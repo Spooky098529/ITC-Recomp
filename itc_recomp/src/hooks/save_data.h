@@ -12,60 +12,60 @@ namespace hooks {
 
 // Stats::Stats sub_821056C0, Stats::ResetRecords sub_821136D8: r3 = the
 // record; r3 left.
-void SaveDataStatsConstruct(lifted::Regs& ctx, uint8_t* base);
-void SaveDataStatsResetRecords(lifted::Regs& ctx, uint8_t* base);
+void SaveDataStatsConstruct(lifted::Regs& ctx);
+void SaveDataStatsResetRecords(lifted::Regs& ctx);
 // Stats::Reset sub_82113730: r3 = the record; r3 = the record + 4948.
-void SaveDataStatsReset(lifted::Regs& ctx, uint8_t* base);
+void SaveDataStatsReset(lifted::Regs& ctx);
 // Progress::Clear sub_82113BD8: r3 = the save data; r3 = Stats::Reset's.
-void SaveDataProgressClear(lifted::Regs& ctx, uint8_t* base);
+void SaveDataProgressClear(lifted::Regs& ctx);
 // BitSet400::SetAll sub_821133A8: r3 = the set; r3 left.
-void SaveDataBitSetAll(lifted::Regs& ctx, uint8_t* base);
+void SaveDataBitSetAll(lifted::Regs& ctx);
 // Progress::SetDefaults sub_82113E60: r3 = the save data; r3 = the unlock
 // set (+0x1ACE4). The original where memcpy's plain C++ can't copy.
-void SaveDataProgressSetDefaults(lifted::Regs& ctx, uint8_t* base);
+void SaveDataProgressSetDefaults(lifted::Regs& ctx);
 // ControlMap::SetDefault sub_821058A8: r3 = the map; r3 left.
-void SaveDataControlMapSetDefault(lifted::Regs& ctx, uint8_t* base);
+void SaveDataControlMapSetDefault(lifted::Regs& ctx);
 // Options::SetDefaults sub_82105940: r3 = the options; r3 = the options +
 // 224, r7 the options (the original's).
-void SaveDataOptionsSetDefaults(lifted::Regs& ctx, uint8_t* base);
+void SaveDataOptionsSetDefaults(lifted::Regs& ctx);
 // CourseRecords::Reset sub_82105D08: r3 = the records; r3 = the last
 // record + 332.
-void SaveDataCourseRecordsReset(lifted::Regs& ctx, uint8_t* base);
+void SaveDataCourseRecordsReset(lifted::Regs& ctx);
 // CourseRecords::Of sub_82105BF8: r3 = the records, r4 = {course,
 // traffic}; r3 = the record, r10 and r11 as the original leaves them.
-void SaveDataCourseRecordsOf(lifted::Regs& ctx, uint8_t* base);
+void SaveDataCourseRecordsOf(lifted::Regs& ctx);
 // SaveData::Delete sub_821055D8: r3 = the player; r3 = the old block. The
 // original unless --native_heap routes the game's heap to the allocation
 // layer, or where the block isn't the layer's.
-void SaveDataDelete(lifted::Regs& ctx, uint8_t* base);
+void SaveDataDelete(lifted::Regs& ctx);
 // SaveData::Create sub_821057C8: r3 = the player; r3 = the sound bank
 // holder. With --native_heap; the original where memcpy's plain C++ can't
 // copy or operator new's plain C++ refuses.
-void SaveDataCreate(lifted::Regs& ctx, uint8_t* base);
+void SaveDataCreate(lifted::Regs& ctx);
 // sub_82105740 SaveData::CreateTwoPlayerBlock (no adapter: only
 // ModeType8::Init's plain C++ calls it; the harness's step): its plain C++
 // over the allocation layer, else the original.
-void SaveDataCreateTwoPlayerBlock(lifted::Regs& ctx, uint8_t* base);
+void SaveDataCreateTwoPlayerBlock(lifted::Regs& ctx);
 // Players::ResetControllers sub_8209F5E0: r3 left; r9 to r11 as the
 // original leaves them.
-void SaveDataResetControllers(lifted::Regs& ctx, uint8_t* base);
+void SaveDataResetControllers(lifted::Regs& ctx);
 // MenuList::Init sub_8220BAC0: r3 = the list, r4 = the count, r5 = the items
 // shown, r6 to r10 and the caller's r1 + 84 and + 92; r3 = the new flags
 // block. With --native_heap; the original where the old block isn't pages
 // the layer gave.
-void SaveDataMenuListInit(lifted::Regs& ctx, uint8_t* base);
+void SaveDataMenuListInit(lifted::Regs& ctx);
 // TitleScreen::ResetPlayer sub_82221D00: r3 = SaveData::Create's. With
 // --native_heap; the original where its callees' checks refuse.
-void SaveDataResetPlayer(lifted::Regs& ctx, uint8_t* base);
+void SaveDataResetPlayer(lifted::Regs& ctx);
 // The default tables' getters: r3 (and r11, 0x826C0000) the table, sign
 // extended as lis and addi leave them.
-void SaveDataTable50A8(lifted::Regs& ctx, uint8_t* base);
-void SaveDataTable3044(lifted::Regs& ctx, uint8_t* base);
-void SaveDataTable3E34(lifted::Regs& ctx, uint8_t* base);
-void SaveDataTable3C24(lifted::Regs& ctx, uint8_t* base);
-void SaveDataTable50E4(lifted::Regs& ctx, uint8_t* base);
+void SaveDataTable50A8(lifted::Regs& ctx);
+void SaveDataTable3044(lifted::Regs& ctx);
+void SaveDataTable3E34(lifted::Regs& ctx);
+void SaveDataTable3C24(lifted::Regs& ctx);
+void SaveDataTable50E4(lifted::Regs& ctx);
 // SaveData::TwoPlayerBlock (no arguments; r3 the block, r11 as its lis
 // leaves it).
-void SaveDataTwoPlayerBlock(lifted::Regs& ctx, uint8_t* base);
+void SaveDataTwoPlayerBlock(lifted::Regs& ctx);
 
 }  // namespace hooks

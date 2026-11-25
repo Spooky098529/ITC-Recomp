@@ -24,7 +24,6 @@ bool ModelsNativeLifetime();
 // and a native caller's).
 struct ModelLoadGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
   models::LoadCalls Calls();
 };
 
@@ -34,18 +33,18 @@ struct ModelLoadGuest {
 // index, r6 = the group), the shared shaders (sub_825896D8, sub_82589700: r3
 // = the pair). (The vertex declaration's, sub_82589728, are the harness's:
 // its adapter is gone.)
-void ModelsMaterialCount(lifted::Regs& ctx, uint8_t* base);
-void ModelsMaterial(lifted::Regs& ctx, uint8_t* base);
-void ModelsSharedVertexShader(lifted::Regs& ctx, uint8_t* base);
-void ModelsSharedPixelShader(lifted::Regs& ctx, uint8_t* base);
+void ModelsMaterialCount(lifted::Regs& ctx);
+void ModelsMaterial(lifted::Regs& ctx);
+void ModelsSharedVertexShader(lifted::Regs& ctx);
+void ModelsSharedPixelShader(lifted::Regs& ctx);
 // sub_825896C0 (r3, r4 the tables; r3 left).
-void ModelsSetSharedShaders(lifted::Regs& ctx, uint8_t* base);
+void ModelsSetSharedShaders(lifted::Regs& ctx);
 
 // A guest call of `function` (r3 the provider, r4 the slot, r5 the index;
 // lr the caller's, r1 its frame) made natively when it's the texture
 // provider's slot 3 (TextureProvider::Get) or slots 5 to 7 and
 // models::CallGet or CallXprTexture answers: r3 as the adapter leaves it.
 // False where the caller makes the guest call.
-bool TextureProviderSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function);
+bool TextureProviderSlotDirect(lifted::Regs& ctx, uint32_t function);
 
 }  // namespace hooks

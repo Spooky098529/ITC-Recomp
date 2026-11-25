@@ -24,14 +24,14 @@ constexpr uint64_t kNone = ~uint64_t(0);
 
 using G = schema::RaceScreensGlobals;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  guest::StoreU32(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  guest::StoreU32(sp - bytes, sp);
   return sp - bytes;
 }
 
 // The screen and its movie (+180), read again at each use.
-schema::CareerResultsScreen Screen(uint8_t* base) { return G::career_results(base); }
-uint32_t Movie(uint8_t* base) { return Screen(base).movie().address; }
+schema::CareerResultsScreen Screen() { return G::career_results(); }
+uint32_t Movie() { return Screen().movie().address; }
 
 // UiMovie::Play(movie, -1, index, 0, 0, 0, 0) through its override.
 uint64_t Play(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t index) {
@@ -45,67 +45,66 @@ uint64_t Run(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie) {
 
 }  // namespace
 
-uint64_t CareerResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t CareerResultsIntro(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82219210 CareerResults::Intro");
-  const uint32_t frame = Frame(base, sp, 96);
-  if (guest::LoadU32(base, step) == 0) {
-    guest::StoreU32(base, step, 1);
-    const uint32_t kind = Screen(base).kind();
+  const uint32_t frame = Frame(sp, 96);
+  if (guest::LoadU32(step) == 0) {
+    guest::StoreU32(step, 1);
+    const uint32_t kind = Screen().kind();
     if (kind < 3) {
-      Play(calls, frame, 0x82219284, Movie(base), kind);
+      Play(calls, frame, 0x82219284, Movie(), kind);
     }
   }
-  return uint32_t(Run(calls, frame, 0x82219294, Movie(base))) == 0 ? 1 : 0;
+  return uint32_t(Run(calls, frame, 0x82219294, Movie())) == 0 ? 1 : 0;
 }
 
-uint64_t CareerResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t CareerResultsShow(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822192B0 CareerResults::Show");
-  const uint32_t frame = Frame(base, sp, 96);
-  if (guest::LoadU32(base, step) == 0) {
-    guest::StoreU32(base, step, 1);
-    Play(calls, frame, 0x822192FC, Movie(base), 3);
-    calls.Call(kLoop, frame, 0x82219310, Movie(base), kNone, 3);
-    const uint32_t kind = Screen(base).kind();
+  const uint32_t frame = Frame(sp, 96);
+  if (guest::LoadU32(step) == 0) {
+    guest::StoreU32(step, 1);
+    Play(calls, frame, 0x822192FC, Movie(), 3);
+    calls.Call(kLoop, frame, 0x82219310, Movie(), kNone, 3);
+    const uint32_t kind = Screen().kind();
     if (kind < 3) {
       const uint32_t lrs[3] = {0x8221939C, 0x82219374, 0x8221934C};
-      Play(calls, frame, lrs[kind], Movie(base), 11 + kind);
-      calls.Call(kLoop, frame, 0x822193B0, Movie(base), kNone, 11 + kind);
+      Play(calls, frame, lrs[kind], Movie(), 11 + kind);
+      calls.Call(kLoop, frame, 0x822193B0, Movie(), kNone, 11 + kind);
     }
   }
-  Run(calls, frame, 0x822193C0, Movie(base));
+  Run(calls, frame, 0x822193C0, Movie());
   return 1;
 }
 
-uint64_t CareerResultsClose1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t CareerResultsClose1(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822193D8 CareerResults::Close1");
-  const uint32_t frame = Frame(base, sp, 96);
-  if (guest::LoadU32(base, step) == 0) {
-    guest::StoreU32(base, step, 1);
-    calls.Call(kFinish, frame, 0x82219414, Movie(base), kNone, 3);
-    const uint32_t kind = Screen(base).kind();
+  const uint32_t frame = Frame(sp, 96);
+  if (guest::LoadU32(step) == 0) {
+    guest::StoreU32(step, 1);
+    calls.Call(kFinish, frame, 0x82219414, Movie(), kNone, 3);
+    const uint32_t kind = Screen().kind();
     if (kind < 3) {
-      calls.Call(kFinish, frame, 0x82219450, Movie(base), kNone, 11 + kind);
+      calls.Call(kFinish, frame, 0x82219450, Movie(), kNone, 11 + kind);
     }
-    Play(calls, frame, 0x82219474, Movie(base), 4);
+    Play(calls, frame, 0x82219474, Movie(), 4);
   }
-  return uint32_t(Run(calls, frame, 0x82219484, Movie(base))) == 0 ? 1 : 0;
+  return uint32_t(Run(calls, frame, 0x82219484, Movie())) == 0 ? 1 : 0;
 }
 
-uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls) {
+uint64_t CareerResultsPage1(uint32_t sp, bool native_slots, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82219A78 CareerResults::Page1");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   using Controllers = schema::RacerControllersGlobals;
-  const schema::PlayerMapperEntry entry(
-      base, guest::LoadU32(base, Controllers::player_entries_address()) * 8 +
+  const schema::PlayerMapperEntry entry(guest::LoadU32(Controllers::player_entries_address()) * 8 +
                 Controllers::mapper_entries_address());
-  const schema::CareerResultsScreen screen = Screen(base);
+  const schema::CareerResultsScreen screen = Screen();
   // Accept, then back: each 0 when the entry's +4 is 1, else the slot's low
   // byte.
   auto pressed = [&](uint32_t action, uint32_t lr) {
     if (int32_t(entry.unread()) == 1) {
       return false;
     }
-    return (MapperPressed(base, entry.mapper().address, action, frame, lr, native_slots,
+    return (MapperPressed(entry.mapper().address, action, frame, lr, native_slots,
                           calls) &
             0xFF) != 0;
   };
@@ -118,11 +117,11 @@ uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const
     page = 2;
     transition = 2;
   } else if (double(screen.entry_value()) >
-             double(guest::LoadFloat(base, race_hud_object::kZero))) {
+             double(guest::LoadFloat(race_hud_object::kZero))) {
     page = 3;
     transition = 3;
   }
-  calls.Call(kPagesGo, frame, 0x82219B54, Screen(base).pages_page_address(), page, transition, kNone);
+  calls.Call(kPagesGo, frame, 0x82219B54, Screen().pages_page_address(), page, transition, kNone);
   return 0;
 }
 
@@ -144,7 +143,7 @@ uint64_t SetNumber(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t mov
 }
 
 // A word of the screen, zero-extended (the originals' lwz).
-uint64_t Word(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
+uint64_t Word(uint32_t address) { return guest::LoadU32(address); }
 
 // A sum kept as the original's 64-bit add of zero-extended words, 0 where
 // its low word is negative (cmpwi).
@@ -152,19 +151,19 @@ uint64_t AtLeastZero(uint64_t sum) { return int32_t(uint32_t(sum)) < 0 ? 0 : sum
 
 }  // namespace
 
-uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls) {
-  const schema::CareerResultsScreen results(base, screen);
+uint64_t CareerResultsSetTexts(uint32_t screen, uint32_t sp, const Calls& calls) {
+  const schema::CareerResultsScreen results(screen);
   ITC_NATIVE_RUNNING("sub_822197A8 CareerResults::SetTexts");
   using namespace camera_modes::steps;
-  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t frame = Frame(sp, 128);
   auto movie = [&] { return results.movie().address; };
   const uint64_t earned = AtLeastZero(uint64_t(results.prize()) + uint64_t(results.money()));
   // A node's children (+100 on, +104 of them, read again each step) set to
   // string `id` (`id` + i where `step`).
   auto children = [&](uint64_t sub_scene, uint32_t index, uint64_t id, bool step, uint32_t lr) {
-    const uint32_t node = ui_movies::FindNode(base, movie(), uint32_t(sub_scene), index);
-    for (int64_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
-      SetText(calls, frame, lr, movie(), sub_scene, uint64_t(i) + FirstChild(base, node),
+    const uint32_t node = ui_movies::FindNode(movie(), uint32_t(sub_scene), index);
+    for (int64_t i = 0; i < int32_t(ChildCount(node)); i++) {
+      SetText(calls, frame, lr, movie(), sub_scene, uint64_t(i) + FirstChild(node),
               step ? uint64_t(i) + id : id);
     }
   };
@@ -174,10 +173,10 @@ uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, cons
   SetNumber(calls, frame, 0x8221988C, movie(), 7, 9, uint64_t(results.win_prize()));
   {
     // The float +12 as a double: f1, and r7 through the frame's +48.
-    const double f1 = Lfs(base, results.streak_factor_address());
+    const double f1 = Lfs(results.streak_factor_address());
     const uint64_t bits = std::bit_cast<uint64_t>(f1);
-    guest::StoreU32(base, frame + 48, uint32_t(bits >> 32));
-    guest::StoreU32(base, frame + 52, uint32_t(bits));
+    guest::StoreU32(frame + 48, uint32_t(bits >> 32));
+    guest::StoreU32(frame + 52, uint32_t(bits));
     SetText(calls, frame, 0x822198AC, movie(), 7, 10, 1983, bits, &f1);
   }
   SetNumber(calls, frame, 0x822198C0, movie(), 7, 11, uint64_t(results.prize()));
@@ -199,34 +198,34 @@ uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, cons
   SetText(calls, frame, 0x82219A14, movie(), 9, 6, 2051);
   {
     // +24 times the double at 0x8200A510 (fmul), rounded to single (frsp).
-    const double scale = std::bit_cast<double>((Word(base, 0x8200A510) << 32) |
-                                               Word(base, 0x8200A514));
-    const double f1 = Single(Lfs(base, results.entry_value_address()) * scale);
+    const double scale = std::bit_cast<double>((Word(0x8200A510) << 32) |
+                                               Word(0x8200A514));
+    const double f1 = Single(Lfs(results.entry_value_address()) * scale);
     const uint64_t bits = std::bit_cast<uint64_t>(f1);
-    guest::StoreU32(base, frame + 48, uint32_t(bits >> 32));
-    guest::StoreU32(base, frame + 52, uint32_t(bits));
+    guest::StoreU32(frame + 48, uint32_t(bits >> 32));
+    guest::StoreU32(frame + 52, uint32_t(bits));
     SetText(calls, frame, 0x82219A44, movie(), 9, 7, 2052, bits, &f1);
   }
   SetNumber(calls, frame, 0x82219A58, movie(), 9, 8, uint64_t(results.entry_points()));
   return SetNumber(calls, frame, 0x82219A6C, movie(), 9, 9, total);
 }
 
-uint64_t CareerResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+uint64_t CareerResultsOpen(uint32_t screen, uint32_t block, uint32_t sp,
                            const Calls& calls) {
-  const schema::CareerResultsScreen results(base, screen);
+  const schema::CareerResultsScreen results(screen);
   ITC_NATIVE_RUNNING("sub_8221A1F0 CareerResults::Open");
-  const uint32_t frame = Frame(base, sp, 112);
-  if (!c_runtime::Memcpy(base, screen, block, 168)) {
+  const uint32_t frame = Frame(sp, 112);
+  if (!c_runtime::Memcpy(screen, block, 168)) {
     calls.Call(kMemcpy, frame, 0x8221A210, screen, block, 168);
   }
-  guest::StoreU32(base, frame + 80, 6);
+  guest::StoreU32(frame + 80, 6);
   const uint32_t movie =
-      guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      guest::LoadU32(ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80));
   results.set_movie(movie);
   calls.Call(kResetPose, frame, 0x8221A234, movie);
-  PagesInit(base, results.pages_page_address(), 1);
+  PagesInit(results.pages_page_address(), 1);
   calls.Call(kPagesGo, frame, 0x8221A258, results.pages_page_address(), 0, 0, kNone);
-  CareerResultsSetTexts(base, screen, frame, calls);
+  CareerResultsSetTexts(screen, frame, calls);
   const uint32_t total =
       results.money() + results.entry_points() + results.item_bonus() + results.prize();
   results.set_total(total);
@@ -234,10 +233,10 @@ uint64_t CareerResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint3
     results.set_total(0);
   }
   results.set_entry(0);
-  const uint32_t node = ui_movies::FindNode(base, Movie(base), 0xFFFFFFFFu, 11);
-  const uint32_t kind = Screen(base).kind();
+  const uint32_t node = ui_movies::FindNode(Movie(), 0xFFFFFFFFu, 11);
+  const uint32_t kind = Screen().kind();
   if (kind < 3) {
-    UiNode(base, node).set_texture_entry(kind);
+    UiNode(node).set_texture_entry(kind);
   }
   return node;
 }

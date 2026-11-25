@@ -495,35 +495,35 @@ constexpr uint32_t kMemcpyReturn = 0x82101624;
 
 }  // namespace
 
-bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame,
+bool CourseRoutesGet(uint64_t out, uint32_t index, uint32_t frame,
                      uint32_t* source, uint64_t* result) {
   ITC_NATIVE_RUNNING("sub_820FFF50 CourseRoutes::Get");
   for (const Store& store : kStores) {
     const uint32_t at = frame + store.offset;
     switch (store.kind) {
       case Kind::kHalf:
-        guest::StoreU16(base, at, uint16_t(store.value));
+        guest::StoreU16(at, uint16_t(store.value));
         break;
       case Kind::kWord:
-        guest::StoreU32(base, at, store.value);
+        guest::StoreU32(at, store.value);
         break;
       case Kind::kFloat:
-        guest::StoreFloat(base, at, float(double(guest::LoadFloat(base, store.value))));
+        guest::StoreFloat(at, float(double(guest::LoadFloat(store.value))));
         break;
       case Kind::kIndex:
-        guest::StoreU32(base, at, index);
+        guest::StoreU32(at, index);
         break;
       case Kind::kOut:
-        guest::StoreU32(base, at, uint32_t(out >> 32));
-        guest::StoreU32(base, at + 4, uint32_t(out));
+        guest::StoreU32(at, uint32_t(out >> 32));
+        guest::StoreU32(at + 4, uint32_t(out));
         break;
     }
   }
-  const uint64_t loaded_index = guest::LoadU32(base, frame + kRoutesIndexWord);
-  *result = uint64_t(guest::LoadU32(base, frame + kRoutesOutWord)) << 32 |
-            guest::LoadU32(base, frame + kRoutesOutWord + 4);
+  const uint64_t loaded_index = guest::LoadU32(frame + kRoutesIndexWord);
+  *result = uint64_t(guest::LoadU32(frame + kRoutesOutWord)) << 32 |
+            guest::LoadU32(frame + kRoutesOutWord + 4);
   *source = uint32_t(loaded_index * kRouteBytes + frame + 80);
-  return native::Buffers_Memcpy(base, uint32_t(*result), *source, kRouteBytes, kMemcpyReturn);
+  return native::Buffers_Memcpy(uint32_t(*result), *source, kRouteBytes, kMemcpyReturn);
 }
 
 namespace {
@@ -532,26 +532,26 @@ namespace {
 // caller's frame at +`out` (its own frame below, frame - 4480), then memcpy
 // (sub_825A7410, from `caller`) of that to the caller's +`to`. Returns the
 // copy's first word (+`to`). Only after RouteCopiesNative said yes.
-uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, uint32_t caller,
+uint32_t CopyRoute(uint32_t frame, uint32_t out, uint32_t index, uint32_t caller,
                    uint32_t to = 96) {
   uint32_t source = 0;
   uint64_t result = 0;
   const bool got =
-      CourseRoutesGet(base, frame + out, index, frame - kRoutesFrameBytes, &source, &result);
+      CourseRoutesGet(frame + out, index, frame - kRoutesFrameBytes, &source, &result);
   const bool copied =
-      native::Buffers_Memcpy(base, frame + to, uint32_t(result), kRouteBytes, caller);
+      native::Buffers_Memcpy(frame + to, uint32_t(result), kRouteBytes, caller);
   if (!got || !copied) {
     ITC_LOG_ERROR("race_setup: a route's copy at {:08X} (route {}) not made natively", frame,
                   index);
   }
-  return guest::LoadU32(base, frame + to);
+  return guest::LoadU32(frame + to);
 }
 
 }  // namespace
 
-uint32_t CopyCourseRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index,
+uint32_t CopyCourseRoute(uint32_t frame, uint32_t out, uint32_t index,
                          uint32_t caller, uint32_t to) {
-  return CopyRoute(base, frame, out, index, caller, to);
+  return CopyRoute(frame, out, index, caller, to);
 }
 
 bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index, uint32_t to) {
@@ -569,39 +569,39 @@ namespace {
 // The route's first and last positions from the copy at frame + 96: +8 =
 // its word +0, +12 = sub_820FFEB0's pair (into frame + 80, then copied by
 // halfwords).
-void RoutePositions(uint8_t* base, uint32_t route, uint32_t frame, uint32_t first) {
-  const schema::Route r(base, route);
+void RoutePositions(uint32_t route, uint32_t frame, uint32_t first) {
+  const schema::Route r(route);
   r.set_first_position(first);
-  vehicle_accessors::PairsLast(base, frame + 80, frame + 96);
-  r.set_last_section(guest::LoadU16(base, frame + 80));
-  r.set_last_slice(guest::LoadU16(base, frame + 82));
+  vehicle_accessors::PairsLast(frame + 80, frame + 96);
+  r.set_last_section(guest::LoadU16(frame + 80));
+  r.set_last_slice(guest::LoadU16(frame + 82));
 }
 
 }  // namespace
 
-bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, uint32_t frame) {
+bool RouteSet(uint32_t route, uint32_t index, uint32_t location, uint32_t frame) {
   if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101A10 Route::Set");
-  const schema::Route r(base, route);
+  const schema::Route r(route);
   r.set_course_route(index);
   r.set_location(int32_t(location) == 48 ? index + 20 : location);
-  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, index, 0x82101A58);
-  RoutePositions(base, route, frame, first);
+  const uint32_t first = CopyRoute(frame, kRouteFrameOut, index, 0x82101A58);
+  RoutePositions(route, frame, first);
   return true;
 }
 
-bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame) {
+bool RouteReset(uint32_t route, uint32_t frame) {
   if (!RouteCopiesNative(frame, kRouteFrameOut, 0)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101990 Route::Reset");
-  const schema::Route r(base, route);
+  const schema::Route r(route);
   r.set_course_route(0);
   r.set_location(20);
-  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, 0, 0x821019D0);
-  RoutePositions(base, route, frame, first);
+  const uint32_t first = CopyRoute(frame, kRouteFrameOut, 0, 0x821019D0);
+  RoutePositions(route, frame, first);
   return true;
 }
 
@@ -638,7 +638,7 @@ bool StartPositionNative(uint32_t location, uint32_t frame) {
   return !c.route || RouteCopiesNative(frame, c.out_or_slice, c.index_or_section);
 }
 
-bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result) {
+bool StartPosition(uint32_t location, uint32_t frame, uint32_t* result) {
   const uint32_t which = location - 1;
   const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
   if (c.route && !RouteCopiesNative(frame, c.out_or_slice, c.index_or_section)) {
@@ -646,35 +646,35 @@ bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* r
   }
   ITC_NATIVE_RUNNING("sub_82101A98 Race::StartPosition");
   if (c.route) {
-    *result = CopyRoute(base, frame, c.out_or_slice, c.index_or_section, 0x82101AF8);
+    *result = CopyRoute(frame, c.out_or_slice, c.index_or_section, 0x82101AF8);
     return true;
   }
-  guest::StoreU16(base, frame + 80, c.index_or_section);
-  guest::StoreU16(base, frame + 82, c.out_or_slice);
-  *result = guest::LoadU32(base, frame + 80);
+  guest::StoreU16(frame + 80, c.index_or_section);
+  guest::StoreU16(frame + 82, c.out_or_slice);
+  *result = guest::LoadU32(frame + 80);
   return true;
 }
 
-bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t frame) {
+bool RaceSetRoute(uint32_t index, uint32_t location, uint32_t frame) {
   // (A tail call: Route::Set's frame is this one's caller's.)
   if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101D38 Race::SetRoute");
-  return RouteSet(base, schema::RaceSetupGlobals::race_data(base).route_address(), index, location,
+  return RouteSet(schema::RaceSetupGlobals::race_data().route_address(), index, location,
                   frame);
 }
 
-bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
+bool StagesSetRoute(uint32_t list, uint32_t index, uint32_t location,
                     uint32_t stage, uint32_t frame) {
   if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101E90 Stages::SetRoute");
   if (int32_t(stage) == -1) {
-    stage = schema::Stages(base, list).current();
+    stage = schema::Stages(list).current();
   }
-  return RouteSet(base, schema::RaceStage(base, stage * 80 + list).route_address(), index,
+  return RouteSet(schema::RaceStage(stage * 80 + list).route_address(), index,
                   location, frame);
 }
 

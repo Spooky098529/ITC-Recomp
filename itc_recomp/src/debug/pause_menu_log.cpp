@@ -63,12 +63,12 @@ uint64_t Ticks() {
   return logic;
 }
 
-uint32_t MapperOf(uint8_t* base, uint32_t menu) {
-  uint32_t index = guest::LoadU32(base, 0x826BABA4 + 4 * guest::LoadU32(base, menu + 60));
+uint32_t MapperOf(uint32_t menu) {
+  uint32_t index = guest::LoadU32(0x826BABA4 + 4 * guest::LoadU32(menu + 60));
   if (index > 4) {
     return 0;
   }
-  return guest::LoadU32(base, 0x826BAB80 + 8 * index);
+  return guest::LoadU32(0x826BAB80 + 8 * index);
 }
 
 // Read counts, keyed by (slot, action, caller, render-only, paused); slot 0
@@ -169,59 +169,59 @@ void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
 // step, hooks/race_screens.h), logged around the update.
 static ITC_REGS_STEP(MenuListUpdate) {
   if (ITC_FLAG(native_race_screens)) {
-    hooks::RaceScreensListUpdate(ctx, base);
+    hooks::RaceScreensListUpdate(ctx);
   } else {
-    lifted::original::c8220C1E0(ctx, base);
+    lifted::original::c8220C1E0(ctx);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8220C1E0) {
   
   if (!ITC_FLAG(log_pause_menu)) {
-    MenuListUpdate(ctx, base);
+    MenuListUpdate(ctx);
     return;
   }
   uint32_t menu = ctx.r3.u32;
   uint32_t caller = uint32_t(ctx.lr);
-  uint32_t mapper = MapperOf(base, menu);
-  uint32_t fired = mapper ? guest::LoadU32(base, mapper + 464) : 0;
-  uint32_t held = mapper ? guest::LoadU32(base, mapper + 448) : 0;
-  uint32_t before = guest::LoadU32(base, menu + 16);
-  uint32_t scroll = guest::LoadU32(base, menu + 4);
-  MenuListUpdate(ctx, base);
-  uint32_t after = guest::LoadU32(base, menu + 16);
-  bool pause_menu = menu == guest::LoadU32(base, 0x826D84DC);
+  uint32_t mapper = MapperOf(menu);
+  uint32_t fired = mapper ? guest::LoadU32(mapper + 464) : 0;
+  uint32_t held = mapper ? guest::LoadU32(mapper + 448) : 0;
+  uint32_t before = guest::LoadU32(menu + 16);
+  uint32_t scroll = guest::LoadU32(menu + 4);
+  MenuListUpdate(ctx);
+  uint32_t after = guest::LoadU32(menu + 16);
+  bool pause_menu = menu == guest::LoadU32(0x826D84DC);
   if ((after != before || (fired & kDirectionBits) || (held & kDirectionBits)) && TakeLine()) {
     ITC_LOG_INFO(
         "pause menu: tick {} pass {} {} list {:08X}{} from {:08X}: selection {} -> {} "
         "(scroll {} -> {}), mapper {:08X} held {:08X} fired {:08X}",
         Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), menu,
         pause_menu ? " (pause)" : "", caller, int32_t(before), int32_t(after), int32_t(scroll),
-        int32_t(guest::LoadU32(base, menu + 4)), mapper, held, fired);
+        int32_t(guest::LoadU32(menu + 4)), mapper, held, fired);
   }
 }
 
 // The action mapper's input update (sub_8210C370; its adapter is in
 // hooks/action_mappers.cpp).
-uint32_t debug::PauseMenuLog_BeforeMapperUpdate(uint8_t* base, uint32_t mapper) {
+uint32_t debug::PauseMenuLog_BeforeMapperUpdate(uint32_t mapper) {
   if (!ITC_FLAG(log_pause_menu)) {
     return 0;
   }
-  return guest::LoadU32(base, mapper + 464);
+  return guest::LoadU32(mapper + 464);
 }
 
-void debug::PauseMenuLog_AfterMapperUpdate(uint8_t* base, uint32_t mapper, uint32_t caller,
+void debug::PauseMenuLog_AfterMapperUpdate(uint32_t mapper, uint32_t caller,
                                            uint32_t fired_before) {
   if (!ITC_FLAG(log_pause_menu)) {
     return;
   }
-  uint32_t held = guest::LoadU32(base, mapper + 448);
-  uint32_t fired = guest::LoadU32(base, mapper + 464);
+  uint32_t held = guest::LoadU32(mapper + 448);
+  uint32_t fired = guest::LoadU32(mapper + 464);
   if (((held | fired | fired_before) & kDirectionBits) && TakeLine()) {
     ITC_LOG_INFO(
         "pause menu: tick {} pass {} {} mapper {:08X} update from {:08X}: held {:08X} "
         "pressed {:08X} fired {:08X} -> {:08X}",
         Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), mapper, caller, held,
-        guest::LoadU32(base, mapper + 456), fired_before, fired);
+        guest::LoadU32(mapper + 456), fired_before, fired);
   }
 }

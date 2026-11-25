@@ -25,6 +25,7 @@
 // vertex and index ranges drawn around it and the textures the cache holds.
 // Every 5 s, a summary by caller.
 
+#include "memory/host_copy.h"
 #include <format>
 #include "buffers.h"
 #include "hooks/native_entry.h"
@@ -204,14 +205,14 @@ Coverage CoverageOf(uint32_t start, uint32_t end) {
   return coverage;
 }
 
-void Seen(uint8_t* base, uint32_t object, bool index, uint32_t stream, uint32_t offset,
+void Seen(uint32_t object, bool index, uint32_t stream, uint32_t offset,
           uint32_t stride) {
   if (!object) {
     return;
   }
   g_binds++;
-  BufferObject now{guest::LoadU32(base, object), guest::LoadU32(base, object + 24),
-                   guest::LoadU32(base, object + 28), index, 1};
+  BufferObject now{guest::LoadU32(object), guest::LoadU32(object + 24),
+                   guest::LoadU32(object + 28), index, 1};
   double seconds = std::chrono::duration<double>(Clock::now() - g_start).count();
   auto [it, added] = g_objects.try_emplace(object, now);
   if (added) {
@@ -472,16 +473,16 @@ bool Buffers_Logging() {
 // Kept out of line: inlined, its stack frame (Seen's and the summary's) was
 // set up on every replayed command before the flag was checked, ~75 thousand
 // cycles a frame with the log off.
-[[gnu::noinline]] static void OnCommandLogged(uint8_t* base, uint32_t id, uint32_t payload,
+[[gnu::noinline]] static void OnCommandLogged(uint32_t id, uint32_t payload,
                                              uint32_t count) {
   if (id == 11 || id == 12) {
     for (uint32_t i = 0; i < count; i++) {
       uint32_t item = payload + 16 * i;
       if (id == 11) {  // [stream, buffer, offset, stride]
-        Seen(base, guest::LoadU32(base, item + 4), false, guest::LoadU32(base, item),
-             guest::LoadU32(base, item + 8), guest::LoadU32(base, item + 12));
+        Seen(guest::LoadU32(item + 4), false, guest::LoadU32(item),
+             guest::LoadU32(item + 8), guest::LoadU32(item + 12));
       } else {  // [buffer]
-        Seen(base, guest::LoadU32(base, item), true, 0, 0, 0);
+        Seen(guest::LoadU32(item), true, 0, 0, 0);
       }
     }
   }
@@ -491,9 +492,9 @@ bool Buffers_Logging() {
   }
 }
 
-void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count) {
+void Buffers_OnCommand(uint32_t id, uint32_t payload, uint32_t count) {
   if (Buffers_Logging()) {
-    OnCommandLogged(base, id, payload, count);
+    OnCommandLogged(id, payload, count);
   }
 }
 
@@ -636,7 +637,7 @@ namespace {
 // The override's work around a copy (`copy()`): the logging, and copies
 // into the physical views recorded once done.
 template <typename Copy>
-void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+void CopyWithRecords(uint32_t destination, uint32_t source, uint32_t size,
                      uint32_t caller, Copy copy) {
   if (Buffers_Logging() && size) {
     uint32_t header_object = 0;
@@ -663,7 +664,8 @@ void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint3
     }
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();
-  bool same = log_write && !std::memcmp(base + destination, base + source, size);
+  bool same = log_write && !memory::IsHandle(source) &&
+              !std::memcmp(guest::Pointer(destination), guest::Pointer(source), size);
   copy();
   if (log_write) {
     LoggedWrite write;
@@ -699,14 +701,26 @@ bool Buffers_NativeMemcpy() {
   return ITC_FLAG(native_memcpy);
 }
 
-bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+bool Buffers_Memcpy(uint32_t destination, uint32_t source, uint32_t size,
                     uint32_t caller) {
+  // From a blob (E5 step 5: a file's data in PC memory) or a host object
+  // into guest memory, the physical views included (XPR::Create's textures,
+  // Model::Load's vertices, the shaders' microcode): recorded for the
+  // renderer as any copy.
+  if (memory::IsHandle(source) && !memory::IsHandle(destination)) {
+    CopyWithRecords(destination, source, size, caller,
+                    [&] { memory::CopyWithHandles(destination, source, size); });
+    return true;
+  }
+  if (memory::CopyWithHandles(destination, source, size)) {
+    return true;
+  }
   if (!ITC_FLAG(native_memcpy) ||
       (size != 0 && c_runtime::MayShare(destination, size, source, size))) {
     return false;
   }
-  CopyWithRecords(base, destination, source, size, caller,
-                  [&] { c_runtime::Memcpy(base, destination, source, size); });
+  CopyWithRecords(destination, source, size, caller,
+                  [&] { c_runtime::Memcpy(destination, source, size); });
   return true;
 }
 
@@ -719,11 +733,20 @@ bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32
 // ranges don't share memory; r3 stays the destination either way, and the
 // other registers the original changes are read by no caller.
 ITC_NATIVE_ENTRY_ALWAYS(825A7410) {
-  
-  native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
+  if (memory::IsHandle(ctx.r4.u32) && !memory::IsHandle(ctx.r3.u32)) {
+    // From a blob into guest memory: recorded as Buffers_Memcpy's.
+    native::CopyWithRecords(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
+      memory::CopyWithHandles(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    });
+    return;
+  }
+  if (memory::CopyWithHandles(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    return;  // a host object on either side (not the renderer's memory)
+  }
+  native::CopyWithRecords(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
     if (!ITC_FLAG(native_memcpy) ||
-        !c_runtime::Memcpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-      lifted::original::c825A7410(ctx, base);
+        !c_runtime::Memcpy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+      lifted::original::c825A7410(ctx);
     }
   });
 }

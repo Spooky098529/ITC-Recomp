@@ -32,12 +32,13 @@ constexpr uint32_t kVinylAlphaReference = 0x82000A34;
 // pages) stored at `header_out` and cleared, set by XGSetTextureHeader (one
 // level, usage 2, `format`, no addresses or pitch); its data
 // (XPhysicalAlloc(size, -1, 0, 0x404)) stored at `data_out` and cleared; the
-// header relocated to it (Resource::Relocate). `stack` is the guest r1 at
-// entry: XGSetTextureHeader's stack words (+84 the pitch, +92 the header,
-// +100, +108 the sizes' pointers) written in its frame as the original's.
+// header relocated to it (Resource::Relocate). `stack` (the guest r1 at
+// entry) is unused since E5 step 6: XGSetTextureHeader's stack words (+84
+// the pitch, +92 the header, +100, +108 the sizes' pointers), which the
+// original wrote in its 160-byte frame, are the native call's arguments.
 // Returns 1 (the original's r3). Each word is read back from guest memory
 // where the original reloads it.
-uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t height,
+uint32_t TextureCreate(uint32_t format, uint32_t width, uint32_t height,
                        uint32_t header_out, uint32_t data_out, uint32_t stack);
 
 // sub_820ECFC8 Texture::Free: the header at `header_in` (VirtualFree) and
@@ -46,8 +47,8 @@ uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t 
 // word (XPhysicalFree's adapter leaves its address), 0 without data.
 // TextureFreeable says whether it runs natively: a header that's 0 or in the
 // layer's range (VirtualFree's adapter runs the original's otherwise).
-bool TextureFreeable(uint8_t* base, uint32_t header_in);
-uint32_t TextureFree(uint8_t* base, uint32_t header_in, uint32_t data_in);
+bool TextureFreeable(uint32_t header_in);
+uint32_t TextureFree(uint32_t header_in, uint32_t data_in);
 
 // Vinyl::Compress's guest calls: XGCompressSurface's (the codecs' vtables,
 // through texture_compression::GuestCall) and Resource::Release
@@ -71,7 +72,7 @@ struct VinylCalls {
 // entry (its frame is `stack` - 272). Returns the original's r3
 // (Texture::Free's); nullopt, with nothing done, where a callee would go to
 // the original (the sheet's header outside the layer's range).
-std::optional<uint32_t> VinylCompress(uint8_t* base, uint32_t width, uint32_t height,
+std::optional<uint32_t> VinylCompress(uint32_t width, uint32_t height,
                                       uint32_t header_in, uint32_t data_in, uint32_t stack,
                                       const VinylCalls& calls);
 

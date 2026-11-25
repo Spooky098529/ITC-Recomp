@@ -8,19 +8,19 @@
 
 namespace last_error {
 
-void Set(uint8_t* base, uint32_t pcr, uint32_t error) {
-  if (guest::LoadU32(base, pcr + 336)) {
+void Set(uint32_t pcr, uint32_t error) {
+  if (guest::LoadU32(pcr + 336)) {
     return;
   }
-  guest::StoreU32(base, guest::LoadU32(base, pcr + 256) + 352, error);
+  guest::StoreU32(guest::LoadU32(pcr + 256) + 352, error);
 }
 
-uint32_t Get(uint8_t* base, uint32_t pcr) {
+uint32_t Get(uint32_t pcr) {
   ITC_NATIVE_RUNNING("sub_82296EC0 GetLastError");
-  if (guest::LoadU32(base, pcr + 336)) {
+  if (guest::LoadU32(pcr + 336)) {
     return 0;
   }
-  return guest::LoadU32(base, guest::LoadU32(base, pcr + 256) + 352);
+  return guest::LoadU32(guest::LoadU32(pcr + 256) + 352);
 }
 
 namespace {
@@ -58,9 +58,9 @@ uint32_t StatusToError(uint32_t status) {
 
 }  // namespace
 
-uint32_t SetFromStatus(uint8_t* base, uint32_t pcr, uint32_t status) {
+uint32_t SetFromStatus(uint32_t pcr, uint32_t status) {
   const uint32_t error = StatusToError(status);
-  Set(base, pcr, error);
+  Set(pcr, error);
   return error;
 }
 
@@ -69,19 +69,19 @@ uint32_t SetFromStatus(uint8_t* base, uint32_t pcr, uint32_t status) {
 // SetLastError: r3 = the error (kept in r3).
 ITC_NATIVE_ENTRY_ALWAYS(82296E70) {
   
-  last_error::Set(base, ctx.r13.u32, ctx.r3.u32);
+  last_error::Set(ctx.r13.u32, ctx.r3.u32);
 }
 
 // The same, reached by a jump (16 callers).
 ITC_NATIVE_ENTRY_ALWAYS(82296FD0) {
   
-  last_error::Set(base, ctx.r13.u32, ctx.r3.u32);
+  last_error::Set(ctx.r13.u32, ctx.r3.u32);
 }
 
 // SetLastError from an NTSTATUS: r3 = the status; returns the DOS error.
 ITC_NATIVE_ENTRY_ALWAYS(82296E88) {
   
-  ctx.r3.u64 = last_error::SetFromStatus(base, ctx.r13.u32, ctx.r3.u32);
+  ctx.r3.u64 = last_error::SetFromStatus(ctx.r13.u32, ctx.r3.u32);
 }
 
 // GetLastError, reached by a jump to sub_82296EC0 (after failed file and
@@ -91,5 +91,5 @@ ITC_NATIVE_ENTRY_ALWAYS(82296E88) {
 // this one.
 ITC_NATIVE_ENTRY_ALWAYS(82295F18) {
   
-  ctx.r3.u64 = last_error::Get(base, ctx.r13.u32);
+  ctx.r3.u64 = last_error::Get(ctx.r13.u32);
 }

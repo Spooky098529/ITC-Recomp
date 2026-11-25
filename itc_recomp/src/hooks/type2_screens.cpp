@@ -97,7 +97,7 @@ namespace t2 = type2_screens;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -108,7 +108,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -123,350 +122,349 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
 ITC_REGS_STEP(ScreenLeaveToHub) {
-  t2::LeaveToHub(base, ctx.r3.u32, ctx.r4.u32);
+  t2::LeaveToHub(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(PlateCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateOpenMovie) {
   // A tail call: UiMovies::Open runs on the caller's frame with its lr.
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(PlateWaitForLoad) {
-  ctx.r3.u64 = t2::PlateWaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateWaitForLoad(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateClose(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateDestroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateDestroy(ctx.r1.u32, guest.calls());
 }
-void PlateOnMessage32(lifted::Regs&, uint8_t* base) { t2::PlateOnMessage32(base); }
+void PlateOnMessage32(lifted::Regs&) { t2::PlateOnMessage32(); }
 ITC_REGS_STEP(PlateStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateStart(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateStart(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-ITC_REGS_STEP(PlateLeavePage) { t2::PlateLeavePage(base, ctx.r3.u32); }
+ITC_REGS_STEP(PlateLeavePage) { t2::PlateLeavePage(ctx.r3.u32); }
 ITC_REGS_STEP(PlateCharLineKind) {
-  ctx.r3.u64 = t2::PlateCharLineKind(base, ctx.r3.u32);
+  ctx.r3.u64 = t2::PlateCharLineKind(ctx.r3.u32);
 }
 ITC_REGS_STEP(PlateRandom) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateRandom(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateRandom(ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateLoad) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateLoad(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateResetMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateResetMovie(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateResetMovie(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateShowRegion) {
-  ctx.r3.u64 = t2::PlateShowRegion(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateShowRegion(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateShowDigits) {
-  ctx.r3.u64 = t2::PlateShowDigits(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateShowDigits(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateShowChars) {
-  ctx.r3.u64 = t2::PlateShowChars(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateShowChars(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateMarkField) {
-  ctx.r3.u64 = t2::PlateMarkField(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateMarkField(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateFinishRegionAnim) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateFinishRegionAnim(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateFinishRegionAnim(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateFinishDigitAnim) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateFinishDigitAnim(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateFinishDigitAnim(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(PlateShowRegionCells) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateShowRegionCells(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateShowRegionCells(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateShowDigitCells) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateShowDigitCells(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateShowDigitCells(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateShowCharCells) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateShowCharCells(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateShowCharCells(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateShowCharLine) {
-  ctx.r3.u64 = t2::PlateShowCharLine(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateShowCharLine(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateShowPlate) {
-  ctx.r3.u64 = t2::PlateShowPlate(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::PlateShowPlate(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PlateSetUpRegionMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateSetUpRegionMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateSetUpRegionMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateSetUpNumberMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateSetUpNumberMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateSetUpNumberMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateSetUpCharsMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateSetUpCharsMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateSetUpCharsMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition0) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition0(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition1) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition1(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition4(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition5) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition5(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition6) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition6(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition8) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition8(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition10) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition10(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition10(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition11) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition11(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition11(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition13) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition13(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition13(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateTransition19) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateTransition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateTransition19(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateRegionPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateRegionPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateRegionPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateNumberPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateNumberPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateNumberPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateCharsPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateCharsPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateCharsPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateUpdatePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateUpdatePage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PlateUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::PlateUpdate(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::PlateUpdate(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(SheetCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::SheetCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::SheetCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(SheetOpenMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::SheetOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::SheetOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(SheetWaitForLoad) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::SheetWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::SheetWaitForLoad(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(SheetClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::SheetClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::SheetClose(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(SheetDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::SheetDestroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::SheetDestroy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildOpenMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(BuildWaitForLoad) {
-  ctx.r3.u64 = t2::BuildWaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t2::BuildWaitForLoad(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(BuildUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildUnload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildClose(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildDestroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildDestroy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildSaveBuildStates) {
-  ctx.r3.u64 = t2::BuildSaveBuildStates(base, ctx.r1.u32);
+  ctx.r3.u64 = t2::BuildSaveBuildStates(ctx.r1.u32);
 }
 ITC_REGS_STEP(BuildLeavePage) {
-  ctx.r3.u64 = t2::BuildLeavePage(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::BuildLeavePage(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(BuildDetailsPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildDetailsPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildDetailsPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildUpdatePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildUpdatePage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void HubOnYes(lifted::Regs&, uint8_t* base) { t2::HubOnYes(base); }
-void HubOnNo(lifted::Regs&, uint8_t* base) { t2::HubOnNo(base); }
+void HubOnYes(lifted::Regs&) { t2::HubOnYes(); }
+void HubOnNo(lifted::Regs&) { t2::HubOnNo(); }
 ITC_REGS_STEP(HubImagesLoadedA) {
-  ctx.r3.u64 = t2::HubImagesLoadedA(base, ctx.r3.u32);
+  ctx.r3.u64 = t2::HubImagesLoadedA(ctx.r3.u32);
 }
 ITC_REGS_STEP(HubImagesLoadedB) {
-  ctx.r3.u64 = t2::HubImagesLoadedB(base, ctx.r3.u32);
+  ctx.r3.u64 = t2::HubImagesLoadedB(ctx.r3.u32);
 }
 ITC_REGS_STEP(HubWaitForLoad) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubWaitForLoad(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubFreeImage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubFreeImage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubFreeImage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubOpenSelected) {
-  t2::HubOpenSelected(base, ctx.r3.u32, ctx.r4.u32);
+  t2::HubOpenSelected(ctx.r3.u32, ctx.r4.u32);
 }
-ITC_REGS_STEP(HubReenter) { t2::HubReenter(base, ctx.r3.u32); }
-ITC_REGS_STEP(HubPostMessage5) { t2::HubPostMessage5(base, ctx.r3.u32); }
-ITC_REGS_STEP(HubChoose) { t2::HubChoose(base, ctx.r3.u32, ctx.r4.u32); }
+ITC_REGS_STEP(HubReenter) { t2::HubReenter(ctx.r3.u32); }
+ITC_REGS_STEP(HubPostMessage5) { t2::HubPostMessage5(ctx.r3.u32); }
+ITC_REGS_STEP(HubChoose) { t2::HubChoose(ctx.r3.u32, ctx.r4.u32); }
 ITC_REGS_STEP(HubUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubUnload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubClose(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubSetPrompts) {
   const uint32_t args[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
-  ctx.r3.u64 = t2::HubSetPrompts(base, args, ctx.r1.u32);
+  ctx.r3.u64 = t2::HubSetPrompts(args, ctx.r1.u32);
 }
-ITC_REGS_STEP(HubBack) { ctx.r3.u64 = t2::HubBack(base, ctx.r1.u32); }
+ITC_REGS_STEP(HubBack) { ctx.r3.u64 = t2::HubBack(ctx.r1.u32); }
 ITC_REGS_STEP(HubSetUpStatus) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubSetUpStatus(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubSetUpStatus(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubNextNotice) {
-  ctx.r3.u64 = t2::HubNextNotice(base, ctx.r1.u32);
+  ctx.r3.u64 = t2::HubNextNotice(ctx.r1.u32);
 }
 ITC_REGS_STEP(HubNextNotice2) {
-  ctx.r3.u64 = t2::HubNextNotice2(base, ctx.r1.u32);
+  ctx.r3.u64 = t2::HubNextNotice2(ctx.r1.u32);
 }
 ITC_REGS_STEP(HubStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubStart(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(HubCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubDestroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubOpenMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubOpenMovie(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubOpenMovie(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubImageLoaded) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubImageLoaded(base, ctx.r4.u32, ctx.r6.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubImageLoaded(ctx.r4.u32, ctx.r6.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubMarkNoticeImages) {
-  ctx.r3.u64 = t2::HubMarkNoticeImages(base, ctx.r1.u32);
+  ctx.r3.u64 = t2::HubMarkNoticeImages(ctx.r1.u32);
 }
 ITC_REGS_STEP(HubFreeImages) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubFreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubFreeImages(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubLoadNoticeImage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubLoadNoticeImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubLoadNoticeImage(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubLoadNoticeImages) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubLoadNoticeImages(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubLoadNoticeImages(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(HubUpdatePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubUpdatePage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubRecordPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubRecordPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubRecordPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubSetRecordText) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubSetRecordText(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubSetRecordText(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubShowBusy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubShowBusy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubShowBusy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubHideBusy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubHideBusy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubHideBusy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubShowNoticeImage) {
-  ctx.r3.u64 = t2::HubShowNoticeImage(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2::HubShowNoticeImage(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(HubShowNotice) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubShowNotice(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubShowNotice(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubFillMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubFillMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubFillMenu(ctx.r1.u32, guest.calls());
 }
 #define ITC_HUB_TRANSITION(n)                                                   \
-  void HubTransition##n(lifted::Regs& ctx, uint8_t* base) {                       \
-    GuestCalls guest(ctx, base);                                                \
-    ctx.r3.u64 = t2::HubTransition##n(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
+  void HubTransition##n(lifted::Regs& ctx) {                       \
+    GuestCalls guest(ctx);                                                \
+    ctx.r3.u64 = t2::HubTransition##n(ctx.r3.u32, ctx.r1.u32, guest.calls()); \
   }
 ITC_HUB_TRANSITION(0)
 ITC_HUB_TRANSITION(1)
@@ -478,113 +476,113 @@ ITC_HUB_TRANSITION(7)
 #undef ITC_HUB_TRANSITION
 
 ITC_REGS_STEP(HubMenuPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubMenuPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubMenuPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubNoticePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubNoticePage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubNoticePage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubOnDialogDone) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubOnDialogDone(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubOnDialogDone(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubFillPlayerRecord) {
-  GuestCalls guest(ctx, base);
-  t2::HubFillPlayerRecord(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  t2::HubFillPlayerRecord(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildEnter) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildEnter(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildEnter(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildFill) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildFill(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildFill(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubUpdate(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubUpdate(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(HubPutCarOnStand) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::HubPutCarOnStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::HubPutCarOnStand(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildGroupsPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildGroupsPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildGroupsPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildBuildsPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildBuildsPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildBuildsPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildBuildPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildBuildPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildBuildPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpGroupA) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpGroupA(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpGroupA(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpGroupB) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpGroupB(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpGroupB(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpBuildA) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpBuildA(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpBuildA(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpBuildB) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpBuildB(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpBuildB(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpStandA) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpStandA(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpStandA(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildJumpStandB) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildJumpStandB(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildJumpStandB(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildSetUpStatus) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2::BuildSetUpStatus(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2::BuildSetUpStatus(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(BuildListRemoveAt) {
-  t2::BuildListRemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+  t2::BuildListRemoveAt(ctx.r3.u32, ctx.r4.u32);
 }
 
 namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
-template <uint32_t (*Init)(uint8_t*, uint32_t, uint32_t, bool*)>
-void InitStep(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes) {
+template <uint32_t (*Init)(uint32_t, uint32_t, bool*)>
+void InitStep(lifted::Regs& ctx, uint32_t frame_bytes) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = Init(base, machine, ctx.r1.u32 - frame_bytes, &replaced);
+  const uint32_t r3 = Init(machine, ctx.r1.u32 - frame_bytes, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 }  // namespace
 
 ITC_REGS_STEP(HubInitStates) {
-  InitStep<t2::HubInitStates>(ctx, base, t2::kHubInitFrame);
+  InitStep<t2::HubInitStates>(ctx, t2::kHubInitFrame);
 }
 ITC_REGS_STEP(SheetInitStates) {
-  InitStep<t2::SheetInitStates>(ctx, base, t2::kSheetInitFrame);
+  InitStep<t2::SheetInitStates>(ctx, t2::kSheetInitFrame);
 }
 ITC_REGS_STEP(BuildInitStates) {
-  InitStep<t2::BuildInitStates>(ctx, base, t2::kBuildInitFrame);
+  InitStep<t2::BuildInitStates>(ctx, t2::kBuildInitFrame);
 }
 ITC_REGS_STEP(PlateInitStates) {
-  InitStep<t2::PlateInitStates>(ctx, base, t2::kPlateInitFrame);
+  InitStep<t2::PlateInitStates>(ctx, t2::kPlateInitFrame);
 }
 
 }  // namespace hooks
 
 #define ITC_TYPE2_SCREENS(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type2_screens)) { \
-    hooks::step(ctx, base);                  \
+    hooks::step(ctx);                  \
   }
 
 // Screen::LeaveToHub: the (8, 3) handler of four type 2 machines (no direct

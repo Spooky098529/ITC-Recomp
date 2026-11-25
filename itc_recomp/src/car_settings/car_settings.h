@@ -50,25 +50,25 @@ constexpr uint32_t kFinishAll = 0x8211DFF8;
 // sub_821AA2F8 CarSettings::Create ((0, 1); r3 the machine): +9608 = 0, the
 // three blocks VirtualAlloc'ed with their first words, state 1 or 9. The
 // last VirtualAlloc's r3. 112-byte frame.
-uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+uint64_t Create(uint32_t machine, uint32_t sp, const Calls& calls);
 // sub_821A8DD0 CarSettings::OpenMovie ((1, 1) -> 2): UiMovies::Open(3,
 // 22554) as a tail call (no frame: the caller's sp and lr). Open's r3.
-uint64_t OpenMovie(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
 // sub_821AA490 CarSettings::WaitForMovie ((2, 1)): +9608 once movie 3 is
 // loaded, then state 9 or 4. IsLoaded's r3 when called, else `r3`. 96-byte
 // frame.
-uint64_t WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t WaitForMovie(uint64_t r3, uint32_t sp);
 // sub_821AAF70 CarSettings::Close ((5, 4), (9, 4), (10, 4); r3 the machine,
 // r4 the mode): state 7; movie 3, when there, UiMovie::FinishAll and
 // UiMovies::Delete(3); message 4 posted on the mode's ring for mode types 2
 // and 5. Delete's r3, or 0 (the missing movie). 112-byte frame (+80 the
 // movie's id).
-uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t Close(uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
 // sub_821AA408 CarSettings::Destroy ((7, 4) -> 6; r3 the machine): state 11
 // when the data's +576 is 1 (a test run set up), else 6; the three blocks
 // VirtualFree'd and their globals 0. The last VirtualFree's r3. 128-byte
 // frame.
-uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+uint64_t Destroy(uint32_t machine, uint32_t sp, const Calls& calls);
 
 // --- The machine's set-ups (init.cpp) ---
 //
@@ -79,7 +79,7 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
 // when `replaced`, else the new transition).
 constexpr uint32_t kInitFrame = 1296;
 constexpr uint32_t kInitType5Frame = 1232;
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t InitType5(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t InitType5(uint32_t machine, uint32_t frame, bool* replaced);
 
 }  // namespace car_settings

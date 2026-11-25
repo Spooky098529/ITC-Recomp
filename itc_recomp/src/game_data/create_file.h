@@ -17,7 +17,7 @@ namespace game_data {
 // attributes, isn't read). From its 192-byte frame below `sp`, r13 the PCR.
 // The last error set as the original sets it; returns the handle, or -1
 // (all 64 bits).
-uint64_t CreateFile(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t path, uint32_t access,
+uint64_t CreateFile(uint32_t sp, uint64_t r13, uint32_t path, uint32_t access,
                     uint32_t sharing, uint32_t disposition, uint32_t flags);
 
 }  // namespace game_data

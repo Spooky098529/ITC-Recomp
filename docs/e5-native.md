@@ -491,7 +491,51 @@ player's `default.xex`, loaded by our loader at build time on the
 developer's machine, as the HLSL shaders were stored). Which tables may be
 committed (they're the game's data) is a decision for the user.
 
-### 9. The end
+Done 2026-11-24 (`docs/loops/e5-loop.md`, "Step 8"): `.rdata` and `.data`
+(the constants, strings, tables and initialized globals; 748 KB without
+their zero runs) are C++ data in `src/image/`, written by
+`itc_recomp/tools/image_data.py` from the player's `default.xex`, and
+copied to `0x82000000` at start-up (`image::CopyInto`); `default.xex` is no
+longer read, and our XEX loader is gone. The code sections and the rest
+aren't compiled in (nothing reads them: the tick replay matched with them
+zeroed). Naming the tables one by one (a `constexpr` array or a typed
+global for each) goes on with the type-by-type work after step 9.
+
+### 9. The heap and the image out of the guest mapping
+
+Added 2026-11-24 (the user's call): steps 3 to 5 moved the objects that
+are allocated on their own and could be cleared of raw accesses; about
+1,590 types are still in our allocation layer's heap at their guest
+addresses (most embedded in other objects, a caller's locals, or types the
+measure never saw allocated), and nothing in steps 6 to 8 moves them. Done
+as the physical memory was in step 7 (`docs/loops/e5-loop.md`, "Step 7 as
+one swarm"):
+
+- **The heap**: our allocation layer's range (`0x10000` up to the handles'
+  range) becomes a block of host memory of its own, and `guest.h`
+  translates its addresses in every load, store and `guest::Pointer`;
+  everything in it is then in host memory at once, its bytes as the guest
+  laid them out.
+- **The image**: after step 8 compiles its data in, what's still read at
+  `0x82000000` (anything step 8 leaves) is a block of its own, translated
+  the same way.
+- **Then** the guest mapping's scaffolding (`src/memory/mapping.cpp`'s 4 GB
+  reservation, the memory file and its views) goes: no address resolves
+  through `base` any more. A raw `base + address` left anywhere faults,
+  named by the fault handler, as the physical memory's did.
+
+Type-by-type conversion of what's left (step 4's units, as swarms) can go
+on after it, for the code's sake: it no longer decides where the memory
+is.
+
+Done 2026-11-24 (`docs/loops/e5-loop.md`, "Step 9 as one swarm"): the
+heap and the image are blocks of host memory of their own
+(`memory::g_heap`, `memory::g_image`), translated by `guest.h`; the memory
+file and its views are gone. `base` stays only as an unmapped 4 GB range
+until step 10, so a raw `base + address` faults and is named. A swarm of 16
+read every hand port for code assuming the old mapping and found none left.
+
+### 10. The end
 
 With no access left at a guest address: the mapping
 (`src/memory/mapping.cpp`), our allocation layer's guest side
@@ -499,6 +543,12 @@ With no access left at a guest address: the mapping
 `new`), `guest.h`, `guest_code.h`, `lifted::Call`, the dispatch table,
 `src/lifted/`'s runtime and the image loader go. `generated/` stays as long
 as the user keeps it as the reference (the user's call, 2026-11-16).
+
+Begun 2026-11-25 (`docs/loops/e5-loop.md`, "Step 10 as one swarm"): `base`
+is gone from the whole program (`guest.h`, the views, the generators, every
+signature and call; the 4 GB fault range and the fault handler with it; an
+address in no block stops the program, named). The rest waits on the
+lifted code becoming typed C++ ("What's left of step 10" there).
 
 ## Checks
 
@@ -582,7 +632,7 @@ Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
   the player's `default.xex` on the developer's machine; `default.xex` is
   then no longer read.
 - **Process**: steps 2 to 5 run as loops with migration agents per area
-  (B7's rules carried over); steps 0, 1 and 6 to 9 done directly.
+  (B7's rules carried over); steps 0, 1 and 6 to 10 done directly.
 - **The names**: rows' names taken even where marked "probably"; rows
   without a name keep `sub_X`.
 - **The Host status** (2026-11-17): added, as proposed: a function whose
@@ -608,3 +658,16 @@ Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
   state digest and drives are the check.
 - **Saves.** A save written from host structures must load back the same
   game state (older builds' saves need not load: "Decided").
+
+## The counts over time
+
+From `tools/e5_status.py` (lifted code / hand ports) and the schema's
+storage.
+
+| When | Guest loads and stores | `guest::Pointer` | Calls by constant address | Calls through a pointer | Vtable words through `VtableWord` | Guest frames | Image addresses | Schema types host / dual / guest |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Step 4's swarm (2026-11-24) | 118,428 / 24,566 | 3,041 / 45 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 155 / 118 / 1,665 (before it: 38 / 54 / 1,845) |
+| Step 5's swarm (2026-11-24) | 112,420 / 24,530 | 3,041 / 51 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 37 blobs |
+| Step 8 (2026-11-24) | 112,420 / 24,272 | 3,041 / 67 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs |
+| Step 9 (2026-11-24) | 112,420 / 24,272 | 3,041 / 85 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs; all in host memory (the heap, the image and the physical memory in blocks of their own) |
+| Step 10, `base` gone (2026-11-25) | 112,420 / 24,268 | 3,041 / 85 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs; no `base` |

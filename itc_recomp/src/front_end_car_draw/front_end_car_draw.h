@@ -49,51 +49,51 @@ struct Calls {
 // memcpy (native::Buffers_Memcpy, else a guest call from the frame at `sp`
 // with `lr`, `lr` standing for the call's return address); its r3 (the
 // destination). Shared by the files (garage_stage.cpp).
-uint64_t Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
+uint64_t Memcpy(const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
                 uint32_t sp, uint32_t lr);
 
 // --- The number plates and the stage's small helpers (garage_stage.cpp) ---
 
 // sub_820DF190 Plates::Hide and sub_820DF180 Plates::Show: the parts'
 // point block's (parts + 176) +2640 and +4576 = 0 (Hide) or 1 (Show).
-void PlatesHide(uint8_t* base, uint32_t points);
-void PlatesShow(uint8_t* base, uint32_t points);
+void PlatesHide(uint32_t points);
+void PlatesShow(uint32_t points);
 // sub_82179BE0 GarageStage::IsBusy: 0 when the stage's scene model is
 // loaded (SceneModel::PollLoad) and the stage's +4 is -1, else 1. Its
 // 96-byte frame below `stack`.
-uint32_t GarageStageIsBusy(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t stack);
+uint32_t GarageStageIsBusy(const Calls& calls, uint32_t holder, uint32_t stack);
 // sub_8217AFE8 GarageStage::SyncPlates: unless busy, the plates shown or
 // hidden when the stage's +6092 isn't the parts' +2816. Returns r3 as the
 // original leaves it (IsBusy's answer, or the point block).
-uint32_t GarageStageSyncPlates(uint8_t* base, const Calls& calls, uint32_t holder,
+uint32_t GarageStageSyncPlates(const Calls& calls, uint32_t holder,
                                uint32_t stack);
 // sub_82178B40 GarageStage::SetDrawWord: the stage's +6056 and the scene
 // model's +4296 = `word`. Returns the scene model (r3).
-uint32_t GarageStageSetDrawWord(uint8_t* base, uint32_t holder, uint32_t word, uint32_t stack);
+uint32_t GarageStageSetDrawWord(uint32_t holder, uint32_t word, uint32_t stack);
 
 // --- The commands (garage_stage.cpp) ---
 
 // sub_82179C88 GarageStage::StepAngles: command 9 to 13 on the angles at
 // `angles` + 48 (the stage's +80 to +88): the yaw or pitch 0.5° up or down
 // (wrapped to -π to π), or all three 0.0 (13). r3 is left.
-void GarageStageStepAngles(uint8_t* base, uint32_t command, uint32_t angles);
+void GarageStageStepAngles(uint32_t command, uint32_t angles);
 // sub_8217F9E0 GarageAnims::Add: an animation of `type` on the list (its
 // 656-byte frame below `stack`, the entries copied through it with memcpy
 // as the original does). Returns r3 as the original leaves it (the last
 // memcpy's destination, or the list).
-uint64_t GarageAnimsAdd(uint8_t* base, const Calls& calls, uint32_t list, uint32_t type,
+uint64_t GarageAnimsAdd(const Calls& calls, uint32_t list, uint32_t type,
                         uint32_t value, uint32_t index, uint32_t word, double steps,
                         uint32_t stack);
 // sub_8217D2B0 GarageStage::ApplyPreset: camera and car preset `preset`
 // applied now, or kept at the stage's +6088 when the garage camera isn't
 // set up. `r3` is r3 at entry. Returns r3 as the original leaves it (tan's
 // _ctrlfp word, or `r3`).
-uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t preset,
+uint64_t GarageStageApplyPreset(const Calls& calls, uint64_t r3, uint32_t preset,
                                 uint32_t stage, uint32_t index, uint32_t stack);
 // sub_82180108 GarageStage::Command: command `command` on the holder's
 // stage (the animations, the angles, the presets). `r3` is the holder (r3 at
 // entry, all 64 bits). Returns r3 as the original leaves it.
-uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t command,
+uint64_t GarageStageCommand(const Calls& calls, uint64_t r3, uint32_t command,
                             uint32_t stack);
 
 // --- The animations (garage_stage.cpp) ---
@@ -102,20 +102,20 @@ uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint
 
 // sub_82179D78 GarageAnims::Turn: the yaw at [entry + 12] + 52 less 0.5°
 // (wrapped); done (+20 = 1, returns 1) when +8 is 0 and the yaw is 0.0.
-uint32_t GarageAnimsTurn(uint8_t* base, uint32_t entry);
+uint32_t GarageAnimsTurn(uint32_t entry);
 // sub_82179DF0 GarageAnims::Open and sub_82179EA8 Close: the value at
 // [entry + 12] stepped up (Open) or down (Close) by the car's maximum
 // (0x82635E90 + 48 x the scene model's +48) / +4, clamped; MenuSound::Play
 // (15) on the first step (Open) or at 0.0 (Close); 1 when done. Their
 // 128- and 112-byte frames below `stack`.
-uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack);
-uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack);
+uint32_t GarageAnimsOpen(const Calls& calls, uint32_t entry, uint32_t stack);
+uint32_t GarageAnimsClose(const Calls& calls, uint32_t entry, uint32_t stack);
 // sub_8217D120 GarageAnims::Run: each entry's runner by its type (0 Turn,
 // 2 Open, 3 Close, 4 and 5 the doors' OpenDoors sub_8217B6B8 and CloseDoors
 // sub_8217B740, never seen in play: guest calls); when any finished, the
 // list rebuilt without the done ones through its 624-byte frame (memcpy,
 // as the original). Returns whether any finished.
-uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32_t stack);
+uint32_t GarageAnimsRun(const Calls& calls, uint32_t list, uint32_t stack);
 
 // --- The light kit and the floor (garage_stage.cpp) ---
 
@@ -125,25 +125,25 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
 // `stack`, inside its diagnostics' wrap). Returns r3 as the original leaves
 // it (`model`, 0 for no kit, the kit when --debug_hide names ApplyRecord,
 // else ApplyRecord's).
-uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t model,
+uint64_t SceneModelApplyLightKit(const Calls& calls, uint32_t model,
                                  uint32_t stack);
 // sub_82179678 GarageStage::SetLightKit: the light kit's group `group` (0
 // to 3, 3 all three) set to `word` and the colors, +4224 the table's word
 // at `index` (its 176-byte frame's +80), then ApplyLightKit from its frame.
-uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+uint64_t GarageStageSetLightKit(const Calls& calls, uint32_t holder,
                                 uint32_t group, uint32_t word, uint32_t index, double f1,
                                 double f2, double f3, uint32_t stack);
 // sub_821795E0 GarageStage::ClearLightKit: the light kit's group `group`'s
 // word (0 +4228, 1 +4244, 2 +4260, 3 all three; signed, none for others) =
 // 0, then ApplyLightKit from its 96-byte frame (its r3; f1 left).
-uint64_t GarageStageClearLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+uint64_t GarageStageClearLightKit(const Calls& calls, uint32_t holder,
                                   uint32_t group, uint32_t stack);
 // sub_820C8480 Floor::Draw: with `word` set and the scene's +4 0, the
 // matrix's last row (0, 0, 0, 1) (built at its 144-byte frame's +80) and
 // each shape of the part model at scene + 4160 drawn
 // (Model::DrawShape(model, 0x826BAC90, matrix, i, 0, 0, 0), `caller_r24`
 // its r24). Returns r3 as the original leaves it.
-uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t matrix,
+uint64_t FloorDraw(const Calls& calls, uint32_t scene, uint32_t matrix,
                    uint32_t word, uint32_t caller_r24, uint32_t stack);
 
 // --- The scene lights (lights.cpp) ---
@@ -155,7 +155,7 @@ uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t m
 // unit does, its cone from cos, c_runtime::Cos), through its 368-byte frame
 // below `stack` as the original. Returns r3 as the original leaves it (its
 // frame's +128).
-uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored, uint32_t stack);
+uint32_t GarageStageSetLights(uint32_t lights, uint32_t mirrored, uint32_t stack);
 
 // --- The car's pose (pose.cpp) ---
 
@@ -169,7 +169,7 @@ uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored,
 // its 800-byte frame below `stack`, every matrix at the original's offsets
 // and every Matrix::Multiply noted for interpolation with the original's
 // return address. Returns r3 as the original leaves it (`out`).
-uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t block,
+uint32_t GarageStagePoseCar(const Calls& calls, uint32_t holder, uint32_t block,
                             uint32_t out, uint32_t stack);
 
 // --- The draw (draw.cpp) ---
@@ -197,7 +197,7 @@ struct DrawCallees {
 // copied to +144 by memcpy, Floor::Draw), then upright (SetLights, PoseCar,
 // the toggle, SetInteriorWord 1); else SetLights, PoseCar and Update. Then
 // CarScene::Draw(scene, 0), whose r3 it returns.
-uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t turn,
+uint64_t GarageStageDraw(const Calls& calls, uint64_t r3, uint32_t turn,
                          const DrawCallees& callees, uint32_t stack);
 
 }  // namespace front_end_car_draw

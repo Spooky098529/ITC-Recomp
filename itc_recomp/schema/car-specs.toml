@@ -14,10 +14,15 @@
 
 # The car parameters (468 bytes, Params::Init's operator new, at [0x826C2E48]),
 # met as the object and as the loads' callbacks' context (r6).
+# In host memory (E5 step 5, 2026-11-24): made by Params::Init's operator new
+# (the hand port's New; host_alloc for the lifted original's), freed by
+# Params::Free's operator delete over the handle (lifted, not seen in play).
 [CarParams]
 measures = ["new<468>@Params::Init", "Params::OnWheelsLoaded.r6", "Params::OnTable83Loaded.r6", "Params::OnCarSpecsLoaded.r6", "Params::OnLoaded.r6"]
 size = 468
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C997C]
 fields = [
   { name = "loads_pending", offset = 0, type = "u32", note = "12 at boot; each load's callback counts it down" },
   { name = "block", offset = 4, type = "u32", note = "the block (operator new[]) tables 72-83 are loaded into" },
@@ -39,6 +44,20 @@ fields = [
   { name = "model1_first_wheel", offset = 68, type = "u32", note = "first_wheels' model 1 (0, written first by table 73's callback)" },
   { name = "model_end", offset = 464, type = "u32", note = "the last wheel model + 1" },
 ]
+
+# The block tables 72-83 are loaded into (CarParams' +4; operator new[] of
+# their TOC sizes' total in Params::Init), the files' bytes as read (each
+# load's callback swaps its table in place). A blob (E5 step 5, 2026-11-24):
+# in PC memory in the guest's byte order, made by the hand port's New and,
+# in the lifted original, at its operator new[] (returning at 0x820C99E4, the
+# size in r3); freed by Params::Free's operator delete[] (lifted, not seen
+# in play). Read by the car parameter code only (no renderer reads).
+[CarParamsBlock]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x820C99E4, reg = "r3" }]
+fields = []
 
 # Params::GetCarParts' answer (36 bytes, its caller's frame): tables 74-82
 # plus the car x each one's stride; the aero getters' r4 and CountBodyKits' r3.

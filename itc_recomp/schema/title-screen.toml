@@ -31,12 +31,19 @@
 # functions' r3: the byte +0 and +4), the +32 interface (Interrupt,
 # ForceExit, Resume: r3 the mode + 32, the fault_interface_* fields) and the
 # block AllLoaded gets (fault_block_*).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType4]
 measures = ["ModeType4", "ModeType4::Restart.r4", "ModeType4::WaitForLeave.r4",
             "ModeType4::LeaveScreen.r4", "ModeType4::NextMode.r4", "ModeType4::Leaving.r4",
             "ModeType4::NextModeAnswer.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82107840]
 vtable = 0x82006BE0
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006BE0" },
@@ -53,12 +60,9 @@ fields = [
   { name = "ring_count", offset = 840, type = "u32" },
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "block", offset = 848, type = "ptr", to = "Type4Block", note = "VirtualAlloc'ed by Init (48,220 bytes)" },
-  { name = "fault_interface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: the +32 interface's -28 (ForceExit), the mode's +4" },
   { name = "fault_interface_ring_count", offset = 808, type = "u32", note = "measure fault: the +32 interface's +808 (ModeType4Interface32), the mode's +840" },
   { name = "fault_interface_ring_start", offset = 812, type = "u32", note = "measure fault: the +32 interface's +812, the mode's +844" },
   { name = "fault_interface_block", offset = 816, type = "u32", note = "measure fault: the +32 interface's +816, the mode's +848" },
-  { name = "fault_block_options_loaded", offset = 9608, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.options_loaded), not the mode's" },
-  { name = "fault_block_save_screen_loaded", offset = 28888, type = "u32", note = "measure fault: AllLoaded's block (Type4Block.save_screen_loaded), not the mode's" },
 ]
 
 # The type 4 mode seen through its +32 interface (vtable 0x82006BD4; r3 the
@@ -67,6 +71,7 @@ fields = [
 [ModeType4Interface32]
 size = 820
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82006BD4" },
   { name = "ring", offset = 208, type = "bytes", count = 600, note = "the mode's ring (+240)" },
@@ -83,10 +88,26 @@ fields = [
 # machine (the TitleScreen:: handlers' r3: the words at +9604 to +9616 are
 # the options' then), its transitions' started word (+0) and the pages' r3
 # (the mode's dispatcher: +804, +808) with it: those fall in `options`.
+# In host memory since E5 step 4 (2026-11-24): made by ModeType4::Init (New
+# in place of the original's VirtualAlloc(48220) at 0x82224CB4; Init has no
+# lifted original), freed by ModeType4::Release's FreePages (its VirtualFree;
+# front-end-screen-helpers' FreeBlock, which takes handles); the mode's +848
+# holds its handle. As Type5ModeBlock and Type2ModeBlock, the five machines
+# stay described by their areas' guest views (Type4Machine, StateMachine,
+# StateTransition, the options' and the save screen's machines): their
+# accesses reach the block through its handle (memory::RawHandleLoad and
+# Store, by this type's layout: the scalar fields below are members, the
+# transitions guest-order bytes), so every view of a machine agrees whatever
+# its type; the dispatcher (the mode's +36) and the transitions' functors
+# hold interior handles (the block + 0, + 9640, + 19280, + 28920, + 38560).
+# The measure's "new<48220>@ModeType4::Init" was Type4BlockPart (the same
+# block, split by the measure), merged here.
 [Type4Block]
-measures = ["TitleScreen", "ModeType4::NextModeAnswer.r4.+848", "ModeType4::NextMode.r4.+848"]
+measures = ["new<48220>@ModeType4::Init", "TitleScreen", "ModeType4::NextModeAnswer.r4.+848",
+            "ModeType4::NextMode.r4.+848"]
 size = 48220
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "options", offset = 0, type = "bytes", count = 9640, note = "the options' machine (Type4Options::Init, options-screen.md)" },
   { name = "options_state", offset = 9604, type = "u32" },
@@ -125,7 +146,8 @@ fields = [
 # (+0) and PostClose's r3 (the mode's dispatcher: +804, +808), all inside
 # `transitions`.
 [Type4Machine]
-measures = ["ModeType4::MachineOf.ret", "TitleLoad", "TitleScreen::LeavePage.r4"]
+measures = ["ModeType4::MachineOf.ret", "TitleLoad", "TitleScreen::LeavePage.r4",
+            "new<48220>@ModeType4::Init@+38560"]
 size = 9620
 origin = "embedded"
 fields = [
@@ -163,6 +185,10 @@ fields = [
 measure = "new<68>@TitleScreen::Create#2"
 size = 68
 origin = "allocated"
+# In host memory (E5 step 5, 2026-11-24): made by TitleScreen::Create
+# (src/title_screen/screen_handlers.cpp, in place of its VirtualAlloc at
+# 0x82221E88), freed by TitleScreen::Destroy's VirtualFree.
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32", note = "0 from Create; not read" },
   { name = "main_item", offset = 4, type = "u32", note = "the main menu's item (0 to 6; 8 the attract race), which picks the next mode (Destroy)" },
@@ -210,36 +236,12 @@ fades_passes = { address = 0x82001BEC, type = "u32", note = "the passes word Scr
 menu4_wrap_up = { address = 0x82001FB0, type = "u32", note = "the cursor's position MoveMenu4Cursor copies when the menu wraps up" }
 menu4_wrap_down = { address = 0x82000A34, type = "u32", note = "its position when the menu wraps down" }
 
-# Embedded objects the measure split from their owners after its offset
-# fix (2026-11-22): seeded from the measure, unknown_ until read.
+# Type4BlockPart (the measure's "new<48220>@ModeType4::Init", split from
+# Type4Block) was the type 4 mode's block: merged into Type4Block (E5 step 4,
+# 2026-11-24), whose fields name the same words (+9612 the options' reenter,
+# +9616 its delete_movie, +19252 the controller options', +28892 the save
+# screen's, +38532 the title load's, +48172 the title screen's).
 
-# Split from Type4Block.
-[Type4BlockPart]
-measure = "new<48220>@ModeType4::Init"
-size = 48180
-origin = "embedded"
-fields = [
-  { name = "unknown_9612", offset = 9612, type = "u32" },
-  { name = "unknown_9616", offset = 9616, type = "u32" },
-  { name = "unknown_19252", offset = 19252, type = "u32" },
-  { name = "unknown_19256", offset = 19256, type = "u32" },
-  { name = "unknown_28892", offset = 28892, type = "u32" },
-  { name = "unknown_28896", offset = 28896, type = "u32" },
-  { name = "unknown_38532", offset = 38532, type = "u32" },
-  { name = "unknown_38536", offset = 38536, type = "u32" },
-  { name = "unknown_48172", offset = 48172, type = "u32" },
-  { name = "unknown_48176", offset = 48176, type = "u32" },
-]
-
-# Embedded objects the measure split from their owners after its offset
-# and class-name fixes (2026-11-22): seeded from the measure; names kept
-# from the owners' fault_ fields, unknown_ until read.
-
-# Split from Type4Block.
-[Type4BlockAt38560]
-measure = "new<48220>@ModeType4::Init@+38560"
-size = 9608
-origin = "embedded"
-fields = [
-  { name = "unknown_9604", offset = 9604, type = "u32" },
-]
+# Type4BlockAt38560 (the measure's "new<48220>@ModeType4::Init@+38560",
+# split from Type4Block: the title screen's machine's state at +9604) merged
+# into Type4Machine (E5 step 4, 2026-11-24).

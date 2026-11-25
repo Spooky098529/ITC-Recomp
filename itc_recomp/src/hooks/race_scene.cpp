@@ -35,10 +35,10 @@ ITC_REGS_STEP(RaceSceneMachineInit) {
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
   const auto r3 = NativeHeapActive()
-                      ? rs::MachineInit(base, machine, ctx.r1.u32 - rs::kInitFrame, &replaced)
+                      ? rs::MachineInit(machine, ctx.r1.u32 - rs::kInitFrame, &replaced)
                       : std::nullopt;
   if (!r3) {
-    lifted::original::c8215D808(ctx, base);
+    lifted::original::c8215D808(ctx);
     return;
   }
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
@@ -48,41 +48,41 @@ ITC_REGS_STEP(RaceSceneMachineInit) {
 
 ITC_REGS_STEP(RaceSceneLightsSetUp) {
   ctx.fpscr.disableFlushMode();
-  rs::LightsSetUp(base, ctx.r3.u32);
+  rs::LightsSetUp(ctx.r3.u32);
   ctx.r3.u64 = ctx.r3.u64 + 16 + 96 * 10;
-  ctx.f1.f64 = rs::LightsLastF1(base);
+  ctx.f1.f64 = rs::LightsLastF1();
 }
 
 ITC_REGS_STEP(RaceSceneSetEffectParams) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::EffectParamsReady(base)) {
-    lifted::original::c8228F5C0(ctx, base);
+  if (!rs::EffectParamsReady()) {
+    lifted::original::c8228F5C0(ctx);
     return;
   }
   double f1 = 0;
-  ctx.r3.u64 = rs::SetEffectParams(base, ctx.r3.u32, ctx.r4.u32, &f1);
+  ctx.r3.u64 = rs::SetEffectParams(ctx.r3.u32, ctx.r4.u32, &f1);
   ctx.f1.f64 = f1;
 }
 
 ITC_REGS_STEP(RaceSceneTogglePause) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::TogglePause(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::TogglePause(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSceneResume) {
   ctx.fpscr.disableFlushMode();
-  if (const auto r3 = rs::Resume(base, ctx.r3.u32)) {
+  if (const auto r3 = rs::Resume(ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
 
 ITC_REGS_STEP(RaceSceneDestroy) {
   ctx.fpscr.disableFlushMode();
-  if (!NativeHeapActive() || !rs::DestroyReady(base)) {
-    lifted::original::c8215D790(ctx, base);
+  if (!NativeHeapActive() || !rs::DestroyReady()) {
+    lifted::original::c8215D790(ctx);
     return;
   }
-  if (const uint32_t scene = rs::Destroy(base)) {
+  if (const uint32_t scene = rs::Destroy()) {
     ctx.r3.u64 = scene;
   }
 }
@@ -92,7 +92,7 @@ ITC_REGS_STEP(RaceSceneDestroy) {
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SCENE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_scene)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 ITC_RACE_SCENE(8215D808, RaceSceneMachineInit)

@@ -49,7 +49,7 @@ bool FreePages(uint32_t address);
 // free.
 bool IsPages(uint32_t address);
 // Whether `address` is inside the layer's range (false before the first
-// allocation).
+// allocation), or a handle (a host object, E5: ours too, freed through it).
 bool InRange(uint32_t address);
 
 // MmAllocatePhysicalMemoryEx as XPhysicalAlloc (sub_822964C8) and

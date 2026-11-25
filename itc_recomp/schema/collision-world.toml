@@ -65,6 +65,11 @@ fields = [
 measures = ["TrackMesh.+4", "WallQuery::GatherCells.r4.+4", "TrackPosition.+4"]
 size = 8
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# its loader's VirtualAlloc (lifted; returning at 0x820F77DC), in PC memory
+# with the file's bytes; freed by the game's VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x820F77DC, reg = "r4" }]
 fields = [
   { name = "section_count", offset = 0, type = "u32" },
   { name = "sections", offset = 4, type = "u32", note = "the section table: a pointer to a section a word" },
@@ -365,11 +370,15 @@ fields = [
   { name = "distance", offset = 0, type = "f32" },
 ]
 
-# The 4-byte object TrackCollision::Load makes at 0x826C5B28.
+# The 4-byte object TrackCollision::Load makes at 0x826C5B28. In host memory
+# (E5 step 4): host_alloc for Load's operator new (lifted); freed by
+# TrackCollision::Unload's operator delete over the handle.
 [TrackCollisionObject]
 measure = "new<4>@TrackCollision::Load"
 size = 4
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820FF37C]
 fields = [
   { name = "value", offset = 0, type = "u32", note = "0, then 4; what it is isn't known" },
 ]

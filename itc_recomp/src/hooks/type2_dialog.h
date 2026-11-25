@@ -12,37 +12,37 @@
 namespace hooks {
 
 // The steps (r3 the started word's address).
-void Type2DialogOpenConfirmStep(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogCloseConfirmStep(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenNoticeStep(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogCloseNoticeStep(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenConfirm2Step(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogCloseConfirm2Step(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenNotice2Step(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogCloseNotice2Step(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogMoveCursorStep(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogMoveCursor2Step(lifted::Regs& ctx, uint8_t* base);
+void Type2DialogOpenConfirmStep(lifted::Regs& ctx);
+void Type2DialogCloseConfirmStep(lifted::Regs& ctx);
+void Type2DialogOpenNoticeStep(lifted::Regs& ctx);
+void Type2DialogCloseNoticeStep(lifted::Regs& ctx);
+void Type2DialogOpenConfirm2Step(lifted::Regs& ctx);
+void Type2DialogCloseConfirm2Step(lifted::Regs& ctx);
+void Type2DialogOpenNotice2Step(lifted::Regs& ctx);
+void Type2DialogCloseNotice2Step(lifted::Regs& ctx);
+void Type2DialogMoveCursorStep(lifted::Regs& ctx);
+void Type2DialogMoveCursor2Step(lifted::Regs& ctx);
 // The pages (r3 the mode).
-void Type2DialogConfirmPage(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogNoticePage(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogConfirm2Page(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogNotice2Page(lifted::Regs& ctx, uint8_t* base);
+void Type2DialogConfirmPage(lifted::Regs& ctx);
+void Type2DialogNoticePage(lifted::Regs& ctx);
+void Type2DialogConfirm2Page(lifted::Regs& ctx);
+void Type2DialogNotice2Page(lifted::Regs& ctx);
 // The machine's handlers (r3 the machine, r4 the mode where read).
-void Type2DialogDraw(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogUpdate(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOnEnter(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogWaitForMovies(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogShown(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogWait(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogCancel(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenConfirm(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenNotice(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenConfirm2(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOpenNotice2(lifted::Regs& ctx, uint8_t* base);
-void Type2DialogOnLeft(lifted::Regs& ctx, uint8_t* base);
+void Type2DialogDraw(lifted::Regs& ctx);
+void Type2DialogUpdate(lifted::Regs& ctx);
+void Type2DialogOnEnter(lifted::Regs& ctx);
+void Type2DialogWaitForMovies(lifted::Regs& ctx);
+void Type2DialogShown(lifted::Regs& ctx);
+void Type2DialogWait(lifted::Regs& ctx);
+void Type2DialogCancel(lifted::Regs& ctx);
+void Type2DialogOpenConfirm(lifted::Regs& ctx);
+void Type2DialogOpenNotice(lifted::Regs& ctx);
+void Type2DialogOpenConfirm2(lifted::Regs& ctx);
+void Type2DialogOpenNotice2(lifted::Regs& ctx);
+void Type2DialogOnLeft(lifted::Regs& ctx);
 // Init (r3 the machine).
-void Type2DialogInit(lifted::Regs& ctx, uint8_t* base);
+void Type2DialogInit(lifted::Regs& ctx);
 // TakesInput (no arguments).
-void Type2DialogTakesInput(lifted::Regs& ctx, uint8_t* base);
+void Type2DialogTakesInput(lifted::Regs& ctx);
 
 }  // namespace hooks

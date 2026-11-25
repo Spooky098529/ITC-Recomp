@@ -32,10 +32,10 @@ struct ThreadDataCall {
 // [0x8266B7B4], the last error put back (SetLastError). A thread without its
 // data yet (the original allocates it there; never seen in play): _getptd's
 // original through `call`, from `sp` with return address `lr`.
-uint32_t ThreadData(uint8_t* base, uint32_t sp, uint32_t lr, const ThreadDataCall& call);
+uint32_t ThreadData(uint32_t sp, uint32_t lr, const ThreadDataCall& call);
 
 // sub_825A9BB8 rand (96 bytes): the seed (+20 of the thread's data) =
 // seed x 214013 + 2531011; returns its bits 16 to 30.
-uint64_t Rand(uint8_t* base, uint32_t sp, const ThreadDataCall& call);
+uint64_t Rand(uint32_t sp, const ThreadDataCall& call);
 
 }  // namespace c_runtime

@@ -183,7 +183,7 @@ size = 8
 origin = "embedded"
 fields = [
   { name = "count", offset = 0, type = "u32" },
-  { name = "records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the block (XPhysicalAlloc): the records, then the objects" },
+  { name = "records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the records (the original: one XPhysicalAlloc block, the records, then the objects; since E5 step 5 a host array, the objects' block apart)" },
 ]
 
 # A pool's 24-byte record.
@@ -191,6 +191,12 @@ fields = [
 measures = ["new<?>@ObjectPools::Init", "ObjectPools::Pool.ret"]
 size = 24
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): the records as a host array of their own
+# (ObjectPools::Init's hand port, NewArray; freed by ObjectPools::Shutdown's
+# Delete), out of the pools' physical block, which keeps the objects and
+# their data (pool 0's first object is its start). Only the hand ports
+# reach them.
+storage = "host"
 fields = [
   { name = "object_count", offset = 0, type = "u32" },
   { name = "object_size", offset = 4, type = "u32" },
@@ -259,6 +265,43 @@ fields = [
   { name = "load", offset = 4, type = "fn" },
   { name = "reset", offset = 8, type = "fn" },
 ]
+
+# The blocks Scenery::AllocPhysical (sub_820F1490) makes: the manager (248
+# bytes), list A's and B's pointer arrays, items and tables, the visible
+# areas, pool 0's block (never in play) and the course set's first file
+# (CourseSet::Load: read whole by Archive::Load, then copied out by
+# XPR::Create and Model::Load and freed by CourseSet::OnLoaded). The
+# original's XPhysicalAlloc(size, -1, 0, 4), but the GPU reads none of them:
+# no physical or GPU address is taken of them, the textures and vertex data
+# are copied into XPR::Create's and Model::Load's own physical blocks. A blob
+# (E5 step 7, 2026-11-24): the hand port's Scenery::AllocPhysical
+# (src/course_scenery/course_scenery.cpp, New) and the lifted original's
+# XPhysicalAlloc (returning at 0x820F14B0); its size (XPhysicalSize, whole
+# 4 KB pages as the physical block's) still counted at [0x826C5518]; freed
+# by Scenery::FreePhysical's XPhysicalFree (memory::FreePhysical takes
+# handles): Scenery::UnloadPools, Unload, Destroy, CourseSet::OnLoaded.
+[SceneryBlock]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x820F14B0, reg = "r3" }]
+fields = []
+
+# The pools' objects and their data (ObjectPools::Init's block, since E5
+# step 5 without the records): the course set (with the second file loaded
+# into its data), the areas' lights (their light files) and models, pools 0
+# and 1's objects. The original's XPhysicalAlloc(size, -1, 64, 4), but the GPU
+# reads none of it (the models' vertex data and the XPRs' textures are
+# copied into their own physical blocks; the light groups' sprites are
+# written into the command buffer). A blob (E5 step 7, 2026-11-24):
+# ObjectPools::Init's hand port (New; its original isn't lifted: no lifted
+# site), freed by ObjectPools::Shutdown (memory::FreePhysical of pool 0's
+# first object, the block's start).
+[ObjectPoolsBlock]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
 
 # Pools 0 and 1's objects (60 bytes; never loaded in play).
 [SceneryBlockObject]

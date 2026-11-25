@@ -15,7 +15,7 @@ namespace texture_compression {
 // 0.0-1.0 (a NaN kept), times 31, 63 and 31 plus 0.5, truncated (fctiwz) and
 // packed into 5:6:5 (red highest) as the original's 32-bit shifts do it (a
 // NaN's 0x80000000 included). The original's r3.
-uint16_t PackR5G6B5(uint8_t* base, const float color[3]);
+uint16_t PackR5G6B5(const float color[3]);
 
 // sub_82420AB8 DxtColor::FitEndpoints (probably): the two end colors of 16
 // pixels (red, green, blue: the float4 pixels' first three lanes) for
@@ -32,7 +32,7 @@ uint16_t PackR5G6B5(uint8_t* base, const float color[3]);
 // memory, read here too) and its step's color below its steps' values on
 // the stack (r1 - 256 + 16 x index): the words it wrote there are given as
 // it leaves them, the others read from guest memory at `stack`.
-void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors, uint32_t stack,
+void FitColorEndpoints(const float pixels[16][3], uint32_t colors, uint32_t stack,
                        float low[3], float high[3]);
 
 // How many step indices FitColorEndpoints has read from the stack so far
@@ -56,7 +56,7 @@ constexpr uint32_t kColorFrameBytes = 1040;
 // 0x8203EAE8 (4 colors) or 0x8203EAF8 (3). `stack` is the guest stack pointer
 // at the call (the original's r1 on entry), for FitColorEndpoints'
 // negative step indices. The original returns 0.
-void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alpha, int32_t dither,
+void EncodeColorBlock(const float pixels[16][4], bool one_bit_alpha, int32_t dither,
                       uint32_t stack, uint8_t block[8]);
 
 }  // namespace texture_compression

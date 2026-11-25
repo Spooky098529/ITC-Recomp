@@ -41,7 +41,7 @@ struct Range {
   uint32_t start;
   uint32_t size;
 };
-std::vector<Range> ReadableGuestRanges(uint8_t* base);  // frame_state_diff.cpp
+std::vector<Range> ReadableGuestRanges();  // frame_state_diff.cpp
 
 namespace {
 
@@ -51,7 +51,7 @@ constexpr int kMaxChangeLines = 300;  // per 2 s
 
 class MenuSelectionScan {
  public:
-  void OnPassStart(uint8_t* base, bool render_only, bool paused, uint32_t listener) {
+  void OnPassStart(bool render_only, bool paused, uint32_t listener) {
     render_only_ = render_only;
     before_.clear();
     if (!watch_parsed_) {
@@ -70,7 +70,7 @@ class MenuSelectionScan {
       return;
     }
     if (sampling_) {
-      Compare(base);
+      Compare();
       sampling_ = false;
     }
     auto now = std::chrono::steady_clock::now();
@@ -82,37 +82,38 @@ class MenuSelectionScan {
       return;
     }
     last_sample_ = now;
-    held_ = guest::LoadU32(base, listener + 0x180) != 0 ||
-            guest::LoadU32(base, listener + 0x190) != 0;
-    ranges_ = ReadableGuestRanges(base);
+    held_ = guest::LoadU32(listener + 0x180) != 0 ||
+            guest::LoadU32(listener + 0x190) != 0;
+    ranges_ = ReadableGuestRanges();
     snapshot_.clear();
     for (const Range& r : ranges_) {
-      snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+      snapshot_.insert(snapshot_.end(), guest::Pointer(r.start),
+                       guest::Pointer(r.start) + r.size);
     }
     sampling_ = true;
   }
 
   bool Active() const { return !candidates_.empty(); }
 
-  void Before(uint8_t* base) {
+  void Before() {
     if (candidates_.empty()) {
       return;
     }
     std::vector<uint32_t> values(candidates_.size());
     for (size_t i = 0; i < candidates_.size(); i++) {
-      values[i] = guest::LoadU32(base, candidates_[i]);
+      values[i] = guest::LoadU32(candidates_[i]);
     }
     before_.push_back(std::move(values));
   }
 
-  void After(uint8_t* base, const char* kind, uint32_t id) {
+  void After(const char* kind, uint32_t id) {
     if (before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
     before_.pop_back();
     for (size_t i = 0; i < values.size() && i < candidates_.size(); i++) {
-      uint32_t now = guest::LoadU32(base, candidates_[i]);
+      uint32_t now = guest::LoadU32(candidates_[i]);
       if (now != values[i] && change_lines_ < kMaxChangeLines) {
         change_lines_++;
         ITC_LOG_INFO("menu selection: pass {} {} {} {:08X} changed {:08X}: {} -> {}",
@@ -124,11 +125,11 @@ class MenuSelectionScan {
   }
 
  private:
-  void Compare(uint8_t* base) {
+  void Compare() {
     size_t offset = 0;
     int changed = 0;
     for (const Range& r : ranges_) {
-      const uint8_t* now = base + r.start;
+      const uint8_t* now = guest::Pointer(r.start);
       const uint8_t* then = snapshot_.data() + offset;
       offset += r.size;
       for (uint32_t block = 0; block < r.size; block += 4096) {
@@ -143,7 +144,7 @@ class MenuSelectionScan {
           changed++;
           uint32_t address = r.start + i;
           uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
-          uint32_t after = guest::LoadU32(base, address);
+          uint32_t after = guest::LoadU32(address);
           Hits& hits = hits_[address];
           if (!held_) {
             hits.idle++;
@@ -216,21 +217,21 @@ MenuSelectionScan& Get() {
 
 }  // namespace
 
-void MenuSelectionScan_OnPassStart(uint8_t* base, bool render_only, bool paused,
+void MenuSelectionScan_OnPassStart(bool render_only, bool paused,
                                    uint32_t listener) {
-  Get().OnPassStart(base, render_only, paused, listener);
+  Get().OnPassStart(render_only, paused, listener);
 }
 
 bool MenuSelectionScan_Active() {
   return Get().Active();
 }
 
-void MenuSelectionScan_Before(uint8_t* base) {
-  Get().Before(base);
+void MenuSelectionScan_Before() {
+  Get().Before();
 }
 
-void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
-  Get().After(base, kind, id);
+void MenuSelectionScan_After(const char* kind, uint32_t id) {
+  Get().After(kind, id);
 }
 
 }  // namespace debug
@@ -244,13 +245,13 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 #define ITC_MENU_SCAN_WRAP(address, step)                   \
   ITC_NATIVE_ENTRY_ALWAYS(address) {                      \
     \
-    debug::MenuSelectionScan_Before(base);                  \
+    debug::MenuSelectionScan_Before();                  \
     if (ITC_FLAG(native_audio_manager_update)) {            \
-      lifted_call::EnterR3<sound_cues::step>(ctx, base);    \
+      lifted_call::EnterR3<sound_cues::step>(ctx);    \
     } else {                                                \
-      lifted::original::c##address(ctx, base);         \
+      lifted::original::c##address(ctx);         \
     }                                                       \
-    debug::MenuSelectionScan_After(base, "call", 0x##address); \
+    debug::MenuSelectionScan_After("call", 0x##address); \
   }
 // The callees of component update 82119118 (component 40066EE0 in the
 // user's race), which posts the events the pause screen's Update consumes.
@@ -264,9 +265,9 @@ ITC_MENU_SCAN_WRAP(82118C18, ManagerRemoveStoppedSounds)
 // inside the wrap.
 ITC_NATIVE_ENTRY_ALWAYS(82094B10) {
   
-  debug::MenuSelectionScan_Before(base);
-  hooks::FramePassesJobWait(ctx, base);
-  debug::MenuSelectionScan_After(base, "call", 0x82094B10);
+  debug::MenuSelectionScan_Before();
+  hooks::FramePassesJobWait(ctx);
+  debug::MenuSelectionScan_After("call", 0x82094B10);
 }
 
 // The app's update (tick handler 82093DC0) runs its component lists through

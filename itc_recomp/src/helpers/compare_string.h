@@ -20,12 +20,12 @@ constexpr uint32_t kSkippedAnswers = 0x82638740;
 // 1 less, 2 equal, 3 greater, or 0 with SetLastError(87) (for the thread's
 // `pcr`) for a null string or a length below -1. Flags 1 (upper case folded),
 // 4 (symbols skipped) and 0x1000 (no word sort) as the original reads them.
-uint64_t CompareStringA(uint8_t* base, uint32_t pcr, uint32_t flags, uint32_t string1,
+uint64_t CompareStringA(uint32_t pcr, uint32_t flags, uint32_t string1,
                         int32_t length1, uint32_t string2, int32_t length2);
 
 // sub_82296130 lstrcmpA: CompareStringA(0, a, -1, b, -1) - 2, or (where that
 // fails: a null string) its own compare: a null first string -1 (0 when both
 // are), a null second 1. r3 as the original leaves it.
-uint64_t Lstrcmp(uint8_t* base, uint32_t pcr, uint32_t a, uint32_t b);
+uint64_t Lstrcmp(uint32_t pcr, uint32_t a, uint32_t b);
 
 }  // namespace helpers

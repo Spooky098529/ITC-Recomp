@@ -4,6 +4,7 @@
 // compiler's array helpers in src/c_runtime/arrays.cpp, and atexit and the
 // exit lock in src/c_runtime/exit.cpp.
 
+#include "memory/host_copy.h"
 #include "guest.h"
 #include "lifted/names.h"
 #include "lifted/functions.h"
@@ -101,20 +102,20 @@ bool hooks::NativeAtexit() {
 ITC_NATIVE_ENTRY_ALWAYS(825B3430) {
   
   if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
-    ctx.r3.u64 = c_runtime::LockExit(base);
+    ctx.r3.u64 = c_runtime::LockExit();
     return;
   }
-  lifted::original::c825B3430(ctx, base);
+  lifted::original::c825B3430(ctx);
 }
 
 // _unlock: r3 = the lock number; r3 = its critical section, as _lock's.
 ITC_NATIVE_ENTRY_ALWAYS(825B32D0) {
   
   if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
-    ctx.r3.u64 = c_runtime::UnlockExit(base);
+    ctx.r3.u64 = c_runtime::UnlockExit();
     return;
   }
-  lifted::original::c825B32D0(ctx, base);
+  lifted::original::c825B32D0(ctx);
 }
 
 // atexit: r3 = the function; returns 0, or -1 when the table can't take it.
@@ -122,12 +123,12 @@ ITC_NATIVE_ENTRY_ALWAYS(825B32D0) {
 ITC_NATIVE_ENTRY_ALWAYS(825A7068) {
   
   if (hooks::NativeAtexit()) {
-    if (const auto result = c_runtime::Atexit(base, ctx.r3.u32)) {
+    if (const auto result = c_runtime::Atexit(ctx.r3.u32)) {
       ctx.r3.s64 = *result;
       return;
     }
   }
-  lifted::original::c825A7068(ctx, base);
+  lifted::original::c825A7068(ctx);
 }
 
 // __onexitinit: no arguments; r3 = 0, or 24 when calloc fails. Natively
@@ -137,18 +138,18 @@ ITC_NATIVE_ENTRY_ALWAYS(825A6F00) {
   
   if (ITC_FLAG(native_c_runtime) && ITC_FLAG(native_c_runtime_heap) &&
       hooks::NativeHeapActive()) {
-    if (const auto result = c_runtime::InitExitTable(base)) {
+    if (const auto result = c_runtime::InitExitTable()) {
       ctx.r3.u64 = *result;
       return;
     }
   }
-  lifted::original::c825A6F00(ctx, base);
+  lifted::original::c825A6F00(ctx);
 }
 
 int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
   auto& call = *static_cast<GuestAtexit*>(self);
   call.ctx.r3.u64 = function;
-  lifted::original::c825A7068(call.ctx, call.base);
+  lifted::original::c825A7068(call.ctx);
   return call.ctx.r3.s32;
 }
 
@@ -166,7 +167,10 @@ ITC_NATIVE_ENTRY_ALWAYS(825A9934) {
 // then words, then bytes: the same bytes in the end.
 ITC_NATIVE_ENTRY(825A71D0, ITC_FLAG(native_c_runtime)) {
   const uint8_t value = ctx.r4.u8;
-  guest::ForEachHostPart(base, ctx.r3.u32, ctx.r5.u32,
+  if (memory::FillWithHandles(ctx.r3.u32, value, ctx.r5.u32)) {
+    return;  // a host object
+  }
+  guest::ForEachHostPart(ctx.r3.u32, ctx.r5.u32,
                          [&](uint8_t* host, uint32_t, uint32_t bytes) {
                            std::memset(host, value, bytes);
                          });
@@ -177,7 +181,7 @@ ITC_NATIVE_ENTRY(825A71D0, ITC_FLAG(native_c_runtime)) {
 // The original's scratch below r1 (its vector and counters, dead after it
 // returns) isn't written.
 ITC_NATIVE_ENTRY(822962B0, ITC_FLAG(native_c_runtime)) {
-  c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  c_runtime::XMemSet(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // XAPI's vectorized copy (probably XMemCpy): r3 = destination, r4 = source,
@@ -188,34 +192,34 @@ ITC_NATIVE_ENTRY(822962B0, ITC_FLAG(native_c_runtime)) {
 ITC_NATIVE_ENTRY_ALWAYS(82295890) {
   
   if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::XMemCpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c82295890(ctx, base);
+      !c_runtime::XMemCpy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c82295890(ctx);
   }
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
 ITC_NATIVE_ENTRY(825A7F30, ITC_FLAG(native_c_runtime)) {
-  c_runtime::Wcscpy(base, ctx.r3.u32, ctx.r4.u32);
+  c_runtime::Wcscpy(ctx.r3.u32, ctx.r4.u32);
 }
 
 // wcscat: r3 = destination, r4 = source; returns r3 (left as it is).
 ITC_NATIVE_ENTRY(825A7EF8, ITC_FLAG(native_c_runtime)) {
-  c_runtime::Wcscat(base, ctx.r3.u32, ctx.r4.u32);
+  c_runtime::Wcscat(ctx.r3.u32, ctx.r4.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
 ITC_NATIVE_ENTRY(825A7F50, ITC_FLAG(native_c_runtime)) {
-  c_runtime::Strncpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  c_runtime::Strncpy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // strncmp: r3, r4 = strings, r5 = count.
 ITC_NATIVE_ENTRY(825AACD0, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.s64 = c_runtime::Strncmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
+  ctx.r3.s64 = c_runtime::Strncmp(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
 }
 
 // _stricmp: r3, r4 = strings.
 ITC_NATIVE_ENTRY(825AA100, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.s64 = c_runtime::Stricmp(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.s64 = c_runtime::Stricmp(ctx.r3.u32, ctx.r4.u32);
 }
 
 // _strnicmp: r3, r4 = strings, r5 = count. A null string or a count above
@@ -225,16 +229,16 @@ ITC_NATIVE_ENTRY_ALWAYS(825AC710) {
   
   if (!ITC_FLAG(native_c_runtime) || ctx.r3.u32 == 0 || ctx.r4.u32 == 0 ||
       ctx.r5.u32 > 0x7FFFFFFFu) {
-    lifted::original::c825AC710(ctx, base);
+    lifted::original::c825AC710(ctx);
     return;
   }
-  ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.s64 = c_runtime::AsciiStrnicmp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // strstr: r3 = string, r4 = what to find; returns the match (r3 moved on by
 // its offset, as the original's register is) or 0.
 ITC_NATIVE_ENTRY(825A98A8, ITC_FLAG(native_c_runtime)) {
-  const int64_t offset = c_runtime::Strstr(base, ctx.r3.u32, ctx.r4.u32);
+  const int64_t offset = c_runtime::Strstr(ctx.r3.u32, ctx.r4.u32);
   ctx.r3.u64 = offset < 0 ? 0 : ctx.r3.u64 + uint64_t(offset);
 }
 
@@ -242,7 +246,7 @@ ITC_NATIVE_ENTRY(825A98A8, ITC_FLAG(native_c_runtime)) {
 // Like the original, not seen by the native renderer's memory mirrors
 // (unlike sub_825A7410's wrapper).
 ITC_NATIVE_ENTRY(825A7830, ITC_FLAG(native_c_runtime)) {
-  c_runtime::CopyForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  c_runtime::CopyForward(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // memmove: r3 = destination, r4 = source, r5 = count; returns r3 (left as it
@@ -257,11 +261,11 @@ ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (ctx.r3.s32 < ctx.r4.s32) {
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
     return;
   }
-  if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c825AA840(ctx, base);
+  if (!c_runtime::MemmoveDown(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c825AA840(ctx);
   }
 }
 
@@ -272,13 +276,13 @@ ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
 ITC_NATIVE_ENTRY_ALWAYS(825A7348) {
   
   if (ITC_FLAG(native_c_runtime)) {
-    if (const auto r3 = c_runtime::MemmoveS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+    if (const auto r3 = c_runtime::MemmoveS(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                             ctx.r6.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c825A7348(ctx, base);
+  lifted::original::c825A7348(ctx);
 }
 
 // memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;
@@ -294,14 +298,14 @@ ITC_NATIVE_ENTRY(825A7270, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (ctx.r3.u32 == 0 || ctx.r5.u32 == 0 || ctx.r4.u32 < ctx.r6.u32) {
-    lifted::original::c825A7270(ctx, base);
+    lifted::original::c825A7270(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.r4.u64 = ctx.r5.u64;
   ctx.r5.u64 = ctx.r6.u64;
   ctx.lr = 0x825A72F0;
-  lifted::Enter(ctx, base, game::memcpy_825A7410);
+  lifted::Enter(ctx, game::memcpy_825A7410);
   ctx.lr = lr;
   ctx.r3.u64 = 0;
 }
@@ -318,20 +322,20 @@ ITC_NATIVE_ENTRY(825A8618, ITC_FLAG(native_c_runtime)) {
 
 // isalpha, isdigit and isalnum: r3 = character; the C locale's table.
 ITC_NATIVE_ENTRY(825AB020, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 0x103);
+  ctx.r3.u64 = c_runtime::CTypeC(ctx.r3.u32, 0x103);
 }
 
 ITC_NATIVE_ENTRY(825AB040, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 4);
+  ctx.r3.u64 = c_runtime::CTypeC(ctx.r3.u32, 4);
 }
 
 ITC_NATIVE_ENTRY(825AB0A0, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 0x107);
+  ctx.r3.u64 = c_runtime::CTypeC(ctx.r3.u32, 0x107);
 }
 
 // isleadbyte: r3 = character; the current locale's table.
 ITC_NATIVE_ENTRY(825B6898, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.u64 = c_runtime::IsLeadByte(base, ctx.r3.u32);
+  ctx.r3.u64 = c_runtime::IsLeadByte(ctx.r3.u32);
 }
 
 // strtoxl's work for strtoul (strtoxl itself has no adapter: strtoul, its
@@ -340,14 +344,14 @@ ITC_NATIVE_ENTRY(825B6898, ITC_FLAG(native_c_runtime)) {
 // recompiled path.
 namespace {
 
-bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, uint32_t flags,
+bool StrToXl(uint32_t string, uint32_t end_out, int32_t radix, uint32_t flags,
              uint64_t* result) {
   uint32_t end = 0;
-  if (!c_runtime::StrToXl(base, string, radix, flags, end_out != 0, &end, result)) {
+  if (!c_runtime::StrToXl(string, radix, flags, end_out != 0, &end, result)) {
     return false;
   }
   if (end_out != 0) {
-    schema::EndPointerOut(base, end_out).set_end(end);
+    schema::EndPointerOut(end_out).set_end(end);
   }
   return true;
 }
@@ -359,8 +363,8 @@ ITC_NATIVE_ENTRY_ALWAYS(825A85E0) {
   
   uint64_t result = 0;
   if (!ITC_FLAG(native_c_runtime) ||
-      !StrToXl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, 1, &result)) {
-    lifted::original::c825A85E0(ctx, base);
+      !StrToXl(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, 1, &result)) {
+    lifted::original::c825A85E0(ctx);
     return;
   }
   ctx.r3.u64 = result;
@@ -372,9 +376,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825A85E0) {
 // after it (the original leaves r3 pointing into its finished frame).
 namespace {
 
-bool Atof(lifted::Regs& ctx, uint8_t* base) {
+bool Atof(lifted::Regs& ctx) {
   uint64_t bits;
-  if (!ITC_FLAG(native_c_runtime) || !c_runtime::AtofL(base, ctx.r3.u32, &bits)) {
+  if (!ITC_FLAG(native_c_runtime) || !c_runtime::AtofL(ctx.r3.u32, &bits)) {
     return false;
   }
   ctx.fpscr.disableFlushMode();
@@ -386,8 +390,8 @@ bool Atof(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
   
-  if (!Atof(ctx, base)) {
-    lifted::original::c825AB1C0(ctx, base);
+  if (!Atof(ctx)) {
+    lifted::original::c825AB1C0(ctx);
   }
 }
 
@@ -402,9 +406,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
 // result and digits, is below the caller's stack pointer: not written.)
 namespace {
 ITC_REGS_STEP(CftofL) {
-  if (!c_runtime::Cftof(base, schema::DoubleValue(base, ctx.r3.u32).bits(), ctx.r4.u32, ctx.r5.u32,
+  if (!c_runtime::Cftof(schema::DoubleValue(ctx.r3.u32).bits(), ctx.r4.u32, ctx.r5.u32,
                         ctx.r6.s32)) {
-    lifted::original::c825AE8E0(ctx, base);
+    lifted::original::c825AE8E0(ctx);
     return;
   }
   ctx.r3.u64 = 0;
@@ -425,14 +429,14 @@ ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
   ctx.r7.u64 = ctx.r8.u64;
   ctx.r8.u64 = ctx.r9.u64;
   if (format == 'e' || format == 'E') {
-    lifted::Enter(ctx, base, game::_cftoe_l);
+    lifted::Enter(ctx, game::_cftoe_l);
   } else if (format == 'f') {
     ctx.r7.u64 = ctx.r8.u64;
-    CftofL(ctx, base);
+    CftofL(ctx);
   } else if (format == 'a' || format == 'A') {
-    lifted::Enter(ctx, base, lifted::e825AE2C0);
+    lifted::Enter(ctx, lifted::e825AE2C0);
   } else {
-    lifted::Enter(ctx, base, game::_cftog_l);
+    lifted::Enter(ctx, game::_cftog_l);
   }
 }
 
@@ -440,9 +444,9 @@ ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
 // the original would call _flsbuf (no room left; never seen in play), the
 // original runs instead. r3 as the original leaves it: the byte when stored.
 ITC_NATIVE_ENTRY(825AF000, ITC_FLAG(native_c_runtime)) {
-  const int32_t done = c_runtime::WriteChar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  const int32_t done = c_runtime::WriteChar(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   if (done < 0) {
-    lifted::original::c825AF000(ctx, base);
+    lifted::original::c825AF000(ctx);
     return;
   }
   if (done == 1) {
@@ -459,8 +463,8 @@ ITC_NATIVE_ENTRY_ALWAYS(825AF098) {
   
   int32_t last;
   if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::WriteMultiChar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.u32, &last)) {
-    lifted::original::c825AF098(ctx, base);
+      !c_runtime::WriteMultiChar(ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.u32, &last)) {
+    lifted::original::c825AF098(ctx);
     return;
   }
   if (last >= 0) {
@@ -478,13 +482,13 @@ ITC_NATIVE_ENTRY(825A93D0, ITC_FLAG(native_c_runtime)) {
   const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                  ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU32(base, ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
-    guest::StoreU32(base, ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
+    guest::StoreU32(ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
+    guest::StoreU32(ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
   }
   int32_t count;
-  if (!c_runtime::Sprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32,
+  if (!c_runtime::Sprintf(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32,
                           ctx.r1.u32 - 144 - 1328, &count)) {
-    lifted::original::c825A93D0(ctx, base);
+    lifted::original::c825A93D0(ctx);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -499,9 +503,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB010) {
   
   int32_t count;
   if (!ITC_FLAG(native_c_runtime) ||
-      !c_runtime::Vsnprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+      !c_runtime::Vsnprintf(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                             ctx.r1.u32 - 144 - 1328, &count)) {
-    lifted::original::c825AB010(ctx, base);
+    lifted::original::c825AB010(ctx);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -517,7 +521,7 @@ ITC_NATIVE_ENTRY(825AD4C0, ITC_FLAG(native_c_runtime)) {
 
 // Branches to _cfltcvt_init.
 ITC_NATIVE_ENTRY(825A6E48, ITC_FLAG(native_c_runtime)) {
-  c_runtime::InitFloatConversions(base);
+  c_runtime::InitFloatConversions();
 }
 
 // _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8,
@@ -527,7 +531,7 @@ ITC_NATIVE_ENTRY(825A6E48, ITC_FLAG(native_c_runtime)) {
 // _init_pointers: no arguments; r3 left 0, as the original's last setter
 // call leaves it.
 ITC_NATIVE_ENTRY(825AA398, ITC_FLAG(native_c_runtime)) {
-  c_runtime::InitPointers(base);
+  c_runtime::InitPointers();
   ctx.r3.u64 = 0;
 }
 
@@ -538,7 +542,7 @@ ITC_NATIVE_ENTRY(82106540, ITC_FLAG(native_c_runtime)) {
 
 // __initmbctable: returns 0.
 ITC_NATIVE_ENTRY(825B6958, ITC_FLAG(native_c_runtime)) {
-  ctx.r3.s64 = c_runtime::InitMbcTable(base);
+  ctx.r3.s64 = c_runtime::InitMbcTable();
 }
 
 
@@ -548,7 +552,6 @@ namespace {
 
 struct ArrayCall {
   lifted::Regs* ctx;
-  uint8_t* base;
   uint32_t return_address;  // after the original's bctrl
 };
 
@@ -559,11 +562,10 @@ struct ArrayCall {
 void CallElement(void* user, uint64_t function, uint64_t element) {
   auto& call = *static_cast<ArrayCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
-  guest_call::InFrame(ctx, base, 128, call.return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, 128, call.return_address, [&](uint32_t) {
     ctx.r3.u64 = element;
     ctx.ctr.u64 = function;
-    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+    lifted::CallFromContext(ctx, ctx.ctr.u32);
   });
 }
 
@@ -572,16 +574,16 @@ void CallElement(void* user, uint64_t function, uint64_t element) {
 // `vector constructor iterator': r3 = the array, r4 = the element size,
 // r5 = the count, r6 = the constructor.
 ITC_NATIVE_ENTRY(820911A8, ITC_FLAG(native_c_runtime)) {
-  ArrayCall call{&ctx, base, 0x820911D4};
-  c_runtime::VectorConstruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
+  ArrayCall call{&ctx, 0x820911D4};
+  c_runtime::VectorConstruct(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
                              &call);
 }
 
 // `vector destructor iterator': r3 = the array, r4 = the element size,
 // r5 = the count, r6 = the destructor.
 ITC_NATIVE_ENTRY(820900C0, ITC_FLAG(native_c_runtime)) {
-  ArrayCall call{&ctx, base, 0x820900F4};
-  c_runtime::VectorDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
+  ArrayCall call{&ctx, 0x820900F4};
+  c_runtime::VectorDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
                             &call);
 }
 
@@ -590,13 +592,11 @@ ITC_NATIVE_ENTRY(820900C0, ITC_FLAG(native_c_runtime)) {
 namespace {
 struct ThreadDataUser {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr, int set,
                          uint64_t r3, uint64_t r4) {
   auto& self = *static_cast<ThreadDataUser*>(user);
   lifted::Regs& ctx = self.ctx;
-  uint8_t* base = self.base;
   const uint64_t stack = ctx.r1.u64, saved_lr = ctx.lr;
   ctx.r1.u64 = r1;
   if (set >= 1) {
@@ -606,20 +606,20 @@ uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr
     ctx.r4.u64 = r4;
   }
   ctx.lr = lr;
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = stack;
   ctx.lr = saved_lr;
   return ctx.r3.u64;
 }
 }  // namespace
 
-void hooks::CRuntimeRand(lifted::Regs& ctx, uint8_t* base) {
-  ThreadDataUser user{ctx, base};
+void hooks::CRuntimeRand(lifted::Regs& ctx) {
+  ThreadDataUser user{ctx};
   const c_runtime::ThreadDataCall call{&ThreadDataGuest, &user};
-  const uint64_t r3 = c_runtime::Rand(base, ctx.r1.u32, call);
+  const uint64_t r3 = c_runtime::Rand(ctx.r1.u32, call);
   ctx.r3.u64 = r3;
 }
 
 ITC_NATIVE_ENTRY(825A9BB8, ITC_FLAG(native_c_runtime)) {
-  hooks::CRuntimeRand(ctx, base);
+  hooks::CRuntimeRand(ctx);
 }

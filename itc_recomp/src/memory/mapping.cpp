@@ -1,110 +1,67 @@
-// See mapping.h. One memory file (memfd_create: nothing in /dev/shm),
-// 4.5 GB plus a page, mapped as nine views into one reservation:
+// See mapping.h. Since E5 step 9 there is no guest mapping, and since step
+// 10 no `base`: the memory the game uses is three blocks of host memory of
+// their own, and guest.h translates the guest's addresses into them in every
+// load, store and guest::Pointer:
 //
-//   guest addresses            file offset         what
-//   0x00010000-0x3FFFFFFF      0x00010000          4 KB pages (our layer's range at 0x10000)
-//   0x40000000-0x7EFFFFFF      0x40000000          64 KB pages
-//   0x7F000000-0x7FFFFFFF      0x100000000         physical 0-16 MB (the L2 area, the
-//                                                  tiling workers' signals)
-//   0x80000000-0x8FFFFFFF      0x80000000          the image (at 0x82000000)
-//   0x90000000-0x9FFFFFFF      0x80000000          the same, as the SDK mapped it
-//   0xA0000000-0xBFFFFFFF      0x100000000         physical, 64 KB pages
-//   0xC0000000-0xDFFFFFFF      0x100000000         physical, 16 MB pages
-//   0xE0000000-0xFFFFFFFF      0x100001000         physical + 4 KB, 4 KB pages
-//   base + 4 GB, 512 MB        0x100000000         physical, flat (the renderer's)
+//   guest addresses                      block
+//   0x00010000 + 384 MiB                 the heap (memory::g_heap: our
+//                                        allocation layer's range, heap.h)
+//   0x82000000 + 0x9B0000                the image (memory::g_image: its data
+//                                        compiled in, image/image.h)
+//   0x7F000000 (physical 0-16 MB),       the physical memory (memory::g_physical,
+//   0xA0000000, 0xC0000000, 0xE0000000   since step 7; + 4 KB at 0xE0000000)
+//   (+ 4 KB)
 //
-// Page 0's 64 KB stay unmapped (the SDK protected them: --protect_zero), so
-// a null pointer faults. The file's pages are only backed once touched.
+// The stacks, thread blocks, blobs and host objects are elsewhere in host
+// memory, behind handles (memory/handles.h). Any other address (a null
+// pointer's, below 0x10000) stops the program, named (NoBlock).
 
 #include "memory/mapping.h"
 #include "memory/handles.h"
+#include "guest.h"
 
 #include "base/log.h"
 
 #include <sys/mman.h>
-#include <unistd.h>
 
 #include <cerrno>
 #include <cstring>
+#include <cstdlib>
 #include <mutex>
 
 namespace memory {
 
 namespace {
 
-constexpr uint64_t kGuestBytes = 0x100000000ull;
 constexpr uint64_t kPhysicalBytes = 0x20000000ull;
-constexpr uint64_t kReserveBytes = kGuestBytes + kPhysicalBytes;
-constexpr uint64_t kFileBytes = kReserveBytes + 0x1000;
-// Where the SDK's mapping landed (its first try); anywhere else when it's
-// taken.
-constexpr uint64_t kPreferredBase = 0x100000000ull;
 
-struct View {
-  uint64_t start;  // guest address (or past 4 GB: the flat physical range)
-  uint64_t end;    // exclusive
-  uint64_t offset;  // in the file
-};
-
-constexpr View kViews[] = {
-    {0x00010000, 0x40000000, 0x00010000},
-    {0x40000000, 0x7F000000, 0x40000000},
-    {0x7F000000, 0x80000000, 0x100000000},
-    {0x80000000, 0x90000000, 0x80000000},
-    {0x90000000, 0xA0000000, 0x80000000},
-    {0xA0000000, 0xC0000000, 0x100000000},
-    {0xC0000000, 0xE0000000, 0x100000000},
-    {0xE0000000, 0x100000000, 0x100001000},
-    {0x100000000, 0x120000000, 0x100000000},
-};
-
-uint8_t* base = nullptr;
+// A block of host memory, read-write; its pages are only backed once
+// touched (zeroed).
+uint8_t* MapBlock(uint64_t bytes, const char* what) {
+  void* block = mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+  if (block == MAP_FAILED) {
+    ITC_LOG_ERROR("memory: mapping {} ({:#x} bytes) failed: {}", what, bytes,
+                  std::strerror(errno));
+    return nullptr;
+  }
+  return static_cast<uint8_t*>(block);
+}
 
 bool Map() {
-  const int file = memfd_create("itc_guest_memory", MFD_CLOEXEC);
-  if (file < 0) {
-    ITC_LOG_ERROR("guest memory: memfd_create failed: {}", std::strerror(errno));
+  g_heap = MapBlock(kHeapBytes, "the heap");
+  g_image = MapBlock(kImageBytes, "the image");
+  // The physical memory and its 4 KB past the end, which the 0xE0000000
+  // addresses reach (they're offset by 4 KB).
+  g_physical = MapBlock(kPhysicalBytes + 0x1000, "the physical memory");
+  if (!g_heap || !g_image || !g_physical) {
     return false;
   }
-  if (ftruncate(file, off_t(kFileBytes)) != 0) {
-    ITC_LOG_ERROR("guest memory: ftruncate failed: {}", std::strerror(errno));
-    close(file);
-    return false;
-  }
-  constexpr int kReserveFlags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
-  void* reserved = MAP_FAILED;
-  if (kPreferredBase != 0) {
-    reserved = mmap(reinterpret_cast<void*>(kPreferredBase), kReserveBytes, PROT_NONE,
-                    kReserveFlags | MAP_FIXED_NOREPLACE, -1, 0);
-  }
-  if (reserved == MAP_FAILED) {
-    reserved = mmap(nullptr, kReserveBytes, PROT_NONE, kReserveFlags, -1, 0);
-  }
-  if (reserved == MAP_FAILED) {
-    ITC_LOG_ERROR("guest memory: reserving {:#x} bytes failed: {}", kReserveBytes,
-                  std::strerror(errno));
-    close(file);
-    return false;
-  }
-  uint8_t* mapped = static_cast<uint8_t*>(reserved);
-  for (const View& view : kViews) {
-    void* at = mapped + view.start;
-    void* result = mmap(at, view.end - view.start, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-                        file, off_t(view.offset));
-    if (result != at) {
-      ITC_LOG_ERROR("guest memory: mapping {:#x}-{:#x} failed: {}", view.start, view.end,
-                    std::strerror(errno));
-      munmap(reserved, kReserveBytes);
-      close(file);
-      return false;
-    }
-  }
-  // The views keep the file.
-  close(file);
-  base = mapped;
-  ITC_LOG_INFO("guest memory: mapped at {}", static_cast<void*>(base));
-  // The handles' range, inaccessible (docs/e5-native.md step 3; handles.h).
-  ProtectHandles(base);
+  ITC_LOG_INFO("memory: heap at {}, image at {}, physical at {}",
+               static_cast<void*>(g_heap), static_cast<void*>(g_image),
+               static_cast<void*>(g_physical));
+  // The handles' table (docs/e5-native.md step 3; handles.h).
+  SetUpHandles();
   return true;
 }
 
@@ -117,8 +74,11 @@ bool MapGuest() {
   return mapped;
 }
 
-uint8_t* Base() {
-  return base;
+void NoBlock(uint32_t address) {
+  ITC_LOG_ERROR("memory: an access at {:08X}, in no block ({}): stopping", address,
+                address < 0x10000 ? "a null pointer" : "not the heap, the image, the physical memory "
+                                                       "or a handle's object");
+  std::abort();
 }
 
 }  // namespace memory

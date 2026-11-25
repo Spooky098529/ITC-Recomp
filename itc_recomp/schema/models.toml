@@ -277,6 +277,17 @@ measures = ["new<?>@TextureProvider::Allocate", "TextureProvider::Assign.r5", "T
             "TextureProvider::InsertN.r4", "TextureProvider::InsertN.r6"]
 size = 4
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the storage of a std::vector<T*>
+# (TextureProvider::Allocate is the allocator of every such vector: the
+# texture providers', and through PtrVector::Insert the render queue's
+# release list), words read and moved by address (memmove_s), in PC memory
+# in the guest's byte order; the view stays a guest view (also the value
+# words on the stack the vector's functions take). Made by Allocate's hand
+# port (New, src/models/texture_provider.cpp) and its lifted original's
+# operator new (returning at 0x82594314; r3 the size); freed by operator
+# delete on the old storage (Reserve, InsertN, the providers' destructor).
+storage = "blob"
+blob_alloc = [{ call = 0x82594314, reg = "r3" }]
 fields = [
   { name = "texture", offset = 0, type = "u32" },
 ]
@@ -389,6 +400,13 @@ measures = ["new<12>@PendingFrees::Insert", "PendingFrees::Insert.r4",
             "[8296BD58]", "[8296BD58].+0", "[8296BD58].+0.+4"]
 size = 12
 origin = "allocated"
+# Dual (E5 step 5, 2026-11-24): the nodes PendingFrees::Insert makes are
+# host objects (its hand port's New, src/models/memory_blocks.cpp; the
+# original isn't lifted: only the hand ports call it); the list's head node,
+# made with the list before main, stays in guest memory, so a node's links
+# reach both shapes. Freed by PendingFrees::FreeDue's operator delete (the
+# hand port's, and its lifted original's: both take handles).
+storage = "dual"
 fields = [
   { name = "next", offset = 0, type = "ptr", to = "PendingFreesNode" },
   { name = "previous", offset = 4, type = "ptr", to = "PendingFreesNode" },
@@ -411,6 +429,14 @@ fields = [
 measures = ["new<12>@Shaders::LoadPair", "Shaders::OnPairLoaded.r6"]
 size = 12
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by Shaders::LoadPair's hand port
+# (New, src/models/shader_pairs.cpp) and its lifted original's operator new
+# (returning at 0x820A0848), handed to the archive's request as the pixel
+# file's callback value (r6) and freed by Shaders::OnPairLoaded's operator
+# delete (src/shader_objects/shader_objects.cpp; its lifted original the
+# same). Only those two read it.
+storage = "host"
+host_alloc = [0x820A0848]
 fields = [
   { name = "vertex_file", offset = 0, type = "u32", note = "in the shared load buffer" },
   { name = "pixel_file", offset = 4, type = "u32", note = "right after the vertex file" },
@@ -543,6 +569,16 @@ measures = ["new<4294967295>@sub_8259A9E0#2", "new<4294967295>@sub_8259A9E0#3",
             "new<4294967295>@sub_8259A9E0#4", "sub_8259A9E0.r3.+144"]
 size = 16
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the node states and matrices are read
+# and written by address as raw floats (the skeleton's updates, the matrix
+# math, frame interpolation's copies, the cars' point and tire matrices),
+# never by the renderer by address, in PC memory in the guest's byte order.
+# Made by SkeletonBase::SetUp's hand port (CountedArray's New,
+# src/model_animation/model_animation.cpp) and its lifted original's
+# operator new[] (returning at 0x8259AAF4, 0x8259AB94, 0x8259AC28; r3 the
+# size); freed by operator delete[] on the block (SkeletonBase::Free).
+storage = "blob"
+blob_alloc = [{ call = 0x8259AAF4, reg = "r3" }, { call = 0x8259AB94, reg = "r3" }, { call = 0x8259AC28, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32" },
   { name = "first_one_12", offset = 28, type = "f32", note = "the first entry's +12: 1.0" },
@@ -560,6 +596,14 @@ fields = [
 measure = "new<4294967295>@sub_82599A20"
 size = 16
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): a float4 a node, read by address
+# (Skeleton::LoadNodeValues, the scene loaders), in PC memory in the guest's
+# byte order. Made by Skeleton::Bind's hand port (New,
+# src/model_animation/model_animation.cpp) and its lifted original's
+# operator new[] (returning at 0x82599A80; r3 the size); freed by operator
+# delete[] (Skeleton::Bind's old values, Skeleton::~Skeleton).
+storage = "blob"
+blob_alloc = [{ call = 0x82599A80, reg = "r3" }]
 fields = [
   { name = "x", offset = 0, type = "f32", note = "0.0 at bind" },
   { name = "y", offset = 4, type = "f32", note = "0.0 at bind" },

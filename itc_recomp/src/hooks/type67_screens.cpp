@@ -140,22 +140,22 @@ namespace hooks {
 
 namespace ts = type67_screens;
 
-ts::Calls Type67ScreensCalls(lifted::Regs& ctx, uint8_t* base) {
+ts::Calls Type67ScreensCalls(lifted::Regs& ctx) {
   ts::Calls calls;
-  static_cast<type67_modes::Calls&>(calls) = Type67Calls(ctx, base);
+  static_cast<type67_modes::Calls&>(calls) = Type67Calls(ctx);
   calls.native_heap = NativeHeapActive();
   calls.set_r4 = [&ctx](uint64_t r4) { ctx.r4.u64 = r4; };
   const auto call_set = calls.call_set;
-  calls.set_text_args = [&ctx, base, call_set](uint32_t frame, uint32_t lr, uint32_t movie,
+  calls.set_text_args = [&ctx, call_set](uint32_t frame, uint32_t lr, uint32_t movie,
                                                uint32_t sub_scene, uint32_t child, uint32_t id,
                                                const uint64_t varargs[4]) -> uint64_t {
-    if (Type67TextsNative(base)) {
+    if (Type67TextsNative()) {
       const uint64_t stack = ctx.r1.u64, link = ctx.lr;
       ctx.fpscr.disableFlushMode();
       std::optional<uint32_t> r3;
       {
-        FormatGuestCalls format(ctx, base);
-        r3 = ui_movies::SetText(base, format.get(), frame, movie, sub_scene, child, id, varargs);
+        FormatGuestCalls format(ctx);
+        r3 = ui_movies::SetText(format.get(), frame, movie, sub_scene, child, id, varargs);
       }
       ctx.r1.u64 = stack;
       ctx.lr = link;
@@ -191,379 +191,379 @@ ts::Calls Type67ScreensCalls(lifted::Regs& ctx, uint8_t* base) {
 
 #define ITC_TS_STEP(name, expression)                \
   ITC_REGS_STEP(name) {        \
-    const ts::Calls calls = Type67ScreensCalls(ctx, base); \
+    const ts::Calls calls = Type67ScreensCalls(ctx); \
     (void)calls;                                     \
     ctx.r3.u64 = (expression);                       \
   }
 
-ITC_TS_STEP(ListScreenOnEnter, ts::ListScreenOnEnter(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenOnEnter, ts::ListScreenOnEnter(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenOpenMovie,
-            ts::ListScreenOpenMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::ListScreenOpenMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(ListScreenWaitForMovie,
-            ts::ListScreenWaitForMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenLeave, ts::ListScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenOnLeft, ts::ListScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenIsLoaded, ts::ListScreenIsLoaded(base, ctx.r3.u64, ctx.r1.u32))
+            ts::ListScreenWaitForMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenLeave, ts::ListScreenLeave(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenOnLeft, ts::ListScreenOnLeft(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenIsLoaded, ts::ListScreenIsLoaded(ctx.r3.u64, ctx.r1.u32))
 ITC_TS_STEP(Type6ListScreenOpenMovie,
-            ts::ListScreenOpenAsset(base, ctx.r3.u64, false, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::ListScreenOpenAsset(ctx.r3.u64, false, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(Type7ListScreenOpenMovie,
-            ts::ListScreenOpenAsset(base, ctx.r3.u64, true, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(Type6ListScreenRelease, ts::ListScreenRelease(base, ctx.r3.u64, false, ctx.r1.u32, calls))
-ITC_TS_STEP(Type7ListScreenRelease, ts::ListScreenRelease(base, ctx.r3.u64, true, ctx.r1.u32, calls))
+            ts::ListScreenOpenAsset(ctx.r3.u64, true, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(Type6ListScreenRelease, ts::ListScreenRelease(ctx.r3.u64, false, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ListScreenRelease, ts::ListScreenRelease(ctx.r3.u64, true, ctx.r1.u32, calls))
 
-ITC_TS_STEP(NodeScreenOnEnter, ts::NodeScreenOnEnter(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenOnEnter, ts::NodeScreenOnEnter(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenOpenMovie,
-            ts::NodeScreenOpenMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::NodeScreenOpenMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(NodeScreenWaitForMovie,
-            ts::NodeScreenWaitForMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenLeave, ts::NodeScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenOnLeft, ts::NodeScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(Type6NodeScreenIsLoaded, ts::NodeScreenIsLoaded(base, ctx.r3.u64, ctx.r1.u32))
+            ts::NodeScreenWaitForMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenLeave, ts::NodeScreenLeave(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenOnLeft, ts::NodeScreenOnLeft(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenIsLoaded, ts::NodeScreenIsLoaded(ctx.r3.u64, ctx.r1.u32))
 ITC_TS_STEP(Type6NodeScreenOpenMovie,
-            ts::NodeScreenOpenAsset(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(Type6NodeScreenRelease, ts::NodeScreenRelease(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::NodeScreenOpenAsset(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(Type6NodeScreenRelease, ts::NodeScreenRelease(ctx.r3.u64, ctx.r1.u32, calls))
 
-ITC_TS_STEP(PanelGroupMovie, ts::PanelGroupMovie(base, ctx.r3.u64, ctx.r1.u32))
-ITC_TS_STEP(GroupPairSelectA, ts::GroupPairSelectA(base, ctx.r3.u64))
-ITC_TS_STEP(GroupPairReset, ts::GroupPairReset(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(GroupPairRun, ts::GroupPairRun(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(GroupPairWaitForFade, ts::GroupPairWaitForFade(base, ctx.r3.u64))
-ITC_TS_STEP(GroupPairFinishAll, ts::GroupPairFinishAll(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(GroupPairDestruct, ts::GroupPairDestruct(base, ctx.r3.u64))
-ITC_TS_STEP(SingleGroupConstruct, ts::SingleGroupConstruct(base, ctx.r3.u64, ctx.r4.u32))
-ITC_TS_STEP(SingleGroupReset, ts::SingleGroupReset(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelFadeIn, ts::PanelFadeIn(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(MachineScreenDestruct, ts::MachineScreenDestruct(base, ctx.r3.u64))
-ITC_TS_STEP(PanelGroupDestruct, ts::PanelGroupDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(PanelGroupMovie, ts::PanelGroupMovie(ctx.r3.u64, ctx.r1.u32))
+ITC_TS_STEP(GroupPairSelectA, ts::GroupPairSelectA(ctx.r3.u64))
+ITC_TS_STEP(GroupPairReset, ts::GroupPairReset(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairRun, ts::GroupPairRun(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairWaitForFade, ts::GroupPairWaitForFade(ctx.r3.u64))
+ITC_TS_STEP(GroupPairFinishAll, ts::GroupPairFinishAll(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(GroupPairDestruct, ts::GroupPairDestruct(ctx.r3.u64))
+ITC_TS_STEP(SingleGroupConstruct, ts::SingleGroupConstruct(ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(SingleGroupReset, ts::SingleGroupReset(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelFadeIn, ts::PanelFadeIn(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(MachineScreenDestruct, ts::MachineScreenDestruct(ctx.r3.u64))
+ITC_TS_STEP(PanelGroupDestruct, ts::PanelGroupDestruct(ctx.r3.u64))
 ITC_TS_STEP(PanelGroupDeletingDestruct,
-            ts::PanelGroupDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::PanelGroupDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6PanelScreenDestruct,
-            ts::PanelScreenDestruct(base, ctx.r3.u64, false, ctx.r1.u32, calls))
+            ts::PanelScreenDestruct(ctx.r3.u64, false, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenDestruct,
-            ts::PanelScreenDestruct(base, ctx.r3.u64, true, ctx.r1.u32, calls))
+            ts::PanelScreenDestruct(ctx.r3.u64, true, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6PanelScreenDeletingDestruct,
-            ts::Type6PanelScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6PanelScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
-ITC_TS_STEP(PanelScreenIsLoaded, ts::PanelScreenIsLoaded(base, ctx.r1.u32))
-ITC_TS_STEP(Type6PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, false, calls))
-ITC_TS_STEP(Type7PanelScreenOpenMovies, ts::PanelScreenOpenMovies(base, ctx.r1.u32, true, calls))
-ITC_TS_STEP(PanelScreenDeleteMovies, ts::PanelScreenDeleteMovies(base, ctx.r1.u32, calls))
-ITC_TS_STEP(Type7PanelScreenBack, ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x82240860))
+ITC_TS_STEP(PanelScreenIsLoaded, ts::PanelScreenIsLoaded(ctx.r1.u32))
+ITC_TS_STEP(Type6PanelScreenOpenMovies, ts::PanelScreenOpenMovies(ctx.r1.u32, false, calls))
+ITC_TS_STEP(Type7PanelScreenOpenMovies, ts::PanelScreenOpenMovies(ctx.r1.u32, true, calls))
+ITC_TS_STEP(PanelScreenDeleteMovies, ts::PanelScreenDeleteMovies(ctx.r1.u32, calls))
+ITC_TS_STEP(Type7PanelScreenBack, ts::PanelScreenPost(ctx.r3.u64, ctx.r4.u64, 0x82240860))
 ITC_TS_STEP(Type6PanelScreenOpenPowerGraph,
-            ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x82247058))
+            ts::PanelScreenPost(ctx.r3.u64, ctx.r4.u64, 0x82247058))
 ITC_TS_STEP(Type7PanelScreenOpenPowerGraph,
-            ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x822408B8))
-ITC_TS_STEP(Type7PanelScreenCarList, ts::Type7CarWord(base, 1972))
-ITC_TS_STEP(Type7PanelScreenCarEntry, ts::Type7CarWord(base, 1976))
-ITC_TS_STEP(Type7PanelScreenCarSlot, ts::Type7CarWord(base, 1980))
-ITC_TS_STEP(PanelScreenOnEnter, ts::PanelScreenOnEnter(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::PanelScreenPost(ctx.r3.u64, ctx.r4.u64, 0x822408B8))
+ITC_TS_STEP(Type7PanelScreenCarList, ts::Type7CarWord(1972))
+ITC_TS_STEP(Type7PanelScreenCarEntry, ts::Type7CarWord(1976))
+ITC_TS_STEP(Type7PanelScreenCarSlot, ts::Type7CarWord(1980))
+ITC_TS_STEP(PanelScreenOnEnter, ts::PanelScreenOnEnter(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelScreenOpenMovie,
-            ts::PanelScreenOpenMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::PanelScreenOpenMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(PanelScreenWaitForMovie,
-            ts::PanelScreenWaitForMovie(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelScreenOpen, ts::PanelScreenOpen(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(PanelScreenShow, ts::PanelScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelScreenUpdate, ts::PanelScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::PanelScreenWaitForMovie(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOpen, ts::PanelScreenOpen(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenShow, ts::PanelScreenShow(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenUpdate, ts::PanelScreenUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelScreenOnMessage24,
-            ts::PanelScreenOnMessage24(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(PanelScreenLeave, ts::PanelScreenLeave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelScreenOnLeft, ts::PanelScreenOnLeft(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::PanelScreenOnMessage24(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(PanelScreenLeave, ts::PanelScreenLeave(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOnLeft, ts::PanelScreenOnLeft(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenPickCar,
-            ts::Type7PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7PanelScreenPickCar(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7PanelScreenDraw,
-            ts::Type7PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7PanelScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
-ITC_TS_STEP(NodeTableDestruct, ts::NodeTableDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(NodeTableDestruct, ts::NodeTableDestruct(ctx.r3.u64))
 ITC_TS_STEP(NodeTableDeletingDestruct,
-            ts::NodeTableDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeTableSetPairs, ts::NodeTableSetPairs(base, ctx.r3.u64, ctx.r4.u32))
-ITC_TS_STEP(PairedNodeTableSavePairs, ts::PairedNodeTableSavePairs(base, ctx.r3.u64))
-ITC_TS_STEP(ColorNodeTableClear, ts::ColorNodeTableClear(base, ctx.r3.u64))
-ITC_TS_STEP(ColorNodeTableSet, ts::ColorNodeTableSet(base, ctx.r3.u64, ctx.r4.u32))
-ITC_TS_STEP(ColorNodeTableSavePairs, ts::ColorNodeTableSavePairs(base, ctx.r3.u64))
+            ts::NodeTableDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeTableSetPairs, ts::NodeTableSetPairs(ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(PairedNodeTableSavePairs, ts::PairedNodeTableSavePairs(ctx.r3.u64))
+ITC_TS_STEP(ColorNodeTableClear, ts::ColorNodeTableClear(ctx.r3.u64))
+ITC_TS_STEP(ColorNodeTableSet, ts::ColorNodeTableSet(ctx.r3.u64, ctx.r4.u32))
+ITC_TS_STEP(ColorNodeTableSavePairs, ts::ColorNodeTableSavePairs(ctx.r3.u64))
 ITC_TS_STEP(NodeTableShow,
-            ts::NodeTableShow(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
-ITC_TS_STEP(NodeTableShowNode, ts::NodeTableShowNode(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32,
+            ts::NodeTableShow(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(NodeTableShowNode, ts::NodeTableShowNode(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r6.u32, ctx.r1.u32))
 ITC_TS_STEP(NodeTableSetMarks,
-            ts::NodeTableSetMarks(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+            ts::NodeTableSetMarks(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
 ITC_TS_STEP(ColorNodeTableSetColors,
-            ts::ColorNodeTableSetColors(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+            ts::ColorNodeTableSetColors(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
 ITC_TS_STEP(ColorNodeTableClearColors,
-            ts::ColorNodeTableClearColors(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
+            ts::ColorNodeTableClearColors(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
 ITC_TS_STEP(ColorNodeTableMarkSelected,
-            ts::ColorNodeTableMarkSelected(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
+            ts::ColorNodeTableMarkSelected(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32))
 ITC_TS_STEP(ColorNodeTableRefresh,
-            ts::ColorNodeTableRefresh(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorNodeTableReset, ts::ColorNodeTableReset(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ColorNodeTableRefresh(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorNodeTableReset, ts::ColorNodeTableReset(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PairedNodeTableRefresh,
-            ts::PairedNodeTableRefresh(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::PairedNodeTableRefresh(ctx.r3.u64, ctx.r1.u32, calls))
 
-ITC_TS_STEP(ListPartBaseDestruct, ts::ListPartBaseDestruct(base, ctx.r3.u64))
-ITC_TS_STEP(ListPartInnerBaseDestruct, ts::ListPartInnerBaseDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(ListPartBaseDestruct, ts::ListPartBaseDestruct(ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerBaseDestruct, ts::ListPartInnerBaseDestruct(ctx.r3.u64))
 ITC_TS_STEP(ListPartBaseDeletingDestruct,
-            ts::ListPartBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListPartBaseDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartInnerBaseDeletingDestruct,
-            ts::ListPartInnerBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartInnerDestruct, ts::ListPartInnerDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ListPartInnerBaseDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerDestruct, ts::ListPartInnerDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartInnerDeletingDestruct,
-            ts::ListPartInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartDestruct, ts::ListPartDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ListPartInnerDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartDestruct, ts::ListPartDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartDeletingDestruct,
-            ts::ListPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartOpen, ts::ListPartOpen(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartPick, ts::ListPartPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListPartDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartOpen, ts::ListPartOpen(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartPick, ts::ListPartPick(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartInput,
-            ts::ListPartInput(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(ListPartClose, ts::ListPartClose(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ListPartInput(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartClose, ts::ListPartClose(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartIsIdle,
-            ts::ListPartIsIdle(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::ListPartIsIdle(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(ListPartCanLeave,
-            ts::ListPartCanLeave(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::ListPartCanLeave(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(ListPartInnerOpen,
-            ts::ListPartInnerOpen(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartInnerPick, ts::ListPartInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
+            ts::ListPartInnerOpen(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerPick, ts::ListPartInnerPick(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
                                                      ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(ListPartInnerInput,
-            ts::ListPartInnerInput(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartInnerIsIdle, ts::ListPartInnerIsIdle(base, ctx.r3.u64, ctx.r1.u32))
+            ts::ListPartInnerInput(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerIsIdle, ts::ListPartInnerIsIdle(ctx.r3.u64, ctx.r1.u32))
 ITC_TS_STEP(ListPartInnerClose,
-            ts::ListPartInnerClose(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(ListPartInnerCanLeave, ts::ListPartInnerCanLeave(base, ctx.r3.u64))
-ITC_TS_STEP(ListPartInnerPage0, ts::ListPartInnerPage0(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListPartInnerPage1, ts::ListPartInnerPage1(base, ctx.r3.u64))
-ITC_TS_STEP(ListPartInnerPage2, ts::ListPartInnerPage2(base, ctx.r3.u64))
+            ts::ListPartInnerClose(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(ListPartInnerCanLeave, ts::ListPartInnerCanLeave(ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerPage0, ts::ListPartInnerPage0(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListPartInnerPage1, ts::ListPartInnerPage1(ctx.r3.u64))
+ITC_TS_STEP(ListPartInnerPage2, ts::ListPartInnerPage2(ctx.r3.u64))
 ITC_TS_STEP(ListPartInnerStep0,
-            ts::ListPartInnerStep0(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListPartInnerStep0(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartInnerStep1,
-            ts::ListPartInnerStep1(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListPartInnerStep1(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListPartInnerStep2,
-            ts::ListPartInnerStep2(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListPartInnerStep2(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
-ITC_TS_STEP(ListScreenDestruct, ts::ListScreenDestruct(base, ctx.r3.u64))
+ITC_TS_STEP(ListScreenDestruct, ts::ListScreenDestruct(ctx.r3.u64))
 ITC_TS_STEP(ListScreenDeletingDestruct,
-            ts::ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeListScreenItemInfo, ts::NodeListScreenItemInfo(base, ctx.r3.u64, ctx.r5.u32))
+            ts::ListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeListScreenItemInfo, ts::NodeListScreenItemInfo(ctx.r3.u64, ctx.r5.u32))
 ITC_TS_STEP(NodeListScreenLoadItem,
-            ts::NodeListScreenLoadItem(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenLoadItem, ts::ColorListScreenLoadItem(base, ctx.r3.u64, ctx.r4.u64,
+            ts::NodeListScreenLoadItem(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenLoadItem, ts::ColorListScreenLoadItem(ctx.r3.u64, ctx.r4.u64,
                                                                  ctx.r5.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenShowSelection,
-            ts::ListScreenShowSelection(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListScreenShowSelection(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenLoopItemNode,
-            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 9936, ctx.r1.u32, calls))
+            ts::ListScreenLoopNode(ctx.r3.u64, ctx.r4.u64, 9936, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenLoopSecondNode,
-            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 9976, ctx.r1.u32, calls))
+            ts::ListScreenLoopNode(ctx.r3.u64, ctx.r4.u64, 9976, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenLoopThirdNode,
-            ts::ListScreenLoopNode(base, ctx.r3.u64, ctx.r4.u64, 10016, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenSetScrollText, ts::ListScreenSetScrollText(base, ctx.r3.u64, ctx.r4.u64,
+            ts::ListScreenLoopNode(ctx.r3.u64, ctx.r4.u64, 10016, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSetScrollText, ts::ListScreenSetScrollText(ctx.r3.u64, ctx.r4.u64,
                                                                  ctx.r5.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenClearScrollText,
-            ts::ListScreenClearScrollText(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ListScreenClearScrollText(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenSetArrows,
-            ts::ListScreenSetArrows(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+            ts::ListScreenSetArrows(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
 ITC_TS_STEP(ListScreenOnToggleMoved,
-            ts::ListScreenOnToggleMoved(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ListScreenOnToggleMoved(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ListScreenShowToggle,
-            ts::ListScreenShowToggle(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenSetIcons, ts::ListScreenSetIcons(base, ctx.r3.u64, ctx.r1.u32))
-ITC_TS_STEP(ListScreenSetUpMovie, ts::ListScreenSetUpMovie(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenShow, ts::ListScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenDraw, ts::ListScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenUpdate, ts::ListScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ListScreenSuspend, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 64, ctx.r1.u32,
+            ts::ListScreenShowToggle(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSetIcons, ts::ListScreenSetIcons(ctx.r3.u64, ctx.r1.u32))
+ITC_TS_STEP(ListScreenSetUpMovie, ts::ListScreenSetUpMovie(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenShow, ts::ListScreenShow(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenDraw, ts::ListScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenUpdate, ts::ListScreenUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ListScreenSuspend, ts::ListScreenTail(ctx.r3.u64, ctx.r4.u64, 64, ctx.r1.u32,
                                                   uint32_t(ctx.lr), calls))
-ITC_TS_STEP(ListScreenResume, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 68, ctx.r1.u32,
+ITC_TS_STEP(ListScreenResume, ts::ListScreenTail(ctx.r3.u64, ctx.r4.u64, 68, ctx.r1.u32,
                                                  uint32_t(ctx.lr), calls))
-ITC_TS_STEP(ListScreenOpen, ts::ListScreenTail(base, ctx.r3.u64, ctx.r4.u64, 60, ctx.r1.u32,
+ITC_TS_STEP(ListScreenOpen, ts::ListScreenTail(ctx.r3.u64, ctx.r4.u64, 60, ctx.r1.u32,
                                                uint32_t(ctx.lr), calls))
-ITC_TS_STEP(TitledListScreenReset, ts::TitledListScreenReset(base, ctx.r3.u64))
+ITC_TS_STEP(TitledListScreenReset, ts::TitledListScreenReset(ctx.r3.u64))
 ITC_TS_STEP(TitledListScreenDraw,
-            ts::TitledListScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::TitledListScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(TitledListScreenUpdate,
-            ts::TitledListScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(TitledListScreenPage2, ts::TitledListScreenPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(TitledListScreenPage3, ts::TitledListScreenPage3(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::TitledListScreenUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage2, ts::TitledListScreenPage2(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage3, ts::TitledListScreenPage3(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(TitledListScreenPage4,
-            ts::TitledListScreenPage4(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(TitledListScreenPage7, ts::TitledListScreenPage7(base, ctx.r3.u64))
-ITC_TS_STEP(ListScreenLeavePage, ts::ListScreenLeavePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+            ts::TitledListScreenPage4(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenPage7, ts::TitledListScreenPage7(ctx.r3.u64))
+ITC_TS_STEP(ListScreenLeavePage, ts::ListScreenLeavePage(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                                          uint32_t(ctx.lr), calls))
-ITC_TS_STEP(TitledListScreenStep0, ts::TitledListScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(TitledListScreenStep1, ts::TitledListScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(TitledListScreenStep2, ts::TitledListScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenStep0, ts::TitledListScreenStep0(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenStep1, ts::TitledListScreenStep1(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(TitledListScreenStep2, ts::TitledListScreenStep2(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(TitledListScreenOnItemMoved,
-            ts::TitledListScreenOnItemMoved(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::TitledListScreenOnItemMoved(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(TitledListScreenDestruct,
-            ts::TitledListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeListScreenDestruct, ts::NodeListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::TitledListScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeListScreenDestruct, ts::NodeListScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(TitledListScreenDeletingDestruct,
-            ts::NodeListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
+            ts::NodeListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
                                                calls))
 ITC_TS_STEP(NodeListScreenDeletingDestruct,
-            ts::NodeListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
+            ts::NodeListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
                                                calls))
-ITC_TS_STEP(ColorListScreenReset, ts::ColorListScreenReset(base, ctx.r3.u64))
+ITC_TS_STEP(ColorListScreenReset, ts::ColorListScreenReset(ctx.r3.u64))
 ITC_TS_STEP(ColorListScreenDraw,
-            ts::ColorListScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenUpdate,
-            ts::ColorListScreenUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenPage2, ts::ColorListScreenPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenPage3, ts::ColorListScreenPage3(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenPage4, ts::ColorListScreenPage4(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenPage5, ts::ColorListScreenPage5(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenPage2, ts::ColorListScreenPage2(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenPage3, ts::ColorListScreenPage3(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenPage4, ts::ColorListScreenPage4(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenPage5, ts::ColorListScreenPage5(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenPage6,
-            ts::ColorListScreenPage6(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenPage7, ts::ColorListScreenPage7(base, ctx.r3.u64))
-ITC_TS_STEP(ColorListScreenPage9, ts::ColorListScreenPage9(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenPage6(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenPage7, ts::ColorListScreenPage7(ctx.r3.u64))
+ITC_TS_STEP(ColorListScreenPage9, ts::ColorListScreenPage9(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenPlaceItemCursor,
-            ts::ColorListScreenPlaceItemCursor(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+            ts::ColorListScreenPlaceItemCursor(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
 ITC_TS_STEP(ColorListScreenPlaceColorCursor,
-            ts::ColorListScreenPlaceColorCursor(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+            ts::ColorListScreenPlaceColorCursor(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
 ITC_TS_STEP(ColorListScreenShowPartNodes,
-            ts::ColorListScreenShowPartNodes(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenShowPartNodes(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenDestruct,
-            ts::ColorListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(ColorListScreenDeletingDestruct,
-            ts::ColorListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep0, ts::ColorListScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep1, ts::ColorListScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep2, ts::ColorListScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep3, ts::ColorListScreenStep3(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep4, ts::ColorListScreenStep4(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenRunMovie, ts::ColorListScreenRunMovie(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep6, ts::ColorListScreenStep6(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep7, ts::ColorListScreenStep7(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep8, ts::ColorListScreenStep8(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(ColorListScreenStep10, ts::ColorListScreenStep10(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::ColorListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep0, ts::ColorListScreenStep0(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep1, ts::ColorListScreenStep1(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep2, ts::ColorListScreenStep2(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep3, ts::ColorListScreenStep3(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep4, ts::ColorListScreenStep4(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenRunMovie, ts::ColorListScreenRunMovie(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep6, ts::ColorListScreenStep6(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep7, ts::ColorListScreenStep7(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep8, ts::ColorListScreenStep8(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(ColorListScreenStep10, ts::ColorListScreenStep10(ctx.r3.u64, ctx.r1.u32, calls))
 
 // The type 6 list screen's slots and destructors, the panel and node
 // screens' leaves.
 ITC_TS_STEP(Type6ListScreenSetItemTexts,
-            ts::Type6ListScreenSetItemTexts(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6ListScreenSetItemTexts(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6ListScreenShowMarks,
-            ts::Type6ListScreenShowMarks(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+            ts::Type6ListScreenShowMarks(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
 ITC_TS_STEP(Type6ListScreenItemInfo,
-            ts::Type6ListScreenItemInfo(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
-ITC_TS_STEP(NodeScreenItemInfo, ts::NodeScreenItemInfo(base, ctx.r3.u64, ctx.r5.u32))
+            ts::Type6ListScreenItemInfo(ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
+ITC_TS_STEP(NodeScreenItemInfo, ts::NodeScreenItemInfo(ctx.r3.u64, ctx.r5.u32))
 ITC_TS_STEP(Type6ListScreenSetUpMenus,
-            ts::Type6ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type6ListScreenSetUpMenus(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6ListScreenBack,
-            ts::Type6ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6ListScreenBack(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_REGS_STEP(Type6ListScreenSetUpRace) {
   ctx.fpscr.disableFlushMode();
-  const ts::Calls calls = Type67ScreensCalls(ctx, base);
-  ctx.r3.u64 = ts::Type6ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
+  const ts::Calls calls = Type67ScreensCalls(ctx);
+  ctx.r3.u64 = ts::Type6ListScreenSetUpRace(ctx.r3.u64, ctx.r1.u32, calls);
 }
 ITC_TS_STEP(Type6ListScreenDestruct,
-            ts::Type6ListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type6ListScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6ListScreenDeletingDestruct,
-            ts::Type6ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(PanelScreenOnYes, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 0))
-ITC_TS_STEP(PanelScreenOnNo, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 1))
-ITC_TS_STEP(PanelScreenOnBack, ts::PanelScreenSetAnswer(base, ctx.r3.u64, 2))
+            ts::Type6ListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(PanelScreenOnYes, ts::PanelScreenSetAnswer(ctx.r3.u64, 0))
+ITC_TS_STEP(PanelScreenOnNo, ts::PanelScreenSetAnswer(ctx.r3.u64, 1))
+ITC_TS_STEP(PanelScreenOnBack, ts::PanelScreenSetAnswer(ctx.r3.u64, 2))
 ITC_TS_STEP(PanelScreenOnDialogClosed,
-            ts::PanelScreenOnDialogClosed(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::PanelScreenOnDialogClosed(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(PanelScreenSuspend,
-            ts::PanelScreenSuspend(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+            ts::PanelScreenSuspend(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
 ITC_TS_STEP(PanelScreenOpenEmpty,
-            ts::PanelScreenOpenEmpty(base, ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
-ITC_TS_STEP(Type6PanelScreenBack, ts::PanelScreenPost(base, ctx.r3.u64, ctx.r4.u64, 0x8223E708))
-ITC_TS_STEP(Type6PanelScreenCarList, ts::Type6CarWord(base, 1972))
-ITC_TS_STEP(Type6PanelScreenCarEntry, ts::Type6CarWord(base, 1976))
-ITC_TS_STEP(Type6PanelScreenCarSlot, ts::Type6CarWord(base, 1980))
+            ts::PanelScreenOpenEmpty(ctx.r3.u64, ctx.r1.u32, uint32_t(ctx.lr), calls))
+ITC_TS_STEP(Type6PanelScreenBack, ts::PanelScreenPost(ctx.r3.u64, ctx.r4.u64, 0x8223E708))
+ITC_TS_STEP(Type6PanelScreenCarList, ts::Type6CarWord(1972))
+ITC_TS_STEP(Type6PanelScreenCarEntry, ts::Type6CarWord(1976))
+ITC_TS_STEP(Type6PanelScreenCarSlot, ts::Type6CarWord(1980))
 ITC_TS_STEP(GroupPairDeletingDestruct,
-            ts::GroupPairDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenOpen, ts::NodeScreenOpen(base, ctx.r3.u64))
+            ts::GroupPairDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenOpen, ts::NodeScreenOpen(ctx.r3.u64))
 
 // The type 7 list screen's slots and destructors.
 ITC_TS_STEP(Type7ListScreenSetItemText,
-            ts::Type7ListScreenSetItemText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenSetItemText(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenClearItemText,
-            ts::Type7ListScreenClearItemText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenClearItemText(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenSetTitle,
-            ts::Type7ListScreenSetTitle(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenSetTitle(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenSetDetails,
-            ts::Type7ListScreenSetDetails(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenSetDetails(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenShowMarks,
-            ts::Type7ListScreenShowMarks(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
+            ts::Type7ListScreenShowMarks(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32))
 ITC_TS_STEP(Type7ListScreenItemInfo,
-            ts::Type7ListScreenItemInfo(base, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+            ts::Type7ListScreenItemInfo(ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
                                         uint32_t(ctx.lr), calls))
 ITC_TS_STEP(Type7ListScreenSetUpMenus,
-            ts::Type7ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenSetUpMenus(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenBack,
-            ts::Type7ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenBack(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_REGS_STEP(Type7ListScreenSetUpRace) {
   ctx.fpscr.disableFlushMode();
-  const ts::Calls calls = Type67ScreensCalls(ctx, base);
-  ctx.r3.u64 = ts::Type7ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
+  const ts::Calls calls = Type67ScreensCalls(ctx);
+  ctx.r3.u64 = ts::Type7ListScreenSetUpRace(ctx.r3.u64, ctx.r1.u32, calls);
 }
 ITC_TS_STEP(Type7ListScreenDestruct,
-            ts::Type7ListScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenDeletingDestruct,
-            ts::Type7ListScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ListScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 // The node screen's show handler, tables, pages, steps, helpers and
 // destructors.
-ITC_TS_STEP(NodeScreenShow, ts::NodeScreenShow(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenDraw, ts::NodeScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenUpdate, ts::NodeScreenUpdate(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenPage2, ts::NodeScreenPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenPage4, ts::NodeScreenPage4(base, ctx.r3.u64))
+ITC_TS_STEP(NodeScreenShow, ts::NodeScreenShow(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenDraw, ts::NodeScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenUpdate, ts::NodeScreenUpdate(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenPage2, ts::NodeScreenPage2(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenPage4, ts::NodeScreenPage4(ctx.r3.u64))
 ITC_TS_STEP(NodeScreenPage5,
-            ts::NodeScreenPage5(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenStep0, ts::NodeScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenStep1, ts::NodeScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::NodeScreenPage5(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenStep0, ts::NodeScreenStep0(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenStep1, ts::NodeScreenStep1(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_REGS_STEP(NodeScreenStep2) {
   ctx.fpscr.disableFlushMode();
-  const ts::Calls calls = Type67ScreensCalls(ctx, base);
-  ctx.r3.u64 = ts::NodeScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls);
+  const ts::Calls calls = Type67ScreensCalls(ctx);
+  ctx.r3.u64 = ts::NodeScreenStep2(ctx.r3.u64, ctx.r1.u32, calls);
 }
 ITC_TS_STEP(NodeScreenShowSelection,
-            ts::NodeScreenShowSelection(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::NodeScreenShowSelection(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenOnToggleMoved,
-            ts::NodeScreenOnToggleMoved(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenRefresh, ts::NodeScreenRefresh(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenShowRecords, ts::NodeScreenShowRecords(base, ctx.r3.u64, ctx.r4.u64,
+            ts::NodeScreenOnToggleMoved(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenRefresh, ts::NodeScreenRefresh(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenShowRecords, ts::NodeScreenShowRecords(ctx.r3.u64, ctx.r4.u64,
                                                             ctx.r5.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenSetArrows,
-            ts::NodeScreenSetArrows(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
-ITC_TS_STEP(NodeScreenLoadItem, ts::NodeScreenLoadItem(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(NodeScreenDestruct, ts::NodeScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::NodeScreenSetArrows(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32))
+ITC_TS_STEP(NodeScreenLoadItem, ts::NodeScreenLoadItem(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(NodeScreenDestruct, ts::NodeScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenDeletingDestruct,
-            ts::NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::NodeScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 // The type 6 node screen's own slots and destructors.
 ITC_TS_STEP(Type6NodeScreenSetUpMenus,
-            ts::Type6NodeScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type6NodeScreenSetUpMenus(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6NodeScreenSetText,
-            ts::Type6NodeScreenSetText(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(Type6NodeScreenBack, ts::Type6NodeScreenBack(base, ctx.r3.u64, ctx.r4.u64))
-ITC_TS_STEP(Type6NodeScreenSetIcons, ts::Type6NodeScreenSetIcons(base, ctx.r1.u32))
+            ts::Type6NodeScreenSetText(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6NodeScreenBack, ts::Type6NodeScreenBack(ctx.r3.u64, ctx.r4.u64))
+ITC_TS_STEP(Type6NodeScreenSetIcons, ts::Type6NodeScreenSetIcons(ctx.r1.u32))
 ITC_TS_STEP(Type6NodeScreenSetScrollText,
-            ts::Type6NodeScreenSetScrollText(base, ctx.r1.u32, calls))
+            ts::Type6NodeScreenSetScrollText(ctx.r1.u32, calls))
 ITC_TS_STEP(Type6NodeScreenShowMarks,
-            ts::Type6NodeScreenShowMarks(base, ctx.r4.u64, ctx.r1.u32))
-ITC_TS_STEP(NodeScreenSetUpTexts, ts::NodeScreenSetUpTexts(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type6NodeScreenShowMarks(ctx.r4.u64, ctx.r1.u32))
+ITC_TS_STEP(NodeScreenSetUpTexts, ts::NodeScreenSetUpTexts(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6NodeScreenDestruct,
-            ts::Type6NodeScreenDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+            ts::Type6NodeScreenDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6NodeScreenDeletingDestruct,
-            ts::Type6NodeScreenDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6NodeScreenDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 // The type 6 panel screen's Draw and PickCar.
 ITC_TS_STEP(Type6PanelScreenDraw,
-            ts::Type6PanelScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6PanelScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6PanelScreenPickCar,
-            ts::Type6PanelScreenPickCar(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6PanelScreenPickCar(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 // The screen blocks' destructors.
-ITC_TS_STEP(Type6ScreensDestruct, ts::Type6ScreensDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_TS_STEP(Type7ScreensDestruct, ts::Type7ScreensDestruct(base, ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type6ScreensDestruct, ts::Type6ScreensDestruct(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_TS_STEP(Type7ScreensDestruct, ts::Type7ScreensDestruct(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6ScreensDeletingDestruct,
-            ts::Type6ScreensDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type6ScreensDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ScreensDeletingDestruct,
-            ts::Type7ScreensDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+            ts::Type7ScreensDeletingDestruct(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 
 #undef ITC_TS_STEP
 
@@ -571,7 +571,7 @@ ITC_TS_STEP(Type7ScreensDeletingDestruct,
 
 #define ITC_TYPE67_SCREENS(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type67_screens)) { \
-    hooks::step(ctx, base);                   \
+    hooks::step(ctx);                   \
   }
 
 // The list screens' handlers (through their machines' transitions) and

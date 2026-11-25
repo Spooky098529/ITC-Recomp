@@ -75,7 +75,7 @@ constexpr uint32_t kInitFrame = 864;
 // (StateMachine::Add), built in the original's stack frame at `frame` (its
 // r1 less kInitFrame: see race_loading_init.cpp), then the end's tick count
 // 0. Returns the last StateMachine::Add's answer (`replaced` as its).
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced);
 
 // --- The machine's handlers (race_loading.cpp) ---
 //
@@ -84,19 +84,19 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
 // sub_82151408 CourseSetup::Start ((1, 0); 112-byte frame): message 2
 // posted, then ScreenFades::FadeIn([0x82001BEC] passes, black, layer 0).
 // Returns the passes (FadeIn's r3).
-uint64_t Start(uint8_t* base, uint32_t dispatcher, uint32_t sp);
+uint64_t Start(uint32_t dispatcher, uint32_t sp);
 // sub_82150DE0 CourseSetup::Begin ((1, 2) -> 3; leaf): +9616, +9620, +9608,
 // +9632, +9636 and +9628 = 0.
-void Begin(uint8_t* base, uint32_t machine);
+void Begin(uint32_t machine);
 // sub_82150DD0 CourseSetup::OnCourseReady ((3, 3) -> 4; leaf): +9640 = 0.
-void OnCourseReady(uint8_t* base, uint32_t machine);
+void OnCourseReady(uint32_t machine);
 // sub_821515A0 CourseSetup::WaitDraw ((4, 0); 96-byte frame): with step 0,
 // once the archive's queue is empty, the fade-out (unless layer 0's alpha is
 // already 255) and step 1; with step 1, once the alpha is 255, message 4
 // posted and +9608, the step = 0. Otherwise (and after step 0's fade) the
 // debug print to the empty sub_82106540 (nothing done). Returns r3: 500 (the
 // print's) or the machine (`r3`, when message 4 is posted).
-uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+uint64_t WaitDraw(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
 
 // The globals the course's wait and end read: the course scenery's manager
@@ -112,7 +112,7 @@ constexpr uint32_t kCarSceneUpdate = 0x820C9608;  // CarScene::Update, through i
 // posted and the draw step (+9648) = 0; returns 0 (IsLoading's r3).
 // Otherwise the debug print "CRS SETUP WAITING." to the empty sub_82106540
 // (nothing done); returns 500.
-uint64_t WaitCourse(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t WaitCourse(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                     const Calls& calls);
 // sub_821516F0 CourseSetup::EndTick ((37, 0); 112-byte frame): the end's
 // tick count (+9644) up by 1; when Scenery::IsLoaded([0x826C5514]) answers
@@ -121,7 +121,7 @@ uint64_t WaitCourse(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32
 // 2 (unsigned) and layer 0's fade counts are both 0: message 50 posted,
 // returns 0 (the queue length's r3). Otherwise CarScene::Update (a guest
 // call with the r3 the failed test left), returning its r3.
-uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t EndTick(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                  const Calls& calls);
 
 // --- The loading screen (race_loading.cpp) ---
@@ -130,7 +130,7 @@ uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t 
 // scene ([movie + 16]) chunk by chunk (+4 the size) up to the TRM one, +72
 // of each TXT chunk = `text` and of each PRM and PIC chunk = `other`. No
 // adapter: only LoadingScreen::Show calls it in play.
-void SetFrames(uint8_t* base, uint32_t movie, uint32_t other, uint32_t text);
+void SetFrames(uint32_t movie, uint32_t other, uint32_t text);
 // sub_822478D0 LoadingScreen::Show (144-byte frame): r3 `tip` (movie 0's
 // tip shown when not 0), r4 `which` (0 to 2, unsigned: 3 or more does
 // nothing, r3 left), r5 `frames` (-1 for none): the movie reset
@@ -140,17 +140,17 @@ void SetFrames(uint8_t* base, uint32_t movie, uint32_t other, uint32_t text);
 // picking strings 1201 + 2n and the next into nodes 9 and 10, shown) or
 // those nodes hidden, its animation finished, played and looped, and the
 // shown word = 1. Returns r3 as the original leaves it (LoopLast's).
-uint64_t Show(uint8_t* base, uint64_t tip, uint32_t which, uint32_t frames, uint32_t sp,
+uint64_t Show(uint64_t tip, uint32_t which, uint32_t frames, uint32_t sp,
               const Calls& calls);
 // sub_82247898 LoadingScreen::Run and sub_82247A60 LoadingScreen::Finish
 // (leaves but for their tail calls): r3 `which` (-1 for the current; 3 or
 // more, signed, does nothing, r3 left): UiMovie::Run(movie, 0) or
 // UiMovie::FinishNamed(movie, its animation), from the caller's frame `sp`
 // with the caller's return address `lr`. Return the callee's r3.
-uint64_t Run(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
-uint64_t Finish(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t Run(uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t Finish(uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls);
 // sub_82293460 (96-byte frame): with [0x82816E3C] set and sub_82293358
 // answering nonzero, sub_82292828([0x82816E3C]) and 1; else 0.
-uint64_t CheckSystemRequest(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CheckSystemRequest(uint32_t sp, const Calls& calls);
 
 }  // namespace race_loading

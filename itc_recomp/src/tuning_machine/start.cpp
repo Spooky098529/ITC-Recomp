@@ -33,23 +33,23 @@ namespace {
 
 namespace steps = camera_modes::steps;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 using G = schema::TuningMachineGlobals;
 
 }  // namespace
 
-uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Calls& calls,
+uint64_t Start(const tuning_screen::StandCalls& stand, const Calls& calls,
                uint64_t r3, uint64_t r1, std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_821E7368 TuningMachine::Start");
   const uint32_t s = uint32_t(r3);
-  const schema::TuningMachineScreen sc(base, s);
+  const schema::TuningMachineScreen sc(s);
   const uint32_t sp = uint32_t(r1);
   const uint32_t frame = sp - kStartFrame;
-  Store(base, frame, sp);  // the back chain, as stwu
+  Store(frame, sp);  // the back chain, as stwu
   // The screen's words, in the original's order.
   sc.set_money(9999999);
   sc.set_list_row(0);
@@ -67,43 +67,45 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
   sc.set_unknown_25080(4);
   sc.set_category(0);      // power
   sc.set_screen_state(3);  // TUNING SHOP MAIN
-  sc.set_save_data(vehicle_accessors::SaveDataOf(base, 0));
+  sc.set_save_data(vehicle_accessors::SaveDataOf(0));
   // The car data (its f1 as FromGarageCar leaves it), a power curve on the
   // frame (+96; FromEngine's tail call Build's frame below this one).
   double data_f1 = 0.0;
-  car_makers::TuningScreenSetUpCarData(base, stand.calls, s, frame, &data_f1);
+  car_makers::TuningScreenSetUpCarData(stand.calls, s, frame, &data_f1);
   *f1 = data_f1;
-  const schema::StagePowerCurve curve(base, frame + 96);
-  vehicle::PowerCurveFromEngine(base, curve.address, s + 20180, frame - 112);
-  vehicle::PowerCurveShiftPeak(base, curve.address, 0, frame);
+  const schema::StagePowerCurve curve(frame + 96);
+  vehicle::PowerCurveFromEngine(curve.address, s + 20180, frame - 112);
+  vehicle::PowerCurveShiftPeak(curve.address, 0, frame);
   // The stats (as SetCarStats): the displacement, the weight, the power
   // (words by fctiwz, stfiwx) and the torque shown (a float).
-  const int32_t displacement = steps::Fctiwz(steps::Lfs(base, sc.car_displacement_address()));
-  const int32_t power = steps::Fctiwz(steps::Lfs(base, curve.shifted_peak_power_address()));
-  const double torque = steps::Lfs(base, curve.torque_scale_address());
-  const double two = steps::Lfs(base, G::axle_factor_address());
+  const int32_t displacement = steps::Fctiwz(steps::Lfs(sc.car_displacement_address()));
+  const int32_t power = steps::Fctiwz(steps::Lfs(curve.shifted_peak_power_address()));
+  const double torque = steps::Lfs(curve.torque_scale_address());
+  const double two = steps::Lfs(G::axle_factor_address());
   sc.set_stat_displacement(uint32_t(displacement));
-  const double rear = steps::Lfs(base, sc.car_rear_weight_address());
-  const double shown = steps::Single(torque * steps::Lfs(base, G::torque_scale_address()));
-  const double front = steps::Lfs(base, sc.car_front_weight_address());
+  const double rear = steps::Lfs(sc.car_rear_weight_address());
+  const double shown = steps::Single(torque * steps::Lfs(G::torque_scale_address()));
+  const double front = steps::Lfs(sc.car_front_weight_address());
   const double axles = steps::Single(rear + front);
-  const double body = steps::Lfs(base, sc.car_body_weight_address());
-  Store(base, sc.stat_torque_address(), std::bit_cast<uint32_t>(float(shown)));
+  const double body = steps::Lfs(sc.car_body_weight_address());
+  Store(sc.stat_torque_address(), std::bit_cast<uint32_t>(float(shown)));
   const double weight = steps::Single(std::fma(axles, two, body));
   sc.set_stat_weight(uint32_t(steps::Fctiwz(weight)));
   sc.set_stat_power(uint32_t(power));
-  SavePlaceholders(base, sc.decal_images_address(), frame);
-  SetUp(base, r3, (r1 & 0xFFFFFFFF00000000ull) | frame, true, calls);
-  // The busy icon: movie 2's nodes 172, 171 and 173 (its id also at the
-  // frame's +80, UiMovies::Find's key), the movie's pose reset.
+  SavePlaceholders(sc.decal_images_address(), frame);
+  SetUp(r3, (r1 & 0xFFFFFFFF00000000ull) | frame, true, calls);
+  // The busy icon: movie 2's nodes 172, 171 and 173 (UiMovies::Find by the
+  // id as a word: the original's key at the frame's +80, read only by Find;
+  // E5 step 6), the movie's pose reset.
   sc.set_busy_shown(0);
   sc.set_busy_movie(kShopMovie);
   sc.set_busy_animation_a(172);
   sc.set_busy_animation_b(171);
   sc.set_busy_animation_c(173);
-  const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, kShopMovie));
-  ui_movies::ResetPose(base, movie);
-  tuning_screen::Refresh(base, stand, r3, frame, f1);
+  const uint32_t movie =
+      Load(ui_movies::PairsFindKey(ui_movies::kMovieTable, kShopMovie));
+  ui_movies::ResetPose(movie);
+  tuning_screen::Refresh(stand, r3, frame, f1);
   // The command queue at its state; the category menu (6 rows, 8 lines).
   const uint32_t state = sc.screen_state();
   schema::PageObject queue = sc.queue();
@@ -139,8 +141,8 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
   queue.set_queued_step(0xFFFFFFFFu);
   queue.set_next_page(page);
   queue.set_page(0xFFFFFFFFu);
-  const uint32_t passes = G::fade_in_passes(base);
-  mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
+  const uint32_t passes = G::fade_in_passes();
+  mode_tick::ScreenFadesFadeIn(passes, 0, 0, 0, 0);
   return passes;  // FadeIn leaves r3 (lwz: zero-extended)
 }
 

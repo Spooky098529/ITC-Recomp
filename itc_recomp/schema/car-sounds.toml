@@ -19,13 +19,29 @@ measure = "CarSound"
 measures = ["CarSounds", "CarSound::UpdateVoices.r3", "CarSound::Pause.r3", "CarSound::Clear.r3", "CarSound::Resume.r3"]
 size = 1264
 origin = "allocated"
+storage = "host"
 fields = [
-  { name = "array_count", offset = -16, type = "u32", note = "the first element only: operator new[]'s count (7) in the array's block" },
+  { name = "array_count", offset = -16, type = "bytes", count = 4, note = "the first element only: CarSoundArray's count (7), read as the array's count (no member: outside the sound; CarSoundArray(array_count_address()).count())" },
   { name = "tunnel_reverb", offset = 0, type = "u32", note = "the submix's reverb state: 1 the block 0x826166F8 set (the vehicle's +5314 bit 1, probably a tunnel), 0 the block 0x82616638" },
-  { name = "listener", offset = 4, type = "bytes", count = 48, note = "an X3DAudioListener; its cone pointer is the emitter's +0 (+52)" },
+  { name = "listener", offset = 4, type = "bytes", count = 48, note = "an X3DAudioListener; its cone pointer is the emitter's +0 (+52). Not an embed (the emitter's cone would be a second layout entry at +52): its floats below, which X3DAudioListener's dual view reads" },
+  { name = "x3d_listener_front_x", offset = 4, type = "f32" },
+  { name = "x3d_listener_front_y", offset = 8, type = "f32" },
+  { name = "x3d_listener_front_z", offset = 12, type = "f32" },
+  { name = "x3d_listener_top_x", offset = 16, type = "f32" },
+  { name = "x3d_listener_top_y", offset = 20, type = "f32" },
+  { name = "x3d_listener_top_z", offset = 24, type = "f32" },
+  { name = "x3d_listener_position_x", offset = 28, type = "f32" },
+  { name = "x3d_listener_position_y", offset = 32, type = "f32" },
+  { name = "x3d_listener_position_z", offset = 36, type = "f32" },
+  { name = "x3d_listener_velocity_x", offset = 40, type = "f32" },
+  { name = "x3d_listener_velocity_y", offset = 44, type = "f32" },
+  { name = "x3d_listener_velocity_z", offset = 48, type = "f32" },
   { name = "emitter", offset = 52, type = "bytes", count = 92, note = "an X3DAudioEmitter (its cone pointer +52 points at +144)" },
+  { name = "emitter_object", offset = 52, type = "embed", to = "X3DAudioEmitter" },
   { name = "cone", offset = 144, type = "bytes", count = 32, note = "an X3DAudioCone" },
+  { name = "cone_object", offset = 144, type = "embed", to = "X3DAudioCone" },
   { name = "dsp", offset = 176, type = "bytes", count = 48, note = "an X3DAudioDspSettings: +176 the matrix (24 bytes from operator new[]), +184 1 source, +188 6 destination channels, +200 the reverb level, +204 the Doppler factor" },
+  { name = "dsp_object", offset = 176, type = "embed", to = "X3DAudioDspSettings" },
   { name = "reverb_map", offset = 224, type = "bytes", count = 48, note = "six {channel byte, gain float} pairs: the reverb level times the volume" },
   { name = "output_map", offset = 272, type = "bytes", count = 48, note = "six {channel byte, gain float} pairs: the matrix times the volume" },
   { name = "reverb_map_count", offset = 320, type = "u8", note = "6" },
@@ -50,18 +66,30 @@ fields = [
   { name = "vehicle", offset = 400, type = "ptr", to = "Vehicle", note = "0 when the car sound has no racer" },
   { name = "index", offset = 404, type = "u8", note = "the car's index, 0 to 6" },
   { name = "engine", offset = 408, type = "bytes", count = 176, note = "a CarSoundEngine" },
+  { name = "engine_object", offset = 408, type = "embed", to = "CarSoundEngine" },
   { name = "hits", offset = 584, type = "bytes", count = 68, note = "a CarSoundHits" },
+  { name = "hits_object", offset = 584, type = "embed", to = "CarSoundHits" },
   { name = "tires", offset = 652, type = "bytes", count = 84, note = "a CarSoundTires (its voice holder at +676)" },
+  { name = "tires_object", offset = 652, type = "embed", to = "CarSoundTires" },
   { name = "gear", offset = 736, type = "bytes", count = 56, note = "a CarSoundGear (sub_8210EBF0, probably the gear change)" },
+  { name = "gear_object", offset = 736, type = "embed", to = "CarSoundGear" },
   { name = "roll", offset = 792, type = "bytes", count = 48, note = "a CarSoundRoll" },
+  { name = "roll_object", offset = 792, type = "embed", to = "CarSoundRoll" },
   { name = "events", offset = 840, type = "bytes", count = 48, note = "a CarSoundEvents (sub_8210ECF0)" },
+  { name = "events_object", offset = 840, type = "embed", to = "CarSoundEvents" },
   { name = "fade", offset = 888, type = "bytes", count = 64, note = "a CarSoundFade (sub_8210EEE0)" },
+  { name = "fade_object", offset = 888, type = "embed", to = "CarSoundFade" },
   { name = "turbo", offset = 952, type = "bytes", count = 64, note = "a CarSoundTurbo (probably)" },
+  { name = "turbo_object", offset = 952, type = "embed", to = "CarSoundTurbo" },
   { name = "wind", offset = 1016, type = "bytes", count = 56, note = "a CarSoundWind" },
+  { name = "wind_object", offset = 1016, type = "embed", to = "CarSoundWind" },
   { name = "horn", offset = 1072, type = "bytes", count = 64, note = "a CarSoundHorn (probably)" },
+  { name = "horn_object", offset = 1072, type = "embed", to = "CarSoundHorn" },
   { name = "pass_by", offset = 1136, type = "bytes", count = 56, note = "a CarSoundPassBy" },
+  { name = "pass_by_object", offset = 1136, type = "embed", to = "CarSoundPassBy" },
   { name = "volume_curve_points", offset = 1192, type = "bytes", count = 48, note = "the emitter's volume curve: six {distance, value} float pairs" },
   { name = "volume_curve", offset = 1240, type = "bytes", count = 8, note = "an X3DAudioCurve over +1192 (six points), the emitter's +64" },
+  { name = "volume_curve_object", offset = 1240, type = "embed", to = "X3DAudioCurve" },
   { name = "live", offset = 1248, type = "u32", note = "1 once CarSounds::SetBanks gave it its banks; 0 stopped" },
   { name = "engine_gain", offset = 1252, type = "f32", note = "1.0; EngineSound::Update's f2" },
   { name = "last_doppler", offset = 1256, type = "f32", note = "the last tick's Doppler factor (+204)" },
@@ -73,9 +101,11 @@ fields = [
 measure = "new<8864>@CarSounds::Init"
 size = 8864
 origin = "allocated"
+storage = "host"
 fields = [
-  { name = "count", offset = 0, type = "u32", note = "7" },
-  { name = "sounds", offset = 16, type = "bytes", count = 8848, note = "seven CarSounds" },
+  { name = "count", offset = 0, type = "u32", note = "7 (operator new[]'s count; CarSounds::Destroy reads it at the first sound's -16)" },
+  { name = "sounds", offset = 16, type = "bytes", count = 8848, note = "seven CarSounds (the embedded sound)" },
+  { name = "sound", offset = 16, type = "embed", to = "CarSound", count = 7 },
 ]
 
 # The voice holder: the 40-byte base of every sound part (vtable 0x82010B5C;
@@ -83,6 +113,7 @@ fields = [
 [CarSoundVoiceHolder]
 size = 40
 origin = "embedded"
+storage = "host"
 vtable = 0x82010B5C
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C" },
@@ -97,8 +128,10 @@ fields = [
 [CarSoundPart]
 size = 48
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView", note = "the effects' bank" },
   { name = "index", offset = 44, type = "u8", note = "the car's index" },
 ]
@@ -110,10 +143,13 @@ measure = "new<8864>@CarSounds::Init@+16@+408"
 measures = ["CarSound@+408"]
 size = 176
 origin = "embedded"
+storage = "host"
 vtable = 0x82008018
 fields = [
   { name = "layer", offset = 0, type = "bytes", count = 84, note = "a CarSoundEngineLayer (from the second wave bank view)" },
   { name = "pitched_layer", offset = 84, type = "bytes", count = 84, note = "a CarSoundEngineLayer (from the first wave bank view)" },
+  { name = "layer_object", offset = 0, type = "embed", to = "CarSoundEngineLayer" },
+  { name = "pitched_layer_object", offset = 84, type = "embed", to = "CarSoundEngineLayer" },
   { name = "load", offset = 168, type = "f32", note = "the load, eased toward the throttle's target (probably)" },
   { name = "idle_speed", offset = 172, type = "f32", note = "the speed without a vehicle: up by 10 a tick, back to 800 past 7,000" },
 ]
@@ -124,6 +160,7 @@ measure = "EngineLayer"
 measures = ["EngineLayer::Update.r3", "EngineLayer::Start.r3"]
 size = 84
 origin = "embedded"
+storage = "host"
 vtable = 0x82008018
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82008018" },
@@ -133,6 +170,7 @@ fields = [
   { name = "table_volume_copy", offset = 16, type = "u32", note = "the same word" },
   { name = "amounts", offset = 20, type = "bytes", count = 24, note = "a float per table entry: the volume's amount from its first curve" },
   { name = "holder", offset = 44, type = "bytes", count = 40, note = "a CarSoundVoiceHolder: one voice per table entry" },
+  { name = "voice_holder", offset = 44, type = "embed", to = "CarSoundVoiceHolder" },
 ]
 
 # An engine layer's table: the car's sound parameters ([[0x82616318 + 16 i]
@@ -172,8 +210,10 @@ fields = [
 measure = "CarSound@+584"
 size = 68
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView", note = "the effects' bank" },
   { name = "index", offset = 44, type = "u8", note = "the car's index" },
   { name = "wait_ticks", offset = 48, type = "u32", note = "ticks to wait before the next hit (unsigned)" },
@@ -188,6 +228,7 @@ fields = [
 measure = "CarSound@+652"
 size = 84
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "slot", offset = 0, type = "u32", note = "the layer record (TireLayer::Update's r4): the voice's slot" },
   { name = "was_active", offset = 4, type = "u32", note = "the last tick's `active`" },
@@ -200,6 +241,7 @@ fields = [
   { name = "ramp_step_2", offset = 21, type = "u8" },
   { name = "ramp_length_2", offset = 22, type = "u8" },
   { name = "holder", offset = 24, type = "bytes", count = 40, note = "a CarSoundVoiceHolder (+28 and +32 its voices)" },
+  { name = "voice_holder", offset = 24, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 64, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 68, type = "u8" },
   { name = "slip_steps", offset = 70, type = "u16", note = "up by one a slipping tick" },
@@ -212,8 +254,10 @@ fields = [
 [CarSoundGear]
 size = 56
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "wait_ticks", offset = 48, type = "u32", note = "32 when played, down by one while the vehicle's byte +2948 is clear" },
@@ -225,8 +269,10 @@ fields = [
 measure = "CarSound@+792"
 size = 48
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder (+4 the voice)" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
 ]
@@ -235,8 +281,10 @@ fields = [
 [CarSoundEvents]
 size = 48
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "wave18_wait", offset = 45, type = "u8", note = "2 when wave 18 played, down by one a tick" },
@@ -246,8 +294,10 @@ fields = [
 [CarSoundFade]
 size = 64
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "playing", offset = 48, type = "u32" },
@@ -261,8 +311,10 @@ fields = [
 measure = "CarSound@+952"
 size = 64
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "slot", offset = 48, type = "u32", note = "the looping wave 3's slot, -1 none" },
@@ -278,8 +330,10 @@ fields = [
 measure = "CarSound@+1016"
 size = 56
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "played", offset = 48, type = "u32", note = "1 once wave 5 played" },
@@ -291,8 +345,10 @@ fields = [
 measure = "CarSound@+1072"
 size = 64
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "slot", offset = 48, type = "u32", note = "-1 none" },
@@ -306,8 +362,10 @@ fields = [
 measure = "CarSound@+1136"
 size = 56
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "holder", offset = 0, type = "bytes", count = 40, note = "a CarSoundVoiceHolder" },
+  { name = "voice_holder", offset = 0, type = "embed", to = "CarSoundVoiceHolder" },
   { name = "view", offset = 40, type = "ptr", to = "CarSoundWaveBankView" },
   { name = "index", offset = 44, type = "u8" },
   { name = "unknown_48", offset = 48, type = "u32", note = "-1 from CarSound::Start; not read" },
@@ -319,6 +377,19 @@ fields = [
 measure = "new<?>@RaceSounds::Begin"
 size = 44
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the race's effects bank (asset 22889), read
+# whole by Archive::Load into the buffer RaceSounds::Begin (hand port) made
+# with XPhysicalAlloc, now schema::CarSoundWaveBank::New with the file's size;
+# its waves' XMA data read by our FFmpeg through guest::Pointer
+# (hooks/xma.cpp); freed by RaceSounds::Unload's XPhysicalFree.
+# E5 step 7 (2026-11-24): the other wave banks too, never read by the
+# renderer: RaceSounds::Init's slot buffers (hand port, New), bank pair 2's
+# 3 MiB block (SoundGlobals::Init, models::AllocPhysicalExBlob) and the other
+# bank pairs' (BankPair::Load's lifted XPhysicalAlloc, returning at
+# 0x821179F0, the size rounded up to 2 KB in r3; freed by BankPair's
+# release, XPhysicalFree at 0x82117BF0).
+storage = "blob"
+blob_alloc = [{ call = 0x821179F0, reg = "r3" }]
 fields = [
   { name = "data_offset", offset = 8, type = "u32", note = "the bank data's offset" },
   { name = "entries_offset", offset = 16, type = "u32", note = "the entries' offset" },
@@ -402,6 +473,7 @@ fields = [
 [X3DAudioListener]
 size = 52
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "front_x", offset = 0, type = "f32" },
   { name = "front_y", offset = 4, type = "f32" },
@@ -423,6 +495,7 @@ fields = [
 measures = ["X3DAudio::Delay.r5", "X3DAudioCalculate.r5"]
 size = 92
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "cone", offset = 0, type = "ptr", to = "X3DAudioCone", note = "0 none" },
   { name = "front_x", offset = 4, type = "f32" },
@@ -454,6 +527,7 @@ fields = [
 measures = ["CarSound.+52", "X3DAudio::Delay.r5.+0"]
 size = 32
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "inner_angle", offset = 0, type = "f32" },
   { name = "outer_angle", offset = 4, type = "f32" },
@@ -469,6 +543,7 @@ fields = [
 [X3DAudioCurve]
 size = 8
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "points", offset = 0, type = "u32", note = "{distance, value} float pairs" },
   { name = "count", offset = 4, type = "u32" },
@@ -479,6 +554,7 @@ fields = [
 measures = ["X3DAudio::Delay.r6", "X3DAudioCalculate.r7"]
 size = 48
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "matrix", offset = 0, type = "ptr", to = "X3DAudioMatrix", note = "destination rows of source-channel floats" },
   { name = "delays", offset = 4, type = "ptr", to = "X3DAudioDelays" },
@@ -529,6 +605,7 @@ measure = "X3DVec"
 measures = ["X3DVec::Cross.r4", "X3DVec::Cross.r5", "X3DVec::Dot.r4", "X3DVec::Sub.r4", "X3DVec::Sub.r5", "X3DAudio::Matrix.r4", "X3DVec::Sub.r3"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "x", offset = 0, type = "f32" },
   { name = "y", offset = 4, type = "f32" },
@@ -545,8 +622,8 @@ sound_picks_b = { address = 0x826C5C64, type = "bytes", count = 28, note = "seve
 sound_manager = { address = 0x826C5C80, type = "u32", note = "the sound manager (AudioManager, app + 124)" }
 music_byte = { address = 0x826C5C84, type = "u8", note = "0 by SoundGlobals::Init and the race's music fades" }
 unknown_826C5C85 = { address = 0x826C5C85, type = "u8", note = "0 by SoundGlobals::Init" }
-bank_pair_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's 3 MiB physical buffer" }
-bank_pair_small_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's 512-byte physical buffer" }
+bank_pair_buffer = { address = 0x826C5C88, type = "u32", note = "bank pair 2's 3 MiB wave bank buffer (a memory block, a blob since E5 step 7)" }
+bank_pair_small_buffer = { address = 0x826C5C8C, type = "u32", note = "bank pair 2's 512-byte sound bank buffer (a memory block, a blob since E5 step 7)" }
 x3daudio = { address = 0x826C5C90, type = "bytes", count = 16, note = "an X3DAudioHandle (X3DAudioInitialize's, 5.1)" }
 channel_azimuths = { address = 0x826C5C38, type = "f32", note = "the emitter's one channel azimuth" }
 horn_record = { address = 0x826C62CC, type = "bytes", count = 20, note = "a CarInputRecord: race mode 8's other player's" }

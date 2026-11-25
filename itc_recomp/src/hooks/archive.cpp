@@ -75,25 +75,25 @@ bool hooks::NativeArchiveQueue() {
 ITC_NATIVE_ENTRY_ALWAYS(82592670) {
   
   if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(ctx.r3.u32)) {
-    s->Wait(base);
+    s->Wait();
     return;
   }
-  lifted::original::c82592670(ctx, base);
+  lifted::original::c82592670(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
   
   if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(ctx.r3.u32)) {
-    s->Signal(base);
+    s->Signal();
     return;
   }
-  lifted::original::c825926E8(ctx, base);
+  lifted::original::c825926E8(ctx);
 }
 
 #define ITC_ARCHIVE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_archive)) {    \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                           \
   }
 
@@ -106,15 +106,15 @@ ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
 
 // Archive::Toc: r3 = an asset id. A leaf: only r3 (and r11, the global's
 // high half, read by no caller) changes.
-ITC_ARCHIVE_WORD(8209D868, archive::Toc(base, ctx.r3.u32))
+ITC_ARCHIVE_WORD(8209D868, archive::Toc(ctx.r3.u32))
 // Archive::AssetSize: r3 = an asset id. Its r31 is restored and r11 read by
 // no caller.
-ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(base, ctx.r3.u32))
+ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(ctx.r3.u32))
 // ListNode::~ListNode (from the panel screens' and the slots' clean-ups,
 // recompiled; never seen in play): r3 left.
 ITC_NATIVE_ENTRY_ALWAYS(8224FB10) {
   ITC_ARCHIVE_FALLBACK(8224FB10)
-  archive::NodeDestruct(base, ctx.r3.u32);
+  archive::NodeDestruct(ctx.r3.u32);
 }
 
 // The static set-ups: no arguments; r3 = atexit's. The original runs when
@@ -123,11 +123,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8224FB10) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                            \
     \
     if (!ITC_FLAG(native_archive) || !hooks::NativeAtexit()) {    \
-      lifted::original::c##address(ctx, base);               \
+      lifted::original::c##address(ctx);               \
       return;                                                     \
     }                                                             \
-    hooks::GuestAtexit guest{ctx, base};                          \
-    ctx.r3.s64 = archive::function(base, guest.Call());           \
+    hooks::GuestAtexit guest{ctx};                          \
+    ctx.r3.s64 = archive::function(guest.Call());           \
   }
 
 ITC_ARCHIVE_STATIC_INIT(825D9160, QueueStaticInit)
@@ -139,31 +139,29 @@ namespace {
 // bytes), with its return addresses.
 struct FinishGuestCalls {
   lifted::Regs& ctx;
-  uint8_t* base;
 
   static void Callback(void* self, uint32_t function, uint32_t serial, uint32_t data,
                        uint32_t size, uint32_t context) {
     auto& c = *static_cast<FinishGuestCalls*>(self);
     lifted::Regs& ctx = c.ctx;
-    uint8_t* base = c.base;
-    guest_call::InFrame(ctx, base, 96, 0x8209D6F8, [&](uint32_t) {
+    guest_call::InFrame(ctx, 96, 0x8209D6F8, [&](uint32_t) {
       ctx.r3.u64 = serial;
       ctx.r4.u64 = data;
       ctx.r5.u64 = size;
       ctx.r6.u64 = context;
       // (r11 = the target, the original's mtctr source, was a leftover: none
       // reads it)
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
     });
   }
   static void GuestFree(void* self, uint32_t address, uint32_t size, uint32_t type) {
     auto& c = *static_cast<FinishGuestCalls*>(self);
     lifted::Regs& ctx = c.ctx;
-    guest_call::InFrame(ctx, c.base, 96, 0x8209D71C, [&](uint32_t) {
+    guest_call::InFrame(ctx, 96, 0x8209D71C, [&](uint32_t) {
       ctx.r3.u64 = address;
       ctx.r4.u64 = size;
       ctx.r5.u64 = type;
-      lifted::original::c82295330(ctx, c.base);
+      lifted::original::c82295330(ctx);
     });
   }
   archive::FinishCalls Calls() { return {&Callback, &GuestFree, this}; }
@@ -174,9 +172,9 @@ struct FinishGuestCalls {
 // The request finish: r3 = the request. Its r31 is restored; r3 and the
 // other volatile registers are whatever its calls leave (read by no
 // caller).
-void hooks::ArchiveFinishRequest(lifted::Regs& ctx, uint8_t* base) {
-  FinishGuestCalls calls{ctx, base};
-  if (auto r3 = archive::FinishRequest(base, ctx.r3.u32, calls.Calls())) {
+void hooks::ArchiveFinishRequest(lifted::Regs& ctx) {
+  FinishGuestCalls calls{ctx};
+  if (auto r3 = archive::FinishRequest(ctx.r3.u32, calls.Calls())) {
     ctx.r3.u64 = *r3;
   }
 }
@@ -184,15 +182,15 @@ void hooks::ArchiveFinishRequest(lifted::Regs& ctx, uint8_t* base) {
 // LoaderFunctor::Invoke: r3 = the functor, r4 = the argument: a tail call of
 // the functor's +4 with r4 as r3 (ctr the target, as the original's mtctr;
 // lr the caller's; r11, also the target there, isn't carried: none reads it).
-void hooks::ArchiveInvokeFunctor(lifted::Regs& ctx, uint8_t* base) {
-  const uint32_t target = archive::LoaderFunctorTarget(base, ctx.r3.u32);
+void hooks::ArchiveInvokeFunctor(lifted::Regs& ctx) {
+  const uint32_t target = archive::LoaderFunctorTarget(ctx.r3.u32);
   ctx.r3.u64 = ctx.r4.u64;
-  lifted::CallFromContext(ctx, base, target);
+  lifted::CallFromContext(ctx, target);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8209DD80) {
   ITC_ARCHIVE_FALLBACK(8209DD80)
-  hooks::ArchiveInvokeFunctor(ctx, base);
+  hooks::ArchiveInvokeFunctor(ctx);
 }
 
 // Ucl::Unpack: r3 = the destination, r4 = the stream, r5 = the expected
@@ -200,28 +198,27 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DD80) {
 // own frame (its byte swaps' and the block's output size) are read by
 // nothing. memcpy, where the native copy can't, through `ctx` in a frame as
 // the original's (160 bytes).
-void hooks::ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ArchiveUclUnpack(lifted::Regs& ctx) {
   struct Guest {
     lifted::Regs& ctx;
-    uint8_t* base;
     static void Memcpy(void* self, uint32_t destination, uint32_t source, uint32_t size) {
       auto& g = *static_cast<Guest*>(self);
       lifted::Regs& ctx = g.ctx;
-      guest_call::InFrame(ctx, g.base, 160, 0x822946E4, [&](uint32_t) {
+      guest_call::InFrame(ctx, 160, 0x822946E4, [&](uint32_t) {
         ctx.r3.u64 = destination;
         ctx.r4.u64 = source;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, g.base, game::memcpy_825A7410);
+        lifted::Enter(ctx, game::memcpy_825A7410);
       });
     }
-  } guest{ctx, base};
+  } guest{ctx};
   ctx.r3.u64 =
-      archive::UclUnpack(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, {&Guest::Memcpy, &guest});
+      archive::UclUnpack(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, {&Guest::Memcpy, &guest});
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82294610) {
   ITC_ARCHIVE_FALLBACK(82294610)
-  hooks::ArchiveUclUnpack(ctx, base);
+  hooks::ArchiveUclUnpack(ctx);
 }
 
 // --- The queue under the four semaphores ---
@@ -229,7 +226,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82294610) {
 #define ITC_ARCHIVE_QUEUE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                      \
   if (!hooks::NativeArchiveQueue()) {       \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                 \
   }
 
@@ -248,16 +245,15 @@ void SetSerial(lifted::Regs& ctx, int64_t serial) {
 // frame as the original's (112 bytes).
 struct SetUpGuestCalls {
   lifted::Regs& ctx;
-  uint8_t* base;
   static uint32_t Alloc(void* self, uint32_t size) {
     auto& c = *static_cast<SetUpGuestCalls*>(self);
     lifted::Regs& ctx = c.ctx;
-    guest_call::InFrame(ctx, c.base, 112, 0x8209D604, [&](uint32_t) {
+    guest_call::InFrame(ctx, 112, 0x8209D604, [&](uint32_t) {
       ctx.r3.u64 = 0;
       ctx.r4.u64 = size;
       ctx.r5.u64 = 4096;
       ctx.r6.u64 = 4;
-      lifted::Enter(ctx, c.base, game::VirtualAlloc);
+      lifted::Enter(ctx, game::VirtualAlloc);
     });
     return ctx.r3.u32;
   }
@@ -274,7 +270,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DE48) {
   if (hooks::StartUpRecorded(ctx, 0x8209DE48)) {
     return;
   }
-  SetSerial(ctx, archive::Queue(base, archive::BuildLoad(base, ctx.r3.u32, ctx.r4.u32,
+  SetSerial(ctx, archive::Queue(archive::BuildLoad(ctx.r3.u32, ctx.r4.u32,
                                                          ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                                                          ctx.r8.u32)));
 }
@@ -286,28 +282,28 @@ ITC_NATIVE_ENTRY_ALWAYS(8209D730) {
   if (hooks::StartUpRecorded(ctx, 0x8209D730)) {
     return;
   }
-  archive::WaitIdle(base);
+  archive::WaitIdle();
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8209DB90) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DB90)
-  archive::CancelQueued(base, ctx.r3.s32 != 0);
+  archive::CancelQueued(ctx.r3.s32 != 0);
 }
 
 // Archive::QueueLength: r3 the count (lwz's).
 ITC_NATIVE_ENTRY_ALWAYS(8209D7B0) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209D7B0)
-  ctx.r3.u64 = archive::QueueLength(base);
+  ctx.r3.u64 = archive::QueueLength();
 }
 
 // The cancel of a request: r3 = its serial; r3 1 or 0.
 ITC_NATIVE_ENTRY_ALWAYS(8209DB20) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DB20)
-  ctx.r3.u64 = archive::Cancel(base, ctx.r3.u32);
+  ctx.r3.u64 = archive::Cancel(ctx.r3.u32);
 }
 
-archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
-  return [base](uint32_t id, uint32_t destination, uint32_t callback,
+archive::LoadCall hooks::NativeArchiveLoad() {
+  return [](uint32_t id, uint32_t destination, uint32_t callback,
                 uint32_t context) -> int64_t {
     // A harness's recorder takes the call first, as Archive::Load's adapter
     // hands it (so a harness running native callers never queues for real).
@@ -321,7 +317,7 @@ archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
         return t.r3.s64 < 0 ? -1 : int64_t(t.r3.u32);
       }
     }
-    return archive::Queue(base, archive::BuildLoad(base, id, destination, callback, context, 0, 0));
+    return archive::Queue(archive::BuildLoad(id, destination, callback, context, 0, 0));
   };
 }
 
@@ -330,28 +326,28 @@ void hooks::SetArchiveSerial(lifted::Regs& ctx, int64_t serial) { SetSerial(ctx,
 
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).
-void hooks::ArchiveSetUp(lifted::Regs& ctx, uint8_t* base) {
-  SetUpGuestCalls calls{ctx, base};
-  archive::SetUp(base, ctx.r3.u32, calls.Calls());
+void hooks::ArchiveSetUp(lifted::Regs& ctx) {
+  SetUpGuestCalls calls{ctx};
+  archive::SetUp(ctx.r3.u32, calls.Calls());
 }
 
 // The loader's next request: r3 = the current request or 0; r3 the next. Its
 // calls from inside a frame as the original's (112 bytes), the finish's and
 // the set-up's own below it.
-void hooks::ArchiveNextRequest(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ArchiveNextRequest(lifted::Regs& ctx) {
   const uint32_t current = ctx.r3.u32;
   uint32_t next = 0;
-  guest_call::InFrame(ctx, base, 112, uint32_t(ctx.lr), [&](uint32_t) {
-    FinishGuestCalls finish{ctx, base};
-    SetUpGuestCalls set_up{ctx, base};
-    next = archive::NextRequest(base, current, {finish.Calls(), set_up.Calls()});
+  guest_call::InFrame(ctx, 112, uint32_t(ctx.lr), [&](uint32_t) {
+    FinishGuestCalls finish{ctx};
+    SetUpGuestCalls set_up{ctx};
+    next = archive::NextRequest(current, {finish.Calls(), set_up.Calls()});
   });
   ctx.r3.u64 = next;
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8209DD98) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DD98)
-  hooks::ArchiveNextRequest(ctx, base);
+  hooks::ArchiveNextRequest(ctx);
 }
 
 // The loader's loose read: r3 = the request (+20 its path, +64 where to
@@ -370,56 +366,56 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   
   if (!ITC_FLAG(native_archive) || !ITC_FLAG(native_std_string) || !hooks::NativeHeapActive() ||
       !ITC_FLAG(native_file_layer)) {
-    lifted::original::c8209DFA8(ctx, base);
+    lifted::original::c8209DFA8(ctx);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8209DFA8 Archive::ReadLoose");
-  const schema::ArchiveRequestSlot request(base, ctx.r3.u32);
+  const schema::ArchiveRequestSlot request(ctx.r3.u32);
   const uint32_t frame = ctx.r1.u32 - 240;
   const uint32_t file = frame + 96, path = frame + 112, name = frame + 144, fixed = frame + 176;
   auto call = [&](uint32_t return_address, auto&& body) {
-    guest_call::InFrame(ctx, base, 240, return_address, [&](uint32_t) { body(); });
+    guest_call::InFrame(ctx, 240, return_address, [&](uint32_t) { body(); });
   };
   auto from_text = [&](uint32_t string, uint32_t text, uint32_t allocator,
                        uint32_t return_address) {
-    if (!std_string::ConstructFromTextWithAllocator(base, string, text)) {
+    if (!std_string::ConstructFromTextWithAllocator(string, text)) {
       call(return_address, [&] {
         ctx.r3.u64 = string;
         ctx.r4.u64 = text;
         ctx.r5.u64 = allocator;
-        lifted::original::c82593248(ctx, base);
+        lifted::original::c82593248(ctx);
       });
     }
   };
   auto assign = [&](uint32_t source, uint32_t return_address) {
-    if (!std_string::AssignFrom(base, path, source, 0, 0xFFFFFFFF)) {
+    if (!std_string::AssignFrom(path, source, 0, 0xFFFFFFFF)) {
       call(return_address, [&] {
         ctx.r3.u64 = path;
         ctx.r4.u64 = source;
         ctx.r5.u64 = 0;
         ctx.r6.s64 = -1;
-        lifted::original::c82091720(ctx, base);
+        lifted::original::c82091720(ctx);
       });
     }
   };
   auto release = [&](uint32_t string, uint32_t return_address) {
-    if (!std_string::Tidy(base, string, true, 0)) {
+    if (!std_string::Tidy(string, true, 0)) {
       call(return_address, [&] {
         ctx.r3.u64 = string;
         ctx.r4.u64 = 1;
         ctx.r5.u64 = 0;
-        lifted::original::c82091328(ctx, base);
+        lifted::original::c82091328(ctx);
       });
     }
   };
-  file_layer::GameFileConstruct(base, file);
-  std_string::Construct(base, path);
+  file_layer::GameFileConstruct(file);
+  std_string::Construct(path);
   from_text(name, request.loose_path().address, frame + 82, 0x8209DFE4);
   assign(name, 0x8209DFFC);
   release(name, 0x8209E00C);
   // The wildcard replace of "/" (0x82001DE8) by "\\" (0x82001DEC): the text.
   uint32_t text;
-  if (const auto replaced = std_string::ReplaceAll(base, path, 0x82001DE8, frame - 144)) {
+  if (const auto replaced = std_string::ReplaceAll(path, 0x82001DE8, frame - 144)) {
     text = *replaced;
   } else {
     call(0x8209E028, [&] {
@@ -427,54 +423,54 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
       ctx.r4.u64 = 0x82001DE8;
       ctx.r5.u64 = 0x82001DEC;
       ctx.r6.u64 = 0;
-      lifted::original::c82593088(ctx, base);
+      lifted::original::c82593088(ctx);
     });
     text = ctx.r3.u32;
   }
   from_text(fixed, text, frame + 83, 0x8209E038);
   assign(fixed, 0x8209E04C);
   release(fixed, 0x8209E05C);
-  guest::StoreU8(base, frame + 80, 1);
+  guest::StoreU8(frame + 80, 1);
   call(0x8209E084, [&] {
     ctx.r3.u64 = file;
-    ctx.r4.u64 = std_string::Text(base, path);
+    ctx.r4.u64 = std_string::Text(path);
     ctx.r5.u64 = frame + 80;
-    lifted::Enter(ctx, base, lifted::entry::e820A6AB8);
+    lifted::Enter(ctx, lifted::entry::e820A6AB8);
   });
   if ((ctx.r3.u32 & 0xFF) != 0) {
-    guest::StoreU32(base, frame + 84, request.read_r7());
-    guest::StoreU32(base, frame + 88, 0);
+    guest::StoreU32(frame + 84, request.read_r7());
+    guest::StoreU32(frame + 88, 0);
     call(0x8209E0AC, [&] {
       ctx.r3.u64 = file;
       ctx.r4.u64 = frame + 84;
       ctx.r5.u64 = frame + 88;
-      lifted::Enter(ctx, base, game::File::Seek);
+      lifted::Enter(ctx, game::File::Seek);
     });
     call(0x8209E0BC, [&] {
       ctx.r3.u64 = file;
       ctx.r4.u64 = request.data();
       ctx.r5.u64 = request.read_stored_size_address();
-      lifted::Enter(ctx, base, game::File::Read);
+      lifted::Enter(ctx, game::File::Read);
     });
     if (ctx.r3.u32 == 0) {
-      call(0x8209E0C8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
+      call(0x8209E0C8, [&] { lifted::Enter(ctx, lifted::e8209AC78); });
     }
     call(0x8209E0D0, [&] {
       ctx.r3.u64 = file;
-      lifted::Enter(ctx, base, game::File::Close);
+      lifted::Enter(ctx, game::File::Close);
     });
   } else {
-    call(0x8209E0D8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
+    call(0x8209E0D8, [&] { lifted::Enter(ctx, lifted::e8209AC78); });
   }
   if (archive::HostSemaphore* done = hooks::ArchiveSemaphore(archive::kRequestDone)) {
-    done->Signal(base);
+    done->Signal();
   } else {
     call(0x8209E0E4, [&] {
       ctx.r3.u64 = archive::kRequestDone;
-      lifted::Enter(ctx, base, game::Semaphore::Signal);
+      lifted::Enter(ctx, game::Semaphore::Signal);
     });
   }
   release(path, 0x8209E0F4);
-  file_layer::GameFileDestruct(base, file);
+  file_layer::GameFileDestruct(file);
   ctx.r3.u64 = file;
 }

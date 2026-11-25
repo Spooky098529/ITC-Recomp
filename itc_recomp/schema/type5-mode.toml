@@ -22,6 +22,11 @@
 # ModeAnswer) at +0, the mode seen from its +32 interface (r3 = the mode + 32
 # in Interrupt and ForceExit: iface_* below, 32 bytes before the fields they
 # are) and the block FindShown gets (fault_* at +9604 and +28920).
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block and at -28 (ForceExit's +4 from the +32 interface:
+# a negative offset no host struct holds) were left out.
 [ModeType5]
 # measures from LocationScreenMode (location-screen), merged at the integration
 measures = [
@@ -34,9 +39,10 @@ measures = [
   "FrontEndMode::NextMode.r4"]
 size = 852
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82107858]
 vtable = 0x82006C24
 fields = [
-  { name = "iface_delegate_ptr", offset = -28, type = "u32", note = "measure fault: ForceExit's mode +4 (delegate_ptr) through the +32 interface (r3 - 28), not a field before the mode" },
   { name = "vtable", offset = 0, type = "u32", note = "0x82006C24 (Type5ModeVtable)" },
   { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer; the delegates clear it), not the mode's" },
   { name = "delegate_ptr", offset = 4, type = "ptr", to = "ModeDelegate", note = "the delegate at +8, 0 when it wraps to 0 (also the answer's next type +4 by the measure's join)" },
@@ -52,8 +58,6 @@ fields = [
   { name = "ring_start", offset = 844, type = "u32" },
   { name = "iface_block", offset = 816, type = "u32", note = "measure fault: block (+848) through the +32 interface (Interrupt, ForceExit)" },
   { name = "block", offset = 848, type = "ptr", to = "Type5ModeBlock", note = "VirtualAlloc(0, 28940, 0x1000, 4) by Init, freed by ModeType5::Release" },
-  { name = "fault_car_settings_state", offset = 9604, type = "u32", note = "measure fault: FindShown's block (r3) +9604, the car settings' machine state, not the mode's" },
-  { name = "fault_shown", offset = 28920, type = "u32", note = "measure fault: FindShown's block (r3) +28920, the shown machine's id, not the mode's" },
 ]
 
 # The block (VirtualAlloc'ed by ModeType5::Init; known-data.md: "type 5 mode
@@ -61,9 +65,23 @@ fields = [
 # words every front-end machine has after it; the dialog's is Type5Dialog),
 # then the shown machine and the next mode's answer. location-screen.toml's
 # LocationScreenModeBlock is this block as FrontEndMode::NextMode meets it.
+# In host memory since E5 step 4 (2026-11-24): made by ModeType5::Init (the
+# original's VirtualAlloc(28940) at 0x8222FDA4; Init has no lifted
+# original), freed by ModeType5::Release's FreePages (its VirtualFree at
+# 0x8222FBB4; the lifted original runs only for a block that isn't pages,
+# never a handle); the mode's +848 holds its handle. As Type2ModeBlock, the
+# three machines stay described by their areas' guest views (CarSettings,
+# LocationScreenMachine, Type5Dialog, StateMachine and StateTransition):
+# their accesses reach the block through its handle (memory::RawHandleLoad
+# and Store, by this type's layout), so every view of a machine agrees
+# whatever its type; the dispatcher (+36) and the transitions' functors
+# hold interior handles (the block + 9640, + 0, + 19280). The measure's
+# "new<28940>@ModeType5::Init" was location-screen.toml's LocationScreenPart
+# (the same block), merged here.
 [Type5ModeBlock]
 # measures from LocationScreenModeBlock (location-screen), merged at the integration
 measures = [
+  "new<28940>@ModeType5::Init",
   "ModeType5.+816",
   "ModeType5::NextMode.r4.+848",
   "ModeType5::WaitForLoads.r4.+848",
@@ -71,6 +89,7 @@ measures = [
   "FrontEndMode::NextMode.r4.+848"]
 size = 28940
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "car_settings", offset = 0, type = "bytes", count = 9640, note = "the car settings' machine (car-settings.md, CarSettings::InitType5); id 3" },
   { name = "car_settings_state", offset = 9604, type = "u32", note = "the car settings' machine state" },
@@ -139,6 +158,7 @@ fields = [
 measure = "Mode::Slot14Thunk.r4"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "Type5ModeVtable", note = "0x82006C24" },
 ]

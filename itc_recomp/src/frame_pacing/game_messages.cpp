@@ -11,6 +11,7 @@
 #include "debug/state_digest.h"
 #include "input/pad_ticks.h"
 #include "guest.h"
+#include "memory/mapping.h"
 #ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
 #endif
@@ -20,6 +21,9 @@
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
 #include "race_update/draw_step.h"
+#include "schema/app_states.h"
+#include "schema/boot_mode.h"
+#include "schema/input.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -44,6 +48,10 @@ ITC_FLAG_BOOL(native_race_draw_step, true, "ITC",
 ITC_FLAG_BOOL(log_race_changes, false, "ITC",
               "Log when the game enters and leaves a race (the race's draw step starts or "
               "stops running)");
+ITC_FLAG_BOOL(game_rand_by_tick, true, "ITC",
+              "Render-only passes don't advance the game's own random number generator "
+              "(sub_82293568's seed): the camera shake drew from it on every frame, so the "
+              "race's traffic and other draws depended on the frame rate");
 ITC_FLAG_BOOL(log_game_messages, false, "ITC",
               "Log game messages delivered and skipped, once a second");
 ITC_FLAG_STRING(render_only_update_handlers, "", "ITC",
@@ -127,12 +135,10 @@ bool SkipOnRenderOnlyPass(uint32_t target) {
   return std::find(targets.begin(), targets.end(), target) != targets.end();
 }
 
-// Message dispatcher object (r3 of sub_821062E8).
-constexpr uint32_t kHandlersOffset = 0;  // array of handler pointers
-constexpr uint32_t kHandlerCountOffset = 200;
-constexpr uint32_t kQueueOffset = 204;  // ring of messages
-constexpr uint32_t kQueueCountOffset = 804;
-constexpr uint32_t kQueueReadIndexOffset = 808;
+// Message dispatcher object (r3 of sub_821062E8; a mode's +36): read through
+// schema::ModeDispatcher, a dual view (E5 step 4: the 852-byte modes are in
+// host memory, the boot and race modes in guest memory). Its handlers (+0)
+// and ring (+204) are bytes in guest order, its counts +200, +804 and +808.
 constexpr uint32_t kQueueCapacity = 50;
 constexpr uint32_t kMessageBytes = 12;  // id and two arguments
 
@@ -204,7 +210,7 @@ void InputWatch_SetRanges(std::vector<InputRange> ranges) {
   g_input_ranges = std::move(ranges);
 }
 
-void InputWatch_Copy(uint8_t* base, std::vector<uint32_t>& out) {
+void InputWatch_Copy(std::vector<uint32_t>& out) {
   size_t words = 0;
   for (const InputRange& r : g_input_ranges) {
     words += r.words;
@@ -212,22 +218,22 @@ void InputWatch_Copy(uint8_t* base, std::vector<uint32_t>& out) {
   out.resize(words);
   size_t at = 0;
   for (const InputRange& r : g_input_ranges) {
-    guest::CopyU32s(base, r.start, out.data() + at, r.words);
+    guest::CopyU32s(r.start, out.data() + at, r.words);
     at += r.words;
   }
 }
 
-void InputWatch_Before(uint8_t* base) {
+void InputWatch_Before() {
   if (ITC_FLAG(log_input_writes) && !g_input_ranges.empty()) {
-    InputWatch_Copy(base, g_input_before);
+    InputWatch_Copy(g_input_before);
   }
 }
 
-void InputWatch_After(uint8_t* base, int kind, uint32_t target) {
+void InputWatch_After(int kind, uint32_t target) {
   if (!ITC_FLAG(log_input_writes) || g_input_ranges.empty() || g_input_before.empty()) {
     return;
   }
-  InputWatch_Copy(base, g_input_after);
+  InputWatch_Copy(g_input_after);
   if (g_input_after.size() != g_input_before.size()) {
     return;
   }
@@ -304,7 +310,7 @@ void InputLog_OnPassStart() {
 }
 
 // As the race draw step is entered: logs the pause signs when any changed.
-void InputLog_PauseSigns(uint8_t* base);
+void InputLog_PauseSigns();
 
 struct Counts {
   int updates = 0;
@@ -355,24 +361,25 @@ void LogRecording(uint32_t message, uint32_t handler, int slots) {
 }
 
 // Delivers one message to every handler, as the game does.
-void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message,
+void Deliver(lifted::Regs& ctx, uint32_t dispatcher, uint32_t message,
              const std::string* only_targets = nullptr) {
-  uint32_t handler_count = guest::LoadU32(base, dispatcher + kHandlerCountOffset);
+  const schema::ModeDispatcher d(dispatcher);
+  uint32_t handler_count = d.handler_count();
   for (uint32_t i = 0; i < handler_count; i++) {
     // sub_82106280 picks the object that handles this message for handler i;
     // its first virtual method takes it.
-    ctx.r3.u64 = guest::LoadU32(base, dispatcher + kHandlersOffset + 4 * i);
+    ctx.r3.u64 = schema::host::LoadU32(d.handlers() + 4 * i);
     ctx.r4.u64 = message;
     ctx.lr = 0x82106370;
-    lifted::Enter(ctx, base, game::StateMachine::Handle);
-    uint32_t object = guest::LoadU32(base, ctx.r3.u32);
-    uint32_t method = guest::LoadU32(base, guest::LoadU32(base, object));
+    lifted::Enter(ctx, game::StateMachine::Handle);
+    uint32_t object = guest::LoadU32(ctx.r3.u32);
+    uint32_t method = guest::LoadU32(guest::LoadU32(object));
     ctx.r3.u64 = object;
     ctx.r4.u64 = dispatcher;
     ctx.lr = 0x82106388;
     // Delegates (sub_8223A3F0, sub_82233460) keep their real target at +8.
     uint32_t target = (method == 0x8223A3F0 || method == 0x82233460)
-                          ? guest::LoadU32(base, object + 8)
+                          ? guest::LoadU32(object + 8)
                           : method;
     if (g_render_only_pass && SkipOnRenderOnlyPass(target)) {
       continue;
@@ -386,53 +393,54 @@ void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t mes
     // The command list recorders write to, and its slots used.
     constexpr uint32_t kCommandListPointer = 0x8296B918;
     constexpr uint32_t kCommandListUsedOffset = 12;
-    uint32_t list = guest::LoadU32(base, kCommandListPointer);
-    uint32_t used_before = list ? guest::LoadU32(base, list + kCommandListUsedOffset) : 0;
-    debug::FrameStateDiff_Before(base);
-    debug::IdleTimerScan_Before(base);
-    debug::MenuSelectionScan_Before(base);
+    uint32_t list = guest::LoadU32(kCommandListPointer);
+    uint32_t used_before = list ? guest::LoadU32(list + kCommandListUsedOffset) : 0;
+    debug::FrameStateDiff_Before();
+    debug::IdleTimerScan_Before();
+    debug::MenuSelectionScan_Before();
     interpolation::BlendState_SetHandler(target);
     g_current_handler = target;
-    g_current_message = guest::LoadU32(base, message);
+    g_current_message = guest::LoadU32(message);
     InputLog_Run(kMessageRun, g_current_message, target);
     if (target == kPauseScreenDraw) {
       g_pause_drawn_this_pass = true;
     }
-    InputWatch_Before(base);
-    lifted::CallFromContext(ctx, base, method);
-    InputWatch_After(base, kMessageRun, target);
+    InputWatch_Before();
+    lifted::CallFromContext(ctx, method);
+    InputWatch_After(kMessageRun, target);
     g_current_handler = 0;
     g_current_message = ~0u;
     interpolation::BlendState_SetHandler(0);
-    debug::MenuSelectionScan_After(base, "message handler", target);
-    debug::IdleTimerScan_After(base, "message handler", target);
-    debug::FrameStateDiff_After(base, "message handler", target);
+    debug::MenuSelectionScan_After("message handler", target);
+    debug::IdleTimerScan_After("message handler", target);
+    debug::FrameStateDiff_After("message handler", target);
     if (ITC_FLAG(log_recording_handlers) && list &&
-        guest::LoadU32(base, kCommandListPointer) == list) {
-      uint32_t used_after = guest::LoadU32(base, list + kCommandListUsedOffset);
+        guest::LoadU32(kCommandListPointer) == list) {
+      uint32_t used_after = guest::LoadU32(list + kCommandListUsedOffset);
       if (used_after != used_before) {
-        LogRecording(guest::LoadU32(base, message), target, int(used_after - used_before));
+        LogRecording(guest::LoadU32(message), target, int(used_after - used_before));
       }
     }
   }
 }
 
-void DispatchMessages(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher) {
+void DispatchMessages(lifted::Regs& ctx, uint32_t dispatcher) {
   guest::StackFrame frame(ctx, 144);
   uint32_t message = frame.Local(80);
   Counts& counts = GetCounts();
-  while (guest::LoadU32(base, dispatcher + kQueueCountOffset) != 0) {
+  const schema::ModeDispatcher d(dispatcher);
+  while (d.ring_count() != 0) {
     // Pop the oldest message into a local copy.
-    uint32_t count = guest::LoadU32(base, dispatcher + kQueueCountOffset);
-    uint32_t read = guest::LoadU32(base, dispatcher + kQueueReadIndexOffset);
-    guest::StoreU32(base, dispatcher + kQueueCountOffset, count - 1);
-    guest::StoreU32(base, dispatcher + kQueueReadIndexOffset, read + 1);
-    uint32_t slot = dispatcher + kQueueOffset + (read % kQueueCapacity) * kMessageBytes;
+    uint32_t count = d.ring_count();
+    uint32_t read = d.ring_start();
+    d.set_ring_count(count - 1);
+    d.set_ring_start(read + 1);
+    const uint32_t slot = (read % kQueueCapacity) * kMessageBytes;
     for (uint32_t k = 0; k < kMessageBytes; k += 4) {
-      guest::StoreU32(base, message + k, guest::LoadU32(base, slot + k));
+      guest::StoreU32(message + k, schema::host::LoadU32(d.ring() + slot + k));
     }
 
-    uint32_t id = guest::LoadU32(base, message);
+    uint32_t id = guest::LoadU32(message);
     if (id == kUpdate) {
       counts.updates++;
       if (g_render_only_pass) {
@@ -451,20 +459,20 @@ void DispatchMessages(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher) {
           only += only.empty() ? "82159948" : ",82159948";
         }
         if (!only.empty()) {
-          Deliver(ctx, base, dispatcher, message, &only);
+          Deliver(ctx, dispatcher, message, &only);
         }
         continue;
       }
     } else if (id == kDraw) {
       counts.draws++;
-      interpolation::BlendState_BeforeDraw(base, g_render_only_pass);
-      Deliver(ctx, base, dispatcher, message);
-      interpolation::BlendState_AfterDraw(base);
+      interpolation::BlendState_BeforeDraw(g_render_only_pass);
+      Deliver(ctx, dispatcher, message);
+      interpolation::BlendState_AfterDraw();
       continue;
     } else {
       counts.others++;
     }
-    Deliver(ctx, base, dispatcher, message);
+    Deliver(ctx, dispatcher, message);
   }
   LogCounts();
 }
@@ -509,6 +517,22 @@ void GameMessages_PassCounts(uint64_t& logic, uint64_t& render_only) {
 }
 
 void GameMessages_SetRenderOnlyPass(bool render_only) {
+  // The game's own random generator advances only on logic passes, as at the
+  // original 30 fps: its seed saved when a render-only pass starts, put back
+  // when the next pass starts (the camera shake draws from it every frame).
+  if (ITC_FLAG(game_rand_by_tick)) {
+    constexpr uint32_t kGameRandSeed = 0x82638188;  // race-overlays.toml's rand_seed
+    static bool saved = false;
+    static uint32_t seed = 0;
+    if (saved) {
+      guest::StoreU32(kGameRandSeed, seed);
+      saved = false;
+    }
+    if (render_only) {
+      seed = guest::LoadU32(kGameRandSeed);
+      saved = true;
+    }
+  }
   g_passes[render_only ? 1 : 0]++;
   g_render_only_pass = render_only;
   g_paused = g_pause_drawn_this_pass;
@@ -547,7 +571,7 @@ bool GameMessages_IsRenderOnlyPass() {
 
 namespace {
 
-void InputLog_PauseSigns(uint8_t* base) {
+void InputLog_PauseSigns() {
   if (!ITC_FLAG(log_input)) {
     return;
   }
@@ -557,10 +581,10 @@ void InputLog_PauseSigns(uint8_t* base) {
   constexpr uint32_t kRecordBytes = 592;
   PauseSigns signs;
   for (uint32_t k = 0; k < 3; k++) {
-    signs.records[k] = guest::LoadU32(base, kRecords + k * kRecordBytes + 588);
+    signs.records[k] = guest::LoadU32(kRecords + k * kRecordBytes + 588);
   }
-  uint32_t mode_object = guest::LoadU32(base, 0x826C5B2C);
-  signs.mode = mode_object ? guest::LoadU32(base, mode_object + 0xA3AF0) : ~0u;
+  uint32_t mode_object = guest::LoadU32(0x826C5B2C);
+  signs.mode = mode_object ? guest::LoadU32(mode_object + 0xA3AF0) : ~0u;
   if (signs == g_pause_signs) {
     return;
   }
@@ -587,41 +611,41 @@ namespace {
 
 // --log_input: the input manager's objects (layout in
 // docs/pause-menu-fix.md, "Input::Update"), once a race.
-void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
+void LogInputManager(lifted::Regs& ctx, uint32_t manager) {
   constexpr uint32_t kLogicalPads = 8, kLogicalPadBytes = 196;
   constexpr uint32_t kPhysicalPads = 988, kPhysicalPadBytes = 212;
   constexpr uint32_t kProcessors = 1840, kProcessorBytes = 416;
   constexpr uint32_t kListeners = 3924, kListenerBytes = 12;
   auto slot1 = [&](uint32_t object) {
-    return guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+    return guest::LoadU32(guest::LoadU32(object) + 4);
   };
   ITC_LOG_INFO("input manager {:08X}", manager);
   for (uint32_t i = 0; i < 4; i++) {
     uint32_t pad = manager + kPhysicalPads + kPhysicalPadBytes * i;
     ITC_LOG_INFO("input physical pad {} at {:08X}: vtable {:08X} slot 1 {:08X} flags {:X}", i, pad,
-                 guest::LoadU32(base, pad), slot1(pad), guest::LoadU32(base, pad + 4));
+                 guest::LoadU32(pad), slot1(pad), guest::LoadU32(pad + 4));
   }
   for (uint32_t j = 0; j < 5; j++) {
     uint32_t processor = manager + kProcessors + kProcessorBytes * j;
     ITC_LOG_INFO("input processor {} at {:08X}: vtable {:08X} slot 1 {:08X}", j, processor,
-                 guest::LoadU32(base, processor), slot1(processor));
+                 guest::LoadU32(processor), slot1(processor));
   }
   for (uint32_t j = 0; j < 5; j++) {
     uint32_t s = manager + kListeners + kListenerBytes * j;
-    uint32_t count = guest::LoadU32(base, s + 4);
-    uint32_t head = guest::LoadU32(base, s);
+    uint32_t count = guest::LoadU32(s + 4);
+    uint32_t head = guest::LoadU32(s);
     if (!count || !head) {
       ITC_LOG_INFO("input listener slot {}: count {} head {:08X}", j, count, head);
       continue;
     }
-    uint32_t node = guest::LoadU32(base, head + 4);
+    uint32_t node = guest::LoadU32(head + 4);
     if (node == head) {
       ITC_LOG_INFO("input listener slot {}: count {} head {:08X}, empty list", j, count, head);
       continue;
     }
-    uint32_t object = guest::LoadU32(base, node + 8);
+    uint32_t object = guest::LoadU32(node + 8);
     ITC_LOG_INFO("input listener slot {}: count {} object {:08X} vtable {:08X} slot 1 {:08X}", j,
-                 count, object, guest::LoadU32(base, object), slot1(object));
+                 count, object, guest::LoadU32(object), slot1(object));
   }
   // Each binding's slot 1 is called as sub_82591918 calls it (r3 = device,
   // returns the values' address in r3); the caller's r3 and lr are kept.
@@ -630,8 +654,8 @@ void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
   for (uint32_t j = 0; j < 5; j++) {
     uint32_t pad = manager + kLogicalPads + kLogicalPadBytes * j;
     for (uint32_t k = 0; k < 4; k++) {
-      uint32_t enabled = guest::LoadU8(base, pad + 4 + 8 * k);
-      uint32_t device = guest::LoadU32(base, pad + 8 + 8 * k);
+      uint32_t enabled = guest::LoadU8(pad + 4 + 8 * k);
+      uint32_t device = guest::LoadU32(pad + 8 + 8 * k);
       if (!device) {
         ITC_LOG_INFO("input logical pad {} binding {}: enabled {} device 0", j, k, enabled);
         continue;
@@ -647,14 +671,14 @@ void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
       if (enabled) {
         ctx.r3.u64 = device;
         ctx.lr = 0x82591970;
-        lifted::CallFromContext(ctx, base, function);
+        lifted::CallFromContext(ctx, function);
         uint32_t v = ctx.r3.u32;
         values = std::format("returns {:08X} (device + 8: {})", v, v == device + 8);
       }
       ITC_LOG_INFO(
           "input logical pad {} binding {}: enabled {} device {:08X} (physical pad {}) vtable "
           "{:08X} slot 1 {:08X} {}",
-          j, k, enabled, device, physical, guest::LoadU32(base, device), function, values);
+          j, k, enabled, device, physical, guest::LoadU32(device), function, values);
     }
   }
   ctx.r3.u64 = saved_r3;
@@ -662,7 +686,7 @@ void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
   for (uint32_t address :
        {0x82000A30u, 0x82000A34u, 0x82001BE0u, 0x82002200u, 0x8200223Cu, 0x82002BD4u,
         0x8206CBFCu}) {
-    uint32_t bits = guest::LoadU32(base, address);
+    uint32_t bits = guest::LoadU32(address);
     ITC_LOG_INFO("input constant {:08X}: {:08X} = {}", address, bits, std::bit_cast<float>(bits));
   }
 }
@@ -677,7 +701,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
   {
     base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
     // --run_harnesses, once (on the thread's SDK context: the harnesses keep it)
-    lifted::Sdk(ctx, base, harness::RunRequested);
+    lifted::Sdk(ctx, harness::RunRequested);
   }
 #endif
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
@@ -687,14 +711,17 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
     g_input_manager_logged = false;
   } else if (ITC_FLAG(log_input) && !g_input_manager_logged) {
     g_input_manager_logged = true;
-    LogInputManager(ctx, base, ctx.r3.u32);
+    LogInputManager(ctx, ctx.r3.u32);
   }
   {
     // Listener 0's object (first node of listener slot 0), for diagnostics.
-    uint32_t s = ctx.r3.u32 + 3924;
-    uint32_t head = guest::LoadU32(base, s);
-    uint32_t node = head && guest::LoadU32(base, s + 4) ? guest::LoadU32(base, head + 4) : 0;
-    frame_pacing::g_input_listener0 = node && node != head ? guest::LoadU32(base, node + 8) : 0;
+    // The manager is in host memory (E5 step 4): its list through the views.
+    const schema::PtrList list = schema::InputManager(ctx.r3.u32).listener_list(0);
+    const schema::PtrListNode head = list.head<schema::PtrListNode>();
+    const schema::PtrListNode node =
+        head.address && list.size() ? head.previous() : schema::PtrListNode(0);
+    frame_pacing::g_input_listener0 =
+        node.address && node.address != head.address ? node.value() : 0;
   }
   if (ITC_FLAG(log_input_writes)) {
     // The manager (its last part, the listener slots, ends at +3984) and
@@ -704,18 +731,18 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
     std::vector<frame_pacing::InputRange> ranges{{manager, 3984 / 4, "manager", 0}};
     for (uint32_t j = 0; j < 5; j++) {
       uint32_t s = manager + 3924 + 12 * j;
-      uint32_t head = guest::LoadU32(base, s);
-      if (!guest::LoadU32(base, s + 4) || !head) {
+      uint32_t head = guest::LoadU32(s);
+      if (!guest::LoadU32(s + 4) || !head) {
         continue;
       }
-      uint32_t node = guest::LoadU32(base, head + 4);
+      uint32_t node = guest::LoadU32(head + 4);
       if (node != head) {
-        ranges.push_back({guest::LoadU32(base, node + 8), 416 / 4, "listener", int(j)});
+        ranges.push_back({guest::LoadU32(node + 8), 416 / 4, "listener", int(j)});
       }
     }
     frame_pacing::InputWatch_SetRanges(std::move(ranges));
   }
-  input_hooks::InputUpdate_Run(ctx, base);
+  input_hooks::InputUpdate_Run(ctx);
 }
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
@@ -724,19 +751,19 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
 // read the record the caller's r31 pointed at: not carried since the
 // rewiring; it reads the records themselves.)
 ITC_NATIVE_ENTRY_ALWAYS(8215B4F8) {
-  frame_pacing::InputLog_PauseSigns(base);
+  frame_pacing::InputLog_PauseSigns();
   frame_pacing::g_race_draw_step_seen = true;
   if (ITC_FLAG(native_race_draw_step)) {
-    lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
+    lifted_call::EnterR3<race_update::RaceDrawStep>(ctx);
   } else {
-    lifted::original::c8215B4F8(ctx, base);
+    lifted::original::c8215B4F8(ctx);
   }
 }
 
 // Message dispatcher: r3 = dispatcher object.
 ITC_NATIVE_ENTRY_ALWAYS(821062E8) {
   
-  frame_pacing::DispatchMessages(ctx, base, ctx.r3.u32);
+  frame_pacing::DispatchMessages(ctx, ctx.r3.u32);
 }
 
 // Diagnostics (--log_tick_handlers): the main loop's tick handlers that run
@@ -754,13 +781,13 @@ std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 ITC_NATIVE_ENTRY_ALWAYS(82099A98) {
   
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
-      frame_pacing::SkipTickHandlerOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
+      frame_pacing::SkipTickHandlerOnRenderOnlyPass(guest::LoadU32(ctx.r4.u32 + 8))) {
     return;
   }
   if (ITC_FLAG(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     uint32_t handler = ctx.r4.u32;
-    uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);
-    uint32_t target = guest::LoadU32(base, handler + 8);
+    uint32_t tick = guest::LoadU32(guest::LoadU32(handler) + 4);
+    uint32_t target = guest::LoadU32(handler + 8);
     g_tick_handlers[{tick, target}]++;
     auto now = std::chrono::steady_clock::now();
     if (now - g_tick_handlers_logged >= std::chrono::seconds(1)) {
@@ -772,24 +799,24 @@ ITC_NATIVE_ENTRY_ALWAYS(82099A98) {
       g_tick_handlers_logged = now;
     }
   }
-  uint32_t target = guest::LoadU32(base, ctx.r4.u32 + 8);
+  uint32_t target = guest::LoadU32(ctx.r4.u32 + 8);
   frame_pacing::InputLog_Run(frame_pacing::kTickRun,
-                             guest::LoadU32(base, guest::LoadU32(base, ctx.r4.u32) + 4), target);
-  debug::FrameStateDiff_Before(base);
-  debug::IdleTimerScan_Before(base);
-  debug::MenuSelectionScan_Before(base);
-  frame_pacing::InputWatch_Before(base);
+                             guest::LoadU32(guest::LoadU32(ctx.r4.u32) + 4), target);
+  debug::FrameStateDiff_Before();
+  debug::IdleTimerScan_Before();
+  debug::MenuSelectionScan_Before();
+  frame_pacing::InputWatch_Before();
   frame_pacing::g_current_tick = target;
   if (hooks::NativeFramework()) {
-    hooks::TickHandlerInvoke(ctx, base);
+    hooks::TickHandlerInvoke(ctx);
   } else {
-    lifted::original::c82099A98(ctx, base);
+    lifted::original::c82099A98(ctx);
   }
   frame_pacing::g_current_tick = 0;
-  frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);
-  debug::MenuSelectionScan_After(base, "tick handler", target);
-  debug::IdleTimerScan_After(base, "tick handler", target);
-  debug::FrameStateDiff_After(base, "tick handler", target);
+  frame_pacing::InputWatch_After(frame_pacing::kTickRun, target);
+  debug::MenuSelectionScan_After("tick handler", target);
+  debug::IdleTimerScan_After("tick handler", target);
+  debug::FrameStateDiff_After("tick handler", target);
 }
 
 // --log_input_reads: the input processors' (and listeners') button tests,

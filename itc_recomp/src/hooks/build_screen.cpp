@@ -67,7 +67,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -78,7 +78,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -93,28 +92,27 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 // GarageStage::ReloadModel for the stand: its plain C++ where its adapter
 // would run it (--native_car_makers, --native_vehicle_accessors,
 // --native_scene_models), else the function through `calls`.
-bs::ReloadCall Reloader(lifted::Regs& ctx, uint8_t* base, const bs::Calls& calls) {
-  return [&ctx, base, calls](uint32_t holder, uint32_t block, uint32_t frame,
+bs::ReloadCall Reloader(lifted::Regs& ctx, const bs::Calls& calls) {
+  return [&ctx, calls](uint32_t holder, uint32_t block, uint32_t frame,
                              uint32_t lr) -> uint64_t {
     if (ITC_FLAG(native_car_makers) && ITC_FLAG(native_vehicle_accessors) &&
         ITC_FLAG(native_scene_models)) {
       const uint64_t link = ctx.lr;
       ctx.fpscr.disableFlushMode();
-      const front_end_car_draw::Calls fe = FrontEndCarDrawCalls(ctx, base);
-      const uint64_t r3 = car_makers::GarageStageReloadModel(base, fe, holder, block, frame);
+      const front_end_car_draw::Calls fe = FrontEndCarDrawCalls(ctx);
+      const uint64_t r3 = car_makers::GarageStageReloadModel(fe, holder, block, frame);
       ctx.fpscr.disableFlushMode();
       ctx.lr = link;
       return r3;
@@ -126,230 +124,230 @@ bs::ReloadCall Reloader(lifted::Regs& ctx, uint8_t* base, const bs::Calls& calls
 }  // namespace
 
 ITC_REGS_STEP(BuildScreenPutOnStand) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const bs::Calls calls = guest.calls();
-  ctx.r3.u64 = bs::PutOnStand(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, Reloader(ctx, base, calls));
+  ctx.r3.u64 = bs::PutOnStand(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, Reloader(ctx, calls));
 }
 
 ITC_REGS_STEP(BuildScreenSetUpStand) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const bs::Calls calls = guest.calls();
-  ctx.r3.u64 = bs::SetUpStand(base, ctx.r1.u32, calls, Reloader(ctx, base, calls));
+  ctx.r3.u64 = bs::SetUpStand(ctx.r1.u32, calls, Reloader(ctx, calls));
 }
 
 ITC_REGS_STEP(BuildScreenOpenStand) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const bs::Calls calls = guest.calls();
-  ctx.r3.u64 = bs::OpenStand(base, ctx.r3.u32, ctx.r1.u32, calls, Reloader(ctx, base, calls));
+  ctx.r3.u64 = bs::OpenStand(ctx.r3.u32, ctx.r1.u32, calls, Reloader(ctx, calls));
 }
 
 ITC_REGS_STEP(BuildScreenKeepGroupList) {
-  ctx.r3.u64 = bs::KeepGroupList(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::KeepGroupList(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenKeepBuildList) {
-  ctx.r3.u64 = bs::KeepBuildList(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::KeepBuildList(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenKeepStandList) {
-  ctx.r3.u64 = bs::KeepStandList(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::KeepStandList(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenRestoreBuildList) {
-  ctx.r3.u64 = bs::RestoreBuildList(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::RestoreBuildList(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenRestoreStandList) {
-  ctx.r3.u64 = bs::RestoreStandList(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::RestoreStandList(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenInitGroupLists) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::InitGroupLists(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::InitGroupLists(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenInitStandList) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::InitStandList(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::InitStandList(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenMarkGroups) {
-  ctx.r3.u64 = bs::MarkGroups(base);
+  ctx.r3.u64 = bs::MarkGroups();
 }
 
 ITC_REGS_STEP(BuildScreenFilterGroups) {
-  ctx.r3.u64 = bs::FilterGroups(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::FilterGroups(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenValueText) {
-  ctx.r3.u64 = bs::ValueText(base, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = bs::ValueText(ctx.r1.u32, ctx.r3.u32);
 }
 
 ITC_REGS_STEP(BuildListInsert) {
-  bs::Insert(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  bs::Insert(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(GarageStageSetDark) {
-  ctx.r3.u64 = bs::SetDark(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = bs::SetDark(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(BuildScreenGroupArrows) {
-  ctx.r3.u64 = bs::GroupArrows(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = bs::GroupArrows(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(BuildScreenBuildArrows) {
-  ctx.r3.u64 = bs::BuildArrows(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = bs::BuildArrows(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(BuildScreenStandArrows) {
-  ctx.r3.u64 = bs::StandArrows(base, ctx.r1.u32);
+  ctx.r3.u64 = bs::StandArrows(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(BuildScreenShowBuildMark) {
-  ctx.r3.u64 = bs::ShowBuildMark(base, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = bs::ShowBuildMark(ctx.r1.u32, ctx.r3.u32);
 }
 
 ITC_REGS_STEP(BuildScreenSetPrompts) {
   const uint32_t pairs[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                              ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
-  ctx.r3.u64 = bs::SetPrompts(base, ctx.r1.u32, pairs);
+  ctx.r3.u64 = bs::SetPrompts(ctx.r1.u32, pairs);
 }
 
 ITC_REGS_STEP(BuildScreenSetHelp) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::SetHelp(base, ctx.r1.u32, ctx.r3.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::SetHelp(ctx.r1.u32, ctx.r3.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenShowNumber) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = bs::ShowNumber(base, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = bs::ShowNumber(ctx.r1.u32, ctx.r3.u32);
 }
 
 ITC_REGS_STEP(BuildScreenDrawGroupRows) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::DrawGroupRows(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::DrawGroupRows(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightGroupsA) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightGroupsA(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightGroupsA(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightGroupsB) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightGroupsB(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightGroupsB(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenFadeOut) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::FadeOut(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::FadeOut(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightBuilds) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightBuilds(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightBuilds(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightStand) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightStand(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightStand2) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightStand2(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightStand2(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenHighlightDetails) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::HighlightDetails(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::HighlightDetails(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenInitBuildList) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::InitBuildList(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::InitBuildList(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenCopyBuilds) {
-  ctx.r3.u64 = bs::CopyBuilds(base, ctx.r1.u32, ctx.r3.u64);
+  ctx.r3.u64 = bs::CopyBuilds(ctx.r1.u32, ctx.r3.u64);
 }
 
 ITC_REGS_STEP(BuildScreenListBuilds) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::ListBuilds(base, ctx.r1.u32, ctx.r3.u64, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::ListBuilds(ctx.r1.u32, ctx.r3.u64, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenDrawBuildRows) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::DrawBuildRows(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::DrawBuildRows(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenDrawStandRow) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::DrawStandRow(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::DrawStandRow(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenShowGroup) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::ShowGroup(base, ctx.r1.u32, ctx.r3.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::ShowGroup(ctx.r1.u32, ctx.r3.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenSetUpBuilds) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::SetUpBuilds(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::SetUpBuilds(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenSetUpGroups) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::SetUpGroups(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::SetUpGroups(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenOpen) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::Open(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::Open(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenBackToGroups) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::BackToGroups(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::BackToGroups(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenOpenBuilds) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::OpenBuilds(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::OpenBuilds(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenRestoreStand) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::RestoreStand(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::RestoreStand(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenBackToStand) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::BackToStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::BackToStand(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenOpenDetails) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::OpenDetails(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::OpenDetails(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenSetUpDetails) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::SetUpDetails(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::SetUpDetails(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenShowDetails) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::ShowDetails(base, ctx.r1.u32, ctx.r3.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::ShowDetails(ctx.r1.u32, ctx.r3.u32, guest.calls());
 }
 
 ITC_REGS_STEP(BuildScreenChangeCategory) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = bs::ChangeCategory(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = bs::ChangeCategory(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
@@ -357,7 +355,7 @@ ITC_REGS_STEP(BuildScreenChangeCategory) {
 // Defines an adapter: the flag, else the original.
 #define ITC_BUILD_SCREEN(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_build_screen)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)

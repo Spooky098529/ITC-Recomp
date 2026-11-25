@@ -35,7 +35,7 @@ constexpr uint32_t kSecondSetBytes[8] = {3744, 37296, 4320, 11680, 13168, 16800,
 // allocation fails, as the original); then ScenePools::CreateA on the first
 // set (+5040) with the record (`create` its constructors' fallbacks).
 // `sp` is the caller's stack pointer. Returns CreateA's r3.
-uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5, uint32_t sp,
+uint32_t SceneSetUp(uint32_t scene, uint32_t record, uint32_t r5, uint32_t sp,
                     uint32_t pcr, const archive::LoadCall& load,
                     const scene_loaders::CreateCalls& create);
 

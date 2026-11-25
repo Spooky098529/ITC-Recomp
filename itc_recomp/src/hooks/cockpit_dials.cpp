@@ -85,25 +85,25 @@ enum Gauge { kSpeed, kRevs, kBoost, k712, k716, k720 };
 // taken as the newer tick's.
 constexpr float kCutDistance = 8.0f;
 
-float Constant(uint8_t* base, uint32_t offset) {
-  return guest::LoadFloat(base, kConstants + offset);
+float Constant(uint32_t offset) {
+  return guest::LoadFloat(kConstants + offset);
 }
-double ConstantDouble(uint8_t* base, uint32_t offset) {
-  uint64_t bits = (uint64_t(guest::LoadU32(base, kConstants + offset)) << 32) |
-                  guest::LoadU32(base, kConstants + offset + 4);
+double ConstantDouble(uint32_t offset) {
+  uint64_t bits = (uint64_t(guest::LoadU32(kConstants + offset)) << 32) |
+                  guest::LoadU32(kConstants + offset + 4);
   return std::bit_cast<double>(bits);
 }
 
-Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
+Matrix4 LoadMatrix(uint32_t address) {
   Matrix4 m;
   for (int i = 0; i < 16; i++) {
-    m[i] = guest::LoadFloat(base, address + 4 * i);
+    m[i] = guest::LoadFloat(address + 4 * i);
   }
   return m;
 }
-void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
+void StoreMatrix(uint32_t address, const Matrix4& m) {
   for (int i = 0; i < 16; i++) {
-    guest::StoreFloat(base, address + 4 * i, m[i]);
+    guest::StoreFloat(address + 4 * i, m[i]);
   }
 }
 
@@ -132,16 +132,16 @@ Matrix4 RotationZ(float angle) {
 
 // A needle on the dash: (B * RotZ(angle)) * A. Its pose is this times the
 // car's world matrix.
-Matrix4 OnDash(uint8_t* base, uint32_t locals, float angle) {
-  Matrix4 a = LoadMatrix(base, locals), b = LoadMatrix(base, locals + 64);
+Matrix4 OnDash(uint32_t locals, float angle) {
+  Matrix4 a = LoadMatrix(locals), b = LoadMatrix(locals + 64);
   return Multiply(Multiply(b, RotationZ(angle)), a);
 }
 
 // sub_820D3688: a dial's angle from gauge `kind` (0-3: car + 704, 712, 716,
 // 720) mapped from [range + 0, + 4] to [range + 8, + 12], clamped. Its middle
 // piece doesn't add range + 8 back (the game's own).
-float DialAngle(uint8_t* base, uint32_t range, uint32_t kind, const std::array<float, 6>& gauges) {
-  float zero = Constant(base, kZero);
+float DialAngle(uint32_t range, uint32_t kind, const std::array<float, 6>& gauges) {
+  float zero = Constant(kZero);
   if (range == 0) {
     return zero;
   }
@@ -150,9 +150,9 @@ float DialAngle(uint8_t* base, uint32_t range, uint32_t kind, const std::array<f
                 : kind < 3  ? gauges[k716]
                 : kind == 3 ? gauges[k720]
                             : zero;
-  float from = guest::LoadFloat(base, range), to = guest::LoadFloat(base, range + 4);
-  float angle_from = guest::LoadFloat(base, range + 8);
-  float angle_to = guest::LoadFloat(base, range + 12);
+  float from = guest::LoadFloat(range), to = guest::LoadFloat(range + 4);
+  float angle_from = guest::LoadFloat(range + 8);
+  float angle_to = guest::LoadFloat(range + 12);
   float angle;
   if (from > value) {
     angle = angle_from;
@@ -161,7 +161,7 @@ float DialAngle(uint8_t* base, uint32_t range, uint32_t kind, const std::array<f
   } else {
     angle = ((value - from) / (to - from)) * (angle_to - angle_from);
   }
-  return angle * Constant(base, kAngleScale);
+  return angle * Constant(kAngleScale);
 }
 
 // sub_820D3740: the tachometer dash's two angles. `a` from the speed: 0
@@ -170,16 +170,16 @@ float DialAngle(uint8_t* base, uint32_t range, uint32_t kind, const std::array<f
 // (table + 4 or + 12); above, table[20]. `b` from the revs: table[28]
 // below table[24], linear over table[24..36] then table[32..44], clamped at
 // table[44].
-std::array<float, 2> TachAngles(uint8_t* base, uint32_t table, bool alternate,
+std::array<float, 2> TachAngles(uint32_t table, bool alternate,
                                 const std::array<float, 6>& gauges) {
-  auto at = [&](uint32_t offset) { return guest::LoadFloat(base, table + offset); };
+  auto at = [&](uint32_t offset) { return guest::LoadFloat(table + offset); };
   auto fused = [](float x, float y, float z) {  // fmadds
     return float(std::fma(double(x), double(y), double(z)));
   };
   float speed = gauges[kSpeed], revs = gauges[kRevs];
   float from = at(alternate ? 8 : 0), to = at(alternate ? 12 : 4);
   float angle_from = at(16), angle_to = at(20);
-  float zero = Constant(base, kZero);
+  float zero = Constant(kZero);
   float a;
   if (speed < zero) {
     a = zero;
@@ -207,14 +207,14 @@ std::array<float, 2> TachAngles(uint8_t* base, uint32_t table, bool alternate,
 
 // sub_820E45A8's mode-5 angle for its second needle (the turbo gauge): from
 // the boost, clamped.
-float BoostAngle(uint8_t* base, float boost) {
-  if (boost > Constant(base, kZero)) {
-    return boost > Constant(base, kOne) ? Constant(base, 25312) : boost * Constant(base, 25312);
+float BoostAngle(float boost) {
+  if (boost > Constant(kZero)) {
+    return boost > Constant(kOne) ? Constant(25312) : boost * Constant(25312);
   }
-  if (double(boost) < ConstantDouble(base, 25304)) {
-    return Constant(base, 25296);
+  if (double(boost) < ConstantDouble(25304)) {
+    return Constant(25296);
   }
-  return boost * Constant(base, 25292) * Constant(base, 25296);
+  return boost * Constant(25292) * Constant(25296);
 }
 
 // What a car's dials are posed from: the gauge values and world matrix of its
@@ -237,16 +237,16 @@ struct PoseInputs {
 // now (and the car's world on its first call this pass, the earlier one kept),
 // on a render-only pass the logic pass's; the car's world blended by the
 // frame's amount.
-PoseInputs InputsFor(uint8_t* base, uint32_t car) {
+PoseInputs InputsFor(uint32_t car) {
   uint64_t logic_passes = 0, render_only_passes = 0;
   frame_pacing::GameMessages_PassCounts(logic_passes, render_only_passes);
   CarDials& dials = g_cars[car];
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() || dials.tick == 0) {
     for (size_t i = 0; i < kGaugeOffsets.size(); i++) {
-      dials.gauges[i] = guest::LoadFloat(base, car + kGaugeOffsets[i]);
+      dials.gauges[i] = guest::LoadFloat(car + kGaugeOffsets[i]);
     }
     if (dials.tick != logic_passes) {
-      Matrix4 world = LoadMatrix(base, car + kCarWorld);
+      Matrix4 world = LoadMatrix(car + kCarWorld);
       dials.has_before = dials.tick != 0 && dials.tick + 1 == logic_passes;
       dials.world_before = dials.world_now;
       dials.world_now = world;
@@ -283,49 +283,49 @@ struct Check {
     angles++;
     angle_error = std::max(angle_error, std::fabs(native - game));
   }
-  void Pose(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t locals, float angle,
+  void Pose(lifted::Regs& ctx, uint32_t frame, uint32_t locals, float angle,
             const Matrix4& car_world, const Matrix4& native) {
     uint32_t r1 = ctx.r1.u32;
     uint32_t scratch = frame - 0x200;  // four matrices and the angle
     uint32_t m0 = scratch, m1 = scratch + 64, m2 = scratch + 128, angle_at = scratch + 192;
     ctx.r1.u32 = frame - 0x280;
-    StoreMatrix(base, m1, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
-    guest::StoreFloat(base, angle_at, angle);
+    StoreMatrix(m1, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+    guest::StoreFloat(angle_at, angle);
     ctx.r3.u32 = m0, ctx.r4.u32 = m1, ctx.r5.u32 = angle_at;
-    lifted::original::c820A2D30(ctx, base);  // m0 = RotZ
+    lifted::original::c820A2D30(ctx);  // m0 = RotZ
     ctx.r3.u32 = m1, ctx.r4.u32 = locals + 64, ctx.r5.u32 = m0;
-    lifted::original::c8209BD50(ctx, base);  // m1 = B * R
+    lifted::original::c8209BD50(ctx);  // m1 = B * R
     ctx.r3.u32 = m2, ctx.r4.u32 = m1, ctx.r5.u32 = locals;
-    lifted::original::c8209BD50(ctx, base);  // m2 = (B * R) * A
-    StoreMatrix(base, m1, car_world);
+    lifted::original::c8209BD50(ctx);  // m2 = (B * R) * A
+    StoreMatrix(m1, car_world);
     ctx.r3.u32 = m0, ctx.r4.u32 = m2, ctx.r5.u32 = m1;
-    lifted::original::c8209BD50(ctx, base);  // m0 = ... * car
-    Matrix4 game = LoadMatrix(base, m0);
+    lifted::original::c8209BD50(ctx);  // m0 = ... * car
+    Matrix4 game = LoadMatrix(m0);
     ctx.r1.u32 = r1;
     poses++;
     for (int i = 0; i < 16; i++) {
       pose_error = std::max(pose_error, std::fabs(native[i] - game[i]));
     }
   }
-  float GameDialAngle(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t range,
+  float GameDialAngle(lifted::Regs& ctx, uint32_t frame, uint32_t range,
                       uint32_t kind, uint32_t car) {
     uint32_t r1 = ctx.r1.u32;
     ctx.r1.u32 = frame - 0x280;
     ctx.r3.u32 = range, ctx.r4.u32 = kind, ctx.r5.u32 = car;
-    lifted::original::c820D3688(ctx, base);
+    lifted::original::c820D3688(ctx);
     ctx.r1.u32 = r1;
     return float(ctx.f1.f64);
   }
-  std::array<float, 2> GameTachAngles(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
+  std::array<float, 2> GameTachAngles(lifted::Regs& ctx, uint32_t frame,
                                       uint32_t table, uint32_t car, uint32_t dash_type) {
     uint32_t r1 = ctx.r1.u32;
     uint32_t out = frame - 0x200;
     ctx.r1.u32 = frame - 0x280;
     ctx.r3.u32 = table, ctx.r4.u32 = car, ctx.r5.u32 = dash_type;
     ctx.r6.u32 = out, ctx.r7.u32 = out + 4;
-    lifted::original::c820D3740(ctx, base);
+    lifted::original::c820D3740(ctx);
     ctx.r1.u32 = r1;
-    return {guest::LoadFloat(base, out), guest::LoadFloat(base, out + 4)};
+    return {guest::LoadFloat(out), guest::LoadFloat(out + 4)};
   }
   void MaybeLog() {
     auto now = std::chrono::steady_clock::now();
@@ -345,26 +345,26 @@ Check g_check;
 // tick's camera, and products pair across passes by it) at the original's
 // frame + 160, `lr` the original's return address (for diagnostics keyed by
 // caller); `world`, its pose for the frame, goes to the replay.
-void DrawNeedle(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t part, uint32_t camera,
+void DrawNeedle(lifted::Regs& ctx, uint32_t frame, uint32_t part, uint32_t camera,
                 const Matrix4& drawn, const Matrix4& world, uint32_t lr) {
   uint32_t r1 = ctx.r1.u32;
   uint32_t world_at = frame + 160;
-  StoreMatrix(base, world_at, drawn);
+  StoreMatrix(world_at, drawn);
   ctx.r1.u32 = frame;
   ctx.r3.u32 = part, ctx.r4.u32 = camera, ctx.r5.u32 = world_at;
   ctx.r6.u64 = 0, ctx.r7.u64 = 0;
   ctx.lr = lr;
   interpolation::BlendState_SetLivePose(world.data());
-  lifted::Enter(ctx, base, game::CarPart::Draw);
+  lifted::Enter(ctx, game::CarPart::Draw);
   interpolation::BlendState_SetLivePose(nullptr);
   ctx.r1.u32 = r1;
 }
 
 // The original's stack frame, below the caller's: the same addresses for the
 // world matrix as the original's, so draws pair across passes as before.
-uint32_t MakeFrame(uint8_t* base, uint32_t r1, uint32_t size) {
+uint32_t MakeFrame(uint32_t r1, uint32_t size) {
   uint32_t frame = r1 - size;
-  guest::StoreU32(base, frame, r1);  // the back chain, as stwu leaves it
+  guest::StoreU32(frame, r1);  // the back chain, as stwu leaves it
   return frame;
 }
 
@@ -400,37 +400,37 @@ constexpr std::array<std::array<uint32_t, 3>, 2> kTachNeedles = {{
 // In mode 5 ([dash + 4]) the second needle is the turbo gauge, from car + 704.
 ITC_NATIVE_ENTRY(820E45A8, ITC_FLAG(native_cockpit_dials)) {
   uint32_t dash = ctx.r3.u32, car = ctx.r4.u32, camera = ctx.r5.u32 + kCameraOffset;
-  uint32_t type = guest::LoadU32(base, dash);
-  uint32_t frame = MakeFrame(base, ctx.r1.u32, kDialsFrame);
-  PoseInputs inputs = InputsFor(base, car);
+  uint32_t type = guest::LoadU32(dash);
+  uint32_t frame = MakeFrame(ctx.r1.u32, kDialsFrame);
+  PoseInputs inputs = InputsFor(car);
   bool check = g_check.Wanted();
   for (size_t k = 0; k < kNeedles.size(); k++) {
     const Needle& needle = kNeedles[k];
-    uint32_t model = guest::LoadU32(base, dash + needle.model);
-    if (guest::LoadU32(base, type + needle.enable) == 0 || model == 0) {
+    uint32_t model = guest::LoadU32(dash + needle.model);
+    if (guest::LoadU32(type + needle.enable) == 0 || model == 0) {
       continue;
     }
-    bool boost = k == 1 && guest::LoadU32(base, dash + kMode) == 5;
-    guest::StoreU32(base, model + 48,
-                    guest::LoadU32(base, dash + (boost ? kMode5Value : needle.model_value)));
+    bool boost = k == 1 && guest::LoadU32(dash + kMode) == 5;
+    guest::StoreU32(model + 48,
+                    guest::LoadU32(dash + (boost ? kMode5Value : needle.model_value)));
     float angle;
     if (boost) {
-      angle = BoostAngle(base, inputs.gauges[kBoost]);
+      angle = BoostAngle(inputs.gauges[kBoost]);
     } else {
-      uint32_t range = guest::LoadU32(base, dash + needle.range);
-      uint32_t kind = guest::LoadU32(base, type + needle.kind);
-      angle = DialAngle(base, range, kind, inputs.gauges);
+      uint32_t range = guest::LoadU32(dash + needle.range);
+      uint32_t kind = guest::LoadU32(type + needle.kind);
+      angle = DialAngle(range, kind, inputs.gauges);
       if (check) {
-        g_check.Angle(angle, g_check.GameDialAngle(ctx, base, frame, range, kind, car));
+        g_check.Angle(angle, g_check.GameDialAngle(ctx, frame, range, kind, car));
       }
     }
-    Matrix4 on_dash = OnDash(base, dash + needle.locals, angle);
+    Matrix4 on_dash = OnDash(dash + needle.locals, angle);
     Matrix4 drawn = Multiply(on_dash, inputs.tick);
     Matrix4 world = Multiply(on_dash, inputs.world);
     if (check) {
-      g_check.Pose(ctx, base, frame, dash + needle.locals, angle, inputs.tick, drawn);
+      g_check.Pose(ctx, frame, dash + needle.locals, angle, inputs.tick, drawn);
     }
-    DrawNeedle(ctx, base, frame, dash + needle.part, camera, drawn, world, needle.lr);
+    DrawNeedle(ctx, frame, dash + needle.part, camera, drawn, world, needle.lr);
   }
   if (check) {
     g_check.MaybeLog();
@@ -442,27 +442,27 @@ ITC_NATIVE_ENTRY(820E45A8, ITC_FLAG(native_cockpit_dials)) {
 // speedometer's and the tachometer's.
 ITC_NATIVE_ENTRY(820E42E8, ITC_FLAG(native_cockpit_dials)) {
   uint32_t dash = ctx.r3.u32, car = ctx.r4.u32, camera = ctx.r5.u32 + kCameraOffset;
-  uint32_t type = guest::LoadU32(base, dash);
-  uint32_t table = guest::LoadU32(base, dash + kTachTable);
-  uint32_t frame = MakeFrame(base, ctx.r1.u32, kTachFrame);
-  PoseInputs inputs = InputsFor(base, car);
-  std::array<float, 2> angles = TachAngles(base, table, guest::LoadU32(base, type) != 0,
+  uint32_t type = guest::LoadU32(dash);
+  uint32_t table = guest::LoadU32(dash + kTachTable);
+  uint32_t frame = MakeFrame(ctx.r1.u32, kTachFrame);
+  PoseInputs inputs = InputsFor(car);
+  std::array<float, 2> angles = TachAngles(table, guest::LoadU32(type) != 0,
                                            inputs.gauges);
   bool check = g_check.Wanted();
   if (check) {
-    std::array<float, 2> game = g_check.GameTachAngles(ctx, base, frame, table, car, type);
+    std::array<float, 2> game = g_check.GameTachAngles(ctx, frame, table, car, type);
     g_check.Angle(angles[0], game[0]);
     g_check.Angle(angles[1], game[1]);
   }
   for (size_t i = 0; i < kTachNeedles.size(); i++) {
     auto [locals, part, lr] = kTachNeedles[i];
-    Matrix4 on_dash = OnDash(base, dash + locals, angles[i]);
+    Matrix4 on_dash = OnDash(dash + locals, angles[i]);
     Matrix4 drawn = Multiply(on_dash, inputs.tick);
     Matrix4 world = Multiply(on_dash, inputs.world);
     if (check) {
-      g_check.Pose(ctx, base, frame, dash + locals, angles[i], inputs.tick, drawn);
+      g_check.Pose(ctx, frame, dash + locals, angles[i], inputs.tick, drawn);
     }
-    DrawNeedle(ctx, base, frame, dash + part, camera, drawn, world, lr);
+    DrawNeedle(ctx, frame, dash + part, camera, drawn, world, lr);
   }
   if (check) {
     g_check.MaybeLog();

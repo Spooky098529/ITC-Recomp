@@ -32,11 +32,11 @@ namespace mp = material_passes;
 
 ITC_REGS_STEP(MaterialPassesHsvToRgb) {
   ctx.fpscr.disableFlushMode();
-  mp::HsvToRgb(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  mp::HsvToRgb(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesTableVector) {
-  mp::TableVector(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  mp::TableVector(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesIsBlockSetA) {
@@ -52,42 +52,42 @@ ITC_REGS_STEP(MaterialPassesRecordAt) {
 }
 
 ITC_REGS_STEP(MaterialPassesTransposeRotation) {
-  if (!mp::TransposeRotation(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
-    lifted::original::c820D1CB0(ctx, base);
+  if (!mp::TransposeRotation(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
+    lifted::original::c820D1CB0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(MaterialPassesSetTexture) {
-  ctx.r3.u64 = mp::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32);
+  ctx.r3.u64 = mp::SetTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesFlipCulling) {
-  ctx.r3.u64 = mp::FlipCulling(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = mp::FlipCulling(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesScaleBlended) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::ScaleBlended(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = mp::ScaleBlended(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesSetPair1002Alpha) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::SetPair1002Alpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = mp::SetPair1002Alpha(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesSetAlpha) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::SetAlpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = mp::SetAlpha(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesSetMaterials) {
   const uint64_t regs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                             ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   std::optional<uint64_t> r3;
-  if (!mp::SetMaterials(base, ctx.r3.u32, regs, ctx.r1.u32, &r3)) {
-    lifted::original::c820D3318(ctx, base);
+  if (!mp::SetMaterials(ctx.r3.u32, regs, ctx.r1.u32, &r3)) {
+    lifted::original::c820D3318(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -100,24 +100,24 @@ ITC_REGS_STEP(MaterialPassesSetPaint) {
   const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
                             ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::SetPaint(base, ctx.r3.u32, regs, ctx.r1.u32);
+  ctx.r3.u64 = mp::SetPaint(ctx.r3.u32, regs, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesSetPaintBody) {
   const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
                             ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::SetPaintBody(base, ctx.r3.u32, regs, ctx.r1.u32);
+  ctx.r3.u64 = mp::SetPaintBody(ctx.r3.u32, regs, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesApplyPalette) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = mp::ApplyPalette(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = mp::ApplyPalette(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(MaterialPassesPaintPaletteInit) {
   ctx.fpscr.disableFlushMode();
-  if (const auto r3 = mp::PaintPaletteInit(base, ctx.r1.u32)) {
+  if (const auto r3 = mp::PaintPaletteInit(ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
@@ -126,9 +126,9 @@ ITC_REGS_STEP(MaterialPassesProjectorMatrices) {
   const mp::ProjectorArgs args{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                ctx.r6.u32, ctx.r7.u32, ctx.r9.u32};
   ctx.fpscr.disableFlushMode();
-  const auto r3 = mp::ProjectorMatrices(base, args, ctx.r1.u32);
+  const auto r3 = mp::ProjectorMatrices(args, ctx.r1.u32);
   if (!r3) {
-    lifted::original::c820D1EB8(ctx, base);
+    lifted::original::c820D1EB8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -142,7 +142,7 @@ ITC_REGS_STEP(MaterialPassesProjectorMatrices) {
 
 #define ITC_MATERIAL_PASSES(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_material_passes)) { \
-    hooks::step(ctx, base);                   \
+    hooks::step(ctx);                   \
   }
 
 ITC_MATERIAL_PASSES(820D0D60, MaterialPassesHsvToRgb)

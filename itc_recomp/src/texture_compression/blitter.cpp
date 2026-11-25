@@ -2,7 +2,8 @@
 // Blitter::Blitter sub_82368D20, Blitter::Release sub_82368D30,
 // Blitter::CopyRows sub_82369860, Blitter::ConvertRows sub_823699F8 and
 // Blitter::Init sub_8236C630, as the translated code does them, on the blit
-// object and the descriptions in guest memory.
+// object and the descriptions in guest memory (XGCompressSurface's stack);
+// the codecs are host objects and the float4 row a blob (E5 step 5).
 
 #include "texture_compression/blitter.h"
 
@@ -21,13 +22,13 @@ constexpr uint32_t kMaxAlloc = 0xFFFFF000;  // malloc's largest size
 
 // A codec deleted through its slot 0 (r4 = 1): the destructors' plain C++
 // for the plain and DXT codecs, else (YUV's) through `call`. Its r3.
-uint32_t DeleteCodec(uint8_t* base, uint32_t codec, uint32_t frame, const GuestCall& call) {
-  const uint32_t function = schema::ImageCodec(base, codec).vtable().destroy();
+uint32_t DeleteCodec(uint32_t codec, uint32_t frame, const GuestCall& call) {
+  const uint32_t function = schema::ImageCodec(codec).vtable().destroy();
   std::optional<uint32_t> r3;
   if (function == kImageCodecDelete) {
-    r3 = ImageCodecDelete(base, codec, 1);
+    r3 = ImageCodecDelete(codec, 1);
   } else if (function == kDxtCodecDelete) {
-    r3 = DxtCodecDelete(base, codec, 1);
+    r3 = DxtCodecDelete(codec, 1);
   }
   return r3 ? *r3 : call(function, frame, codec, 1, 0, 0);
 }
@@ -35,10 +36,10 @@ uint32_t DeleteCodec(uint8_t* base, uint32_t codec, uint32_t frame, const GuestC
 // memcpy (sub_825A7410): host side where c_runtime::Memcpy takes it (outside
 // the physical views, whose copies memcpy's override records for the
 // renderer), else the function through `call`.
-void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t frame,
+void Copy(uint32_t to, uint32_t from, uint32_t bytes, uint32_t frame,
           const GuestCall& call) {
   if (to < 0xA0000000u && c_runtime::InOneView(to, bytes) && c_runtime::InOneView(from, bytes) &&
-      !c_runtime::MayShare(to, bytes, from, bytes) && c_runtime::Memcpy(base, to, from, bytes)) {
+      !c_runtime::MayShare(to, bytes, from, bytes) && c_runtime::Memcpy(to, from, bytes)) {
     return;
   }
   call(kMemcpy, frame, to, from, bytes, 0);
@@ -46,32 +47,32 @@ void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t fr
 
 }  // namespace
 
-void BlitterConstruct(uint8_t* base, uint32_t blitter) {
+void BlitterConstruct(uint32_t blitter) {
   ITC_NATIVE_RUNNING("sub_82368D20 Blitter::Blitter");
-  const schema::Blitter b(base, blitter);
+  const schema::Blitter b(blitter);
   b.set_destination(0);
   b.set_source(0);
 }
 
-uint32_t BlitterRelease(uint8_t* base, uint32_t blitter, uint32_t stack, const GuestCall& call) {
+uint32_t BlitterRelease(uint32_t blitter, uint32_t stack, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82368D30 Blitter::Release");
   const uint32_t frame = stack - kReleaseFrameBytes;
-  const schema::Blitter b(base, blitter);
+  const schema::Blitter b(blitter);
   uint32_t r3 = b.destination().address;
   if (r3 != 0) {
-    DeleteCodec(base, r3, frame, call);
+    DeleteCodec(r3, frame, call);
   }
   r3 = b.source().address;
   if (r3 != 0) {
-    r3 = DeleteCodec(base, r3, frame, call);
+    r3 = DeleteCodec(r3, frame, call);
   }
   return r3;
 }
 
-uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const GuestCall& call) {
+uint32_t BlitterCopyRows(uint32_t blitter, uint32_t stack, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82369860 Blitter::CopyRows");
   const uint32_t frame = stack - kCopyRowsFrameBytes;
-  const schema::Blitter blit(base, blitter);
+  const schema::Blitter blit(blitter);
   const schema::ImageCodec src = blit.source();       // r10
   const schema::ImageCodec dst = blit.destination();  // r9
   if (((src.format() ^ dst.format()) & ~0x100u) != 0 || src.color_key() != 0 ||
@@ -89,7 +90,7 @@ uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const 
       const uint32_t end = a + 1024;
       int32_t difference;
       do {
-        difference = int32_t(guest::LoadU8(base, a)) - int32_t(guest::LoadU8(base, b));
+        difference = int32_t(guest::LoadU8(a)) - int32_t(guest::LoadU8(b));
         if (difference != 0) break;
         a++;
         b++;
@@ -104,10 +105,10 @@ uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const 
   auto to_codec = [&]() { return blit.destination(); };
   auto from_codec = [&]() { return blit.source(); };
   for (uint32_t z = 0; z < to_codec().depth(); z++) {
-    uint32_t from = from_codec().slice_pitch() * z + from_codec().data().address;
-    uint32_t to = to_codec().slice_pitch() * z + to_codec().data().address;
+    uint32_t from = from_codec().slice_pitch() * z + from_codec().surface().address;
+    uint32_t to = to_codec().slice_pitch() * z + to_codec().surface().address;
     for (uint32_t y = 0; y < to_codec().height(); y++) {
-      Copy(base, to, from, to_codec().row_bytes(), frame, call);
+      Copy(to, from, to_codec().row_bytes(), frame, call);
       to += to_codec().row_pitch();
       from += from_codec().row_pitch();
     }
@@ -115,9 +116,9 @@ uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const 
   return 0;
 }
 
-std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint32_t stack,
+std::optional<uint32_t> BlitterConvertRows(uint32_t blitter, uint32_t stack,
                                            const GuestCall& call) {
-  const schema::Blitter blit(base, blitter);
+  const schema::Blitter blit(blitter);
   const schema::ImageCodec src = blit.source();
   const schema::ImageCodec dst = blit.destination();
   const uint32_t width = dst.width();
@@ -132,12 +133,7 @@ std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint
     return kFail;
   }
   const uint32_t frame = stack - kConvertRowsFrameBytes;
-  const auto made = memory::crt::OperatorNew(base, bytes);
-  const uint32_t row = made ? *made : 0;  // r28
-  if (row == 0) {
-    ITC_LOG_ERROR("Blitter::ConvertRows: operator new refused the row");
-    return kFail;
-  }
+  const uint32_t row = schema::TcFloat4::New(bytes).address;  // r28, a blob
   auto to_codec = [&]() { return blit.destination(); };
   auto from_codec = [&]() { return blit.source(); };
   if (to_codec().srgb() != 0 && from_codec().srgb() != 0) {
@@ -147,19 +143,19 @@ std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint
   for (uint32_t z = 0; z < to_codec().depth(); z++) {
     for (uint32_t y = 0; y < to_codec().height(); y++) {
       const uint32_t decoder = from_codec().address;
-      const uint32_t decode = schema::ImageCodec(base, decoder).vtable().decode_row();
+      const uint32_t decode = schema::ImageCodec(decoder).vtable().decode_row();
       std::optional<uint32_t> done;
       if (decode == kDecodeA8R8G8B8Row) {
-        done = DecodeA8R8G8B8Row(base, decoder, y, z, row);
+        done = DecodeA8R8G8B8Row(decoder, y, z, row);
       }
       if (!done) {
         call(decode, frame, decoder, y, z, row);
       }
       const uint32_t encoder = to_codec().address;
-      const uint32_t encode = schema::ImageCodec(base, encoder).vtable().encode_row();
+      const uint32_t encode = schema::ImageCodec(encoder).vtable().encode_row();
       done.reset();
       if (encode == kDxtEncodeRow) {
-        done = DxtEncodeRow(base, encoder, y, z, row, frame, call);
+        done = DxtEncodeRow(encoder, y, z, row, frame, call);
       }
       if (!done) {
         call(encode, frame, encoder, y, z, row);
@@ -172,11 +168,11 @@ std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint
   return 0;
 }
 
-uint32_t BlitterInit(uint8_t* base, uint32_t blitter, uint32_t destination, uint32_t source,
+uint32_t BlitterInit(uint32_t blitter, uint32_t destination, uint32_t source,
                      uint32_t filter, uint32_t stack, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8236C630 Blitter::Init");
   const uint32_t frame = stack - kInitFrameBytes;
-  const schema::Blitter b(base, blitter);
+  const schema::Blitter b(blitter);
   b.set_filter(filter);
   b.set_source(0);
   b.set_destination(0);
@@ -185,13 +181,13 @@ uint32_t BlitterInit(uint8_t* base, uint32_t blitter, uint32_t destination, uint
     helpers::DebugOutput(nullptr);
     return kInvalidCall;
   }
-  const schema::ImageDescription to_description(base, destination);
-  schema::ImageDescription(base, source).set_srgb(filter & 0x200000);
+  const schema::ImageDescription to_description(destination);
+  schema::ImageDescription(source).set_srgb(filter & 0x200000);
   to_description.set_srgb(filter & 0x400000);
   to_description.set_dither(filter & 0x80000);
   to_description.set_diffusion(filter & 0x100000);
   auto create = [&](uint32_t d) {
-    const auto codec = CreateCodec(base, d, frame, call);
+    const auto codec = CreateCodec(d, frame, call);
     return codec ? *codec : call(kCreate, frame, d, 0, 0, 0);
   };
   uint32_t result = 0;  // r30
@@ -204,15 +200,15 @@ uint32_t BlitterInit(uint8_t* base, uint32_t blitter, uint32_t destination, uint
     made = from != 0;
     if (made) {
       const uint32_t prepare_to = b.destination().address;
-      const auto prepared = PrepareCodecs(base, prepare_to, from);
+      const auto prepared = PrepareCodecs(prepare_to, from);
       result = prepared ? *prepared : call(kPrepare, frame, prepare_to, from, 0, 0);
       if (int32_t(result) >= 0) {
         static constexpr uint32_t kFilters[8] = {0x82369B48, 0x82369DB8, 0x82369FF8,
                                                  0x8236A4F0, 0x8236AB00, 0x8236AEA8,
                                                  0x8236BF40, 0x8236B7A0};
-        bool taken = int32_t(BlitterCopyRows(base, blitter, frame, call)) >= 0;
+        bool taken = int32_t(BlitterCopyRows(blitter, frame, call)) >= 0;
         if (!taken) {
-          const auto converted = BlitterConvertRows(base, blitter, frame, call);
+          const auto converted = BlitterConvertRows(blitter, frame, call);
           taken = int32_t(converted ? *converted : call(kConvertRows, frame, blitter, 0, 0, 0)) >= 0;
         }
         for (uint32_t i = 0; !taken && i < 8; i++) {
@@ -234,11 +230,11 @@ uint32_t BlitterInit(uint8_t* base, uint32_t blitter, uint32_t destination, uint
     result = kFail;
   }
   if (const uint32_t codec = b.destination().address; codec != 0) {
-    DeleteCodec(base, codec, frame, call);
+    DeleteCodec(codec, frame, call);
     b.set_destination(0);
   }
   if (const uint32_t codec = b.source().address; codec != 0) {
-    DeleteCodec(base, codec, frame, call);
+    DeleteCodec(codec, frame, call);
     b.set_source(0);
   }
   return result;

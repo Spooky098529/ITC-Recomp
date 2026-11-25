@@ -41,7 +41,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -52,7 +52,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -67,13 +66,12 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
@@ -81,129 +79,129 @@ class GuestCalls {
 
 ITC_REGS_STEP(AltHudMenuListRelease) {
   if (NativeHeapActive()) {
-    if (const auto r3 = alt_hud::MenuListRelease(base, ctx.r3.u32, ctx.r1.u32)) {
+    if (const auto r3 = alt_hud::MenuListRelease(ctx.r3.u32, ctx.r1.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c8220BBB0(ctx, base);
+  lifted::original::c8220BBB0(ctx);
 }
 
 ITC_REGS_STEP(AltHudMenuListPressedX) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = alt_hud::MenuListPressedX(base, ctx.r3.u32, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = alt_hud::MenuListPressedX(ctx.r3.u32, ctx.r1.u32,
                                          ITC_FLAG(native_action_mappers), guest.calls());
 }
 
 ITC_REGS_STEP(AltHudPowerClass) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = alt_hud::PowerClass(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = alt_hud::PowerClass(ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(AltHudSetUpGauges) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   double f1 = ctx.f1.f64;
-  ctx.r3.u64 = alt_hud::SetUpGauges(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), &f1);
+  ctx.r3.u64 = alt_hud::SetUpGauges(ctx.r3.u32, ctx.r1.u32, guest.calls(), &f1);
   ctx.f1.f64 = f1;
 }
 
 ITC_REGS_STEP(AltHudSetUpExtraGauges) {
-  ctx.r3.u64 = alt_hud::SetUpExtraGauges(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetUpExtraGauges(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudShowPanels) {
-  ctx.r3.u64 = alt_hud::ShowPanels(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::ShowPanels(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudShowGauge) {
-  ctx.r3.u64 = alt_hud::ShowGauge(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::ShowGauge(ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetUp) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   double f1 = ctx.f1.f64;
-  ctx.r3.u64 = alt_hud::SetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(), &f1);
+  ctx.r3.u64 = alt_hud::SetUp(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(), &f1);
   ctx.f1.f64 = f1;
 }
 
 ITC_REGS_STEP(AltHudSetSpeed) {
   ctx.fpscr.disableFlushMode();
   double f1 = ctx.f1.f64;
-  ctx.r3.u64 = alt_hud::SetSpeed(base, ctx.r4.u32, ctx.r1.u32, &f1);
+  ctx.r3.u64 = alt_hud::SetSpeed(ctx.r4.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
 }
 
 ITC_REGS_STEP(AltHudUpdateExtraGauges) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = alt_hud::UpdateExtraGauges(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u64, ctx.r6.u64,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = alt_hud::UpdateExtraGauges(ctx.r3.u32, ctx.f1.f64, ctx.r5.u64, ctx.r6.u64,
                                           ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(AltHudSetGear) {
-  ctx.r3.u64 = alt_hud::SetGear(base, ctx.r4.s32, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetGear(ctx.r4.s32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetNode25) {
-  ctx.r3.u64 = alt_hud::SetNode25(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetNode25(ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetTach) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetTach(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetTach(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetBar) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetBar(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetBar(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetBoost) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetBoost(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetBoost(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetThrottle) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetThrottle(base, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetThrottle(ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetBrake) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetBrake(base, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetBrake(ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudSetSteering) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = alt_hud::SetSteering(base, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = alt_hud::SetSteering(ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(AltHudTick) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   double f1 = ctx.f1.f64;
-  ctx.r3.u64 = alt_hud::Tick(base, ctx.r3.u32, ctx.r1.u32, ITC_FLAG(native_action_mappers),
+  ctx.r3.u64 = alt_hud::Tick(ctx.r3.u32, ctx.r1.u32, ITC_FLAG(native_action_mappers),
                              guest.calls(), &f1);
   ctx.f1.f64 = f1;
 }
 
 ITC_REGS_STEP(AltHudDestroy) {
   if (NativeHeapActive()) {
-    GuestCalls guest(ctx, base);
-    if (const auto r3 = alt_hud::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls())) {
+    GuestCalls guest(ctx);
+    if (const auto r3 = alt_hud::Destroy(ctx.r3.u32, ctx.r1.u32, guest.calls())) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82216BA8(ctx, base);
+  lifted::original::c82216BA8(ctx);
 }
 
 ITC_REGS_STEP(AltHudRunMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = alt_hud::RunMovie(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = alt_hud::RunMovie(ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
@@ -222,7 +220,7 @@ ITC_REGS_STEP(AltHudRunMovie) {
 
 #define ITC_ALT_HUD(address, step)                \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_alt_hud)) { \
-    hooks::step(ctx, base);                       \
+    hooks::step(ctx);                       \
   }
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)

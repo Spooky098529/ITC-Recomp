@@ -106,14 +106,14 @@ void NoOriginal(uint32_t address) {
   std::abort();
 }
 
-Result Call(uint8_t* base, uint32_t address, const Args& args) {
+Result Call(uint32_t address, const Args& args) {
   const auto& table = Table();
   if (const auto it = table.find(address); it != table.end()) {
-    return it->second.entry(base, args);
+    return it->second.entry(args);
   }
   const auto& fallbacks = Fallbacks();
   if (const auto it = fallbacks.find(address); it != fallbacks.end()) {
-    return it->second(base, args);
+    return it->second(args);
   }
   Unknown(address);
 }
@@ -129,17 +129,21 @@ Result Call(uint8_t* base, uint32_t address, const Args& args) {
   std::abort();
 }
 
-Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
+Result Import(ImportFunction* function, const Args& args) {
   if (LoggingImports()) {
     NoteImport(function, args);
   }
   if (const imports::NativeImport native = imports::FindNativeImport(function)) {
-    return native(base, args);
+    return native(args);
   }
   NoAnswer(function, args.lr);
 }
 
-Result ImportFromSdk(uint8_t*, ImportFunction* function, const Args& args) {
+ImportAnswer FindImportAnswer(ImportFunction* function) {
+  return imports::FindNativeImport(function);
+}
+
+Result ImportFromSdk(ImportFunction* function, const Args& args) {
   NoAnswer(function, args.lr);
 }
 
@@ -153,8 +157,8 @@ bool RegisterEntry(uint32_t address, Entry entry, const bool* enabled) {
   return true;
 }
 
-void Sdk(Regs& regs, uint8_t* base, ImportFunction* function) {
-  regs.Apply(Import(base, function, regs.ToArgs()));
+void Sdk(Regs& regs, ImportFunction* function) {
+  regs.Apply(Import(function, regs.ToArgs()));
 }
 
 }  // namespace lifted

@@ -36,52 +36,52 @@ namespace hooks {
 namespace sm = scene_models;
 
 ITC_REGS_STEP(SceneModelsAccessories) {
-  ctx.r3.u64 = sm::Accessories(base);
+  ctx.r3.u64 = sm::Accessories();
 }
 
 ITC_REGS_STEP(SceneModelsAccessory) {
-  ctx.r3.u64 = sm::Accessory(base, ctx.r3.u32);
+  ctx.r3.u64 = sm::Accessory(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsOnSoundLoaded) {
-  sm::OnSoundLoaded(base, ctx.r6.u32);
+  sm::OnSoundLoaded(ctx.r6.u32);
 }
 
 ITC_REGS_STEP(SceneModelsWheelsSetRecord) {
-  sm::WheelsSetRecord(base, ctx.r3.u32, ctx.r4.u32);
+  sm::WheelsSetRecord(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsSetCarModel) {
-  sm::SetCarModel(base, ctx.r3.u32, ctx.r4.u32);
+  sm::SetCarModel(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsPartsLink) {
-  sm::PartsLink(base, ctx.r3.u32, ctx.r4.u32);
+  sm::PartsLink(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsPartsSetRecord) {
-  sm::PartsSetRecord(base, ctx.r3.u32, ctx.r4.u32);
+  sm::PartsSetRecord(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsInteriorLink) {
-  sm::InteriorLink(base, ctx.r3.u32, ctx.r4.u32);
+  sm::InteriorLink(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsSetWord11452) {
-  sm::SetWord11452(base, ctx.r3.u32, ctx.r4.u32);
+  sm::SetWord11452(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
-  if (!sm::CarModelSetRecord(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c820D3C70(ctx, base);
+  if (!sm::CarModelSetRecord(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820D3C70(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 32;
 }
 
 ITC_REGS_STEP(SceneModelsCarRecordCopy) {
-  if (!sm::CarRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c820D7EE8(ctx, base);
+  if (!sm::CarRecordCopy(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820D7EE8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -89,8 +89,8 @@ ITC_REGS_STEP(SceneModelsCarRecordCopy) {
 }
 
 ITC_REGS_STEP(SceneModelsSceneModelRecordCopy) {
-  if (!sm::SceneModelRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c820DB290(ctx, base);
+  if (!sm::SceneModelRecordCopy(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820DB290(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -99,69 +99,69 @@ ITC_REGS_STEP(SceneModelsSceneModelRecordCopy) {
 
 ITC_REGS_STEP(SceneModelsSceneModelRecordConstruct) {
   ctx.fpscr.disableFlushMode();
-  sm::SceneModelRecordConstruct(base, ctx.r3.u32);
+  sm::SceneModelRecordConstruct(ctx.r3.u32);
   ctx.r3.u64 = ctx.r3.u32;
 }
 
 ITC_REGS_STEP(SceneModelsCockpitRecordReset) {
-  ctx.r3.u64 = sm::CockpitRecordReset(base, ctx.r3.u32);
+  ctx.r3.u64 = sm::CockpitRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsCarRecordSetW) {
   ctx.fpscr.disableFlushMode();
-  sm::CarRecordSetW(base, ctx.r3.u32);
+  sm::CarRecordSetW(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsRecord12Reset) {
   ctx.fpscr.disableFlushMode();
-  sm::Record12Reset(base, ctx.r3.u32);
+  sm::Record12Reset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsLayerReset) {
   ctx.fpscr.disableFlushMode();
-  sm::LayerReset(base, ctx.r3.u32);
+  sm::LayerReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsCarRecordReset) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = sm::CarRecordReset(base, ctx.r3.u32);
+  ctx.r3.u64 = sm::CarRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsPartsRecordReset) {
-  sm::PartsRecordReset(base, ctx.r3.u32);
+  sm::PartsRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsInteriorRecordReset) {
-  sm::InteriorRecordReset(base, ctx.r3.u32);
+  sm::InteriorRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsWheelsRecordReset) {
   ctx.fpscr.disableFlushMode();
-  sm::WheelsRecordReset(base, ctx.r3.u32);
+  sm::WheelsRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsPool4RecordReset) {
   ctx.fpscr.disableFlushMode();
-  sm::Pool4RecordReset(base, ctx.r3.u32);
+  sm::Pool4RecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsSceneModelRecordReset) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = sm::SceneModelRecordReset(base, ctx.r3.u32);
+  ctx.r3.u64 = sm::SceneModelRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SceneModelsAllocPages) {
-  ctx.r3.u64 = sm::AllocPages(base, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = sm::AllocPages(ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(SceneModelsApplyRecord) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
-  const auto r3 = sm::SceneModelApplyRecord(base, call, ctx.r3.u32, ctx.r1.u32);
+  const sm::ApplyCall call = StandModelsGuestCall(ctx);
+  const auto r3 = sm::SceneModelApplyRecord(call, ctx.r3.u32, ctx.r1.u32);
   ctx.lr = lr;
   if (!r3) {
-    lifted::original::c820DA758(ctx, base);
+    lifted::original::c820DA758(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -170,8 +170,8 @@ ITC_REGS_STEP(SceneModelsApplyRecord) {
 ITC_REGS_STEP(SceneModelsReloadDecals) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
-  const uint64_t r3 = sm::SceneModelReloadDecals(base, call, ctx.r3.u32, ctx.r1.u32);
+  const sm::ApplyCall call = StandModelsGuestCall(ctx);
+  const uint64_t r3 = sm::SceneModelReloadDecals(call, ctx.r3.u32, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -179,8 +179,8 @@ ITC_REGS_STEP(SceneModelsReloadDecals) {
 ITC_REGS_STEP(SceneModelsPartsApply) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
-  const uint64_t r3 = sm::ScenePartsApply(base, call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  const sm::ApplyCall call = StandModelsGuestCall(ctx);
+  const uint64_t r3 = sm::ScenePartsApply(call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -188,8 +188,8 @@ ITC_REGS_STEP(SceneModelsPartsApply) {
 ITC_REGS_STEP(SceneModelsInteriorApply) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
-  const uint64_t r3 = sm::SceneInteriorApply(base, call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  const sm::ApplyCall call = StandModelsGuestCall(ctx);
+  const uint64_t r3 = sm::SceneInteriorApply(call, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -197,7 +197,7 @@ ITC_REGS_STEP(SceneModelsInteriorApply) {
 
 ITC_REGS_STEP(SceneModelUpdate) {
   const uint64_t lr = ctx.lr;
-  const auto call = StandModelsGuestCall(ctx, base);
+  const auto call = StandModelsGuestCall(ctx);
   sm::ModelUpdateCalls calls;
   calls.build = [&](uint32_t model, uint32_t frame) -> uint64_t {
     // SceneModel::Build's register step (its own fallbacks), from the frame.
@@ -206,9 +206,9 @@ ITC_REGS_STEP(SceneModelUpdate) {
     ctx.r3.u64 = model;
     ctx.lr = 0x820DA1C4;
     if (ITC_FLAG(native_scene_models)) {
-      SceneModelBuild(ctx, base);
+      SceneModelBuild(ctx);
     } else {
-      lifted::original::c820D9870(ctx, base);
+      lifted::original::c820D9870(ctx);
     }
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
@@ -226,7 +226,7 @@ ITC_REGS_STEP(SceneModelUpdate) {
     return call(0x820EF250, {accessory, 0}, frame, 0x820DA300);
   };
   const uint64_t r3_in = ctx.r3.u64;
-  const auto r3 = sm::ModelUpdate(base, ctx.r3.u32, ctx.r1.u32, calls);
+  const auto r3 = sm::ModelUpdate(ctx.r3.u32, ctx.r1.u32, calls);
   ctx.lr = lr;
   ctx.r3.u64 = r3.value_or(r3_in);
 }
@@ -236,7 +236,7 @@ ITC_REGS_STEP(SceneModelUpdate) {
 // Defines an adapter: the flag, else the original.
 #define ITC_SCENE_MODELS(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_scene_models)) { \
-    hooks::step(ctx, base);                 \
+    hooks::step(ctx);                 \
   }
 
 ITC_SCENE_MODELS(82175EE0, SceneModelsOnSoundLoaded)
@@ -280,8 +280,8 @@ ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 ITC_NATIVE_ENTRY_ALWAYS(820C3CA0) {
   
   if (!ITC_FLAG(native_scene_models) || !hooks::NativeHeapActive()) {
-    lifted::original::c820C3CA0(ctx, base);
+    lifted::original::c820C3CA0(ctx);
     return;
   }
-  hooks::SceneModelsAllocPages(ctx, base);
+  hooks::SceneModelsAllocPages(ctx);
 }

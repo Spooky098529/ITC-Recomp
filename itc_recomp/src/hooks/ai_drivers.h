@@ -15,22 +15,22 @@ namespace hooks {
 // stack pointer; the plain C++ (src/ai_drivers/) with --native_ai_drivers,
 // the original where it can't be native or with the flag off. r3 and f1 as
 // the original leaves them.
-void AiDriveCar(lifted::Regs& ctx, uint8_t* base);
+void AiDriveCar(lifted::Regs& ctx);
 // AiDriver::UpdateIdle (sub_821399A8) as its adapter runs it: r3 = the
 // driver, r1 the caller's stack pointer.
-void AiUpdateIdle(lifted::Regs& ctx, uint8_t* base);
+void AiUpdateIdle(lifted::Regs& ctx);
 
 // AiDrivers::UpdateAll (sub_82139628) as its adapter runs it: r1 the
 // caller's stack pointer; the plain C++ with --native_ai_drivers (the
 // drivers' updates through their +6148), the original with the flag off. r3
 // as the original leaves it.
-void AiUpdateAll(lifted::Regs& ctx, uint8_t* base);
+void AiUpdateAll(lifted::Regs& ctx);
 
 // For harnesses: while set, these run instead (from the adapters and the
 // functions above), answering with made-up data.
 // On the SDK's context (the harnesses' functions); code on a view calls them
 // through lifted::Sdk.
-using AiStandIn = void (*)(lifted::Regs&, uint8_t*);
+using AiStandIn = void (*)(lifted::Regs&);
 extern AiStandIn g_drive_car_stand_in;
 extern AiStandIn g_update_idle_stand_in;
 extern AiStandIn g_update_all_stand_in;

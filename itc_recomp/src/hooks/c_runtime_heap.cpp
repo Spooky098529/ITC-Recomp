@@ -37,26 +37,26 @@ bool Native() {
 
 // GetProcessHeap: returns the process heap's handle.
 ITC_NATIVE_ENTRY(8229B670, ITC_FLAG(native_c_runtime_heap)) {
-  ctx.r3.u64 = memory::crt::GetProcessHeap(base);
+  ctx.r3.u64 = memory::crt::GetProcessHeap();
 }
 
 // malloc: r3 = size; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(825A9A90) {
   
   if (Native()) {
-    if (auto block = memory::crt::Malloc(base, ctx.r3.u32)) {
+    if (auto block = memory::crt::Malloc(ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c825A9A90(ctx, base);
+  lifted::original::c825A9A90(ctx);
 }
 
 // free: r3 = block.
 ITC_NATIVE_ENTRY_ALWAYS(825A9B58) {
   
   if (!Native() || !memory::crt::Free(ctx.r3.u32)) {
-    lifted::original::c825A9B58(ctx, base);
+    lifted::original::c825A9B58(ctx);
   }
 }
 
@@ -69,19 +69,19 @@ ITC_NATIVE_ENTRY_ALWAYS(825AC320) {
       return;
     }
   }
-  lifted::original::c825AC320(ctx, base);
+  lifted::original::c825AC320(ctx);
 }
 
 // realloc: r3 = block, r4 = size; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(825AEBC8) {
   
   if (Native()) {
-    if (auto block = memory::crt::Realloc(base, ctx.r3.u32, ctx.r4.u32)) {
+    if (auto block = memory::crt::Realloc(ctx.r3.u32, ctx.r4.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c825AEBC8(ctx, base);
+  lifted::original::c825AEBC8(ctx);
 }
 
 // _msize: r3 = block; returns its size.
@@ -93,24 +93,24 @@ ITC_NATIVE_ENTRY_ALWAYS(825AED30) {
       return;
     }
   }
-  lifted::original::c825AED30(ctx, base);
+  lifted::original::c825AED30(ctx);
 }
 
 // XMemAlloc: r3 = size, r4 = attributes; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(822976F8) {
   
   if (!Native()) {
-    lifted::original::c822976F8(ctx, base);
+    lifted::original::c822976F8(ctx);
     return;
   }
-  ctx.r3.u64 = memory::crt::XMemAlloc(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = memory::crt::XMemAlloc(ctx.r3.u32, ctx.r4.u32);
 }
 
 // XMemFree: r3 = block, r4 = attributes.
 ITC_NATIVE_ENTRY_ALWAYS(82297790) {
   
   if (!Native()) {
-    lifted::original::c82297790(ctx, base);
+    lifted::original::c82297790(ctx);
     return;
   }
   ctx.r3.u64 = memory::crt::XMemFree(ctx.r3.u32, ctx.r4.u32);
@@ -123,31 +123,31 @@ ITC_NATIVE_ENTRY_ALWAYS(825A6880) {
     return;  // a harness's (the race HUD object's)
   }
   if (Native()) {
-    if (auto block = memory::crt::OperatorNew(base, ctx.r3.u32)) {
+    if (auto block = memory::crt::OperatorNew(ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c825A6880(ctx, base);
+  lifted::original::c825A6880(ctx);
 }
 
 // operator new[]: r3 = size; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(825A6940) {
   
   if (Native()) {
-    if (auto block = memory::crt::OperatorNewArray(base, ctx.r3.u32)) {
+    if (auto block = memory::crt::OperatorNewArray(ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c825A6940(ctx, base);
+  lifted::original::c825A6940(ctx);
 }
 
 // operator delete: r3 = block.
 ITC_NATIVE_ENTRY_ALWAYS(825A70E8) {
   
   if (!Native() || !memory::crt::OperatorDelete(ctx.r3.u32)) {
-    lifted::original::c825A70E8(ctx, base);
+    lifted::original::c825A70E8(ctx);
   }
 }
 
@@ -155,6 +155,6 @@ ITC_NATIVE_ENTRY_ALWAYS(825A70E8) {
 ITC_NATIVE_ENTRY_ALWAYS(825A71C0) {
   
   if (!Native() || !memory::crt::OperatorDeleteArray(ctx.r3.u32)) {
-    lifted::original::c825A71C0(ctx, base);
+    lifted::original::c825A71C0(ctx);
   }
 }

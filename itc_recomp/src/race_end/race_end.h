@@ -53,13 +53,13 @@ constexpr uint32_t kCheckUnlocks = 0x821162B0;  // Progress::CheckUnlocks
 // frame below `sp` (its +80 to +87; +81 to +83 never written, the stack's)
 // and copied; see race-end.md's row. Returns r3 as the original leaves it
 // (the answer: the adapter keeps its r3).
-void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& calls);
+void ModeAfterRace(uint32_t answer, uint32_t sp, const Calls& calls);
 
 // sub_82151EF0 RaceMode::NextMode: the answer cleared; messages 0 (when
 // +167260 isn't 0) and 1 posted into the mode's ring; LoadingScreen::Run(-1)
 // with the +848 machine in state 3 or 4; sub_82293460; GameMessages::Dispatch;
 // in state 35, ModeAfterRace's answer (in its frame's +80) copied. Returns r3
 // as the original leaves it (the answer).
-void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextMode(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
 
 }  // namespace race_end

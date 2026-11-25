@@ -59,8 +59,8 @@ thread_local uint64_t g_set_calls = 0, g_set_same = 0;
 thread_local std::chrono::steady_clock::time_point g_last_log;
 
 // Adds `delta` to the big-endian count at `address`; returns the new count.
-uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
+uint32_t AddToCount(uint32_t address, int32_t delta) {
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {
@@ -71,8 +71,8 @@ uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
 }
 
 // Type 4 with +0 bit 0x40000000: the object holds a reference on +24.
-bool HoldsChild(uint8_t* base, uint32_t object) {
-  uint32_t common = guest::LoadU32(base, object);
+bool HoldsChild(uint32_t object) {
+  uint32_t common = guest::LoadU32(object);
   return (common & 0xF) == 4 && (common & 0x40000000);
 }
 
@@ -80,14 +80,14 @@ bool HoldsChild(uint8_t* base, uint32_t object) {
 
 namespace refcount {
 
-uint32_t AddRef(uint8_t* base, uint32_t object) {
+uint32_t AddRef(uint32_t object) {
   ITC_NATIVE_RUNNING("sub_822A6738 Resource::AddRef");
   if (object == g_unchanged_shader) {
-    return guest::LoadU32(base, object + kCount);  // unused by the caller
+    return guest::LoadU32(object + kCount);  // unused by the caller
   }
-  uint32_t count = AddToCount(base, object + kCount, 1);
-  if (count == 1 && HoldsChild(base, object)) {
-    AddRef(base, guest::LoadU32(base, object + kChild));
+  uint32_t count = AddToCount(object + kCount, 1);
+  if (count == 1 && HoldsChild(object)) {
+    AddRef(guest::LoadU32(object + kChild));
   }
   return count;
 }
@@ -113,35 +113,35 @@ void NoteSetVertexShader(bool same) {
 ITC_NATIVE_ENTRY_ALWAYS(822A6738) {
   
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::original::c822A6738(ctx, base);
+    lifted::original::c822A6738(ctx);
     return;
   }
-  ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
+  ctx.r3.u64 = refcount::AddRef(ctx.r3.u32);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
   
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::original::c822A67B0(ctx, base);
+    lifted::original::c822A67B0(ctx);
     return;
   }
   uint32_t object = ctx.r3.u32;
   if (object == g_unchanged_shader) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kCount);  // unused by the caller
+    ctx.r3.u64 = guest::LoadU32(object + kCount);  // unused by the caller
     return;
   }
-  uint32_t count = AddToCount(base, object + kCount, -1);
+  uint32_t count = AddToCount(object + kCount, -1);
   if (count != 0) {
     ctx.r3.u64 = count;
     return;
   }
-  if (HoldsChild(base, object)) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kChild);
+  if (HoldsChild(object)) {
+    ctx.r3.u64 = guest::LoadU32(object + kChild);
     ctx.lr = 0x822A6810;
-    lifted::Enter(ctx, base, game::Resource::Release);
+    lifted::Enter(ctx, game::Resource::Release);
   }
   ctx.r3.u64 = object;
   ctx.lr = 0x822A6818;
-  lifted::Enter(ctx, base, game::Resource::Destroy);
+  lifted::Enter(ctx, game::Resource::Destroy);
   ctx.r3.u64 = 0;
 }

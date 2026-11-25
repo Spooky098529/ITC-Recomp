@@ -133,12 +133,19 @@ fields = [
   { name = "fault_node_is_nil", offset = 41, type = "u8", note = "measure fault: a node's isnil" },
 ]
 
-# A map node (48 bytes, UvMap::AllocateNodes).
+# A map node (48 bytes, UvMap::AllocateNodes). In host memory (E5 step 4,
+# 2026-11-24): made by UvMap::AllocateNodes' hand port (NewArray, one node
+# a call), freed by UvMap::EraseSubtree's and ~UvMap's (Delete); no lifted
+# function allocates or frees one (their originals' calls to the
+# allocators have no entry). The measure's "RaceScreens@+16.+592" (a
+# texture read by sub_822A5C50, a graphics function: a register reused)
+# is left out, so that function's load stays a guest one.
 [ScreenObjectUvMapNode]
 measure = "UvMap.+4"
-measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8", "RaceScreens@+16.+592"]
+measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8"]
 size = 48
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "left", offset = 0, type = "ptr", to = "ScreenObjectUvMapNode" },
   { name = "parent", offset = 4, type = "ptr", to = "ScreenObjectUvMapNode" },
@@ -146,9 +153,7 @@ fields = [
   { name = "key", offset = 16, type = "f64", note = "x rounded to 0.001" },
   { name = "key_high", offset = 16, type = "u32", note = "the key's high word" },
   { name = "key_low", offset = 20, type = "u32", note = "the key's low word" },
-  { name = "column", offset = 24, type = "bytes", count = 12, note = "a ScreenObjectUvColumn" },
-  { name = "column_head", offset = 28, type = "ptr", to = "ScreenObjectUvColumnNode" },
-  { name = "column_size", offset = 32, type = "u32" },
+  { name = "column", offset = 24, type = "embed", to = "ScreenObjectUvColumn", note = "its head at +28, its size at +32" },
   { name = "color", offset = 40, type = "u8", note = "0 red, 1 black" },
   { name = "is_nil", offset = 41, type = "u8", note = "1 only for the head" },
 ]
@@ -170,10 +175,13 @@ fields = [
 ]
 
 # A column (std::map<double, {float u, v}>, 12 bytes): a map node's +24.
+# Dual: embedded in the map's nodes (host) and made on AddRingPoint's
+# stack, alone and at a map value's +8 (guest).
 [ScreenObjectUvColumn]
 measures = ["UvColumn", "UvColumn::Find.r4", "UvColumn::InsertUnique.r4"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "head", offset = 4, type = "ptr", to = "ScreenObjectUvColumnNode" },
   { name = "size", offset = 8, type = "u32" },
@@ -182,7 +190,10 @@ fields = [
   { name = "fault_size_byte", offset = 8, type = "u8", note = "measure fault: a byte met at +8" },
 ]
 
-# A column node (40 bytes, UvColumn::AllocateNodes).
+# A column node (40 bytes, UvColumn::AllocateNodes). In host memory (E5
+# step 4, 2026-11-24): made by UvColumn::AllocateNodes' hand port
+# (NewArray, one node a call), freed by UvColumn::EraseSubtree's and
+# ~UvColumn's (Delete); no lifted function allocates or frees one.
 [ScreenObjectUvColumnNode]
 measures = ["new<?>@UvColumn::AllocateNodes", "UvColumn.+4.+8", "UvColumn.+4.+8.+4",
             "UvColumn.+4.+8.+4.+8", "UvColumn::RotateRight.r4.+0",
@@ -194,6 +205,7 @@ measures = ["new<?>@UvColumn::AllocateNodes", "UvColumn.+4.+8", "UvColumn.+4.+8.
             "sub_8212EEF8.r3.+4", "sub_8212EEF8.r3.+4.+0", "sub_8212EEF8.r3.+4.+8"]
 size = 40
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "left", offset = 0, type = "ptr", to = "ScreenObjectUvColumnNode" },
   { name = "parent", offset = 4, type = "ptr", to = "ScreenObjectUvColumnNode" },
@@ -208,11 +220,16 @@ fields = [
 ]
 
 # A column's value ({double y, float u, float v}, 16 bytes):
-# UvColumn::InsertUnique's r5, UvColumn::NewNode's r7.
+# UvColumn::InsertUnique's r5, UvColumn::NewNode's r7. Dual: met on
+# AddRingPoint's stack (guest) and as a column node's +16 (CopySubtree
+# hands NewNode its source node's key address, an interior handle; the
+# node's own fields cover those bytes, so no embed field there: the view
+# reads the node's members at +16 to +31, laid out alike).
 [ScreenObjectUvColumnValue]
 measures = ["UvColumn::InsertUnique.r5", "UvColumn::NewNode.r7"]
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "key", offset = 0, type = "f64" },
   { name = "key_high", offset = 0, type = "u32" },

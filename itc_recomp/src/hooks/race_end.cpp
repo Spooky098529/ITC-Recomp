@@ -37,8 +37,8 @@ namespace re = race_end;
 // race event's tests. The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base)
-      : ctx_(ctx), base_(base), lr_(ctx.lr), event_(ctx, base) {}
+  GuestCalls(lifted::Regs& ctx)
+      : ctx_(ctx), lr_(ctx.lr), event_(ctx) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -54,8 +54,7 @@ class GuestCalls {
     ctx_.lr = lr;
     ctx_.ctr.u64 = function;
     lifted::Regs& ctx = ctx_;
-    uint8_t* base = base_;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx_.r1.u64 = stack;
     ctx_.fpscr.disableFlushMode();
     return ctx_.r3.u64;
@@ -84,7 +83,6 @@ class GuestCalls {
     return self.Run(function, r1, lr);
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
   RaceEventGuest event_;
 };
@@ -96,8 +94,8 @@ ITC_REGS_STEP(RaceModeModeAfterRace) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   {
-    GuestCalls guest(ctx, base);
-    re::ModeAfterRace(base, uint32_t(r3), sp, guest.calls());
+    GuestCalls guest(ctx);
+    re::ModeAfterRace(uint32_t(r3), sp, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
@@ -107,8 +105,8 @@ ITC_REGS_STEP(RaceModeNextMode) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t mode = ctx.r4.u32, sp = ctx.r1.u32;
   {
-    GuestCalls guest(ctx, base);
-    re::NextMode(base, uint32_t(r3), mode, sp, guest.calls());
+    GuestCalls guest(ctx);
+    re::NextMode(uint32_t(r3), mode, sp, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
@@ -118,7 +116,7 @@ ITC_REGS_STEP(RaceModeNextMode) {
 // The adapters: the register steps above, or the originals with the flag off.
 #define ITC_RACE_END(address, step)       \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_end)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 // RaceMode::ModeAfterRace has no adapter (removed, B7 loop, 2026-11-12): its

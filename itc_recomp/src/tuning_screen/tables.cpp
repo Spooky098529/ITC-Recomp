@@ -14,39 +14,39 @@ namespace tuning_screen {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-int32_t CategoryOf(uint8_t* base, uint32_t screen) {
-  return int32_t(TS(base, screen).category());
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+int32_t CategoryOf(uint32_t screen) {
+  return int32_t(TS(screen).category());
 }
-uint32_t ItemOf(uint8_t* base, uint32_t screen) { return uint32_t(TS(base, screen).item()); }
+uint32_t ItemOf(uint32_t screen) { return uint32_t(TS(screen).item()); }
 // The screen's word at word index `index`.
-uint32_t Word(uint8_t* base, uint32_t screen, uint32_t index) {
-  return Load(base, screen + index * 4);
+uint32_t Word(uint32_t screen, uint32_t index) {
+  return Load(screen + index * 4);
 }
 
 }  // namespace
 
-uint32_t CategoryItemCount(uint8_t* base, uint32_t screen) {
+uint32_t CategoryItemCount(uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CC6C0 TuningScreen::CategoryItemCount");
   static constexpr uint32_t kCounts[7] = {4, 5, 1, 3, 10, 8, 4};
-  const uint32_t m = TS(base, screen).category();
+  const uint32_t m = TS(screen).category();
   return m < 7 ? kCounts[m] : 0;
 }
 
-uint32_t IsItemAvailable(uint8_t* base, uint32_t screen, uint64_t item) {
+uint32_t IsItemAvailable(uint32_t screen, uint64_t item) {
   ITC_NATIVE_RUNNING("sub_821CDB18 TuningScreen::IsItemAvailable");
   const uint32_t r4 = uint32_t(item);
   std::optional<uint32_t> index;
-  const int32_t m = CategoryOf(base, screen);
+  const int32_t m = CategoryOf(screen);
   if (m == 0) {
-    if (int32_t(TS(base, screen).state()) != 5) {
+    if (int32_t(TS(screen).state()) != 5) {
       return 1;
     }
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 0) {
-      index = TS(base, screen).price_class() * 10 + r4 + 8526;
+      index = TS(screen).price_class() * 10 + r4 + 8526;
     } else if (p == 1) {
-      index = (TS(base, screen).price_class() + 1238) * 7 + r4;
+      index = (TS(screen).price_class() + 1238) * 7 + r4;
     } else if (p == 2) {
       index = r4 + 8748;
     } else if (p == 3) {
@@ -54,7 +54,7 @@ uint32_t IsItemAvailable(uint8_t* base, uint32_t screen, uint64_t item) {
     }
   } else if (m == 1) {
     static constexpr uint32_t kRows[5] = {8800, 8822, 8844, 8866, 8892};
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p < 5) {
       index = r4 + kRows[p];
     }
@@ -63,11 +63,11 @@ uint32_t IsItemAvailable(uint8_t* base, uint32_t screen, uint64_t item) {
   } else if (m == 3) {
     index = r4 + 8950;
   } else if (m == 4) {
-    if (ItemOf(base, screen) == 9) {
+    if (ItemOf(screen) == 9) {
       index = r4 + 9144;
     }
   }
-  return index ? Word(base, screen, *index) : 1;
+  return index ? Word(screen, *index) : 1;
 }
 
 uint64_t WheelNumber(uint64_t brand, uint64_t model) {
@@ -81,19 +81,19 @@ uint64_t WheelNumber(uint64_t brand, uint64_t model) {
   return model + kFirst[b];
 }
 
-uint32_t GetPrice(uint8_t* base, uint32_t screen) {
+uint32_t GetPrice(uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CD160 TuningScreen::GetPrice");
-  TS(base, screen).set_price(0);
+  TS(screen).set_price(0);
   std::optional<uint32_t> index;
-  const int32_t m = CategoryOf(base, screen);
-  const uint32_t p = ItemOf(base, screen);
-  auto level = [&] { return uint32_t(TS(base, screen).level()); };
-  auto type = [&] { return uint32_t(TS(base, screen).type()); };
+  const int32_t m = CategoryOf(screen);
+  const uint32_t p = ItemOf(screen);
+  auto level = [&] { return uint32_t(TS(screen).level()); };
+  auto type = [&] { return uint32_t(TS(screen).type()); };
   if (m == 0) {
     if (p == 0) {
-      index = level() + TS(base, screen).price_class() * 10 + 8476;
+      index = level() + TS(screen).price_class() * 10 + 8476;
     } else if (p == 1) {
-      index = (TS(base, screen).price_class() + 1233) * 7 + level();
+      index = (TS(screen).price_class() + 1233) * 7 + level();
     } else if (p == 2) {
       index = level() + 8741;
     } else if (p == 3) {
@@ -109,21 +109,21 @@ uint32_t GetPrice(uint8_t* base, uint32_t screen) {
   } else if (m == 3) {
     static constexpr uint32_t kRows[3] = {8935, 8972, 9004};
     if (p < 3) {
-      index = level() * 3 + uint32_t(TS(base, screen).option()) + kRows[p];
+      index = level() * 3 + uint32_t(TS(screen).option()) + kRows[p];
     }
   } else if (m == 4) {
     static constexpr uint32_t kRows[10] = {9036, 9047, 9058, 9069, 0,
                                            9105, 9114, 9123, 9132, 9141};
     if (p == 4) {
-      index = (type() + 4541) * 2 + uint32_t(TS(base, screen).bonnet_choice());
+      index = (type() + 4541) * 2 + uint32_t(TS(screen).bonnet_choice());
     } else if (p <= 9) {
       index = type() + kRows[p];
     }
   } else if (m == 5) {
     if (p == 0) {
-      index = TS(base, screen).part_group() * 38 + TS(base, screen).list_cursor() + 6312;
+      index = TS(screen).part_group() * 38 + TS(screen).list_cursor() + 6312;
     } else if (p == 1) {
-      index = uint32_t(TS(base, screen).option()) + 9151;
+      index = uint32_t(TS(screen).option()) + 9151;
     } else if (p == 2) {
       index = type() + 9156;
     } else if (p == 3) {
@@ -137,31 +137,31 @@ uint32_t GetPrice(uint8_t* base, uint32_t screen) {
     } else if (p == 2) {
       index = type() + 9193;
     } else if (p == 3) {
-      const int32_t kind = int32_t(TS(base, screen).interior_mode());
+      const int32_t kind = int32_t(TS(screen).interior_mode());
       if (kind == 0) {
-        index = TS(base, screen).interior_pick() + 8396;
+        index = TS(screen).interior_pick() + 8396;
       } else if (kind == 1) {
-        index = (TS(base, screen).interior_page_mode() + 1682) * 5 +
-                TS(base, screen).interior_pair_index();
+        index = (TS(screen).interior_page_mode() + 1682) * 5 +
+                TS(screen).interior_pair_index();
       }
     }
   }
   if (index) {
-    TS(base, screen).set_price(Word(base, screen, *index));
+    TS(screen).set_price(Word(screen, *index));
   }
-  return TS(base, screen).price();
+  return TS(screen).price();
 }
 
-uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
+uint32_t GetCurrentChoice(uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CD868 TuningScreen::GetCurrentChoice");
   std::optional<uint32_t> offset;
-  const int32_t m = CategoryOf(base, screen);
-  const uint32_t p = ItemOf(base, screen);
+  const int32_t m = CategoryOf(screen);
+  const uint32_t p = ItemOf(screen);
   if (m == 0) {
     if (p == 0) {
-      offset = (TS(base, screen).price_class() + 8576) * 4;
+      offset = (TS(screen).price_class() + 8576) * 4;
     } else if (p == 1) {
-      offset = (TS(base, screen).price_class() + 8701) * 4;
+      offset = (TS(screen).price_class() + 8701) * 4;
     } else if (p == 2) {
       offset = 35020;
     } else if (p == 3) {
@@ -187,7 +187,7 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
     }
   } else if (m == 5) {
     if (p == 0) {
-      offset = (TS(base, screen).wheel_part_cursor() + 6958) * 4;
+      offset = (TS(screen).wheel_part_cursor() + 6958) * 4;
     } else if (p == 1) {
       offset = 36612;
     } else if (p == 2) {
@@ -202,24 +202,24 @@ uint32_t GetCurrentChoice(uint8_t* base, uint32_t screen) {
       offset = 36752;
     } else if (p == 2) {
       offset = 36796;
-    } else if (p == 3 && int32_t(TS(base, screen).interior_mode()) == 0) {
+    } else if (p == 3 && int32_t(TS(screen).interior_mode()) == 0) {
       offset = 33616;
     }
   }
-  return offset ? Load(base, screen + *offset) : 0;
+  return offset ? Load(screen + *offset) : 0;
 }
 
-uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
+uint32_t GetChoiceFlag(uint32_t screen, uint64_t choice) {
   ITC_NATIVE_RUNNING("sub_821CDC38 TuningScreen::GetChoiceFlag");
   const uint32_t r4 = uint32_t(choice);
   std::optional<uint32_t> index;
-  const int32_t m = CategoryOf(base, screen);
+  const int32_t m = CategoryOf(screen);
   if (m == 0) {
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 0) {
-      index = TS(base, screen).price_class() * 10 + r4 + 8581;
+      index = TS(screen).price_class() * 10 + r4 + 8581;
     } else if (p == 1) {
-      index = TS(base, screen).price_class() * 7 + r4 + 8706;
+      index = TS(screen).price_class() * 7 + r4 + 8706;
     } else if (p == 2) {
       index = r4 + 8757;
     } else if (p == 3) {
@@ -227,34 +227,34 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
     }
   } else if (m == 1) {
     static constexpr uint32_t kRows[5] = {8808, 8830, 8852, 8875, 8903};
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p < 5) {
       index = r4 + kRows[p];
     }
   } else if (m == 2) {
     index = r4 + 8928;
   } else if (m == 3) {
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 0) {
-      index = uint32_t(TS(base, screen).level()) * 3 + r4 + 8957;
+      index = uint32_t(TS(screen).level()) * 3 + r4 + 8957;
     } else if (p == 1) {
-      index = uint32_t(TS(base, screen).level()) * 3 + r4 + 8989;
+      index = uint32_t(TS(screen).level()) * 3 + r4 + 8989;
     } else if (p == 2) {
-      index = (uint32_t(TS(base, screen).level()) + 3007) * 3 + r4;
+      index = (uint32_t(TS(screen).level()) + 3007) * 3 + r4;
     }
   } else if (m == 4) {
     static constexpr uint32_t kRows[10] = {9042, 9053, 9064, 9076, 0,
                                            9110, 9119, 9128, 9137, 9148};
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 4) {
-      index = uint32_t(TS(base, screen).type()) * 2 + r4 + 9095;
+      index = uint32_t(TS(screen).type()) * 2 + r4 + 9095;
     } else if (p <= 9) {
       index = r4 + kRows[p];
     }
   } else if (m == 5) {
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 0) {
-      index = TS(base, screen).part_group() * 38 + r4 + 6964;
+      index = TS(screen).part_group() * 38 + r4 + 6964;
     } else if (p == 1) {
       index = r4 + 9154;
     } else if (p == 2) {
@@ -263,7 +263,7 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
       index = r4 + 9168;
     }
   } else if (m == 6) {
-    const uint32_t p = ItemOf(base, screen);
+    const uint32_t p = ItemOf(screen);
     if (p == 0) {
       index = r4 + 9179;
     } else if (p == 1) {
@@ -271,15 +271,15 @@ uint32_t GetChoiceFlag(uint8_t* base, uint32_t screen, uint64_t choice) {
     } else if (p == 2) {
       index = r4 + 9200;
     } else if (p == 3) {
-      const int32_t kind = int32_t(TS(base, screen).interior_mode());
+      const int32_t kind = int32_t(TS(screen).interior_mode());
       if (kind == 0) {
         index = r4 + 8406;
       } else if (kind == 1) {
-        index = (TS(base, screen).interior_page_mode() + 1691) * 5 + r4;
+        index = (TS(screen).interior_page_mode() + 1691) * 5 + r4;
       }
     }
   }
-  return index ? Word(base, screen, *index) : 0;
+  return index ? Word(screen, *index) : 0;
 }
 
 }  // namespace tuning_screen

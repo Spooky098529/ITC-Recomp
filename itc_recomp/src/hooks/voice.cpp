@@ -31,9 +31,9 @@ namespace voice {
 // and the tick count to +444, as the original stores them around the
 // engine's creation (read only by the chat data read and system link code).
 // Returns the tick count (the original's r3).
-uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id) {
+uint32_t SetUpWithoutEngine(uint32_t manager, uint32_t machine_id) {
   ITC_NATIVE_RUNNING("sub_8214F6E8 Network::SetUpVoice (no engine)");
-  const schema::NetworkManager network(base, manager);
+  const schema::NetworkManager network(manager);
   network.set_machine_id(machine_id);
   const uint32_t ticks = helpers::TickCount();
   network.set_voice_ticks(ticks);
@@ -46,5 +46,5 @@ uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id
 // manager's set-up (sub_8214E190) once at boot.
 ITC_NATIVE_ENTRY_ALWAYS(8214F6E8) {
   
-  ctx.r3.u64 = voice::SetUpWithoutEngine(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = voice::SetUpWithoutEngine(ctx.r3.u32, ctx.r4.u32);
 }

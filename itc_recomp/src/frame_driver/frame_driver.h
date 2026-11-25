@@ -35,7 +35,7 @@ uint32_t GetVideoOutput(uint32_t object);
 // 80) and pushed on the request vector (interface + 20). Whether PushBack
 // took Insert, or nullopt when it hands back (the request is then built:
 // the caller runs the original PushBack on it).
-std::optional<bool> AddListener(uint8_t* base, uint32_t interface, uint32_t key,
+std::optional<bool> AddListener(uint32_t interface, uint32_t key,
                                 uint32_t delegate, uint32_t request,
                                 const app_states::AppCalls& calls);
 
@@ -45,7 +45,7 @@ std::optional<bool> AddListener(uint8_t* base, uint32_t interface, uint32_t key,
 // nullopt for type 1 (a listener's removal, never seen in play: the
 // original runs, as RunLoop::ApplyRequest's and App::ApplyRequest's
 // removals) or an insert handed back.
-std::optional<bool> ApplyRequest(uint8_t* base, uint32_t driver, uint32_t type, uint32_t key,
+std::optional<bool> ApplyRequest(uint32_t driver, uint32_t type, uint32_t key,
                                  uint32_t delegate);
 
 // sub_82091A98 FrameDriver::CallListener (DrawFrame's functor): `entry` (the
@@ -53,7 +53,7 @@ std::optional<bool> ApplyRequest(uint8_t* base, uint32_t driver, uint32_t type, 
 // caller's r1 + 24 (`frame` + 120, `frame` the original's 96-byte frame),
 // then the delegate's slot 1 with r4 = driver + 20 (0 for no driver)
 // and r5 = the device (+384), returning to 0x82091AD4. Its r3.
-uint32_t CallListener(uint8_t* base, uint32_t driver, uint64_t entry, uint32_t frame,
+uint32_t CallListener(uint32_t driver, uint64_t entry, uint32_t frame,
                       const app_states::AppCalls& calls);
 
 // sub_82091E58 FrameDriver::DrawFrame (the render thread's frame): the device
@@ -62,7 +62,7 @@ uint32_t CallListener(uint8_t* base, uint32_t driver, uint64_t entry, uint32_t f
 // (the iterators and the functor stored in `frame`, the original's 144-byte
 // frame, as it stores them; r29 to r31 as it sets them), then the device
 // unlocked with the word at +384.
-void DrawFrame(uint8_t* base, uint32_t driver, uint32_t frame,
+void DrawFrame(uint32_t driver, uint32_t frame,
                const app_states::AppCalls& calls);
 
 constexpr uint32_t kGetVideoOutput = 0x824960E0;
@@ -72,19 +72,19 @@ constexpr uint32_t kGetVideoOutput = 0x824960E0;
 using SetGpr = std::function<void(uint32_t device, uint32_t vertex, uint32_t pixel)>;
 
 // sub_82591838: [0x82970BC4] = 0 when it was 1, else 1.
-void FlipPrimitiveWord(uint8_t* base);
+void FlipPrimitiveWord();
 
 // sub_820988C8 Scene::Update (tick handler 18): the command list (+8)
 // flipped and its tick begun (CommandList::Flip and BeginTick's plain C++),
 // sub_82591838, then the render queue's (+64) slots 6 (RenderQueue::Flip,
 // returning to 0x82098910) and 2 (ClearRecording, 0x82098924) as guest
 // calls, r30 and r31 as the original sets them.
-void SceneUpdate(uint8_t* base, uint32_t scene, const app_states::AppCalls& calls);
+void SceneUpdate(uint32_t scene, const app_states::AppCalls& calls);
 
 // sub_8258D958 VideoOutput::BeginFrame (probably): `set_gpr` on the device
 // (+140) with 32 vertex and 96 pixel registers, then the vblank count
 // [0x8296BD30] = 0.
-void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& set_gpr);
+void VideoOutputBeginFrame(uint32_t video_output, const SetGpr& set_gpr);
 
 // sub_82098940 Scene::Draw (the frame driver's listener 1): the video output
 // from `interface`'s slot 3 (FrameDriver::GetVideoOutput's plain C++ where the
@@ -95,7 +95,7 @@ void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& s
 // returning to 0x82098994: its per-frame replay wrap kept). r29 to r31 as
 // the original sets them. Returns the video output (the original's r3, as
 // the empty call leaves it).
-uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t device,
+uint32_t SceneDraw(uint32_t scene, uint32_t interface, uint32_t device,
                    const app_states::AppCalls& calls, const SetGpr& set_gpr);
 
 // VideoOutput::UnbindAll's guest calls: the device's setters through their
@@ -121,6 +121,6 @@ struct UnbindCalls {
 // 20)), every stream 0-3 (bit 63 >> 51, 51, 51, 50: the original's
 // (95 - stream) x 21846 >> 16, plus 20), the index buffer and both shaders;
 // r29 to r31 as the original keeps them.
-void VideoOutputUnbindAll(uint8_t* base, uint32_t video_output, const UnbindCalls& calls);
+void VideoOutputUnbindAll(uint32_t video_output, const UnbindCalls& calls);
 
 }  // namespace frame_driver

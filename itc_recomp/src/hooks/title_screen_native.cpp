@@ -78,7 +78,7 @@ namespace ts = title_screen;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -89,7 +89,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -104,24 +103,22 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
-void InitSteps(lifted::Regs& ctx, uint8_t* base,
-               uint32_t (*init)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t frame_bytes) {
+void InitSteps(lifted::Regs& ctx, uint32_t (*init)(uint32_t, uint32_t, bool*), uint32_t frame_bytes) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = init(base, machine, ctx.r1.u32 - frame_bytes, &replaced);
+  const uint32_t r3 = init(machine, ctx.r1.u32 - frame_bytes, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -130,216 +127,216 @@ void InitSteps(lifted::Regs& ctx, uint8_t* base,
 bool TitleScreenNative() { return ITC_FLAG(native_title_screen); }
 
 ITC_REGS_STEP(TitleLoadCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = ts::LoadOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(TitleLoadWaitForMovie) {
-  ctx.r3.u64 = ts::LoadWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::LoadWaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(TitleLoadStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadStart(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadUpdate(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadUpdate(ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadPlayLogo) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadPlayLogo(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadPlayLogo(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadWaitForArchive) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadWaitForArchive(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadWaitForArchive(ctx.r1.u32, guest.calls());
 }
-ITC_REGS_STEP(TitleLoadPostClose) { ts::LoadPostClose(base, ctx.r3.u32); }
+ITC_REGS_STEP(TitleLoadPostClose) { ts::LoadPostClose(ctx.r3.u32); }
 ITC_REGS_STEP(TitleLoadUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadUnload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadOpenTitle) {
-  ts::LoadOpenTitle(base, ctx.r3.u32, ctx.r4.u32);
+  ts::LoadOpenTitle(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(TitleLoadLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadLeave(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadDestroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadDestroy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleLoadInit) {
-  InitSteps(ctx, base, ts::LoadInit, ts::kLoadInitFrame);
+  InitSteps(ctx, ts::LoadInit, ts::kLoadInitFrame);
 }
 ITC_REGS_STEP(TitleScreenInit) {
-  InitSteps(ctx, base, ts::ScreenInit, ts::kScreenInitFrame);
+  InitSteps(ctx, ts::ScreenInit, ts::kScreenInitFrame);
 }
 
 ITC_REGS_STEP(TitleScreenCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = ts::ScreenOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(TitleScreenWaitForMovie) {
-  ctx.r3.u64 = ts::ScreenWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::ScreenWaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(TitleScreenStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenStart(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenSetUp) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenSetUp(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenSetUp(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenUpdateTransitions) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenUpdate(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenUpdate(ctx.r1.u32, guest.calls());
 }
-void TitleScreenOnGameDataLoaded(lifted::Regs&, uint8_t* base) { ts::ScreenOnGameDataLoaded(base); }
-void TitleScreenOnInterrupt(lifted::Regs&, uint8_t* base) { ts::ScreenOnInterrupt(base); }
-void TitleScreenOnResume(lifted::Regs&, uint8_t* base) { ts::ScreenOnResume(base); }
+void TitleScreenOnGameDataLoaded(lifted::Regs&) { ts::ScreenOnGameDataLoaded(); }
+void TitleScreenOnInterrupt(lifted::Regs&) { ts::ScreenOnInterrupt(); }
+void TitleScreenOnResume(lifted::Regs&) { ts::ScreenOnResume(); }
 ITC_REGS_STEP(TitleScreenUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenUnload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenOpenNext) {
-  ctx.r3.u64 = ts::ScreenOpenNext(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::ScreenOpenNext(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(TitleScreenLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenLeave(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ScreenDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ScreenDestroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenLoadGameData) {
-  ts::ScreenLoadGameData(base, ctx.r3.u32);
+  ts::ScreenLoadGameData(ctx.r3.u32);
 }
 ITC_REGS_STEP(TitleScreenLeavePage) {
-  ts::ScreenLeavePage(base, ctx.r3.u32, ctx.r4.u32);
+  ts::ScreenLeavePage(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(TitleScreenIntro) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::Intro(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::Intro(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenPressStartLoop) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::PressStartLoop(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::PressStartLoop(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenTransition2) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::BackToPressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::BackToPressStart(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenLeavePressStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LeavePressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LeavePressStart(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenShowMainMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ShowMainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ShowMainMenu(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenShowMainMenuAtOnce) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ShowMainMenuAtOnce(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ShowMainMenuAtOnce(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenHighlightMain) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::HighlightMain(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::HighlightMain(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenMoveMainCursor) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::MoveMainCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::MoveMainCursor(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenTransition9) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::RefreshSaveItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::RefreshSaveItem(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenTransition10) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::RefreshPadItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::RefreshPadItem(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenShowCareerMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ShowCareerMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ShowCareerMenu(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenHighlightCareer) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::HighlightCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::HighlightCareer(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenMoveCareerCursor) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::MoveCareerCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::MoveCareerCursor(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenBackFromCareer) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::BackFromCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::BackFromCareer(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenShowMenu4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ShowMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ShowMenu4(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenBackFromMenu4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::BackFromMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::BackFromMenu4(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenMoveMenu4Cursor) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::MoveMenu4Cursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::MoveMenu4Cursor(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenSetUpMainMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::SetUpMainMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::SetUpMainMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenSetUpCareerMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::SetUpCareerMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::SetUpCareerMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenSetUpMenu4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::SetUpMenu4(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::SetUpMenu4(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenCareerMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::CareerMenu(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::CareerMenu(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenMenu4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::Menu4(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::Menu4(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenMainMenu) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls(),
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::MainMenu(ctx.r3.u32, ctx.r1.u32, guest.calls(),
                             ITC_FLAG(multiplayer_menu_items));
 }
 
 ITC_REGS_STEP(ModeType4Init) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::ModeInit(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE4_DELEGATE(name)                                       \
-  void ModeType4##name(lifted::Regs& ctx, uint8_t* base) {                    \
+  void ModeType4##name(lifted::Regs& ctx) {                    \
     const uint64_t answer = ctx.r3.u64;                                     \
     {                                                                       \
-      GuestCalls guest(ctx, base);                                          \
-      ts::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());    \
+      GuestCalls guest(ctx);                                          \
+      ts::name(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());    \
     }                                                                       \
     ctx.r3.u64 = answer;                                                    \
   }
@@ -350,48 +347,47 @@ ITC_MODE_TYPE4_DELEGATE(WaitForLeave)
 ITC_MODE_TYPE4_DELEGATE(Leaving)
 #undef ITC_MODE_TYPE4_DELEGATE
 ITC_REGS_STEP(ModeType4NextModeAnswer) {
-  ts::NextModeAnswer(base, ctx.r3.u32, ctx.r4.u32);
+  ts::NextModeAnswer(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(ModeType4Interrupt) {
-  ctx.r3.u64 = ts::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::Interrupt(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(ModeType4ForceExit) {
-  ts::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ts::ForceExit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-ITC_REGS_STEP(ModeType4Resume) { ts::Resume(base, ctx.r3.u32); }
+ITC_REGS_STEP(ModeType4Resume) { ts::Resume(ctx.r3.u32); }
 ITC_REGS_STEP(ModeType4MachineOf) {
-  (void)base;
   ctx.r3.u64 = ts::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
 ITC_REGS_STEP(ModeType4AllLoaded) {
-  ctx.r3.u64 = ts::AllLoaded(base, ctx.r3.u32);
+  ctx.r3.u64 = ts::AllLoaded(ctx.r3.u32);
 }
 ITC_REGS_STEP(ModeType4FindShown) {
-  ctx.r3.u64 = ts::FindShown(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::FindShown(ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TitleScreenPressStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::PressStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::PressStart(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TitleScreenOnControllerPicked) {
-  ctx.r3.u64 = ts::ScreenOnControllerPicked(base, ctx.r3.u64);
+  ctx.r3.u64 = ts::ScreenOnControllerPicked(ctx.r3.u64);
 }
 ITC_REGS_STEP(PlayersAssignController) {
-  ts::AssignController(base, ctx.r3.u32, ctx.r4.u32);
+  ts::AssignController(ctx.r3.u32, ctx.r4.u32);
 }
 
 template <uint32_t kWhich>
-void TitleLoadDebugPage(lifted::Regs& ctx, uint8_t* base) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ts::LoadDebugPage(base, kWhich, ctx.r3.u64, ctx.r1.u32, guest.calls());
+void TitleLoadDebugPage(lifted::Regs& ctx) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ts::LoadDebugPage(kWhich, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 template <uint32_t kWhich>
-void TitleLoadDebugStep(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = ts::LoadDebugStep(base, kWhich, ctx.r3.u32, ctx.r1.u32);
+void TitleLoadDebugStep(lifted::Regs& ctx) {
+  ctx.r3.u64 = ts::LoadDebugStep(kWhich, ctx.r3.u32, ctx.r1.u32);
 }
 #define ITC_TITLE_LOAD_DEBUG(name, index)                  \
-  template void name<index>(lifted::Regs&, uint8_t*);
+  template void name<index>(lifted::Regs&);
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 0)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 1)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 2)
@@ -414,7 +410,7 @@ ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 11)
 
 #define ITC_TITLE_SCREEN(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_title_screen)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 // The title load's handlers (member function functors the machine calls; no

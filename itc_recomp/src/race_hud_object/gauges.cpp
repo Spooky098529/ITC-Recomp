@@ -18,26 +18,26 @@ namespace {
 using namespace camera_modes::steps;
 
 // The original's frame: its back chain.
-void Frame(uint8_t* base, uint32_t sp, uint32_t bytes) { guest::StoreU32(base, sp - bytes, sp); }
+void Frame(uint32_t sp, uint32_t bytes) { guest::StoreU32(sp - bytes, sp); }
 
-void StoreS64(uint8_t* base, uint32_t address, int64_t value) {
-  guest::StoreU32(base, address, uint32_t(uint64_t(value) >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(uint64_t(value)));
+void StoreS64(uint32_t address, int64_t value) {
+  guest::StoreU32(address, uint32_t(uint64_t(value) >> 32));
+  guest::StoreU32(address + 4, uint32_t(uint64_t(value)));
 }
 
 using Hud = schema::RaceHud;
 
-uint32_t Dashboard(uint8_t* base, uint32_t hud) { return Hud(base, hud).dashboard().address; }
+uint32_t Dashboard(uint32_t hud) { return Hud(hud).dashboard().address; }
 
 }  // namespace
 
-void CurveEval(uint8_t* base, uint32_t curve, double x) {
+void CurveEval(uint32_t curve, double x) {
   ITC_NATIVE_RUNNING("sub_82212118 HudCurve::Eval");
   using Point = schema::HudCurvePoint;
-  const schema::HudCurve c(base, curve);
+  const schema::HudCurve c(curve);
   double f0 = double(c.max_x());
   c.set_input(float(x));
-  double y = Lfs(base, kZero);
+  double y = Lfs(kZero);
   if (x > f0) {
     c.set_input(float(f0));
     return;
@@ -51,9 +51,9 @@ void CurveEval(uint8_t* base, uint32_t curve, double x) {
     int32_t i = 0;
     while (true) {
       const uint32_t point = c.points_address() + 8 * uint32_t(i);
-      if (!(x < double(Point(base, point).x())) && !(x > double(Point(base, point + 8).x()))) {
-        const Point at(base, uint32_t(i) * 8 + c.points_address());
-        const Point next(base, at.address + 8);
+      if (!(x < double(Point(point).x())) && !(x > double(Point(point + 8).x()))) {
+        const Point at{uint32_t(i) * 8 + c.points_address()};
+        const Point next(at.address + 8);
         double a = double(at.x());
         const double b = double(next.x());
         const double dx = Fsubs(x, a);
@@ -73,12 +73,12 @@ void CurveEval(uint8_t* base, uint32_t curve, double x) {
   c.set_output(float(y));
 }
 
-double PowInt(uint8_t* base, double x, int32_t n) {
+double PowInt(double x, int32_t n) {
   ITC_NATIVE_RUNNING("sub_82213C40 PowInt");
   double square = x;
   uint32_t bits = n < 0 ? uint32_t(-int64_t(n)) : uint32_t(n);
   const uint64_t one_bits =
-      uint64_t(guest::LoadU32(base, 0x82002250)) << 32 | guest::LoadU32(base, 0x82002254);
+      uint64_t(guest::LoadU32(0x82002250)) << 32 | guest::LoadU32(0x82002254);
   const double one = std::bit_cast<double>(one_bits);
   double result = one;
   while (true) {
@@ -97,22 +97,22 @@ double PowInt(uint8_t* base, double x, int32_t n) {
   return result;
 }
 
-void BarStep(uint8_t* base, uint32_t bar, int32_t target, uint32_t sp) {
+void BarStep(uint32_t bar, int32_t target, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82211FB8 HudBar::Step");
-  const schema::RaceHudBar b(base, bar);
+  const schema::RaceHudBar b(bar);
   const double value = double(b.value());
   const double trail = double(b.trail());
-  StoreS64(base, sp - 16, target);
+  StoreS64(sp - 16, target);
   const double goal = Single(double(int64_t(target)));
-  const double zero = Lfs(base, kZero);
+  const double zero = Lfs(kZero);
   b.set_target(float(goal));
   double to_value = Fsubs(goal, value);
   double to_trail = Fsubs(goal, trail);
   const int32_t value_sign = to_value < zero ? -1 : 1;
   const int32_t trail_sign = to_trail < zero ? -1 : 1;
   const double value_step = double(b.value_step());
-  StoreS64(base, sp - 16, value_sign);
-  StoreS64(base, sp - 8, trail_sign);
+  StoreS64(sp - 16, value_sign);
+  StoreS64(sp - 8, trail_sign);
   const double vs = Single(double(int64_t(value_sign)));
   const double ts = Single(double(int64_t(trail_sign)));
   to_value = Fmuls(vs, to_value);
@@ -145,73 +145,73 @@ void BarStep(uint8_t* base, uint32_t bar, int32_t target, uint32_t sp) {
   }
 }
 
-uint32_t SetGear(uint8_t* base, uint32_t hud, int32_t gear, uint32_t sp) {
+uint32_t SetGear(uint32_t hud, int32_t gear, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212DB0 RaceHud::SetGear");
-  Frame(base, sp, 96);
-  const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0xFFFFFFFFu, 11);
+  Frame(sp, 96);
+  const uint32_t node = ui_movies::FindNode(Dashboard(hud), 0xFFFFFFFFu, 11);
   uint32_t picture;
   if (gear > 0) {
     picture = gear == 6 ? 7 : uint32_t(gear - 1);
   } else {
     picture = gear == 0 ? 5 : 6;
   }
-  guest::StoreU32(base, node + 108, picture);
+  guest::StoreU32(node + 108, picture);
   return node;
 }
 
-uint32_t SetBar(uint8_t* base, uint32_t hud, double value, uint32_t sp) {
+uint32_t SetBar(uint32_t hud, double value, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82214698 RaceHud::SetBar");
-  Frame(base, sp, 112);
-  const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), 0xFFFFFFFFu, 35);
-  const Hud h(base, hud);
+  Frame(sp, 112);
+  const uint32_t node = ui_movies::FindNode(Dashboard(hud), 0xFFFFFFFFu, 35);
+  const Hud h(hud);
   const double low = double(h.bar_min());
   h.set_bar_value(float(value));
   if (!(value > low)) {
-    guest::StoreU32(base, node + 80, 0);
+    guest::StoreU32(node + 80, 0);
     return node;
   }
-  guest::StoreU32(base, node + 80, 1);
+  guest::StoreU32(node + 80, 1);
   const double from = double(h.bar_min());
   const double range = Fsubs(double(h.bar_max()), from);
-  Stfs(base, node + 28, Fdivs(double(h.bar_value()), range));
+  Stfs(node + 28, Fdivs(double(h.bar_value()), range));
   return node;
 }
 
-void ResetBar(uint8_t* base, uint32_t hud) {
+void ResetBar(uint32_t hud) {
   ITC_NATIVE_RUNNING("sub_82212668 RaceHud::ResetBar");
-  const Hud h(base, hud);
+  const Hud h(hud);
   const schema::Vehicle car = h.vehicle();
   h.set_bar_max(float(double(car.nitrous_value())));
   const double value = double(car.nitrous_value());
-  const double zero = Lfs(base, kZero);
+  const double zero = Lfs(kZero);
   h.set_bar_value(float(value));
   h.set_bar_min(float(zero));
 }
 
-void ClearWarning(uint8_t* base, uint32_t hud) {
+void ClearWarning(uint32_t hud) {
   ITC_NATIVE_RUNNING("sub_822122A0 RaceHud::ClearWarning");
-  Hud(base, hud).set_warning_shown(0);
+  Hud(hud).set_warning_shown(0);
 }
 
-uint32_t SetPlayer(uint8_t* base, uint32_t hud, uint32_t player, uint32_t sp) {
+uint32_t SetPlayer(uint32_t hud, uint32_t player, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212690 RaceHud::SetPlayer");
-  Frame(base, sp, 96);
-  const Hud h(base, hud);
+  Frame(sp, 96);
+  const Hud h(hud);
   h.set_player(player);
-  const uint32_t vehicle = vehicle_accessors::VehicleGet(base, player);
+  const uint32_t vehicle = vehicle_accessors::VehicleGet(player);
   h.set_vehicle(vehicle);
   return vehicle;
 }
 
-uint32_t Touching(uint8_t* base, uint32_t player, uint32_t sp) {
+uint32_t Touching(uint32_t player, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82215820 RaceHud::Touching");
-  Frame(base, sp, 96);
-  const uint32_t vehicle = vehicle_accessors::VehicleGet(base, player);
-  const uint32_t object = schema::Vehicle(base, vehicle).collision_object();
+  Frame(sp, 96);
+  const uint32_t vehicle = vehicle_accessors::VehicleGet(player);
+  const uint32_t object = schema::Vehicle(vehicle).collision_object();
   if (object == 0) {
     return 0;
   }
-  return vehicle_accessors::CollisionObjectFirstContact(base, object, 0x07000000) != 0 ? 1 : 0;
+  return vehicle_accessors::CollisionObjectFirstContact(object, 0x07000000) != 0 ? 1 : 0;
 }
 
 }  // namespace race_hud_object

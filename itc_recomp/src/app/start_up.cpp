@@ -43,25 +43,25 @@ constexpr uint32_t kCExit = 0x825AA388;
 
 }  // namespace
 
-lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
+lifted::Result StartUp(const lifted::Args& in) {
   ITC_NATIVE_RUNNING("xstart StartUp");
   const uint32_t frame = uint32_t(in.r1) - kFrameBytes;
-  guest::StoreU32(base, frame, uint32_t(in.r1));
-  G::set_crt_word_a(base, 0xFFFFFFFFu);
-  G::set_crt_word_b(base, 0xFFFFFFFFu);
+  guest::StoreU32(frame, uint32_t(in.r1));
+  G::set_crt_word_a(0xFFFFFFFFu);
+  G::set_crt_word_b(0xFFFFFFFFu);
   auto call = [&](uint32_t function, uint64_t r3) {
     lifted::Args args;
     args.r1 = frame;
     args.r13 = in.r13;
     args.r[0] = r3;
-    return lifted::Call(base, function, args).r3;
+    return lifted::Call(function, args).r3;
   };
   call(kCheckHeap, 0);
   call(kThreadNotify, 1);
   call(kMtInit, 0);
   call(kInittermE, 0);
   call(kCInit, 1);
-  if (G::command_line_set(base) != 0) {
+  if (G::command_line_set() != 0) {
     ITC_LOG_WARN("start-up: [0x829537B8] is set, but main gets no arguments");
   }
   const uint64_t result = call(kMain, 0);
@@ -69,7 +69,7 @@ lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
   lifted::Args args;
   args.r1 = frame;
   args.r13 = in.r13;
-  lifted::Import(base, __imp__XamLoaderTerminateTitle, args);
+  lifted::Import(__imp__XamLoaderTerminateTitle, args);
   return {result, in.f[0]};
 }
 

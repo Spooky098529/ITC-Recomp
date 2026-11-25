@@ -19,16 +19,16 @@ namespace x3daudio {
 // --- The vector helpers (three floats each) ---
 
 // sub_824819E0 X3DVec::Sub: out = a - b.
-void VecSub(uint8_t* base, uint32_t a, uint32_t b, uint32_t out);
+void VecSub(uint32_t a, uint32_t b, uint32_t out);
 // sub_82481998 X3DVec::Length: sqrt(x² + y² + z²) (y² first, then z and x
 // fused, in double; the root rounded to single).
-float VecLength(uint8_t* base, uint32_t v);
+float VecLength(uint32_t v);
 // sub_824819B8 X3DVec::Dot: a · b (y first, then z and x fused, each step
 // rounded to single).
-float VecDot(uint8_t* base, uint32_t a, uint32_t b);
+float VecDot(uint32_t a, uint32_t b);
 // sub_82481A18 X3DVec::Cross: out = a × b (each component a fused
 // multiply-subtract rounded to single, stored before the next is read).
-void VecCross(uint8_t* base, uint32_t a, uint32_t b, uint32_t out);
+void VecCross(uint32_t a, uint32_t b, uint32_t out);
 
 // --- The distance curves ---
 
@@ -37,7 +37,7 @@ void VecCross(uint8_t* base, uint32_t a, uint32_t b, uint32_t out);
 // f registers as the caller has them): linear between the first point past
 // it and the one before; the last point's value when none is past it (with
 // a count of 0, the word before the points).
-float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distance);
+float EvaluateCurve(uint32_t curve, double scaler, double distance);
 
 // sub_82480918 X3DAudio::Curves: by `flags` (X3DAudioCalculate's) the
 // emitter's curves at the DSP settings' distance (+36) with the emitter's
@@ -49,7 +49,7 @@ float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distanc
 // two points, built at `frame` + 80 (the curve) and + 96 (the points) as
 // the original builds it in its 128-byte frame. Returns the last curve
 // evaluated (the original's r3), 0 when none was.
-uint32_t Curves(uint8_t* base, uint32_t emitter, uint32_t flags, uint32_t dsp, uint32_t frame);
+uint32_t Curves(uint32_t emitter, uint32_t flags, uint32_t dsp, uint32_t frame);
 
 // --- The matrix ---
 
@@ -89,7 +89,7 @@ struct PanSaves {
 // below it is written as the original leaves it (the back chain, `saves`,
 // the azimuth tables at +80 to +143). Returns the r3 the original leaves:
 // `handle` (its r3 on entry), or tan's when the tangent law ran.
-uint64_t Pan(uint8_t* base, uint64_t handle, uint32_t dsp, uint32_t channel, double azimuth,
+uint64_t Pan(uint64_t handle, uint32_t dsp, uint32_t channel, double azimuth,
              uint32_t sp, const PanSaves& saves, const TanCall& tan);
 
 // sub_82481390 X3DAudio::Matrix: the matrix for every emitter channel: the
@@ -107,7 +107,7 @@ uint64_t Pan(uint8_t* base, uint64_t handle, uint32_t dsp, uint32_t channel, dou
 // as whole registers and `f31` the caller's f31 bits (what Pan's prologue
 // saves); `frame` is the original's 304-byte frame (r1 - 304; its prologue's
 // saves are the adapter's). Returns the r3 the original leaves.
-uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emitter, uint64_t dsp,
+uint64_t Matrix(uint64_t handle, uint32_t listener, uint64_t emitter, uint64_t dsp,
                 uint64_t f31, uint32_t frame, const TanCall& tan);
 
 // --- The cone, Doppler and X3DAudioCalculate ---
@@ -135,7 +135,7 @@ struct ConeSaves {
 // original's 160-byte frame below it written as the original leaves it (the
 // back chain, `saves`, the vector at +88). Returns the r3 the original
 // leaves: `handle`, or the frame's +88 when it worked out the angle.
-uint64_t Cone(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+uint64_t Cone(uint64_t handle, uint32_t listener, uint32_t emitter,
               uint32_t flags, uint32_t dsp, uint32_t sp, const ConeSaves& saves);
 
 // What Doppler's prologue saves: the return address at -8, r28 to r31 at -40
@@ -154,7 +154,7 @@ struct DopplerSaves {
 // with c the handle's +8, into +28; else 1, 0 and 0. `sp` as Cone's (the
 // 144-byte frame, the vector at +80). Returns the r3 the original leaves:
 // `handle`, or the frame's +80.
-uint64_t Doppler(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+uint64_t Doppler(uint64_t handle, uint32_t listener, uint32_t emitter,
                  uint32_t dsp, uint32_t sp, const DopplerSaves& saves);
 
 // X3DAudioCalculate's registers on entry (whole: its callees' prologues save
@@ -179,7 +179,7 @@ struct CalculateSaves {
 // (X3DAudio::EmitterAngle sub_82480780) or 0x2 (X3DAudio::Delay
 // sub_82481708, both never seen in play): the caller runs the original then.
 // `sp` is the caller's stack pointer. Returns the r3 the original leaves.
-std::optional<uint64_t> Calculate(uint8_t* base, const CalculateArgs& args, uint32_t sp,
+std::optional<uint64_t> Calculate(const CalculateArgs& args, uint32_t sp,
                                   const CalculateSaves& saves, const TanCall& tan);
 
 }  // namespace x3daudio

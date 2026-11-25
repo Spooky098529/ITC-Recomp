@@ -18,9 +18,9 @@ constexpr float kMetersPerSecondToKmh = 3.6f;
 
 }  // namespace
 
-float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
+float Vehicle_GetSpeedKmh(uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0128 Vehicle::GetSpeedKmh");
-  float speed = schema::Vehicle(base, vehicle).speed();  // meters per second
+  float speed = schema::Vehicle(vehicle).speed();  // meters per second
   return speed * kMetersPerSecondToKmh;
 }
 
@@ -32,5 +32,5 @@ ITC_NATIVE_ENTRY_ALWAYS(820C0128) {
   
   ctx.fpscr.disableFlushMode();
   debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
-  ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));
+  ctx.f1.f64 = double(Vehicle_GetSpeedKmh(ctx.r3.u32));
 }

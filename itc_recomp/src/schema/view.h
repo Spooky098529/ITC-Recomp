@@ -1,5 +1,5 @@
 // A view of one of the game's objects in guest memory (docs/e5-native.md,
-// step 2): `base` and the object's guest address, nothing else. The views
+// step 2): the object's guest address, nothing else. The views
 // of the schema's types (itc_recomp/schema/*.toml, written into this folder
 // by tools/schema_gen.py) derive from it and name the object's fields; their
 // accessors read and write guest memory as guest::Load* and guest::Store* do,
@@ -12,18 +12,21 @@
 
 #include "guest.h"
 #include "memory/handles.h"
+#include "memory/host_copy.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
+#include <cstring>
+#include <new>
 
 namespace schema {
 
 struct View {
-  uint8_t* base = nullptr;
   uint32_t address = 0;
 
   View() = default;
-  View(uint8_t* base_, uint32_t address_) : base(base_), address(address_) {}
+  explicit View(uint32_t address_) : address(address_) {}
 
   // Whether it views an object (a null pointer field gives address 0).
   explicit operator bool() const { return address != 0; }

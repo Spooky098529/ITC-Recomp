@@ -50,10 +50,10 @@ double Fsqrts(double a) {
 // picks fsubs); `b(i)` loads b's component i (x, y, z), at the original's
 // point.
 template <typename LoadB>
-void AddOrSubSteps(uint8_t* base, uint32_t out, uint32_t a, LoadB b, bool subtract) {
+void AddOrSubSteps(uint32_t out, uint32_t a, LoadB b, bool subtract) {
   auto op = [subtract](double x, double y) { return subtract ? Fsubs(x, y) : Fadds(x, y); };
-  const V va(base, a);
-  const V vo(base, out);
+  const V va(a);
+  const V vo(out);
   {
     const double bx = b(0);
     const double ax = double(va.x());
@@ -66,27 +66,26 @@ void AddOrSubSteps(uint8_t* base, uint32_t out, uint32_t a, LoadB b, bool subtra
   }
   const double az = double(va.z());
   const double bz = b(2);
-  const uint32_t one = G::one_bits(base);
+  const uint32_t one = G::one_bits();
   const double z = op(az, bz);
   vo.set_w_bits(one);
   vo.set_z(float(z));
 }
 
-void AddOrSub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
-  const V vb(base, b);
-  AddOrSubSteps(
-      base, out, a,
+void AddOrSub(uint32_t out, uint32_t a, uint32_t b, bool subtract) {
+  const V vb(b);
+  AddOrSubSteps(out, a,
       [vb](uint32_t i) { return double(i == 0 ? vb.x() : i == 1 ? vb.y() : vb.z()); },
       subtract);
 }
 
 // The x, y, z of a - b or a + b with all loads first (the copies through a
 // temporary), stored with w 1.0.
-void AddOrSubCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
+void AddOrSubCopy(uint32_t out, uint32_t a, uint32_t b, bool subtract) {
   auto op = [subtract](double x, double y) { return subtract ? Fsubs(x, y) : Fadds(x, y); };
-  const V va(base, a);
-  const V vb(base, b);
-  const V vo(base, out);
+  const V va(a);
+  const V vb(b);
+  const V vo(out);
   const double bx = double(vb.x());
   const double ax = double(va.x());
   const double x = op(ax, bx);
@@ -99,22 +98,22 @@ void AddOrSubCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subt
   vo.set_x(float(x));
   vo.set_y(float(y));
   vo.set_z(float(z));
-  vo.set_w_bits(G::one_bits(base));
+  vo.set_w_bits(G::one_bits());
 }
 
 // Matrix::Rotate's and Matrix::TransformPoint's steps (`translate` adds the
 // fourth row).
 // Locals are named by the matrix's fields (m<row><column>, rows of 16 bytes).
-void Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v, bool translate) {
-  const M mat(base, m);
-  const V vv(base, v);
-  const V vo(base, out);
+void Transform(uint32_t out, uint32_t m, uint32_t v, bool translate) {
+  const M mat(m);
+  const V vv(v);
+  const V vo(out);
   const double vz = double(vv.z());
   const double m20 = double(mat.m20());
   const double vy = double(vv.y());
   const double m11 = double(mat.m11());
   const double m12 = double(mat.m12());
-  vo.set_w_bits(G::zero_bits(base));
+  vo.set_w_bits(G::zero_bits());
   const double t11 = Fmuls(m20, vz);
   const double t10 = Fmuls(m11, vy);
   const double m10 = double(mat.m10());
@@ -149,8 +148,8 @@ void Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v, bool transla
 }
 
 // A guest vector as the translated code holds it (word 0 in the top lane).
-simde__m128 VectorAt(uint8_t* base, uint32_t address) {
-  const V v(base, address);
+simde__m128 VectorAt(uint32_t address) {
+  const V v(address);
   return simde_mm_castsi128_ps(simde_mm_set_epi32(int32_t(v.x_bits()), int32_t(v.y_bits()),
                                                   int32_t(v.z_bits()), int32_t(v.w_bits())));
 }
@@ -162,65 +161,65 @@ float Sqrtf(double x) {
   return float(Fsqrts(x));
 }
 
-void MatrixSetTranslation(uint8_t* base, uint32_t matrix, uint32_t vector) {
+void MatrixSetTranslation(uint32_t matrix, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_82293818 Matrix::SetTranslation");
-  const V v(base, vector);
-  const M m(base, matrix);
+  const V v(vector);
+  const M m(matrix);
   const uint32_t x = v.x_bits();
   const uint32_t y = v.y_bits();
   const uint32_t z = v.z_bits();
-  const uint32_t one = G::one_bits(base);
+  const uint32_t one = G::one_bits();
   m.set_m30_bits(x);
   m.set_m31_bits(y);
   m.set_m32_bits(z);
   m.set_m33_bits(one);
 }
 
-void MatrixRotate(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t vector) {
+void MatrixRotate(uint32_t out, uint32_t matrix, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_82293880 Matrix::Rotate");
-  Transform(base, out, matrix, vector, false);
+  Transform(out, matrix, vector, false);
 }
 
-void MatrixTransformPoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t vector) {
+void MatrixTransformPoint(uint32_t out, uint32_t matrix, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_822938F0 Matrix::TransformPoint");
-  Transform(base, out, matrix, vector, true);
+  Transform(out, matrix, vector, true);
 }
 
-void Vec3Add(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3Add(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294028 Vec3::Add");
-  AddOrSub(base, out, a, b, false);
+  AddOrSub(out, a, b, false);
 }
 
-void Vec3Sub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3Sub(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294068 Vec3::Sub");
-  AddOrSub(base, out, a, b, true);
+  AddOrSub(out, a, b, true);
 }
 
-void Vec4ScaleTo(uint8_t* base, uint32_t out, uint32_t v, double s) {
+void Vec4ScaleTo(uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_822940A8 Vec4::ScaleTo");
-  const V vv(base, v);
-  const V vo(base, out);
+  const V vv(v);
+  const V vo(out);
   vo.set_x(float(Fmuls(double(vv.x()), s)));
   vo.set_y(float(Fmuls(double(vv.y()), s)));
   vo.set_z(float(Fmuls(double(vv.z()), s)));
   vo.set_w(float(Fmuls(double(vv.w()), s)));
 }
 
-void Vec4Copy(uint8_t* base, uint32_t out, uint32_t v) {
+void Vec4Copy(uint32_t out, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_822940E0 Vec4::Copy");
-  const V vv(base, v);
-  const V vo(base, out);
+  const V vv(v);
+  const V vo(out);
   vo.set_x_bits(vv.x_bits());
   vo.set_y_bits(vv.y_bits());
   vo.set_z_bits(vv.z_bits());
   vo.set_w_bits(vv.w_bits());
 }
 
-void Vec3CrossW1(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3CrossW1(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294108 Vec3::CrossW1");
-  const V va(base, a);
-  const V vb(base, b);
-  const V vo(base, out);
+  const V va(a);
+  const V vb(b);
+  const V vo(out);
   {
     const double by = double(vb.y());
     const double az = double(va.z());
@@ -242,14 +241,14 @@ void Vec3CrossW1(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   const double t = Fmuls(bx, ay);
   const double by = double(vb.y());
   const double ax = double(va.x());
-  vo.set_w_bits(G::one_bits(base));
+  vo.set_w_bits(G::one_bits());
   vo.set_z(float(Fmsubs(ax, by, t)));
 }
 
-float Vec3Dot(uint8_t* base, uint32_t a, uint32_t b) {
+float Vec3Dot(uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294170 Vec3::Dot");
-  simde__m128 va = VectorAt(base, a);
-  simde__m128 vb = VectorAt(base, b);
+  simde__m128 va = VectorAt(a);
+  simde__m128 vb = VectorAt(b);
   const uint32_t csr = Fpscr::getcsr();
   Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
   // The barriers keep dpps between the two control word writes (the
@@ -262,15 +261,15 @@ float Vec3Dot(uint8_t* base, uint32_t a, uint32_t b) {
   return simde_mm_cvtss_f32(dot);
 }
 
-float Vec3Normalize(uint8_t* base, uint32_t out, uint32_t v) {
+float Vec3Normalize(uint32_t out, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_822941B0 Vec3::Normalize");
-  const V vv(base, v);
-  const V vo(base, out);
+  const V vv(v);
+  const V vo(out);
   const double y = double(vv.y());
   const double y2 = Fmuls(y, y);
   const double x = double(vv.x());
   const double z = double(vv.z());
-  const uint32_t one_word = G::one_bits(base);
+  const uint32_t one_word = G::one_bits();
   const double one = double(std::bit_cast<float>(one_word));
   const double squared = Fmadds(z, z, Fmadds(x, x, y2));
   const double length = Fsqrts(squared);
@@ -283,11 +282,11 @@ float Vec3Normalize(uint8_t* base, uint32_t out, uint32_t v) {
   return float(length);
 }
 
-float Vec3Direction(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+float Vec3Direction(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294200 Vec3::Direction");
-  const V va(base, a);
-  const V vb(base, b);
-  const V vo(base, out);
+  const V va(a);
+  const V vb(b);
+  const V vo(out);
   const double bx = double(vb.x());
   const double ax = double(va.x());
   vo.set_x(float(Fsubs(ax, bx)));
@@ -299,7 +298,7 @@ float Vec3Direction(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   const double az = double(va.z());
   const double z = Fsubs(az, bz);
   const double x = double(vo.x());
-  const uint32_t one_word = G::one_bits(base);
+  const uint32_t one_word = G::one_bits();
   vo.set_w_bits(one_word);
   vo.set_z(float(z));
   const double squared = Fmadds(z, z, Fmadds(x, x, Fmuls(y, y)));
@@ -311,85 +310,85 @@ float Vec3Direction(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   return float(length);
 }
 
-float Vec3Length(uint8_t* base, uint32_t v) {
+float Vec3Length(uint32_t v) {
   ITC_NATIVE_RUNNING("sub_82294270 Vec3::Length");
-  return Sqrtf(double(Vec3Dot(base, v, v)));
+  return Sqrtf(double(Vec3Dot(v, v)));
 }
 
-float Vec3NormalizeSelf(uint8_t* base, uint32_t v) {
+float Vec3NormalizeSelf(uint32_t v) {
   ITC_NATIVE_RUNNING("sub_82294298 Vec3::NormalizeSelf");
-  return Vec3Normalize(base, v, v);
+  return Vec3Normalize(v, v);
 }
 
-void Vec3Sum(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3Sum(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822942A0 Vec3::Sum");
-  V(base, out).set_w_bits(G::zero_bits(base));
-  Vec3Add(base, out, a, b);
+  V(out).set_w_bits(G::zero_bits());
+  Vec3Add(out, a, b);
 }
 
-void Vec3Difference(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3Difference(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822942E0 Vec3::Difference");
-  V(base, out).set_w_bits(G::zero_bits(base));
-  Vec3Sub(base, out, a, b);
+  V(out).set_w_bits(G::zero_bits());
+  Vec3Sub(out, a, b);
 }
 
-void Vec3AddTo(uint8_t* base, uint32_t v, uint32_t b) {
+void Vec3AddTo(uint32_t v, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294320 Vec3::AddTo");
-  Vec3Add(base, v, v, b);
+  Vec3Add(v, v, b);
 }
 
-void Vec4ScaleBy(uint8_t* base, uint32_t v, double s) {
+void Vec4ScaleBy(uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294340 Vec4::ScaleBy");
-  Vec4ScaleTo(base, v, v, s);
+  Vec4ScaleTo(v, v, s);
 }
 
-float Vec4DivideBy(uint8_t* base, uint32_t v, double s) {
+float Vec4DivideBy(uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294348 Vec4::DivideBy");
-  const double inverse = Fdivs(double(G::one(base)), s);
-  Vec4ScaleTo(base, v, v, inverse);
+  const double inverse = Fdivs(double(G::one()), s);
+  Vec4ScaleTo(v, v, inverse);
   return float(inverse);
 }
 
-void Vec3SubCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3SubCopy(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294360 Vec3::SubCopy");
-  AddOrSubCopy(base, out, a, b, true);
+  AddOrSubCopy(out, a, b, true);
 }
 
-void Vec3AddCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3AddCopy(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822943C8 Vec3::AddCopy");
-  AddOrSubCopy(base, out, a, b, false);
+  AddOrSubCopy(out, a, b, false);
 }
 
-void Vec4Scaled(uint8_t* base, uint32_t out, uint32_t v, double s) {
+void Vec4Scaled(uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294430 Vec4::Scaled");
-  V(base, out).set_w_bits(G::zero_bits(base));
-  Vec4ScaleTo(base, out, v, s);
+  V(out).set_w_bits(G::zero_bits());
+  Vec4ScaleTo(out, v, s);
 }
 
-void Vec4ScaledFrom(uint8_t* base, uint32_t out, uint32_t v, double s) {
+void Vec4ScaledFrom(uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294470 Vec4::ScaledFrom");
-  V(base, out).set_w_bits(G::zero_bits(base));
-  Vec4ScaleTo(base, out, v, s);
+  V(out).set_w_bits(G::zero_bits());
+  Vec4ScaleTo(out, v, s);
 }
 
-void Vec3ScaledCopy(uint8_t* base, uint32_t out, uint32_t v, double s) {
+void Vec3ScaledCopy(uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_822944B0 Vec3::ScaledCopy");
-  const V vv(base, v);
-  const V vo(base, out);
+  const V vv(v);
+  const V vo(out);
   const double x = Fmuls(double(vv.x()), s);
   const double y = Fmuls(double(vv.y()), s);
   const double z = Fmuls(double(vv.z()), s);
   vo.set_x(float(x));
   vo.set_y(float(y));
   vo.set_z(float(z));
-  vo.set_w_bits(G::one_bits(base));
+  vo.set_w_bits(G::one_bits());
 }
 
-void Vec3Cross(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Vec3Cross(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294518 Vec3::Cross");
-  const V va(base, a);
-  const V vb(base, b);
-  const V vo(base, out);
+  const V va(a);
+  const V vb(b);
+  const V vo(out);
   const double az = double(va.z());
   const double by = double(vb.y());
   const double bz = double(vb.z());
@@ -399,19 +398,19 @@ void Vec3Cross(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   const double t6 = Fmuls(ax, bz);
   const double bx = double(vb.x());
   const double t5 = Fmuls(bx, ay);
-  const uint32_t zero = G::zero_bits(base);
+  const uint32_t zero = G::zero_bits();
   vo.set_x(float(Fmsubs(bz, ay, t7)));
   vo.set_y(float(Fmsubs(bx, az, t6)));
   vo.set_z(float(Fmsubs(ax, by, t5)));
   vo.set_w_bits(zero);
 }
 
-void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t) {
+void Vec3Lerp(uint32_t out, uint32_t a, uint32_t b, double t) {
   ITC_NATIVE_RUNNING("sub_82294568 Vec3::Lerp");
   // (a - b) x t, in a temporary (the original's two on its stack).
-  const V va(base, a);
-  const V vb(base, b);
-  const V vo(base, out);
+  const V va(a);
+  const V vb(b);
+  const V vo(out);
   const double bx = double(vb.x());
   const double ax = double(va.x());
   const double dx = Fmuls(Fsubs(ax, bx), t);
@@ -422,27 +421,27 @@ void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t) {
   const double bz = double(vb.z());
   const double dz = Fmuls(Fsubs(az, bz), t);
   // Then out = a - that (Vec3::Sub's steps, a read again after each store).
-  vo.set_w_bits(G::zero_bits(base));
+  vo.set_w_bits(G::zero_bits());
   vo.set_x(float(Fsubs(double(va.x()), dx)));
   vo.set_y(float(Fsubs(double(va.y()), dy)));
   const double z = Fsubs(double(va.z()), dz);
-  vo.set_w_bits(G::one_bits(base));
+  vo.set_w_bits(G::one_bits());
   vo.set_z(float(z));
 }
 
-float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b) {
+float Vec3DotOf(uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294608 Vec3::DotOf");
-  return Vec3Dot(base, a, b);
+  return Vec3Dot(a, b);
 }
 
-Vector LoadVector(uint8_t* base, uint32_t address) {
-  const V v(base, address);
+Vector LoadVector(uint32_t address) {
+  const V v(address);
   return {std::bit_cast<float>(v.x_bits()), std::bit_cast<float>(v.y_bits()),
           std::bit_cast<float>(v.z_bits()), std::bit_cast<float>(v.w_bits())};
 }
 
-void StoreVector(uint8_t* base, uint32_t address, const Vector& v) {
-  const V to(base, address);
+void StoreVector(uint32_t address, const Vector& v) {
+  const V to(address);
   to.set_x_bits(std::bit_cast<uint32_t>(v.x));
   to.set_y_bits(std::bit_cast<uint32_t>(v.y));
   to.set_z_bits(std::bit_cast<uint32_t>(v.z));
@@ -485,9 +484,9 @@ float Dot(const Vector& a, const Vector& b) {
   return simde_mm_cvtss_f32(dot);
 }
 
-void AddValue(uint8_t* base, uint32_t out, uint32_t a, const Vector& b, bool subtract) {
+void AddValue(uint32_t out, uint32_t a, const Vector& b, bool subtract) {
   const float parts[3] = {b.x, b.y, b.z};
-  AddOrSubSteps(base, out, a, [&parts](uint32_t i) { return double(parts[i]); }, subtract);
+  AddOrSubSteps(out, a, [&parts](uint32_t i) { return double(parts[i]); }, subtract);
 }
 
 }  // namespace vector_library

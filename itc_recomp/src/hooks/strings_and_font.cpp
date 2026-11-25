@@ -79,7 +79,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 #define ITC_STRINGS_AND_FONT_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                         \
   if (!ITC_FLAG(native_strings_and_font)) {    \
-    lifted::original::c##address(ctx, base);           \
+    lifted::original::c##address(ctx);           \
     return;                                    \
   }
 
@@ -91,7 +91,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 // Strings::OnLoaded: r6 = the file's loaded flag.
 ITC_NATIVE_ENTRY_ALWAYS(8210A850) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A850)
-  StringsOnLoaded(base, ctx.r6.u32);
+  StringsOnLoaded(ctx.r6.u32);
 }
 
 // Strings::Release: r3 = the table, r4 = the mask. Natively only while
@@ -101,15 +101,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A850) {
 ITC_NATIVE_ENTRY_ALWAYS(8210A538) {
   
   if (!ITC_FLAG(native_strings_and_font) || !hooks::NativeHeapActive() ||
-      !StringsRelease(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c8210A538(ctx, base);
+      !StringsRelease(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c8210A538(ctx);
   }
 }
 
 // Text::IsLoaded: no arguments; r3 0 or 1.
 ITC_NATIVE_ENTRY_ALWAYS(82211C90) {
   ITC_STRINGS_AND_FONT_FALLBACK(82211C90)
-  ctx.r3.u64 = TextIsLoaded(base);
+  ctx.r3.u64 = TextIsLoaded();
 }
 
 // swprintf: r3 = the buffer, r4 = the format, r5 to r10 and the stack the
@@ -122,13 +122,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A490) {
   const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                  ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU32(base, ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
-    guest::StoreU32(base, ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
+    guest::StoreU32(ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
+    guest::StoreU32(ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
   }
   int32_t count;
-  if (!Swprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
+  if (!Swprintf(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
                 &count)) {
-    lifted::original::c8210A490(ctx, base);
+    lifted::original::c8210A490(ctx);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -142,21 +142,19 @@ namespace {
 
 struct FormatGuest {
   lifted::Regs& ctx;
-  uint8_t* base;
 };
 
 uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
                     uint32_t frame, uint32_t lr) {
   auto& guest = *static_cast<FormatGuest*>(user);
   lifted::Regs& ctx = guest.ctx;
-  uint8_t* base = guest.base;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u32;
@@ -169,21 +167,21 @@ namespace hooks {
 uint32_t FormatGuestCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
                          uint32_t frame, uint32_t lr) {
   auto& calls = *static_cast<FormatGuestCalls*>(user);
-  FormatGuest guest{calls.ctx_, calls.base_};
+  FormatGuest guest{calls.ctx_};
   return FormatCall(&guest, function, r3, r4, r5, frame, lr);
 }
 
-FormatGuestCalls::FormatGuestCalls(lifted::Regs& ctx, uint8_t* base)
-    : ctx_(ctx), base_(base), calls_{this, FormatGuestCall} {}
+FormatGuestCalls::FormatGuestCalls(lifted::Regs& ctx)
+    : ctx_(ctx), calls_{this, FormatGuestCall} {}
 
 }  // namespace hooks
 
-void hooks::StringsFormatVSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::StringsFormatVSteps(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  FormatGuest guest{ctx, base};
+  FormatGuest guest{ctx};
   const FormatCalls calls{&guest, FormatCall};
-  const uint32_t out = StringsFormatV(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+  const uint32_t out = StringsFormatV(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                       ctx.r5.u32, ctx.r6.u32);
   ctx.lr = lr;
   ctx.r3.u64 = out;
@@ -191,17 +189,17 @@ void hooks::StringsFormatVSteps(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_NATIVE_ENTRY_ALWAYS(8210A990) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A990)
-  hooks::StringsFormatVSteps(ctx, base);
+  hooks::StringsFormatVSteps(ctx);
 }
 
 // Strings::Format: as FormatV with r6 to r10 the varargs; r3 the output.
-void hooks::StringsFormatSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::StringsFormatSteps(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  FormatGuest guest{ctx, base};
+  FormatGuest guest{ctx};
   const FormatCalls calls{&guest, FormatCall};
   const uint64_t varargs[5] = {ctx.r6.u64, ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
-  const uint32_t out = StringsFormat(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+  const uint32_t out = StringsFormat(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                      ctx.r5.u32, varargs);
   ctx.lr = lr;
   ctx.r3.u64 = out;
@@ -209,21 +207,21 @@ void hooks::StringsFormatSteps(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_NATIVE_ENTRY_ALWAYS(8210ABC0) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210ABC0)
-  hooks::StringsFormatSteps(ctx, base);
+  hooks::StringsFormatSteps(ctx);
 }
 
 // Strings::CopyPage: r4 = the output, r5 = the text, r6 = the page, r7 =
 // the lines to skip; r3 the output.
 ITC_NATIVE_ENTRY_ALWAYS(8210A5E8) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A5E8)
-  ctx.r3.u64 = StringsCopyPage(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.s32);
+  ctx.r3.u64 = StringsCopyPage(ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.s32);
 }
 
 // The font's pixel shader entries: no arguments, from the C runtime's
 // start-up table.
 ITC_NATIVE_ENTRY_ALWAYS(825D9590) {
   ITC_STRINGS_AND_FONT_FALLBACK(825D9590)
-  InitShaderEntries(base);
+  InitShaderEntries();
 }
 
 namespace {
@@ -238,8 +236,8 @@ bool SlotDiagnostics() {
 // font's +8, its vtable slot 4: r4 = the chunk, r5 = the parameters' +116
 // + 1, f1 = 0.0) and 0x826C5BFC cleared, as the original. False, with
 // nothing done that the original won't redo, where it must run.
-bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
-  const DrawPassResult result = FontDrawPass(base, font, text);
+bool DrawPass(lifted::Regs& ctx, uint32_t font, uint32_t text) {
+  const DrawPassResult result = FontDrawPass(font, text);
   if (result.kind == DrawPassResult::kOriginal) {
     return false;
   }
@@ -247,18 +245,18 @@ bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
     return true;
   }
   if (result.chunk != 0) {
-    guest_call::InFrame(ctx, base, 192, 0x8210A3F0, [&](uint32_t) {
-      const schema::FontDrawParams params = schema::Font(base, font).params();
-      const schema::RenderQueue queue = schema::Font(base, font).render_queue();
+    guest_call::InFrame(ctx, 192, 0x8210A3F0, [&](uint32_t) {
+      const schema::FontDrawParams params = schema::Font(font).params();
+      const schema::RenderQueue queue = schema::Font(font).render_queue();
       ctx.fpscr.disableFlushMode();
-      ctx.f1.f64 = double(schema::StringsAndFontGlobals::zero(base));
+      ctx.f1.f64 = double(schema::StringsAndFontGlobals::zero());
       ctx.r3.u64 = queue.address;
       ctx.r4.u64 = result.chunk;
       ctx.r5.s64 = int64_t(int32_t(params.layer())) + 1;
-      lifted::CallFromContext(ctx, base, queue.vtable().add());
+      lifted::CallFromContext(ctx, queue.vtable().add());
     });
   }
-  schema::StringsAndFontGlobals::set_chunk(base, 0);
+  schema::StringsAndFontGlobals::set_chunk(0);
   return true;
 }
 
@@ -267,17 +265,17 @@ bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
 // where it must run), from a frame like the original's (112 bytes). The
 // whole original where the second pass is on (never in play).
 template <typename SetUp>
-void FontDraw(lifted::Regs& ctx, uint8_t* base, SetUp set_up) {
+void FontDraw(lifted::Regs& ctx, SetUp set_up) {
   const uint32_t params = ctx.r4.u32, text = ctx.r5.u32;
   ctx.fpscr.disableFlushMode();
   const uint32_t font = set_up(params);
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 112, 0x8210A444, [&](uint32_t) {
-    if (!DrawPass(ctx, base, font, text)) {
+  guest_call::InFrame(ctx, 112, 0x8210A444, [&](uint32_t) {
+    if (!DrawPass(ctx, font, text)) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = text;
       ctx.r5.u64 = 0;
-      lifted::original::c82109EF0(ctx, base);
+      lifted::original::c82109EF0(ctx);
     }
   });
   ctx.lr = lr;
@@ -291,14 +289,14 @@ void FontDraw(lifted::Regs& ctx, uint8_t* base, SetUp set_up) {
 ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
   ITC_STRINGS_AND_FONT_FALLBACK(82109EF0)
   if (ctx.r5.u32 != 0 || SlotDiagnostics()) {
-    lifted::original::c82109EF0(ctx, base);
+    lifted::original::c82109EF0(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  if (!DrawPass(ctx, base, ctx.r3.u32, ctx.r4.u32)) {
+  if (!DrawPass(ctx, ctx.r3.u32, ctx.r4.u32)) {
     ctx.lr = lr;
-    lifted::original::c82109EF0(ctx, base);
+    lifted::original::c82109EF0(ctx);
     return;
   }
   ctx.lr = lr;
@@ -307,13 +305,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
 // Font::Draw: r3 = the font, r4 = the draw parameters, r5 = the text.
 ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A400)
-  if (schema::FontDrawParams(base, ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
-    lifted::original::c8210A400(ctx, base);
+  if (schema::FontDrawParams(ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
+    lifted::original::c8210A400(ctx);
     return;
   }
   const uint32_t font = ctx.r3.u32;
-  FontDraw(ctx, base, [&](uint32_t params) {
-    FontDrawSetUp(base, font, params);
+  FontDraw(ctx, [&](uint32_t params) {
+    FontDrawSetUp(font, params);
     return font;
   });
 }
@@ -323,18 +321,18 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
 ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
   
   if (hooks::g_text_draw_stand_in != nullptr) {
-    lifted::Sdk(ctx, base, hooks::g_text_draw_stand_in);
+    lifted::Sdk(ctx, hooks::g_text_draw_stand_in);
     return;
   }
   if (!ITC_FLAG(native_strings_and_font)) {
-    lifted::original::c8210A758(ctx, base);
+    lifted::original::c8210A758(ctx);
     return;
   }
-  if (schema::FontDrawParams(base, ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
-    lifted::original::c8210A758(ctx, base);
+  if (schema::FontDrawParams(ctx.r4.u32).second_pass() != 0 || SlotDiagnostics()) {
+    lifted::original::c8210A758(ctx);
     return;
   }
-  FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
+  FontDraw(ctx, [&](uint32_t params) { return TextDrawSetUp(params); });
 }
 
 // XPR::Release of a slot (sub_82108860): r3 = the slot; r3 as the original
@@ -343,12 +341,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
 ITC_NATIVE_ENTRY_ALWAYS(82108860) {
   
   if (ITC_FLAG(native_strings_and_font) && hooks::ModelsNativeLifetime()) {
-    if (const auto r3 = ReleaseXprSlot(base, ctx.r3.u32)) {
+    if (const auto r3 = ReleaseXprSlot(ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82108860(ctx, base);
+  lifted::original::c82108860(ctx);
 }
 
 // --- The loads ---
@@ -370,21 +368,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A8D0) {
     return;  // a harness's (the race HUD object's)
   }
   if (!LoadsNative()) {
-    lifted::original::c8210A8D0(ctx, base);
+    lifted::original::c8210A8D0(ctx);
     return;
   }
-  if (const auto last = StringsLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
+  if (const auto last = StringsLoad(ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad())) {
     hooks::SetArchiveSerial(ctx, *last);
   }
 }
 
-void hooks::TextLoadSteps(lifted::Regs& ctx, uint8_t* base) {
-  const int64_t r3 = TextLoad(base, hooks::NativeArchiveLoad(base), [&](uint32_t font,
+void hooks::TextLoadSteps(lifted::Regs& ctx) {
+  const int64_t r3 = TextLoad(hooks::NativeArchiveLoad(), [&](uint32_t font,
                                                                          uint32_t mask) {
-    guest_call::InFrame(ctx, base, 96, 0x8210AE14, [&](uint32_t) {
+    guest_call::InFrame(ctx, 96, 0x8210AE14, [&](uint32_t) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = mask;
-      lifted::original::c82109498(ctx, base);  // Font::Load
+      lifted::original::c82109498(ctx);  // Font::Load
     });
   });
   hooks::SetArchiveSerial(ctx, r3);
@@ -397,8 +395,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADF8) {
     return;
   }
   if (!LoadsNative()) {
-    lifted::original::c8210ADF8(ctx, base);
+    lifted::original::c8210ADF8(ctx);
     return;
   }
-  hooks::TextLoadSteps(ctx, base);
+  hooks::TextLoadSteps(ctx);
 }

@@ -35,7 +35,7 @@ using UpdateMatricesCall = std::function<void(uint32_t skeleton)>;
 // original's return addresses. `stack` is the guest r1 at entry. Only
 // where memcpy is native (native::Buffers_NativeMemcpy, the adapter's
 // check).
-uint32_t ModelPointFind(uint8_t* base, uint32_t point, uint32_t model, uint32_t stack,
+uint32_t ModelPointFind(uint32_t point, uint32_t model, uint32_t stack,
                         const UpdateMatricesCall& update_matrices);
 
 }  // namespace scene_loaders

@@ -25,8 +25,8 @@ constexpr int32_t kAttractTicks = 600;
 
 // The page object to `page` through `transition` (+8 the old page unless
 // it's `page`).
-void Through(uint8_t* base, uint32_t transition, uint32_t page) {
-  const auto pages = G::pages(base);
+void Through(uint32_t transition, uint32_t page) {
+  const auto pages = G::pages();
   const uint32_t old = pages.page();
   if (old != page) {
     pages.set_previous_page(old);
@@ -39,54 +39,54 @@ void Through(uint8_t* base, uint32_t transition, uint32_t page) {
 
 }  // namespace
 
-void AssignController(uint8_t* base, uint32_t player, uint32_t controller) {
+void AssignController(uint32_t player, uint32_t controller) {
   ITC_NATIVE_RUNNING("sub_8209F6B8 Players::AssignController");
   uint32_t holder = 4;
   for (uint32_t i = 0; i < 4; i++) {
-    if (Load(base, kControllers + 4 * i) == controller) {
+    if (Load(kControllers + 4 * i) == controller) {
       holder = i;
       break;
     }
   }
-  G::set_profile_read(base, 1);
-  const uint32_t mine = Load(base, kControllers + (player << 2));
-  Store(base, kControllers + (holder << 2), mine);
-  Store(base, kControllers + (player << 2), controller);
+  G::set_profile_read(1);
+  const uint32_t mine = Load(kControllers + (player << 2));
+  Store(kControllers + (holder << 2), mine);
+  Store(kControllers + (player << 2), controller);
 }
 
-uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t PressStart(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822221A0 TitleScreen::Update");
   // The empty sub_82106540(120, 60, 0, string) the original calls first is
   // left out (its r3, 120, stays the answer when nothing else is called).
-  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t frame = Frame(sp, 144);
   uint32_t entries[4];
   for (uint32_t p = 0; p < 4; p++) {
-    entries[p] = kMapperEntries + (Load(base, kControllers + 4 * p) << 3);
+    entries[p] = kMapperEntries + (Load(kControllers + 4 * p) << 3);
   }
   static constexpr uint32_t kLrs[4] = {0x82222230, 0x82222264, 0x82222298, 0x822222CC};
   uint64_t r3 = 120;
   for (uint32_t p = 0; p < 4; p++) {
     // The player's mapper entry (racer-controllers' PlayerMapperEntry).
-    const schema::PlayerMapperEntry entry(base, entries[p]);
+    const schema::PlayerMapperEntry entry(entries[p]);
     if (int32_t(entry.unread()) == 1) {
       continue;
     }
     const schema::ActionMapper mapper = entry.mapper();
-    r3 = calls.Call(Load(base, mapper.vtable() + kPressedSlot), frame, kLrs[p], mapper.address,
+    r3 = calls.Call(Load(mapper.vtable() + kPressedSlot), frame, kLrs[p], mapper.address,
                     152);
     if ((r3 & 0xFF) == 0) {
       continue;
     }
-    AssignController(base, 0, Load(base, kControllers + 4 * p));
+    AssignController(0, Load(kControllers + 4 * p));
     r3 = calls.Call(kMenuSoundPlay, frame, 0x822222E8, 1);
-    Through(base, 3, 1);
+    Through(3, 1);
     break;
   }
-  const auto words = Words(base);
+  const auto words = Words();
   words.set_idle_ticks(words.idle_ticks() + 1);
-  if (int32_t(Words(base).idle_ticks()) >= kAttractTicks) {
-    Words(base).set_main_item(8);
-    Through(base, 8, 5);
+  if (int32_t(Words().idle_ticks()) >= kAttractTicks) {
+    Words().set_main_item(8);
+    Through(8, 5);
     // SetUpAttractRace (sub_82222038) stays recompiled: never seen in the
     // coverage session (attract races reach it); see its row.
     r3 = calls.Call(kSetUpAttractRace, frame, 0x8222236C);
@@ -94,12 +94,12 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3) {
+uint64_t ScreenOnControllerPicked(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822219E0 TitleScreen::OnControllerPicked");
   // The controller pick (the save screen's data, save-screen's SaveScreenData).
-  const uint32_t count = G::pick_block(base).controller_pick();
+  const uint32_t count = G::pick_block().controller_pick();
   if (count == 0) {
-    const auto pages = G::pages(base);
+    const auto pages = G::pages();
     const uint32_t old = pages.page();
     if (old != 2) {
       pages.set_previous_page(old);
@@ -112,8 +112,8 @@ uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3) {
   if (count >= 4) {
     return r3;
   }
-  Through(base, 8, 5);
-  AssignController(base, 1, Load(base, kControllers + (count << 2)));
+  Through(8, 5);
+  AssignController(1, Load(kControllers + (count << 2)));
   return 1;
 }
 

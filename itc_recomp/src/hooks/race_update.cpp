@@ -30,27 +30,27 @@ namespace ru = race_update;
 
 ITC_REGS_STEP(RaceUpdateVaryCar) {
   ctx.fpscr.disableFlushMode();
-  ru::VaryCar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32, ctx.r6.s32);
+  ru::VaryCar(ctx.r3.u32, ctx.r4.s32, ctx.r5.s32, ctx.r6.s32);
 }
 
 ITC_REGS_STEP(RaceUpdateLights) {
   ctx.fpscr.disableFlushMode();
-  ctx.r4.u64 = ru::LightsUpdate(base, ctx.r3.u32, ctx.r1.u32 - ru::kLightsFrame);
+  ctx.r4.u64 = ru::LightsUpdate(ctx.r3.u32, ctx.r1.u32 - ru::kLightsFrame);
   ctx.r3.u64 = ctx.r3.u64 + 16 + 96 * 11;
 }
 
 ITC_REGS_STEP(RaceUpdateLoadScenery) {
-  CourseSceneryGuest guest{&ctx, base};
+  CourseSceneryGuest guest{&ctx};
   const course_scenery::Calls calls = CourseSceneryCalls(&guest);
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const uint32_t r3 = race_update::LoadScenery(base, calls, ctx.r1.u32, ctx.r3.u32);
+  const uint32_t r3 = race_update::LoadScenery(calls, ctx.r1.u32, ctx.r3.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
-race_update::GuestCall RaceUpdateGuestCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, std::initializer_list<uint64_t> args, uint32_t frame,
+race_update::GuestCall RaceUpdateGuestCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, std::initializer_list<uint64_t> args, uint32_t frame,
                       uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
     lifted::Temp* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
@@ -60,7 +60,7 @@ race_update::GuestCall RaceUpdateGuestCall(lifted::Regs& ctx, uint8_t* base) {
     }
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -70,8 +70,8 @@ race_update::GuestCall RaceUpdateGuestCall(lifted::Regs& ctx, uint8_t* base) {
 ITC_REGS_STEP(RaceUpdateRemakeCarModel) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const race_update::GuestCall call = RaceUpdateGuestCall(ctx, base);
-  const uint32_t r3 = race_update::RemakeCarModel(base, call, ctx.r1.u32, ctx.r4.u32, ctx.r5.u32,
+  const race_update::GuestCall call = RaceUpdateGuestCall(ctx);
+  const uint32_t r3 = race_update::RemakeCarModel(call, ctx.r1.u32, ctx.r4.u32, ctx.r5.u32,
                                                   ctx.r6.u32, ctx.r7.u64);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -80,8 +80,8 @@ ITC_REGS_STEP(RaceUpdateRemakeCarModel) {
 ITC_REGS_STEP(RaceUpdateTickUpdate) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const race_update::GuestCall call = RaceUpdateGuestCall(ctx, base);
-  const uint64_t r3 = race_update::TickUpdate(base, call, ctx.r1.u32, ctx.r3.u32);
+  const race_update::GuestCall call = RaceUpdateGuestCall(ctx);
+  const uint64_t r3 = race_update::TickUpdate(call, ctx.r1.u32, ctx.r3.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -90,32 +90,32 @@ ITC_REGS_STEP(RaceUpdateUpdate) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   race_update::UpdateCalls calls;
-  calls.call = RaceUpdateGuestCall(ctx, base);
-  calls.call_f1 = [&ctx, base](uint32_t function, uint32_t r3, double f1, uint32_t frame,
+  calls.call = RaceUpdateGuestCall(ctx);
+  calls.call_f1 = [&ctx](uint32_t function, uint32_t r3, double f1, uint32_t frame,
                          uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r3.u64 = r3;
     ctx.f1.f64 = f1;
     ctx.r1.u64 = frame;
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
   // Scenery::Update. The original has r28 = the scene there, only for its
   // register saves (r18 to r31): not carried by the view.
-  calls.scenery_update = [&ctx, base](uint32_t manager, uint32_t /*scene*/, uint32_t frame) {
+  calls.scenery_update = [&ctx](uint32_t manager, uint32_t /*scene*/, uint32_t frame) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r3.u64 = manager;
     ctx.r1.u64 = frame;
     ctx.lr = 0x8215D2D8;
-    lifted::Enter(ctx, base, game::Scenery::Update);
+    lifted::Enter(ctx, game::Scenery::Update);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
-  const uint64_t r3 = race_update::Update(base, calls, ctx.r1.u32, ctx.r3.u32);
+  const uint64_t r3 = race_update::Update(calls, ctx.r1.u32, ctx.r3.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -125,7 +125,7 @@ ITC_REGS_STEP(RaceUpdateUpdate) {
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_UPDATE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_update)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 // RaceScene::VaryCar (sub_8215B330), RaceLights::Update (sub_8215D008) and
@@ -149,8 +149,8 @@ ITC_RACE_UPDATE(8215D2B0, RaceUpdateUpdate)
 ITC_NATIVE_ENTRY_ALWAYS(8215B790) {
   
   if (!ITC_FLAG(native_race_update) || !hooks::CourseScenerySetUpNative()) {
-    lifted::original::c8215B790(ctx, base);
+    lifted::original::c8215B790(ctx);
     return;
   }
-  hooks::RaceUpdateLoadScenery(ctx, base);
+  hooks::RaceUpdateLoadScenery(ctx);
 }

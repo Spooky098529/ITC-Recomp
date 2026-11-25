@@ -28,7 +28,7 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
               "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
               "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
-              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (XPhysicalAlloc through the function table, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (its buffers blobs since E5 step 7, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -45,7 +45,7 @@ namespace rs = race_sounds;
 // put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -56,7 +56,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
@@ -72,54 +71,53 @@ class GuestCalls {
     ctx.lr = lr;
     switch (function) {
       case rs::kCarSoundPauseAll:
-        CarSoundsPauseAll(ctx, base);
+        CarSoundsPauseAll(ctx);
         break;
       case rs::kCarSoundResumeAll:
-        CarSoundsResumeAll(ctx, base);
+        CarSoundsResumeAll(ctx);
         break;
       case rs::kCarSoundsStopAll:
-        CarSoundsStopAll(ctx, base);
+        CarSoundsStopAll(ctx);
         break;
       case rs::kCarSoundsRelease:
-        CarSoundsReleaseAll(ctx, base);
+        CarSoundsReleaseAll(ctx);
         break;
       case rs::kCarSoundStop:
-        CarSoundsStop(ctx, base);
+        CarSoundsStop(ctx);
         break;
       case rs::kCarSoundStart:
-        CarSoundsCarSoundStart(ctx, base);
+        CarSoundsCarSoundStart(ctx);
         break;
       case rs::kCarSoundUpdate:
-        CarSoundsUpdate(ctx, base);
+        CarSoundsUpdate(ctx);
         break;
       case rs::kMusicPlay:
-        ModeTickMusicPlay(ctx, base);
+        ModeTickMusicPlay(ctx);
         break;
       case rs::kSoundPlay:
-        SoundPlay(ctx, base);
+        SoundPlay(ctx);
         break;
       case rs::kCarSoundsInit:
-        CarSoundsInit(ctx, base);
+        CarSoundsInit(ctx);
         break;
       default:
-        lifted::CallFromContext(ctx, base, function);
+        lifted::CallFromContext(ctx, function);
     }
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 // Runs `body(calls)` with the guest calls through `ctx`, its r3 into r3.
 template <typename Body>
-void Step(lifted::Regs& ctx, uint8_t* base, Body body) {
+void Step(lifted::Regs& ctx, Body body) {
   ctx.fpscr.disableFlushMode();
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
+    GuestCalls guest(ctx);
     r3 = body(guest.calls());
   }
   ctx.r3.u64 = r3;
@@ -130,168 +128,168 @@ void Step(lifted::Regs& ctx, uint8_t* base, Body body) {
 ITC_REGS_STEP(RaceSoundsSetListener) {
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base,
-       [&](const rs::Calls& c) { return rs::SetListener(base, r3, r4, r5, r6, sp, c); });
+  Step(ctx,
+       [&](const rs::Calls& c) { return rs::SetListener(r3, r4, r5, r6, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsFadeMusic) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::FadeMusic(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::FadeMusic(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsRestoreMusicVolume) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::RestoreMusicVolume(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::RestoreMusicVolume(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsEndTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::EndTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::EndTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsPause) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::Pause(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::Pause(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsResume) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::Resume(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::Resume(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsPauseCars) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::PauseCars(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::PauseCars(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsResumeCars) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::ResumeCars(base, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::ResumeCars(sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnStageCountdown) {
-  ctx.r3.u64 = rs::OnStageCountdown(base, ctx.r3.u64);
+  ctx.r3.u64 = rs::OnStageCountdown(ctx.r3.u64);
 }
 
 ITC_REGS_STEP(RaceSoundsOnRollingStartDone) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRollingStartDone(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRollingStartDone(r3, sp, c); });
 }
 
-void RaceSoundsOnEffectsBankLoaded(lifted::Regs&, uint8_t* base) {
-  race_sounds::OnEffectsBankLoaded(base);
+void RaceSoundsOnEffectsBankLoaded(lifted::Regs&) {
+  race_sounds::OnEffectsBankLoaded();
 }
 
 ITC_REGS_STEP(RaceSoundsSetUpCars) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::SetUpCars(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::SetUpCars(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsUpdateCars) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::UpdateCars(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::UpdateCars(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsPickRivalMusic) {
-  ctx.r3.u64 = rs::PickRivalMusic(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = rs::PickRivalMusic(ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(RaceSoundsPlayRivalMusic) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::PlayRivalMusic(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::PlayRivalMusic(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsRaceTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::RaceTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::RaceTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsStageTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::StageTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::StageTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsRollingStartTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::RollingStartTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::RollingStartTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsAfterRaceTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::AfterRaceTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::AfterRaceTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnCountdown) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnCountdown(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnCountdown(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnRaceEnd) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRaceEnd(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRaceEnd(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnLeaveAfterRace) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnLeaveAfterRace(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnLeaveAfterRace(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnNextStage) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnNextStage(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnNextStage(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnRollingStart) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRollingStart(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRollingStart(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsPlayStartMusic) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::PlayStartMusic(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::PlayStartMusic(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsIdleTick) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::IdleTick(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::IdleTick(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsBegin) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::Begin(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::Begin(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnAbort) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnAbort(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnAbort(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsOnAbortDone) {
-  ctx.r3.u64 = rs::OnAbortDone(base, ctx.r3.u64);
+  ctx.r3.u64 = rs::OnAbortDone(ctx.r3.u64);
 }
 
 ITC_REGS_STEP(RaceSoundsUnload) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rs::Calls& c) { return rs::Unload(base, r3, sp, c); });
+  Step(ctx, [&](const rs::Calls& c) { return rs::Unload(r3, sp, c); });
 }
 
 ITC_REGS_STEP(RaceSoundsInit) {
@@ -300,8 +298,8 @@ ITC_REGS_STEP(RaceSoundsInit) {
   const uint32_t sp = ctx.r1.u32;
   bool replaced = false;
   uint32_t r3 = 0;
-  Step(ctx, base, [&](const rs::Calls& c) {
-    r3 = rs::Init(base, machine, sp, c, &replaced);
+  Step(ctx, [&](const rs::Calls& c) {
+    r3 = rs::Init(machine, sp, c, &replaced);
     return uint64_t(0);
   });
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
@@ -314,7 +312,7 @@ ITC_REGS_STEP(RaceSoundsInit) {
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SOUNDS(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_sounds)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 ITC_RACE_SOUNDS(82175A40, RaceSoundsEndTick)

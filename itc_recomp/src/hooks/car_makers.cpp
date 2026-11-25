@@ -62,30 +62,30 @@ ITC_REGS_STEP(CarMakersBlockOf) {
 
 ITC_REGS_STEP(CarMakersSetPaint) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cm::SetPaint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+  ctx.r3.u64 = cm::SetPaint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarMakersSetWheels) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cm::SetWheels(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cm::SetWheels(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarMakersSetChoice) {
-  cm::SetChoice(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
+  cm::SetChoice(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarMakersSetBytes) {
-  ctx.r3.u64 = cm::SetBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cm::SetBytes(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarMakersFromCar) {
   if (!ITC_FLAG(native_scene_models) || !ITC_FLAG(native_car_specs)) {
-    lifted::original::c8215B878(ctx, base);
+    lifted::original::c8215B878(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::FromCar(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::FromCar(calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
@@ -96,73 +96,73 @@ bool CarMakersGarageCalleesNative() {
 
 ITC_REGS_STEP(CarMakersGarageCarReset) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::original::c82110448(ctx, base);
+    lifted::original::c82110448(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::GarageCarReset(base, calls, ctx.r3.u32, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::GarageCarReset(calls, ctx.r3.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(CarMakersStaticInit) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::original::c825D9EF0(ctx, base);
+    lifted::original::c825D9EF0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::GarageCarsStaticInit(base, calls, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::GarageCarsStaticInit(calls, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(CarMakersFromGarageCar) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::original::c82179A60(ctx, base);
+    lifted::original::c82179A60(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   double f1 = 0.0;
-  ctx.r3.u64 = cm::FromGarageCar(base, calls, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &f1);
+  ctx.r3.u64 = cm::FromGarageCar(calls, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(CarMakersSetUpCarData) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::original::c821DF2F8(ctx, base);
+    lifted::original::c821DF2F8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   double f1 = 0.0;
-  ctx.r3.u64 = cm::TuningScreenSetUpCarData(base, calls, ctx.r3.u32, ctx.r1.u32, &f1);
+  ctx.r3.u64 = cm::TuningScreenSetUpCarData(calls, ctx.r3.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(CarMakersFitCar) {
   if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
-    lifted::original::c82178C40(ctx, base);
+    lifted::original::c82178C40(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   double f1 = 0.0;
-  ctx.r3.u64 = cm::GarageStageFitCar(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &f1);
+  ctx.r3.u64 = cm::GarageStageFitCar(calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(CarMakersCopyRecord) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::original::c8217FC60(ctx, base);
+    lifted::original::c8217FC60(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::GarageStageCopyRecord(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::GarageStageCopyRecord(calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
@@ -173,15 +173,15 @@ bool CarMakersReapplyCalleesNative() {
 
 namespace {
 
-void Reapply(lifted::Regs& ctx, uint8_t* base, bool decals) {
+void Reapply(lifted::Regs& ctx, bool decals) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  const stand_models::GuestCall apply = StandModelsGuestCall(ctx, base);
+  const stand_models::GuestCall apply = StandModelsGuestCall(ctx);
   const uint64_t r3 =
-      cm::GarageStageReapplyRecord(base, calls, apply, ctx.r3.u32, ctx.r1.u32, decals);
+      cm::GarageStageReapplyRecord(calls, apply, ctx.r3.u32, ctx.r1.u32, decals);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -191,18 +191,18 @@ void Reapply(lifted::Regs& ctx, uint8_t* base, bool decals) {
 
 ITC_REGS_STEP(CarMakersReapplyRecord) {
   if (!CarMakersReapplyCalleesNative()) {
-    lifted::original::c82178DF8(ctx, base);
+    lifted::original::c82178DF8(ctx);
     return;
   }
-  Reapply(ctx, base, true);
+  Reapply(ctx, true);
 }
 
 ITC_REGS_STEP(CarMakersReapplyRecordNoDecals) {
   if (!CarMakersReapplyCalleesNative()) {
-    lifted::original::c82178E60(ctx, base);
+    lifted::original::c82178E60(ctx);
     return;
   }
-  Reapply(ctx, base, false);
+  Reapply(ctx, false);
 }
 
 bool CarMakersSetCarClassCalleesNative() {
@@ -217,17 +217,17 @@ bool CarMakersSetCarCalleesNative() {
 
 ITC_REGS_STEP(CarMakersSetCar) {
   if (!CarMakersSetCarCalleesNative()) {
-    lifted::original::c8217FD58(ctx, base);
+    lifted::original::c8217FD58(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  const stand_models::GuestCall apply = StandModelsGuestCall(ctx, base);
+  const stand_models::GuestCall apply = StandModelsGuestCall(ctx);
   double f1 = ctx.f1.f64;
-  const uint64_t r3 = cm::GarageStageSetCar(base, calls, apply, ctx.r3.u32, ctx.r4.u32,
+  const uint64_t r3 = cm::GarageStageSetCar(calls, apply, ctx.r3.u32, ctx.r4.u32,
                                             ctx.r5.u64, ctx.r1.u32, &f1);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -237,16 +237,16 @@ ITC_REGS_STEP(CarMakersSetCar) {
 
 ITC_REGS_STEP(CarMakersSetCarClass) {
   if (!CarMakersSetCarClassCalleesNative()) {
-    lifted::original::c8217FDC8(ctx, base);
+    lifted::original::c8217FDC8(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  const stand_models::GuestCall apply = StandModelsGuestCall(ctx, base);
-  const uint64_t r3 = cm::GarageStageSetCarClass(base, calls, apply, ctx.r3.u32, ctx.r4.u32,
+  const stand_models::GuestCall apply = StandModelsGuestCall(ctx);
+  const uint64_t r3 = cm::GarageStageSetCarClass(calls, apply, ctx.r3.u32, ctx.r4.u32,
                                                  ctx.r5.u64, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -260,16 +260,16 @@ bool CarMakersShowCarByIdCalleesNative(bool with_class) {
 
 namespace {
 
-void ShowCarById(lifted::Regs& ctx, uint8_t* base, bool with_class) {
+void ShowCarById(lifted::Regs& ctx, bool with_class) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  const stand_models::GuestCall apply = StandModelsGuestCall(ctx, base);
+  const stand_models::GuestCall apply = StandModelsGuestCall(ctx);
   double f1 = ctx.f1.f64;
   const uint64_t r3 =
-      cm::GarageStageShowCarById(base, calls, apply, ctx.r3.u64, ctx.r1.u32, with_class, &f1);
+      cm::GarageStageShowCarById(calls, apply, ctx.r3.u64, ctx.r1.u32, with_class, &f1);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.f1.f64 = f1;
@@ -280,48 +280,48 @@ void ShowCarById(lifted::Regs& ctx, uint8_t* base, bool with_class) {
 
 ITC_REGS_STEP(CarMakersShowCarById) {
   if (!CarMakersShowCarByIdCalleesNative(false)) {
-    lifted::original::c82182C90(ctx, base);
+    lifted::original::c82182C90(ctx);
     return;
   }
-  ShowCarById(ctx, base, false);
+  ShowCarById(ctx, false);
 }
 
 ITC_REGS_STEP(CarMakersShowCarByIdWithClass) {
   if (!CarMakersShowCarByIdCalleesNative(true)) {
-    lifted::original::c82182D30(ctx, base);
+    lifted::original::c82182D30(ctx);
     return;
   }
-  ShowCarById(ctx, base, true);
+  ShowCarById(ctx, true);
 }
 
 ITC_REGS_STEP(CarMakersShowBusyMarker) {
   if (!ITC_FLAG(native_ui_movies_game)) {
-    lifted::original::c8219ED10(ctx, base);
+    lifted::original::c8219ED10(ctx);
     return;
   }
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::ShowBusyMarker(base, calls, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::ShowBusyMarker(calls, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarMakersHideBusyMarker) {
   if (!ITC_FLAG(native_ui_movies_game)) {
-    lifted::original::c8219EDB0(ctx, base);
+    lifted::original::c8219EDB0(ctx);
     return;
   }
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = cm::HideBusyMarker(base, calls, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = cm::HideBusyMarker(calls, ctx.r1.u32);
 }
 
 
 ITC_REGS_STEP(CarMakersReloadModel) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::original::c8217F880(ctx, base);
+    lifted::original::c8217F880(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  const uint64_t r3 = cm::GarageStageReloadModel(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+  const uint64_t r3 = cm::GarageStageReloadModel(calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -332,7 +332,7 @@ ITC_REGS_STEP(CarMakersReloadModel) {
 // Defines an adapter: the flag, else the original.
 #define ITC_CAR_MAKERS(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_makers)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 ITC_CAR_MAKERS(8215AAD0, CarMakersBlockOf)

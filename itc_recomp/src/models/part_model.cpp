@@ -13,8 +13,8 @@ namespace models {
 namespace {
 
 // The words after the base Model, in the originals' order.
-void Clear(uint8_t* base, uint32_t model) {
-  const schema::Model m(base, model);
+void Clear(uint32_t model) {
+  const schema::Model m(model);
   m.set_vinyl_sheet(0u);
   m.set_vinyl_texture_b(0u);
   m.set_category3_texture(0u);
@@ -27,33 +27,33 @@ void Clear(uint8_t* base, uint32_t model) {
 
 }  // namespace
 
-void PartModelClear(uint8_t* base, uint32_t model) {
+void PartModelClear(uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820CE9C8 PartModel::Clear");
-  Clear(base, model);
+  Clear(model);
 }
 
-void PartModelSetVinylTextures(uint8_t* base, uint32_t model, uint32_t a, uint32_t b) {
+void PartModelSetVinylTextures(uint32_t model, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820CE9F8 Model::SetVinylTextures");
-  const schema::Model m(base, model);
+  const schema::Model m(model);
   m.set_vinyl_sheet(a);
   m.set_vinyl_texture_b(b);
 }
 
-bool PartModelConstruct(uint8_t* base, uint32_t model) {
+bool PartModelConstruct(uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820CE928 PartModel::PartModel");
-  if (!ModelConstruct(base, model)) {
+  if (!ModelConstruct(model)) {
     return false;
   }
-  schema::Model(base, model).set_vtable(kPartModelVtable);
-  Clear(base, model);
+  schema::Model(model).set_vtable(kPartModelVtable);
+  Clear(model);
   return true;
 }
 
-std::optional<uint32_t> PartModelDestruct(uint8_t* base, uint32_t model) {
+std::optional<uint32_t> PartModelDestruct(uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820CE990 PartModel::~PartModel");
-  schema::Model(base, model).set_vtable(kPartModelVtable);
-  Clear(base, model);
-  return ModelDestruct(base, model);
+  schema::Model(model).set_vtable(kPartModelVtable);
+  Clear(model);
+  return ModelDestruct(model);
 }
 
 }  // namespace models

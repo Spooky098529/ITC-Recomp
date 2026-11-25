@@ -24,6 +24,11 @@ measure = "Sound"
 measures = ["Sound.+0"]
 size = 24
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by AudioManager::PlayCue's and
+# PlayHandle's operator new (lifted, returning at 0x82119578 and 0x82119700);
+# freed by sub_82118490's operator delete (the game's free takes handles).
+storage = "host"
+host_alloc = [0x82119578, 0x82119700]
 fields = [
   { name = "owner", offset = 0, type = "u32", note = "the manager's +8 interface (its slot +4 GetSoundBank; +8 and +12 the 3D state and the listener)" },
   { name = "emitter", offset = 4, type = "ptr", to = "SoundEmitter", note = "its emitter (300 bytes)" },
@@ -46,6 +51,13 @@ measure = "Emitter"
 measures = ["Emitter.+8"]
 size = 300
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by Sound::Sound's operator new (lifted,
+# returning at 0x8211736C); freed by sub_821175D8's operator delete. Its
+# interior pointers (+8, +68, +216, +272, +280, +288, +296) are values
+# inside its handle's span; XACT writes the cue (+0) and the properties
+# (+136) by address (the raw path).
+storage = "host"
+host_alloc = [0x8211736C]
 fields = [
   { name = "cue", offset = 0, type = "ptr", to = "EmitterCue", note = "the XACT cue (0 none)" },
   { name = "unknown_4", offset = 4, type = "f32" },
@@ -162,6 +174,11 @@ measure = "BankPair"
 size = 112
 origin = "allocated"
 vtable = 0x820066DC
+# Host (E5 step 5, 2026-11-24): made by AudioManager::LoadBank's operator
+# new (lifted, returning at 0x8211811C); freed by sub_82118438's operator
+# delete. Its std::string (+40) is kept as bytes in the guest's order.
+storage = "host"
+host_alloc = [0x8211811C]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820066DC (0x82000EB8, the base's, first)" },
   { name = "vtable2", offset = 4, type = "u32", note = "0x82002908 (0x82000AB4, then 0x82000BA8, first)" },
@@ -184,8 +201,8 @@ fields = [
   { name = "sound_bank_file_id", offset = 88, type = "u32" },
   { name = "wave_bank_size", offset = 92, type = "u32" },
   { name = "sound_bank_size", offset = 96, type = "u32" },
-  { name = "wave_bank_buffer", offset = 100, type = "u32", note = "XPhysicalAlloc's (bank 2: [0x826C5C88])" },
-  { name = "sound_bank_buffer", offset = 104, type = "u32", note = "operator new[]'s (bank 2: [0x826C5C8C])" },
+  { name = "wave_bank_buffer", offset = 100, type = "u32", note = "XPhysicalAlloc's, a CarSoundWaveBank blob (bank 2: [0x826C5C88], a blob block)" },
+  { name = "sound_bank_buffer", offset = 104, type = "u32", note = "operator new[]'s, a SoundBankFile blob (bank 2: [0x826C5C8C], a blob block)" },
   { name = "wave_bank_loaded", offset = 108, type = "u8" },
   { name = "sound_bank_loaded", offset = 109, type = "u8" },
 ]
@@ -196,6 +213,15 @@ fields = [
 measures = ["WaveBankHolder", "BankPair.+72"]
 size = 28
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by BankPair::Load's operator new
+# (lifted, returning at 0x82117900 and 0x82117944); freed by
+# WaveBankHolderDelete (sub_82117AD8, operator delete). XACT's
+# CreateInMemoryWaveBank writes the bank into +8 by address (the raw path).
+# Its buffer is a CarSoundWaveBank blob since E5 step 7 (BankPair::Load's
+# XPhysicalAlloc; bank 2's SoundGlobals::Init's block), the XMA data in it
+# read by our FFmpeg through guest::Pointer (src/hooks/xma.cpp).
+storage = "host"
+host_alloc = [0x82117900, 0x82117944]
 fields = [
   { name = "buffer", offset = 0, type = "u32" },
   { name = "size", offset = 4, type = "u32" },
@@ -209,11 +235,32 @@ fields = [
 measures = ["SoundBankHolder", "Emitter::Prepare.r4"]
 size = 12
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by BankPair::Load's operator new
+# (lifted, returning at 0x82117924 and 0x82117968); freed by
+# SoundBankHolderDelete (sub_82117B30, operator delete). XACT's
+# CreateSoundBank writes the bank into +8 by address (the raw path).
+storage = "host"
+host_alloc = [0x82117924, 0x82117968]
 fields = [
   { name = "buffer", offset = 0, type = "u32" },
   { name = "size", offset = 4, type = "u32" },
   { name = "sound_bank", offset = 8, type = "ptr", to = "EmitterSoundBank", note = "the XACT sound bank" },
 ]
+
+# A bank pair's sound bank file (XACT's .xsb), read whole by Archive::Load
+# into BankPair::Load's operator new[] (its size rounded up to 2 KB) and used
+# in place by XACT (XACTSoundBank::Load keeps it; the cues read their
+# entries from it). A blob (E5 step 5, 2026-11-24): in PC memory with the
+# file's bytes (lifted operator new[], returning at 0x82117A38, the size in
+# r3); freed by BankPair::~BankPair's operator delete (the game's free takes
+# handles). Bank 2's (the race's effects) is SoundGlobals::Init's 512-byte
+# memory block, a blob too since E5 step 7 (models::AllocPhysicalExBlob).
+[SoundBankFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82117A38, reg = "r3" }]
+fields = []
 
 # A slot of the manager's bank vector, by address (a bank pair or 0).
 [BankPairSlot]
@@ -233,6 +280,9 @@ measure = "AudioManager@+1456"
 measures = ["AudioManager::SetListenerOrientation.r3@+1456", "AudioManager::SetListenerPosition.r3@+1456", "AudioManager::SetListenerParams.r3@+1456"]
 size = 56
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): embedded in the host AudioManager
+# (menu-sounds.toml, its listener field).
+storage = "dual"
 fields = [
   { name = "front_x", offset = 0, type = "f32", note = "front (0, 0, 1)" },
   { name = "front_y", offset = 4, type = "f32" },
@@ -256,6 +306,9 @@ fields = [
 measure = "sub_8259CC80.r3"
 size = 48
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): an emitter or the listener (host objects)
+# or another object, by address.
+storage = "dual"
 fields = [
   { name = "vector_x", offset = 36, type = "f32" },
   { name = "vector_y", offset = 40, type = "f32" },
@@ -268,6 +321,9 @@ fields = [
 measures = ["sub_8259CC80.r4", "Listener::SetOrientation.r4", "Listener::SetOrientation.r5", "Listener::SetPosition.r4"]
 size = 12
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): a vector given by address, on the frame or
+# inside a host object.
+storage = "dual"
 fields = [
   { name = "x", offset = 0, type = "f32" },
   { name = "y", offset = 4, type = "f32" },
@@ -286,6 +342,9 @@ measure = "sub_82118638.r3@+16"
 measures = ["sub_82118638.r3@+16@+8", "AudioManager@+16", "AudioManager::GetCategory.r3@+16", "AudioManager::SetCategoryVolume.r3@+16", "AudioManager::PauseCategory.r3@+16", "AudioManager::ResumeCategory.r3@+16", "AudioEngine::DoWork.r3"]
 size = 100
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): embedded in the host AudioManager
+# (menu-sounds.toml, its engine field).
+storage = "dual"
 fields = [
   { name = "settings", offset = 0, type = "u32", note = "the global settings (TXR_XACT.xgs) read whole (also the fault's handle: speaker count)" },
   { name = "settings_size", offset = 4, type = "u32", note = "its size (also the fault's handle: LFE speaker)" },
@@ -436,6 +495,12 @@ fields = [
 measures = ["new<16>@sub_82118720", "sub_82118720.r3"]
 size = 16
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by DelegateClone (sub_82118720, the
+# member delegate vtable 0x8200833C's clone; New in
+# src/sound_cues/sound_cues.cpp), freed by its owner's operator delete (the
+# game's free takes handles). The delegates' callers read it by address
+# (the raw path).
+storage = "host"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x8200833C" },
   { name = "object", offset = 4, type = "u32", note = "the manager" },
@@ -449,6 +514,8 @@ fields = [
 measure = "AudioManager::RemoveStoppedSounds.r3@+1528"
 size = 12
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): the host AudioManager's +1528.
+storage = "dual"
 fields = [
   { name = "allocator", offset = 0, type = "u32", note = "probably the allocator word" },
   { name = "head", offset = 4, type = "ptr", to = "SoundListNode", note = "the sentinel node" },
@@ -483,6 +550,9 @@ fields = [
 measure = "WordVector"
 size = 16
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): a generic vector, the host AudioManager's
+# +1512 among others.
+storage = "dual"
 fields = [
   { name = "allocator", offset = 0, type = "u32", note = "probably the allocator word (never written here)" },
   { name = "fault_0", offset = 0, type = "u64", note = "read as a doubleword (probably a measure fault: an iterator pair joined)" },

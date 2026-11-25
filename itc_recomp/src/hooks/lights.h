@@ -17,7 +17,7 @@ namespace lights {
 // count (the original's r3); nullopt, with nothing done, where the original
 // must run (--native_nearest_lights off, f2 or f3 not single-precision
 // values).
-std::optional<uint32_t> FindNearest(uint8_t* base, uint32_t owner, uint32_t output,
+std::optional<uint32_t> FindNearest(uint32_t owner, uint32_t output,
                                     uint32_t point, int32_t most, uint32_t direction, double f1,
                                     double f2, double f3);
 

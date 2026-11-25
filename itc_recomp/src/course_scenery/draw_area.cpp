@@ -52,59 +52,59 @@ using VisibleArea = schema::SceneryVisibleArea;
 using Pass = schema::CameraPass;
 
 // The camera pass `index` (592 bytes each from 0x826BAC00).
-Pass PassAt(uint8_t* base, uint32_t index) {
-  return Pass(base, index * Pass::kSize + schema::CamerasGlobals::passes_address());
+Pass PassAt(uint32_t index) {
+  return Pass(index * Pass::kSize + schema::CamerasGlobals::passes_address());
 }
 
 constexpr uint32_t kViewCopy = schema::SceneryListsGlobals::view_address();
 
 }  // namespace
 
-void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
+void DrawArea(const scenery_lists::DrawCalls& draws,
               const car_scene_draw::SceneDrawCalls& calls, uint32_t stack, uint32_t manager,
               uint32_t description, uint32_t area, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820F3B70 Scenery::DrawArea");
   const uint32_t f = stack - kFrame;
-  Store(base, f, stack);  // the back chain, as stwu
-  const schema::Scenery m(base, manager);
-  const schema::SceneryPassDesc desc(base, description);
-  const VisibleArea va(base, area);
+  Store(f, stack);  // the back chain, as stwu
+  const schema::Scenery m(manager);
+  const schema::SceneryPassDesc desc(description);
+  const VisibleArea va(area);
   const schema::CourseSet s = m.course_set();  // r18
   if ((desc.mask() & m.mask() & va.mask()) == 0) {
     return;
   }
-  RecordHeadlightProjectors(base, calls, f, description);
+  RecordHeadlightProjectors(calls, f, description);
   FlushOff();
 
   // The identity at +80 (1.0 stored in +144's w column first) and its copy
   // at +208, the camera pass's view-projection at +144 and its view at
   // 0x8265ECA0 (both copies noted for interpolation), the keys.
-  const Pass pass = PassAt(base, desc.camera_pass());  // r24
-  const double one = double(G::one(base));
+  const Pass pass = PassAt(desc.camera_pass());  // r24
+  const double one = double(G::one());
   for (uint32_t at : {156u, 172u, 188u, 204u}) {
-    Stfs(base, f + at, one);
+    Stfs(f + at, one);
   }
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t col = 0; col < 4; col++) {
-      Store(base, f + 80 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
+      Store(f + 80 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
     }
   }
   for (uint32_t at = 0; at < 64; at += 4) {
-    Store(base, f + 208 + at, Load(base, f + 80 + at));
+    Store(f + 208 + at, Load(f + 80 + at));
   }
   const uint32_t view_projection = f + 144, world = f + 208;
-  matrix_math::Copy(base, view_projection, pass.view_projection_address());
-  interpolation::BlendState_OnCopy(base, view_projection, pass.view_projection_address(),
+  matrix_math::Copy(view_projection, pass.view_projection_address());
+  interpolation::BlendState_OnCopy(view_projection, pass.view_projection_address(),
                                    0x820F3C3C);
   FlushOff();
   // The depth buckets' key 163 here; the draws' keys the description's.
-  G::set_key_depth(base, 163);
+  G::set_key_depth(163);
   const uint32_t key_a = desc.key_a();
   const uint32_t key_b = desc.key_b();
-  G::set_key_a(base, key_a);
-  G::set_key_b(base, key_b);
-  matrix_math::Copy(base, kViewCopy, pass.view_address());
-  interpolation::BlendState_OnCopy(base, kViewCopy, pass.view_address(), 0x820F3C70);
+  G::set_key_a(key_a);
+  G::set_key_b(key_b);
+  matrix_math::Copy(kViewCopy, pass.view_address());
+  interpolation::BlendState_OnCopy(kViewCopy, pass.view_address(), 0x820F3C70);
   FlushOff();
 
   // Model::DrawShapeDepth: natively (its queue entry handed over from its
@@ -115,7 +115,7 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
     const uint32_t frame = f - kDepthFrame;
     const std::array<uint32_t, 9> context = {kDepthContextReturn, 1, mask, 0, shape,
                                              depth_r28, model, world, view_projection};
-    const auto draw = scenery_lists::DrawShapeDepth(base, model, view_projection, world, shape,
+    const auto draw = scenery_lists::DrawShapeDepth(model, view_projection, world, shape,
                                                     0, mask, 1, frame, context);
     FlushOff();
     if (!draw) {
@@ -126,7 +126,7 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
       FlushOff();
       return;
     }
-    Store(base, frame, f);  // its back chain, as its stwu
+    Store(frame, f);  // its back chain, as its stwu
     if (draw->submit) {
       draws.submit(draws.user, draw->entry, draw->key, draw->depth, frame, kDepthSubmitReturn);
       FlushOff();
@@ -138,7 +138,7 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
   auto provider_set = [&](uint32_t slot, uint32_t value, uint32_t lr) {
     const uint32_t function = m.texture_provider().set();
     if (function != kTextureProviderSet ||
-        !scenery_lists::TextureProviderSet(base, provider, slot, value)) {
+        !scenery_lists::TextureProviderSet(provider, slot, value)) {
       const uint32_t args[3] = {provider, slot, value};
       draws.call(draws.user, function, args, 3, f, lr);
     }
@@ -147,7 +147,7 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
 
   // The area's models' entries (+16, a word each).
   auto model_at = [&](uint32_t n) {
-    return schema::AreaModel(base, Load(base, va.models_address() + 4 * n));
+    return schema::AreaModel(Load(va.models_address() + 4 * n));
   };
   const uint32_t count = va.model_count();
   for (uint32_t n = 0; n < count; n++) {
@@ -155,13 +155,13 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
     const int32_t type = int32_t(pass.type());
     if (ShadowPass(type)) {
       // The shadow passes' keys: the description's +28 and +24.
-      G::set_other_key(base, desc.key_b());
-      G::set_depth_key(base, desc.key_a());
+      G::set_other_key(desc.key_b());
+      G::set_depth_key(desc.key_a());
       const uint32_t model = model_at(n).model().address;
       if (model == 0) {
         continue;
       }
-      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(base, model).shape_count()); i++) {
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
         draw_depth(model, i, 1, caller_r28, 0x820F3F44);
       }
       continue;
@@ -169,30 +169,30 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
     uint32_t slot = 1;
     const uint32_t textures = s.texture_animations().address;
     const uint32_t model = entry.model().address;
-    scenery_lists::ResetDrawState(base, model);
+    scenery_lists::ResetDrawState(model);
     if (textures != 0) {
       provider_set(1, s.xpr_address(), 0x820F3CE4);
       slot = 2;
     }
-    schema::SceneryModel(base, model).set_animations(textures);
+    schema::SceneryModel(model).set_animations(textures);
     const uint32_t own = model_at(n).xpr().address;
     if (own != 0) {
       provider_set(slot, own, 0x820F3D14);
     }
-    schema::SceneryModel(base, model).set_texture_provider(provider);
+    schema::SceneryModel(model).set_texture_provider(provider);
     const int32_t kind = int32_t(pass.type());
     const uint32_t depth_too = kind == 0 ? 1 : 0;  // r28
     const uint32_t pair_offset = (kind == 0 || kind == 1 || kind == 2) ? 0 : 28;
-    for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(base, model).shape_count()); i++) {
+    for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
       const uint32_t frame = f - scenery_lists::kSceneryDrawShapeFrame;
-      const uint32_t chain = Load(base, frame);
-      Store(base, frame, f);
-      const auto drawn = scenery_lists::SceneryDrawShape(base, draws, frame, model,
+      const uint32_t chain = Load(frame);
+      Store(frame, f);
+      const auto drawn = scenery_lists::SceneryDrawShape(draws, frame, model,
                                                          view_projection, world, i, depth_too, 0,
                                                          0, pair_offset, pass.address);
       FlushOff();
       if (!drawn) {
-        Store(base, frame, chain);
+        Store(frame, chain);
         const uint32_t args[8] = {model, view_projection, world, i, depth_too, 0, 0, pair_offset};
         draws.call(draws.user, kDrawShape, args, 8, f, 0x820F3D84);
         FlushOff();
@@ -208,13 +208,13 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
       if (int32_t(pass.type()) != d.type) {
         continue;
       }
-      const uint32_t effect = post_effects::Get(base, d.effect);
-      if (effect == 0 || schema::PostEffect(base, effect).skipped() != 0) {
+      const uint32_t effect = post_effects::Get(d.effect);
+      if (effect == 0 || schema::PostEffect(effect).skipped() != 0) {
         continue;
       }
-      G::set_depth_key(base, d.key);
-      G::set_other_key(base, d.key);
-      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(base, model).shape_count()); i++) {
+      G::set_depth_key(d.key);
+      G::set_other_key(d.key);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
         draw_depth(model, i, 0, depth_too, d.lr);
       }
     }
@@ -224,7 +224,7 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
   if ((m.mask() & 0x400) == 0) {
     return;
   }
-  const Pass pass_again = PassAt(base, desc.camera_pass());
+  const Pass pass_again = PassAt(desc.camera_pass());
   if (ShadowPass(int32_t(pass_again.type()))) {
     return;
   }
@@ -232,11 +232,11 @@ void DrawArea(uint8_t* base, const scenery_lists::DrawCalls& draws,
   if (lights == 0) {
     return;
   }
-  scenery_lists::SetBillboardPass(base, description, desc.camera_pass_object(), desc.key_b());
-  for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(base, lights).count()); i++) {
+  scenery_lists::SetBillboardPass(description, desc.camera_pass_object(), desc.key_b());
+  for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(lights).count()); i++) {
     const uint32_t animations = s.texture_animations().address;
-    const uint32_t groups = game_data::GetEntry(base, lights, i, false);
-    sprites::DrawLightGroups(base, calls, f, description, groups, s.xpr_address(), animations);
+    const uint32_t groups = game_data::GetEntry(lights, i, false);
+    sprites::DrawLightGroups(calls, f, description, groups, s.xpr_address(), animations);
     FlushOff();
   }
 }

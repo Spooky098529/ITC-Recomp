@@ -32,7 +32,7 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 #define ITC_DATA_TABLES_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_data_tables)) {     \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                \
   }
 
@@ -47,17 +47,17 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 
 using namespace data_tables;
 
-ITC_DATA_TABLES_SWAP(821170F0, On56Loaded(base, ctx.r6.u32))
-ITC_DATA_TABLES_SWAP(82116FF0, On20Loaded(base, ctx.r6.u32))
-ITC_DATA_TABLES_SWAP(82117058, On40Loaded(base, ctx.r6.u32))
+ITC_DATA_TABLES_SWAP(821170F0, On56Loaded(ctx.r6.u32))
+ITC_DATA_TABLES_SWAP(82116FF0, On20Loaded(ctx.r6.u32))
+ITC_DATA_TABLES_SWAP(82117058, On40Loaded(ctx.r6.u32))
 
 ITC_NATIVE_ENTRY_ALWAYS(821170D8) {
   ITC_DATA_TABLES_FALLBACK(821170D8)
-  OnItemsLoaded(base, ctx.r6.u32);
+  OnItemsLoaded(ctx.r6.u32);
 }
 ITC_NATIVE_ENTRY_ALWAYS(821170C0) {
   ITC_DATA_TABLES_FALLBACK(821170C0)
-  OnLoaded84(base);
+  OnLoaded84();
 }
 
 // The accessors: r3 a word (zero-extended; the originals' carry the
@@ -69,17 +69,17 @@ ITC_NATIVE_ENTRY_ALWAYS(821170C0) {
     ctx.r3.u64 = uint32_t(expr);           \
   }
 
-ITC_DATA_TABLES_WORD(82117158, IsLoading(base))
-ITC_DATA_TABLES_WORD(82117178, Item(base, ctx.r3.u32))
+ITC_DATA_TABLES_WORD(82117158, IsLoading())
+ITC_DATA_TABLES_WORD(82117178, Item(ctx.r3.u32))
 // ItemRecords::Item (probably): r3 (the records) not read, r4 the id.
-ITC_DATA_TABLES_WORD(82116DA8, RecordsItem(base, ctx.r4.u32))
-ITC_DATA_TABLES_WORD(82117190, Entry56(base, ctx.r3.u32, ctx.r4.u32))
-ITC_DATA_TABLES_WORD(82117210, Entry20(base, ctx.r3.u32))
-ITC_DATA_TABLES_WORD(82117228, Entry40(base, ctx.r3.u32))
+ITC_DATA_TABLES_WORD(82116DA8, RecordsItem(ctx.r4.u32))
+ITC_DATA_TABLES_WORD(82117190, Entry56(ctx.r3.u32, ctx.r4.u32))
+ITC_DATA_TABLES_WORD(82117210, Entry20(ctx.r3.u32))
+ITC_DATA_TABLES_WORD(82117228, Entry40(ctx.r3.u32))
 
 ITC_NATIVE_ENTRY_ALWAYS(821171B0) {
   ITC_DATA_TABLES_FALLBACK(821171B0)
-  ctx.r3.s64 = Find20(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.s64 = Find20(ctx.r3.u32, ctx.r4.u32);
 }
 
 // DataTables::Init: r3 as the original leaves it (Archive::Toc's, lwz's).
@@ -89,12 +89,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82116DB0) {
     return;
   }
   if (ITC_FLAG(native_data_tables) && hooks::NativeHeapActive()) {
-    if (const auto r3 = Init(base)) {
+    if (const auto r3 = Init()) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82116DB0(ctx, base);
+  lifted::original::c82116DB0(ctx);
 }
 
 // DataTables::Load: the loads through the archive's queue's plain C++.
@@ -104,8 +104,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82117240) {
     return;
   }
   if (!ITC_FLAG(native_data_tables) || !hooks::NativeArchiveQueue()) {
-    lifted::original::c82117240(ctx, base);
+    lifted::original::c82117240(ctx);
     return;
   }
-  hooks::SetArchiveSerial(ctx, Load(base, hooks::NativeArchiveLoad(base)));
+  hooks::SetArchiveSerial(ctx, Load(hooks::NativeArchiveLoad()));
 }

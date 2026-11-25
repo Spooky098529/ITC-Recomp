@@ -50,20 +50,20 @@ constexpr uint32_t kRacersCount = 0x595E0;
 // Car::ResetDecals40 (sub_820CC4A0): forty 32-byte decal entries from
 // `decals` (a car object's +288): +0, +4 = 1.0, +8, +12, +16 = 0.0,
 // halfword +20 and bytes +22, +23 = 0, +24 = -1, +28 = 0.
-void ResetDecals40(uint8_t* base, uint32_t decals);
+void ResetDecals40(uint32_t decals);
 // Car::ResetDecals6 (sub_820CCBF0): six such entries (a car object's +96).
-void ResetDecals6(uint8_t* base, uint32_t decals);
+void ResetDecals6(uint32_t decals);
 // Car::ResetSettings (sub_820CD760): a car object's +16: bytes +56 to +59 =
 // 2, +60 = 3, +61 = 7, +62 to +76 = 0, +77 = 10, +78 = 0, then nine
 // halfwords from +0 = 0.
-void ResetSettings(uint8_t* base, uint32_t settings);
+void ResetSettings(uint32_t settings);
 // sub_820CCC70: a car object's +1568 (20 bytes): word +16 = 0, bytes +0,
 // +1, +12 = 0, +2 = 5, +3, +4 = 0, +5 = 1, +6 = 2, +7 = 1, +8 to +11 = 2.
-void Reset1568(uint8_t* base, uint32_t bytes);
+void Reset1568(uint32_t bytes);
 // CarTuning::Reset (sub_820CD618): a car object's +1648 (240 bytes): +0 =
 // 0, +4 = (flag != 0), +8 = 0, +12 = (+4 == 1), +16 to +164 = 0, +168 = 3,
 // +172 = 0, five 12-byte entries from +176 = (1, 0, 0).
-void TuningReset(uint8_t* base, uint32_t tuning, uint32_t flag);
+void TuningReset(uint32_t tuning, uint32_t flag);
 // CarDecal::FromBuild (sub_820CDC18, with its setters sub_820CC458,
 // sub_820CC460, sub_820CC468, sub_820CC470, sub_820CC478 and sub_820CC450
 // merged): a 32-byte decal entry from a car build's 36-byte one: +20 =
@@ -71,22 +71,22 @@ void TuningReset(uint8_t* base, uint32_t tuning, uint32_t flag);
 // +31; +8, +12 = build +8, +12; when build +0 is below 0.0, +0 = -(it) and
 // +28 = 1, else +28 = 0 (+0 left); +4 = build +4; +16 = build +16
 // (Object344::SetFloat16's plain C++); +24 = build +32 (sub_820E70B8's).
-void DecalFromBuild(uint8_t* base, uint32_t decal, uint32_t build);
+void DecalFromBuild(uint32_t decal, uint32_t build);
 // Car::Clear (sub_820CD7F0): +12 = 0; CarTuning::Reset(+1648, 0); halfwords
 // +2, +0, +6, +8 = 0, byte +10 = 0, halfword +4 = -1, byte +11 = 0;
 // Car::ResetSettings(+16), Car::ResetDecals40(+288), Car::ResetDecals6(+96),
 // sub_820CCC70(+1568); three 20-byte entries from +1588: +8, +12, +16 =
 // 0.0, +0, +4 = 0. Returns the car + 1568 (the original's r3).
-uint32_t CarClear(uint8_t* base, uint32_t car);
+uint32_t CarClear(uint32_t car);
 // Car::Init (sub_820CD5D8): Car::Clear, then +3888 = 0 (the flags), +3892 =
 // 1. Returns Car::Clear's r3.
-uint32_t CarInit(uint8_t* base, uint32_t car);
+uint32_t CarInit(uint32_t car);
 // Car::SetupVehicle (sub_820CD5C8): Vehicle::SetupFromCar(data, car), a tail
 // call (`frame` is SetupFromCar's 368-byte frame under the caller's r1;
 // car_physics::VehicleSetupFromCar). False, with nothing written, where it
 // refuses (its ApplyTuning's memcpy): the original runs there. `f1` gets
 // what it leaves; r3 comes back as `frame` - 1008 + 352.
-bool CarSetupVehicle(uint8_t* base, uint32_t car, uint32_t data, uint32_t frame, double* f1);
+bool CarSetupVehicle(uint32_t car, uint32_t data, uint32_t frame, double* f1);
 
 // Car::SetModel (sub_820CD8A8): +12 = the car id; unless Params::Exists is
 // 0 (then returns 0), from its spec (Params::GetCarSpec): CarTuning::Reset(
@@ -105,7 +105,7 @@ bool CarSetupVehicle(uint8_t* base, uint32_t car, uint32_t data, uint32_t frame,
 // game's rand): +1569 = 0 to 13, +1573 = 1 to 10, +1574 and +1575 = 1 to 10
 // after a 10, else 1 to 9, +1576 = 1 to 9; +1580 = 1 for cars 56, 64 to 68
 // and 70. Returns the last rand() (the original's r3).
-uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id);
+uint32_t SetModel(uint32_t car, uint32_t id);
 // Car::FromBuild (sub_820CDCE0): a car object from a car build (an item's
 // +160, at least 2,812 bytes): Car::Clear; +12 = build +2788 and
 // Car::SetModel with it; the paint (halfwords +0, +2 = build +2792, +8 =
@@ -121,7 +121,7 @@ uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id);
 // +1736 = Params::FirstWheelOfModel(build +232 / 10) + build +232 % 10 (and
 // +240), +1732, +1740 = +236, +244. Returns the last FirstWheelOfModel (the
 // original's r3).
-uint32_t FromBuild(uint8_t* base, uint32_t car, uint32_t build);
+uint32_t FromBuild(uint32_t car, uint32_t build);
 
 // --- The race data's small pieces (src/race_setup/race_data.cpp) ---
 
@@ -130,26 +130,26 @@ uint32_t FromBuild(uint8_t* base, uint32_t car, uint32_t build);
 uint64_t RivalLocation(int32_t location, uint64_t value);
 // Race::AddStage (sub_82101828): unless `type` is 4, the race data's stage
 // list's stage at its count (+800) gets +0 = type, and the count up.
-void AddStage(uint8_t* base, uint32_t type);
+void AddStage(uint32_t type);
 // Stages::AddRacer (sub_820FFAB8): stage `stage` of the list (-1: the one at
 // its count +800): its slot at +76 gets +44 + 8 x slot = racer, +48 + 8 x
 // slot = word, and +76 up (each index loaded again after each store, as the
 // original).
-void StagesAddRacer(uint8_t* base, uint32_t list, uint32_t racer, uint32_t word, int32_t stage);
+void StagesAddRacer(uint32_t list, uint32_t racer, uint32_t word, int32_t stage);
 // sub_82101D20: a 972-byte entry's +792 = 0.0, +796 = 0 (the race data's
 // records' element constructor; c_runtime::VectorConstruct calls this).
-void RaceDataEntryConstruct(uint8_t* base, uint32_t entry);
+void RaceDataEntryConstruct(uint32_t entry);
 // RaceData::RaceData (sub_821021B8): the 77 records' four 972-byte entries
 // each (from +0x59AEC, 3,936 apart) constructed by the array helper
 // (c_runtime::VectorConstruct with sub_82101D20). Returns the race data.
-uint32_t RaceDataConstruct(uint8_t* base, uint32_t data);
+uint32_t RaceDataConstruct(uint32_t data);
 // sub_820FF558: a 76-byte record cleared (memset of 64 bytes, then +60, +64,
 // +72, +68 = 0). Returns the record (memset's r3).
-uint32_t LapRecordReset(uint8_t* base, uint32_t record);
+uint32_t LapRecordReset(uint32_t record);
 // RunningMean::Add (sub_82101698): {+0 a float mean, +4 a count}: the count
 // += weight; unless that's 0, mean = fdivs(fmadds(old count, mean,
 // fmuls(weight, value)), new count) (the counts converted to single).
-void RunningMeanAdd(uint8_t* base, uint32_t mean, double value, uint32_t weight);
+void RunningMeanAdd(uint32_t mean, double value, uint32_t weight);
 // RunningMean::Add's arithmetic on host values: the mean after adding
 // `value` with `weight` to {mean, count} (the counts' sum not 0).
 float MeanAfterAdd(float mean, uint32_t count, double value, uint32_t weight);
@@ -158,11 +158,11 @@ float MeanAfterAdd(float mean, uint32_t count, double value, uint32_t weight);
 // to (0.0, 1) (RunningMean::Add of 0.0 with weight 1 on (0.0, 0), on the
 // original's stack: here on host values); +800, +816 to +828 = 0.0; +804,
 // +812, +808, +968 = 0, halfword +964 = 0, +832 = 0.
-void EntryReset(uint8_t* base, uint32_t entry);
+void EntryReset(uint32_t entry);
 // CourseRecord::Reset (sub_82105C90): a 408-byte course record:
 // sub_820FF558(+332); halfwords +4i + 2 = i, +4i = i + 1 for i < 10; +40, +48
 // = 0, +36, +44, +46, +42 = -1. Returns sub_820FF558's (the record + 332).
-uint32_t CourseRecordReset(uint8_t* base, uint32_t record);
+uint32_t CourseRecordReset(uint32_t record);
 // Time::Pack (sub_82101700): milliseconds (r3, all 64 bits as the original
 // computes with them) packed: the sign in bit 31, minutes in bits 16-30,
 // seconds in 10-15, milliseconds in 0-9. Its stack word (the original's r11
@@ -171,34 +171,34 @@ uint64_t TimePack(uint64_t milliseconds);
 // sub_82110AC0: r3 = save data +48, mode: halfword +5796 + 14 x mode up
 // (below 9999); when +6008 isn't the mode, +6008 = mode and halfword +6012 =
 // 1, else +6012 up (below 9999).
-void CountRace(uint8_t* base, uint32_t stats, uint32_t mode);
+void CountRace(uint32_t stats, uint32_t mode);
 // RaceEvent::FirstOwned (sub_821430A0): the id (halfword +0, sign-extended)
 // of the first item of the event's list (+156, halfword +20 entries of 12
 // bytes) with +8 nonzero, byte +91 1 and a save data record (SaveData::Of(0)
 // + 0x199F8 + 12 x id: halfwords +0, +4, +2 summed, to 16 bits) of 0 or
 // below (the mapped row had it above 0: the original returns at `ble`);
 // else -1.
-int32_t EventFirstOwned(uint8_t* base, uint32_t event);
+int32_t EventFirstOwned(uint32_t event);
 // RaceEvent::CurrentFirstOwned (sub_821434C8): RaceEvent::FirstOwned of
 // [0x826C6078], or -1 when it's 0.
-int32_t EventCurrentFirstOwned(uint8_t* base);
+int32_t EventCurrentFirstOwned();
 // RaceEvent::Current (sub_821434E8): [0x826C6078].
-uint32_t EventCurrent(uint8_t* base);
+uint32_t EventCurrent();
 // RaceEvent::Count (sub_821434F8): its halfword +20 (zero-extended).
-uint32_t EventCount(uint8_t* base);
+uint32_t EventCount();
 
 // Stages::Reset (sub_82101860): a 1,224-byte stage list cleared (memset),
 // then ten 80-byte stages: +4 = 0, +0 = 4 (the type), +8 = 0, four slots
 // from +44 of (-1, 2), +76 = 0; +800, +804, +1220, +808 = 0;
 // CourseRecord::Reset(+812). Returns CourseRecord::Reset's r3.
-uint32_t StagesReset(uint8_t* base, uint32_t list);
+uint32_t StagesReset(uint32_t list);
 // Stages::Clear (sub_82101900): Stages::Reset keeping the list's +1220.
 // Returns Stages::Reset's r3.
-uint32_t StagesClear(uint8_t* base, uint32_t list);
+uint32_t StagesClear(uint32_t list);
 // RacerRecord::Init (sub_820FF808): Car::Init, then +3920 = [0x82000A34]
 // (0.0), +3912, +3916 = -1, halfwords +3904, +3906 = -1, +3924 = 0. Returns
 // Car::Init's r3.
-uint32_t RacerRecordInit(uint8_t* base, uint32_t record);
+uint32_t RacerRecordInit(uint32_t record);
 
 // --- The course routes (src/race_setup/course_routes.cpp) ---
 
@@ -217,7 +217,7 @@ constexpr uint32_t kRoutesIndexWord = 4508;
 // back from the frame). False, with the table written but nothing copied,
 // where memcpy's override would run the original: the adapter makes the copy
 // through memcpy.
-bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame,
+bool CourseRoutesGet(uint64_t out, uint32_t index, uint32_t frame,
                      uint32_t* source, uint64_t* result);
 
 
@@ -245,22 +245,22 @@ bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index, uint32_t to
 // (from the return address `caller`) of that to the caller's +`to` (96 for
 // most callers). Returns the copy's first word. Only after
 // RouteCopiesNative said yes.
-uint32_t CopyCourseRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index,
+uint32_t CopyCourseRoute(uint32_t frame, uint32_t out, uint32_t index,
                          uint32_t caller, uint32_t to = 96);
 // Route::Set (sub_82101A10): a 16-byte route: +0 = index, +4 = location
 // (index + 20 when location is 48, signed compare); the course route copied
 // (CourseRoutes::Get(index), memcpy); +8 = its word +0, +12 = its last
 // position (sub_820FFEB0 into frame + 80, copied by halfwords). The
 // original's r3 is frame + 80.
-bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, uint32_t frame);
+bool RouteSet(uint32_t route, uint32_t index, uint32_t location, uint32_t frame);
 // Route::Reset (sub_82101990): as Route::Set with index 0 and +4 = 20.
-bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame);
+bool RouteReset(uint32_t route, uint32_t frame);
 // Race::StartPosition (sub_82101A98, with the switch piece sub_82101ADC): a
 // location's start position: locations 14 to 46 the first word of a course
 // route (indexes 11, 13, 15, 17, 19, 21, then 0 to 22, each case's out at
 // its own place in the frame); others a fixed pair stored as halfwords at
 // frame + 80 and + 82 and loaded back as a word; outside 1 to 46, (135, 0).
-bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result);
+bool StartPosition(uint32_t location, uint32_t frame, uint32_t* result);
 // Whether Race::StartPosition at `frame` would be native.
 bool StartPositionNative(uint32_t location, uint32_t frame);
 
@@ -269,37 +269,37 @@ bool StartPositionNative(uint32_t location, uint32_t frame);
 
 // Racers::Reset (sub_820FF978): the racer records' +0x595E0 to +0x595EC = 0,
 // then RacerRecord::Init on all 93. Returns the last one's r3.
-uint32_t RacersReset(uint8_t* base, uint32_t records);
+uint32_t RacersReset(uint32_t records);
 // Whether Racers::Add's copy of `car` would be native (always, when the car
 // id isn't added).
-bool RacersAddNative(uint8_t* base, uint32_t records, uint32_t car);
+bool RacersAddNative(uint32_t records, uint32_t car);
 // Racers::Add (sub_820FF860): unless `car`'s id (+12, signed) is 0 to 71
 // (then -1), the record at the count: RacerRecord::Init, 3,904 bytes from
 // the car (memcpy's native copy), +3920 = float(value), +3924 = word, the
 // count up (the record's address worked out again from the count before
 // each step, as the original). Returns the count before (zero-extended).
 // Only after RacersAddNative said yes.
-int64_t RacersAdd(uint8_t* base, uint32_t records, uint32_t car, double value, uint32_t word);
+int64_t RacersAdd(uint32_t records, uint32_t car, double value, uint32_t word);
 // Race::AddRacer (sub_821017C0): with the racers' +0x595E4 (racers added
 // this way) 0 the record's flags +3888 |= 0x1, with 1 |= 0x80; a nonzero
 // `flag` |= 0x400; +0x595E4 up; then Racers::Add (a tail call). Returns its
 // r3. Only after AddRacerNative said yes.
-bool AddRacerNative(uint8_t* base, uint32_t record);
-int64_t AddRacer(uint8_t* base, uint32_t record, uint32_t flag, double value, uint32_t word);
+bool AddRacerNative(uint32_t record);
+int64_t AddRacer(uint32_t record, uint32_t flag, double value, uint32_t word);
 // sub_82101F68: one of the race data's 77 records (`frame` its frame, the
 // caller's r1 - 128): +3912 = 0, +3908 = 1, +0, +3924, +3920 = 0; its four
 // 972-byte entries at +4 reset (sub_82101EB0) with their +784 and +788 =
 // 12000; +3932 = 0; Route::Reset(+3892) (its frame below this one). False,
 // with nothing written, where Route::Reset's copies wouldn't be native.
 bool RecordResetNative(uint32_t frame);
-bool RecordReset(uint8_t* base, uint32_t record, uint32_t frame);
+bool RecordReset(uint32_t record, uint32_t frame);
 
 // Race::SetRoute (sub_82101D38): Route::Set(the race data + 4, index,
 // location), a tail call (`frame` is Route::Set's: the caller's r1 - 496).
-bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t frame);
+bool RaceSetRoute(uint32_t index, uint32_t location, uint32_t frame);
 // Stages::SetRoute (sub_82101E90): Route::Set(stage `stage` (-1: the list's
 // +804) + 24, index, location), a tail call.
-bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
+bool StagesSetRoute(uint32_t list, uint32_t index, uint32_t location,
                     uint32_t stage, uint32_t frame);
 
 
@@ -313,15 +313,15 @@ bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t locat
 // +0xA3AE4 to +0xA3AEC = 0, +0xA3AF0 = 7, +0xA3AF4 = 2. False, with nothing
 // written, where a route's copies wouldn't be native (RaceDataResetNative).
 bool RaceDataResetNative(uint32_t frame);
-bool RaceDataReset(uint8_t* base, uint32_t frame);
+bool RaceDataReset(uint32_t frame);
 // RaceData::ResetGlobal (sub_821021A8): RaceData::Reset, a tail call (the
 // same frame).
-bool RaceDataResetGlobal(uint8_t* base, uint32_t frame);
+bool RaceDataResetGlobal(uint32_t frame);
 // sub_82101FD0: the race data's 77 records (`frame` its frame): cleared
 // (memset, 0x49FE8 bytes), +0x49FE0 and +0x49FE4 = 0, then sub_82101F68 on
 // each (3,936 bytes apart; their frames below). Only after
 // RaceDataResetNative said yes.
-void RecordsReset(uint8_t* base, uint32_t records, uint32_t frame);
+void RecordsReset(uint32_t records, uint32_t frame);
 
 // Car::Refresh as the original, where its plain C++ refuses (a guest call
 // the adapter makes, with the car in r3).
@@ -336,8 +336,8 @@ using GuestRefresh = void (*)(void* user, uint32_t car);
 // = the position and +3908 = 0.0 for types 2 and 3 (signed), else
 // [0x8200692C]; with flag 0x2 only +3908. Returns 1. Only after
 // SetStartNative said yes.
-bool SetStartNative(uint8_t* base, uint32_t records, uint32_t location, uint32_t frame);
-uint32_t SetStart(uint8_t* base, uint32_t records, uint32_t location, uint32_t type,
+bool SetStartNative(uint32_t records, uint32_t location, uint32_t frame);
+uint32_t SetStart(uint32_t records, uint32_t location, uint32_t type,
                   uint32_t frame, GuestRefresh refresh, void* user);
 // Race::PlaceRacers (sub_82102048; `frame` its 128-byte frame):
 // Racers::SetStart(the race data + 48, its +8, the current stage's type)
@@ -345,8 +345,8 @@ uint32_t SetStart(uint8_t* base, uint32_t records, uint32_t location, uint32_t t
 // +0xA3AF4 is 0 or 4 (the save data's course record copied first,
 // sub_82105BF8: never seen in play, the original runs) or Racers::SetStart
 // wouldn't be native. Returns Racers::SetStart's 1.
-bool PlaceRacersNative(uint8_t* base, uint32_t frame);
-uint32_t PlaceRacers(uint8_t* base, uint32_t frame, GuestRefresh refresh, void* user);
+bool PlaceRacersNative(uint32_t frame);
+uint32_t PlaceRacers(uint32_t frame, GuestRefresh refresh, void* user);
 
 
 // Race::SetUpRival (sub_82112DB0, with its switch piece sub_82112E2C;
@@ -373,9 +373,9 @@ uint32_t PlaceRacers(uint8_t* base, uint32_t frame, GuestRefresh refresh, void* 
 // plain C++ refuses. False from SetUpRivalNative for kind 1
 // (sub_820FFA88, never seen in play: the original runs) or where a copy
 // wouldn't be native.
-bool SetUpRivalNative(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+bool SetUpRivalNative(uint64_t location, uint32_t rival, uint32_t add,
                       uint32_t frame);
-uint32_t SetUpRival(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+uint32_t SetUpRival(uint64_t location, uint32_t rival, uint32_t add,
                     uint32_t frame, GuestRefresh refresh, void* user);
 
 
@@ -411,8 +411,8 @@ using GuestCall = uint64_t (*)(void* user, uint32_t function, const uint64_t arg
 // C++ would hand back to its original, that original is called through
 // `call` (from `frame`). Only after SetUpNative said yes (memcpy's native
 // copies for the garage car and the racer records).
-bool SetUpNative(uint8_t* base, uint32_t save, uint32_t frame);
-uint32_t SetUp(uint8_t* base, uint32_t save, uint64_t rival, uint32_t frame, GuestCall call,
+bool SetUpNative(uint32_t save, uint32_t frame);
+uint32_t SetUp(uint32_t save, uint64_t rival, uint32_t frame, GuestCall call,
                void* user);
 
 }  // namespace race_setup

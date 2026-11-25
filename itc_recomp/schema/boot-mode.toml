@@ -15,10 +15,15 @@
 # boot mode and the race mode extend it). The measure joins the next-mode
 # answer (slot 6's r3, ModeAnswer) with it: Mode::NoNextMode's and
 # BootMode::NextMode's answer stores land on +0 and +4 (answer_* below).
+# Dual (E5 step 4): the 852-byte modes live in host memory, the boot, race
+# and type 8 modes in guest memory, and the joined answer is on the stack;
+# the dispatcher (+36, ModeDispatcher) and the delegate (+8, ModeDelegate)
+# are dual for the same reason.
 [GameMode]
 measures = ["Mode", "BootMode", "Mode::NextModeThunk.r4"]
 size = 848
 origin = "embedded"
+storage = "dual"
 vtable = 0x820069EC
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820069EC the base's, 0x82006B70 the boot mode's, 0x82006B44 ModeType3's" },
@@ -79,6 +84,7 @@ measure = "Boot::WaitForMovie.r4"
 measures = ["TitleLoad::OpenTitle.r4", "TitleLoad::Leave.r4", "TitleLoad::Update.r4", "TitleScreen::OpenNext.r4", "TitleScreen::Leave.r4", "TodaysResult::Leave.r4", "TodaysEvent::Leave.r4", "TodaysEvent::Unloaded.r4", "ReplayTheater::Wait.r4", "ReplayTheater::Leave.r4", "Type5Dialog::Update.r4", "Type6ListScreen::Back.r4", "Type7ListScreen::Back.r4", "Type6NodeScreen::Back.r4", "Type6PanelScreen::Back.r4", "Type7PanelScreen::Back.r4", "Type6PanelScreen::OpenPowerGraph.r4", "Type7PanelScreen::OpenPowerGraph.r4", "Type6PanelScreen::PickCar.r4", "Type7PanelScreen::PickCar.r4", "sub_82230BA8.r4", "sub_82240518.r4", "ControllerOptions::Leave.r4", "Dialog::Leave.r4", "Type6Dialog::Cancel.r4", "Type6Dialog::ConfirmPage.r4", "Type6Dialog::NoticePage.r4", "Type6Dialog::Update.r4", "Type7Dialog::Cancel.r4", "Type7Dialog::ConfirmPage.r4", "Type7Dialog::Leave.r4", "Type7Dialog::NoticePage.r4", "Type7Dialog::Update.r4", "Type6Screen0::ChosenPage.r4", "Type6Screen0::Confirm.r4", "Type6Screen0::ConfirmAgain.r4", "Type6Screen0::Leave.r4", "Type6Screen0::MenuPage.r4", "Type6Screen0::SetUpCar.r4", "Type7Screen0::ChosenPage.r4", "Type7Screen0::Confirm.r4", "Type7Screen0::Leave.r4", "Type7Screen0::MenuPage.r4", "Type7Screen0::SetUpCar.r4", "Type8PanelScreen::UpdateOpening.r4", "Type8PanelScreen::Leave.r4", "Type8PanelScreen::AskQuit.r4", "Type8ListScreen::SetUpRace.r4", "Type8ColorListScreen::SetUpRace.r4", "sub_8226A660.r4", "sub_82263D80.r4", "sub_822657D8.r4", "sub_82266028.r4", "sub_822662F0.r4", "sub_822663E0.r4", "sub_82266548.r4", "sub_82266658.r4", "sub_82266750.r4", "sub_822681D0.r4", "sub_82269988.r4", "sub_822702C0.r4", "sub_82277178.r4", "sub_82277340.r4", "sub_822858D8.r4", "sub_82282BC8.r6"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "handlers", offset = 0, type = "bytes", count = 200, note = "50 handler pointers (state machines)" },
   { name = "handler_count", offset = 200, type = "u32" },
@@ -121,6 +127,7 @@ fields = [
 measure = "ModeDelegate::Invoke.r4"
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010FA0" },
   { name = "object", offset = 4, type = "u32", note = "the mode" },

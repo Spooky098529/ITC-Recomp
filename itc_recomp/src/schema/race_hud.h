@@ -13,8 +13,8 @@ struct RaceHudRunMovieTail : View {
   using View::View;
   static constexpr uint32_t kSize = 636;
   // really RaceHud's +632: the UI movie run in states 2 and 4 (RaceHud::RunMovie)
-  uint32_t state2_movie() const { return guest::LoadU32(base, address + 632); }
-  void set_state2_movie(uint32_t v) const { guest::StoreU32(base, address + 632, v); }
+  uint32_t state2_movie() const { return guest::LoadU32(address + 632); }
+  void set_state2_movie(uint32_t v) const { guest::StoreU32(address + 632, v); }
   uint32_t state2_movie_address() const { return address + 632; }
 };
 

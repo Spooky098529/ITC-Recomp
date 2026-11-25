@@ -20,11 +20,11 @@ using schema::TgaHeader;
 using schema::TgaImage;
 using schema::TgaReader;
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
 }
 
 void Require(bool done, const char* what) {
@@ -45,9 +45,9 @@ void VirtualFree(uint32_t address) {
 
 }  // namespace
 
-void TgaHeaderClear(uint8_t* base, uint32_t header) {
+void TgaHeaderClear(uint32_t header) {
   ITC_NATIVE_RUNNING("sub_820EEBC0 TgaHeader::Clear");
-  const TgaHeader h(base, header);
+  const TgaHeader h(header);
   h.set_id_length(0);
   h.set_color_map_type(0);
   h.set_image_type(0);
@@ -62,9 +62,9 @@ void TgaHeaderClear(uint8_t* base, uint32_t header) {
   h.set_descriptor(0);
 }
 
-void TgaImageClear(uint8_t* base, uint32_t image) {
+void TgaImageClear(uint32_t image) {
   ITC_NATIVE_RUNNING("sub_820EED38 TgaImage::Clear");
-  const TgaImage i(base, image);
+  const TgaImage i(image);
   i.set_file(0);
   i.set_header(0u);
   i.set_pixels(0);
@@ -73,42 +73,42 @@ void TgaImageClear(uint8_t* base, uint32_t image) {
   i.set_height(0);
 }
 
-void TgaImageFree(uint8_t* base, uint32_t image) {
+void TgaImageFree(uint32_t image) {
   ITC_NATIVE_RUNNING("sub_820EED58 TgaImage::Free");
-  const TgaImage i(base, image);
+  const TgaImage i(image);
   if (const uint32_t pixels = i.pixels(); pixels != 0) {
     VirtualFree(pixels);
     i.set_pixels(0);
   }
 }
 
-void TgaReaderInit(uint8_t* base, uint32_t reader) {
+void TgaReaderInit(uint32_t reader) {
   ITC_NATIVE_RUNNING("sub_820EEB58 TgaReader::TgaReader");
-  const TgaReader r(base, reader);
-  Require(std_string::Tidy(base, r.text_address(), false, 0), "the reader's _Tidy");
-  TgaHeaderClear(base, r.header_address());
-  TgaImageClear(base, r.image_address());
-  Require(std_string::AssignText(base, r.text_address(), kTgaReaderText, 0),
+  const TgaReader r(reader);
+  Require(std_string::Tidy(r.text_address(), false, 0), "the reader's _Tidy");
+  TgaHeaderClear(r.header_address());
+  TgaImageClear(r.image_address());
+  Require(std_string::AssignText(r.text_address(), kTgaReaderText, 0),
           "the reader's assign");
   r.set_file(0);
 }
 
-void TgaReaderFree(uint8_t* base, uint32_t reader) {
+void TgaReaderFree(uint32_t reader) {
   ITC_NATIVE_RUNNING("sub_820EEAE8 TgaReader::~TgaReader");
-  const TgaReader r(base, reader);
+  const TgaReader r(reader);
   if (const uint32_t buffer = r.file<schema::View>().address; buffer != 0) {
     VirtualFree(buffer);
     r.set_file(0);
   }
-  TgaImageFree(base, r.image_address());
+  TgaImageFree(r.image_address());
   // The header's destructor (sub_82106540) does nothing.
-  Require(std_string::Tidy(base, r.text_address(), true, 0), "the reader's _Tidy");
+  Require(std_string::Tidy(r.text_address(), true, 0), "the reader's _Tidy");
 }
 
-uint32_t TgaParseHeader(uint8_t* base, uint32_t header, uint32_t buffer) {
+uint32_t TgaParseHeader(uint32_t header, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_820EEBF8 TGA::ParseHeader");
-  const schema::TgaFile file(base, buffer);
-  const TgaHeader h(base, header);
+  const schema::TgaFile file(buffer);
+  const TgaHeader h(header);
   h.set_id_length(file.id_length());
   h.set_color_map_type(file.color_map_type());
   h.set_image_type(file.image_type());
@@ -126,10 +126,10 @@ uint32_t TgaParseHeader(uint8_t* base, uint32_t header, uint32_t buffer) {
   return 0;
 }
 
-uint32_t TgaDecode(uint8_t* base, uint32_t image, uint32_t buffer, uint32_t header) {
+uint32_t TgaDecode(uint32_t image, uint32_t buffer, uint32_t header) {
   ITC_NATIVE_RUNNING("sub_820EF168 TGA::Decode");
-  const TgaImage i(base, image);
-  const TgaHeader h(base, header);
+  const TgaImage i(image);
+  const TgaHeader h(header);
   i.set_header(header);
   i.set_file(buffer);
   const uint32_t height = h.height();
@@ -142,26 +142,26 @@ uint32_t TgaDecode(uint8_t* base, uint32_t image, uint32_t buffer, uint32_t head
   i.set_size(size);
   i.set_pixels(VirtualAlloc(size));
   Require(i.header().image_type() == 2, "TGA::Decode's type");
-  Require(c_runtime::Memcpy(base, i.pixels(), buffer + 18, i.size()), "TGA::Decode's memcpy");
+  Require(c_runtime::Memcpy(i.pixels(), buffer + 18, i.size()), "TGA::Decode's memcpy");
   return 0;
 }
 
-uint32_t TgaReaderLoad(uint8_t* base, uint32_t reader, uint32_t size, uint32_t buffer) {
+uint32_t TgaReaderLoad(uint32_t reader, uint32_t size, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_820EEA78 TgaReader::Load");
-  const TgaReader r(base, reader);
+  const TgaReader r(reader);
   if (r.file<schema::View>().address != 0) {
     return 5;
   }
   r.set_file_size(size);
   r.set_file(buffer);
-  TgaParseHeader(base, r.header_address(), buffer);
-  return TgaDecode(base, r.image_address(), r.file<schema::View>().address, r.header_address());
+  TgaParseHeader(r.header_address(), buffer);
+  return TgaDecode(r.image_address(), r.file<schema::View>().address, r.header_address());
 }
 
-void TgaToArgb(uint8_t* base, uint32_t image, uint32_t pixels_out) {
+void TgaToArgb(uint32_t image, uint32_t pixels_out) {
   ITC_NATIVE_RUNNING("sub_820EEF08 TGA::ToARGB");
-  const TgaImage i(base, image);
-  const schema::CarModelsAddressWord out(base, pixels_out);
+  const TgaImage i(image);
+  const schema::CarModelsAddressWord out(pixels_out);
   const bool rgb = i.header().bits_per_pixel() == 24;
   const uint32_t size = rgb ? (i.width() * i.height()) << 2 : i.size();
   out.set_value(VirtualAlloc(size));
@@ -176,38 +176,38 @@ void TgaToArgb(uint8_t* base, uint32_t image, uint32_t pixels_out) {
       uint32_t argb;
       if (rgb) {
         const uint32_t p = from + source_row * 3 + 3 * x;
-        argb = 0xFF000000u | uint32_t(guest::LoadU8(base, p + 2)) << 16 |
-               uint32_t(guest::LoadU8(base, p + 1)) << 8 | guest::LoadU8(base, p);
+        argb = 0xFF000000u | uint32_t(guest::LoadU8(p + 2)) << 16 |
+               uint32_t(guest::LoadU8(p + 1)) << 8 | guest::LoadU8(p);
       } else {
-        argb = __builtin_bswap32(Load(base, from + (source_row << 2) + 4 * x));
+        argb = __builtin_bswap32(Load(from + (source_row << 2) + 4 * x));
       }
-      Store(base, row + 4 * x, argb);
+      Store(row + 4 * x, argb);
     }
   }
 }
 
-bool TgaDecodable(uint8_t* base, uint32_t buffer) {
-  const schema::TgaFile file(base, buffer);
+bool TgaDecodable(uint32_t buffer) {
+  const schema::TgaFile file(buffer);
   const uint8_t bits = file.bits_per_pixel();
   return file.image_type() == 2 && (bits == 24 || bits == 32);
 }
 
-std::optional<uint32_t> TgaCreateImage(uint8_t* base, uint32_t header_out, uint32_t size,
+std::optional<uint32_t> TgaCreateImage(uint32_t header_out, uint32_t size,
                                        uint32_t buffer_at, uint32_t pixels_out,
                                        uint32_t stack) {
-  const schema::CarModelsAddressWord file(base, buffer_at);
-  if (!TgaDecodable(base, file.value())) {
+  const schema::CarModelsAddressWord file(buffer_at);
+  if (!TgaDecodable(file.value())) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820ED020 TGA::CreateImage");
-  const TgaReader r(base, stack - kTgaCreateImageFrameBytes + kTgaReaderInFrame);
-  TgaReaderInit(base, r.address);
-  TgaReaderLoad(base, r.address, size, file.value());
-  TgaToArgb(base, r.image_address(), pixels_out);
-  Require(c_runtime::Memcpy(base, header_out, r.header_address(), 20),
+  const TgaReader r(stack - kTgaCreateImageFrameBytes + kTgaReaderInFrame);
+  TgaReaderInit(r.address);
+  TgaReaderLoad(r.address, size, file.value());
+  TgaToArgb(r.image_address(), pixels_out);
+  Require(c_runtime::Memcpy(header_out, r.header_address(), 20),
           "TGA::CreateImage's memcpy");
   r.set_file(0);
-  TgaReaderFree(base, r.address);
+  TgaReaderFree(r.address);
   return 1;
 }
 

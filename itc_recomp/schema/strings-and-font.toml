@@ -15,6 +15,11 @@
 measure = "Font"
 size = 16592
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by Font::Init's plain C++
+# (app_start_up::TextInit, Font::New); freed by the game's VirtualFree
+# (sub_82109A40, never in play) through its handle. Not read by the renderer
+# (its vertices go into the command list; the page's texture is the XPR's).
+storage = "host"
 # 19 functions; areas: data-load.md, strings-and-font.md
 fields = [
   { name = "video_output", offset = 0, type = "ptr", note = "the device's state object (Font::Font's video output)" },
@@ -85,6 +90,10 @@ fields = [
 measures = ["Font.+36", "new<28>@Font::Load", "Font::OnPageLoaded.r6"]
 size = 28
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by Font::Load's plain C++ (FontPage::New
+# for its operator new); set by Font::OnPageLoaded (lifted: raw stores by
+# its handle); freed by operator delete (sub_82109400, never in play).
+storage = "host"
 fields = [
   { name = "glyph_table", offset = 0, type = "ptr", to = "FontGlyphTable", note = "the page file's entry 0" },
   { name = "records", offset = 4, type = "ptr", to = "FontGlyphRecord", note = "the glyph table's +4: 4 bytes per UTF-16 code" },
@@ -154,6 +163,10 @@ fields = [
 measure = "Strings"
 size = 4304
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by Strings::Init's plain C++
+# (Strings::New for its VirtualAlloc); never freed. Its loaded flags' addresses
+# go to Archive::Load as the callback's context (StringsLoadedFlag).
+storage = "host"
 # 4 functions; areas: files-and-saves.md, strings-and-font.md
 fields = [
   { name = "files", offset = 0, type = "bytes", count = 68, note = "the 17 string files (+4i; assets 22638-22654, the ids at 0x82007DD0)" },
@@ -167,9 +180,23 @@ fields = [
 measure = "Strings::OnLoaded.r6"
 size = 4
 origin = "file"
+# Host (E5 step 5): a view inside the host string table (reached through the
+# owner's layout).
+storage = "host"
 fields = [
   { name = "loaded", offset = 0, type = "u32" },
 ]
+
+# A string file (asset 22638 + i, a DataFile container of UTF-16 strings;
+# Strings::Get hands out addresses inside it).
+[StringFile]
+size = 0
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# Strings::Load's plain C++ (StringFile::New for its VirtualAlloc), in PC
+# memory with the file's bytes; freed by Strings::Release's VirtualFree.
+storage = "blob"
+fields = []
 
 [globals]
 font = { address = 0x826C5C00, type = "ptr", to = "Font" }

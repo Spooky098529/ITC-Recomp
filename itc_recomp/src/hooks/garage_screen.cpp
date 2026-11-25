@@ -61,7 +61,7 @@ namespace gs = garage_screen;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -72,7 +72,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -87,232 +86,231 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
 ITC_REGS_STEP(GarageScreenSetCarRow) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetCarRow(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetCarRow(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenFillRows) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::FillRows(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::FillRows(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenSetPrompts) {
   const uint32_t args[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
-  ctx.r3.u64 = gs::SetPrompts(base, args, ctx.r1.u32);
+  ctx.r3.u64 = gs::SetPrompts(args, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenSetHelpLine) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetHelpLine(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetHelpLine(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenSetUpLists) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetUpLists(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetUpLists(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenTransition0) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Transition0(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenTransition1) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Transition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Transition1(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenTransition3) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Transition3(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(GarageScreenCarListPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::CarListPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::CarListPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenLeavePage) {
-  gs::LeavePage(base, ctx.r3.u32);
+  gs::LeavePage(ctx.r3.u32);
 }
 ITC_REGS_STEP(GarageScreenUpdatePage) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      gs::UpdatePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32, guest.calls());
+      gs::UpdatePage(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Update(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Update(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Create(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // A tail call: Open runs from the adapter's frame with its lr.
 ITC_REGS_STEP(GarageScreenOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = gs::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(GarageScreenWaitForLoad) {
-  ctx.r3.u64 = gs::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = gs::WaitForLoad(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenReadSave) {
-  ctx.r3.u64 = gs::ReadSave(base, ctx.r1.u32);
+  ctx.r3.u64 = gs::ReadSave(ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenSetHeader) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetHeader(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetHeader(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Start(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Start(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Unload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Close(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::Destroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::Destroy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenSetScrollArrows) {
-  ctx.r3.u64 = gs::SetScrollArrows(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = gs::SetScrollArrows(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenSetActionMarker) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = gs::SetActionMarker(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = gs::SetActionMarker(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenSetOptionMarker) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = gs::SetOptionMarker(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = gs::SetOptionMarker(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenShowSpecTexts) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ShowSpecTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ShowSpecTexts(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenShowCarNames) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ShowCarNames(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ShowCarNames(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenSetPlateQuestion) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetPlateQuestion(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetPlateQuestion(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenCopyGarageCar) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::CopyGarageCar(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::CopyGarageCar(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
                                  guest.calls());
 }
 ITC_REGS_STEP(GarageScreenShowBusy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ShowBusy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ShowBusy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenHideBusy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::HideBusy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::HideBusy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenHideBusyNow) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::HideBusyNow(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::HideBusyNow(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenResetStand) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ResetStand(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ResetStand(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenSetUpView) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::SetUpView(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::SetUpView(ctx.r1.u32, guest.calls());
 }
 // The toggles' commands are tail calls: from the adapter's frame and lr.
 ITC_REGS_STEP(GarageScreenToggleTurn) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ToggleTurn(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ToggleTurn(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(GarageScreenToggleDoors) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ToggleDoors(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ToggleDoors(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(GarageScreenToggleDoors2) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::ToggleDoors2(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::ToggleDoors2(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(GarageScreenTurnLeft) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::TurnLeft(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::TurnLeft(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(GarageScreenTurnRight) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = gs::TurnRight(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = gs::TurnRight(ctx.r1.u32, guest.calls());
 }
 // CarValue: f1 (r3 left the car).
 ITC_REGS_STEP(GarageScreenCarValue) {
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = gs::CarValue(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.f1.f64 = gs::CarValue(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenSalePrice) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = gs::SalePrice(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = gs::SalePrice(ctx.r3.u32, ctx.r1.u32);
 }
 #define ITC_GARAGE_STEP(name, call)                    \
-  void GarageScreen##name(lifted::Regs& ctx, uint8_t* base) { \
+  void GarageScreen##name(lifted::Regs& ctx) { \
     ctx.fpscr.disableFlushMode();                     \
-    GuestCalls guest(ctx, base);                      \
+    GuestCalls guest(ctx);                      \
     ctx.r3.u64 = gs::call;                            \
     ctx.fpscr.disableFlushMode();                     \
   }
-ITC_GARAGE_STEP(ReloadStandCar, ReloadStandCar(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(PutCarOnStand, PutCarOnStand(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(ShowCarSpecs, ShowCarSpecs(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetUseQuestion, SetUseQuestion(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetSaleQuestion, SetSaleQuestion(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetUpPlateEditor, SetUpPlateEditor(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetUpSpecSheet, SetUpSpecSheet(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(CameraA, CameraA(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(CameraB, CameraB(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition2, Transition2(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition4, Transition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition5, Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition6, Transition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition7, Transition7(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition8, Transition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition9, Transition9(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition10, Transition10(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition12, Transition12(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition13, Transition13(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition14, Transition14(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition16, Transition16(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(Transition17, Transition17(base, ctx.r3.u32, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetUpActions, SetUpActions(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(SetUpOptions, SetUpOptions(base, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(ActionsPage, ActionsPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(ViewPage, ViewPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(ViewOptionsPage, ViewOptionsPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls()))
-ITC_GARAGE_STEP(OnPlateDone, OnPlateDone(base, ctx.r4.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ReloadStandCar, ReloadStandCar(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(PutCarOnStand, PutCarOnStand(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ShowCarSpecs, ShowCarSpecs(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetUseQuestion, SetUseQuestion(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetSaleQuestion, SetSaleQuestion(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetUpPlateEditor, SetUpPlateEditor(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetUpSpecSheet, SetUpSpecSheet(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(CameraA, CameraA(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(CameraB, CameraB(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition2, Transition2(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition4, Transition4(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition5, Transition5(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition6, Transition6(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition7, Transition7(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition8, Transition8(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition9, Transition9(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition10, Transition10(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition12, Transition12(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition13, Transition13(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition14, Transition14(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition16, Transition16(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(Transition17, Transition17(ctx.r3.u32, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetUpActions, SetUpActions(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(SetUpOptions, SetUpOptions(ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ActionsPage, ActionsPage(ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ViewPage, ViewPage(ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(ViewOptionsPage, ViewOptionsPage(ctx.r3.u64, ctx.r1.u32, guest.calls()))
+ITC_GARAGE_STEP(OnPlateDone, OnPlateDone(ctx.r4.u32, ctx.r1.u32, guest.calls()))
 #undef ITC_GARAGE_STEP
 // The handlers without guest calls (SetPrompts' a tail call from the
 // adapter's frame).
 ITC_REGS_STEP(GarageScreenOnSpecSheetClosed) {
-  ctx.r3.u64 = gs::OnSpecSheetClosed(base, ctx.r1.u32);
+  ctx.r3.u64 = gs::OnSpecSheetClosed(ctx.r1.u32);
 }
 ITC_REGS_STEP(GarageScreenOnPlateCancelled) {
-  gs::OnPlateCancelled(base, ctx.r4.u32);
+  gs::OnPlateCancelled(ctx.r4.u32);
 }
 ITC_REGS_STEP(GarageScreenOnPlateEditorLeft) {
-  ctx.r3.u64 = gs::OnPlateEditorLeft(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = gs::OnPlateEditorLeft(ctx.r3.u64, ctx.r1.u32);
 }
-ITC_REGS_STEP(GarageScreenOnNo) { gs::OnNo(base, ctx.r4.u32); }
+ITC_REGS_STEP(GarageScreenOnNo) { gs::OnNo(ctx.r4.u32); }
 ITC_REGS_STEP(GarageScreenOnDialogDone) {
-  ctx.r3.u64 = gs::OnDialogDone(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = gs::OnDialogDone(ctx.r3.u64, ctx.r1.u32);
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
@@ -320,7 +318,7 @@ ITC_REGS_STEP(GarageScreenInitStates) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = gs::InitStates(base, machine, ctx.r1.u32 - gs::kInitFrame, &replaced);
+  const uint32_t r3 = gs::InitStates(machine, ctx.r1.u32 - gs::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -328,7 +326,7 @@ ITC_REGS_STEP(GarageScreenInitStates) {
 
 #define ITC_GARAGE_SCREEN(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_garage_screen)) { \
-    hooks::step(ctx, base);                 \
+    hooks::step(ctx);                 \
   }
 
 // No adapters (removed, B7 loop, 2026-11-09: their callers are native and

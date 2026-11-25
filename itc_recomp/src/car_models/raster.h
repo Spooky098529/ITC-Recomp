@@ -2,8 +2,9 @@
 // Vinyl::DrawDecal and the triangles, spans, pixels and texels under it),
 // step for step as the translated code: its float steps
 // (texture_compression/steps.h, the operands in its order), its integer
-// blends, and its stack frames' words (each function's locals written where
-// the original writes them, its saved registers not). Built with
+// blends, and DrawDecal's stack frame words (its locals written where the
+// original writes them, its saved registers not; the frames below it, which
+// only this code read, are values since E5 step 6). Built with
 // -ffp-model=strict and -ffp-contract=off (CMakeLists.txt); flush-to-zero
 // off is the adapter's job. Adapter: src/hooks/car_models.cpp.
 //
@@ -22,7 +23,8 @@
 
 namespace car_models {
 
-// The frames (bytes).
+// The frames (bytes; only DrawDecal's is made since E5 step 6, the others
+// are the originals' sizes).
 constexpr uint32_t kDrawDecalFrameBytes = 400;
 constexpr uint32_t kDrawTriangleFrameBytes = 496;
 constexpr uint32_t kDrawSpanFrameBytes = 272;
@@ -33,37 +35,42 @@ constexpr uint32_t kBlendPixelFrameBytes = 112;
 
 // sub_820ED2A0: the decal's texel at (u, v), bilinear: the four pixels
 // around it (clamped to the image), weighted by the fractions times the
-// scale (as integers out of 256) with the packed blend of BlendPixel. Its
-// conversions' words written at `scratch` (its caller's r1 - 80: the words
-// at -80 to -65). Returns the ARGB word.
-uint32_t SampleTexel(uint8_t* base, uint32_t image, double u, double v, uint32_t scratch);
+// scale (as integers out of 256) with the packed blend of BlendPixel.
+// Returns the ARGB word. (The original wrote its conversions' words at its
+// caller's r1 - 80, read by nothing: no longer stored since E5 step 6.)
+uint32_t SampleTexel(uint32_t image, double u, double v);
 
 // sub_820ED498 SoftRaster::BlendPixel: the canvas pixel at (x, y) blended
-// with the texel at the floats at `uv` by its alpha (skipped for 0). `stack`
-// is the guest r1 at entry.
-void BlendPixel(uint8_t* base, uint32_t image, uint32_t canvas, uint32_t region, int32_t x,
-                int32_t y, uint32_t uv, uint32_t stack);
+// with the texel at (u, v) by its alpha (skipped for 0). The original read
+// u and v as floats from its caller's frame (a value since E5 step 6).
+void BlendPixel(uint32_t image, uint32_t canvas, uint32_t region, int32_t x,
+                int32_t y, double u, double v);
+
+// A span's end's texel (single-rounded values), which the original handed
+// over as a vertex in its caller's frame.
+struct SpanEnd {
+  double u = 0.0, v = 0.0;
+};
 
 // sub_820EDE00 SoftRaster::DrawSpan: row `y` from xa to xb (either order;
-// the right end left out), its texels from the vertices at `a` and `b`
-// (each end's), less 0.5 when the flags word at `stack` + 84 has its top bit;
-// clipped to the region, each pixel blended. `stack` is the guest r1 at
-// entry.
-void DrawSpan(uint8_t* base, uint32_t canvas, uint32_t region, int32_t xa, int32_t xb,
-              int32_t y, uint32_t a, uint32_t b, uint32_t image, uint32_t stack);
+// the right end left out), its texels from `a` and `b` (each end's), less
+// 0.5 when `flags` (the original's word at its caller's frame + 84) has its
+// top bit; clipped to the region, each pixel blended.
+void DrawSpan(uint32_t canvas, uint32_t region, int32_t xa, int32_t xb,
+              int32_t y, const SpanEnd& a, const SpanEnd& b, uint32_t flags, uint32_t image);
 
 // sub_820EE0C8 SoftRaster::DrawTriangle: the three vertices at `positions`
 // (16 bytes apart) with their texels at `texels`, sorted by y and filled row
 // by row from the rows' centers (spans of the top half, then the bottom),
 // `flags` (its low 29 bits, with the top bit set) handed to each span.
-// `stack` is the guest r1 at entry.
-void DrawTriangle(uint8_t* base, uint32_t canvas, uint32_t region, uint32_t positions,
+// `stack`, the guest r1 at entry, is unused since E5 step 6 (no frame).
+void DrawTriangle(uint32_t canvas, uint32_t region, uint32_t positions,
                   uint32_t texels, uint32_t image, uint32_t flags, uint32_t stack);
 
 // sub_820ED1E8: a decal's corner: (p - c) scaled by `scale`, rotated by
 // `angle` (sin and cos: c_runtime), plus c, plus the offset `t`, into `out`
 // (which may be `p`).
-void DecalCorner(uint8_t* base, uint32_t out, uint32_t p, uint32_t c, uint32_t scale,
+void DecalCorner(uint32_t out, uint32_t p, uint32_t c, uint32_t scale,
                  uint32_t t, double angle);
 
 // sub_820EE638 Vinyl::DrawDecal's registers: r3 the region, r4 mirrored, r5
@@ -92,7 +99,7 @@ bool DecalRegionPorted(uint32_t region);
 // triangles. `stack` is the guest r1 at entry. Returns the original's r3
 // (`stack` + 32); nullopt, with nothing done, for a region not
 // DecalRegionPorted.
-std::optional<uint32_t> DrawDecal(uint8_t* base, const DecalArguments& arguments,
+std::optional<uint32_t> DrawDecal(const DecalArguments& arguments,
                                   uint32_t stack);
 
 }  // namespace car_models

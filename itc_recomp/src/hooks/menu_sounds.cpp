@@ -28,7 +28,7 @@ namespace {
 // put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -39,7 +39,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
@@ -47,13 +46,12 @@ class GuestCalls {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
@@ -61,26 +59,26 @@ class GuestCalls {
 
 ITC_REGS_STEP(MenuSoundPlay) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = menu_sounds::PlayMenuSound(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = menu_sounds::PlayMenuSound(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(SoundPlay) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = menu_sounds::PlaySound(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = menu_sounds::PlaySound(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(SoundOptionsSetEffectsVolume) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = menu_sounds::SetEffectsVolume(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = menu_sounds::SetEffectsVolume(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(SoundOptionsSetMusicVolume) {
   ctx.fpscr.disableFlushMode();
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = menu_sounds::SetMusicVolume(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = menu_sounds::SetMusicVolume(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
@@ -88,7 +86,7 @@ ITC_REGS_STEP(SoundOptionsSetMusicVolume) {
 // Defines an adapter: the flag, else the original.
 #define ITC_MENU_SOUNDS(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_menu_sounds)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 ITC_MENU_SOUNDS(821103F0, MenuSoundPlay)

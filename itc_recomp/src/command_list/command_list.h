@@ -26,8 +26,8 @@ constexpr uint32_t kOpenChunks = schema::CommandListGlobals::open_chunks_address
 // write pointer; the first, or 0 with nothing changed when the list would be
 // full (used + count not below the capacity, 32-bit), where the original
 // prints a message (sub_825A1318) and returns 0.
-inline uint32_t AllocateSlots(uint8_t* base, uint32_t list, uint32_t count) {
-  const schema::CommandList l(base, list);
+inline uint32_t AllocateSlots(uint32_t list, uint32_t count) {
+  const schema::CommandList l(list);
   const uint32_t used = l.used() + count;
   if (used >= l.capacity()) {
     return 0;
@@ -39,14 +39,14 @@ inline uint32_t AllocateSlots(uint8_t* base, uint32_t list, uint32_t count) {
 }
 
 // CommandList::CommandList (sub_8258C960): the vtable, everything else 0.
-void Construct(uint8_t* base, uint32_t list);
+void Construct(uint32_t list);
 
 // CommandList::Flip (sub_8258C9C0): +4 ^= 1.
-void Flip(uint8_t* base, uint32_t list);
+void Flip(uint32_t list);
 
 // CommandList::BeginTick (sub_8258C998): +32 = the buffer +4 selects, +16 =
 // +12, +12 = 0.
-void BeginTick(uint8_t* base, uint32_t list);
+void BeginTick(uint32_t list);
 
 enum class OpenResult {
   kOpened,       // a chunk opened at +32
@@ -57,14 +57,14 @@ enum class OpenResult {
 };
 
 // CommandList::OpenChunk (sub_8258C9D0).
-OpenResult OpenChunk(uint8_t* base, uint32_t list);
+OpenResult OpenChunk(uint32_t list);
 
 // CommandList::CloseChunk (sub_8258CA50): when a chunk is open, closes it at
 // the write pointer (+32 = +40 = +44) and the open count goes down by 1.
-void CloseChunk(uint8_t* base, uint32_t list);
+void CloseChunk(uint32_t list);
 
 // CommandList::ChunkSlots (sub_8258CA88): (+40 - +36) >> 4, signed.
-int32_t ChunkSlots(uint8_t* base, uint32_t list);
+int32_t ChunkSlots(uint32_t list);
 
 // The allocations with an optional header slot ([id, arg1] written, +8 and
 // +12 left as they were), then `slots` slots for the payload; return the
@@ -74,13 +74,13 @@ int32_t ChunkSlots(uint8_t* base, uint32_t list);
 //
 // CommandList::AllocateVertices (sub_8258CB08): (count × 24 + 15) >> 4
 // slots, header command 5 with arg1 = count.
-uint32_t AllocateVertices(uint8_t* base, uint32_t list, uint32_t count, bool header);
+uint32_t AllocateVertices(uint32_t list, uint32_t count, bool header);
 // CommandList::AllocateBytes (sub_8258CB98): (bytes + 15) >> 4 slots, header
 // command 21 with arg1 = that slot count (the game's own: command 21's
 // handler reads it as bytes).
-uint32_t AllocateBytes(uint8_t* base, uint32_t list, uint32_t bytes, bool header);
+uint32_t AllocateBytes(uint32_t list, uint32_t bytes, bool header);
 // CommandList::AllocateResolve (sub_8258CC30): 5 slots, header command 25
 // with arg1 = 5.
-uint32_t AllocateResolve(uint8_t* base, uint32_t list, bool header);
+uint32_t AllocateResolve(uint32_t list, bool header);
 
 }  // namespace command_list

@@ -12,7 +12,7 @@ namespace hooks {
 
 // rand (sub_825A9BB8): no registers in; r3 the number. The per-thread data's
 // lookup through `ctx` (c_runtime::ThreadData). Shared with the harness.
-void CRuntimeRand(lifted::Regs& ctx, uint8_t* base);
+void CRuntimeRand(lifted::Regs& ctx);
 
 // Whether lock 8 (the exit lock) is the host mutex for this run
 // (c_runtime::ExitMutex): --native_c_runtime at the first _lock call, fixed
@@ -30,7 +30,6 @@ bool NativeAtexit();
 // as long as the adapter's call.
 struct GuestAtexit {
   lifted::Regs& ctx;
-  uint8_t* base;
   c_runtime::AtexitCall Call() { return {&GuestAtexit::Run, this}; }
   static int32_t Run(void* self, uint32_t function);
 };

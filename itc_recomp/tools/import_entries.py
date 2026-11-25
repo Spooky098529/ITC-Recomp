@@ -48,8 +48,8 @@ def main():
         "",
     ]
     for address, name in thunks:
-        lines.append(f"Result i{address}(uint8_t* base, const Args& args) {{")
-        lines.append(f"  return Import(base, {name}, args);")
+        lines.append(f"Result i{address}(const Args& args) {{")
+        lines.append(f"  return Import({name}, args);")
         lines.append("}")
     lines += ["", "const bool kOn = true;", "", "const Registration kImports[] = {"]
     for address, _ in thunks:

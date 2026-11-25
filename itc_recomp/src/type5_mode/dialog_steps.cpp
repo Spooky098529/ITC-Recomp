@@ -21,63 +21,66 @@ using guest::StoreU32;
 using G = schema::Type5ModeGlobals;
 
 // The original's frame below `sp`, its back chain written.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   return frame;
 }
 
-// UiMovies::Find with the id stored at the frame's +80: the movie.
-uint32_t FindMovie(uint8_t* base, uint32_t frame, uint32_t id) {
-  StoreU32(base, frame + 80, id);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+// UiMovies::Find with the id the original stores at its frame's +80 (read
+// only by the find: a value since E5 step 6): the movie.
+uint32_t FindMovie(uint32_t id) {
+  return LoadU32(ui_movies::PairsFindKey(ui_movies::kMovieTable, id));
 }
 
 uint32_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
 
 }  // namespace
 
-uint64_t OpenConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t OpenConfirmStep(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822261E0 Type5Dialog::OpenConfirmStep");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, frame, 16);
-  if (LoadU32(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(16);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, 0x82226224, 5);
     calls.CallArgs(kPlayNamed, frame, 0x82226240, {movie, 5, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, 0x82226250, movie, 0));
   if (done != 0) {
     calls.Call(kResetPose, frame, 0x82226264, movie);
-    // The highlights' table {1, 2} at the frame's +80, the cursor's entry.
-    StoreU32(base, frame + 80, 1);
-    StoreU32(base, frame + 84, 2);
-    const uint32_t cursor = G::menu(base).cursor();
-    const uint32_t named = LoadU32(base, frame + 80 + (cursor << 2));
+    // The highlights' table {1, 2} at the frame's +80 (handed to PlayNamed:
+    // it stays on the stack), the cursor's entry.
+    StoreU32(frame + 80, 1);
+    StoreU32(frame + 84, 2);
+    const uint32_t cursor = G::menu().cursor();
+    const uint32_t named = LoadU32(frame + 80 + (cursor << 2));
     calls.CallArgs(kPlayNamed, frame, 0x822262A0, {movie, named, 0, 0, 0, 0, 2, frame + 80});
     calls.Call(kLoopLast, frame, 0x822262A8, movie);
   }
   return done;
 }
 
-uint64_t CloseConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t CloseConfirmStep(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822262B8 Type5Dialog::CloseConfirmStep");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame, 16);
-  if (LoadU32(base, started) == 0) {
+  // The original's 112-byte frame held only the find's id (a value now):
+  // the guest calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
+  const uint32_t movie = FindMovie(16);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, 0x82226300, 5);
     calls.CallArgs(kPlayNamed, frame, 0x8222631C, {movie, 6, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, 0x82226330, movie, 0));
   if (done != 0) {
     calls.Call(kFinishAll, frame, 0x82226344, movie);
-    G::data(base).set_queued_state(9);
+    G::data().set_queued_state(9);
   }
   return done;
 }
 
-uint64_t SimpleStep(uint8_t* base, uint32_t started, Simple which, uint32_t sp,
+uint64_t SimpleStep(uint32_t started, Simple which, uint32_t sp,
                     const Calls& calls) {
   struct Shape {
     uint32_t movie, animation;
@@ -105,46 +108,50 @@ uint64_t SimpleStep(uint8_t* base, uint32_t started, Simple which, uint32_t sp,
       break;
   }
   const Shape& s = kShapes[static_cast<int>(which)];
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame, s.movie);
-  if (LoadU32(base, started) == 0) {
+  // The original's 112-byte frame held only the find's id (a value now):
+  // the guest calls run from `sp` (E5 step 6).
+  const uint32_t frame = sp;
+  const uint32_t movie = FindMovie(s.movie);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, s.lr[0], 5);
     calls.CallArgs(kPlayNamed, frame, s.lr[1], {movie, s.animation, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, s.lr[2], movie, 0));
   if (s.close && done != 0) {
-    G::data(base).set_queued_state(9);
+    G::data().set_queued_state(9);
   }
   return done;
 }
 
-uint64_t MoveCursorStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t MoveCursorStep(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82226618 Type5Dialog::MoveCursorStep");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, frame, 16);
-  if (LoadU32(base, started) == 0) {
-    // The highlights' table {1, 2} at the frame's +80 (+84 stored first).
-    StoreU32(base, frame + 84, 2);
-    StoreU32(base, frame + 80, 1);
-    const uint32_t previous = G::menu(base).previous();
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(16);
+  if (LoadU32(started) == 0) {
+    // The highlights' table {1, 2} at the frame's +80 (+84 stored first;
+    // handed to the movie's calls: it stays on the stack).
+    StoreU32(frame + 84, 2);
+    StoreU32(frame + 80, 1);
+    const uint32_t previous = G::menu().previous();
     calls.CallArgs(kFinishNamed, frame, 0x82226680,
-                   {movie, LoadU32(base, frame + 80 + (previous << 2)), 0, 0, 0, 0, 2,
+                   {movie, LoadU32(frame + 80 + (previous << 2)), 0, 0, 0, 0, 2,
                     frame + 80});
-    const uint32_t cursor = G::menu(base).cursor();
+    const uint32_t cursor = G::menu().cursor();
     calls.CallArgs(kPlayNamed, frame, 0x822266AC,
-                   {movie, LoadU32(base, frame + 80 + (cursor << 2)), 0, 0, 0, 0, 0, frame + 80});
+                   {movie, LoadU32(frame + 80 + (cursor << 2)), 0, 0, 0, 0, 0, frame + 80});
     calls.Call(kLoopLast, frame, 0x822266B4, movie);
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   calls.Call(kRun, frame, 0x822266C4, movie, 0);
   return 1;
 }
 
-uint64_t Step9(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t Step9(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822266D0 Type5Dialog::Step9");
-  const uint32_t frame = Frame(base, sp, 96);
-  calls.Call(kMenuSoundPlay, frame, 0x822266E4, 5);
+  // The original's 96-byte frame (only its back chain) left out: the call
+  // runs from `sp` (E5 step 6).
+  calls.Call(kMenuSoundPlay, sp, 0x822266E4, 5);
   return 1;
 }
 

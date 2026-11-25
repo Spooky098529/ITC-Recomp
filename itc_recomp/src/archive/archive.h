@@ -24,12 +24,12 @@ constexpr uint32_t kFirstCrsId = 23011;
 
 // Archive::Toc (sub_8209D868): the TOC an asset id is in, [0x826A5120] below
 // 23011, else [0x826A5128].
-uint32_t Toc(uint8_t* base, uint32_t id);
+uint32_t Toc(uint32_t id);
 
 // Archive::AssetSize (sub_820A0678): the asset's TOC entry (index id + 1, or
 // id - 23011 + 1 in BUILD_CRS, 16 bytes each) +8, the unpacked size, or +4,
 // the stored size, when that's 0.
-uint32_t AssetSize(uint8_t* base, uint32_t id);
+uint32_t AssetSize(uint32_t id);
 
 // --- The request queue's list and slots ---
 
@@ -44,31 +44,31 @@ constexpr uint32_t kSlotsCleanUp = 0x825DAD38;
 
 // List::List (sub_82294B80): the vtable 0x820128C8, +4 = `deletes`, the
 // count, head and tail 0.
-void ListConstruct(uint8_t* base, uint32_t list, uint32_t deletes);
+void ListConstruct(uint32_t list, uint32_t deletes);
 // List::Append (sub_82294BA8): `node` linked after the tail (or as the head
 // when there's no tail), its link 0, the tail it, the count up by one; 1, or
 // 0 for no node.
-uint32_t ListAppend(uint8_t* base, uint32_t list, uint32_t node);
+uint32_t ListAppend(uint32_t list, uint32_t node);
 // List::Remove (sub_82294C00): `node` found from the head by the links and
 // unlinked (the previous node's link, the head and the tail fixed), the count
 // down by one; 1, or 0 when it isn't there (or is 0).
-uint32_t ListRemove(uint8_t* base, uint32_t list, uint32_t node);
+uint32_t ListRemove(uint32_t list, uint32_t node);
 // ListNode::ListNode (sub_82294B68): the vtable 0x82010B5C, the link `link`.
-void NodeConstruct(uint8_t* base, uint32_t node, uint32_t link);
+void NodeConstruct(uint32_t node, uint32_t link);
 // ListNode::~ListNode (sub_8224FB10): +0 = the vtable 0x82010B5C.
-void NodeDestruct(uint8_t* base, uint32_t node);
+void NodeDestruct(uint32_t node);
 
 // The slot lookup (sub_8209D818): the first of the 960 slots whose serial
 // (+8) is `serial` (-1 for a free one), or 0.
-uint32_t FindSlot(uint8_t* base, uint32_t serial);
+uint32_t FindSlot(uint32_t serial);
 
 // The static set-ups (_cinit's table, once at start-up); each returns
 // atexit's r3 (c_runtime::AtexitFrom). sub_825D9160: the queue made
 // (List::List(0), then its vtable 0x82001DD4), its clean-up 0x825DACB8
 // registered. sub_825D91B0: the 960 slots made (ListNode::ListNode(0), then
 // the vtable 0x82001DD8), their clean-up 0x825DAD38 registered.
-int32_t QueueStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
-int32_t SlotsStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
+int32_t QueueStaticInit(const c_runtime::AtexitCall& call);
+int32_t SlotsStaticInit(const c_runtime::AtexitCall& call);
 
 // --- The loose files ---
 
@@ -79,7 +79,7 @@ int32_t SlotsStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
 
 // Archive::FindLooseFile (sub_8209D8D8): the path of the first entry whose id
 // is `id`, or 0 at the first entry with no path.
-uint32_t FindLooseFile(uint8_t* base, uint32_t id);
+uint32_t FindLooseFile(uint32_t id);
 
 // --- The loader thread's pieces ---
 
@@ -103,12 +103,12 @@ struct FinishCalls {
 // step, as the original does (the callback may change them). Returns
 // VirtualFree's r3 when the native one freed (the original's r3 then), else
 // nothing (r3 is the callback's or guest_free's, or the request).
-std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request, const FinishCalls& calls);
+std::optional<uint32_t> FinishRequest(uint32_t request, const FinishCalls& calls);
 
 // LoaderFunctor::Invoke (sub_8209DD80): the function the functor calls (its
 // +4), which the adapter tail-calls with the argument as r3. Its one functor
 // (0x82600B68) holds the loader thread (0x8209E118).
-uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor);
+uint32_t LoaderFunctorTarget(uint32_t functor);
 
 // --- Ucl::Unpack ---
 
@@ -122,7 +122,7 @@ struct UclBlockResult {
   uint32_t out;
   uint32_t in;
 };
-UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t dst);
+UclBlockResult UclBlock(uint32_t src, uint32_t src_len, uint32_t dst);
 
 // Ucl::Unpack's call into the translated code: memcpy (sub_825A7410) for a
 // stored block where the native copy can't (native::Buffers_Memcpy's false).
@@ -140,7 +140,7 @@ struct UclCalls {
 // recorded as the memcpy override's). Stops with 0 when the output would
 // pass `expected` (an unpacked block is checked after it's written, a copied
 // one before); else 1 when the output's size is `expected`.
-uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expected,
+uint32_t UclUnpack(uint32_t dst, uint32_t stream, uint32_t expected,
                    const UclCalls& calls);
 
 // --- The queue and the loader under the four semaphores ---
@@ -157,7 +157,7 @@ using LoadRequest = std::array<uint8_t, 40>;
 // 0x200 with a loose file or else 0x800, 0x2000 with a callback, 0x80 with
 // `r7`; the size is the unpacked size (compressed), else `size` when not 0,
 // else the stored size.
-LoadRequest BuildLoad(uint8_t* base, uint32_t id, uint32_t destination, uint32_t callback,
+LoadRequest BuildLoad(uint32_t id, uint32_t destination, uint32_t callback,
                       uint32_t context, uint32_t r7, uint32_t size);
 
 // Archive::Load as native callers' plain C++ is handed it (r3 the id, r4 the
@@ -173,22 +173,22 @@ using LoadCall = std::function<int64_t(uint32_t id, uint32_t destination, uint32
 // lock). The slot's +8 the serial (0x826A5104), the request copied to +12,
 // +52 to +88 cleared, the serial counter up by one (0 at 0x7FFFFFFF), the
 // slot appended to the queue. Returns the serial, or -1.
-int64_t Queue(uint8_t* base, const LoadRequest& request);
+int64_t Queue(const LoadRequest& request);
 
 // Archive::WaitIdle (sub_8209D730): under the queue lock, 0x826A5108 = 1
 // when the queue has requests; then, when 0x826A5108 is set, the idle
 // semaphore waited on (the loader signals it once the queue is drained).
-void WaitIdle(uint8_t* base);
+void WaitIdle();
 // Archive::QueueLength (sub_8209D7B0): the queue's count, under the lock.
-uint32_t QueueLength(uint8_t* base);
+uint32_t QueueLength();
 // Archive::CancelQueued (sub_8209DB90): under the lock, every queued request
 // still waiting (+52 0) with flag 0x4000 taken off the queue and its slot
 // freed (+8 = -1); then, with `wait`, Archive::WaitIdle.
-void CancelQueued(uint8_t* base, bool wait);
+void CancelQueued(bool wait);
 // A request's cancel (sub_8209DB20): r3 a serial; under the lock, its slot
 // (FindSlot): none, 1; still waiting (+52 0), taken off the queue and freed,
 // 1; else 0.
-uint32_t Cancel(uint8_t* base, uint32_t serial);
+uint32_t Cancel(uint32_t serial);
 
 // The picker (sub_8209D950), on the loader thread, under the queue lock:
 // `current` kept as the chained one when it's compressed (0x100 without
@@ -201,7 +201,7 @@ uint32_t Cancel(uint8_t* base, uint32_t serial);
 // +56 to +88 cleared (not +68); the chained one's +84 = the next (or itself
 // with no next, then the next) and +52 = 2. With a next and the work
 // semaphore's count not 0, takes it. Returns the next.
-uint32_t PickNext(uint8_t* base, uint32_t current, uint32_t finished_chained,
+uint32_t PickNext(uint32_t current, uint32_t finished_chained,
                   uint32_t finished_current);
 
 // The set-up's call into the translated code: VirtualAlloc (sub_82295398)
@@ -219,7 +219,7 @@ struct SetUpCalls {
 // fresh allocation of the sectors (0 with 0x1000) at +76 and the caller's
 // word +40 points at; with 0x4, +76 = +40; compressed without 0x8, +88 = +76
 // and +76 the staging half (0x826A5114 + 4 x (count & 1)), the count up.
-void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls);
+void SetUp(uint32_t request, const SetUpCalls& calls);
 
 // The loader's next request (sub_8209DD98): `current` 0 or the one just
 // read. Its chained one (+84) finished (FinishRequest), and +84 = 0 unless it
@@ -230,6 +230,6 @@ struct LoaderCalls {
   FinishCalls finish;
   SetUpCalls set_up;
 };
-uint32_t NextRequest(uint8_t* base, uint32_t current, const LoaderCalls& calls);
+uint32_t NextRequest(uint32_t current, const LoaderCalls& calls);
 
 }  // namespace archive

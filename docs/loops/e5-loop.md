@@ -3,9 +3,9 @@
 Instructions for running E5's steps 2 to 5 (`docs/e5-native.md`) area by
 area, as B7's loop did (`docs/loops/b7-loop.md`; its rules carried over by
 the user's call, 2026-11-16: precedent first, the user's limits per run).
-This file covers step 2 (the schema and named fields) and, drafted,
-step 3 (private objects to the host); steps 4 and 5 get their sections
-when they start.
+This file covers step 2 (the schema and named fields), step 3 (private
+objects to the host) and, drafted, step 4 (shared objects); step 5 gets
+its section when it starts.
 
 The session running the loop (the **lead**) does no area's work itself: it
 hands each area to one subagent at a time, reads its report, checks it
@@ -501,3 +501,833 @@ args, in the same session) only when the user's current message says to.
   areas). The rows for the leftovers await the user's review.
 - Merged into `rexglue-removal-project` up to the pilot (`fc5e3b94`), then
   with the batches, the leftovers and their rows (2026-11-22).
+
+## Step 4: shared objects (2026-11-22)
+
+`docs/e5-native.md` step 4 is the why. The user's call (2026-11-22): the
+goal is guest memory out of the picture; the lead takes its own
+recommendations below (the open points at the end, now decided) and goes
+ahead.
+
+### The ground (measured 2026-11-22, after step 3)
+
+`tools/e5_movable.py` (`coverage/e5_movable.tsv`): 1,805 schema types the
+code touches, 17 in host memory (step 3's 16 moves; `Type2HubImage` counts
+as shared since `TodaysEventImage` merged into it). "Movable" lists 64: the
+16 host types, the movie library's 9 (a replaced library) and step 3's 39
+skipped. The rest, by what stops them (a type can have several):
+
+| Blocker | Types |
+| --- | --- |
+| No allocation seen (embedded in another object, static, or a parameter the measure couldn't join to its allocation) | 1,574 |
+| Shared (touched by several areas) | 339 |
+| Read from a file in place (with GPU 11, with save 3) | 328 |
+| Overlapping fields (a union, or a measure fault) | 313 |
+| Read by the GPU | 131 |
+| Saved | 43 |
+
+What matters is the combinations:
+
+- **910 private types blocked only by "no allocation seen"** (2,406
+  function touches): 741 embedded, 92 in the image, 56 allocated through a
+  path the measure doesn't follow, 21 other. By their measure names: 344
+  parameters (many are a caller's locals passed by address: step 6), 294
+  embedded at an offset (`T@+N`), 151 a field's pointee, 94 classes (the
+  menus' 9,620-byte machines carved out of a mode's one block:
+  `RaceHudMachine`, `CarDealer`, `GarageScreen`, `PlateEditor`,
+  `RaceMenu`; `TrackZone` inside `TrackZones`; `AiPath`), 17 returns.
+  257 have their owner noted ("Split from"); 31 have a vtable.
+- **22 types blocked only by "shared"** (allocated, no tags, no overlap):
+  18 of them shared by two areas (`PtrListNode`, `CollisionHit`,
+  `SceneCarModel`, `InputClientList`, `AfterRaceMenuData`, `Framework`,
+  `RaceDialogData`, `TabPanel`, `BuildScreenDataPart`, `CarSettingsData`,
+  `Movie`, `MovieWrapper`, `ColorPanel`, `RowPanel`, `CollisionWorld`,
+  `RaceScreens`, `CarPanel`, `Type2HubImage`, already host), 4 by three
+  (`XAudioAllocBlock`, `CString`, `NetRankingData`, `CarDealerData`).
+- Shared types by their number of areas: 180 two, 73 three, 29 four, 57
+  five or more (the hubs: `UiMovieTableValue` 40 areas, `RaceData` 38,
+  `SaveData` 36, `UiMovieNode` 19, `Vehicle` 15; most of them also tagged
+  file, save or GPU, or embedded).
+- **Step 3's 39 skipped**, by what stops them:
+  - virtual dispatch over a raw vtable word (15): `GameModeType6`,
+    `GameModeType7`, `ModeHolder`, `FloatPairItem`, `FloatTripleItem`,
+    `FloatTriple`, `FrameStart`, `MorphJobMaker`, `AppDelegate`,
+    `AppStates`, `OverlayView`, `SysUsers`, `AppCameraList`,
+    `AppCameraEntry`, `D3DXBuffer`;
+  - objects or interfaces embedded at offsets, their addresses handed out
+    (10): `TrackZones`, `CarSoundArray`, `Type4BlockPart`,
+    `LocationScreenPart`, `StateLayer`, `WorkerPool`, `Kind6MenuPart`,
+    `AppCamera`, `Type2Hub`, `CareerResultsScreen`;
+  - an address handed to a callee that reads guest memory (5):
+    `LocationScreenPictureTexture`, `CarDealerSwatch`, `Type2HubTexture`,
+    `CarOverlays`, `CameraCubeFaceSurface`;
+  - raw containers or arrays (5): `HandlerMapNode`, `ByteCountedList`,
+    `TrackCollisionObject`, `Vector16Storage`, `CollisionObjectBlock`;
+  - memcpy targets (3): `CarListEntry`, `CarDealerEntry`,
+    `StandModelsSpecCopy`;
+  - file-backed (1): `CarSoundWaveBank` (step 5).
+- **Virtual calls** in the lifted code (batches and originals): 2,515 calls
+  through `ctr`; 2,365 are the vtable idiom (`lwz a,0(obj)`, `lwz c,N(a)`,
+  `mtctr c`, `bctrl`), 484 of them with the vtable word read through a
+  view, 1,881 raw; 111 call a slot read from something else (callbacks,
+  functors), 39 a computed target. The hand ports: about 100 helpers like
+  `VirtualTarget` (`Load(Load(object) + offset)`), 226 uses of a `vtable`
+  accessor.
+
+What it means: being shared isn't what stops most types. Since step 2
+every area reads a type through the same view, so a shared type whose
+accesses all go through views moves like a private one, provided its
+allocation sites are known and every area's raw accesses are gone. What
+stops them is shape: objects living inside other objects (no allocation of
+their own), virtual calls that read the vtable word raw, interior
+pointers, memcpy, and addresses handed to callees that read guest memory.
+Step 4 is mostly groundwork for those shapes, then moving **units** (an
+allocated object with every object embedded in it) wherever their areas
+are.
+
+### Groundwork, before the pilot (done directly, not by agents)
+
+1. **Embedded objects in the schema.** A field type `embed`
+   (`{ name = "race_menu", offset = 9640, type = "embed", to = "RaceMenu" }`,
+   `count` for arrays): a guest view returns `T(base, address + offset)`; in
+   a host type, `T`'s struct becomes a member. Seeded from the measure's
+   `T@+N` votes and the "Split from" notes (`schema_seed.py` or a one-off
+   script), checked by `schema_check.py` (an embedded type's accesses must
+   fit its owner's span).
+2. **Host layout at the guest offsets.** Host structs keep each field at
+   its guest offset (`schema_gen.py` fills the gaps with padding and
+   `static_assert`s `offsetof`), in host byte order. Then an interior
+   pointer is `object + offset`, an embedded member sits where the guest
+   code expects it, and a memcpy between two host objects of one type is a
+   memcpy. (Step 3's structs are packed; regenerated this way, nothing that
+   reads them changes.) Repacked when the last guest-shaped reader goes
+   (step 10).
+3. **Interior handles.** `memory::HandleObject` accepts any value inside a
+   live object's span (`handle + offset`, already reserved by `MakeHandle`)
+   and returns `object + offset`; the views of embedded types inside a host
+   owner use it. The fault handler is unchanged for raw accesses.
+4. **Dual views** (`storage = "dual"`): for a type with instances in both
+   shapes while its owners convert (a generic container such as `PtrList`
+   embedded in host and guest objects; a record embedded in several
+   owners), the view checks `memory::IsHandle(address)` at each access and
+   reads the host struct or guest memory. No `_address()` either, so the
+   build still lists what's left. Used only where a type really has both;
+   a shared allocated type moves whole (all its allocation sites at once)
+   and needs no dual view.
+5. **Virtual calls over handles.** `lifted::VtableSlot(base, object,
+   offset)`: the vtable word from guest memory, or from a handle's host
+   object (its `vtable` member at +0, still the image table's guest address,
+   written by the constructors and destructors through the view as now).
+   `lift.py` emits it for the 2,365 vtable-idiom sites (`lwz a,0(obj)`
+   feeding `lwz c,N(a)` feeding `mtctr`), typed or not, and the hand ports'
+   `VirtualTarget`-style helpers call it. The call itself still goes
+   through the dispatch table by address. C++ virtual functions (the plan's
+   end state) come per class hierarchy once its slots' functions are all
+   typed and its objects all host: a follow-up after the moves, not
+   groundwork.
+6. **memcpy over host objects.** The game's memcpy and memmove (native
+   entries, so one place) accept handles on either side: host to host, a
+   memcpy of the host bytes (the layout is the guest's); host to guest or
+   guest to host, a per-type copy generated by `schema_gen.py`
+   (`CopyFromGuest`, `CopyToGuest`: each field swapped) when the size is
+   the type's or a field run's, else a logged stop. The same for memset.
+7. **Callbacks and contexts.** Callbacks stay guest function addresses
+   dispatched through the table (that works whatever shape the object is);
+   their context word may be a handle (`CameraAnimLoad` did it). Nothing to
+   build: the rule for agents. Function objects come with step 6.
+8. **Addresses handed to callees.** No tool: per site, by the precedents.
+   A value the callee only reads goes by value (`ui_movies::NameRecord`);
+   a callee that writes through it, or keeps it, takes the view (dual if
+   it gets both shapes).
+9. **The step 4 pick list** (`tools/e5_movable.py --units`, extended):
+   units (an allocated type with its `embed` closure), each with its
+   allocation and free sites, its areas and hand-port files, its raw
+   vtable reads, memcpy sites and interior addresses taken, and what keeps
+   it from moving in step 4's terms (a file, GPU or save tag: steps 5 and
+   7; an image static: step 8; a caller's local: step 6). Ordered leaves
+   first: fewest areas, then fewest functions.
+
+Each piece built, an attract race and `tick_replay.sh` (nothing moved yet:
+the game unchanged), committed. Pieces 1 to 4 change only generated code
+and step 3's structs' layout; 5 and 6 change every virtual call and copy,
+so they're checked like a batch.
+
+### The pilot
+
+Recommended: `app-states`' **`AppStates` with `StateLayer`** (and
+`AppDelegate`, made by `Delegate::Clone`). `AppStates` (12 B, vtable
+`0x820028F8`) is the app's state stack; `StateLayer` (48 B, vtable
+`0x820028E0`) holds a state interface at +4 (the layer + 4 is handed out
+as the state), and two `PtrList`s at +12 and +24 walked by the list
+helpers. Between them they need pieces 1 to 5 (embedded members, interior
+handles, the `PtrList` dual view, virtual calls through raw vtable words,
+`VirtualTarget`), and they run every tick, so the attract race and
+`tick_replay.sh` check them in full; a mistake stops the boot at once. The
+fallback if that's too much for one pilot: `race-overlays`' `CarOverlays`
+with `OverlayView` (vtables, an embedded part, the archive's callback
+context; run in every race).
+
+### Units and order
+
+From the measure (leaves first), in waves, each a few batches:
+
+1. **The pilot** (above).
+2. **Shared allocated types** (the 22 blocked only by "shared", less
+   `Type2HubImage`, already host, and `Movie` and `MovieWrapper` if the
+   movie wrappers no longer run): no new shape, only their areas' raw
+   accesses to clear.
+3. **Step 3's 39 skipped**, by groundwork piece: virtual dispatch (15),
+   embedded (10), handed addresses (5), containers (5), memcpy (3); less
+   `CarSoundWaveBank` (step 5) and `StandModelsSpecCopy` and
+   `Kind6MenuPart` (the Xbox Live mode: unreachable, to add to
+   `UNREACHABLE`).
+4. **Owners with their embedded objects**: the mode blocks
+   (`Type2ModeBlock`, `ModeType9Block`, ...) with the menus' machines and
+   screens inside them, `TrackZones` with `TrackZone`, `AiDriver` with
+   `AiPath`; the 910 private embedded types go with their owners here.
+   Areas by fewest ties first (`type_map_areas.tsv`'s shared weight:
+   `std-string` 0, `menu-helpers` 1, `morph-jobs` 1, `framework` 17,
+   `heap` 17, `screen-constructors` 19, `race-hud` 42, `c-runtime-core` 55,
+   `app-states` 56, `c-runtime` 66).
+5. **The hubs** last, as far as they go before steps 5 and 7: `Racers`,
+   `Vehicle`, the scene and its models, the car scene; the UI movies'
+   records and `RaceData` are file-tagged, `SaveData` saved: they move
+   with their loaders (step 5).
+
+Out of step 4: types tagged file, GPU or save (steps 5 and 7, even when
+otherwise movable), statics in the image (step 8), a caller's locals
+passed by address (step 6).
+
+### As a swarm
+
+Like step 3's (batches, one checked before the next; 6 agents at a time;
+edits only), with one change: **one agent per unit, not per area**, since a
+unit spans areas. The script (a new `e5-step4-swarm.js`) takes a batch of
+units whose hand-port files don't overlap (checked by the script from the
+pick list, so two agents never edit one file).
+
+An agent may:
+- set `storage = "host"` (or `"dual"`) on its unit's types, add `embed`
+  fields to them, list `host_alloc` and `host_free`;
+- edit every hand-port file touching its unit's types (any area), and the
+  unit's schema entries;
+- turn a raw access, a vtable read, a memcpy or a handed address into the
+  view, `VtableSlot`, the handle-aware copy, a value or a view parameter,
+  as the precedents above do.
+
+An agent may not:
+- edit `src/lifted/`, `src/schema/` or the tools, build, run the game, use
+  git, or run `lift.py`, `lift_originals.py`, `type_map.py` or the full
+  `schema_gen.py` (`schema_gen.py --area` only);
+- touch types outside its unit, or another unit's files;
+- write rows (proposed in its report);
+- change what the game does (the behavior rule: the same game tick for
+  tick);
+- move a type it can't clear of raw accesses: it skips it, with the reason
+  and the sites.
+
+### The lead's check after each batch
+
+Step 3's ("The lead's check after each batch"), plus:
+- `lift.py reemit`'s list of host types' accesses left raw must be empty
+  (each would fault);
+- a count of the vtable-idiom sites left raw (`lift.py` reports it);
+- `tick_replay.sh` twice, both races "all match"; a digest that differs is
+  narrowed to a unit by putting units back half at a time;
+- grep the replay's log for "native running" and say which moves only the
+  build has checked;
+- functions whose objects are now all host get the status **Host** (rows
+  proposed to the user first), then `check_function_statuses.py`;
+- `tools/e5_status.py` (the plan's "Tracking"; written in the groundwork
+  if the user wants it now): the counts after each wave, in
+  `docs/e5-native.md`.
+
+### Decided (2026-11-22)
+
+The lead's recommendations, by the user's call ("I don't care about any of
+these details, what I want is guest memory out of the picture"): host
+structs at the guest offsets (repacked at step 10, the end); virtual calls through
+the bridge first (`VtableWord`), C++ virtual functions per hierarchy after
+the moves; agents per unit; the pilot `AppStates` with `StateLayer`; types
+tagged file, GPU or save left for steps 5 and 7; memcpy between host and
+guest objects swapping each field (`memory/host_copy.h`);
+`StandModelsSpecCopy` and `Kind6MenuPart` unreachable; `tools/e5_status.py`
+written now. Overlapping fields no longer stop a move: a field over
+another is read at its offset (a measure's `fault_` field never a member).
+
+### Groundwork: done (2026-11-22, `895f9731`)
+
+- `schema_gen.py`: host structs at the guest offsets (packed, padded,
+  `static_assert`ed); `embed` fields (a view at the owner's address +
+  offset, from either shape); `storage = "dual"` (each access tells a
+  handle from a guest address); overlapping fields read at their offset;
+  each host type's layout of scalar fields (`k<Type>Layout`) handed to
+  `MakeHandle`.
+- `memory::HandleObject` takes any value inside a live object's span;
+  `DescribeHandle`.
+- `lift.py`: the vtable idiom's first load through `lifted::VtableWord`
+  (1,151 sites in the batches, 1,015 in the originals); `guest::VtableWord`
+  in `guest.h` for the hand ports (the generic `VirtualTarget` helpers in
+  six files call it).
+- `memory/host_copy.h`: the game's memcpy (both), memmove, memset, `XMemCpy`
+  and `XMemSet` over handles: host to host a byte copy, host and guest with
+  each field of the host type's layout swapped.
+- Checked: build, attract race (38 s, no error lines), `tick_replay.sh`
+  (both races all match).
+
+### The pilot: done (2026-11-22)
+
+`AppStates` and `StateLayer` (`app-states`) in host memory, with their
+lists (`PtrList` at the layer's +12 and +24, `OpList` at +36) as `embed`
+fields of dual types: the stack made by `AppStates::Create`, the layers by
+`AppStates::AppStates`, `AddLayer` and `ApplyOp` (`New`; `host_alloc` for
+the four lifted originals' operator new calls). The hand ports' uses of the
+layer's interface and lists switched from `_address()` to `address + 4`
+and the embed views. One raw access found by the run: the shared getter
+`WordAt8` (`sub_822BE2C8`, the layer's vtable slot 1) read the layer's +8;
+its parameter type `WordAt8Object` made dual (a generic accessor's type is
+dual by rule: its callers pass both shapes). Checked: build, attract race
+(38 s, no error lines, no handle fault), `tick_replay.sh` twice (both races
+all match), a frame dump (normal). The replay reaches `AppStates::Create`,
+`AddLayer`, `StateLayer::ApplyOp` and `Update` (every tick).
+
+### Batch 1: done (2026-11-22)
+
+Six agents, one per unit (edits only; a brief in the session, the pilot as the
+model), then the lead's build, checks and fixes:
+
+- **Moved** (host or dual): the framework (`Framework`, `FrameStart`, both
+  pool makers `MorphJobMaker`, `HandlerMapNode`, `AppOpListNode`; the
+  framework's interface views dual); the nine game mode objects and
+  `ModeHolder` (most dual: the measure joins them with stack answers and
+  blocks; every 812-byte dispatcher view dual); the car list's entries and
+  colors, the dealer's swatches, the camera presets and animations, the
+  four panels (dual: the type 8 mode embeds them); `AfterRaceMenuData`
+  and its screen (dual), `RaceDialogData`, `PowerGraphScreenData`,
+  `UserInfoData`; `CollisionWorld`; `InputClientList` and the race's car
+  inputs (`CarInput`, dual). About 40 types.
+- **Skipped**, by the agents (their reasons): the vector library and the
+  matrix math read field addresses as guest memory (`RigidBody`,
+  `BoxShape`, `CollisionHit`, `CollisionContact`); arrays allocated as one
+  block (`CollisionObjectBlock`, `PtrListNode`'s allocator); `InputManager`
+  and `ActionMapper` (arrays of embedded objects handed out by address);
+  `App` (its +16 interface's vtable read raw in other units' files); lifted
+  vtable slots reading their objects raw (`AppCamera` and its list and
+  entries, `CarDealerEntry`); kernel objects in place (`WorkerPool`);
+  objects handed to the graphics code (`AppScene`, `Type2HubTexture`).
+- **The lead's fixes on the way:** the game's frees (`memory::FreeHandle`
+  from `Free`, `FreePages`, `FreePhysical`) and `InRange`, `IsPages` and
+  `IsHeapBlock` take handles (a menu teardown fell into the kernel's
+  `NtFreeVirtualMemory` before); every `guest::Load*` and `Store*` reaches
+  a host object through its handle (`memory::RawHandleLoad` and `Store`,
+  as the guest's bytes would give it, logged once per type and offset):
+  raw accesses no longer stop the game (the career's free run,
+  `RaceStates::LinkTick`, copies car inputs raw); overlaid fields (a word
+  read as two halves) read the guest-order image of the members they
+  cover (`memory::LoadOverlay`), with `load_at` and `store_at` for lifted
+  accesses inside a field; scalars over bytes fields as members; embed
+  accessors as templates, their areas' headers included at the end.
+- **The replay's sensitivity to timing**, found because race 1 differed
+  from tick 0: the game's own random generator was advanced by the camera
+  shake on render-only passes and on each tick of a race's loading, so the
+  traffic's random parts moved with the frame rate and the load times
+  (found by logging each draw's caller in both builds). Fixed:
+  `--game_rand_by_tick` (on by default) and the replay's line-up at each
+  race's start (`docs/pad-replay.md`); the baseline made again from the
+  pilot's build with both. Things tried and ruled out on the way: the
+  moved types one unit at a time, `rand` (identical), zero-filled heap
+  blocks (no effect).
+- **Checked:** build; attract race (38 s, no error lines); `tick_replay.sh`
+  twice against the new baseline (both races all match); a frame dump
+  (normal). Raw accesses logged in the replay (handled, to convert): a
+  `CarInput`'s +0 to +16 (lifted copies), a `Framework`'s +72.
+- Rows proposed by the agents await the user's review (not written).
+- The schema check lists 23 accesses that fit no field: the modes' fault
+  fields the modes agent removed (block reads joined to the mode, which
+  stay guest reads, and the `ForceExit` stores at -28, never reached).
+
+
+## Step 4 as one swarm (the user's call, 2026-11-24)
+
+The rest of step 4 in one Workflow instead of batches, validated once at
+the end by the lead (build, attract race, `tick_replay.sh` twice, a frame
+dump; every `[error]` line and handle fault fixed; a replay race that
+differs is narrowed with logs, not guesses: the two builds' race data
+diffed at the race's first tick, each draw of the game's random generator
+logged with its caller). The script: `itc_recomp/tools/workflows/e5-step4-swarm.js`,
+`args`: `{"units": [{name, types, embedded, areas, files}]}`; one agent
+per unit, 6 at a time, and never two units sharing a file at once (the
+script holds each running unit's files). Agents edit only (the rules of
+step 3's swarm); their reports go into `docs/loops/e5-step4-reports.md`.
+
+### The swarm's groundwork (done 2026-11-24, before the swarm)
+
+- **`_address()` on host and dual views** (`schema_gen.py`): the field's
+  address, `address + offset`, an interior handle on the host, which every
+  guest load and store resolves (`memory::RawHandleLoad` and `Store`). The
+  build no longer lists raw uses; the runtime log does ("handles: a raw
+  N-byte access at +X of a T", once per type and offset). This unblocks
+  types whose field addresses go to the vector library and the matrix
+  math (`RigidBody`, `BoxShape`, `CollisionHit`, `CollisionContact`),
+  which read through `guest::Load*` and `Store*`.
+- **Raw accesses without a lock** (`memory/host_copy.cpp`): the sites
+  already logged are found in a lock-free table; logging stops after 512
+  (4,096 since the swarm's validation: `RaceMode` alone logs ~3,100).
+- **Host arrays**: `T::NewArray(base, count)` makes `count` objects in one
+  block behind one handle (element `i` is the handle + `i * kSize`, its
+  view `at(i)`); the handle's entry records the element size, and
+  overlays, copies and raw accesses use the element's layout at
+  `offset % size`. `Delete()` frees the whole block (through
+  `memory::FreeHandle`; 0 does nothing). In the schema,
+  `host_alloc_array = [{ call = 0x<return address>, reg = "r3" }]` (the
+  register holding the byte size) makes `lift.py` emit
+  `NewArray(base, reg / kSize)` for a lifted `new[]` without a count
+  header.
+- Checked: build, attract race (38 s, no error lines; the known raw read at
+  a `Framework`'s +72), `tick_replay.sh` twice (both races all match), a
+  frame dump (normal).
+
+### The units
+
+From `tools/e5_movable.py` (`coverage/e5_movable.tsv`, 2026-11-24): every
+type allocated and not tagged file, GPU or save, shared or not (shared no
+longer stops a move), less what's host or dual already, `UNREACHABLE`, the
+movie library's 9 (a replaced library), `CarSoundWaveBank` (file-backed:
+step 5), `HeapBlock` and `CString` (raw memory and strings, sizes 0): 68
+owners in 35 units, each with the types found inside it (embed fields,
+"Split from" notes, `T@+N` measure names; agents find the rest, such as
+the menus' machines carved out of a mode's block). Batch 1's skipped
+types are among them (`InputManager` with `ActionMapper`, `App`, the
+`AppCamera` family, `CarDealerEntry` and `CarDealerData`, the collision
+types, the modes' blocks).
+
+### The swarm: done (2026-11-24)
+
+35 agents, one per unit (run `wf_46642786-785`, ~46 minutes); their
+reports in `docs/loops/e5-step4-reports.md`. Schema types by storage:
+host 38 -> 155, dual 54 -> 118, guest 1,845 -> 1,665. Nothing moved in
+four units, by their agents' reading: `TrackRouteFile` is file-backed
+(read in place by the archive: step 5, as its twin `TrackMeshFile`);
+`AppScene` holds the command list and render queue (tagged GPU: step 7);
+`WorkerPool`'s worker loop reaches it through `lwarx`/`stwcx.` on a
+`guest::Pointer` (to do: a handle-aware atomic in `lift.py`, or the loop
+ported); `XAudioAllocBlock` is the measure's join of every `XAudio::Alloc`
+answer, not an object (the type that matters is `XAudioBumpAllocator`,
+whose block holds every XAudio object as interior addresses: a unit of its
+own). The big blocks moved whole with their machines and screens still
+reached through guest views (`RaceMode`, `Type4Block`, `Type2ModeBlock`,
+`Type5ModeBlock`, the type 9 and 10 blocks): correct through the owner's
+layout, logged as raw accesses; embedding them waits on `StateMachine`
+made dual and the owners' copies of their machines' words removed.
+
+**The lead's fixes in validation:**
+- `layout_fields` listed a field twice where an owner's scalar and an
+  embedded object's field share an offset (five agents found it; the
+  pilot's `StateLayer` had it): swapped twice, it came out in the wrong
+  order in copies and raw accesses. The owner's members now come first, an
+  embedded field over one of them is left out; no layout has overlaps.
+- **Views on objects inside other owners**: a host or dual view reached
+  through an interior handle read its own struct's members, while the bytes
+  there are laid out by the owner (an 80-byte record kept as bytes in guest
+  order): `collision::WordAt8` (`WordAt8Object`, dual) read a shape's
+  pointer byte-swapped and the collision query dereferenced it. Views now
+  read their members only when the handle's own object has their type
+  (`memory::HandleOwn`, by the layout's address, at an element boundary;
+  `direct()`), else by address through the owner's layout
+  (`memory::OwnerLoad` and `OwnerStore`, the raw path without its log
+  line).
+- **Copies between two host objects** whose layouts differ (a record kept
+  as bytes in `RaceCarSlot`, as members in `SceneInterior`) went byte for
+  byte: an interior's accessory index came out as `0x03000000` and its
+  load asked for a missing asset. Now through the guest's order (the
+  source's fields swapped by its layout, then the destination's).
+- `RigidBody` dual, not host: `RigidBody::Mass` (`sub_820B6708`, the float
+  at +4) is a shared leaf the render queue's sort also calls on its guest
+  entries.
+- schema_gen: the members' struct is `<Type>HostData` when `<Type>Data` is
+  also a type (`SaveScreen`, dual, beside `SaveScreenData`); a field named
+  like a host view's member (`data`, `at`, `New`, ...) is refused
+  (`D3DXBuffer`'s `data` renamed `contents`).
+- Layout scans by binary search (`TrackZones` has 18,555 fields); the raw
+  log's cap 4,096.
+
+**Checked:** the build; an attract race (38 s, no error lines); `tick_replay.sh`
+twice (both races all match, 112 and 1,183 ticks); a frame dump (the same
+frame as before the swarm). The replay and the attract race reach every
+unit's allocation but the type 5, 6, 7, 10 and 12 modes' blocks and the
+morph job maker (checked by the build only). Race 0's line-up skips 474
+reads now (24 to 34 before): the race is entered at the same time from
+launch (~0.33 s) but the boot's loading ran fewer ticks before it, the
+raw path over the big blocks being slower (races hold the 144 cap as
+before). `schema_check.py` lists 106 accesses that fit no field (23
+before): reads inside embed fields and arrays' later elements, which it
+doesn't resolve (`field_at` ignores embeds and strides), and the modes'
+fault fields batch 1 left. Raw accesses logged in the replay, by type:
+`RaceMode` ~3,100 sites, `Type4Block` ~800, `AppCameraCamera` 100,
+`PtrListNode` 63, `SysUsers` 17, a few each for `D3DXBuffer`,
+`AppCamera`, `AppDelegate`, `ActionMapper`, `ByteCountedList`,
+`InputManager`, `Framework`, `App` (to convert: the machines' views,
+`Camera` as a dual base, `StateListNode` and `Request` dual).
+
+Rows proposed by the agents await the user's review (not written).
+
+## Step 5 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 5 (the game's files): the user's go-ahead
+(2026-11-24, "do step 5"), run as step 4's swarm was (one Workflow, 6
+agents at a time, units sharing files never side by side, edits only, the
+lead's validation once at the end). The script:
+`itc_recomp/tools/workflows/e5-step5-swarm.js`, `args`:
+`{"units": [{name, loaders, types, hint, files}]}`; reports in
+`docs/loops/e5-step5-reports.md`.
+
+### The ground
+
+- 34 functions call `Archive::Load` (`sub_8209DE48`), each reading an asset
+  into a buffer it allocated; the game fixes up pointers inside and reads
+  the data in place. Other reads: the archives' tables of contents, the
+  data files at boot, the file class's and whole-file reads, the movies.
+- The measure's "file" and "save" tags are area-wide (`type_map.py`'s
+  `FILE_AREAS` and `SAVE_AREAS`: any type a function there touches), so
+  most of the ~370 tagged types are ordinary objects of those areas, which
+  move as step 4's did.
+- What stays in guest memory until step 7: what the renderer reads (vertex
+  and index data, textures, XPR texture packs, shader microcode), physical
+  allocations. The image loaders (the race overlays' textures, the rival
+  logo, the location pictures, the day's event images, the type 2 hub's
+  notice, the decal images) are texture packs: left out.
+
+### Groundwork: blobs (done 2026-11-24, `2f23bdfe`)
+
+A blob is a file's data (or any buffer the game uses as raw bytes) in PC
+memory behind a handle, its bytes in the guest's byte order, with no field
+layout (`memory::NewBlob`). Everything reaching it behaves as on guest
+memory: loads and stores by address (a direct big-endian path, no raw-access
+log line), `guest::Pointer` (gives the blob's bytes; a typed host object's
+handle still faults), so `ForEachHostPart` and the archive's reads, the
+vector loads and copies; the game's frees. In the schema, `storage = "blob"`
+(a guest view with `New(base, size)` and `Delete()`) and
+`blob_alloc = [{ call = 0x<return address>, reg = "r4" }]` (the size's
+register), which `lift.py` emits as `memory::NewBlob(reg, "<Type>")`.
+Checked: build, attract race.
+
+### The pilot: done (2026-11-24, `4f7d8d9f`)
+
+The track's collision mesh and route files (`TrackMeshFile`,
+`TrackRouteFile`; `TrackMesh::Load` and `TrackRoute::Load`, lifted,
+`VirtualAlloc` with the size in r4): two schema edits. Checked: build,
+attract race, `tick_replay.sh` twice (both races all match).
+
+### The units
+
+17, by format and area: models, the scene pools, the car models' loads,
+the course scenery, the accessories, the sound banks with the audio
+manager, the race's wave bank, the UI movies, the strings and font, the
+car parameters, the data tables, the camera files, the texture compressor,
+the saves, the menus, small objects of the loader areas, and the reads
+outside `Archive::Load`.
+
+### The swarm: done (2026-11-24)
+
+17 agents (run `wf_82bd95ee-2bf`; stopped once at the usage limit after 9
+units, resumed); reports in `docs/loops/e5-step5-reports.md`. Schema types
+by storage: blob 0 -> 37, host 155 -> 193, dual 118 -> 132, guest 1,665 ->
+1,590. In PC memory now: the car models' files, the car parameters, the
+data tables, the strings, the sound and wave banks (our FFmpeg reads the
+XMA data through `guest::Pointer`), the UI movies' files and texts, the
+camera animations, paths and garage presets, the archives' tables of
+contents and staging buffer, the XACT settings file, the save buffers and
+the replays kept in them, the scene's pool objects, the audio manager, the
+font, the accessories, the menus, the texture compressor's codecs and
+scratch. Left in guest memory: what the renderer reads (textures, vertex
+data, shader microcode, the image loaders' texture packs) until step 7.
+
+**The lead's fixes in validation:**
+- A few hand ports indexed guest memory directly (`base[address]`, five
+  sites) or copied from `base + address` (four): now `guest::LoadU8`,
+  `StoreU8` and `guest::Pointer` (the same bytes on guest memory).
+- `guest::VtableWord` read a host object's word in host order even inside
+  another owner (a texture provider at +4048 of a host `CarModel`, kept in
+  guest order there): the vtable came out byte-swapped and a slot read from
+  it called nothing. Now by the owner's layout (`memory::OwnerLoad`).
+- Blobs are whole 4 KB pages, as `VirtualAlloc`'s blocks: the pause menu's
+  `MenuList::IsEnabled` reads its enabled flags past the count it asked for.
+- A missing include (`save_layer.cpp`).
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks, the
+pause menu included); a frame dump (normal).
+
+## Step 6 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 6 (control flow and threads), the user's call
+(2026-11-24: "do step 6", "make use of an agent swarm for this too").
+
+### Groundwork: the stacks in PC memory (done 2026-11-24, `db5a8a0d`)
+
+The lifted code passes the addresses of its frames' slots to its callees
+everywhere (over 10,000 `rX = r1 + N`), so frames can't become C++ locals
+by a tool; the stacks themselves moved instead. Every thread's stack,
+thread object, per-thread block (r13) and TLS slots are blobs
+(`threads/threads.cpp`'s `Make`): r1 and r13 are handles. `guest.h` keeps
+the calling thread's stack (`memory::t_stack`, set when our thread starts)
+and finds its bytes first in every load, store and `guest::Pointer`,
+before the handles' lookup. Eleven hand-port sites reading frames through
+`base + address` (the car draws' and track route's word copies, the
+resolve's clear color, the inline draws' data, the memcpy check, a file
+path, the spin-lock words, the state digest) now go through
+`guest::Pointer`. Checked: build, attract race (38 s, no error lines, 150
+fps at the cap), `tick_replay.sh` twice (both races all match).
+
+### The swarm
+
+The hand ports' own work, by area (16 groups of the ~65 areas with guest
+frames, import calls or float mode switches; `threads/`, `imports/` and
+`memory/` are the lead's): frames' slots only the port reads become C++
+locals, slots handed to other code stay on the (PC memory) stack; import
+calls whose answer is a plain host operation called directly; float mode
+switches kept only where a result depends on them. The script:
+`itc_recomp/tools/workflows/e5-step6-swarm.js`, `args`:
+`{"units": [{name, areas, files}]}`; reports in
+`docs/loops/e5-step6-reports.md`. The lifted code's import calls (each
+through `lifted::Import`'s lookup) are a `lift.py` change, the lead's.
+
+### The swarm: done (2026-11-24)
+
+16 agents (run `wf_aa92f2e9-852`); reports in `docs/loops/e5-step6-reports.md`:
+282 changes (frames' slots only the port used made C++ locals, empty
+pass-through frames dropped, import calls straight to our answers, float
+mode switches dropped where nothing depends on them), 124 kept (slots
+handed to other code by address, or the guest fallbacks reading them).
+The lead: the lifted code's 564 import calls go straight to our answers
+(`lifted::ImportAt<&import_records::X>`: found at a site's first call,
+then called with no lookup; through `lifted::Import` with
+`--log_imports`). It built clean at once. Checked: attract race (38 s, no
+error lines, 150 to 151 fps), `tick_replay.sh` twice (both races all
+match), a frame dump (normal).
+
+Left of step 6: the lifted code's own frames stay (on the PC memory
+stacks: their slots' addresses go to their callees); the per-thread block
+is a blob read through r13 as before (not yet `thread_local` state); the
+lifted code's float mode switches are as the original made them.
+
+## Step 7 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 7 (the renderer's memory), the user's call
+(2026-11-24: "do step 7 with another swarm").
+
+### Groundwork: the physical memory out of guest memory (done 2026-11-24, `3987bc46`)
+
+The physical memory (the GPU's: textures, vertex and index data, shader
+microcode, the command buffer, the tiling workers' signals) is mapped on
+its own (`memory::g_physical`, `memory/mapping.cpp`), outside the guest
+mapping, and the renderer reads it there (`native::PhysicalHostAddress`).
+The guest's addresses for it (0x7F000000: physical 0 to 16 MB;
+0xA0000000 and 0xC0000000; 0xE0000000, + 4 KB) are no longer views of
+guest memory: `guest.h` translates them in every load, store and
+`guest::Pointer`, so the game's code and our ports reach the same bytes. A
+raw `base + address` into them faults, named by the fault handler
+("physical fault"); two were found (the shader microcode's copy in
+`native/replay_hooks.cpp`, a resource word in `graphics/resources.cpp`).
+Checked: build, attract race (38 s, no error lines, 150 fps at the cap),
+`tick_replay.sh` twice (both races all match), a frame dump.
+
+### The swarm
+
+Seven units: what the GPU never reads out of physical memory (the sound
+buffers, the course scenery's lists, the models' and shaders' blocks, the
+surfaces, the lifted direct allocations) into blobs; the image loaders
+step 5 left (their files' buffers blobs where the pixels are copied out
+before the renderer reads them). The script:
+`itc_recomp/tools/workflows/e5-step7-swarm.js`; reports in
+`docs/loops/e5-step7-reports.md`.
+
+### The swarm: done (2026-11-24)
+
+7 agents (run `wf_21df284c-eb9`); reports in `docs/loops/e5-step7-reports.md`.
+Out of physical memory into blobs: the sound buffers (the race's slot wave
+banks, the effects bank pair's, `BankPair::Load`'s), the course scenery's
+blocks (the manager, the draw lists, the visible areas, the course set's
+first file, the object pools), and the image files step 5 left (the race
+overlays' textures, the location pictures, the day's event images, the
+type 2 hub's notice image, the decal images: their pixels are copied out
+before the renderer reads them). What the renderer reads stays in physical
+memory, outside guest memory since the groundwork: the models' vertex
+data, textures and XPR data, shader microcode, the surfaces, the rival
+logo's XPR. It built clean at once. Checked: attract race (38 s, no error
+lines, 150 to 151 fps), `tick_replay.sh` twice (both races all match), a
+frame dump (normal).
+
+The guest mapping's scaffolding (`memory/mapping.cpp`: the 4 GB
+reservation, the memory file and its views, now holding only the heap and
+the image) waits for step 8, the user's call (2026-11-24): then the heap
+and the image become blocks of their own, translated as the physical
+memory is, and the reservation goes (`docs/e5-native.md`, step 9, added
+to the plan the same day).
+
+## Step 8: the image's data compiled in (2026-11-24)
+
+`docs/e5-native.md` step 8, done directly (the user's go-ahead,
+2026-11-24). `itc_recomp/tools/image_data.py <default.xex>` (on the
+developer's machine; Python with the `cryptography` package for AES)
+decrypts the player's `default.xex`, checks its SHA-1, and writes its
+`.rdata` (`0x82000600` to `0x82077400`) and `.data` (`0x82600000` to
+`0x82978400`) sections into `src/image/image_rdata.cpp` and
+`image_data.cpp`: the runs holding nonzero bytes (gaps of 64 zero bytes
+end a run), as big-endian words, 361 runs, 748 KB.
+`image::CopyInto` (`src/image/image.cpp`) stores them at their addresses
+at start-up, before the kernel variables are bound; the load address and
+the main thread's stack size (0x40000) are constants (`src/image/image.h`).
+`src/app/image_load.cpp` (the XEX loader) and the start-up's check for
+`default.xex` are gone.
+
+Not compiled in: the headers, `.pdata`, the code (`.text`, the
+`.embsec_` sections), `.idata` (no code builds an address in it: the
+`lis rN,-32104` references end in `.data`'s zeros at `0x8297xxxx`),
+`.XBLD` and `.reloc`. That nothing reads them is shown by the checks: they
+are zeros now, and the game ran the same tick for tick.
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks); a
+frame dump (normal); an attract race from a folder holding only `DATA/`
+(no `default.xex`): 18 s, no error lines.
+
+Next is step 9: the heap and the image become blocks of their own,
+outside the guest mapping (the image's block can be the compiled-in data
+itself).
+
+
+## Step 9 as one swarm (2026-11-24)
+
+`docs/e5-native.md` step 9 (the heap and the image out of the guest
+mapping), the user's call (2026-11-24: "do step 9, make use of a swarm").
+
+### Groundwork: the heap and the image in blocks of their own (done 2026-11-24, `95c5f19f`)
+
+There is no guest mapping any more: no memory file, no views. The heap
+(our allocation layer's range, `0x10000` + 384 MiB) and the image
+(`0x82000000` + `0x9B0000`, its data compiled in since step 8) are blocks
+of host memory of their own (`memory::g_heap`, `memory::g_image`,
+`memory/mapping.cpp`), as the physical memory is since step 7
+(`memory::g_physical`, now anonymous memory too). `guest.h` translates
+their addresses in every load, store and `guest::Pointer`
+(`memory::BlockPointer`). `base`, still passed through the code until step
+10, is a 4 GB range with nothing mapped: a raw `base + address` faults, and
+the fault handler names it ("guest fault: a raw access at X (the heap /
+the image / a null pointer / no block)"). Raw sites converted: the native
+audio's sample read, the per-frame logic's state copies, the kernel
+variables' strings, the debug scans and captures (their ranges now the
+heap's and the image's blocks instead of `/proc/self/maps` under `base`).
+Checked: build, attract race (38 s, no error lines, 150 fps at the cap),
+`tick_replay.sh` (both races all match).
+
+### The swarm
+
+The races and the tick replay only reach the paths they play; a raw access
+on another path (a menu, the saves, the replay theater) would fault for a
+player. The swarm reads every hand port (`src/` but `lifted/`, `schema/`,
+`image/`, `memory/`, `harnesses/`: about 395,000 lines in 16 units of
+about 25,000, `hooks/` split by file) for code that assumes the old flat
+mapping (host addresses made from `base`, guest addresses recovered from
+host pointers, a host pointer for one address walked to another, spans
+leaving their block) and converts each site to `guest.h`'s calls, the same
+bytes in the same order. The script:
+`itc_recomp/tools/workflows/e5-step9-swarm.js`, `args`:
+`{"units": [{name, files}]}`; reports in `docs/loops/e5-step9-reports.md`.
+
+### The swarm: done (2026-11-24)
+
+16 agents (run `wf_6f32ad81-49b`); reports in `docs/loops/e5-step9-reports.md`.
+No unit had a site left to change: every hand port reaches memory through
+`guest.h` (the groundwork had converted the raw sites there were). Their
+notes, read by the lead: the remaining single-object spans through
+`guest::Pointer` (debug strings, the camera passes' snapshot in the image,
+the XMA buffer, the car list's records) stay inside one block; the copy
+checks in `c_runtime/strings.cpp` (`Behind`, `InOneView`) still describe
+the old views but only compare guest addresses, the copies themselves made
+per address through `guest::Pointer` or `memory::CopyWithHandles`. Left
+for step 10 with `base`: `native/state.h`'s unused `kPhysicalMemoryOffset`
+and its comment, the copy checks' view table.
+
+**Checked:** the build; an attract race (38 s, no error lines, 150 to 151
+fps); `tick_replay.sh` twice (both races all match, 112 and 1,183 ticks); a
+frame dump (normal).
+
+The game's memory is now all host memory: the heap, the image and the
+physical memory in blocks of their own, the stacks, blobs and host objects
+behind handles. Nothing is reached through `base` any more; what's left is
+step 10 (the guest addresses themselves: `base`, `guest.h`'s translation,
+the lifted code's 32-bit addresses).
+
+
+## Step 10 as one swarm (2026-11-25)
+
+`docs/e5-native.md` step 10, the user's call (2026-11-24: "do step 10, make
+use of a swarm"). What step 10 can remove now: `base`, the pointer every
+function took for the guest mapping, which since step 9 only stood for an
+unmapped range. Everything else step 10 lists (`guest.h`'s 32-bit
+addresses, `lifted::Call` and the dispatch table, the lifted runtime) goes
+only when the lifted code is typed C++ (see "What's left of step 10" below).
+
+### Groundwork: `base` dropped (2026-11-25, `d0383928`, `a2232059`)
+
+- `guest.h`: every function takes only the guest address; an address in no
+  block (a null pointer's, a handle's typed object read raw) stops the
+  program, named (`memory::NoBlock`). The 4 GB fault range and the fault
+  handler are gone (`memory/mapping.cpp`, `memory/handles.cpp`); a view is
+  only its address (`schema/view.h`, `explicit View(uint32_t)`).
+- A codemod (parameters `uint8_t* base`, the argument `base`, `x.base` and
+  `memory::Base()`, lambda captures) over `src/` (1,267 files, 368,869
+  edits), and the same over the generators' templates (`lift.py`,
+  `lift_originals.py`, `schema_gen.py`, `entry_list.py`,
+  `import_entries.py`) and `src/lifted/signatures.json`: regenerating gives
+  the codemod's output byte for byte.
+- The lead's fixes by script: function pointer types with an unnamed
+  `uint8_t*`, declarations the codemod turned into most vexing parses (now
+  brace inits), `base` members and their initializers, the machine init
+  tables' enum field `Value::base` the codemod emptied (`switch (v.base)`,
+  put back; the only non-pointer `base` it reached, besides fields it left
+  intact).
+
+### The swarm
+
+39 files the compiler still rejected, in 8 units with their error lines;
+agents fix them by reading (no builds), restoring anything the codemod
+dropped that wasn't the guest base. The script:
+`itc_recomp/tools/workflows/e5-step10-swarm.js`, `args`:
+`{"units": [{name, files, errors_file}]}`; reports in
+`docs/loops/e5-step10-reports.md`.
+
+### The swarm: done (2026-11-25)
+
+8 agents (run `wf_4fc71676-c70`); reports in `docs/loops/e5-step10-reports.md`.
+They fixed what the codemod couldn't: views and calls built with a literal
+`nullptr` base, function pointer types and template instantiations still
+naming `uint8_t*`, braced view returns the explicit constructor refuses, an
+overload pair (`S16`) that collided once base was dropped, leftover
+`(void)base;` lines. Nothing to restore: no other unrelated `base` was hit.
+The lead then fixed three stand-in typedefs in headers the agents named and
+15 definitions with an unnamed `uint8_t*` parameter (linked as overloads of
+nothing). `e5_status.py`'s call patterns follow the new spelling.
+
+**Checked:** the build (clean); an attract race (38 s, no error lines, 150
+to 151 fps); `tick_replay.sh` twice (both races all match, 112 and 1,183
+ticks); a frame dump (normal).
+
+`base` is gone: nothing in the program holds or passes a pointer to guest
+memory, and there's no 4 GB range reserved for it. Every access goes
+through `guest.h` by guest address to the host block holding it.
+
+### What's left of step 10
+
+`guest.h`, `guest_code.h`, `lifted::Call`, the dispatch table and the
+lifted runtime go only when nothing uses a guest address: the lifted code
+(3,726 functions, about 1,000,000 lines of register-level C++) rewritten
+as typed C++ over host structs. Measured now (`tools/e5_status.py`):
+112,420 guest loads and stores in the lifted code and 24,268 in the hand
+ports, 6,522 calls by address, 4,286 functions with guest stack frames,
+11,660 image addresses, 1,590 schema types still guest-shaped. That's the
+type-by-type conversion step 4's swarms began (117 types for 35 agents),
+continued until the last guest type goes, then the lifted functions
+rewritten area by area: many swarms, not one.
+

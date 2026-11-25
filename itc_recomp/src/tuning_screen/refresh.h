@@ -34,7 +34,6 @@ constexpr uint32_t kHelpTextLr = 0x821E68C0;
 constexpr uint32_t kHelpScrollLr = 0x821E68D4;
 
 struct Context {
-  uint8_t* base;
   const StandCalls& stand;
   uint64_t self;     // r31: r3 at entry, all 64 bits
   uint32_t screen;   // its low word
@@ -42,7 +41,7 @@ struct Context {
   uint32_t movie;    // r30: movie 2
   std::optional<double>* f1;
 
-  schema::TuningScreen Screen() const { return schema::TuningScreen(base, screen); }
+  schema::TuningScreen Screen() const { return schema::TuningScreen(screen); }
   int32_t State() const { return int32_t(Screen().state()); }
   int32_t Category() const { return int32_t(Screen().category()); }
   uint32_t Item() const { return uint32_t(Screen().item()); }

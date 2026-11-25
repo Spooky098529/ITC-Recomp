@@ -34,7 +34,6 @@ constexpr int kBurstTicks = 60;          // 2 s
 
 // Guest addresses that can hold game objects: below the physical memory
 // views at 0xA0000000.
-constexpr uint64_t kGuestScanEnd = 0xA0000000;
 
 constexpr uint32_t kRecordMagic = 0x49544331;  // "ITC1"
 
@@ -77,7 +76,7 @@ class StateCapture {
     }
   }
 
-  void OnTickDone(uint8_t* base) {
+  void OnTickDone() {
     if (!Open()) {
       return;
     }
@@ -91,8 +90,8 @@ class StateCapture {
     }
 
     if (ticks_until_scan_ <= 0) {
-      ScanForReferrers(base, vehicles);
-      ScanForNearbyMatrices(base, vehicles[0]);
+      ScanForReferrers(vehicles);
+      ScanForNearbyMatrices(vehicles[0]);
       ticks_until_scan_ = kTicksBetweenScans;
       burst_ticks_left_ = kBurstTicks;
     }
@@ -116,7 +115,7 @@ class StateCapture {
     for (uint32_t point : nearby_points_) {
       regions.push_back({point, kPointSize});
     }
-    WriteRecord(base, regions);
+    WriteRecord(regions);
     tick_++;
   }
 
@@ -147,36 +146,13 @@ class StateCapture {
   }
 
   // Guest address ranges that are readable, from the host's memory map.
-  static std::vector<Region> ReadableGuestRanges(uint8_t* base) {
-    std::vector<Region> ranges;
-#ifdef _WIN32
-    // Reads the Linux memory map; captures aren't supported on Windows.
-    (void)base;
-    return ranges;
-#endif
-    std::ifstream maps("/proc/self/maps");
-    std::string line;
-    uint64_t guest_start = reinterpret_cast<uint64_t>(base);
-    while (std::getline(maps, line)) {
-      std::istringstream fields(line);
-      std::string span, perms;
-      fields >> span >> perms;
-      if (perms.empty() || perms[0] != 'r') {
-        continue;
-      }
-      uint64_t start = std::stoull(span.substr(0, span.find('-')), nullptr, 16);
-      uint64_t end = std::stoull(span.substr(span.find('-') + 1), nullptr, 16);
-      if (end <= guest_start || start >= guest_start + kGuestScanEnd) {
-        continue;
-      }
-      start = std::max(start, guest_start);
-      end = std::min(end, guest_start + kGuestScanEnd);
-      ranges.push_back({uint32_t(start - guest_start), uint32_t(end - start)});
-    }
-    return ranges;
+  // The memory game state can be in (E5 step 9: the heap's and the image's
+  // blocks, memory/mapping.cpp), as guest ranges.
+  static std::vector<Region> ReadableGuestRanges() {
+    return {{memory::kHeapStart, memory::kHeapBytes}, {memory::kImageStart, memory::kImageBytes}};
   }
 
-  void ScanForReferrers(uint8_t* base, const std::vector<uint32_t>& vehicles) {
+  void ScanForReferrers(const std::vector<uint32_t>& vehicles) {
     auto started = std::chrono::steady_clock::now();
     referrers_.clear();
     std::vector<uint32_t> wanted;  // big-endian, as stored in guest memory
@@ -184,8 +160,8 @@ class StateCapture {
       wanted.push_back(__builtin_bswap32(vehicle));
     }
     std::vector<size_t> found(vehicles.size(), 0);
-    for (const Region& range : ReadableGuestRanges(base)) {
-      auto* words = reinterpret_cast<const uint32_t*>(base + range.address);
+    for (const Region& range : ReadableGuestRanges()) {
+      auto* words = reinterpret_cast<const uint32_t*>(guest::Pointer(range.address));
       size_t count = range.size / 4;
       for (size_t i = 0; i < count; i++) {
         uint32_t word = words[i];
@@ -267,17 +243,17 @@ class StateCapture {
 
   // Finds 4x4 matrices (world or view) that place something near the car
   // but not on it, and loose 16-byte-aligned positions near the car.
-  void ScanForNearbyMatrices(uint8_t* base, uint32_t vehicle) {
+  void ScanForNearbyMatrices(uint32_t vehicle) {
     auto started = std::chrono::steady_clock::now();
     nearby_matrices_.clear();
     nearby_points_.clear();
     uint32_t car_matrix = vehicle + kVehicleWorldMatrixOffset;
     float car[3];
     for (int k = 0; k < 3; k++) {
-      car[k] = guest::LoadFloat(base, car_matrix + 48 + 4 * k);
+      car[k] = guest::LoadFloat(car_matrix + 48 + 4 * k);
     }
-    for (const Region& range : ReadableGuestRanges(base)) {
-      auto* words = reinterpret_cast<const uint32_t*>(base + range.address);
+    for (const Region& range : ReadableGuestRanges()) {
+      auto* words = reinterpret_cast<const uint32_t*>(guest::Pointer(range.address));
       size_t count = range.size / 4;
       for (size_t i = 0; i + 16 <= count; i += 4) {
         uint32_t address = range.address + uint32_t(i * 4);
@@ -315,7 +291,7 @@ class StateCapture {
     out_.write(reinterpret_cast<const char*>(&value), sizeof(value));
   }
 
-  void WriteRecord(uint8_t* base, const std::vector<Region>& regions) {
+  void WriteRecord(const std::vector<Region>& regions) {
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                   std::chrono::steady_clock::now() - start_)
                   .count();
@@ -326,7 +302,7 @@ class StateCapture {
     for (const Region& region : regions) {
       Write32(region.address);
       Write32(region.size);
-      out_.write(reinterpret_cast<const char*>(base + region.address), region.size);
+      out_.write(reinterpret_cast<const char*>(guest::Pointer(region.address)), region.size);
     }
     // Which pointer each referrer window belongs to, for the reader.
     if (burst_ticks_left_ + 1 == kBurstTicks) {
@@ -369,11 +345,11 @@ void StateCapture_OnVehicleSeen(uint32_t vehicle) {
   GetStateCapture().OnVehicleSeen(vehicle);
 }
 
-void StateCapture_OnTickDone(uint8_t* base) {
+void StateCapture_OnTickDone() {
   if (ITC_FLAG(capture_dir).empty()) {
     return;
   }
-  GetStateCapture().OnTickDone(base);
+  GetStateCapture().OnTickDone();
 }
 
 }  // namespace debug

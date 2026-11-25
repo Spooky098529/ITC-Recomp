@@ -23,25 +23,25 @@ constexpr uint64_t Extended(uint32_t address) { return 0xFFFFFFFF00000000ull | a
 
 }  // namespace
 
-uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t Update(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A64A0 SaveScreen::Update");
-  Fn f(base, sp, 144, calls);
+  Fn f(sp, 144, calls);
   f.Call(kDebugPrint, 0x821A64C8, 100, 30, 0, 0x8200A4F0);
-  const uint32_t movie = FindMovie(base, 44, f.frame + 80);
+  const uint32_t movie = FindMovie(44, f.frame + 80);
   f.r3 = movie;
   for (uint32_t i = 0; i < 7; i++) {
-    Store(base, f.frame + 96 + 4 * i, kSteps[i]);
+    Store(f.frame + 96 + 4 * i, kSteps[i]);
   }
-  auto pages = Pages(base);
+  auto pages = Pages();
   const int32_t step = int32_t(pages.step());
   if (step == -1) {
-    if (int32_t(Data(base).dialog_state()) != -1) {
+    if (int32_t(Data().dialog_state()) != -1) {
       f.Call(kRun, 0x821A65F0, movie, 0);
     }
     return f.r3;
   }
   if (step >= 0) {
-    const uint32_t function = Load(base, f.frame + 96 + 4 * uint32_t(step));
+    const uint32_t function = Load(f.frame + 96 + 4 * uint32_t(step));
     const uint64_t args[8] = {pages.step_started_address(),
                               Extended(kSteps[0]),
                               Extended(kSteps[1]),
@@ -51,7 +51,7 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
                               Extended(kSteps[5]),
                               uint32_t(step) << 2};
     f.r3 = calls.CallArgs(function, f.frame, 0x821A656C, args);
-    pages = Pages(base);
+    pages = Pages();
     if (int32_t(uint32_t(f.r3)) == 0) {
       return f.r3;
     }
@@ -69,53 +69,53 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   return f.r3;
 }
 
-uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls) {
+uint64_t Draw(uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A6AF0 SaveScreen::Draw");
-  Fn f(base, sp, 368, calls, Extended(0x821A2C98));
-  Store(base, sp + 20, machine);
-  Store(base, sp + 28, mode);
-  auto pages = Pages(base);
+  Fn f(sp, 368, calls, Extended(0x821A2C98));
+  Store(sp + 20, machine);
+  Store(sp + 28, mode);
+  auto pages = Pages();
   const int32_t page = int32_t(pages.page());
   const bool stepping = page == -1 && int32_t(pages.step()) != -1;
-  if (!stepping && int32_t(Data(base).cancel()) != 0 && page != 26 && page != 4 &&
+  if (!stepping && int32_t(Data().cancel()) != 0 && page != 26 && page != 4 &&
       page != 9 && page != 16 && page != 21 && page != 25) {
-    const uint32_t kind = Data(base).kind();
+    const uint32_t kind = Data().kind();
     if (kind == 0) {
-      Go(base, 4, 2, kNone);
+      Go(4, 2, kNone);
     } else if (kind == 1) {
-      Go(base, 9, 2, kNone);
+      Go(9, 2, kNone);
     } else if (kind < 6) {
-      Data(base).set_answer(0);
-      Go(base, 16, 2, kNone);
+      Data().set_answer(0);
+      Go(16, 2, kNone);
     } else if (kind == 6) {
-      if (int32_t(Data(base).dialog_state()) == -1) {
-        Jump(base, 21);
+      if (int32_t(Data().dialog_state()) == -1) {
+        Jump(21);
       } else {
-        Go(base, 21, 2, kNone);
+        Go(21, 2, kNone);
       }
     } else if (kind == 7) {
-      Go(base, 25, 2, kNone);
+      Go(25, 2, kNone);
     }
   }
-  pages = Pages(base);
+  pages = Pages();
   const int32_t shown = int32_t(pages.page());
-  Store(base, f.frame + 80, 0x821A0000);
+  Store(f.frame + 80, 0x821A0000);
   for (uint32_t i = 0; i < 27; i++) {
-    Store(base, f.frame + 96 + 4 * i, kPageTable[i]);
+    Store(f.frame + 96 + 4 * i, kPageTable[i]);
   }
   if (shown != -1) {
-    const uint32_t function = Load(base, f.frame + 96 + 4 * uint32_t(shown));
-    const uint64_t args[8] = {Load(base, sp + 28),         Extended(kPageTable[20]),
+    const uint32_t function = Load(f.frame + 96 + 4 * uint32_t(shown));
+    const uint64_t args[8] = {Load(sp + 28),         Extended(kPageTable[20]),
                               Extended(kPageTable[21]),    Extended(kPageTable[22]),
                               Extended(kPageTable[23]),    Extended(kPageTable[24]),
                               Extended(kPageTable[25]),    f.frame + 96};
     f.r3 = calls.CallArgs(function, f.frame, 0x821A6DD0, args);
   }
-  const uint32_t next = Data(base).next_state();
+  const uint32_t next = Data().next_state();
   if (int32_t(next) != 21) {
-    Machine(base, Load(base, sp + 20)).set_state(next);
-    Data(base).set_next_state(21);
-    if (Data(base).kind() < 2) {
+    Machine(Load(sp + 20)).set_state(next);
+    Data().set_next_state(21);
+    if (Data().kind() < 2) {
       f.Call(kSaveBuffersDestroy, 0x821A6E0C, f.r3);
     }
   }

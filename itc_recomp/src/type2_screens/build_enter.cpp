@@ -20,124 +20,123 @@ constexpr uint32_t kPercent = 0x82002968;  // the float the state-2 count is sca
 constexpr uint32_t kRatioScale = 0x82002A0C;
 constexpr uint32_t kFadeInLayer = 0x82001BEC;
 
-schema::BuildScreenData Screen(uint8_t* base) { return Globals::build_screen(base); }
+schema::BuildScreenData Screen() { return Globals::build_screen(); }
 
-uint16_t Half(uint8_t* base, uint32_t address) { return guest::LoadU16(base, address); }
-int32_t SignedHalf(uint8_t* base, uint32_t address) { return int16_t(Half(base, address)); }
+uint16_t Half(uint32_t address) { return guest::LoadU16(address); }
+int32_t SignedHalf(uint32_t address) { return int16_t(Half(address)); }
 
 // The list's link `steps` from its head, by the halfword links.
-uint32_t Walk(uint8_t* base, uint32_t list, uint32_t steps) {
-  uint32_t link = list + 4 * uint32_t(int32_t(int16_t(schema::BuildSlotList(base, list).head())));
+uint32_t Walk(uint32_t list, uint32_t steps) {
+  uint32_t link = list + 4 * uint32_t(int32_t(int16_t(schema::BuildSlotList(list).head())));
   while (steps != 0) {
-    link = list + 4 * uint32_t(SignedHalf(base, link));
+    link = list + 4 * uint32_t(SignedHalf(link));
     steps -= 1;
   }
   return link;
 }
 
 // The build a list's link names: the slot of the node (+2).
-uint32_t BuildAt(uint8_t* base, uint32_t list, uint32_t link) {
-  return Load(base, schema::BuildSlotList(base, list).slots_address() +
-                        4 * uint32_t(SignedHalf(base, link + 2)));
+uint32_t BuildAt(uint32_t list, uint32_t link) {
+  return Load(schema::BuildSlotList(list).slots_address() +
+                        4 * uint32_t(SignedHalf(link + 2)));
 }
 
 }  // namespace
 
-void BuildListRemoveAt(uint8_t* base, uint32_t list, uint32_t position) {
+void BuildListRemoveAt(uint32_t list, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_8219C160 BuildList::RemoveAt");
-  const schema::BuildSlotList slots(base, list);
-  const uint32_t link = position == 0 ? slots.head_address() : Walk(base, list, position - 1);
-  const uint16_t node = Half(base, link);
+  const schema::BuildSlotList slots(list);
+  const uint32_t link = position == 0 ? slots.head_address() : Walk(list, position - 1);
+  const uint16_t node = Half(link);
   const uint32_t at = list + 4 * uint32_t(int32_t(int16_t(node)));
-  const uint16_t next = Half(base, at);
-  guest::StoreU16(base, at, node);
-  guest::StoreU16(base, link, next);
-  const uint16_t moved = Half(base, at);
+  const uint16_t next = Half(at);
+  guest::StoreU16(at, node);
+  guest::StoreU16(link, next);
+  const uint16_t moved = Half(at);
   const uint16_t free = slots.free();
   slots.set_free(moved);
-  guest::StoreU16(base, at, free);
+  guest::StoreU16(at, free);
   slots.set_count(uint16_t(slots.count() - 1));
 }
 
-uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t BuildFill(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A0228 BuildScreen::Fill");
-  const uint32_t frame = Frame(base, sp, 240);
-  const SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const uint32_t frame = Frame(sp, 240);
+  const SaveData save(vehicle_accessors::SaveDataOf(0));
   int32_t day = int32_t(save.day());
   for (uint32_t k = 0; k < 5; k++) {
     // The player's name, 20 bytes from +8 (SaveData's pick_head).
-    Store(base, Screen(base).name_address() + 4 * k, Load(base, save.pick_head_address() + 4 * k));
+    Store(Screen().name_address() + 4 * k, Load(save.pick_head_address() + 4 * k));
   }
-  Screen(base).set_money(save.money());
-  Screen(base).set_weekday(uint32_t(day - (day / 7) * 7));
+  Screen().set_money(save.money());
+  Screen().set_weekday(uint32_t(day - (day / 7) * 7));
   if (day > 999) {
     day = 999;
   }
-  Screen(base).set_day(uint32_t(day));
+  Screen().set_day(uint32_t(day));
   // The builds.
   const uint32_t record = frame + 96;
   for (uint32_t i = 0; i < 400; i++) {
-    const schema::OpponentItem item(base, data_tables::Item(base, i));
+    const schema::OpponentItem item(data_tables::Item(i));
     const uint32_t entry = 12 * i;  // player 0's build state: the item record `i`
-    Store(base, record + 12, 0);
-    Store(base, record + 44, 0);
-    Store(base, record + 48, item.build_address());
+    Store(record + 12, 0);
+    Store(record + 44, 0);
+    Store(record + 48, item.build_address());
     const int32_t group = int8_t(item.category());
-    Store(base, record + 24, 0);
-    Store(base, record + 4, uint32_t(group));
-    Store(base, record + 0, uint32_t(int32_t(int16_t(item.id()))));
-    Store(base, record + 20, uint32_t(int32_t(int8_t(item.location()))));
-    Store(base, record + 28, uint32_t(int32_t(int16_t(item.level()))));
+    Store(record + 24, 0);
+    Store(record + 4, uint32_t(group));
+    Store(record + 0, uint32_t(int32_t(int16_t(item.id()))));
+    Store(record + 20, uint32_t(int32_t(int8_t(item.location()))));
+    Store(record + 28, uint32_t(int32_t(int16_t(item.level()))));
     uint32_t kind = 0;
     switch (int16_t(item.mode_mask())) {
-      case 1: kind = 0; Store(base, record + 24, kind); break;
-      case 2: kind = 1; Store(base, record + 24, kind); break;
-      case 4: kind = 2; Store(base, record + 24, kind); break;
-      case 7: kind = 3; Store(base, record + 24, kind); break;
+      case 1: kind = 0; Store(record + 24, kind); break;
+      case 2: kind = 1; Store(record + 24, kind); break;
+      case 4: kind = 2; Store(record + 24, kind); break;
+      case 7: kind = 3; Store(record + 24, kind); break;
       default: break;
     }
-    const bool owned = SignedHalf(base, save.item_record_wins_address() + entry) != 0;
+    const bool owned = SignedHalf(save.item_record_wins_address() + entry) != 0;
     uint32_t flags;
-    if (!owned && Half(base, save.item_record_outcome3_address() + entry) == 0 &&
-        Half(base, save.item_record_losses_address() + entry) == 0) {
-      Store(base, record + 8, 0);
+    if (!owned && Half(save.item_record_outcome3_address() + entry) == 0 &&
+        Half(save.item_record_losses_address() + entry) == 0) {
+      Store(record + 8, 0);
       flags = 1;
     } else if (!owned) {
-      Store(base, record + 8, 1);
+      Store(record + 8, 1);
       flags = 3;
     } else {
-      Store(base, record + 8, 2);
+      Store(record + 8, 2);
       flags = 7;
     }
-    Store(base, record + 32, flags);
-    const uint32_t seen = Load(base, save.item_flags_address() + 4 * (i >> 5)) & (1u << (i & 31));
+    Store(record + 32, flags);
+    const uint32_t seen = Load(save.item_flags_address() + 4 * (i >> 5)) & (1u << (i & 31));
     if (seen != 0) {
-      Store(base, record + 40, 1);
-      Store(base, record + 32, flags | 8);
+      Store(record + 40, 1);
+      Store(record + 32, flags | 8);
     } else {
-      Store(base, record + 40, 0);
+      Store(record + 40, 0);
     }
     if (group == 48 || group == 49) {
-      Store(base, record + 16, group == 48 ? 2 : 1);
+      Store(record + 16, group == 48 ? 2 : 1);
       const uint32_t first = group == 48 ? 48 : 52;
       const uint32_t v = kind == 0 ? first : kind == 1 ? first + 1 : first + 2 + (kind != 2 ? 1 : 0);
-      Store(base, record + 4, v);
+      Store(record + 4, v);
     } else {
-      Store(base, record + 16, 0);
+      Store(record + 16, 0);
     }
-    Store(base, record + 36, Load(base, save.item_record_word_address() + entry));
+    Store(record + 36, Load(save.item_record_word_address() + entry));
     calls.Call(kMemcpy, frame, 0x821A04B8,
-               Screen(base).builds_address() + schema::BuildRecord::kSize * i, record, 52);
+               Screen().builds_address() + schema::BuildRecord::kSize * i, record, 52);
   }
   // The lists made empty.
   for (uint32_t off = 0; off < kListsEnd; off += kListBytes) {
-    const schema::BuildSlotList list(
-        base, schema::BuildGroup(base, Screen(base).groups_address() + off).list_address());
+    const schema::BuildSlotList list(schema::BuildGroup(Screen().groups_address() + off).list_address());
     for (uint32_t k = 0; k < 400; k++) {
-      guest::StoreU16(base, list.links_address() + 4 * k + 2, uint16_t(k));
-      guest::StoreU16(base, list.links_address() + 4 * k, uint16_t(k + 1));
+      guest::StoreU16(list.links_address() + 4 * k + 2, uint16_t(k));
+      guest::StoreU16(list.links_address() + 4 * k, uint16_t(k + 1));
     }
-    guest::StoreU16(base, list.links_address() + 1596, 0xFFFF);  // the last node's next
+    guest::StoreU16(list.links_address() + 1596, 0xFFFF);  // the last node's next
     list.set_head(0xFFFF);
     list.set_unknown_1606(0xFFFF);
     list.set_free(0);
@@ -146,33 +145,33 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   // Each build into its group's list.
   for (uint32_t off = 0; off < 52 * 400; off += 52) {
-    const schema::BuildScreenData screen = Screen(base);
-    const schema::BuildRecord build(base, screen.builds_address() + off);
-    Store(base, frame + 80, build.address);
+    const schema::BuildScreenData screen = Screen();
+    const schema::BuildRecord build(screen.builds_address() + off);
+    Store(frame + 80, build.address);
     const uint32_t list =
-        schema::BuildGroup(base, screen.groups_address() + build.group() * kListBytes).list_address();
+        schema::BuildGroup(screen.groups_address() + build.group() * kListBytes).list_address();
     calls.Call(kBuildListInsert, frame, 0x821A0560, list, frame + 80,
-               uint64_t(int64_t(int16_t(schema::BuildSlotList(base, list).count()))));
+               uint64_t(int64_t(int16_t(schema::BuildSlotList(list).count()))));
   }
   // The state-2 count as a percentage.
-  const schema::BuildScreenData screen = Screen(base);
+  const schema::BuildScreenData screen = Screen();
   int32_t owned = 0;
   for (uint32_t i = 0; i < 400; i++) {
-    if (schema::BuildRecord(base, screen.builds_address() + schema::BuildRecord::kSize * i).state() ==
+    if (schema::BuildRecord(screen.builds_address() + schema::BuildRecord::kSize * i).state() ==
         2) {
       owned++;
     }
   }
-  Store(base, frame + 80, owned < 0 ? kNone : 0);
-  Store(base, frame + 84, uint32_t(owned));
+  Store(frame + 80, owned < 0 ? kNone : 0);
+  Store(frame + 84, uint32_t(owned));
   {
-    const float scaled = float(double(Single(owned)) * double(guest::LoadFloat(base, kPercent)));
+    const float scaled = float(double(Single(owned)) * double(guest::LoadFloat(kPercent)));
     screen.set_number(uint32_t(TruncateWord(double(scaled))));
   }
-  const float scale = guest::LoadFloat(base, kRatioScale);
+  const float scale = guest::LoadFloat(kRatioScale);
   // The lists' summaries.
   for (uint32_t j = 0, off = 0; off < kListsEnd; j++, off += kListBytes) {
-    const schema::BuildGroup summary(base, Screen(base).groups_address() + off);
+    const schema::BuildGroup summary(Screen().groups_address() + off);
     summary.set_index(j);
     const int32_t count = int16_t(summary.list_count());
     int32_t states2 = 0;
@@ -180,7 +179,7 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
     int32_t kind = -1;
     const uint32_t list = summary.list_address();
     for (int32_t k = 0; k < count; k++) {
-      const schema::BuildRecord build(base, BuildAt(base, list, Walk(base, list, uint32_t(k))));
+      const schema::BuildRecord build(BuildAt(list, Walk(list, uint32_t(k))));
       if (build.state() == 2) {
         states2++;
       }
@@ -200,10 +199,10 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (count > 0) {
       summary.set_count(uint32_t(count));
       summary.set_owned(uint32_t(states2));
-      Store(base, frame + 88, count < 0 ? kNone : 0);
-      Store(base, frame + 92, uint32_t(count));
-      Store(base, frame + 80, states2 < 0 ? kNone : 0);
-      Store(base, frame + 84, uint32_t(states2));
+      Store(frame + 88, count < 0 ? kNone : 0);
+      Store(frame + 92, uint32_t(count));
+      Store(frame + 80, states2 < 0 ? kNone : 0);
+      Store(frame + 84, uint32_t(states2));
       const float ratio = float(double(Single(states2)) / double(Single(count)));
       const float scaled = float(double(ratio) * double(scale));
       summary.set_percent(uint32_t(TruncateWord(double(scaled))));
@@ -221,9 +220,9 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The builds above the player's stage removed.
   uint64_t r3 = calls.Call(kStageOf, frame, 0x821A0774, save.address);
   const int32_t limit = int32_t(uint32_t(r3) + 1);
-  schema::BuildScreenData screen_now = Screen(base);
+  schema::BuildScreenData screen_now = Screen();
   for (uint32_t off = 0; off < kListsEnd; off += kListBytes) {
-    const schema::BuildGroup summary(base, screen_now.groups_address() + off);
+    const schema::BuildGroup summary(screen_now.groups_address() + off);
     const int32_t count = int16_t(summary.list_count());
     if (count <= 0) {
       continue;
@@ -232,19 +231,19 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
     uint32_t removed = 0;
     for (int32_t k = 0; k < count; k++) {
       const uint32_t position = uint32_t(k) - removed;
-      const schema::BuildRecord build(base, BuildAt(base, list, Walk(base, list, position)));
+      const schema::BuildRecord build(BuildAt(list, Walk(list, position)));
       if (int32_t(build.level()) > limit) {
-        BuildListRemoveAt(base, list, position);
+        BuildListRemoveAt(list, position);
         r3 = list;
         removed++;
       }
     }
-    screen_now = Screen(base);
+    screen_now = Screen();
   }
   // Whether a kind-3 list has builds.
   uint32_t kinds3 = 0;
   for (uint32_t j = 0; j < 56; j++) {
-    const schema::BuildGroup group(base, screen_now.groups_address() + kListBytes * j);
+    const schema::BuildGroup group(screen_now.groups_address() + kListBytes * j);
     if (group.category() == 3 && group.list_count() != 0) {
       kinds3++;
     }
@@ -253,30 +252,30 @@ uint64_t BuildFill(uint8_t* base, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint32_t BuildSetUpStatus(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint32_t BuildSetUpStatus(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219C438 BuildScreen::SetUpStatus");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, kBuildMovie, frame + 80);
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kBuildMovie, frame + 80);
   calls.Call(kResetPose, frame, 0x8219C470, movie);
-  calls.Call(kSetChildNameText, frame, 0x8219C48C, movie, 0, 6, Screen(base).name_address());
-  calls.Call(kSetNumberText, frame, 0x8219C4A4, movie, 0, 9, Screen(base).money());
-  const uint64_t args[8] = {movie, 0, 13, 8, Screen(base).day(), 0, 0, 0};
+  calls.Call(kSetChildNameText, frame, 0x8219C48C, movie, 0, 6, Screen().name_address());
+  calls.Call(kSetNumberText, frame, 0x8219C4A4, movie, 0, 9, Screen().money());
+  const uint64_t args[8] = {movie, 0, 13, 8, Screen().day(), 0, 0, 0};
   calls.CallArgs(kSetText, frame, 0x8219C4C0, args);
-  const uint32_t node = ui_movies::FindNode(base, movie, 0, 11);
-  Node(base, node).set_texture_entry(Screen(base).weekday());
-  Screen(base).set_car_shown(0);
-  Screen(base).set_stand_model(0);
-  Screen(base).set_set_up(1);
+  const uint32_t node = ui_movies::FindNode(movie, 0, 11);
+  Node(node).set_texture_entry(Screen().weekday());
+  Screen().set_car_shown(0);
+  Screen().set_stand_model(0);
+  Screen().set_set_up(1);
   return node;
 }
 
-uint64_t BuildEnter(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t BuildEnter(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A0860 BuildScreen::Enter");
-  const uint32_t frame = Frame(base, sp, 96);
-  BuildFill(base, frame, calls);
-  BuildSetUpStatus(base, frame, calls);
-  PagesGo(base, Globals::build_pages(base).address, 0, 0, 1);
-  return calls.Call(kFadeIn, frame, 0x821A08C4, Load(base, kFadeInLayer), 0, 0, 0);
+  const uint32_t frame = Frame(sp, 96);
+  BuildFill(frame, calls);
+  BuildSetUpStatus(frame, calls);
+  PagesGo(Globals::build_pages().address, 0, 0, 1);
+  return calls.Call(kFadeIn, frame, 0x821A08C4, Load(kFadeInLayer), 0, 0, 0);
 }
 
 }  // namespace type2_screens

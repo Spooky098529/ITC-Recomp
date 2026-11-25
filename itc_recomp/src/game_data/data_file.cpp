@@ -12,20 +12,20 @@ namespace game_data {
 
 namespace {
 
-uint32_t LoadLittle(uint8_t* base, uint32_t address) {
-  return __builtin_bswap32(guest::LoadU32(base, address));
+uint32_t LoadLittle(uint32_t address) {
+  return __builtin_bswap32(guest::LoadU32(address));
 }
 
 }  // namespace
 
-uint32_t GetEntry(uint8_t* base, uint32_t container, uint32_t index, bool skip_empty) {
+uint32_t GetEntry(uint32_t container, uint32_t index, bool skip_empty) {
   ITC_NATIVE_RUNNING("sub_82294730 DataFile::GetEntry");
-  const schema::DataFile file(base, container);
-  if (index >= LoadLittle(base, file.count_address())) {
+  const schema::DataFile file(container);
+  if (index >= LoadLittle(file.count_address())) {
     return 0;
   }
-  const uint32_t entry = container + LoadLittle(base, file.offsets_address() + 4 * index);
-  if (skip_empty && guest::LoadU32(base, entry) == 0) {
+  const uint32_t entry = container + LoadLittle(file.offsets_address() + 4 * index);
+  if (skip_empty && guest::LoadU32(entry) == 0) {
     return 0;
   }
   return entry;

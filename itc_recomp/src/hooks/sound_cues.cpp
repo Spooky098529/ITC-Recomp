@@ -27,7 +27,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 #define ITC_SOUND_FALLBACK(address)        \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_sound_cues)) {      \
-    lifted::original::c##address(ctx, base);       \
+    lifted::original::c##address(ctx);       \
     return;                                \
   }                                        \
   ctx.fpscr.disableFlushMode();
@@ -53,8 +53,8 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                   \
     ITC_SOUND_FALLBACK(address)                                          \
     uint32_t result = 0;                                                 \
-    if (!function(base, ctx.r3.u32, ctx.r4.u32, &result)) {              \
-      lifted::original::c##address(ctx, base);                                   \
+    if (!function(ctx.r3.u32, ctx.r4.u32, &result)) {              \
+      lifted::original::c##address(ctx);                                   \
       return;                                                            \
     }                                                                    \
     ctx.r3.u64 = result;                                                 \
@@ -62,17 +62,17 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 
 using namespace sound_cues;
 
-ITC_SOUND_VOID(8259D478, ListenerConstruct(base, ctx.r3.u32), ctx.r3.u32)
+ITC_SOUND_VOID(8259D478, ListenerConstruct(ctx.r3.u32), ctx.r3.u32)
 // Listener::SetOrientation, Listener::SetPosition and sub_8259CC80
 // (sub_8259D550, sub_8259D588, sub_8259CC80) have no adapters: their
 // callers in play (the manager's listener setters and Sound::SetPosition)
 // are native.
-ITC_SOUND_VOID(82117E08, ManagerSetListenerPosition(base, ctx.r3.u32, ctx.r4.u32),
+ITC_SOUND_VOID(82117E08, ManagerSetListenerPosition(ctx.r3.u32, ctx.r4.u32),
                ctx.r3.u32 + 1456)
 ITC_SOUND_VOID(82117E10,
-               ManagerSetListenerOrientation(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32),
+               ManagerSetListenerOrientation(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32),
                ctx.r3.u32 + 1456)
-ITC_SOUND_VOID(82117E18, ManagerSetListenerVelocity(base, ctx.r3.u32, ctx.r4.u32),
+ITC_SOUND_VOID(82117E18, ManagerSetListenerVelocity(ctx.r3.u32, ctx.r4.u32),
                ctx.r3.u32 + 1456)
 ITC_SOUND_WORD(82117EA8, ManagerGetEngine(ctx.r3.u32))
 
@@ -84,17 +84,17 @@ ITC_SOUND_SLOT(82118200, ManagerIsBankLoading)
 ITC_SOUND_SLOT(821182E0, ManagerIsBankSlotEmpty)
 ITC_SOUND_SLOT(82118400, ManagerGetSoundBank)
 
-ITC_SOUND_VOID(821173F0, SoundStart(base, ctx.r3.u32), ctx.r3.u32)
-ITC_SOUND_VOID(82117568, SoundSet3D(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
-ITC_SOUND_WORD(82117560, SoundSetPosition(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SOUND_WORD(821175B8, SoundIsBank(base, ctx.r3.u32, ctx.r4.u32))
-ITC_SOUND_WORD(82117578, SoundIsCue(base, ctx.r3.u32, ctx.r4.u32))
+ITC_SOUND_VOID(821173F0, SoundStart(ctx.r3.u32), ctx.r3.u32)
+ITC_SOUND_VOID(82117568, SoundSet3D(ctx.r3.u32, ctx.r4.u32), ctx.r3.u32)
+ITC_SOUND_WORD(82117560, SoundSetPosition(ctx.r3.u32, ctx.r4.u32))
+ITC_SOUND_WORD(821175B8, SoundIsBank(ctx.r3.u32, ctx.r4.u32))
+ITC_SOUND_WORD(82117578, SoundIsCue(ctx.r3.u32, ctx.r4.u32))
 
-ITC_SOUND_VOID(8259C9B0, EmitterConstruct(base, ctx.r3.u32), ctx.r3.u32)
-ITC_SOUND_VOID(8259D3D8, SoundBankHolderConstruct(base, ctx.r3.u32), ctx.r3.u32)
-ITC_SOUND_VOID(8259D418, WaveBankHolderConstruct(base, ctx.r3.u32), ctx.r3.u32)
+ITC_SOUND_VOID(8259C9B0, EmitterConstruct(ctx.r3.u32), ctx.r3.u32)
+ITC_SOUND_VOID(8259D3D8, SoundBankHolderConstruct(ctx.r3.u32), ctx.r3.u32)
+ITC_SOUND_VOID(8259D418, WaveBankHolderConstruct(ctx.r3.u32), ctx.r3.u32)
 
-ITC_SOUND_WORD(82118B58, ManagerIsCuePlaying(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_SOUND_WORD(82118B58, ManagerIsCuePlaying(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // The delegate clone allocates through the native heap: the original runs
 // unless --native_heap routes the game's heap there, and where operator new
@@ -102,8 +102,8 @@ ITC_SOUND_WORD(82118B58, ManagerIsCuePlaying(base, ctx.r3.u32, ctx.r4.u32, ctx.r
 ITC_NATIVE_ENTRY_ALWAYS(82118720) {
   ITC_SOUND_FALLBACK(82118720)
   uint32_t copy = 0;
-  if (!hooks::NativeHeapActive() || !DelegateClone(base, ctx.r3.u32, &copy)) {
-    lifted::original::c82118720(ctx, base);
+  if (!hooks::NativeHeapActive() || !DelegateClone(ctx.r3.u32, &copy)) {
+    lifted::original::c82118720(ctx);
     return;
   }
   ctx.r3.u64 = copy;
@@ -116,16 +116,16 @@ ITC_NATIVE_ENTRY_ALWAYS(82118720) {
 ITC_NATIVE_ENTRY_ALWAYS(821194A0) {
   ITC_SOUND_FALLBACK(821194A0)
   if (hooks::NativeHeapActive()) {
-    if (const auto r3 = WordVectorFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    if (const auto r3 = WordVectorFill(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c821194A0(ctx, base);
+  lifted::original::c821194A0(ctx);
 }
 
-ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
-ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
+ITC_SOUND_WORD(82480710, X3DAudioInitialize(ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
+ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(ctx.r3.u32))
 
 // The bank holders' deletes, which free through the native heap: the
 // original unless --native_heap routes the game's heap there, with a handle
@@ -136,8 +136,8 @@ ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                    \
     ITC_SOUND_FALLBACK(address)                                           \
     uint32_t r3 = 0;                                                      \
-    if (!hooks::NativeHeapActive() || !function(base, ctx.r3.u32, &r3)) { \
-      lifted::original::c##address(ctx, base);                                    \
+    if (!hooks::NativeHeapActive() || !function(ctx.r3.u32, &r3)) { \
+      lifted::original::c##address(ctx);                                    \
       return;                                                             \
     }                                                                     \
     ctx.r3.u64 = r3;                                                      \

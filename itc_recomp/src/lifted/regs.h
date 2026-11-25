@@ -76,15 +76,15 @@ struct Regs {
 
 // A call by address with these registers through the dispatch table; its r3
 // and f1 back in them. The counterpart of CallFromContext (sdk.h).
-inline void CallFromContext(Regs& regs, uint8_t* base, uint32_t address) {
+inline void CallFromContext(Regs& regs, uint32_t address) {
   regs.ctr.u64 = address;
-  regs.Apply(Call(base, address, regs.ToArgs()));
+  regs.Apply(Call(address, regs.ToArgs()));
 }
 
 // Runs an entry on a view's registers (as Enter does on the context): its
 // r3 and f1 back in them.
-inline void Enter(Regs& regs, uint8_t* base, Entry entry) {
-  regs.Apply(entry(base, regs.ToArgs()));
+inline void Enter(Regs& regs, Entry entry) {
+  regs.Apply(entry(regs.ToArgs()));
 }
 
 // The flag of entries registered always on.

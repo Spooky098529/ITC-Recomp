@@ -46,42 +46,42 @@ constexpr uint32_t kRenderManager = schema::AppStartUpGlobals::render_app_addres
 // A guest call made from the frame at `frame` (`bytes` long, its back chain
 // written as the original's stwu does), returning to `back`.
 template <typename Call>
-void From(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t bytes, uint32_t back,
+void From(lifted::Regs& ctx, uint32_t frame, uint32_t bytes, uint32_t back,
           Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + bytes;
-  guest_call::InFrame(ctx, base, bytes, back, [&](uint32_t) { call(); });
+  guest_call::InFrame(ctx, bytes, back, [&](uint32_t) { call(); });
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
 }
 
 // `object`'s vtable slot at `offset` with r3 = `object`, returning to
 // `back`; its r3.
-uint32_t VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+uint32_t VtableCall(lifted::Regs& ctx, uint32_t object, uint32_t offset,
                     uint32_t back) {
   ctx.r3.u64 = object;
-  const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  const uint32_t function = guest::LoadU32(guest::LoadU32(object) + offset);
   ctx.ctr.u64 = function;
   ctx.lr = back;
   // (The render manager's slot 8 by its plain C++ where it's the game's,
   // hooks::DirectSlotCall.)
-  if (!hooks::DirectSlotCall(ctx, base, function)) {
-    lifted::CallFromContext(ctx, base, function);
+  if (!hooks::DirectSlotCall(ctx, function)) {
+    lifted::CallFromContext(ctx, function);
   }
   return ctx.r3.u32;
 }
 
 // std of a doubleword.
-void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
+void StoreDoubleword(uint32_t address, uint64_t value) {
+  guest::StoreU32(address, uint32_t(value >> 32));
+  guest::StoreU32(address + 4, uint32_t(value));
 }
 
 }  // namespace
 
-void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
-  if (!pg::DrawReady(base, ctx.r6.u32)) {
-    lifted::original::c8217C708(ctx, base);
+void hooks::PowerGraphDraw(lifted::Regs& ctx) {
+  if (!pg::DrawReady(ctx.r6.u32)) {
+    lifted::original::c8217C708(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -91,27 +91,27 @@ void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
   const double y = ctx.f2.f64;
   const uint64_t lr = ctx.lr;
   uint32_t draw_frame = 0;
-  guest_call::InFrame(ctx, base, pg::kDrawFrame, pg::kTorqueLineReturn, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, pg::kDrawFrame, pg::kTorqueLineReturn, [&](uint32_t frame) {
     draw_frame = frame;
     pg::LineCalls calls;
     calls.list_and_queue = [&](uint32_t line_frame) {
       std::pair<uint32_t, uint32_t> answer;
-      From(ctx, base, line_frame, pg::kLineFrame, 0x8217B538, [&] {
+      From(ctx, line_frame, pg::kLineFrame, 0x8217B538, [&] {
         const uint32_t scene =
-            VtableCall(ctx, base, guest::LoadU32(base, kRenderManager), 32, 0x8217B538);
-        answer.first = VtableCall(ctx, base, scene, 4, 0x8217B548);
+            VtableCall(ctx, guest::LoadU32(kRenderManager), 32, 0x8217B538);
+        answer.first = VtableCall(ctx, scene, 4, 0x8217B548);
         const uint32_t again =
-            VtableCall(ctx, base, guest::LoadU32(base, kRenderManager), 32, 0x8217B564);
-        answer.second = VtableCall(ctx, base, again, 8, 0x8217B574);
+            VtableCall(ctx, guest::LoadU32(kRenderManager), 32, 0x8217B564);
+        answer.second = VtableCall(ctx, again, 8, 0x8217B574);
       });
       return answer;
     };
     calls.add = [&](uint32_t line_frame, uint32_t queue, uint32_t chunk, uint32_t key) {
-      From(ctx, base, line_frame, pg::kLineFrame, 0x8217B6B0, [&] {
+      From(ctx, line_frame, pg::kLineFrame, 0x8217B6B0, [&] {
         ctx.r4.u64 = chunk;
         ctx.r5.u64 = key;
-        ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
-        VtableCall(ctx, base, queue, 16, 0x8217B6B0);
+        ctx.f1.f64 = double(guest::LoadFloat(0x82000A34));
+        VtableCall(ctx, queue, 16, 0x8217B6B0);
       });
     };
     calls.original = [&](uint32_t sprite, uint32_t back) {
@@ -121,31 +121,31 @@ void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
       ctx.r5.u64 = pg::kPass;
       ctx.r6.u64 = pg::kKey;
       ctx.lr = back;
-      lifted::CallFromContext(ctx, base, 0x8217B508);
+      lifted::CallFromContext(ctx, 0x8217B508);
       ctx.fpscr.disableFlushMode();
     };
-    pg::Draw(base, frame, x, y, car, calls);
+    pg::Draw(frame, x, y, car, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = draw_frame + pg::kDrawR3;
 }
 
-void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
+void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx) {
   const uint32_t screen = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   // The original's saves in its caller's frame (a segment count above 32
   // has PowerGraph::Draw's lines read them).
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 24, 0);  // (the caller's r30: not carried by the view)
-  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
+  guest::StoreU32(ctx.r1.u32 - 8, uint32_t(lr));
+  StoreDoubleword(ctx.r1.u32 - 24, 0);  // (the caller's r30: not carried by the view)
+  StoreDoubleword(ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
-  guest_call::InFrame(ctx, base, pg::kTuningFrame, pg::kTuningDrawReturn, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, pg::kTuningFrame, pg::kTuningDrawReturn, [&](uint32_t frame) {
     uint32_t r3 = 0, movie = 0;
-    if (!pg::TuningScreenShowsGraph(base, screen, frame, &r3, &movie)) {
+    if (!pg::TuningScreenShowsGraph(screen, frame, &r3, &movie)) {
       ctx.r3.u64 = r3;
       return;
     }
-    const pg::TuningDraw draw = pg::TuningScreenDraw(base, screen);
+    const pg::TuningDraw draw = pg::TuningScreenDraw(screen);
     ctx.r3.u64 = draw.r3;
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
@@ -154,7 +154,7 @@ void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame: not carried by the view.)
     (void)movie;
     ctx.lr = pg::kTuningDrawReturn;
-    lifted::Enter(ctx, base, game::PowerGraph::Draw);
+    lifted::Enter(ctx, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }
@@ -164,25 +164,25 @@ bool hooks::CarListDrawEntryCalleesNative() {
          ITC_FLAG(native_career);
 }
 
-void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx) {
   if (!CarListDrawEntryCalleesNative()) {
-    lifted::original::c82250670(ctx, base);
+    lifted::original::c82250670(ctx);
     return;
   }
   const uint32_t entry = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   // The original's saves in its caller's frame.
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
+  guest::StoreU32(ctx.r1.u32 - 8, uint32_t(lr));
+  StoreDoubleword(ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
-  guest_call::InFrame(ctx, base, pg::kEntryFrame, pg::kEntryDrawReturn, [&](uint32_t frame) {
-    const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-    const bool draws = pg::CarListEntrySetUp(base, calls, entry, frame);
+  guest_call::InFrame(ctx, pg::kEntryFrame, pg::kEntryDrawReturn, [&](uint32_t frame) {
+    const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+    const bool draws = pg::CarListEntrySetUp(calls, entry, frame);
     ctx.fpscr.disableFlushMode();
     if (!draws) {
       return;
     }
-    const pg::TuningDraw draw = pg::CarListEntryDraw(base, frame);
+    const pg::TuningDraw draw = pg::CarListEntryDraw(frame);
     ctx.r3.u64 = draw.r3;
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
@@ -191,30 +191,30 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kEntryDrawReturn;
-    lifted::Enter(ctx, base, game::PowerGraph::Draw);
+    lifted::Enter(ctx, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }
 
-void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_car_makers) || !hooks::CarMakersGarageCalleesNative()) {
-    lifted::original::c82250700(ctx, base);
+    lifted::original::c82250700(ctx);
     return;
   }
   const uint32_t car = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   // The original's saves in its caller's frame.
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
+  guest::StoreU32(ctx.r1.u32 - 8, uint32_t(lr));
+  StoreDoubleword(ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
-  guest_call::InFrame(ctx, base, pg::kCarFrame, pg::kCarDrawReturn, [&](uint32_t frame) {
-    const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
-    const bool draws = pg::CarListCarSetUp(base, calls, car, frame);
+  guest_call::InFrame(ctx, pg::kCarFrame, pg::kCarDrawReturn, [&](uint32_t frame) {
+    const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
+    const bool draws = pg::CarListCarSetUp(calls, car, frame);
     ctx.fpscr.disableFlushMode();
     if (!draws) {
       return;
     }
-    const pg::TuningDraw draw = pg::CarListEntryDraw(base, frame);
+    const pg::TuningDraw draw = pg::CarListEntryDraw(frame);
     ctx.r3.u64 = draw.r3;
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
@@ -223,7 +223,7 @@ void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kCarDrawReturn;
-    lifted::Enter(ctx, base, game::PowerGraph::Draw);
+    lifted::Enter(ctx, game::PowerGraph::Draw);
   });
   ctx.lr = lr;
 }
@@ -232,20 +232,20 @@ ITC_NATIVE_ENTRY_ALWAYS(8217C708) {
   
   if (!ITC_FLAG(native_power_graph) || ITC_FLAG(log_overlay_uploads) ||
       ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
-    lifted::original::c8217C708(ctx, base);
+    lifted::original::c8217C708(ctx);
     return;
   }
-  hooks::PowerGraphDraw(ctx, base);
+  hooks::PowerGraphDraw(ctx);
 }
 
 ITC_NATIVE_ENTRY(821DF350, ITC_FLAG(native_power_graph)) {
-  hooks::TuningScreenDrawPowerGraph(ctx, base);
+  hooks::TuningScreenDrawPowerGraph(ctx);
 }
 
 ITC_NATIVE_ENTRY(82250670, ITC_FLAG(native_power_graph)) {
-  hooks::CarListDrawEntryPowerGraph(ctx, base);
+  hooks::CarListDrawEntryPowerGraph(ctx);
 }
 
 ITC_NATIVE_ENTRY(82250700, ITC_FLAG(native_power_graph)) {
-  hooks::CarListDrawCarPowerGraph(ctx, base);
+  hooks::CarListDrawCarPowerGraph(ctx);
 }

@@ -41,13 +41,13 @@ using G = schema::SpritesGlobals;
 // SpriteList::Reset: r3 = a sprite list (500 sprites).
 ITC_NATIVE_ENTRY(821298C0, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
-  sprites::ResetSprites(base, ctx.r3.u32, sprites::kListCorners);
+  sprites::ResetSprites(ctx.r3.u32, sprites::kListCorners);
 }
 
 // Sprite::Reset: r3 = a single sprite.
 ITC_NATIVE_ENTRY(8211EB60, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
-  sprites::ResetSprites(base, ctx.r3.u32, sprites::kSpriteCorners);
+  sprites::ResetSprites(ctx.r3.u32, sprites::kSpriteCorners);
 }
 
 // Overlay::LayerFor: r4 = camera pass index (r3, the overlay, isn't read);
@@ -62,8 +62,8 @@ ITC_NATIVE_ENTRY(82123300, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
   float a[4], b[4];
   for (int i = 0; i < 4; i++) {
-    a[i] = guest::LoadFloat(base, ctx.r3.u32 + 4 * i);
-    b[i] = guest::LoadFloat(base, ctx.r4.u32 + 4 * i);
+    a[i] = guest::LoadFloat(ctx.r3.u32 + 4 * i);
+    b[i] = guest::LoadFloat(ctx.r4.u32 + 4 * i);
   }
   ctx.r3.u64 = sprites::Equal4(a, b) ? 1 : 0;
 }
@@ -81,7 +81,7 @@ ITC_NATIVE_ENTRY(82129940, ITC_FLAG(native_sprites)) {
   float a[4], b[4];
   unpack(ctx.r3.u64, ctx.r4.u64, a);
   unpack(ctx.r5.u64, ctx.r6.u64, b);
-  ctx.r3.s64 = sprites::TurnSide(a, b, G::zero(base));
+  ctx.r3.s64 = sprites::TurnSide(a, b, G::zero());
 }
 
 namespace {
@@ -90,22 +90,22 @@ namespace {
 // (slot 4: r3 = the queue, r4 = the chunk, r5 = the layer, f1 = 0.0) from a
 // frame like the original's (272 bytes), with its return address. False,
 // with nothing done, where the original must run instead.
-bool RecordScreenRect(lifted::Regs& ctx, uint8_t* base) {
+bool RecordScreenRect(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint32_t layer = ctx.r5.u32;
   const std::optional<uint32_t> chunk =
-      sprites::RecordScreenRect(base, G::command_list(base), ctx.r3.u32);
+      sprites::RecordScreenRect(G::command_list(), ctx.r3.u32);
   if (!chunk) {
     return false;
   }
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 272, 0x82129278, [&](uint32_t) {
-    const uint32_t queue = G::render_queue(base);
+  guest_call::InFrame(ctx, 272, 0x82129278, [&](uint32_t) {
+    const uint32_t queue = G::render_queue();
     ctx.r3.u64 = queue;
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = layer;
-    ctx.f1.f64 = double(G::zero(base));
-    lifted::CallFromContext(ctx, base, schema::RenderQueue(base, queue).vtable().add());
+    ctx.f1.f64 = double(G::zero());
+    lifted::CallFromContext(ctx, schema::RenderQueue(queue).vtable().add());
   });
   ctx.lr = lr;
   return true;
@@ -116,8 +116,8 @@ bool RecordScreenRect(lifted::Regs& ctx, uint8_t* base) {
 // (r4, the camera pass, isn't read).
 ITC_NATIVE_ENTRY_ALWAYS(82128E70) {
   
-  if (!ITC_FLAG(native_sprites) || SlotDiagnostics() || !RecordScreenRect(ctx, base)) {
-    lifted::original::c82128E70(ctx, base);
+  if (!ITC_FLAG(native_sprites) || SlotDiagnostics() || !RecordScreenRect(ctx)) {
+    lifted::original::c82128E70(ctx);
   }
 }
 
@@ -126,15 +126,15 @@ ITC_NATIVE_ENTRY_ALWAYS(82128E70) {
 ITC_NATIVE_ENTRY_ALWAYS(82129280) {
   
   if (!ITC_FLAG(native_sprites) || SlotDiagnostics()) {
-    lifted::original::c82129280(ctx, base);
+    lifted::original::c82129280(ctx);
     return;
   }
   // (r11 and cr6 as the original leaves them: leftovers for recompiled
   // callers, none now)
-  if (guest::LoadU32(base, ctx.r3.u32 + 64) != 0) {
+  if (guest::LoadU32(ctx.r3.u32 + 64) != 0) {
     return;
   }
-  if (!RecordScreenRect(ctx, base)) {
-    lifted::original::c82128E70(ctx, base);
+  if (!RecordScreenRect(ctx)) {
+    lifted::original::c82128E70(ctx);
   }
 }

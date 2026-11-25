@@ -19,17 +19,17 @@ namespace car_scene_draw::ops {
 
 using Fpscr = ::base::FloatMode;
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // lfs and stfs (through the double, as the translated code).
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+inline double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
-inline void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+inline void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 inline double Fmuls(double a, double b) { return double(float(a * b)); }
 inline double Fadds(double a, double b) { return double(float(a + b)); }
@@ -46,22 +46,22 @@ inline double Fabs(double a) {
 }
 
 // 16 bytes as two ld and two std, both loads first (ld, ld, std, std).
-inline void Copy16(uint8_t* base, uint32_t to, uint32_t from) {
+inline void Copy16(uint32_t to, uint32_t from) {
   uint32_t w[4];
   for (int i = 0; i < 4; i++) {
-    w[i] = Load(base, from + 4 * i);
+    w[i] = Load(from + 4 * i);
   }
   for (int i = 0; i < 4; i++) {
-    Store(base, to + 4 * i, w[i]);
+    Store(to + 4 * i, w[i]);
   }
 }
 // 16 bytes as ld, std, ld, std.
-inline void Copy16Interleaved(uint8_t* base, uint32_t to, uint32_t from) {
+inline void Copy16Interleaved(uint32_t to, uint32_t from) {
   for (uint32_t half = 0; half < 16; half += 8) {
-    const uint32_t a = Load(base, from + half);
-    const uint32_t b = Load(base, from + half + 4);
-    Store(base, to + half, a);
-    Store(base, to + half + 4, b);
+    const uint32_t a = Load(from + half);
+    const uint32_t b = Load(from + half + 4);
+    Store(to + half, a);
+    Store(to + half + 4, b);
   }
 }
 
@@ -73,9 +73,9 @@ inline simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) 
       simde_mm_set_epi32(int32_t(w0), int32_t(w1), int32_t(w2), int32_t(w3)));
 }
 // lvx128: the aligned 16 bytes holding `address`.
-inline simde__m128 Lvx(uint8_t* base, uint32_t address) {
+inline simde__m128 Lvx(uint32_t address) {
   const uint32_t at = address & ~0xFu;
-  return VectorOf(Load(base, at), Load(base, at + 4), Load(base, at + 8), Load(base, at + 12));
+  return VectorOf(Load(at), Load(at + 4), Load(at + 8), Load(at + 12));
 }
 inline uint32_t WordOf(simde__m128 v, int i) {
   alignas(16) uint32_t lanes[4];
@@ -83,10 +83,10 @@ inline uint32_t WordOf(simde__m128 v, int i) {
   return lanes[3 - i];
 }
 // stvx: to the aligned 16 bytes holding `address`.
-inline void Stvx(uint8_t* base, uint32_t address, simde__m128 v) {
+inline void Stvx(uint32_t address, simde__m128 v) {
   const uint32_t at = address & ~0xFu;
   for (int i = 0; i < 4; i++) {
-    Store(base, at + 4 * i, WordOf(v, i));
+    Store(at + 4 * i, WordOf(v, i));
   }
 }
 // vpermwi128 as the translation's shuffles (the shuffle's immediate).

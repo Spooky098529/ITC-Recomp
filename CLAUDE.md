@@ -60,7 +60,40 @@ as a swarm"; the script `itc_recomp/tools/workflows/e5-step3-swarm.js`;
 sites) and the lead's leftovers: 16 types in host memory, each checked
 (build, attract race, `tick_replay.sh` twice, frame dump); the other 39 wait
 on step 4 (virtual dispatch over handles, embedded objects, memcpy targets,
-addresses handed to other areas; `docs/loops/e5-step3-reports.md`). A row's
+addresses handed to other areas; `docs/loops/e5-step3-reports.md`). Step 4
+(shared objects): groundwork, pilot and batch 1 (2026-11-22), then one
+swarm of 35 units (2026-11-24, `docs/loops/e5-loop.md` "Step 4 as one
+swarm", reports in `docs/loops/e5-step4-reports.md`): host types 38 -> 155,
+dual 54 -> 118; views read their own members only on their own type's
+handle (`direct()`), else by address through the owner's layout. Step 5
+(the game's files): blobs (a file's data in PC memory, in the guest's byte
+order, `memory::NewBlob`, `storage = "blob"`), a pilot and one swarm of 17
+units (2026-11-24, `docs/loops/e5-loop.md` "Step 5 as one swarm", reports in
+`docs/loops/e5-step5-reports.md`); what the renderer reads stays in guest
+memory until step 7. Step 6 (2026-11-24, "Step 6 as one swarm"): every
+thread's stack, thread object, per-thread block and TLS slots are blobs
+(the calling thread's stack found first in `guest.h`); 16 agents took the
+hand ports' frames, import calls and float modes off guest shape; lifted
+import calls go straight to our answers (`lifted::ImportAt`). Step 7
+(2026-11-24, "Step 7 as one swarm"): the physical memory (the GPU's) is
+mapped on its own outside guest memory, `guest.h` translating the guest's
+addresses for it; what the GPU never reads moved out of it into blobs. Step 8
+(2026-11-24, done directly, `docs/loops/e5-loop.md` "Step 8"): the
+image's data (`.rdata`, `.data`) compiled in (`src/image/`, written by
+`tools/image_data.py` from the player's `default.xex`), copied to
+`0x82000000` at start-up; `default.xex` is no longer read. Step 9
+(2026-11-24, groundwork and a swarm of 16, "Step 9 as one swarm", reports
+in `docs/loops/e5-step9-reports.md`): the heap and the image are blocks of
+host memory of their own (`memory::g_heap`, `g_image`, `guest.h`
+translating their addresses); the guest mapping (the memory file, its
+views) is gone, and `base` is an unmapped range whose raw accesses fault and
+are named ("guest fault"). All the game's memory is host memory. Step 10
+(2026-11-25, a codemod and a swarm of 8, "Step 10 as one swarm", reports in
+`docs/loops/e5-step10-reports.md`): `base` is gone from the whole program
+(`guest.h` and the views take only guest addresses; no fault range; an
+address in no block stops the program, named by `memory::NoBlock`); left
+of step 10 is the lifted code made typed C++, so `guest.h`'s addresses,
+`lifted::Call` and the dispatch table can go ("What's left of step 10"). A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

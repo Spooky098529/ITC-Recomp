@@ -40,27 +40,27 @@ constexpr uint32_t kCourseTexts = 0x826366FC;
 constexpr uint32_t kNodeMovie = 15;
 
 // The movie of the id at the frame's +80 (written first), by UiMovies::Find.
-uint32_t MovieById(uint8_t* base, uint32_t id, uint32_t frame) {
-  StoreU32(base, frame + 80, id);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+uint32_t MovieById(uint32_t id, uint32_t frame) {
+  StoreU32(frame + 80, id);
+  return LoadU32(ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80));
 }
 
 // UiMovie::HideNode (sub_8211AC48): the node's +80 cleared; the node.
-uint32_t Hide(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  schema::UiMovieNode(base, node).set_visible(0);
+uint32_t Hide(uint32_t movie, uint32_t sub_scene, uint32_t child) {
+  const uint32_t node = ui_movies::FindNode(movie, sub_scene, child);
+  schema::UiMovieNode(node).set_visible(0);
   return node;
 }
 
 // MenuList::Init on `list` with the ids at the frame's +84 and +92 written
 // first (the original's stack arguments): its plain C++ where it frees the
 // old block natively, else a guest call.
-void InitList(uint8_t* base, const Calls& calls, uint32_t list, uint32_t frame, uint32_t lr,
+void InitList(const Calls& calls, uint32_t list, uint32_t frame, uint32_t lr,
               const save_data::MenuListArgs& a) {
-  StoreU32(base, frame + 92, a.id6);
-  StoreU32(base, frame + 84, a.id5);
-  if (calls.native_heap && save_data::MenuListInitNative(base, list)) {
-    save_data::MenuListInit(base, list, a);
+  StoreU32(frame + 92, a.id6);
+  StoreU32(frame + 84, a.id5);
+  if (calls.native_heap && save_data::MenuListInitNative(list)) {
+    save_data::MenuListInit(list, a);
     return;
   }
   const uint64_t args[8] = {list, a.count, a.shown, a.r6, a.r7, a.r8, a.r9, a.r10};
@@ -69,57 +69,57 @@ void InitList(uint8_t* base, const Calls& calls, uint32_t list, uint32_t frame, 
 
 }  // namespace
 
-uint64_t Type6NodeScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type6NodeScreenSetUpMenus(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82236F00 Type6NodeScreen::SetUpMenus");
-  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 144);
-  InitList(base, calls, screen + 10132, frame, 0x82236F48, {8, 6, 1, 154, 153, 155, 156, 159, 158});
-  InitList(base, calls, screen + 10204, frame, 0x82236F78, {2, 2, 1, 156, 155, 154, 153, 159, 158});
-  race_screens::ListSetSelection(base, screen + 10204, 1);
+  const uint32_t screen = uint32_t(r3), frame = Frame(sp, 144);
+  InitList(calls, screen + 10132, frame, 0x82236F48, {8, 6, 1, 154, 153, 155, 156, 159, 158});
+  InitList(calls, screen + 10204, frame, 0x82236F78, {2, 2, 1, 156, 155, 154, 153, 159, 158});
+  race_screens::ListSetSelection(screen + 10204, 1);
   // Slot 2 (SetText) with r4 = 0.
-  Slot(base, r3, 8, 0, frame, 0x82236F9C, calls);
-  NodeScreenLoadItem(base, r3, frame, calls);
-  const uint32_t traffic = race_screens::ListSelection(base, screen + 10204);
-  const uint32_t selection = race_screens::ListSelection(base, screen + 10132);
-  const uint64_t course = uint64_t(NS(base, screen).course_list_scroll()) + uint64_t(selection);
-  return NodeScreenShowRecords(base, r3, course, traffic, frame, calls);
+  Slot(r3, 8, 0, frame, 0x82236F9C, calls);
+  NodeScreenLoadItem(r3, frame, calls);
+  const uint32_t traffic = race_screens::ListSelection(screen + 10204);
+  const uint32_t selection = race_screens::ListSelection(screen + 10132);
+  const uint64_t course = uint64_t(NS(screen).course_list_scroll()) + uint64_t(selection);
+  return NodeScreenShowRecords(r3, course, traffic, frame, calls);
 }
 
-uint64_t Type6NodeScreenSetText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t Type6NodeScreenSetText(uint64_t r3, uint64_t r4, uint32_t sp,
                                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822370A0 Type6NodeScreen::SetText");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieById(base, NS(base, uint32_t(r3)).movie(), frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieById(NS(uint32_t(r3)).movie(), frame);
   const uint32_t texts = (uint32_t(r4) << 2) + kCourseTexts;
   uint64_t result = 0;
   for (uint32_t i = 0; i < 7; i++) {
-    result = calls.set_text(frame, 0x822370F8, movie, 5, 5 + i, LoadU32(base, texts + 4 * i));
+    result = calls.set_text(frame, 0x822370F8, movie, 5, 5 + i, LoadU32(texts + 4 * i));
   }
   return result;
 }
 
-uint64_t Type6NodeScreenBack(uint8_t* base, uint64_t r3, uint64_t r4) {
+uint64_t Type6NodeScreenBack(uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82237110 Type6NodeScreen::Back");
   // Message 6: back to Type6Screen0.
-  Post(base, uint32_t(r4), 6);
+  Post(uint32_t(r4), 6);
   return r3;
 }
 
-uint64_t Type6NodeScreenSetIcons(uint8_t* base, uint32_t sp) {
+uint64_t Type6NodeScreenSetIcons(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82237160 Type6NodeScreen::SetIcons");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = MovieById(base, kNodeMovie, frame);
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = MovieById(kNodeMovie, frame);
   // UiMovie::SetNodeTexture (sub_8211A708): the lookup, then the texture.
-  ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 2, 4), 0);
-  ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 2, 5), 1);
+  ui_movies::SetNodeTexture(ui_movies::FindNode(movie, 2, 4), 0);
+  ui_movies::SetNodeTexture(ui_movies::FindNode(movie, 2, 5), 1);
   uint32_t node = 0;
-  for (const uint32_t child : {6u, 7u, 8u, 9u, 13u, 14u}) node = Hide(base, movie, 2, child);
+  for (const uint32_t child : {6u, 7u, 8u, 9u, 13u, 14u}) node = Hide(movie, 2, child);
   return node;
 }
 
-uint64_t Type6NodeScreenSetScrollText(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t Type6NodeScreenSetScrollText(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82237228 Type6NodeScreen::SetScrollText");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = MovieById(base, kNodeMovie, frame);
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = MovieById(kNodeMovie, frame);
   const uint64_t reset[6] = {movie, 1, 0, 0, 0, 0};
   calls.call_set(kResetTextScroll, reset, 3, frame, 0x82237264);
   calls.set_text(frame, 0x82237278, movie, 1, 0, 934);
@@ -127,63 +127,63 @@ uint64_t Type6NodeScreenSetScrollText(uint8_t* base, uint32_t sp, const Calls& c
   return calls.call_set(kScrollText, scroll, 4, frame, 0x8223728C);
 }
 
-uint64_t Type6NodeScreenShowMarks(uint8_t* base, uint64_t r4, uint32_t sp) {
+uint64_t Type6NodeScreenShowMarks(uint64_t r4, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822372A0 Type6NodeScreen::ShowMarks");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieById(base, kNodeMovie, frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieById(kNodeMovie, frame);
   const uint32_t which = uint32_t(r4);
-  uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 13);
-  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
-  node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 14);
-  schema::UiMovieNode(base, node).set_visible(which + 6 - 8 != 0 ? 1 : 0);
+  uint32_t node = ui_movies::FindNode(movie, 0xFFFFFFFFu, 13);
+  schema::UiMovieNode(node).set_visible(which != 0 ? 1 : 0);
+  node = ui_movies::FindNode(movie, 0xFFFFFFFFu, 14);
+  schema::UiMovieNode(node).set_visible(which + 6 - 8 != 0 ? 1 : 0);
   return node;
 }
 
-uint64_t NodeScreenSetUpTexts(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t NodeScreenSetUpTexts(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82247FE0 NodeScreen::SetUpTexts");
-  const uint32_t table = uint32_t(r3), frame = Frame(base, sp, 128);
-  StoreU32(base, frame + 80, Paired(base, table).movie());
-  const uint32_t found = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
-  const uint32_t movie = LoadU32(base, found);
+  const uint32_t table = uint32_t(r3), frame = Frame(sp, 128);
+  StoreU32(frame + 80, Paired(table).movie());
+  const uint32_t found = ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80);
+  const uint32_t movie = LoadU32(found);
   uint64_t result = found;
   for (uint32_t i = 0; i < 27; i++) {
-    const uint32_t child = LoadU32(base, Paired(base, table).item_nodes_address() + 4 * i);
-    if (int32_t(child) >= 0) result = Hide(base, movie, Paired(base, table).node_set_b(), child);
-    const uint32_t first = Paired(base, table).extra_node_base();
+    const uint32_t child = LoadU32(Paired(table).item_nodes_address() + 4 * i);
+    if (int32_t(child) >= 0) result = Hide(movie, Paired(table).node_set_b(), child);
+    const uint32_t first = Paired(table).extra_node_base();
     if (int32_t(first) > -1)
-      result = Hide(base, movie, Paired(base, table).node_set_a(), first + i);
+      result = Hide(movie, Paired(table).node_set_a(), first + i);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    const uint32_t child = LoadU32(base, Paired(base, table).nodes_address() + 4 * i);
-    if (int32_t(child) >= 0) result = Hide(base, movie, Paired(base, table).node_set_a(), child);
+    const uint32_t child = LoadU32(Paired(table).nodes_address() + 4 * i);
+    if (int32_t(child) >= 0) result = Hide(movie, Paired(table).node_set_a(), child);
   }
-  const uint32_t texts = Paired(base, table).text_node_base();
+  const uint32_t texts = Paired(table).text_node_base();
   if (int32_t(texts) > -1) {
-    calls.set_text(frame, 0x822480A0, movie, Paired(base, table).node_set_a(), texts, 402);
+    calls.set_text(frame, 0x822480A0, movie, Paired(table).node_set_a(), texts, 402);
     static constexpr uint32_t kIds[3] = {401, 407, 408};
     static constexpr uint32_t kLr[3] = {0x822480B8, 0x822480D0, 0x822480E8};
     for (uint32_t k = 0; k < 3; k++) {
-      const uint32_t child = Paired(base, table).text_node_base() + 1 + k;
+      const uint32_t child = Paired(table).text_node_base() + 1 + k;
       result =
-          calls.set_text(frame, kLr[k], movie, Paired(base, table).node_set_a(), child, kIds[k]);
+          calls.set_text(frame, kLr[k], movie, Paired(table).node_set_a(), child, kIds[k]);
     }
   }
   return result;
 }
 
-uint64_t Type6NodeScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type6NodeScreenDestruct(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82236EA0 Type6NodeScreen::~Type6NodeScreen");
-  NS(base, uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
+  NS(uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
   // A tail call of ~NodeScreen.
-  return NodeScreenDestruct(base, r3, sp, calls);
+  return NodeScreenDestruct(r3, sp, calls);
 }
 
-uint64_t Type6NodeScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t Type6NodeScreenDeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                          const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82237048 Type6NodeScreen::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  NS(base, uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
-  NodeScreenDestruct(base, r3, frame, calls);
+  const uint32_t frame = Frame(sp, 112);
+  NS(uint32_t(r3)).set_vtable(kType6NodeScreenVtable);
+  NodeScreenDestruct(r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.
     Call1(calls, car_list::kOperatorDelete, r3, frame, 0x82237084);

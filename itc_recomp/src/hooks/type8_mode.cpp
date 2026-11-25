@@ -63,29 +63,29 @@ namespace t8m = type8_mode;
 
 #define ITC_T8M_STEP(name, expression)                       \
   ITC_REGS_STEP(name) {                \
-    const t8m::Calls calls = Type67Calls(ctx, base);         \
+    const t8m::Calls calls = Type67Calls(ctx);         \
     (void)calls;                                             \
     const uint32_t sp = ctx.r1.u32;                          \
     (void)sp;                                                \
     ctx.r3.u64 = (expression);                               \
   }
 
-ITC_T8M_STEP(Type8DialogOnEnter, t8m::DialogOnEnter(base, ctx.r3.u64))
-ITC_T8M_STEP(Type8DialogOpenMovies, t8m::DialogOpenMovies(base, sp, calls))
-ITC_T8M_STEP(Type8DialogWaitForMovies, t8m::DialogWaitForMovies(base, ctx.r3.u64, sp))
-ITC_T8M_STEP(Type8DialogDraw, t8m::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8M_STEP(Type8DialogUpdate, t8m::DialogUpdate(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_STEP(Type8DialogOpenConfirm, t8m::DialogOpenConfirm(base, ctx.r3.u32, sp))
-ITC_T8M_STEP(Type8DialogOpenNotice, t8m::DialogOpenNotice(base, ctx.r3.u64))
-ITC_T8M_STEP(Type8DialogDrawWaiting, t8m::DialogDrawWaiting(base, ctx.r3.u64, sp))
+ITC_T8M_STEP(Type8DialogOnEnter, t8m::DialogOnEnter(ctx.r3.u64))
+ITC_T8M_STEP(Type8DialogOpenMovies, t8m::DialogOpenMovies(sp, calls))
+ITC_T8M_STEP(Type8DialogWaitForMovies, t8m::DialogWaitForMovies(ctx.r3.u64, sp))
+ITC_T8M_STEP(Type8DialogDraw, t8m::DialogDraw(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_STEP(Type8DialogUpdate, t8m::DialogUpdate(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogOpenConfirm, t8m::DialogOpenConfirm(ctx.r3.u32, sp))
+ITC_T8M_STEP(Type8DialogOpenNotice, t8m::DialogOpenNotice(ctx.r3.u64))
+ITC_T8M_STEP(Type8DialogDrawWaiting, t8m::DialogDrawWaiting(ctx.r3.u64, sp))
 ITC_T8M_STEP(Type8DialogConfirmPage,
-             t8m::DialogConfirmPage(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_STEP(Type8DialogNoticePage, t8m::DialogNoticePage(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_STEP(Type8DialogOpenConfirmStep, t8m::DialogOpenConfirmStep(base, ctx.r3.u32, sp, calls))
+             t8m::DialogConfirmPage(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogNoticePage, t8m::DialogNoticePage(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_STEP(Type8DialogOpenConfirmStep, t8m::DialogOpenConfirmStep(ctx.r3.u32, sp, calls))
 
 #define ITC_T8M_SCREEN(name, expression)                     \
   ITC_REGS_STEP(name) {                \
-    const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base); \
+    const t8m::ScreenCalls calls = Type67ScreensCalls(ctx); \
     (void)calls;                                             \
     const uint32_t sp = ctx.r1.u32;                          \
     (void)sp;                                                \
@@ -94,64 +94,64 @@ ITC_T8M_STEP(Type8DialogOpenConfirmStep, t8m::DialogOpenConfirmStep(base, ctx.r3
     ctx.r3.u64 = (expression);                               \
   }
 
-ITC_T8M_SCREEN(Type8Screen0Construct, t8m::Screen0Construct(base, ctx.r3.u64, sp))
-ITC_T8M_SCREEN(Type8Screen0Destruct, t8m::Screen0Destruct(base, ctx.r3.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8Screen0Construct, t8m::Screen0Construct(ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Destruct, t8m::Screen0Destruct(ctx.r3.u64, sp, lr, calls))
 ITC_T8M_SCREEN(Type8Screen0DeletingDestruct,
-               t8m::Screen0DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0OnEnter, t8m::Screen0OnEnter(base, ctx.r3.u64, sp, calls))
+               t8m::Screen0DeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OnEnter, t8m::Screen0OnEnter(ctx.r3.u64, sp, calls))
 ITC_T8M_SCREEN(Type8Screen0OpenMovie, t8m::Screen0OpenMovie(sp, lr, calls))
-ITC_T8M_SCREEN(Type8Screen0WaitForMovie, t8m::Screen0WaitForMovie(base, ctx.r3.u64, sp))
-ITC_T8M_SCREEN(Type8Screen0Suspend, t8m::Screen0Suspend(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0PickYes, t8m::Screen0Pick(base, ctx.r3.u64, 1))
-ITC_T8M_SCREEN(Type8Screen0PickNo, t8m::Screen0Pick(base, ctx.r3.u64, 0))
-ITC_T8M_SCREEN(Type8Screen0PickBack, t8m::Screen0Pick(base, ctx.r3.u64, 2))
-ITC_T8M_SCREEN(Type8Screen0OnDialogClosed, t8m::Screen0OnDialogClosed(base, ctx.r3.u64, sp))
-ITC_T8M_SCREEN(Type8Screen0Leave, t8m::Screen0Leave(base, ctx.r4.u32, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0OnLeft, t8m::Screen0OnLeft(base, ctx.r3.u64, sp, lr, calls))
+ITC_T8M_SCREEN(Type8Screen0WaitForMovie, t8m::Screen0WaitForMovie(ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Suspend, t8m::Screen0Suspend(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0PickYes, t8m::Screen0Pick(ctx.r3.u64, 1))
+ITC_T8M_SCREEN(Type8Screen0PickNo, t8m::Screen0Pick(ctx.r3.u64, 0))
+ITC_T8M_SCREEN(Type8Screen0PickBack, t8m::Screen0Pick(ctx.r3.u64, 2))
+ITC_T8M_SCREEN(Type8Screen0OnDialogClosed, t8m::Screen0OnDialogClosed(ctx.r3.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Leave, t8m::Screen0Leave(ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OnLeft, t8m::Screen0OnLeft(ctx.r3.u64, sp, lr, calls))
 ITC_T8M_SCREEN(Type8Screen0Confirm,
-               t8m::Screen0Confirm(base, ctx.r3.u64, ctx.r5.u32, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0ConfirmPage, t8m::Screen0ConfirmPage(base, ctx.r3.u64))
+               t8m::Screen0Confirm(ctx.r3.u64, ctx.r5.u32, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0ConfirmPage, t8m::Screen0ConfirmPage(ctx.r3.u64))
 ITC_T8M_SCREEN(Type8Screen0ChosenPage,
-               t8m::Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, sp))
+               t8m::Screen0ChosenPage(ctx.r3.u64, ctx.r4.u32, sp))
 ITC_T8M_SCREEN(Type8Screen0ShowPage,
-               t8m::Screen0ShowPage(base, ctx.r4.u64, ctx.r5.u64, sp))
-ITC_T8M_SCREEN(Type8Screen0PlaceCursor, t8m::Screen0PlaceCursor(base, ctx.r4.u64, sp))
-ITC_T8M_SCREEN(Type8Screen0Draw, t8m::Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+               t8m::Screen0ShowPage(ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0PlaceCursor, t8m::Screen0PlaceCursor(ctx.r4.u64, sp))
+ITC_T8M_SCREEN(Type8Screen0Draw, t8m::Screen0Draw(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8M_SCREEN(Type8Screen0MenuPage,
-               t8m::Screen0MenuPage(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0OpeningStep, t8m::Screen0OpeningStep(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0ItemStep, t8m::Screen0ItemStep(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0CursorStep, t8m::Screen0CursorStep(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0FadeOutStep, t8m::Screen0FadeOutStep(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0UpdateStand, t8m::Screen0UpdateStand(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0Update, t8m::Screen0Update(base, ctx.r3.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0SetTexts, t8m::Screen0SetTexts(base, sp, calls))
+               t8m::Screen0MenuPage(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0OpeningStep, t8m::Screen0OpeningStep(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0ItemStep, t8m::Screen0ItemStep(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0CursorStep, t8m::Screen0CursorStep(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0FadeOutStep, t8m::Screen0FadeOutStep(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0UpdateStand, t8m::Screen0UpdateStand(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Update, t8m::Screen0Update(ctx.r3.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0SetTexts, t8m::Screen0SetTexts(sp, calls))
 ITC_T8M_SCREEN(Type8Screen0CarCard,
-               t8m::Screen0CarCard(base, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
-ITC_T8M_SCREEN(Type8Screen0Show, t8m::Screen0Show(base, ctx.r3.u64, sp, calls))
+               t8m::Screen0CarCard(ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_T8M_SCREEN(Type8Screen0Show, t8m::Screen0Show(ctx.r3.u64, sp, calls))
 
-ITC_T8M_SCREEN(Type8ModeAllLoaded, t8m::ModeAllLoaded(base, ctx.r3.u32))
-ITC_T8M_SCREEN(Type8FreeTwoPlayerBlock, t8m::FreeTwoPlayerBlock(base, sp, calls))
+ITC_T8M_SCREEN(Type8ModeAllLoaded, t8m::ModeAllLoaded(ctx.r3.u32))
+ITC_T8M_SCREEN(Type8FreeTwoPlayerBlock, t8m::FreeTwoPlayerBlock(sp, calls))
 ITC_T8M_SCREEN(Type8ModeRelease,
-               t8m::ModeRelease(base, ctx.r3.u64, ctx.r4.u64, sp, lr, calls))
+               t8m::ModeRelease(ctx.r3.u64, ctx.r4.u64, sp, lr, calls))
 ITC_T8M_SCREEN(Type8ModeWaitForLoads,
-               t8m::ModeWaitForLoads(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_SCREEN(Type8ModeNextMode, t8m::ModeNextMode(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+               t8m::ModeWaitForLoads(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeNextMode, t8m::ModeNextMode(ctx.r3.u64, ctx.r4.u32, sp, calls))
 ITC_T8M_SCREEN(Type8ModePollTeardown,
-               t8m::ModePollTeardown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_SCREEN(Type8ModeTearDown, t8m::ModeTearDown(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_T8M_SCREEN(Type8ModeInterrupt, t8m::ModeInterrupt(base, ctx.r3.u32, sp))
+               t8m::ModePollTeardown(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeTearDown, t8m::ModeTearDown(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_T8M_SCREEN(Type8ModeInterrupt, t8m::ModeInterrupt(ctx.r3.u32, sp))
 ITC_T8M_SCREEN(Type8ModeForceExit,
-               t8m::ModeForceExit(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
+               t8m::ModeForceExit(ctx.r3.u64, ctx.r4.u32, sp, calls))
 
 #undef ITC_T8M_SCREEN
 #undef ITC_T8M_STEP
 
 ITC_REGS_STEP(Type8ModeInit) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
-  const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base);
+  const t8m::ScreenCalls calls = Type67ScreensCalls(ctx);
   ctx.fpscr.disableFlushMode();
-  const uint64_t r3 = t8m::ModeInit(base, ctx.r3.u32, ctx.r1.u32, calls);
+  const uint64_t r3 = t8m::ModeInit(ctx.r3.u32, ctx.r1.u32, calls);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -161,7 +161,7 @@ ITC_REGS_STEP(Type8ModeInit) {
 
 #define ITC_TYPE8_MODE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type8_mode)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // The dialog's handlers (its machine's transitions), pages (its Draw's

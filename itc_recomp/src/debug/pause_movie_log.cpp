@@ -57,7 +57,7 @@ struct Range {
   uint32_t start;
   uint32_t size;
 };
-std::vector<Range> ReadableGuestRanges(uint8_t* base);  // frame_state_diff.cpp
+std::vector<Range> ReadableGuestRanges();  // frame_state_diff.cpp
 
 namespace {
 
@@ -90,7 +90,7 @@ bool TakeLine(int& lines, std::chrono::steady_clock::time_point& last, int max) 
 
 class PauseMovieLog {
  public:
-  void Before(uint8_t* base, uint32_t movie, uint32_t r4, bool draw_only) {
+  void Before(uint32_t movie, uint32_t r4, bool draw_only) {
     active_ = ITC_FLAG(log_pause_movie) && frame_pacing::GameMessages_Paused();
     if (!active_) {
       last_after_.clear();
@@ -98,7 +98,7 @@ class PauseMovieLog {
     }
     auto now = std::chrono::steady_clock::now();
     if (movie != movie_ || now - last_rebuild_ >= std::chrono::seconds(1)) {
-      Rebuild(base, movie);
+      Rebuild(movie);
       last_rebuild_ = now;
       last_after_.clear();
     }
@@ -108,17 +108,17 @@ class PauseMovieLog {
     }
     r4_ = r4;
     draw_only_ = draw_only;
-    Snapshot(base, before_);
+    Snapshot(before_);
     if (last_after_.size() == before_.size()) {
       Compare(last_after_, before_, "between");
     }
   }
 
-  void After(uint8_t* base) {
+  void After() {
     if (!active_) {
       return;
     }
-    Snapshot(base, after_);
+    Snapshot(after_);
     Compare(before_, after_, "in update");
     last_after_.swap(after_);
   }
@@ -145,9 +145,9 @@ class PauseMovieLog {
     return uint64_t(address) + size <= uint64_t(it->start) + it->size;
   }
 
-  void Rebuild(uint8_t* base, uint32_t movie) {
+  void Rebuild(uint32_t movie) {
     movie_ = movie;
-    ranges_ = ReadableGuestRanges(base);
+    ranges_ = ReadableGuestRanges();
     std::sort(ranges_.begin(), ranges_.end(),
               [](const Range& a, const Range& b) { return a.start < b.start; });
     // Adjacent mappings are one range here.
@@ -176,7 +176,7 @@ class PauseMovieLog {
       for (size_t i = from; i < to && objects_.size() < kMaxObjects; i++) {
         const Object o = objects_[i];
         for (uint32_t off = 0; off + 4 <= o.size && objects_.size() < kMaxObjects; off += 4) {
-          uint32_t v = guest::LoadU32(base, o.address + off);
+          uint32_t v = guest::LoadU32(o.address + off);
           if (v < 0x01000000 || v >= 0x80000000 || (v & 3) != 0) {
             continue;
           }
@@ -200,10 +200,11 @@ class PauseMovieLog {
                  movie, objects_.size(), bytes);
   }
 
-  void Snapshot(uint8_t* base, std::vector<uint8_t>& out) const {
+  void Snapshot(std::vector<uint8_t>& out) const {
     out.clear();
     for (const Object& o : objects_) {
-      out.insert(out.end(), base + o.address, base + o.address + o.size);
+      const uint8_t* bytes = guest::Pointer(o.address);
+      out.insert(out.end(), bytes, bytes + o.size);
     }
   }
 
@@ -320,7 +321,7 @@ std::chrono::steady_clock::time_point g_track_lines_since{};
 constexpr uint64_t kTracePasses = 12;
 uint64_t g_trace_until_pass = 0;
 
-void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
+void LogMovingTargets(uint32_t movie, const char* when) {
   if (g_moving_targets.empty() || !frame_pacing::GameMessages_Paused() ||
       frame_pacing::GameMessages_PassNumber() > g_trace_until_pass ||
       !TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
@@ -328,7 +329,7 @@ void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
   }
   std::string line;
   for (uint32_t target : g_moving_targets) {
-    line += std::format(" {:08X}={:g}", target, guest::LoadFloat(base, target));
+    line += std::format(" {:08X}={:g}", target, guest::LoadFloat(target));
   }
   ITC_LOG_INFO("pause movie targets: tick {} pass {} {} movie {:08X} {}:{}", Ticks(),
                frame_pacing::GameMessages_PassNumber(), PassType(), movie, when, line);
@@ -354,23 +355,23 @@ void LogCall(const char* name, lifted::Regs& ctx) {
 
 }  // namespace
 
-void PauseMovieLog_Before(uint8_t* base, uint32_t movie, uint32_t r4, uint32_t caller) {
+void PauseMovieLog_Before(uint32_t movie, uint32_t r4, uint32_t caller) {
   constexpr bool draw_only = false;
   if (!ITC_FLAG(log_pause_movie)) {
     return;
   }
   CountUpdate(movie, r4, caller, draw_only);
-  g_logs[movie].Before(base, movie, r4, draw_only);
-  LogMovingTargets(base, movie, "update start");
+  g_logs[movie].Before(movie, r4, draw_only);
+  LogMovingTargets(movie, "update start");
 }
 
-void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const char* outcome,
+void PauseMovieLog_After(uint32_t movie, uint32_t caller, const char* outcome,
                          int occurrence) {
   if (!ITC_FLAG(log_pause_movie)) {
     return;
   }
-  g_logs[movie].After(base);
-  LogMovingTargets(base, movie, "update end");
+  g_logs[movie].After();
+  LogMovingTargets(movie, "update end");
   // Every update for a few passes after an animation call, with the replay's
   // outcome and the sub-menus' movie's animation clocks.
   uint64_t pass = frame_pacing::GameMessages_PassNumber();
@@ -380,8 +381,8 @@ void PauseMovieLog_After(uint8_t* base, uint32_t movie, uint32_t caller, const c
         "pause movie update: tick {} pass {} {} movie {:08X} from {:08X} occurrence {} {}: "
         "clocks +9154 {:g} +96E0 {:g} +9708 {:g}",
         Ticks(), pass, PassType(), movie, caller, occurrence, outcome,
-        guest::LoadFloat(base, movie + 0x9154), guest::LoadFloat(base, movie + 0x96E0),
-        guest::LoadFloat(base, movie + 0x9708));
+        guest::LoadFloat(movie + 0x9154), guest::LoadFloat(movie + 0x96E0),
+        guest::LoadFloat(movie + 0x9708));
   }
 }
 
@@ -453,7 +454,7 @@ void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target) {
 // moved words it changes (to find what puts the arrow's track back after
 // the update applies it).
 template <typename Call>
-void WatchMovingTargets(const char* name, lifted::Regs& ctx, uint8_t* base, Call&& call) {
+void WatchMovingTargets(const char* name, lifted::Regs& ctx, Call&& call) {
   if (g_moving_targets.empty() || !PauseMovieLog_TracksWanted()) {
     call();
     return;
@@ -461,11 +462,11 @@ void WatchMovingTargets(const char* name, lifted::Regs& ctx, uint8_t* base, Call
   uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, lr = uint32_t(ctx.lr);
   std::array<uint32_t, kMaxMovingTargets> before{};
   for (size_t i = 0; i < g_moving_targets.size(); i++) {
-    before[i] = guest::LoadU32(base, g_moving_targets[i]);
+    before[i] = guest::LoadU32(g_moving_targets[i]);
   }
   call();
   for (size_t i = 0; i < g_moving_targets.size(); i++) {
-    uint32_t after = guest::LoadU32(base, g_moving_targets[i]);
+    uint32_t after = guest::LoadU32(g_moving_targets[i]);
     if (after != before[i] && TakeLine(g_track_lines, g_track_lines_since, kMaxTrackLines)) {
       ITC_LOG_INFO(
           "pause movie target written: tick {} pass {} {} {} from {:08X} r3 {:08X} r4 {:08X}: "
@@ -485,29 +486,29 @@ void WatchMovingTargets(const char* name, lifted::Regs& ctx, uint8_t* base, Call
 // src/hooks/ui_movies_game.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8211CD90) {
   
-  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211CD90, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211CD90, ctx)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::DrawTexts(ctx, base);
+    ui_movies_game_hooks::DrawTexts(ctx);
     return;
   }
-  debug::WatchMovingTargets("8211CD90", ctx, base,
-                            [&] { ui_movies_game_hooks::DrawTexts(ctx, base); });
+  debug::WatchMovingTargets("8211CD90", ctx,
+                            [&] { ui_movies_game_hooks::DrawTexts(ctx); });
 }
 
 // UiMovie::Draw, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8259FA00) {
   
-  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259FA00, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259FA00, ctx)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_hooks::Draw(ctx, base);
+    ui_movies_hooks::Draw(ctx);
     return;
   }
-  debug::WatchMovingTargets("8259FA00", ctx, base, [&] { ui_movies_hooks::Draw(ctx, base); });
+  debug::WatchMovingTargets("8259FA00", ctx, [&] { ui_movies_hooks::Draw(ctx); });
 }
 
 // AnimationList::Insert and RemoveAt, watched as the others; their work
@@ -515,21 +516,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8259FA00) {
 ITC_NATIVE_ENTRY_ALWAYS(8211B4D0) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::Insert(ctx, base);
+    ui_movies_game_hooks::Insert(ctx);
     return;
   }
-  debug::WatchMovingTargets("8211B4D0", ctx, base,
-                            [&] { ui_movies_game_hooks::Insert(ctx, base); });
+  debug::WatchMovingTargets("8211B4D0", ctx,
+                            [&] { ui_movies_game_hooks::Insert(ctx); });
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211B080) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::RemoveAt(ctx, base);
+    ui_movies_game_hooks::RemoveAt(ctx);
     return;
   }
-  debug::WatchMovingTargets("8211B080", ctx, base,
-                            [&] { ui_movies_game_hooks::RemoveAt(ctx, base); });
+  debug::WatchMovingTargets("8211B080", ctx,
+                            [&] { ui_movies_game_hooks::RemoveAt(ctx); });
 }
 
 // UiMovie::RestorePose (sub_82119B80), natively with --native_ui_movies
@@ -537,29 +538,29 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B080) {
 // watched as the others (its recursive calls come back here, each watched).
 ITC_NATIVE_ENTRY_ALWAYS(82119B80) {
   
-  if (ui_movies_hooks::UpdateCalleeStoodIn(0x82119B80, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x82119B80, ctx)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_hooks::RestorePose(ctx, base);
+    ui_movies_hooks::RestorePose(ctx);
     return;
   }
-  debug::WatchMovingTargets("82119B80", ctx, base, [&] { lifted::original::c82119B80(ctx, base); });
+  debug::WatchMovingTargets("82119B80", ctx, [&] { lifted::original::c82119B80(ctx); });
 }
 
 // sub_8259DAC0, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8259DAC0) {
   
-  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259DAC0, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259DAC0, ctx)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_hooks::ResetAfterMovie(ctx, base);
+    ui_movies_hooks::ResetAfterMovie(ctx);
     return;
   }
-  debug::WatchMovingTargets("8259DAC0", ctx, base,
-                            [&] { ui_movies_hooks::ResetAfterMovie(ctx, base); });
+  debug::WatchMovingTargets("8259DAC0", ctx,
+                            [&] { ui_movies_hooks::ResetAfterMovie(ctx); });
 }
 
 // The sub-menus' calls on the movie's nodes, logged for --log_pause_movie.
@@ -572,11 +573,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8259DAC0) {
 ITC_NATIVE_ENTRY_ALWAYS(8211C7E8) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::SetNodeText(ctx, base);
+    ui_movies_game_hooks::SetNodeText(ctx);
     return;
   }
   debug::LogCall("8211C7E8 movie node", ctx);
-  lifted::original::c8211C7E8(ctx, base);
+  lifted::original::c8211C7E8(ctx);
 }
 
 // sub_821BE5A8 (Options::ShowVolumeBar) natively under
@@ -588,10 +589,10 @@ ITC_NATIVE_ENTRY_ALWAYS(821BE5A8) {
     debug::LogCall("821BE5A8 flags by selection", ctx);
   }
   if (ITC_FLAG(native_options_screen)) {
-    hooks::OptionsShowVolumeBar(ctx, base);
+    hooks::OptionsShowVolumeBar(ctx);
     return;
   }
-  lifted::original::c821BE5A8(ctx, base);
+  lifted::original::c821BE5A8(ctx);
 }
 
 // PauseMenu::ShowVolume: natively with --native_race_screens
@@ -602,9 +603,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8220D040) {
     debug::LogCall("8220D040 node and flags by selection", ctx);
   }
   if (ITC_FLAG(native_race_screens)) {
-    hooks::RaceScreensPauseMenuShowVolume(ctx, base);
+    hooks::RaceScreensPauseMenuShowVolume(ctx);
   } else {
-    lifted::original::c8220D040(ctx, base);
+    lifted::original::c8220D040(ctx);
   }
 }
 
@@ -618,21 +619,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8220D040) {
 ITC_NATIVE_ENTRY_ALWAYS(8211DAC8) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::PlayNamed(ctx, base);
+    ui_movies_game_hooks::PlayNamed(ctx);
     return;
   }
   debug::LogCall("8211DAC8 start animation", ctx);
-  lifted::original::c8211DAC8(ctx, base);
+  lifted::original::c8211DAC8(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211D978) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::Play(ctx, base);
+    ui_movies_game_hooks::Play(ctx);
     return;
   }
   debug::LogCall("8211D978 start item animation", ctx);
-  lifted::original::c8211D978(ctx, base);
+  lifted::original::c8211D978(ctx);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -640,11 +641,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D978) {
 ITC_NATIVE_ENTRY_ALWAYS(8211DE38) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::Finish(ctx, base);
+    ui_movies_game_hooks::Finish(ctx);
     return;
   }
   debug::LogCall("8211DE38", ctx);
-  lifted::original::c8211DE38(ctx, base);
+  lifted::original::c8211DE38(ctx);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -652,11 +653,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DE38) {
 ITC_NATIVE_ENTRY_ALWAYS(8211DDD8) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::Loop(ctx, base);
+    ui_movies_game_hooks::Loop(ctx);
     return;
   }
   debug::LogCall("8211DDD8", ctx);
-  lifted::original::c8211DDD8(ctx, base);
+  lifted::original::c8211DDD8(ctx);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -664,11 +665,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DDD8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211DF20) {
   
   if (!ITC_FLAG(log_pause_movie)) {
-    ui_movies_game_hooks::FinishNamed(ctx, base);
+    ui_movies_game_hooks::FinishNamed(ctx);
     return;
   }
   debug::LogCall("8211DF20", ctx);
-  lifted::original::c8211DF20(ctx, base);
+  lifted::original::c8211DF20(ctx);
 }
 
 // ScreenPages::Go (natively with --native_race_screens: the adapter's step,
@@ -679,8 +680,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8220BA68) {
     debug::LogCall("8220BA68 screen switch", ctx);
   }
   if (ITC_FLAG(native_race_screens)) {
-    hooks::RaceScreensPagesGo(ctx, base);
+    hooks::RaceScreensPagesGo(ctx);
   } else {
-    lifted::original::c8220BA68(ctx, base);
+    lifted::original::c8220BA68(ctx);
   }
 }

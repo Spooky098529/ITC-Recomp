@@ -25,18 +25,17 @@ namespace tuning_pages {
 
 // The decal images' entry i (DecalImages' +36i; the address math in 32 bits
 // as the originals').
-inline schema::DecalImageEntry DecalEntryAt(uint8_t* base, uint64_t images, uint64_t i) {
-  return schema::DecalImageEntry(base, uint32_t(i * 36 + images));
+inline schema::DecalImageEntry DecalEntryAt(uint64_t images, uint64_t i) {
+  return schema::DecalImageEntry(uint32_t(i * 36 + images));
 }
 // The decal images' kept texture k (+7236 + 8k).
-inline schema::DecalImageKept DecalKeptAt(uint8_t* base, uint64_t images, uint32_t k) {
-  return schema::DecalImageKept(base,
-                                schema::DecalImages(base, uint32_t(images)).kept_address() + 8 * k);
+inline schema::DecalImageKept DecalKeptAt(uint64_t images, uint32_t k) {
+  return schema::DecalImageKept(schema::DecalImages(uint32_t(images)).kept_address() + 8 * k);
 }
 // UI movie `movie`'s texture n: [[movie + 28] + 4n] (both loads, in order).
-inline schema::UiMovieTexture MovieTexture(uint8_t* base, uint32_t movie, uint32_t n) {
-  const schema::UiMovieTextureTable table(base, schema::UiMovie(base, movie).textures());
-  return schema::UiMovieTexture(base, guest::LoadU32(base, table.slots_address() + n * 4));
+inline schema::UiMovieTexture MovieTexture(uint32_t movie, uint32_t n) {
+  const schema::UiMovieTextureTable table(schema::UiMovie(movie).textures());
+  return schema::UiMovieTexture(guest::LoadU32(table.slots_address() + n * 4));
 }
 
 // --- The pages' counts and the owned flags (tables.cpp): leaves, no frame ---
@@ -44,52 +43,52 @@ inline schema::UiMovieTexture MovieTexture(uint8_t* base, uint32_t movie, uint32
 // sub_821CC728 TuningScreen::LevelCount: the level list's length for the
 // category +9656 (unsigned) and the item byte +9660: 0: item 0 10, 1 to 3 7;
 // 1: 0 to 3 7, 4 10; 3: 0 to 2 5; else 0.
-uint32_t LevelCount(uint8_t* base, uint32_t screen);
+uint32_t LevelCount(uint32_t screen);
 // sub_821CC7B8 TuningScreen::TypeCount: the type list's length (its row).
-uint32_t TypeCount(uint8_t* base, uint32_t screen);
+uint32_t TypeCount(uint32_t screen);
 // sub_821CCD38 TuningScreen::PageCursor (its case 0 the split piece
 // sub_821CCD70, merged): the cursor of the page for the state +9652.
-uint32_t PageCursor(uint8_t* base, uint32_t screen);
+uint32_t PageCursor(uint32_t screen);
 // sub_821CCDB0 TuningScreen::PageItemCount (its case 0 the split piece
 // sub_821CCDE8, merged): the item count of the page for the state +9652.
-uint32_t PageItemCount(uint8_t* base, uint32_t screen);
+uint32_t PageItemCount(uint32_t screen);
 // sub_821CCE30 TuningScreen::IsPickOwned: the owned flag of the current pick
 // (the screen's own level, type and option bytes), 0 where there's none.
-uint32_t IsPickOwned(uint8_t* base, uint32_t screen);
+uint32_t IsPickOwned(uint32_t screen);
 // sub_821CD498 TuningScreen::MarkOwned (its category 4 case 0 the split
 // piece sub_821CD6C8, merged): the bought choice's owned flags set to 1 (its
 // row). r3 left as it is.
-void MarkOwned(uint8_t* base, uint32_t screen);
+void MarkOwned(uint32_t screen);
 // sub_821CDF98 TuningScreen::TestAndSetWheelFlag: wheel number `n` (r4, its
 // low word signed): the wheels' flag word by its brand returned as it was
 // and set to 1; 0 and nothing written for n below 0 or above 178.
-uint32_t TestAndSetWheelFlag(uint8_t* base, uint32_t screen, uint64_t n);
+uint32_t TestAndSetWheelFlag(uint32_t screen, uint64_t n);
 // sub_821E7DB0 TuningScreen::SetWheelListEnd (its cases 0, 7 and 13 the
 // split piece sub_821E7DE4, merged): +25224 by the brand +25204 (above 16
 // unsigned, nothing). r3 left as it is.
-void SetWheelListEnd(uint8_t* base, uint32_t screen);
+void SetWheelListEnd(uint32_t screen);
 // sub_821EF288 TuningScreen::InchListEnd (its cases 0, 4, 13, 14, 17, 21
 // the split piece sub_821EF2FC, merged): 3, 2, 4 or 0 by the selected
 // garage car's id (its row).
-uint32_t InchListEnd(uint8_t* base, uint32_t screen);
+uint32_t InchListEnd(uint32_t screen);
 
 // --- The vinyl editor's set-up (editor.cpp): leaves, no frame ---
 
 // sub_821FE560 TuningScreen::SetUpVinylBusyIcon: +10016 = 0, +10020 = 13,
 // +10024 = 155, +10028 = 154, +10032 = 156. r3 left as it is.
-void SetUpVinylBusyIcon(uint8_t* base, uint32_t screen);
+void SetUpVinylBusyIcon(uint32_t screen);
 // sub_821FE5D8 DecalImages::AllLoaded: r3 = the decal images; 0 when an
 // entry's +8 is 1 (loading), else 1 (all 200 looked at).
-uint32_t AllLoaded(uint8_t* base, uint32_t images);
+uint32_t AllLoaded(uint32_t images);
 // sub_821FE7D8 TuningScreen::KeepListTextures: with +9656 5 and byte +9660
 // 6, the kept textures 6 to 14 = entries 12 to 20's +28 and +32. r3 left.
-void KeepListTextures(uint8_t* base, uint32_t screen);
+void KeepListTextures(uint32_t screen);
 // sub_821FE420 TuningScreen::SetEditorLimits: +30784 to +30796 by the item
 // and the set +30724 (its row). r3 left.
-void SetEditorLimits(uint8_t* base, uint32_t screen);
+void SetEditorLimits(uint32_t screen);
 // sub_822045F8 TuningScreen::LoadPageLayouts: +30800 to +30831 from the
 // table at 0x8200C560 by the selected garage car's id (unchecked). r3 left.
-void LoadPageLayouts(uint8_t* base, uint32_t screen);
+void LoadPageLayouts(uint32_t screen);
 
 // --- The decal images' textures (decals.cpp) ---
 // Each with the original's frame below `sp` (its back chain and the movie
@@ -106,43 +105,43 @@ using TextureFreeFn = std::function<uint64_t(uint32_t header_in, uint32_t data_i
 // Texture::Free(e + 28, e + 32), its r3) unless a kept texture's header
 // (r3 + 7236 + 8k) or, for i 33 to 50, another of entries 33 to 50 holds it;
 // then r3 = e + 28 (64 bits). No frame.
-uint64_t FreeTexture(uint8_t* base, uint64_t images, uint64_t i, const TextureFreeFn& free);
+uint64_t FreeTexture(uint64_t images, uint64_t i, const TextureFreeFn& free);
 // sub_82204698 DecalImages::RestoreVinylTexture: w 0 or 1, movie 13's
 // texture n's +0 = [images + 8836] or [+ 8840]. 112-byte frame; r3 the
 // movie's entry, else `images` (r3 as it came, all 64 bits).
-uint64_t RestoreVinylTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n, uint32_t sp);
+uint64_t RestoreVinylTexture(uint64_t images, uint32_t w, uint32_t n, uint32_t sp);
 // sub_821F89B8 DecalImages::RestoreStickerTexture: w 2 or 3, movie 14's
 // texture n's +0 = [images + 8844] or [+ 8848]. The same frame and r3.
-uint64_t RestoreStickerTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
+uint64_t RestoreStickerTexture(uint64_t images, uint32_t w, uint32_t n,
                                uint32_t sp);
 // sub_82204730 DecalImages::BindVinylTexture: entry i's texture into movie
 // 13's texture by i and the group (its row). 128-byte frame; r3 the movie's
 // entry.
-uint32_t BindVinylTexture(uint8_t* base, uint64_t images, uint32_t i, uint32_t group,
+uint32_t BindVinylTexture(uint64_t images, uint32_t i, uint32_t group,
                           uint32_t sp);
 // sub_822081A0 DecalImages::RestoreMovieTexture: RestoreVinylTexture then
 // RestoreStickerTexture with (images, w, n), from its 112-byte frame; r3 the
 // second's.
-uint64_t RestoreMovieTexture(uint8_t* base, uint64_t images, uint32_t w, uint32_t n,
+uint64_t RestoreMovieTexture(uint64_t images, uint32_t w, uint32_t n,
                              uint32_t sp);
 // sub_822081D8 DecalImages::RestoreVinylMovie: movie 13's 24 textures back
 // to their placeholders (its row), each followed by RestoreStickerTexture.
 // 128-byte frame; r3 the last RestoreStickerTexture's (`images`).
-uint64_t RestoreVinylMovie(uint8_t* base, uint64_t images, uint32_t sp);
+uint64_t RestoreVinylMovie(uint64_t images, uint32_t sp);
 // sub_821F6DD8 DecalImages::RestoreStickerMovie: RestoreMovieTexture for
 // movie 14's 32 textures (placeholder 3, then 2; its row). 96-byte frame; r3
 // the last one's.
-uint64_t RestoreStickerMovie(uint8_t* base, uint64_t images, uint32_t sp);
+uint64_t RestoreStickerMovie(uint64_t images, uint32_t sp);
 // sub_82203D40 TuningScreen::BindVinylTextures: with +9656 5 and byte +9660
 // 6, the 24 entries' textures into movie 13's (its row). 112-byte frame; r3
 // the movie's entry, else the screen (all 64 bits).
-uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t BindVinylTextures(uint64_t screen, uint32_t sp);
 // sub_821D84F8 TuningScreen::EnterEditor: state 60's page (its row). With
 // layer 0's fade counts 0 and the decal images all loaded: FadeIn, then for
 // the vinyls or the stickers BindVinylTextures and KeepListTextures, Push(4),
 // the queue to state 23 (command 15, SetUpVinylBusyIcon) or 38 (command 32).
 // 96-byte frame; r3 the screen, AllLoaded's 0 or FadeIn's (the passes).
-uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t EnterEditor(uint64_t screen, uint32_t sp);
 
 // --- The decal images' update and unload (decals.cpp) ---
 // They allocate and free (the allocation layer's pages and physical
@@ -160,26 +159,26 @@ uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp);
 // buffer's address; the header at frame + 96, the pixels at + 80, the pitch
 // at + 88). r3 frame + 96 (the empty sub_82106540's argument); nullopt,
 // with nothing done, where memcpy isn't native (Buffers_NativeMemcpy).
-std::optional<uint64_t> TextureFromTga(uint8_t* base, const tuning_screen::GuestCall& call,
+std::optional<uint64_t> TextureFromTga(const tuning_screen::GuestCall& call,
                                        uint32_t file, uint32_t size, uint32_t header_out,
                                        uint32_t data_out, uint32_t sp);
 // sub_821FE628 DecalImages::Update: each entry with +20 set and +8 2 made a
 // texture (Texture::FromTga(+12, +16, e + 28, e + 32)), then +20 = 0.
 // 112-byte frame; r3 the last FromTga's, else `images` (all 64 bits).
-uint64_t UpdateImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t UpdateImages(const tuning_screen::GuestCall& call, uint64_t images,
                       uint32_t sp);
 // sub_821FEA68 DecalImages::Unload: entry i (not checked), when loaded
 // (+8 2): +0 = -1, +4 = +8 = 0, FreeTexture, +28 = +32 = 0, its file freed
 // (VirtualFree(+12, 0, MEM_RELEASE)), +12 to +24 = 0. 112-byte frame; r3
 // VirtualFree's, else `images`. `native_free` Texture::Free by car_models'
 // plain C++ (--native_car_models) where TextureFreeable.
-uint64_t Unload(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images, uint64_t i,
+uint64_t Unload(const tuning_screen::GuestCall& call, uint64_t images, uint64_t i,
                 uint32_t sp, bool native_free);
 // sub_82208738 DecalImages::UnloadAll: RestoreVinylMovie, RestoreStickerMovie,
 // Unload for the 200 entries, then Texture::Free(&header, &data) for each
 // kept texture (images + 7236 + 8k) whose words are both set. 112-byte
 // frame; r3 the last call's.
-uint64_t UnloadAll(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t UnloadAll(const tuning_screen::GuestCall& call, uint64_t images,
                    uint32_t sp, bool native_free);
 
 // --- The vinyls' records (vinyls.cpp; flush-to-zero off) ---
@@ -189,13 +188,13 @@ uint64_t UnloadAll(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
 // garage car's decal records (its row). No frame: the index list {0, 1, 2}
 // at sp - 16 and the conversions' doublewords at sp - 48 to sp - 24 as the
 // original leaves them. r3 left.
-void StoreVinyls(uint8_t* base, uint64_t screen, uint32_t sp);
+void StoreVinyls(uint64_t screen, uint32_t sp);
 // sub_822040A8 TuningScreen::LoadVinyls: the inverse, then the ids and the
 // records copied to their saved copies (+31192, +31024: memcpy's plain C++
 // where Buffers_Memcpy takes it, else the guest's through `call`). 144-byte
 // frame (the index list at frame + 80); r3 the last memcpy's (its
 // destination).
-uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LoadVinyls(const tuning_screen::GuestCall& call, uint64_t screen,
                     uint32_t sp);
 
 // --- Movie 2's nodes and the color conversion (nodes.cpp) ---
@@ -203,22 +202,22 @@ uint64_t LoadVinyls(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
 // sub_821D9E68 TuningScreen::ShowPricePanel: node (-1, 19) shown (UiMovie::
 // ShowNode's plain steps), then hidden in state 16 with the brand +25204 0
 // and in states 9, 10, 11, 14. 112-byte frame; r3 the node.
-uint32_t ShowPricePanel(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t ShowPricePanel(uint32_t screen, uint32_t sp);
 // sub_821EED98 TuningScreen::SetBrandLogo (its brand 1 the split piece
 // sub_821EEE14, merged): node (-1, 17)'s child 0's +108 by the brand +25204
 // (1 to 16; else nothing). 112-byte frame; r3 the child.
-uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t SetBrandLogo(uint32_t screen, uint32_t sp);
 // sub_8224AB50 Color::HsvToRgb: `in` (h, s, v floats) into `out` (r, g, b,
 // then 1.0 at +12), with the original's single-precision steps; s 0.0 gives
 // v three times (no +12); no frame: the input copied below `sp` and the
 // sector's conversions there as the original leaves them. Needs
 // flush-to-zero off. r3 left.
-void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp);
+void HsvToRgb(uint32_t out, uint32_t in, uint32_t sp);
 // sub_821CE188 TuningScreen::IsSlotAvailable: with the category +9656 6,
 // the item byte +9660 3 and the mode +33540 1, the word +25176 + 4 × `slot`
 // (not bound-checked; r4 all 64 bits as the original's address math);
 // else 1. A leaf.
-uint32_t IsSlotAvailable(uint8_t* base, uint32_t screen, uint64_t slot);
+uint32_t IsSlotAvailable(uint32_t screen, uint64_t slot);
 // sub_821E9488 TuningScreen::SetPaintGradients: the paint's value and
 // saturation bars (node (21, 3)'s and (21, 4)'s child 4, vertices 0 to 3):
 // HsvToRgb's plain C++ on (+30444, 1.0, +30452 × 1/255) and (+30444, +30448
@@ -226,15 +225,15 @@ uint32_t IsSlotAvailable(uint8_t* base, uint32_t screen, uint64_t slot);
 // +112; the ints made floats through +80 and +88, the colors' ints through
 // +80, as the original leaves them). r3 the last vertex. Needs
 // flush-to-zero off.
-uint32_t SetPaintGradients(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t SetPaintGradients(uint32_t screen, uint32_t sp);
 // sub_821EA130 TuningScreen::SetLightKind0Bars: nodes (23, 2 to 4)'s child
 // 8, vertices 2 to 5's +0 = float(+30512, +30516, +30520) × [0x82002C30]
 // (2, 3) or [0x8200B5CC] (4, 5), × [0x820021FC]. 176-byte frame (the ints
 // through +80); r3 the last vertex.
-uint32_t SetLightKind0Bars(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t SetLightKind0Bars(uint32_t screen, uint32_t sp);
 // sub_821EAE68 TuningScreen::SetLightKind1Bar: the same on node (24, 3)'s
 // child 8 from +30552. 144-byte frame; r3 the last vertex.
-uint32_t SetLightKind1Bar(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t SetLightKind1Bar(uint32_t screen, uint32_t sp);
 
 // --- The current choices (choices.cpp) ---
 // Guest calls through `call` (tuning_screen::GuestCall) where the plain C++
@@ -246,14 +245,14 @@ uint32_t SetLightKind1Bar(uint8_t* base, uint32_t screen, uint32_t sp);
 // availability +25128 to +25164 by the selected garage car's body kit
 // [+36588] (its row). 192-byte frame (the parts at frame + 128, their copy
 // at frame + 80); r3 Get82's (frame + 128), else memcpy's (frame + 80).
-uint64_t SetAeroAvailability(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t SetAeroAvailability(const tuning_screen::GuestCall& call, uint32_t screen,
                              uint32_t sp, bool native_specs);
 // sub_821E1DB0 TuningScreen::SetCurrentChoice (its category 4 case 0 the
 // split piece sub_821E203C, merged): the choice just picked into the
 // current choice words (its row). 96-byte frame; r3 as the original leaves
 // it: 36080 (category 3 item 0), SetAeroAvailability's (category 4 item 9),
 // the last WheelNumber's (category 5 item 0), else r3 as it came.
-uint64_t SetCurrentChoice(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3,
+uint64_t SetCurrentChoice(const tuning_screen::GuestCall& call, uint64_t r3,
                           uint32_t sp, bool native_specs);
 
 // --- The decal images' loads (loads.cpp) ---
@@ -267,51 +266,51 @@ uint64_t SetCurrentChoice(uint8_t* base, const tuning_screen::GuestCall& call, u
 // stand-in, entries above 108 keeping theirs), the file's pages into +12,
 // Archive::Load into +4, +8 = +24 = 1, +16 the size, +20 = 0. 96-byte frame;
 // r3 the last AssetSize's, else `images`.
-uint64_t RequestImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t RequestImage(const tuning_screen::GuestCall& call, uint64_t images,
                       uint64_t id, uint64_t i, uint32_t sp);
 // sub_821F6D40 DecalImages::Load: Request without its state check and id
 // swap. 96-byte frame; r3 the last AssetSize's.
-uint64_t LoadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t LoadImage(const tuning_screen::GuestCall& call, uint64_t images,
                    uint64_t id, uint64_t i, uint32_t sp);
 // sub_821FEE10 TuningScreen::LoadDecalImages: r3 = the screen (all 64 bits).
 // With +9656 5 and byte +9660 6 the vinyls' 51 entries requested (its row),
 // else the 200 sticker images loaded. 128-byte frame; r3 the last call's.
-uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LoadDecalImages(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp);
 
 // Texture::Free for FreeTexture's and FreeKept's tail calls from `frame`
 // returning to `lr`: car_models' plain C++ with `native_free` (the native
 // heap and --native_car_models) where TextureFreeable, else the guest's.
-TextureFreeFn GuestTextureFree(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t frame,
+TextureFreeFn GuestTextureFree(const tuning_screen::GuestCall& call, uint32_t frame,
                                uint32_t lr, bool native_free);
 // sub_821FE608 DecalImages::OnLoaded: the archive's callback, r3 = a
 // finished request's handle, r6 = the entry e: when the handle is e+4's,
 // e+8 = 2 (loaded) and e+20 = 1 (a texture to make). Leaf.
-void OnImageLoaded(uint8_t* base, uint32_t handle, uint32_t e);
+void OnImageLoaded(uint32_t handle, uint32_t e);
 // sub_821FE960 DecalImages::Reload: Request's id swap, then with no state
 // check and no new pages the file into the entry's buffer +12
 // (Archive::Load into +4), +8 = +24 = 1, +16 the size, +20 = 0. 96-byte
 // frame; r3 AssetSize's.
-uint64_t ReloadImage(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t ReloadImage(const tuning_screen::GuestCall& call, uint64_t images,
                      uint64_t id, uint64_t i, uint32_t sp);
 // sub_821FEAF0 DecalImages::LoadWindow: Reload for n entries from i with the
 // ids from `first` moved into the list `list` (0 163 to 167, 1 189 to 382, 2
 // 383 to 581; 3 or more nothing; its row). 144-byte frame; r3 the last
 // Reload's, else `images`.
-uint64_t LoadWindow(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t LoadWindow(const tuning_screen::GuestCall& call, uint64_t images,
                     uint64_t first, uint64_t i, uint64_t n, uint64_t list, uint32_t sp);
 // sub_821FED30 DecalImages::Scroll: direction 1 (FreeTexture(i), entries i
 // to i + n - 2 take the next one's texture, Reload into i + n - 1) or 0 (the
 // other way, Reload into i); other directions nothing. 128-byte frame; r3
 // Reload's, else `images`. `native_free` as GuestTextureFree's.
-uint64_t ScrollImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t images,
+uint64_t ScrollImages(const tuning_screen::GuestCall& call, uint64_t images,
                       uint64_t direction, uint64_t i, uint64_t n, uint64_t id, uint32_t sp,
                       bool native_free);
 // sub_821FE740 DecalImages::FreeKept: the kept texture k (images + 7236 +
 // 8k) freed (the tail call Texture::Free(kept, kept + 4)) unless an entry's
 // +28 holds its header; then r3 = the kept word's address (64 bits). No
 // frame; the kept words aren't cleared.
-uint64_t FreeKept(uint8_t* base, uint64_t images, uint64_t k, const TextureFreeFn& free);
+uint64_t FreeKept(uint64_t images, uint64_t k, const TextureFreeFn& free);
 
 // --- The input pages and the list menu's step (pages.cpp) ---
 // Guest calls through `call` from the originals' frames with their return
@@ -336,7 +335,7 @@ struct StandFit {
   const front_end_car_draw::Calls* calls = nullptr;
   std::optional<double>* f1 = nullptr;
 };
-uint64_t FitSelectedCar(uint8_t* base, const tuning_screen::GuestCall& call, const StandFit& fit,
+uint64_t FitSelectedCar(const tuning_screen::GuestCall& call, const StandFit& fit,
                         uint32_t holder, uint64_t r4, uint64_t r5, uint32_t frame, uint32_t lr);
 
 struct PageFlags {
@@ -353,18 +352,18 @@ struct PageFlags {
 // (+44 = 1) or clamped to [+12, +16], the row to [+56, +60 - 1] (or to the
 // other end after a wrap), +8 the way it moved. 128-byte frame; r3 the last
 // slot's, else the menu.
-uint64_t StepList(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp,
+uint64_t StepList(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp,
                   bool native_slots);
 // sub_821D8670 TuningScreen::LeaveEditor: state 61's page (its row): with
 // layer 0's fade counts 0, Push(61), the queue to state 62, FadeIn, movie
 // 2's item animation (27, item + 2) finished, played and looped, the busy
 // icon. 128-byte frame; r3 Loop's, else the screen (all 64 bits).
-uint64_t LeaveEditor(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LeaveEditor(const tuning_screen::GuestCall& call, uint64_t screen,
                      uint32_t sp);
 // sub_821D6AD0 TuningScreen::InputCategories: state 3's page (its row):
 // Menu::Step on [+10040]; moved, A or B (the player's mapper's slot 10 on
 // 159, 158); MoveCategory always. 112-byte frame; r3 MoveCategory's.
-uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputCategories(const tuning_screen::GuestCall& call, uint32_t screen,
                          uint32_t sp, const PageFlags& flags);
 
 // sub_821D87C0 TuningScreen::BackToItems: state 62's page (its row): with
@@ -372,31 +371,31 @@ uint64_t InputCategories(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // native heap), +9708 = +9716 = +9720 = 1, the history popped until state 4
 // (no bound), the queue to state 4 with command 2 (OpenItems). 96-byte
 // frame; r3 UnloadAll's, else the screen (all 64 bits).
-uint64_t BackToItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t BackToItems(const tuning_screen::GuestCall& call, uint64_t screen,
                      uint32_t sp, const PageFlags& flags);
 // sub_821EE390 TuningScreen::InputWheelParts: state 15's page (its row): up
 // and down on +25196 (0 to 2, wrapped: +25200), A (brand 0, SetWheelListEnd,
 // Push(15), Go(16, 8), PreviewWheels and ShowPricePanel by their plain C++),
 // B (Pop, the menu reset by PageItemCount and PageCursor, command 2); then
 // AnimateWheelParts. 128-byte frame; r3 AnimateWheelParts'.
-uint64_t InputWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputWheelParts(const tuning_screen::GuestCall& call, uint32_t screen,
                          uint32_t sp, const PageFlags& flags);
 // sub_821E8CE0 TuningScreen::AnimateWheelParts: state 15's movie side (its
 // row): movie 2's named animations 389 to 401, 966 by the same actions asked
 // again; the bar node (27, 0)'s +16 after a wrap. 128-byte frame; the last
 // call's r3, else the movie's entry.
-uint64_t AnimateWheelParts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t AnimateWheelParts(const tuning_screen::GuestCall& call, uint32_t screen,
                            uint32_t sp, bool native_slots);
 // sub_821EEEA8 TuningScreen::InputInches: state 17's page (its row): up and
 // down on +25228 (0 to +25232, wrapped: +25236), A (the confirm dialog by
 // IsPickOwned and GetPrice, Push(17)), B (Pop, command 8); PreviewWheels
 // after any of them; then AnimateInches. 112-byte frame; r3 AnimateInches'.
-uint64_t InputInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputInches(const tuning_screen::GuestCall& call, uint32_t screen,
                      uint32_t sp, const PageFlags& flags);
 // sub_821E9110 TuningScreen::AnimateInches: state 17's movie side (its row):
 // named animations 20 to 31 and 62; the bar Child(node (1, 9), 0)'s +16
 // after a wrap. 128-byte frame; the last call's r3, else the movie's entry.
-uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t AnimateInches(const tuning_screen::GuestCall& call, uint32_t screen,
                        uint32_t sp, bool native_slots);
 // sub_821F40B8 TuningScreen::FillPartRowsRight and sub_821F4768
 // FillPartRowsLeft: the wheel list's rows after a step right or left (their
@@ -404,8 +403,8 @@ uint64_t AnimateInches(uint8_t* base, const tuning_screen::GuestCall& call, uint
 // HidePartMarks; n = +25224 1, 2 or 4 and above (0, 3 or negative nothing).
 // r3 = the screen (all 64 bits). 176-byte frame; the last ShowPartMarks' r3,
 // else the movie's entry.
-uint64_t FillPartRowsRight(uint8_t* base, uint64_t r3, uint32_t sp);
-uint64_t FillPartRowsLeft(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t FillPartRowsRight(uint64_t r3, uint32_t sp);
+uint64_t FillPartRowsLeft(uint64_t r3, uint32_t sp);
 // sub_821F60E0 TuningScreen::AnimateWheels: state 16's movie side (its row):
 // by the same actions asked again, the list's slides (58, 59, 63, 64) with
 // SetPartName and FillPartRowsRight or Left, the tabs' bars (30, 31; the bar
@@ -414,7 +413,7 @@ uint64_t FillPartRowsLeft(uint8_t* base, uint64_t r3, uint32_t sp);
 // and B's finishes (B: the part pick 415 + row, 1008, 1012 played). r3 = the
 // screen (all 64 bits). 128-byte frame; the last call's r3, else the movie's
 // entry or the slot's r3.
-uint64_t AnimateWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t AnimateWheels(const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots);
 // sub_821F6688 TuningScreen::InputWheels: state 16's page (its row): left
 // and right on the model cursor +25220, up and down on the brand +25204 and
@@ -424,7 +423,7 @@ uint64_t AnimateWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint
 // panel's three SetText calls (the varargs they leave unset passed as 0),
 // the brand logo node (SetBrandLogo) and AnimateWheels. r3 = the screen (all
 // 64 bits). 128-byte frame; AnimateWheels' r3.
-uint64_t InputWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputWheels(const tuning_screen::GuestCall& call, uint64_t screen,
                      uint32_t sp, const PageFlags& flags);
 
 // sub_821D0CC0 TuningScreen::MoveItem: state 4's movie side (its row): by
@@ -435,7 +434,7 @@ uint64_t InputWheels(uint8_t* base, const tuning_screen::GuestCall& call, uint64
 // category 3's 401 + item) or B (966, or for aero 1013, 15 and 967) asked
 // again. 128-byte frame; the last call's r3, else the movie's entry or the
 // slot's r3.
-uint64_t MoveItem(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t MoveItem(const tuning_screen::GuestCall& call, uint32_t screen,
                   uint32_t sp, bool native_slots);
 // sub_821DFD48 TuningScreen::InputItems: state 4's page (its row): Menu::Step
 // (StepList for aero); moved, A (the stand car's record copied into the
@@ -445,7 +444,7 @@ uint64_t MoveItem(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t 
 // The sticker editor's ResetStickerEditor sub_821F8440 and LoadStickers
 // sub_821F86C0 (not seen in play) through the guest. r3 = the screen (all
 // 64 bits: the editors' callees get it). 128-byte frame; MoveItem's r3.
-uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputItems(const tuning_screen::GuestCall& call, uint64_t screen,
                     uint32_t sp, const PageFlags& flags);
 
 // sub_821D5610 TuningScreen::MoveOption: state 8's movie side (its row): by
@@ -456,13 +455,13 @@ uint64_t InputItems(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
 // step A (the rows and bars finished) or B (the same, then the page before
 // played) asked again. 128-byte frame; the last call's r3, else the movie's
 // entry or the slot's r3.
-uint64_t MoveOption(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t MoveOption(const tuning_screen::GuestCall& call, uint32_t screen,
                     uint32_t sp, bool native_slots);
 // sub_821D8160 TuningScreen::InputOptions: state 8's page (its row):
 // Menu::Step; moved, A (the confirm dialog: equip, money short or buy, then
 // Push(8)) or B (Pop, the menu reset, ShowLevels for the tire); then
 // MoveOption. 112-byte frame; MoveOption's r3.
-uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputOptions(const tuning_screen::GuestCall& call, uint32_t screen,
                       uint32_t sp, const PageFlags& flags);
 
 // sub_821D1A18 TuningScreen::MoveLevel: state 5's movie side (its row): by
@@ -476,7 +475,7 @@ uint64_t InputOptions(uint8_t* base, const tuning_screen::GuestCall& call, uint3
 // the page before played) asked again. IsItemAvailable's r4 leftover is the
 // level (the leaf leaves it). 128-byte frame; the last call's r3, else the
 // movie's entry, the slot's r3 or IsItemAvailable's 0.
-uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t MoveLevel(const tuning_screen::GuestCall& call, uint32_t screen,
                    uint32_t sp, bool native_slots);
 // sub_821D32C8 TuningScreen::MoveType: state 6's movie side (its row): by
 // the front-end menu's step (+8) and wrap (+40), the type list's bars slid
@@ -490,7 +489,7 @@ uint64_t MoveLevel(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t
 // page before played) asked again. IsItemAvailable's r4 leftover is the
 // type (the leaf leaves it). 128-byte frame; the last call's r3, else the
 // movie's entry, the slot's r3 or IsItemAvailable's.
-uint64_t MoveType(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t MoveType(const tuning_screen::GuestCall& call, uint32_t screen,
                   uint32_t sp, bool native_slots);
 // sub_821D6E20 TuningScreen::InputLevels: state 5's page (its row):
 // Menu::StepList for the 10-level lists, else Menu::Step; moved (the level
@@ -499,7 +498,7 @@ uint64_t MoveType(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t 
 // options Go(8, 6) or the confirm dialog: equip, money short or buy; then
 // Push(5)) or B (Pop, +9732, the menu reset, PlayIntro for category 2, else
 // OpenItems); then MoveLevel. 112-byte frame; MoveLevel's r3.
-uint64_t InputLevels(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputLevels(const tuning_screen::GuestCall& call, uint32_t screen,
                      uint32_t sp, const PageFlags& flags);
 // sub_821D74A0 TuningScreen::InputTypes: state 6's page (its row):
 // Menu::Step on the lists that step; moved (the type and the long list's
@@ -508,7 +507,7 @@ uint64_t InputLevels(uint8_t* base, const tuning_screen::GuestCall& call, uint32
 // the confirm dialog: equip, money short or buy; then Push(6)) or B (Pop,
 // +9732, the menu reset and ShowLevels or OpenItems by the list); then
 // MoveType. 112-byte frame; MoveType's r3.
-uint64_t InputTypes(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t InputTypes(const tuning_screen::GuestCall& call, uint32_t screen,
                     uint32_t sp, const PageFlags& flags);
 
 // sub_821DD408 TuningScreen::StoreOwnedParts: the screen's owned flags
@@ -518,12 +517,12 @@ uint64_t InputTypes(uint8_t* base, const tuning_screen::GuestCall& call, uint32_
 // original leaves it (register saves not written). Returns r3 as the
 // original leaves it: the old word of the last bit set after the wheels,
 // else wheel 178's old flag.
-uint64_t StoreOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
+uint64_t StoreOwnedParts(uint32_t screen, uint32_t sp);
 // sub_821E25B0 TuningScreen::Leave: state 59's page (its row). With both
 // layer 0 fade counts 0: the money into the save data, StoreToGarageCar,
 // StoreOwnedParts, then message 11 posted to r4's ring (+204). 112-byte
 // frame; r3 as given, else StoreOwnedParts' r3.
-uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
+uint64_t Leave(uint64_t r3, uint64_t r4, uint32_t sp);
 
 // --- The confirm dialogs' yes answers (dialogs.cpp; flush-to-zero off) ---
 // Guest calls through `call` from the originals' frames with their return
@@ -534,45 +533,45 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp);
 
 // sub_821FE798 DecalImages::SwapKept: entry i's texture (+28, +32) swapped
 // with the kept texture k (images + 7236 + 8k, + 7240 + 8k). No frame.
-void SwapKept(uint8_t* base, uint64_t images, uint64_t k, uint64_t i);
+void SwapKept(uint64_t images, uint64_t k, uint64_t i);
 // sub_821F84C8 TuningScreen::GarageDecal: the selected garage car's 32-byte
 // decal record for an area 0 to 7 (unsigned: else 0) and a slot (its row).
 // No frame.
-uint32_t GarageDecal(uint8_t* base, uint32_t screen, uint32_t area, uint64_t slot);
+uint32_t GarageDecal(uint32_t screen, uint32_t area, uint64_t slot);
 // sub_821F6CE8 TuningScreen::SaveAreaDecals: area a's five placed decals
 // (ids +33320 + 20a, records +32360 + 120a) copied to the saved ones (+32200,
 // +31240). 112-byte frame; r3 the last memcpy's (its destination).
-uint64_t SaveAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t SaveAreaDecals(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint64_t area, uint32_t sp);
 // sub_821F6C90 TuningScreen::RestoreAreaDecals: area a's five saved decals
 // (ids +32200 + 20a, records +31240 + 120a) copied to the placed ones
 // (+33320, +32360), SaveAreaDecals' other way. 112-byte frame; r3 the last
 // memcpy's (its destination).
-uint64_t RestoreAreaDecals(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t RestoreAreaDecals(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint64_t area, uint32_t sp);
 // sub_821F86C0 TuningScreen::LoadStickers: the garage car's sticker records
 // (GarageDecal) into the screen's saved ones (+32200 ids, +31240 records;
 // its row: mirrored areas 2 and 7), then RestoreAreaDecals for each area.
 // 176-byte frame (its saves not written); r3 the last RestoreAreaDecals'.
-uint64_t LoadStickers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LoadStickers(const tuning_screen::GuestCall& call, uint64_t screen,
                       uint32_t sp);
 // sub_821F8440 TuningScreen::ResetStickerEditor: +33508 = whether the
 // selected garage car's id (its +224) is 0, the busy icon +10016 and the
 // editor's page, layer and cursors 0 (its row). Leaf; r3 left the screen.
-uint64_t ResetStickerEditor(uint8_t* base, uint64_t screen);
+uint64_t ResetStickerEditor(uint64_t screen);
 // sub_821F8598 TuningScreen::StoreStickers: the saved sticker records into
 // the garage car's (GarageDecal; its row), the int conversions' doublewords
 // at frame + 80 and + 88 as the last ones leave them. 112-byte frame; r3 the
 // last GarageDecal's.
-uint64_t StoreStickers(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t StoreStickers(uint64_t screen, uint32_t sp);
 // sub_821FA230 TuningScreen::OnStickerDialogYes: states 50 to 52's answers
 // (its row). 96-byte frame; r3 SaveData::Of(0)'s in state 50, else `screen`.
-uint64_t OnStickerDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t OnStickerDialogYes(const tuning_screen::GuestCall& call, uint64_t screen,
                             uint32_t sp);
 // sub_821E2660 TuningScreen::OnDialogYes: the confirm dialogs' yes answers by
 // the state +9652 (its row), then OnStickerDialogYes. 112-byte frame; r3
 // OnStickerDialogYes's. `native_specs` as SetCurrentChoice's.
-uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t OnDialogYes(const tuning_screen::GuestCall& call, uint64_t screen,
                      uint32_t sp, bool native_specs, const StandFit& fit = {});
 
 // --- The vinyl editor's pages (vinyl_pages.cpp) ---
@@ -588,25 +587,25 @@ uint64_t OnDialogYes(uint8_t* base, const tuning_screen::GuestCall& call, uint64
 // finished and played, the camera preset by the area +30724 (Command 40 or
 // 41). 128-byte frame; the last call's r3 (the movie's entry or the last
 // slot's when neither is pressed).
-uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LeaveVinylView(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots, const StandFit& fit = {});
 // sub_82202928 TuningScreen::InputVinylView: state 34's page (its row): A or
 // B (Pop, Go(the popped state, 18), the stand's turns cancelled and its
 // camera reset), the held buttons' stand and camera commands, then
 // LeaveVinylView. 112-byte frame; LeaveVinylView's r3.
-uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylView(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots, const StandFit& fit = {});
 
 // sub_821FE498 TuningScreen::SetLastImage: +30796 the image list's last
 // index: 4 or 193 on the vinyls' pages 0 and 1 (other pages nothing), else
 // 198. Leaf.
-void SetLastImage(uint8_t* base, uint32_t screen);
+void SetLastImage(uint32_t screen);
 // sub_821FF3A0 TuningScreen::MoveVinylMenu: state 23's movie side (its
 // row): movie 13's bars (16, 17) and pages (+30724 + 5 to + 7) by up, down
 // (only with +9708 set; the bar node (3, 0)'s +16 after a wrap), A (the
 // stand's decals applied: +10012 = 5, FitSelectedCar) or B. 128-byte frame;
 // the last call's r3, else the movie's entry or the slot's r3.
-uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylMenu(const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots, const StandFit& fit = {});
 // sub_82204B70 TuningScreen::InputVinylPages: state 23's page (its row): a
 // kept page's textures freed (FreeKept) and kept again on its third frame,
@@ -615,7 +614,7 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
 // halves) or B (state 61, StoreVinyls, FadeOut); then MoveVinylMenu.
 // 128-byte frame; MoveVinylMenu's r3. Texture::Free as GuestTextureFree's
 // with the native heap and car models' flag.
-uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylPages(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
 
 // sub_82206A50 TuningScreen::InputDecalPosition, sub_82206F48
@@ -627,11 +626,11 @@ uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // held nor released (Pop, Go(the popped state, 18); B puts the decal back
 // from +30856 between Go's halves), then the movie side. 112-byte frame;
 // the movie side's r3.
-uint64_t InputDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalPosition(const tuning_screen::GuestCall& call, uint64_t screen,
                             uint32_t sp, const PageFlags& flags);
-uint64_t InputDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalAngle(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
-uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalScale(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
 // sub_82200DC0 TuningScreen::MoveDecalPosition, sub_822012E8 MoveDecalAngle
 // and sub_82201620 MoveDecalScale: their movie sides (their rows): on a
@@ -639,11 +638,11 @@ uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // placed, turned or sized; on A or B (164 neither held nor released) B's
 // the same, then 228 finished and played. 128-byte frame; the last call's
 // r3, the node, or the slot's.
-uint64_t MoveDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalPosition(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, bool native_slots);
-uint64_t MoveDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalAngle(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots);
-uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalScale(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots);
 
 // sub_82205110 TuningScreen::InputLayerEdit: state 26's page (its row): 164
@@ -654,14 +653,14 @@ uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uin
 // Go(24, 16), the edit into the layer's saved record; cancel: Pop, from 28
 // back to 25 with 24 left pushed, Go(+9652, 17 or 36)) or B (the cursor to
 // 6); then MoveLayerEdit. 112-byte frame; MoveLayerEdit's r3.
-uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerEdit(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, const PageFlags& flags);
 // sub_82200760 TuningScreen::MoveLayerEdit: state 26's movie side (its row):
 // movie 13's rows (130 to 134), buttons (136, 137), arrows (102, 103) and
 // the list's scroll node (Child(FindNode(11, 1), 0)'s +16) by the moves, A
 // and B asked again; last the edited decal's node +132 the flip. 128-byte
 // frame; the node, or the last call's r3.
-uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerEdit(const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots);
 
 // sub_821FFB20 TuningScreen::MoveVinylLayers: state 24's movie side (its
@@ -671,7 +670,7 @@ uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint
 // a layer the rows finished and the picker's row (198 + c or 172 + c)
 // played; else B asked, its answer's low byte stored into the frame's +80.
 // 128-byte frame; the last call's r3, else the movie's entry or the slot's.
-uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylLayers(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, bool native_slots);
 // sub_82208CE0 TuningScreen::InputVinylLayers: state 24's page (its row):
 // with the load wait [0x826D84B8] 0, up, down, left and right on the cursor
@@ -686,14 +685,14 @@ uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // 176-byte frame; MoveVinylLayers', LoadWindow's or the last call's r3.
 // Texture::Free as GuestTextureFree's with the native heap and car models'
 // flag.
-uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylLayers(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
 // sub_82202530 TuningScreen::MoveVinylImages: state 28's movie side (its
 // row): nothing while 164 is held or released or on a move left or right;
 // else on B the window's arrows (167 and 166, or 162 and 161 on page 1)
 // finished and the layer's row (234 an empty layer, else 224) restarted.
 // 128-byte frame; the last call's r3, else the movie's entry or the slot's.
-uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylImages(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, bool native_slots);
 // sub_822058F8 TuningScreen::InputVinylImages: state 28's page (its row):
 // with its wait words [0x826D84B4], [0x826D84B0] and [0x826D84A8] 0, left
@@ -713,7 +712,7 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // Texture::Free as GuestTextureFree's with the native heap and car models'
 // flag; the sticker editor's SetGroupImage and SetImageGroup by their plain
 // C++.
-uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylImages(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
 
 // sub_821FE370 TuningScreen::BeginLayerOrder: r3 = the screen (its row).
@@ -721,7 +720,7 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
 // 4k = the page's saved ids (+31192 + 12 x +30724 + 4k, the page read again
 // each pass) and its indices +31228 + 4k = k, k 0 to 2. Leaf, no frame; r3
 // left the screen.
-void BeginLayerOrder(uint8_t* base, uint64_t screen);
+void BeginLayerOrder(uint64_t screen);
 // sub_82200230 TuningScreen::MoveLayerActions: state 25's movie side (its
 // row): on up or down with +9708 set, a wrap (+30744) placing the cursor's
 // bar (FindNode(10, 0)'s +16 = +30740 x 40.0) with both arrows finished,
@@ -729,7 +728,7 @@ void BeginLayerOrder(uint8_t* base, uint64_t screen);
 // (49 + +30740) restarted and looped; on A the rows and arrows finished, on
 // B the same and 222 restarted. 128-byte frame; the last call's r3, else
 // the movie's entry or the slot's.
-uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerActions(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, bool native_slots);
 // sub_82209738 TuningScreen::InputLayerActions: state 25's page (its row):
 // 164 held or released HighlightSelected; with the load wait [0x826D84BC]
@@ -747,45 +746,45 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
 // count comes to 0). 176-byte frame; MoveLayerActions', LoadWindow's or
 // the last call's r3. Texture::Free as GuestTextureFree's with the native
 // heap and car models' flag.
-uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerActions(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
 
 // sub_821FD5C0 TuningScreen::SetGroupImage: +30764 = group `group`'s first
 // image (0, 43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192 for 0 to 11;
 // above 11 unsigned nothing; case 0 the piece sub_821FD5F0, merged). Leaf; r3
 // left the screen.
-void SetGroupImage(uint8_t* base, uint64_t screen, uint64_t group);
+void SetGroupImage(uint64_t screen, uint64_t group);
 // sub_821FD658 TuningScreen::SetImageGroup: +30768 = image `image`'s group
 // by the same bounds (signed; 11 from 192 up). Leaf; r3 left the screen.
-void SetImageGroup(uint8_t* base, uint64_t screen, uint64_t image);
+void SetImageGroup(uint64_t screen, uint64_t image);
 // sub_821FD518 TuningScreen::SwapLayerRecords: the page's (+30724 0: +31024,
 // 1: +31096) 24-byte layer records `first` and `second` exchanged through
 // frame + 80 (memcpy three times; its plain C++ where Buffers_Memcpy takes
 // it); other pages nothing. 144-byte frame; the last memcpy's r3, else the
 // screen.
-uint64_t SwapLayerRecords(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t SwapLayerRecords(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint64_t first, uint64_t second, uint32_t sp);
 // sub_821FE3C8 TuningScreen::EndLayerOrder: only on the vinyls (+9656 5,
 // byte +9660 6): the page's saved ids (+31192 + 12 x +30724 + 4k, the page
 // read again each pass) = the work list's ids +31216 + 4k, its indices
 // +31228 + 4k = k, k 0 to 2. Leaf; r3 left the screen.
-void EndLayerOrder(uint8_t* base, uint64_t screen);
+void EndLayerOrder(uint64_t screen);
 // sub_82207F38 TuningScreen::SwapOrderTextures: on page 0 or 1 the two
 // entries a move swapped exchange their textures (+30760 1: 7 + p and 6 + p,
 // 2: one lower; page 1 21 higher), then movie 13's slots +764 to +772 (page
 // 1 +776 to +784) = entries 6 to 8's (27 to 29's) headers, the movie looked
 // up again each time. 128-byte frame; the last lookup's entry, else the
 // screen.
-uint64_t SwapOrderTextures(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t SwapOrderTextures(uint64_t screen, uint32_t sp);
 // sub_82203A30 TuningScreen::ShowOrderNodes: on page 0 or 1 movie 13's nodes
 // 19 to 21 (22 to 24) hidden where the work list's id is -1, else shown
 // (UiMovie::HideNode and ShowNode inline: FindNode, +80). 128-byte frame;
 // the last node, else the movie's entry.
-uint64_t ShowOrderNodes(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t ShowOrderNodes(uint64_t screen, uint32_t sp);
 // sub_82201DB8 TuningScreen::MoveLayerOrder: state 27's movie side: nothing
 // on 164 held or released, a move or A; on B 238 restarted. 112-byte frame;
 // PlayNamed's r3, else the last slot read's or the movie's entry.
-uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerOrder(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots);
 // sub_8220A1C8 TuningScreen::InputLayerOrder: state 27's page (its row): with
 // the count [0x826D84C0] 0, up or down moving the layer through the work
@@ -795,7 +794,7 @@ uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uin
 // order, 13 popping down to state 24 with command 16 and EndLayerOrder; then
 // ShowOrderNodes, and MoveLayerOrder with the count 0. 176-byte frame;
 // MoveLayerOrder's r3, else ShowOrderNodes'.
-uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerOrder(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags);
 
 // sub_821E6950 TuningScreen::HandleInput (handle_input.cpp; its state 0 the
@@ -808,7 +807,7 @@ uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, ui
 // 58) through the guest, the empty sub_82106540 (35 to 37, 50 to 52) left
 // out. 112-byte frame (its saves not written); r3 the page's, the screen for
 // the empty ones, else DecalImages::Update's.
-uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t HandleInput(const tuning_screen::GuestCall& call, uint64_t screen,
                      uint64_t r4, uint32_t sp, const PageFlags& flags);
 
 // --- The sticker editor (sticker_pages.cpp; docs/functions/sticker-editor.md) ---
@@ -823,45 +822,45 @@ uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64
 // mapper (its entry's +4 not 1), +33500 0 -> 1, else 1 -> 0; 1 when it
 // changed, else 0. 96-byte frame. sub_821F7348 UpdatePreviewHold: the same
 // for 163 and +33504.
-uint32_t UpdateSoloHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint32_t UpdateSoloHold(const tuning_screen::GuestCall& call, uint32_t screen,
                         uint32_t sp, bool native_slots);
-uint32_t UpdatePreviewHold(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint32_t UpdatePreviewHold(const tuning_screen::GuestCall& call, uint32_t screen,
                            uint32_t sp, bool native_slots);
 // sub_821F73F8 TuningScreen::StepUnlockedSticker: the sticker `n` owned
 // stickers away from `id` (all 64 bits each; the save data's bits), mod 199
 // (signed). Leaf. Loops forever when none is owned (as the original).
-uint64_t StepUnlockedSticker(uint8_t* base, uint32_t screen, uint64_t id, uint64_t n);
+uint64_t StepUnlockedSticker(uint32_t screen, uint64_t id, uint64_t n);
 // sub_821F8070 TuningScreen::ShowSlotNode: slot j's nodes (-1, 2j + 19 and
 // 2j + 20) shown or hidden by the sticker `id`'s T word, both hidden while
 // solo for a slot other than `current` (below 5). 128-byte frame; r3 the
 // last node.
-uint32_t ShowSlotNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t current,
+uint32_t ShowSlotNode(uint32_t screen, uint32_t id, uint32_t j, uint32_t current,
                       uint32_t sp);
 // sub_821F8160 TuningScreen::PlaceStickerNode: slot j's node for the sticker
 // `id` placed from the 24-byte record `record` and the garage car's layout
 // (its row). 176-byte frame (the conversions' doublewords at frame + 80 to
 // + 103 and the layout at + 112 as the original leaves them); r3 the node.
 // Needs flush-to-zero off.
-uint32_t PlaceStickerNode(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j,
+uint32_t PlaceStickerNode(uint32_t screen, uint32_t id, uint32_t j,
                           uint32_t record, uint32_t sp);
 // sub_821F8868 DecalImages::SetSlot: movie 14's nodes (sub, first) and (sub,
 // second) shown and hidden by the entry i and `flag`, and the texture slot's
 // word the entry's texture header (or entry 199's for i negative; its row).
 // 176-byte frame; r3 the last node.
-uint32_t SetSlot(uint8_t* base, uint32_t images, uint32_t sub, uint32_t first, uint32_t second,
+uint32_t SetSlot(uint32_t images, uint32_t sub, uint32_t first, uint32_t second,
                  uint32_t first_slot, uint32_t second_slot, uint32_t i, uint32_t flag, uint32_t sp);
 // sub_821F7F20 TuningScreen::SetStickerEditTexts: movie 14's edit texts
 // (its row; the varargs SetText leaves unset passed as 0, the scale's double
 // in r7). 112-byte frame (the angle's fctiwz at frame + 80); r3 the last
 // SetText's. Needs flush-to-zero off.
-uint64_t SetStickerEditTexts(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t SetStickerEditTexts(const tuning_screen::GuestCall& call, uint32_t screen,
                              uint32_t sp);
 // sub_821FA408 TuningScreen::ShowSlotImage: SetSlot(screen + 10048, -1,
 // 2j + 19, 2j + 20, 2j + 190, 2j + 191, id, T[id] 1 ? 0 : 1), a tail call
 // from the caller's `sp`; its r3. sub_821FA460 ShowStickerListImage: the
 // same in sub-scene 30 for the list's index n (its row).
-uint32_t ShowSlotImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t j, uint32_t sp);
-uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint32_t n,
+uint32_t ShowSlotImage(uint32_t screen, uint32_t id, uint32_t j, uint32_t sp);
+uint32_t ShowStickerListImage(uint32_t screen, uint32_t id, uint32_t n,
                               uint32_t sp);
 // The movie sides (their rows), each `show` 0 or not; the named animations
 // through `call` (their overrides) with the originals' return addresses,
@@ -873,20 +872,20 @@ uint32_t ShowStickerListImage(uint8_t* base, uint32_t screen, uint32_t id, uint3
 // AnimateStickerEditMenu (state 41, 160; SetStickerEditTexts by its plain
 // C++), sub_821FBB60 ShowStickerPicker (state 43, 160; its slot images and
 // StepUnlockedSticker by their plain C++).
-uint64_t AnimateStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t AnimateStickerAreas(const tuning_screen::GuestCall& call, uint32_t screen,
                              uint32_t show, uint32_t sp);
-uint64_t AnimateStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call,
+uint64_t AnimateStickerOperate(const tuning_screen::GuestCall& call,
                                uint32_t screen, uint32_t show, uint32_t sp);
-uint64_t AnimateStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t AnimateStickerSlots(const tuning_screen::GuestCall& call, uint32_t screen,
                              uint32_t show, uint32_t sp);
-uint64_t AnimateStickerEditMenu(uint8_t* base, const tuning_screen::GuestCall& call,
+uint64_t AnimateStickerEditMenu(const tuning_screen::GuestCall& call,
                                 uint32_t screen, uint32_t show, uint32_t sp);
-uint64_t ShowStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t screen,
+uint64_t ShowStickerPicker(const tuning_screen::GuestCall& call, uint32_t screen,
                            uint32_t show, uint32_t sp);
 // sub_821FBA40 ShowStickerOrder: state 42's movie side (its row), no guest
 // calls. 144-byte frame; r3 the movie's entry with `show` 0, else the last
 // ShowSlotNode's node.
-uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_t sp);
+uint32_t ShowStickerOrder(uint32_t screen, uint32_t show, uint32_t sp);
 
 // --- The update's sticker commands (sticker_commands.cpp) ---
 // TuningScreen::Update's command runners 32 to 41 and 43 to 51 (their rows
@@ -904,25 +903,25 @@ uint32_t ShowStickerOrder(uint8_t* base, uint32_t screen, uint32_t show, uint32_
 // Command49 (128), sub_821FB8D8 Command51 (128). Need flush-to-zero off
 // (PlaceStickerNode under most).
 bool IsStickerCommand(uint32_t command);
-std::optional<uint64_t> StickerCommand(uint8_t* base, const tuning_screen::GuestCall& call,
+std::optional<uint64_t> StickerCommand(const tuning_screen::GuestCall& call,
                                        uint32_t command, uint64_t r3, uint32_t sp);
-uint64_t Command32(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command33(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command34(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command35(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command36(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command37(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command38(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command39(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command40(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command41(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command43(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command44(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command45(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command46(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command47(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command49(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
-uint64_t Command51(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command32(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command33(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command34(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command35(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command36(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command37(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command38(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command39(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command40(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command41(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command43(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command44(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command45(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command46(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command47(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command49(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
+uint64_t Command51(const tuning_screen::GuestCall& call, uint64_t r3, uint32_t sp);
 
 // The input pages (their rows), r3 = the screen (all 64 bits), each from
 // HandleInput's frame: Menu::Step, Menu::Pressed, MenuSound::Play and the
@@ -935,15 +934,15 @@ uint64_t Command51(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
 // sub_821F9328 InputStickerOperate (40, 112), sub_821F9608 InputStickerEdit
 // (41, 112), sub_821F7000 InputStickerView (49, 112; the mapper's slots by
 // their plain C++ with `flags.native_slots`, as UpdateSoloHold's).
-uint64_t InputStickerAreas(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerAreas(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerSlots(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerSlots(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerOperate(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerOperate(const tuning_screen::GuestCall& call, uint64_t screen,
                              uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerEdit(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerView(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
 // sub_821FBF18 InputStickerOrder (state 42, 272-byte frame: the area's
 // records and ids copied into it at +112 and +80; ShowStickerOrder by its
@@ -952,15 +951,15 @@ uint64_t InputStickerView(uint8_t* base, const tuning_screen::GuestCall& call, u
 // InputStickerMove, sub_821F9D30 InputStickerRotate and sub_821F9FB8
 // InputStickerScale (44 to 46, 112; the mapper's slots by their plain C++
 // with `flags.native_slots`).
-uint64_t InputStickerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerOrder(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerPicker(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerPicker(const tuning_screen::GuestCall& call, uint64_t screen,
                             uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerMove(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerMove(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerRotate(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerRotate(const tuning_screen::GuestCall& call, uint64_t screen,
                             uint32_t sp, const PageFlags& flags);
-uint64_t InputStickerScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputStickerScale(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags);
 
 }  // namespace tuning_pages

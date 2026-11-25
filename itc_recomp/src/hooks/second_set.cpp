@@ -109,37 +109,37 @@ namespace hooks {
 namespace ss = second_set;
 
 ITC_REGS_STEP(SecondSetPointSetNode) {
-  ss::PointRecordSetNode(base, ctx.r3.u32, ctx.r4.u32);
+  ss::PointRecordSetNode(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SecondSetPointSetShape) {
-  ss::PointRecordSetShape(base, ctx.r3.u32, ctx.r4.u32);
+  ss::PointRecordSetShape(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SecondSetPointClear) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::original::c820CEA08(ctx, base);
+    lifted::original::c820CEA08(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ss::PointRecordClear(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ss::PointRecordClear(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(SecondSetPointConstruct) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::original::c820D0270(ctx, base);
+    lifted::original::c820D0270(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ss::PointRecordConstruct(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ss::PointRecordConstruct(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(SecondSetFindShape) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::original::c820CEB30(ctx, base);
+    lifted::original::c820CEB30(ctx);
     return;
   }
-  ctx.r3.u64 = ss::ModelPointFindShape(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = ss::ModelPointFindShape(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 namespace {
@@ -147,21 +147,21 @@ namespace {
 // A point group's reset or init: r3 = the group or record, r3 as the plain
 // C++ returns it; the original where memcpy isn't native.
 template <typename Step>
-void GroupStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
+void GroupStep(lifted::Regs& ctx, lifted::RegsFunction* original,
                Step step) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, original);
+    lifted::Sdk(ctx, original);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = step(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = step(ctx.r3.u32, ctx.r1.u32);
 }
 
 }  // namespace
 
 #define ITC_SECOND_SET_GROUP(address, name)                         \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {            \
-    GroupStep(ctx, base, lifted::original::c##address, ss::name);           \
+  void SecondSet##name(lifted::Regs& ctx) {            \
+    GroupStep(ctx, lifted::original::c##address, ss::name);           \
   }
 
 ITC_SECOND_SET_GROUP(820DE0E0, PartsResetFrontBumper)
@@ -220,23 +220,23 @@ ITC_SECOND_SET_GROUP(820D9F50, SceneModelBlockReset)
 
 ITC_REGS_STEP(SecondSetScenePartsReset) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::original::c820E0510(ctx, base);
+    lifted::original::c820E0510(ctx);
     return;
   }
-  GroupStep(ctx, base, lifted::original::c820E0510, ss::ScenePartsReset);
+  GroupStep(ctx, lifted::original::c820E0510, ss::ScenePartsReset);
 }
 
 ITC_REGS_STEP(SecondSetSceneCarModelRelease) {
   if (!native::Buffers_NativeMemcpy() || !SceneLoadersReleaseANative(0)) {
-    lifted::original::c820DB6C0(ctx, base);
+    lifted::original::c820DB6C0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (const auto r3 = ss::SceneCarModelRelease(base, ctx.r3.u32, ctx.r1.u32)) {
+  if (const auto r3 = ss::SceneCarModelRelease(ctx.r3.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c820DB6C0(ctx, base);
+  lifted::original::c820DB6C0(ctx);
 }
 
 ITC_SECOND_SET_GROUP(820E88A8, SceneWheelsReset)
@@ -249,47 +249,47 @@ ITC_SECOND_SET_GROUP(820EB320, WheelsInitBrakes)
 
 namespace {
 
-using Release = std::optional<uint32_t> (*)(uint8_t*, uint32_t, uint32_t);
-using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
+using Release = std::optional<uint32_t> (*)(uint32_t, uint32_t);
+using Construct = uint32_t (*)(uint32_t, uint32_t, uint32_t);
 
 // A release: natively where memcpy is native and ReleaseA's plain C++ runs
 // for `pool` (and with --native_material_passes for the parts'); r3 as the
 // plain C++ returns it, else the original.
-void ReleaseStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
+void ReleaseStep(lifted::Regs& ctx, lifted::RegsFunction* original,
                  uint32_t pool, Release release) {
   if (!native::Buffers_NativeMemcpy() || !SceneLoadersReleaseANative(pool) ||
       (pool == 1 && !ITC_FLAG(native_material_passes))) {
-    lifted::Sdk(ctx, base, original);
+    lifted::Sdk(ctx, original);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (const auto r3 = release(base, ctx.r3.u32, ctx.r1.u32)) {
+  if (const auto r3 = release(ctx.r3.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, original);
+  lifted::Sdk(ctx, original);
 }
 
 // A constructor: r3 = the object, r4 = its list; r3 = the object.
-void ConstructStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
+void ConstructStep(lifted::Regs& ctx, lifted::RegsFunction* original,
                    Construct construct) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, original);
+    lifted::Sdk(ctx, original);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = construct(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 }  // namespace
 
 #define ITC_SECOND_SET_RELEASE(address, pool, name)                       \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    ReleaseStep(ctx, base, lifted::original::c##address, pool, ss::name);         \
+  void SecondSet##name(lifted::Regs& ctx) {                  \
+    ReleaseStep(ctx, lifted::original::c##address, pool, ss::name);         \
   }
 #define ITC_SECOND_SET_CONSTRUCT(address, name)                           \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    ConstructStep(ctx, base, lifted::original::c##address, ss::name);             \
+  void SecondSet##name(lifted::Regs& ctx) {                  \
+    ConstructStep(ctx, lifted::original::c##address, ss::name);             \
   }
 
 ITC_SECOND_SET_RELEASE(820E0590, 1, ScenePartsRelease)
@@ -315,10 +315,10 @@ bool SecondSetReleaseNative(uint32_t pool) {
   return SceneLoadersReleaseANative(pool) && (pool != 1 || ITC_FLAG(native_material_passes));
 }
 
-ss::ReleaseCalls SecondSetReleaseCalls(lifted::Regs& ctx, uint8_t* base) {
+ss::ReleaseCalls SecondSetReleaseCalls(lifted::Regs& ctx) {
   ss::ReleaseCalls calls;
   calls.native = SecondSetReleaseNative;
-  calls.release_b = [&ctx, base](uint32_t set, uint32_t pool, uint32_t index, uint32_t sp,
+  calls.release_b = [&ctx](uint32_t set, uint32_t pool, uint32_t index, uint32_t sp,
                                  uint32_t lr) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
@@ -326,7 +326,7 @@ ss::ReleaseCalls SecondSetReleaseCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = set;
     ctx.r4.u64 = pool;
     ctx.r5.u64 = index;
-    lifted::original::c820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
@@ -337,37 +337,37 @@ ss::ReleaseCalls SecondSetReleaseCalls(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(SecondSetReleaseB) {
   if (!SecondSetReleaseNative(ctx.r4.u32 <= 7 ? ctx.r4.u32 : 7)) {
-    lifted::original::c820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
-  ctx.r3.u64 = ss::ReleaseB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx);
+  ctx.r3.u64 = ss::ReleaseB(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
                             uint32_t(ctx.lr), calls);
 }
 
 ITC_REGS_STEP(SecondSetSceneCockpitRelease) {
   if (!SecondSetReleaseNative(2)) {
-    lifted::original::c820DBF88(ctx, base);
+    lifted::original::c820DBF88(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
-  if (const auto r3 = ss::SceneCockpitRelease(base, ctx.r3.u32, ctx.r1.u32, calls)) {
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx);
+  if (const auto r3 = ss::SceneCockpitRelease(ctx.r3.u32, ctx.r1.u32, calls)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c820DBF88(ctx, base);
+  lifted::original::c820DBF88(ctx);
 }
 
 ITC_REGS_STEP(SecondSetSceneModelRelease) {
   if (!SecondSetReleaseNative(7)) {
-    lifted::original::c820DA5D0(ctx, base);
+    lifted::original::c820DA5D0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
-  ctx.r3.u64 = ss::SceneModelRelease(base, ctx.r3.u32, ctx.r1.u32, calls);
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx);
+  ctx.r3.u64 = ss::SceneModelRelease(ctx.r3.u32, ctx.r1.u32, calls);
 }
 
 namespace {
@@ -378,42 +378,41 @@ namespace {
 bool DestructNative(uint32_t pool) { return SecondSetReleaseNative(pool); }
 
 // A destructor: r3 = the object, left; the original where it declines.
-void DestructStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
-                  uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
+void DestructStep(lifted::Regs& ctx, lifted::RegsFunction* original,
+                  uint32_t pool, bool (*destruct)(uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
-    if (destruct(base, ctx.r3.u32, ctx.r1.u32)) {
+    if (destruct(ctx.r3.u32, ctx.r1.u32)) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, original);
+  lifted::Sdk(ctx, original);
 }
 
 // A deleting destructor: r3 = the object (left), r4 = the flags.
-void DeletingStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
-                  uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t, uint32_t)) {
+void DeletingStep(lifted::Regs& ctx, lifted::RegsFunction* original,
+                  uint32_t pool, bool (*destruct)(uint32_t, uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
-    if (destruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
+    if (destruct(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, original);
+  lifted::Sdk(ctx, original);
 }
 
 }  // namespace
 
 #define ITC_SECOND_SET_DESTRUCT(address, pool, name)                      \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    DestructStep(ctx, base, lifted::original::c##address, pool, ss::name);        \
+  void SecondSet##name(lifted::Regs& ctx) {                  \
+    DestructStep(ctx, lifted::original::c##address, pool, ss::name);        \
   }
 #define ITC_SECOND_SET_DELETING(address, pool, name)                      \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    DeletingStep(ctx, base, lifted::original::c##address, pool, ss::name);        \
+  void SecondSet##name(lifted::Regs& ctx) {                  \
+    DeletingStep(ctx, lifted::original::c##address, pool, ss::name);        \
   }
 #define ITC_SECOND_SET_POINTS_DESTRUCT(name)                              \
-  void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    (void)base;                                                           \
+  void SecondSet##name(lifted::Regs& ctx) {                  \
     ctx.r3.u64 = ss::name(ctx.r3.u32);                                    \
   }
 
@@ -439,27 +438,27 @@ ITC_SECOND_SET_POINTS_DESTRUCT(TrafficPointsDestruct)
 ITC_REGS_STEP(SecondSetSceneCockpitDestruct) {
   if (DestructNative(2)) {
     ctx.fpscr.disableFlushMode();
-    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
-    if (ss::SceneCockpitDestruct(base, ctx.r3.u32, ctx.r1.u32, calls)) {
+    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx);
+    if (ss::SceneCockpitDestruct(ctx.r3.u32, ctx.r1.u32, calls)) {
       return;
     }
   }
-  lifted::original::c820DC2F8(ctx, base);
+  lifted::original::c820DC2F8(ctx);
 }
 
 ITC_REGS_STEP(SecondSetSceneCockpitDeletingDestruct) {
   if (DestructNative(2)) {
     ctx.fpscr.disableFlushMode();
-    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
-    if (ss::SceneCockpitDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls)) {
+    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx);
+    if (ss::SceneCockpitDeletingDestruct(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls)) {
       return;
     }
   }
-  lifted::original::c820DC448(ctx, base);
+  lifted::original::c820DC448(ctx);
 }
 
 ITC_REGS_STEP(SecondSetSceneTrafficDestruct) {
-  ss::SceneTrafficDestruct(base, ctx.r3.u32);
+  ss::SceneTrafficDestruct(ctx.r3.u32);
 }
 
 namespace {
@@ -485,32 +484,32 @@ void SetFlush(lifted::Regs& ctx, ss::Flush flush, bool was_on) {
 }  // namespace
 
 ITC_REGS_STEP(SecondSetModelStreamData) {
-  ctx.r3.u64 = ss::ModelStreamData(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ss::ModelStreamData(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(SecondSetModelStreamSize) {
-  ctx.r3.u64 = ss::ModelStreamSize(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ss::ModelStreamSize(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(SecondSetModelStreamData2) {
-  ctx.r3.u64 = ss::ModelStreamData2(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ss::ModelStreamData2(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(SecondSetModelStreamSize2) {
-  ctx.r3.u64 = ss::ModelStreamSize2(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ss::ModelStreamSize2(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(SecondSetMorphSetUp) {
   const bool was_on = FlushOffForMorph(ctx);
   SetFlush(ctx,
-           ss::MorphSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+           ss::MorphSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                           ctx.r8.u32),
            was_on);
 }
 
 ITC_REGS_STEP(SecondSetMorphBlend) {
   const bool was_on = FlushOffForMorph(ctx);
-  const auto result = ss::MorphBlend(base, ctx.r3.u32, ctx.r1.u32);
+  const auto result = ss::MorphBlend(ctx.r3.u32, ctx.r1.u32);
   if (!result) {
     SetFlush(ctx, ss::Flush::kUnchanged, was_on);
-    lifted::original::c8258BD28(ctx, base);
+    lifted::original::c8258BD28(ctx);
     return;
   }
   ctx.r3.u64 = result->r3;
@@ -519,10 +518,10 @@ ITC_REGS_STEP(SecondSetMorphBlend) {
 
 ITC_REGS_STEP(SecondSetMorphRun) {
   const bool was_on = FlushOffForMorph(ctx);
-  const auto result = ss::MorphRun(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+  const auto result = ss::MorphRun(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!result) {
     SetFlush(ctx, ss::Flush::kUnchanged, was_on);
-    lifted::original::c82594D10(ctx, base);
+    lifted::original::c82594D10(ctx);
     return;
   }
   ctx.r3.u64 = result->r3;
@@ -531,12 +530,12 @@ ITC_REGS_STEP(SecondSetMorphRun) {
 
 ITC_REGS_STEP(SecondSetTireFillEntries) {
   ctx.fpscr.disableFlushMode();
-  ss::TireFillEntries(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32);
+  ss::TireFillEntries(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(SecondSetTireReadEntry) {
   ctx.fpscr.disableFlushMode();
-  ss::TireReadEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  ss::TireReadEntry(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                     ctx.r1.u32);
 }
 
@@ -562,9 +561,9 @@ void FromFrame(lifted::Regs& ctx, uint32_t sp, uint32_t lr, Body body) {
 
 }  // namespace
 
-ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base) {
+ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx) {
   ss::WheelCalls calls;
-  calls.morph_run = [&ctx, base](uint32_t model, uint32_t record, uint32_t out1, uint32_t out2,
+  calls.morph_run = [&ctx](uint32_t model, uint32_t record, uint32_t out1, uint32_t out2,
                                  uint32_t sp, uint32_t lr) {
     bool on = false;
     FromFrame(ctx, sp, lr, [&] {
@@ -572,25 +571,25 @@ ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r4.u64 = record;
       ctx.r5.u64 = out1;
       ctx.r6.u64 = out2;
-      lifted::original::c82594D10(ctx, base);
+      lifted::original::c82594D10(ctx);
       on = (::base::FloatMode::getcsr() & uint32_t(::base::FloatMode::FlushMask)) != 0;
     });
     return on;
   };
-  calls.memcpy = [&ctx, base](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+  calls.memcpy = [&ctx](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
                               uint32_t lr) {
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = bytes;
-      lifted::original::c825A7410(ctx, base);
+      lifted::original::c825A7410(ctx);
     });
   };
-  calls.free_pages_in = [&ctx, base](uint32_t at, uint32_t sp, uint32_t lr) {
+  calls.free_pages_in = [&ctx](uint32_t at, uint32_t sp, uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = at;
-      lifted::original::c820D09A0(ctx, base);
+      lifted::original::c820D09A0(ctx);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -598,47 +597,47 @@ ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base) {
   return calls;
 }
 
-void SecondSetWheelStep(lifted::Regs& ctx, uint8_t* base, WheelFunction step) {
+void SecondSetWheelStep(lifted::Regs& ctx, WheelFunction step) {
   const bool was_on = FlushOffForMorph(ctx);
-  ss::WheelCalls calls = SecondSetWheelCalls(ctx, base);
-  ctx.r3.u64 = step(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ss::WheelCalls calls = SecondSetWheelCalls(ctx);
+  ctx.r3.u64 = step(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
   SetFlush(ctx, calls.flush, was_on);
 }
 
 ITC_REGS_STEP(SecondSetWheelPointsSetUp) {
   if (!SecondSetWheelsNative()) {
-    lifted::original::c820E8668(ctx, base);
+    lifted::original::c820E8668(ctx);
     return;
   }
   const bool was_on = FlushOffForMorph(ctx);
-  ss::WheelCalls calls = SecondSetWheelCalls(ctx, base);
-  ctx.r3.u64 = ss::WheelPointsSetUp(base, ctx.r3.u32, ctx.r1.u32, calls);
+  ss::WheelCalls calls = SecondSetWheelCalls(ctx);
+  ctx.r3.u64 = ss::WheelPointsSetUp(ctx.r3.u32, ctx.r1.u32, calls);
   SetFlush(ctx, calls.flush, was_on);
 }
 
 ITC_REGS_STEP(SecondSetScenePartsConstruct) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::original::c820E2F18(ctx, base);
+    lifted::original::c820E2F18(ctx);
     return;
   }
-  ConstructStep(ctx, base, lifted::original::c820E2F18, ss::ScenePartsConstruct);
+  ConstructStep(ctx, lifted::original::c820E2F18, ss::ScenePartsConstruct);
 }
 
 ITC_REGS_STEP(SecondSetSceneModelBlockConstruct) {
   ctx.fpscr.disableFlushMode();
-  ss::SceneModelBlockConstruct(base, ctx.r3.u32);
+  ss::SceneModelBlockConstruct(ctx.r3.u32);
 }
 
-ss::FindCalls SecondSetFindCalls(lifted::Regs& ctx, uint8_t* base) {
+ss::FindCalls SecondSetFindCalls(lifted::Regs& ctx) {
   ss::FindCalls calls;
-  calls.update_matrices = [&ctx, base](uint32_t skeleton, uint32_t frame) {
+  calls.update_matrices = [&ctx](uint32_t skeleton, uint32_t frame) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     // ModelPoint::Find's frame (its back chain written, as the original's).
-    guest::StoreU32(base, frame, frame + scene_loaders::kModelPointFrameBytes);
+    guest::StoreU32(frame, frame + scene_loaders::kModelPointFrameBytes);
     ctx.r1.u64 = frame;
     ctx.r3.u64 = skeleton;
     ctx.lr = 0x820D03EC;
-    lifted::original::c825998A0(ctx, base);
+    lifted::original::c825998A0(ctx);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
@@ -646,14 +645,14 @@ ss::FindCalls SecondSetFindCalls(lifted::Regs& ctx, uint8_t* base) {
   return calls;
 }
 
-void SecondSetFindStep(lifted::Regs& ctx, uint8_t* base, FindFunction find) {
+void SecondSetFindStep(lifted::Regs& ctx, FindFunction find) {
   if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
       !ITC_FLAG(native_material_passes)) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ss::FindCalls calls = SecondSetFindCalls(ctx, base);
-  ctx.r3.u64 = find(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ss::FindCalls calls = SecondSetFindCalls(ctx);
+  ctx.r3.u64 = find(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
   if (calls.flush) {
     ctx.fpscr.enableFlushMode();
   } else {
@@ -668,73 +667,73 @@ bool SecondSetFindsNative() {
 
 ITC_REGS_STEP(SecondSetPartsFind) {
   if (!SecondSetFindsNative()) {
-    lifted::original::c820E0258(ctx, base);
+    lifted::original::c820E0258(ctx);
     return;
   }
-  SecondSetFindStep(ctx, base, ss::PartsFind);
+  SecondSetFindStep(ctx, ss::PartsFind);
 }
 
 ITC_REGS_STEP(SecondSetCockpitFind) {
   if (!SecondSetFindsNative()) {
-    lifted::original::c820DBC88(ctx, base);
+    lifted::original::c820DBC88(ctx);
     return;
   }
-  SecondSetFindStep(ctx, base, ss::CockpitFind);
+  SecondSetFindStep(ctx, ss::CockpitFind);
 }
 
 ITC_REGS_STEP(SecondSetInteriorFind) {
   if (!SecondSetFindsNative()) {
-    lifted::original::c820E3660(ctx, base);
+    lifted::original::c820E3660(ctx);
     return;
   }
-  SecondSetFindStep(ctx, base, ss::InteriorFind);
+  SecondSetFindStep(ctx, ss::InteriorFind);
 }
 
 ITC_REGS_STEP(SecondSetLightsFind) {
   if (!SecondSetFindsNative()) {
-    lifted::original::c820DC900(ctx, base);
+    lifted::original::c820DC900(ctx);
     return;
   }
-  SecondSetFindStep(ctx, base, ss::LightsFind);
+  SecondSetFindStep(ctx, ss::LightsFind);
 }
 
 ITC_REGS_STEP(SecondSetTrafficFind) {
   if (!SecondSetFindsNative()) {
-    lifted::original::c820E58C8(ctx, base);
+    lifted::original::c820E58C8(ctx);
     return;
   }
-  SecondSetFindStep(ctx, base, ss::TrafficFind);
+  SecondSetFindStep(ctx, ss::TrafficFind);
 }
 
 ITC_REGS_STEP(SecondSetPartsPointsConstruct) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::original::c820E2A10(ctx, base);
+    lifted::original::c820E2A10(ctx);
     return;
   }
-  GroupStep(ctx, base, lifted::original::c820E2A10, ss::PartsPointsConstruct);
+  GroupStep(ctx, lifted::original::c820E2A10, ss::PartsPointsConstruct);
 }
 
 ITC_REGS_STEP(SecondSetPartsPointsReset) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::original::c820E00F0(ctx, base);
+    lifted::original::c820E00F0(ctx);
     return;
   }
-  GroupStep(ctx, base, lifted::original::c820E00F0, ss::PartsPointsReset);
+  GroupStep(ctx, lifted::original::c820E00F0, ss::PartsPointsReset);
 }
 
 ITC_REGS_STEP(SecondSetPartsResetRightDoor) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::original::c820DE7E8(ctx, base);
+    lifted::original::c820DE7E8(ctx);
     return;
   }
-  GroupStep(ctx, base, lifted::original::c820DE7E8, ss::PartsResetRightDoor);
+  GroupStep(ctx, lifted::original::c820DE7E8, ss::PartsResetRightDoor);
 }
 
 }  // namespace hooks
 
 #define ITC_SECOND_SET(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_second_set)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // No adapters (their callers in play are native and call their plain C++;

@@ -46,10 +46,10 @@ bool NativeBlocks() {
 ITC_NATIVE_ENTRY_ALWAYS(8258DFF0) {
   
   if (!NativeBlocks()) {
-    lifted::original::c8258DFF0(ctx, base);
+    lifted::original::c8258DFF0(ctx);
     return;
   }
-  ctx.r3.u64 = models::AllocVirtual(base, ctx.r3.u32);
+  ctx.r3.u64 = models::AllocVirtual(ctx.r3.u32);
 }
 
 // Memory::AllocPhysicalEx: r3 = bytes, r4 and r5 the lowest and highest
@@ -58,10 +58,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258DFF0) {
 ITC_NATIVE_ENTRY_ALWAYS(8258E098) {
   
   if (!NativeBlocks()) {
-    lifted::original::c8258E098(ctx, base);
+    lifted::original::c8258E098(ctx);
     return;
   }
-  ctx.r3.u64 = models::AllocPhysicalEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = models::AllocPhysicalEx(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                        ctx.r7.u32);
 }
 
@@ -69,8 +69,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E098) {
 // address the original leaves, read by no caller).
 ITC_NATIVE_ENTRY_ALWAYS(8258E1D8) {
   
-  if (!NativeBlocks() || !models::FreeDue(base)) {
-    lifted::original::c8258E1D8(ctx, base);
+  if (!NativeBlocks() || !models::FreeDue()) {
+    lifted::original::c8258E1D8(ctx);
   }
 }
 
@@ -80,14 +80,13 @@ namespace {
 
 struct CreateContext {
   lifted::Regs& ctx;
-  uint8_t* base;
   // VertexShader::Init's original, from a frame as the create's own.
   static void Init(void* user, uint32_t object, uint32_t microcode) {
     auto& c = *static_cast<CreateContext*>(user);
-    guest_call::InFrame(c.ctx, c.base, 128, 0x822AA0CC, [&](uint32_t) {
+    guest_call::InFrame(c.ctx, 128, 0x822AA0CC, [&](uint32_t) {
       c.ctx.r3.u64 = object;
       c.ctx.r4.u64 = microcode;
-      lifted::original::c822A8740(c.ctx, c.base);
+      lifted::original::c822A8740(c.ctx);
     });
   }
 };
@@ -100,27 +99,27 @@ ITC_NATIVE_ENTRY_ALWAYS(822AA018) {
   
   if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
     const uint64_t lr = ctx.lr;
-    CreateContext context{ctx, base};
+    CreateContext context{ctx};
     shader_objects::CreateCalls calls;
     calls.init = &CreateContext::Init;
     calls.user = &context;
-    const auto object = shader_objects::VertexShaderCreate(base, ctx.r3.u32, calls);
+    const auto object = shader_objects::VertexShaderCreate(ctx.r3.u32, calls);
     ctx.lr = lr;
     if (object) {
       ctx.r3.u64 = *object;
       return;
     }
   }
-  lifted::original::c822AA018(ctx, base);
+  lifted::original::c822AA018(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(822A9EE8) {
   
   if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
-    if (const auto object = shader_objects::PixelShaderCreate(base, ctx.r3.u32)) {
+    if (const auto object = shader_objects::PixelShaderCreate(ctx.r3.u32)) {
       ctx.r3.u64 = *object;
       return;
     }
   }
-  lifted::original::c822A9EE8(ctx, base);
+  lifted::original::c822A9EE8(ctx);
 }

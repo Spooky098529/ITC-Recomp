@@ -40,10 +40,10 @@ struct Step {
 #include "options_screen/init_tables.h"
 
 template <size_t n>
-InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t sp,
+InitResult Run(const Step (&steps)[n], uint32_t object, uint32_t sp,
                uint32_t frame_bytes) {
   const uint32_t frame = sp - frame_bytes;
-  guest::StoreU32(base, frame, sp);  // the back chain
+  guest::StoreU32(frame, sp);  // the back chain
   auto at = [&](const Value& v) {
     switch (v.base) {
       case Value::kConst:
@@ -59,14 +59,14 @@ InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t 
   for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
         result.machine = at(step.c);
-        result.r3 = game_modes::StateMachineAdd(base, result.machine, at(step.a), at(step.b),
+        result.r3 = game_modes::StateMachineAdd(result.machine, at(step.a), at(step.b),
                                                 &result.replaced);
         break;
     }
@@ -88,10 +88,10 @@ const InitInfo kInits[kInitCount] = {
 #define ITC_OPTIONS_INIT(address, name, bytes)            \
   case 0x##address: {                                     \
     ITC_NATIVE_RUNNING("sub_" #address " " name);         \
-    return Run(base, k##address, object, sp, bytes);      \
+    return Run(k##address, object, sp, bytes);      \
   }
 
-InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp) {
+InitResult RunInit(uint32_t address, uint32_t object, uint32_t sp) {
   switch (address) {
     ITC_OPTIONS_INIT(821C9E00, "Type2Options::Init", 976)
     ITC_OPTIONS_INIT(821CA458, "Type4Options::Init", 992)
@@ -101,11 +101,11 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp
     // doesn't take the adapters' macro name for an override).
     case 0x821CAAB0: {
       ITC_NATIVE_RUNNING("sub_821CAAB0 Type8Options::Init");
-      return Run(base, k821CAAB0, object, sp, 912);
+      return Run(k821CAAB0, object, sp, 912);
     }
     case 0x821C8F48: {
       ITC_NATIVE_RUNNING("sub_821C8F48 Type8ControllerOptions::Init");
-      return Run(base, k821C8F48, object, sp, 800);
+      return Run(k821C8F48, object, sp, 800);
     }
     default:
       break;

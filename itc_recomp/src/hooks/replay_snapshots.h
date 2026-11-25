@@ -13,14 +13,14 @@ namespace hooks {
 // Replay::Keep sub_82104F68: r3 = the kept replay, r4 = the race data, r5 =
 // the recordings, r6 = the save data or 0, r7 = the stage flag; r3 as the
 // original leaves it.
-void ReplayKeep(lifted::Regs& ctx, uint8_t* base);
+void ReplayKeep(lifted::Regs& ctx);
 // RaceReplay::SaveStart sub_82104D40, SaveEnd sub_82104E68, RestoreStart
 // sub_821046F8, RestoreEnd sub_82104898: no arguments; r3 as the original
 // leaves it. The three with the world's reset run the original unless
 // --native_heap routes the game's heap to the allocation layer.
-void RaceReplaySaveStart(lifted::Regs& ctx, uint8_t* base);
-void RaceReplaySaveEnd(lifted::Regs& ctx, uint8_t* base);
-void RaceReplayRestoreStart(lifted::Regs& ctx, uint8_t* base);
-void RaceReplayRestoreEnd(lifted::Regs& ctx, uint8_t* base);
+void RaceReplaySaveStart(lifted::Regs& ctx);
+void RaceReplaySaveEnd(lifted::Regs& ctx);
+void RaceReplayRestoreStart(lifted::Regs& ctx);
+void RaceReplayRestoreEnd(lifted::Regs& ctx);
 
 }  // namespace hooks

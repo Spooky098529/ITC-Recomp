@@ -68,33 +68,33 @@ Stats& GetStats() {
   return stats;
 }
 
-std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
+std::string Words(uint32_t address, uint32_t count) {
   std::string words;
   for (uint32_t i = 0; i < count; i++) {
-    words += std::format(" {:08X}", guest::LoadU32(base, address + 4 * i));
+    words += std::format(" {:08X}", guest::LoadU32(address + 4 * i));
   }
   return words;
 }
 
 // A surface: +24 surface info (pitch, MSAA), +28 color/depth info (EDRAM
 // base, format), +32 HiZ (depth).
-std::string Surface(uint8_t* base, uint32_t surface) {
+std::string Surface(uint32_t surface) {
   if (!surface) {
     return "none";
   }
-  return std::format("{:08X} [info{}]", surface, Words(base, surface + 24, 3));
+  return std::format("{:08X} [info{}]", surface, Words(surface + 24, 3));
 }
 
 // A texture: its fetch constant (+28..+48).
-std::string Texture(uint8_t* base, uint32_t texture) {
+std::string Texture(uint32_t texture) {
   if (!texture) {
     return "none";
   }
-  return std::format("{:08X} [fetch{}]", texture, Words(base, texture + 28, 6));
+  return std::format("{:08X} [fetch{}]", texture, Words(texture + 28, 6));
 }
 
 // One line per pass-structure command of a traced frame.
-void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, uint32_t arg2) {
+void TraceCommand(uint32_t id, uint32_t payload, uint32_t arg1, uint32_t arg2) {
   Stats& s = GetStats();
   if (id == 17 || id == 18 || id == 19 || id == 15 || id == 27) {
     s.trace_draws++;
@@ -104,52 +104,52 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   switch (id) {
     case 23:
       for (uint32_t i = 0; i < arg1; i++) {
-        what += std::format(" rt{}={}", guest::LoadU32(base, payload + 16 * i),
-                            Surface(base, guest::LoadU32(base, payload + 16 * i + 4)));
+        what += std::format(" rt{}={}", guest::LoadU32(payload + 16 * i),
+                            Surface(guest::LoadU32(payload + 16 * i + 4)));
       }
       break;
     case 24:
       for (uint32_t i = 0; i < arg1; i++) {
-        what += " depth=" + Surface(base, guest::LoadU32(base, payload + 16 * i));
+        what += " depth=" + Surface(guest::LoadU32(payload + 16 * i));
       }
       break;
     case 25:
       for (uint32_t i = 0; i < arg1; i++) {
         uint32_t item = payload + 68 * i;
-        uint32_t present = guest::LoadU32(base, item);
-        what += std::format(" [flags {:08X}", guest::LoadU32(base, item + 4));
+        uint32_t present = guest::LoadU32(item);
+        what += std::format(" [flags {:08X}", guest::LoadU32(item + 4));
         if (present & 1) {
-          what += " rect" + Words(base, item + 8, 4);
+          what += " rect" + Words(item + 8, 4);
         }
         if (present & 2) {
-          what += " dest " + Texture(base, guest::LoadU32(base, item + 24));
+          what += " dest " + Texture(guest::LoadU32(item + 24));
         }
         if (present & 4) {
-          what += " point" + Words(base, item + 28, 2);
+          what += " point" + Words(item + 28, 2);
         }
-        what += std::format(" level {} slice {}", guest::LoadU32(base, item + 36),
-                            guest::LoadU32(base, item + 40));
+        what += std::format(" level {} slice {}", guest::LoadU32(item + 36),
+                            guest::LoadU32(item + 40));
         if (present & 8) {
-          what += std::format(" clear color {:08X}", guest::LoadU32(base, item + 44));
+          what += std::format(" clear color {:08X}", guest::LoadU32(item + 44));
         }
-        what += std::format(" z {:08X} stencil {}]", guest::LoadU32(base, item + 48),
-                            guest::LoadU32(base, item + 52));
+        what += std::format(" z {:08X} stencil {}]", guest::LoadU32(item + 48),
+                            guest::LoadU32(item + 52));
       }
       break;
     case 26:
       for (uint32_t i = 0; i < arg1; i++) {
         uint32_t item = payload + 280 * i;
         what += std::format(" [rects {} flags {:08X} color {:08X} z {:08X} stencil {}]",
-                            guest::LoadU32(base, item + 4), guest::LoadU32(base, item + 8),
-                            guest::LoadU32(base, item + 268), guest::LoadU32(base, item + 272),
-                            guest::LoadU32(base, item + 276));
+                            guest::LoadU32(item + 4), guest::LoadU32(item + 8),
+                            guest::LoadU32(item + 268), guest::LoadU32(item + 272),
+                            guest::LoadU32(item + 276));
       }
       break;
     case 29:
-      what = std::format(" mask {:08X}", guest::LoadU32(base, payload));
+      what = std::format(" mask {:08X}", guest::LoadU32(payload));
       break;
     case 30:
-      what = Words(base, payload, 4 * arg1);
+      what = Words(payload, 4 * arg1);
       break;
     case 34:
     case 35:
@@ -164,27 +164,26 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
 // Kept out of line: inlined, its stack frame was set up on every replayed
 // command before the flag was checked (~0.6% of the render thread with the
 // log off).
-[[gnu::noinline]] void OnCommandLogged(uint8_t* base, uint32_t id, uint32_t payload,
+[[gnu::noinline]] void OnCommandLogged(uint32_t id, uint32_t payload,
                                        uint32_t arg1, uint32_t arg2) {
   Stats& s = GetStats();
   if (s.tracing) {
-    TraceCommand(base, id, payload, arg1, arg2);
+    TraceCommand(id, payload, arg1, arg2);
   }
   s.commands[id]++;
   s.items[id] += arg1;
   if (id == 1 || id == 2) {
     // Items: [state, value] (render) or [sampler, state, value].
-    uint32_t device = guest::LoadU32(base, kDevicePointer);
+    uint32_t device = guest::LoadU32(kDevicePointer);
     for (uint32_t i = 0; i < arg1; i++) {
       uint32_t item = payload + 16 * i;
-      uint32_t state = guest::LoadU32(base, item + (id == 1 ? 0 : 4));
-      uint32_t value = guest::LoadU32(base, item + (id == 1 ? 4 : 8));
+      uint32_t state = guest::LoadU32(item + (id == 1 ? 0 : 4));
+      uint32_t value = guest::LoadU32(item + (id == 1 ? 4 : 8));
       auto& uses = id == 1 ? s.render_states : s.sampler_states;
       auto [it, added] = uses.try_emplace(state);
       StateUse& use = it->second;
       if (added) {
-        use.setter = guest::LoadU32(
-            base, device + (id == 1 ? kRenderStateSetters : kSamplerStateSetters) + state);
+        use.setter = guest::LoadU32(device + (id == 1 ? kRenderStateSetters : kSamplerStateSetters) + state);
         use.last_value = value;
         use.distinct_values = 1;
         s.new_states = true;
@@ -198,13 +197,13 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   if (id == 4) {
     // Items: [sampler, texture]. The texture's fetch constant is +28..+48.
     for (uint32_t i = 0; i < arg1; i++) {
-      uint32_t texture = guest::LoadU32(base, payload + 16 * i + 4);
+      uint32_t texture = guest::LoadU32(payload + 16 * i + 4);
       if (!texture) {
         continue;
       }
-      auto key = std::make_tuple(guest::LoadU32(base, texture + 28),
-                                 guest::LoadU32(base, texture + 32) & 0xFFF,
-                                 guest::LoadU32(base, texture + 36));
+      auto key = std::make_tuple(guest::LoadU32(texture + 28),
+                                 guest::LoadU32(texture + 32) & 0xFFF,
+                                 guest::LoadU32(texture + 36));
       if (s.texture_fetches[key]++ == 0) {
         ITC_LOG_INFO("replay texture fetch (new): dword0 {:08X} dword1&FFF {:03X} dword2 {:08X}",
                      std::get<0>(key), std::get<1>(key), std::get<2>(key));
@@ -214,20 +213,20 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   if (id == 8 || id == 9) {
     // [shader]. Vertex shader: microcode at +48, size in bytes at +600.
     // Pixel shader: microcode at +24, size at +64 (see docs/gpu-functions.md).
-    uint32_t shader = guest::LoadU32(base, payload);
+    uint32_t shader = guest::LoadU32(payload);
     if (shader) {
       bool vertex = id == 8;
-      uint32_t ucode = guest::LoadU32(base, shader + (vertex ? 48 : 24));
-      uint32_t size = guest::LoadU32(base, shader + (vertex ? 600 : 64));
+      uint32_t ucode = guest::LoadU32(shader + (vertex ? 48 : 24));
+      uint32_t size = guest::LoadU32(shader + (vertex ? 600 : 64));
       std::vector<uint8_t> bytes(size < 0x40000 ? size : 0);
       for (uint32_t i = 0; i < bytes.size(); i++) {
-        bytes[i] = guest::LoadU8(base, ucode + i);
+        bytes[i] = guest::LoadU8(ucode + i);
       }
       uint64_t hash = base::Hash64(bytes.data(), bytes.size());
       if (s.shaders.emplace(shader, hash).second) {
         std::string header;
         for (uint32_t i = 0; i < 20; i++) {
-          header += std::format(" {:08X}", guest::LoadU32(base, shader + 4 * i));
+          header += std::format(" {:08X}", guest::LoadU32(shader + 4 * i));
         }
         ITC_LOG_INFO("replay {} shader (new) {:08X}: microcode {:08X}, {} bytes, hash {:016X}; "
                      "words 0-19:{}",
@@ -237,12 +236,12 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   }
   if (id == 10 || id == 12) {
     // [declaration] or [index buffer]: log each new one's first words.
-    uint32_t object = guest::LoadU32(base, payload);
+    uint32_t object = guest::LoadU32(payload);
     auto& seen = id == 10 ? s.declarations : s.index_buffers;
     if (object && seen.insert(object).second) {
       std::string words;
       for (uint32_t i = 0; i < 16; i++) {
-        words += std::format(" {:08X}", guest::LoadU32(base, object + 4 * i));
+        words += std::format(" {:08X}", guest::LoadU32(object + 4 * i));
       }
       ITC_LOG_INFO("replay {} (new) {:08X}: words 0-15:{}",
                    id == 10 ? "vertex declaration" : "index buffer", object, words);
@@ -251,7 +250,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   if (IsUnknown(id)) {
     std::string words;
     for (uint32_t i = 0; i < 8; i++) {
-      words += std::format(" {:08X}", guest::LoadU32(base, payload + 4 * i));
+      words += std::format(" {:08X}", guest::LoadU32(payload + 4 * i));
     }
     s.sample[id] = std::format("arg1 {} arg2 {:08X} payload{}", arg1, arg2, words);
   }
@@ -259,10 +258,10 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
 
 }  // namespace
 
-void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+void debug::ReplayStats_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                                   uint32_t arg2) {
   if (ITC_FLAG(log_replay_commands) && id < kCommandCount) {
-    OnCommandLogged(base, id, payload, arg1, arg2);
+    OnCommandLogged(id, payload, arg1, arg2);
   }
 }
 

@@ -6,7 +6,9 @@
 #include "type5_mode/type5_mode.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
+#include "hooks/heap.h"
 #include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
@@ -24,9 +26,9 @@ using Machine = schema::Type5Dialog;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   return frame;
 }
 
@@ -43,12 +45,12 @@ constexpr uint32_t kStepTable[10] = {0x822261E0, 0x822262B8, 0x821878B0, 0x82226
 
 // Posts the message (id, 0, 0) on the dispatcher's ring (+204), the id
 // stored first.
-void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
-  const schema::ModeDispatcher d(base, dispatcher);
+void Post(uint32_t dispatcher, uint32_t id) {
+  const schema::ModeDispatcher d(dispatcher);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  const game_modes::RingSlot slot{d.ring() + (end - (end / 50) * 50) * 12};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);
@@ -56,39 +58,40 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
 
 }  // namespace
 
-uint64_t Draw(uint8_t* base, uint64_t machine, uint64_t dispatcher, uint32_t sp,
+uint64_t Draw(uint64_t machine, uint64_t dispatcher, uint32_t sp,
               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822266F8 Type5Dialog::Draw");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t page = G::pages(base).page();
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t page = G::pages().page();
   for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, frame + 80 + 4 * i, kPageTable[i]);
+    StoreU32(frame + 80 + 4 * i, kPageTable[i]);
   }
-  StoreU32(base, frame + 96, 0);
+  StoreU32(frame + 96, 0);
   if (page == kNone) {
     return dispatcher;
   }
   // No bounds check, as the original: the word at the table's index.
-  const uint32_t target = LoadU32(base, frame + 80 + (page << 2));
+  const uint32_t target = LoadU32(frame + 80 + (page << 2));
   return calls.CallArgs(target, frame, 0x82226774,
                         {dispatcher, machine, machine, kPageTable[0], kPageTable[1],
                          kPageTable[2], kPageTable[3], frame + 80});
 }
 
-uint64_t Update(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t Update(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                 const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82226788 Type5Dialog::Update");
   // The empty sub_82106540(100, 30, 0, "TXR_PaCmnWindow") the original
   // calls first is left out: it returns at once.
-  const uint32_t frame = Frame(base, sp, 208);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
-  const auto pages = G::pages(base);
-  StoreU32(base, frame + 132, kStepTable[9]);
+  const uint32_t frame = Frame(sp, 208);
+  // The find's id (the original's +80, read only by the find) a value
+  // since E5 step 6; the steps' table at +96 is handed to the step's call:
+  // it stays on the stack.
+  const uint32_t movie = LoadU32(ui_movies::PairsFindKey(ui_movies::kMovieTable, G::data().movie_shown()));
+  const auto pages = G::pages();
+  StoreU32(frame + 132, kStepTable[9]);
   const uint32_t step = pages.step();
   for (uint32_t i = 0; i < 9; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kStepTable[i]);
+    StoreU32(frame + 96 + 4 * i, kStepTable[i]);
   }
   uint64_t answer = movie;
   if (step == kNone) {
@@ -99,11 +102,11 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t s
     if (int32_t(step) >= 0) {
       // No bounds check: the word at the table's index. r4 to r10 as the
       // original leaves them (the table's build), not read by the steps.
-      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      const uint32_t target = LoadU32(frame + 96 + (step << 2));
       answer = calls.CallArgs(target, frame, 0x82226888,
                               {pages.step_started_address(), kStepTable[3], kStepTable[4], kStepTable[5],
                                kStepTable[6], kStepTable[7], frame + 96, step << 2});
-      p = G::pages(base);
+      p = G::pages();
       done = int32_t(answer) != 0;
     }
     if (done) {
@@ -125,39 +128,42 @@ uint64_t Update(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t s
       p.set_step_started(0);
     }
   }
-  const uint32_t state = G::data(base).queued_state();
+  const uint32_t state = G::data().queued_state();
   if (state == 21) {
     return answer;
   }
-  Machine(base, machine).set_state(state);
-  const auto data = G::data(base);
+  Machine(machine).set_state(state);
+  const auto data = G::data();
   if (data.queued_state() == 9) {
     data.set_interrupted(0);
-    Post(base, dispatcher, 18);
-    G::data(base).set_queued_state(21);
+    Post(dispatcher, 18);
+    G::data().set_queued_state(21);
   } else {
     data.set_queued_state(21);
   }
   return answer;
 }
 
-uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t OnEnter(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225878 Type5Dialog::OnEnter");
-  const uint32_t frame = Frame(base, sp, 112);
-  const Machine m(base, machine);
+  // The original's 112-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
+  (void)calls;
+  const Machine m(machine);
   m.set_loaded(0);
-  const schema::PageObject pages(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x822258A4, 0, 28, 0x1000, 4)));
-  G::set_pages(base, pages);
+  // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x822258A4
+  // and the VirtualAlloc(68) at 0x822258E0; the globals hold their handles.
+  const schema::PageObject pages = schema::PageObject::New();
+  G::set_pages(pages);
   pages.set_next_page(0);
   pages.set_page(0);
   pages.set_previous_page(0);
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const schema::FrontEndMenu menu(
-      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x822258E0, 0, 68, 0x1000, 4)));
-  G::set_menu(base, menu);
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New();
+  G::set_menu(menu);
   menu.set_first_item(0);
   menu.set_last_item(1);
   menu.set_wraps(1);
@@ -175,9 +181,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   menu.set_shoulders_step(0);
   // The data block lives in host memory (E5 step 3): the original's
   // VirtualAlloc(68) at 0x8222593C; the global holds its handle.
-  const schema::Type5DialogData data = schema::Type5DialogData::New(base);
+  const schema::Type5DialogData data = schema::Type5DialogData::New();
   const uint64_t r3 = data.address;
-  G::set_data(base, data);
+  G::set_data(data);
   data.set_movies_loaded(0);
   data.set_movie_shown(0);
   data.set_interrupted(0);
@@ -186,14 +192,16 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   return r3;
 }
 
-uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
+uint64_t WaitForMovies(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82226978 Type5Dialog::WaitForMovies");
-  Frame(base, sp, 96);
-  const Machine m(base, uint32_t(r3));
+  // The original's 96-byte frame (only its back chain) left out: no guest
+  // call is made from it (E5 step 6).
+  (void)sp;
+  const Machine m{uint32_t(r3)};
   if (m.loaded() == 0) {
     uint32_t loaded = 0;
     for (uint32_t id = 16; id <= 19; id++) {
-      loaded = ui_movies::IsLoaded(base, id);
+      loaded = ui_movies::IsLoaded(id);
       if (int32_t(loaded) == 0) {
         return loaded;
       }
@@ -201,40 +209,39 @@ uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp) {
     m.set_loaded(1);
     return loaded;
   }
-  G::data(base).set_movies_loaded(1);
+  G::data().set_movies_loaded(1);
   m.set_state(9);
   return r3;
 }
 
-void OnInterrupt(uint8_t* base) {
+void OnInterrupt() {
   ITC_NATIVE_RUNNING("sub_82225860 Type5Dialog::OnInterrupt");
-  G::data(base).set_interrupted(1);
+  G::data().set_interrupted(1);
 }
 
-uint64_t OpenConfirm(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t OpenConfirm(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225A90 Type5Dialog::OpenConfirm");
-  const uint32_t frame = Frame(base, sp, 112);
-  G::data(base).set_movie_shown(16);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
-  const uint64_t r3 = calls.Call(kResetPose, frame, 0x82225AE0, movie);
+  // The original's 112-byte frame held only the find's id (a value since E5
+  // step 6): ResetPose runs from `sp`.
+  G::data().set_movie_shown(16);
+  const uint32_t movie = LoadU32(ui_movies::PairsFindKey(ui_movies::kMovieTable, G::data().movie_shown()));
+  const uint64_t r3 = calls.Call(kResetPose, sp, 0x82225AE0, movie);
   // The movie's +40960: the choice it last showed (a UI movie's word).
-  const uint32_t choice = LoadU32(base, movie + 40960);
-  const auto menu = G::menu(base);
+  const uint32_t choice = LoadU32(movie + 40960);
+  const auto menu = G::menu();
   const uint32_t cursor = menu.cursor();
   menu.set_cursor(choice);
   menu.set_previous(cursor);
-  const auto pages = G::pages(base);
+  const auto pages = G::pages();
   pages.set_next_page(0);
   pages.set_page(0);
   pages.set_previous_page(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
   pages.set_step_started(0);
-  const Machine m(base, machine);
+  const Machine m(machine);
   if (m.loaded() != 0) {
-    const auto p = G::pages(base);
+    const auto p = G::pages();
     const uint32_t before = p.page();
     if (before != 0) {
       p.set_previous_page(before);
@@ -250,28 +257,30 @@ uint64_t OpenConfirm(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   return r3;
 }
 
-uint64_t OpenConfirm2(uint8_t* base, uint32_t machine, uint32_t sp) {
+uint64_t OpenConfirm2(uint32_t machine, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82225B88 Type5Dialog::OpenConfirm2");
-  const uint32_t frame = Frame(base, sp, 112);
-  G::data(base).set_movie_shown(18);
-  StoreU32(base, frame + 80, G::data(base).movie_shown());
-  const uint32_t pair = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
-  const uint32_t movie = LoadU32(base, pair);
-  const auto menu = G::menu(base);
-  const uint32_t choice = LoadU32(base, movie + 40960);
+  // The original's 112-byte frame held only the find's id (a value since E5
+  // step 6); no guest call is made.
+  (void)sp;
+  G::data().set_movie_shown(18);
+  const uint32_t pair =
+      ui_movies::PairsFindKey(ui_movies::kMovieTable, G::data().movie_shown());
+  const uint32_t movie = LoadU32(pair);
+  const auto menu = G::menu();
+  const uint32_t choice = LoadU32(movie + 40960);
   const uint32_t cursor = menu.cursor();
   menu.set_cursor(choice);
   menu.set_previous(cursor);
-  const auto pages = G::pages(base);
+  const auto pages = G::pages();
   pages.set_next_page(2);
   pages.set_page(2);
   pages.set_previous_page(2);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
   pages.set_step_started(0);
-  const Machine m(base, machine);
+  const Machine m(machine);
   if (m.loaded() != 0) {
-    const auto p = G::pages(base);
+    const auto p = G::pages();
     const uint32_t before = p.page();
     if (before != 2) {
       p.set_previous_page(before);
@@ -287,24 +296,24 @@ uint64_t OpenConfirm2(uint8_t* base, uint32_t machine, uint32_t sp) {
   return pair;
 }
 
-void OpenNotice(uint8_t* base, uint32_t machine, bool second) {
+void OpenNotice(uint32_t machine, bool second) {
   if (second) {
     ITC_NATIVE_RUNNING("sub_82225A08 Type5Dialog::OpenNotice2");
   } else {
     ITC_NATIVE_RUNNING("sub_82225980 Type5Dialog::OpenNotice");
   }
   const uint32_t page = second ? 3 : 1;
-  G::data(base).set_movie_shown(second ? 19 : 17);
-  const auto pages = G::pages(base);
+  G::data().set_movie_shown(second ? 19 : 17);
+  const auto pages = G::pages();
   pages.set_next_page(page);
   pages.set_page(page);
   pages.set_previous_page(page);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
   pages.set_step_started(0);
-  const Machine m(base, machine);
+  const Machine m(machine);
   if (m.loaded() != 0) {
-    const auto p = G::pages(base);
+    const auto p = G::pages();
     const uint32_t before = p.page();
     if (before != page) {
       p.set_previous_page(before);
@@ -319,18 +328,27 @@ void OpenNotice(uint8_t* base, uint32_t machine, bool second) {
   }
 }
 
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t OnLeft(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822257A8 Type5Dialog::OnLeft");
-  const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kVirtualFree, frame, 0x822257D0, G::pages(base).address, 0, 0x8000);
-  calls.Call(kVirtualFree, frame, 0x822257E4, G::menu(base).address, 0, 0x8000);
+  // VirtualFree (sub_82295330) as its adapter answers it, called directly
+  // (E5 step 6); through the dispatch, from the original's 112-byte frame,
+  // where the adapter runs the original (and for 0, which its adapter
+  // answers with the last error set).
+  auto free_pages = [&](uint32_t pages, uint32_t lr) {
+    if (pages != 0 && hooks::VirtualFree(pages, 0, 0x8000, lr)) {
+      return;
+    }
+    calls.Call(kVirtualFree, Frame(sp, 112), lr, pages, 0, 0x8000);
+  };
+  free_pages(G::pages().address, 0x822257D0);
+  free_pages(G::menu().address, 0x822257E4);
   // The host data block (OnEnter): the original's VirtualFree at
   // 0x822257F8, which returned 1.
-  G::data(base).Delete();
+  G::data().Delete();
   const uint64_t r3 = 1;
-  G::set_pages(base, 0u);
-  G::set_menu(base, 0u);
-  G::set_data(base, 0u);
+  G::set_pages(0u);
+  G::set_menu(0u);
+  G::set_data(0u);
   return r3;
 }
 

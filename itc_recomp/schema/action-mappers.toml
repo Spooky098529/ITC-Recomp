@@ -20,19 +20,35 @@
 # mapper"; the update's fields in docs/pause-menu-fix.md): a client node of
 # type 2 in the input client list, turning a logical pad's values and its
 # listener's held buttons into 30 actions.
+#
+# In host memory (E5 step 4): the four made by ActionMappers::Init (its hand
+# port, and the lifted original's operator new calls), never freed (the
+# process ends with them). Its arrays are embedded objects (one element type
+# each: ActionWord, ActionHalf, ActionFloat, ActionRepeat, ActionCurve,
+# ActionThreshold; its listener an InputProcessor); the bytes fields over
+# them keep the measure's reads at the mapper's offsets and the `_address()`
+# arithmetic, without doubling the embedded members in the layout. The
+# input state and analog stage views (ActionMapperState, ActionMapperAnalog
+# and the measure's ActionMapperAt448, ActionMapperAt624) and the configs
+# are host views over the mapper's members (interior handles), not embeds.
 [ActionMapper]
 measure = "ActionMapper"
 measures = ["ActionMapper::ResetWords.r3", "ActionMapper::ResetAnalog.r3", "ActionMapper::ResetWords.r3.+24", "ActionMapper@+448.+24", "ActionMapper::ResetAnalog.r3.+180"]
 size = 2896
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8209F48C, 0x8209F4C4, 0x8209F4EC, 0x8209F514]
 vtable = 0x82007F78
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82007F78" },
   { name = "client_type", offset = 4, type = "u32", note = "the client node's type: 2" },
   { name = "next_client", offset = 8, type = "ptr", to = "InputClientNode", note = "the next node of the client list" },
-  { name = "kinds", offset = 12, type = "u32", note = "30 words: each action's kind (1, digital)" },
-  { name = "analog_kinds", offset = 132, type = "u32", note = "30 words: each action's analog kind (2 for actions 24-29, else 1)" },
-  { name = "links", offset = 252, type = "u32", note = "30 words: each action's linked action (probably each direction's opposite; 30 none)" },
+  { name = "kinds", offset = 12, type = "bytes", count = 120, note = "30 words: each action's kind (1, digital); the embedded kind" },
+  { name = "kind", offset = 12, type = "embed", to = "ActionWord", count = 30 },
+  { name = "analog_kinds", offset = 132, type = "bytes", count = 120, note = "30 words: each action's analog kind (2 for actions 24-29, else 1); the embedded analog_kind" },
+  { name = "analog_kind", offset = 132, type = "embed", to = "ActionWord", count = 30 },
+  { name = "links", offset = 252, type = "bytes", count = 120, note = "30 words: each action's linked action (probably each direction's opposite; 30 none); the embedded link" },
+  { name = "link", offset = 252, type = "embed", to = "ActionWord", count = 30 },
   { name = "config", offset = 372, type = "u32", note = "an ActionMapperConfig (the kinds and links pointers), then at +380 the analog stage's" },
   { name = "config_links", offset = 376, type = "u32", note = "the config's links pointer (mapper + 252)" },
   { name = "analog_config", offset = 380, type = "u32", note = "the analog stage's ActionMapperConfig: its kinds pointer (mapper + 132)" },
@@ -73,15 +89,23 @@ fields = [
   { name = "released", offset = 460, type = "u32" },
   { name = "fired", offset = 464, type = "u32", note = "pressed or repeating" },
   { name = "pending", offset = 468, type = "u32", note = "ORed into the next update's held before and pressed" },
-  { name = "repeat_pointers", offset = 472, type = "ptr", to = "ActionRepeat", note = "30 pointers to the repeat objects" },
-  { name = "repeats", offset = 592, type = "u32", note = "30 ActionRepeats (16 bytes): the first's vtable" },
-  { name = "analog_raw", offset = 1072, type = "u16", note = "the analog stage (an ActionMapperAnalog) starts here: 30 u16s" },
-  { name = "analog_values", offset = 1132, type = "f32", note = "30 floats: the analog values through each action's curve" },
-  { name = "curve_pointers", offset = 1252, type = "ptr", to = "ActionCurve", note = "30 pointers to the curve objects" },
-  { name = "curves", offset = 1372, type = "u32", note = "30 ActionCurves (16 bytes): the first's vtable" },
-  { name = "thresholds", offset = 1852, type = "f32", note = "30 ActionThresholds (20 bytes): the first's on" },
+  { name = "repeat_pointers", offset = 472, type = "bytes", count = 120, note = "30 pointers to the repeat objects; the embedded repeat_pointer" },
+  { name = "repeat_pointer", offset = 472, type = "embed", to = "ActionWord", count = 30 },
+  { name = "repeats", offset = 592, type = "bytes", count = 480, note = "30 ActionRepeats (16 bytes); the embedded repeat (the constructor's store to the first's vtable is the measure's +592)" },
+  { name = "repeat", offset = 592, type = "embed", to = "ActionRepeat", count = 30 },
+  { name = "analog_raw", offset = 1072, type = "bytes", count = 60, note = "the analog stage (an ActionMapperAnalog) starts here: 30 u16s; the embedded analog_raw_value" },
+  { name = "analog_raw_value", offset = 1072, type = "embed", to = "ActionHalf", count = 30 },
+  { name = "analog_values", offset = 1132, type = "bytes", count = 120, note = "30 floats: the analog values through each action's curve; the embedded analog_value" },
+  { name = "analog_value", offset = 1132, type = "embed", to = "ActionFloat", count = 30 },
+  { name = "curve_pointers", offset = 1252, type = "bytes", count = 120, note = "30 pointers to the curve objects; the embedded curve_pointer" },
+  { name = "curve_pointer", offset = 1252, type = "embed", to = "ActionWord", count = 30 },
+  { name = "curves", offset = 1372, type = "bytes", count = 480, note = "30 ActionCurves (16 bytes); the embedded curve (the constructor's store to the first's vtable is the measure's +1372)" },
+  { name = "curve", offset = 1372, type = "embed", to = "ActionCurve", count = 30 },
+  { name = "thresholds", offset = 1852, type = "bytes", count = 600, note = "30 ActionThresholds (20 bytes); the embedded threshold" },
+  { name = "threshold", offset = 1852, type = "embed", to = "ActionThreshold", count = 30 },
   { name = "unknown_2452", offset = 2452, type = "bytes", count = 12 },
-  { name = "listener", offset = 2464, type = "bytes", count = 416, note = "the listener: an input processor (vtable 0x8206C0C4, input.md)" },
+  { name = "listener", offset = 2464, type = "bytes", count = 416, note = "the listener: an input processor (vtable 0x8206C0C4, input.md); the embedded listener_processor" },
+  { name = "listener_processor", offset = 2464, type = "embed", to = "InputProcessor" },
   { name = "fault_analog_raw", offset = 0, type = "u16", note = "measure fault: the analog stage's raw[0] (ActionMapperAnalog +0, mapper + 1072)" },
   { name = "fault_state_fired", offset = 16, type = "u32", note = "measure fault: ActionMapperState's fired (mapper + 464)" },
   { name = "fault_state_pending", offset = 20, type = "u32", note = "measure fault: ActionMapperState's pending (mapper + 468)" },
@@ -97,6 +121,7 @@ fields = [
 # The mapper's input state (mapper + 448): what ResetStages, InitRepeats,
 # ResetWords, Rebuild, Hysteresis and Words take as r3.
 [ActionMapperState]
+storage = "host"
 size = 2004
 origin = "embedded"
 fields = [
@@ -116,6 +141,7 @@ fields = [
 # The mapper's analog stage (mapper + 1072): what InitCurves, ResetAnalog,
 # Analog, CurveUnsigned and CurveCentered take as r3.
 [ActionMapperAnalog]
+storage = "host"
 size = 780
 origin = "embedded"
 fields = [
@@ -129,6 +155,7 @@ fields = [
 [ActionThreshold]
 size = 20
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "on", offset = 0, type = "f32" },
   { name = "off", offset = 4, type = "f32" },
@@ -143,6 +170,7 @@ fields = [
 measure = "ActionMapper::Hysteresis.r6"
 size = 8
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "kinds", offset = 0, type = "u32", note = "the address of 30 kinds" },
   { name = "links", offset = 4, type = "u32", note = "the address of 30 links (30 none)" },
@@ -153,6 +181,7 @@ fields = [
 measure = "ActionRepeat"
 size = 16
 origin = "embedded"
+storage = "host"
 vtable = 0x82007F68
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "ActionObjectVtable" },
@@ -166,6 +195,7 @@ fields = [
 measure = "ActionCurve"
 size = 16
 origin = "embedded"
+storage = "host"
 vtable = 0x82007F70
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "ActionObjectVtable" },
@@ -188,10 +218,16 @@ fields = [
 
 # The logical pad's values the mapper reads (logical pad + 36; 40 floats,
 # docs/pause-menu-fix.md): values 0-7 the sticks and triggers.
+#
+# Embedded in the logical pads (their +36) and the physical pads (their +8),
+# both in host memory (E5 step 4); dual, since a device the update doesn't
+# know answers its values' address from its own code. The values past
+# +27 are read and written by offset (load_at, store_at).
 [ActionPadValues]
 measure = "ActionMapper.+2880"
 size = 160
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "left_x", offset = 0, type = "f32" },
   { name = "left_y", offset = 4, type = "f32" },
@@ -229,6 +265,8 @@ fields = [
 measures = ["ClientList", "InputClientList"]
 size = 52
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8209F454]
 vtable = 0x82007F18
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820713C0, then 0x82007F18" },
@@ -302,6 +340,34 @@ fields = [
   { name = "curve_maximum", offset = 28, type = "f32" },
 ]
 
+# The mapper's array elements (E5 step 4): a word, a halfword and a float,
+# embedded 30 at a time in the mapper (in host memory, host byte order);
+# views of them are the arrays' elements by address (the config's kinds and
+# links, the repeat and curve pointers, the raw values). Dual: generic.
+[ActionWord]
+size = 4
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+[ActionHalf]
+size = 2
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "value", offset = 0, type = "u16" },
+]
+
+[ActionFloat]
+size = 4
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "value", offset = 0, type = "f32" },
+]
+
 [globals]
 one = { address = 0x82000A30, type = "f32", note = "1.0" }
 zero = { address = 0x82000A34, type = "f32", note = "probably 0.0" }
@@ -329,6 +395,7 @@ the_client_list = { address = 0x82970C14, type = "ptr", to = "InputClientList", 
 measure = "ActionMapper::Words.r4@+8"
 size = 8
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
@@ -343,6 +410,7 @@ fields = [
 measure = "ActionMapper@+448"
 size = 1421
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32" },
@@ -367,6 +435,7 @@ fields = [
 measure = "ActionMapper@+448@+624"
 size = 316
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "analog_raw", offset = 0, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's raw[0] (ActionMapperAnalog +0, mapper + 1072)" },
   { name = "analog_values", offset = 60, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the analog stage's values (mapper + 1132)" },

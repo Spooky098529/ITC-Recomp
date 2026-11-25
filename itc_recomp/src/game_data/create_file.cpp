@@ -47,10 +47,10 @@ uint32_t CreateOptions(uint32_t flags) {
 
 }  // namespace
 
-uint64_t CreateFile(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t path, uint32_t access,
+uint64_t CreateFile(uint32_t sp, uint64_t r13, uint32_t path, uint32_t access,
                     uint32_t sharing, uint32_t disposition, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_82295508 CreateFile");
-  const uint32_t frame = lifted_call::PushFrame(base, sp, 192);
+  const uint32_t frame = lifted_call::PushFrame(sp, 192);
   const uint32_t pcr = uint32_t(r13);
   uint32_t nt_disposition = 0;
   switch (disposition) {
@@ -65,24 +65,24 @@ uint64_t CreateFile(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t path, uin
       }
       [[fallthrough]];
     default:
-      last_error::SetFromStatus(base, pcr, kInvalidParameter);
+      last_error::SetFromStatus(pcr, kInvalidParameter);
       return ~uint64_t(0);
   }
   // The name (RtlInitAnsiString's rule) and whether it ends in a backslash.
   const uint32_t name = frame + 104;
   const helpers::AnsiString string = helpers::AnsiString_Init(
-      path != 0 ? reinterpret_cast<const char*>(base + path) : nullptr, path);
-  guest::StoreU16(base, name, string.length);
-  guest::StoreU16(base, name + 2, string.maximum_length);
-  guest::StoreU32(base, name + 4, string.buffer);
-  const uint32_t length = guest::LoadU16(base, name);
-  const bool trailing_backslash = length > 1 && guest::LoadU8(base, path + length - 1) == '\\';
+      path != 0 ? reinterpret_cast<const char*>(guest::Pointer(path)) : nullptr, path);
+  guest::StoreU16(name, string.length);
+  guest::StoreU16(name + 2, string.maximum_length);
+  guest::StoreU32(name + 4, string.buffer);
+  const uint32_t length = guest::LoadU16(name);
+  const bool trailing_backslash = length > 1 && guest::LoadU8(path + length - 1) == '\\';
   // The object attributes at +120, the create options at +84 (the call's
   // ninth argument, on the frame).
   uint32_t options = CreateOptions(flags);
-  guest::StoreU32(base, frame + 120, kDosDevices);
-  guest::StoreU32(base, frame + 128, kCaseInsensitive);
-  guest::StoreU32(base, frame + 124, name);
+  guest::StoreU32(frame + 120, kDosDevices);
+  guest::StoreU32(frame + 128, kCaseInsensitive);
+  guest::StoreU32(frame + 124, name);
   if ((flags & 0x04000000) != 0) {  // FILE_FLAG_DELETE_ON_CLOSE
     options |= 0x1000;
     access |= 0x10000;  // DELETE
@@ -90,27 +90,27 @@ uint64_t CreateFile(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t path, uin
   if ((flags & 0x02000000) == 0) {
     options |= 0x40;  // FILE_NON_DIRECTORY_FILE
   }
-  guest::StoreU32(base, frame + 84, options);
+  guest::StoreU32(frame + 84, options);
   const uint32_t status = uint32_t(
-      lifted_call::Import(base, __imp__NtCreateFile, frame, r13,
+      lifted_call::Import(__imp__NtCreateFile, frame, r13,
                           {frame + 96, access | 0x100000 | 0x80, frame + 120, frame + 112, 0,
                            flags & 0x7FA7, sharing, nt_disposition})
           .r3);
   if (int32_t(status) < 0) {
-    last_error::SetFromStatus(base, pcr, status);
+    last_error::SetFromStatus(pcr, status);
     if (status == kNameCollision) {
-      last_error::Set(base, pcr, 80);  // ERROR_FILE_EXISTS
+      last_error::Set(pcr, 80);  // ERROR_FILE_EXISTS
     } else if (status == kFileIsADirectory) {
-      last_error::Set(base, pcr, trailing_backslash ? 3 : 5);
+      last_error::Set(pcr, trailing_backslash ? 3 : 5);
     }
     return ~uint64_t(0);
   }
   // ERROR_ALREADY_EXISTS when CREATE_ALWAYS overwrote or OPEN_ALWAYS opened.
-  const uint32_t information = guest::LoadU32(base, frame + 116);
+  const uint32_t information = guest::LoadU32(frame + 116);
   const bool existed = (disposition == 2 && information == 3) ||
                        (disposition == 4 && information == 1);
-  last_error::Set(base, pcr, existed ? 183 : 0);
-  return guest::LoadU32(base, frame + 96);
+  last_error::Set(pcr, existed ? 183 : 0);
+  return guest::LoadU32(frame + 96);
 }
 
 }  // namespace game_data

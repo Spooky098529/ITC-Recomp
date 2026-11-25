@@ -34,12 +34,20 @@
 
 # The first set of scene pools ([0x826C2E40], 140 bytes, ScenePools::MakeA;
 # filled by ScenePools::CreateA).
+# In host memory (E5 step 5): made by ScenePools::MakeA (the hand port,
+# src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc returning
+# to 0x820C3C60), freed by ScenePools::UpdateA's VirtualFree once torn down
+# (a handle; src/scene/scene.cpp). Its pools' lists (+56, PoolList) stay
+# guest-shaped views reaching it through raw accesses; the deferred release
+# records (+52) are pages of their own.
 [ScenePools]
 # measures from CarModelsFirstSet (car-models), merged at the integration
 measures = ["ScenePools", "new<140>@sub_820C3C40",
             "new<140>@ScenePools::MakeA", "CarInterior.+3092", "TrafficCar.+576"]
 size = 140
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C3C60]
 fields = [
   { name = "teardown_count", offset = 0, type = "u32", note = "the teardown's count (2, ScenePools::StartTeardownA); the measure's store here is AllocPages' (sub_820D0960) into its out word, the set's +52" },
   { name = "state", offset = 4, type = "u32", note = "0 when made, 3 once filled, 4 tearing down" },
@@ -114,14 +122,25 @@ fields = [
 
 # The car parts (pool 1, 106,016 bytes, vtable 0x82005094; CarParts::CarParts
 # sub_820D7428). SceneModel.+5060.+104 is CarParts::ApplyPalette's r3.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C4264), freed by ScenePools::DestroyA's VirtualFree (a
+# handle; src/scene/scene.cpp). Its scalar fields (the PoolNode's included)
+# are the layout; the record, the load slots and the 216 part models
+# (CarPartsLoads) stay guest-shaped views reaching it through raw accesses.
 [CarParts]
 measures = ["CarParts", "SceneModel.+5060.+104",
             "CarParts::OnPartLoadedA.r6", "CarParts::OnPartLoadedB.r6"]
 size = 106016
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C4264]
 vtable = 0x82005094
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82005094 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (its pool's, in the first set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
   { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
@@ -146,13 +165,25 @@ fields = [
 
 # The cockpit body (pool 2, 3,520 bytes, vtable 0x82005020; Cockpit::Cockpit
 # sub_820D63A0); Cockpit::OnFileLoaded's r6.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C4234), freed by ScenePools::DestroyA's VirtualFree (a
+# handle; src/scene/scene.cpp). Its scalar fields (the PoolNode's included)
+# are the layout; the record, the load slots, the skeleton, the XPR objects,
+# the texture providers and the part models stay guest-shaped views reaching
+# it through raw accesses.
 [Cockpit]
 measures = ["Cockpit", "Cockpit::OnFileLoaded.r6"]
 size = 3520
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C4234]
 vtable = 0x82005020
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82005020 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (its pool's, in the first set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
   { name = "car_model", offset = 24, type = "ptr", to = "CarModel", note = "its +32 the block" },
@@ -188,13 +219,24 @@ fields = [
 
 # The interior (pool 3, 3,104 bytes, vtable 0x8200509C; Interior::Interior
 # sub_820D78B8); Interior::OnPartLoaded's r6.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C4208), freed by ScenePools::DestroyA's VirtualFree (a
+# handle; src/scene/scene.cpp). Its scalar fields (the PoolNode's included)
+# are the layout; the record, the load slots and the part models stay guest-
+# shaped views reaching it through raw accesses.
 [Interior]
 measures = ["Interior", "Interior::OnPartLoaded.r6"]
 size = 3104
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C4208]
 vtable = 0x8200509C
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x8200509C (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (its pool's, in the first set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
   { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
@@ -211,14 +253,25 @@ fields = [
 
 # Pool 4's object (592 bytes, vtable 0x82005064; Pool4Object::Pool4Object
 # sub_820D6A70): one model.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C41DC), freed by ScenePools::DestroyA's VirtualFree (a
+# handle; src/scene/scene.cpp). Its scalar fields (the PoolNode's included)
+# are the layout; the record, the load slot and the part model stay guest-
+# shaped views reaching it through raw accesses.
 [Pool4Object]
 measure = "Pool4Object"
 measures = ["sub_820D69B8.r6", "SceneLights.+13152"]
 size = 592
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C41DC]
 vtable = 0x82005064
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82005064 (the pool node's 0x82004F90 while it's torn down)" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (its pool's, in the first set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
   { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
   { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },

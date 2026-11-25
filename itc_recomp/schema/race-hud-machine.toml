@@ -37,6 +37,9 @@ fields = [
 measure = "RaceScreens@+16.+436"
 size = 9612
 origin = "embedded"
+# Dual (E5 step 4): the measure joins the race HUD in the host holder
+# (RaceHud::RunMovie's r3) with the machine in the race mode's guest block.
+storage = "dual"
 fields = [
   { name = "fault_hud_movie_running", offset = 456, type = "u32", note = "measure fault: RaceHud::RunMovie's HUD +456 (its movie +604 run when not 0)" },
   { name = "fault_hud_movie", offset = 604, type = "u32", note = "measure fault: RaceHud::RunMovie's HUD +604 (a UI movie)" },
@@ -47,22 +50,33 @@ fields = [
 # RaceScreens::Create, freed by RaceScreens::Destroy; known-data.md). The race
 # HUD (RaceHud, race-hud-object.toml) is embedded at +16, the +656 object
 # (SplitHud) at +656, the alternate HUD's holder (AltHudHolder, alt-hud.toml)
-# at +1004: the words of theirs the holder's users reach through the holder
-# are named here by the object's offset.
+# at +1004. In host memory (E5 step 4): RaceScreens::Create's New (the hand
+# port; host_alloc for the lifted original's VirtualAlloc), freed by
+# RaceScreens::Destroy's Delete (the lifted original's VirtualFree takes the
+# handle). Dual: the measure joins the race mode's dispatcher (guest) with
+# it (the fault_ fields). The words of the embedded objects the holder's
+# users reach through the holder are bytes fields here (read at their offset
+# with the embedded objects' order, load_at and store_at), so the layout
+# names each word once: the embeds' fields.
 [RaceScreens]
 measure = "RaceScreens"
 measures = ["PauseMenu4::Open.ret.+9608", "AltHud::ToggleView.ret.+9608", "RaceScreens@+16.+436.+9608"]
 size = 1040
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82211F6C]
 fields = [
   { name = "flags", offset = 8, type = "u32", note = "0 at set-up; bit 0 the replay bit (set when the menu after the race picks the replay: the alternate HUD drawn in place of the race HUD)" },
-  { name = "hud_signs_on", offset = 440, type = "u32", note = "the race HUD's +424 (signs on): 1 by CloseResults, 0 by OnRaceEnd" },
-  { name = "hud_countdown_running", offset = 452, type = "u32", note = "the race HUD's +436: CountdownUpdate goes to the race once it's 0" },
-  { name = "hud_results", offset = 460, type = "ptr", to = "RacerResultsRecord", note = "the race HUD's +444: the race progress's ([0x826D82E8]) +2184, its results record (StartCountdown)" },
+  { name = "hud", offset = 16, type = "embed", to = "RaceHud", note = "the race HUD (race-hud-object.toml)" },
+  { name = "hud_signs_on", offset = 440, type = "bytes", count = 4, note = "the race HUD's +424 (signs_on; 1 by CloseResults, 0 by OnRaceEnd): a word of the hud embed" },
+  { name = "hud_countdown_running", offset = 452, type = "bytes", count = 4, note = "the race HUD's +436 (countdown_running; CountdownUpdate goes to the race once it's 0): a word of the hud embed" },
+  { name = "hud_results", offset = 460, type = "bytes", count = 4, note = "the race HUD's +444 (racers): the race progress's ([0x826D82E8]) +2184, its results record (StartCountdown); a word of the hud embed" },
+  { name = "split_hud", offset = 656, type = "embed", to = "SplitHud", note = "the +656 object (kind 4's, never seen in play)" },
   { name = "fault_ring_count", offset = 820, type = "u32", note = "measure fault: RaceUpdate's post, the race mode's dispatcher's ring count (+804)" },
   { name = "fault_ring_start", offset = 824, type = "u32", note = "measure fault: RaceUpdate's post, the dispatcher's ring start (+808)" },
-  { name = "split_results", offset = 1000, type = "ptr", to = "RacerResultsRecord", note = "the +656 object's +344: the race progress's +2184 (StartCountdown, kind 4)" },
-  { name = "alt_hud", offset = 1004, type = "bytes", count = 8, note = "the alternate HUD's holder (AltHudHolder, alt-hud.toml): the object and its menu list" },
+  { name = "split_results", offset = 1000, type = "bytes", count = 4, note = "the +656 object's +344 (results): the race progress's +2184 (StartCountdown, kind 4); a word of the split_hud embed" },
+  { name = "alt_hud", offset = 1004, type = "bytes", count = 8, note = "the alternate HUD's holder's bytes (alt_hud_holder's words)" },
+  { name = "alt_hud_holder", offset = 1004, type = "embed", to = "AltHudHolder", note = "the alternate HUD's holder (alt-hud.toml): the object and its menu list" },
   { name = "pause_menu", offset = 1012, type = "ptr", note = "[0x826D84D0], the pause menu (the measure's PauseMenu4 ... new<4>@sub_8220D7E8; race-screens.md)" },
   { name = "kind4_pause_menu", offset = 1016, type = "ptr", note = "[0x826D84E0], kind 4's pause menu, probably (the measure's PauseMenu4)" },
   { name = "after_race_menu", offset = 1020, type = "ptr", note = "[0x826D8510], the menu after the race (the measure's new<4>@sub_8221B1F0)" },
@@ -130,10 +144,12 @@ fields = [
 
 # The holder's +656 object (348 bytes), probably the split screen's HUD
 # (kind 4; never seen in play, its functions lifted and not read).
+# In host memory (E5 step 4): embedded in the host holder only.
 [SplitHud]
 measures = ["sub_82215A50.r3", "sub_82215D08.r3", "sub_82215DA8.r3", "sub_82216908.r3", "sub_82216950.r3", "sub_82216A40.r3"]
 size = 348
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_248", offset = 248, type = "f32" },
   { name = "unknown_252", offset = 252, type = "f32" },
@@ -144,6 +160,7 @@ fields = [
   { name = "unknown_272", offset = 272, type = "f32" },
   { name = "unknown_280", offset = 280, type = "u32" },
   { name = "unknown_284", offset = 284, type = "u32" },
+  { name = "unknown_328", offset = 328, type = "u32", note = "RaceHudAt656's +328 (sub_82215B48's stores and loads, lifted), named here so the holder's layout has it" },
   { name = "countdown_running", offset = 336, type = "u32", note = "as the race HUD's +436, probably: CountdownUpdate's kind 4 goes to the race once it's 0; written by sub_822159F0 (the start), sub_82215D08 (the stop) and sub_82215DA8" },
   { name = "mode", offset = 340, type = "u32", note = "probably the mode sub_82216810 sets (StartCountdown's kind 4); read by sub_82216A40 and sub_82216830" },
   { name = "results", offset = 344, type = "ptr", to = "RacerResultsRecord", note = "the race progress's +2184 (the holder's +1000, StartCountdown)" },

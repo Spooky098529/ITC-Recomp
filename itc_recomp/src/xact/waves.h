@@ -38,7 +38,7 @@ constexpr uint32_t kVoiceDeletingDestructor = 0x825CA448;
 // +4, and with `reverb` set +8 = the holder's ([holder]) slot +4, +16 =
 // [level] and the voice's slot +32 (SetOutputs) with 0, both through the
 // guest call. `frame` is this function's (128 bytes). Returns the last r3.
-uint32_t VoiceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t holder,
+uint32_t VoiceInit(uint32_t voice, uint32_t description, uint32_t holder,
                    uint32_t level, uint32_t reverb, const Thread& thread, uint32_t frame,
                    const GuestCall& call);
 // XACTVoice::Create (sub_825C9C40): 24 bytes (XMemAlloc 0x2084802A; none:
@@ -47,13 +47,13 @@ uint32_t VoiceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t
 // destructor's plain C++ while the slot holds it) and [out] 0, else [out] the
 // voice. `frame` is this function's (144 bytes). Allocates through the
 // native layer: call it only while hooks::NativeHeapActive().
-uint32_t VoiceCreate(uint8_t* base, uint32_t description, uint32_t holder, uint32_t level,
+uint32_t VoiceCreate(uint32_t description, uint32_t holder, uint32_t level,
                      uint32_t reverb, uint32_t out, const Thread& thread, uint32_t frame,
                      const GuestCall& call);
 // XACTVoice::GetState (sub_825C9DB8, slot +0): XAudioVoice::GetState on +4
 // into the frame's +80; on success [out] = 1 when its bit 0 (playing) is
 // clear, else 0. `frame` is this function's (112 bytes). Returns XAudio's r3.
-uint32_t VoiceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t frame,
+uint32_t VoiceGetState(uint32_t voice, uint32_t out, uint32_t frame,
                        const GuestCall& call);
 // The tail calls on +4, with the XAudio entry point's frame below `sp`
 // (the caller's stack pointer): SetVolume (sub_825C9BE8, slot +4, f1),
@@ -61,28 +61,28 @@ uint32_t VoiceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t fra
 // (sub_825C9BF8, slot +16, `deferred` != 0 as XAudio's flag), Stop
 // (sub_825C9C10, slot +20, `now` != 0 as XAudio's flag), FlushPackets
 // (sub_825C9C28, slot +24). Each returns the entry point's r3.
-uint32_t VoiceSetVolume(uint8_t* base, uint32_t voice, double volume, uint32_t sp,
+uint32_t VoiceSetVolume(uint32_t voice, double volume, uint32_t sp,
                         const GuestCall& call);
-uint32_t VoiceSetPitch(uint8_t* base, uint32_t voice, double ratio, uint32_t sp,
+uint32_t VoiceSetPitch(uint32_t voice, double ratio, uint32_t sp,
                        const GuestCall& call);
-uint32_t VoiceStart(uint8_t* base, uint32_t voice, uint32_t deferred, const Thread& thread,
+uint32_t VoiceStart(uint32_t voice, uint32_t deferred, const Thread& thread,
                     uint32_t sp, const GuestCall& call);
-uint32_t VoiceStop(uint8_t* base, uint32_t voice, uint32_t now, uint32_t sp,
+uint32_t VoiceStop(uint32_t voice, uint32_t now, uint32_t sp,
                    const GuestCall& call);
-uint32_t VoiceFlushPackets(uint8_t* base, uint32_t voice, uint32_t sp, const GuestCall& call);
+uint32_t VoiceFlushPackets(uint32_t voice, uint32_t sp, const GuestCall& call);
 // XACTVoice::SubmitPacket (sub_825C9E08, slot +12): XACT's 40-byte packet
 // at `packet` copied into XAudio's 32 bytes at the frame's +80 (its words
 // +0, +4, +8 (255 becomes -1), +20 to +36), then the codec's slot +36
 // (sub_8245A108) on +4 with it and (`flag` != 0). `frame` is this
 // function's (128 bytes). Returns its r3.
-uint32_t VoiceSubmitPacket(uint8_t* base, uint32_t voice, uint32_t packet, uint32_t flag,
+uint32_t VoiceSubmitPacket(uint32_t voice, uint32_t packet, uint32_t flag,
                            uint32_t frame, const GuestCall& call);
 // XACTVoice::~XACTVoice, deleting (sub_825CA448, slot +56): the vtable put
 // back, XAudioVoice::Release on +4 when set, and with `flags` bit 0
 // XMemFree(this, 0x2084802A). `frame` is this function's (112 bytes).
 // Returns the voice. Frees through the native layer: call it only while
 // hooks::NativeHeapActive().
-uint32_t VoiceDeletingDestruct(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t frame,
+uint32_t VoiceDeletingDestruct(uint32_t voice, uint32_t flags, uint32_t frame,
                                const GuestCall& call);
 
 // --- The waves (XACTWave: +0 the vtable, +4/+8 the node in the wave
@@ -103,22 +103,22 @@ constexpr uint32_t kWaveBankAddListener = 0x825C8690;  // the bank's +4 slot +0
 // +0, AddListener with the wave's +12): AddListener's plain C++ while the
 // slot holds it and `native_heap`, else through the guest call. `frame` is
 // this function's (112 bytes). Returns the wave.
-uint32_t WaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, uint32_t bank,
+uint32_t WaveConstruct(uint32_t wave, uint32_t engine, uint32_t bank,
                        uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
                        const GuestCall& call);
 // XACTInMemoryWave::XACTInMemoryWave (sub_825D37A8): the base (a frame
 // below), its vtables, +64 to +92 zeroed, +64 and +80 the wave. `frame` is
 // this function's (96 bytes). Returns the wave.
-uint32_t InMemoryWaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, uint32_t bank,
+uint32_t InMemoryWaveConstruct(uint32_t wave, uint32_t engine, uint32_t bank,
                                uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
                                const GuestCall& call);
 // XACTTrack::GetVolume (sub_825D0268): f1 = +56 x +40 x XACTSound::GetVolume
 // of the sound (+20), each product rounded to single; r3 as GetVolume leaves
 // it. nullopt where GetVolume's plain C++ declines (nothing changed).
-std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track);
+std::optional<CategoryVolume> TrackGetVolume(uint32_t track);
 // XACTTrack::GetPitch (sub_825D02B0): f1 = +60 + +44 + XACTSound::GetPitch
 // of the sound, each sum rounded to single; r3 the sound.
-CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track);
+CategoryVolume TrackGetPitch(uint32_t track);
 // XACTWave::GetStartPosition (sub_825D2170): the start in samples to
 // [start] and the loop count left to the byte at `count` for an offset of
 // `ms` into the wave's entry (the accessor at `entry`); the count is the
@@ -128,17 +128,17 @@ CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track);
 // Returns 0, or 0x8AC70019 for an offset past the duration ([start] 0).
 // nullopt, with nothing changed, where the original traps (a zero loop
 // length with the count 255 and the offset past the loop start).
-std::optional<uint32_t> WaveGetStartPosition(uint8_t* base, uint32_t wave, uint32_t entry,
+std::optional<uint32_t> WaveGetStartPosition(uint32_t wave, uint32_t entry,
                                              uint32_t ms, uint32_t start, uint32_t count);
 // XACTWave::RequestNext (sub_825D1C30): +32 exchanged with `value`
 // atomically (the original's lwarx/stwcx. loop, as a compare-and-swap on the
 // big-endian word, as XAudio's AddStat does).
-void WaveRequestNext(uint8_t* base, uint32_t wave, uint32_t value);
+void WaveRequestNext(uint32_t wave, uint32_t value);
 // XACTEngine::RequestCommit (sub_825D1C78): the engine's critical section
 // (+144) entered, +184 = 1, left; the game's lock, its imports through the
 // guest call at their thunks (the user's call, 2026-10-29). Returns
 // RtlLeaveCriticalSection's r3.
-uint32_t EngineRequestCommit(uint8_t* base, uint32_t engine, const GuestCall& call);
+uint32_t EngineRequestCommit(uint32_t engine, const GuestCall& call);
 
 // The voice's methods these call: the plain C++ while the voice's slot holds
 // the native function (XACTVoice's vtable), else through the guest call.
@@ -153,7 +153,7 @@ constexpr uint32_t kVoiceFlushPackets = 0x825C9C28;  // slot +24
 // voice's slot +48 with the cue's 16-bit +68, that r3's low 16 bits and
 // the cue's +64; all through the guest call. `frame` is this function's
 // (112 bytes). Returns the last r3.
-uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t frame,
+uint32_t WaveSetVoice(uint32_t wave, uint32_t voice, uint32_t frame,
                       const GuestCall& call);
 // XACTInMemoryWave::Play (sub_825D3938, slot +8): with an owner, its slot
 // +100 (byte +25 bit 0x20 set and a loop count) and +96; unless paused
@@ -161,7 +161,7 @@ uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t fra
 // once), RequestCommit when deferred and bit 0x2 set; then bit 0x40 set and
 // the voice's FlushPackets. `frame` is this function's (112 bytes). Returns
 // the last r3.
-uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const Thread& thread,
+uint32_t InMemoryWavePlay(uint32_t wave, uint32_t deferred, const Thread& thread,
                           uint32_t frame, const GuestCall& call);
 // XACTWave::Pause (sub_825D1ED8, slot +36): nothing (0) when the paused bit
 // (byte +25 bit 0x80, as 0 or 1) is `pause` (compared as a word); else the
@@ -170,7 +170,7 @@ uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const
 // +16 with 1; a failure returned), RequestCommit, and flushes again (slot
 // +24) when it had been (0x40). `frame` is this function's (112 bytes).
 // Returns 0 or the voice call's r3.
-uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& thread,
+uint32_t WavePause(uint32_t wave, uint32_t pause, const Thread& thread,
                    uint32_t frame, const GuestCall& call);
 // XACTWave::PrepareNext (sub_825D2778, slot +24): when byte +25 has 0x8
 // (cleared) and the loop count byte +24 isn't 0: the owner's slot +108 (a
@@ -183,7 +183,7 @@ uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& t
 // bank's wave list (+240); else it's deleted (slot +0 with 1). `frame` is
 // this function's (112 bytes). Returns the last r3 (the wave when nothing
 // is to do).
-uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+uint32_t WavePrepareNext(uint32_t wave, bool native_heap, uint32_t frame,
                          const GuestCall& call);
 
 // XACTInMemoryWave::Update (sub_825D3890, slot +24): PrepareNext's plain
@@ -192,7 +192,7 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
 // gives the voice back (the renderer's slot +12) and clears it (SetVoice's
 // plain C++ with 0). `frame` is this function's (96 bytes). Returns the
 // last r3.
-uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+uint32_t InMemoryWaveUpdate(uint32_t wave, bool native_heap, uint32_t frame,
                             const GuestCall& call);
 
 // --- XACT's clock and notifications ---
@@ -201,11 +201,11 @@ uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint
 // where the original traps (no frequency), the original through the guest
 // call from `frame` with `return_address`, which traps the same. Its low
 // word.
-uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call);
+uint32_t ClockMs(uint32_t return_address, uint32_t frame, const GuestCall& call);
 // The same in full (r3 as XACTGetTimeMs leaves it: the counter's low word
 // sign-extended, or GetTickCount zero-extended); where the original traps,
 // the guest call's r3 in full.
-uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
+uint64_t ClockMsFull(uint32_t return_address, uint32_t frame,
                      const GuestCall& call);
 
 // XACTEngine::SendNotification (sub_825C1388, xact.md's row; under
@@ -222,7 +222,7 @@ uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
 // left it. Returns r3 in full as the original leaves it: `engine_r3` without
 // a callback, the time (ClockMsFull) with no registration, else the last
 // matcher's or the callback's (xaudio::LastCallR3).
-uint64_t EngineSendNotification(uint8_t* base, uint64_t engine_r3, const uint64_t words[4],
+uint64_t EngineSendNotification(uint64_t engine_r3, const uint64_t words[4],
                                 uint32_t frame, const GuestCall& call);
 // XACTWave::Notify (sub_825D2030): with a wave bank (+36), the 32-byte
 // notification built in this function's frame as the original builds it
@@ -233,7 +233,7 @@ uint64_t EngineSendNotification(uint8_t* base, uint64_t engine_r3, const uint64_
 // frame below) on the engine (+20) with r4 to r7 as the original loads them.
 // `frame` is this function's (160 bytes). Returns r3 in full as the original
 // leaves it (memset's, or SendNotification's).
-uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
+uint64_t WaveNotify(uint32_t wave, uint32_t type, uint32_t frame,
                     const GuestCall& call);
 // XACTWave::SetState (sub_825D24D8): going to 3 from below 3, +40 = 3 and
 // the notification 12; going to 5 from 3 or 4, +40 = 5 and the
@@ -241,7 +241,7 @@ uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
 // `frame` is this function's (112 bytes). `wave_r3` is r3 in full as the
 // caller left it. Returns r3 in full as the original leaves it (`wave_r3`
 // without a notification, else Notify's).
-uint64_t WaveSetState(uint8_t* base, uint64_t wave_r3, uint32_t state, uint32_t frame,
+uint64_t WaveSetState(uint64_t wave_r3, uint32_t state, uint32_t frame,
                       const GuestCall& call);
 
 // --- Releasing and stopping waves ---
@@ -256,17 +256,17 @@ constexpr uint32_t kInMemoryWaveAttributes = 0x2084801A;  // XMemAlloc's
 // (Notify's plain C++, a frame below); +40 = 5; then the bank's +4
 // interface's slot +4 (RemoveListener) with this + 12 through the guest
 // call. `frame` is this function's (112 bytes). Returns that slot's r3.
-uint32_t WaveRelease(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call);
+uint32_t WaveRelease(uint32_t wave, uint32_t frame, const GuestCall& call);
 // XACTWave::~XACTWave (sub_825D29E8): the base vtables (0x82076A38 and the
 // listener's 0x82076A70 at +12), Release (a frame below) unless released
 // (byte +25 0x4), XACT's base vtable 0x82075344. `frame` is this
 // function's (96 bytes). Returns r3 as the original leaves it.
-uint32_t WaveDestruct(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call);
+uint32_t WaveDestruct(uint32_t wave, uint32_t frame, const GuestCall& call);
 // XACTInMemoryWave's deleting destructor (sub_825D3820, slot +0): its
 // vtables, ~XACTWave (a frame below), XMemFree(0x2084801A) with `flags`
 // bit 0. `frame` is this function's (112 bytes). Returns the wave. Frees
 // through the native layer: call it only while hooks::NativeHeapActive().
-uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t flags,
+uint32_t InMemoryWaveDeletingDestruct(uint32_t wave, uint32_t flags,
                                       uint32_t frame, const GuestCall& call);
 // XACTInMemoryWave::Stop (sub_825D3A28, slot +12): `mode` 0 at once, 1 as
 // authored; nothing when stopped (5), or stopping (4) and stopped at once
@@ -276,7 +276,7 @@ uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t fla
 // the voice's slot +52 (through the guest call); other modes nothing. From
 // an earlier state: state 5. SetState through its plain C++, a frame below.
 // `frame` is this function's (112 bytes). Returns the voice call's r3, or 0.
-uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t exit_loop,
+uint32_t InMemoryWaveStop(uint32_t wave, uint32_t mode, uint32_t exit_loop,
                           uint32_t frame, const GuestCall& call);
 
 // --- Preparing a wave and the audio callback's update ---
@@ -304,12 +304,12 @@ uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t 
 // callees where they answer, the slots through the guest call. `frame` is
 // this function's (320 bytes). Returns r3 in full as the original leaves
 // it: 0 or the first error.
-uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint32_t loops,
+uint64_t InMemoryWavePrepare(uint32_t wave, uint32_t count, uint32_t loops,
                              uint32_t ms, uint32_t frame, const GuestCall& call);
 // XACTWave::Finish (sub_825D1FD8): byte +25 |= 0x10 (finished); with an
 // owner, its slot +28 through the guest call, then +48 = 0. `frame` is this
 // function's (96 bytes). Returns r3 in full: the slot's, or 0.
-uint64_t WaveFinish(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call);
+uint64_t WaveFinish(uint32_t wave, uint32_t frame, const GuestCall& call);
 // XACTWave::AudioUpdate (sub_825D2560): nothing (r3 `r3_in`) when released
 // (0x4), finished (0x10) or stopped (5). +32 taken atomically (1 -> 0; any
 // other word kept): set, state 5 (the notification 13 from 3 or 4), and
@@ -323,7 +323,7 @@ uint64_t WaveFinish(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCal
 // Done and Finish run a frame below; the slots through the guest call.
 // `frame` is this function's (128 bytes). Returns r3 as the original
 // leaves it (the guest calls' in full).
-uint64_t WaveAudioUpdate(uint8_t* base, uint32_t wave, uint64_t r3_in, uint32_t frame,
+uint64_t WaveAudioUpdate(uint32_t wave, uint64_t r3_in, uint32_t frame,
                          const GuestCall& call);
 
 }  // namespace xact

@@ -19,11 +19,14 @@
 # page block at +9644, its UI movie's nodes and named animations' ids.
 # The derived lists below repeat these fields (no inheritance in the schema).
 # "ListScreen.+9892" is the toggle's two animations reached by index.
+# Dual (E5 step 4): a base whose views run on the type 6 and 7 host blocks'
+# screens (their fields cover its words); the type 8 mode's stay guest.
 [ListScreen]
 measure = "ListScreen"
 measures = ["ListScreen.+9892", "ListScreen::Init.r3"]
 size = 10144
 origin = "embedded"
+storage = "dual"
 vtable = 0x82011218
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -125,11 +128,14 @@ fields = [
 # NodeListScreen (vtable 0x82011558): the list screen with three menu lists
 # and a PairedNodeTable at +10360 (the base of the type 6 list and the type 8
 # mode's list).
+# Dual (E5 step 4): a base whose views run on the type 6 and 7 host blocks'
+# screens (their fields cover its words); the type 8 mode's stay guest.
 [NodeListScreen]
 measure = "NodeListScreen"
 measures = ["NodeListScreen::NodeListScreen.r3"]
 size = 10820
 origin = "embedded"
+storage = "dual"
 vtable = 0x82011558
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -272,11 +278,14 @@ fields = [
 # The type 6 list screen (10,964 bytes, the type 6 block's +19432; vtable
 # 0x820109A8, TitledListScreen's 0x820115C8 before it): the titled list over
 # NodeListScreen, a ListPart at +10824.
+# Dual (E5 step 4): embedded in the type 6 and 7 host blocks (Type6Screens,
+# Type7Screens); the type 8 mode's blocks stay guest.
 [Type6ListScreen]
 measure = "TitledListScreen"
 measures = ["Type6ListScreen", "Type6ListScreen.+9676"]
 size = 10964
 origin = "embedded"
+storage = "dual"
 vtable = 0x820109A8
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -395,6 +404,7 @@ fields = [
   { name = "toggle_player", offset = 10348, type = "u32", note = "the list's +60 (player)" },
   { name = "toggle_enabled", offset = 10356, type = "u32", note = "the list's +68 (enabled)" },
   { name = "paired_table", offset = 10360, type = "bytes", count = 460, note = "the PairedNodeTable node_table points to" },
+  { name = "table_vtable", offset = 10360, type = "u32", note = "the paired table's vtable (0x82010FF8)" },
   { name = "table_movie", offset = 10364, type = "u32", note = "the UI movie's id" },
   { name = "table_node_set_a", offset = 10368, type = "u32", note = "the sub-scene of the extra nodes (+420, +424, +264)" },
   { name = "table_node_set_b", offset = 10372, type = "u32", note = "the sub-scene of the items' nodes" },
@@ -421,11 +431,14 @@ fields = [
 # ColorListScreen (vtable 0x820114E0): the list screen with four menu lists
 # and a ColorNodeTable at +10432 (the base of the type 7 list and the type 8
 # mode's color list).
+# Dual (E5 step 4): a base whose views run on the type 6 and 7 host blocks'
+# screens (their fields cover its words); the type 8 mode's stay guest.
 [ColorListScreen]
 measure = "ColorListScreen"
 measures = ["ColorListScreen::ColorListScreen.r3"]
 size = 11040
 origin = "embedded"
+storage = "dual"
 vtable = 0x820114E0
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -584,11 +597,14 @@ fields = [
 
 # The type 7 list screen (11,180 bytes, the type 7 block's +19428; vtable
 # 0x82010F18): the color list, a ListPart at +11040.
+# Dual (E5 step 4): embedded in the type 6 and 7 host blocks (Type6Screens,
+# Type7Screens); the type 8 mode's blocks stay guest.
 [Type7ListScreen]
 measure = "Type7ListScreen"
 measures = ["Type7ListScreen.+9676"]
 size = 11180
 origin = "embedded"
+storage = "dual"
 vtable = 0x82010F18
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -714,6 +730,19 @@ fields = [
   { name = "kind_list_player", offset = 10420, type = "u32", note = "the list's +60 (player)" },
   { name = "kind_list_enabled", offset = 10428, type = "u32", note = "the list's +68 (enabled)" },
   { name = "color_table", offset = 10432, type = "bytes", count = 584, note = "the ColorNodeTable node_table points to" },
+  { name = "table_vtable", offset = 10432, type = "u32", note = "the color table's vtable (0x82011000)" },
+  { name = "table_item", offset = 10860, type = "u32", note = "the color table's item (+428)" },
+  { name = "table_item_before", offset = 10864, type = "u32", note = "the color table's item_before (+432)" },
+  { name = "table_second", offset = 10868, type = "u32", note = "the color table's second (+436)" },
+  { name = "table_second_before", offset = 10872, type = "u32", note = "the color table's second_before (+440)" },
+  { name = "table_third", offset = 10876, type = "u32", note = "the color table's third (+444)" },
+  { name = "table_third_before", offset = 10880, type = "u32", note = "the color table's third_before (+448)" },
+  { name = "table_fourth", offset = 10884, type = "u32", note = "the color table's fourth (+452)" },
+  { name = "table_fourth_before", offset = 10888, type = "u32", note = "the color table's fourth_before (+456)" },
+  { name = "table_mark_a", offset = 10892, type = "u32", note = "the color table's mark_a (+460)" },
+  { name = "table_mark_a_before", offset = 10896, type = "u32", note = "the color table's mark_a_before (+464)" },
+  { name = "table_mark_b", offset = 10900, type = "u32", note = "the color table's mark_b (+468)" },
+  { name = "table_mark_b_before", offset = 10904, type = "u32", note = "the color table's mark_b_before (+472)" },
   { name = "table_movie", offset = 10436, type = "u32", note = "the color table's movie" },
   { name = "table_node_set_a", offset = 10440, type = "u32" },
   { name = "table_node_set_b", offset = 10444, type = "u32" },
@@ -789,10 +818,13 @@ fields = [
 # PairedNodeTable at +0 (its fields unprefixed), a screen machine at +460.
 # "sub_822370A0.r3" is SetText's r3, "NodeScreen.+10324" the toggle's
 # animations reached by index.
+# Dual (E5 step 4): embedded in the type 6 and 7 host blocks (Type6Screens,
+# Type7Screens); the type 8 mode's blocks stay guest.
 [NodeScreen]
 measures = ["NodeScreen", "Type6NodeScreen", "sub_822370A0.r3", "NodeScreen.+10324"]
 size = 10552
 origin = "embedded"
+storage = "dual"
 vtable = 0x82010A80
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010A80 (Type6NodeScreen's); NodeScreen's 0x820116B8" },
@@ -909,11 +941,14 @@ fields = [
 # The panel screens' base (PanelScreen; the type 6 and 7 ones and the type 8
 # mode's): fields past +9660 are the type 6 and 7 layout's (the type 8 panel
 # screen differs there).
+# Dual (E5 step 4): a base whose views run on the type 6 and 7 host blocks'
+# screens (their fields cover its words); the type 8 mode's stay guest.
 [PanelScreen]
 measure = "PanelScreen"
 measures = ["PanelScreen::Init.r3"]
 size = 11684
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "machine", offset = 4, type = "bytes", count = 9640, note = "a ScreenMachine (boot-mode.md)" },
@@ -933,11 +968,14 @@ fields = [
 # block's +40948, the type 7 block's +30608; vtables 0x82010920 and
 # 0x82010E90): MachineScreen, groups A (+9664) and B (+9708), the car list
 # (PanelSet) at +9752, the group pair at +11728.
+# Dual (E5 step 4): embedded in the type 6 and 7 host blocks (Type6Screens,
+# Type7Screens); the type 8 mode's blocks stay guest.
 [Type67PanelScreen]
 measure = "Type6PanelScreen"
 measures = ["Type7PanelScreen", "Type6PanelScreen.+9644", "Type7PanelScreen.+9644"]
 size = 11744
 origin = "embedded"
+storage = "dual"
 vtable = 0x82010E90
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -1023,11 +1061,14 @@ fields = [
 
 # MachineScreen (vtable 0x82011168): the panel screens' base, a screen
 # machine at +4.
+# Dual (E5 step 4): a base whose views run on the type 6 and 7 host blocks'
+# screens (their fields cover its words); the type 8 mode's stay guest.
 [MachineScreen]
 measure = "MachineScreen"
 measures = ["MachineScreen::MachineScreen.r3"]
 size = 9656
 origin = "embedded"
+storage = "dual"
 vtable = 0x82011168
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -1217,12 +1258,15 @@ fields = [
 # and the node screen's (+0). "sub_82247FE0.r3" is NodeScreen::SetUpTexts' r3.
 # The same object as screen-constructors.toml's ListNodeTable
 # ("Type6ListScreen.+9672", to merge).
+# Dual (E5 step 4): inside the type 6 and 7 host blocks' list (and node)
+# screens, whose fields cover its words; the type 8 mode's stay guest.
 [PairedNodeTable]
 measure = "PairedNodeTable"
 measures = ["sub_82247FE0.r3", "PairedNodeTable::SavePairs.r3", "Type6Screens@+19432.+9672", "ModeType8@+848@+19544.+9672"]
 # measures from ListNodeTable (screen-constructors), merged at the integration
 size = 460
 origin = "embedded"
+storage = "dual"
 vtable = 0x82010FF8
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -1252,12 +1296,15 @@ fields = [
 # with mark bits, a color child, two named-animation grids and two colors.
 # The same object as screen-constructors.toml's ListColorNodeTable
 # ("Type7ListScreen.+9672", to merge).
+# Dual (E5 step 4): inside the type 6 and 7 host blocks' list (and node)
+# screens, whose fields cover its words; the type 8 mode's stay guest.
 [ColorNodeTable]
 measure = "ColorNodeTable"
 measures = ["ColorListScreen.+10432", "NodeTable::SetMarks.ret", "Type7Screens@+19428.+9672", "ModeType8@+848@+30912.+9672"]
 # measures from ListColorNodeTable (screen-constructors), merged at the integration
 size = 584
 origin = "embedded"
+storage = "dual"
 vtable = 0x82011000
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
@@ -1326,21 +1373,33 @@ fields = [
 
 # The type 6 mode's screen block (91,272 bytes, VirtualAlloc'ed, the mode's
 # +848; vtable 0x82010A78; docs/known-data.md's "type 6 screens").
+# In host memory since E5 step 4 (the swarm, 2026-11-24): made by
+# Type6Mode::Init (New; host_alloc for the lifted original's VirtualAlloc),
+# freed by StandMode::Release (VirtualFree, which takes handles). Its first
+# screen, list, node and panel screens are embedded dual objects; the dialog
+# at +9672 (Type67Dialog's 9,764 bytes don't fit type 6's 9,760), the power
+# graph screen and the options, controller and save machines stay its bytes
+# (their views guest: raw accesses through the handle). Words inside an
+# embedded screen are `bytes` of 4 here (an address for the lifted code; the
+# screen's own field is the member).
 [Type6Screens]
 measure = "Type6Screens"
 measures = ["Type6Mode::TearDown.r4.+848", "Type6Mode::WaitForLoads.r4.+848"]
 size = 91272
 origin = "allocated"
+storage = "host"
+host_alloc = [0x822368C4]
 vtable = 0x82010A78
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
-  { name = "screen0_open_at_start", offset = 9616, type = "u32", note = "the machine at +4's +9612 (1 at Init)" },
-  { name = "screen0_unknown_9616", offset = 9620, type = "u32", note = "the machine at +4's +9616 (0 at Init)" },
+  { name = "screen0", offset = 4, type = "embed", to = "Type6Screen0", note = "the first screen" },
+  { name = "screen0_open_at_start", offset = 9616, type = "bytes", count = 4, note = "the machine at +4's +9612 (1 at Init): screen0's reenter" },
+  { name = "screen0_unknown_9616", offset = 9620, type = "bytes", count = 4, note = "the machine at +4's +9616 (0 at Init): screen0's delete_movie" },
   { name = "machine_9672_open_at_start", offset = 19284, type = "u32", note = "the machine at +9672's +9612 (1 at Init)" },
   { name = "machine_9672_unknown_9616", offset = 19288, type = "u32", note = "the machine at +9672's +9616 (0 at Init)" },
-  { name = "list_screen", offset = 19432, type = "bytes", count = 10964, note = "the Type6ListScreen" },
-  { name = "node_screen", offset = 30396, type = "bytes", count = 10552, note = "the node screen" },
-  { name = "panel_screen", offset = 40948, type = "bytes", count = 11744, note = "the Type67PanelScreen" },
+  { name = "list_screen", offset = 19432, type = "embed", to = "Type6ListScreen", note = "the Type6ListScreen" },
+  { name = "node_screen", offset = 30396, type = "embed", to = "NodeScreen", note = "the node screen" },
+  { name = "panel_screen", offset = 40948, type = "embed", to = "Type67PanelScreen", note = "the Type67PanelScreen" },
   { name = "power_graph_vtable", offset = 52692, type = "u32", note = "the power graph screen's vtable (0x82010A68; 0x82010A2C its base's)" },
   { name = "machine_62336_open_at_start", offset = 71948, type = "u32", note = "the machine at +62336's +9612 (1 at Init)" },
   { name = "machine_62336_unknown_9616", offset = 71952, type = "u32", note = "the machine at +62336's +9616 (0 at Init)" },
@@ -1351,25 +1410,32 @@ fields = [
   { name = "answer", offset = 91256, type = "u8", note = "the block's 8-byte answer: its first byte" },
   { name = "answer_word", offset = 91260, type = "u32", note = "the answer's word at +4" },
   { name = "phase", offset = 91264, type = "u32", note = "4 leaving, 5 torn down" },
-  { name = "loaded_9612", offset = 9612, type = "u32", note = "a screen's loaded word (Type6Mode::TearDown, WaitForLoads)" },
+  { name = "loaded_9612", offset = 9612, type = "bytes", count = 4, note = "a screen's loaded word (Type6Mode::TearDown, WaitForLoads): screen0's loaded" },
   { name = "loaded_19280", offset = 19280, type = "u32", note = "a screen's loaded word" },
+  { name = "loaded_29044", offset = 29044, type = "bytes", count = 4, note = "a screen's loaded word (Type6Mode::WaitForLoads): the list screen's movie_loaded" },
   { name = "answer_word0", offset = 91256, type = "u32", note = "the next-mode answer's word (its byte the answer, type6-type7-modes' report)" },
 ]
 
 # The type 7 mode's screen block (71,292 bytes, VirtualAlloc'ed, the mode's
 # +848; vtable 0x82010FE0; docs/known-data.md's "type 7 screens").
+# In host memory since E5 step 4 (as Type6Screens): made by Type7Mode::Init,
+# freed by StandMode::Release; the first screen, list and panel screens
+# embedded (dual), the dialog at +9664 and the other machines its bytes.
 [Type7Screens]
 measure = "Type7Screens"
 measures = ["Type7Mode::TearDown.r4.+848", "Type7Mode::WaitForLoads.r4.+848"]
 size = 71292
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82246CD4]
 vtable = 0x82010FE0
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
+  { name = "screen0", offset = 4, type = "embed", to = "Type7Screen0", note = "the first screen" },
   { name = "machine_9664_open_at_start", offset = 19276, type = "u32", note = "the machine at +9664's +9612 (1 at Init)" },
   { name = "machine_9664_unknown_9616", offset = 19280, type = "u32", note = "the machine at +9664's +9616 (0 at Init)" },
-  { name = "list_screen", offset = 19428, type = "bytes", count = 11180, note = "the Type7ListScreen" },
-  { name = "panel_screen", offset = 30608, type = "bytes", count = 11744, note = "the Type67PanelScreen" },
+  { name = "list_screen", offset = 19428, type = "embed", to = "Type7ListScreen", note = "the Type7ListScreen" },
+  { name = "panel_screen", offset = 30608, type = "embed", to = "Type67PanelScreen", note = "the Type67PanelScreen" },
   { name = "power_graph_vtable", offset = 42352, type = "u32", note = "the power graph screen's vtable (0x82010FD0; 0x82010A2C its base's)" },
   { name = "machine_51996_open_at_start", offset = 61608, type = "u32", note = "the machine at +51996's +9612 (1 at Init)" },
   { name = "machine_51996_unknown_9616", offset = 61612, type = "u32", note = "the machine at +51996's +9616 (0 at Init)" },
@@ -1378,8 +1444,9 @@ fields = [
   { name = "answer", offset = 71276, type = "u8", note = "the block's 8-byte answer: its first byte" },
   { name = "answer_word", offset = 71280, type = "u32", note = "the answer's word at +4" },
   { name = "phase", offset = 71284, type = "u32", note = "4 leaving, 5 torn down" },
-  { name = "loaded_9616", offset = 9616, type = "u32", note = "a screen's loaded word (Type7Mode::TearDown, WaitForLoads)" },
+  { name = "loaded_9616", offset = 9616, type = "bytes", count = 4, note = "a screen's loaded word (Type7Mode::TearDown, WaitForLoads): screen0's loaded" },
   { name = "loaded_19272", offset = 19272, type = "u32", note = "a screen's loaded word" },
+  { name = "loaded_29040", offset = 29040, type = "bytes", count = 4, note = "a screen's loaded word (Type7Mode::WaitForLoads): the list screen's movie_loaded" },
   { name = "answer_word0", offset = 71276, type = "u32", note = "the next-mode answer's word" },
 ]
 
@@ -1468,10 +1535,13 @@ fields = [
 ]
 
 # Split from Type6ListScreen.
+# Dual (E5 step 4): the measure's view of a screen in a host block (the
+# lifted originals'); the screen's fields cover its words.
 [Type6ListScreenAt19432]
 measure = "Type6Screens@+19432"
 size = 10824
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_9672", offset = 9672, type = "u32" },
@@ -1605,10 +1675,13 @@ fields = [
 ]
 
 # Split from Type67PanelScreen.
+# Dual (E5 step 4): the measure's view of a screen in a host block (the
+# lifted originals'); the screen's fields cover its words.
 [Type67PanelScreenAt40948]
 measure = "Type6Screens@+40948"
 size = 11728
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_9644", offset = 9644, type = "u32" },
@@ -1622,10 +1695,13 @@ fields = [
 ]
 
 # Split from Type7ListScreen.
+# Dual (E5 step 4): the measure's view of a screen in a host block (the
+# lifted originals'); the screen's fields cover its words.
 [Type7ListScreenAt19428]
 measure = "Type7Screens@+19428"
 size = 10980
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_9672", offset = 9672, type = "u32" },
@@ -1706,10 +1782,13 @@ fields = [
 ]
 
 # Split from Type67PanelScreen.
+# Dual (E5 step 4): the measure's view of a screen in a host block (the
+# lifted originals'); the screen's fields cover its words.
 [Type67PanelScreenAt30608]
 measure = "Type7Screens@+30608"
 size = 11728
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_9644", offset = 9644, type = "u32" },

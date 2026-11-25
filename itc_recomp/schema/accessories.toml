@@ -16,6 +16,13 @@
 measures = ["Accessories", "AccessoriesBase"]
 size = 32
 origin = "allocated"
+# In host memory (E5 step 5): made by Accessories::New (the hand port,
+# src/accessories/accessories.cpp; the lifted original's VirtualAlloc
+# returning to 0x820F0F6C), freed by Accessories::Free's VirtualFree (a
+# handle; AccessoryFile::FreeData's plain C++). Its entries' slots (+4 to
+# +12) are read by index through raw accesses.
+storage = "host"
+host_alloc = [0x820F0F6C]
 vtable = 0x82006740
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AccessoriesVtable", note = "0x82006740 (the base's 0x8200672C while it's built or torn down, the list node's 0x82010B5C after)" },
@@ -49,6 +56,16 @@ measure = "Accessories.+4"
 measures = ["new<1104>@AccessoryEntry::New", "AccessoryEntry::OnLoaded.r6", "Accessories@+4"]
 size = 1104
 origin = "allocated"
+# In host memory (E5 step 5): made by AccessoryEntry::New (the hand port,
+# src/accessories/accessories.cpp; sub_820F0920 has no lifted body), freed
+# by AccessoryEntry::Destroy's VirtualFree (a handle; AccessoryFile::
+# FreeData's plain C++). Its scalar fields are the layout; the file, the
+# accessory (a part model, its two files and its skeleton) stay guest-shaped
+# views reaching it through raw accesses, as the scene pools' part models.
+# The file's data (the archive's asset 23008 + the index: the part model,
+# an XPR2 texture pack and the node file, used in place) stays in guest
+# memory: the renderer reads the XPR's textures.
+storage = "host"
 fields = [
   { name = "count", offset = 0, type = "u32", note = "the reference count: 1 when made, +1 an acquire, -1 a release (destroyed at 0)" },
   { name = "file", offset = 4, type = "bytes", count = 36, note = "an AccessoryFile: archive asset 23008 + the index" },

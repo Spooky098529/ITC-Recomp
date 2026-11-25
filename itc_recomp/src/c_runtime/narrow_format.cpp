@@ -49,9 +49,9 @@ bool Overlaps(const Range& a, const Range& b) {
 // nothing native code can't do.
 class NarrowOutput {
  public:
-  NarrowOutput(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
+  NarrowOutput(uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
                uint32_t frame, bool dry)
-      : base_(base),
+      :
         out_(buffer),
         counts_only_(buffer == 0),
         room_(room),
@@ -71,12 +71,12 @@ class NarrowOutput {
   const std::vector<Range>& reads() const { return reads_; }
 
  private:
-  uint8_t U8(uint32_t a) { return guest::LoadU8(base_, a); }
-  uint16_t U16(uint32_t a) { return guest::LoadU16(base_, a); }
-  uint32_t U32(uint32_t a) { return guest::LoadU32(base_, a); }
+  uint8_t U8(uint32_t a) { return guest::LoadU8(a); }
+  uint16_t U16(uint32_t a) { return guest::LoadU16(a); }
+  uint32_t U32(uint32_t a) { return guest::LoadU32(a); }
   // The float conversion table's _cfltcvt_l (+24).
   uint32_t CfltcvtL() {
-    return schema::FloatConversionTable(base_, CRuntimeGlobals::float_conversions_address())
+    return schema::FloatConversionTable(CRuntimeGlobals::float_conversions_address())
         .cfltcvt_l();
   }
   // The next argument's slot (8 bytes, aligned): its address.
@@ -102,7 +102,7 @@ class NarrowOutput {
     }
     room_--;
     if (!dry_) {
-      guest::StoreU8(base_, out_, uint8_t(character));
+      guest::StoreU8(out_, uint8_t(character));
     }
     out_++;
     count_ = int32_t(uint32_t(count_) + 1);
@@ -124,7 +124,6 @@ class NarrowOutput {
     return true;
   }
 
-  uint8_t* base_;
   uint32_t out_;
   bool counts_only_;
   int32_t room_;
@@ -240,8 +239,8 @@ bool NarrowOutput::Run(int32_t* result) {
                 return false;  // wctomb_s (sub_825B6890, never in play): the original
               }
               text_length = 1;
-              guest::StoreU32(base_, f + 84, 1);
-              guest::StoreU8(base_, f + 144, uint8_t(U32(slot + 4)));
+              guest::StoreU32(f + 84, 1);
+              guest::StoreU8(f + 144, uint8_t(U32(slot + 4)));
               text = f + 144;
               break;
             }
@@ -251,7 +250,7 @@ bool NarrowOutput::Run(int32_t* result) {
                 Read(string, uint64_t(string) + 8);
               }
               if (string == 0 || U32(string + 4) == 0) {
-                text = CRuntimeGlobals::narrow_null(base_).address;
+                text = CRuntimeGlobals::narrow_null().address;
                 uint32_t p = text;
                 while (U8(p) != 0) p++;
                 Read(text, uint64_t(p) + 1);
@@ -276,7 +275,7 @@ bool NarrowOutput::Run(int32_t* result) {
               int32_t most = precision == -1 ? 0x7FFFFFFF : precision;
               text = U32(NextSlot() + 4);
               if (flags & (kLong | kWide)) {
-                if (text == 0) text = CRuntimeGlobals::wide_null(base_).address;
+                if (text == 0) text = CRuntimeGlobals::wide_null().address;
                 wide_text = true;
                 uint32_t p = text;
                 for (; most != 0; most--) {
@@ -290,7 +289,7 @@ bool NarrowOutput::Run(int32_t* result) {
                 Read(text, p);
                 text_length = uint32_t(int32_t(p - text) >> 1);
               } else {
-                if (text == 0) text = CRuntimeGlobals::narrow_null(base_).address;
+                if (text == 0) text = CRuntimeGlobals::narrow_null().address;
                 uint32_t p = text;
                 for (; most != 0; most--) {
                   if (U8(p) == 0) {
@@ -326,9 +325,9 @@ bool NarrowOutput::Run(int32_t* result) {
               }
               const uint32_t slot = NextSlot();
               const uint64_t bits = (uint64_t(U32(slot)) << 32) | U32(slot + 4);
-              guest::StoreU32(base_, f + 128, uint32_t(bits >> 32));
-              guest::StoreU32(base_, f + 132, uint32_t(bits));
-              if (!Cftof(base_, bits, text, 512, precision)) {
+              guest::StoreU32(f + 128, uint32_t(bits >> 32));
+              guest::StoreU32(f + 132, uint32_t(bits));
+              if (!Cftof(bits, text, 512, precision)) {
                 return false;  // (a real run follows a dry one that succeeded)
               }
               if (U8(text) == '-') {
@@ -359,8 +358,8 @@ bool NarrowOutput::Run(int32_t* result) {
               hex_add = sc == 'x' ? 39 : 7;
               radix = 16;
               if (flags & kAlternate) {
-                guest::StoreU8(base_, f + 89, uint8_t(hex_add + 81));
-                guest::StoreU8(base_, f + 88, '0');
+                guest::StoreU8(f + 89, uint8_t(hex_add + 81));
+                guest::StoreU8(f + 88, '0');
                 prefix_length = 2;
               }
               break;
@@ -406,14 +405,14 @@ bool NarrowOutput::Run(int32_t* result) {
               value /= radix;
               uint32_t ch = uint32_t(digit) + 48;
               if (int32_t(ch) > 57) ch += hex_add;
-              guest::StoreU8(base_, p, uint8_t(ch));
+              guest::StoreU8(p, uint8_t(ch));
               p--;
             }
             text_length = (f + 655) - p;
             text = p + 1;
             if ((flags & kForceOctal) && (text_length == 0 || U8(text) != '0')) {
               text--;
-              guest::StoreU8(base_, text, '0');
+              guest::StoreU8(text, '0');
               text_length++;
             }
           }
@@ -424,7 +423,7 @@ bool NarrowOutput::Run(int32_t* result) {
       }
       if (normal) {
         wide_text = false;
-        if (IsLeadByte(base_, c & 0xFF) != 0) {
+        if (IsLeadByte(c & 0xFF) != 0) {
           if (!Write(c)) return false;
           c = U8(format_);
           format_++;
@@ -441,7 +440,7 @@ bool NarrowOutput::Run(int32_t* result) {
           else if (flags & kSign) sign = '+';
           else if (flags & kSignSpace) sign = ' ';
           if (sign != 0) {
-            guest::StoreU8(base_, f + 88, uint8_t(sign));
+            guest::StoreU8(f + 88, uint8_t(sign));
             prefix_length = 1;
           }
         }
@@ -489,10 +488,10 @@ bool NarrowOutput::Run(int32_t* result) {
 // real one only where it needs nothing the original alone does, and where
 // what it writes (with the terminator) reads none of its own inputs or its
 // frame (the original would read its own writes there).
-bool Format(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
+bool Format(uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
             uint32_t frame, int32_t* count) {
   {
-    NarrowOutput dry(base, buffer, room, format, args, frame, true);
+    NarrowOutput dry(buffer, room, format, args, frame, true);
     int32_t ignored;
     if (!dry.Run(&ignored)) {
       return false;
@@ -512,35 +511,35 @@ bool Format(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint3
       }
     }
   }
-  NarrowOutput output(base, buffer, room, format, args, frame, false);
+  NarrowOutput output(buffer, room, format, args, frame, false);
   output.Run(count);
   if (buffer != 0) {
-    guest::StoreU8(base, output.pointer(), 0);
+    guest::StoreU8(output.pointer(), 0);
   }
   return true;
 }
 
 }  // namespace
 
-bool Sprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+bool Sprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
              int32_t* count) {
   if (buffer == 0 || format == 0) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
-  if (!Format(base, buffer, 0x7FFFFFFF, format, args, frame, count)) {
+  if (!Format(buffer, 0x7FFFFFFF, format, args, frame, count)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_825A93D0 sprintf");
   return true;
 }
 
-bool Vsnprintf(uint8_t* base, uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
+bool Vsnprintf(uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
                uint32_t frame, int32_t* count) {
   if (format == 0 || (size != 0 && buffer == 0)) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
   const int32_t room = size > 0x7FFFFFFFu ? 0x7FFFFFFF : int32_t(size);
-  if (!Format(base, buffer, room, format, args, frame, count)) {
+  if (!Format(buffer, room, format, args, frame, count)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_825AB010 _vsnprintf");

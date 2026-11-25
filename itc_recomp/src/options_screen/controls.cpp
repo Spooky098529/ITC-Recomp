@@ -23,20 +23,24 @@ using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
 using Word = SettingsWord;
 
-// The edits copied below `sp` from `at`, then 1 when an item
-// other than `item` holds item `item`'s word (read from `at + 4 * item`, the
-// 32-bit wrap of the original's address, on every try).
-uint32_t Taken(uint8_t* base, uint32_t item, uint32_t at, const Word* words, uint32_t count) {
-  const S o = G::settings(base);
+// The edits copied (the original's copy below `sp` from `at`; a C++ array
+// since E5 step 6), then 1 when an item other than `item` holds item
+// `item`'s word (at `4 * item`, wrapped to 32 bits, on every try); one
+// outside the copy reads the stack word the original reads there.
+uint32_t Taken(uint32_t item, uint32_t at, const Word* words, uint32_t count) {
+  const S o = G::settings();
+  uint32_t edits[12];
   for (uint32_t i = 0; i < count; i++) {
-    guest::StoreU32(base, at + 4 * i, (o.*words[i])());
+    edits[i] = (o.*words[i])();
   }
   for (uint32_t i = 0; i < count; i++) {
     if (int32_t(i) == int32_t(item)) {
       continue;
     }
-    const uint32_t mine = guest::LoadU32(base, at + 4 * i);
-    const uint32_t theirs = guest::LoadU32(base, at + (item << 2));
+    const uint32_t mine = edits[i];
+    const uint32_t offset = item << 2;
+    const uint32_t theirs =
+        offset < 4 * count ? edits[offset >> 2] : guest::LoadU32(at + offset);
     if (mine == theirs) {
       return 1;
     }
@@ -46,19 +50,19 @@ uint32_t Taken(uint8_t* base, uint32_t item, uint32_t at, const Word* words, uin
 
 // StepButtons and StepAnalog: `set_side` the settings' side word's store,
 // `last` the last item (OK/Default).
-uint32_t Step(uint8_t* base, void (S::*set_side)(uint32_t) const, int32_t last) {
-  const schema::FrontEndMenu menu = G::menu(base);
+uint32_t Step(void (S::*set_side)(uint32_t) const, int32_t last) {
+  const schema::FrontEndMenu menu = G::menu();
   const int32_t side = menu.side();
   const int32_t cursor = int32_t(menu.cursor());
-  (G::settings(base).*set_side)(0);
+  (G::settings().*set_side)(0);
   if (side != -1 && side != 1) {
     return 0;
   }
-  (G::settings(base).*set_side)(uint32_t(side));
+  (G::settings().*set_side)(uint32_t(side));
   if (cursor != last) {
     return 1;
   }
-  const S o = G::settings(base);
+  const S o = G::settings();
   const int32_t choice = int32_t(o.ok_default());
   if (side == -1 ? choice != 1 : choice != 0) {
     return 0;
@@ -117,14 +121,14 @@ uint32_t AnalogPicture(uint32_t index) {
   }
 }
 
-uint32_t IsButtonTaken(uint8_t* base, uint32_t item, uint32_t sp) {
+uint32_t IsButtonTaken(uint32_t item, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BA7E0 Options::IsButtonTaken");
-  return Taken(base, item, sp - 48, kButtonEdits, 12);
+  return Taken(item, sp - 48, kButtonEdits, 12);
 }
 
-uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp) {
+uint32_t IsAnalogTaken(uint32_t item, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BAB58 Options::IsAnalogTaken");
-  return Taken(base, item, sp - 32, kAnalogEdits, 6);  // sp - 8 and - 4 not written
+  return Taken(item, sp - 32, kAnalogEdits, 6);  // sp - 8 and - 4 not written
 }
 
 namespace {
@@ -132,15 +136,17 @@ namespace {
 // HasButtonClash and HasAnalogClash: the edits copied below `sp` in menu
 // order (as the taken checks copy them), then 1 at the first pair of items
 // holding the same word, else 0.
-uint32_t Clash(uint8_t* base, uint32_t at, const Word* words, uint32_t count) {
-  const S o = G::settings(base);
+// (A C++ array since E5 step 6; `at` the original's copy, unused.)
+uint32_t Clash([[maybe_unused]] uint32_t at, const Word* words, uint32_t count) {
+  const S o = G::settings();
+  uint32_t edits[12];
   for (uint32_t i = 0; i < count; i++) {
-    guest::StoreU32(base, at + 4 * i, (o.*words[i])());
+    edits[i] = (o.*words[i])();
   }
   for (uint32_t i = 0; i + 1 < count; i++) {
-    const uint32_t mine = guest::LoadU32(base, at + 4 * i);
+    const uint32_t mine = edits[i];
     for (uint32_t j = i + 1; j < count; j++) {
-      if (mine == guest::LoadU32(base, at + 4 * j)) {
+      if (mine == edits[j]) {
         return 1;
       }
     }
@@ -150,35 +156,35 @@ uint32_t Clash(uint8_t* base, uint32_t at, const Word* words, uint32_t count) {
 
 }  // namespace
 
-uint32_t HasButtonClash(uint8_t* base, uint32_t sp) {
+uint32_t HasButtonClash(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BA890 Options::HasButtonClash");
-  return Clash(base, sp - 48, kButtonEdits, 12);
+  return Clash(sp - 48, kButtonEdits, 12);
 }
 
-uint32_t HasAnalogClash(uint8_t* base, uint32_t sp) {
+uint32_t HasAnalogClash(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BAC78 Options::HasAnalogClash");
-  return Clash(base, sp - 32, kAnalogEdits, 6);
+  return Clash(sp - 32, kAnalogEdits, 6);
 }
 
-uint32_t StepButtons(uint8_t* base) {
+uint32_t StepButtons() {
   ITC_NATIVE_RUNNING("sub_821BA550 Options::StepButtons");
-  return Step(base, &S::set_buttons_side, 12);
+  return Step(&S::set_buttons_side, 12);
 }
 
-uint32_t StepAnalog(uint8_t* base) {
+uint32_t StepAnalog() {
   ITC_NATIVE_RUNNING("sub_821BABD8 Options::StepAnalog");
-  return Step(base, &S::set_analog_side, 6);
+  return Step(&S::set_analog_side, 6);
 }
 
-uint32_t StepSound(uint8_t* base) {
+uint32_t StepSound() {
   ITC_NATIVE_RUNNING("sub_821BE5F8 Options::StepSound");
-  const schema::FrontEndMenu menu = G::menu(base);
+  const schema::FrontEndMenu menu = G::menu();
   const int32_t side = menu.side();
   const uint32_t cursor = menu.cursor();
   if (side != -1 && side != 1) {
     return 0;
   }
-  const S o = G::settings(base);
+  const S o = G::settings();
   // The volumes (0 to 15): a step past a bound stores the bound and answers 0.
   const auto volume = [&](uint32_t (S::*get)() const, void (S::*set)(uint32_t) const) -> uint32_t {
     const int32_t value = int32_t((o.*get)()) + side;
@@ -214,30 +220,29 @@ uint32_t StepSound(uint8_t* base) {
   }
 }
 
-uint32_t StepSliders(uint8_t* base, uint32_t sp) {
+uint32_t StepSliders(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BEAC8 Options::StepSliders");
-  const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
+  // No guest frame (E5 step 6): the movie id passed as a value.
   // Node (7, 0)'s children 4 to 6 looked up, unused (as the original).
-  const uint32_t node = ui_movies::FindNode(base, FindMovie(base, frame), 7, 0);
+  const uint32_t node = ui_movies::FindNode(FindMovie(sp), 7, 0);
   for (uint32_t i = 4; i <= 6; i++) {
-    ui_movies::Child(base, node, i);
+    ui_movies::Child(node, i);
   }
-  const schema::FrontEndMenu menu = G::menu(base);
+  const schema::FrontEndMenu menu = G::menu();
   const int32_t side = menu.side();
   const uint32_t cursor = menu.cursor();
   if (side != -1 && side != 1) {
     return 0;
   }
-  const S o = G::settings(base);
+  const S o = G::settings();
   if (cursor < 3) {
     // The sliders (-10 to 10): no change at a bound.
     const uint32_t field = o.edit_slider_0_address() + 4 * cursor;
-    const int32_t value = int32_t(guest::LoadU32(base, field));
+    const int32_t value = int32_t(guest::LoadU32(field));
     if (side == -1 ? value <= -10 : value >= 10) {
       return 0;
     }
-    guest::StoreU32(base, field, uint32_t(value + side));
+    guest::StoreU32(field, uint32_t(value + side));
     return 1;
   }
   if (cursor != 3 || int32_t(o.ok_default()) != (side == -1 ? 1 : 0)) {
@@ -247,17 +252,17 @@ uint32_t StepSliders(uint8_t* base, uint32_t sp) {
   return 1;
 }
 
-uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp) {
+uint32_t SettingsReset(uint32_t settings, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821B9DB8 Settings::Reset");
-  guest::StoreU32(base, sp - 112, sp);
-  const S o(base, settings);
+  (void)sp;  // its frame held only the back chain (E5 step 6)
+  const S o(settings);
   o.set_set_up(0);
   // memset (sub_825A71D0) with 0: the same bytes (+12: the name to the day).
   for (const auto& [at, bytes] : {std::pair<uint32_t, uint32_t>{o.current_block_address(), 192},
                                   {o.edit_block_address(), 192},
                                   {o.default_block_address(), 192},
                                   {o.name_0_address(), 32}}) {
-    guest::ForEachHostPart(base, at, bytes,
+    guest::ForEachHostPart(at, bytes,
                            [](uint8_t* host, uint32_t, uint32_t size) {
                              std::memset(host, 0, size);
                            });

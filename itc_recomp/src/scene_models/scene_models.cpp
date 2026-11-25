@@ -24,17 +24,17 @@ namespace {
 using G = schema::SceneModelsGlobals;
 
 // A doubleword's ld and std, as two words.
-void CopyDoubleword(uint8_t* base, uint32_t to, uint32_t from) {
-  const uint32_t high = guest::LoadU32(base, from);
-  const uint32_t low = guest::LoadU32(base, from + 4);
-  guest::StoreU32(base, to, high);
-  guest::StoreU32(base, to + 4, low);
+void CopyDoubleword(uint32_t to, uint32_t from) {
+  const uint32_t high = guest::LoadU32(from);
+  const uint32_t low = guest::LoadU32(from + 4);
+  guest::StoreU32(to, high);
+  guest::StoreU32(to + 4, low);
 }
 
 // memset (sub_825A71D0) with 0: the same bytes.
-void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
+void Clear(uint32_t address, uint32_t bytes) {
   for (uint32_t i = 0; i < bytes; i++) {
-    guest::StoreU8(base, address + i, 0);
+    guest::StoreU8(address + i, 0);
   }
 }
 
@@ -73,113 +73,113 @@ uint32_t WheelsRecordOf(const schema::SceneModelRecord& r) {
 
 }  // namespace
 
-uint32_t Accessories(uint8_t* base) {
+uint32_t Accessories() {
   ITC_NATIVE_RUNNING("sub_820F0E50 Accessories");
-  return G::accessories(base).address;
+  return G::accessories().address;
 }
 
-uint32_t Accessory(uint8_t* base, uint32_t interior) {
+uint32_t Accessory(uint32_t interior) {
   ITC_NATIVE_RUNNING("sub_820D97B8 SceneModel::Accessory");
-  const schema::Accessories set(base, Accessories(base));
-  const uint32_t which = schema::CarInterior(base, interior).accessory();
+  const schema::Accessories set(Accessories());
+  const uint32_t which = schema::CarInterior(interior).accessory();
   if (which == 3) {
     return 0;
   }
   // The set's entries (+4, +8, +12) by the accessory picked.
-  const uint32_t entry = guest::LoadU32(base, set.entry_0_address() + (which << 2));
-  return entry == 0 ? 0 : schema::AccessoryEntry(base, entry).accessory_address();
+  const uint32_t entry = guest::LoadU32(set.entry_0_address() + (which << 2));
+  return entry == 0 ? 0 : schema::AccessoryEntry(entry).accessory_address();
 }
 
-void OnSoundLoaded(uint8_t* base, uint32_t context) {
+void OnSoundLoaded(uint32_t context) {
   ITC_NATIVE_RUNNING("sub_82175EE0 SceneModel::OnSoundLoaded");
-  const schema::SceneModelsSoundContext ctx(base, context);
+  const schema::SceneModelsSoundContext ctx(context);
   const uint32_t arrived = G::sound_files_arrived_address();
   uint32_t slot = ctx.slot();
-  guest::StoreU8(base, slot + arrived, uint8_t(guest::LoadU8(base, slot + arrived) + 1));
+  guest::StoreU8(slot + arrived, uint8_t(guest::LoadU8(slot + arrived) + 1));
   slot = ctx.slot();
-  if (guest::LoadU8(base, slot + arrived) != 2) {
+  if (guest::LoadU8(slot + arrived) != 2) {
     return;
   }
-  guest::StoreU32(base, (slot << 2) + G::sound_loaded_address(), 1);
+  guest::StoreU32((slot << 2) + G::sound_loaded_address(), 1);
 }
 
-void WheelsSetRecord(uint8_t* base, uint32_t wheels, uint32_t value) {
+void WheelsSetRecord(uint32_t wheels, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820E7378 SceneWheels::SetRecord");
-  schema::SceneWheels(base, wheels).set_traffic_record(value);
+  schema::SceneWheels(wheels).set_traffic_record(value);
 }
 
-void SetCarModel(uint8_t* base, uint32_t object, uint32_t car_model) {
+void SetCarModel(uint32_t object, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820E70B8 SetCarModel");
-  schema::SceneModelsPartLink(base, object).set_car_model(car_model);
+  schema::SceneModelsPartLink(object).set_car_model(car_model);
 }
 
-void PartsLink(uint8_t* base, uint32_t parts, uint32_t car_model) {
+void PartsLink(uint32_t parts, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820DF1A8 SceneParts::Link");
-  const schema::SceneParts p(base, parts);
+  const schema::SceneParts p(parts);
   p.set_scene_car_model(car_model);
   p.set_skeleton(
-      schema::CarModelsSceneCarModel(base, car_model).car_model().skeleton_address());
+      schema::CarModelsSceneCarModel(car_model).car_model().skeleton_address());
 }
 
-void PartsSetRecord(uint8_t* base, uint32_t parts, uint32_t value) {
+void PartsSetRecord(uint32_t parts, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820DF1C0 SceneParts::SetRecord");
   // The point block's scene model record.
-  schema::PartsPoints(base, schema::SceneParts(base, parts).points_address())
+  schema::PartsPoints(schema::SceneParts(parts).points_address())
       .set_scene_model_record(value);
 }
 
-void InteriorLink(uint8_t* base, uint32_t interior, uint32_t car_model) {
+void InteriorLink(uint32_t interior, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820E37D0 SceneInterior::Link");
-  const schema::SceneInterior i(base, interior);
-  const schema::CarModelsSceneCarModel model(base, car_model);
+  const schema::SceneInterior i(interior);
+  const schema::CarModelsSceneCarModel model(car_model);
   i.set_car_model(car_model);
   // The first set's car model, read twice as the original does.
   i.set_skeleton(model.car_model().skeleton_address());
   i.set_texture_set(model.car_model().texture_providers_address());
 }
 
-void SetWord11452(uint8_t* base, uint32_t object, uint32_t value) {
+void SetWord11452(uint32_t object, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820E3658 SetWord11452");
   // r3 is an interior's point block (the interior + 160).
-  schema::SecondSetInteriorPoints(base, object).set_cockpit(value);
+  schema::SecondSetInteriorPoints(object).set_cockpit(value);
 }
 
-bool CarModelSetRecord(uint8_t* base, uint32_t car_model, uint32_t record) {
+bool CarModelSetRecord(uint32_t car_model, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3C70 CarModel::SetRecord");
-  const uint32_t to = schema::CarModel(base, car_model).record_address();
+  const uint32_t to = schema::CarModel(car_model).record_address();
   if (to >= kPhysical) {
     return false;
   }
-  return c_runtime::Memcpy(base, to, record, schema::CarRecord::kSize);
+  return c_runtime::Memcpy(to, record, schema::CarRecord::kSize);
 }
 
-bool CarRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
+bool CarRecordCopy(uint32_t to, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_820D7EE8 CarRecord::Copy");
   constexpr uint32_t kBytes = schema::CarRecord::kSize;
   if (to >= kPhysical || from >= kPhysical || to - from < kBytes || from - to < kBytes) {
     return false;
   }
-  const schema::CarRecord t(base, to), f(base, from);
+  const schema::CarRecord t(to), f(from);
   t.set_block(f.block());
   // The paint and the wheels' paint (+16 to +159, one run of rows) as
   // doublewords.
   for (uint32_t offset = 0; offset < 144; offset += 8) {
-    CopyDoubleword(base, t.paint_address() + offset, f.paint_address() + offset);
+    CopyDoubleword(t.paint_address() + offset, f.paint_address() + offset);
   }
   t.set_emblem_choice(f.emblem_choice());
   t.set_emblem_word(f.emblem_word());
   ForEachLayer(t, [&](uint32_t r) {
-    const schema::CarModelDecalRecord tl(base, to + r), fl(base, from + r);
+    const schema::CarModelDecalRecord tl(to + r), fl(from + r);
     tl.set_index(fl.index());
     tl.set_mirrored(fl.mirrored());
     tl.set_region(fl.region());
-    CopyDoubleword(base, tl.offset_xy_address(), fl.offset_xy_address());
-    CopyDoubleword(base, tl.offset_zw_address(), fl.offset_zw_address());
+    CopyDoubleword(tl.offset_xy_address(), fl.offset_xy_address());
+    CopyDoubleword(tl.offset_zw_address(), fl.offset_zw_address());
     tl.set_rotation(fl.rotation());
-    CopyDoubleword(base, tl.scale_address(), fl.scale_address());
-    CopyDoubleword(base, tl.scale_address() + 8, fl.scale_address() + 8);
+    CopyDoubleword(tl.scale_address(), fl.scale_address());
+    CopyDoubleword(tl.scale_address() + 8, fl.scale_address() + 8);
   });
-  if (!c_runtime::Memcpy(base, t.plate_address(), f.plate_address(), 48)) {
+  if (!c_runtime::Memcpy(t.plate_address(), f.plate_address(), 48)) {
     return false;
   }
   t.set_selected_texture(f.selected_texture());
@@ -189,15 +189,15 @@ bool CarRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
   return true;
 }
 
-bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
+bool SceneModelRecordCopy(uint32_t to, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_820DB290 SceneModelRecord::Copy");
   if (to >= kPhysical || from >= kPhysical || to - from < kSceneModelRecordBytes ||
       from - to < kSceneModelRecordBytes) {
     return false;
   }
-  const schema::SceneModelRecord t(base, to), f(base, from);
+  const schema::SceneModelRecord t(to), f(from);
   t.set_kind(f.kind());
-  if (!CarRecordCopy(base, t.block_address(), f.block_address())) {
+  if (!CarRecordCopy(t.block_address(), f.block_address())) {
     return false;
   }
   // The parts', interior's, cockpit's, wheels' and light kit's records, in
@@ -214,69 +214,69 @@ bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
                                  schema::SceneModelsWheelsRecord::kSize,
                                  schema::LightKitRecord::kSize};
   for (uint32_t i = 0; i < 5; i++) {
-    if (!c_runtime::Memcpy(base, kParts[i][0], kParts[i][1], kBytes[i])) {
+    if (!c_runtime::Memcpy(kParts[i][0], kParts[i][1], kBytes[i])) {
       return false;
     }
   }
   return true;
 }
 
-void SceneModelRecordConstruct(uint8_t* base, uint32_t record) {
+void SceneModelRecordConstruct(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820DB240 SceneModelRecord::SceneModelRecord");
-  const schema::SceneModelRecord r(base, record);
-  CarRecordSetW(base, r.block_address());
+  const schema::SceneModelRecord r(record);
+  CarRecordSetW(r.block_address());
   // The wheels record's front and rear sizes (+44, +56).
-  Record12Reset(base, r.front_size_address());
-  Record12Reset(base, r.rear_size_address());
+  Record12Reset(r.front_size_address());
+  Record12Reset(r.rear_size_address());
 }
 
-void CarRecordSetW(uint8_t* base, uint32_t record) {
+void CarRecordSetW(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D45B0 CarRecord::SetW");
-  const schema::CarRecord r(base, record);
+  const schema::CarRecord r(record);
   // The w of the three blocks of three rows from the paint's start (+16,
   // +64, +112).
   for (uint32_t block = 0; block < 3; block++) {
     for (uint32_t row = 0; row < 3; row++) {
-      guest::StoreFloat(base, r.paint_address() + 48 * block + 16 * row + 12, G::one(base));
+      guest::StoreFloat(r.paint_address() + 48 * block + 16 * row + 12, G::one());
     }
   }
   ForEachLayer(r, [&](uint32_t layer) {
-    const schema::CarModelDecalRecord l(base, record + layer);
+    const schema::CarModelDecalRecord l(record + layer);
     // The offset's w (+28) and the scale's (+60).
-    guest::StoreFloat(base, l.offset_zw_address() + 4, G::one(base));
-    guest::StoreFloat(base, l.scale_address() + 12, G::one(base));
+    guest::StoreFloat(l.offset_zw_address() + 4, G::one());
+    guest::StoreFloat(l.scale_address() + 12, G::one());
   });
 }
 
-void Record12Reset(uint8_t* base, uint32_t record) {
+void Record12Reset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3B38 Record12::Reset");
-  const schema::SceneModelsWheelSize size(base, record);
-  size.set_a(G::minus_one(base));
+  const schema::SceneModelsWheelSize size(record);
+  size.set_a(G::minus_one());
   size.set_index(0xFFFFFFFFu);
-  size.set_b(G::minus_one(base));
+  size.set_b(G::minus_one());
 }
 
-void LayerReset(uint8_t* base, uint32_t layer) {
+void LayerReset(uint32_t layer) {
   ITC_NATIVE_RUNNING("sub_820D0A20 Layer::Reset");
-  const schema::CarModelDecalRecord l(base, layer);
+  const schema::CarModelDecalRecord l(layer);
   l.set_mirrored(0);
   l.set_region(8);
   l.set_index(0xFFFFFFFFu);
   // The offset (0, 0, 0, 1), built in the original's stack and copied as
   // two doublewords.
-  guest::StoreFloat(base, l.offset_xy_address(), G::zero(base));
-  guest::StoreFloat(base, l.offset_xy_address() + 4, G::zero(base));
-  guest::StoreFloat(base, l.offset_zw_address(), G::zero(base));
-  guest::StoreFloat(base, l.offset_zw_address() + 4, G::one(base));
-  l.set_rotation(G::zero(base));
+  guest::StoreFloat(l.offset_xy_address(), G::zero());
+  guest::StoreFloat(l.offset_xy_address() + 4, G::zero());
+  guest::StoreFloat(l.offset_zw_address(), G::zero());
+  guest::StoreFloat(l.offset_zw_address() + 4, G::one());
+  l.set_rotation(G::zero());
   for (uint32_t offset = 0; offset < 16; offset += 4) {
-    guest::StoreFloat(base, l.scale_address() + offset, G::one(base));
+    guest::StoreFloat(l.scale_address() + offset, G::one());
   }
 }
 
-uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
+uint32_t CarRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D0A98 CarRecord::Reset");
-  const schema::CarRecord r(base, record);
+  const schema::CarRecord r(record);
   r.set_block(0xFFFFFFFFu);
   // Three blocks of three 16-byte rows from the paint's start (built in the
   // original's stack and copied as doublewords): x, y = 0.0, z = 1.0 or the
@@ -284,13 +284,13 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
   for (uint32_t block = 0; block < 3; block++) {
     for (uint32_t row = 0; row < 3; row++) {
       const uint32_t at = r.paint_address() + 48 * block + 16 * row;
-      guest::StoreFloat(base, at + 0, G::zero(base));
-      guest::StoreFloat(base, at + 4, G::zero(base));
-      guest::StoreFloat(base, at + 8,
-                        row != 2      ? G::one(base)
-                        : block == 0 ? G::car_record_z0(base)
-                                     : G::car_record_z1(base));
-      guest::StoreFloat(base, at + 12, G::one(base));
+      guest::StoreFloat(at + 0, G::zero());
+      guest::StoreFloat(at + 4, G::zero());
+      guest::StoreFloat(at + 8,
+                        row != 2      ? G::one()
+                        : block == 0 ? G::car_record_z0()
+                                     : G::car_record_z1());
+      guest::StoreFloat(at + 12, G::one());
     }
   }
   r.set_emblem_choice(0);
@@ -298,11 +298,11 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
   // The sticker group's size.
   constexpr uint32_t kGroupBytes = 6 * kLayerBytes;
   for (uint32_t i = 0; i < 3; i++) {
-    const schema::CarModelDecalRecord a(base, r.vinyl_layers_a_address() + kLayerBytes * i);
-    LayerReset(base, a.address);
+    const schema::CarModelDecalRecord a(r.vinyl_layers_a_address() + kLayerBytes * i);
+    LayerReset(a.address);
     a.set_region(8);
-    const schema::CarModelDecalRecord b(base, r.vinyl_layers_b_address() + kLayerBytes * i);
-    LayerReset(base, b.address);
+    const schema::CarModelDecalRecord b(r.vinyl_layers_b_address() + kLayerBytes * i);
+    LayerReset(b.address);
     b.set_region(0);
   }
   // The stickers' eight groups: the region at +8, and +4 = 1 in the third
@@ -310,9 +310,8 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
   constexpr uint32_t kRegions[8] = {8, 2, 1, 3, 4, 7, 6, 5};
   for (uint32_t j = 0; j < 6; j++) {
     for (uint32_t group = 0; group < 8; group++) {
-      const schema::CarModelDecalRecord layer(
-          base, r.stickers_address() + kGroupBytes * group + kLayerBytes * j);
-      LayerReset(base, layer.address);
+      const schema::CarModelDecalRecord layer(r.stickers_address() + kGroupBytes * group + kLayerBytes * j);
+      LayerReset(layer.address);
       if (group == 7) {
         layer.set_mirrored(1);
         layer.set_region(kRegions[group]);
@@ -333,7 +332,7 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
       {24, 36}, {36, 37}, {40, 34}, {44, 35}, {28, 31}, {32, 32},
   };
   for (const Word& word : kPlate) {
-    guest::StoreU32(base, r.plate_address() + word.offset, word.value);
+    guest::StoreU32(r.plate_address() + word.offset, word.value);
   }
   r.set_selected_texture(0);
   r.set_unknown_3684(0);
@@ -342,10 +341,10 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
   return 32;
 }
 
-void PartsRecordReset(uint8_t* base, uint32_t record) {
+void PartsRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3558 PartsRecord::Reset");
-  const schema::PartsRecord p(base, record);
-  Clear(base, record, schema::PartsRecord::kSize);
+  const schema::PartsRecord p(record);
+  Clear(record, schema::PartsRecord::kSize);
   p.set_unknown_0(0);
   p.set_unknown_4(0);
   p.set_unknown_8(0);
@@ -363,10 +362,10 @@ void PartsRecordReset(uint8_t* base, uint32_t record) {
   p.set_unknown_56(0);
 }
 
-void InteriorRecordReset(uint8_t* base, uint32_t record) {
+void InteriorRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3840 InteriorRecord::Reset");
-  const schema::InteriorRecord i(base, record);
-  Clear(base, record, schema::InteriorRecord::kSize);
+  const schema::InteriorRecord i(record);
+  Clear(record, schema::InteriorRecord::kSize);
   // The original's store order.
   i.set_speedometer(0);
   i.set_tachometer(0);
@@ -400,114 +399,118 @@ void InteriorRecordReset(uint8_t* base, uint32_t record) {
   i.set_unknown_88(1);
 }
 
-uint32_t CockpitRecordReset(uint8_t* base, uint32_t record) {
+uint32_t CockpitRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D34B8 CockpitRecord::Reset");
-  const schema::SceneModelsCockpitRecord cockpit(base, record);
+  const schema::SceneModelsCockpitRecord cockpit(record);
   cockpit.set_bonnet(0);
   cockpit.set_aero_kit(0);
   cockpit.set_aero6(0);
   cockpit.set_aero7(0);
   cockpit.set_aero9(0);
-  InteriorRecordReset(base, cockpit.interior_record_address());
+  InteriorRecordReset(cockpit.interior_record_address());
   return cockpit.interior_record_address();
 }
 
-void WheelsRecordReset(uint8_t* base, uint32_t record) {
+void WheelsRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3900 WheelsRecord::Reset");
-  const schema::SceneModelsWheelsRecord w(base, record);
+  const schema::SceneModelsWheelsRecord w(record);
   w.set_kind(1);
-  w.set_front_f20(G::wheel_default(base));
+  w.set_front_f20(G::wheel_default());
   w.set_front_wheel(0xFFFFFFFFu);
-  w.set_rear_f36(G::wheel_default(base));
+  w.set_rear_f36(G::wheel_default());
   w.set_rear_wheel(0xFFFFFFFFu);
-  w.set_front_f24(G::half(base));
-  w.set_rear_f40(G::half(base));
+  w.set_front_f24(G::half());
+  w.set_rear_f40(G::half());
   w.set_painted(0);
   w.set_morph_each_draw(0);
   w.set_unknown_12(0);
   w.set_unknown_28(0);
-  w.set_front_size_a(G::minus_one(base));
-  w.set_front_size_b(G::minus_one(base));
+  w.set_front_size_a(G::minus_one());
+  w.set_front_size_b(G::minus_one());
   w.set_front_size_index(0xFFFFFFFFu);
-  w.set_rear_size_a(G::minus_one(base));
+  w.set_rear_size_a(G::minus_one());
   w.set_rear_size_index(0xFFFFFFFFu);
-  w.set_rear_size_b(G::minus_one(base));
+  w.set_rear_size_b(G::minus_one());
   w.set_brake_kind(0);
-  w.set_unknown_128(G::zero(base));
+  w.set_unknown_128(G::zero());
   w.set_unknown_124(0xFFFFFFFFu);
-  w.set_unknown_132(G::zero(base));
+  w.set_unknown_132(G::zero());
   w.set_front_index_add(0);
-  w.set_unknown_136(G::zero(base));
+  w.set_unknown_136(G::zero());
   w.set_rear_index_add(0);
-  w.set_unknown_140(G::zero(base));
+  w.set_unknown_140(G::zero());
   w.set_unknown_80(0);
-  w.set_unknown_144(G::zero(base));
+  w.set_unknown_144(G::zero());
   w.set_caliper_a(0);
-  w.set_unknown_148(G::zero(base));
+  w.set_unknown_148(G::zero());
   w.set_caliper_texture(0);
-  w.set_unknown_152(G::zero(base));
-  w.set_front_brake_turn(G::zero(base));
+  w.set_unknown_152(G::zero());
+  w.set_front_brake_turn(G::zero());
   w.set_unknown_92(0);
   w.set_unknown_116(0);
   w.set_front_brake_size(11);
-  w.set_rear_brake_turn(G::zero(base));
+  w.set_rear_brake_turn(G::zero());
   w.set_unknown_96(0);
   w.set_unknown_120(0);
   w.set_rear_brake_size(11);
 }
 
-void Pool4RecordReset(uint8_t* base, uint32_t record) {
+void Pool4RecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D34E0 Pool4Record::Reset");
-  const schema::LightKitRecord k(base, record);
-  Clear(base, record, schema::LightKitRecord::kSize);
+  const schema::LightKitRecord k(record);
+  Clear(record, schema::LightKitRecord::kSize);
   k.set_texture(0);
-  k.set_front_on(G::one(base));
-  k.set_front_fade(G::one(base));
+  k.set_front_on(G::one());
+  k.set_front_fade(G::one());
   k.set_front_mode(0);
-  k.set_front_rate(G::one(base));
+  k.set_front_rate(G::one());
   k.set_sides_mode(0);
-  k.set_sides_on(G::one(base));
-  k.set_sides_fade(G::one(base));
-  k.set_sides_rate(G::one(base));
+  k.set_sides_on(G::one());
+  k.set_sides_fade(G::one());
+  k.set_sides_rate(G::one());
   k.set_rear_mode(0);
-  k.set_rear_on(G::one(base));
-  k.set_rear_fade(G::one(base));
-  k.set_rear_rate(G::one(base));
+  k.set_rear_on(G::one());
+  k.set_rear_fade(G::one());
+  k.set_rear_rate(G::one());
 }
 
-uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record) {
+uint32_t SceneModelRecordReset(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D9810 SceneModelRecord::Reset");
-  const schema::SceneModelRecord r(base, record);
+  const schema::SceneModelRecord r(record);
   r.set_kind(1);
-  CarRecordReset(base, r.block_address());
-  PartsRecordReset(base, r.parts_aero0_address());
-  InteriorRecordReset(base, InteriorRecordOf(r));
-  CockpitRecordReset(base, r.cockpit_bonnet_address());
-  WheelsRecordReset(base, WheelsRecordOf(r));
-  Pool4RecordReset(base, r.layer0_b_address());
+  CarRecordReset(r.block_address());
+  PartsRecordReset(r.parts_aero0_address());
+  InteriorRecordReset(InteriorRecordOf(r));
+  CockpitRecordReset(r.cockpit_bonnet_address());
+  WheelsRecordReset(WheelsRecordOf(r));
+  Pool4RecordReset(r.layer0_b_address());
   return r.layer0_b_address();
 }
 
-uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
+uint32_t AllocPages(uint32_t out, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_820C3CA0 CarModel::AllocPages");
-  const uint32_t pages = memory::AllocPages(size, 4096);
-  guest::StoreU32(base, out, pages);
+  // CarModel::LoadSetA's node file and body XPR2 in PC memory (E5 step 5: a
+  // blob, whole pages as VirtualAlloc's; freed by sub_820C3CE0's VirtualFree
+  // through its handle); a size of 0 gives 0, as VirtualAlloc's.
+  const uint32_t whole_pages = uint32_t((uint64_t(size) + 0xFFF) & ~uint64_t(0xFFF));
+  const uint32_t pages = size == 0 ? 0 : schema::CarModelsFile::New(whole_pages).address;
+  guest::StoreU32(out, pages);
   return pages;
 }
 
 
-std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
+std::optional<uint64_t> ModelUpdate(uint32_t model, uint32_t sp,
                                     const ModelUpdateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820DA180 SceneModel::Update");
   const uint32_t frame = sp - 240;
   std::optional<uint64_t> r3;
-  const schema::SceneModel m(base, model);
+  const schema::SceneModel m(model);
   const int32_t count = int32_t(m.build_delay());
   if (count > 0) {
     const uint32_t pending = m.build_pending();
     m.set_build_delay(uint32_t(count - 1));
     if (pending != 0 && count - 1 == 0) {
-      guest::StoreU32(base, frame, sp);  // the back chain, for Build's guest call
+      guest::StoreU32(frame, sp);  // the back chain, for Build's guest call
       r3 = calls.build(model, frame);
       m.set_build_pending(0);
     }
@@ -523,26 +526,24 @@ std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
   }
   // The scene interior's first-set interior (scene-loaders' Interior, read
   // here for its accessory as car-models' CarInterior).
-  const uint32_t accessory = Accessory(
-      base,
-      schema::SceneInterior(base, m.interior()).first_set_interior<schema::CarInterior>().address);
+  const uint32_t accessory = Accessory(schema::SceneInterior(m.interior()).first_set_interior<schema::CarInterior>().address);
   if (accessory == 0) {
     return 0;
   }
-  // Never seen in play: the identity built at +80 and copied to +144 (the
-  // vupkd3d128 and vpermwi128 rows), row 3 the node's position.
-  guest::StoreU32(base, frame, sp);
+  // Never seen in play: the identity at +144 (the vupkd3d128 and vpermwi128
+  // rows; the original's copy built at +80 first, which nothing reads, left
+  // out: E5 step 6), row 3 the node's position.
+  guest::StoreU32(frame, sp);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
       const uint32_t value = row == column ? 0x3F800000u : 0;
-      guest::StoreU32(base, frame + 80 + 16 * row + 4 * column, value);
-      guest::StoreU32(base, frame + 144 + 16 * row + 4 * column, value);
+      guest::StoreU32(frame + 144 + 16 * row + 4 * column, value);
     }
   }
   // The first set's car model's accessory node's position.
   const uint32_t node = m.car_model().car_model().accessory_position_address();
   for (uint32_t w = 0; w < 4; w++) {
-    guest::StoreU32(base, frame + 192 + 4 * w, guest::LoadU32(base, node + 4 * w));
+    guest::StoreU32(frame + 192 + 4 * w, guest::LoadU32(node + 4 * w));
   }
   calls.multiply(frame + 144, frame + 144, m.matrix_address(), frame);
   calls.set_anchor(accessory, frame + 144, frame);

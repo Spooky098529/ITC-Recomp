@@ -141,6 +141,8 @@ fields = [
 measure = "AppCamera"
 size = 368
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82094760]
 vtable = 0x820026B8
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820026B8" },
@@ -170,6 +172,8 @@ fields = [
 measures = ["AppCamera::Camera", "AppCamera.+28"]
 size = 832
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C34]
 vtable = 0x820027B0
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "CameraVtable", note = "0x82001EC0 (Camera); 0x820027B0 for AppCameraCamera" },
@@ -229,6 +233,8 @@ fields = [
 measures = ["AppCameraList", "AppCamera.+32", "sub_820A9200.r3"]
 size = 8
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C58]
 vtable = 0x82002780
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppCameraListVtable", note = "0x82002780" },
@@ -249,6 +255,8 @@ fields = [
 measure = "AppCameraEntry"
 size = 16
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C7C, 0x820A8278, 0x820A82A0]
 vtable = 0x82002580
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82002580" },
@@ -304,6 +312,15 @@ fields = [
 measures = ["new<?>@MessageVector::Allocate", "new<16>@AppCameraList::AppCameraList"]
 size = 16
 origin = "file"
+# A blob (E5 step 5, 2026-11-24): both shapes are words read and written by
+# address, so both are blobs in PC memory in the guest's byte order: the
+# storage from MessageVector::Allocate (app_states::MessagesAllocate; the
+# lifted original's operator new at 0x82092BD8, r3 = count x 4) and
+# AppCameraList's 16-byte vector (app_start_up::AppCameraListConstruct; the
+# lifted original's at 0x820A98E8, r3 = 16). Freed by operator delete (the
+# vectors' growth; the list's never in play).
+storage = "blob"
+blob_alloc = [{ call = 0x82092BD8, reg = "r3" }, { call = 0x820A98E8, reg = "r3" }]
 fields = [
   { name = "word_0", offset = 0, type = "u32", note = "as storage: the first element; a vector object leaves it unwritten" },
   { name = "first", offset = 4, type = "u32", note = "a vector of words' first (sub_820A93E8, sub_820A9818); as storage the second element" },

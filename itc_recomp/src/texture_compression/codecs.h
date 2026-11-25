@@ -39,7 +39,7 @@ using GuestCall = std::function<uint32_t(uint32_t address, uint32_t stack, uint3
 // when the codec has a color key (+24) or sRGB in (+16): ApplyColorKey
 // (sub_823EADB0) and SrgbToLinear (sub_823EB180) never ran in play, so the
 // whole original runs then.
-std::optional<uint32_t> DecodeA8R8G8B8Row(uint8_t* base, uint32_t codec, uint32_t row,
+std::optional<uint32_t> DecodeA8R8G8B8Row(uint32_t codec, uint32_t row,
                                           uint32_t slice, uint32_t pixels);
 
 // DxtCodec::EncodeRow's stack frame.
@@ -60,25 +60,25 @@ constexpr uint32_t kEncodeRowFrameBytes = 192;
 // convert the row (+84: ConvertRange sub_823EA0C0; +16: LinearToSrgb
 // sub_823EAE40; neither ran in play), allocate a size operator new refuses,
 // or free a block the heap didn't give: the whole original runs then.
-std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row, uint32_t slice,
+std::optional<uint32_t> DxtEncodeRow(uint32_t codec, uint32_t row, uint32_t slice,
                                      uint32_t pixels, uint32_t stack, const GuestCall& call);
 
 // sub_823EA070 ImageCodec::~ImageCodec: the base vtable back (0x8203B778),
 // operator delete on +56, +88 and +92. The original's r3 (+92, as operator
 // delete leaves it). nullopt, with nothing done, when one isn't 0 or a heap
 // block.
-std::optional<uint32_t> ImageCodecDestruct(uint8_t* base, uint32_t codec);
+std::optional<uint32_t> ImageCodecDestruct(uint32_t codec);
 // sub_823EA770 DxtCodec::~DxtCodec: the DXT vtable back (0x8203B9E8); with
 // block rows held (+244), each cache entry's float4s (over the block rows
 // +200 to +208 by 4, the slices +212 to +216) freed; operator delete on +240
 // and +248; ~ImageCodec. Its r3, or nullopt as ImageCodecDestruct.
-std::optional<uint32_t> DxtCodecDestruct(uint8_t* base, uint32_t codec);
+std::optional<uint32_t> DxtCodecDestruct(uint32_t codec);
 // sub_823F6B70 and sub_823F6BC0 (slot 0, the scalar deleting destructors of
 // the plain and DXT codecs): the destructor, then operator delete on the
 // codec with bit 0 of `flags`. The original's r3 (the codec), or nullopt as
 // above.
-std::optional<uint32_t> ImageCodecDelete(uint8_t* base, uint32_t codec, uint32_t flags);
-std::optional<uint32_t> DxtCodecDelete(uint8_t* base, uint32_t codec, uint32_t flags);
+std::optional<uint32_t> ImageCodecDelete(uint32_t codec, uint32_t flags);
+std::optional<uint32_t> DxtCodecDelete(uint32_t codec, uint32_t flags);
 
 // ImageCodec::Create's stack frame (the color key's slot 3 runs below it).
 constexpr uint32_t kCreateFrameBytes = 112;
@@ -100,7 +100,7 @@ constexpr uint32_t kOutOfMemory = 0x8007000E;
 // nullopt, with nothing done, when the codec's 128 bytes overlap the
 // description or the error row's size is one operator new refuses (the whole
 // original runs then). Only with the native heap.
-std::optional<uint32_t> ImageCodecConstruct(uint8_t* base, uint32_t codec, uint32_t description,
+std::optional<uint32_t> ImageCodecConstruct(uint32_t codec, uint32_t description,
                                             uint32_t bits, uint32_t kind);
 // sub_823EAA90 ImageCodec::Prepare: the destination's +84 = the source's
 // kind when theirs differ and the destination's isn't float (4); with +84 or
@@ -108,7 +108,7 @@ std::optional<uint32_t> ImageCodecConstruct(uint8_t* base, uint32_t codec, uint3
 // none: E_OUTOFMEMORY); both +20 = 1 when both are sRGB. The original's r3
 // (0 or E_OUTOFMEMORY). nullopt, with nothing done, for a row size operator
 // new refuses. Only with the native heap.
-std::optional<uint32_t> PrepareCodecs(uint8_t* base, uint32_t destination, uint32_t source);
+std::optional<uint32_t> PrepareCodecs(uint32_t destination, uint32_t source);
 // sub_823F5FA0 DxtCodec::DxtCodec: ImageCodec::ImageCodec (0 bits, kind 1),
 // the DXT vtable (0x8203B9E8), by the format +136 the block's bytes, +140
 // and +144 the block decoder and encoder (left alone for a format not DXT1,
@@ -117,7 +117,7 @@ std::optional<uint32_t> PrepareCodecs(uint8_t* base, uint32_t destination, uint3
 // the block columns, rows and slices, +232, +236 -1, +240 to +248 0, +252
 // the dither. The original's r3 (the codec). nullopt as ImageCodecConstruct
 // (the codec's 256 bytes).
-std::optional<uint32_t> DxtCodecConstruct(uint8_t* base, uint32_t codec, uint32_t description);
+std::optional<uint32_t> DxtCodecConstruct(uint32_t codec, uint32_t description);
 // sub_823F6C60 ImageCodec::Create: the codec for the description's format
 // (its 80 formats, 40 and each with bit 8, as a table built from the
 // original's compare tree): operator new (128 bytes) and
@@ -130,7 +130,7 @@ std::optional<uint32_t> DxtCodecConstruct(uint8_t* base, uint32_t codec, uint32_
 // formats (YuvCodec::YuvCodec, never seen in play) and an error row's size
 // operator new refuses: the whole original runs then. Only with the native
 // heap.
-std::optional<uint32_t> CreateCodec(uint8_t* base, uint32_t description, uint32_t stack,
+std::optional<uint32_t> CreateCodec(uint32_t description, uint32_t stack,
                                     const GuestCall& call);
 
 }  // namespace texture_compression

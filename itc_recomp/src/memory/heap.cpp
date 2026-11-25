@@ -1,5 +1,7 @@
 #include "memory/heap.h"
+#include "guest.h"
 
+#include "memory/handles.h"
 #include "memory/mapping.h"
 
 #include "base/log.h"
@@ -21,7 +23,7 @@ namespace {
 // The range's size: the most the game had in use was 172.6 MiB (heap and
 // pages, a drive through the front end and a race); see "What the counter
 // saw" in docs/native-memory.md.
-constexpr uint32_t kRangeBytes = 384u << 20;
+constexpr uint32_t kRangeBytes = kHeapBytes;  // guest.h: the heap's block
 constexpr uint32_t kPageBytes = 4096;
 
 struct Block {
@@ -31,7 +33,6 @@ struct Block {
 };
 
 std::mutex mutex;
-uint8_t* membase = nullptr;
 std::atomic<uint32_t> range_start{0};
 uint32_t range_end = 0;
 std::map<uint32_t, uint32_t> free_ranges;  // start -> bytes, sorted by address
@@ -65,7 +66,7 @@ bool FirstTime(Seen kind, uint32_t value) {
 
 // The range's start: the first 64 KB past page 0, where the SDK's 4 KB
 // heap gave it.
-constexpr uint32_t kRangeStart = 0x10000;
+constexpr uint32_t kRangeStart = kHeapStart;
 
 // Takes the range, on the first allocation (under the mutex): guest memory
 // mapped by us (memory/mapping.h).
@@ -77,7 +78,6 @@ void ReserveRange() {
     OutOfMemory("mapping guest memory", kRangeBytes);
   }
   const uint32_t address = kRangeStart;
-  membase = Base();
   range_end = address + kRangeBytes;
   free_ranges.emplace(address, kRangeBytes);
   range_start.store(address, std::memory_order_relaxed);
@@ -137,7 +137,8 @@ uint32_t HeapSpan(uint32_t size) {
 }
 
 void Clear(uint32_t address, uint32_t bytes) {
-  std::memset(membase + address, 0, bytes);
+  guest::ForEachHostPart(address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
 // Xbox protection bits (X_PAGE_*, X_MEM_*) AllocPhysical reads.
@@ -244,6 +245,9 @@ bool Free(uint32_t address) {
   if (address == 0) {
     return true;
   }
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || it->second.pages) {
@@ -301,7 +305,8 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
       if (result == 0) {
         OutOfMemory("HeapReAlloc", size);
       }
-      std::memmove(membase + result, membase + address, std::min(old_size, size));
+      std::memmove(guest::Pointer(result), guest::Pointer(address),
+                   std::min(old_size, size));
       Give(address, block.span);
       blocks.erase(it);
       blocks[result] = {size, span, false};
@@ -315,6 +320,9 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
 
 uint32_t Size(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82298FF8 HeapSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.size;  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || it->second.pages) {
@@ -327,12 +335,18 @@ uint32_t Size(uint32_t address) {
 }
 
 bool IsHeapBlock(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && !it->second.pages;
 }
 
 bool IsPages(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && it->second.pages;
@@ -357,6 +371,9 @@ uint32_t AllocPages(uint32_t size, uint32_t alignment) {
 
 bool FreePages(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82295330 VirtualFree");
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || !it->second.pages) {
@@ -371,6 +388,9 @@ bool FreePages(uint32_t address) {
 }
 
 bool InRange(uint32_t address) {
+  if (IsHandle(address)) {
+    return true;  // a host object (E5): ours, freed through its handle
+  }
   const uint32_t start = range_start.load(std::memory_order_relaxed);
   return start != 0 && address >= start && address - start < kRangeBytes;
 }
@@ -435,6 +455,10 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
 
 void FreePhysical(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C8 XPhysicalFree");
+  if (IsHandle(address)) {
+    FreeHandle(address);  // a host object (E5)
+    return;
+  }
   std::lock_guard lock(mutex);
   const auto it = physical_sizes.find(address);
   if (it == physical_sizes.end()) {
@@ -451,6 +475,11 @@ void FreePhysical(uint32_t address) {
 
 uint32_t PhysicalSize(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C0 XPhysicalSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    // A blob made where the game asked for physical memory (E5 step 7):
+    // whole 4 KB pages, as a 4 KB-page physical block's size.
+    return info.size;
+  }
   std::lock_guard lock(mutex);
   const auto it = physical_sizes.find(address);
   if (it == physical_sizes.end()) {

@@ -12,8 +12,8 @@ void PauseMenuLog_NoteMapperUpdate(uint32_t caller);
 // adapter is in hooks/action_mappers.cpp, and the native mappers' update
 // calls these too): Before returns the mapper's fired word (0 when the flag
 // is off); After logs the update when a direction is held or fires.
-uint32_t PauseMenuLog_BeforeMapperUpdate(uint8_t* base, uint32_t mapper);
-void PauseMenuLog_AfterMapperUpdate(uint8_t* base, uint32_t mapper, uint32_t caller,
+uint32_t PauseMenuLog_BeforeMapperUpdate(uint32_t mapper);
+void PauseMenuLog_AfterMapperUpdate(uint32_t mapper, uint32_t caller,
                                     uint32_t fired_before);
 
 // For --log_pause_menu: a call to one of the mapper's read slots (`slot` its

@@ -122,6 +122,7 @@ fields = [
 measures = ["LocationScreen::OnMessage3.r4", "LocationScreen::Unload.r4"]
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },
@@ -152,15 +153,36 @@ fields = [
 
 # A picture's texture record (12 bytes, operator new by OnPictureLoadedA
 # and B, deleted by Picture::Free).
+# In host memory since E5 step 4 (2026-11-24): made by OnPictureLoadedA and
+# B (New in place of their operator new(12) at 0x82228F00 and 0x82229040),
+# deleted by Picture::Free (Delete in place of its operator delete at
+# 0x8222846C); the picture's +8 keeps its handle. PictureA and B hand it to
+# UiMovie::SetPictureTexture (movie 21's texture table, which also holds
+# the movie's own guest records): the UI movie draw reads its three words
+# through guest::LoadU32 (raw accesses resolved through the handle).
 [LocationScreenPictureTexture]
 measures = ["Picture.+8", "new<12>@LocationScreen::OnPictureLoadedA", "new<12>@LocationScreen::OnPictureLoadedB", "new<16>@LocationScreen::OnPictureLoadedA.+8", "new<16>@LocationScreen::OnPictureLoadedB.+8"]
 size = 12
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "texture", offset = 0, type = "u32", note = "the XPR's texture 0 (XPR::GetTexture)" },
   { name = "width", offset = 4, type = "u32", note = "Texture::GetLevelDesc's +24" },
   { name = "height", offset = 8, type = "u32", note = "Texture::GetLevelDesc's +28" },
 ]
+
+# A picture's file (an XPR2 file read whole by Archive::Load). In PC memory
+# since E5 step 7 (2026-11-24): New in place of LocationScreen::LoadPicture's
+# VirtualAlloc(size) (0x8222C2A8). Read only by the game's code:
+# OnPictureLoadedA and B's XPR::Create copies its header into a block of its
+# own and its texture data into physical memory (the renderer reads that
+# copy, never this file); then deleted by them in place of their VirtualFree
+# (0x82228FA4, 0x822290E4), which returned 1.
+[LocationScreenPictureFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
 
 # A 20-byte data table entry (asset 95) as the screen's text walks read it
 # (DataTables::Entry20; data-tables.toml's DataTablesEntry20 is the same
@@ -235,21 +257,11 @@ fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
 ]
 
-# Split from LocationScreen.
-[LocationScreenPart]
-measure = "new<28940>@ModeType5::Init"
-size = 28928
-origin = "embedded"
-fields = [
-  { name = "unknown_9612", offset = 9612, type = "u32" },
-  { name = "unknown_9616", offset = 9616, type = "u32" },
-  { name = "unknown_19252", offset = 19252, type = "u32" },
-  { name = "unknown_19256", offset = 19256, type = "u32" },
-  { name = "unknown_28892", offset = 28892, type = "u32" },
-  { name = "unknown_28896", offset = 28896, type = "u32" },
-  { name = "unknown_28920", offset = 28920, type = "u32" },
-  { name = "unknown_28924", offset = 28924, type = "u32" },
-]
+# LocationScreenPart (the measure's "new<28940>@ModeType5::Init", split
+# from LocationScreen) was the type 5 mode's block: merged into
+# type5-mode.toml's Type5ModeBlock (E5 step 4, 2026-11-24), whose fields
+# name the same words (+9612 the car settings' reenter, +19252 the parking
+# area's, +28892 the dialog's, +28920 shown, ...).
 
 # Embedded objects the measure split from their owners after its offset
 # and class-name fixes (2026-11-22): seeded from the measure; names kept

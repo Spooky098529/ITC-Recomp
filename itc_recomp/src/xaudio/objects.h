@@ -45,88 +45,88 @@ constexpr uint64_t kEOutOfMemory = 0xFFFFFFFF8007000Eull;
 
 // XAudioCodec::Size (sub_82466B78): by the format's type (byte +8): up to 3
 // PcmCodecSize, 4 XmaCodecSize, else E_NOTIMPL with nothing written.
-uint64_t CodecSize(uint8_t* base, uint32_t descriptor, uint32_t out);
+uint64_t CodecSize(uint32_t descriptor, uint32_t out);
 // PcmCodec::Size (sub_8246D720): 272 + 120 x the packet count (byte +68).
-uint64_t PcmCodecSize(uint8_t* base, uint32_t descriptor, uint32_t out);
+uint64_t PcmCodecSize(uint32_t descriptor, uint32_t out);
 // XmaCodec::Size (sub_8246B458): 284 + 120 x the packets + 88 x the streams
 // (byte +12).
-uint64_t XmaCodecSize(uint8_t* base, uint32_t descriptor, uint32_t out);
+uint64_t XmaCodecSize(uint32_t descriptor, uint32_t out);
 // XAudioMatrix::Size (sub_82466840): 28 + 12 x the entries (byte +8, at most
 // the default matrix's count byte at [+12] when there is one).
-uint64_t MatrixSize(uint8_t* base, uint32_t descriptor, uint32_t out);
+uint64_t MatrixSize(uint32_t descriptor, uint32_t out);
 // Reverb::Size (sub_82463B78): 309,936.
-uint64_t ReverbSize(uint8_t* base, uint32_t out);
+uint64_t ReverbSize(uint32_t out);
 // VolumeMeter::Size (sub_825A60E0): 12 x (+8 x +12, signed) + 52.
-uint64_t MeterSize(uint8_t* base, uint32_t descriptor, uint32_t out);
+uint64_t MeterSize(uint32_t descriptor, uint32_t out);
 
 // --- Small accessors ---
 
 // XAudioCodec::GetInfo (sub_82466E80): byte 4 and the half-word at
 // 0x8204B950. XAudioMatrix::GetInfo (sub_82465BE0): 6 and 0.
 // VolumeMeter::GetInfo (sub_825A5778): 1 and 1. Each returns 0.
-uint64_t CodecGetInfo(uint8_t* base, uint32_t out);
-uint64_t MatrixGetInfo(uint8_t* base, uint32_t out);
-uint64_t MeterGetInfo(uint8_t* base, uint32_t out);
+uint64_t CodecGetInfo(uint32_t out);
+uint64_t MatrixGetInfo(uint32_t out);
+uint64_t MeterGetInfo(uint32_t out);
 // XAudioCodec::GetState (sub_8246A920): the state byte (+172) to [out]; 0.
-uint64_t CodecGetState(uint8_t* base, uint32_t codec, uint32_t out);
+uint64_t CodecGetState(uint32_t codec, uint32_t out);
 // XAudioMatrix::SetOverwrite (sub_82465C08): +26 = r4's low byte; 0.
-uint64_t MatrixSetOverwrite(uint8_t* base, uint32_t matrix, uint32_t overwrite);
+uint64_t MatrixSetOverwrite(uint32_t matrix, uint32_t overwrite);
 // ReverbCore::SetStereo (sub_824679F8): +100 = r4 (r3 left as it is).
-void ReverbSetStereo(uint8_t* base, uint32_t core, uint32_t stereo);
+void ReverbSetStereo(uint32_t core, uint32_t stereo);
 
 // XAudioObject::Release (sub_8246CE70): the inner's count (the object's +8)
 // less one (as 64 bits from the zero-extended word); at 0 the inner's
 // (+4) slot +12 and 0. `frame` is this function's (96 bytes).
-uint64_t ObjectRelease(uint8_t* base, uint32_t object, uint32_t frame, const GuestCall& call);
+uint64_t ObjectRelease(uint32_t object, uint32_t frame, const GuestCall& call);
 
 // --- The codecs' construction ---
 
 // PacketLists::Init (sub_8246E1E0): the two list heads at `lists` (12 bytes
 // each: next, prev, the node's offset) empty, offsets 0.
-void PacketListsInit(uint8_t* base, uint32_t lists);
+void PacketListsInit(uint32_t lists);
 // CodecBase::CodecBase (sub_82469920): vtable 0x8204B958, its lists (+4)
 // made empty. Returns the codec base.
-uint64_t CodecBaseConstruct(uint8_t* base, uint64_t codec_base);
+uint64_t CodecBaseConstruct(uint64_t codec_base);
 // XAudioCodec::Construct (sub_82466BC8): the codec's inner at `inner`:
 // vtable 0x8204AA58, +4 = 1, +8 the descriptor's +4; CodecBase::CodecBase
 // on +12; vtables 0x8204ABD0 (+0) and 0x8204AB70 (+12). Returns `inner`.
-uint64_t CodecConstruct(uint8_t* base, uint64_t inner, uint32_t descriptor);
+uint64_t CodecConstruct(uint64_t inner, uint32_t descriptor);
 // PacketLists::Alloc (sub_8246E120): `count` (its low byte) x 120 bytes from
 // the allocator's slot +20 into +24, each entry put on the free list (+12).
 // Returns the allocation (`lists` when the count is 0). `frame` is this
 // function's (112 bytes).
-uint64_t PacketListsAlloc(uint8_t* base, uint64_t lists, uint32_t count, uint32_t allocator,
+uint64_t PacketListsAlloc(uint64_t lists, uint32_t count, uint32_t allocator,
                           uint32_t frame, const GuestCall& call);
 // CodecBase::Init (sub_82469978): the 56-byte format to +36 (memcpy), +96
 // and +100 = 1.0, the state +156 = 32, +92 and +94 = 1, +152 = 0, then
 // PacketLists::Alloc on +4. Returns its r3. `frame` is this function's (112
 // bytes).
-uint64_t CodecBaseInit(uint8_t* base, uint32_t codec_base, uint32_t format, uint32_t count,
+uint64_t CodecBaseInit(uint32_t codec_base, uint32_t format, uint32_t count,
                        uint32_t allocator, uint32_t frame, const GuestCall& call);
 // XAudioCodec::Init (sub_82466960): the callbacks (+172, +176) from the
 // descriptor's +72 and +76, then CodecBase::Init on +12 (a tail call: `sp`
 // is the caller's stack pointer).
-uint64_t CodecInit(uint8_t* base, uint32_t inner, uint32_t descriptor, uint32_t allocator,
+uint64_t CodecInit(uint32_t inner, uint32_t descriptor, uint32_t allocator,
                    uint32_t sp, const GuestCall& call);
 // PcmCodec::PcmCodec (sub_8246D750): see the row. `frame` is this
 // function's (144 bytes). Returns the object.
-uint64_t PcmCodecConstruct(uint8_t* base, uint64_t object, uint32_t descriptor,
+uint64_t PcmCodecConstruct(uint64_t object, uint32_t descriptor,
                            uint32_t allocator, uint32_t frame, const GuestCall& call);
 // XmaCodec::XmaCodec (sub_8246C1D0): see the row. `frame` is this
 // function's (160 bytes). Returns the object.
-uint64_t XmaCodecConstruct(uint8_t* base, uint64_t object, uint32_t descriptor,
+uint64_t XmaCodecConstruct(uint64_t object, uint32_t descriptor,
                            uint32_t allocator, uint32_t frame, const GuestCall& call);
 // PcmCodec::Create (sub_8246DF78) and XmaCodec::Create (sub_8246CDB0): the
 // object from the allocator's slot +20, constructed (the XMA codec's slot
 // +120 then sets up its XMA object, audio.md), to [out]; 0 or the error.
 // `frame` is the function's (112 bytes).
-uint64_t PcmCodecCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t PcmCodecCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                         uint32_t frame, const GuestCall& call);
-uint64_t XmaCodecCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t XmaCodecCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                         uint32_t frame, const GuestCall& call);
 // XAudioCodec::Create (sub_82466BA0): by the format's type, PcmCodecCreate
 // or XmaCodecCreate (tail calls: their frames below `sp`), else E_NOTIMPL.
-uint64_t CodecCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t CodecCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                      uint32_t sp, const GuestCall& call);
 
 // --- The codecs' destruction ---
@@ -134,27 +134,27 @@ uint64_t CodecCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uin
 // PacketList::Next (sub_82466EA0): the neighbor of `entry` (0: the head) in
 // the list at `list`, next when `direction` (as a signed word) isn't 0, as
 // an entry (the node less the head's offset, +8), 0 at the head.
-uint64_t PacketListNext(uint8_t* base, uint64_t list, uint64_t entry, uint32_t direction);
+uint64_t PacketListNext(uint64_t list, uint64_t entry, uint32_t direction);
 // PacketList::Clear (sub_8246E060): every node unlinked, each pointed at
 // itself. Returns the last Next's r3 (0).
-uint64_t PacketListClear(uint8_t* base, uint32_t list);
+uint64_t PacketListClear(uint32_t list);
 // PacketLists::Clear (sub_8246E0E8): the second list (+12), then the first.
-uint64_t PacketListsClear(uint8_t* base, uint32_t lists);
+uint64_t PacketListsClear(uint32_t lists);
 // CodecBase::~CodecBase (sub_82469960): vtable 0x8204B958, PacketLists::Clear
 // on +4.
-uint64_t CodecBaseDestruct(uint8_t* base, uint32_t codec_base);
+uint64_t CodecBaseDestruct(uint32_t codec_base);
 // XAudioCodec::Destruct (sub_82466EE8): vtables 0x8204ABD0 and 0x8204AB70
 // (+12), CodecBase::~CodecBase on +12, the root vtable (0x8204A6B8).
-uint64_t CodecDestruct(uint8_t* base, uint32_t inner);
+uint64_t CodecDestruct(uint32_t inner);
 // PcmCodec::~PcmCodec (sub_8246CF50): the PCM codec's three vtables, then
 // XAudioCodec::Destruct on +4. Returns the object.
-uint64_t PcmCodecDestroy(uint8_t* base, uint64_t object);
+uint64_t PcmCodecDestroy(uint64_t object);
 // XmaCodec::~XmaCodec (sub_8246AAD0): the XMA object's release (sub_8246A758,
 // audio.md, through `call`). Returns the object. `frame` is its (96 bytes).
-uint64_t XmaCodecDestroy(uint8_t* base, uint64_t object, uint32_t frame, const GuestCall& call);
+uint64_t XmaCodecDestroy(uint64_t object, uint32_t frame, const GuestCall& call);
 // XAudioMatrix::Destruct (sub_82466418): vtables 0x8204AB30 (+0), then
 // 0x8204AB14 and the root's at +4.
-void MatrixDestruct(uint8_t* base, uint32_t matrix);
+void MatrixDestruct(uint32_t matrix);
 
 // --- The matrix and the meter's construction ---
 
@@ -162,18 +162,18 @@ void MatrixDestruct(uint8_t* base, uint32_t matrix);
 // +20, its vtables and count, +12 the descriptor's +4, its slot +52
 // (XAudioMatrix::Init); the object to [out], or the inner's slot +12 and the
 // error; E_OUTOFMEMORY. `frame` is its (128 bytes).
-uint64_t MatrixCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t MatrixCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                       uint32_t frame, const GuestCall& call);
 // VolumeMeter::Create (sub_825A6460): 52 bytes from the allocator's slot
 // +20 (no check), its slot +28 (VolumeMeter::Init); the object to [out]; 0.
 // `frame` is its (128 bytes).
-uint64_t MeterCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t MeterCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                      uint32_t frame, const GuestCall& call);
 // VolumeMeter::Init (sub_825A6138): the descriptor's 16 bytes to +8, the
 // allocator to +48, three arrays of 4 x (+8 x +12) bytes from its slot +20
 // into +28, +32 and +36, each cleared (memset); 0. `frame` is its (128
 // bytes).
-uint64_t MeterInit(uint8_t* base, uint32_t meter, uint32_t descriptor, uint32_t allocator,
+uint64_t MeterInit(uint32_t meter, uint32_t descriptor, uint32_t allocator,
                    uint32_t frame, const GuestCall& call);
 
 // --- The packet queue and the codecs' slots (under the voice lists' spin
@@ -183,70 +183,70 @@ uint64_t MeterInit(uint8_t* base, uint32_t meter, uint32_t descriptor, uint32_t 
 // CodecBase::SetFlags (sub_82467078): under the spin lock, +156 = (+156 &
 // ~mask) | bits (their low bytes). Returns r3 as the last kernel call left
 // it (LastCallR3). `frame` is its (144 bytes).
-uint64_t CodecSetFlags(uint8_t* base, uint32_t codec_base, uint32_t mask, uint32_t bits,
+uint64_t CodecSetFlags(uint32_t codec_base, uint32_t mask, uint32_t bits,
                        uint32_t thread, const GuestCall& call);
 // CodecBase::RetirePacket (sub_8246A430): under the spin lock, `entry` (0:
 // the first queued, when there is one; else 0 is returned) moved from the
 // queued list (+4) to the end of the free list (+16), +104 cleared (48
 // bytes), the entry's +116 = 0, slot +84 (32, 32). Returns the entry.
 // `frame` is its (128 bytes).
-uint64_t CodecRetirePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint32_t thread,
+uint64_t CodecRetirePacket(uint32_t codec_base, uint64_t entry, uint32_t thread,
                            uint32_t frame, const GuestCall& call);
 // CodecBase::CompletePacket (sub_824674D8): RetirePacket, then the
 // packet-done callback (+160) when there's one and an entry, with a pointer
 // to {the codec's +12 (the base's -4), the entry's +36, `result`} in its
 // frame. Returns the entry. `frame` is its (128 bytes).
-uint64_t CodecCompletePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint64_t result,
+uint64_t CodecCompletePacket(uint32_t codec_base, uint64_t entry, uint64_t result,
                              uint32_t thread, uint32_t frame, const GuestCall& call);
 // CodecBase::FlushPackets (sub_824699E0): E_UNEXPECTED while playing; else
 // slot +92 (0, E_ABORT) until it returns 0, slot +84 (24, 0), +152 = 0; 0.
 // `frame` is its (96 bytes).
-uint64_t CodecFlushPackets(uint8_t* base, uint32_t codec_base, uint32_t frame,
+uint64_t CodecFlushPackets(uint32_t codec_base, uint32_t frame,
                            const GuestCall& call);
 // CodecBase::SetFormat (sub_82469E58): E_UNEXPECTED while playing or with
 // packets queued; else the format to +36 (memcpy), +157 = r5, slot +80
 // with f1 = 1.0, whose r3 it returns. `frame` is its (112 bytes).
-uint64_t CodecBaseSetFormat(uint8_t* base, uint32_t codec_base, uint32_t format, uint32_t extra,
+uint64_t CodecBaseSetFormat(uint32_t codec_base, uint32_t format, uint32_t extra,
                             uint32_t frame, const GuestCall& call);
 // PcmCodec::SetFormat (sub_8246CFA8): CodecBase::SetFormat on +16; on
 // success +110 = 1 and +108 = the type's bytes a sample x the channels.
 // `frame` is its (96 bytes).
-uint64_t PcmCodecSetFormat(uint8_t* base, uint32_t codec, uint32_t format, uint32_t extra,
+uint64_t PcmCodecSetFormat(uint32_t codec, uint32_t format, uint32_t extra,
                            uint32_t frame, const GuestCall& call);
 // PcmCodec::Start (sub_8246D410), Stop (sub_8246D500, `flags` r4) and
 // XAudioCodec::EndOfStream (sub_8246D630): the state changes under the
 // spin lock, through slot +84; 0. `frame` is theirs (128 bytes).
-uint64_t PcmCodecStart(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+uint64_t PcmCodecStart(uint32_t codec, uint32_t thread, uint32_t frame,
                        const GuestCall& call);
-uint64_t PcmCodecStop(uint8_t* base, uint32_t codec, uint32_t flags, uint32_t thread,
+uint64_t PcmCodecStop(uint32_t codec, uint32_t flags, uint32_t thread,
                       uint32_t frame, const GuestCall& call);
-uint64_t CodecEndOfStream(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+uint64_t CodecEndOfStream(uint32_t codec, uint32_t thread, uint32_t frame,
                           const GuestCall& call);
 // PcmCodec::SetVolume (sub_8246D008): +112 and +224 = the volume rounded
 // to float, under the spin lock; 0.
-uint64_t PcmCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+uint64_t PcmCodecSetVolume(uint32_t codec, double volume, uint32_t thread,
                            const GuestCall& call);
 // PcmCodec::SetPitch (sub_8246D0C8, the ratio 2^octaves through pow) and
 // SetFrequencyRatio (sub_8246D1E0): +116 the ratio as float; the
 // converter's +196 and +197 the format's type and channels, +200 the rate
 // x the ratio (the pitch's rounded to float, the ratio's in double) by
 // fctidz, +264 bit 0; 0. `frame` is theirs (144 bytes).
-uint64_t PcmCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+uint64_t PcmCodecSetPitch(uint32_t codec, double octaves, uint32_t thread,
                           uint32_t frame, const GuestCall& call);
-uint64_t PcmCodecSetFrequencyRatio(uint8_t* base, uint32_t codec, double ratio, uint32_t thread,
+uint64_t PcmCodecSetFrequencyRatio(uint32_t codec, double ratio, uint32_t thread,
                                    uint32_t frame, const GuestCall& call);
 // XmaCodec::SetVolume (sub_8246AB48) and SetPitch (sub_8246AC40): as the
 // PCM codec's over each stream (+56 of them, 88 bytes from [+188]). `frame`
 // is SetPitch's (144 bytes).
-uint64_t XmaCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+uint64_t XmaCodecSetVolume(uint32_t codec, double volume, uint32_t thread,
                            const GuestCall& call);
-uint64_t XmaCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+uint64_t XmaCodecSetPitch(uint32_t codec, double octaves, uint32_t thread,
                           uint32_t frame, const GuestCall& call);
 // CodecBase::OnSubmit (sub_82469AF8): the new entry's bounds checked
 // (unless flags bit 4), each failed check releasing one level of the spin
 // lock as the original does; slot +84 (24, 8 for flags bit 0 else 0); slot
 // +84 (32, 0) when the free list is empty; 0. `frame` is its (128 bytes).
-uint64_t CodecOnSubmit(uint8_t* base, uint32_t codec_base, uint32_t entry, uint32_t flags,
+uint64_t CodecOnSubmit(uint32_t codec_base, uint32_t entry, uint32_t flags,
                        uint32_t thread, uint32_t frame, const GuestCall& call);
 // CodecBase::SubmitPacket (sub_82469EF8) and SubmitRegion (sub_8246A1C0):
 // under the spin lock, the first free entry to the end of the queued list,
@@ -254,10 +254,10 @@ uint64_t CodecOnSubmit(uint8_t* base, uint32_t codec_base, uint32_t entry, uint3
 // free entry (the lock released twice, as the original does). nullopt, with
 // nothing done, when the block size (+92) is 0 (the original traps on its
 // division). `frame` is theirs (144 bytes).
-std::optional<uint64_t> CodecSubmitPacket(uint8_t* base, uint32_t codec_base, uint32_t packet,
+std::optional<uint64_t> CodecSubmitPacket(uint32_t codec_base, uint32_t packet,
                                           uint32_t flags, uint32_t thread, uint32_t frame,
                                           const GuestCall& call);
-std::optional<uint64_t> CodecSubmitRegion(uint8_t* base, uint32_t codec_base, uint32_t region,
+std::optional<uint64_t> CodecSubmitRegion(uint32_t codec_base, uint32_t region,
                                           uint32_t flags, uint32_t thread, uint32_t frame,
                                           const GuestCall& call);
 // XmaCodec::SubmitRegion (sub_8246A860): E_NOTIMPL when +266 is 1; else
@@ -265,7 +265,7 @@ std::optional<uint64_t> CodecSubmitRegion(uint8_t* base, uint32_t codec_base, ui
 // 32 bytes in its frame, CodecBase::SubmitRegion on +16 with flags | 16.
 // nullopt as SubmitRegion's (before anything is written). `frame` is its
 // (128 bytes).
-std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint32_t region,
+std::optional<uint64_t> XmaCodecSubmitRegion(uint32_t codec, uint32_t region,
                                              uint32_t flags, uint32_t thread, uint32_t frame,
                                              const GuestCall& call);
 
@@ -277,18 +277,18 @@ std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint
 // (SetMatrix) with the default matrix, then on success slot +32
 // (SetOverwrite) with the descriptor's +9. Returns the last call's r3.
 // `frame` is its (112 bytes).
-uint64_t MatrixInit(uint8_t* base, uint32_t matrix, uint32_t descriptor, uint32_t allocator,
+uint64_t MatrixInit(uint32_t matrix, uint32_t descriptor, uint32_t allocator,
                     uint32_t frame, const GuestCall& call);
 // XAudioMatrix::SetMatrix (sub_82465E50): under the spin lock, the entries
 // from `levels` (0: none), +25 the highest output channel + 1; 0, or
 // E_INVALIDARG past +24.
-uint64_t MatrixSetMatrix(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t thread,
+uint64_t MatrixSetMatrix(uint32_t matrix, uint32_t levels, uint32_t thread,
                          const GuestCall& call);
 // XAudioMatrix::SetLevels (sub_82466188): under the spin lock, each given
 // entry's target level, and its current one too when `now`'s low byte
 // isn't 0; E_INVALIDARG at the first index past +16 (the entries before it
 // set).
-uint64_t MatrixSetLevels(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t now,
+uint64_t MatrixSetLevels(uint32_t matrix, uint32_t levels, uint32_t now,
                          uint32_t thread, const GuestCall& call);
 // XAudioMatrix::MixRamp (sub_82466310): out += in x the level, 16 frames a
 // loop of 4-frame vectors (aligned down, as lvx and stvx), the level from
@@ -296,7 +296,7 @@ uint64_t MatrixSetLevels(uint8_t* base, uint32_t matrix, uint32_t levels, uint32
 // the translated code computes it (a product, then a sum), with the vector
 // unit's flush to zero on. Returns r3 as the original leaves it (the last
 // loop's input less 32 bytes, or `out` with no loop).
-uint64_t MatrixMixRamp(uint8_t* base, uint64_t out, uint64_t in, uint32_t start, uint32_t step,
+uint64_t MatrixMixRamp(uint64_t out, uint64_t in, uint32_t start, uint32_t step,
                        uint32_t frames);
 // XAudioMatrix::Mix (sub_82466440): the source's channels into the
 // target's by the entries (each ramped from its current level to its
@@ -304,7 +304,7 @@ uint64_t MatrixMixRamp(uint8_t* base, uint64_t out, uint64_t in, uint32_t start,
 // as it is; overwriting (+26) clears the target first and stores instead
 // of adding. Under the spin lock; its locals in its frame as the original
 // (`frame`, 288 bytes). Returns 0, or a format's or the clear's error.
-uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t target,
+uint64_t MatrixMix(uint32_t matrix, uint32_t source, uint32_t target,
                    uint32_t thread, uint32_t frame, const GuestCall& call);
 
 // --- The volume meter ---
@@ -316,38 +316,38 @@ uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t tar
 // buffer, the two fold-downs to slots 6 and 7 of the arrays' first words;
 // +24 up by one, +44 = 1 when it reaches +16; 0. `frame` is its (112
 // bytes).
-uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t frame);
+uint64_t MeterProcess(uint32_t meter, uint32_t buffer, uint32_t frame);
 
 // --- The render driver's set-up and the reverb's small parts ---
 
 // sub_824657C8 (the render driver's slot +32): its slot +28
 // (AudioRenderDriver::Register, audio.md) with the descriptor's +8 in r4, a
 // tail call. Returns the method; `r4` the register's value.
-uint32_t RenderDriverSetUpThunk(uint8_t* base, uint32_t driver, uint32_t descriptor, uint32_t* r4);
+uint32_t RenderDriverSetUpThunk(uint32_t driver, uint32_t descriptor, uint32_t* r4);
 // Reverb::Destruct (sub_824656B8): the vtables put back to the bases'
 // (0x8204AAB0 at +0, 0x8204AA94 at +4; the core's second, at its +16 plus
 // the offset its vtable's +4 holds, 0x8204AA74; +208's 0x8204A868), then
 // the root's (0x8204A6B8) at +4. r3 left as it is.
-void ReverbDestruct(uint8_t* base, uint32_t reverb);
+void ReverbDestruct(uint32_t reverb);
 // ReverbCore::Defaults (sub_82467538): the default native parameters to the
 // 84 bytes at `out` (words 5, 5, 6, 6, 8, 8, 8, 4, 8, 4, 5 at +0 to +48, +16
 // and +20 left; the floats at 0x8204AC10 to 0x8204AC1C from +52). r3 left.
-void ReverbDefaults(uint8_t* base, uint32_t out);
+void ReverbDefaults(uint32_t out);
 // LargestPrimeBelow (sub_8246DFE8): 1 for n up to 1, 9,973 from 9,973,
 // else the table's (0x8204BBD0, 1,229 primes) by its binary search: n when
 // it's there, else the entry where the search stops.
-uint32_t LargestPrimeBelow(uint8_t* base, uint32_t n);
+uint32_t LargestPrimeBelow(uint32_t n);
 // The delay lines' fills (sub_82467720 2,048 groups, sub_82467788 64,
 // sub_824677F0 16, sub_82467858 256, sub_824678C0 32, sub_82467928 128,
 // sub_82467990 512): `groups` x 8 words from +8 set to +4's (copied as
 // the translated code's lfs/stfs leave it), then +0 = 0. r3 left.
-void FillDelayLine(uint8_t* base, uint32_t line, uint32_t groups);
+void FillDelayLine(uint32_t line, uint32_t groups);
 // ReverbCore::FilterCoefficient (sub_824675B8): the filter at `filter` (+0,
 // +4, +8 and +12 its inputs) given +24 (through four pows) and +28 (a cos
 // and a square root, or the float at 0x8204AC14), each rounding as the
 // translated code's (its double products and quotients kept double, its
 // fmadd fused); pow and cos through their plain C++.
-void FilterCoefficient(uint8_t* base, uint32_t filter);
+void FilterCoefficient(uint32_t filter);
 
 // --- The reverb's parameters ---
 
@@ -360,7 +360,7 @@ void FilterCoefficient(uint8_t* base, uint32_t filter);
 // the voice lists' spin lock taken twice and released twice, as the
 // original does; else E_INVALIDARG (nothing taken). Returns 0 or the error
 // (sign-extended, as r3). `frame` is its (240 bytes).
-uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint32_t data,
+uint64_t ReverbSetParameters(uint32_t reverb, uint32_t kind, uint32_t data,
                              uint32_t thread, uint32_t frame, const GuestCall& call);
 // I3dl2::ToNative (sub_82469418): the 12 I3DL2 parameters at `in` (room and
 // room HF in millibels, rolloff, decay time, decay HF ratio, reflections,
@@ -374,7 +374,7 @@ uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint
 // through its plain C++. The scratch words at `frame` + 80 (its frame, 128
 // bytes) left as the original leaves them. Returns log10's result (f1 as
 // the original leaves it); r3 is not touched.
-double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame);
+double I3dl2ToNative(uint32_t in, uint32_t out, uint32_t frame);
 
 // --- The reverb's construction ---
 
@@ -386,7 +386,7 @@ double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame);
 // 0x82000A30, 0x82001BE4, 0x82002FB0, 0x8200256C, 0x82002A0C twice and
 // 0x82001FCC to +12 to +48, copied as words). `frame` is its (112 bytes):
 // its +80 gets 0. Returns `object`.
-uint64_t I3dl2ParamsConstruct(uint8_t* base, uint32_t object, uint32_t flag, uint32_t frame);
+uint64_t I3dl2ParamsConstruct(uint32_t object, uint32_t flag, uint32_t frame);
 // Reverb::Reverb (sub_82465608): the reverb at `reverb` for the descriptor
 // at `descriptor`: +4 the shared base 0x8204AA58, +8 1, +12 the
 // descriptor's +4, the vtables 0x8204AAB0 (+0) and 0x8204AA94 (+4), the
@@ -395,14 +395,14 @@ uint64_t I3dl2ParamsConstruct(uint8_t* base, uint32_t object, uint32_t flag, uin
 // at the offset its vtable's +4 holds, ReverbCore::Defaults on the core's
 // +52; the timers +0x4BAA0 and +0x4BAA8 (64-bit) cleared. `frame` is its
 // (128 bytes): its +80 gets 0. Returns `reverb`.
-uint64_t ReverbConstruct(uint8_t* base, uint32_t reverb, uint32_t descriptor, uint32_t frame);
+uint64_t ReverbConstruct(uint32_t reverb, uint32_t descriptor, uint32_t frame);
 // Reverb::Create (sub_82465710): 309,936 bytes from the allocator's slot
 // +20, Reverb::Reverb (in a frame below), the outer vtable's slot +28 with
 // (the reverb, the descriptor, the allocator); on success the reverb to
 // [out] and that slot's r3; on failure the inner's (+4) slot +12 and the
 // error; E_OUTOFMEMORY when nothing was allocated. `frame` is its (128
 // bytes).
-uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+uint64_t ReverbCreate(uint32_t descriptor, uint32_t allocator, uint32_t out,
                       uint32_t frame, const GuestCall& call);
 
 // --- The reverb's pass ---
@@ -416,7 +416,7 @@ uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, ui
 // (in a frame below), ReverbCore::Apply on the core proper (the offset its
 // vtable's +4 holds) with them (in a frame below). `frame` is its (192
 // bytes). Returns Apply's r3.
-uint64_t I3dl2SetParameter(uint8_t* base, uint32_t object, uint32_t index, uint32_t value,
+uint64_t I3dl2SetParameter(uint32_t object, uint32_t index, uint32_t value,
                            uint32_t frame, const GuestCall& call);
 // Reverb::Run (sub_82465258): `core` the reverb's core (+16, all 64 bits),
 // `inputs` and `outputs` the channels' pointers. Under the voice lists'
@@ -428,7 +428,7 @@ uint64_t I3dl2SetParameter(uint8_t* base, uint32_t object, uint32_t index, uint3
 // below); the three bytes cleared. Then ReverbCore::Process on the core
 // proper for 256 frames (below `frame`). `frame` is its (144 bytes; no
 // words of its own). Returns Process's r3.
-uint64_t ReverbRun(uint8_t* base, uint64_t core, uint32_t inputs, uint32_t outputs,
+uint64_t ReverbRun(uint64_t core, uint32_t inputs, uint32_t outputs,
                    uint32_t thread, uint32_t frame, const GuestCall& call);
 // Reverb::Process (sub_82465428; slot +24 of 0x8204AAB0): the reverb at
 // `reverb`, `input` and `output` the buffers' interfaces. Both formats
@@ -441,7 +441,7 @@ uint64_t ReverbRun(uint8_t* base, uint64_t core, uint32_t inputs, uint32_t outpu
 // performance counter (+88 and +96) into the reverb's +0x4BAA0 (the sum)
 // and +0x4BAA8 (the count). `frame` is its (192 bytes). Returns 0 or the
 // error.
-uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t output,
+uint64_t ReverbProcess(uint32_t reverb, uint32_t input, uint32_t output,
                        uint32_t thread, uint32_t frame, const GuestCall& call);
 
 // --- The PCM codec's pass ---
@@ -469,7 +469,7 @@ uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t 
 // +92 and the codec's +52 run their plain C++ when they're the game's
 // (SetFlags, CompletePacket, PcmCodec::Stop), else through `call`.
 // `frame` is its (192 bytes).
-uint64_t PcmCodecProcess(uint8_t* base, uint32_t codec, uint64_t iface, uint32_t thread,
+uint64_t PcmCodecProcess(uint32_t codec, uint64_t iface, uint32_t thread,
                          uint32_t frame, const GuestCall& call);
 
 }  // namespace xaudio

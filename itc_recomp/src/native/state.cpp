@@ -136,7 +136,7 @@ void MarkFetchConstantsDirty(uint64_t mask) {
   g_pending_blocks |= uint32_t(mask != 0) << kFetchBlock;
 }
 
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs) {
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs) {
   // Each bit of the device's masks: a register, a fetch constant (6 words),
   // or the bool and loop constants.
   for (size_t m = 0; m < 3; m++) {
@@ -146,9 +146,9 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
       const BitCopy& copy = kBitCopies.bits[m][__builtin_ctzll(bits)];
       bits &= bits - 1;
       if (copy.words == 1) {
-        regs.values[copy.first_register] = guest::LoadU32(base, device + copy.shadow_offset);
+        regs.values[copy.first_register] = guest::LoadU32(device + copy.shadow_offset);
       } else {
-        guest::CopyU32s(base, device + copy.shadow_offset, &regs.values[copy.first_register],
+        guest::CopyU32s(device + copy.shadow_offset, &regs.values[copy.first_register],
                         copy.words);
       }
     }
@@ -163,14 +163,14 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
     while (bits) {
       uint32_t k = uint32_t(__builtin_ctzll(bits));
       bits &= bits - 1;
-      guest::CopyU32s(base, device + block.shadow_offset + 4 * block.words_per_unit * k,
+      guest::CopyU32s(device + block.shadow_offset + 4 * block.words_per_unit * k,
                       &regs.values[block.first_register + block.words_per_unit * k],
                       block.words_per_unit);
     }
   }
 }
 
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs,
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs,
                    RegisterReadStats& stats) {
   // The words as last read (from regs, not touching the shadow).
   uint32_t old[512];
@@ -182,7 +182,7 @@ void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& 
     n += words;
     stats.words_copied += uint32_t(__builtin_popcountll(PendingUnits(b))) * block.words_per_unit;
   }
-  ReadRegisters(base, device, regs);
+  ReadRegisters(device, regs);
   stats.calls++;
   stats.words += n;
   bool any = false;

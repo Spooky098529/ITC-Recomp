@@ -109,14 +109,29 @@ fields = [
 # a few second set objects' words (the `joined_` fields). Where both use an
 # offset, the field is named for the traffic body and the note gives the
 # stand model's word.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# of 7,408 bytes returning to 0x820C4184; the host object is this type's
+# 16,780 bytes, the joined fields' span), freed by ScenePools::DestroyA's
+# VirtualFree (a handle; src/scene/scene.cpp). Its scalar fields (the
+# PoolNode's included) are the layout; the car record (+32), the load slots,
+# the skeleton, the XPR objects, the texture providers and the part models
+# stay guest-shaped views reaching it through raw accesses. The views of the
+# stand model's record (the `model_` fields, on a SceneModel's handle) go by
+# address through the SceneModel's layout, as any view on another owner.
 [TrafficCar]
 measure = "TrafficCar"
 measures = ["SceneCockpit.+28", "SceneTraffic.+9768", "SceneModel.+5092.+9760"]
 size = 16780
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C4184]
 vtable = 0x820050B4
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x820050B4 (0x82004F90 in the destructor's end)" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list (pool 6's of the first set)" },
+  { name = "next", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "previous", offset = 12, type = "u32" },
   { name = "state", offset = 16, type = "u32", note = "the pool node's (0 when made)" },
   { name = "index", offset = 20, type = "u32", note = "-1 when made. Measure fault: also SceneCockpit, SceneTraffic and SceneWheels::Release's pool index" },
   { name = "joined_owner", offset = 24, type = "u32", note = "measure fault: the second set's pool objects' +24 (SceneCockpit, SceneParts, ScenePool4, SceneWheels::SetUp; SceneModel::ApplyRecord, Build)" },

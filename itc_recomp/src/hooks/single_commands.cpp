@@ -27,8 +27,8 @@ ITC_FLAG_BOOL(native_single_commands, true, "ITC",
 
 namespace sc = graphics::single_commands;
 
-sc::GuestCall hooks::SingleCommandsCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
+sc::GuestCall hooks::SingleCommandsCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t sp, uint32_t return_address,
                       std::initializer_list<uint64_t> args) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -38,24 +38,24 @@ sc::GuestCall hooks::SingleCommandsCall(lifted::Regs& ctx, uint8_t* base) {
       registers[i++]->u64 = value;
     }
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
 }
 
-void hooks::NativeSingleInlineVertices(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = sc::InlineVertices(base, ctx.r3.u32);
+void hooks::NativeSingleInlineVertices(lifted::Regs& ctx) {
+  ctx.r3.u64 = sc::InlineVertices(ctx.r3.u32);
 }
 
-void hooks::NativeSingleSetUpDrawer(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = sc::SetUpDrawer(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
+void hooks::NativeSingleSetUpDrawer(lifted::Regs& ctx) {
+  ctx.r3.u64 = sc::SetUpDrawer(ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx));
 }
 
-void hooks::NativeSingleSetShaderConstants(lifted::Regs& ctx, uint8_t* base) {
+void hooks::NativeSingleSetShaderConstants(lifted::Regs& ctx) {
   ctx.r3.u64 =
-      sc::SetShaderConstants(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
+      sc::SetShaderConstants(ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx));
 }
 
 namespace {
@@ -63,40 +63,40 @@ namespace {
 // Command 15: marked as command 15 around it, so the wraps of BeginVertices
 // and EndVertices hand PrimitiveDrawer::Draw's inline draw to the renderer
 // (as its wrap in src/native/replay_hooks.cpp does around the original).
-uint32_t DrawerDrawMarked(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+uint32_t DrawerDrawMarked(lifted::Regs& ctx, uint32_t sp) {
   const uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
-  const uint32_t r3 = sc::DrawerDraw(base, sp, hooks::SingleCommandsCall(ctx, base));
+  const uint32_t r3 = sc::DrawerDraw(sp, hooks::SingleCommandsCall(ctx));
   native::g_current_command = outer_command;
   return r3;
 }
 
 }  // namespace
 
-void hooks::NativeSingleDrawerDraw(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = DrawerDrawMarked(ctx, base, ctx.r1.u32);
+void hooks::NativeSingleDrawerDraw(lifted::Regs& ctx) {
+  ctx.r3.u64 = DrawerDrawMarked(ctx, ctx.r1.u32);
 }
 
-void hooks::NativeSingleCallback(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = sc::Callback(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
+void hooks::NativeSingleCallback(lifted::Regs& ctx) {
+  ctx.r3.u64 = sc::Callback(ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx));
 }
 
-graphics::render_queue::SingleCommand hooks::SingleCommands(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t handler, uint32_t slot, uint32_t sp) -> std::optional<uint32_t> {
+graphics::render_queue::SingleCommand hooks::SingleCommands(lifted::Regs& ctx) {
+  return [&ctx](uint32_t handler, uint32_t slot, uint32_t sp) -> std::optional<uint32_t> {
     if (!ITC_FLAG(native_single_commands)) {
       return std::nullopt;
     }
     switch (handler) {
       case sc::kInlineVertices:
-        return sc::InlineVertices(base, slot);
+        return sc::InlineVertices(slot);
       case sc::kSetUpDrawer:
-        return sc::SetUpDrawer(base, slot, sp, SingleCommandsCall(ctx, base));
+        return sc::SetUpDrawer(slot, sp, SingleCommandsCall(ctx));
       case sc::kSetShaderConstants:
-        return sc::SetShaderConstants(base, slot, sp, SingleCommandsCall(ctx, base));
+        return sc::SetShaderConstants(slot, sp, SingleCommandsCall(ctx));
       case sc::kDrawerDraw:
-        return DrawerDrawMarked(ctx, base, sp);
+        return DrawerDrawMarked(ctx, sp);
       case sc::kCallback:
-        return sc::Callback(base, slot, sp, SingleCommandsCall(ctx, base));
+        return sc::Callback(slot, sp, SingleCommandsCall(ctx));
       default:
         return std::nullopt;
     }
@@ -105,20 +105,20 @@ graphics::render_queue::SingleCommand hooks::SingleCommands(lifted::Regs& ctx, u
 
 // Single::InlineVertices (5): r3 = the slot.
 ITC_NATIVE_ENTRY(8258E8E8, ITC_FLAG(native_single_commands)) {
-  hooks::NativeSingleInlineVertices(ctx, base);
+  hooks::NativeSingleInlineVertices(ctx);
 }
 
 // Single::SetUpDrawer (13 and 14): r3 = the slot.
 ITC_NATIVE_ENTRY(8258E958, ITC_FLAG(native_single_commands)) {
-  hooks::NativeSingleSetUpDrawer(ctx, base);
+  hooks::NativeSingleSetUpDrawer(ctx);
 }
 
 // Single::SetShaderConstants (7): r3 = the slot.
 ITC_NATIVE_ENTRY(8258F0F0, ITC_FLAG(native_single_commands)) {
-  hooks::NativeSingleSetShaderConstants(ctx, base);
+  hooks::NativeSingleSetShaderConstants(ctx);
 }
 
 // Single::Callback (28): r3 = the slot.
 ITC_NATIVE_ENTRY(8258E9B8, ITC_FLAG(native_single_commands)) {
-  hooks::NativeSingleCallback(ctx, base);
+  hooks::NativeSingleCallback(ctx);
 }

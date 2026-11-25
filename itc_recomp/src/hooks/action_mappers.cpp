@@ -40,7 +40,7 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
 #define ITC_MAPPERS_FALLBACK(address)       \
   REX_FUNC_PROLOGUE();                      \
   if (!ITC_FLAG(native_action_mappers)) {   \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                 \
   }                                         \
   ctx.fpscr.disableFlushMode();
@@ -56,9 +56,9 @@ using namespace action_mappers;
 
 ITC_NATIVE_ENTRY_ALWAYS(8210B5B8) {
   ITC_MAPPERS_FALLBACK(8210B5B8)
-  ctx.f1.f64 = CurveApply(base, ctx.r3.u32, ctx.f1.f64);
+  ctx.f1.f64 = CurveApply(ctx.r3.u32, ctx.f1.f64);
 }
-ITC_MAPPERS_WORD(8210B568, RepeatUpdate(base, ctx.r3.u32, ctx.r4.u32))
+ITC_MAPPERS_WORD(8210B568, RepeatUpdate(ctx.r3.u32, ctx.r4.u32))
 
 // The held tests, also counted for --log_input_reads (as the wrappers in
 // src/frame_pacing/game_messages.cpp count the other button tests).
@@ -66,11 +66,11 @@ ITC_NATIVE_ENTRY_ALWAYS(825924E0) {
   
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
-  const uint32_t mask = schema::ActionButtonMask(base, ctx.r4.u32).mask();
+  const uint32_t mask = schema::ActionButtonMask(ctx.r4.u32).mask();
   if (ITC_FLAG(native_action_mappers)) {
-    ctx.r3.u64 = ListenerHeld(base, listener, mask);
+    ctx.r3.u64 = ListenerHeld(listener, mask);
   } else {
-    lifted::original::c825924E0(ctx, base);
+    lifted::original::c825924E0(ctx);
   }
   if (frame_pacing::GameMessages_LogInputReads()) {
     frame_pacing::GameMessages_NoteInputRead(0x825924E0, caller, listener, mask,
@@ -81,16 +81,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
   
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
-  const uint32_t mask = schema::ActionButtonMask(base, ctx.r4.u32).mask();
+  const uint32_t mask = schema::ActionButtonMask(ctx.r4.u32).mask();
   if (!ITC_FLAG(native_action_mappers)) {
-    lifted::original::c8258CF10(ctx, base);  // its call to sub_825924E0 is counted there
+    lifted::original::c8258CF10(ctx);  // its call to sub_825924E0 is counted there
     if (frame_pacing::GameMessages_LogInputReads()) {
       frame_pacing::GameMessages_NoteInputRead(0x8258CF10, caller, listener, mask,
                                                ctx.r3.u32 & 0xFF);
     }
     return;
   }
-  ctx.r3.u64 = ListenerTest(base, listener, ctx.r4.u32);
+  ctx.r3.u64 = ListenerTest(listener, ctx.r4.u32);
   NoteListenerTest(caller, listener, mask, ctx.r3.u32);
 }
 
@@ -115,16 +115,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
 ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
   const uint32_t mapper = ctx.r3.u32;
   const uint32_t caller = uint32_t(ctx.lr);
-  const uint32_t fired_before = debug::PauseMenuLog_BeforeMapperUpdate(base, mapper);
-  if (ITC_FLAG(native_action_mappers) && MapperCallsKnown(base, mapper)) {
+  const uint32_t fired_before = debug::PauseMenuLog_BeforeMapperUpdate(mapper);
+  if (ITC_FLAG(native_action_mappers) && MapperCallsKnown(mapper)) {
     ctx.fpscr.disableFlushMode();
     double f1 = 0;
-    ctx.r3.u64 = MapperUpdate(base, mapper, 0, &f1);
+    ctx.r3.u64 = MapperUpdate(mapper, 0, &f1);
     ctx.f1.f64 = f1;
   } else {
-    lifted::original::c8210C370(ctx, base);
+    lifted::original::c8210C370(ctx);
   }
-  debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
+  debug::PauseMenuLog_AfterMapperUpdate(mapper, caller, fired_before);
 }
 
 // The read slots, also logged for --log_pause_menu (moved from
@@ -137,9 +137,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
     const uint32_t action = ctx.r4.u32;                                        \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
     if (ITC_FLAG(native_action_mappers)) {                                     \
-      ctx.r3.u64 = function(base, mapper, action);                             \
+      ctx.r3.u64 = function(mapper, action);                             \
     } else {                                                                   \
-      lifted::original::c##address(ctx, base);                            \
+      lifted::original::c##address(ctx);                            \
     }                                                                          \
     debug::PauseMenuLog_NoteSlotRead(slot, mapper, action, caller,             \
                                      double(slot == 14 ? ctx.r3.u32 & 0xFFFF   \
@@ -163,19 +163,19 @@ ITC_NATIVE_ENTRY_ALWAYS(8210BA68) {
   if (ITC_FLAG(native_action_mappers)) {
     ctx.fpscr.disableFlushMode();
     double f1 = 0;
-    ctx.r3.u64 = AnalogValue(base, mapper, action, &f1);
+    ctx.r3.u64 = AnalogValue(mapper, action, &f1);
     ctx.f1.f64 = f1;
   } else {
-    lifted::original::c8210BA68(ctx, base);
+    lifted::original::c8210BA68(ctx);
   }
   debug::PauseMenuLog_NoteSlotRead(5, mapper, action, caller, ctx.f1.f64);
 }
 
 // The setters (slots 2, 4 and 7), from ActionMappers::Configure at boot.
-ITC_MAPPERS_WORD(8210B698, SetThreshold(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+ITC_MAPPERS_WORD(8210B698, SetThreshold(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
                                         ctx.r7.u32))
-ITC_MAPPERS_WORD(8210BDF0, SetRepeat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-ITC_MAPPERS_WORD(8210BE30, SetCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+ITC_MAPPERS_WORD(8210BDF0, SetRepeat(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_MAPPERS_WORD(8210BE30, SetCurve(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
                                     ctx.f3.f64))
 
 // ActionMappers::Configure (sub_8209F228) has no adapter: its only caller
@@ -211,23 +211,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8210AF08) {
   ITC_NATIVE_RUNNING("sub_8210AF08 InputClientList::BindAll");
   const uint32_t list = ctx.r3.u32;
   const uint64_t saved_lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 112, 0x8210AF58, [&](uint32_t) {
-    for (uint32_t i = 0; i < ClientListCount(base, list, 2, 0); i++) {
-      const uint32_t mapper = ClientListFind(base, 2, i);
-      const schema::ActionMappersOwner owner = schema::InputClientList(base, list).manager();
+  guest_call::InFrame(ctx, 112, 0x8210AF58, [&](uint32_t) {
+    for (uint32_t i = 0; i < ClientListCount(list, 2, 0); i++) {
+      const uint32_t mapper = ClientListFind(2, i);
+      const schema::ActionMappersOwner owner = schema::InputClientList(list).manager();
       ctx.r3.u64 = owner.address;
       ctx.lr = 0x8210AF58;
-      lifted::CallFromContext(ctx, base, owner.vtable().get_input_manager());
+      lifted::CallFromContext(ctx, owner.vtable().get_input_manager());
       const uint32_t object = ctx.r3.u32;
-      if (hooks::NativeHeapActive() && MapperBindKnown(base, mapper, object)) {
-        MapperBind(base, mapper, object);
+      if (hooks::NativeHeapActive() && MapperBindKnown(mapper, object)) {
+        MapperBind(mapper, object);
       } else {
         ctx.r3.u64 = mapper;
         ctx.r4.u64 = object;
         ctx.lr = 0x8210AF64;
-        lifted::original::c8210B270(ctx, base);
+        lifted::original::c8210B270(ctx);
       }
-      ClientListBoundCount(base, list, 2, 1);
+      ClientListBoundCount(list, 2, 1);
     }
   });
   ctx.lr = saved_lr;
@@ -246,26 +246,26 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
     return;
   }
   uint32_t list = 0;
-  if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
-      !InitCreate(base, ctx.r3.u32, &list)) {
-    lifted::original::c8209F430(ctx, base);
+  if (!hooks::NativeHeapActive() || !MapperConstructKnown() ||
+      !InitCreate(ctx.r3.u32, &list)) {
+    lifted::original::c8209F430(ctx);
     return;
   }
   const uint32_t index = ctx.r4.u32;
   const uint64_t saved_lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
+  guest_call::InFrame(ctx, 112, 0x8209F56C, [&](uint32_t) {
     ctx.r3.u64 = list;
-    lifted::Enter(ctx, base, game::InputClientList::BindAll);
-    if (ConfigureKnown(base)) {
+    lifted::Enter(ctx, game::InputClientList::BindAll);
+    if (ConfigureKnown()) {
       double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
-      ctx.r3.u64 = Configure(base, index, f);
+      ctx.r3.u64 = Configure(index, f);
       ctx.f1.f64 = f[0];
       ctx.f2.f64 = f[1];
       ctx.f3.f64 = f[2];
     } else {
       ctx.r3.u64 = index;
       ctx.lr = 0x8209F574;
-      lifted::CallFromContext(ctx, base, 0x8209F228);
+      lifted::CallFromContext(ctx, 0x8209F228);
     }
   });
   ctx.lr = saved_lr;

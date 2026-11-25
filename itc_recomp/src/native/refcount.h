@@ -10,7 +10,7 @@ namespace refcount {
 // to the count at +4 and returns it; at 1, a type 4 object with +0 bit
 // 0x40000000 also AddRefs its parent (+24). The vertex shader
 // SetVertexShader is binding is left as it is (its count returned).
-uint32_t AddRef(uint8_t* base, uint32_t object);
+uint32_t AddRef(uint32_t object);
 
 // The rebind skip's object for the recompiled SetVertexShader (its fallback
 // adapter, src/hooks/device_shaders.cpp): AddRef's and Release's overrides

@@ -44,11 +44,11 @@ ITC_NATIVE_ENTRY_ALWAYS(820CCDC0) {
     return;
   }
   if (!ITC_FLAG(native_data_load)) {
-    lifted::original::c820CCDC0(ctx, base);
+    lifted::original::c820CCDC0(ctx);
     return;
   }
   // r3 as lis and addi leave the address: sign-extended.
-  ctx.r3.s64 = int32_t(dl::DefaultsInit(base, ctx.r1.u32 - 128));
+  ctx.r3.s64 = int32_t(dl::DefaultsInit(ctx.r1.u32 - 128));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82102208) {
@@ -58,12 +58,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82102208) {
   }
   if (ITC_FLAG(native_data_load) && hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
-    if (const auto data = dl::RaceDataCreate(base)) {
+    if (const auto data = dl::RaceDataCreate()) {
       ctx.r3.u64 = *data;
       return;
     }
   }
-  lifted::original::c82102208(ctx, base);
+  lifted::original::c82102208(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82105508) {
@@ -73,12 +73,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82105508) {
   }
   if (ITC_FLAG(native_data_load) && hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
-    if (const auto block = dl::InputRecordingsCreate(base)) {
+    if (const auto block = dl::InputRecordingsCreate()) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c82105508(ctx, base);
+  lifted::original::c82105508(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82105560) {
@@ -88,12 +88,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82105560) {
   }
   if (ITC_FLAG(native_data_load) && hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
-    if (const auto r3 = dl::ReplayCreate(base)) {
+    if (const auto r3 = dl::ReplayCreate()) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82105560(ctx, base);
+  lifted::original::c82105560(ctx);
 }
 
 // The static replays' set-ups (no direct callers: _cinit's initializer
@@ -101,23 +101,23 @@ ITC_NATIVE_ENTRY_ALWAYS(82105560) {
 ITC_NATIVE_ENTRY_ALWAYS(825D9E60) {
   
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    lifted::original::c825D9E60(ctx, base);
+    lifted::original::c825D9E60(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  hooks::GuestAtexit guest{ctx, base};
-  ctx.r3.s64 = dl::StaticReplayAInit(base, guest.Call());
+  hooks::GuestAtexit guest{ctx};
+  ctx.r3.s64 = dl::StaticReplayAInit(guest.Call());
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(825D9F68) {
   
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    lifted::original::c825D9F68(ctx, base);
+    lifted::original::c825D9F68(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  hooks::GuestAtexit guest{ctx, base};
-  ctx.r3.s64 = dl::StaticReplayBInit(base, guest.Call());
+  hooks::GuestAtexit guest{ctx};
+  ctx.r3.s64 = dl::StaticReplayBInit(guest.Call());
 }
 
 // --- The movie sets and the load ---
@@ -135,37 +135,37 @@ bool BootNative() {
 // address.
 // (The render manager's slot 8 by its plain C++ where it's the game's,
 // hooks::DirectSlotCall.)
-void SlotCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
+void SlotCall(lifted::Regs& ctx, uint32_t slot, uint32_t return_address) {
+  ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 4 * slot);
   ctx.lr = return_address;
-  if (hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
+  if (hooks::DirectSlotCall(ctx, ctx.ctr.u32)) {
     return;
   }
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
 }
 
 // The movie sets' calls, from the adder's frame (112 bytes, `construct_at`
 // the original's return address after UiMovie::UiMovie) or the load's.
-dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint8_t* base, uint32_t construct_at) {
+dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint32_t construct_at) {
   dl::MovieCalls calls;
-  calls.construct = [&ctx, base, construct_at](uint32_t movie) {
+  calls.construct = [&ctx, construct_at](uint32_t movie) {
     if (ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap)) {
-      if (const auto made = ui_movies::ConstructMovie(base, movie)) {
+      if (const auto made = ui_movies::ConstructMovie(movie)) {
         return *made;
       }
     }
-    guest_call::InFrame(ctx, base, 112, construct_at, [&](uint32_t) {
+    guest_call::InFrame(ctx, 112, construct_at, [&](uint32_t) {
       ctx.r3.u64 = movie;
-      lifted::Enter(ctx, base, game::UiMovie::Ctor);  // UiMovie::UiMovie
+      lifted::Enter(ctx, game::UiMovie::Ctor);  // UiMovie::UiMovie
     });
     return ctx.r3.u32;
   };
-  calls.load = hooks::NativeArchiveLoad(base);
-  calls.render_object = [&ctx, base](int which) {
-    guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {
-      ctx.r3.u64 = schema::DataLoadGlobals::render_manager(base).address;
-      SlotCall(ctx, base, 8, which == 0 ? 0x822913AC : 0x822913D8);
-      SlotCall(ctx, base, which == 0 ? 1 : 2, which == 0 ? 0x822913BC : 0x822913E8);
+  calls.load = hooks::NativeArchiveLoad();
+  calls.render_object = [&ctx](int which) {
+    guest_call::InFrame(ctx, 112, 0, [&](uint32_t) {
+      ctx.r3.u64 = schema::DataLoadGlobals::render_manager().address;
+      SlotCall(ctx, 8, which == 0 ? 0x822913AC : 0x822913D8);
+      SlotCall(ctx, which == 0 ? 1 : 2, which == 0 ? 0x822913BC : 0x822913E8);
     });
     return ctx.r3.u32;
   };
@@ -174,16 +174,16 @@ dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint8_t* base, uint32_t construct_a
 
 }  // namespace
 
-void hooks::LoadingScreenLoadSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::LoadingScreenLoadSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
-  const int64_t r3 = dl::LoadingScreenLoad(base, [&](uint32_t id) -> int64_t {
+  const int64_t r3 = dl::LoadingScreenLoad([&](uint32_t id) -> int64_t {
     const uint32_t at = id == 22575 ? 0x82247BC8 : id == 22574 ? 0x82247BD0 : 0x82247BD8;
-    if (const auto serial = dl::LoadingScreenAddMovie(base, id, MovieCalls(ctx, base, 0x82247AD0))) {
+    if (const auto serial = dl::LoadingScreenAddMovie(id, MovieCalls(ctx, 0x82247AD0))) {
       return *serial;
     }
-    guest_call::InFrame(ctx, base, 96, at, [&](uint32_t) {
+    guest_call::InFrame(ctx, 96, at, [&](uint32_t) {
       ctx.r3.u64 = id;
-      lifted::original::c82247AA0(ctx, base);  // LoadingScreen::AddMovie
+      lifted::original::c82247AA0(ctx);  // LoadingScreen::AddMovie
     });
     return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
   });
@@ -191,18 +191,16 @@ void hooks::LoadingScreenLoadSteps(lifted::Regs& ctx, uint8_t* base) {
   hooks::SetArchiveSerial(ctx, r3);
 }
 
-void hooks::OtherMoviesLoadSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::OtherMoviesLoadSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
-  const dl::MovieCalls calls = MovieCalls(ctx, base, 0x822912D0);
-  const uint32_t r3 = dl::OtherMoviesLoad(
-      base,
-      [&](uint32_t id) -> int64_t {
-        if (const auto serial = dl::OtherMoviesAdd(base, id, calls)) {
+  const dl::MovieCalls calls = MovieCalls(ctx, 0x822912D0);
+  const uint32_t r3 = dl::OtherMoviesLoad([&](uint32_t id) -> int64_t {
+        if (const auto serial = dl::OtherMoviesAdd(id, calls)) {
           return *serial;
         }
-        guest_call::InFrame(ctx, base, 112, 0x82291350, [&](uint32_t) {
+        guest_call::InFrame(ctx, 112, 0x82291350, [&](uint32_t) {
           ctx.r3.u64 = id;
-          lifted::original::c822912A0(ctx, base);
+          lifted::original::c822912A0(ctx);
         });
         return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
       },
@@ -218,10 +216,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82247B98) {
     return;
   }
   if (!BootNative()) {
-    lifted::original::c82247B98(ctx, base);
+    lifted::original::c82247B98(ctx);
     return;
   }
-  hooks::LoadingScreenLoadSteps(ctx, base);
+  hooks::LoadingScreenLoadSteps(ctx);
 }
 
 // sub_82291328: no arguments; r3 the renderer.
@@ -231,10 +229,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82291328) {
     return;
   }
   if (!BootNative()) {
-    lifted::original::c82291328(ctx, base);
+    lifted::original::c82291328(ctx);
     return;
   }
-  hooks::OtherMoviesLoadSteps(ctx, base);
+  hooks::OtherMoviesLoadSteps(ctx);
 }
 
 namespace {
@@ -242,17 +240,17 @@ namespace {
 // The callees through their adapters, from a frame of `frame_bytes` as the
 // original's (its link register kept above it, as its prologue does).
 template <typename Body>
-void InBootFrame(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
+void InBootFrame(lifted::Regs& ctx, uint32_t frame_bytes, Body body) {
   const uint64_t lr = ctx.lr;
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  guest_call::InFrame(ctx, base, frame_bytes, 0, [&](uint32_t frame) {
+  guest::StoreU32(ctx.r1.u32 - 8, uint32_t(lr));
+  guest_call::InFrame(ctx, frame_bytes, 0, [&](uint32_t frame) {
     const dl::BootCall call = [&](uint32_t target, std::optional<uint32_t> r3,
                                   uint32_t return_address) {
       if (r3) {
         ctx.r3.u64 = *r3;
       }
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, target);
+      lifted::CallFromContext(ctx, target);
       return ctx.r3.u32;
     };
     body(frame, call);
@@ -262,18 +260,18 @@ void InBootFrame(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Body bo
 
 }  // namespace
 
-void hooks::CreateObjectsSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CreateObjectsSteps(lifted::Regs& ctx) {
   uint32_t r3 = 0;
-  InBootFrame(ctx, base, 96, [&](uint32_t, const dl::BootCall& call) {
-    r3 = dl::CreateObjects(base, call);
+  InBootFrame(ctx, 96, [&](uint32_t, const dl::BootCall& call) {
+    r3 = dl::CreateObjects(call);
   });
   ctx.r3.u64 = r3;
 }
 
-void hooks::BootDataLoadSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::BootDataLoadSteps(lifted::Regs& ctx) {
   std::optional<uint32_t> r3;
-  InBootFrame(ctx, base, 128, [&](uint32_t frame, const dl::BootCall& call) {
-    r3 = dl::BootDataLoad(base, frame, call);
+  InBootFrame(ctx, 128, [&](uint32_t frame, const dl::BootCall& call) {
+    r3 = dl::BootDataLoad(frame, call);
   });
   if (r3) {
     ctx.r3.u64 = *r3;
@@ -287,10 +285,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82105868) {
     return;
   }
   if (!BootNative()) {
-    lifted::original::c82105868(ctx, base);
+    lifted::original::c82105868(ctx);
     return;
   }
-  hooks::CreateObjectsSteps(ctx, base);
+  hooks::CreateObjectsSteps(ctx);
 }
 
 // BootData::Load: r3 not read; r3 as the original leaves it.
@@ -300,8 +298,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82106618) {
     return;
   }
   if (!BootNative()) {
-    lifted::original::c82106618(ctx, base);
+    lifted::original::c82106618(ctx);
     return;
   }
-  hooks::BootDataLoadSteps(ctx, base);
+  hooks::BootDataLoadSteps(ctx);
 }

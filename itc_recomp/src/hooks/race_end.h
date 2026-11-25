@@ -11,7 +11,7 @@
 
 namespace hooks {
 
-void RaceModeModeAfterRace(lifted::Regs& ctx, uint8_t* base);  // sub_82150E00
-void RaceModeNextMode(lifted::Regs& ctx, uint8_t* base);       // sub_82151EF0
+void RaceModeModeAfterRace(lifted::Regs& ctx);  // sub_82150E00
+void RaceModeNextMode(lifted::Regs& ctx);       // sub_82151EF0
 
 }  // namespace hooks

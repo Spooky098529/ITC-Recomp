@@ -41,21 +41,21 @@ namespace dsh = graphics::device_shaders;
 namespace {
 
 // Release and memcpy through the guest, with the original's return addresses.
-dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
+dsh::ShaderCalls Calls(lifted::Regs& ctx, uint32_t release_at) {
   dsh::ShaderCalls calls;
-  calls.release = [&ctx, base, release_at](uint32_t resource) {
+  calls.release = [&ctx, release_at](uint32_t resource) {
     ctx.r3.u64 = resource;
     ctx.lr = release_at;
-    lifted::Enter(ctx, base, game::Resource::Release);
+    lifted::Enter(ctx, game::Resource::Release);
     return ctx.r3.u32;
   };
-  calls.memcpy = [&ctx, base](uint32_t destination, uint32_t source, uint32_t size,
+  calls.memcpy = [&ctx](uint32_t destination, uint32_t source, uint32_t size,
                               uint32_t at) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     ctx.lr = at;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
   };
   return calls;
 }
@@ -64,14 +64,14 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
 // (the wrapper as it was), for the entry's fallback.
 ITC_REGS_STEP(RecompiledSetVertexShader) {
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::original::c822A8808(ctx, base);
+    lifted::original::c822A8808(ctx);
     return;
   }
   const uint32_t shader = ctx.r4.u32;
-  const bool same = shader && shader == schema::Device(base, ctx.r3.u32).vertex_shader();
+  const bool same = shader && shader == schema::Device(ctx.r3.u32).vertex_shader();
   refcount::NoteSetVertexShader(same);
   if (same) refcount::SetUnchangedShader(shader);
-  lifted::original::c822A8808(ctx, base);
+  lifted::original::c822A8808(ctx);
   refcount::SetUnchangedShader(0);
 }
 
@@ -81,21 +81,21 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8958) {
   
   if (!ITC_FLAG(native_device_shaders)) {
     // The original's store, then its tail call with refcount.cpp's skip.
-    schema::Device(base, ctx.r3.u32).set_entry_vertex_shader(ctx.r4.u32);
-    RecompiledSetVertexShader(ctx, base);
+    schema::Device(ctx.r3.u32).set_entry_vertex_shader(ctx.r4.u32);
+    RecompiledSetVertexShader(ctx);
     return;
   }
-  const dsh::ShaderCalls calls = Calls(ctx, base, 0x822A883C);
-  ctx.r3.u64 = dsh::SetVertexShaderEntry(base, ctx.r3.u32, ctx.r4.u32, calls);
+  const dsh::ShaderCalls calls = Calls(ctx, 0x822A883C);
+  ctx.r3.u64 = dsh::SetVertexShaderEntry(ctx.r3.u32, ctx.r4.u32, calls);
 }
 
 ITC_NATIVE_ENTRY(822A8618, ITC_FLAG(native_device_shaders)) {
-  const dsh::ShaderCalls calls = Calls(ctx, base, 0);
-  ctx.r3.u64 = dsh::SetPixelShader(base, ctx.r3.u32, ctx.r4.u32, calls);
+  const dsh::ShaderCalls calls = Calls(ctx, 0);
+  ctx.r3.u64 = dsh::SetPixelShader(ctx.r3.u32, ctx.r4.u32, calls);
 }
 
 ITC_NATIVE_ENTRY(822A8960, ITC_FLAG(native_device_shaders)) {
-  dsh::SetVertexDeclaration(base, ctx.r3.u32, ctx.r4.u32);  // r3: the device, as given
+  dsh::SetVertexDeclaration(ctx.r3.u32, ctx.r4.u32);  // r3: the device, as given
 }
 
 // r3: the queue, as given (the original returns it).
@@ -103,9 +103,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825915E0) {
   
   if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
-    if (dsh::RenderQueueConstruct(base, ctx.r3.u32)) {
+    if (dsh::RenderQueueConstruct(ctx.r3.u32)) {
       return;
     }
   }
-  lifted::original::c825915E0(ctx, base);
+  lifted::original::c825915E0(ctx);
 }

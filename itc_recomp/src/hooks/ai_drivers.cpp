@@ -208,7 +208,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213D9D8, sub_8213F4B0, sub_8213E970, sub_8213DC08, sub_8213D020, sub_8213CFC8, "
               "sub_82145CA8, sub_8213E690");
 
-// Defines an adapter: `body` uses `ctx` and `base`.
+// Defines an adapter: `body` uses `ctx`.
 #define ITC_AI_DRIVERS(address, body)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ai_drivers)) { \
     ctx.fpscr.disableFlushMode();       \
@@ -223,13 +223,13 @@ hooks::AiStandIn hooks::g_update_all_stand_in = nullptr;
 
 // --- Set-up and clears (r3 kept) ---
 
-ITC_AI_DRIVERS(82139728, ctx.r3.u64 = Of(base, ctx.r3.u32))
-ITC_AI_DRIVERS(820C96E8, ClearCarInput(base, ctx.r3.u32))
+ITC_AI_DRIVERS(82139728, ctx.r3.u64 = Of(ctx.r3.u32))
+ITC_AI_DRIVERS(820C96E8, ClearCarInput(ctx.r3.u32))
 
 // --- Small reads and steps ---
 
 ITC_AI_DRIVERS(82101760, ctx.r3.u64 = TimeFromTicks(ctx.r3.u32))
-ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
+ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(ctx.r3.u32))
 
 // --- Set-up, modes and the plan ---
 
@@ -239,11 +239,11 @@ ITC_AI_DRIVERS(82144F50, ctx.r3.u64 = ReadCar(base, ctx.r3.u32))
 // call their plain C++.
 // The path's +5532 in mode 1 (no direct callers): r3 not read, r4 = the
 // entry, r5 = the position, r6 = &the lane, r7 = the masks or 0.
-ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+ITC_AI_DRIVERS(8213B428, ctx.r3.u64 = NormalizeByLane(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                                       ctx.r7.u32))
 // The original's frame 128 bytes down; r3 left at its clamped position
 // (ClampPosition's out), as the original leaves it.
-ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
+ITC_AI_DRIVERS(82144EF8, UpdateLane(ctx.r3.u32, ctx.r1.u32 - 128);
                ctx.r3.u64 = ctx.r1.u32 - 128 + 80)
 
 // --- Starts and resets ---
@@ -255,23 +255,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8213ADF8) {
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     uint32_t result = 0;
-    if (AllSettled(base, ctx.r1.u32 - 6320, &result)) {
+    if (AllSettled(ctx.r1.u32 - 6320, &result)) {
       ctx.r3.u64 = result;
       return;
     }
   }
-  lifted::original::c8213ADF8(ctx, base);
+  lifted::original::c8213ADF8(ctx);
 }
 
 // --- Resets, steering input and the path's lists ---
 
-ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(base, ctx.r3.u32))
+ITC_AI_DRIVERS(8213AAA8, ctx.r3.u64 = ResetDriver(ctx.r3.u32))
 
 // --- The states and the drivers' resets (the originals' frames: 112 or 128
 // bytes down) ---
 
-ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(base, ctx.r1.u32 - 128))
-ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
+ITC_AI_DRIVERS(82139750, ctx.r3.u64 = ResetAll(ctx.r1.u32 - 128))
+ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(ctx.r1.u32 - 128))
 
 
 // --- The drivers' table and the path's lines and ranges ---
@@ -282,12 +282,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8213B1E0) {
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     uint64_t r3 = 0;
-    if (Create(base, &r3)) {
+    if (Create(&r3)) {
       ctx.r3.u64 = r3;
       return;
     }
   }
-  lifted::original::c8213B1E0(ctx, base);
+  lifted::original::c8213B1E0(ctx);
 }
 
 // The original where the table can't be freed natively.
@@ -295,19 +295,19 @@ ITC_NATIVE_ENTRY_ALWAYS(8213B2B8) {
   
   if (ITC_FLAG(native_ai_drivers)) {
     uint64_t r3 = ctx.r3.u64;
-    if (Destroy(base, &r3)) {
+    if (Destroy(&r3)) {
       ctx.r3.u64 = r3;
       return;
     }
   }
-  lifted::original::c8213B2B8(ctx, base);
+  lifted::original::c8213B2B8(ctx);
 }
 
 // --- The path's offsets, narrowing and branches ---
 
 // The path's +5532 in mode 0 (no direct callers): r4 = the entry, r5 = the
 // position, r6 = &the lane, r7 = the masks or 0.
-ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r6.u32, ctx.r7.u32))
 
 // --- The skill's timed triggers (f1 the last trigger's value of kinds 6 and
@@ -317,7 +317,7 @@ ITC_AI_DRIVERS(8213C908, ctx.r3.u64 = NormalizeByBranch(base, ctx.r3.u32, ctx.r4
 ITC_AI_DRIVERS(8213FCF8, {
   double f1 = 0;
   bool f1_set = false;
-  ctx.r3.u64 = UpdateSkill(base, ctx.r3.u32, ctx.r4.u32, &f1, &f1_set);
+  ctx.r3.u64 = UpdateSkill(ctx.r3.u32, ctx.r4.u32, &f1, &f1_set);
   if (f1_set) {
     ctx.f1.f64 = f1;
   }
@@ -327,24 +327,22 @@ ITC_AI_DRIVERS(8213FCF8, {
 
 // r3 = &the kind; the list's address sign-extended, as the original's lis
 // leaves it.
-ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(base, ctx.r3.u32)))
+ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(ctx.r3.u32)))
 
 // --- The drivers' updates and the pairs ---
 
 namespace {
 struct UpdateCall {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 // A driver's update (its +6148), called from a frame like UpdateAll's (176
 // bytes, returning to 0x82139684) with r3 = the driver, as the original.
 uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
   auto& call = *static_cast<UpdateCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
-  guest_call::InFrame(ctx, base, 176, 0x82139684, [&](uint32_t) {
+  guest_call::InFrame(ctx, 176, 0x82139684, [&](uint32_t) {
     ctx.r3.u64 = driver;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
   });
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -353,44 +351,42 @@ uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
 
 // The updates are recompiled code (through the driver's +6148); the
 // original's frame 176 bytes down.
-void hooks::AiUpdateAll(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AiUpdateAll(lifted::Regs& ctx) {
   if (g_update_all_stand_in != nullptr) {
-    lifted::Sdk(ctx, base, g_update_all_stand_in);
+    lifted::Sdk(ctx, g_update_all_stand_in);
     return;
   }
   if (!ITC_FLAG(native_ai_drivers)) {
-    lifted::original::c82139628(ctx, base);
+    lifted::original::c82139628(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   UpdateCall call;
   call.ctx = &ctx;
-  call.base = base;
-  ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
+  ctx.r3.u64 = UpdateAll(ctx.r1.u32 - 176, CallDriverUpdate, &call);
 }
 ITC_NATIVE_ENTRY_ALWAYS(82139628) {
   
-  hooks::AiUpdateAll(ctx, base);
+  hooks::AiUpdateAll(ctx);
 }
 
 // --- The drivers' starts (the originals' frames: 160 and 224 bytes down) ---
 
-ITC_AI_DRIVERS(8213A000, ctx.r3.u64 = StartGroup(base, ctx.r1.u32 - 160))
-ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(base, ctx.r1.u32 - 224))
+ITC_AI_DRIVERS(8213A000, ctx.r3.u64 = StartGroup(ctx.r1.u32 - 160))
+ITC_AI_DRIVERS(8213A8B0, ctx.r3.u64 = StartRanked(ctx.r1.u32 - 224))
 
 // --- Reading the vehicle (r3 UpdateAgainstPlayer's, as the originals leave
 // it) ---
 
 // r4 = the slice record or 0.
-ITC_AI_DRIVERS(821467F0, ctx.r3.u64 = ReadVehicle(base, ctx.r3.u32, ctx.r4.u32))
-ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
+ITC_AI_DRIVERS(821467F0, ctx.r3.u64 = ReadVehicle(ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(ctx.r3.u32))
 
 // --- The path's update ---
 
 namespace {
 struct PathCall {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 // The path's normalizer when it's neither of the native ones (never in the
 // game: AiPath::SetMode sets only those), called from Extend's frame (its
@@ -399,9 +395,8 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
                         uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks) {
   auto& call = *static_cast<PathCall*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
-  guest::StoreU32(base, frame, frame + 208);
+  guest::StoreU32(frame, frame + 208);
   ctx.r1.u64 = frame;
   ctx.lr = 0x8213EEDC;
   ctx.r3.u64 = path;
@@ -409,7 +404,7 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
   ctx.r5.u64 = position;
   ctx.r6.u64 = lane;
   ctx.r7.u64 = masks;
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = saved;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -420,50 +415,50 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
 
 // r3 = the car's input record (left in r3), r4 = the racer's index, r5 = the
 // flag; the original's frame 144 bytes down.
-void hooks::AiDriveCar(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AiDriveCar(lifted::Regs& ctx) {
   if (g_drive_car_stand_in != nullptr) {
-    lifted::Sdk(ctx, base, g_drive_car_stand_in);
+    lifted::Sdk(ctx, g_drive_car_stand_in);
     return;
   }
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
-    PathCall call{&ctx, base};
+    PathCall call{&ctx};
     const PathCalls calls{&call, CallNormalizer};
     uint64_t r3 = 0;
     double f1 = 0;
     const uint64_t input = ctx.r3.u64;
-    if (DriveCar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 144, calls, &r3, &f1)) {
+    if (DriveCar(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 144, calls, &r3, &f1)) {
       ctx.r3.u64 = input;
       ctx.f1.f64 = f1;
       return;
     }
   }
-  lifted::original::c8215F678(ctx, base);
+  lifted::original::c8215F678(ctx);
 }
 ITC_NATIVE_ENTRY_ALWAYS(8215F678) {
   
-  hooks::AiDriveCar(ctx, base);
+  hooks::AiDriveCar(ctx);
 }
 // The original's frame 96 bytes down.
-void hooks::AiUpdateIdle(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AiUpdateIdle(lifted::Regs& ctx) {
   if (g_update_idle_stand_in != nullptr) {
-    lifted::Sdk(ctx, base, g_update_idle_stand_in);
+    lifted::Sdk(ctx, g_update_idle_stand_in);
     return;
   }
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
-    PathCall call{&ctx, base};
+    PathCall call{&ctx};
     const PathCalls calls{&call, CallNormalizer};
     bool done = false;
-    const uint64_t r3 = UpdateIdle(base, ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
+    const uint64_t r3 = UpdateIdle(ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
     if (done) {
       ctx.r3.u64 = r3;
       return;
     }
   }
-  lifted::original::c821399A8(ctx, base);
+  lifted::original::c821399A8(ctx);
 }
 ITC_NATIVE_ENTRY_ALWAYS(821399A8) {
   
-  hooks::AiUpdateIdle(ctx, base);
+  hooks::AiUpdateIdle(ctx);
 }

@@ -55,7 +55,7 @@ namespace t10 = type10_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -66,7 +66,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -81,13 +80,12 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
@@ -96,16 +94,16 @@ class GuestCalls {
 bool Type10ModeNative() { return ITC_FLAG(native_type10_mode); }
 
 ITC_REGS_STEP(ModeType10Init) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::ModeInit(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE10_DELEGATE(name)                                      \
-  void ModeType10##name(lifted::Regs& ctx, uint8_t* base) {                   \
+  void ModeType10##name(lifted::Regs& ctx) {                   \
     const uint64_t answer = ctx.r3.u64;                                     \
     {                                                                       \
-      GuestCalls guest(ctx, base);                                          \
-      t10::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());   \
+      GuestCalls guest(ctx);                                          \
+      t10::name(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());   \
     }                                                                       \
     ctx.r3.u64 = answer;                                                    \
   }
@@ -116,16 +114,16 @@ ITC_MODE_TYPE10_DELEGATE(WaitForShown)
 ITC_MODE_TYPE10_DELEGATE(Leaving)
 #undef ITC_MODE_TYPE10_DELEGATE
 ITC_REGS_STEP(ModeType10NextModeAnswer) {
-  t10::NextModeAnswer(base, ctx.r3.u32, ctx.r4.u32);
+  t10::NextModeAnswer(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(ModeType10Interrupt) {
-  ctx.r3.u64 = t10::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t10::Interrupt(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(ModeType10ForceExit) {
-  t10::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  t10::ForceExit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-ITC_REGS_STEP(ModeType10Resume) { t10::Resume(base, ctx.r3.u32); }
-ITC_REGS_STEP(ModeType10FindShown) { t10::FindShown(base, ctx.r3.u32); }
+ITC_REGS_STEP(ModeType10Resume) { t10::Resume(ctx.r3.u32); }
+ITC_REGS_STEP(ModeType10FindShown) { t10::FindShown(ctx.r3.u32); }
 ITC_REGS_STEP(ReplayTheaterInitStates) {
   // StateMachine::Add's r3: a new transition's address from the machine's
   // 64-bit r3, as the title screen's Inits.
@@ -133,90 +131,90 @@ ITC_REGS_STEP(ReplayTheaterInitStates) {
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
   const uint32_t r3 =
-      t10::InitStates(base, machine, ctx.r1.u32 - t10::kInitStatesFrame, &replaced);
+      t10::InitStates(machine, ctx.r1.u32 - t10::kInitStatesFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
-ITC_REGS_STEP(ReplayTheaterOnList) { ctx.r3.u64 = t10::OnList(base); }
+ITC_REGS_STEP(ReplayTheaterOnList) { ctx.r3.u64 = t10::OnList(); }
 
 ITC_REGS_STEP(ReplayTheaterCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Create(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = t10::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterWaitForMovie) {
-  ctx.r3.u64 = t10::WaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t10::WaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(ReplayTheaterStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Start(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Start(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterStartPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::StartPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::StartPage(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Draw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Update(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Update(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterOnDone) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::OnDone(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::OnDone(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void ReplayTheaterOnFailed(lifted::Regs&, uint8_t* base) { t10::OnFailed(base); }
+void ReplayTheaterOnFailed(lifted::Regs&) { t10::OnFailed(); }
 ITC_REGS_STEP(ReplayTheaterOnRetry) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::OnRetry(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::OnRetry(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void ReplayTheaterOnBack(lifted::Regs&, uint8_t* base) { t10::OnBack(base); }
-void ReplayTheaterOnInterrupt(lifted::Regs&, uint8_t* base) { t10::OnInterrupt(base); }
-void ReplayTheaterOnResume(lifted::Regs&, uint8_t* base) { t10::OnResume(base); }
+void ReplayTheaterOnBack(lifted::Regs&) { t10::OnBack(); }
+void ReplayTheaterOnInterrupt(lifted::Regs&) { t10::OnInterrupt(); }
+void ReplayTheaterOnResume(lifted::Regs&) { t10::OnResume(); }
 ITC_REGS_STEP(ReplayTheaterUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Unload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterWait) {
-  t10::Wait(base, ctx.r3.u32, ctx.r4.u32);
+  t10::Wait(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(ReplayTheaterLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Leave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Leave(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::Destroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(ReplayTheaterListPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::ListPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::ListPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-ITC_REGS_STEP(ReplayTheaterAskList) { t10::AskList(base, ctx.r3.u32); }
-ITC_REGS_STEP(ReplayTheaterAskLoad) { t10::AskLoad(base, ctx.r3.u32); }
+ITC_REGS_STEP(ReplayTheaterAskList) { t10::AskList(ctx.r3.u32); }
+ITC_REGS_STEP(ReplayTheaterAskLoad) { t10::AskLoad(ctx.r3.u32); }
 ITC_REGS_STEP(ReplayTheaterLeavePage) {
-  t10::LeavePage(base, ctx.r3.u32);
+  t10::LeavePage(ctx.r3.u32);
 }
 ITC_REGS_STEP(ReplayTheaterWaitPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::WaitPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::WaitPage(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterSetPrompts) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const uint32_t a[3] = {ctx.r3.u32, ctx.r5.u32, ctx.r7.u32};
   const uint32_t b[3] = {ctx.r4.u32, ctx.r6.u32, ctx.r8.u32};
-  ctx.r3.u64 = t10::SetPrompts(base, a, b, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = t10::SetPrompts(a, b, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_REPLAY_THEATER_TRANSITION(name)                                         \
-  void ReplayTheater##name(lifted::Regs& ctx, uint8_t* base) {                        \
-    GuestCalls guest(ctx, base);                                                    \
-    ctx.r3.u64 = t10::name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());            \
+  void ReplayTheater##name(lifted::Regs& ctx) {                        \
+    GuestCalls guest(ctx);                                                    \
+    ctx.r3.u64 = t10::name(ctx.r3.u32, ctx.r1.u32, guest.calls());            \
   }
 ITC_REPLAY_THEATER_TRANSITION(Intro)
 ITC_REPLAY_THEATER_TRANSITION(FadeOut)
@@ -228,19 +226,19 @@ ITC_REPLAY_THEATER_TRANSITION(PickReplay)
 ITC_REPLAY_THEATER_TRANSITION(ShowRecord)
 #undef ITC_REPLAY_THEATER_TRANSITION
 ITC_REGS_STEP(ReplayTheaterBuildList) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::BuildList(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::BuildList(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(ReplayTheaterShowListPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t10::ShowListPage(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t10::ShowListPage(ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
 
 #define ITC_TYPE10_MODE(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type10_mode)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // The mode: Init (vtable 0x82006CF0's slot 0, from Modes::Tick), the

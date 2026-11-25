@@ -55,24 +55,24 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
 using namespace mode_tick;
 
 // Billboards::FlipRing: no arguments.
-ITC_MODE_TICK(8209BD18, BillboardsFlipRing(base))
+ITC_MODE_TICK(8209BD18, BillboardsFlipRing())
 
 // ScreenFades::Init: no arguments.
-ITC_MODE_TICK(8209CDE8, if (hooks::StartUpRecorded(ctx, 0x8209CDE8)) return; ScreenFadesInit(base))
+ITC_MODE_TICK(8209CDE8, if (hooks::StartUpRecorded(ctx, 0x8209CDE8)) return; ScreenFadesInit())
 
 // ScreenFades::FadeIn and FadeOut: r3 = the passes, r4, r5, r6 = the color,
 // r7 = the layer (r3 left).
-ITC_MODE_TICK(8209D038, ScreenFadesFadeIn(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_MODE_TICK(8209D038, ScreenFadesFadeIn(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                           ctx.r6.u32, ctx.r7.u32))
-ITC_MODE_TICK(8209D0C8, ScreenFadesFadeOut(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_MODE_TICK(8209D0C8, ScreenFadesFadeOut(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                            ctx.r6.u32, ctx.r7.u32))
 
 // Players::SignedInSlot: r3 = a player; r3 = the slot or -1 (sign-extended,
 // as the original's li).
-ITC_MODE_TICK(8209F658, ctx.r3.s64 = PlayersSignedInSlot(base, ctx.r3.u32))
+ITC_MODE_TICK(8209F658, ctx.r3.s64 = PlayersSignedInSlot(ctx.r3.u32))
 
 // ActionMappers::SetBlocked: r3 = the value (left).
-ITC_MODE_TICK(8209F318, ActionMappersSetBlocked(base, ctx.r3.u32))
+ITC_MODE_TICK(8209F318, ActionMappersSetBlocked(ctx.r3.u32))
 
 // Modes::SetChecks: r3 = the holder (not read), r4 = the type; r3 left, but
 // for type 1, Stages::Copy's out (the frame's +80, from the original's r1,
@@ -81,8 +81,8 @@ ITC_MODE_TICK(8209F318, ActionMappersSetBlocked(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY_ALWAYS(82106868) {
   
   const uint32_t frame = ctx.r1.u32 - kSetChecksFrame;
-  if (!ITC_FLAG(native_mode_tick) || !ModesSetChecks(base, ctx.r4.u32, frame)) {
-    lifted::original::c82106868(ctx, base);
+  if (!ITC_FLAG(native_mode_tick) || !ModesSetChecks(ctx.r4.u32, frame)) {
+    lifted::original::c82106868(ctx);
     return;
   }
   if (ctx.r4.s32 == 1) {
@@ -92,11 +92,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82106868) {
 
 // Modes::SetSceneTargetMode: r3 = the holder (not read), r4 = the type (r3
 // left).
-ITC_MODE_TICK(82106740, ModesSetSceneTargetMode(base, ctx.r4.u32))
+ITC_MODE_TICK(82106740, ModesSetSceneTargetMode(ctx.r4.u32))
 
 // Presence::SetForMode: r3 = the type; r3 = 0 where the original's last
 // XUserSetContextEx call answers it, else left.
-ITC_MODE_TICK(822934B8, if (PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) ctx.r3.u64 = 0)
+ITC_MODE_TICK(822934B8, if (PresenceSetForMode(ctx.r13.u32, ctx.r3.u32)) ctx.r3.u64 = 0)
 
 // SignInWatch::Update: r3 = 0x826C5B9C, r4 = the mode (both only for the
 // prompts' handlers); r3 = the last name's address as wcscpy and memset
@@ -105,8 +105,8 @@ ITC_MODE_TICK(822934B8, if (PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) c
 ITC_NATIVE_ENTRY_ALWAYS(8209EEC8) {
   
   if (!ITC_FLAG(native_mode_tick) ||
-      !SignInWatchUpdate(base, ctx.r1.u32 - kSignInWatchUpdateFrame)) {
-    lifted::original::c8209EEC8(ctx, base);
+      !SignInWatchUpdate(ctx.r1.u32 - kSignInWatchUpdateFrame)) {
+    lifted::original::c8209EEC8(ctx);
     return;
   }
   ctx.r3.s64 = int32_t(schema::ModeTickGlobals::last_name_address());
@@ -125,25 +125,25 @@ namespace {
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // (The render manager's slot 8 by its plain C++ where it's the game's,
 // hooks::DirectSlotCall.)
-void VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
+void VtableCall(lifted::Regs& ctx, uint32_t slot, uint32_t return_address) {
   ctx.lr = return_address;
-  const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
-  if (!hooks::DirectSlotCall(ctx, base, function)) {
-    lifted::CallFromContext(ctx, base, function);
+  const uint32_t function = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 4 * slot);
+  if (!hooks::DirectSlotCall(ctx, function)) {
+    lifted::CallFromContext(ctx, function);
   }
 }
 
 // A chunk handed to the render queue `queue` (its slot 4, sub_8258EDC8 in
 // play, which adds it to the queue's entries: r4 = the chunk, r5 = the key,
 // f1 = the depth's float at `depth`).
-void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t key,
+void Submit(lifted::Regs& ctx, uint32_t queue, uint32_t chunk, uint32_t key,
             uint32_t depth, uint32_t return_address) {
   ctx.r3.u64 = queue;
   ctx.r4.u64 = chunk;
   ctx.r5.u64 = key;
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = double(guest::LoadFloat(base, depth));
-  VtableCall(ctx, base, 4, return_address);
+  ctx.f1.f64 = double(guest::LoadFloat(depth));
+  VtableCall(ctx, 4, return_address);
 }
 
 // ScreenFades::RecordScissor (r3 = the key, f1 = -10,000.0, not read) from
@@ -151,32 +151,32 @@ void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, ui
 // queue (four getters), then the two chunks natively, each handed on; where
 // they wouldn't fit, the original (whose getters are then called again,
 // never seen in play).
-void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
+void RecordScissor(lifted::Regs& ctx, uint32_t key) {
   bool fit = false;
-  guest_call::InFrame(ctx, base, 160, 0x8209CE90, [&](uint32_t) {
-    ctx.r3.u64 = schema::ModeTickGlobals::app_interface(base);
-    VtableCall(ctx, base, 8, 0x8209CE90);
-    VtableCall(ctx, base, 1, 0x8209CEA0);
+  guest_call::InFrame(ctx, 160, 0x8209CE90, [&](uint32_t) {
+    ctx.r3.u64 = schema::ModeTickGlobals::app_interface();
+    VtableCall(ctx, 8, 0x8209CE90);
+    VtableCall(ctx, 1, 0x8209CEA0);
     const uint32_t list = ctx.r3.u32;
-    ctx.r3.u64 = schema::ModeTickGlobals::app_interface(base);
-    VtableCall(ctx, base, 8, 0x8209CEBC);
-    VtableCall(ctx, base, 2, 0x8209CECC);
+    ctx.r3.u64 = schema::ModeTickGlobals::app_interface();
+    VtableCall(ctx, 8, 0x8209CEBC);
+    VtableCall(ctx, 2, 0x8209CECC);
     const uint32_t queue = ctx.r3.u32;
-    if (!mode_tick::ScissorChunksFit(base, list)) {
+    if (!mode_tick::ScissorChunksFit(list)) {
       return;
     }
     fit = true;
-    Submit(ctx, base, queue, mode_tick::RecordScissorChunk(base, list), key,
+    Submit(ctx, queue, mode_tick::RecordScissorChunk(list), key,
            schema::ModeTickGlobals::scissor_depth_0_address(), 0x8209CF90);
-    Submit(ctx, base, queue, mode_tick::RecordScissorEndChunk(base, list), key,
+    Submit(ctx, queue, mode_tick::RecordScissorEndChunk(list), key,
            schema::ModeTickGlobals::scissor_depth_1_address(), 0x8209D030);
   });
   if (!fit) {
     ctx.r3.u64 = key;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(schema::ModeTickGlobals::scissor_depth_0(base));
+    ctx.f1.f64 = double(schema::ModeTickGlobals::scissor_depth_0());
     ctx.lr = 0x8209D348;
-    lifted::original::c8209CE68(ctx, base);
+    lifted::original::c8209CE68(ctx);
   }
 }
 
@@ -184,18 +184,18 @@ void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
 // key) natively, its chunk handed to the render queue at [0x826D83D0] from a
 // 368-byte frame like the original's; where the plain C++ declines, the
 // original.
-void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t key) {
-  const auto chunk = mode_tick::ColorRectRecordFlat(base, rect);
+void RecordColorRect(lifted::Regs& ctx, uint32_t rect, uint32_t key) {
+  const auto chunk = mode_tick::ColorRectRecordFlat(rect);
   if (!chunk) {
     ctx.r3.u64 = rect;
     ctx.r4.u64 = schema::ModeTickGlobals::fade_camera_pass_address();
     ctx.r5.u64 = key;
     ctx.lr = 0x8209D35C;
-    lifted::original::c8217A370(ctx, base);
+    lifted::original::c8217A370(ctx);
     return;
   }
-  guest_call::InFrame(ctx, base, 368, 0x8217A74C, [&](uint32_t) {
-    Submit(ctx, base, schema::ModeTickGlobals::color_rect_queue(base), *chunk, key,
+  guest_call::InFrame(ctx, 368, 0x8217A74C, [&](uint32_t) {
+    Submit(ctx, schema::ModeTickGlobals::color_rect_queue(), *chunk, key,
            schema::ModeTickGlobals::float_zero_address(),
            0x8217A74C);
   });
@@ -203,18 +203,18 @@ void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t k
 
 }  // namespace
 
-void hooks::ModeTickScreenFadesUpdate(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ModeTickScreenFadesUpdate(lifted::Regs& ctx) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    lifted::original::c8209D130(ctx, base);
+    lifted::original::c8209D130(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, kScreenFadesUpdateFrame, 0x8209D348, [&](uint32_t frame) {
-    r3 = ScreenFadesUpdate(base, frame, [&](uint32_t key, uint32_t rect) {
-      RecordScissor(ctx, base, key);
-      RecordColorRect(ctx, base, rect, key + 1);
+  guest_call::InFrame(ctx, kScreenFadesUpdateFrame, 0x8209D348, [&](uint32_t frame) {
+    r3 = ScreenFadesUpdate(frame, [&](uint32_t key, uint32_t rect) {
+      RecordScissor(ctx, key);
+      RecordColorRect(ctx, rect, key + 1);
     });
   });
   ctx.lr = lr;
@@ -222,46 +222,46 @@ void hooks::ModeTickScreenFadesUpdate(lifted::Regs& ctx, uint8_t* base) {
 }
 
 // ScreenFades::Update: r3 not read; r3 = 1 while any count isn't 0, else 0.
-ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx, base))
+ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx))
 
 // Music::Play: r3, r5 = two pointers passed on, r4 = the music's name; r3 as
 // the call through [0x826C5C80]'s slot 4 leaves it, made from a 288-byte
 // frame like the original's (the ids its r7 and r8 point at in it).
-void hooks::ModesTickSteps(lifted::Regs& ctx, uint8_t* base) {
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {mode_tick::ModesTick(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+void hooks::ModesTickSteps(lifted::Regs& ctx) {
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    return {mode_tick::ModesTick(uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                  uint32_t(a.r[1])),
             a.f[0]};
   });
 }
 
-void hooks::ModeTickMusicPlay(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ModeTickMusicPlay(lifted::Regs& ctx) {
   const uint32_t name = ctx.r4.u32;
   const uint64_t a = ctx.r3.u64, name64 = ctx.r4.u64, b = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, kMusicPlayFrame, 0x82106538, [&](uint32_t frame) {
-    const MusicIds ids = MusicPlay(base, ctx.r13.u32, frame, name);
-    ctx.r3.u64 = schema::ModeTickGlobals::music_player(base);
+  guest_call::InFrame(ctx, kMusicPlayFrame, 0x82106538, [&](uint32_t frame) {
+    const MusicIds ids = MusicPlay(ctx.r13.u32, frame, name);
+    ctx.r3.u64 = schema::ModeTickGlobals::music_player();
     ctx.r4.u64 = a;
     ctx.r5.u64 = name64;
     ctx.r6.u64 = b;
     // The frame's addresses as the original's addi from r1 (InFrame's r1).
     ctx.r7.u64 = ctx.r1.u64 + (ids.r7 - frame);
     ctx.r8.u64 = ctx.r1.u64 + (ids.r8 - frame);
-    VtableCall(ctx, base, 4, 0x82106538);
+    VtableCall(ctx, 4, 0x82106538);
   });
   ctx.lr = lr;
 }
 
-ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx, base))
+ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx))
 
 // SignInWatch::StaticInit: no arguments; r3 = atexit's.
 ITC_NATIVE_ENTRY_ALWAYS(825D9518) {
   
   if (!ITC_FLAG(native_mode_tick) || !hooks::NativeAtexit()) {
-    lifted::original::c825D9518(ctx, base);
+    lifted::original::c825D9518(ctx);
     return;
   }
-  hooks::GuestAtexit guest{ctx, base};
-  ctx.r3.s64 = SignInWatchStaticInit(base, guest.Call());
+  hooks::GuestAtexit guest{ctx};
+  ctx.r3.s64 = SignInWatchStaticInit(guest.Call());
 }

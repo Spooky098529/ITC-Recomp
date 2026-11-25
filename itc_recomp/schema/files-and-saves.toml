@@ -41,6 +41,23 @@ fields = [
   { name = "get_size", offset = 20, type = "fn", note = "File::GetSize (sub_822B80D8), probably" },
 ]
 
+# XACT's global settings (TXR_XACT.xgs): read whole through the file class
+# (File::Read, src/hooks/file_class.cpp: guest::ForEachHostPart) by the
+# audio engine's start-up (sub_8259D1F0) into its operator new[]
+# (sub_825A6940, the file's size in r3), kept at the audio engine's +0
+# (sound-cues.toml's AudioEngine.settings) and handed to XACT's Initialize;
+# XACT's global settings read it by address (src/xact/xact.cpp,
+# SettingsGetBuffer). A blob (E5 step 5, 2026-11-24): in PC memory with the
+# file's bytes (lifted operator new[] returning at 0x8259D284); freed by the
+# audio engine's teardown (operator delete[] sub_825A71C0, returning at
+# 0x8259D39C; the game's free takes handles; not seen in play).
+[XactSettingsFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x8259D284, reg = "r3" }]
+fields = []
+
 # File::Read's and File::Write's r5: the size, passed by pointer.
 [FileSizeArg]
 measure = "File::Write.r5"

@@ -33,7 +33,7 @@ namespace {
 // put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -44,44 +44,42 @@ class GuestCalls {
                        uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
     ctx.r4.u64 = args[1];
     ctx.r5.u64 = args[2];
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
 ITC_REGS_STEP(TimeLessSteps) {
-  ctx.r3.u64 = achievements::TimeLess(schema::AchievementsPackedTime(base, ctx.r3.u32).packed(),
-                                      schema::AchievementsPackedTime(base, ctx.r4.u32).packed());
+  ctx.r3.u64 = achievements::TimeLess(schema::AchievementsPackedTime(ctx.r3.u32).packed(),
+                                      schema::AchievementsPackedTime(ctx.r4.u32).packed());
 }
 
 ITC_REGS_STEP(AchievementsCheckSteps) {
-  ctx.r3.u64 = achievements::Check(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = achievements::Check(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(WriteAchievementsSteps) {
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {achievements::WriteAchievements(base, uint32_t(a.r[0]), uint32_t(a.r[1]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    return {achievements::WriteAchievements(uint32_t(a.r[0]), uint32_t(a.r[1]),
                                             uint32_t(a.r[2])),
             a.f[0]};
   });
 }
 
 ITC_REGS_STEP(AchievementsWriteSteps) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = achievements::Write(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = achievements::Write(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
@@ -89,7 +87,7 @@ ITC_REGS_STEP(AchievementsWriteSteps) {
 // Defines an adapter: the flag, else the original.
 #define ITC_ACHIEVEMENTS(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_achievements)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
@@ -103,5 +101,5 @@ ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
 // (the user's call, 2026-11-16): the game reads nothing back, so the SDK's
 // import isn't reached and no unlock is recorded.
 ITC_NATIVE_ENTRY_ALWAYS(82294E58) {
-  hooks::WriteAchievementsSteps(ctx, base);
+  hooks::WriteAchievementsSteps(ctx);
 }

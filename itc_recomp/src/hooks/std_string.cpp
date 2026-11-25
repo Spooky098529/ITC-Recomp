@@ -55,11 +55,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82091328) {
   
   const uint32_t string = ctx.r3.u32;
   const bool built = (ctx.r4.u32 & 0xFF) != 0;
-  const schema::StdString s(base, string);
+  const schema::StdString s(string);
   const bool frees = built && s.capacity() >= kInPlace;
   const uint32_t block = s.block();
-  if (!NativeLifetime() || !Tidy(base, string, built, ctx.r5.u32)) {
-    lifted::original::c82091328(ctx, base);
+  if (!NativeLifetime() || !Tidy(string, built, ctx.r5.u32)) {
+    lifted::original::c82091328(ctx);
     return;
   }
   if (frees) {
@@ -72,8 +72,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82091328) {
 ITC_NATIVE_ENTRY_ALWAYS(82091720) {
   
   if (!NativeLifetime() ||
-      !AssignFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    lifted::original::c82091720(ctx, base);
+      !AssignFrom(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    lifted::original::c82091720(ctx);
   }
 }
 
@@ -81,8 +81,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82091720) {
 // count; r3 the string (left as it came).
 ITC_NATIVE_ENTRY_ALWAYS(82091808) {
   
-  if (!NativeLifetime() || !AssignText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c82091808(ctx, base);
+  if (!NativeLifetime() || !AssignText(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c82091808(ctx);
   }
 }
 
@@ -90,23 +90,23 @@ ITC_NATIVE_ENTRY_ALWAYS(82091808) {
 // count; r3 the string (left as it came).
 ITC_NATIVE_ENTRY_ALWAYS(820A6F60) {
   
-  if (!NativeLifetime() || !Append(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c820A6F60(ctx, base);
+  if (!NativeLifetime() || !Append(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c820A6F60(ctx);
   }
 }
 
 // string(): r3 = the string, returned (r4, the allocator, not read). It
 // neither allocates nor frees.
 ITC_NATIVE_ENTRY(825929E8, ITC_FLAG(native_std_string)) {
-  Construct(base, ctx.r3.u32);
+  Construct(ctx.r3.u32);
 }
 
 // string(const char*): r3 = the string, r4 = the text; r3 the string (left
 // as it came).
 ITC_NATIVE_ENTRY_ALWAYS(825931D0) {
   
-  if (!NativeLifetime() || !ConstructFromText(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c825931D0(ctx, base);
+  if (!NativeLifetime() || !ConstructFromText(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c825931D0(ctx);
   }
 }
 
@@ -114,8 +114,8 @@ ITC_NATIVE_ENTRY_ALWAYS(825931D0) {
 // the allocator, not read); r3 the string (left as it came).
 ITC_NATIVE_ENTRY_ALWAYS(82593248) {
   
-  if (!NativeLifetime() || !ConstructFromTextWithAllocator(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c82593248(ctx, base);
+  if (!NativeLifetime() || !ConstructFromTextWithAllocator(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c82593248(ctx);
   }
 }
 
@@ -125,8 +125,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82593248) {
 ITC_NATIVE_ENTRY_ALWAYS(82593040) {
   
   if (!NativeLifetime() ||
-      !ConstructFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    lifted::original::c82593040(ctx, base);
+      !ConstructFrom(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    lifted::original::c82593040(ctx);
   }
 }
 
@@ -137,12 +137,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82593040) {
 ITC_NATIVE_ENTRY_ALWAYS(82593088) {
   
   if (ITC_FLAG(native_std_string)) {
-    if (const auto text = ReplaceAll(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 144)) {
+    if (const auto text = ReplaceAll(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 144)) {
       ctx.r3.u64 = *text;
       return;
     }
   }
-  lifted::original::c82593088(ctx, base);
+  lifted::original::c82593088(ctx);
 }
 
 // The global strings' static set-ups: no arguments; r3 = atexit's.
@@ -150,13 +150,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82593088) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                   \
     \
     if (NativeLifetime() && hooks::NativeAtexit()) {                     \
-      hooks::GuestAtexit guest{ctx, base};                               \
-      if (const auto result = function(base, guest.Call())) {            \
+      hooks::GuestAtexit guest{ctx};                               \
+      if (const auto result = function(guest.Call())) {            \
         ctx.r3.s64 = *result;                                            \
         return;                                                          \
       }                                                                  \
     }                                                                    \
-    lifted::original::c##address(ctx, base);                        \
+    lifted::original::c##address(ctx);                        \
   }
 
 ITC_STD_STRING_STATIC_INIT(825DA540, InitGlobalString8265EE7C)

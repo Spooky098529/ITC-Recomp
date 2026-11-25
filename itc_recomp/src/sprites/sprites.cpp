@@ -20,22 +20,22 @@ using G = schema::SpritesGlobals;
 
 // The word an `lfs` then `stfs` of the 1.0 the game stores as w stores
 // (through a double, as the original's registers hold floats).
-uint32_t OneThroughDouble(uint8_t* base) {
-  float value = std::bit_cast<float>(G::one_word(base));
+uint32_t OneThroughDouble() {
+  float value = std::bit_cast<float>(G::one_word());
   volatile double through = value;
   return std::bit_cast<uint32_t>(float(through));
 }
 
 }  // namespace
 
-void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
-  const uint32_t w = OneThroughDouble(base);
+void ResetSprites(uint32_t sprite, uint32_t corners) {
+  const uint32_t w = OneThroughDouble();
   for (uint32_t row = 0; row < 4; row++) {
-    guest::StoreU32(base, sprite + 16 * row + 12, w);
+    guest::StoreU32(sprite + 16 * row + 12, w);
   }
   // A sprite list's head is laid out as a single sprite (race-overlays'
   // OverlaySprite) up to its corners.
-  const schema::OverlaySprite s(base, sprite);
+  const schema::OverlaySprite s(sprite);
   s.set_skip(0);
   s.set_blend_mode(0);
   s.set_address_mode(0);
@@ -45,11 +45,11 @@ void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
   for (uint32_t row = 0; row < 4; row++) {
     const uint32_t at = (sprite + 16 * row) & ~0xFu;
     for (uint32_t column = 0; column < 4; column++) {
-      guest::StoreU32(base, at + 4 * column, row == column ? kOneBits : 0);
+      guest::StoreU32(at + 4 * column, row == column ? kOneBits : 0);
     }
   }
   for (uint32_t i = 0; i < corners; i++) {
-    guest::StoreU32(base, s.corners_address() + 16 * i + 12, w);
+    guest::StoreU32(s.corners_address() + 16 * i + 12, w);
   }
 }
 
@@ -85,14 +85,14 @@ int32_t TurnSide(const float a[4], const float b[4], float zero) {
 namespace {
 
 // One command slot's words (+0, +4, +8), stored in the original's order.
-void Slot3(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
-  guest::StoreU32(base, slot + 0, w0);
-  guest::StoreU32(base, slot + 4, w1);
-  guest::StoreU32(base, slot + 8, w2);
+void Slot3(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
+  guest::StoreU32(slot + 0, w0);
+  guest::StoreU32(slot + 4, w1);
+  guest::StoreU32(slot + 8, w2);
 }
-void Slot2(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1) {
-  guest::StoreU32(base, slot + 0, w0);
-  guest::StoreU32(base, slot + 4, w1);
+void Slot2(uint32_t slot, uint32_t w0, uint32_t w1) {
+  guest::StoreU32(slot + 0, w0);
+  guest::StoreU32(slot + 4, w1);
 }
 
 // The slots a screen rectangle allocates, in order (the vertices' 6 last but
@@ -102,11 +102,11 @@ constexpr uint32_t kScreenRectAllocations[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 
 }  // namespace
 
-std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t rect) {
+std::optional<uint32_t> RecordScreenRect(uint32_t list, uint32_t rect) {
   // What the original's command list calls would print about: another chunk
   // open (OpenChunk), or the list full on any allocation.
-  const schema::CommandList cl(base, list);
-  if (cl.chunk_open() == 0 && schema::CommandListGlobals::open_chunks(base) != 0) {
+  const schema::CommandList cl(list);
+  if (cl.chunk_open() == 0 && schema::CommandListGlobals::open_chunks() != 0) {
     return std::nullopt;
   }
   {
@@ -119,68 +119,68 @@ std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t 
       }
     }
   }
-  command_list::OpenChunk(base, list);
-  auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
+  command_list::OpenChunk(list);
+  auto slot = [&] { return command_list::AllocateSlots(list, 1); };
 
   const uint32_t chunk = slot();
-  guest::StoreU16(base, chunk + 2, 5);
-  guest::StoreU32(base, chunk + 4, 0);
+  guest::StoreU16(chunk + 2, 5);
+  guest::StoreU32(chunk + 4, 0);
   uint32_t s = slot();
-  guest::StoreU32(base, s + 8, 0);
-  guest::StoreU32(base, s + 0, 4);
-  guest::StoreU32(base, s + 4, 1);
+  guest::StoreU32(s + 8, 0);
+  guest::StoreU32(s + 0, 4);
+  guest::StoreU32(s + 4, 1);
   s = slot();
-  guest::StoreU32(base, s + 0, 0);
-  guest::StoreU32(base, s + 4, guest::LoadU32(base, rect + 112));
-  Slot3(base, slot(), 1, 5, 0);
+  guest::StoreU32(s + 0, 0);
+  guest::StoreU32(s + 4, guest::LoadU32(rect + 112));
+  Slot3(slot(), 1, 5, 0);
   // The blend states: alpha blending on (+116) or off.
-  const bool blend = guest::LoadU32(base, rect + 116) != 0;
-  Slot2(base, slot(), 56, 6);
-  Slot2(base, slot(), 96, 0);
-  Slot2(base, slot(), 60, blend ? 1 : 0);
-  Slot2(base, slot(), 72, blend ? 6 : 1);
-  Slot2(base, slot(), 76, blend ? 7 : 0);
-  Slot3(base, slot(), 2, 2, 0);
-  Slot3(base, slot(), 0, 20, 1);
-  Slot3(base, slot(), 0, 16, 1);
-  Slot3(base, slot(), 13, 1, 0);
-  Slot3(base, slot(), 6, 1, 2);
-  Slot3(base, slot(), 5, 4, 0);
+  const bool blend = guest::LoadU32(rect + 116) != 0;
+  Slot2(slot(), 56, 6);
+  Slot2(slot(), 96, 0);
+  Slot2(slot(), 60, blend ? 1 : 0);
+  Slot2(slot(), 72, blend ? 6 : 1);
+  Slot2(slot(), 76, blend ? 7 : 0);
+  Slot3(slot(), 2, 2, 0);
+  Slot3(slot(), 0, 20, 1);
+  Slot3(slot(), 0, 16, 1);
+  Slot3(slot(), 13, 1, 0);
+  Slot3(slot(), 6, 1, 2);
+  Slot3(slot(), 5, 4, 0);
 
   // The quad: four 24-byte vertices (x, y, 1.0, white, u, v) at the
   // rectangle's corners, the integers converted to floats.
-  const uint32_t v = command_list::AllocateVertices(base, list, 4, false);
+  const uint32_t v = command_list::AllocateVertices(list, 4, false);
   // The floats go through registers (lfs, stfs) in the original, but the
   // translated code stores their words unchanged (a signaling NaN stays one,
   // seen in the harness), so they're copied as words.
-  const uint32_t one = G::one_word(base);
-  const int32_t x = int32_t(guest::LoadU32(base, rect + 80));
-  const int32_t y = int32_t(guest::LoadU32(base, rect + 84));
-  const int32_t width = int32_t(guest::LoadU32(base, rect + 88));
-  const int32_t height = int32_t(guest::LoadU32(base, rect + 92));
+  const uint32_t one = G::one_word();
+  const int32_t x = int32_t(guest::LoadU32(rect + 80));
+  const int32_t y = int32_t(guest::LoadU32(rect + 84));
+  const int32_t width = int32_t(guest::LoadU32(rect + 88));
+  const int32_t height = int32_t(guest::LoadU32(rect + 92));
   const uint32_t x0 = std::bit_cast<uint32_t>(float(x));
   const uint32_t y0 = std::bit_cast<uint32_t>(float(y));
   const uint32_t x1 = std::bit_cast<uint32_t>(float(int32_t(uint32_t(x) + uint32_t(width))));
   const uint32_t y1 = std::bit_cast<uint32_t>(float(int32_t(uint32_t(y) + uint32_t(height))));
-  const uint32_t u0 = guest::LoadU32(base, rect + 96);
-  const uint32_t v0 = guest::LoadU32(base, rect + 100);
-  const uint32_t u1 = guest::LoadU32(base, rect + 104);
-  const uint32_t v1 = guest::LoadU32(base, rect + 108);
+  const uint32_t u0 = guest::LoadU32(rect + 96);
+  const uint32_t v0 = guest::LoadU32(rect + 100);
+  const uint32_t u1 = guest::LoadU32(rect + 104);
+  const uint32_t v1 = guest::LoadU32(rect + 108);
   const uint32_t corners[4][4] = {{x0, y0, u0, v0}, {x1, y0, u1, v0}, {x0, y1, u0, v1},
                                   {x1, y1, u1, v1}};
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t at = v + 24 * i;
-    guest::StoreU32(base, at + 0, corners[i][0]);
-    guest::StoreU32(base, at + 4, corners[i][1]);
-    guest::StoreU32(base, at + 8, one);
-    guest::StoreU32(base, at + 12, 0xFFFFFFFF);
-    guest::StoreU32(base, at + 16, corners[i][2]);
-    guest::StoreU32(base, at + 20, corners[i][3]);
+    guest::StoreU32(at + 0, corners[i][0]);
+    guest::StoreU32(at + 4, corners[i][1]);
+    guest::StoreU32(at + 8, one);
+    guest::StoreU32(at + 12, 0xFFFFFFFF);
+    guest::StoreU32(at + 16, corners[i][2]);
+    guest::StoreU32(at + 20, corners[i][3]);
   }
-  Slot3(base, slot(), 15, 1, 0);
+  Slot3(slot(), 15, 1, 0);
   slot();  // allocated and left as it was, as the original does
-  Slot3(base, slot(), 36, 0, 0);
-  command_list::CloseChunk(base, list);
+  Slot3(slot(), 36, 0, 0);
+  command_list::CloseChunk(list);
   return chunk;
 }
 

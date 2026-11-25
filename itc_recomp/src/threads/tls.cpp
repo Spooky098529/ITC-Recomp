@@ -30,13 +30,13 @@ constexpr uint32_t kOutOfIndexes = 0xFFFFFFFF;
 std::mutex g_mutex;
 std::bitset<kSlotCount> g_used;
 
-uint32_t SlotAddress(uint8_t* base, const lifted::Args& args, uint32_t slot) {
-  const uint32_t thread = guest::LoadU32(base, uint32_t(args.r13) + kPcrCurrentThread);
-  return guest::LoadU32(base, thread + kThreadTlsAddress) + 4 * slot;
+uint32_t SlotAddress(const lifted::Args& args, uint32_t slot) {
+  const uint32_t thread = guest::LoadU32(uint32_t(args.r13) + kPcrCurrentThread);
+  return guest::LoadU32(thread + kThreadTlsAddress) + 4 * slot;
 }
 
 // KeTlsAlloc(): a free slot (0 in this thread), or kOutOfIndexes.
-lifted::Result TlsAlloc(uint8_t* base, const lifted::Args& args) {
+lifted::Result TlsAlloc(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTlsAlloc");
   uint32_t slot = kOutOfIndexes;
   {
@@ -52,13 +52,13 @@ lifted::Result TlsAlloc(uint8_t* base, const lifted::Args& args) {
   if (slot == kOutOfIndexes) {
     ITC_LOG_ERROR("threads: out of TLS slots");
   } else {
-    guest::StoreU32(base, SlotAddress(base, args, slot), 0);
+    guest::StoreU32(SlotAddress(args, slot), 0);
   }
   return {slot, 0.0};
 }
 
 // KeTlsFree(slot): 1, or 0 for kOutOfIndexes.
-lifted::Result TlsFree(uint8_t*, const lifted::Args& args) {
+lifted::Result TlsFree(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTlsFree");
   const uint32_t slot = uint32_t(args.r[0]);
   if (slot == kOutOfIndexes) {
@@ -72,15 +72,15 @@ lifted::Result TlsFree(uint8_t*, const lifted::Args& args) {
 }
 
 // KeTlsGetValue(slot).
-lifted::Result TlsGetValue(uint8_t* base, const lifted::Args& args) {
+lifted::Result TlsGetValue(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTlsGetValue");
-  return {guest::LoadU32(base, SlotAddress(base, args, uint32_t(args.r[0]))), 0.0};
+  return {guest::LoadU32(SlotAddress(args, uint32_t(args.r[0]))), 0.0};
 }
 
 // KeTlsSetValue(slot, value): 1.
-lifted::Result TlsSetValue(uint8_t* base, const lifted::Args& args) {
+lifted::Result TlsSetValue(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTlsSetValue");
-  guest::StoreU32(base, SlotAddress(base, args, uint32_t(args.r[0])), uint32_t(args.r[1]));
+  guest::StoreU32(SlotAddress(args, uint32_t(args.r[0])), uint32_t(args.r[1]));
   return {1, 0.0};
 }
 

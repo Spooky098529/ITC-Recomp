@@ -57,30 +57,30 @@ constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 // PostLeave (3), sub_82247008 PostClosing (20): the message (id, 0, 0)
 // posted on the mode's ring (+204: its count +600, start +604, 50 slots of
 // 12 bytes). Leaves.
-void Post(uint8_t* base, uint32_t mode, uint32_t id);
+void Post(uint32_t mode, uint32_t id);
 // The slot at `slot`'s address posting its message.
-void SlotPost(uint8_t* base, uint32_t mode, uint32_t slot);
+void SlotPost(uint32_t mode, uint32_t slot);
 
 // --- The machine's handlers (handlers.cpp; r3 the member) ---
 //
 // sub_82250778 OnEnter: the three blocks VirtualAlloc'ed with their first
 // words, state 1 or 9, the shown word 0. The last VirtualAlloc's r3.
 // 112-byte frame.
-uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls);
+uint64_t OnEnter(uint32_t member, uint32_t sp, const Calls& calls);
 // sub_82250D70 WaitForLoad: movie 9 loaded, then the data's +0 = 1 and state
 // 9. IsLoaded's r3 when called, else `r3`. 96-byte frame.
-uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t WaitForLoad(uint64_t r3, uint32_t sp);
 // sub_82250338 Shown: the shown word 0. A leaf.
-void Shown(uint8_t* base);
+void Shown();
 // sub_82250890 Open: with the movie loaded, step 0 queued for page 0 (state
 // 4), else state 1; the shown word 0. A leaf.
-void Open(uint8_t* base, uint32_t member);
+void Open(uint32_t member);
 // sub_82250900 Leave (r4 the mode): state 7, UiMovies::Delete(9), the
 // member's slot 1, state 7 again. The slot's r3. 112-byte frame.
-uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Leave(uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_822502C0 OnLeft: the three blocks VirtualFree'd, the globals 0. The
 // last VirtualFree's r3. 112-byte frame.
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t OnLeft(uint32_t sp, const Calls& calls);
 
 // --- The pages (pages.cpp; r3 the member, r4 the mode) ---
 //
@@ -88,43 +88,45 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 // and 159 (below 3) or 158 and 163 (3 to 5): one pressed starts step 1
 // (the close) for page 1 and calls the member's slot 2. The last call's
 // r3. 112-byte frame.
-uint64_t MenuPage(uint8_t* base, uint64_t member, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t MenuPage(uint64_t member, uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_82250348 ClosedPage: the data's +4 = 9, then a tail call to the
 // member's slot 3 (with the caller's lr `lr`). The slot's r3. A leaf.
-uint64_t ClosedPage(uint8_t* base, uint64_t member, uint64_t mode, uint32_t sp, uint32_t lr,
+uint64_t ClosedPage(uint64_t member, uint64_t mode, uint32_t sp, uint32_t lr,
                     const Calls& calls);
 // sub_82250A20 Draw: the page from its table (112-byte frame), r3 the member
 // plus the entry's adjust. The page's r3, or `r3`.
-uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Draw(uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls);
 
 // --- The steps (steps.cpp; r3 the member, r4 the started word's address) ---
 //
 // sub_82251320 Step0 (the open animation): the first call SetTexts and
 // UiMovie::Play(animation 0); then UiMovie::Run; done: the shown word 1.
 // Returns 1 when done. 128-byte frame.
-uint64_t Step0(uint8_t* base, uint64_t member, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t Step0(uint64_t member, uint32_t started, uint32_t sp, const Calls& calls);
 // sub_82250AA8 Step1 (the close): the first call UiMovie::Play(animation
 // 1) and the shown word 0; then UiMovie::Run. Returns 1 when done. 112-byte
 // frame.
-uint64_t Step1(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t Step1(uint32_t started, uint32_t sp, const Calls& calls);
 // sub_82250DD8 SetTexts: movie 9's texts from the record (SetText's unset
 // varargs passed as 0: the user's call of 2026-10-30), node 3 shown by the
 // tab, then SetParts for tabs 2 and 5. The last call's r3. 128-byte frame.
-uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls);
+uint64_t SetTexts(uint64_t member, uint32_t sp, const Calls& calls);
 // sub_82250CD0 SetParts (r4 the record's +60): its bytes sign-extended into
 // two arrays on its frame, then SetPartIcon, SetPartRow2 and SetPartRow1.
-// SetPartRow1's r3. 144-byte frame.
-uint64_t SetParts(uint8_t* base, uint32_t parts, uint32_t sp);
+// SetPartRow1's r3. 144-byte frame. `parts` holds the record's +60 to +79
+// in guest byte order (the data is a host object since E5 step 4: its
+// five words read through the view by SetTexts).
+uint64_t SetParts(const uint8_t* parts, uint32_t sp);
 // sub_82250B48 SetPartIcon: node (3, 0)'s +108 = `value`. The node.
 // 112-byte frame.
-uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp);
+uint64_t SetPartIcon(uint32_t value, uint32_t sp);
 // sub_82250BA0 SetPartRow2 and sub_82250C40 SetPartRow1 (r4 a word array):
 // group node (3, 2) or (3, 1)'s children shown with the array's values, or
 // hidden (10; 37 and above). The last node found. 144-byte frames.
-uint64_t SetPartRow2(uint8_t* base, uint32_t values, uint32_t sp);
-uint64_t SetPartRow1(uint8_t* base, uint32_t values, uint32_t sp);
+uint64_t SetPartRow2(uint32_t values, uint32_t sp);
+uint64_t SetPartRow1(uint32_t values, uint32_t sp);
 // sub_822513B8 Update: the step from its table (144-byte frame), or
 // UiMovie::Run; then the queued state. The step's, Run's r3 or the movie.
-uint64_t Update(uint8_t* base, uint64_t member, uint32_t sp, const Calls& calls);
+uint64_t Update(uint64_t member, uint32_t sp, const Calls& calls);
 
 }  // namespace power_graph_screen

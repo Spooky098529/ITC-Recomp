@@ -20,12 +20,12 @@
 measure = "new<92>@PowerGraphScreen67::OnEnter"
 size = 92
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "movie_loaded", offset = 0, type = "u32", note = "1 once movie 9 is loaded (WaitForLoad)" },
   { name = "part_icon", offset = 1, type = "u8", note = "measure fault: SetParts' r4 is the data's +68 (parts), joined with the block; its byte +1 (the part icon), not the data's +1" },
   { name = "queued_state", offset = 4, type = "u32", note = "the machine's state Update applies; 21 none, 9 from ClosedPage" },
-  { name = "record", offset = 8, type = "bytes", count = 84, note = "the record (+8 to +92)" },
-  { name = "car_value", offset = 8, type = "u32", note = "record +0: 0 (SetEntry) or int(the car's +1892 float) (SetFromCar); SetTexts' node 10" },
+  { name = "car_value", offset = 8, type = "u32", note = "the record (+8 to +92; its words below) +0: 0 (SetEntry) or int(the car's +1892 float) (SetFromCar); SetTexts' node 10" },
   { name = "rating", offset = 12, type = "u32", note = "record +4: the spec's +712 (SetEntry) or a value from the car data (SetFromCar); node 11" },
   { name = "spec_word_0", offset = 16, type = "u32", note = "record +8: the spec's +716 (s +76); node 12" },
   { name = "spec_word_1", offset = 20, type = "u32", note = "record +12: the spec's +724 (s +84); node 13" },
@@ -40,8 +40,7 @@ fields = [
   { name = "curve_value_1", offset = 56, type = "u32", note = "record +48: int(the curve's +1060) (+656); node 40" },
   { name = "peak_torque", offset = 60, type = "f32", note = "record +52: the peak torque in kgf·m (probably); node 34" },
   { name = "peak_index", offset = 64, type = "u32", note = "record +56: int(the curve's +1052), the peak's index; node 41" },
-  { name = "parts", offset = 68, type = "bytes", count = 20, note = "record +60 to +76: five words from the car's +1568 (SetFromCar only); SetParts reads its bytes +1 to +11" },
-  { name = "parts_word_0", offset = 68, type = "u32" },
+  { name = "parts_word_0", offset = 68, type = "u32", note = "record +60 to +76 (the parts): five words from the car's +1568 (SetFromCar only); SetParts reads their bytes +1 to +11 in guest order (each word's most significant byte first)" },
   { name = "parts_word_1", offset = 72, type = "u32" },
   { name = "parts_word_2", offset = 76, type = "u32" },
   { name = "parts_word_3", offset = 80, type = "u32" },

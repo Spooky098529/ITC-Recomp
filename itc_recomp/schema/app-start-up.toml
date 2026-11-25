@@ -19,6 +19,7 @@ measure = "sub_82379338.r3"
 measures = ["sub_82379350.r3", "sub_820943B0.r3", "sub_820943C8.r3", "[826BDC90]"]
 size = 116
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82000E38" },
   { name = "sound_manager", offset = 108, type = "u32", note = "app + 124: the sound manager (AudioManager::Create, sound-cues.md), slot +48's answer" },
@@ -34,6 +35,7 @@ fields = [
 measure = "sub_82094368.r3"
 size = 20
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "framework_interface", offset = 16, type = "ptr", to = "AppFrameworkInterface", note = "app + 24: the framework's +36 interface" },
 ]
@@ -46,6 +48,7 @@ measure = "sub_82094368.r3.+16"
 measures = ["sub_820943B0.r3.+8", "sub_820943C8.r3.+8", "App::SceneFromInterface16.r3@-8.+16"]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppFrameworkInterfaceVtable", note = "0x82000AFC" },
 ]

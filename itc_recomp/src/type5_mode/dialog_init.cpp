@@ -38,7 +38,7 @@ struct Step {
 
 }  // namespace
 
-uint32_t DialogInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t DialogInit(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82226A10 Type5Dialog::Init");
   auto at = [&](const Value& v) {
     switch (v.base) {
@@ -51,19 +51,19 @@ uint32_t DialogInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* repla
     }
     return frame + v.value;
   };
-  guest::StoreU32(base, frame, frame + kDialogInitFrame);
+  guest::StoreU32(frame, frame + kDialogInitFrame);
   uint32_t r3 = machine;
   *replaced = false;
   for (const Step& step : k82226A10) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, at(step.c), at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(at(step.c), at(step.a), at(step.b), replaced);
         break;
     }
   }

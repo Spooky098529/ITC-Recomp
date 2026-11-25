@@ -47,16 +47,16 @@ using namespace car_specs;
 #define ITC_CAR_SPECS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                  \
   if (!ITC_FLAG(native_car_specs)) {    \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                             \
   }
 
 namespace {
 
 // The archive's TOC for an asset (r3 = the id): the guest function.
-uint32_t Toc(lifted::Regs& ctx, uint8_t* base, uint32_t id) {
+uint32_t Toc(lifted::Regs& ctx, uint32_t id) {
   ctx.r3.u64 = id;
-  lifted::Enter(ctx, base, game::Archive::Toc);
+  lifted::Enter(ctx, game::Archive::Toc);
   return ctx.r3.u32;
 }
 
@@ -67,30 +67,30 @@ uint32_t Toc(lifted::Regs& ctx, uint8_t* base, uint32_t id) {
 ITC_NATIVE_ENTRY_ALWAYS(820CC248) {
   ITC_CAR_SPECS_FALLBACK(820CC248)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 72);
+  const uint32_t toc = Toc(ctx, 72);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnCarSpecsLoaded(base, object, toc);
+  ctx.r3.u64 = OnCarSpecsLoaded(object, toc);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820CC0A8) {
   ITC_CAR_SPECS_FALLBACK(820CC0A8)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 73);
+  const uint32_t toc = Toc(ctx, 73);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnWheelsLoaded(base, object, toc);
+  ctx.r3.u64 = OnWheelsLoaded(object, toc);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820C9DF0) {
   ITC_CAR_SPECS_FALLBACK(820C9DF0)
-  OnLoaded(base, ctx.r6.u32);
+  OnLoaded(ctx.r6.u32);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820CBD90) {
   ITC_CAR_SPECS_FALLBACK(820CBD90)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 83);
+  const uint32_t toc = Toc(ctx, 83);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnTable83Loaded(base, object, toc);
+  ctx.r3.u64 = OnTable83Loaded(object, toc);
 }
 
 // The getters: r3 a word (zero-extended; the originals' carry the
@@ -101,17 +101,17 @@ ITC_NATIVE_ENTRY_ALWAYS(820CBD90) {
     ctx.r3.u64 = uint32_t(expr);         \
   }
 
-ITC_CAR_SPECS_WORD(820C9E98, GetCarSpec(base, ctx.r3.u32))
-ITC_CAR_SPECS_WORD(820C9EE0, FirstWheelOfModel(base, ctx.r3.s32))
-ITC_CAR_SPECS_WORD(820C9DD8, Exists(base))
+ITC_CAR_SPECS_WORD(820C9E98, GetCarSpec(ctx.r3.u32))
+ITC_CAR_SPECS_WORD(820C9EE0, FirstWheelOfModel(ctx.r3.s32))
+ITC_CAR_SPECS_WORD(820C9DD8, Exists())
 
 // Params::GetCarParts: r3 = out, left as it came.
 ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
   ITC_CAR_SPECS_FALLBACK(820C9E00)
   uint32_t parts[9];
-  GetCarParts(base, ctx.r4.u32, parts);
+  GetCarParts(ctx.r4.u32, parts);
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, schema::CarPartTables(base, ctx.r3.u32).table74_address() + 4 * i,
+    guest::StoreU32(schema::CarPartTables(ctx.r3.u32).table74_address() + 4 * i,
                     parts[i]);
   }
 }
@@ -126,10 +126,10 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
     uint32_t parts[9];                                                 \
     for (uint32_t i = 0; i < 9; i++) {                                 \
       parts[i] = guest::LoadU32(                                       \
-          base, schema::CarPartTables(base, ctx.r4.u32).table74_address() + 4 * i); \
+          schema::CarPartTables(ctx.r4.u32).table74_address() + 4 * i); \
     }                                                                  \
-    if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
-      lifted::original::c##address(ctx, base);                    \
+    if (!function(ctx.r3.u32, parts, ctx.r5.s32)) {              \
+      lifted::original::c##address(ctx);                    \
       return;                                                          \
     }                                                                  \
     ctx.fpscr.disableFlushMode();                                      \
@@ -143,7 +143,7 @@ ITC_CAR_SPECS_AERO(820CBC90, AeroPart82)
 ITC_NATIVE_ENTRY_ALWAYS(820CBD20) {
   ITC_CAR_SPECS_FALLBACK(820CBD20)
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = CountBodyKits(base, ctx.r3.u32);
+  ctx.r3.u64 = CountBodyKits(ctx.r3.u32);
 }
 
 // Car::Refresh: r3 = the car; r3 as the original leaves it (its last
@@ -154,8 +154,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820C4998) {
   ITC_CAR_SPECS_FALLBACK(820C4998)
   ctx.fpscr.disableFlushMode();
   uint32_t r3;
-  if (!CarRefresh(base, ctx.r3.u32, &r3)) {
-    lifted::original::c820C4998(ctx, base);
+  if (!CarRefresh(ctx.r3.u32, &r3)) {
+    lifted::original::c820C4998(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -172,16 +172,16 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9960) {
     return;
   }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeHeapActive()) {
-    lifted::original::c820C9960(ctx, base);
+    lifted::original::c820C9960(ctx);
     return;
   }
   uint32_t tocs[12];
   for (uint32_t k = 0; k < 12; k++) {
-    tocs[k] = Toc(ctx, base, 72 + k);
+    tocs[k] = Toc(ctx, 72 + k);
   }
   uint32_t r3;
-  if (!ParamsInit(base, tocs, &r3)) {
-    lifted::original::c820C9960(ctx, base);
+  if (!ParamsInit(tocs, &r3)) {
+    lifted::original::c820C9960(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -195,8 +195,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820CC2A8) {
     return;
   }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeArchiveQueue()) {
-    lifted::original::c820CC2A8(ctx, base);
+    lifted::original::c820CC2A8(ctx);
     return;
   }
-  hooks::SetArchiveSerial(ctx, ParamsLoad(base, hooks::NativeArchiveLoad(base)));
+  hooks::SetArchiveSerial(ctx, ParamsLoad(hooks::NativeArchiveLoad()));
 }

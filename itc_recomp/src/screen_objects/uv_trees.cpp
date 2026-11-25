@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/handles.h"
 #include "schema/screen_objects.h"
 
 #include <bit>
@@ -51,19 +52,21 @@ uint32_t Required(std::optional<uint32_t> block, const char* what) {
 }
 
 template <typename T>
-std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count) {
+std::optional<uint32_t> AllocateNodes(uint32_t count) {
   constexpr uint32_t node_bytes = T::Node::kSize;
   // The original's bad_alloc path: 0xFFFFFFFF / count below the node's size.
   if (count != 0 && 0xFFFFFFFFu / count < node_bytes) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count * node_bytes);
+  // In host memory (E5 step 4): `count` nodes in one block, one handle (the
+  // original's operator new(count x size); every caller asks for one).
+  return T::Node::NewArray(count).address;
 }
 
 // NewHead's stores, the original's null checks kept.
 template <typename T>
-void InitHead(uint8_t* base, uint32_t node) {
-  const typename T::Node n(base, node);
+void InitHead(uint32_t node) {
+  const typename T::Node n(node);
   if (node != 0) {
     n.set_left(0u);
   }
@@ -78,9 +81,9 @@ void InitHead(uint8_t* base, uint32_t node) {
 }
 
 template <typename T>
-void Construct(uint8_t* base, uint32_t tree, uint32_t head) {
-  const typename T::Tree t(base, tree);
-  const typename T::Node h(base, head);
+void Construct(uint32_t tree, uint32_t head) {
+  const typename T::Tree t(tree);
+  const typename T::Node h(head);
   t.set_head(head);
   h.set_is_nil(1);
   h.set_parent(head);
@@ -90,9 +93,9 @@ void Construct(uint8_t* base, uint32_t tree, uint32_t head) {
 }
 
 template <typename T>
-void RotateLeft(uint8_t* base, uint32_t tree, uint32_t x) {
+void RotateLeft(uint32_t tree, uint32_t x) {
   using N = typename T::Node;
-  const N xn(base, x);
+  const N xn(x);
   const N y = xn.right();
   xn.set_right(y.left());
   const N y_left = y.left();
@@ -100,7 +103,7 @@ void RotateLeft(uint8_t* base, uint32_t tree, uint32_t x) {
     y_left.set_parent(x);
   }
   y.set_parent(xn.parent());
-  const N head = typename T::Tree(base, tree).head();
+  const N head = typename T::Tree(tree).head();
   if (x == head.parent().address) {
     head.set_parent(y);
   } else {
@@ -116,9 +119,9 @@ void RotateLeft(uint8_t* base, uint32_t tree, uint32_t x) {
 }
 
 template <typename T>
-void RotateRight(uint8_t* base, uint32_t tree, uint32_t x) {
+void RotateRight(uint32_t tree, uint32_t x) {
   using N = typename T::Node;
-  const N xn(base, x);
+  const N xn(x);
   const N y = xn.left();
   xn.set_left(y.right());
   const N y_right = y.right();
@@ -126,7 +129,7 @@ void RotateRight(uint8_t* base, uint32_t tree, uint32_t x) {
     y_right.set_parent(x);
   }
   y.set_parent(xn.parent());
-  const N head = typename T::Tree(base, tree).head();
+  const N head = typename T::Tree(tree).head();
   if (x == head.parent().address) {
     head.set_parent(y);
   } else {
@@ -142,10 +145,10 @@ void RotateRight(uint8_t* base, uint32_t tree, uint32_t x) {
 }
 
 template <typename T>
-uint32_t LowerBoundNode(uint8_t* base, uint32_t tree, double key) {
+uint32_t LowerBoundNode(uint32_t tree, double key) {
   using N = typename T::Node;
-  uint32_t result = typename T::Tree(base, tree).head().address;
-  N node = N(base, result).parent();
+  uint32_t result = typename T::Tree(tree).head().address;
+  N node = N(result).parent();
   while (!node.is_nil()) {
     if (KeyOf(node) < key) {
       node = node.right();
@@ -160,24 +163,24 @@ uint32_t LowerBoundNode(uint8_t* base, uint32_t tree, double key) {
 // Find's step after LowerBound: end when it's the head or `key` is below
 // its key. nullopt where the original traps (an iterator of another tree).
 template <typename T>
-std::optional<Iterator> FindFrom(uint8_t* base, uint32_t tree, Iterator it, double key) {
+std::optional<Iterator> FindFrom(uint32_t tree, Iterator it, double key) {
   if (it.tree == 0 || it.tree != tree) {
     return std::nullopt;
   }
-  const uint32_t head = typename T::Tree(base, tree).head().address;
-  if (it.node == head || key < KeyOf(typename T::Node(base, it.node))) {
+  const uint32_t head = typename T::Tree(tree).head().address;
+  if (it.node == head || key < KeyOf(typename T::Node(it.node))) {
     return Iterator{tree, head};
   }
   return it;
 }
 
 template <typename T>
-bool Decrement(uint8_t* base, Iterator& it) {
+bool Decrement(Iterator& it) {
   using N = typename T::Node;
   if (it.tree == 0) {
     return false;
   }
-  const N node(base, it.node);
+  const N node(it.node);
   if (node.is_nil()) {
     // end: the rightmost node, a trap when the tree is empty.
     const N rightmost = node.right();
@@ -211,13 +214,13 @@ bool Decrement(uint8_t* base, Iterator& it) {
 // Insert's links and rebalance, once the node is made: `rotate_left` and
 // `rotate_right` are the tree's own.
 template <typename T, typename RotateLeftFn, typename RotateRightFn>
-Iterator LinkAndBalance(uint8_t* base, uint32_t tree, bool add_left, uint32_t where,
+Iterator LinkAndBalance(uint32_t tree, bool add_left, uint32_t where,
                         uint32_t node, RotateLeftFn rotate_left, RotateRightFn rotate_right) {
   using N = typename T::Node;
-  const typename T::Tree t(base, tree);
+  const typename T::Tree t(tree);
   t.set_size(t.size() + 1);
   N head = t.head();
-  const N w(base, where);
+  const N w(where);
   if (where == head.address) {
     head.set_parent(node);
     t.head().set_left(node);
@@ -235,7 +238,7 @@ Iterator LinkAndBalance(uint8_t* base, uint32_t tree, bool add_left, uint32_t wh
       head.set_right(node);
     }
   }
-  N x(base, node);
+  N x(node);
   while (x.parent().color() == 0) {
     const N parent = x.parent();
     const N grandparent = parent.parent();
@@ -287,10 +290,10 @@ struct Place {
   Iterator existing;
 };
 template <typename T, typename DecrementFn>
-std::optional<Place> FindPlace(uint8_t* base, uint32_t tree, double key,
+std::optional<Place> FindPlace(uint32_t tree, double key,
                                DecrementFn decrement) {
   using N = typename T::Node;
-  const N head = typename T::Tree(base, tree).head();
+  const N head = typename T::Tree(tree).head();
   uint32_t where = head.address;
   bool add_left = true;
   N node = head.parent();
@@ -308,15 +311,15 @@ std::optional<Place> FindPlace(uint8_t* base, uint32_t tree, double key,
       return std::nullopt;
     }
   }
-  if (KeyOf(N(base, it.node)) < key) {
+  if (KeyOf(N(it.node)) < key) {
     return Place{where, add_left, false, {}};
   }
   return Place{where, add_left, true, it};
 }
 
 template <typename T>
-void ClearHead(uint8_t* base, uint32_t tree) {
-  const typename T::Tree t(base, tree);
+void ClearHead(uint32_t tree) {
+  const typename T::Tree t(tree);
   const typename T::Node head = t.head();
   head.set_parent(head);
   t.set_size(0);
@@ -327,8 +330,8 @@ void ClearHead(uint8_t* base, uint32_t tree) {
 // Erase's checks: whether [first, last) is the whole tree (begin, end) and
 // no iterator traps.
 template <typename T>
-bool WholeRange(uint8_t* base, uint32_t tree, Iterator first, Iterator last) {
-  const typename T::Node head = typename T::Tree(base, tree).head();
+bool WholeRange(uint32_t tree, Iterator first, Iterator last) {
+  const typename T::Node head = typename T::Tree(tree).head();
   if (first.tree == 0 || first.tree != tree) {
     return false;
   }
@@ -338,42 +341,44 @@ bool WholeRange(uint8_t* base, uint32_t tree, Iterator first, Iterator last) {
   return last.tree != 0 && last.tree == tree && last.node == head.address;
 }
 
+// A node's block freed (the original's operator delete): a handle, as
+// AllocateNodes makes them.
 void Free(uint32_t block, const char* what) {
-  if (!memory::crt::OperatorDelete(block)) {
-    ITC_LOG_ERROR("{}: operator delete refused {:08X}", what, block);
+  if (!memory::FreeHandle(block)) {
+    ITC_LOG_ERROR("{}: a node's handle {:08X} not freed", what, block);
     std::abort();
   }
 }
 
 }  // namespace
 
-bool CanAllocate(uint8_t* base) { return memory::crt::GetProcessHeap(base) != 0; }
+bool CanAllocate() { return memory::crt::GetProcessHeap() != 0; }
 
 // --- UvColumn ---
 
-std::optional<uint32_t> ColumnAllocateNodes(uint8_t* base, uint32_t count) {
+std::optional<uint32_t> ColumnAllocateNodes(uint32_t count) {
   ITC_NATIVE_RUNNING("sub_8212FBD8 UvColumn::AllocateNodes");
-  return AllocateNodes<Column>(base, count);
+  return AllocateNodes<Column>(count);
 }
 
-uint32_t ColumnNewHead(uint8_t* base) {
+uint32_t ColumnNewHead() {
   ITC_NATIVE_RUNNING("sub_8212FF08 UvColumn::NewHead");
-  const uint32_t node = Required(ColumnAllocateNodes(base, 1), "UvColumn::NewHead");
-  InitHead<Column>(base, node);
+  const uint32_t node = Required(ColumnAllocateNodes(1), "UvColumn::NewHead");
+  InitHead<Column>(node);
   return node;
 }
 
-void ColumnConstruct(uint8_t* base, uint32_t column) {
+void ColumnConstruct(uint32_t column) {
   ITC_NATIVE_RUNNING("sub_82130140 UvColumn::UvColumn");
-  Construct<Column>(base, column, ColumnNewHead(base));
+  Construct<Column>(column, ColumnNewHead());
 }
 
-uint32_t ColumnNewNode(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right,
+uint32_t ColumnNewNode(uint32_t left, uint32_t parent, uint32_t right,
                        uint32_t value, uint8_t color) {
   ITC_NATIVE_RUNNING("sub_8212FDB0 UvColumn::NewNode");
-  const uint32_t node = Required(ColumnAllocateNodes(base, 1), "UvColumn::NewNode");
-  const ColumnNode n(base, node);
-  const schema::ScreenObjectUvColumnValue v(base, value);
+  const uint32_t node = Required(ColumnAllocateNodes(1), "UvColumn::NewNode");
+  const ColumnNode n(node);
+  const schema::ScreenObjectUvColumnValue v(value);
   n.set_left(left);
   n.set_parent(parent);
   n.set_right(right);
@@ -386,30 +391,30 @@ uint32_t ColumnNewNode(uint8_t* base, uint32_t left, uint32_t parent, uint32_t r
   return node;
 }
 
-uint32_t ColumnCopySubtree(uint8_t* base, uint32_t column, uint32_t source, uint32_t parent) {
+uint32_t ColumnCopySubtree(uint32_t column, uint32_t source, uint32_t parent) {
   ITC_NATIVE_RUNNING("sub_8212FE80 UvColumn::CopySubtree");
-  const ColumnNode head = ColumnTree(base, column).head();
-  const ColumnNode src(base, source);
+  const ColumnNode head = ColumnTree(column).head();
+  const ColumnNode src(source);
   uint32_t result = head.address;
   if (src.is_nil()) {
     return result;
   }
   const uint32_t node =
-      ColumnNewNode(base, head.address, parent, head.address, src.key_address(), src.color());
+      ColumnNewNode(head.address, parent, head.address, src.key_address(), src.color());
   if (head.is_nil()) {
     result = node;
   }
-  const ColumnNode n(base, node);
-  n.set_left(ColumnCopySubtree(base, column, src.left().address, node));
-  n.set_right(ColumnCopySubtree(base, column, src.right().address, node));
+  const ColumnNode n(node);
+  n.set_left(ColumnCopySubtree(column, src.left().address, node));
+  n.set_right(ColumnCopySubtree(column, src.right().address, node));
   return result;
 }
 
-uint32_t ColumnCopy(uint8_t* base, uint32_t column, uint32_t source) {
+uint32_t ColumnCopy(uint32_t column, uint32_t source) {
   ITC_NATIVE_RUNNING("sub_82130088 UvColumn::Copy");
-  const ColumnTree c(base, column);
-  const ColumnTree s(base, source);
-  const uint32_t root = ColumnCopySubtree(base, column, s.head().parent().address, c.head().address);
+  const ColumnTree c(column);
+  const ColumnTree s(source);
+  const uint32_t root = ColumnCopySubtree(column, s.head().parent().address, c.head().address);
   c.head().set_parent(root);
   c.set_size(s.size());
   const ColumnNode head = c.head();
@@ -432,82 +437,81 @@ uint32_t ColumnCopy(uint8_t* base, uint32_t column, uint32_t source) {
   return root;
 }
 
-void ColumnRotateLeft(uint8_t* base, uint32_t column, uint32_t node) {
+void ColumnRotateLeft(uint32_t column, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8212F920 UvColumn::RotateLeft");
-  RotateLeft<Column>(base, column, node);
+  RotateLeft<Column>(column, node);
 }
 
-void ColumnRotateRight(uint8_t* base, uint32_t column, uint32_t node) {
+void ColumnRotateRight(uint32_t column, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8212F988 UvColumn::RotateRight");
-  RotateRight<Column>(base, column, node);
+  RotateRight<Column>(column, node);
 }
 
-uint32_t ColumnLowerBoundNode(uint8_t* base, uint32_t column, double key) {
+uint32_t ColumnLowerBoundNode(uint32_t column, double key) {
   ITC_NATIVE_RUNNING("sub_8212F8C8 UvColumn::LowerBoundNode");
-  return LowerBoundNode<Column>(base, column, key);
+  return LowerBoundNode<Column>(column, key);
 }
 
-std::optional<Iterator> ColumnLowerBound(uint8_t* base, uint32_t column, double key) {
+std::optional<Iterator> ColumnLowerBound(uint32_t column, double key) {
   ITC_NATIVE_RUNNING("sub_8212FFC8 UvColumn::LowerBound");
   if (column == 0) {
     return std::nullopt;
   }
-  return Iterator{column, ColumnLowerBoundNode(base, column, key)};
+  return Iterator{column, ColumnLowerBoundNode(column, key)};
 }
 
-std::optional<Iterator> ColumnFind(uint8_t* base, uint32_t column, double key) {
+std::optional<Iterator> ColumnFind(uint32_t column, double key) {
   ITC_NATIVE_RUNNING("sub_821301F0 UvColumn::Find");
-  const auto it = ColumnLowerBound(base, column, key);
+  const auto it = ColumnLowerBound(column, key);
   if (!it) {
     return std::nullopt;
   }
-  return FindFrom<Column>(base, column, *it, key);
+  return FindFrom<Column>(column, *it, key);
 }
 
-bool ColumnDecrement(uint8_t* base, Iterator& it) {
+bool ColumnDecrement(Iterator& it) {
   ITC_NATIVE_RUNNING("sub_8212EEF8 UvColumn's iterator decrement");
-  return Decrement<Column>(base, it);
+  return Decrement<Column>(it);
 }
 
-std::optional<Iterator> ColumnInsert(uint8_t* base, uint32_t column, bool add_left, uint32_t where,
+std::optional<Iterator> ColumnInsert(uint32_t column, bool add_left, uint32_t where,
                                      uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82131680 UvColumn::Insert");
-  const ColumnTree c(base, column);
-  if (c.size() >= Column::kMaxSize || !CanAllocate(base)) {
+  const ColumnTree c(column);
+  if (c.size() >= Column::kMaxSize || !CanAllocate()) {
     return std::nullopt;
   }
   const uint32_t head = c.head().address;
-  const uint32_t node = ColumnNewNode(base, head, where, head, value, 0);
-  return LinkAndBalance<Column>(
-      base, column, add_left, where, node,
-      [&](uint32_t x) { ColumnRotateLeft(base, column, x); },
-      [&](uint32_t x) { ColumnRotateRight(base, column, x); });
+  const uint32_t node = ColumnNewNode(head, where, head, value, 0);
+  return LinkAndBalance<Column>(column, add_left, where, node,
+      [&](uint32_t x) { ColumnRotateLeft(column, x); },
+      [&](uint32_t x) { ColumnRotateRight(column, x); });
 }
 
-std::optional<InsertResult> ColumnInsertUnique(uint8_t* base, uint32_t column, uint32_t value) {
+std::optional<InsertResult> ColumnInsertUnique(uint32_t column, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82131CB8 UvColumn::InsertUnique");
-  const auto place = FindPlace<Column>(base, column,
-                                       KeyOf(schema::ScreenObjectUvColumnValue(base, value)),
-                                       [&](Iterator& it) { return ColumnDecrement(base, it); });
+  const auto place = FindPlace<Column>(column,
+                                       KeyOf(schema::ScreenObjectUvColumnValue(value)),
+                                       [&](Iterator& it) { return ColumnDecrement(it); });
   if (!place) {
     return std::nullopt;
   }
   if (place->exists) {
     return InsertResult{place->existing, false};
   }
-  const auto it = ColumnInsert(base, column, place->add_left, place->where, value);
+  const auto it = ColumnInsert(column, place->add_left, place->where, value);
   if (!it) {
     return std::nullopt;
   }
   return InsertResult{*it, true};
 }
 
-uint32_t ColumnEraseSubtree(uint8_t* base, uint32_t column, uint32_t node) {
+uint32_t ColumnEraseSubtree(uint32_t column, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8212FD50 UvColumn::EraseSubtree");
   uint32_t r3 = column;
-  ColumnNode n(base, node);
+  ColumnNode n(node);
   while (!n.is_nil()) {
-    ColumnEraseSubtree(base, column, n.right().address);
+    ColumnEraseSubtree(column, n.right().address);
     const ColumnNode next = n.left();
     Free(n.address, "UvColumn::EraseSubtree");
     r3 = n.address;
@@ -516,32 +520,32 @@ uint32_t ColumnEraseSubtree(uint8_t* base, uint32_t column, uint32_t node) {
   return r3;
 }
 
-uint32_t ColumnClear(uint8_t* base, uint32_t column) {
+uint32_t ColumnClear(uint32_t column) {
   ITC_NATIVE_RUNNING("sub_8212FE28 UvColumn::Clear");
   const uint32_t r3 =
-      ColumnEraseSubtree(base, column, ColumnTree(base, column).head().parent().address);
-  ClearHead<Column>(base, column);
+      ColumnEraseSubtree(column, ColumnTree(column).head().parent().address);
+  ClearHead<Column>(column);
   return r3;
 }
 
-std::optional<Iterator> ColumnErase(uint8_t* base, uint32_t column, Iterator first,
+std::optional<Iterator> ColumnErase(uint32_t column, Iterator first,
                                     Iterator last) {
   ITC_NATIVE_RUNNING("sub_82131DD8 UvColumn::Erase");
-  if (!WholeRange<Column>(base, column, first, last)) {
+  if (!WholeRange<Column>(column, first, last)) {
     return std::nullopt;
   }
-  ColumnClear(base, column);
-  return Iterator{column, ColumnTree(base, column).head().left().address};
+  ColumnClear(column);
+  return Iterator{column, ColumnTree(column).head().left().address};
 }
 
-std::optional<uint32_t> ColumnDestroy(uint8_t* base, uint32_t column) {
+std::optional<uint32_t> ColumnDestroy(uint32_t column) {
   ITC_NATIVE_RUNNING("sub_82131EE0 UvColumn::~UvColumn");
   if (column == 0) {
     return std::nullopt;
   }
-  const ColumnTree c(base, column);
+  const ColumnTree c(column);
   const ColumnNode head = c.head();
-  if (!ColumnErase(base, column, {column, head.left().address}, {column, head.address})) {
+  if (!ColumnErase(column, {column, head.left().address}, {column, head.address})) {
     return std::nullopt;
   }
   const uint32_t block = c.head().address;
@@ -553,28 +557,28 @@ std::optional<uint32_t> ColumnDestroy(uint8_t* base, uint32_t column) {
 
 // --- UvMap ---
 
-std::optional<uint32_t> MapAllocateNodes(uint8_t* base, uint32_t count) {
+std::optional<uint32_t> MapAllocateNodes(uint32_t count) {
   ITC_NATIVE_RUNNING("sub_8212FC50 UvMap::AllocateNodes");
-  return AllocateNodes<Map>(base, count);
+  return AllocateNodes<Map>(count);
 }
 
-uint32_t MapNewHead(uint8_t* base) {
+uint32_t MapNewHead() {
   ITC_NATIVE_RUNNING("sub_8212FF68 UvMap::NewHead");
-  const uint32_t node = Required(MapAllocateNodes(base, 1), "UvMap::NewHead");
-  InitHead<Map>(base, node);
+  const uint32_t node = Required(MapAllocateNodes(1), "UvMap::NewHead");
+  InitHead<Map>(node);
   return node;
 }
 
-void MapConstruct(uint8_t* base, uint32_t map) {
+void MapConstruct(uint32_t map) {
   ITC_NATIVE_RUNNING("sub_82130198 UvMap::UvMap");
-  Construct<Map>(base, map, MapNewHead(base));
+  Construct<Map>(map, MapNewHead());
 }
 
-uint32_t MapConstructNode(uint8_t* base, uint32_t node, uint32_t left, uint32_t parent,
+uint32_t MapConstructNode(uint32_t node, uint32_t left, uint32_t parent,
                           uint32_t right, uint32_t value, uint8_t color) {
   ITC_NATIVE_RUNNING("sub_82131F50 UvMap::ConstructNode");
-  const MapNode n(base, node);
-  const schema::ScreenObjectUvMapValue v(base, value);
+  const MapNode n(node);
+  const schema::ScreenObjectUvMapValue v(value);
   n.set_left(left);
   n.set_parent(parent);
   n.set_right(right);
@@ -582,91 +586,90 @@ uint32_t MapConstructNode(uint8_t* base, uint32_t node, uint32_t left, uint32_t 
   const uint32_t key_low = v.key_low();
   n.set_key_high(key_high);
   n.set_key_low(key_low);
-  ColumnConstruct(base, n.column_address());
-  ColumnCopy(base, n.column_address(), v.column_address());
+  ColumnConstruct(n.column().address);
+  ColumnCopy(n.column().address, v.column_address());
   n.set_color(color);
   n.set_is_nil(0);
   return node;
 }
 
-void MapRotateLeft(uint8_t* base, uint32_t map, uint32_t node) {
+void MapRotateLeft(uint32_t map, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8212FA50 UvMap::RotateLeft");
-  RotateLeft<Map>(base, map, node);
+  RotateLeft<Map>(map, node);
 }
 
-void MapRotateRight(uint8_t* base, uint32_t map, uint32_t node) {
+void MapRotateRight(uint32_t map, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8212FAB8 UvMap::RotateRight");
-  RotateRight<Map>(base, map, node);
+  RotateRight<Map>(map, node);
 }
 
-uint32_t MapLowerBoundNode(uint8_t* base, uint32_t map, double key) {
+uint32_t MapLowerBoundNode(uint32_t map, double key) {
   ITC_NATIVE_RUNNING("sub_8212F9F8 UvMap::LowerBoundNode");
-  return LowerBoundNode<Map>(base, map, key);
+  return LowerBoundNode<Map>(map, key);
 }
 
-std::optional<Iterator> MapLowerBound(uint8_t* base, uint32_t map, double key) {
+std::optional<Iterator> MapLowerBound(uint32_t map, double key) {
   ITC_NATIVE_RUNNING("sub_82130028 UvMap::LowerBound");
   if (map == 0) {
     return std::nullopt;
   }
-  return Iterator{map, MapLowerBoundNode(base, map, key)};
+  return Iterator{map, MapLowerBoundNode(map, key)};
 }
 
-std::optional<Iterator> MapFind(uint8_t* base, uint32_t map, double key) {
+std::optional<Iterator> MapFind(uint32_t map, double key) {
   ITC_NATIVE_RUNNING("sub_82130290 UvMap::Find");
-  const auto it = MapLowerBound(base, map, key);
+  const auto it = MapLowerBound(map, key);
   if (!it) {
     return std::nullopt;
   }
-  return FindFrom<Map>(base, map, *it, key);
+  return FindFrom<Map>(map, *it, key);
 }
 
-bool MapDecrement(uint8_t* base, Iterator& it) {
+bool MapDecrement(Iterator& it) {
   ITC_NATIVE_RUNNING("sub_8212FB28 UvMap::Decrement");
-  return Decrement<Map>(base, it);
+  return Decrement<Map>(it);
 }
 
-std::optional<Iterator> MapInsert(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
+std::optional<Iterator> MapInsert(uint32_t map, bool add_left, uint32_t where,
                                   uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82131FB0 UvMap::Insert");
-  const MapTree m(base, map);
-  if (m.size() >= Map::kMaxSize || !CanAllocate(base)) {
+  const MapTree m(map);
+  if (m.size() >= Map::kMaxSize || !CanAllocate()) {
     return std::nullopt;
   }
   const uint32_t head = m.head().address;
-  const uint32_t node = Required(MapAllocateNodes(base, 1), "UvMap::Insert");
-  MapConstructNode(base, node, head, where, head, value, 0);
-  return LinkAndBalance<Map>(
-      base, map, add_left, where, node, [&](uint32_t x) { MapRotateLeft(base, map, x); },
-      [&](uint32_t x) { MapRotateRight(base, map, x); });
+  const uint32_t node = Required(MapAllocateNodes(1), "UvMap::Insert");
+  MapConstructNode(node, head, where, head, value, 0);
+  return LinkAndBalance<Map>(map, add_left, where, node, [&](uint32_t x) { MapRotateLeft(map, x); },
+      [&](uint32_t x) { MapRotateRight(map, x); });
 }
 
-std::optional<InsertResult> MapInsertUnique(uint8_t* base, uint32_t map, uint32_t value) {
+std::optional<InsertResult> MapInsertUnique(uint32_t map, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_821321F8 UvMap::InsertUnique");
-  const auto place = FindPlace<Map>(base, map, KeyOf(schema::ScreenObjectUvMapValue(base, value)),
-                                    [&](Iterator& it) { return MapDecrement(base, it); });
+  const auto place = FindPlace<Map>(map, KeyOf(schema::ScreenObjectUvMapValue(value)),
+                                    [&](Iterator& it) { return MapDecrement(it); });
   if (!place) {
     return std::nullopt;
   }
   if (place->exists) {
     return InsertResult{place->existing, false};
   }
-  const auto it = MapInsert(base, map, place->add_left, place->where, value);
+  const auto it = MapInsert(map, place->add_left, place->where, value);
   if (!it) {
     return std::nullopt;
   }
   return InsertResult{*it, true};
 }
 
-uint32_t MapEraseSubtree(uint8_t* base, uint32_t map, uint32_t node) {
+uint32_t MapEraseSubtree(uint32_t map, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_82132720 UvMap::EraseSubtree");
   uint32_t r3 = map;
-  MapNode n(base, node);
+  MapNode n(node);
   while (!n.is_nil()) {
-    MapEraseSubtree(base, map, n.right().address);
+    MapEraseSubtree(map, n.right().address);
     const MapNode next = n.left();
-    if (!ColumnDestroy(base, n.column_address())) {
-      ITC_LOG_ERROR("UvMap::EraseSubtree: a column at {:08X} not destroyed", n.column_address());
+    if (!ColumnDestroy(n.column().address)) {
+      ITC_LOG_ERROR("UvMap::EraseSubtree: a column at {:08X} not destroyed", n.column().address);
       std::abort();
     }
     Free(n.address, "UvMap::EraseSubtree");
@@ -676,30 +679,30 @@ uint32_t MapEraseSubtree(uint8_t* base, uint32_t map, uint32_t node) {
   return r3;
 }
 
-uint32_t MapClear(uint8_t* base, uint32_t map) {
+uint32_t MapClear(uint32_t map) {
   ITC_NATIVE_RUNNING("sub_82132960 UvMap::Clear");
-  const uint32_t r3 = MapEraseSubtree(base, map, MapTree(base, map).head().parent().address);
-  ClearHead<Map>(base, map);
+  const uint32_t r3 = MapEraseSubtree(map, MapTree(map).head().parent().address);
+  ClearHead<Map>(map);
   return r3;
 }
 
-std::optional<Iterator> MapErase(uint8_t* base, uint32_t map, Iterator first, Iterator last) {
+std::optional<Iterator> MapErase(uint32_t map, Iterator first, Iterator last) {
   ITC_NATIVE_RUNNING("sub_82132BD8 UvMap::Erase");
-  if (!WholeRange<Map>(base, map, first, last)) {
+  if (!WholeRange<Map>(map, first, last)) {
     return std::nullopt;
   }
-  MapClear(base, map);
-  return Iterator{map, MapTree(base, map).head().left().address};
+  MapClear(map);
+  return Iterator{map, MapTree(map).head().left().address};
 }
 
-std::optional<uint32_t> MapDestroy(uint8_t* base, uint32_t map) {
+std::optional<uint32_t> MapDestroy(uint32_t map) {
   ITC_NATIVE_RUNNING("sub_82132F58 UvMap::~UvMap");
   if (map == 0) {
     return std::nullopt;
   }
-  const MapTree m(base, map);
+  const MapTree m(map);
   const MapNode head = m.head();
-  if (!MapErase(base, map, {map, head.left().address}, {map, head.address})) {
+  if (!MapErase(map, {map, head.left().address}, {map, head.address})) {
     return std::nullopt;
   }
   const uint32_t block = m.head().address;

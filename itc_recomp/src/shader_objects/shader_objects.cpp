@@ -20,14 +20,14 @@ namespace shader_objects {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // memset (sub_825A71D0) with 0: the same bytes.
-void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
-  guest::ForEachHostPart(base, address, bytes,
+void Clear(uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(address, bytes,
                          [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
@@ -41,20 +41,20 @@ uint32_t ObjectBytes(uint32_t magic, uint32_t header) {
 }
 
 // The header copy from `file` after `fields` cleared bytes, its checks made.
-void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields);
+void CopyHeaderFrom(uint32_t object, uint32_t file, uint32_t fields);
 
 // The header copy (sub_822A9FD8, sub_822A9EA8) for `fields` bytes.
-bool CopyHeader(uint8_t* base, uint32_t object, uint32_t record, uint32_t fields) {
+bool CopyHeader(uint32_t object, uint32_t record, uint32_t fields) {
   if (c_runtime::MayShare(record, 4, object, fields)) {
     return false;
   }
-  const schema::ShaderFile file = schema::ShaderFileRecord(base, record).file();
+  const schema::ShaderFile file = schema::ShaderFileRecord(record).file();
   const uint32_t bytes = file.header_size();
-  if (!c_runtime::XMemCpyFits(base, object + fields, file.address, bytes)) {
+  if (!c_runtime::XMemCpyFits(object + fields, file.address, bytes)) {
     return false;
   }
-  Clear(base, object, fields);
-  c_runtime::XMemCpy(base, object + fields, file.address, bytes);
+  Clear(object, fields);
+  c_runtime::XMemCpy(object + fields, file.address, bytes);
   return true;
 }
 
@@ -75,11 +75,11 @@ struct FileRecord {
   uint32_t file, object_bytes, code, code_bytes;
 };
 
-FileRecord ReadFile(uint8_t* base, uint32_t file) {
+FileRecord ReadFile(uint32_t file) {
   // ShaderFile::Parse's work (its record kept on the host) for its native
   // callers.
   ITC_NATIVE_RUNNING("sub_822A8568 ShaderFile::Parse");
-  const schema::ShaderFile view(base, file);
+  const schema::ShaderFile view(file);
   const uint32_t header = view.header_size();
   return {file, ObjectBytes(view.magic(), header), header + file, view.microcode_size()};
 }
@@ -94,17 +94,17 @@ std::string TrimmedMessage(const char* host) {
   return text;
 }
 
-void DebugMessage(uint8_t* base, const char* where, uint32_t text) {
-  const char* host = reinterpret_cast<const char*>(guest::Pointer(base, text));
+void DebugMessage(const char* where, uint32_t text) {
+  const char* host = reinterpret_cast<const char*>(guest::Pointer(text));
   ITC_LOG_WARN("{}: the game's debug message: {}", where, TrimmedMessage(host));
 }
 
 }  // namespace
 
-void ParseFile(uint8_t* base, uint32_t file, uint32_t record) {
+void ParseFile(uint32_t file, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_822A8568 ShaderFile::Parse");
-  const schema::ShaderFileRecord out(base, record);
-  const schema::ShaderFile in(base, file);
+  const schema::ShaderFileRecord out(record);
+  const schema::ShaderFile in(file);
   out.set_file(0u);
   out.set_object_bytes(0);
   out.set_microcode(0);
@@ -118,17 +118,17 @@ void ParseFile(uint8_t* base, uint32_t file, uint32_t record) {
   out.set_microcode_bytes(in.microcode_size());
 }
 
-bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
+bool VertexShaderInit(uint32_t object, uint32_t microcode) {
   ITC_NATIVE_RUNNING("sub_822A8740 VertexShader::Init");
   if (object >= kPhysical || !c_runtime::InOneView(object, kVertexShaderBytes)) {
     return false;
   }
-  const schema::VertexShader shader(base, object);
+  const schema::VertexShader shader(object);
   // Read before anything is written: with the checks below, nothing the
   // function writes is read again.
   const uint32_t table = object + kVertexShaderBytes + shader.header_fetch_table();
-  const uint32_t count = Load(base, table + 28);
-  const uint32_t words = table + 4 * (Load(base, table + 24) + 10);
+  const uint32_t count = Load(table + 28);
+  const uint32_t words = table + 4 * (Load(table + 24) + 10);
   if (count > kMaxFetches || c_runtime::MayShare(table + 24, 8, object, kVertexShaderBytes)) {
     return false;
   }
@@ -137,12 +137,12 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
     return false;
   }
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t from = microcode + 12 * (Load(base, words + 4 * i) & 0xFFF);
+    const uint32_t from = microcode + 12 * (Load(words + 4 * i) & 0xFFF);
     if (c_runtime::MayShare(from, 12, object, kVertexShaderBytes)) {
       return false;
     }
   }
-  Clear(base, object, kVertexShaderBytes);
+  Clear(object, kVertexShaderBytes);
   shader.set_microcode(microcode);
   shader.set_common(6);
   shader.set_reference_count(1);
@@ -150,35 +150,35 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
   shader.set_unknown_24(0xFFFFFFFFu);
   shader.set_fetch_count(count);
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t word = Load(base, words + 4 * i);
-    Store(base, shader.fetch_words_address() + 4 * i, word);
+    const uint32_t word = Load(words + 4 * i);
+    Store(shader.fetch_words_address() + 4 * i, word);
     const uint32_t from = microcode + 12 * (word & 0xFFF);
     const uint32_t to = shader.fetch_instructions_address() + 12 * i;
     if (to != from) {
-      std::memcpy(guest::Pointer(base, to), guest::Pointer(base, from), 12);
+      std::memcpy(guest::Pointer(to), guest::Pointer(from), 12);
     }
   }
   return true;
 }
 
-void PixelShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
+void PixelShaderInit(uint32_t object, uint32_t microcode) {
   ITC_NATIVE_RUNNING("sub_822A85B8 PixelShader::Init");
-  const schema::PixelShader shader(base, object);
-  Clear(base, object, kPixelShaderBytes);
+  const schema::PixelShader shader(object);
+  Clear(object, kPixelShaderBytes);
   shader.set_microcode(microcode);
   shader.set_common(7);
   shader.set_reference_count(1);
   shader.set_base_flush(0xFFFF0000u);
 }
 
-bool CopyVertexHeader(uint8_t* base, uint32_t object, uint32_t record) {
+bool CopyVertexHeader(uint32_t object, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_822A9FD8 VertexShader::CopyHeader");
-  return CopyHeader(base, object, record, kVertexShaderBytes);
+  return CopyHeader(object, record, kVertexShaderBytes);
 }
 
-bool CopyPixelHeader(uint8_t* base, uint32_t object, uint32_t record) {
+bool CopyPixelHeader(uint32_t object, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_822A9EA8 PixelShader::CopyHeader");
-  return CopyHeader(base, object, record, kPixelShaderBytes);
+  return CopyHeader(object, record, kPixelShaderBytes);
 }
 
 namespace {
@@ -191,57 +191,57 @@ struct Made {
   uint32_t microcode = 0;
 };
 
-std::optional<Made> MakeShader(uint8_t* base, uint32_t file, uint32_t fields, uint32_t caller) {
-  const schema::ShaderFile view(base, file);
+std::optional<Made> MakeShader(uint32_t file, uint32_t fields, uint32_t caller) {
+  const schema::ShaderFile view(file);
   const uint32_t magic = view.magic();
   const uint32_t code_bytes = view.microcode_size();
   const uint32_t header = view.header_size();
   // The header copy's step and memcpy's flag, checked first (the new
   // blocks can't share memory with the file).
-  if (!native::Buffers_NativeMemcpy() || !c_runtime::XMemCpyBytes(base, file, header)) {
+  if (!native::Buffers_NativeMemcpy() || !c_runtime::XMemCpyBytes(file, header)) {
     return std::nullopt;
   }
   const uint32_t code = header + file;
   Made made;
-  made.object = memory::crt::XMemAlloc(base, ObjectBytes(magic, header), kObjectAttributes);
+  made.object = memory::crt::XMemAlloc(ObjectBytes(magic, header), kObjectAttributes);
   if (made.object == 0) {
     return made;
   }
   const uint32_t copied = view.header_size();
-  Clear(base, made.object, fields);
-  Require(c_runtime::XMemCpy(base, made.object + fields, file, copied), "XMemCpy");
-  made.microcode = memory::crt::XMemAlloc(base, code_bytes, kMicrocodeAttributes);
+  Clear(made.object, fields);
+  Require(c_runtime::XMemCpy(made.object + fields, file, copied), "XMemCpy");
+  made.microcode = memory::crt::XMemAlloc(code_bytes, kMicrocodeAttributes);
   if (made.microcode == 0) {
     memory::crt::XMemFree(made.object, kObjectAttributes);
     made.object = 0;
     return made;
   }
-  Require(native::Buffers_Memcpy(base, made.microcode, code, code_bytes, caller), "memcpy");
+  Require(native::Buffers_Memcpy(made.microcode, code, code_bytes, caller), "memcpy");
   return made;
 }
 
 }  // namespace
 
-std::optional<uint32_t> VertexShaderCreate(uint8_t* base, uint32_t file, const CreateCalls& calls) {
+std::optional<uint32_t> VertexShaderCreate(uint32_t file, const CreateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_822AA018 VertexShader::Create");
-  const auto made = MakeShader(base, file, kVertexShaderBytes, 0x822AA0C0);
+  const auto made = MakeShader(file, kVertexShaderBytes, 0x822AA0C0);
   if (!made) {
     return std::nullopt;
   }
   if (made->object == 0) {
     return 0;
   }
-  if (!VertexShaderInit(base, made->object, made->microcode)) {
+  if (!VertexShaderInit(made->object, made->microcode)) {
     calls.init(calls.user, made->object, made->microcode);
   }
-  const schema::VertexShader shader(base, made->object);
+  const schema::VertexShader shader(made->object);
   shader.set_common(shader.common() | kCreatedFlag);
   return made->object;
 }
 
-std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
+std::optional<uint32_t> PixelShaderCreate(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_822A9EE8 PixelShader::Create");
-  const auto made = MakeShader(base, file, kPixelShaderBytes, 0x822A9F90);
+  const auto made = MakeShader(file, kPixelShaderBytes, 0x822A9F90);
   if (!made) {
     return std::nullopt;
   }
@@ -249,8 +249,8 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
     return 0;
   }
   const uint32_t object = made->object;
-  const schema::PixelShader shader(base, object);
-  Clear(base, object, kPixelShaderBytes);
+  const schema::PixelShader shader(object);
+  Clear(object, kPixelShaderBytes);
   shader.set_microcode(made->microcode);
   shader.set_common(7);
   shader.set_reference_count(1);
@@ -261,7 +261,7 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
 
 namespace {
 
-void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields) {
+void CopyHeaderFrom(uint32_t object, uint32_t file, uint32_t fields) {
   // VertexShader::CopyHeader's or PixelShader::CopyHeader's work for their
   // native callers.
   if (fields == kVertexShaderBytes) {
@@ -269,17 +269,17 @@ void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fiel
   } else {
     ITC_NATIVE_RUNNING("sub_822A9EA8 PixelShader::CopyHeader");
   }
-  const uint32_t bytes = schema::ShaderFile(base, file).header_size();
-  Clear(base, object, fields);
-  Require(c_runtime::XMemCpy(base, object + fields, file, bytes), "XMemCpy");
+  const uint32_t bytes = schema::ShaderFile(file).header_size();
+  Clear(object, fields);
+  Require(c_runtime::XMemCpy(object + fields, file, bytes), "XMemCpy");
 }
 
 }  // namespace
 
-bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCalls& calls) {
+bool LoadShaders(uint32_t model, uint32_t section, const CreateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82594D20 Mesh::LoadShaders");
-  const schema::Model mesh(base, model);
-  const uint32_t count = schema::ShaderSection(base, section).pair_count();
+  const schema::Model mesh(model);
+  const uint32_t count = schema::ShaderSection(section).pair_count();
   // The checks first: memcpy's flag, each header copy's byte loop (the
   // new blocks can't share memory with the files).
   if (!native::Buffers_NativeMemcpy()) {
@@ -287,11 +287,11 @@ bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCa
   }
   uint32_t pair = section + 32;
   for (uint32_t i = 0; i < count; i++) {
-    const schema::ShaderPairEntry entry(base, pair);
+    const schema::ShaderPairEntry entry(pair);
     const uint32_t vertex = pair + 32;
     const uint32_t pixel = entry.vertex_size() + vertex;
-    if (!c_runtime::XMemCpyBytes(base, vertex, schema::ShaderFile(base, vertex).header_size()) ||
-        !c_runtime::XMemCpyBytes(base, pixel, schema::ShaderFile(base, pixel).header_size())) {
+    if (!c_runtime::XMemCpyBytes(vertex, schema::ShaderFile(vertex).header_size()) ||
+        !c_runtime::XMemCpyBytes(pixel, schema::ShaderFile(pixel).header_size())) {
       return false;
     }
     pair = entry.pixel_size() + pixel;
@@ -300,83 +300,83 @@ bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCa
   if (count == 0) {
     return true;
   }
-  mesh.set_shader_pairs(models::AllocVirtual(base, count << 4));
+  mesh.set_shader_pairs(models::AllocVirtual(count << 4));
   pair = section + 32;
   for (uint32_t i = 0; i < mesh.shader_pair_count(); i++) {
-    const schema::ShaderPairEntry entry(base, pair);
+    const schema::ShaderPairEntry entry(pair);
     const uint32_t vertex = pair + 32;
     const uint32_t pixel = entry.vertex_size() + vertex;
-    const schema::ModelShaderPair shaders(base, mesh.shader_pairs().address + 16 * i);
+    const schema::ModelShaderPair shaders(mesh.shader_pairs().address + 16 * i);
     const uint32_t next = entry.pixel_size() + pixel;
     // The vertex shader.
-    FileRecord record = ReadFile(base, vertex);
-    shaders.set_vertex_shader(models::AllocVirtual(base, record.object_bytes));
-    CopyHeaderFrom(base, shaders.vertex_shader(), vertex, kVertexShaderBytes);
+    FileRecord record = ReadFile(vertex);
+    shaders.set_vertex_shader(models::AllocVirtual(record.object_bytes));
+    CopyHeaderFrom(shaders.vertex_shader(), vertex, kVertexShaderBytes);
     shaders.set_vertex_microcode(
-        models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
-    Require(native::Buffers_Memcpy(base, shaders.vertex_microcode(), record.code,
+        models::AllocPhysicalEx(record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
+    Require(native::Buffers_Memcpy(shaders.vertex_microcode(), record.code,
                                    record.code_bytes, 0x82594DE0),
             "memcpy");
-    if (!VertexShaderInit(base, shaders.vertex_shader(), shaders.vertex_microcode())) {
+    if (!VertexShaderInit(shaders.vertex_shader(), shaders.vertex_microcode())) {
       calls.init(calls.user, shaders.vertex_shader(), shaders.vertex_microcode());
     }
     // The pixel shader.
-    record = ReadFile(base, pixel);
-    shaders.set_pixel_shader(models::AllocVirtual(base, record.object_bytes));
-    CopyHeaderFrom(base, shaders.pixel_shader(), pixel, kPixelShaderBytes);
+    record = ReadFile(pixel);
+    shaders.set_pixel_shader(models::AllocVirtual(record.object_bytes));
+    CopyHeaderFrom(shaders.pixel_shader(), pixel, kPixelShaderBytes);
     shaders.set_pixel_microcode(
-        models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
-    Require(native::Buffers_Memcpy(base, shaders.pixel_microcode(), record.code,
+        models::AllocPhysicalEx(record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
+    Require(native::Buffers_Memcpy(shaders.pixel_microcode(), record.code,
                                    record.code_bytes, 0x82594E38),
             "memcpy");
-    PixelShaderInit(base, shaders.pixel_shader(), shaders.pixel_microcode());
+    PixelShaderInit(shaders.pixel_shader(), shaders.pixel_microcode());
     if (shaders.vertex_microcode() == 0) {
-      DebugMessage(base, "Mesh::LoadShaders", 0x8206CD7C);
+      DebugMessage("Mesh::LoadShaders", 0x8206CD7C);
     }
     if (shaders.pixel_microcode() == 0) {
-      DebugMessage(base, "Mesh::LoadShaders", 0x8206CDA0);
+      DebugMessage("Mesh::LoadShaders", 0x8206CDA0);
     }
     pair = next;
   }
   return true;
 }
 
-std::optional<bool> PairLoaded(uint8_t* base, uint32_t context, const CreateCalls& calls) {
+std::optional<bool> PairLoaded(uint32_t context, const CreateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820A06D0 Shaders::OnPairLoaded");
   constexpr uint32_t kVertexTable = schema::ModelsGlobals::shared_vertex_table_address();
   constexpr uint32_t kPixelTable = schema::ModelsGlobals::shared_pixel_table_address();
-  const schema::ShaderPairLoad load(base, context);
+  const schema::ShaderPairLoad load(context);
   const uint32_t vertex = load.vertex_file();
   const uint32_t pixel = load.pixel_file();
   // The checks first: memcpy's flag, each header copy's byte loop (the new
   // blocks can't share memory with the files).
   if (!native::Buffers_NativeMemcpy() ||
-      !c_runtime::XMemCpyBytes(base, vertex, schema::ShaderFile(base, vertex).header_size()) ||
-      !c_runtime::XMemCpyBytes(base, pixel, schema::ShaderFile(base, pixel).header_size())) {
+      !c_runtime::XMemCpyBytes(vertex, schema::ShaderFile(vertex).header_size()) ||
+      !c_runtime::XMemCpyBytes(pixel, schema::ShaderFile(pixel).header_size())) {
     return std::nullopt;
   }
   // The shared tables are bytes fields (2,056 pointers each): their slots by
   // the pair index.
   const auto slot = [&](uint32_t table) { return table + (load.pair() << 2); };
   // The vertex shader.
-  FileRecord record = ReadFile(base, vertex);
-  Store(base, slot(kVertexTable), models::AllocVirtual(base, record.object_bytes));
-  CopyHeaderFrom(base, Load(base, slot(kVertexTable)), vertex, kVertexShaderBytes);
-  uint32_t code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
-  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A074C),
+  FileRecord record = ReadFile(vertex);
+  Store(slot(kVertexTable), models::AllocVirtual(record.object_bytes));
+  CopyHeaderFrom(Load(slot(kVertexTable)), vertex, kVertexShaderBytes);
+  uint32_t code = models::AllocPhysicalEx(record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(code, record.code, record.code_bytes, 0x820A074C),
           "memcpy");
-  const uint32_t vertex_object = Load(base, slot(kVertexTable));
-  if (!VertexShaderInit(base, vertex_object, code)) {
+  const uint32_t vertex_object = Load(slot(kVertexTable));
+  if (!VertexShaderInit(vertex_object, code)) {
     calls.init(calls.user, vertex_object, code);
   }
   // The pixel shader (its file read again: nothing above writes it).
-  record = ReadFile(base, load.pixel_file());
-  Store(base, slot(kPixelTable), models::AllocVirtual(base, record.object_bytes));
-  CopyHeaderFrom(base, Load(base, slot(kPixelTable)), record.file, kPixelShaderBytes);
-  code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
-  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A07C8),
+  record = ReadFile(load.pixel_file());
+  Store(slot(kPixelTable), models::AllocVirtual(record.object_bytes));
+  CopyHeaderFrom(Load(slot(kPixelTable)), record.file, kPixelShaderBytes);
+  code = models::AllocPhysicalEx(record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(code, record.code, record.code_bytes, 0x820A07C8),
           "memcpy");
-  PixelShaderInit(base, Load(base, slot(kPixelTable)), code);
+  PixelShaderInit(Load(slot(kPixelTable)), code);
   return memory::crt::OperatorDelete(context);
 }
 

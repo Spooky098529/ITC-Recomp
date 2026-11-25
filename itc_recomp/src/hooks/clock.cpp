@@ -12,8 +12,8 @@
 ITC_NATIVE_ENTRY_ALWAYS(825B9A70) {
   
   const uint32_t out = ctx.r3.u32;
-  guest::StoreU32(base, out, uint32_t(helpers::kPerformanceFrequency >> 32));
-  guest::StoreU32(base, out + 4, uint32_t(helpers::kPerformanceFrequency));
+  guest::StoreU32(out, uint32_t(helpers::kPerformanceFrequency >> 32));
+  guest::StoreU32(out + 4, uint32_t(helpers::kPerformanceFrequency));
   ctx.r3.u64 = 1;
 }
 
@@ -32,7 +32,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BA0C8) {
   
   const uint32_t out = ctx.r3.u32;
   const uint64_t count = helpers::PerformanceCounter();
-  guest::StoreU32(base, out, uint32_t(count >> 32));
-  guest::StoreU32(base, out + 4, uint32_t(count));
+  guest::StoreU32(out, uint32_t(count >> 32));
+  guest::StoreU32(out + 4, uint32_t(count));
   ctx.r3.u64 = 1;
 }

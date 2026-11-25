@@ -29,46 +29,48 @@ constexpr uint32_t kSetGauges = 0x820E3938;
 constexpr uint32_t kReloadDecals = 0x820D5D20;
 constexpr uint32_t kSetUpB = 0x820C5B28;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
-uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
+uint32_t Frame(uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
-  Store(base, frame, stack);
+  Store(frame, stack);
   return frame;
 }
 
-void Memcpy(uint8_t* base, const ApplyCall& call, uint32_t to, uint32_t from, uint32_t bytes,
+void Memcpy(const ApplyCall& call, uint32_t to, uint32_t from, uint32_t bytes,
             uint32_t frame, uint32_t lr) {
-  if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
+  if (!native::Buffers_Memcpy(to, from, bytes, lr)) {
     call(kMemcpy, {to, from, bytes}, frame, lr);
   }
 }
 
 }  // namespace
 
-uint64_t ScenePartsApply(uint8_t* base, const ApplyCall& call, uint32_t parts, uint32_t record,
+uint64_t ScenePartsApply(const ApplyCall& call, uint32_t parts, uint32_t record,
                          uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E08B0 SceneParts::Apply");
-  const uint32_t frame = Frame(base, stack, 96);
-  const schema::SceneParts p(base, parts);
+  const schema::SceneParts p(parts);
   if (int32_t(p.scene().model_set()) == 1) {
     return parts;
   }
-  Memcpy(base, call, p.record_address(), record, schema::PartsRecord::kSize, frame, 0x820E08E8);
+  // The original's frame (only its back chain), for the guest calls below;
+  // not made on the early return, which calls nothing (E5 step 6).
+  const uint32_t frame = Frame(stack, 96);
+  Memcpy(call, p.record_address(), record, schema::PartsRecord::kSize, frame, 0x820E08E8);
   return call(kPartsBuild, {parts}, frame, 0x820E08F0);
 }
 
-uint64_t SceneInteriorApply(uint8_t* base, const ApplyCall& call, uint32_t interior,
+uint64_t SceneInteriorApply(const ApplyCall& call, uint32_t interior,
                             uint32_t record, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E4258 SceneInterior::Apply");
-  const uint32_t frame = Frame(base, stack, 112);
-  const schema::SceneInterior in(base, interior);
+  const uint32_t frame = Frame(stack, 112);
+  const schema::SceneInterior in(interior);
   constexpr uint32_t kBytes = schema::InteriorRecord::kSize;
-  Memcpy(base, call, in.record_address(), record, kBytes, frame, 0x820E4278);
-  Memcpy(base, call, in.first_set_interior().record_address(), record, kBytes, frame,
+  Memcpy(call, in.record_address(), record, kBytes, frame, 0x820E4278);
+  Memcpy(call, in.first_set_interior().record_address(), record, kBytes, frame,
          0x820E428C);
   const uint32_t part = in.seat_model();
   if (part != 0) {
@@ -79,21 +81,21 @@ uint64_t SceneInteriorApply(uint8_t* base, const ApplyCall& call, uint32_t inter
     const uint32_t car = in.car_model().car_model().address;
     const uint32_t texture =
         uint32_t(call(kSelectedTexture, {car}, frame, 0x820E42C0));
-    schema::PartModel(base, Load(base, in.part_models_address() + 4 * i))
+    schema::PartModel(Load(in.part_models_address() + 4 * i))
         .set_category3_texture(texture);
   }
   return call(kSetGauges, {interior}, frame, 0x820E42DC);
 }
 
-std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& call,
+std::optional<uint64_t> SceneModelApplyRecord(const ApplyCall& call,
                                               uint32_t model, uint32_t stack) {
-  const schema::SceneModel m(base, model);
+  const schema::SceneModel m(model);
   // 0 the front end.
   if (m.scene().model_set() != 0) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820DA758 SceneModel::ApplyRecord");
-  const uint32_t frame = Frame(base, stack, 144);
+  const uint32_t frame = Frame(stack, 144);
   uint64_t r3 = call(kPollLoad, {model}, frame, 0x820DA76C);
   if (int32_t(uint32_t(r3)) == 0) {
     return r3;
@@ -104,8 +106,8 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
   }
   const uint32_t car = m.car_model().car_model().address;
   call(kSetRecord, {car, m.car_record_address()}, frame, 0x820DA7B0);
-  ScenePartsApply(base, call, m.parts().address, m.parts_record_address(), frame);
-  r3 = SceneInteriorApply(base, call, m.interior(), m.interior_record_address(), frame);
+  ScenePartsApply(call, m.parts().address, m.parts_record_address(), frame);
+  r3 = SceneInteriorApply(call, m.interior(), m.interior_record_address(), frame);
   if (int32_t(m.kind()) != 2) {
     return r3;
   }
@@ -114,14 +116,16 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
   return uint64_t(m.scene().address);
 }
 
-uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t model,
+uint64_t SceneModelReloadDecals(const ApplyCall& call, uint32_t model,
                                 uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9D48 SceneModel::ReloadDecals");
-  const uint32_t frame = Frame(base, stack, 96);
-  const schema::SceneModel m(base, model);
+  const schema::SceneModel m(model);
   if (m.ready() == 0 || int32_t(m.kind()) == 3) {
     return model;
   }
+  // The original's frame (only its back chain), for the guest calls below
+  // (E5 step 6: not made on the early return).
+  const uint32_t frame = Frame(stack, 96);
   m.set_ready(0);
   m.set_decals_reloaded(0);
   // The first set's car model, read for each call.
@@ -130,21 +134,23 @@ uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t m
   return call(kReloadDecals, {m.car_model().car_model().address}, frame, 0x820D9D9C);
 }
 
-uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,
+uint64_t SceneModelAddSecondWheels(const ApplyCall& call, uint32_t model,
                                    uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D9E00 SceneModel::AddSecondWheels");
-  const uint32_t frame = Frame(base, stack, 112);
-  const schema::SceneModel m(base, model);
+  const schema::SceneModel m(model);
   if (m.second_wheels_claimed() != 0) {
     return 0;
   }
+  // The original's frame (only its back chain), for the guest call below
+  // (E5 step 6: not made on the early return).
+  const uint32_t frame = Frame(stack, 112);
   m.set_second_wheels_claimed(1);
   m.set_second_wheels_ready(0);
-  const int32_t index = vehicle_accessors::ScenePoolsClaimB(base, m.scene().address, 5);
+  const int32_t index = vehicle_accessors::ScenePoolsClaimB(m.scene().address, 5);
   const uint32_t wheels =
-      vehicle_accessors::ScenePoolsGetB(base, m.scene().address, 5, uint32_t(index));
+      vehicle_accessors::ScenePoolsGetB(m.scene().address, 5, uint32_t(index));
   m.set_second_wheels(wheels);
-  SetCarModel(base, wheels, m.car_model().address);
+  SetCarModel(wheels, m.car_model().address);
   call(kSetUpB, {m.scene().address, 5, uint64_t(int64_t(index)), m.wheels_record_address()},
        frame, 0x820D9E80);
   return 1;

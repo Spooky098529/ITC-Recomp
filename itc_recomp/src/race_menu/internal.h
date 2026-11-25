@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "race_menu/race_menu.h"
 #include "schema/boot_mode.h"
@@ -18,9 +19,9 @@
 
 namespace race_menu {
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
@@ -38,33 +39,33 @@ using EventKind = schema::RaceMenuEventKind;
 using Save = schema::SaveData;
 using CareerSave = schema::CareerSave;
 using Node = schema::UiMovieNode;
-using Message = schema::ModeMessage;
+using Message = game_modes::RingSlot;  // a slot in a mode's ring (its bytes, E5 step 4)
 // A player's mapper entry (racer-controllers.toml).
 using Entry = schema::PlayerMapperEntry;
 
 // The machine's event pairs (+9852) and kind pairs (+9980) by index.
-inline Event EventAt(uint8_t* base, uint32_t machine, uint32_t i) {
-  return Event(base, Machine(base, machine).events_address() + 8 * i);
+inline Event EventAt(uint32_t machine, uint32_t i) {
+  return Event(Machine(machine).events_address() + 8 * i);
 }
-inline EventKind EventKindAt(uint8_t* base, uint32_t machine, uint32_t i) {
-  return EventKind(base, Machine(base, machine).event_kinds_address() + 8 * i);
+inline EventKind EventKindAt(uint32_t machine, uint32_t i) {
+  return EventKind(Machine(machine).event_kinds_address() + 8 * i);
 }
 
 // The original's frame below `sp`, its back chain written.
-inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
+  Store(frame, sp);
   return frame;
 }
 
-// UiMovies::Find with the id stored at `key` (the original's frame word):
-// the pair's value's address, and the movie in it.
-inline uint32_t FindPair(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
+// UiMovies::Find(id): the pair's value's address, and the movie in it. The
+// original stored the id at `key` (a frame word only it read) and passed its
+// address; the id is passed as a value (E5 step 6), `key` left unwritten.
+inline uint32_t FindPair(uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(ui_movies::kMovieTable, id);
 }
-inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  return Load(base, FindPair(base, id, key));
+inline uint32_t FindMovie(uint32_t id, uint32_t key) {
+  return Load(FindPair(id, key));
 }
 
 
@@ -75,20 +76,20 @@ constexpr uint32_t kStopCueSlot = 52;       // 13
 constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
 
 // The sound manager's slot with r4 = the bank's word, r5 = the cue's.
-inline uint64_t CallSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame,
+inline uint64_t CallSlot(const Calls& calls, uint32_t slot, uint32_t frame,
                          uint32_t lr, uint32_t bank, uint32_t cue) {
-  const uint32_t manager = G::sound_manager(base);
-  return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, bank, cue);
+  const uint32_t manager = G::sound_manager();
+  return calls.Call(Load(Load(manager) + slot), frame, lr, manager, bank, cue);
 }
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
-inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const schema::RaceMenuMode m(base, mode);
+inline void Post(uint32_t mode, uint32_t id) {
+  const schema::RaceMenuMode m(mode);
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const Message slot(base, m.messages_address() + 12 * ((start + count - 1) % 50));
+  const Message slot{m.messages() + 12 * ((start + count - 1) % 50)};
   slot.set_id(id);
   slot.set_arg0(0);
   slot.set_arg1(0);

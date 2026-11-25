@@ -21,9 +21,9 @@ namespace graphics {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // XMemAlloc's attributes for a header (cleared), and XMemFree's for it.
@@ -47,9 +47,9 @@ constexpr uint32_t kFormatTable = G::format_table_address();
 
 }  // namespace
 
-uint32_t ResourceType(uint8_t* base, uint32_t resource) {
+uint32_t ResourceType(uint32_t resource) {
   ITC_NATIVE_RUNNING("sub_822A6180 Resource::GetType");
-  const ResourceHeader r(base, resource);
+  const ResourceHeader r(resource);
   const uint32_t common = r.common();
   const uint32_t type = common & 0xF;
   if (type == 3) {
@@ -73,9 +73,9 @@ uint32_t ResourceType(uint8_t* base, uint32_t resource) {
   return type;
 }
 
-uint32_t TextureFormat(uint8_t* base, uint32_t texture) {
+uint32_t TextureFormat(uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A44A8 Texture::Format");
-  const TextureHeader t(base, texture);
+  const TextureHeader t(texture);
   const uint32_t w40 = t.fetch_swizzle();
   const uint32_t w28 = t.fetch_tiling();
   const uint32_t w32 = t.fetch_format();
@@ -122,9 +122,9 @@ Block GpuBlockSize(uint32_t format) {
   }
 }
 
-Extent TextureBaseSize(uint8_t* base, uint32_t texture) {
+Extent TextureBaseSize(uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A4348 Texture::BaseSize");
-  const TextureHeader t(base, texture);
+  const TextureHeader t(texture);
   const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
   const uint32_t add = ((t.fetch_swizzle() >> 30) & 2) + 1;
   const uint32_t size = t.fetch_size();
@@ -226,7 +226,7 @@ uint32_t Sraw(uint32_t value, uint32_t shift) { return uint32_t(int32_t(value) >
 
 }  // namespace
 
-TextureSizes TextureLayoutSizes(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+TextureSizes TextureLayoutSizes(uint32_t width, uint32_t height, uint32_t depth,
                                 uint32_t levels, uint32_t format, uint32_t dimension,
                                 uint32_t tiled, uint32_t packed, uint32_t border, uint32_t pitch) {
   ITC_NATIVE_RUNNING("sub_822A46C8 TextureLayout::Sizes");
@@ -236,7 +236,7 @@ TextureSizes TextureLayoutSizes(uint8_t* base, uint32_t width, uint32_t height, 
   const bool array = dimension == 1 && depth > 1;
   const bool slices = array || dimension == 3;
   uint32_t level_depth = slices ? 1 : depth;  // r28
-  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+  const uint32_t bits = guest::LoadU8(kFormatTable + 1 + (format << 1));
   const uint32_t twice = border << 1;
   const uint32_t w_inner = width - twice;   // r23
   const uint32_t h_inner = height - twice;  // r26
@@ -343,7 +343,7 @@ uint32_t& Word(uint32_t* words, uint32_t offset) { return words[offset / 4]; }
 
 // TextureHeader::Set on a host copy of the header's 13 words (as guest
 // words); see SetTextureHeader.
-TextureHeaderSizes SetTextureHeaderWords(uint8_t* base, uint32_t* words, uint32_t type,
+TextureHeaderSizes SetTextureHeaderWords(uint32_t* words, uint32_t type,
                                          uint32_t width, uint32_t height, uint32_t depth,
                                          uint32_t levels, uint32_t usage, uint32_t format,
                                          uint32_t packed, uint32_t border, uint32_t field,
@@ -371,7 +371,7 @@ TextureHeaderSizes SetTextureHeaderWords(uint8_t* base, uint32_t* words, uint32_
   if (packed == 2) {
     packed = levels > 1 ? 1 : 0;
   }
-  const TextureSizes sizes = TextureLayoutSizes(base, width, height, depth, levels,
+  const TextureSizes sizes = TextureLayoutSizes(width, height, depth, levels,
                                                 format & 0x3F, dimension, (format >> 8) & 1,
                                                 packed, border, pitch);
   uint32_t common = (usage & 0x4) ? 0x00300003 : 0x00100003;
@@ -451,29 +451,28 @@ constexpr uint32_t kSetWords[] = {0, 4, 8, 20, 24, 28, 32, 36, 40, 44, 48};
 
 }  // namespace
 
-TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
+TextureHeaderSizes SetTextureHeader(uint32_t type, uint32_t width, uint32_t height,
                                     uint32_t depth, uint32_t levels, uint32_t usage,
                                     uint32_t format, uint32_t packed, uint32_t border,
                                     uint32_t field, uint32_t pitch, uint32_t header) {
   ITC_NATIVE_RUNNING("sub_822A5608 TextureHeader::Set");
   uint32_t words[13];
   for (uint32_t i = 0; i < 13; i++) {
-    words[i] = Load(base, header + 4 * i);
+    words[i] = Load(header + 4 * i);
   }
-  const TextureHeaderSizes sizes = SetTextureHeaderWords(
-      base, words, type, width, height, depth, levels, usage, format, packed, border, field, pitch);
+  const TextureHeaderSizes sizes = SetTextureHeaderWords(words, type, width, height, depth, levels, usage, format, packed, border, field, pitch);
   for (uint32_t offset : kSetWords) {
-    Store(base, header + offset, Word(words, offset));
+    Store(header + offset, Word(words, offset));
   }
   return sizes;
 }
 
-LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) {
+LevelLayout TextureLevelLayout(uint32_t texture, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A4B98 Texture::LevelLayout");
-  const TextureHeader t(base, texture);
+  const TextureHeader t(texture);
   const uint32_t format = t.fetch_format() & 0x3F;
-  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
-  const uint32_t type = ResourceType(base, texture);
+  const uint32_t bits = guest::LoadU8(kFormatTable + 1 + (format << 1));
+  const uint32_t type = ResourceType(texture);
   // The level's width, height and depth for TextureLevelSize (the
   // original's stack slots +88, +80 and +84; +80 is the aligned height).
   uint32_t width = 0, height = 0, depth = 0;
@@ -482,7 +481,7 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
   // packed mips).
   uint32_t at = level;
   if (type == 4) {
-    const Extent size = TextureBaseSize(base, texture);
+    const Extent size = TextureBaseSize(texture);
     const uint32_t w28 = t.fetch_tiling();
     const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
     out_height = size.height;
@@ -497,7 +496,7 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
   } else {
     const uint32_t border = t.fetch_swizzle() >> 31;
     const uint32_t twice = border << 1;
-    const Extent size = TextureBaseSize(base, texture);
+    const Extent size = TextureBaseSize(texture);
     out_width = size.width;
     out_height = size.height;
     out_depth = size.depth;
@@ -564,10 +563,10 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
   return {out_width, out_height, out_depth, pitch, slice};
 }
 
-MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32_t height,
+MipTailPlace MipTailOffset(uint32_t level, uint32_t width, uint32_t height,
                            uint32_t depth, uint32_t pitch, uint32_t slice, uint32_t format) {
   ITC_NATIVE_RUNNING("sub_822A4A40 TextureLayout::MipTailOffset");
-  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+  const uint32_t bits = guest::LoadU8(kFormatTable + 1 + (format << 1));
   const Block block = GpuBlockSize(format);
   const uint32_t log_w = 32 - Clz(width - 1);
   const uint32_t log_h = 32 - Clz(height - 1);
@@ -599,15 +598,15 @@ MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32
   return place;
 }
 
-LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level) {
+LevelPlace TextureLevelOffset(uint32_t texture, uint32_t face, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A4FF0 Texture::LevelOffset");
-  const TextureHeader t(base, texture);
-  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + ((t.fetch_format() & 0x3F) << 1));
+  const TextureHeader t(texture);
+  const uint32_t bits = guest::LoadU8(kFormatTable + 1 + ((t.fetch_format() & 0x3F) << 1));
   const uint32_t border = t.fetch_swizzle() >> 31;
   const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
   const uint32_t tiled = t.fetch_tiling() >> 31;
   const uint32_t twice = border << 1;
-  const Extent size = TextureBaseSize(base, texture);
+  const Extent size = TextureBaseSize(texture);
   LevelPlace place{};
   place.width = size.width;
   place.height = size.height;
@@ -655,7 +654,7 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
     // A cube map's faces, or an array's slices (aligned to 4 with +32 bit
     // 0x400), share each level.
     uint32_t slices = 1;  // r16
-    const uint32_t type = ResourceType(base, texture);
+    const uint32_t type = ResourceType(texture);
     if (type == 18 || type == 19) {
       const uint32_t align = Slw(1, (t.fetch_format() >> 9) & 2);
       slices = ((t.fetch_size() >> 26) + align) & ~(align - 1);
@@ -698,7 +697,7 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
         // The level is in the mip tail.
         aligned_height = h;
         const MipTailPlace tail =
-            MipTailOffset(base, uint32_t(left), mw, mh, md, pitch, pitch * h, format);
+            MipTailOffset(uint32_t(left), mw, mh, md, pitch, pitch * h, format);
         aligned_depth = d;
         place.tail = tail.offset;
         start += tail.offset;
@@ -732,12 +731,12 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
   return place;
 }
 
-uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc) {
+uint32_t TextureLevelDesc(uint32_t texture, uint32_t level, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_822A4F60 Texture::LevelDesc");
-  const LevelLayout layout = TextureLevelLayout(base, texture, level);
-  const LevelDesc d(base, desc);
-  d.set_format(TextureFormat(base, texture));
-  const uint32_t type = ResourceType(base, texture);
+  const LevelLayout layout = TextureLevelLayout(texture, level);
+  const LevelDesc d(desc);
+  d.set_format(TextureFormat(texture));
+  const uint32_t type = ResourceType(texture);
   d.set_type(type);
   d.set_usage(0);
   d.set_pool(0);
@@ -748,14 +747,14 @@ uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint3
   return type;
 }
 
-uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc) {
+uint32_t SurfaceDesc(uint32_t surface, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_822A5F50 Surface::GetDesc");
   uint32_t r3 = surface;
-  const SurfaceHeader s(base, surface);
-  const LevelDesc d(base, desc);
+  const SurfaceHeader s(surface);
+  const LevelDesc d(desc);
   if (s.common() & 0x40000000) {
     const uint32_t level = s.level_face() >> 28;
-    r3 = TextureLevelDesc(base, s.parent().address, level, desc);
+    r3 = TextureLevelDesc(s.parent().address, level, desc);
   } else {
     const uint32_t format = s.format();
     d.set_usage(0);
@@ -770,7 +769,7 @@ uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc) {
   return r3;
 }
 
-SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+SurfaceSizes SetSurfaceHeader(uint32_t width, uint32_t height, uint32_t format,
                               int32_t multisample, uint32_t parameters, uint32_t header) {
   ITC_NATIVE_RUNNING("sub_822A5910 SurfaceHeader::Set");
   uint32_t low = format & 0x3F;
@@ -778,7 +777,7 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   if (low == 54) {
     low = 7;
   }
-  const SurfaceHeader surface(base, header);
+  const SurfaceHeader surface(header);
   surface.set_ref_count(1);
   surface.set_common(4);
   surface.set_locked_base(kUnlocked);
@@ -800,11 +799,11 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   uint32_t hi_z_base = 0xFFFFFFFF;
   uint32_t parameter8 = 0;
   if (parameters != 0) {
-    const schema::SurfaceParameters p(base, parameters);
+    const schema::SurfaceParameters p(parameters);
     edram_base = p.edram_base();
     hi_z_base = p.hi_z_base();
     parameter8 = p.unknown_8();
-  } else if (depth && G::hi_z_taken(base) == 0) {
+  } else if (depth && G::hi_z_taken() == 0) {
     hi_z_base = 0;
   }
   // The pitch: 80-pixel tiles (40 with 4x samples), and the width aligned.
@@ -822,7 +821,7 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   const uint32_t size =
       ((width - 1) << 18) | (((height - 1) << 3) & 0x3FFF8) | (surface.size() & 7);
   surface.set_size(size);
-  const uint32_t format_bits = (guest::LoadU16(base, kFormatTable + (low << 1)) >> 8) & 0xF;
+  const uint32_t format_bits = (guest::LoadU16(kFormatTable + (low << 1)) >> 8) & 0xF;
   if (depth) {
     surface.set_edram(((format_bits & 1) << 16) | (edram_base & 0xFFF));
     if (hi_z_base == 0xFFFFFFFF) {
@@ -844,45 +843,45 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   return {tiles, hi_z};
 }
 
-uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+uint32_t CreateSurface(uint32_t width, uint32_t height, uint32_t format,
                        int32_t multisample, uint32_t parameters) {
   ITC_NATIVE_RUNNING("sub_822A5E28 Device::CreateSurface");
-  const uint32_t header = memory::crt::XMemAlloc(base, 48, kHeaderAttributes);
+  const uint32_t header = memory::crt::XMemAlloc(48, kHeaderAttributes);
   if (header == 0) {
     return 0;
   }
   const SurfaceSizes sizes =
-      SetSurfaceHeader(base, width, height, format, multisample, parameters, header);
-  const SurfaceHeader h(base, header);
+      SetSurfaceHeader(width, height, format, multisample, parameters, header);
+  const SurfaceHeader h(header);
   h.set_common(h.common() | 0x00100000);
   if (parameters != 0) {
     return header;
   }
   const uint32_t low = h.format() & 0x3F;
   const bool depth = low == 22 || low == 23;
-  const std::optional<edram::Allocation> allocation = edram::Alloc(base, sizes.tiles);
+  const std::optional<edram::Allocation> allocation = edram::Alloc(sizes.tiles);
   if (!allocation || !allocation->ok) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
   const uint32_t edram_base = allocation->base;
   if (edram_base + sizes.tiles > 2048) {
-    edram::Free(base, edram_base, sizes.tiles);
+    edram::Free(edram_base, sizes.tiles);
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
   h.set_common(h.common() | 0x80000000);
   h.set_edram((h.edram() & 0xFFFFF000) | (edram_base & 0xFFF));
-  if (depth && G::hi_z_taken(base) == 0) {
-    G::set_hi_z_taken(base, 1);
+  if (depth && G::hi_z_taken() == 0) {
+    G::set_hi_z_taken(1);
     h.set_hi_z(h.hi_z() & 0x1FFFF);
   }
   return header;
 }
 
-uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {
+uint32_t CreateVertexBuffer(uint32_t bytes, uint32_t usage) {
   ITC_NATIVE_RUNNING("sub_822A6830 Device::CreateVertexBuffer");
-  const uint32_t header = memory::crt::XMemAlloc(base, 32, kHeaderAttributes);
+  const uint32_t header = memory::crt::XMemAlloc(32, kHeaderAttributes);
   if (header == 0) {
     return 0;
   }
@@ -895,12 +894,12 @@ uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {
   if (usage & kUsage200) {
     common |= 0x00400000;
   }
-  const uint32_t data = memory::crt::XMemAlloc(base, bytes, kDataAttributes | (protection << 28));
+  const uint32_t data = memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
-  const BufferHeader h(base, header);
+  const BufferHeader h(header);
   h.set_common(common);
   h.set_ref_count(1);
   const uint32_t old28 = h.size();
@@ -910,9 +909,9 @@ uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {
   return header;
 }
 
-uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32_t format) {
+uint32_t CreateIndexBuffer(uint32_t bytes, uint32_t usage, uint32_t format) {
   ITC_NATIVE_RUNNING("sub_822A6968 Device::CreateIndexBuffer");
-  const uint32_t header = memory::crt::XMemAlloc(base, 32, kHeaderAttributes);
+  const uint32_t header = memory::crt::XMemAlloc(32, kHeaderAttributes);
   if (header == 0) {
     return 0;
   }
@@ -925,12 +924,12 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
   if (usage & kUsage200) {
     common |= 0x00400000;
   }
-  const uint32_t data = memory::crt::XMemAlloc(base, bytes, kDataAttributes | (protection << 28));
+  const uint32_t data = memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
-  const BufferHeader h(base, header);
+  const BufferHeader h(header);
   h.set_size(bytes);
   h.set_common(common);
   h.set_data(data);
@@ -939,56 +938,56 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
   return header;
 }
 
-uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+uint32_t CreateTexture(uint32_t width, uint32_t height, uint32_t depth,
                        uint32_t levels, uint32_t usage, uint32_t format, uint32_t type) {
   ITC_NATIVE_RUNNING("sub_822A5D08 Device::CreateTexture");
-  const uint32_t header = memory::crt::XMemAlloc(base, 52, kHeaderAttributes);
+  const uint32_t header = memory::crt::XMemAlloc(52, kHeaderAttributes);
   if (header == 0) {
     return 0;
   }
-  const TextureHeaderSizes sizes = SetTextureHeader(base, type, width, height, depth, levels,
+  const TextureHeaderSizes sizes = SetTextureHeader(type, width, height, depth, levels,
                                                     usage, format, 2, 0, 0, 0, header);
   // Physical, the protection field 3, or 2 (write-combined) with usage 0x4.
   const uint32_t attributes = 0x8C800000 | (((~usage >> 2) & 1) | 2) << 28;
-  const uint32_t data = memory::crt::XMemAlloc(base, sizes.base_size, attributes);
+  const uint32_t data = memory::crt::XMemAlloc(sizes.base_size, attributes);
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
   uint32_t mips = 0;
   if (sizes.mip_size != 0) {
-    mips = memory::crt::XMemAlloc(base, sizes.mip_size, attributes);
+    mips = memory::crt::XMemAlloc(sizes.mip_size, attributes);
     if (mips == 0) {
       memory::crt::XMemFree(header, kHeaderFreeAttributes);
       memory::crt::XMemFree(data, 0xB1800000);
       return 0;
     }
   }
-  const TextureHeader h(base, header);
+  const TextureHeader h(header);
   h.set_fetch_format((h.fetch_format() & 0xFFF) | (data & 0xFFFFF000));
   h.set_fetch_mips((h.fetch_mips() & 0xFFF) | (mips & 0xFFFFF000));
   return header;
 }
 
-uint32_t GetSurfaceLevel(uint8_t* base, uint32_t texture, uint32_t level) {
+uint32_t GetSurfaceLevel(uint32_t texture, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A5B80 Texture::GetSurfaceLevel");
-  const uint32_t surface = memory::crt::XMemAlloc(base, 48, kHeaderAttributes);
+  const uint32_t surface = memory::crt::XMemAlloc(48, kHeaderAttributes);
   if (surface == 0) {
     return 0;
   }
-  const SurfaceHeader s(base, surface);
-  const uint32_t common = 0x40100004 | (TextureHeader(base, texture).common() & 0x200000);
+  const SurfaceHeader s(surface);
+  const uint32_t common = 0x40100004 | (TextureHeader(texture).common() & 0x200000);
   s.set_parent(texture);
   s.set_common(common);
   const uint32_t w28 = s.level_face();
   s.set_ref_count(1);
   s.set_locked_base(kUnlocked);
   s.set_level_face((w28 & 0x003FFFFF) | (level << 28));
-  refcount::AddRef(base, texture);
+  refcount::AddRef(texture);
   return surface;
 }
 
-uint32_t XGSetTextureHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t levels,
+uint32_t XGSetTextureHeader(uint32_t width, uint32_t height, uint32_t levels,
                             uint32_t usage, uint32_t format, uint32_t base_address,
                             uint32_t mip_address, uint32_t pitch, uint32_t header,
                             uint32_t base_size_out, uint32_t mip_size_out) {
@@ -1010,14 +1009,14 @@ uint32_t XGSetTextureHeader(uint8_t* base, uint32_t width, uint32_t height, uint
   args.header = header;
   args.base_size_out = base_size_out;
   args.mip_size_out = mip_size_out;
-  return XGSetTextureHeaderEx(base, args);
+  return XGSetTextureHeaderEx(args);
 }
 
 bool XgHeaderCopyFits(uint32_t header) {
   return header == 0 || (header < 0xA0000000u && c_runtime::InOneView(header, 52));
 }
 
-uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
+uint32_t XGSetTextureHeaderEx(const XgTextureHeader& a) {
   ITC_NATIVE_RUNNING("sub_8235A720 XGSetTextureHeaderEx");
   const Block block = GpuBlockSize(a.format & 0x3F);
   // A single level (one asked, or the full chain of a 1 x 1 x 1 texture,
@@ -1035,7 +1034,7 @@ uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
   // The header, built in a host copy of the original's zeroed stack block.
   uint32_t words[13] = {};
   const TextureHeaderSizes sizes =
-      SetTextureHeaderWords(base, words, a.type, a.width, a.height, a.depth, a.levels, a.usage,
+      SetTextureHeaderWords(words, a.type, a.width, a.height, a.depth, a.levels, a.usage,
                             a.format, a.packed, a.border, a.field, pitch);
   Word(words, 32) = (a.base_address & 0xFFFFF000) | (Word(words, 32) & 0xFFF);
   Word(words, 4) = 1;
@@ -1062,14 +1061,14 @@ uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
     Word(words, 48) &= 0xFFF;
   }
   if (a.base_size_out != 0) {
-    Store(base, a.base_size_out, base_size);
+    Store(a.base_size_out, base_size);
   }
   if (a.mip_size_out != 0) {
-    Store(base, a.mip_size_out, sizes.mip_size);
+    Store(a.mip_size_out, sizes.mip_size);
   }
   if (a.header != 0) {  // the original's memcpy (XgHeaderCopyFits)
     for (uint32_t i = 0; i < 13; i++) {
-      Store(base, a.header + 4 * i, words[i]);
+      Store(a.header + 4 * i, words[i]);
     }
   }
   return base_size + sizes.mip_size;
@@ -1078,41 +1077,41 @@ uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
 namespace {
 
 // A device's slot, AddRef'ed when set.
-uint32_t Current(uint8_t* base, uint32_t slot) {
-  const uint32_t resource = Load(base, slot);
+uint32_t Current(uint32_t slot) {
+  const uint32_t resource = Load(slot);
   if (resource != 0) {
-    refcount::AddRef(base, resource);
+    refcount::AddRef(resource);
   }
   return resource;
 }
 
 }  // namespace
 
-uint32_t GetRenderTarget(uint8_t* base, uint32_t device, uint32_t index) {
+uint32_t GetRenderTarget(uint32_t device, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_822A3998 Device::GetRenderTarget");
-  return Current(base, schema::Device(base, device).render_target0_address() + 4 * index);
+  return Current(schema::Device(device).render_target0_address() + 4 * index);
 }
 
-uint32_t GetDepthStencilSurface(uint8_t* base, uint32_t device) {
+uint32_t GetDepthStencilSurface(uint32_t device) {
   ITC_NATIVE_RUNNING("sub_822A39E0 Device::GetDepthStencilSurface");
-  return Current(base, schema::Device(base, device).depth_surface_address());
+  return Current(schema::Device(device).depth_surface_address());
 }
 
-StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream) {
+StreamSource GetStreamSource(uint32_t device, uint32_t stream) {
   ITC_NATIVE_RUNNING("sub_822A3880 Device::GetStreamSource");
-  const schema::Device d(base, device);
-  StreamSource source{Load(base, d.streams_address() + 4 * stream), 0, 0};
+  const schema::Device d(device);
+  StreamSource source{Load(d.streams_address() + 4 * stream), 0, 0};
   uint32_t offset = 0;
   if (source.buffer != 0) {
     // The stream's fetch constant's address, less the buffer's (+24's low
     // 29 bits, in the view its top 12 bits say).
-    const uint32_t fetch = Load(base, d.fetch_constants_address() + 760 - 8 * stream);
-    const uint32_t data = BufferHeader(base, source.buffer).data();
+    const uint32_t fetch = Load(d.fetch_constants_address() + 760 - 8 * stream);
+    const uint32_t data = BufferHeader(source.buffer).data();
     offset = fetch - ((((data >> 20) & 0xFFF) + 512) & 0x1000) - (data & 0x1FFFFFFF);
-    refcount::AddRef(base, source.buffer);
+    refcount::AddRef(source.buffer);
   }
   source.offset = offset << 2;
-  source.stride = uint32_t(guest::LoadU8(base, d.stream_strides_address() + stream)) << 2;
+  source.stride = uint32_t(guest::LoadU8(d.stream_strides_address() + stream)) << 2;
   return source;
 }
 
@@ -1121,8 +1120,8 @@ namespace {
 // Adds `delta` to the big-endian word at `address` atomically (the
 // library's lwarx/stwcx loop, without the recompiler's global lock, as
 // src/native/refcount.cpp does); returns the old value.
-uint32_t AddToWord(uint8_t* base, uint32_t address, uint32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(base + address);
+uint32_t AddToWord(uint32_t address, uint32_t delta) {
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {
@@ -1142,12 +1141,12 @@ uint32_t OtherView(uint32_t address) {
 
 }  // namespace
 
-uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t data,
+uint32_t LockResource(uint32_t resource, uint32_t mips, uint32_t data,
                       uint32_t mip_data, uint32_t address, uint32_t size, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A63F8 Resource::Lock");
   // The fence wait and the cache flush packet are Dropped (resources.h).
   const uint32_t other_view = flags & 0x10;
-  const ResourceHeader r(base, resource);
+  const ResourceHeader r(resource);
   if (other_view || (r.common() & 0x200000)) {
     if (!(flags & 1)) {
       uint32_t offset, slot;
@@ -1158,7 +1157,7 @@ uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t 
         offset = address - data;
         slot = r.locked_base_address();
       }
-      const uint32_t range = Load(base, slot);
+      const uint32_t range = Load(slot);
       uint32_t end = (offset + size + 127) >> 7;
       const uint32_t old_end = range & 0xFFFF;
       uint32_t start = range >> 16;
@@ -1169,20 +1168,20 @@ uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t 
       if (new_start < start) {
         start = new_start;
       }
-      Store(base, slot, ((start << 16) & 0xFFFF0000) | end);
+      Store(slot, ((start << 16) & 0xFFFF0000) | end);
     }
     if (other_view) {
       address = OtherView(address);
     }
   }
-  AddToWord(base, r.common_address(), kLockCount);
+  AddToWord(r.common_address(), kLockCount);
   return address;
 }
 
-uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_t mip_data) {
+uint32_t UnlockResource(uint32_t resource, uint32_t data, uint32_t mip_data) {
   ITC_NATIVE_RUNNING("sub_822A6630 Resource::Unlock");
-  const ResourceHeader r(base, resource);
-  const uint32_t old = AddToWord(base, r.common_address(), 0u - kLockCount);
+  const ResourceHeader r(resource);
+  const uint32_t old = AddToWord(r.common_address(), 0u - kLockCount);
   uint32_t r3 = resource;
   if ((old & 0xF00) != 0x100) {
     return r3;
@@ -1190,12 +1189,12 @@ uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_
   // The last lock: the ranges reset (their data cache flush Dropped; r3 is
   // the flush's start address, as the original leaves it).
   auto reset = [&](uint32_t slot, uint32_t start_address) {
-    const uint32_t range = Load(base, slot);
+    const uint32_t range = Load(slot);
     if (range == kUnlocked) {
       return;
     }
     const uint32_t common = r.common();
-    Store(base, slot, kUnlocked);
+    Store(slot, kUnlocked);
     if (!(common & 0x200000)) {
       start_address = OtherView(start_address);
     }
@@ -1208,120 +1207,120 @@ uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_
   return r3;
 }
 
-LevelLock LockTextureLevel(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+LevelLock LockTextureLevel(uint32_t texture, uint32_t face, uint32_t level,
                            uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A54B0 Texture::LockLevel");
-  const LevelPlace place = TextureLevelOffset(base, texture, face, level);
-  const TextureHeader t(base, texture);
+  const LevelPlace place = TextureLevelOffset(texture, face, level);
+  const TextureHeader t(texture);
   const Block block = GpuBlockSize(t.fetch_format() & 0x3F);
   LevelLock lock;
   lock.pitch = place.pitch * block.height;
   lock.slice = place.slice;
   lock.tail = place.tail;
-  lock.r3 = LockResource(base, texture, level, t.fetch_format() & 0xFFFFF000,
+  lock.r3 = LockResource(texture, level, t.fetch_format() & 0xFFFFF000,
                          t.fetch_mips() & 0xFFFFF000, place.offset - place.tail,
                          place.size, flags);
   lock.address = place.tail + lock.r3;
   return lock;
 }
 
-uint32_t LockTextureRect(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+uint32_t LockTextureRect(uint32_t texture, uint32_t face, uint32_t level,
                          uint32_t locked, uint32_t rect, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A5578 Texture::LockRect");
-  const LevelLock lock = LockTextureLevel(base, texture, face, level, flags);
+  const LevelLock lock = LockTextureLevel(texture, face, level, flags);
   uint32_t bits = lock.address;
   if (rect != 0) {
-    const uint32_t format = TextureHeader(base, texture).fetch_format() & 0x3F;
-    const uint32_t pixel_bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
-    const schema::GpuLockRect area(base, rect);
+    const uint32_t format = TextureHeader(texture).fetch_format() & 0x3F;
+    const uint32_t pixel_bits = guest::LoadU8(kFormatTable + 1 + (format << 1));
+    const schema::GpuLockRect area(rect);
     bits = ((pixel_bits * area.left()) >> 3) + area.top() * lock.pitch + lock.address;
   }
-  const schema::LockedRect out(base, locked);
+  const schema::LockedRect out(locked);
   out.set_pitch(lock.pitch);
   out.set_bits(bits);
   return lock.r3;
 }
 
-uint32_t LockTextureRectLevel(uint8_t* base, uint32_t texture, uint32_t level, uint32_t locked,
+uint32_t LockTextureRectLevel(uint32_t texture, uint32_t level, uint32_t locked,
                               uint32_t rect, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A5C38 Texture::LockRectLevel");
-  return LockTextureRect(base, texture, 0, level, locked, rect, flags);
+  return LockTextureRect(texture, 0, level, locked, rect, flags);
 }
 
-uint32_t UnlockTexture(uint8_t* base, uint32_t texture) {
+uint32_t UnlockTexture(uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A43E0 Texture::Unlock");
-  const TextureHeader t(base, texture);
-  return UnlockResource(base, texture, t.fetch_format() & 0xFFFFF000, t.fetch_mips() & 0xFFFFF000);
+  const TextureHeader t(texture);
+  return UnlockResource(texture, t.fetch_format() & 0xFFFFF000, t.fetch_mips() & 0xFFFFF000);
 }
 
-uint32_t UnlockSurface(uint8_t* base, uint32_t surface) {
+uint32_t UnlockSurface(uint32_t surface) {
   ITC_NATIVE_RUNNING("sub_822A43F8 Surface::Unlock");
-  const TextureHeader t = SurfaceHeader(base, surface).parent();
-  return UnlockResource(base, t.address, t.fetch_format() & 0xFFFFF000,
+  const TextureHeader t = SurfaceHeader(surface).parent();
+  return UnlockResource(t.address, t.fetch_format() & 0xFFFFF000,
                         t.fetch_mips() & 0xFFFFF000);
 }
 
-uint32_t LockSurfaceRect(uint8_t* base, uint32_t surface, uint32_t locked, uint32_t rect,
+uint32_t LockSurfaceRect(uint32_t surface, uint32_t locked, uint32_t rect,
                          uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A5FE8 Surface::LockRect");
-  const SurfaceHeader s(base, surface);
+  const SurfaceHeader s(surface);
   const uint32_t w28 = s.level_face();
-  return LockTextureRect(base, s.parent().address, (w28 >> 22) & 0x3F, w28 >> 28, locked, rect,
+  return LockTextureRect(s.parent().address, (w28 >> 22) & 0x3F, w28 >> 28, locked, rect,
                          flags);
 }
 
-uint32_t LockVertexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+uint32_t LockVertexBuffer(uint32_t buffer, uint32_t offset, uint32_t size,
                           uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A68F8 VertexBuffer::Lock");
   if (size == 0) {
-    size = BufferHeader(base, buffer).size() & 0x3FFFFFC;
+    size = BufferHeader(buffer).size() & 0x3FFFFFC;
     offset = 0;
   }
-  const uint32_t data = BufferHeader(base, buffer).data() & 0xFFFFFFFC;
-  return LockResource(base, buffer, 0, data, 0, data + offset, size, flags);
+  const uint32_t data = BufferHeader(buffer).data() & 0xFFFFFFFC;
+  return LockResource(buffer, 0, data, 0, data + offset, size, flags);
 }
 
-uint32_t LockIndexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+uint32_t LockIndexBuffer(uint32_t buffer, uint32_t offset, uint32_t size,
                          uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A6A18 IndexBuffer::Lock");
   if (size == 0) {
-    size = BufferHeader(base, buffer).size();
+    size = BufferHeader(buffer).size();
     offset = 0;
   }
-  const uint32_t data = BufferHeader(base, buffer).data();
-  return LockResource(base, buffer, 0, data, 0, data + offset, size, flags | 2);
+  const uint32_t data = BufferHeader(buffer).data();
+  return LockResource(buffer, 0, data, 0, data + offset, size, flags | 2);
 }
 
-uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
+uint32_t DestroySurface(uint32_t surface, uint32_t common) {
   ITC_NATIVE_RUNNING("sub_822A6268 Resource::DestroySurface");
   if (!(common & 0x40000000)) {
     if (common & 0x80000000) {
-      const SurfaceHeader s(base, surface);
+      const SurfaceHeader s(surface);
       const uint32_t tiles = s.edram_bytes() / 5120;
-      edram::Free(base, s.edram() & 0xFFF, tiles);
+      edram::Free(s.edram() & 0xFFF, tiles);
     }
-    if (SurfaceHeader(base, surface).hi_z() & 1) {
-      G::set_hi_z_taken(base, 0);
+    if (SurfaceHeader(surface).hi_z() & 1) {
+      G::set_hi_z_taken(0);
     }
   }
   return memory::crt::XMemFree(surface, kHeaderFreeAttributes);
 }
 
-uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer) {
+uint32_t UnlockVertexBuffer(uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_822A6958 VertexBuffer::Unlock");
-  return UnlockResource(base, buffer, BufferHeader(base, buffer).data() & 0xFFFFFFFC, 0);
+  return UnlockResource(buffer, BufferHeader(buffer).data() & 0xFFFFFFFC, 0);
 }
 
-uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer) {
+uint32_t UnlockIndexBuffer(uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_822A6A78 IndexBuffer::Unlock");
-  return UnlockResource(base, buffer, BufferHeader(base, buffer).data(), 0);
+  return UnlockResource(buffer, BufferHeader(buffer).data(), 0);
 }
 
-uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
+uint32_t DestroyResource(uint32_t resource) {
   ITC_NATIVE_RUNNING("sub_822A6210 Resource::Destroy");
   // The fence waits are Dropped (resources.h).
   constexpr uint32_t kDataFreeAttributes = 0xB1800000;
-  const ResourceHeader r(base, resource);
+  const ResourceHeader r(resource);
   const uint32_t common = r.common();
   switch (common & 0xF) {
     case 1:
@@ -1339,7 +1338,7 @@ uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
       break;
     }
     case 4:
-      return DestroySurface(base, resource, common);
+      return DestroySurface(resource, common);
     case 6:
       memory::crt::XMemFree(r.fetch_mips(), kDataFreeAttributes);
       break;

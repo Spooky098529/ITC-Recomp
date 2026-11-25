@@ -24,8 +24,8 @@ using G = schema::FramePassesGlobals;
 // Clear), -8.0 (slope-scaled depth bias) and -0.0001 (depth bias).
 
 // A float as the original moves it: loaded to a double, stored as a float.
-float LoadConverted(uint8_t* base, uint32_t address) {
-  const double value = double(guest::LoadFloat(base, address));
+float LoadConverted(uint32_t address) {
+  const double value = double(guest::LoadFloat(address));
   return float(value);
 }
 
@@ -47,7 +47,7 @@ void End(Recorder& r) { r.Slot3(36, 0, 0); }
 // A float stored as a word of the frame (the original's stfs there; the
 // slots read it back with LoadFrame).
 void FrameFloat(Recorder& r, uint32_t offset, float value) {
-  guest::StoreFloat(r.base, r.frame + offset, value);
+  guest::StoreFloat(r.frame + offset, value);
 }
 
 // The shared shader pair 0 (commands 8 and 9), each shader's slot kept at
@@ -55,11 +55,11 @@ void FrameFloat(Recorder& r, uint32_t offset, float value) {
 void VertexShader0(Recorder& r) {
   r.Slot3(8, 1, 0);
   r.StoreFrame(84, r.Slot());
-  r.Store(r.LoadFrame(84), models::SharedVertexShader(r.base, 0));
+  r.Store(r.LoadFrame(84), models::SharedVertexShader(0));
 }
 void PixelShader0Slot(Recorder& r) {
   r.StoreFrame(84, r.Slot());
-  r.Store(r.LoadFrame(84), models::SharedPixelShader(r.base, 0));
+  r.Store(r.LoadFrame(84), models::SharedPixelShader(0));
 }
 
 }  // namespace
@@ -121,13 +121,13 @@ void RecordPart2(Recorder& r) {
   r.Slot2(52, 0);
   {
     const uint32_t s = r.Slot();
-    FrameFloat(r, 80, LoadConverted(r.base, G::depth_bias_address()));
+    FrameFloat(r, 80, LoadConverted(G::depth_bias_address()));
     r.Store(s + 0, 44);
     r.Store(s + 4, 6);
   }
   {
     const uint32_t s = r.Slot();
-    FrameFloat(r, 84, LoadConverted(r.base, G::slope_bias_address()));
+    FrameFloat(r, 84, LoadConverted(G::slope_bias_address()));
     r.Store(s + 0, 208);
     r.Store(s + 4, r.LoadFrame(80));
   }
@@ -137,7 +137,7 @@ void RecordPart2(Recorder& r) {
   // Head 8 (the frame's +120): the depth biases back to 0.0 (the original's
   // f31) through the frame's +80 and +84.
   r.StoreFrame(120, r.Head());
-  const float zero = LoadConverted(r.base, G::zero_address());
+  const float zero = LoadConverted(G::zero_address());
   {
     const uint32_t s = r.Slot();
     FrameFloat(r, 80, zero);

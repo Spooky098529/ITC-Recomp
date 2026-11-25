@@ -53,14 +53,14 @@ bool hooks::NativeFramePasses() {
 #define ITC_FRAME_PASSES_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                     \
   if (!hooks::NativeFramePasses()) {       \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                \
   }
 
 // FramePasses::FlipWorkMem: r3 not read, left as it came.
 ITC_NATIVE_ENTRY_ALWAYS(82096218) {
   ITC_FRAME_PASSES_FALLBACK(82096218)
-  fp::FlipWorkMem(base);
+  fp::FlipWorkMem();
 }
 
 // The delegate thunk: r3 = the object; its slot 2 as a tail call (r12 the
@@ -68,18 +68,18 @@ ITC_NATIVE_ENTRY_ALWAYS(82096218) {
 // none reads them).
 ITC_NATIVE_ENTRY_ALWAYS(82096350) {
   ITC_FRAME_PASSES_FALLBACK(82096350)
-  const uint32_t target = fp::DelegateSlot2Target(base, ctx.r3.u32);
+  const uint32_t target = fp::DelegateSlot2Target(ctx.r3.u32);
   ctx.ctr.u64 = target;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
 }
 
 // FramePasses::RecordConstants and RecordSamplers: r4 = the command list;
 // r3 the last slot, r4 = 1 (the count of the original's last AllocateSlots).
 ITC_NATIVE_ENTRY_ALWAYS(82096360) {
   ITC_FRAME_PASSES_FALLBACK(82096360)
-  const auto last = fp::RecordConstants(base, ctx.r4.u32);
+  const auto last = fp::RecordConstants(ctx.r4.u32);
   if (!last) {
-    lifted::original::c82096360(ctx, base);
+    lifted::original::c82096360(ctx);
     return;
   }
   ctx.r3.u64 = *last;
@@ -88,59 +88,59 @@ ITC_NATIVE_ENTRY_ALWAYS(82096360) {
 
 ITC_NATIVE_ENTRY_ALWAYS(82096030) {
   ITC_FRAME_PASSES_FALLBACK(82096030)
-  const auto last = fp::RecordSamplers(base, ctx.r4.u32);
+  const auto last = fp::RecordSamplers(ctx.r4.u32);
   if (!last) {
-    lifted::original::c82096030(ctx, base);
+    lifted::original::c82096030(ctx);
     return;
   }
   ctx.r3.u64 = *last;
   ctx.r4.u64 = 1;
 }
 
-void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
   bool done = false;
-  guest_call::InFrame(ctx, base, fp::kRecordPrimitiveResetFrame, 0x82589A6C, [&](uint32_t) {
-    const auto chunk = fp::RecordPrimitiveReset(base);
+  guest_call::InFrame(ctx, fp::kRecordPrimitiveResetFrame, 0x82589A6C, [&](uint32_t) {
+    const auto chunk = fp::RecordPrimitiveReset();
     if (!chunk) {
       return;
     }
     done = true;
     // The render queue's slot 4: r4 = the chunk, r5 = 0, f1 = 0.0.
-    ctx.r3.u64 = schema::FramePassesGlobals::render_queue(base);
+    ctx.r3.u64 = schema::FramePassesGlobals::render_queue();
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = 0;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(schema::FramePassesGlobals::zero(base));
-    const uint32_t function = schema::RenderQueue(base, ctx.r3.u32).vtable().add();
+    ctx.f1.f64 = double(schema::FramePassesGlobals::zero());
+    const uint32_t function = schema::RenderQueue(ctx.r3.u32).vtable().add();
     ctx.ctr.u64 = function;
     ctx.lr = 0x82589A6C;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
   });
   ctx.lr = lr;
   if (!done) {
-    lifted::original::c82589990(ctx, base);
+    lifted::original::c82589990(ctx);
   }
 }
 
 
-void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FramePassesJobWait(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_frame_passes)) {
-    lifted::original::c82094B10(ctx, base);
+    lifted::original::c82094B10(ctx);
     return;
   }
   const uint32_t job = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 96, 0x82094B48, [&](uint32_t) {
-    const bool waited = fp::JobWait(base, job, [&](uint32_t object) {
+  guest_call::InFrame(ctx, 96, 0x82094B48, [&](uint32_t) {
+    const bool waited = fp::JobWait(job, [&](uint32_t object) {
       // The object's slot 1 with r4 = the job.
       ctx.r3.u64 = object;
       ctx.r4.u64 = job;
       const uint32_t function =
-          schema::FramePassesJobWaiter(base, object).vtable().slot_1_wait();
+          schema::FramePassesJobWaiter(object).vtable().slot_1_wait();
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = 0x82094B48;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
     });
     // (r11 = 0, as the original leaves it, was a leftover for recompiled
     // callers: none now)
@@ -155,21 +155,21 @@ void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
 // original's (the interface's and the renderer's getters, PostEffects::InitBoot
 // through its adapter's work); the device lock over the native video output
 // (the original without --native_video_output). r3 the video output.
-void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FramePassesBoot(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_frame_passes) || !ITC_FLAG(native_video_output)) {
-    lifted::original::c820962B8(ctx, base);
+    lifted::original::c820962B8(ctx);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, fp::kBootFrame, 0x820962DC, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, fp::kBootFrame, 0x820962DC, [&](uint32_t frame) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(guest::VtableWord(object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
       return ctx.r3.u32;
     };
     const fp::BootCalls calls{
@@ -180,9 +180,9 @@ void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
         [&](uint32_t device) {
           ctx.r3.u64 = device;
           ctx.lr = 0x820962FC;
-          hooks::PostEffectsInitBoot(ctx, base);
+          hooks::PostEffectsInitBoot(ctx);
         }};
-    r3 = fp::Boot(base, passes, frame, calls);
+    r3 = fp::Boot(passes, frame, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -190,27 +190,27 @@ void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_NATIVE_ENTRY_ALWAYS(820962B8) {
   
-  hooks::FramePassesBoot(ctx, base);
+  hooks::FramePassesBoot(ctx);
 }
 
 // FramePasses::FramePasses: r3 = it, r4 = the block; the guest calls from a
 // 224-byte frame like the original's (the delegates and the key there, the
 // word it reads at its +164 read there); r3 it.
-void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FramePassesConstruct(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_frame_passes)) {
-    lifted::original::c82098630(ctx, base);
+    lifted::original::c82098630(ctx);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, fp::kConstructFrame, 0x820986F0, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, fp::kConstructFrame, 0x820986F0, [&](uint32_t frame) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(guest::VtableWord(object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
       return ctx.r3.u32;
     };
     const fp::ConstructCalls calls{
@@ -223,14 +223,14 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
         [&](uint32_t job) {
           ctx.r3.u64 = job;
           ctx.lr = 0x82098710;
-          lifted::Enter(ctx, base, game::Job::Wait);  // --find_menu_selection's wrap
+          lifted::Enter(ctx, game::Job::Wait);  // --find_menu_selection's wrap
         },
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr) {
           ctx.r5.u64 = delegate;
           ctx.r4.u64 = key;
           vtable_call(loop, offset, lr);
         }};
-    fp::Construct(base, passes, block, frame, guest::LoadU32(base, frame + 164), calls);
+    fp::Construct(passes, block, frame, guest::LoadU32(frame + 164), calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = passes;
@@ -238,7 +238,7 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_NATIVE_ENTRY_ALWAYS(82098630) {
   
-  hooks::FramePassesConstruct(ctx, base);
+  hooks::FramePassesConstruct(ctx);
 }
 
 // FramePasses::Record: r3 = it; the guest calls from a 320-byte frame like
@@ -247,28 +247,28 @@ ITC_NATIVE_ENTRY_ALWAYS(82098630) {
 // through their adapters' work. r3 as the last leaves it. The original
 // where the plain C++ declines (the getters then called again) or with the
 // command list's diagnostics on.
-void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FramePassesRecord(lifted::Regs& ctx) {
   if (!hooks::NativeFramePasses()) {
-    lifted::original::c82096418(ctx, base);
+    lifted::original::c82096418(ctx);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   bool done = false;
-  guest_call::InFrame(ctx, base, fp::kRecordFrame, 0x82096440, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, fp::kRecordFrame, 0x82096440, [&](uint32_t frame) {
     auto vcall = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
-      const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
+      const uint32_t function = guest::LoadU32(guest::VtableWord(object) + byte);
       ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
       return ctx.r3.u32;
     };
     const fp::RecordCalls calls{
         vcall,
         [&](uint32_t queue, uint32_t chunk, uint32_t bucket, uint32_t return_address) {
           ctx.fpscr.disableFlushMode();
-          ctx.f1.f64 = double(schema::FramePassesGlobals::zero(base));
+          ctx.f1.f64 = double(schema::FramePassesGlobals::zero());
           ctx.r5.u64 = bucket;
           ctx.r4.u64 = chunk;
           vcall(queue, 16, return_address);
@@ -278,24 +278,24 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
           ctx.r6.u64 = 602;
           ctx.r5.u64 = 150;
           ctx.r4.u64 = list;
-          ctx.r3.u64 = schema::FramePassesGlobals::scene_target(base);
+          ctx.r3.u64 = schema::FramePassesGlobals::scene_target();
           ctx.lr = 0x82098620;
-          hooks::SceneTargetRecordPassesOrOriginal(ctx, base);
+          hooks::SceneTargetRecordPassesOrOriginal(ctx);
         },
         [&]() {
           ctx.lr = 0x82098624;
-          hooks::FramePassesRecordPrimitiveReset(ctx, base);
+          hooks::FramePassesRecordPrimitiveReset(ctx);
         }};
-    done = fp::Record(base, passes, frame, calls);
+    done = fp::Record(passes, frame, calls);
   });
   ctx.lr = lr;
   if (!done) {
     ctx.r3.u64 = passes;  // the getters left their answers
-    lifted::original::c82096418(ctx, base);
+    lifted::original::c82096418(ctx);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82096418) {
   
-  hooks::FramePassesRecord(ctx, base);
+  hooks::FramePassesRecord(ctx);
 }

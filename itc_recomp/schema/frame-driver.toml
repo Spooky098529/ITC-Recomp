@@ -216,6 +216,7 @@ fields = [
 measures = ["sub_82093000.r4.+4", "sub_82093000.r4.+4.+0", "sub_82093000.r4.+4.+8", "sub_82099F50.ret.+0.+4", "sub_82099F50.ret.+0.+4.+8", "sub_82099F50.ret.+0.+4.+8.+0"]
 size = 24
 origin = "allocated"
+storage = "dual"  # the handler map's nodes (framework.toml's HandlerMapNode, in host memory)
 fields = [
   { name = "left", offset = 0, type = "ptr", to = "FrameDriverMapNode" },
   { name = "parent", offset = 4, type = "ptr", to = "FrameDriverMapNode" },
@@ -262,6 +263,7 @@ fields = [
 measures = ["Scene.+4", "Scene::Scene.r4.+4"]
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppSceneFrameworkInterfaceVtable" },
 ]

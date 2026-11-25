@@ -69,8 +69,8 @@ HostSection& Find(uint32_t address) {
   return *slot;
 }
 
-uint32_t CurrentThread(uint8_t* base, const lifted::Args& args) {
-  const uint32_t thread = guest::LoadU32(base, uint32_t(args.r13) + kPcrCurrentThread);
+uint32_t CurrentThread(const lifted::Args& args) {
+  const uint32_t thread = guest::LoadU32(uint32_t(args.r13) + kPcrCurrentThread);
   if (thread == 0) {
     // 0 would read as free: the PCR's address stands in (logged once).
     static bool logged = false;
@@ -86,20 +86,20 @@ uint32_t CurrentThread(uint8_t* base, const lifted::Args& args) {
 }
 
 // The guest fields from the host state (under the section's mutex).
-void Publish(uint8_t* base, uint32_t address, const HostSection& section) {
-  guest::StoreU32(base, address + kLockCount, uint32_t(section.lock_count));
-  guest::StoreU32(base, address + kRecursionCount, uint32_t(section.depth));
-  guest::StoreU32(base, address + kOwningThread, section.owner);
+void Publish(uint32_t address, const HostSection& section) {
+  guest::StoreU32(address + kLockCount, uint32_t(section.lock_count));
+  guest::StoreU32(address + kRecursionCount, uint32_t(section.depth));
+  guest::StoreU32(address + kOwningThread, section.owner);
 }
 
 // RtlInitializeCriticalSection(cs): the struct as the SDK sets it up (an
 // auto-reset event's header, no spin count), and a fresh host lock.
-lifted::Result InitializeCriticalSection(uint8_t* base, const lifted::Args& args) {
+lifted::Result InitializeCriticalSection(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import RtlInitializeCriticalSection");
   const uint32_t address = uint32_t(args.r[0]);
-  guest::StoreU8(base, address + 0, 1);  // type: EventSynchronizationObject
-  guest::StoreU8(base, address + 1, 0);  // absolute: the spin count / 256
-  guest::StoreU32(base, address + 4, 0);  // signal state
+  guest::StoreU8(address + 0, 1);  // type: EventSynchronizationObject
+  guest::StoreU8(address + 1, 0);  // absolute: the spin count / 256
+  guest::StoreU32(address + 4, 0);  // signal state
   {
     Sections& all = All();
     std::unique_lock lock(all.mutex);
@@ -107,15 +107,15 @@ lifted::Result InitializeCriticalSection(uint8_t* base, const lifted::Args& args
   }
   HostSection& section = Find(address);
   std::lock_guard lock(section.mutex);
-  Publish(base, address, section);
+  Publish(address, section);
   return {0, 0.0};
 }
 
 // RtlEnterCriticalSection(cs).
-lifted::Result EnterCriticalSection(uint8_t* base, const lifted::Args& args) {
+lifted::Result EnterCriticalSection(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import RtlEnterCriticalSection");
   const uint32_t address = uint32_t(args.r[0]);
-  const uint32_t self = CurrentThread(base, args);
+  const uint32_t self = CurrentThread(args);
   HostSection& section = Find(address);
   std::unique_lock lock(section.mutex);
   section.lock_count++;
@@ -124,15 +124,15 @@ lifted::Result EnterCriticalSection(uint8_t* base, const lifted::Args& args) {
     section.owner = self;
   }
   section.depth++;
-  Publish(base, address, section);
+  Publish(address, section);
   return {0, 0.0};
 }
 
 // RtlTryEnterCriticalSection(cs): 1 when entered, else 0.
-lifted::Result TryEnterCriticalSection(uint8_t* base, const lifted::Args& args) {
+lifted::Result TryEnterCriticalSection(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import RtlTryEnterCriticalSection");
   const uint32_t address = uint32_t(args.r[0]);
-  const uint32_t self = CurrentThread(base, args);
+  const uint32_t self = CurrentThread(args);
   HostSection& section = Find(address);
   std::lock_guard lock(section.mutex);
   if (section.owner != 0 && section.owner != self) {
@@ -141,12 +141,12 @@ lifted::Result TryEnterCriticalSection(uint8_t* base, const lifted::Args& args) 
   section.owner = self;
   section.lock_count++;
   section.depth++;
-  Publish(base, address, section);
+  Publish(address, section);
   return {1, 0.0};
 }
 
 // RtlLeaveCriticalSection(cs).
-lifted::Result LeaveCriticalSection(uint8_t* base, const lifted::Args& args) {
+lifted::Result LeaveCriticalSection(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import RtlLeaveCriticalSection");
   const uint32_t address = uint32_t(args.r[0]);
   HostSection& section = Find(address);
@@ -162,7 +162,7 @@ lifted::Result LeaveCriticalSection(uint8_t* base, const lifted::Args& args) {
       section.owner = 0;
       wake = section.lock_count != -1;
     }
-    Publish(base, address, section);
+    Publish(address, section);
   }
   if (wake) {
     section.released.notify_one();

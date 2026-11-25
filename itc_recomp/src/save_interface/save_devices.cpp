@@ -14,12 +14,12 @@ namespace save_interface {
 
 namespace {
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
+void Store64(uint32_t address, uint64_t value) {
+  Store(address, uint32_t(value >> 32));
+  Store(address + 4, uint32_t(value));
 }
 
 constexpr uint32_t kDelegateVtable = 0x82002850;  // a member delegate
@@ -29,73 +29,67 @@ constexpr uint32_t kDevicesEvent = 0x820A4800;    // probably the event handler
 constexpr uint32_t kInitialName = 0x820021E0;     // copied into +16
 constexpr uint32_t kMallocMost = 0xFFFFF000;      // malloc's largest size
 
-// operator new[] after the checks said it can: the layer aborts when out of
-// memory, so it doesn't fail here.
-uint32_t NewArray(uint8_t* base, uint32_t bytes, const char* what) {
-  const auto block = memory::crt::OperatorNewArray(base, bytes);
-  if (!block) {
-    ITC_LOG_ERROR("{}: operator new[] refused {} bytes after its checks", what, bytes);
-    return 0;
-  }
-  return *block;
-}
-
 }  // namespace
 
-bool CanAllocBuffers(uint8_t* base, uint32_t saves) {
-  return memory::crt::GetProcessHeap(base) != 0 &&
+bool CanAllocBuffers(uint32_t saves) {
+  return memory::crt::GetProcessHeap() != 0 &&
          uint64_t(saves) * kSaveRecordBytes <= kMallocMost;
 }
 
-void SlotAllocBuffers(uint8_t* base, uint32_t slot, uint32_t saves) {
+void SlotAllocBuffers(uint32_t slot, uint32_t saves) {
   ITC_NATIVE_RUNNING("sub_820A4560 SaveSlot::AllocBuffers");
-  const schema::SaveSlot s(base, slot);
-  s.set_enumeration_buffer(NewArray(base, saves * kSaveRecordBytes, "SaveSlot::AllocBuffers"));
-  s.set_open_failed(NewArray(base, saves * 4, "SaveSlot::AllocBuffers"));
+  const schema::SaveSlot s(slot);
+  // operator new[] of each, as blobs in PC memory (E5 step 5): the slot
+  // steps write and read them by address.
+  s.set_enumeration_buffer(
+      schema::SaveEnumerationBuffer::New(saves * kSaveRecordBytes).address);
+  s.set_open_failed(schema::SaveOpenFlags::New(saves * 4).address);
 }
 
 std::optional<uint32_t> SaveDevicesConstruct(
-    uint8_t* base, uint32_t devices, uint32_t block, uint32_t saves, uint32_t frame,
+    uint32_t devices, uint32_t block, uint32_t saves, uint32_t frame,
     const std::function<void(uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate)>&
         add) {
-  if (!CanAllocBuffers(base, saves)) {
+  if (!CanAllocBuffers(saves)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A6160 SaveDevices::SaveDevices");
-  const schema::SaveDevices d(base, devices);
-  const schema::SaveDevicesSetUp setup(base, block);
+  const schema::SaveDevices d(devices);
+  const schema::SaveDevicesSetUp setup(block);
   const uint32_t tick = frame + 80;
   const uint32_t listener = frame + 96;
-  Store(base, tick + 4, devices);
+  Store(tick + 4, devices);
   d.set_vtable(kDevicesVtable);
-  Store(base, tick + 0, kDelegateVtable);
+  Store(tick + 0, kDelegateVtable);
   d.set_device_list(setup.device_list());
-  Store(base, tick + 8, kDevicesUpdate);
+  Store(tick + 8, kDevicesUpdate);
   d.set_tick_key(setup.tick_key());
   d.set_listener_key(setup.listener_key());
   add(setup.run_loop<schema::View>().address, 8, d.tick_key_address(), tick);
   // The tick handler's delegate destroyed (its base vtable), the listener's
   // built.
-  Store(base, listener + 4, devices);
-  Store(base, tick + 0, kFunctorBase);
-  Store(base, listener + 0, kDelegateVtable);
-  Store(base, listener + 8, kDevicesEvent);
+  Store(listener + 4, devices);
+  Store(tick + 0, kFunctorBase);
+  Store(listener + 0, kDelegateVtable);
+  Store(listener + 8, kDevicesEvent);
   add(setup.run_loop<schema::View>().address, 4, d.listener_key_address(), listener);
-  Store(base, listener + 0, kFunctorBase);
+  Store(listener + 0, kFunctorBase);
   // XNotifyCreateListener(1) left out: no listener (the user's call,
   // 2026-10-30).
   d.set_listener(user::kNoListener);
   d.set_device_selector_flags(512);
   d.set_slot_count(kSlotCount);
+  // operator new[] of the four slots and their count, as a blob in PC memory
+  // (E5 step 5): the slots stay in the guest's layout, reached by address.
   const uint32_t array =
-      NewArray(base, schema::SaveSlotArrayBlock::kSize, "SaveDevices::SaveDevices");
+      schema::SaveSlotArrayBlock::New(schema::SaveSlotArrayBlock::kSize).address;
   uint32_t slots = 0;
   if (array != 0) {
-    const schema::SaveSlotArrayBlock block_of_slots(base, array);
+    const schema::SaveSlotArrayBlock block_of_slots(array);
     block_of_slots.set_count(kSlotCount);
     slots = block_of_slots.slots_address();
     for (uint32_t i = 0; i < kSlotCount; i++) {
-      const schema::SaveSlot slot(base, slots + kSlotBytes * i);
+      const schema::SaveSlot slot(slots + kSlotBytes * i);
       slot.set_device(0);
       slot.set_vtable(kSaveSlotVtable);
       slot.set_request_device_selector(0);
@@ -106,7 +100,7 @@ std::optional<uint32_t> SaveDevicesConstruct(
       slot.set_failure_acknowledged(0);
       slot.set_enumerated_saves(0);
       // Two word stores, as the original.
-      Store64(base, slot.device_free_bytes_address(), 0);
+      Store64(slot.device_free_bytes_address(), 0);
       slot.set_state(3);
       slot.set_enumeration_step(0);
       slot.set_step(0);
@@ -119,12 +113,12 @@ std::optional<uint32_t> SaveDevicesConstruct(
     // SaveSlot::AllocBuffers' prologue (__savegprlr_29) below this frame:
     // the return address, r29 (i), r30 (0) and r31 (the save devices), and
     // its back chain.
-    Store(base, frame - 8, 0x820A62F8);
-    Store64(base, frame - 32, i);
-    Store64(base, frame - 24, 0);
-    Store64(base, frame - 16, devices);
-    Store(base, frame - 112, frame);
-    SlotAllocBuffers(base, d.slots<schema::View>().address + kSlotBytes * i,
+    Store(frame - 8, 0x820A62F8);
+    Store64(frame - 32, i);
+    Store64(frame - 24, 0);
+    Store64(frame - 16, devices);
+    Store(frame - 112, frame);
+    SlotAllocBuffers(d.slots<schema::View>().address + kSlotBytes * i,
                      d.saves_to_enumerate());
   }
   d.set_busy_slot(0);
@@ -141,8 +135,8 @@ std::optional<uint32_t> SaveDevicesConstruct(
   d.set_save_step(0x820A5BE8);
   d.set_load_step(0x820A5E68);
   for (uint32_t i = 0;; i++) {
-    const uint8_t c = guest::LoadU8(base, kInitialName + i);
-    guest::StoreU8(base, d.root_name_address() + i, c);
+    const uint8_t c = guest::LoadU8(kInitialName + i);
+    d.store_at(d.root_name_address() - d.address + i, 1, c);  // host memory: its layout
     if (c == 0) {
       break;
     }
@@ -151,31 +145,27 @@ std::optional<uint32_t> SaveDevicesConstruct(
 }
 
 std::optional<uint32_t> SaveDevicesCreate(
-    uint8_t* base, uint32_t saves, const std::function<void(uint32_t devices)>& construct) {
-  if (!CanAllocBuffers(base, saves)) {
+    uint32_t saves, const std::function<void(uint32_t devices)>& construct) {
+  if (!CanAllocBuffers(saves)) {
     return std::nullopt;
   }
-  const auto devices = memory::crt::OperatorNew(base, 116);
-  if (!devices) {
-    return std::nullopt;
-  }
+  // operator new(116), in host memory (E5 step 5).
+  const uint32_t devices = schema::SaveDevices::New().address;
   ITC_NATIVE_RUNNING("sub_820A63C8 SaveDevices::Create");
-  if (*devices != 0) {
-    construct(*devices);
-  }
-  return *devices;
+  construct(devices);
+  return devices;
 }
 
-uint32_t SlotArrayReset(uint8_t* base, uint32_t holder,
+uint32_t SlotArrayReset(uint32_t holder,
                         const std::function<uint32_t(uint32_t slot)>& destroy) {
   ITC_NATIVE_RUNNING("sub_820A55F0 SlotArray::Reset");
-  const schema::SaveSlotArrayHolder h(base, holder);
+  const schema::SaveSlotArrayHolder h(holder);
   const uint32_t slots = h.slots<schema::View>().address;
   if (slots == 0) {
     return holder;
   }
-  uint32_t r3 = schema::SaveSlot(base, slots).array_count_address();
-  if (schema::SaveSlot(base, slots).array_count() != 0) {
+  uint32_t r3 = schema::SaveSlot(slots).array_count_address();
+  if (schema::SaveSlot(slots).array_count() != 0) {
     r3 = destroy(slots);
   } else if (!memory::crt::OperatorDeleteArray(r3)) {
     ITC_LOG_ERROR("SlotArray::Reset: operator delete[] refused {:08X}", r3);
@@ -184,24 +174,24 @@ uint32_t SlotArrayReset(uint8_t* base, uint32_t holder,
   return r3;
 }
 
-uint32_t SaveDevicesDestroy(uint8_t* base, uint32_t devices,
+uint32_t SaveDevicesDestroy(uint32_t devices,
                             const std::function<uint32_t(uint32_t slot)>& destroy) {
   ITC_NATIVE_RUNNING("sub_820A56E8 SaveDevices::Destroy");
-  const schema::SaveDevices d(base, devices);
+  const schema::SaveDevices d(devices);
   d.set_vtable(kDevicesVtable);
   // CloseHandle on +56 left out: no listener is made (user::kNoListener).
   uint32_t r3 = d.slots_address();
   if (d.slots<schema::View>().address != 0) {
-    r3 = SlotArrayReset(base, r3, destroy);
+    r3 = SlotArrayReset(r3, destroy);
   }
   d.set_vtable(kDevicesBaseVtable);
   return r3;
 }
 
-uint32_t SaveDevicesDelete(uint8_t* base, uint32_t devices, uint32_t flags,
+uint32_t SaveDevicesDelete(uint32_t devices, uint32_t flags,
                            const std::function<uint32_t(uint32_t slot)>& destroy) {
   ITC_NATIVE_RUNNING("sub_820A6110 SaveDevices::~SaveDevices");
-  SaveDevicesDestroy(base, devices, destroy);
+  SaveDevicesDestroy(devices, destroy);
   if ((flags & 1) != 0 && !memory::crt::OperatorDelete(devices)) {
     ITC_LOG_ERROR("SaveDevices::~SaveDevices: operator delete refused {:08X}", devices);
   }

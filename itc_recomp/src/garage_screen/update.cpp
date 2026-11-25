@@ -23,19 +23,19 @@ constexpr uint32_t kFormat = 0x8200A3C8;
 
 }  // namespace
 
-uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t Update(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82196230 GarageScreen::Update");
-  const uint32_t frame = Frame(base, sp, 272);
+  const uint32_t frame = Frame(sp, 272);
   calls.Call(kEmpty, frame, 0x82196254, 100, 30, 0, kFormat);
-  const uint32_t movie = FindMovie(base, kMovie, frame + 80);
+  const uint32_t movie = FindMovie(kMovie, frame + 80);
   for (uint32_t i = 0; i < 18; i++) {
-    Store(base, frame + 96 + 4 * i, kTransitions[i]);
+    Store(frame + 96 + 4 * i, kTransitions[i]);
   }
   // The running transition: its handler from the table on the page
   // object's +24; a nonzero answer (or none below -1) starts the queued one
   // or, with none, the page becomes +4.
   uint64_t r3 = movie;
-  PageObject pages = PagesOf(base);
+  PageObject pages = PagesOf();
   const uint32_t running = pages.step();
   if (running == kNone) {
     if (pages.page() != 4) {
@@ -50,14 +50,14 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
       // The native transitions' plain C++ by the word's address; the others
       // (Transition11 and Transition15, or a word past the table) through the
       // guest.
-      const uint32_t target = Load(base, frame + 96 + (running << 2));
-      if (!RunTransition(base, target, pages.step_started_address(), frame, calls, &r3)) {
+      const uint32_t target = Load(frame + 96 + (running << 2));
+      if (!RunTransition(target, pages.step_started_address(), frame, calls, &r3)) {
         r3 = calls.CallArgs(target, frame, 0x82196380,
                             {pages.step_started_address(), kTransitions[11], kTransitions[12],
                              kTransitions[13], kTransitions[14], kTransitions[15], frame + 96,
                              running << 2});
       }
-      pages = PagesOf(base);
+      pages = PagesOf();
       finished = uint32_t(r3) != 0;
     }
     if (finished) {
@@ -74,40 +74,40 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
     }
   }
   // The stand.
-  if (Data(base).stand_shown() == 0) {
-    if (Data(base).busy_shown() != 0) {
-      r3 = HideBusyNow(base, frame, calls);
-      Data(base).set_busy_shown(0);
+  if (Data().stand_shown() == 0) {
+    if (Data().busy_shown() != 0) {
+      r3 = HideBusyNow(frame, calls);
+      Data().set_busy_shown(0);
     }
     return r3;
   }
-  r3 = calls.Call(kIsBusy, frame, 0x82196418, Holder(base));
+  r3 = calls.Call(kIsBusy, frame, 0x82196418, Holder());
   if (uint32_t(r3) != 0) {
-    if (Data(base).busy_shown() == 0) {
-      r3 = ShowBusy(base, frame, calls);
-      Data(base).set_busy_shown(1);
+    if (Data().busy_shown() == 0) {
+      r3 = ShowBusy(frame, calls);
+      Data().set_busy_shown(1);
     }
-  } else if (Data(base).busy_shown() != 0) {
-    r3 = HideBusy(base, frame, calls);
-    Data(base).set_busy_shown(0);
+  } else if (Data().busy_shown() != 0) {
+    r3 = HideBusy(frame, calls);
+    Data().set_busy_shown(0);
   }
-  const ScreenData data = Data(base);
+  const ScreenData data = Data();
   if (data.stand_model() != 0) {
-    return calls.Call(kStageDraw, frame, 0x821964FC, Holder(base), 0, 0);
+    return calls.Call(kStageDraw, frame, 0x821964FC, Holder(), 0, 0);
   }
   // The selected garage car's model (the data's +44 + +48 in the save's
   // garage, its id at the car's +12).
   const uint32_t record =
-      GarageRecord(base, data.save(), data.scroll() + data.selection());
+      GarageRecord(data.save(), data.scroll() + data.selection());
   const uint64_t block = calls.Call(kBlockOf, frame, 0x821964A8,
-                                    schema::CarMakersCar(base, record + 212).car_id());
-  r3 = calls.Call(kReloadModel, frame, 0x821964B8, Holder(base), block);
-  Data(base).set_stand_model(uint32_t(r3));
-  if (Data(base).stand_model() == 0) {
+                                    schema::CarMakersCar(record + 212).car_id());
+  r3 = calls.Call(kReloadModel, frame, 0x821964B8, Holder(), block);
+  Data().set_stand_model(uint32_t(r3));
+  if (Data().stand_model() == 0) {
     return r3;
   }
-  PutCarOnStand(base, frame, calls);
-  return calls.Call(kStageCommand, frame, 0x821964E4, Holder(base), 15);
+  PutCarOnStand(frame, calls);
+  return calls.Call(kStageCommand, frame, 0x821964E4, Holder(), 15);
 }
 
 }  // namespace garage_screen

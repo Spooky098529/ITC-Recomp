@@ -40,8 +40,8 @@ namespace hooks {
 
 namespace re = race_event;
 
-RaceEventGuest::RaceEventGuest(lifted::Regs& ctx, uint8_t* base)
-    : ctx_(ctx), base_(base), guest_{&RaceEventGuest::Test, this} {}
+RaceEventGuest::RaceEventGuest(lifted::Regs& ctx)
+    : ctx_(ctx), guest_{&RaceEventGuest::Test, this} {}
 
 uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
                               uint32_t level, uint32_t depth) {
@@ -54,10 +54,10 @@ uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
   uint32_t r3 = 0;
   // From the original's depth (its callers' frames and Met's), Met's call's
   // return.
-  guest_call::InFrame(ctx, self.base_, depth, 0x82142A58, [&](uint32_t) {
+  guest_call::InFrame(ctx, depth, 0x82142A58, [&](uint32_t) {
     ctx.r3.u64 = condition;
     ctx.r4.u64 = level;
-    lifted::Enter(ctx, self.base_, lifted::e82141668);  // EventCondition::Power
+    lifted::Enter(ctx, lifted::e82141668);  // EventCondition::Power
     r3 = ctx.r3.u32;
   });
   ctx.fpscr.disableFlushMode();
@@ -67,10 +67,10 @@ uint32_t RaceEventGuest::Test(void* user, uint32_t function, uint32_t condition,
 ITC_REGS_STEP(RaceEventMake) {
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64;
-  if (re::MakeNative(base)) {
-    RaceEventGuest guest(ctx, base);
-    const auto made = re::Make(base, guest::LoadU32(base, uint32_t(r3)),
-                               guest::LoadU32(base, uint32_t(r4)), uint32_t(r5), guest.get());
+  if (re::MakeNative()) {
+    RaceEventGuest guest(ctx);
+    const auto made = re::Make(guest::LoadU32(uint32_t(r3)),
+                               guest::LoadU32(uint32_t(r4)), uint32_t(r5), guest.get());
     if (made) {
       ctx.r3.u64 = *made;
       return;
@@ -79,41 +79,41 @@ ITC_REGS_STEP(RaceEventMake) {
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
-  lifted::original::c82144E58(ctx, base);
+  lifted::original::c82144E58(ctx);
 }
 
 ITC_REGS_STEP(RaceEventDestroy) {
-  if (!re::DestroyNative(base)) {
-    lifted::original::c82144DF0(ctx, base);
+  if (!re::DestroyNative()) {
+    lifted::original::c82144DF0(ctx);
     return;
   }
-  re::Destroy(base);
+  re::Destroy();
 }
 
 ITC_REGS_STEP(RaceEventPlaceUnlockedCurrent) {
   ctx.fpscr.disableFlushMode();
   const uint32_t position = ctx.r3.u32, flag = ctx.r4.u32, sp = ctx.r1.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::PlaceUnlockedCurrent(base, position, flag, sp, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::PlaceUnlockedCurrent(position, flag, sp, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventSectionRivalCurrent) {
   ctx.fpscr.disableFlushMode();
   const uint32_t position = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::SectionRivalCurrent(base, position, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::SectionRivalCurrent(position, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventItemsAvailable) {
   ctx.fpscr.disableFlushMode();
   const uint32_t id = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::ItemsAvailable(base, id, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::ItemsAvailable(id, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventGroupItem) {
-  ctx.r3.u64 = re::GroupItem(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-                             guest::LoadU32(base, ctx.r5.u32));
+  ctx.r3.u64 = re::GroupItem(ctx.r3.u32, guest::LoadU32(ctx.r4.u32),
+                             guest::LoadU32(ctx.r5.u32));
 }
 
 // --- No adapters: the harness's steps ---
@@ -121,131 +121,131 @@ ITC_REGS_STEP(RaceEventGroupItem) {
 ITC_REGS_STEP(RaceEventConditionMet) {
   ctx.fpscr.disableFlushMode();
   const uint32_t condition = ctx.r3.u32, level = ctx.r4.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::ConditionMet(base, condition, level, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::ConditionMet(condition, level, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventConditionState) {
   ctx.fpscr.disableFlushMode();
   const uint32_t condition = ctx.r3.u32, level = ctx.r4.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::ConditionState(base, condition, level, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::ConditionState(condition, level, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUnlockAll) {
   ctx.fpscr.disableFlushMode();
   const uint32_t block = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::UnlockAll(base, block, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::UnlockAll(block, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUnlockAny) {
   ctx.fpscr.disableFlushMode();
   const uint32_t block = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::UnlockAny(base, block, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::UnlockAny(block, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUnlockState) {
   ctx.fpscr.disableFlushMode();
   const uint32_t item = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::UnlockState(base, item, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::UnlockState(item, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUnlockStateKind2) {
   ctx.fpscr.disableFlushMode();
   const uint32_t item = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::UnlockStateKind2(base, item, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::UnlockStateKind2(item, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUnlockStateKind5) {
   ctx.fpscr.disableFlushMode();
   const uint32_t item = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::UnlockStateKind5(base, item, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::UnlockStateKind5(item, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventHasSectionCondition) {
-  ctx.r3.u64 = re::HasSectionCondition(base, ctx.r3.u32);
+  ctx.r3.u64 = re::HasSectionCondition(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceEventCategoryMask) {
-  ctx.r3.u64 = re::CategoryMask(base, guest::LoadU16(base, ctx.r3.u32),
-                                guest::LoadU32(base, ctx.r4.u32), guest::LoadU32(base, ctx.r5.u32));
+  ctx.r3.u64 = re::CategoryMask(guest::LoadU16(ctx.r3.u32),
+                                guest::LoadU32(ctx.r4.u32), guest::LoadU32(ctx.r5.u32));
 }
 
 ITC_REGS_STEP(RaceEventFloatAtLeast) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = re::FloatAtLeast(base, ctx.r3.u32, guest::LoadFloat(base, ctx.r4.u32));
+  ctx.r3.u64 = re::FloatAtLeast(ctx.r3.u32, guest::LoadFloat(ctx.r4.u32));
 }
 
-ITC_REGS_STEP(RaceEventConstruct) { re::Construct(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceEventConstruct) { re::Construct(ctx.r3.u32); }
 
 ITC_REGS_STEP(RaceEventSetMode) {
-  re::SetMode(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
-              guest::LoadU32(base, ctx.r5.u32));
+  re::SetMode(ctx.r3.u32, guest::LoadU32(ctx.r4.u32),
+              guest::LoadU32(ctx.r5.u32));
 }
 
-ITC_REGS_STEP(RaceEventAlloc) { ctx.r3.u64 = re::Alloc(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceEventAlloc) { ctx.r3.u64 = re::Alloc(ctx.r3.u32); }
 
 ITC_REGS_STEP(RaceEventGroupAlloc) {
-  ctx.r3.u64 = re::GroupAlloc(base, ctx.r3.u32);
+  ctx.r3.u64 = re::GroupAlloc(ctx.r3.u32);
 }
 
-ITC_REGS_STEP(RaceEventFree) { re::Free(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceEventFree) { re::Free(ctx.r3.u32); }
 
-ITC_REGS_STEP(RaceEventGroupFree) { re::GroupFree(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceEventGroupFree) { re::GroupFree(ctx.r3.u32); }
 
 ITC_REGS_STEP(RaceEventPoolsAddItem) {
   ctx.fpscr.disableFlushMode();
   const uint32_t pools = ctx.r3.u32, item = ctx.r4.u32, records = ctx.r6.u32;
-  RaceEventGuest guest(ctx, base);
-  re::PoolsAddItem(base, pools, item, records, guest.get());
+  RaceEventGuest guest(ctx);
+  re::PoolsAddItem(pools, item, records, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventItemsBeaten) {
-  ctx.r3.u64 = re::ItemsBeaten(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = re::ItemsBeaten(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceEventPoolsAddRivals) {
-  re::PoolsAddRivals(base, ctx.r3.u32, ctx.r4.u32);
+  re::PoolsAddRivals(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceEventPoolsAddRivalsOf) {
-  re::PoolsAddRivalsOf(base, ctx.r3.u32, ctx.r4.u32);
+  re::PoolsAddRivalsOf(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceEventPoolsTrim) {
-  re::PoolsTrim(base, ctx.r3.u32, guest::LoadU16(base, ctx.r4.u32));
+  re::PoolsTrim(ctx.r3.u32, guest::LoadU16(ctx.r4.u32));
 }
 
 ITC_REGS_STEP(RaceEventPoolsToGroup) {
-  uint32_t index = guest::LoadU32(base, ctx.r6.u32);
-  re::PoolsToGroup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, index);
-  guest::StoreU32(base, ctx.r6.u32, index);
+  uint32_t index = guest::LoadU32(ctx.r6.u32);
+  re::PoolsToGroup(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, index);
+  guest::StoreU32(ctx.r6.u32, index);
 }
 
 ITC_REGS_STEP(RaceEventPoolsCopyIds) {
-  uint32_t index = guest::LoadU32(base, ctx.r6.u32);
-  re::PoolsCopyIds(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, index,
-                   guest::LoadU32(base, ctx.r7.u32));
-  guest::StoreU32(base, ctx.r6.u32, index);
+  uint32_t index = guest::LoadU32(ctx.r6.u32);
+  re::PoolsCopyIds(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, index,
+                   guest::LoadU32(ctx.r7.u32));
+  guest::StoreU32(ctx.r6.u32, index);
 }
 
 ITC_REGS_STEP(RaceEventPoolsToGroupNoList) {
-  uint32_t index = guest::LoadU32(base, ctx.r5.u32);
-  re::PoolsToGroupNoList(base, ctx.r3.u32, ctx.r4.u32, index);
-  guest::StoreU32(base, ctx.r5.u32, index);
+  uint32_t index = guest::LoadU32(ctx.r5.u32);
+  re::PoolsToGroupNoList(ctx.r3.u32, ctx.r4.u32, index);
+  guest::StoreU32(ctx.r5.u32, index);
 }
 
 ITC_REGS_STEP(RaceEventInit) {
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
-  RaceEventGuest guest(ctx, base);
-  const auto made = re::Init(base, uint32_t(r3), guest::LoadU32(base, uint32_t(r4)),
-                             guest::LoadU32(base, uint32_t(r5)), uint32_t(r6), guest.get());
+  RaceEventGuest guest(ctx);
+  const auto made = re::Init(uint32_t(r3), guest::LoadU32(uint32_t(r4)),
+                             guest::LoadU32(uint32_t(r5)), uint32_t(r6), guest.get());
   if (made) {
     ctx.r3.u64 = *made;
     return;
@@ -254,49 +254,49 @@ ITC_REGS_STEP(RaceEventInit) {
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
   ctx.r6.u64 = r6;
-  lifted::original::c82144A50(ctx, base);
+  lifted::original::c82144A50(ctx);
 }
 
 ITC_REGS_STEP(RaceEventGroupPromoteFlagged) {
-  re::GroupPromoteFlagged(base, ctx.r3.u32, ctx.r4.u32);
+  re::GroupPromoteFlagged(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceEventGroupSortOpen) {
-  re::GroupSortOpen(base, ctx.r3.u32);
+  re::GroupSortOpen(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceEventGroupPromoteUnlocked) {
   ctx.fpscr.disableFlushMode();
   const uint32_t group = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  re::GroupPromoteUnlocked(base, group, guest.get());
+  RaceEventGuest guest(ctx);
+  re::GroupPromoteUnlocked(group, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventRefresh) {
   ctx.fpscr.disableFlushMode();
   const uint32_t event = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::Refresh(base, event, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::Refresh(event, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventRefreshCurrent) {
   ctx.fpscr.disableFlushMode();
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::RefreshCurrent(base, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::RefreshCurrent(guest.get());
 }
 
 ITC_REGS_STEP(RaceEventUpdateLocation) {
   ctx.fpscr.disableFlushMode();
-  const uint32_t location = guest::LoadU32(base, ctx.r3.u32);
-  RaceEventGuest guest(ctx, base);
-  re::UpdateLocation(base, location, guest.get());
+  const uint32_t location = guest::LoadU32(ctx.r3.u32);
+  RaceEventGuest guest(ctx);
+  re::UpdateLocation(location, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventFindRacer) {
   uint32_t out = 0;
-  const uint32_t r = re::FindRacer(base, ctx.r3.u32, out);
+  const uint32_t r = re::FindRacer(ctx.r3.u32, out);
   if (r != 0) {
-    guest::StoreU32(base, ctx.r4.u32, out);
+    guest::StoreU32(ctx.r4.u32, out);
   }
   ctx.r3.u64 = r;
 }
@@ -304,22 +304,22 @@ ITC_REGS_STEP(RaceEventFindRacer) {
 ITC_REGS_STEP(RaceEventSectionRival) {
   ctx.fpscr.disableFlushMode();
   const uint32_t event = ctx.r3.u32, position = ctx.r4.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::SectionRival(base, event, position, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::SectionRival(event, position, guest.get());
 }
 
 ITC_REGS_STEP(RaceEventPlaceUnlocked) {
   ctx.fpscr.disableFlushMode();
   const uint32_t event = ctx.r3.u32, position = ctx.r4.u32, flag = ctx.r5.u32, sp = ctx.r1.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = re::PlaceUnlocked(base, event, position, flag, sp, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = re::PlaceUnlocked(event, position, flag, sp, guest.get());
 }
 
 }  // namespace hooks
 
 #define RACE_EVENT_ADAPTER(address, step)  \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_event)) { \
-    hooks::step(ctx, base);                \
+    hooks::step(ctx);                \
   }
 
 RACE_EVENT_ADAPTER(82144DF0, RaceEventDestroy)

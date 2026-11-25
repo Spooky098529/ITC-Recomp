@@ -27,7 +27,7 @@ namespace xaudio {
 // filters and delay lines, four 512-entry all-passes, two crossfading
 // 256-entry delay lines, and the four outputs from the stages' buffers and
 // the inputs, weighted by the gain at +92 (vector work, 256 frames each). Returns r3 as the original leaves it.
-uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core, uint32_t inputs, uint32_t outputs,
+uint64_t ReverbCoreProcess(uint64_t core, uint32_t inputs, uint32_t outputs,
                            uint32_t sp);
 
 // The core's set-up (reverb_setup.cpp).
@@ -42,7 +42,7 @@ uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core, uint32_t inputs, uint32
 // frame (432 bytes; the words the original writes there are written, its
 // register saves aren't). Returns r3 as the original leaves it (the second
 // low-pass, +0x200C8).
-uint64_t ReverbCoreApply(uint8_t* base, uint32_t core, uint32_t params, uint32_t frame,
+uint64_t ReverbCoreApply(uint32_t core, uint32_t params, uint32_t frame,
                          const GuestCall& call);
 // sub_82468848: the core's delay lines and filters set up at `lines` (the
 // reverb's +208, the core's +192, from Reverb::Reverb; an I3DL2 side's +52
@@ -50,6 +50,6 @@ uint64_t ReverbCoreApply(uint8_t* base, uint32_t core, uint32_t params, uint32_t
 // to +100), each line's state and its fill (FillDelayLine), the low-passes
 // with FilterCoefficient, the gains with pow. No frame words. Returns r3 as
 // the original leaves it (`lines`).
-uint64_t ReverbCoreInit(uint8_t* base, uint32_t lines);
+uint64_t ReverbCoreInit(uint32_t lines);
 
 }  // namespace xaudio

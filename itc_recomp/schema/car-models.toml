@@ -16,11 +16,20 @@
 # under several names: Vinyl:: and the load callbacks' r6, the interior's,
 # the wheels' and the scene wheels' +24 (their car model), and the second
 # set's objects (CarModel.+24: their +24 is the first set's car model).
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C4290), freed by ScenePools::DestroyA's VirtualFree (a
+# handle; src/scene/scene.cpp). Its scalar fields are the layout; what's
+# inside it (the record, the load slots, the skeleton, the XPR objects, the
+# texture providers, the decal slots) stays guest-shaped views reaching the
+# host object through raw accesses (guest order but for the fields here).
 [CarModel]
 measure = "CarModel"
 measures = ["CarModel.+24", "Vinyl", "CarModel::OnDecalLoaded.r6", "CarModel::OnFileLoaded.r6", "CarModel::OnFileLoadedB.r6", "CarInterior.+24", "Wheels.+24", "SceneWheels.+192.+24", "List::At.ret.+24", "Cockpit.+24", "TrafficCar.+24", "sub_820C3CA0.r4", "TGA::CreateImage.r5", "CarParts.+24", "CarModel::MakePlate.r3"]
 size = 7264
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C4290]
 vtable = 0x82004F94
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82004F94 (also where the measure's Vinyl puts Vinyl::DecalCorner's out point, Vinyl::Compress's sheet word and TGA::CreateImage's buffer word: joined)" },
@@ -97,6 +106,24 @@ fields = [
   { name = "rotation", offset = 32, type = "f32", note = "radians, probably" },
   { name = "scale", offset = 48, type = "bytes", count = 16, note = "x and y the scale" },
 ]
+
+# A file LoadSlot::Load (sub_820D07C8) reads into its own buffer: a node
+# file (CarModel::LoadSetB, CarInterior::LoadSetCBody), a part file
+# (CarScene::LoadAssets), a traffic car's container (TrafficCar::Load); and
+# CarModel::LoadSetA's node file and body XPR2 (sub_820C3CA0's pages). A blob
+# (E5 step 5): in PC memory with the file's bytes, the hand ports'
+# memory::NewBlob (src/car_models/load_slots.cpp,
+# src/scene_models/scene_models.cpp) and the lifted LoadSlot::Load's
+# VirtualAlloc (returning at 0x820D0814); read in place by the skeletons
+# (bound to node files for the model's life), copied out by XPR::Create,
+# Model::Load and Mesh::LoadShaders; freed by the game's VirtualFree
+# (LoadSlot::ReleaseBuffer, sub_820C3CE0, sub_820D09A0).
+[CarModelsFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x820D0814, reg = "r4" }]
+fields = []
 
 # A 24-byte load slot (LoadSlot::, load_slots.h).
 [LoadSlot]
@@ -389,10 +416,17 @@ fields = [
 # "car wheels"): 3,280 bytes, vtable 0x82005100 (Wheels::Wheels in
 # scene-loaders.md). The six part models (464 bytes each) are `bytes`; their
 # +48 (the texture provider Wheels::BindTextures sets) named here.
+# In host memory (E5 step 5): made by ScenePools::CreateA (the hand port's
+# pool loop, src/scene_loaders/pools.cpp; the lifted original's VirtualAlloc
+# returning to 0x820C41B0), freed by ScenePools::DestroyA's VirtualFree (a
+# handle). Its part models, load slots, XPR objects and providers stay
+# guest-shaped views reaching it through raw accesses.
 [CarWheels]
 measure = "Wheels"
 size = 3280
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820C41B0]
 vtable = 0x82005100
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82005100 (the pool node's 0x82004F90 while it's built or torn down)" },

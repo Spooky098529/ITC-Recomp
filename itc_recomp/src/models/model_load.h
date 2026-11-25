@@ -30,12 +30,12 @@ struct LoadCalls {
 
 // sub_825963F0 Mesh::Parse: `file` a part file (version 0x00150000; any other
 // gets the original's debug message, logged). See models.md's row.
-void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& calls);
+void MeshParse(uint32_t model, uint32_t file, const LoadCalls& calls);
 
 // Whether MeshParse and ModelLoad run natively (checked before anything is
 // done): memcpy's copies native (--native_memcpy), and each of the file's
 // shader header copies XMemCpy makes natively.
-bool LoadFits(uint8_t* base, uint32_t file);
+bool LoadFits(uint32_t file);
 
 // sub_82596920 Model::Load: Model::Release, Mesh::Parse, then with `xpr` (an
 // XPR2 file or 0) XPR::Create on +56 and the texture provider's (+80) slot 4
@@ -43,7 +43,7 @@ bool LoadFits(uint8_t* base, uint32_t file);
 // weights quantized and the last of each vertex made 1 minus the others.
 // False, with nothing done, where the original must run (Model::Release's,
 // or LoadFits').
-bool ModelLoad(uint8_t* base, uint32_t model, uint32_t file, uint32_t xpr,
+bool ModelLoad(uint32_t model, uint32_t file, uint32_t xpr,
                const LoadCalls& calls);
 
 }  // namespace models

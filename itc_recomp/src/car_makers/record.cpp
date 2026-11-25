@@ -29,47 +29,38 @@ using Car = schema::CarMakersCar;
 
 constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82
 
-// std of a doubleword.
-void Std(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
-}
+// An unsigned value to a float (the original's std, lfd, fcfid, frsp
+// through a scratch doubleword below the stack, only it reading it: no
+// longer stored since E5 step 6).
+double Convert(uint64_t value) { return Frsp(double(int64_t(value))); }
 
-// An unsigned value through the stack to a float (std, lfd, fcfid, frsp),
-// its doubleword left at `scratch`.
-double Convert(uint8_t* base, uint64_t value, uint32_t scratch) {
-  Std(base, scratch, value);
-  return Frsp(double(int64_t(value)));
-}
-
-// A halfword as a float into `to`, then two bytes x f0 into `to` + 4 and + 8,
-// each through its scratch doubleword.
-void Triple(uint8_t* base, uint32_t from_half, uint32_t from_b0, uint32_t from_b1, uint32_t to,
-            double f0, uint32_t s0, uint32_t s1, uint32_t s2) {
-  Stfs(base, to, Convert(base, guest::LoadU16(base, from_half), s0));
-  Stfs(base, to + 4, Fmuls(Convert(base, guest::LoadU8(base, from_b0), s1), f0));
-  Stfs(base, to + 8, Fmuls(Convert(base, guest::LoadU8(base, from_b1), s2), f0));
+// A halfword as a float into `to`, then two bytes x f0 into `to` + 4 and + 8.
+void Triple(uint32_t from_half, uint32_t from_b0, uint32_t from_b1, uint32_t to,
+            double f0) {
+  Stfs(to, Convert(guest::LoadU16(from_half)));
+  Stfs(to + 4, Fmuls(Convert(guest::LoadU8(from_b0)), f0));
+  Stfs(to + 8, Fmuls(Convert(guest::LoadU8(from_b1)), f0));
 }
 
 // An lfs then stfs of one word: its bits (the translated code's float to
 // double and back folds to a copy, keeping a signaling NaN).
-void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) {
-  Store(base, to, Load(base, from));
+void CopyFloat(uint32_t from, uint32_t to) {
+  Store(to, Load(from));
 }
 
 // One decal entry of the car (32 bytes at `e`) into the record's 64-byte
 // entry at `r` (its +0, +4 words, +16, +20, +32, +48, +52 floats), in the
 // original's order.
-void Decal(uint8_t* base, uint32_t r_at, uint32_t e_at) {
-  const schema::CarMakersRecordDecal r(base, r_at);
-  const schema::CarMakersCarDecal e(base, e_at);
+void Decal(uint32_t r_at, uint32_t e_at) {
+  const schema::CarMakersRecordDecal r(r_at);
+  const schema::CarMakersCarDecal e(e_at);
   r.set_image(e.image());
   r.set_mirrored(e.mirrored());
-  CopyFloat(base, e.x_address(), r.x_address());
-  CopyFloat(base, e.y_address(), r.y_address());
-  CopyFloat(base, e.angle_address(), r.angle_address());
-  CopyFloat(base, e.flag_scale_address(), r.flag_scale_address());
-  CopyFloat(base, e.scale_address(), r.scale_address());
+  CopyFloat(e.x_address(), r.x_address());
+  CopyFloat(e.y_address(), r.y_address());
+  CopyFloat(e.angle_address(), r.angle_address());
+  CopyFloat(e.flag_scale_address(), r.flag_scale_address());
+  CopyFloat(e.scale_address(), r.scale_address());
 }
 
 // The record's interior choice `slot` (0 to 6, 12 bytes from +3780).
@@ -79,11 +70,11 @@ uint32_t ChoiceSlot(const Record& rec, uint32_t slot) {
 
 // SetChoice with the car's 12-byte value at `from` (ld of its first
 // doubleword; the word +8 rotated into r5's high half), from the frame.
-void ChoiceFrom(uint8_t* base, uint32_t out, uint32_t from, uint32_t frame) {
-  const schema::CarMakersCarChoice v(base, from);
+void ChoiceFrom(uint32_t out, uint32_t from, uint32_t frame) {
+  const schema::CarMakersCarChoice v(from);
   const uint64_t c = v.c();
   const uint64_t r4 = (uint64_t(v.a()) << 32) | v.b();
-  SetChoice(base, out, r4, c << 32, frame);
+  SetChoice(out, r4, c << 32, frame);
 }
 
 }  // namespace
@@ -100,98 +91,91 @@ uint32_t BlockOf(uint32_t id) {
   return index > 70 ? 0 : kBlocks[index];
 }
 
-uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, uint32_t stack) {
+uint32_t SetPaint(uint32_t record, uint32_t car, uint32_t pick, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215AC70 SceneModelRecord::SetPaint");
-  const Record rec(base, record);
-  const Car c(base, car);
+  const Record rec(record);
+  const Car c(car);
   int32_t p = int32_t(pick);
   if (p == -1) {
     p = int16_t(c.paint_pick());
   }
   const int32_t kind = int32_t(rec.kind());
-  const double f0 = double(G::byte_scale(base));
-  const uint32_t s16 = stack - 16, s24 = stack - 24, s32 = stack - 32;
+  const double f0 = double(G::byte_scale());
+  (void)stack;  // the scratch doublewords below it no longer written (E5 step 6)
   if (kind == 3) {
     rec.set_traffic_paint(uint32_t(p));
   } else if (p == -2) {
     for (uint32_t i = 0; i < 3; i++) {
-      Triple(base, c.paint_copy0_hue0_address() + 4 * i, c.paint_copy0_saturation0_address() + 4 * i,
-             c.paint_copy0_value0_address() + 4 * i, rec.paint0_hue_address() + 16 * i, f0, s32,
-             s24, s16);
+      Triple(c.paint_copy0_hue0_address() + 4 * i, c.paint_copy0_saturation0_address() + 4 * i,
+             c.paint_copy0_value0_address() + 4 * i, rec.paint0_hue_address() + 16 * i, f0);
     }
-    rec.set_paint0_hue(float(Convert(base, c.paint_hue(), s16)));
-    rec.set_paint0_saturation(float(Fmuls(Convert(base, c.paint_saturation(), s16), f0)));
-    rec.set_paint0_value(float(Fmuls(Convert(base, c.paint_value(), s16), f0)));
-    rec.set_paint1_hue(float(Convert(base, c.paint_hue(), s16)));
-    rec.set_paint1_saturation(float(Fmuls(Convert(base, c.paint_saturation(), s16), f0)));
-    rec.set_paint1_value(float(Fmuls(Convert(base, c.paint_value(), s16), f0)));
+    rec.set_paint0_hue(float(Convert(c.paint_hue())));
+    rec.set_paint0_saturation(float(Fmuls(Convert(c.paint_saturation()), f0)));
+    rec.set_paint0_value(float(Fmuls(Convert(c.paint_value()), f0)));
+    rec.set_paint1_hue(float(Convert(c.paint_hue())));
+    rec.set_paint1_saturation(float(Fmuls(Convert(c.paint_saturation()), f0)));
+    rec.set_paint1_value(float(Fmuls(Convert(c.paint_value()), f0)));
     const int32_t six = int16_t(c.paint_kind());
     if (six == 0) {
-      const double zero = Lfs(base, schema::CarSceneDrawGlobals::zero_address());
+      const double zero = Lfs(schema::CarSceneDrawGlobals::zero_address());
       rec.set_paint2_hue(float(zero));
       rec.set_paint2_saturation(float(zero));
-      CopyFloat(base, G::value72_address(), rec.paint2_value_address());
+      CopyFloat(G::value72_address(), rec.paint2_value_address());
     } else if (six == 1) {
-      const double value = double(G::value72_kind1(base));
-      rec.set_paint2_hue(float(Convert(base, c.paint_hue(), s16)));
+      const double value = double(G::value72_kind1());
+      rec.set_paint2_hue(float(Convert(c.paint_hue())));
       const uint32_t b10 = c.paint_saturation();
       rec.set_paint2_value(float(value));
-      const double f12 = Convert(base, b10, s16);
-      rec.set_paint2_saturation(float(Fmuls(Fmuls(f12, double(G::hue_scale(base))), f0)));
+      const double f12 = Convert(b10);
+      rec.set_paint2_saturation(float(Fmuls(Fmuls(f12, double(G::hue_scale())), f0)));
     }
   } else {
     const uint32_t from = uint32_t(int64_t(p) * 20) + c.paint_copy0_hue0_address();
     for (uint32_t i = 0; i < 3; i++) {
-      Triple(base, from + 4 * i, from + 2 + 4 * i, from + 3 + 4 * i,
-             rec.paint0_hue_address() + 16 * i, f0, s16, s24, s32);
+      Triple(from + 4 * i, from + 2 + 4 * i, from + 3 + 4 * i,
+             rec.paint0_hue_address() + 16 * i, f0);
     }
   }
   rec.set_wheels_painted(1);
-  Triple(base, c.front_wheel_color0_hue_address(), c.front_wheel_color0_saturation_address(),
-         c.front_wheel_color0_value_address(), rec.front_wheel_paint0_hue_address(), f0, s16, s16,
-         s16);
-  Triple(base, c.rear_wheel_color0_hue_address(), c.rear_wheel_color0_saturation_address(),
-         c.rear_wheel_color0_value_address(), rec.rear_wheel_paint0_hue_address(), f0, s16, s16,
-         s16);
-  Triple(base, c.front_wheel_color1_hue_address(), c.front_wheel_color1_saturation_address(),
-         c.front_wheel_color1_value_address(), rec.front_wheel_paint1_hue_address(), f0, s16, s16,
-         s16);
-  Triple(base, c.rear_wheel_color1_hue_address(), c.rear_wheel_color1_saturation_address(),
-         c.rear_wheel_color1_value_address(), rec.rear_wheel_paint1_hue_address(), f0, s16, s16,
-         s16);
-  Triple(base, c.front_wheel_color2_hue_address(), c.front_wheel_color2_saturation_address(),
-         c.front_wheel_color2_value_address(), rec.front_wheel_paint2_hue_address(), f0, s16, s16,
-         s16);
-  Triple(base, c.rear_wheel_color2_hue_address(), c.rear_wheel_color2_saturation_address(),
-         c.rear_wheel_color2_value_address(), rec.rear_wheel_paint2_hue_address(), f0, s16, s16,
-         s16);
-  CopyFloat(base, c.front_wheel_f16_address(), rec.front_wheel_f16_address());
-  CopyFloat(base, c.rear_wheel_f16_address(), rec.rear_wheel_f16_address());
-  CopyFloat(base, c.front_wheel_f28_address(), rec.front_wheel_f28_address());
-  CopyFloat(base, c.rear_wheel_f28_address(), rec.rear_wheel_f28_address());
+  Triple(c.front_wheel_color0_hue_address(), c.front_wheel_color0_saturation_address(),
+         c.front_wheel_color0_value_address(), rec.front_wheel_paint0_hue_address(), f0);
+  Triple(c.rear_wheel_color0_hue_address(), c.rear_wheel_color0_saturation_address(),
+         c.rear_wheel_color0_value_address(), rec.rear_wheel_paint0_hue_address(), f0);
+  Triple(c.front_wheel_color1_hue_address(), c.front_wheel_color1_saturation_address(),
+         c.front_wheel_color1_value_address(), rec.front_wheel_paint1_hue_address(), f0);
+  Triple(c.rear_wheel_color1_hue_address(), c.rear_wheel_color1_saturation_address(),
+         c.rear_wheel_color1_value_address(), rec.rear_wheel_paint1_hue_address(), f0);
+  Triple(c.front_wheel_color2_hue_address(), c.front_wheel_color2_saturation_address(),
+         c.front_wheel_color2_value_address(), rec.front_wheel_paint2_hue_address(), f0);
+  Triple(c.rear_wheel_color2_hue_address(), c.rear_wheel_color2_saturation_address(),
+         c.rear_wheel_color2_value_address(), rec.rear_wheel_paint2_hue_address(), f0);
+  CopyFloat(c.front_wheel_f16_address(), rec.front_wheel_f16_address());
+  CopyFloat(c.rear_wheel_f16_address(), rec.rear_wheel_f16_address());
+  CopyFloat(c.front_wheel_f28_address(), rec.front_wheel_f28_address());
+  CopyFloat(c.rear_wheel_f28_address(), rec.rear_wheel_f28_address());
   return record;
 }
 
-uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack) {
+uint32_t SetWheels(uint32_t record, uint32_t car, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B238 SceneModelRecord::SetWheels");
-  Store(base, stack - 112, stack);
-  const Record rec(base, record);
-  const Car c(base, car);
+  (void)stack;  // no frame (E5 step 6: its back chain was all it held)
+  const Record rec(record);
+  const Car c(car);
   rec.set_front_wheel(c.front_wheel_number() - 1);
   rec.set_rear_wheel(c.rear_wheel_number() - 1);
   rec.set_wheel_extra(c.power_train4());
   rec.set_caliper_texture(c.power_train3());
   // The car's spec copies (race-event's CarSpecCopies, sub_820C4550's answer).
   uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
-  if (schema::CarSpecCopies(base, block2).wheel_236() != 0) {
+  if (schema::CarSpecCopies(block2).wheel_236() != 0) {
     block2 = vehicle_accessors::ObjectRecord1888(car);
-    rec.set_caliper_texture(schema::CarSpecCopies(base, block2).wheel_236());
+    rec.set_caliper_texture(schema::CarSpecCopies(block2).wheel_236());
   }
   using strings_and_font::steps::Fctiwz;
   rec.set_front_size(uint32_t(Fctiwz(double(c.front_tire_80()))));
-  const double scale = double(G::tire_scale(base));
+  const double scale = double(G::tire_scale());
   rec.set_front_size_a(float(Fmuls(double(c.front_tire_48()), scale)));
-  const double hundred = double(G::hundred(base));
+  const double hundred = double(G::hundred());
   rec.set_front_size_b(float(Fmuls(double(c.front_tire_84()), hundred)));
   rec.set_rear_size(uint32_t(Fctiwz(double(c.rear_tire_80()))));
   rec.set_rear_size_a(float(Fmuls(double(c.rear_tire_48()), scale)));
@@ -199,68 +183,69 @@ uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack)
   return block2;
 }
 
-void SetChoice(uint8_t* base, uint32_t out, uint64_t r4, uint64_t r5, uint32_t stack) {
+void SetChoice(uint32_t out, uint64_t r4, uint64_t r5, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B1A0 SceneModelRecord::SetChoice");
-  Std(base, stack + 40, r5);
-  Std(base, stack + 32, r4);
-  const schema::CarMakersRecordChoice choice(base, out);
-  const uint32_t c = Load(base, stack + 40);
+  // The value's words as registers (the original spilled r4 and r5 into the
+  // caller's parameter area, +32 and +40, and read them back; E5 step 6).
+  (void)stack;
+  const schema::CarMakersRecordChoice choice(out);
+  const uint32_t c = uint32_t(r5 >> 32);
   if (c == 0) {
     choice.set_set(c);
     return;
   }
-  const uint32_t a = Load(base, stack + 32);
+  const uint32_t a = uint32_t(r4 >> 32);
   choice.set_index(c - 1);
   choice.set_set(1);
   uint32_t k = 0;
   if (int32_t(a) == 1) {
-    const uint32_t b = Load(base, stack + 36);
+    const uint32_t b = uint32_t(r4);
     k = b < 1 ? 1 : b == 1 ? 2 : 0;
   } else if (int32_t(a) == 2) {
-    const uint32_t b = Load(base, stack + 36);
+    const uint32_t b = uint32_t(r4);
     k = b == 1 ? 1 : 0;
   }
   choice.set_variant(uint32_t(uint64_t(a) * 3 + k - 3));
 }
 
-void ResetBytes(uint8_t* base, uint32_t at) {
+void ResetBytes(uint32_t at) {
   ITC_NATIVE_RUNNING("sub_820D0900 CarRecord::ResetBytes");
-  Store(base, at + 0, 0);
-  Store(base, at + 4, 0);
-  Store(base, at + 8, 1);
-  Store(base, at + 12, 2);
-  Store(base, at + 16, 3);
-  Store(base, at + 20, 29);
-  Store(base, at + 24, 36);
-  Store(base, at + 36, 37);
-  Store(base, at + 40, 34);
-  Store(base, at + 44, 35);
-  Store(base, at + 28, 31);
-  Store(base, at + 32, 32);
+  Store(at + 0, 0);
+  Store(at + 4, 0);
+  Store(at + 8, 1);
+  Store(at + 12, 2);
+  Store(at + 16, 3);
+  Store(at + 20, 29);
+  Store(at + 24, 36);
+  Store(at + 36, 37);
+  Store(at + 40, 34);
+  Store(at + 44, 35);
+  Store(at + 28, 31);
+  Store(at + 32, 32);
 }
 
-uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack) {
+uint32_t SetBytes(uint32_t record, uint32_t bytes, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B0E0 CarRecord::SetBytes");
-  Store(base, stack - 112, stack);
-  const schema::CarRecord car_record(base, record);
+  (void)stack;  // no frame (E5 step 6: its back chain was all it held)
+  const schema::CarRecord car_record(record);
   const uint32_t at = car_record.plate_address();
-  ResetBytes(base, at);
-  Store(base, at, 0);
+  ResetBytes(at);
+  Store(at, 0);
   for (uint32_t i = 1; i <= 11; i++) {
-    Store(base, at + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + i)))));
+    Store(at + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(bytes + i)))));
   }
-  car_record.set_unknown_3684(uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + 0)))));
+  car_record.set_unknown_3684(uint32_t(int32_t(int8_t(guest::LoadU8(bytes + 0)))));
   return at;
 }
 
-uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t record,
+uint32_t FromCar(const front_end_car_draw::Calls& calls, uint32_t record,
                  uint32_t car, uint64_t pick, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B878 SceneModelRecord::FromCar");
   const uint32_t frame = stack - 256;
-  Store(base, frame, stack);
-  const Record rec(base, record);
-  const Car c(base, car);
-  scene_models::SceneModelRecordReset(base, record);
+  Store(frame, stack);
+  const Record rec(record);
+  const Car c(car);
+  scene_models::SceneModelRecordReset(record);
   const uint32_t flags = c.flags();
   bool cars = true;  // r23
   uint32_t block;
@@ -277,11 +262,11 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
   }
   const uint32_t car_record = rec.block_address();
   rec.set_block(block);
-  SetWheels(base, record, car, frame);
-  SetPaint(base, record, car, uint32_t(pick), frame);
+  SetWheels(record, car, frame);
+  SetPaint(record, car, uint32_t(pick), frame);
   if (int32_t(rec.kind()) == 2) {
     bool both = false;  // r28
-    scene_models::CockpitRecordReset(base, rec.cockpit_bonnet_address());
+    scene_models::CockpitRecordReset(rec.cockpit_bonnet_address());
     rec.set_cockpit_bonnet(c.bonnet());
     rec.set_cockpit_bonnet_again(c.bonnet());
     rec.set_cockpit_aero9(c.aero_item9());
@@ -308,27 +293,27 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
       rec.set_interior_seats(0);
     }
     bool second = false;
-    if (int32_t(schema::CarSpecCopies(base, vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
+    if (int32_t(schema::CarSpecCopies(vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
       rec.set_interior_seats(1);
       second = true;
     } else {
       // The same word read again, as the original does.
-      if (int32_t(schema::CarSpecCopies(base, vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
+      if (int32_t(schema::CarSpecCopies(vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
         both = true;
         rec.set_interior_seats(2);
       }
       second = both;
     }
     if (second) {
-      ChoiceFrom(base, ChoiceSlot(rec, 2), c.choice3_address(), frame);
-      ChoiceFrom(base, ChoiceSlot(rec, 3), c.choice4_address(), frame);
+      ChoiceFrom(ChoiceSlot(rec, 2), c.choice3_address(), frame);
+      ChoiceFrom(ChoiceSlot(rec, 3), c.choice4_address(), frame);
     } else {
-      ChoiceFrom(base, ChoiceSlot(rec, 0), c.choice3_address(), frame);
-      ChoiceFrom(base, ChoiceSlot(rec, 1), c.choice4_address(), frame);
+      ChoiceFrom(ChoiceSlot(rec, 0), c.choice3_address(), frame);
+      ChoiceFrom(ChoiceSlot(rec, 1), c.choice4_address(), frame);
     }
-    ChoiceFrom(base, ChoiceSlot(rec, 6), c.choice0_address(), frame);
-    ChoiceFrom(base, ChoiceSlot(rec, 5), c.choice1_address(), frame);
-    ChoiceFrom(base, ChoiceSlot(rec, 4), c.choice2_address(), frame);
+    ChoiceFrom(ChoiceSlot(rec, 6), c.choice0_address(), frame);
+    ChoiceFrom(ChoiceSlot(rec, 5), c.choice1_address(), frame);
+    ChoiceFrom(ChoiceSlot(rec, 4), c.choice2_address(), frame);
     const uint32_t light = c.accessory();
     if (int32_t(light) != 3) {
       rec.set_accessory(light);
@@ -362,26 +347,26 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
     } else {
       const uint32_t out = frame + 128, parts_copy = frame + 80;
       uint32_t parts[9];
-      car_specs::GetCarParts(base, c.car_id(), parts);
+      car_specs::GetCarParts(c.car_id(), parts);
       for (uint32_t i = 0; i < 9; i++) {
-        Store(base, out + 4 * i, parts[i]);
+        Store(out + 4 * i, parts[i]);
       }
-      front_end_car_draw::Memcpy(base, calls, parts_copy, out, 36, frame, 0x8215BB98);
+      front_end_car_draw::Memcpy(calls, parts_copy, out, 36, frame, 0x8215BB98);
       const uint32_t k = c.aero_kit();
       const uint64_t k_less = uint64_t(k) - 1;  // r29
       for (uint32_t i = 0; i < 9; i++) {
-        parts[i] = Load(base, parts_copy + 4 * i);
+        parts[i] = Load(parts_copy + 4 * i);
       }
       uint32_t kit = out;
-      if (!car_specs::AeroPart82(base, out, parts, int32_t(k))) {
+      if (!car_specs::AeroPart82(out, parts, int32_t(k))) {
         const uint64_t regs[3] = {out, parts_copy, k};
         kit = uint32_t(calls.call(kGet82, regs, 3, nullptr, 0, frame, 0x8215BBAC, nullptr));
       }
       const uint32_t entry = uint32_t((uint64_t(rec.block() << 1) + k_less) * 24) +
                              G::aero_kits_address();
-      const uint32_t kit_flags = schema::AeroPartRecord(base, kit).flags();
-      front_end_car_draw::Memcpy(base, calls, parts_copy, entry, 24, frame, 0x8215BBDC);
-      auto word = [&](uint32_t at) { return Load(base, frame + at); };
+      const uint32_t kit_flags = schema::AeroPartRecord(kit).flags();
+      front_end_car_draw::Memcpy(calls, parts_copy, entry, 24, frame, 0x8215BBDC);
+      auto word = [&](uint32_t at) { return Load(frame + at); };
       if (int32_t(word(80)) != -1) {
         rec.set_parts_aero0(word(80));
       }
@@ -415,8 +400,8 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
     // the record's first three and the next three (+192 bytes on).
     for (uint32_t i = 0; i < 3; i++) {
       const uint32_t r = rec.decals_address() + 64 * i, e = c.decals_address() + 64 - 32 * i;
-      Decal(base, r, e);
-      Decal(base, r + 192, e + 96);
+      Decal(r, e);
+      Decal(r + 192, e + 96);
     }
     // The car's forty from its +288 in runs of five, each into a group of
     // six slots of the record's (from its +576): the record's and the car's
@@ -426,36 +411,38 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
                                              {3072, 1152}, {2688, 1312}};
     for (const auto& run : kRuns) {
       for (uint32_t i = 0; i < 5; i++) {
-        Decal(base, rec.decals_address() + run[0] + 64 * i, c.decals_address() + run[1] + 32 * i);
+        Decal(rec.decals_address() + run[0] + 64 * i, c.decals_address() + run[1] + 32 * i);
       }
     }
   }
   const int32_t doors = int16_t(c.body_class());
   rec.set_parts_class((doors == 1 || doors == 2 || doors == 4) ? 1 : 0);
   if (cars) {
+    // The tire grades' table {0, 1, 1, 2, 2} (the original's frame +80 to
+    // +96, a local since E5 step 6), indexed unchecked: past it (never in
+    // play) the stack's word there, as the original.
+    static constexpr uint32_t kTable[5] = {0, 1, 1, 2, 2};
     const uint32_t table = frame + 80;
-    Store(base, table + 0, 0);
-    Store(base, table + 4, 1);
-    Store(base, table + 8, 1);
-    Store(base, table + 12, 2);
+    auto grade = [&](uint32_t index) {
+      return index < 5 ? kTable[index] : Load(table + (index << 2));
+    };
     rec.set_layer0_a(c.layer0_a());
-    CopyFloat(base, c.layer0_f8_address(), rec.layer0_f8_address());
-    Store(base, table + 16, 2);
-    CopyFloat(base, c.layer0_f12_address(), rec.layer0_f12_address());
-    CopyFloat(base, c.layer0_f16_address(), rec.layer0_f16_address());
+    CopyFloat(c.layer0_f8_address(), rec.layer0_f8_address());
+    CopyFloat(c.layer0_f12_address(), rec.layer0_f12_address());
+    CopyFloat(c.layer0_f16_address(), rec.layer0_f16_address());
     rec.set_layer1_a(c.layer1_a());
-    CopyFloat(base, c.layer1_f8_address(), rec.layer1_f8_address());
-    CopyFloat(base, c.layer1_f12_address(), rec.layer1_f12_address());
-    CopyFloat(base, c.layer1_f16_address(), rec.layer1_f16_address());
+    CopyFloat(c.layer1_f8_address(), rec.layer1_f8_address());
+    CopyFloat(c.layer1_f12_address(), rec.layer1_f12_address());
+    CopyFloat(c.layer1_f16_address(), rec.layer1_f16_address());
     rec.set_layer2_a(c.layer2_a());
-    CopyFloat(base, c.layer2_f8_address(), rec.layer2_f8_address());
-    CopyFloat(base, c.layer2_f12_address(), rec.layer2_f12_address());
-    CopyFloat(base, c.layer2_f16_address(), rec.layer2_f16_address());
+    CopyFloat(c.layer2_f8_address(), rec.layer2_f8_address());
+    CopyFloat(c.layer2_f12_address(), rec.layer2_f12_address());
+    CopyFloat(c.layer2_f16_address(), rec.layer2_f16_address());
     rec.set_layer0_b(c.layer0_b());
-    rec.set_front_tire_grade(Load(base, table + (c.front_tire_grade() << 2)));
-    rec.set_rear_tire_grade(Load(base, table + (c.rear_tire_grade() << 2)));
+    rec.set_front_tire_grade(grade(c.front_tire_grade()));
+    rec.set_rear_tire_grade(grade(c.rear_tire_grade()));
   }
-  return SetBytes(base, car_record, c.setting_bytes_address(), frame);
+  return SetBytes(car_record, c.setting_bytes_address(), frame);
 }
 
 }  // namespace car_makers

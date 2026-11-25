@@ -11,6 +11,7 @@
 #include "type67_modes/views.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "guest.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
@@ -29,10 +30,11 @@ constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 
-// Movie 16: its id at the frame's +80, then UiMovies::Find.
-uint32_t DialogMovie(uint8_t* base, uint32_t frame) {
-  StoreU32(base, frame + 80, kDialogMovie);
-  return schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+// Movie 16 through UiMovies::Find (the original's id at its frame's +80,
+// a C++ value since E5 step 6).
+uint32_t DialogMovie() {
+  return schema::UiMovieWord(ui_movies::PairsFindKey(ui_movies::kMovieTable, kDialogMovie))
+      .value();
 }
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
@@ -55,12 +57,12 @@ menu_helpers::Calls Menus(const Calls& calls) {
 
 // A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
 // pages do it inline.
-void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const schema::ModeDispatcher d(base, dispatcher);
+void Post(uint32_t dispatcher, uint32_t message) {
+  const schema::ModeDispatcher d(dispatcher);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t end = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  const game_modes::RingSlot slot{d.ring() + (end - (end / 50) * 50) * 12};
   slot.set_arg0(0);
   slot.set_arg1(0);
   slot.set_id(message);
@@ -81,9 +83,9 @@ void ToStep(const Dialog& dialog, uint32_t step) {
 
 // The reopen both opens share after ResetPose: the cursors, the pages, and
 // the state (4 with the movies loaded, page 0 through step 0; else 1).
-void ResetConfirm(uint8_t* base, const Dialog& dialog, uint32_t movie) {
+void ResetConfirm(const Dialog& dialog, uint32_t movie) {
   const uint32_t previous = dialog.menu_cursor();
-  const uint32_t choice = LoadU32(base, movie + 40960);
+  const uint32_t choice = LoadU32(movie + 40960);
   dialog.set_menu_previous(previous);
   dialog.set_menu_cursor(choice);
   dialog.set_next_page(0);
@@ -111,73 +113,68 @@ void ResetConfirm(uint8_t* base, const Dialog& dialog, uint32_t movie) {
 
 }  // namespace
 
-uint64_t DialogOpenConfirm(uint8_t* base, uint32_t dialog, bool type7, uint32_t sp) {
+uint64_t DialogOpenConfirm(uint32_t dialog, bool type7, uint32_t sp) {
   if (type7) {
     ITC_NATIVE_RUNNING("sub_82241B40 Type7Dialog::OpenConfirm");
   } else {
     ITC_NATIVE_RUNNING("sub_822320D8 Type6Dialog::OpenConfirm");
   }
-  const Dialog d(base, dialog);
-  const uint32_t frame = sp - 112;
-  StoreU32(base, frame + 80, kDialogMovie);
+  (void)sp;  // its frame's one slot (the movie id) a C++ value (E5 step 6)
+  const Dialog d(dialog);
   d.set_movie(kDialogMovie);
-  const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
-  const uint64_t r3 = ui_movies::ResetPose(base, movie);
-  ResetConfirm(base, d, movie);
+  const uint32_t movie = DialogMovie();
+  const uint64_t r3 = ui_movies::ResetPose(movie);
+  ResetConfirm(d, movie);
   if (!type7) {
     d.set_type6_status(5);
   }
   return r3;
 }
 
-std::optional<uint64_t> DialogDrawWaiting(uint8_t* base, uint32_t dialog, uint32_t sp) {
+std::optional<uint64_t> DialogDrawWaiting(uint32_t dialog, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82241C18 Dialog::DrawWaiting");
-  const Dialog d(base, dialog);
+  const Dialog d(dialog);
   if (d.reopen() == 0) {
     return std::nullopt;
   }
-  const uint32_t frame = sp - 128;
-  StoreU32(base, frame + 80, kDialogMovie);
+  (void)sp;  // its frame's one slot (the movie id) a C++ value (E5 step 6)
   d.set_reopen(0);
   d.set_movie(kDialogMovie);
-  const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
-  const uint64_t r3 = ui_movies::ResetPose(base, movie);
-  ResetConfirm(base, d, movie);
+  const uint32_t movie = DialogMovie();
+  const uint64_t r3 = ui_movies::ResetPose(movie);
+  ResetConfirm(d, movie);
   return r3;
 }
 
-uint64_t DialogOpenConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls) {
+uint64_t DialogOpenConfirmStep(uint32_t dialog, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822325E0 Dialog::OpenConfirmStep");
   const uint32_t frame = sp - 128;
-  const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const Dialog d(dialog);
+  const uint32_t movie = DialogMovie();
   if (d.step_started() == 0) {
-    menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
-    ui_movies::PlayNamed(base, movie, 5, 0, 0, 0, 0);
+    menu_sounds::PlayMenuSound(5, frame, Sounds(calls));
+    ui_movies::PlayNamed(movie, 5, 0, 0, 0, 0);
     d.set_step_started(1);
   }
   const bool done = uint32_t(calls.call(kRun, frame, 0x82232650, movie, 0)) == 0;
   if (done) {
-    StoreU32(base, frame + 80, 1);
-    StoreU32(base, frame + 84, 2);
+    const uint32_t names[2] = {1, 2};  // the frame's +80 (E5 step 6: a C++ array)
     const uint32_t cursor = d.menu_cursor();
-    const uint32_t named = LoadU32(base, frame + 80 + (cursor << 2));
-    ui_movies::PlayNamed(base, movie, named, 1, 0, 0, 0);
-    ui_movies::LoopLast(base, movie);
+    const uint32_t named = names[cursor];
+    ui_movies::PlayNamed(movie, named, 1, 0, 0, 0);
+    ui_movies::LoopLast(movie);
   }
   return done ? 1 : 0;
 }
 
-uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls) {
+uint64_t DialogCloseConfirmStep(uint32_t dialog, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223AA10 Dialog::CloseConfirmStep");
   const uint32_t frame = sp - 128;
-  const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const Dialog d(dialog);
+  const uint32_t movie = DialogMovie();
   if (d.step_started() == 0) {
-    menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
-    ui_movies::PlayNamed(base, movie, 6, 0, 0, 0, 0);
+    menu_sounds::PlayMenuSound(5, frame, Sounds(calls));
+    ui_movies::PlayNamed(movie, 6, 0, 0, 0, 0);
     d.set_step_started(1);
   }
   const bool done = uint32_t(calls.call(kRun, frame, 0x8223AA80, movie, 0)) == 0;
@@ -188,27 +185,25 @@ uint64_t DialogCloseConfirmStep(uint8_t* base, uint32_t dialog, uint32_t sp, con
   return done ? 1 : 0;
 }
 
-uint64_t DialogMoveCursorStep(uint8_t* base, uint32_t dialog, uint32_t sp, const Calls& calls) {
+uint64_t DialogMoveCursorStep(uint32_t dialog, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223AB50 Dialog::MoveCursorStep");
   const uint32_t frame = sp - 128;
-  const Dialog d(base, dialog);
-  const uint32_t movie = DialogMovie(base, frame);
+  const Dialog d(dialog);
+  const uint32_t movie = DialogMovie();
   if (d.step_started() == 0) {
     const uint32_t previous = d.menu_previous();
-    StoreU32(base, frame + 84, 2);
-    StoreU32(base, frame + 80, 1);
-    calls.call(kFinishNamed, frame, 0x8223ABB0, movie,
-               LoadU32(base, frame + 80 + (previous << 2)));
+    const uint32_t names[2] = {1, 2};  // the frame's +80 (E5 step 6: a C++ array)
+    calls.call(kFinishNamed, frame, 0x8223ABB0, movie, names[previous]);
     const uint32_t cursor = d.menu_cursor();
-    ui_movies::PlayNamed(base, movie, LoadU32(base, frame + 80 + (cursor << 2)), 1, 0, 0, 0);
-    ui_movies::LoopLast(base, movie);
+    ui_movies::PlayNamed(movie, names[cursor], 1, 0, 0, 0);
+    ui_movies::LoopLast(movie);
     d.set_step_started(1);
   }
   calls.call(kRun, frame, 0x8223ABF0, movie, 0);
   return 1;
 }
 
-uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t sp,
+uint64_t DialogNoticeStep(uint32_t dialog, bool close, uint32_t sp,
                           const Calls& calls) {
   if (close) {
     ITC_NATIVE_RUNNING("sub_8223AAA8 Dialog::CloseNoticeStep");
@@ -216,14 +211,14 @@ uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t s
     ITC_NATIVE_RUNNING("sub_822326A8 Dialog::OpenNoticeStep");
   }
   const uint32_t frame = sp - 112;
-  StoreU32(base, frame, sp);
-  StoreU32(base, frame + 80, 19);
+  StoreU32(frame, sp);
+  // Movie 19 (the original's id at the frame's +80, a C++ value).
   const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
-  const Dialog d(base, dialog);
+      schema::UiMovieWord(ui_movies::PairsFindKey(ui_movies::kMovieTable, 19)).value();
+  const Dialog d(dialog);
   if (d.step_started() == 0) {
-    menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
-    ui_movies::PlayNamed(base, movie, close ? 3 : 2, 0, 0, 0, 0);
+    menu_sounds::PlayMenuSound(5, frame, Sounds(calls));
+    ui_movies::PlayNamed(movie, close ? 3 : 2, 0, 0, 0, 0);
     d.set_step_started(1);
   }
   const bool done =
@@ -234,14 +229,14 @@ uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t s
   return done ? 1 : 0;
 }
 
-uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7,
+uint64_t DialogConfirmPage(uint64_t r3, uint32_t dispatcher, bool type7,
                            uint32_t sp, const Calls& calls) {
   if (type7) {
     ITC_NATIVE_RUNNING("sub_82241EF8 Type7Dialog::ConfirmPage");
   } else {
     ITC_NATIVE_RUNNING("sub_82232328 Type6Dialog::ConfirmPage");
   }
-  const Dialog dialog(base, uint32_t(r3));
+  const Dialog dialog{uint32_t(r3)};
   const uint32_t frame = sp - 128;
   dialog.set_is_notice(0);
   if (DialogStatus(dialog, type7) == 4) {
@@ -250,24 +245,24 @@ uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool
   }
   SetDialogStatus(dialog, type7, 1);
   const uint32_t menu = dialog.menu_address();
-  menu_helpers::Step(base, menu, frame, calls.native_action_slots, Menus(calls));
+  menu_helpers::Step(menu, frame, calls.native_action_slots, Menus(calls));
   uint64_t answer =
-      menu_helpers::Pressed(base, menu, 159, frame, calls.native_action_slots, Menus(calls));
+      menu_helpers::Pressed(menu, 159, frame, calls.native_action_slots, Menus(calls));
   if (int32_t(answer) != 0) {
-    answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
+    answer = menu_sounds::PlayMenuSound(0, frame, Sounds(calls));
     ToStep(dialog, 1);
     const bool yes = dialog.menu_cursor() == 0;
-    Post(base, dispatcher, type7 ? (yes ? 8 : 9) : (yes ? 9 : 10));
+    Post(dispatcher, type7 ? (yes ? 8 : 9) : (yes ? 9 : 10));
     if (type7) {
       dialog.set_type7_status(2);
     }
     return answer;
   }
-  answer = menu_helpers::Pressed(base, menu, 158, frame, calls.native_action_slots, Menus(calls));
+  answer = menu_helpers::Pressed(menu, 158, frame, calls.native_action_slots, Menus(calls));
   if (int32_t(answer) != 0) {
-    answer = menu_sounds::PlayMenuSound(base, 2, frame, Sounds(calls));
+    answer = menu_sounds::PlayMenuSound(2, frame, Sounds(calls));
     ToStep(dialog, 1);
-    Post(base, dispatcher, type7 ? 11 : 12);
+    Post(dispatcher, type7 ? 11 : 12);
     if (type7) {
       dialog.set_type7_status(2);
     }
@@ -276,38 +271,38 @@ uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool
   if (dialog.menu_moved() == 0) {
     return answer;
   }
-  answer = menu_sounds::PlayMenuSound(base, 4, frame, Sounds(calls));
+  answer = menu_sounds::PlayMenuSound(4, frame, Sounds(calls));
   ToStep(dialog, 4);
   return answer;
 }
 
-uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type7, uint32_t sp,
+uint64_t DialogUpdate(uint64_t r3, uint32_t dispatcher, bool type7, uint32_t sp,
                       const Calls& calls) {
   if (type7) {
     ITC_NATIVE_RUNNING("sub_82242218 Type7Dialog::Update");
   } else {
     ITC_NATIVE_RUNNING("sub_82232798 Type6Dialog::Update");
   }
-  const Dialog dialog(base, uint32_t(r3));
+  const Dialog dialog{uint32_t(r3)};
   const uint32_t frame = sp - 160;
-  StoreU32(base, frame + 80, dialog.movie());
+  StoreU32(frame + 80, dialog.movie());
   const uint32_t movie =
-      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
+      schema::UiMovieWord(ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80)).value();
   const uint32_t step = dialog.step();
   // The steps' table: OpenConfirmStep, CloseConfirmStep, OpenNoticeStep,
   // CloseNoticeStep, MoveCursorStep.
+  // (The original builds it at the frame's +96; read only here, so a C++
+  // table since E5 step 6. The movie id at +80 stays: its address is the
+  // step's r4.)
   static constexpr uint32_t kSteps[5] = {0x822325E0, 0x8223AA10, 0x822326A8, 0x8223AAA8,
                                          0x8223AB50};
-  for (uint32_t i = 0; i < 5; i++) {
-    StoreU32(base, frame + 96 + 4 * i, kSteps[i]);
-  }
   uint64_t answer = movie;
   if (step == 0xFFFFFFFF) {
     answer = calls.call(kRun, frame, type7 ? 0x82242304 : 0x82232884, movie, 0);
   } else {
     bool done = true;
     if (int32_t(step) >= 0) {
-      const uint32_t target = LoadU32(base, frame + 96 + (step << 2));
+      const uint32_t target = kSteps[step];
       answer = calls.call(target, frame, type7 ? 0x822422B4 : 0x82232834, r3, frame + 80);
       done = int32_t(answer) != 0;
     }
@@ -329,7 +324,7 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type
     return answer;
   }
   if (state == 9) {
-    Post(base, dispatcher, type7 ? 12 : 13);
+    Post(dispatcher, type7 ? 12 : 13);
   }
   dialog.set_state(dialog.queued_state());
   if (type7) {

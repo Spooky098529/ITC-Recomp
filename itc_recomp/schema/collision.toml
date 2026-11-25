@@ -29,6 +29,14 @@ measures = ["Shape", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "
 # measures from ReplayPlacedBox (replay-snapshots), merged at the integration
 size = 496
 origin = "allocated"
+# Dual (E5 step 4): host when allocated (Vehicle::SetUpPhysics and ResetPhysics,
+# BoxShape::Clone: their hand ports' New; host_alloc their originals' operator
+# new), guest for CollisionShape::Place's stack copy and a clone into memory a
+# caller gives. Freed by Shape::DeletingDestructor (operator delete takes the
+# handle). The faces (+304, 6 x BoxShapeFace) aren't an embed field: its fields
+# would repeat the face fields' in the layout.
+storage = "dual"
+host_alloc = [0x820B57D8, 0x820B5C88, 0x820BB240]
 vtable = 0x82002B30
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82002B30 (a box); 0x82002AA8 (Shape's) once destroyed or before BoxShape::BoxShape sets it" },
@@ -197,6 +205,7 @@ fields = [
 measure = "sub_822BE2C8.r3"
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "word_8", offset = 8, type = "u32", note = "the word sub_822BE2C8 returns (a shape record's current copy in collision)" },
 ]
@@ -331,6 +340,8 @@ fields = [
 measure = "BoxBox::FaceSeparates.r4"
 size = 32
 origin = "embedded"
+# A BoxShape's face (+304 + 32i), so dual as the box is (E5 step 4).
+storage = "dual"
 fields = [
   { name = "distance", offset = 0, type = "f32" },
   { name = "normal_x", offset = 16, type = "f32", note = "the outward normal" },
@@ -531,6 +542,8 @@ fields = [
 measure = "CollisionObject@+32.+4"
 size = 4
 origin = "embedded"
+# A BoxShape (dual) seen through a pointer.
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
 ]
@@ -550,6 +563,8 @@ fields = [
 measure = "CollisionObject@+32.+8"
 size = 60
 origin = "embedded"
+# A BoxShape (dual) seen through a pointer.
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_48", offset = 48, type = "f32" },
@@ -573,6 +588,8 @@ fields = [
 measure = "Vehicles::DestroyAll.r3@+37632.+344"
 size = 4
 origin = "embedded"
+# A BoxShape (dual) seen through a pointer.
+storage = "dual"
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
 ]

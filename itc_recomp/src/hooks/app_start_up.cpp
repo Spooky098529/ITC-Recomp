@@ -68,12 +68,12 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
   
   if (ITC_FLAG(native_app_start_up) && hooks::NativeHeapActive()) {
     const auto declaration =
-        asu::CreateVertexDeclaration(base, ctx.r3.u32, [&](uint32_t to, uint32_t from, uint32_t size) {
-          InFrame(ctx, base, 160, 0x822A8A54, [&](uint32_t) {
+        asu::CreateVertexDeclaration(ctx.r3.u32, [&](uint32_t to, uint32_t from, uint32_t size) {
+          InFrame(ctx, 160, 0x822A8A54, [&](uint32_t) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+            lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
           });
         });
     if (declaration) {
@@ -84,7 +84,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
       return;
     }
   }
-  lifted::original::c822A8980(ctx, base);
+  lifted::original::c822A8980(ctx);
 }
 
 // --- The network manager's set-up ---
@@ -94,13 +94,13 @@ namespace {
 // memcpy through the guest from XNet::Configure's frame. (SignIn::SetUp,
 // Network::StartUp, XNetStartup and XNet::Configure have no adapters: only
 // Network::SetUp's plain C++ calls them in play.)
-asu::MemcpyCall XNetMemcpy(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
-    InFrame(ctx, base, 112, 0x82577580, [&](uint32_t) {
+asu::MemcpyCall XNetMemcpy(lifted::Regs& ctx) {
+  return [&ctx](uint32_t to, uint32_t from, uint32_t size) {
+    InFrame(ctx, 112, 0x82577580, [&](uint32_t) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+      lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
     });
   };
 }
@@ -113,10 +113,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8214E190) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    lifted::original::c8214E190(ctx, base);
+    lifted::original::c8214E190(ctx);
     return;
   }
-  ctx.r3.u64 = asu::NetworkSetUp(base, ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx, base));
+  ctx.r3.u64 = asu::NetworkSetUp(ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx));
 }
 
 // --- The scene target ---
@@ -128,18 +128,18 @@ namespace {
 
 // [0x8266D088]'s slot 7, then that object's slot 3: the video output, with
 // the original's return addresses.
-uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
+uint32_t VideoOutput(lifted::Regs& ctx, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app().address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 =
-      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
-  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    lifted::CallFromContext(ctx, base, slot7);
+      guest::LoadU32(schema::AppInterface16(ctx.r3.u32).vtable() + 28);
+  if (!hooks::DirectSlotCall(ctx, slot7)) {
+    lifted::CallFromContext(ctx, slot7);
   }
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.ctr.u64 = guest::LoadU32(guest::VtableWord(ctx.r3.u32) + 12);
   ctx.lr = second;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -152,10 +152,10 @@ bool DeviceUsersNative() {
 
 // (SceneTarget::SceneTarget has no adapter: only SceneTarget::Create's plain
 // C++ calls it in play.)
-asu::VideoOutputCall SceneTargetVideoOutput(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](int at) {
-    return at == 0 ? VideoOutput(ctx, base, 0x8209B0B0, 0x8209B0C0)
-                   : VideoOutput(ctx, base, 0x8209B298, 0x8209B2A8);
+asu::VideoOutputCall SceneTargetVideoOutput(lifted::Regs& ctx) {
+  return [&ctx](int at) {
+    return at == 0 ? VideoOutput(ctx, 0x8209B0B0, 0x8209B0C0)
+                   : VideoOutput(ctx, 0x8209B298, 0x8209B2A8);
   };
 }
 
@@ -167,20 +167,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8209B378) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::original::c8209B378(ctx, base);
+    lifted::original::c8209B378(ctx);
     return;
   }
   const uint32_t interface = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> result;
-  InFrame(ctx, base, 96, 0x8209B3A4, [&](uint32_t) {
-    InFrame(ctx, base, 192, 0x8209B0B0, [&](uint32_t frame) {
-      result = asu::SceneTargetCreate(base, interface, frame, SceneTargetVideoOutput(ctx, base));
-    });
+  // SceneTarget::Create's 96-byte frame (its back chain not written since E5
+  // step 6: no guest call is made from it), the constructor's 192 below.
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = stack - 96;
+  InFrame(ctx, 192, 0x8209B0B0, [&](uint32_t frame) {
+    result = asu::SceneTargetCreate(interface, frame, SceneTargetVideoOutput(ctx));
   });
+  ctx.r1.u64 = stack;
   ctx.lr = lr;
   if (!result) {
-    lifted::original::c8209B378(ctx, base);
+    lifted::original::c8209B378(ctx);
     return;
   }
   ctx.r3.u64 = *result;
@@ -190,15 +193,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8209B378) {
 
 namespace {
 
-uint32_t VirtualCall(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+uint32_t VirtualCall(lifted::Regs& ctx, uint32_t object, uint32_t offset,
                      uint32_t return_address) {
   ctx.r3.u64 = object;
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+  ctx.ctr.u64 = guest::LoadU32(guest::VtableWord(object) + offset);
   ctx.lr = return_address;
   // (The render manager's slots 8 and 7 by their plain C++ where they're the
   // game's, hooks::DirectSlotCall.)
-  if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
-    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  if (!hooks::DirectSlotCall(ctx, ctx.ctr.u32)) {
+    lifted::CallFromContext(ctx, ctx.ctr.u32);
   }
   return ctx.r3.u32;
 }
@@ -211,11 +214,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::original::c8209BE88(ctx, base);
+    lifted::original::c8209BE88(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
-  InFrame(ctx, base, 160, 0x8209BF18, [&](uint32_t frame) {
+  InFrame(ctx, 160, 0x8209BF18, [&](uint32_t frame) {
     asu::BillboardCalls calls;
     calls.compile = [&](int which, uint32_t source, uint32_t length, uint32_t entry,
                         uint32_t profile, uint32_t out) {
@@ -228,43 +231,43 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8209BF18 : 0x8209C01C;
-      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     };
     calls.buffer_data = [&](int which, uint32_t buffer) {
-      return VirtualCall(ctx, base, buffer, 12, which == 0 ? 0x8209BF80 : 0x8209C080);
+      return VirtualCall(ctx, buffer, 12, which == 0 ? 0x8209BF80 : 0x8209C080);
     };
     calls.release = [&](int which, uint32_t buffer) {
       static constexpr uint32_t kReturns[] = {0x8209BF3C, 0x8209BFCC, 0x8209C040, 0x8209C0CC};
-      VirtualCall(ctx, base, buffer, 8, kReturns[which]);
+      VirtualCall(ctx, buffer, 8, kReturns[which]);
     };
     calls.video_output = [&](int at) {
       static constexpr uint32_t kReturns[6][2] = {
           {0x8209BF54, 0x8209BF64}, {0x8209BFA0, 0x8209BFB0}, {0x8209C054, 0x8209C064},
           {0x8209C0A0, 0x8209C0B0}, {0x8209C0E0, 0x8209C0F0}, {0x8209C124, 0x8209C134}};
-      return VideoOutput(ctx, base, kReturns[at][0], kReturns[at][1]);
+      return VideoOutput(ctx, kReturns[at][0], kReturns[at][1]);
     };
     calls.vertex_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209BF84;
-      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
+      lifted::Enter(ctx, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     };
     calls.pixel_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209C084;
-      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
+      lifted::Enter(ctx, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     };
     calls.memcpy_call = [&](uint32_t to, uint32_t from, uint32_t size) {
-      InFrame(ctx, base, 160, 0x822A8A54, [&](uint32_t) {
+      InFrame(ctx, 160, 0x822A8A54, [&](uint32_t) {
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+        lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
       });
     };
-    asu::BillboardsInit(base, frame, calls);
+    asu::BillboardsInit(frame, calls);
   });
   ctx.lr = lr;
 }
@@ -290,22 +293,22 @@ uint32_t At(lifted::Regs& ctx, uint32_t frame, Call call) {
 
 // The font's guest calls: Font::Font's from `font_frame`, Font::CreateShaders'
 // from `shaders_frame`, Strings::Init from `text_frame` (Text::Init's).
-asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_frame,
+asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint32_t text_frame,
                             uint32_t font_frame, uint32_t shaders_frame) {
   asu::FontCalls calls;
-  calls.video_output = [&ctx, base, font_frame] {
-    return At(ctx, font_frame, [&] { return VideoOutput(ctx, base, 0x82109258, 0x82109268); });
+  calls.video_output = [&ctx, font_frame] {
+    return At(ctx, font_frame, [&] { return VideoOutput(ctx, 0x82109258, 0x82109268); });
   };
-  calls.render_object = [&ctx, base, font_frame](int which) {
+  calls.render_object = [&ctx, font_frame](int which) {
     return At(ctx, font_frame, [&] {
       const uint32_t object =
-          VirtualCall(ctx, base, schema::AppStartUpGlobals::render_app(base).address, 32,
+          VirtualCall(ctx, schema::AppStartUpGlobals::render_app().address, 32,
                       which == 0 ? 0x82109284 : 0x821092AC);
-      return VirtualCall(ctx, base, object, which == 0 ? 4 : 8,
+      return VirtualCall(ctx, object, which == 0 ? 4 : 8,
                          which == 0 ? 0x82109294 : 0x821092BC);
     });
   };
-  calls.compile = [&ctx, base, shaders_frame](int which, uint32_t source, uint32_t length,
+  calls.compile = [&ctx, shaders_frame](int which, uint32_t source, uint32_t length,
                                                uint32_t profile, uint32_t out) {
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = source;
@@ -320,60 +323,60 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8210893C : 0x821089B8;
-      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     });
   };
-  calls.buffer_data = [&ctx, base, shaders_frame](int which, uint32_t buffer) {
+  calls.buffer_data = [&ctx, shaders_frame](int which, uint32_t buffer) {
     return At(ctx, shaders_frame, [&] {
-      return VirtualCall(ctx, base, buffer, 12, which == 0 ? 0x82108950 : 0x821089CC);
+      return VirtualCall(ctx, buffer, 12, which == 0 ? 0x82108950 : 0x821089CC);
     });
   };
-  calls.release = [&ctx, base, shaders_frame](int which, uint32_t buffer) {
+  calls.release = [&ctx, shaders_frame](int which, uint32_t buffer) {
     return At(ctx, shaders_frame, [&] {
-      return VirtualCall(ctx, base, buffer, 8, which == 0 ? 0x82108970 : 0x821089EC);
+      return VirtualCall(ctx, buffer, 8, which == 0 ? 0x82108970 : 0x821089EC);
     });
   };
-  calls.vertex_shader = [&ctx, base, shaders_frame](uint32_t data) {
+  calls.vertex_shader = [&ctx, shaders_frame](uint32_t data) {
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x82108954;
-      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
+      lifted::Enter(ctx, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     });
   };
-  calls.pixel_shader = [&ctx, base, shaders_frame](int, uint32_t data) {
+  calls.pixel_shader = [&ctx, shaders_frame](int, uint32_t data) {
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x821089D0;
-      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
+      lifted::Enter(ctx, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     });
   };
-  calls.memcpy_call = [&ctx, base, shaders_frame](uint32_t to, uint32_t from, uint32_t size) {
+  calls.memcpy_call = [&ctx, shaders_frame](uint32_t to, uint32_t from, uint32_t size) {
     At(ctx, shaders_frame, [&] {
-      InFrame(ctx, base, 160, 0x822A8A54, [&](uint32_t) {
+      InFrame(ctx, 160, 0x822A8A54, [&](uint32_t) {
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+        lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
       });
       return 0u;
     });
   };
-  calls.strings_init = [&ctx, base, text_frame] {
+  calls.strings_init = [&ctx, text_frame] {
     // Font::Init's r3 (Font::Font's, 14), which Strings::Init leaves when
     // the table is already there.
     ctx.r3.u64 = 14;
     if (ITC_FLAG(native_strings_and_font) && hooks::NativeHeapActive()) {
-      if (const uint32_t table = strings_and_font::StringsInit(base); table != 0) {
+      if (const uint32_t table = strings_and_font::StringsInit(); table != 0) {
         ctx.r3.u64 = table;
       }
       return ctx.r3.u32;
     }
     return At(ctx, text_frame, [&] {
       ctx.lr = 0x8210ADE4;
-      lifted::CallFromContext(ctx, base, 0x8210A860);  // Strings::Init
+      lifted::CallFromContext(ctx, 0x8210A860);  // Strings::Init
       return ctx.r3.u32;
     });
   };
@@ -382,31 +385,33 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
 
 }  // namespace
 
-void hooks::TextInitSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::TextInitSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  InFrame(ctx, base, 96, 0x8210ADE0, [&](uint32_t text_frame) {
-    InFrame(ctx, base, 96, 0x82109A2C, [&](uint32_t init_frame) {
-      const uint32_t font_frame = init_frame - 128;
-      const uint32_t shaders_frame = font_frame - 160;
-      guest::StoreU32(base, font_frame, init_frame);
-      guest::StoreU32(base, shaders_frame, font_frame);
-      r3 = asu::TextInit(base, font_frame, shaders_frame,
-                         FontCallsFor(ctx, base, text_frame, font_frame, shaders_frame));
-    });
+  InFrame(ctx, 96, 0x8210ADE0, [&](uint32_t text_frame) {
+    // Font::Init's 96-byte frame (its back chain not written since E5 step
+    // 6: no guest call is made from it), Font::Font's and CreateShaders'
+    // below it.
+    const uint32_t init_frame = text_frame - 96;
+    const uint32_t font_frame = init_frame - 128;
+    const uint32_t shaders_frame = font_frame - 160;
+    guest::StoreU32(font_frame, init_frame);
+    guest::StoreU32(shaders_frame, font_frame);
+    r3 = asu::TextInit(font_frame, shaders_frame,
+                       FontCallsFor(ctx, text_frame, font_frame, shaders_frame));
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
-void hooks::FontConstructSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::FontConstructSteps(lifted::Regs& ctx) {
   const uint32_t font = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  InFrame(ctx, base, 128, 0x82109258, [&](uint32_t font_frame) {
+  InFrame(ctx, 128, 0x82109258, [&](uint32_t font_frame) {
     const uint32_t shaders_frame = font_frame - 160;
-    guest::StoreU32(base, shaders_frame, font_frame);
-    asu::FontConstruct(base, font, font_frame, shaders_frame,
-                       FontCallsFor(ctx, base, font_frame, font_frame, shaders_frame));
+    guest::StoreU32(shaders_frame, font_frame);
+    asu::FontConstruct(font, font_frame, shaders_frame,
+                       FontCallsFor(ctx, font_frame, font_frame, shaders_frame));
   });
   ctx.lr = lr;
   ctx.r3.u64 = 14;
@@ -420,26 +425,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADD0) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::original::c8210ADD0(ctx, base);
+    lifted::original::c8210ADD0(ctx);
     return;
   }
-  hooks::TextInitSteps(ctx, base);
+  hooks::TextInitSteps(ctx);
 }
 
 // --- The app's start-up ---
 
-void hooks::AppStartUpSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppStartUpSteps(lifted::Regs& ctx) {
   const uint32_t interface = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  // The original's prologue: the link register and r31 kept above its frame
-  // (the caller's r31: not carried by the view).
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  guest::StoreU32(base, ctx.r1.u32 - 16, 0);
-  guest::StoreU32(base, ctx.r1.u32 - 12, 0);
+  // (The original's prologue saves, the link register and r31 above its
+  // frame, aren't written since E5 step 6: nothing reads them.)
   uint32_t r3 = 0;
   // (r31 = the interface in the body, as the original, reached callees only
   // as the bytes they save: not carried by the view)
-  InFrame(ctx, base, 128, 0x82106564, [&](uint32_t frame) {
+  InFrame(ctx, 128, 0x82106564, [&](uint32_t frame) {
     asu::StartUpCalls calls;
     calls.call = [&](uint32_t target, std::optional<uint32_t> a, std::optional<uint32_t> b,
                      uint32_t return_address) {
@@ -450,13 +452,13 @@ void hooks::AppStartUpSteps(lifted::Regs& ctx, uint8_t* base) {
         ctx.r4.u64 = *b;
       }
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, target);
+      lifted::CallFromContext(ctx, target);
       return ctx.r3.u32;
     };
     calls.virtual_call = [&](uint32_t offset, uint32_t return_address) {
-      return VirtualCall(ctx, base, interface, offset, return_address);
+      return VirtualCall(ctx, interface, offset, return_address);
     };
-    r3 = asu::AppStartUp(base, interface, frame, calls);
+    r3 = asu::AppStartUp(interface, frame, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -469,75 +471,61 @@ ITC_NATIVE_ENTRY_ALWAYS(82106548) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    lifted::original::c82106548(ctx, base);
+    lifted::original::c82106548(ctx);
     return;
   }
-  hooks::AppStartUpSteps(ctx, base);
+  hooks::AppStartUpSteps(ctx);
 }
 
 // --- The movie class's construction ---
 
 namespace {
 
-// The original's __savegprlr_N: the link register at r1 - 8 and rN to r31
-// (doublewords) below it, above the frame it's about to make. rN to r31 are
-// stored as 0 (the caller's: not carried by the view).
-void SaveRegisters(lifted::Regs& ctx, uint8_t* base, int first) {  // first >= 14
-  const uint32_t sp = ctx.r1.u32;
-  guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
-  for (int n = first; n < 32; n++) {
-    const uint64_t value = 0;
-    const uint32_t at = sp - 8 * (32 - n) - 8;
-    guest::StoreU32(base, at, uint32_t(value >> 32));
-    guest::StoreU32(base, at + 4, uint32_t(value));
-  }
-}
+// (The originals' prologue saves, __savegprlr_N's link register and rN to
+// r31 above their frames, aren't written since E5 step 6: nothing reads
+// them, and the registers were stored as 0, not carried by the view.)
 
 }  // namespace
 
-void hooks::MovieWrapperSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::MovieWrapperSteps(lifted::Regs& ctx) {
   const uint32_t wrapper = ctx.r3.u32;
-  // The original's prologue: lr, r30 and r31 above its 112-byte frame.
-  SaveRegisters(ctx, base, 30);
-  if (const auto r3 = asu::MovieWrapperConstruct(base, wrapper)) {
+  if (const auto r3 = asu::MovieWrapperConstruct(wrapper)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c82593DC0(ctx, base);
+  lifted::original::c82593DC0(ctx);
 }
 
 // MovieWrapper::MovieWrapper (sub_82593DC0) has no adapter: only Movie::Movie's
 // plain C++ calls it in play (its steps above), the original with the flag
 // off.
 
-void hooks::MovieConstructSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::MovieConstructSteps(lifted::Regs& ctx) {
   const uint32_t movie = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
-  // The original's prologue (__savegprlr_28): lr and r28 to r31.
-  SaveRegisters(ctx, base, 28);
   std::optional<uint32_t> result;
-  InFrame(ctx, base, 160, 0x820AEB10, [&](uint32_t frame) {
+  InFrame(ctx, 160, 0x820AEB10, [&](uint32_t frame) {
     asu::MovieCalls calls;
     calls.virtual_call = [&](uint32_t object, uint32_t offset, uint32_t r4, uint32_t r5,
                              uint32_t return_address) {
       ctx.r4.u64 = r4;
       ctx.r5.u64 = r5;
-      return VirtualCall(ctx, base, object, offset, return_address);
+      return VirtualCall(ctx, object, offset, return_address);
     };
     calls.wrapper = [&](uint32_t wrapper) {
       ctx.r3.u64 = wrapper;
       ctx.lr = 0x820AEB1C;
-      hooks::MovieWrapperSteps(ctx, base);
+      hooks::MovieWrapperSteps(ctx);
       return ctx.r3.u32;
     };
-    result = asu::MovieConstruct(base, movie, block, frame, calls);
+    result = asu::MovieConstruct(movie, block, frame, calls);
   });
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = block;
-    lifted::original::c820AEA88(ctx, base);
+    lifted::original::c820AEA88(ctx);
     return;
   }
   ctx.r3.u64 = *result;
@@ -551,24 +539,19 @@ ITC_NATIVE_ENTRY_ALWAYS(820AEA88) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::original::c820AEA88(ctx, base);
+    lifted::original::c820AEA88(ctx);
     return;
   }
-  hooks::MovieConstructSteps(ctx, base);
+  hooks::MovieConstructSteps(ctx);
 }
 
 // --- The sound manager's construction ---
 
 namespace {
 
-void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
-}
-
-asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
+asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint32_t frame) {
   asu::AudioManagerCalls calls;
-  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, std::optional<uint32_t> r4,
+  calls.call = [&ctx](uint32_t target, uint32_t sp, uint32_t r3, std::optional<uint32_t> r4,
                             std::optional<uint32_t> r5, uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -580,11 +563,11 @@ asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint8_t* base, ui
       ctx.r5.u64 = *r5;
     }
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, target);
+    lifted::CallFromContext(ctx, target);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
-  calls.virtual_call = [&ctx, base, frame](uint32_t object, uint32_t offset,
+  calls.virtual_call = [&ctx, frame](uint32_t object, uint32_t offset,
                                            std::optional<uint32_t> r4, std::optional<uint32_t> r5,
                                            uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
@@ -595,7 +578,7 @@ asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint8_t* base, ui
     if (r5) {
       ctx.r5.u64 = *r5;
     }
-    const uint32_t r3 = VirtualCall(ctx, base, object, offset, return_address);
+    const uint32_t r3 = VirtualCall(ctx, object, offset, return_address);
     ctx.r1.u64 = stack;
     return r3;
   };
@@ -604,43 +587,29 @@ asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint8_t* base, ui
 
 }  // namespace
 
-void hooks::AudioManagerCreateSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AudioManagerCreateSteps(lifted::Regs& ctx) {
   const uint32_t owner = ctx.r3.u32, name = ctx.r4.u32, count = ctx.r5.u32;
   const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64, entry_r5 = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  // The frames as the original's: Create's 112 bytes (__savegprlr_29), the
-  // constructor's 256 below it (__savegprlr_26), StartXAudio's 144 below
-  // that; their back chains.
-  SaveRegisters(ctx, base, 29);
+  // The frames as the original's: Create's 112 bytes, the constructor's 256
+  // below it, StartXAudio's 144 below that; their back chains.
   const uint32_t create_frame = sp - 112;
   const uint32_t frame = create_frame - 256;
   const uint32_t start_frame = frame - 144;
-  guest::StoreU32(base, create_frame, sp);
-  guest::StoreU32(base, frame, create_frame);
-  guest::StoreU32(base, start_frame, frame);
-  const auto calls = AudioManagerCallsFor(ctx, base, frame);
-  const auto result = asu::AudioManagerCreate(base, owner, name, count, frame, start_frame, calls);
+  guest::StoreU32(create_frame, sp);
+  guest::StoreU32(frame, create_frame);
+  guest::StoreU32(start_frame, frame);
+  const auto calls = AudioManagerCallsFor(ctx, frame);
+  const auto result = asu::AudioManagerCreate(owner, name, count, frame, start_frame, calls);
   ctx.r1.u64 = sp;
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
     ctx.r5.u64 = entry_r5;
-    lifted::original::c82119B38(ctx, base);
+    lifted::original::c82119B38(ctx);
     return;
-  }
-  if (*result != 0) {
-    // The constructor's prologue saves: lr, r26 to r28 as they came, r29 to
-    // r31 Create's (the count, the name, the owner). (The caller's r26 to
-    // r28: not carried by the view.)
-    guest::StoreU32(base, create_frame - 8, 0x82119B70);
-    StoreDoubleword(base, create_frame - 56, 0);
-    StoreDoubleword(base, create_frame - 48, 0);
-    StoreDoubleword(base, create_frame - 40, 0);
-    StoreDoubleword(base, create_frame - 32, entry_r5);
-    StoreDoubleword(base, create_frame - 24, entry_r4);
-    StoreDoubleword(base, create_frame - 16, entry_r3);
   }
   ctx.r3.u64 = *result;
 }
@@ -655,22 +624,21 @@ ITC_NATIVE_ENTRY_ALWAYS(82119B38) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::original::c82119B38(ctx, base);
+    lifted::original::c82119B38(ctx);
     return;
   }
-  hooks::AudioManagerCreateSteps(ctx, base);
+  hooks::AudioManagerCreateSteps(ctx);
 }
 
-void hooks::StartXAudioSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::StartXAudioSteps(lifted::Regs& ctx) {
   const uint32_t sp = ctx.r1.u32;
   const uint64_t lr = ctx.lr;
-  // The original's prologue: lr, r30 and r31 above its 144-byte frame.
-  SaveRegisters(ctx, base, 30);
+  // The original's 144-byte frame.
   const uint32_t frame = sp - 144;
-  guest::StoreU32(base, frame, sp);
-  const auto calls = AudioManagerCallsFor(ctx, base, frame);
+  guest::StoreU32(frame, sp);
+  const auto calls = AudioManagerCallsFor(ctx, frame);
   // r3 as the last guest call left it (XAudioInitialize's, in full).
-  asu::StartXAudio(base, frame, calls);
+  asu::StartXAudio(frame, calls);
   ctx.r1.u64 = sp;
   ctx.lr = lr;
 }
@@ -679,46 +647,42 @@ void hooks::StartXAudioSteps(lifted::Regs& ctx, uint8_t* base) {
 
 namespace {
 
-asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint8_t* base, uint64_t owner);
+asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint64_t owner);
 
-// The constructors' prologues: lr and r31 (the owner's object, the caller's
-// r31) above their frames.
-uint32_t AppCameraCameraSteps(lifted::Regs& ctx, uint8_t* base, uint32_t camera, uint64_t owner) {
+// The constructors (their prologue saves, lr and the owner's object as r31,
+// not written since E5 step 6: nothing reads them).
+uint32_t AppCameraCameraSteps(lifted::Regs& ctx, uint32_t camera, uint64_t owner) {
   const uint32_t sp = ctx.r1.u32;
-  guest::StoreU32(base, sp - 8, 0x820A8C40);
-  StoreDoubleword(base, sp - 16, owner);
   const uint32_t frame = sp - 144;
-  guest::StoreU32(base, frame, sp);
-  return asu::AppCameraCameraConstruct(base, camera, frame, AppCameraCallsFor(ctx, base, owner));
+  guest::StoreU32(frame, sp);
+  return asu::AppCameraCameraConstruct(camera, frame, AppCameraCallsFor(ctx, owner));
 }
 
-uint32_t AppCameraListSteps(lifted::Regs& ctx, uint8_t* base, uint32_t list, uint64_t owner) {
-  const uint32_t sp = ctx.r1.u32;
-  guest::StoreU32(base, sp - 8, 0x820A8C64);
-  StoreDoubleword(base, sp - 16, owner);
-  if (const auto r3 = asu::AppCameraListConstruct(base, list)) {
+uint32_t AppCameraListSteps(lifted::Regs& ctx, uint32_t list, uint64_t owner) {
+  (void)owner;
+  if (const auto r3 = asu::AppCameraListConstruct(list)) {
     return *r3;
   }
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = list;
   ctx.lr = 0x820A8C64;
-  lifted::original::c820A98C0(ctx, base);
+  lifted::original::c820A98C0(ctx);
   ctx.lr = lr;
   return ctx.r3.u32;
 }
 
-asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint8_t* base, uint64_t owner) {
+asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint64_t owner) {
   asu::AppCameraCalls calls;
-  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, uint32_t return_address) {
+  calls.call = [&ctx](uint32_t target, uint32_t sp, uint32_t r3, uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.r3.u64 = r3;
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, target);
+    lifted::CallFromContext(ctx, target);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
-  calls.virtual_call = [&ctx, base](uint32_t object, uint32_t offset, uint32_t sp,
+  calls.virtual_call = [&ctx](uint32_t object, uint32_t offset, uint32_t sp,
                                     std::optional<uint32_t> r4, std::optional<uint32_t> r5,
                                     std::optional<uint32_t> f1, uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
@@ -735,70 +699,60 @@ asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint8_t* base, uint64_t
       std::memcpy(&value, &bits, 4);
       ctx.f1.f64 = double(value);
     }
-    const uint32_t r3 = VirtualCall(ctx, base, object, offset, return_address);
+    const uint32_t r3 = VirtualCall(ctx, object, offset, return_address);
     ctx.r1.u64 = stack;
     return r3;
   };
-  calls.camera = [&ctx, base, owner](uint32_t block) {
-    return AppCameraCameraSteps(ctx, base, block, owner);
+  calls.camera = [&ctx, owner](uint32_t block) {
+    return AppCameraCameraSteps(ctx, block, owner);
   };
-  calls.list = [&ctx, base, owner](uint32_t block) {
-    return AppCameraListSteps(ctx, base, block, owner);
+  calls.list = [&ctx, owner](uint32_t block) {
+    return AppCameraListSteps(ctx, block, owner);
   };
   return calls;
 }
 
 }  // namespace
 
-void hooks::AppCameraSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppCameraSteps(lifted::Regs& ctx) {
   const uint32_t object = ctx.r3.u32, block = ctx.r4.u32;
   const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64;
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  // The original's prologue: __savegprlr_27 and f31 at -56.
-  SaveRegisters(ctx, base, 27);
-  StoreDoubleword(base, sp - 56, 0);  // (the caller's f31: not carried by the view)
   const uint32_t frame = sp - 224;
-  guest::StoreU32(base, frame, sp);
+  guest::StoreU32(frame, sp);
   ctx.r1.u64 = frame;
   const auto result =
-      asu::AppCameraConstruct(base, object, block, frame, AppCameraCallsFor(ctx, base, entry_r3));
+      asu::AppCameraConstruct(object, block, frame, AppCameraCallsFor(ctx, entry_r3));
   ctx.r1.u64 = sp;
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
-    lifted::original::c820A8B88(ctx, base);
+    lifted::original::c820A8B88(ctx);
     return;
   }
   ctx.r3.u64 = *result;
 }
 
-void hooks::AppCameraCameraConstructSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppCameraCameraConstructSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  guest::StoreU32(base, sp - 8, uint32_t(lr));
-  // (the caller's r31, saved here and by the callees as their owner: not
-  // carried by the view)
-  StoreDoubleword(base, sp - 16, 0);
   const uint32_t frame = sp - 144;
-  guest::StoreU32(base, frame, sp);
+  guest::StoreU32(frame, sp);
   const uint32_t r3 =
-      asu::AppCameraCameraConstruct(base, ctx.r3.u32, frame, AppCameraCallsFor(ctx, base, 0));
+      asu::AppCameraCameraConstruct(ctx.r3.u32, frame, AppCameraCallsFor(ctx, 0));
   ctx.r1.u64 = sp;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
-void hooks::AppCameraListConstructSteps(lifted::Regs& ctx, uint8_t* base) {
-  const uint64_t lr = ctx.lr;
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
-  if (const auto r3 = asu::AppCameraListConstruct(base, ctx.r3.u32)) {
+void hooks::AppCameraListConstructSteps(lifted::Regs& ctx) {
+  if (const auto r3 = asu::AppCameraListConstruct(ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c820A98C0(ctx, base);
+  lifted::original::c820A98C0(ctx);
 }
 
 // The second camera class: r3 = the object (368 bytes), r4 = the block
@@ -811,24 +765,22 @@ ITC_NATIVE_ENTRY_ALWAYS(820A8B88) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::original::c820A8B88(ctx, base);
+    lifted::original::c820A8B88(ctx);
     return;
   }
-  hooks::AppCameraSteps(ctx, base);
+  hooks::AppCameraSteps(ctx);
 }
 
 // --- The app's constructor ---
 
-void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppConstructSteps(lifted::Regs& ctx) {
   const uint32_t app = ctx.r3.u32, block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
-  const uint32_t sp = ctx.r1.u32;
-  // The original's prologue (__savegprlr_22). (Its saved registers as it
-  // sets them for the body, r22 to r31, reached callees only as the bytes
-  // they save: not carried by the view; nor kept and put back.)
-  SaveRegisters(ctx, base, 22);
+  // (Its saved registers as it sets them for the body, r22 to r31, reached
+  // callees only as the bytes they save: not carried by the view; nor kept
+  // and put back.)
   uint32_t r3 = 0;
-  InFrame(ctx, base, 240, 0x82094644, [&](uint32_t frame) {
+  InFrame(ctx, 240, 0x82094644, [&](uint32_t frame) {
     asu::AppCalls calls;
     calls.call = [&](uint32_t target, uint32_t a, std::optional<uint32_t> b,
                      uint32_t return_address, uint32_t r30, std::optional<uint32_t> c) {
@@ -841,16 +793,16 @@ void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
       }
       (void)r30;  // (not carried by the view, as the other saved registers)
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, target);
+      lifted::CallFromContext(ctx, target);
       return ctx.r3.u32;
     };
     calls.virtual_call = [&](uint32_t object, uint32_t offset, uint32_t a, uint32_t b,
                              uint32_t return_address) {
       ctx.r4.u64 = a;
       ctx.r5.u64 = b;
-      return VirtualCall(ctx, base, object, offset, return_address);
+      return VirtualCall(ctx, object, offset, return_address);
     };
-    r3 = asu::AppConstruct(base, app, block, frame, calls);
+    r3 = asu::AppConstruct(app, block, frame, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -864,37 +816,33 @@ ITC_NATIVE_ENTRY_ALWAYS(82094590) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::original::c82094590(ctx, base);
+    lifted::original::c82094590(ctx);
     return;
   }
-  hooks::AppConstructSteps(ctx, base);
+  hooks::AppConstructSteps(ctx);
 }
 
 // --- App::Create and the app's interface slots ---
 
-void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppCreateSteps(lifted::Regs& ctx) {
   const uint32_t block = ctx.r3.u32;
   const uint64_t entry_r3 = ctx.r3.u64;
   const uint64_t lr = ctx.lr;
-  const uint32_t sp = ctx.r1.u32;
-  // The original's prologue: lr and r31 above its 96-byte frame; r31 the
-  // block in the body.
-  SaveRegisters(ctx, base, 31);
   std::optional<uint32_t> result;
   // (r31 = the block in the body: not carried by the view, nor kept)
-  InFrame(ctx, base, 96, 0x82094AE4, [&](uint32_t) {
-    result = asu::AppCreate(base, block, [&](uint32_t app) {
+  InFrame(ctx, 96, 0x82094AE4, [&](uint32_t) {
+    result = asu::AppCreate(block, [&](uint32_t app) {
       ctx.r3.u64 = app;
       ctx.r4.u64 = entry_r3;
       ctx.lr = 0x82094AE4;
-      lifted::Enter(ctx, base, game::App::Ctor);  // App::App (its adapter: the harness's recorder)
+      lifted::Enter(ctx, game::App::Ctor);  // App::App (its adapter: the harness's recorder)
       return ctx.r3.u32;
     });
   });
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
-    lifted::original::c82094AB8(ctx, base);
+    lifted::original::c82094AB8(ctx);
     return;
   }
   ctx.r3.u64 = *result;
@@ -905,19 +853,19 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82094AB8) {
   
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::original::c82094AB8(ctx, base);
+    lifted::original::c82094AB8(ctx);
     return;
   }
-  hooks::AppCreateSteps(ctx, base);
+  hooks::AppCreateSteps(ctx);
 }
 
 // The getters of +108 and +112 (vtable slots; r3 the object).
 ITC_NATIVE_ENTRY(82379338, ITC_FLAG(native_app_start_up)) {
-  ctx.r3.u64 = asu::InterfaceWord108(base, ctx.r3.u32);
+  ctx.r3.u64 = asu::InterfaceWord108(ctx.r3.u32);
 }
 
 ITC_NATIVE_ENTRY(82379350, ITC_FLAG(native_app_start_up)) {
-  ctx.r3.u64 = asu::InterfaceWord112(base, ctx.r3.u32);
+  ctx.r3.u64 = asu::InterfaceWord112(ctx.r3.u32);
 }
 
 // The app's interfaces' slots to the framework's first worker pool: a tail
@@ -925,26 +873,26 @@ ITC_NATIVE_ENTRY(82379350, ITC_FLAG(native_app_start_up)) {
 // target there, isn't carried: none reads it).
 namespace {
 
-void TailCall(lifted::Regs& ctx, uint8_t* base, const asu::SlotCall& call) {
+void TailCall(lifted::Regs& ctx, const asu::SlotCall& call) {
   ctx.r3.u64 = call.object;
-  lifted::CallFromContext(ctx, base, call.target);
+  lifted::CallFromContext(ctx, call.target);
 }
 
 }  // namespace
 
 ITC_NATIVE_ENTRY(82094368, ITC_FLAG(native_app_start_up)) {
-  TailCall(ctx, base, asu::AppPoolSlot(base, ctx.r3.u32));
+  TailCall(ctx, asu::AppPoolSlot(ctx.r3.u32));
 }
 
 ITC_NATIVE_ENTRY(820944A8, ITC_FLAG(native_app_start_up)) {
-  TailCall(ctx, base, asu::AppPoolSlotFromInterface16(base, ctx.r3.u32));
+  TailCall(ctx, asu::AppPoolSlotFromInterface16(ctx.r3.u32));
 }
 
 // The scene's render manager's slot 8 and the frame driver's slots (vtable
 // slots; tail calls through the framework's +36 interface).
 #define ITC_APP_SLOT(address, plain)                    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_app_start_up)) { \
-    TailCall(ctx, base, asu::plain(base, ctx.r3.u32));  \
+    TailCall(ctx, asu::plain(ctx.r3.u32));  \
   }
 
 ITC_APP_SLOT(82094338, SceneSlot)
@@ -953,8 +901,8 @@ ITC_APP_SLOT(82094320, FrameDriverSlot)
 ITC_APP_SLOT(82094498, FrameDriverSlotFromInterface16)
 ITC_APP_SLOT(82094480, FrameDriverSlotFromInterface8)
 
-bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function) {
-  const auto slot = asu::RenderManagerCall(base, function, ctx.r3.u32);
+bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint32_t function) {
+  const auto slot = asu::RenderManagerCall(function, ctx.r3.u32);
   if (!slot) {
     return false;
   }

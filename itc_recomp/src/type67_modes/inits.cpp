@@ -41,7 +41,7 @@ struct Step {
 #include "type67_modes/init_tables.h"
 
 template <size_t n>
-InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t frame) {
+InitResult Run(const Step (&steps)[n], uint32_t object, uint32_t frame) {
   auto at = [&](const Value& v) {
     switch (v.base) {
       case Value::kConst:
@@ -57,14 +57,14 @@ InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t 
   for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
         result.machine = at(step.c);
-        result.r3 = game_modes::StateMachineAdd(base, result.machine, at(step.a), at(step.b),
+        result.r3 = game_modes::StateMachineAdd(result.machine, at(step.a), at(step.b),
                                                 &result.replaced);
         break;
     }
@@ -98,10 +98,10 @@ const InitInfo kInits[kInitCount] = {
 #define ITC_TYPE67_INIT(address, name)                     \
   case 0x##address: {                                      \
     ITC_NATIVE_RUNNING("sub_" #address " " name);          \
-    return Run(base, k##address, object, frame);           \
+    return Run(k##address, object, frame);           \
   }
 
-InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame) {
+InitResult RunInit(uint32_t address, uint32_t object, uint32_t frame) {
   switch (address) {
     ITC_TYPE67_INIT(82235138, "Type6Screen0::Init")
     ITC_TYPE67_INIT(822454B8, "Type7Screen0::Init")

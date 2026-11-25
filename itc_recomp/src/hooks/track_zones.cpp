@@ -52,19 +52,19 @@ using namespace track_zones;
 
 namespace {
 
-Position LoadPosition(uint8_t* base, uint32_t address) {
-  const schema::TrackZonePosition position(base, address);
+Position LoadPosition(uint32_t address) {
+  const schema::TrackZonePosition position(address);
   return {position.section(), position.slice()};
 }
 
 // RouteRange::Init's ends: the start's, then the end's.
-Position LoadStart(uint8_t* base, uint32_t address) {
-  const schema::RouteRangeEnds ends(base, address);
+Position LoadStart(uint32_t address) {
+  const schema::RouteRangeEnds ends(address);
   return {ends.start_section(), ends.start_slice()};
 }
 
-Position LoadEnd(uint8_t* base, uint32_t address) {
-  const schema::RouteRangeEnds ends(base, address);
+Position LoadEnd(uint32_t address) {
+  const schema::RouteRangeEnds ends(address);
   return {ends.end_section(), ends.end_slice()};
 }
 
@@ -72,19 +72,19 @@ Position LoadEnd(uint8_t* base, uint32_t address) {
 
 // --- The fixed-size lists: r3 = the list (left), r4 = a position ---
 
-ITC_TRACK_ZONES(821531C0, List16Link(base, ctx.r3.u32, int16_t(ctx.r4.u16)))
+ITC_TRACK_ZONES(821531C0, List16Link(ctx.r3.u32, int16_t(ctx.r4.u16)))
 // r4 = &the word, r5 = the position.
-ITC_TRACK_ZONES(820FE330, List64Insert(base, ctx.r3.u32, schema::TrackZonesListWord(base, ctx.r4.u32).value(),
+ITC_TRACK_ZONES(820FE330, List64Insert(ctx.r3.u32, schema::TrackZonesListWord(ctx.r4.u32).value(),
                                        ctx.r5.u32))
 
 // --- The route ranges ---
 
 // RouteRange::Init: r3 = the range (left), r4 = &(the start, the end).
-ITC_TRACK_ZONES(820FE058, RangeInit(base, ctx.r3.u32, LoadStart(base, ctx.r4.u32),
-                                    LoadEnd(base, ctx.r4.u32)))
+ITC_TRACK_ZONES(820FE058, RangeInit(ctx.r3.u32, LoadStart(ctx.r4.u32),
+                                    LoadEnd(ctx.r4.u32)))
 // RouteRange::AddBranch: r3 = the range, r4 = a section; r3 = the range's
 // list of sections to take (+12), as List64::Insert leaves it.
-ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
+ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(ctx.r3.u32, ctx.r4.u32);
                 ctx.r3.u64 = ctx.r3.u64 + 12)
 
 // RouteRange::Test and Update: r3 = a range, r4 = &a position; each
@@ -93,9 +93,9 @@ ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
 // native since 2026-10-30 and calling the plain C++ directly; with
 // --native_camera_modes off they reach these again.
 ITC_TRACK_ZONES(820FE6F8,
-                ctx.r3.u64 = RangeTest(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+                ctx.r3.u64 = RangeTest(ctx.r3.u32, LoadPosition(ctx.r4.u32)))
 ITC_TRACK_ZONES(820FE878,
-                ctx.r3.u64 = RangeUpdate(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
+                ctx.r3.u64 = RangeUpdate(ctx.r3.u32, LoadPosition(ctx.r4.u32)))
 
 // --- The zones ---
 
@@ -103,12 +103,12 @@ ITC_TRACK_ZONES(820FE878,
 // TrackZones::Update). r3 = the last range's result, or with no ranges
 // where memcpy left it (the copy on the original's stack, r1 - 208 + 80).
 ITC_TRACK_ZONES(8228BC80, {
-  const int32_t last = ZoneUpdate(base, ctx.r3.u32);
+  const int32_t last = ZoneUpdate(ctx.r3.u32);
   ctx.r3.u64 = last < 0 ? ctx.r1.u64 - 208 + 80 : uint64_t(last);
 })
 
 // Zone::IsInside: r3 = the zone; returns its flag.
-ITC_TRACK_ZONES(8228B4F8, ctx.r3.u64 = ZoneIsInside(base, ctx.r3.u32))
+ITC_TRACK_ZONES(8228B4F8, ctx.r3.u64 = ZoneIsInside(ctx.r3.u32))
 
 // --- The zones' set-ups ---
 
@@ -116,7 +116,6 @@ namespace {
 
 struct GuestCalls {
   lifted::Regs* ctx;
-  uint8_t* base;
 };
 
 // A copy ZoneRanges::Insert can't make natively: memcpy from the set-up's
@@ -124,15 +123,14 @@ struct GuestCalls {
 void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t stack = ctx.r1.u64;
   const uint64_t lr = ctx.lr;
   ctx.r1.u64 = frame;
-  guest_call::InFrame(ctx, base, 112, 0x8228BC10, [&](uint32_t) {
+  guest_call::InFrame(ctx, 112, 0x8228BC10, [&](uint32_t) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = schema::RouteRange::kSize;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
   });
   ctx.r1.u64 = stack;
   ctx.lr = lr;
@@ -142,7 +140,6 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
                   uint32_t frame, uint32_t lr) {
   auto& call = *static_cast<GuestCalls*>(user);
   lifted::Regs& ctx = *call.ctx;
-  uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;
@@ -150,7 +147,7 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
   if (set_r4) {
     ctx.r4.u64 = r4;
   }
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = saved;
   return ctx.r3.u64;
 }
@@ -160,7 +157,7 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
 // --- The zones' owner ---
 
 // Racers::Vehicle: r3 = a racer index; returns its vehicle or 0.
-ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(base, ctx.r3.u32))
+ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(ctx.r3.u32))
 
 // TrackZones::Create: no arguments; r3 = the last set-up's. The original
 // where operator new can't be native.
@@ -170,16 +167,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8228E788) {
     return;  // a harness's (the race HUD object's)
   }
   if (!ITC_FLAG(native_track_zones)) {
-    lifted::original::c8228E788(ctx, base);
+    lifted::original::c8228E788(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
-  GuestCalls user{&ctx, base};
+  GuestCalls user{&ctx};
   const OwnerCalls calls{&user, CallZone};
   const SetupCalls setup_calls{&user, CopyRange};
   uint64_t r3 = 0;
-  if (!OwnerCreate(base, ctx.r1.u32, calls, setup_calls, &r3)) {
-    lifted::original::c8228E788(ctx, base);
+  if (!OwnerCreate(ctx.r1.u32, calls, setup_calls, &r3)) {
+    lifted::original::c8228E788(ctx);
     return;
   }
   ctx.lr = lr;
@@ -191,8 +188,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8228E788) {
 ITC_NATIVE_ENTRY_ALWAYS(8228B500) {
   
   uint32_t r3 = 0;
-  if (!ITC_FLAG(native_track_zones) || !OwnerDestroy(base, &r3)) {
-    lifted::original::c8228B500(ctx, base);
+  if (!ITC_FLAG(native_track_zones) || !OwnerDestroy(&r3)) {
+    lifted::original::c8228B500(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -201,9 +198,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8228B500) {
 // TrackZones::Update: r3 = the owner; r3 = the last zone's.
 ITC_TRACK_ZONES(8228BD30, {
   const uint64_t lr = ctx.lr;
-  GuestCalls user{&ctx, base};
+  GuestCalls user{&ctx};
   const OwnerCalls calls{&user, CallZone};
-  const uint64_t r3 = OwnerUpdate(base, ctx.r3.u32, ctx.r1.u32, calls);
+  const uint64_t r3 = OwnerUpdate(ctx.r3.u32, ctx.r1.u32, calls);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 })
@@ -212,10 +209,10 @@ ITC_TRACK_ZONES(8228BD30, {
 // returns its flag.
 ITC_TRACK_ZONES(8228BDD0, {
   const uint64_t lr = ctx.lr;
-  GuestCalls user{&ctx, base};
+  GuestCalls user{&ctx};
   const OwnerCalls calls{&user, CallZone};
   const uint64_t r3 =
-      OwnerIsInside(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(lr), calls);
+      OwnerIsInside(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, uint32_t(lr), calls);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 })
@@ -225,10 +222,10 @@ ITC_TRACK_ZONES(8228BDD0, {
 // TrackZones::Create), so the adapters stay.
 #define ITC_ZONE_SETUP(address, number)                                                 \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_track_zones)) { \
-    GuestCalls user{&ctx, base};                                                        \
+    GuestCalls user{&ctx};                                                        \
     const SetupCalls calls{&user, CopyRange};                                           \
-    const schema::TrackZoneSetupArgs args(base, ctx.r4.u32);                             \
-    ctx.r3.u64 = ZoneSetup(base, number, ctx.r3.u32, args.index(), args.vehicle(),      \
+    const schema::TrackZoneSetupArgs args(ctx.r4.u32);                             \
+    ctx.r3.u64 = ZoneSetup(number, ctx.r3.u32, args.index(), args.vehicle(),      \
                            ctx.r1.u32, calls);                                          \
   }
 

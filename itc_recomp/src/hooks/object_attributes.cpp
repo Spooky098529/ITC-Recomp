@@ -21,7 +21,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822970A8) {
   std::string text;
   if (text_address) {
     for (uint32_t p = text_address;; p++) {
-      char c = char(guest::LoadU8(base, p));
+      char c = char(guest::LoadU8(p));
       if (!c) {
         break;
       }
@@ -30,14 +30,14 @@ ITC_NATIVE_ENTRY_ALWAYS(822970A8) {
   }
   const helpers::AnsiString name =
       helpers::AnsiString_Init(text_address ? text.c_str() : nullptr, text_address);
-  guest::StoreU16(base, name_address + 0, name.length);
-  guest::StoreU16(base, name_address + 2, name.maximum_length);
-  guest::StoreU32(base, name_address + 4, name.buffer);
+  guest::StoreU16(name_address + 0, name.length);
+  guest::StoreU16(name_address + 2, name.maximum_length);
+  guest::StoreU32(name_address + 4, name.buffer);
 
   const helpers::ObjectAttributes attributes = helpers::NamedObjectAttributes(name_address);
-  guest::StoreU32(base, attributes_address + 0, attributes.root_directory);
-  guest::StoreU32(base, attributes_address + 4, attributes.object_name);
-  guest::StoreU32(base, attributes_address + 8, attributes.attributes);
+  guest::StoreU32(attributes_address + 0, attributes.root_directory);
+  guest::StoreU32(attributes_address + 4, attributes.object_name);
+  guest::StoreU32(attributes_address + 8, attributes.attributes);
 
   ctx.r3.u64 = attributes_address;
 }

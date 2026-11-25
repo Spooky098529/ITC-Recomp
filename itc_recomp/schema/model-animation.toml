@@ -142,6 +142,15 @@ fields = [
 measures = ["new<4294967295>@TrackSet::SetupFloat4", "new<4294967295>@TrackSet::Setup32", "new<4294967295>@TrackSet::Setup208"]
 size = 224
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the count header and the values, read by
+# address (the samplers, the model draws' float4 table at Model +320, copied
+# into constants by guest loads; never by the renderer by address), in PC
+# memory in the guest's byte order. Made by the set-ups' hand ports
+# (SetupWithHeader's New) and the lifted originals' operator new[] (returning
+# at 0x825A1E84, 0x825A1294, 0x825A1AB4; r3 the size); freed by operator
+# delete[] on the block (TrackSet::ReleaseArray, the set-ups' old values).
+storage = "blob"
+blob_alloc = [{ call = 0x825A1E84, reg = "r3" }, { call = 0x825A1294, reg = "r3" }, { call = 0x825A1AB4, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "operator new[]'s count header: the track count" },
   { name = "values", offset = 16, type = "bytes", count = 208, note = "the values (TrackSet +16 points here)" },
@@ -241,24 +250,32 @@ fields = [
 # PhysicalPad::PhysicalPad sub_82591B68). The measure files RecordClear's
 # (sub_825A18D8) stores to the records at +168 and +180 as the pad's +0, +4
 # and +8 (a measure fault: its r3 is pad + 168).
+#
+# In host memory inside the input manager (E5 step 4; four at its +988).
+# Not read from a file: the measure's file tag on its record
+# (PhysicalPadAt168) is RecordClear's area's, and RecordClear's only caller
+# is PhysicalPad::PhysicalPad. Past +192 (to +211): the XInput capabilities
+# Input::Update stores when a pad connects, written by offset.
 [PhysicalPad]
 measure = "InputManager@+988"
 size = 212
-origin = "file"
+origin = "embedded"
+storage = "host"
 vtable = 0x8206CBF4
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
-  { name = "values", offset = 8, type = "bytes", count = 160, note = "the 40 values (slot 1, PhysicalPad::Values)" },
-  { name = "record_a", offset = 168, type = "bytes", count = 12, note = "a PhysicalPadRecord" },
-  { name = "record_b", offset = 180, type = "bytes", count = 12, note = "a PhysicalPadRecord" },
+  { name = "values", offset = 8, type = "embed", to = "ActionPadValues", note = "the 40 values (slot 1, PhysicalPad::Values; action-mappers.toml's ActionPadValues, as a logical pad's)" },
+  { name = "record_a", offset = 168, type = "embed", to = "PhysicalPadRecord", note = "the first motor" },
+  { name = "record_b", offset = 180, type = "embed", to = "PhysicalPadRecord", note = "the second motor" },
 ]
 
 # A physical pad's 12-byte record (+168, +180), as sub_825A18D8 clears it
 # (the measure files it as the pad).
 [PhysicalPadRecord]
 size = 12
-origin = "file"
+origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "f32", note = "0.0 when made" },
   { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
@@ -278,6 +295,7 @@ inverse_two_pi = { address = 0x82001FA4, type = "f32", note = "1 / (2 pi) (Skele
 measure = "InputManager@+988@+168"
 size = 12
 origin = "embedded"
+storage = "host"
 fields = [
   { name = "unknown_0", offset = 0, type = "f32" },
   { name = "unknown_4", offset = 4, type = "u32" },

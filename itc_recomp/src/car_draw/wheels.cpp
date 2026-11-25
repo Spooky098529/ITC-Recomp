@@ -48,100 +48,96 @@ constexpr uint32_t kOneBits = 0x3F800000;
 constexpr uint32_t kIndexTable = 0x820044B0;  // 44 bytes a car
 constexpr uint32_t kMorphShape = 0x82595110;
 
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
 }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
-uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
+uint32_t Frame(uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
-  Store(base, frame, stack);
+  Store(frame, stack);
   return frame;
 }
 
-simde__m128 Lvx(uint8_t* base, uint32_t address) {
+simde__m128 Lvx(uint32_t address) {
   const uint32_t at = address & ~0xFu;
-  return VectorOf(Load(base, at), Load(base, at + 4), Load(base, at + 8), Load(base, at + 12));
+  return VectorOf(Load(at), Load(at + 4), Load(at + 8), Load(at + 12));
 }
 
 // memcpy (sub_825A7410) from the frame at `sp` returning to `lr`: natively,
 // else its original.
-void Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
+void Memcpy(const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
             uint32_t sp, uint32_t lr) {
-  if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
+  if (!native::Buffers_Memcpy(to, from, bytes, lr)) {
     calls.memcpy(to, from, bytes, sp, lr);
   }
 }
 
 // An identity stvx'd at `at` and its 64 bytes copied doubleword by
 // doubleword to `to` (the originals' fresh matrices).
-void FreshIdentity(uint8_t* base, uint32_t at, uint32_t to) {
-  StoreIdentity(base, at);
-  CopyDoublewords(base, to, at, 64);
+void FreshIdentity(uint32_t at, uint32_t to) {
+  StoreIdentity(at);
+  CopyDoublewords(to, at, 64);
 }
 
 // The side's translation: unless the block's +732 is set, T's row 3 (at
 // `row`) = `w` + the group's float4 at `side` (vaddfp, flush-to-zero on).
-void Translate(uint8_t* base, uint32_t block, uint32_t row, simde__m128 w, uint32_t side) {
-  if (int32_t(Block(base, block).no_side_offset()) != 0) {
+void Translate(uint32_t block, uint32_t row, simde__m128 w, uint32_t side) {
+  if (int32_t(Block(block).no_side_offset()) != 0) {
     return;
   }
-  const simde__m128 add = Lvx(base, side);
+  const simde__m128 add = Lvx(side);
   FlushToZero ftz;
-  Stvx(base, row, simde_mm_add_ps(w, add));
+  Stvx(row, simde_mm_add_ps(w, add));
 }
 
 // The product chain factors[0] x factors[1] x ... into outs[0], outs[1], ...
 // (each with its 1.0 w's written first, noted returning to lrs[i]); the last
 // product's address.
-uint32_t Chain(uint8_t* base, std::initializer_list<uint32_t> factors, const uint32_t* outs,
+uint32_t Chain(std::initializer_list<uint32_t> factors, const uint32_t* outs,
                const uint32_t* lrs, double one) {
   const uint32_t* f = factors.begin();
   uint32_t left = f[0];
   for (size_t i = 1; i < factors.size(); i++) {
     const uint32_t out = outs[i - 1];
     for (uint32_t at = 12; at < 64; at += 16) {
-      Stfs(base, out + at, one);
+      Stfs(out + at, one);
     }
-    matrix_math::Multiply(base, out, left, f[i]);
-    interpolation::BlendState_OnMultiply(base, out, left, f[i], lrs[i - 1]);
+    matrix_math::Multiply(out, left, f[i]);
+    interpolation::BlendState_OnMultiply(out, left, f[i], lrs[i - 1]);
     left = out;
   }
   return left;
 }
 
-void NotedCopy(uint8_t* base, uint32_t to, uint32_t from, uint32_t lr) {
-  matrix_math::Copy(base, to, from);
-  interpolation::BlendState_OnCopy(base, to, from, lr);
+void NotedCopy(uint32_t to, uint32_t from, uint32_t lr) {
+  matrix_math::Copy(to, from);
+  interpolation::BlendState_OnCopy(to, from, lr);
 }
 
 // The second rear tire's (and rim's) shift: T's x (at `x`) +=
 // float(the wheels record's +56) x [0x82002D0C] x 3.0, fused with x 0.001
-// (the integer through the frame's +80, as fcfid takes it).
-void ShiftX(uint8_t* base, uint32_t frame, uint32_t group, uint32_t x, double shift,
-            double three, double milli) {
-  const uint32_t wheels = schema::SecondSetWheelPoints(base, group).wheels_record().address;
-  const double f13 = Lfs(base, x);
-  const int64_t count = int64_t(int32_t(schema::SceneModelsWheelsRecord(base, wheels).rear_size_index()));
-  Store64(base, frame + 80, uint64_t(count));
+// (the integer the original spilled to its frame's +80 for fcfid, which
+// nothing read but the fcfid: a value, E5 step 6).
+void ShiftX([[maybe_unused]] uint32_t frame, uint32_t group, uint32_t x,
+            double shift, double three, double milli) {
+  const uint32_t wheels = schema::SecondSetWheelPoints(group).wheels_record().address;
+  const double f13 = Lfs(x);
+  const int64_t count = int64_t(int32_t(schema::SceneModelsWheelsRecord(wheels).rear_size_index()));
   double f0 = Single(double(count));
   f0 = Fmuls(f0, shift);
   f0 = Fmuls(f0, three);
   f0 = Fmadds(f0, milli, f13);
-  Stfs(base, x, f0);
+  Stfs(x, f0);
 }
 
 // The pass at the description's +4, or 0 when it's disabled (+588 clear).
-uint32_t EnabledPass(uint8_t* base, schema::CarScene description) {
+uint32_t EnabledPass(schema::CarScene description) {
   const uint32_t camera = kCameraPasses + description.pass_shadow_camera_a() * schema::CameraPass::kSize;
-  if (camera == 0 || int32_t(schema::CameraPass(base, camera).enabled()) == 0) {
+  if (camera == 0 || int32_t(schema::CameraPass(camera).enabled()) == 0) {
     return 0;
   }
   return camera;
@@ -158,33 +154,33 @@ struct DepthSites {
 // and +80 and set to its +32, the record drawn depth-only at `world` with it
 // and, with a `block` (0 for none) whose +592 is set, at `second` with
 // `main_vp`, the keys put back. `left` what's in r3 before.
-Left TireDepth(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+Left TireDepth(const Calls& calls, uint32_t frame, uint32_t group,
                uint32_t record, uint32_t world, uint32_t copy, uint32_t block, uint32_t second,
                uint32_t main_vp, uint64_t r24, uint64_t r28, const DepthSites& sites,
                Left left) {
-  const schema::CarScene description = G::scene(base);  // its pass description
-  if (int32_t(schema::SecondSetWheelPoints(base, group).wheels_record().kind()) == 2) {
+  const schema::CarScene description = G::scene();  // its pass description
+  if (int32_t(schema::SecondSetWheelPoints(group).wheels_record().kind()) == 2) {
     return left;
   }
-  const uint32_t camera = EnabledPass(base, description);
+  const uint32_t camera = EnabledPass(description);
   if (camera == 0 || (description.pass_mask() & 0x4) == 0) {
     return left;
   }
-  Memcpy(base, calls, copy, schema::CameraPass(base, camera).view_projection_address(), 64, frame, sites.memcpy);
+  Memcpy(calls, copy, schema::CameraPass(camera).view_projection_address(), 64, frame, sites.memcpy);
   const uint32_t key = description.pass_shadow_key_a();
-  description.set_pass_saved_depth_key(G::depth_key(base));
-  description.set_pass_saved_other_key(G::other_key(base));
-  G::set_depth_key(base, key);
-  G::set_other_key(base, key);
-  left = PartsDrawRecord(base, calls, frame, record, copy, world, 1, r24, r28, sites.draw);
-  if (block != 0 && int32_t(Block(base, block).rear_second_matrix()) != 0) {
-    left = PartsDrawRecord(base, calls, frame, record, main_vp, second, 1, r24, r28,
+  description.set_pass_saved_depth_key(G::depth_key());
+  description.set_pass_saved_other_key(G::other_key());
+  G::set_depth_key(key);
+  G::set_other_key(key);
+  left = PartsDrawRecord(calls, frame, record, copy, world, 1, r24, r28, sites.draw);
+  if (block != 0 && int32_t(Block(block).rear_second_matrix()) != 0) {
+    left = PartsDrawRecord(calls, frame, record, main_vp, second, 1, r24, r28,
                            sites.second);
   }
   const uint32_t other = description.pass_saved_other_key();
   const uint32_t depth = description.pass_saved_depth_key();
-  G::set_other_key(base, other);
-  G::set_depth_key(base, depth);
+  G::set_other_key(other);
+  G::set_depth_key(depth);
   return left;
 }
 
@@ -192,181 +188,180 @@ Left TireDepth(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
 
 // --- The tires ---
 
-Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawTire(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820E8AE8 WheelPoints::DrawTire");
-  const uint32_t frame = Frame(base, stack, kWheelsTireFrame);
+  const uint32_t frame = Frame(stack, kWheelsTireFrame);
   const uint32_t t = frame + 160, main = frame + 224, second = frame + 288;
   // T, the side's world and the second rear tire's, all identities.
-  FreshIdentity(base, frame + 96, t);
-  FreshIdentity(base, frame + 96, main);
-  FreshIdentity(base, frame + 96, second);
-  Translate(base, block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(base, group).tire_rows_address());
-  const bool front = int32_t(schema::SecondSetWheelPoints(base, group).tire_front()) != 0;
-  const double milli = Lfs(base, kMilli), three = Lfs(base, kThree), shift = Lfs(base, kShift);
-  const double one = Lfs(base, kOne);
+  FreshIdentity(frame + 96, t);
+  FreshIdentity(frame + 96, main);
+  FreshIdentity(frame + 96, second);
+  Translate(block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(group).tire_rows_address());
+  const bool front = int32_t(schema::SecondSetWheelPoints(group).tire_front()) != 0;
+  const double milli = Lfs(kMilli), three = Lfs(kThree), shift = Lfs(kShift);
+  const double one = Lfs(kOne);
   const uint32_t world = block + 16;
   if (front) {
     static constexpr uint32_t kLrs[] = {0x820E8C8C, 0x820E8CAC, 0x820E8CD0};
     const uint32_t outs[] = {frame + 992, frame + 480, frame + 1504};
-    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 336, block + 80, t, world}, outs, kLrs, one),
               0x820E8DF8);
   } else {
     static constexpr uint32_t kLrs[] = {0x820E8D04, 0x820E8D24, 0x820E8D48};
     const uint32_t outs[] = {frame + 608, frame + 1248, frame + 736};
-    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 464, block + 208, t, world}, outs, kLrs, one),
               0x820E8D54);
-    if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-      ShiftX(base, frame, group, t + 48, shift, three, milli);
+    if (int32_t(Block(block).rear_second_matrix()) != 0) {
+      ShiftX(frame, group, t + 48, shift, three, milli);
       static constexpr uint32_t kSecondLrs[] = {0x820E8DAC, 0x820E8DCC, 0x820E8DEC};
       const uint32_t second_outs[] = {frame + 1696, frame + 864, frame + 1376};
-      NotedCopy(base, second,
-                Chain(base, {block + 464, block + 208, t, world}, second_outs, kSecondLrs, one),
+      NotedCopy(second,
+                Chain({block + 464, block + 208, t, world}, second_outs, kSecondLrs, one),
                 0x820E8DF8);
     }
   }
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address(), record = schema::SecondSetWheelPoints(base, group).tire_records_address();
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address(), record = schema::SecondSetWheelPoints(group).tire_records_address();
   const uint64_t r24 = record, r28 = block;
-  Left left = PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, r28, 0x820E8E18);
-  if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-    left = PartsDrawRecord(base, calls, frame, record, vp, second, 0, r24, r28, 0x820E8E3C);
+  Left left = PartsDrawRecord(calls, frame, record, vp, main, 0, r24, r28, 0x820E8E18);
+  if (int32_t(Block(block).rear_second_matrix()) != 0) {
+    left = PartsDrawRecord(calls, frame, record, vp, second, 0, r24, r28, 0x820E8E3C);
   }
-  left = TireDepth(base, calls, frame, group, record, main, frame + 1760, block, second, vp,
+  left = TireDepth(calls, frame, group, record, main, frame + 1760, block, second, vp,
                    r24, r28, {0x820E8EC8, 0x820E8EFC, 0x820E8F20}, left);
   // Side 2: turned by pi about y.
   const uint32_t turned = frame + 1056;
-  FreshIdentity(base, frame + 96, turned);
-  Stfs(base, frame + 80, Lfs(base, kPi));
-  matrix_math::RotateY(base, turned, turned, frame + 80, frame - 80);
+  FreshIdentity(frame + 96, turned);
+  Stfs(frame + 80, Lfs(kPi));
+  matrix_math::RotateY(turned, turned, frame + 80, frame - 80);
   // T's row 3 back to (0, 0, 0, 1), through +80.
-  Stfs(base, frame + 92, one);
-  const double zero = Lfs(base, kZero);
-  Stfs(base, frame + 80, zero);
-  Stfs(base, frame + 84, zero);
-  Stfs(base, frame + 88, zero);
-  CopyDoublewords(base, t + 48, frame + 80, 16);
-  Translate(base, block, t + 48, Lvx(base, frame + 80), schema::SecondSetWheelPoints(base, group).tire_rows_address() + 16);
-  if (int32_t(schema::SecondSetWheelPoints(base, group).tire_front()) != 0) {
+  Stfs(frame + 92, one);
+  const double zero = Lfs(kZero);
+  Stfs(frame + 80, zero);
+  Stfs(frame + 84, zero);
+  Stfs(frame + 88, zero);
+  CopyDoublewords(t + 48, frame + 80, 16);
+  Translate(block, t + 48, Lvx(frame + 80), schema::SecondSetWheelPoints(group).tire_rows_address() + 16);
+  if (int32_t(schema::SecondSetWheelPoints(group).tire_front()) != 0) {
     static constexpr uint32_t kLrs[] = {0x820E9028, 0x820E9048, 0x820E9068, 0x820E9088};
     const uint32_t outs[] = {frame + 352, frame + 1632, frame + 1120, frame + 416};
-    NotedCopy(base, main,
-              Chain(base, {turned, block + 400, block + 144, t, world}, outs, kLrs, one),
+    NotedCopy(main,
+              Chain({turned, block + 400, block + 144, t, world}, outs, kLrs, one),
               0x820E91E8);
   } else {
     static constexpr uint32_t kLrs[] = {0x820E90B4, 0x820E90D8, 0x820E90F8, 0x820E9118};
     const uint32_t outs[] = {frame + 544, frame + 672, frame + 800, frame + 928};
-    NotedCopy(base, main,
-              Chain(base, {turned, block + 528, block + 272, t, world}, outs, kLrs, one),
+    NotedCopy(main,
+              Chain({turned, block + 528, block + 272, t, world}, outs, kLrs, one),
               0x820E9124);
-    if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-      ShiftX(base, frame, group, t + 48, shift, three, milli);
+    if (int32_t(Block(block).rear_second_matrix()) != 0) {
+      ShiftX(frame, group, t + 48, shift, three, milli);
       static constexpr uint32_t kSecondLrs[] = {0x820E917C, 0x820E919C, 0x820E91BC,
                                                 0x820E91DC};
       const uint32_t second_outs[] = {frame + 1184, frame + 1312, frame + 1440, frame + 1568};
-      NotedCopy(
-          base, second,
-          Chain(base, {turned, block + 528, block + 272, t, world}, second_outs, kSecondLrs, one),
+      NotedCopy(second,
+          Chain({turned, block + 528, block + 272, t, world}, second_outs, kSecondLrs, one),
           0x820E91E8);
     }
   }
-  left = PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, r28, 0x820E9200);
-  if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-    left = PartsDrawRecord(base, calls, frame, record, vp, second, 0, r24, r28, 0x820E9224);
+  left = PartsDrawRecord(calls, frame, record, vp, main, 0, r24, r28, 0x820E9200);
+  if (int32_t(Block(block).rear_second_matrix()) != 0) {
+    left = PartsDrawRecord(calls, frame, record, vp, second, 0, r24, r28, 0x820E9224);
   }
-  return TireDepth(base, calls, frame, group, record, main, frame + 1824, block, second, vp,
+  return TireDepth(calls, frame, group, record, main, frame + 1824, block, second, vp,
                    r24, r28, {0x820E9294, 0x820E92C8, 0x820E92EC}, left);
 }
 
-Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawTireMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E9318 WheelPoints::DrawTireMorphed");
-  const uint32_t frame = Frame(base, stack, kWheelsTireMorphedFrame);
+  const uint32_t frame = Frame(stack, kWheelsTireMorphedFrame);
   const uint32_t t = frame + 176, main = frame + 240, morph = frame + 1392;
-  FreshIdentity(base, frame + 80, t);
-  FreshIdentity(base, frame + 80, main);
+  FreshIdentity(frame + 80, t);
+  FreshIdentity(frame + 80, main);
   // The weights again (not for traffic, kind 3), as WheelPoints::SetUpTire:
   // the record's entry index (+44, or the rear's +56) with its float and
   // value, else the car's table index plus the record's +72 (+76).
-  const uint32_t wheels = schema::SecondSetWheelPoints(base, group).wheels_record().address;
-  if (int32_t(schema::SceneModelsWheelsRecord(base, wheels).kind()) != 3) {
-    const bool front = int32_t(schema::SecondSetWheelPoints(base, group).tire_front()) != 0;
+  const uint32_t wheels = schema::SecondSetWheelPoints(group).wheels_record().address;
+  if (int32_t(schema::SceneModelsWheelsRecord(wheels).kind()) != 3) {
+    const bool front = int32_t(schema::SecondSetWheelPoints(group).tire_front()) != 0;
     const uint32_t own = front ? 44 : 56;
     uint64_t index;
-    if (int32_t(Load(base, wheels + own)) != -1) {
-      const uint32_t record = schema::SecondSetWheelPoints(base, group).wheels_record().address;
-      const double f1 = Lfs(base, record + own + 8);
-      second_set::TireFillEntries(base, schema::SecondSetWheelPoints(base, group).tire_entries_address(), Load(base, record + own), record + own + 4,
+    if (int32_t(Load(wheels + own)) != -1) {
+      const uint32_t record = schema::SecondSetWheelPoints(group).wheels_record().address;
+      const double f1 = Lfs(record + own + 8);
+      second_set::TireFillEntries(schema::SecondSetWheelPoints(group).tire_entries_address(), Load(record + own), record + own + 4,
                                   f1, frame);
-      index = Load(base, schema::SecondSetWheelPoints(base, group).wheels_record().address + own);
+      index = Load(schema::SecondSetWheelPoints(group).wheels_record().address + own);
     } else {
-      const uint32_t add = front ? schema::SceneModelsWheelsRecord(base, wheels).front_index_add() : schema::SceneModelsWheelsRecord(base, wheels).rear_index_add();
-      const uint32_t car = schema::SecondSetWheelPoints(base, group).car_record().block();
-      index = uint64_t(Load(base, uint32_t(uint64_t(car) * 44) + kIndexTable)) + uint64_t(add);
+      const uint32_t add = front ? schema::SceneModelsWheelsRecord(wheels).front_index_add() : schema::SceneModelsWheelsRecord(wheels).rear_index_add();
+      const uint32_t car = schema::SecondSetWheelPoints(group).car_record().block();
+      index = uint64_t(Load(uint32_t(uint64_t(car) * 44) + kIndexTable)) + uint64_t(add);
     }
     // sub_820E6F28 leaves r3 the entries.
-    second_set::TireReadEntry(base, uint32_t(index), schema::SecondSetWheelPoints(base, group).tire_entries_address(), schema::SecondSetWheelPoints(base, group).tire_weights_address(), schema::SecondSetWheelPoints(base, group).tire_out1_address(),
-                              schema::SecondSetWheelPoints(base, group).tire_out2_address(), frame);
+    second_set::TireReadEntry(uint32_t(index), schema::SecondSetWheelPoints(group).tire_entries_address(), schema::SecondSetWheelPoints(group).tire_weights_address(), schema::SecondSetWheelPoints(group).tire_out1_address(),
+                              schema::SecondSetWheelPoints(group).tire_out2_address(), frame);
   }
   // Record 0's shape toward records 1 to 5 by the five weights.
-  const uint32_t model = schema::SecondSetWheelPoints(base, group).tire_record0_model();
-  second_set::MorphSetUp(base, model, morph, schema::SecondSetWheelPoints(base, group).tire_base_shape(), schema::SecondSetWheelPoints(base, group).tire_shapes_address(), schema::SecondSetWheelPoints(base, group).tire_weights_address(),
+  const uint32_t model = schema::SecondSetWheelPoints(group).tire_record0_model();
+  second_set::MorphSetUp(model, morph, schema::SecondSetWheelPoints(group).tire_base_shape(), schema::SecondSetWheelPoints(group).tire_shapes_address(), schema::SecondSetWheelPoints(group).tire_weights_address(),
                          5);
-  const uint64_t shape = schema::SecondSetWheelPoints(base, group).tire_base_shape();
-  if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+  const uint64_t shape = schema::SecondSetWheelPoints(group).tire_base_shape();
+  if (!ModelMorphShape(calls, model, morph, shape, frame)) {
     const uint64_t regs[3] = {model, morph, shape};
     calls.call(kMorphShape, regs, 3, frame, 0x820E94E8);
   }
-  Translate(base, block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(base, group).tire_rows_address());
-  const double one = Lfs(base, kOne);
+  Translate(block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(group).tire_rows_address());
+  const double one = Lfs(kOne);
   const uint32_t world = block + 16;
-  if (int32_t(schema::SecondSetWheelPoints(base, group).tire_front()) != 0) {
+  if (int32_t(schema::SecondSetWheelPoints(group).tire_front()) != 0) {
     static constexpr uint32_t kLrs[] = {0x820E9540, 0x820E9560, 0x820E9584};
     const uint32_t outs[] = {frame + 1072, frame + 432, frame + 944};
-    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 336, block + 80, t, world}, outs, kLrs, one),
               0x820E95FC);
   } else {
     static constexpr uint32_t kLrs[] = {0x820E95AC, 0x820E95CC, 0x820E95F0};
     const uint32_t outs[] = {frame + 560, frame + 1136, frame + 688};
-    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 464, block + 208, t, world}, outs, kLrs, one),
               0x820E95FC);
   }
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address(), record = schema::SecondSetWheelPoints(base, group).tire_records_address();
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address(), record = schema::SecondSetWheelPoints(group).tire_records_address();
   // r24 the block's world from the matrices on; r28 the caller's at the
   // first draw, then lis's sign-extended 0x82970000.
   const uint64_t r24 = world;
   Left left =
-      PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, caller_r28, 0x820E961C);
+      PartsDrawRecord(calls, frame, record, vp, main, 0, r24, caller_r28, 0x820E961C);
   const uint64_t r28 = 0xFFFFFFFF82970000ull;
-  left = TireDepth(base, calls, frame, group, record, main, frame + 1328, 0, 0, vp, r24, r28,
+  left = TireDepth(calls, frame, group, record, main, frame + 1328, 0, 0, vp, r24, r28,
                    {0x820E96A8, 0x820E96DC, 0}, left);
   // Side 2: turned by pi about y.
   const uint32_t turned = frame + 1200;
-  FreshIdentity(base, frame + 80, turned);
-  Stfs(base, frame + 144, Lfs(base, kPi));
-  matrix_math::RotateY(base, turned, turned, frame + 144, frame - 80);
+  FreshIdentity(frame + 80, turned);
+  Stfs(frame + 144, Lfs(kPi));
+  matrix_math::RotateY(turned, turned, frame + 144, frame - 80);
   // T's row 3 back to (0, 0, 0, 1), through +160.
-  Stfs(base, frame + 172, one);
-  const double zero = Lfs(base, kZero);
-  Stfs(base, frame + 160, zero);
-  Stfs(base, frame + 164, zero);
-  Stfs(base, frame + 168, zero);
-  CopyDoublewords(base, t + 48, frame + 160, 16);
-  Translate(base, block, t + 48, Lvx(base, frame + 160), schema::SecondSetWheelPoints(base, group).tire_rows_address() + 16);
-  if (int32_t(schema::SecondSetWheelPoints(base, group).tire_front()) != 0) {
+  Stfs(frame + 172, one);
+  const double zero = Lfs(kZero);
+  Stfs(frame + 160, zero);
+  Stfs(frame + 164, zero);
+  Stfs(frame + 168, zero);
+  CopyDoublewords(t + 48, frame + 160, 16);
+  Translate(block, t + 48, Lvx(frame + 160), schema::SecondSetWheelPoints(group).tire_rows_address() + 16);
+  if (int32_t(schema::SecondSetWheelPoints(group).tire_front()) != 0) {
     static constexpr uint32_t kLrs[] = {0x820E97E4, 0x820E9804, 0x820E9824, 0x820E9844};
     const uint32_t outs[] = {frame + 304, frame + 816, frame + 1008, frame + 368};
-    NotedCopy(base, main,
-              Chain(base, {turned, block + 400, block + 144, t, world}, outs, kLrs, one),
+    NotedCopy(main,
+              Chain({turned, block + 400, block + 144, t, world}, outs, kLrs, one),
               0x820E98D4);
   } else {
     static constexpr uint32_t kLrs[] = {0x820E9868, 0x820E9888, 0x820E98A8, 0x820E98C8};
     const uint32_t outs[] = {frame + 496, frame + 624, frame + 752, frame + 880};
-    NotedCopy(base, main,
-              Chain(base, {turned, block + 528, block + 272, t, world}, outs, kLrs, one),
+    NotedCopy(main,
+              Chain({turned, block + 528, block + 272, t, world}, outs, kLrs, one),
               0x820E98D4);
   }
-  left = PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, r28, 0x820E98EC);
-  return TireDepth(base, calls, frame, group, record, main, frame + 1264, 0, 0, vp, r24, r28,
+  left = PartsDrawRecord(calls, frame, record, vp, main, 0, r24, r28, 0x820E98EC);
+  return TireDepth(calls, frame, group, record, main, frame + 1264, 0, 0, vp, r24, r28,
                    {0x820E995C, 0x820E9990, 0}, left);
 }
 
@@ -453,66 +448,66 @@ constexpr RimALayout kRimAMorphed = {
 
 // T (+240) and the side's world (+176), fresh: the identity stvx'd at +176
 // and copied to +240, then one stvx'd at `scratch` and copied to +176.
-void RimAIdentities(uint8_t* base, uint32_t frame, uint32_t scratch) {
-  FreshIdentity(base, frame + 176, frame + 240);
-  FreshIdentity(base, frame + scratch, frame + 176);
+void RimAIdentities(uint32_t frame, uint32_t scratch) {
+  FreshIdentity(frame + 176, frame + 240);
+  FreshIdentity(frame + scratch, frame + 176);
 }
 
 // Both sides of a set a rim, from the world copy on (see car_draw.h).
-Left RimASides(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+Left RimASides(const Calls& calls, uint32_t frame, uint32_t group,
                uint32_t camera, uint32_t block, uint64_t caller_r24, const RimALayout& l) {
   const uint32_t t = frame + 240, main = frame + 176, world = block + 16;
-  NotedCopy(base, main, world, l.world_copy_lr);
-  Translate(base, block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(base, group).rim_rows_address());
-  const bool front = int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0;
+  NotedCopy(main, world, l.world_copy_lr);
+  Translate(block, t + 48, VectorOf(0, 0, 0, kOneBits), schema::SecondSetWheelPoints(group).rim_rows_address());
+  const bool front = int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0;
   {
-    const double z = Lfs(base, t + 56), add = double(schema::SecondSetWheelPoints(base, group).float_20());
-    Stfs(base, t + 56, l.z_add_swapped ? Fadds(add, z) : Fadds(z, add));
+    const double z = Lfs(t + 56), add = double(schema::SecondSetWheelPoints(group).float_20());
+    Stfs(t + 56, l.z_add_swapped ? Fadds(add, z) : Fadds(z, add));
   }
-  const double one = Lfs(base, kOne);
+  const double one = Lfs(kOne);
   uint32_t outs[4];
   if (front) {
     for (int i = 0; i < 3; i++) outs[i] = frame + l.front_outs[i];
-    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, l.front_lrs, one),
+    NotedCopy(main, Chain({block + 336, block + 80, t, world}, outs, l.front_lrs, one),
               l.side1_copy_lr);
   } else {
     for (int i = 0; i < 3; i++) outs[i] = frame + l.rear_outs[i];
-    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, l.rear_lrs, one),
+    NotedCopy(main, Chain({block + 464, block + 208, t, world}, outs, l.rear_lrs, one),
               l.side1_copy_lr);
   }
   // Records 2, 4, 5, 6, then 0; r24 the caller's until record 6's is loaded.
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address();
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address();
   const uint32_t records[5] = {512, 992, 1232, 1472, 32};
   const uint64_t r24s[5] = {caller_r24, caller_r24, caller_r24, group + 1472, group + 1472};
   Left left;
   for (int i = 0; i < 5; i++) {
-    left = PartsDrawRecord(base, calls, frame, group + records[i], vp, main, 0, r24s[i], block,
+    left = PartsDrawRecord(calls, frame, group + records[i], vp, main, 0, r24s[i], block,
                            l.side1_draw_lrs[i]);
   }
   // Side 2: the turned world's identity, the mirror (z scaled by
   // [0x82001BE0]) and the turn by pi about y.
   const uint32_t turned_world = frame + l.turned_world, mirror = frame + l.mirror,
                  turned = frame + l.turned;
-  FreshIdentity(base, frame + 80, turned_world);
-  FreshIdentity(base, frame + 80, mirror);
-  Stfs(base, mirror + 40, Lfs(base, kMirrorZ));
-  FreshIdentity(base, frame + 80, turned);
-  Stfs(base, frame + l.angle, Lfs(base, kPi));
-  matrix_math::RotateY(base, turned, turned, frame + l.angle, frame - 80);
+  FreshIdentity(frame + 80, turned_world);
+  FreshIdentity(frame + 80, mirror);
+  Stfs(mirror + 40, Lfs(kMirrorZ));
+  FreshIdentity(frame + 80, turned);
+  Stfs(frame + l.angle, Lfs(kPi));
+  matrix_math::RotateY(turned, turned, frame + l.angle, frame - 80);
   // T's row 3 back to (0, 0, 0, 1), through the row's temporary.
   const uint32_t row = frame + l.row;
-  Stfs(base, row + 12, one);
-  const double zero = Lfs(base, kZero);
-  Stfs(base, row + 0, zero);
-  Stfs(base, row + 4, zero);
-  Stfs(base, row + 8, zero);
-  CopyDoublewords(base, t + 48, row, 16);
-  Translate(base, block, t + 48, Lvx(base, row), schema::SecondSetWheelPoints(base, group).rim_rows_address() + 16);
+  Stfs(row + 12, one);
+  const double zero = Lfs(kZero);
+  Stfs(row + 0, zero);
+  Stfs(row + 4, zero);
+  Stfs(row + 8, zero);
+  CopyDoublewords(t + 48, row, 16);
+  Translate(block, t + 48, Lvx(row), schema::SecondSetWheelPoints(group).rim_rows_address() + 16);
   {
-    const double z = Lfs(base, t + 56), add = double(schema::SecondSetWheelPoints(base, group).float_20());
-    Stfs(base, t + 56, Fsubs(z, add));
+    const double z = Lfs(t + 56), add = double(schema::SecondSetWheelPoints(group).float_20());
+    Stfs(t + 56, Fsubs(z, add));
   }
-  const bool front2 = int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0;
+  const bool front2 = int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0;
   const uint32_t s = front2 ? block + 400 : block + 528;
   const uint32_t r = front2 ? block + 144 : block + 272;
   const uint32_t* mirror_outs = front2 ? l.mirror_front_outs : l.mirror_rear_outs;
@@ -520,22 +515,22 @@ Left RimASides(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
   const uint32_t* turned_outs = front2 ? l.turned_front_outs : l.turned_rear_outs;
   const uint32_t* turned_lrs = front2 ? l.turned_front_lrs : l.turned_rear_lrs;
   for (int i = 0; i < 4; i++) outs[i] = frame + mirror_outs[i];
-  NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, outs, mirror_lrs, one),
+  NotedCopy(main, Chain({mirror, s, r, t, world}, outs, mirror_lrs, one),
             front2 ? l.mirror_front_copy_lr : l.mirror_rear_copy_lr);
   for (int i = 0; i < 4; i++) outs[i] = frame + turned_outs[i];
-  NotedCopy(base, turned_world, Chain(base, {turned, s, r, t, world}, outs, turned_lrs, one),
+  NotedCopy(turned_world, Chain({turned, s, r, t, world}, outs, turned_lrs, one),
             l.turned_copy_lr);
   // Records 2, 4, 5, 6 mirrored between two flips of the rim model's
   // culling, then record 0 turned; r28 the side's R from here on.
   const uint64_t r28 = r;
   const uint64_t r24 = group + 1472;
-  material_passes::FlipCulling(base, schema::CarPart(base, group + 32).model(), frame);
+  material_passes::FlipCulling(schema::CarPart(group + 32).model(), frame);
   for (int i = 0; i < 4; i++) {
-    left = PartsDrawRecord(base, calls, frame, group + records[i], vp, main, 0, r24, r28,
+    left = PartsDrawRecord(calls, frame, group + records[i], vp, main, 0, r24, r28,
                            l.side2_draw_lrs[i]);
   }
-  material_passes::FlipCulling(base, schema::CarPart(base, group + 32).model(), frame);
-  return PartsDrawRecord(base, calls, frame, group + 32, vp, turned_world, 0, r24, r28,
+  material_passes::FlipCulling(schema::CarPart(group + 32).model(), frame);
+  return PartsDrawRecord(calls, frame, group + 32, vp, turned_world, 0, r24, r28,
                          l.side2_draw_lrs[4]);
 }
 
@@ -544,17 +539,17 @@ Left RimASides(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
 // to the frame's +304, the weight to +368, Morph::SetUp into the frame's
 // +2000, then Model::MorphShape (its plain C++, else its original returning
 // to `lr`).
-void RimAMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+void RimAMorph(const Calls& calls, uint32_t frame, uint32_t group,
                uint32_t model, uint32_t from, uint32_t to, uint32_t lr) {
-  const uint32_t target = Load(base, group + to + 228);
-  const double weight = double(schema::SecondSetWheelPoints(base, group).weight());
-  const uint32_t shape = Load(base, group + from + 228);
-  Stfs(base, frame + 368, weight);
-  Store(base, frame + 304, target);
+  const uint32_t target = Load(group + to + 228);
+  const double weight = double(schema::SecondSetWheelPoints(group).weight());
+  const uint32_t shape = Load(group + from + 228);
+  Stfs(frame + 368, weight);
+  Store(frame + 304, target);
   const uint32_t morph = frame + 2000;
-  second_set::MorphSetUp(base, model, morph, shape, frame + 304, frame + 368, 1);
-  const uint64_t again = Load(base, group + from + 228);
-  if (!ModelMorphShape(base, calls, model, morph, again, frame)) {
+  second_set::MorphSetUp(model, morph, shape, frame + 304, frame + 368, 1);
+  const uint64_t again = Load(group + from + 228);
+  if (!ModelMorphShape(calls, model, morph, again, frame)) {
     const uint64_t regs[3] = {model, morph, again};
     calls.call(kMorphShape, regs, 3, frame, lr);
   }
@@ -562,27 +557,27 @@ void RimAMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
 
 }  // namespace
 
-Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimA(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E9A28 WheelPoints::DrawRimA");
-  const uint32_t frame = Frame(base, stack, kWheelsRimAFrame);
-  RimAIdentities(base, frame, 80);
-  return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimA);
+  const uint32_t frame = Frame(stack, kWheelsRimAFrame);
+  RimAIdentities(frame, 80);
+  return RimASides(calls, frame, group, camera, block, caller_r24, kRimA);
 }
 
-Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimAMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820EA148 WheelPoints::DrawRimAMorphed");
-  const uint32_t frame = Frame(base, stack, kWheelsRimAMorphedFrame);
-  RimAIdentities(base, frame, 304);
+  const uint32_t frame = Frame(stack, kWheelsRimAMorphedFrame);
+  RimAIdentities(frame, 304);
   // Record 0 toward record 1 when record 0 has a model; record 2 toward
   // record 3 on that model regardless.
-  const uint32_t model = schema::CarPart(base, group + 32).model();
+  const uint32_t model = schema::CarPart(group + 32).model();
   if (model != 0) {
-    RimAMorph(base, calls, frame, group, model, 32, 272, 0x820EA270);
+    RimAMorph(calls, frame, group, model, 32, 272, 0x820EA270);
   }
-  RimAMorph(base, calls, frame, group, model, 512, 752, 0x820EA2AC);
-  return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimAMorphed);
+  RimAMorph(calls, frame, group, model, 512, 752, 0x820EA2AC);
+  return RimASides(calls, frame, group, camera, block, caller_r24, kRimAMorphed);
 }
 
 // --- Set b's rim ---
@@ -602,77 +597,77 @@ struct RimBSites {
 // +32) at `main`, and with the block's +592 both again at the frame's +352.
 // r28 is `r28` at the first draw; with +592 the original keeps the look in
 // r28 for the rest when `look_in_r28` (side 1), else r28 stays.
-Left RimBDraws(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+Left RimBDraws(const Calls& calls, uint32_t frame, uint32_t group,
                uint32_t camera, uint32_t block, uint32_t look, uint32_t main, uint64_t r24,
                uint64_t r28, bool look_in_r28, const RimBSites& sites) {
-  const uint32_t which = Load(base, look);
+  const uint32_t which = Load(look);
   const int site = which == 1 ? 1 : which == 2 ? 2 : 0;
   const uint32_t chosen = group + (which == 1 ? 512 : which == 2 ? 992 : 32);
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address(), record6 = group + 1472, second = frame + 352;
-  if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-    PartsDrawRecord(base, calls, frame, record6, vp, main, 0, r24, r28,
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address(), record6 = group + 1472, second = frame + 352;
+  if (int32_t(Block(block).rear_second_matrix()) != 0) {
+    PartsDrawRecord(calls, frame, record6, vp, main, 0, r24, r28,
                     sites.first_second[site]);
     const uint64_t later = look_in_r28 ? uint64_t(chosen) : r28;
-    PartsDrawRecord(base, calls, frame, chosen, vp, main, 0, r24, later, sites.look_main);
-    PartsDrawRecord(base, calls, frame, record6, vp, second, 0, r24, later,
+    PartsDrawRecord(calls, frame, chosen, vp, main, 0, r24, later, sites.look_main);
+    PartsDrawRecord(calls, frame, record6, vp, second, 0, r24, later,
                     sites.record6_second);
-    return PartsDrawRecord(base, calls, frame, chosen, vp, second, 0, r24, later, sites.last);
+    return PartsDrawRecord(calls, frame, chosen, vp, second, 0, r24, later, sites.last);
   }
-  PartsDrawRecord(base, calls, frame, record6, vp, main, 0, r24, r28, sites.first_alone[site]);
-  return PartsDrawRecord(base, calls, frame, chosen, vp, main, 0, r24, r28, sites.last);
+  PartsDrawRecord(calls, frame, record6, vp, main, 0, r24, r28, sites.first_alone[site]);
+  return PartsDrawRecord(calls, frame, chosen, vp, main, 0, r24, r28, sites.last);
 }
 
 // T's row 3 (0, 0, 0, 1) through the frame's +80, copied into T (+272),
 // then the side's float4 added unless +732 is set.
-void RimBRow(uint8_t* base, uint32_t frame, uint32_t block, uint32_t side, double zero,
+void RimBRow(uint32_t frame, uint32_t block, uint32_t side, double zero,
              double one) {
-  Stfs(base, frame + 80, zero);
-  Stfs(base, frame + 84, zero);
-  Stfs(base, frame + 88, zero);
-  Stfs(base, frame + 92, one);
-  CopyDoublewords(base, frame + 272, frame + 80, 16);
-  Translate(base, block, frame + 272, Lvx(base, frame + 80), side);
+  Stfs(frame + 80, zero);
+  Stfs(frame + 84, zero);
+  Stfs(frame + 88, zero);
+  Stfs(frame + 92, one);
+  CopyDoublewords(frame + 272, frame + 80, 16);
+  Translate(block, frame + 272, Lvx(frame + 80), side);
 }
 
 }  // namespace
 
-Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimB(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820EA950 WheelPoints::DrawRimB");
-  const uint32_t frame = Frame(base, stack, kWheelsRimBFrame);
+  const uint32_t frame = Frame(stack, kWheelsRimBFrame);
   const uint32_t t = frame + 224, main = frame + 288, second = frame + 352;
   const uint32_t world = block + 16;
   // T, the side's world and the second matrix, all identities.
-  FreshIdentity(base, frame + 96, t);
-  FreshIdentity(base, frame + 96, main);
-  FreshIdentity(base, frame + 96, second);
-  const double zero = Lfs(base, kZero), one = Lfs(base, kOne);
-  RimBRow(base, frame, block, schema::SecondSetWheelPoints(base, group).rim_rows_address(), zero, one);
+  FreshIdentity(frame + 96, t);
+  FreshIdentity(frame + 96, main);
+  FreshIdentity(frame + 96, second);
+  const double zero = Lfs(kZero), one = Lfs(kOne);
+  RimBRow(frame, block, schema::SecondSetWheelPoints(group).rim_rows_address(), zero, one);
   {
-    const double z = Lfs(base, t + 56), add = double(schema::SecondSetWheelPoints(base, group).float_20());
-    Stfs(base, t + 56, Fadds(z, add));
+    const double z = Lfs(t + 56), add = double(schema::SecondSetWheelPoints(group).float_20());
+    Stfs(t + 56, Fadds(z, add));
   }
-  const double milli = Lfs(base, kMilli), three = Lfs(base, kThree), shift = Lfs(base, kShift);
+  const double milli = Lfs(kMilli), three = Lfs(kThree), shift = Lfs(kShift);
   // r24: 0 for the front (+12 set), 1 for the rear, through both sides.
   uint64_t r24;
-  if (int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0) {
+  if (int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0) {
     r24 = 0;
     static constexpr uint32_t kLrs[] = {0x820EAB3C, 0x820EAB5C, 0x820EAB80};
     const uint32_t outs[] = {frame + 1248, frame + 1888, frame + 608};
-    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 336, block + 80, t, world}, outs, kLrs, one),
               0x820EACAC);
   } else {
     r24 = 1;
     static constexpr uint32_t kLrs[] = {0x820EABB8, 0x820EABD8, 0x820EABFC};
     const uint32_t outs[] = {frame + 1504, frame + 736, frame + 2144};
-    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, kLrs, one),
+    NotedCopy(main, Chain({block + 464, block + 208, t, world}, outs, kLrs, one),
               0x820EAC08);
-    if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-      ShiftX(base, frame, group, t + 48, shift, three, milli);
+    if (int32_t(Block(block).rear_second_matrix()) != 0) {
+      ShiftX(frame, group, t + 48, shift, three, milli);
       static constexpr uint32_t kSecondLrs[] = {0x820EAC60, 0x820EAC80, 0x820EACA0};
       const uint32_t second_outs[] = {frame + 864, frame + 1632, frame + 992};
-      NotedCopy(base, second,
-                Chain(base, {block + 464, block + 208, t, world}, second_outs, kSecondLrs, one),
+      NotedCopy(second,
+                Chain({block + 464, block + 208, t, world}, second_outs, kSecondLrs, one),
                 0x820EACAC);
     }
   }
@@ -682,54 +677,54 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
                                        0x820EAD10,
                                        0x820EAD28,
                                        0x820EAD90};
-  const Block view(base, block);
-  RimBDraws(base, calls, frame, group, camera, block,
+  const Block view(block);
+  RimBDraws(calls, frame, group, camera, block,
             r24 != 0 ? view.rear_rim_look_a_address() : view.front_rim_look_a_address(), main,
             r24, camera, true, kSide1);
   // Side 2: the turned world (+96), the mirror (+2336, z scaled by
   // [0x82001BE0]) and the turn by pi about y (+1696).
   const uint32_t turned_world = frame + 96, mirror = frame + 2336, turned = frame + 1696;
-  FreshIdentity(base, frame + 160, turned_world);
-  FreshIdentity(base, frame + 160, mirror);
-  Stfs(base, mirror + 40, Lfs(base, kMirrorZ));
-  FreshIdentity(base, frame + 160, turned);
-  Stfs(base, frame + 80, Lfs(base, kPi));
-  matrix_math::RotateY(base, turned, turned, frame + 80, frame - 80);
-  RimBRow(base, frame, block, schema::SecondSetWheelPoints(base, group).rim_rows_address() + 16, zero, one);
+  FreshIdentity(frame + 160, turned_world);
+  FreshIdentity(frame + 160, mirror);
+  Stfs(mirror + 40, Lfs(kMirrorZ));
+  FreshIdentity(frame + 160, turned);
+  Stfs(frame + 80, Lfs(kPi));
+  matrix_math::RotateY(turned, turned, frame + 80, frame - 80);
+  RimBRow(frame, block, schema::SecondSetWheelPoints(group).rim_rows_address() + 16, zero, one);
   {
-    const double z = Lfs(base, t + 56), add = double(schema::SecondSetWheelPoints(base, group).float_20());
-    Stfs(base, t + 56, Fsubs(z, add));
+    const double z = Lfs(t + 56), add = double(schema::SecondSetWheelPoints(group).float_20());
+    Stfs(t + 56, Fsubs(z, add));
   }
   // The mirrored product goes into side 1's world (+288), never drawn.
   uint32_t s;
-  if (int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0) {
+  if (int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0) {
     s = block + 400;
     const uint32_t r = block + 144;
     static constexpr uint32_t kMirrorLrs[] = {0x820EAF50, 0x820EAF74, 0x820EAF94, 0x820EAFB4};
     const uint32_t mirror_outs[] = {frame + 2016, frame + 1120, frame + 1760, frame + 416};
-    NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
+    NotedCopy(main, Chain({mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
               0x820EAFC0);
     static constexpr uint32_t kTurnedLrs[] = {0x820EAFE0, 0x820EB000, 0x820EB020, 0x820EB040};
     const uint32_t turned_outs[] = {frame + 2272, frame + 1376, frame + 480, frame + 544};
-    NotedCopy(base, turned_world,
-              Chain(base, {turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB22C);
+    NotedCopy(turned_world,
+              Chain({turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB22C);
   } else {
     s = block + 528;
     const uint32_t r = block + 272;
     static constexpr uint32_t kMirrorLrs[] = {0x820EB06C, 0x820EB090, 0x820EB0B0, 0x820EB0D0};
     const uint32_t mirror_outs[] = {frame + 672, frame + 800, frame + 928, frame + 1056};
-    NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
+    NotedCopy(main, Chain({mirror, s, r, t, world}, mirror_outs, kMirrorLrs, one),
               0x820EB0DC);
     static constexpr uint32_t kTurnedLrs[] = {0x820EB0FC, 0x820EB11C, 0x820EB13C, 0x820EB15C};
     const uint32_t turned_outs[] = {frame + 1184, frame + 1312, frame + 1440, frame + 1568};
-    NotedCopy(base, turned_world,
-              Chain(base, {turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB168);
-    if (int32_t(Block(base, block).rear_second_matrix()) != 0) {
-      ShiftX(base, frame, group, t + 48, shift, three, milli);
+    NotedCopy(turned_world,
+              Chain({turned, s, r, t, world}, turned_outs, kTurnedLrs, one), 0x820EB168);
+    if (int32_t(Block(block).rear_second_matrix()) != 0) {
+      ShiftX(frame, group, t + 48, shift, three, milli);
       static constexpr uint32_t kSecondLrs[] = {0x820EB1C0, 0x820EB1E0, 0x820EB200, 0x820EB220};
       const uint32_t second_outs[] = {frame + 1824, frame + 1952, frame + 2080, frame + 2208};
-      NotedCopy(base, second,
-                Chain(base, {turned, s, r, t, world}, second_outs, kSecondLrs, one),
+      NotedCopy(second,
+                Chain({turned, s, r, t, world}, second_outs, kSecondLrs, one),
                 0x820EB22C);
     }
   }
@@ -739,7 +734,7 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
                                        0x820EB288,
                                        0x820EB2A0,
                                        0x820EB308};
-  return RimBDraws(base, calls, frame, group, camera, block,
+  return RimBDraws(calls, frame, group, camera, block,
                    r24 != 0 ? view.rear_rim_look_b_address() : view.front_rim_look_b_address(),
                    turned_world, r24, s, false, kSide2);
 }
@@ -838,16 +833,16 @@ constexpr BrakesLayout kBrakesMorphed = {
 
 // One side's products from Z (the frame's +96) into the layout's spinning
 // and still matrices.
-void BrakesSide(uint8_t* base, uint32_t frame, uint32_t s, uint32_t r, uint32_t t,
+void BrakesSide(uint32_t frame, uint32_t s, uint32_t r, uint32_t t,
                 uint32_t world, uint32_t spin, uint32_t still, const BrakesChains& c,
                 double one) {
   const uint32_t z = frame + 96;
   uint32_t outs[4];
   for (int i = 0; i < 4; i++) outs[i] = frame + c.spin_outs[i];
-  NotedCopy(base, frame + spin, Chain(base, {z, s, r, t, world}, outs, c.spin_lrs, one),
+  NotedCopy(frame + spin, Chain({z, s, r, t, world}, outs, c.spin_lrs, one),
             c.spin_copy_lr);
   for (int i = 0; i < 3; i++) outs[i] = frame + c.still_outs[i];
-  NotedCopy(base, frame + still, Chain(base, {z, r, t, world}, outs, c.still_lrs, one),
+  NotedCopy(frame + still, Chain({z, r, t, world}, outs, c.still_lrs, one),
             c.still_copy_lr);
 }
 
@@ -855,40 +850,40 @@ void BrakesSide(uint8_t* base, uint32_t frame, uint32_t s, uint32_t r, uint32_t 
 // (+288) from +2912 and +2928 unless the block's +732 is set, Z by the
 // wheels record's +100 (rear +104) in degrees, Z' = RotY turned by (that -
 // 180) degrees, and each side's products.
-void BrakesMatrices(uint8_t* base, uint32_t frame, uint32_t group, uint32_t block,
+void BrakesMatrices(uint32_t frame, uint32_t group, uint32_t block,
                     const BrakesLayout& l) {
   for (const uint32_t to : l.fresh) {
-    FreshIdentity(base, frame + 96, frame + to);
+    FreshIdentity(frame + 96, frame + to);
   }
-  FreshIdentity(base, frame + 160, frame + 96);
+  FreshIdentity(frame + 160, frame + 96);
   const uint32_t t = frame + 224, t2 = frame + 288, world = block + 16;
   const simde__m128 w = VectorOf(0, 0, 0, kOneBits);
-  Translate(base, block, t + 48, w, schema::SecondSetWheelPoints(base, group).brake_rows_address());
-  Translate(base, block, t2 + 48, w, schema::SecondSetWheelPoints(base, group).brake_rows_address() + 16);
-  const bool front = int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0;
+  Translate(block, t + 48, w, schema::SecondSetWheelPoints(group).brake_rows_address());
+  Translate(block, t2 + 48, w, schema::SecondSetWheelPoints(group).brake_rows_address() + 16);
+  const bool front = int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0;
   const uint32_t angle_at = front ? 100 : 104;
   const uint32_t z = frame + 96, angle = frame + 80, turn = frame - 80;
-  const double degrees = Lfs(base, kDegrees);
-  Stfs(base, angle, Fmuls(Lfs(base, schema::SecondSetWheelPoints(base, group).wheels_record().address + angle_at), degrees));
-  matrix_math::RotateZ(base, z, z, angle, turn);
-  const double one = Lfs(base, kOne);
+  const double degrees = Lfs(kDegrees);
+  Stfs(angle, Fmuls(Lfs(schema::SecondSetWheelPoints(group).wheels_record().address + angle_at), degrees));
+  matrix_math::RotateZ(z, z, angle, turn);
+  const double one = Lfs(kOne);
   if (front) {
-    BrakesSide(base, frame, block + 336, block + 80, t, world, l.spin1, l.still1, l.front1, one);
+    BrakesSide(frame, block + 336, block + 80, t, world, l.spin1, l.still1, l.front1, one);
   } else {
-    BrakesSide(base, frame, block + 464, block + 208, t, world, l.spin1, l.still1, l.rear1, one);
+    BrakesSide(frame, block + 464, block + 208, t, world, l.spin1, l.still1, l.rear1, one);
   }
-  FreshIdentity(base, frame + 160, z);
-  Stfs(base, angle, Lfs(base, kPi));
-  matrix_math::RotateY(base, z, z, angle, turn);
+  FreshIdentity(frame + 160, z);
+  Stfs(angle, Lfs(kPi));
+  matrix_math::RotateY(z, z, angle, turn);
   {
-    const double f13 = Lfs(base, schema::SecondSetWheelPoints(base, group).wheels_record().address + angle_at);
-    Stfs(base, angle, Fmuls(Fsubs(f13, Lfs(base, kHalfTurn)), degrees));
+    const double f13 = Lfs(schema::SecondSetWheelPoints(group).wheels_record().address + angle_at);
+    Stfs(angle, Fmuls(Fsubs(f13, Lfs(kHalfTurn)), degrees));
   }
-  matrix_math::RotateZ(base, z, z, angle, turn);
+  matrix_math::RotateZ(z, z, angle, turn);
   if (front) {
-    BrakesSide(base, frame, block + 400, block + 144, t2, world, l.spin2, l.still2, l.front2, one);
+    BrakesSide(frame, block + 400, block + 144, t2, world, l.spin2, l.still2, l.front2, one);
   } else {
-    BrakesSide(base, frame, block + 528, block + 272, t2, world, l.spin2, l.still2, l.rear2, one);
+    BrakesSide(frame, block + 528, block + 272, t2, world, l.spin2, l.still2, l.rear2, one);
   }
 }
 
@@ -897,20 +892,20 @@ void BrakesMatrices(uint8_t* base, uint32_t frame, uint32_t group, uint32_t bloc
 // +68 and +84 are 0, else record 2 (+512); still, record 8 (+1952) when +68
 // is 0 and +88 isn't 1. The wheels record read again before each test, as
 // the original does.
-Left BrakesDraws(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+Left BrakesDraws(const Calls& calls, uint32_t frame, uint32_t group,
                  uint32_t vp, uint32_t spin, uint32_t still, uint64_t r24, uint64_t r28,
                  const uint32_t lrs[3]) {
-  const auto wheels = [&] { return schema::SecondSetWheelPoints(base, group).wheels_record(); };
+  const auto wheels = [&] { return schema::SecondSetWheelPoints(group).wheels_record(); };
   const uint32_t first = int32_t(wheels().brake_kind()) < 4 ? 992 : 1472;
-  PartsDrawRecord(base, calls, frame, group + first, vp, spin, 0, r24, r28, lrs[0]);
+  PartsDrawRecord(calls, frame, group + first, vp, spin, 0, r24, r28, lrs[0]);
   uint32_t second = 512;
   if (int32_t(wheels().brake_kind()) == 0 && int32_t(wheels().caliper_a()) == 0) {
     second = 32;
   }
   Left left =
-      PartsDrawRecord(base, calls, frame, group + second, vp, still, 0, r24, r28, lrs[1]);
+      PartsDrawRecord(calls, frame, group + second, vp, still, 0, r24, r28, lrs[1]);
   if (int32_t(wheels().brake_kind()) == 0 && int32_t(wheels().caliper_texture()) != 1) {
-    left = PartsDrawRecord(base, calls, frame, group + 1952, vp, still, 0, r24, r28, lrs[2]);
+    left = PartsDrawRecord(calls, frame, group + 1952, vp, still, 0, r24, r28, lrs[2]);
   }
   return left;
 }
@@ -919,14 +914,14 @@ Left BrakesDraws(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t gro
 // `to`'s: the target's index to the frame's +224 (the weight already at
 // +160), Morph::SetUp into the frame's +288, then Model::MorphShape (its
 // plain C++, else its original returning to `lr`).
-void BrakesMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+void BrakesMorph(const Calls& calls, uint32_t frame, uint32_t group,
                  uint32_t model, uint32_t from, uint32_t to, uint32_t lr) {
-  Store(base, frame + 224, Load(base, group + to + 228));
+  Store(frame + 224, Load(group + to + 228));
   const uint32_t morph = frame + 288;
-  second_set::MorphSetUp(base, model, morph, Load(base, group + from + 228), frame + 224,
+  second_set::MorphSetUp(model, morph, Load(group + from + 228), frame + 224,
                          frame + 160, 1);
-  const uint64_t shape = Load(base, group + from + 228);
-  if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+  const uint64_t shape = Load(group + from + 228);
+  if (!ModelMorphShape(calls, model, morph, shape, frame)) {
     const uint64_t regs[3] = {model, morph, shape};
     calls.call(kMorphShape, regs, 3, frame, lr);
   }
@@ -934,103 +929,104 @@ void BrakesMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t gro
 
 }  // namespace
 
-Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawBrakes(const Calls& calls, uint32_t stack, uint32_t group,
                       uint32_t camera, uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820EB388 WheelPoints::DrawBrakes");
-  const uint32_t frame = Frame(base, stack, kWheelsBrakesFrame);
-  BrakesMatrices(base, frame, group, block, kBrakes);
+  const uint32_t frame = Frame(stack, kWheelsBrakesFrame);
+  BrakesMatrices(frame, group, block, kBrakes);
   // The morphs when the wheels record's +8 is set (never in play: its caller
   // runs only when it's 0), all on record 0's model, the weight the group's
   // +16 (to the frame's +160 once).
-  if (int32_t(schema::SecondSetWheelPoints(base, group).wheels_record().morph_each_draw()) != 0) {
-    const uint32_t model = schema::CarPart(base, group + 32).model();
-    Stfs(base, frame + 160, double(schema::SecondSetWheelPoints(base, group).weight()));
-    BrakesMorph(base, calls, frame, group, model, 32, 272, 0x820EBC38);
-    BrakesMorph(base, calls, frame, group, model, 512, 752, 0x820EBC6C);
-    BrakesMorph(base, calls, frame, group, model, 1952, 2192, 0x820EBCA0);
-    BrakesMorph(base, calls, frame, group, model, 992, 1232, 0x820EBCD4);
-    BrakesMorph(base, calls, frame, group, model, 1472, 1712, 0x820EBD08);
+  if (int32_t(schema::SecondSetWheelPoints(group).wheels_record().morph_each_draw()) != 0) {
+    const uint32_t model = schema::CarPart(group + 32).model();
+    Stfs(frame + 160, double(schema::SecondSetWheelPoints(group).weight()));
+    BrakesMorph(calls, frame, group, model, 32, 272, 0x820EBC38);
+    BrakesMorph(calls, frame, group, model, 512, 752, 0x820EBC6C);
+    BrakesMorph(calls, frame, group, model, 1952, 2192, 0x820EBCA0);
+    BrakesMorph(calls, frame, group, model, 992, 1232, 0x820EBCD4);
+    BrakesMorph(calls, frame, group, model, 1472, 1712, 0x820EBD08);
   }
   // r24 the caller's, r28 the block at every draw; record 10's materials'
   // alpha by the block's +612 + 8 x rear (side 2 +616) before it's drawn.
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address();
-  const uint32_t rear = int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0 ? 0 : 8;
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address();
+  const uint32_t rear = int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0 ? 0 : 8;
   const uint64_t r24 = caller_r24, r28 = block;
   static constexpr uint32_t kSide1[] = {0x820EBD38, 0x820EBD70, 0x820EBDA4};
   static constexpr uint32_t kSide2[] = {0x820EBE04, 0x820EBE3C, 0x820EBE70};
-  BrakesDraws(base, calls, frame, group, vp, frame + kBrakes.spin1, frame + kBrakes.still1, r24,
+  BrakesDraws(calls, frame, group, vp, frame + kBrakes.spin1, frame + kBrakes.still1, r24,
               r28, kSide1);
-  material_passes::SetAlpha(base, schema::SecondSetWheelPoints(base, group).brake_record10_model(), schema::SecondSetWheelPoints(base, group).brake_record10_shape(),
-                            double(rear != 0 ? Block(base, block).rear_brake_alpha_a()
-                                             : Block(base, block).front_brake_alpha_a()),
+  material_passes::SetAlpha(schema::SecondSetWheelPoints(group).brake_record10_model(), schema::SecondSetWheelPoints(group).brake_record10_shape(),
+                            double(rear != 0 ? Block(block).rear_brake_alpha_a()
+                                             : Block(block).front_brake_alpha_a()),
                             frame);
-  PartsDrawRecord(base, calls, frame, group + 2432, vp, frame + kBrakes.spin1, 0, r24, r28,
+  PartsDrawRecord(calls, frame, group + 2432, vp, frame + kBrakes.spin1, 0, r24, r28,
                   0x820EBDD8);
-  BrakesDraws(base, calls, frame, group, vp, frame + kBrakes.spin2, frame + kBrakes.still2, r24,
+  BrakesDraws(calls, frame, group, vp, frame + kBrakes.spin2, frame + kBrakes.still2, r24,
               r28, kSide2);
-  material_passes::SetAlpha(base, schema::SecondSetWheelPoints(base, group).brake_record10_model(), schema::SecondSetWheelPoints(base, group).brake_record10_shape(),
-                            double(rear != 0 ? Block(base, block).rear_brake_alpha_b()
-                                             : Block(base, block).front_brake_alpha_b()),
+  material_passes::SetAlpha(schema::SecondSetWheelPoints(group).brake_record10_model(), schema::SecondSetWheelPoints(group).brake_record10_shape(),
+                            double(rear != 0 ? Block(block).rear_brake_alpha_b()
+                                             : Block(block).front_brake_alpha_b()),
                             frame);
-  return PartsDrawRecord(base, calls, frame, group + 2432, vp, frame + kBrakes.spin2, 0, r24,
+  return PartsDrawRecord(calls, frame, group + 2432, vp, frame + kBrakes.spin2, 0, r24,
                          r28, 0x820EBEA0);
 }
 
-Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawBrakesMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                              uint32_t camera, uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820EBEB8 WheelPoints::DrawBrakesMorphed");
-  const uint32_t frame = Frame(base, stack, kWheelsBrakesMorphedFrame);
-  BrakesMatrices(base, frame, group, block, kBrakesMorphed);
+  const uint32_t frame = Frame(stack, kWheelsBrakesMorphedFrame);
+  BrakesMatrices(frame, group, block, kBrakesMorphed);
   // The group's +2912 to +2943 copied doubleword by doubleword from the
   // 64-byte matrix at [+0] (the front its first half, the rear its second),
   // [+0] read again for the second pair; then the brake's size word, the
   // wheels record's +108 (rear +112).
-  const bool front = int32_t(schema::SecondSetWheelPoints(base, group).word_12()) != 0;
+  const bool front = int32_t(schema::SecondSetWheelPoints(group).word_12()) != 0;
   const uint32_t half = front ? 0 : 32;
   for (uint32_t at = 0; at < 32; at += 16) {
-    const uint32_t from = Load(base, group) + half + at;
-    CopyDoublewords(base, schema::SecondSetWheelPoints(base, group).brake_row0_xy_address() + at, from, 8);
-    CopyDoublewords(base, schema::SecondSetWheelPoints(base, group).brake_row0_zw_address() + at, from + 8, 8);
+    const uint32_t from = Load(group) + half + at;
+    CopyDoublewords(schema::SecondSetWheelPoints(group).brake_row0_xy_address() + at, from, 8);
+    CopyDoublewords(schema::SecondSetWheelPoints(group).brake_row0_zw_address() + at, from + 8, 8);
   }
-  const uint32_t wheels = schema::SecondSetWheelPoints(base, group).wheels_record().address;
-  int32_t size = int32_t(front ? schema::SceneModelsWheelsRecord(base, wheels).front_brake_size() : schema::SceneModelsWheelsRecord(base, wheels).rear_brake_size());
-  if (int32_t(schema::SceneModelsWheelsRecord(base, wheels).morph_each_draw()) != 0) {
+  const uint32_t wheels = schema::SecondSetWheelPoints(group).wheels_record().address;
+  int32_t size = int32_t(front ? schema::SceneModelsWheelsRecord(wheels).front_brake_size() : schema::SceneModelsWheelsRecord(wheels).rear_brake_size());
+  if (int32_t(schema::SceneModelsWheelsRecord(wheels).morph_each_draw()) != 0) {
     // The weight (size, + 1 for the kinds 3 to 5, + 2 for 6, - 9) / 9,
     // through fcfid at the frame's +80, to the frame's +160 and the group's
     // +16; five morphs on record 0's model, records 0, 2, 4, 6, 8 toward the
     // next.
-    const int32_t kind = int32_t(schema::SceneModelsWheelsRecord(base, wheels).brake_kind());
-    const uint32_t model = schema::CarPart(base, group + 32).model();
+    const int32_t kind = int32_t(schema::SceneModelsWheelsRecord(wheels).brake_kind());
+    const uint32_t model = schema::CarPart(group + 32).model();
     if (kind >= 3 && kind < 6) size += 1;
     if (kind == 6) size += 2;
     const int64_t count = int64_t(int32_t(uint32_t(size) - 9u));
-    Store(base, frame + 224, schema::SecondSetWheelPoints(base, group).rim_record1_shape());
-    Store64(base, frame + 80, uint64_t(count));
-    const double weight = Fmuls(Single(double(count)), Lfs(base, kNinth));
-    Stfs(base, frame + 160, weight);
-    Stfs(base, schema::SecondSetWheelPoints(base, group).weight_address(), weight);
+    Store(frame + 224, schema::SecondSetWheelPoints(group).rim_record1_shape());
+    // The count's spill to the frame's +80 for fcfid left out (E5 step 6:
+    // nothing else read it).
+    const double weight = Fmuls(Single(double(count)), Lfs(kNinth));
+    Stfs(frame + 160, weight);
+    Stfs(schema::SecondSetWheelPoints(group).weight_address(), weight);
     const uint32_t morph = frame + 288;
-    second_set::MorphSetUp(base, model, morph, schema::SecondSetWheelPoints(base, group).rim_record0_shape(), frame + 224, frame + 160,
+    second_set::MorphSetUp(model, morph, schema::SecondSetWheelPoints(group).rim_record0_shape(), frame + 224, frame + 160,
                            1);
-    const uint64_t shape = schema::SecondSetWheelPoints(base, group).rim_record0_shape();
-    if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+    const uint64_t shape = schema::SecondSetWheelPoints(group).rim_record0_shape();
+    if (!ModelMorphShape(calls, model, morph, shape, frame)) {
       const uint64_t regs[3] = {model, morph, shape};
       calls.call(kMorphShape, regs, 3, frame, 0x820EC810);
     }
-    BrakesMorph(base, calls, frame, group, model, 512, 752, 0x820EC844);
-    BrakesMorph(base, calls, frame, group, model, 992, 1232, 0x820EC878);
-    BrakesMorph(base, calls, frame, group, model, 1472, 1712, 0x820EC8AC);
-    BrakesMorph(base, calls, frame, group, model, 1952, 2192, 0x820EC8E0);
+    BrakesMorph(calls, frame, group, model, 512, 752, 0x820EC844);
+    BrakesMorph(calls, frame, group, model, 992, 1232, 0x820EC878);
+    BrakesMorph(calls, frame, group, model, 1472, 1712, 0x820EC8AC);
+    BrakesMorph(calls, frame, group, model, 1952, 2192, 0x820EC8E0);
   }
   // r24 the caller's, r28 the side 1 R (the block's +80 front, +208 rear)
   // at every draw; no record 10, no SetAlpha.
-  const uint32_t vp = schema::CameraPass(base, camera).view_projection_address();
+  const uint32_t vp = schema::CameraPass(camera).view_projection_address();
   const uint64_t r24 = caller_r24, r28 = block + (front ? 80 : 208);
   static constexpr uint32_t kSide1[] = {0x820EC910, 0x820EC948, 0x820EC97C};
   static constexpr uint32_t kSide2[] = {0x820EC9A8, 0x820EC9E0, 0x820ECA14};
-  BrakesDraws(base, calls, frame, group, vp, frame + kBrakesMorphed.spin1,
+  BrakesDraws(calls, frame, group, vp, frame + kBrakesMorphed.spin1,
               frame + kBrakesMorphed.still1, r24, r28, kSide1);
-  return BrakesDraws(base, calls, frame, group, vp, frame + kBrakesMorphed.spin2,
+  return BrakesDraws(calls, frame, group, vp, frame + kBrakesMorphed.spin2,
                      frame + kBrakesMorphed.still2, r24, r28, kSide2);
 }
 
@@ -1043,10 +1039,10 @@ constexpr uint64_t kListsR28 = 0xFFFFFFFF826C0000ull;
 
 // The scene's current camera pass ([0x826C2E44] + 5072; 0 when disabled,
 // so its view-projection is read from address 144, as the original).
-uint32_t CurrentCamera(uint8_t* base) {
-  const uint32_t index = G::scene(base).pass_camera();
+uint32_t CurrentCamera() {
+  const uint32_t index = G::scene().pass_camera();
   const uint32_t pass = kCameraPasses + index * schema::CameraPass::kSize;
-  if (pass == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
+  if (pass == 0 || int32_t(schema::CameraPass(pass).enabled()) == 0) {
     return 0;
   }
   return pass;
@@ -1054,72 +1050,72 @@ uint32_t CurrentCamera(uint8_t* base) {
 
 // The tires' +352 and +356 (the point block's +384, +388 and +2224, +2228)
 // into the rims' +16 and +20 (lfs, lfs, lfs, lfs, then the four stfs).
-void CopyTireFloats(uint8_t* base, uint32_t points, uint32_t front, uint32_t rear) {
-  const double f0 = Lfs(base, points + 384), f13 = Lfs(base, points + 388);
-  const double f12 = Lfs(base, points + 2224), f11 = Lfs(base, points + 2228);
-  Stfs(base, points + front + 16, f0);
-  Stfs(base, points + front + 20, f13);
-  Stfs(base, points + rear + 16, f12);
-  Stfs(base, points + rear + 20, f11);
+void CopyTireFloats(uint32_t points, uint32_t front, uint32_t rear) {
+  const double f0 = Lfs(points + 384), f13 = Lfs(points + 388);
+  const double f12 = Lfs(points + 2224), f11 = Lfs(points + 2228);
+  Stfs(points + front + 16, f0);
+  Stfs(points + front + 20, f13);
+  Stfs(points + rear + 16, f12);
+  Stfs(points + rear + 20, f11);
 }
 
 }  // namespace
 
-Left WheelsPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left WheelsPointsDraw(const Calls& calls, uint32_t stack, uint32_t points,
                       uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820ECA30 WheelPoints::Draw");
-  const uint32_t frame = Frame(base, stack, kWheelsPointsFrame);
-  const uint32_t camera = CurrentCamera(base);
-  WheelsDrawBrakes(base, calls, frame, points + 10688, camera, block, caller_r24);
-  WheelsDrawBrakes(base, calls, frame, points + 13632, camera, block, caller_r24);
+  const uint32_t frame = Frame(stack, kWheelsPointsFrame);
+  const uint32_t camera = CurrentCamera();
+  WheelsDrawBrakes(calls, frame, points + 10688, camera, block, caller_r24);
+  WheelsDrawBrakes(calls, frame, points + 13632, camera, block, caller_r24);
   // The scene's model set, then the wheels record's ([+12]) +8: with it,
   // the tires' floats copied into the set's rims first.
-  const int32_t set = int32_t(G::scene(base).model_set());
-  const int32_t copy = int32_t(Load(base, Load(base, points + 12) + 8));
+  const int32_t set = int32_t(G::scene().model_set());
+  const int32_t copy = int32_t(Load(Load(points + 12) + 8));
   if (set == 0) {
     if (copy != 0) {
-      CopyTireFloats(base, points, 3712, 5456);
+      CopyTireFloats(points, 3712, 5456);
     }
-    WheelsDrawRimA(base, calls, frame, points + 3712, camera, block, caller_r24);
-    WheelsDrawRimA(base, calls, frame, points + 5456, camera, block, caller_r24);
+    WheelsDrawRimA(calls, frame, points + 3712, camera, block, caller_r24);
+    WheelsDrawRimA(calls, frame, points + 5456, camera, block, caller_r24);
   } else {
     if (copy != 0) {
-      CopyTireFloats(base, points, 7200, 8944);
+      CopyTireFloats(points, 7200, 8944);
     }
-    WheelsDrawRimB(base, calls, frame, points + 7200, camera, block);
-    WheelsDrawRimB(base, calls, frame, points + 8944, camera, block);
+    WheelsDrawRimB(calls, frame, points + 7200, camera, block);
+    WheelsDrawRimB(calls, frame, points + 8944, camera, block);
   }
-  WheelsDrawTire(base, calls, frame, points + 32, camera, block);
-  return WheelsDrawTire(base, calls, frame, points + 1872, camera, block);
+  WheelsDrawTire(calls, frame, points + 32, camera, block);
+  return WheelsDrawTire(calls, frame, points + 1872, camera, block);
 }
 
-Left WheelsPointsDrawMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left WheelsPointsDrawMorphed(const Calls& calls, uint32_t stack, uint32_t points,
                              uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820ECB68 WheelPoints::DrawMorphed");
-  const uint32_t frame = Frame(base, stack, kWheelsPointsFrame);
-  const uint32_t camera = CurrentCamera(base);
-  WheelsDrawBrakesMorphed(base, calls, frame, points + 10688, camera, block, caller_r24);
-  WheelsDrawBrakesMorphed(base, calls, frame, points + 13632, camera, block, caller_r24);
+  const uint32_t frame = Frame(stack, kWheelsPointsFrame);
+  const uint32_t camera = CurrentCamera();
+  WheelsDrawBrakesMorphed(calls, frame, points + 10688, camera, block, caller_r24);
+  WheelsDrawBrakesMorphed(calls, frame, points + 13632, camera, block, caller_r24);
   // Only in the front end: set a's rims, the tires' floats copied into them
   // first (unconditionally).
-  if (int32_t(G::scene(base).model_set()) == 0) {
-    CopyTireFloats(base, points, 3712, 5456);
-    WheelsDrawRimAMorphed(base, calls, frame, points + 3712, camera, block, caller_r24);
-    WheelsDrawRimAMorphed(base, calls, frame, points + 5456, camera, block, caller_r24);
+  if (int32_t(G::scene().model_set()) == 0) {
+    CopyTireFloats(points, 3712, 5456);
+    WheelsDrawRimAMorphed(calls, frame, points + 3712, camera, block, caller_r24);
+    WheelsDrawRimAMorphed(calls, frame, points + 5456, camera, block, caller_r24);
   }
-  WheelsDrawTireMorphed(base, calls, frame, points + 32, camera, block, kListsR28);
-  return WheelsDrawTireMorphed(base, calls, frame, points + 1872, camera, block, kListsR28);
+  WheelsDrawTireMorphed(calls, frame, points + 32, camera, block, kListsR28);
+  return WheelsDrawTireMorphed(calls, frame, points + 1872, camera, block, kListsR28);
 }
 
-Left SceneWheelsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t wheels,
+Left SceneWheelsDraw(const Calls& calls, uint32_t stack, uint32_t wheels,
                      uint32_t block, uint64_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820ECE28 SceneWheels::Draw");
   // By the wheels record's +8 (the object's +40); both tail calls.
-  const schema::SceneWheels object(base, wheels);
+  const schema::SceneWheels object(wheels);
   if (int32_t(object.morph_each_draw()) == 0) {
-    return WheelsPointsDraw(base, calls, stack, object.points_address(), block, caller_r24);
+    return WheelsPointsDraw(calls, stack, object.points_address(), block, caller_r24);
   }
-  return WheelsPointsDrawMorphed(base, calls, stack, object.points_address(), block, caller_r24);
+  return WheelsPointsDrawMorphed(calls, stack, object.points_address(), block, caller_r24);
 }
 
 }  // namespace car_draw

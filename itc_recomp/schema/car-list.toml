@@ -239,6 +239,7 @@ fields = [
 measures = ["new<8448>@PanelSetBase::Build", "new<8448>@PanelSetBase::Build#2", "CarPanel::SetName.r4", "CarPanel::ShowStats.r4", "RowPanel::SetRow.r5"]
 size = 8448
 origin = "allocated"
+storage = "host"
 fields = [
   { name = "displacement", offset = 648, type = "u32", note = "the spec's block 2 +8 (cc)" },
   { name = "unknown_652", offset = 652, type = "f32", note = "one of power, torque and their rpm (block 2 +12 to +24)" },
@@ -279,6 +280,8 @@ measure = "ColorPanel::SetSwatch.r5"
 measures = ["new<32>@PanelSetBase::SetUpColors"]
 size = 32
 origin = "allocated"
+storage = "host"
+host_alloc = [0x8224B3FC]
 fields = [
   { name = "red", offset = 0, type = "u32" },
   { name = "green", offset = 4, type = "u32" },
@@ -344,6 +347,7 @@ fields = [
 measure = "PanelPart"
 size = 8
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "group", offset = 4, type = "ptr" },
 ]
@@ -354,6 +358,8 @@ fields = [
 measures = ["TabPanel", "PanelFBase", "Panel6F", "Panel7F"]
 size = 144
 origin = "embedded"
+storage = "dual"
+host_alloc = [0x82230A78, 0x82240450]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (NodeBase's) from PanelFBase, 0x82010974 from Panel6F and Panel7F" },
   { name = "group", offset = 4, type = "ptr", note = "its panel group" },
@@ -392,6 +398,8 @@ measure = "RowPanel"
 measures = ["MenuList.+1900", "PanelE", "PanelEBase", "PanelSetBase::ToTabs.r3.+1900"]
 size = 160
 origin = "embedded"
+storage = "dual"
+host_alloc = [0x82230A54, 0x8224042C]
 fields = [
   { name = "group", offset = 0, type = "ptr", note = "its panel group" },
   { name = "row_count", offset = 4, type = "u32", note = "the rows shown" },
@@ -431,6 +439,8 @@ fields = [
 measures = ["ColorPanel", "PanelDBase", "Panel6D", "Panel7D"]
 size = 92
 origin = "embedded"
+storage = "dual"
+host_alloc = [0x82230A30, 0x82240408]
 fields = [
   { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (NodeBase's) from PanelDBase, 0x82010974 from Panel6D and Panel7D" },
   { name = "group", offset = 4, type = "ptr", note = "its panel group" },
@@ -463,6 +473,8 @@ fields = [
 measures = ["CarPanel", "CarPanelBase", "Panel6C", "Panel7C", "PanelCBase"]
 size = 320
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x82230A08, 0x822403E0]
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "CarPanelVtable" },
   { name = "shows_price", offset = 4, type = "u32", note = "ShowStats calls SetPrice" },

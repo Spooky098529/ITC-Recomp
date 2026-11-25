@@ -14,18 +14,18 @@ struct GameFile : View {
   static constexpr uint32_t kSize = 16;
   static constexpr uint32_t kVtable = 0x82002270;
   // 0x82002270 GameFile, 0x8206CC0C AsyncFile, 0x8206C05C File, 0x8206BFF8 the base stream
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { return guest::LoadU32(address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
   // -1 when closed (AsyncFile::Detach returns it and sets -1)
-  uint32_t handle() const { return guest::LoadU32(base, address + 4); }
-  void set_handle(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t handle() const { return guest::LoadU32(address + 4); }
+  void set_handle(uint32_t v) const { guest::StoreU32(address + 4, v); }
   uint32_t handle_address() const { return address + 4; }
-  uint32_t position() const { return guest::LoadU32(base, address + 8); }
-  void set_position(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t position() const { return guest::LoadU32(address + 8); }
+  void set_position(uint32_t v) const { guest::StoreU32(address + 8, v); }
   uint32_t position_address() const { return address + 8; }
-  uint32_t size() const { return guest::LoadU32(base, address + 12); }
-  void set_size(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t size() const { return guest::LoadU32(address + 12); }
+  void set_size(uint32_t v) const { guest::StoreU32(address + 12, v); }
   uint32_t size_address() const { return address + 12; }
 };
 
@@ -34,12 +34,12 @@ struct Path : View {
   using View::View;
   static constexpr uint32_t kSize = 516;
   static constexpr uint32_t kVtable = 0x8206CC3C;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { return guest::LoadU32(address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
   // the full path's first character (probably a 512-byte buffer; Path::Build's sprintf writes it)
-  uint8_t text() const { return guest::LoadU8(base, address + 4); }
-  void set_text(uint8_t v) const { guest::StoreU8(base, address + 4, v); }
+  uint8_t text() const { return guest::LoadU8(address + 4); }
+  void set_text(uint8_t v) const { guest::StoreU8(address + 4, v); }
   uint32_t text_address() const { return address + 4; }
 };
 
@@ -47,8 +47,8 @@ struct Path : View {
 struct PathText : View {
   using View::View;
   static constexpr uint32_t kSize = 1;
-  uint8_t first_char() const { return guest::LoadU8(base, address + 0); }
-  void set_first_char(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint8_t first_char() const { return guest::LoadU8(address + 0); }
+  void set_first_char(uint8_t v) const { guest::StoreU8(address + 0, v); }
   uint32_t first_char_address() const { return address + 0; }
 };
 
@@ -57,12 +57,12 @@ struct GamePath : View {
   using View::View;
   static constexpr uint32_t kSize = 5;
   static constexpr uint32_t kVtable = 0x820022A0;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { return guest::LoadU32(address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
   // the path's first character (its size not known)
-  uint8_t text() const { return guest::LoadU8(base, address + 4); }
-  void set_text(uint8_t v) const { guest::StoreU8(base, address + 4, v); }
+  uint8_t text() const { return guest::LoadU8(address + 4); }
+  void set_text(uint8_t v) const { guest::StoreU8(address + 4, v); }
   uint32_t text_address() const { return address + 4; }
 };
 

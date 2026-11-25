@@ -77,19 +77,19 @@ static_assert(std::size(kDescriptors) == 48);
 
 }  // namespace
 
-uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
+uint64_t TrackProperty(uint64_t id, uint32_t frame,
                        const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_8259FE68 UiMovie::TrackProperty");
   // The +8 words' last two bytes: the original's frame's +90 and +91 (its
   // stack's leftovers, under the two bytes it stores at +88 and +89 and
   // loads back as a word), never written by it.
-  const uint16_t leftover = guest::LoadU16(base, frame + 90);
+  const uint16_t leftover = guest::LoadU16(frame + 90);
   const auto entry_at = [&](uint32_t i) {
-    return schema::UiMovieTrackProperty(base, G::track_properties_address() + 12 * i);
+    return schema::UiMovieTrackProperty(G::track_properties_address() + 12 * i);
   };
-  const uint32_t guard = G::track_properties_guard(base);
+  const uint32_t guard = G::track_properties_guard();
   if ((guard & 1) == 0) {
-    G::set_track_properties_guard(base, guard | 1);
+    G::set_track_properties_guard(guard | 1);
     for (uint32_t i = 0; i < 64; i++) {
       const schema::UiMovieTrackProperty entry = entry_at(i);
       entry.set_node_offset(0);
@@ -97,9 +97,9 @@ uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
       entry.set_sets(0);
       entry.set_indirect(0);
     }
-    c_runtime::AtexitFrom(base, kCleanUp, call);
+    c_runtime::AtexitFrom(kCleanUp, call);
   }
-  if (G::track_properties_filled(base) == 0) {
+  if (G::track_properties_filled() == 0) {
     for (uint32_t i = 0; i < std::size(kDescriptors); i++) {
       const Descriptor& d = kDescriptors[i];
       const schema::UiMovieTrackProperty entry = entry_at(i);
@@ -107,7 +107,7 @@ uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
       entry.set_type(d.type);
       entry.set_flags(uint32_t(d.add) << 24 | uint32_t(d.indirect) << 16 | leftover);
     }
-    G::set_track_properties_filled(base, 1);
+    G::set_track_properties_filled(1);
   }
   // mulli and add on the full registers: the table's address sign-extended
   // (lis).

@@ -32,7 +32,7 @@ constexpr uint32_t kTrafficBindFrameBytes = 1184;
 // below 18, +452 = XPR::GetTexture(+448, index). Returns 1. `stack` is the
 // guest r1 at entry. nullopt, with nothing done, where sprintf's plain C++
 // declines (the original runs).
-std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uint32_t stack);
+std::optional<uint32_t> CockpitBindTextures(uint32_t cockpit, uint32_t stack);
 
 // TrafficCar::BindTextures (sub_820D7D38): 0 while the file's slot (+3764) is
 // loading (2). Else for the six part models (+4256 + 464i): +48 = +4064 (the
@@ -43,7 +43,7 @@ std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uin
 // XPR::GetTexture(+4016, +7060) and its +436 = +7056. Returns 1. nullopt
 // where sprintf's plain C++ declines (the original then runs from the
 // start: the words written before are the ones it writes again).
-std::optional<uint32_t> TrafficBindTextures(uint8_t* base, uint32_t traffic, uint32_t stack);
+std::optional<uint32_t> TrafficBindTextures(uint32_t traffic, uint32_t stack);
 
 // The guest calls the file-loaded callbacks make, each from the callback's
 // frame with the original's return address: Model::Load's own
@@ -67,7 +67,7 @@ constexpr uint32_t kCockpitLoadedFrameBytes = 272;
 // Whether Cockpit::OnFileLoaded runs natively for this request (nothing
 // changed): not for a part's slot whose buffer LoadSlot::ReleaseBuffer
 // wouldn't free natively.
-bool CockpitFileLoadedNative(uint8_t* base, uint32_t request, uint32_t cockpit);
+bool CockpitFileLoadedNative(uint32_t request, uint32_t cockpit);
 
 // Cockpit::OnFileLoaded (sub_820D6528, Archive::Load's callback for
 // CarInterior::LoadSetCBody): r3 = the request, r4 = the buffer, r6 = the
@@ -86,7 +86,7 @@ bool CockpitFileLoadedNative(uint8_t* base, uint32_t request, uint32_t cockpit);
 // count (0 after the search), +3488 (Vec4::Transform's), or `request` when
 // none matches. `stack` is the guest r1 at entry. Only where
 // CockpitFileLoadedNative and the models' lifetime are native.
-uint64_t CockpitFileLoaded(uint8_t* base, uint32_t request, uint32_t buffer, uint32_t cockpit,
+uint64_t CockpitFileLoaded(uint32_t request, uint32_t buffer, uint32_t cockpit,
                            uint32_t stack, const FileLoadedCalls& calls);
 
 constexpr uint32_t kTrafficLoadedFrameBytes = 1360;
@@ -94,7 +94,7 @@ constexpr uint32_t kTrafficLoadedFrameBytes = 1360;
 // Whether TrafficCar::OnFileLoaded runs natively (nothing changed): memcpy
 // native, and for the file's request (+3748) the slot's (+3744) buffer
 // releasable natively.
-bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic);
+bool TrafficFileLoadedNative(uint32_t request, uint32_t traffic);
 
 // TrafficCar::OnFileLoaded (sub_820D8430, Archive::Load's callback for
 // TrafficCar::Load): r3 = the request, r6 = the traffic car. "%s%s" of the
@@ -116,7 +116,7 @@ bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic);
 // with nothing done, where sprintf's plain C++ declines. `stack` is the
 // guest r1 at entry. Only where TrafficFileLoadedNative and the models'
 // lifetime are native.
-std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint32_t traffic,
+std::optional<uint64_t> TrafficFileLoaded(uint32_t request, uint32_t traffic,
                                           uint32_t stack, const FileLoadedCalls& calls);
 
 }  // namespace scene_loaders

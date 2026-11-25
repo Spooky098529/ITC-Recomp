@@ -38,7 +38,7 @@ struct FileLoadedCalls {
 // texture set's (+3956) when +3724 is 1 (sub_820C4E68's image drawn into the
 // sheet, not mapped: the original's; it runs in play), nor, for set a, when that
 // set's buffer (+3968 + 24i) isn't pages the allocation layer gave.
-bool FileLoadedNative(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t car);
+bool FileLoadedNative(FileLoadedSet set, uint32_t request, uint32_t car);
 
 // sub_820D47A8 / sub_820D4F80: r3 = the request's serial, r4 = its buffer,
 // r6 = the car model. The car's name ([0x826018C8 + 4 x +32]) with
@@ -59,7 +59,7 @@ bool FileLoadedNative(uint8_t* base, FileLoadedSet set, uint32_t request, uint32
 // accessory's +7216). `stack` is the guest r1 at entry (the frame is
 // `stack` - 1552). Only where FileLoadedNative, the allocation layer and
 // memcpy are native (the adapter's checks).
-void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buffer,
+void FileLoaded(FileLoadedSet set, uint32_t request, uint32_t buffer,
                 uint32_t car, uint32_t stack, const FileLoadedCalls& calls);
 
 }  // namespace car_models

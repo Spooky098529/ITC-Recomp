@@ -49,9 +49,9 @@ bool FrontEndCarDrawCalleesNative() {
          ITC_FLAG(native_menu_sounds) && ITC_FLAG(native_load_poll) && LoadPollCalleesNative();
 }
 
-fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx, uint8_t* base) {
+fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx) {
   fe::Calls calls;
-  calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
+  calls.call = [&ctx](uint32_t function, const uint64_t* regs, int count,
                             const double* fregs, int fcount, uint32_t sp, uint32_t lr,
                             double* f1) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
@@ -68,7 +68,7 @@ fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx, uint8_t* base) {
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
@@ -83,111 +83,111 @@ fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx, uint8_t* base) {
 // The original unless the callees are native; else flush-to-zero off.
 #define ITC_FRONT_END_ORIGINAL(address)  \
   if (!FrontEndCarDrawCalleesNative()) { \
-    lifted::original::c##address(ctx, base);     \
+    lifted::original::c##address(ctx);     \
     return;                              \
   }                                      \
   ctx.fpscr.disableFlushMode();
 
 ITC_REGS_STEP(FrontEndCarDrawPlatesHide) {
-  fe::PlatesHide(base, ctx.r3.u32);
+  fe::PlatesHide(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(FrontEndCarDrawPlatesShow) {
-  fe::PlatesShow(base, ctx.r3.u32);
+  fe::PlatesShow(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(FrontEndCarDrawIsBusy) {
   ITC_FRONT_END_ORIGINAL(82179BE0)
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  ctx.r3.u64 = fe::GarageStageIsBusy(base, calls, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageIsBusy(calls, ctx.r3.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawSyncPlates) {
   ITC_FRONT_END_ORIGINAL(8217AFE8)
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  ctx.r3.u64 = fe::GarageStageSyncPlates(base, calls, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageSyncPlates(calls, ctx.r3.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawSetDrawWord) {
   ITC_FRONT_END_ORIGINAL(82178B40)
-  ctx.r3.u64 = fe::GarageStageSetDrawWord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageSetDrawWord(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(FrontEndCarDrawStepAngles) {
   ctx.fpscr.disableFlushMode();
-  fe::GarageStageStepAngles(base, ctx.r4.u32, ctx.r5.u32);
+  fe::GarageStageStepAngles(ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(FrontEndCarDrawAnimsAdd) {
   ITC_FRONT_END_ORIGINAL(8217F9E0)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageAnimsAdd(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageAnimsAdd(calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                   ctx.r7.u32, ctx.f1.f64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawApplyPreset) {
   ITC_FRONT_END_ORIGINAL(8217D2B0)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageStageApplyPreset(base, calls, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32,
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageStageApplyPreset(calls, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32,
                                           ctx.r6.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawCommand) {
   ITC_FRONT_END_ORIGINAL(82180108)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageStageCommand(base, calls, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageStageCommand(calls, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawAnimsTurn) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = fe::GarageAnimsTurn(base, ctx.r4.u32);
+  ctx.r3.u64 = fe::GarageAnimsTurn(ctx.r4.u32);
 }
 
 ITC_REGS_STEP(FrontEndCarDrawAnimsOpen) {
   ITC_FRONT_END_ORIGINAL(82179DF0)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageAnimsOpen(base, calls, ctx.r4.u32, ctx.r1.u32);
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageAnimsOpen(calls, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawAnimsClose) {
   ITC_FRONT_END_ORIGINAL(82179EA8)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageAnimsClose(base, calls, ctx.r4.u32, ctx.r1.u32);
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageAnimsClose(calls, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawAnimsRun) {
   ITC_FRONT_END_ORIGINAL(8217D120)
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageAnimsRun(base, calls, ctx.r3.u32, ctx.r1.u32);
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageAnimsRun(calls, ctx.r3.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawApplyLightKit) {
   ITC_FRONT_END_ORIGINAL(820D9D10)
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  ctx.r3.u64 = fe::SceneModelApplyLightKit(base, calls, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::SceneModelApplyLightKit(calls, ctx.r3.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawSetLightKit) {
   ITC_FRONT_END_ORIGINAL(82179678)
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  ctx.r3.u64 = fe::GarageStageSetLightKit(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  ctx.r3.u64 = fe::GarageStageSetLightKit(calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                           ctx.r6.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
                                           ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
@@ -195,39 +195,39 @@ ITC_REGS_STEP(FrontEndCarDrawSetLightKit) {
 
 ITC_REGS_STEP(FrontEndCarDrawClearLightKit) {
   ITC_FRONT_END_ORIGINAL(821795E0)
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  ctx.r3.u64 = fe::GarageStageClearLightKit(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageClearLightKit(calls, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 // `caller_r24`, handed to Model::DrawShape's recorder's context (a
 // diagnostic word), isn't carried (the rewiring, stage 3): 0.
-void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base) {
+void FrontEndCarDrawFloorDraw(lifted::Regs& ctx) {
   // (the caller's r24: diagnostic only, not carried)
-  FrontEndCarDrawFloorDraw(ctx, base, 0);
+  FrontEndCarDrawFloorDraw(ctx, 0);
 }
-void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
+void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint32_t caller_r24) {
   // Model::DrawShape's plain C++ only with its flag and without the command
   // list's diagnostics (as its adapter).
   if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_scenery_lists) ||
       SceneryListsSlotDiagnostics()) {
-    lifted::original::c820C8480(ctx, base);
+    lifted::original::c820C8480(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  SceneryDrawGuest guest{ctx, base};
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  SceneryDrawGuest guest{ctx};
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.draw = SceneryListsDrawCalls(&guest);
-  ctx.r3.u64 = fe::FloorDraw(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, caller_r24,
+  ctx.r3.u64 = fe::FloorDraw(calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, caller_r24,
                              ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
 ITC_REGS_STEP(FrontEndCarDrawSetLights) {
   ITC_FRONT_END_ORIGINAL(8217BA20)
-  ctx.r3.u64 = fe::GarageStageSetLights(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageSetLights(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 
@@ -236,12 +236,12 @@ ITC_REGS_STEP(FrontEndCarDrawPoseCar) {
   // only where their adapters would run it.
   if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_accessories) || !native::Buffers_NativeMemcpy()) {
-    lifted::original::c8217CAB8(ctx, base);
+    lifted::original::c8217CAB8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
-  ctx.r3.u64 = fe::GarageStagePoseCar(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx);
+  ctx.r3.u64 = fe::GarageStagePoseCar(calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                       ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
@@ -263,20 +263,20 @@ fe::DrawCallees FrontEndCarDrawDrawCallees(uint32_t caller_r24) {
 
 // `caller_r24`, handed to Floor::Draw (a diagnostic word of its draws'
 // recorder's context), isn't carried (the rewiring, stage 3): 0.
-void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base) {
+void FrontEndCarDrawDraw(lifted::Regs& ctx) {
   // (the caller's r24: diagnostic only, not carried)
-  FrontEndCarDrawDraw(ctx, base, 0);
+  FrontEndCarDrawDraw(ctx, 0);
 }
-void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
+void FrontEndCarDrawDraw(lifted::Regs& ctx, uint32_t caller_r24) {
   ITC_FRONT_END_ORIGINAL(8217FE60)
   const uint64_t lr = ctx.lr;
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  SceneryDrawGuest guest{ctx, base};
-  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  SceneryDrawGuest guest{ctx};
+  fe::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
   calls.draw = SceneryListsDrawCalls(&guest);
   const fe::DrawCallees callees = FrontEndCarDrawDrawCallees(caller_r24);
-  ctx.r3.u64 = fe::GarageStageDraw(base, calls, ctx.r3.u64, ctx.r5.u32, callees, ctx.r1.u32);
+  ctx.r3.u64 = fe::GarageStageDraw(calls, ctx.r3.u64, ctx.r5.u32, callees, ctx.r1.u32);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -287,7 +287,7 @@ void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) 
 
 #define ITC_FRONT_END_CAR_DRAW(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_front_end_car_draw)) { \
-    hooks::step(ctx, base);                      \
+    hooks::step(ctx);                      \
   }
 
 ITC_FRONT_END_CAR_DRAW(82179BE0, FrontEndCarDrawIsBusy)
@@ -297,7 +297,7 @@ ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
 // GarageStage::Draw.
 ITC_NATIVE_ENTRY(8217FE60, ITC_FLAG(native_front_end_car_draw)) {
   // (the caller's r24: diagnostic only, not carried)
-  hooks::FrontEndCarDrawDraw(ctx, base, 0);
+  hooks::FrontEndCarDrawDraw(ctx, 0);
 }
 
 // SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,

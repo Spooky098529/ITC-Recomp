@@ -36,14 +36,14 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
 // code calls theirs.
 #define ITC_FILE_LAYER_OBJECT(address, function) \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_file_layer)) { \
-    file_layer::function(base, ctx.r3.u32);     \
+    file_layer::function(ctx.r3.u32);     \
   }
 
 // File::GetSize: r3 = the file object; its size (+12). From the debug
 // font's loader (recompiled) and, as the XMD archive's count, from
 // UiMovie::OnLoaded.
 ITC_NATIVE_ENTRY(822B80D8, ITC_FLAG(native_file_layer)) {
-  ctx.r3.u64 = file_layer::FileGetSize(base, ctx.r3.u32);
+  ctx.r3.u64 = file_layer::FileGetSize(ctx.r3.u32);
 }
 
 ITC_FILE_LAYER_OBJECT(820A6A00, GameFileConstruct)
@@ -55,8 +55,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820A6BF0) {
   
   uint32_t result;
   if (!ITC_FLAG(native_file_layer) ||
-      !file_layer::GamePathSetGame(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &result)) {
-    lifted::original::c820A6BF0(ctx, base);
+      !file_layer::GamePathSetGame(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &result)) {
+    lifted::original::c820A6BF0(ctx);
     return;
   }
   ctx.r3.u64 = result;
@@ -72,18 +72,18 @@ ITC_NATIVE_ENTRY_ALWAYS(820A6AB8) {
   const uint64_t flag = ctx.r5.u64;
   uint32_t text;
   if (!ITC_FLAG(native_file_layer) ||
-      !file_layer::OpenPathBuild(base, ctx.r4.u32, ctx.r1.u32, &text)) {
-    lifted::original::c820A6AB8(ctx, base);
+      !file_layer::OpenPathBuild(ctx.r4.u32, ctx.r1.u32, &text)) {
+    lifted::original::c820A6AB8(ctx);
     return;
   }
   ITC_NATIVE_RUNNING("sub_820A6AB8 GameFile::OpenRead (by name)");
-  guest_call::InFrame(ctx, base, file_layer::kOpenFrameBytes, 0x820A6AF8, [&](uint32_t) {
+  guest_call::InFrame(ctx, file_layer::kOpenFrameBytes, 0x820A6AF8, [&](uint32_t) {
     ctx.r3.u64 = file;
     ctx.r4.u64 = text;
     ctx.r5.u64 = flag;
-    lifted::Enter(ctx, base, game::File::OpenRead);
+    lifted::Enter(ctx, game::File::OpenRead);
   });
   const bool opened = (ctx.r3.u32 & 0xFF) != 0;
-  file_layer::OpenPathRelease(base, ctx.r1.u32);
+  file_layer::OpenPathRelease(ctx.r1.u32);
   ctx.r3.u64 = opened ? 1 : 0;
 }

@@ -20,14 +20,14 @@ namespace hooks {
 // nothing done, where the original must run instead (--native_cameras off,
 // a stack pointer not 16-byte aligned, a camera whose vtable slot 0 isn't
 // Camera::SetViewportSize).
-bool CameraPassUpdate(lifted::Regs& ctx, uint8_t* base);
+bool CameraPassUpdate(lifted::Regs& ctx);
 
 // Camera::Update (sub_82593568) and Camera::Camera (sub_82593908)
 // natively, without the flag: r3 = the camera; from frames like the
 // originals' (320 and 128 bytes). False, with nothing done, where the
 // original must run (a stack pointer not 16-byte aligned).
-bool CameraUpdate(lifted::Regs& ctx, uint8_t* base);
-bool CameraConstruct(lifted::Regs& ctx, uint8_t* base);
+bool CameraUpdate(lifted::Regs& ctx);
+bool CameraConstruct(lifted::Regs& ctx);
 
 // CameraPass::RecordBegin (sub_820A0CC0) and RecordEnd (sub_820A1C30)
 // natively, without the flag: r3 = the pass; the scene's getters and the
@@ -36,8 +36,8 @@ bool CameraConstruct(lifted::Regs& ctx, uint8_t* base);
 // diagnostics' wrapper). False where the original must run (the command
 // list's diagnostics on, or a chunk its calls would print about), r3 put
 // back.
-bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base);
-bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base);
+bool CameraPassRecordBegin(lifted::Regs& ctx);
+bool CameraPassRecordEnd(lifted::Regs& ctx);
 
 // CameraPasses::MakeRenderTarget (sub_8209FBF0) natively, without the
 // flag: r3 = the id; from a frame like the original's (112 bytes), the video
@@ -47,7 +47,7 @@ bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base);
 // call leaves it. False, with nothing done, where the original must run
 // (--native_video_output or --native_graphics_resources off, or the
 // allocation layer not routing the heaps).
-bool CameraPassesMakeRenderTarget(lifted::Regs& ctx, uint8_t* base);
+bool CameraPassesMakeRenderTarget(lifted::Regs& ctx);
 
 // CameraPass::SetUpSurfaces (sub_820A2F40) natively, without the flag:
 // r3 = the pass; from a frame like the original's (544 bytes), the video
@@ -57,14 +57,14 @@ bool CameraPassesMakeRenderTarget(lifted::Regs& ctx, uint8_t* base);
 // guest call leaves it (the video output; the original's last call is
 // UnlockDevice, after the same slot calls; no caller reads it). False, with
 // nothing done, as CameraPassesMakeRenderTarget.
-bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base);
+bool CameraPassSetUpSurfaces(lifted::Regs& ctx);
 
 // CameraPass::Init (sub_820A3DB0) natively, without the flag: r3 = the
 // pass, r4 = the type; from a frame like the original's (144 bytes),
 // Camera::Camera, the video output's slots (type 0), CameraPass::Update and
 // SetUpSurfaces (through their overrides) as guest calls; r3 = 0.
 // Flush-to-zero left off. Always runs (true).
-bool CameraPassInit(lifted::Regs& ctx, uint8_t* base);
+bool CameraPassInit(lifted::Regs& ctx);
 
 // For the cameras harness: while not null, CameraPass::Init's adapter only
 // appends its r3, r4 and r5 here (and leaves r3 = 0; whatever the flag), so
@@ -76,22 +76,22 @@ extern thread_local std::vector<std::array<uint32_t, 3>>* camera_pass_init_calls
 // natively, without the flag: from a frame like InitPasses' (128 bytes),
 // CameraPass::Init through its override with InitPasses' return address;
 // r3 and f1 as the original's last call (SetMode) leaves them.
-void CameraPassesInit(lifted::Regs& ctx, uint8_t* base, bool all);
+void CameraPassesInit(lifted::Regs& ctx, bool all);
 
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900)
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each
 // enabled pass recorded as above (the original RecordBegin or RecordEnd
 // where it must run), from frames like the originals'.
-void CameraPassesRecordBegins(lifted::Regs& ctx, uint8_t* base);
-void CameraPassesRecordEnds(lifted::Regs& ctx, uint8_t* base);
+void CameraPassesRecordBegins(lifted::Regs& ctx);
+void CameraPassesRecordEnds(lifted::Regs& ctx);
 
 // CameraPass::RecordViewport (sub_820A0978)'s adapter's work, without the
 // flag: r3 = the pass, r4 = the sort key (for the harness).
-void CameraPassRecordViewport(lifted::Regs& ctx, uint8_t* base);
+void CameraPassRecordViewport(lifted::Regs& ctx);
 
 // RecordClear (sub_8209FA38)'s adapter's work, without the flag: r4 = the
 // key, r5 = the flags, r6 = the color, r7 = the depth (for the harness).
-void RecordClear(lifted::Regs& ctx, uint8_t* base);
+void RecordClear(lifted::Regs& ctx);
 
 // Viewports::Init (sub_820AB358) natively, without the flag: from frames
 // like the originals' (112 and Viewport::Init's 160 below it), the video
@@ -99,6 +99,6 @@ void RecordClear(lifted::Regs& ctx, uint8_t* base);
 // atexit through the game's only where the native one can't. Returns the
 // second viewport (r3 left for the caller); nullopt, with nothing done,
 // where the original must run (cameras::ViewportsInit's).
-std::optional<uint32_t> ViewportsInit(lifted::Regs& ctx, uint8_t* base);
+std::optional<uint32_t> ViewportsInit(lifted::Regs& ctx);
 
 }  // namespace hooks

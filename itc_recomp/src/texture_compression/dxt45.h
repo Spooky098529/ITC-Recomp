@@ -20,7 +20,7 @@ constexpr uint32_t kDxt45PremultipliedFrameBytes = 368;
 // `block`. `stack` is the guest r1 at its entry. The original returns 0 (its
 // copy of the pixels, at its r1 + 80, is below its caller's stack pointer and
 // isn't kept).
-void EncodeDxt45BlockPremultiplied(uint8_t* base, const float pixels[16][4], int32_t dither,
+void EncodeDxt45BlockPremultiplied(const float pixels[16][4], int32_t dither,
                                    uint32_t stack, uint8_t block[16]);
 
 // sub_82422A68 Dxt45::EncodeBlock: with the premultiplied switch set,
@@ -28,7 +28,7 @@ void EncodeDxt45BlockPremultiplied(uint8_t* base, const float pixels[16][4], int
 // `block` + 8 and the alpha half into `block`, on the pixels as they are.
 // `stack` is the guest r1 at its entry; `block` the 16 bytes in the guest's
 // order. The original returns 0 and writes nothing at or above `stack`.
-void EncodeDxt45Block(uint8_t* base, const float pixels[16][4], int32_t dither, uint32_t stack,
+void EncodeDxt45Block(const float pixels[16][4], int32_t dither, uint32_t stack,
                       uint8_t block[16]);
 
 }  // namespace texture_compression

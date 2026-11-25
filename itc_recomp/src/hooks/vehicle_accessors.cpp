@@ -31,7 +31,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter returning a word in r3: `address` the function's
-// (sub_<address>), `expr` the result (using `ctx` and `base`).
+// (sub_<address>), `expr` the result (using `ctx`).
 #define ITC_ACCESSOR_WORD(address, expr)          \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.r3.u64 = uint32_t(expr);                 \
@@ -51,7 +51,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
     ctx.f1.f64 = double(expr);                   \
   }
 
-// The same for a function returning nothing (`call` uses `ctx` and `base`,
+// The same for a function returning nothing (`call` uses `ctx`,
 // and sets r3 where the original leaves it something callers could see).
 #define ITC_ACCESSOR_VOID(address, call)          \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
@@ -61,23 +61,23 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
 
 using namespace vehicle_accessors;
 
-ITC_ACCESSOR_WORD(820C0468, VehicleGet(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820C0468, VehicleGet(ctx.r3.u32))
 // Vehicle::WheelContact (sub_820C0170) has no adapter: its callers in play,
 // OverlayView::WheelContact and WheelSurfaceMarks, are native.
 ITC_ACCESSOR_WORD(820B67D8, RigidBodyPosition(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6930, RigidBodyMatrix(ctx.r3.u32))
-ITC_ACCESSOR_WORD(820B8CC0, ContactObject(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B8CC0, ContactObject(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B8D00, ContactPosition(ctx.r3.u32))
-ITC_ACCESSOR_FLOAT(820B8D08, ContactStrength(base, ctx.r3.u32))
-ITC_ACCESSOR_SIGNED(820FF9F8, RacersIndexOf(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFCF8, StagesHasRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_ACCESSOR_WORD(82105620, SaveDataOf(base, ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820B8D08, ContactStrength(ctx.r3.u32))
+ITC_ACCESSOR_SIGNED(820FF9F8, RacersIndexOf(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFCF8, StagesHasRacer(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(82105620, SaveDataOf(ctx.r3.u32))
 ITC_ACCESSOR_WORD(825C8388, DebugSwitchOff())
 
 // The rigid body (r3). The setters leave r3 at their last copy's or
 // addition's destination, as the originals do.
-ITC_ACCESSOR_WORD(820B6638, RigidBodyIsFixed(base, ctx.r3.u32))
-ITC_ACCESSOR_FLOAT(820B6708, RigidBodyMass(base, ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B6638, RigidBodyIsFixed(ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820B6708, RigidBodyMass(ctx.r3.u32))
 // RigidBody::SetGravity, SetMass, SetCenterOfMass and SetFloat112
 // (sub_820B6640, sub_820B6698, sub_820B67E0, sub_820B6950) have no adapters:
 // their callers in play (the vehicle's physics set-up and reset, Unflip,
@@ -92,40 +92,40 @@ ITC_ACCESSOR_WORD(820B6898, RigidBodyField160(ctx.r3.u32))
 // caller native). RigidBody::Torque (sub_82379328) has none: its callers in
 // play, Vehicle::ApplyForces and BoxBox::PushOutCorners, are native.
 ITC_ACCESSOR_WORD(820988C0, RigidBodyForce(ctx.r3.u32))
-ITC_ACCESSOR_FLOAT(820B68A0, RigidBodyFloat48(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_FLOAT(820B68A0, RigidBodyFloat48(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6948, RigidBodyAngularVelocity(ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B6958, RigidBodyAddForce(base, ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
-ITC_ACCESSOR_VOID(820B6960, RigidBodyAddTorque(base, ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
-ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
-ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
+ITC_ACCESSOR_VOID(820B6958, RigidBodyAddForce(ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).force_address())
+ITC_ACCESSOR_VOID(820B6960, RigidBodyAddTorque(ctx.r3.u32, ctx.r4.u32);
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).torque_address())
+ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).force_address())
+ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).torque_address())
 
 // The wheels' slip: r3 = the vehicle, f1 = a threshold. Vehicle::WheelSlip
 // (sub_820C0180) has no adapter: its callers in play, MaxWheelSlip and
 // OverlayView::WheelSlip, are native.
-ITC_ACCESSOR_FLOAT(820C0290, VehicleMaxWheelSlip(base, ctx.r3.u32, ctx.f1.f64))
+ITC_ACCESSOR_FLOAT(820C0290, VehicleMaxWheelSlip(ctx.r3.u32, ctx.f1.f64))
 
 // The vehicle (r3).
-ITC_ACCESSOR_FLOAT(820C0140, VehicleFloat2224(base, ctx.r3.u32))
-ITC_ACCESSOR_FLOAT(820C0148, VehicleSpeed(base, ctx.r3.u32))
-ITC_ACCESSOR_FLOAT(820C0150, VehicleDistancePerFrame(base, ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820C0140, VehicleFloat2224(ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820C0148, VehicleSpeed(ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820C0150, VehicleDistancePerFrame(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820C0168, VehicleIdentity(ctx.r3.u32))
-ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(ctx.r3.u32, ctx.r4.u32))
 // Quaternion::ToMatrix3 (sub_820C0490) has no adapter: its only caller is
 // ToMatrix, native.
 // Quaternion::ToMatrix (sub_820C0550) has no adapter: its only caller in
 // play, Car::TickUpdate, calls its plain C++ (--native_race_update switches it).
-ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(ctx.r3.u32, ctx.r4.u32))
 
 // The collision object (r3) and the collision world. CollisionObject::Link
 // and Unlink (sub_820B7BF0, sub_820B7C18) have no adapters: their callers
 // in play, CollisionWorld::AddObject and RemoveObject, are native.
-ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(ctx.r3.u32, ctx.r4.u32))
 // CollisionObject::Word264 and SetWord264 (sub_820B7CB8, sub_820B7CC0) have
 // no adapters: their callers in play, the collision world's LinkPair,
 // UnlinkPair and MovePair (src/car_physics/), are native. Nor have the
@@ -136,46 +136,46 @@ ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4
 // queries' pointers' setters and CollisionWorld::SetCallback (sub_820B8768,
 // sub_820B8778, sub_820B8788): their caller in play, CollisionWorld::Setup,
 // is native.
-ITC_ACCESSOR_WORD(820B8A48, CollisionWorldNewContact(base))
-ITC_ACCESSOR_WORD(820B8C90, CollisionWorldWord60(base))
-ITC_ACCESSOR_WORD(820B8CA0, CollisionWorldWord64(base))
-ITC_ACCESSOR_WORD(820B8CB0, CollisionWorldWord68(base))
-ITC_ACCESSOR_WORD(820B8CE0, ContactOtherObject(base, ctx.r3.u32))
-ITC_ACCESSOR_WORD(820B8D10, ContactNext(base, ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B8A48, CollisionWorldNewContact())
+ITC_ACCESSOR_WORD(820B8C90, CollisionWorldWord60())
+ITC_ACCESSOR_WORD(820B8CA0, CollisionWorldWord64())
+ITC_ACCESSOR_WORD(820B8CB0, CollisionWorldWord68())
+ITC_ACCESSOR_WORD(820B8CE0, ContactOtherObject(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B8D10, ContactNext(ctx.r3.u32, ctx.r4.u32))
 
 // The vehicle's +344 object (r3). Its setters (sub_820B9658, sub_820B9660,
 // sub_820B9670, sub_820B9678) have no adapters: their callers in play (the
 // physics' set-up and reset, CarDecal::FromBuild) are native.
-ITC_ACCESSOR_FLOAT(820B9668, Object344Float28(base, ctx.r3.u32))
-ITC_ACCESSOR_WORD(820B99B0, ObjectHalf112(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B99B8, ObjectSetHalf112(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820B99C0, ObjectHalf114(base, ctx.r3.u32))
+ITC_ACCESSOR_FLOAT(820B9668, Object344Float28(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820B99B0, ObjectHalf112(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820B99B8, ObjectSetHalf112(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820B99C0, ObjectHalf114(ctx.r3.u32))
 // Object::SetHalf114 (sub_820B99C8) has no adapter: its only caller is
 // sub_820C0450, native.
 
 // The race data, its stages (r3 the stage list) and racer records.
-ITC_ACCESSOR_VOID(820FF918, RaceDataSetWord59618(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820FF938, RaceDataSetWord5961C(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820FF968, RaceDataSetWord32(base, ctx.r3.u32))
-ITC_ACCESSOR_WORD(820FFA30, StagesHasNext(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820FFA50, StagesSetType(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_ACCESSOR_VOID(820FFAB0, StagesSetWord808(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFBE8, StagesType(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFC08, StagesWord4(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFC30, StagesIsType2Or3(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFC68, StagesWord808(base, ctx.r3.u32))
-ITC_ACCESSOR_WORD(820FFC70, StagesWord76(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820FFC98, StagesRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_ACCESSOR_WORD(820FFCC8, StagesWord48(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_ACCESSOR_VOID(820FFD48, StagesCopy24(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_ACCESSOR_VOID(820FFDD8, EntriesAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FF918, RaceDataSetWord59618(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FF938, RaceDataSetWord5961C(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FF968, RaceDataSetWord32(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820FFA30, StagesHasNext(ctx.r3.u32))
+ITC_ACCESSOR_VOID(820FFA50, StagesSetType(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFAB0, StagesSetWord808(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFBE8, StagesType(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC08, StagesWord4(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC30, StagesIsType2Or3(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC68, StagesWord808(ctx.r3.u32))
+ITC_ACCESSOR_WORD(820FFC70, StagesWord76(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820FFC98, StagesRacer(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820FFCC8, StagesWord48(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFD48, StagesCopy24(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(820FFDD8, EntriesAdd(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // RacerRecords::Add (sub_820FFE08) has no adapter (removed, B7 loop,
 // 2026-11-13): its only caller in play, RaceStates::OnRaceEnd, calls its
 // plain C++ (the original through the function table where it declines).
-ITC_ACCESSOR_WORD(820FFE58, RacerRecordsAt(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_VOID(820FFE98, PairCopy(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_VOID(820FFEB0, PairsLast(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_VOID(820FFF10, PairsAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_WORD(820FFE58, RacerRecordsAt(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFE98, PairCopy(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFEB0, PairsLast(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_VOID(820FFF10, PairsAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(825C8390, DebugSwitchOn())
 
 // Stages::Copy and List::At: their adapters keep what the frame state
@@ -189,12 +189,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820FFD88) {
   if (debug::IsHidden(0x820FFD88)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (!ITC_FLAG(native_vehicle_accessors) ||
-      !StagesCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c820FFD88(ctx, base);
+      !StagesCopy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c820FFD88(ctx);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x820FFD88);
+  debug::FrameStateDiff_After("draw step part", 0x820FFD88);
 }
 
 // List::At: r3 = the list, r4 = n.
@@ -203,13 +203,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82593FC0) {
   if (debug::IsHidden(0x82593FC0)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::original::c82593FC0(ctx, base);
+    lifted::original::c82593FC0(ctx);
   } else {
-    ctx.r3.u64 = ListAt(base, ctx.r3.u32, ctx.r4.u32);
+    ctx.r3.u64 = ListAt(ctx.r3.u32, ctx.r4.u32);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x82593FC0);
+  debug::FrameStateDiff_After("draw step part", 0x82593FC0);
 }
 
 // The scene's pools: r3 = the scene (or the list, or an object).
@@ -217,9 +217,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82593FC0) {
 // their callers in play (the second set's set-ups) are native. Neither has
 // GetB (sub_820C5C20) since LocationScreen::PollLoad is native (B7 loop,
 // 2026-11-12): every caller in play calls its plain C++.
-ITC_ACCESSOR_VOID(82593FB0, ListInit(base, ctx.r3.u32))
-ITC_ACCESSOR_SIGNED(820C5AB0, ScenePoolsClaimB(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_WORD(820C5D70, ScenePoolsFindModel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_ACCESSOR_VOID(82593FB0, ListInit(ctx.r3.u32))
+ITC_ACCESSOR_SIGNED(820C5AB0, ScenePoolsClaimB(ctx.r3.u32, ctx.r4.u32))
+ITC_ACCESSOR_WORD(820C5D70, ScenePoolsFindModel(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_ACCESSOR_WORD(820C4550, ObjectRecord1888(ctx.r3.u32))
 
 // --- The vector library (src/vehicle_accessors/vectors.cpp) ---
@@ -233,7 +233,7 @@ ITC_FLAG_BOOL(native_vector_library, true, "ITC",
               "translated code (same results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter for a function returning nothing (r3 left as it was):
-// `call` uses `ctx` and `base`.
+// `call` uses `ctx`.
 #define ITC_VECTOR_VOID(address, call)         \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vector_library)) { \
     ctx.fpscr.disableFlushMode();             \
@@ -253,28 +253,28 @@ ITC_VECTOR_FLOAT(82293590, Sqrtf(ctx.f1.f64))
 // Matrix::SetTranslation and Matrix::Rotate (sub_82293818, sub_82293880)
 // have no adapters: their callers in play, the rigid body's functions
 // (src/car_physics/, src/vehicle_accessors/), are native.
-ITC_VECTOR_VOID(822938F0, MatrixTransformPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(82294028, Vec3Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(82294068, Vec3Sub(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(822940A8, Vec4ScaleTo(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_VECTOR_VOID(822940E0, Vec4Copy(base, ctx.r3.u32, ctx.r4.u32))
-ITC_VECTOR_VOID(82294108, Vec3CrossW1(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_FLOAT(82294170, Vec3Dot(base, ctx.r3.u32, ctx.r4.u32))
-ITC_VECTOR_FLOAT(822941B0, Vec3Normalize(base, ctx.r3.u32, ctx.r4.u32))
-ITC_VECTOR_FLOAT(82294200, Vec3Direction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_FLOAT(82294270, Vec3Length(base, ctx.r3.u32))
-ITC_VECTOR_VOID(822942A0, Vec3Sum(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(822942E0, Vec3Difference(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(82294320, Vec3AddTo(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_VOID(822938F0, MatrixTransformPoint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294028, Vec3Add(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294068, Vec3Sub(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822940A8, Vec4ScaleTo(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(822940E0, Vec4Copy(ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_VOID(82294108, Vec3CrossW1(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_FLOAT(82294170, Vec3Dot(ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_FLOAT(822941B0, Vec3Normalize(ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_FLOAT(82294200, Vec3Direction(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_FLOAT(82294270, Vec3Length(ctx.r3.u32))
+ITC_VECTOR_VOID(822942A0, Vec3Sum(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822942E0, Vec3Difference(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294320, Vec3AddTo(ctx.r3.u32, ctx.r4.u32))
 // Vec4::DivideBy (sub_82294348) has no adapter: its caller in play,
 // CollisionRecords::Merge (src/car_physics/), is native.
-ITC_VECTOR_VOID(82294360, Vec3SubCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(822943C8, Vec3AddCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_VECTOR_VOID(82294430, Vec4Scaled(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_VECTOR_VOID(822944B0, Vec3ScaledCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(82294360, Vec3SubCopy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(822943C8, Vec3AddCopy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_VECTOR_VOID(82294430, Vec4Scaled(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_VECTOR_VOID(822944B0, Vec3ScaledCopy(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 // Vec3::NormalizeSelf, Vec4::ScaleBy, sub_82294470 (ScaledFrom) and
 // Vec3::Cross (sub_82294298, sub_82294340, sub_82294470, sub_82294518) have
 // no adapters: their callers in play (Vehicle::ProbeGround, Unflip and
 // CarData::Derive) are native.
-ITC_VECTOR_VOID(82294568, Vec3Lerp(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64))
-ITC_VECTOR_FLOAT(82294608, Vec3DotOf(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VECTOR_VOID(82294568, Vec3Lerp(ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64))
+ITC_VECTOR_FLOAT(82294608, Vec3DotOf(ctx.r3.u32, ctx.r4.u32))

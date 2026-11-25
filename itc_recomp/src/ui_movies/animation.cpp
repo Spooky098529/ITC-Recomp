@@ -21,13 +21,13 @@ double R(double x) { return double(float(x)); }
 
 // The tracks of one node track list on one child: each track's keys around
 // the time and its t (the original's loc_825A0974 to loc_825A0AF4).
-void ApplyTracks(uint8_t* base, uint32_t animation, uint32_t list, uint32_t child, double time,
+void ApplyTracks(uint32_t animation, uint32_t list, uint32_t child, double time,
                  double one, double zero, uint32_t frame, const TrackCall& apply) {
-  const auto key_time = [&](uint32_t key) { return double(schema::UiMovieKey(base, key).time()); };
-  for (uint32_t i = 0; i < schema::UiMovieNodeTrackList(base, list).track_count(); i++) {
-    const schema::UiMovieTrack track(base, NodeTrack(list, i));
-    const uint32_t keys = KeyList(base, animation, track.key_list());
-    const schema::UiMovieKeyList key_list(base, keys);
+  const auto key_time = [&](uint32_t key) { return double(schema::UiMovieKey(key).time()); };
+  for (uint32_t i = 0; i < schema::UiMovieNodeTrackList(list).track_count(); i++) {
+    const schema::UiMovieTrack track(NodeTrack(list, i));
+    const uint32_t keys = KeyList(animation, track.key_list());
+    const schema::UiMovieKeyList key_list(keys);
     const double local = R(time - double(track.start()));
     if (local < zero) {
       continue;
@@ -68,7 +68,7 @@ void ApplyTracks(uint8_t* base, uint32_t animation, uint32_t list, uint32_t chil
     }
     // The end: k1's time, or the animation's length with no k1.
     double t = R((k1 != 0 ? key_time(k1)
-                          : double(schema::UiMovieAnimation(base, animation).length())) -
+                          : double(schema::UiMovieAnimation(animation).length())) -
                  start);
     if (t == zero) {
       t = zero;
@@ -86,25 +86,25 @@ void ApplyTracks(uint8_t* base, uint32_t animation, uint32_t list, uint32_t chil
 
 }  // namespace
 
-uint32_t ApplyAnimation(uint8_t* base, uint32_t node, uint32_t animation, double time,
+uint32_t ApplyAnimation(uint32_t node, uint32_t animation, double time,
                         uint32_t loop, uint32_t frame, const TrackCall& apply) {
   ITC_NATIVE_RUNNING("sub_825A08E0 UiMovie::ApplyAnimation");
-  const schema::UiMovieAnimation a(base, animation);
-  const double one = double(G::one(base));
-  const double zero = double(G::zero(base));
+  const schema::UiMovieAnimation a(animation);
+  const double one = double(G::one());
+  const double zero = double(G::zero());
   for (uint32_t l = 0; l < a.node_track_list_count(); l++) {
-    const uint32_t list = NodeTrackList(base, animation, l);
-    for (uint32_t c = 0; c < schema::UiMovieNode(base, node).unknown_112(); c++) {
-      const uint32_t child = Child(base, node, c);
-      if (schema::UiMovieNode(base, child).id() !=
-          schema::UiMovieNodeTrackList(base, list).node_id()) {
+    const uint32_t list = NodeTrackList(animation, l);
+    for (uint32_t c = 0; c < schema::UiMovieNode(node).unknown_112(); c++) {
+      const uint32_t child = Child(node, c);
+      if (schema::UiMovieNode(child).id() !=
+          schema::UiMovieNodeTrackList(list).node_id()) {
         continue;
       }
-      ApplyTracks(base, animation, list, child, time, one, zero, frame, apply);
+      ApplyTracks(animation, list, child, time, one, zero, frame, apply);
     }
   }
   for (uint32_t s = 0; s < a.sub_animation_count(); s++) {
-    const schema::UiMovieSubAnimation sub(base, SubAnimation(base, animation, s));
+    const schema::UiMovieSubAnimation sub(SubAnimation(animation, s));
     if (time < double(sub.start())) {
       continue;
     }
@@ -126,14 +126,14 @@ uint32_t ApplyAnimation(uint8_t* base, uint32_t node, uint32_t animation, double
     const double mapped = R(std::fma(R(double(sub.map_end()) - m0), f0, m0));
     const uint32_t id = sub.node_id();
     if (id == 0) {
-      ApplyAnimation(base, node, sub.animation().address, mapped, loop, frame - 224,
+      ApplyAnimation(node, sub.animation().address, mapped, loop, frame - 224,
                      apply);
       continue;
     }
-    for (uint32_t c = 0; c < schema::UiMovieNode(base, node).unknown_112(); c++) {
-      const uint32_t child = Child(base, node, c);
-      if (schema::UiMovieNode(base, child).id() == id) {
-        ApplyAnimation(base, child, sub.animation().address, mapped, loop, frame - 224,
+    for (uint32_t c = 0; c < schema::UiMovieNode(node).unknown_112(); c++) {
+      const uint32_t child = Child(node, c);
+      if (schema::UiMovieNode(child).id() == id) {
+        ApplyAnimation(child, sub.animation().address, mapped, loop, frame - 224,
                        apply);
       }
     }

@@ -77,24 +77,24 @@ constexpr uint32_t kListSetSelection = 0x8220BC30;  // MenuList::SetSelection
 // sub_82196EC0 ModeType2::Release: cues 0 and 2, StandScene::Release (its
 // plain C++, a guest call to its override where that refuses), files
 // 0x100BB. 144-byte frame.
-std::optional<uint64_t> ModeType2Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType2Release(uint32_t mode, uint32_t sp,
                                          const Calls& calls);
 // sub_82224AB8 ModeType4::Release: files 3, the movies deleted, then
 // StopCue(bank 1, cue 1) unconditionally. 112-byte frame.
-std::optional<uint64_t> ModeType4Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType4Release(uint32_t mode, uint32_t sp,
                                          const Calls& calls);
 // sub_8222FB90 ModeType5::Release: cue 3, files 59. 128-byte frame.
-std::optional<uint64_t> ModeType5Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType5Release(uint32_t mode, uint32_t sp,
                                          const Calls& calls);
 // sub_8225D590 ModeType9::Release: cue 2, files 171. 128-byte frame.
-std::optional<uint64_t> ModeType9Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType9Release(uint32_t mode, uint32_t sp,
                                          const Calls& calls);
 // sub_82288898 ModeType10::Release: files 11, no music. 96-byte frame.
-std::optional<uint64_t> ModeType10Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType10Release(uint32_t mode, uint32_t sp,
                                           const Calls& calls);
 // sub_82277DB0 ModeType12::Release: StandScene::Release (after the block's
 // free), files 59, no music. 96-byte frame.
-std::optional<uint64_t> ModeType12Release(uint8_t* base, uint32_t mode, uint32_t sp,
+std::optional<uint64_t> ModeType12Release(uint32_t mode, uint32_t sp,
                                           const Calls& calls);
 
 // --- The dialogs' text setters (dialogs.cpp) ---
@@ -107,26 +107,26 @@ std::optional<uint64_t> ModeType12Release(uint8_t* base, uint32_t mode, uint32_t
 // text string `id` with the varargs (SetNodeTextV), Child(n, 1)'s children 3
 // and 4 strings 2 and 3 (SetNodeText), then its child 8's +80 = 1. The last
 // SetNodeText's r3. 144-byte frame.
-uint64_t SaveScreenSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+uint64_t SaveScreenSetText(uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
 // sub_821A52C0 SaveScreen::SetNote: movie 44's Child(FindNode(0, 2), 1) set
 // by SetNodeTextV. Its r3. 112-byte frame.
-uint64_t SaveScreenSetNote(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+uint64_t SaveScreenSetNote(uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
 // sub_821A5360 SaveScreen::SetMessage: as SetText with one answer: child 3
 // string 4, child 4's text cleared (ClearNodeText), child 8's +80 = 0.
 // ClearNodeText's r3. 144-byte frame.
-uint64_t SaveScreenSetMessage(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+uint64_t SaveScreenSetMessage(uint64_t id, const uint64_t varargs[7], uint32_t sp,
                               const Calls& calls);
 // sub_821C0D70 Options::SetSaveDialogText and sub_821C0BF0
 // Options::SetCategory6DialogText: as SaveScreen::SetText on UI movie 7's
 // sub-scene 13 or 14, without the child 8 word. 144-byte frames.
-uint64_t OptionsSetDialogText(uint8_t* base, uint32_t sub_scene, uint64_t id,
+uint64_t OptionsSetDialogText(uint32_t sub_scene, uint64_t id,
                               const uint64_t varargs[7], uint32_t sp, const Calls& calls);
 // sub_821C0E50 Options::SetSaveDialogNote and sub_821C0CD0
 // Options::SetCategory6DialogNote: movie 7's Child(FindNode(13 or 14, 2), 1)
 // set by SetNodeTextV. 112-byte frames.
-uint64_t OptionsSetDialogNote(uint8_t* base, uint32_t sub_scene, uint64_t id,
+uint64_t OptionsSetDialogNote(uint32_t sub_scene, uint64_t id,
                               const uint64_t varargs[7], uint32_t sp, const Calls& calls);
 
 // sub_821A63B0 SaveScreen::ShowNotice: step 6 of the save screen's table,
@@ -136,7 +136,7 @@ uint64_t OptionsSetDialogNote(uint8_t* base, uint32_t sub_scene, uint64_t id,
 // 44, 12) when its +16 is 0; MenuSound::Play(5). Every call:
 // UiMovie::Run(movie, 0); when it answers 0 and +16 is 0, PlayNamed and
 // LoopNamed(movie, 2). Whether Run answered 0. 144-byte frame.
-uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SaveScreenShowNotice(uint32_t step, uint32_t sp, const Calls& calls);
 
 // sub_821A5450 SaveScreen::StartCheck: the data's +4 = 0, +0 = 1, +28 = 0;
 // MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159, 158);
@@ -144,12 +144,12 @@ uint64_t SaveScreenShowNotice(uint8_t* base, uint32_t step, uint32_t sp, const C
 // +12 = 2 (their plain C++, varargs 0: the originals' are SaveSlots::State's
 // leftovers); +16 = 1; the page block to page 1 by step 0; +56 = 1. The
 // note's r3. 128-byte frame.
-uint64_t SaveScreenStartCheck(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SaveScreenStartCheck(uint32_t sp, const Calls& calls);
 // sub_821A5540 SaveScreen::Start: +0 = 1, SaveSlots::State(0), the list's
 // Init, +28 = 0, +56 = 1; by the state SetNote(70) and the page block to
 // page 6 by step 3, or SetText(102) and page 5 by step 3. The setter's r3.
 // 144-byte frame.
-uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SaveScreenStart(uint32_t sp, const Calls& calls);
 // sub_821C6D48 Options::SetUpSavePage (`sub_scene` 13) and sub_821C6E50
 // Options::SetUpCategory6Page (14): by SaveSlots::State(0) the dialog's
 // note 70 (kind 3, +4 0) or 69 (kind 2); ShowPrompts(0, 0, -1, -1, -1, -1)
@@ -157,7 +157,7 @@ uint64_t SaveScreenStart(uint8_t* base, uint32_t sp, const Calls& calls);
 // the page block to page 2; FindNode(movie 7, sub_scene, 0) +80 = 0;
 // SaveBuffers::Create (r3 the node); `o` +712 and +708 = 0. Create's r3.
 // 144-byte frames.
-uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
+uint64_t OptionsSetUpDialogPage(uint32_t sub_scene, uint32_t sp,
                                 const Calls& calls);
 
 // sub_821A5668 SaveScreen::ShowMessage (`which` 0), sub_821A5980
@@ -175,7 +175,7 @@ uint64_t OptionsSetUpDialogPage(uint8_t* base, uint32_t sub_scene, uint32_t sp,
 // MenuSound::Play(5), the word = 1. Every call: Run(movie, 0); when it
 // answers 0, state 0 named Selection + 2 played and looped, 2 named 0's.
 // Whether Run answered 0. 160-byte frames.
-uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uint32_t sp,
+uint64_t SaveScreenShowMessage(uint32_t which, uint32_t step, uint32_t sp,
                                const Calls& calls);
 // sub_821C6638 Options::ShowSaveDialog (`sub_scene` 13: page 9's words
 // `o` +620 to +636) and sub_821C69D0 Options::ShowCategory6Dialog (14:
@@ -190,7 +190,7 @@ uint64_t SaveScreenShowMessage(uint8_t* base, uint32_t which, uint32_t step, uin
 // all -1 for 2; the word = 1. Every call: Run; when it answers 0, state 0
 // named 843 (859) + the menu's +0 played and looped, 2 named 841's (857).
 // Whether Run answered 0. 160-byte frames.
-uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uint32_t sp,
+uint64_t OptionsShowDialog(uint32_t sub_scene, uint32_t step, uint32_t sp,
                            const Calls& calls);
 
 // --- The car cards (car_cards.cpp) ---
@@ -200,20 +200,20 @@ uint64_t OptionsShowDialog(uint8_t* base, uint32_t sub_scene, uint32_t step, uin
 // then children 5 to 7 strings 1934 + the byte +769, 1646 + the id and 1718
 // + the id (SetNodeText), child 8 the number +744 (SetNodeNumberText),
 // child 9 string 435. The last SetNodeText's r3. 128-byte frame.
-uint64_t CarCardFill(uint8_t* base, uint32_t node, uint32_t entry, uint32_t sp,
+uint64_t CarCardFill(uint32_t node, uint32_t entry, uint32_t sp,
                      const Calls& calls);
 // sub_821822F8 CarCards::FillAll: movie 4's cards FindNode(7, i + 5) for i
 // 0 to 3 below the entries' count (P +512, read once) filled from P[the car
 // list's scroll ([0x826D83EC] +4) + i] (CarCard::Fill's plain C++). The
 // last Fill's r3, or UiMovies::Find's (the pair) with none. 144-byte frame.
-uint64_t CarCardsFillAll(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CarCardsFillAll(uint32_t sp, const Calls& calls);
 // sub_821827E0 CarCard::FillDetail: UI movie 18's +0xA000 = 0 and its nodes
 // set from the car entry P[+48 + +52] (P [0x826D83F4] +1136). The last
 // SetNodeText's r3. 192-byte frame.
-uint64_t CarCardFillDetail(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CarCardFillDetail(uint32_t sp, const Calls& calls);
 // sub_821830C0 CarDetail::Open: [0x826D83F4] +12 = 1, FillDetail, +36 = 2,
 // then the message (36, 0, 0) posted on `mode`'s ring (+204: its count
 // +600, start +604, 50 slots of 12 bytes). FillDetail's r3. 112-byte frame.
-uint64_t CarDetailOpen(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t CarDetailOpen(uint32_t mode, uint32_t sp, const Calls& calls);
 
 }  // namespace front_end_screen_helpers

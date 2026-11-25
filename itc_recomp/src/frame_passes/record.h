@@ -18,14 +18,13 @@ namespace frame_passes::record {
 // (Record's r1), and the kind-5 heads in the order they're made (heads[0]
 // the first; 18 in all).
 struct Recorder {
-  uint8_t* base;
   uint32_t list;
   uint32_t passes;
   uint32_t frame;
   std::vector<uint32_t> heads;
 
-  uint32_t Load(uint32_t address) const { return guest::LoadU32(base, address); }
-  void Store(uint32_t address, uint32_t value) const { guest::StoreU32(base, address, value); }
+  uint32_t Load(uint32_t address) const { return guest::LoadU32(address); }
+  void Store(uint32_t address, uint32_t value) const { guest::StoreU32(address, value); }
   // Words of Record's frame (its r1 + offset).
   void StoreFrame(uint32_t offset, uint32_t value) const { Store(frame + offset, value); }
   uint32_t LoadFrame(uint32_t offset) const { return Load(frame + offset); }

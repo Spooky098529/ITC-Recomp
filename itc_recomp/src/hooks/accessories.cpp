@@ -46,30 +46,29 @@ namespace {
 // table (its override when it has one) with r3, r4 set, from the frame at
 // `r1` with the link register `lr` (the original's return address); r1 and
 // lr put back after.
-void GuestCall(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
+void GuestCall(lifted::Regs& ctx, uint32_t function, uint32_t r1, uint32_t lr,
                uint64_t r3, uint64_t r4) {
   const uint64_t stack = ctx.r1.u64, link = ctx.lr;
   ctx.r1.u64 = r1;
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.lr = lr;
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = stack;
   ctx.lr = link;
 }
 
 }  // namespace
 
-std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(lifted::Regs& ctx,
-                                                                 uint8_t* base) {
-  return [&ctx, base](uint32_t set, uint32_t frame) {
-    const uint32_t function = schema::Accessories(base, set).vtable().destroy();
-    GuestCall(ctx, base, function, frame, 0x820F0FC4, set, 0);
+std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(lifted::Regs& ctx) {
+  return [&ctx](uint32_t set, uint32_t frame) {
+    const uint32_t function = schema::Accessories(set).vtable().destroy();
+    GuestCall(ctx, function, frame, 0x820F0FC4, set, 0);
   };
 }
 
-bool AccessoriesSetFreeable(uint8_t* base, uint32_t slot) {
-  const uint32_t set = guest::LoadU32(base, slot);
+bool AccessoriesSetFreeable(uint32_t slot) {
+  const uint32_t set = guest::LoadU32(slot);
   return set == 0 || memory::IsPages(set);
 }
 
@@ -85,12 +84,12 @@ bool AccessoriesNativeLoads() {
 // lr the caller's): the guest function through the function table.
 ITC_REGS_STEP(AccessoryFileOnArchiveDone) {
   const accessories::Callback callback =
-      accessories::FileOnArchiveDone(base, ctx.r3.u32, ctx.r6.u32);
+      accessories::FileOnArchiveDone(ctx.r3.u32, ctx.r6.u32);
   if (callback.function == 0) {
     return;
   }
   ctx.r6.u64 = callback.context;
-  lifted::CallFromContext(ctx, base, callback.function);
+  lifted::CallFromContext(ctx, callback.function);
 }
 
 
@@ -101,26 +100,26 @@ ITC_REGS_STEP(AccessoryFileOnArchiveDone) {
 
 ITC_REGS_STEP(AccessoriesCreate) {
   if (!NativeHeapActive()) {
-    lifted::original::c820F1038(ctx, base);
+    lifted::original::c820F1038(ctx);
     return;
   }
-  if (const auto r3 = accessories::SetCreate(base)) {
+  if (const auto r3 = accessories::SetCreate()) {
     ctx.fpscr.disableFlushMode();
     ctx.r3.u64 = *r3;
   }
 }
 
 ITC_REGS_STEP(AccessoriesSetScale) {
-  accessories::SetScale(base, ctx.r3.u32, ctx.r4.u32);
+  accessories::SetScale(ctx.r3.u32, ctx.r4.u32);
 }
 
 
 ITC_REGS_STEP(AccessoriesDestroy) {
-  if (!NativeHeapActive() || !AccessoriesSetFreeable(base, accessories::kSet)) {
-    lifted::original::c820F1078(ctx, base);
+  if (!NativeHeapActive() || !AccessoriesSetFreeable(accessories::kSet)) {
+    lifted::original::c820F1078(ctx);
     return;
   }
-  ctx.r3.u64 = accessories::SetDestroy(base, ctx.r1.u32, AccessoriesSetDestructor(ctx, base));
+  ctx.r3.u64 = accessories::SetDestroy(ctx.r1.u32, AccessoriesSetDestructor(ctx));
 }
 
 // --- The entry and the accessory ---
@@ -135,11 +134,11 @@ ITC_REGS_STEP(AccessoriesDestroy) {
 
 ITC_REGS_STEP(AccessoriesReleaseAll) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::SetReleasable(base, ctx.r3.u32)) {
-    lifted::original::c820F0AD8(ctx, base);
+      !accessories::SetReleasable(ctx.r3.u32)) {
+    lifted::original::c820F0AD8(ctx);
     return;
   }
-  if (const auto r3 = accessories::SetReleaseAll(base, ctx.r3.u32)) {
+  if (const auto r3 = accessories::SetReleaseAll(ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
     ctx.r3.u64 = *r3;
   }
@@ -148,20 +147,20 @@ ITC_REGS_STEP(AccessoriesReleaseAll) {
 // Accessories::Release: r3 the set, r4 the index.
 ITC_REGS_STEP(AccessoriesRelease) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::SetReleaseNative(base, ctx.r3.u32, ctx.r4.s32)) {
-    lifted::original::c820F0A90(ctx, base);
+      !accessories::SetReleaseNative(ctx.r3.u32, ctx.r4.s32)) {
+    lifted::original::c820F0A90(ctx);
     return;
   }
   const uint32_t set = ctx.r3.u32;
   const int32_t index = ctx.r4.s32;
   if (index != 3) {
     const uint32_t entry =
-        guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu));
-    if (entry != 0 && schema::AccessoryEntry(base, entry).count() - 1 == 0) {
+        guest::LoadU32(set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu));
+    if (entry != 0 && schema::AccessoryEntry(entry).count() - 1 == 0) {
       ctx.fpscr.disableFlushMode();  // as AccessoryEntry::Destroy's register step
     }
   }
-  if (const auto r3 = accessories::SetRelease(base, set, index)) {
+  if (const auto r3 = accessories::SetRelease(set, index)) {
     ctx.r3.u64 = *r3;
   }
 }
@@ -172,33 +171,32 @@ ITC_REGS_STEP(AccessoriesRelease) {
 
 ITC_REGS_STEP(AccessoriesDestruct) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::SetReleasable(base, ctx.r3.u32) ||
+      !accessories::SetReleasable(ctx.r3.u32) ||
       ((ctx.r4.u32 & 1) && !memory::IsHeapBlock(ctx.r3.u32))) {
-    lifted::original::c820F0FE0(ctx, base);
+    lifted::original::c820F0FE0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::SetDestruct(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = accessories::SetDestruct(ctx.r3.u32, ctx.r4.u32);
 }
 
 // --- The draw's helpers ---
 
 // The texture provider's vtable +12 with r4 = 0, from SetTexture's frame,
 // returning to 0x820EF5A8.
-std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(lifted::Regs& ctx,
-                                                                uint8_t* base) {
-  return [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
+std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(lifted::Regs& ctx) {
+  return [&ctx](uint32_t provider, uint32_t frame) -> uint64_t {
     // The provider is embedded at the accessory's +80 (Accessory::textures_vtable).
     const uint32_t function =
-        schema::AccessoryTexturesVtable(base, guest::LoadU32(base, provider)).texture_set();
-    GuestCall(ctx, base, function, frame, 0x820EF5A8, provider, 0);
+        schema::AccessoryTexturesVtable(guest::LoadU32(provider)).texture_set();
+    GuestCall(ctx, function, frame, 0x820EF5A8, provider, 0);
     return ctx.r3.u64;
   };
 }
 
 ITC_REGS_STEP(AccessorySetTexture) {
-  ctx.r3.u64 = accessories::AccessorySetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
-                                                ctx.r1.u32, AccessoryTextureSet(ctx, base));
+  ctx.r3.u64 = accessories::AccessorySetTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
+                                                ctx.r1.u32, AccessoryTextureSet(ctx));
 }
 
 // --- The load's end ---
@@ -207,27 +205,26 @@ namespace {
 
 // Accessory::Finish's guest calls from its frame: Model::Load's original
 // (returning to 0x820EF3A8) and AccessorySkeleton::SetUp's (0x820EF3CC).
-accessories::FinishCalls FinishGuestCalls(lifted::Regs& ctx, uint8_t* base,
-                                          ModelLoadGuest& model_load) {
+accessories::FinishCalls FinishGuestCalls(lifted::Regs& ctx, ModelLoadGuest& model_load) {
   accessories::FinishCalls calls;
   calls.model_load = model_load.Calls();
-  calls.load = [&ctx, base](uint32_t model, uint32_t file, uint32_t xpr, uint32_t frame) {
+  calls.load = [&ctx](uint32_t model, uint32_t file, uint32_t xpr, uint32_t frame) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = model;
     ctx.r4.u64 = file;
     ctx.r5.u64 = xpr;
     ctx.lr = 0x820EF3A8;
-    lifted::original::c82596920(ctx, base);
+    lifted::original::c82596920(ctx);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
-  calls.set_up = [&ctx, base](uint32_t skeleton, uint32_t frame) -> uint32_t {
+  calls.set_up = [&ctx](uint32_t skeleton, uint32_t frame) -> uint32_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = skeleton;
     ctx.lr = 0x820EF3CC;
-    lifted::original::c820F0070(ctx, base);
+    lifted::original::c820F0070(ctx);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u32;
@@ -237,22 +234,22 @@ accessories::FinishCalls FinishGuestCalls(lifted::Regs& ctx, uint8_t* base,
 
 }  // namespace
 
-bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory) {
+bool AccessoriesFinishNative(uint32_t accessory) {
   return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
-         accessories::Finishable(base, accessory);
+         accessories::Finishable(accessory);
 }
 
 ITC_REGS_STEP(AccessoryFinish) {
-  if (!AccessoriesFinishNative(base, ctx.r3.u32)) {
-    lifted::original::c820EF368(ctx, base);
+  if (!AccessoriesFinishNative(ctx.r3.u32)) {
+    lifted::original::c820EF368(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
-  ModelLoadGuest model_load{ctx, base};
+  ModelLoadGuest model_load{ctx};
   bool ran_load = false;
   const uint32_t r3 =
-      accessories::AccessoryFinish(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
-                                   FinishGuestCalls(ctx, base, model_load), &ran_load);
+      accessories::AccessoryFinish(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                   FinishGuestCalls(ctx, model_load), &ran_load);
   if (ran_load) {
     ctx.fpscr.disableFlushMode();  // as Model::Load's adapter leaves it
   }
@@ -262,15 +259,15 @@ ITC_REGS_STEP(AccessoryFinish) {
 
 ITC_REGS_STEP(AccessoryEntryOnLoaded) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
-    lifted::original::c820F0820(ctx, base);
+    lifted::original::c820F0820(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
-  ModelLoadGuest model_load{ctx, base};
+  ModelLoadGuest model_load{ctx};
   bool ran_load = false;
-  const uint64_t r3 = accessories::EntryOnLoaded(base, ctx.r6.u32, ctx.r1.u32,
-                                                 FinishGuestCalls(ctx, base, model_load),
-                                                 AccessoryTextureSet(ctx, base), &ran_load);
+  const uint64_t r3 = accessories::EntryOnLoaded(ctx.r6.u32, ctx.r1.u32,
+                                                 FinishGuestCalls(ctx, model_load),
+                                                 AccessoryTextureSet(ctx), &ran_load);
   if (ran_load) {
     ctx.fpscr.disableFlushMode();
   }
@@ -280,34 +277,34 @@ ITC_REGS_STEP(AccessoryEntryOnLoaded) {
 
 // --- The acquisition ---
 
-bool AccessoriesAcquireNative(uint8_t* base) {
+bool AccessoriesAcquireNative() {
   return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
-         accessories::AccessoryConstructible(base);
+         accessories::AccessoryConstructible();
 }
 
 // Accessories::Acquire: r3 the set, r4 the index, r5 the texture index; r3
 // the accessory or 0.
 ITC_REGS_STEP(AccessoriesAcquire) {
-  if (!AccessoriesAcquireNative(base)) {
-    lifted::original::c820F0EB8(ctx, base);
+  if (!AccessoriesAcquireNative()) {
+    lifted::original::c820F0EB8(ctx);
     return;
   }
   const uint32_t set = ctx.r3.u32;
   const int32_t index = ctx.r4.s32;
-  if (index != 3 && guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu)) == 0) {
+  if (index != 3 && guest::LoadU32(set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu)) == 0) {
     ctx.fpscr.disableFlushMode();  // as AccessoryEntry::New's register step leaves it
   }
-  ctx.r3.u64 = accessories::SetAcquire(base, set, index, ctx.r5.u32, ctx.r1.u32,
-                                       NativeArchiveLoad(base), AccessoryTextureSet(ctx, base));
+  ctx.r3.u64 = accessories::SetAcquire(set, index, ctx.r5.u32, ctx.r1.u32,
+                                       NativeArchiveLoad(), AccessoryTextureSet(ctx));
 }
 
 ITC_REGS_STEP(MatrixFromScaleRotationTranslation) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::original::c820EF660(ctx, base);
+    lifted::original::c820EF660(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::FromScaleRotationTranslation(base, ctx.r3.u32, ctx.r4.u32,
+  ctx.r3.u64 = accessories::FromScaleRotationTranslation(ctx.r3.u32, ctx.r4.u32,
                                                          ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();  // as the original's last lfs
 }
@@ -317,7 +314,7 @@ ITC_REGS_STEP(MatrixFromScaleRotationTranslation) {
 // Defines an adapter: the flag, else the original.
 #define ITC_ACCESSORIES(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_accessories)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)

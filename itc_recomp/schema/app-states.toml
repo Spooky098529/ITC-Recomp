@@ -22,8 +22,16 @@ measure = "App"
 measures = ["AppStates.+4", "App::FrameDriver.r3"]
 size = 132
 origin = "allocated"
+storage = "host"
+host_alloc = [0x82094AD4]
 vtable = 0x82000EA0
 fields = [
+  { name = "handlers_map", offset = 28, type = "embed", to = "HandlerMap", note = "the handler map run while the toggle is clear" },
+  { name = "toggled_handlers_map", offset = 40, type = "embed", to = "HandlerMap", note = "the handler map run while the toggle is set" },
+  { name = "always_handlers_map", offset = 52, type = "embed", to = "HandlerMap", note = "the handler map run every pass" },
+  { name = "listeners_map", offset = 64, type = "embed", to = "HandlerMap", note = "the listener map" },
+  { name = "messages_vector", offset = 76, type = "embed", to = "MessageVector", note = "the message vector" },
+  { name = "requests_vector", offset = 96, type = "embed", to = "RequestVector", note = "the request vector" },
   { name = "vtable", offset = 0, type = "ptr", to = "AppVtable", note = "0x82000EA0" },
   { name = "fault_for_each_result_0", offset = 0, type = "u64", note = "measure fault: App::ForEachMessage's and ForEachRequest's r3 is the result functor, not the app" },
   { name = "vtable_4", offset = 4, type = "u32", note = "the +4 interface's: 0x82000E94 (base 0x82000ABC)" },
@@ -80,7 +88,10 @@ fields = [
 measure = "AppStates::OnMessage.r4"
 size = 112
 origin = "embedded"
+storage = "dual"
 fields = [
+  { name = "messages_vector", offset = 56, type = "embed", to = "MessageVector", note = "the app's message vector" },
+  { name = "requests_vector", offset = 76, type = "embed", to = "RequestVector", note = "the app's request vector" },
   { name = "vtable", offset = 0, type = "ptr", to = "AppInterfaceVtable" },
   { name = "messages", offset = 56, type = "u32", note = "the app's message vector (app + 76)" },
   { name = "requests", offset = 76, type = "u32", note = "the app's request vector (app + 96)" },
@@ -112,6 +123,7 @@ fields = [
 measure = "App.+24"
 size = 4
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppFrameworkIfaceVtable" },
 ]
@@ -129,6 +141,7 @@ fields = [
 measures = ["App.+32", "App.+44", "App.+56", "App.+68"]
 size = 12
 origin = "allocated"
+storage = "dual"
 fields = [
   { name = "left", offset = 0, type = "u32", note = "the leftmost node (begin)" },
 ]
@@ -157,6 +170,8 @@ fields = [
 measures = ["App::AddHandler.r5", "App::AddToggledHandler.r5", "App::AddAlwaysHandler.r5", "App::AddListener.r5", "new<12>@Delegate::Clone"]
 size = 12
 origin = "allocated"
+storage = "dual"
+host_alloc = [0x820ACA64]
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppDelegateVtable", note = "0x82002850 (base 0x82000ABC)" },
   { name = "object", offset = 4, type = "u32" },
@@ -179,6 +194,7 @@ fields = [
 measure = "MessageVector"
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "fault_result", offset = 0, type = "u64", note = "measure fault: Erase's and Insert's r3 is the result iterator (vector, element), not the vector" },
   { name = "first", offset = 4, type = "ptr", to = "AppMessageWord" },
@@ -191,6 +207,8 @@ fields = [
 measures = ["AppStates", "App.+96", "sub_820AD8D0.ret"]
 size = 12
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820AE4B4]
 vtable = 0x820028F8
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "AppStatesVtable" },
@@ -224,8 +242,13 @@ fields = [
 measures = ["StateLayer", "AppStates.+8", "sub_820ADBD8.r3", "sub_820AD350.ret", "sub_820AD5B0.r3", "sub_820AD8D0.r3", "sub_820ADA70.r3", "sub_820ADB28.r3", "sub_820ADB80.r3", "sub_820ACD60.r4", "sub_820ACD80.r4", "sub_820ACDE8.r4", "StateLayer::AddChild.r4"]
 size = 48
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820ADE34, 0x820AE14C, 0x820AE374]
 vtable = 0x820028E0
 fields = [
+  { name = "children_list", offset = 12, type = "embed", to = "PtrList", note = "the child layers" },
+  { name = "states_list", offset = 24, type = "embed", to = "PtrList", note = "the states, the top at the front" },
+  { name = "ops_list", offset = 36, type = "embed", to = "OpList", note = "the queued operations" },
   { name = "vtable", offset = 0, type = "u32", note = "0x820028E0" },
   { name = "state_vtable", offset = 4, type = "ptr", to = "AppStateVtable", note = "0x820028B0 (the state base's 0x82002880 first): the layer + 4 is a state" },
   { name = "owner", offset = 8, type = "u32", note = "the app's interface at app + 16 (the app's slot 2)" },
@@ -275,6 +298,7 @@ measure = "PtrList"
 measures = ["PtrList::Erase.r4", "PtrList::PtrList.r3"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: PtrList::ForEach's and Erase's r3 is the result (functor or iterator), not the list; HandleList::Remove's and sub_82118850's reads are an iterator's" },
   { name = "head", offset = 4, type = "ptr", to = "StateListNode", note = "the head node (new<?>@PtrList::AllocateNodes, input's)" },
@@ -301,6 +325,7 @@ measure = "OpList"
 measures = ["OpList::IncSize.r3"]
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "fault_result_0", offset = 0, type = "u64", note = "measure fault: OpList::ForEach's r3 is the result functor, not the list" },
   { name = "head", offset = 4, type = "ptr", to = "AppOpListNode" },
@@ -313,12 +338,14 @@ fields = [
 measures = ["OpList::BuyNode.ret", "OpList::BuyNode.ret.+4", "StateLayer.+40", "sub_820ADA70.r3.+40", "sub_820ADB28.r3.+40", "sub_820ADB80.r3.+40", "new<?>@OpList::AllocateNodes"]
 size = 16
 origin = "allocated"
+storage = "host"
+host_alloc = [0x820ACF70]
 fields = [
   { name = "next", offset = 0, type = "ptr", to = "AppOpListNode" },
   { name = "previous", offset = 4, type = "ptr", to = "AppOpListNode" },
-  { name = "op", offset = 8, type = "u64", note = "the operation: its type (high word), then a state" },
   { name = "op_type", offset = 8, type = "u32", note = "0 add a child layer, 1 pop, 2 push, 3 replace" },
   { name = "op_state", offset = 12, type = "u32" },
+  { name = "op", offset = 8, type = "u64", note = "the operation: its type (high word), then a state (in host memory the two words are the members: read them, not this doubleword)" },
 ]
 
 # An operation by address (OpList::BuyNode's r6).
@@ -378,6 +405,7 @@ fields = [
 measure = "App::SceneFromInterface16.r3@-8"
 size = 20
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_16", offset = 16, type = "u32" },
 ]
@@ -387,6 +415,7 @@ fields = [
 measure = "App::SendMessage.r3@+56"
 size = 16
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },
@@ -407,6 +436,7 @@ fields = [
 measure = "App@+76"
 size = 12
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
   { name = "unknown_8", offset = 8, type = "u32" },

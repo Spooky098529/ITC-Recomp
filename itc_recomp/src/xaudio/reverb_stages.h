@@ -19,20 +19,20 @@ namespace xaudio {
 // (out[0] the last output kept at +20, then a frame each; four at a time,
 // then one at a time): the state +16 and +20, the gains from +24 and +28
 // (1 - +28, the float at 0x82000A30).
-void ReverbLowPass(uint8_t* base, uint32_t state, uint32_t in, uint32_t out, uint32_t count);
+void ReverbLowPass(uint32_t state, uint32_t in, uint32_t out, uint32_t count);
 
 // sub_82462CF8 (512 entries) and sub_82463060 (2,048 entries): a delay line
 // at +44 written at +36 (a block of 256 from `in`, the index moved on by 256
 // and wrapped), read at three taps (+36 less +0, +12 and +24): `out_a` gets
 // the first tap x +16 plus the second x +4 (`fmadds`), `out_b` the third x
 // +28, each after the last block's (+8 and +32).
-void ReverbDelay512(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
-void ReverbDelay2048(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
+void ReverbDelay512(uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
+void ReverbDelay2048(uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
 
 // sub_82463578: a 1,024-entry delay line at +32 written at +24, two taps
 // (+24 less +0 and +12) x +4 and x +16 to `out_a` and `out_b`, each after the
 // last block's (+8 and +20).
-void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
+void ReverbDelay1024(uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
 
 // The all-pass stages: the state +0 the tap, +4 and +8 the gains, +12 the
 // last output, +16 the write index, the line at +24. Over a block of 256
@@ -42,14 +42,14 @@ void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, 
 // the block's last kept in +12 and also stored one past the block's end).
 // sub_82462DC8 (128 entries, in place): the first 128 written from the
 // write index, the second from the line's start; the write index 0 after.
-void ReverbAllPass128(uint8_t* base, uint32_t state, uint32_t in);
+void ReverbAllPass128(uint32_t state, uint32_t in);
 // sub_82463130 (256 entries) and sub_824632A0 (512), in place: the write
 // index wrapped at 0xFF and 0x1FF (so kept).
-void ReverbAllPass256(uint8_t* base, uint32_t state, uint32_t in);
-void ReverbAllPass512(uint8_t* base, uint32_t state, uint32_t in);
+void ReverbAllPass256(uint32_t state, uint32_t in);
+void ReverbAllPass512(uint32_t state, uint32_t in);
 // sub_82463410 (512 entries): the outputs to `out`, the block's last also
 // stored one past `in`'s end.
-void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out);
+void ReverbAllPass512To(uint32_t state, uint32_t in, uint32_t out);
 
 // The crossfading delay lines: the state +4 the crossfade's position (1.0
 // down to 0.0, a step of the float at 0x82002CC4 a frame), +8 the tap faded
@@ -66,10 +66,10 @@ void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out
 // sub_824624F8: 16,384 entries (the core's +104 and +0x10088).
 // `r3` the state (all 64 bits); returns r3 as the original leaves it (a
 // scratch value in some paths).
-uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3, uint32_t in, uint32_t out, uint32_t sp);
+uint64_t ReverbCrossfadeDelay(uint64_t r3, uint32_t in, uint32_t out, uint32_t sp);
 // sub_82463620: 256 entries; its frame-at-a-time fade weights the taps the
 // other way round, as the original does (called with `out` = `in` - 8).
-void ReverbCrossfadeDelay256(uint8_t* base, uint32_t state, uint32_t in, uint32_t out,
+void ReverbCrossfadeDelay256(uint32_t state, uint32_t in, uint32_t out,
                              uint32_t sp);
 
 }  // namespace xaudio

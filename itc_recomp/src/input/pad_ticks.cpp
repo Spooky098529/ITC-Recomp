@@ -2,6 +2,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "guest.h"
+#include "memory/mapping.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -183,7 +185,17 @@ void PadTicks_OnRaceEntered() {
 void PadTicks_OnRaceStarted() {
   std::lock_guard lock(g_mutex);
   Load();
+  const size_t n = g_starts;
   OnMark(Mark::kStart, g_starts++, "started");
+  // The game's own random generator (sub_82293568's seed) lined up at each
+  // race's start too, as the reads are: the camera shake draws from it on
+  // every tick of the race's loading, whose length varies from run to run
+  // and build to build, so the draws after it (the next race's traffic)
+  // would otherwise move with the load times. Recording and playback alike.
+  if (g_playing || g_record) {
+    constexpr uint32_t kGameRandSeed = 0x82638188;  // race-overlays.toml's rand_seed
+    guest::StoreU32(kGameRandSeed, 0x1234567u + uint32_t(n));
+  }
 }
 
 }  // namespace input

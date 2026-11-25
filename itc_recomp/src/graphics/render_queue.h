@@ -38,27 +38,27 @@ using SingleCommand =
 
 // RenderQueue::Flip (sub_8258E5E0, slot 6): the state's +0 (the replay
 // index) = 1 when it was 0, else 0.
-void Flip(uint8_t* base, uint32_t queue);
+void Flip(uint32_t queue);
 // RenderQueue::Recording (sub_8258E5F8, slot 7): the pass list being
 // recorded, +12 when the replay index is 0, else +8.
-uint32_t Recording(uint8_t* base, uint32_t queue);
+uint32_t Recording(uint32_t queue);
 // RenderQueue::Replaying (sub_8258E618, slot 8): the word at +8 + 4 x the
 // replay index.
-uint32_t Replaying(uint8_t* base, uint32_t queue);
+uint32_t Replaying(uint32_t queue);
 // QueueEntry::Sequence (sub_8258E5C0): the float at the entry's +8.
-float Sequence(uint8_t* base, uint32_t entry);
+float Sequence(uint32_t entry);
 
 // RenderQueue::ClearRecording (sub_8258ED78, slot 2), from its caller's
 // stack pointer `sp`: the list the queue's slot 7 returns emptied
 // (PassList::Clear), then the state's +84 = 0.0 (0x82000A34). Returns r3
 // as the original leaves it (the list).
-uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestCall& call);
+uint32_t ClearRecording(uint32_t queue, uint32_t sp, const GuestCall& call);
 
 // RenderQueue::Init (sub_8258ED00, slot 0): the drawer's (state + 4) slot
 // 0, PrimitiveDrawer::Init, with r4 = the device; state +48 + 4 x i =
 // Device::GetRenderTarget(device, i) for i 0 to 3, +64 =
 // GetDepthStencilSurface(device). Returns r3 (the depth surface).
-uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call);
+uint32_t Init(uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call);
 
 // PassList::Add (sub_8258EB88), a leaf from its caller's frame `sp`:
 // `chunk_key` = {the chunk, the key's bits} and `sequence` = {the
@@ -69,7 +69,7 @@ uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const
 // 0, +4 = the chunk, +8 = the key, +12 = the sequence, appended to the
 // bucket (+24 + 16 x bucket: +0 the first when empty, else the last's +0;
 // +4 the last; +12 += 1); +16 += 1; returns 1.
-uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t sequence,
+uint32_t PassListAdd(uint32_t list, uint64_t chunk_key, uint64_t sequence,
                      uint32_t bucket, uint32_t sp);
 
 // RenderQueue::Add (sub_8258EDC8, slot 4): `chunk` (or 0) into `bucket`
@@ -81,7 +81,7 @@ uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t 
 // PassList::Add on the list the queue's slot 7 returns; then the sequence
 // += 0.1 (0x82001FBC, single precision). Returns r3 as the original leaves
 // it (PassList::Add's answer).
-std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t bucket,
+std::optional<uint32_t> Add(uint32_t queue, uint32_t chunk, uint32_t bucket,
                             double key, uint32_t sp, const GuestCall& call);
 
 // PtrVector::PushBack (sub_82591540, std::vector<T*>::push_back): r3 = the
@@ -92,13 +92,13 @@ std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint3
 // last, where the answer goes); returns that address (the original's r3).
 // nullopt where the original must run (no `may_allocate`, or
 // TextureProvider::InsertN's refusal, models/texture_provider.h).
-std::optional<uint32_t> PushBack(uint8_t* base, uint32_t vector, uint32_t value, uint32_t sp,
+std::optional<uint32_t> PushBack(uint32_t vector, uint32_t value, uint32_t sp,
                                  bool may_allocate);
 // PtrVector::Insert (sub_825911C8, std::vector<T*>::insert): the index
 // (where - first; 0 for an empty vector), TextureProvider::InsertN(vector,
 // where, 1, the value at `value`), then [answer] = first + 4 x the index;
 // returns `answer`. nullopt (nothing changed) where InsertN refuses.
-std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t vector,
+std::optional<uint32_t> PtrVectorInsert(uint32_t answer, uint32_t vector,
                                         uint32_t where, uint32_t value);
 
 // --- The replay ---
@@ -112,11 +112,11 @@ std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t
 // swapped; returns i. The getters RigidBody::Mass (0x820B6708) and
 // QueueEntry::Sequence (0x8258E5C0) are read natively, any other is a guest
 // call.
-int32_t Partition(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
+int32_t Partition(uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
                   uint32_t sp, const GuestCall& call);
 // RenderQueue::QuickSort (sub_82590CB0), in its 128-byte frame: while lo <
 // hi, p = Partition, QuickSort(lo, p - 1), lo = p + 1.
-void QuickSort(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
+void QuickSort(uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
                uint32_t sp, const GuestCall& call);
 // ChunkChain::Run (sub_8258EE98), in its 96-byte frame: while `item` isn't
 // 0, its kind (the first word's low halfword, sign-extended): 0 the single
@@ -129,7 +129,7 @@ void QuickSort(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t g
 // where it answers nullopt) and 0x8265EDE0 (r3 = the payload, r4 and r5 the
 // slot's +4 and +8; until id 36) as guest calls, where the native
 // renderer's and the stats' wrappers see them.
-void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
+void ChunkChainRun(uint32_t queue, uint32_t item, uint32_t sp,
                    const GuestCall& call, const SingleCommand& single);
 // RenderQueue::Replay (sub_82591238, slot 5): r3 = the queue, r4 = the
 // device, r5 = the video output, in its 192-byte frame: the globals the
@@ -143,7 +143,7 @@ void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
 // chunk run (ChunkChain::Run); then the release list's objects' slot 0 with
 // r4 = 1, each element then 0; [0x8296BD90] = 0. r3 isn't returned (its
 // caller, Scene::Draw, doesn't read it).
-void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_output, uint32_t sp,
+void Replay(uint32_t queue, uint32_t device, uint32_t video_output, uint32_t sp,
             const GuestCall& call, const SingleCommand& single);
 
 }  // namespace graphics::render_queue

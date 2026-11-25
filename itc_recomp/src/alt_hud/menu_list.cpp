@@ -25,18 +25,19 @@ constexpr uint32_t kPressedSlot = 0x8210BF40;  // ActionMapper::Pressed, slot 10
 
 }  // namespace
 
-bool MenuListReleasable(uint8_t* base, uint32_t list) {
-  const uint32_t block = schema::MenuList(base, list).enabled().address;
+bool MenuListReleasable(uint32_t list) {
+  const uint32_t block = schema::MenuList(list).enabled().address;
   return block == 0 || memory::IsPages(block);
 }
 
-std::optional<uint32_t> MenuListRelease(uint8_t* base, uint32_t list, uint32_t sp) {
-  if (!MenuListReleasable(base, list)) {
+std::optional<uint32_t> MenuListRelease(uint32_t list,
+                                        [[maybe_unused]] uint32_t sp) {
+  if (!MenuListReleasable(list)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8220BBB0 MenuList::Release");
-  guest::StoreU32(base, sp - 96, sp);
-  const schema::MenuList menu(base, list);
+  // No frame (E5 step 6): the original's held only its back chain.
+  const schema::MenuList menu(list);
   const uint32_t block = menu.enabled().address;
   if (block == 0) {
     return 0;
@@ -46,24 +47,25 @@ std::optional<uint32_t> MenuListRelease(uint8_t* base, uint32_t list, uint32_t s
   return 1;
 }
 
-uint32_t MenuListPressedX(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint32_t MenuListPressedX(uint32_t list, uint32_t sp, bool native_slots,
                           const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220BF00 MenuList::PressedX");
-  const uint32_t frame = sp - 96;
-  guest::StoreU32(base, frame, sp);
-  const schema::MenuList menu(base, list);
-  const uint32_t index = guest::LoadU32(base, menu.player() * 4 + RC::player_entries_address());
-  const schema::PlayerMapperEntry entry(base, index * 8 + RC::mapper_entries_address());
+  // No frame (E5 step 6): the slot's call made from `sp` (no stack
+  // arguments; it reads none of the caller's frame).
+  const uint32_t frame = sp;
+  const schema::MenuList menu(list);
+  const uint32_t index = guest::LoadU32(menu.player() * 4 + RC::player_entries_address());
+  const schema::PlayerMapperEntry entry(index * 8 + RC::mapper_entries_address());
   if (int32_t(entry.unread()) == 1) {
     return 0;
   }
   const uint32_t mapper = entry.mapper().address;
   // ActionMapper's vtable slot 10 (+40): no schema type for the vtable.
   const uint32_t function =
-      guest::LoadU32(base, schema::ActionMapper(base, mapper).vtable() + 40);
+      guest::LoadU32(schema::ActionMapper(mapper).vtable() + 40);
   uint64_t r3;
   if (native_slots && function == kPressedSlot) {
-    r3 = action_mappers::Pressed(base, mapper, kActionX);
+    r3 = action_mappers::Pressed(mapper, kActionX);
     // The read slots' adapters' line for --log_pause_menu.
     debug::PauseMenuLog_NoteSlotRead(10, mapper, kActionX, 0x8220BF5C, double(uint32_t(r3)));
   } else {

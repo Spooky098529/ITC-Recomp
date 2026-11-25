@@ -12,6 +12,8 @@
 #include "guest.h"
 #include "schema/car_makers.h"
 
+#include <optional>
+
 namespace tuning_screen {
 
 namespace {
@@ -222,25 +224,88 @@ constexpr uint32_t kGroups[23] = {3472, 3568, 0,    0,    3952, 3664, 4144, 3760
 
 }  // namespace
 
-uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t item,
+namespace {
+
+// The frame's image (E5 step 6: a C++ table built once in place of the
+// original's 1,100 stores on every call): each word's kind and value by its
+// offset / 4. Pointer words hold a frame offset (their value the frame's
+// address plus it); the back chain (offset 0) holds `sp`.
+struct Image {
+  enum Kind : uint8_t { kUnwritten, kConstant, kPointer, kBackChain };
+  Kind kind[kFrameBytes / 4] = {};
+  uint32_t value[kFrameBytes / 4] = {};
+};
+
+const Image& FrameImage() {
+  static const Image image = [] {
+    Image i;
+    i.kind[0] = Image::kBackChain;
+    for (const Run& run : kRuns) {
+      for (uint32_t k = 0; k < run.count; k++) {
+        i.kind[(run.offset + 4 * k) / 4] = Image::kConstant;
+        i.value[(run.offset + 4 * k) / 4] = kWords[run.first + k];
+      }
+    }
+    for (const Pointer& pointer : kPointers) {
+      i.kind[pointer.offset / 4] = Image::kPointer;
+      i.value[pointer.offset / 4] = pointer.target;
+    }
+    return i;
+  }();
+  return image;
+}
+
+}  // namespace
+
+uint64_t AeroPartValue(uint32_t screen, uint64_t type, uint64_t item,
                        uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821DE2D8 TuningScreen::AeroPartValue");
+  // The original's frame below `sp`, its words read from the image; a read
+  // outside the words it writes (type or item out of range: unchecked) reads
+  // the stack there, as the original's.
   const uint32_t frame = sp - kFrameBytes;
-  guest::StoreU32(base, frame, sp);
-  for (const Run& run : kRuns) {
-    for (uint32_t k = 0; k < run.count; k++) {
-      guest::StoreU32(base, frame + run.offset + 4 * k, kWords[run.first + k]);
+  const Image& image = FrameImage();
+  // The word at frame offset `offset` (aligned, in the frame), if written.
+  const auto word = [&](uint32_t offset) -> std::optional<uint32_t> {
+    switch (image.kind[offset / 4]) {
+      case Image::kConstant: return image.value[offset / 4];
+      case Image::kPointer: return frame + image.value[offset / 4];
+      case Image::kBackChain: return sp;
+      case Image::kUnwritten: break;
     }
-  }
-  for (const Pointer& pointer : kPointers) {
-    guest::StoreU32(base, frame + pointer.offset, frame + pointer.target);
-  }
-  const uint32_t id = schema::CarMakersCar(base, SelectedGarageCar(base, screen) + 212).car_id();
+    return std::nullopt;
+  };
+  const auto load = [&](uint32_t address) -> uint32_t {
+    const uint32_t offset = address - frame;
+    if (offset < kFrameBytes && (offset & 3) == 0) {
+      if (const auto w = word(offset)) {
+        return *w;
+      }
+      return guest::LoadU32(address);
+    }
+    if (offset >= kFrameBytes && offset <= 0xFFFFFFFCu) {  // no byte in the frame
+      return guest::LoadU32(address);
+    }
+    // Unaligned, or across the frame's end: byte by byte (big-endian).
+    uint32_t value = 0;
+    for (uint32_t k = 0; k < 4; k++) {
+      const uint32_t at = offset + k;
+      std::optional<uint32_t> w;
+      if (at < kFrameBytes) {
+        w = word(at & ~3u);
+      }
+      const uint8_t b = w ? uint8_t(*w >> (24 - 8 * (at & 3)))
+                          : guest::LoadU8(address + k);
+      value = (value << 8) | b;
+    }
+    return value;
+  };
+  const uint32_t id = schema::CarMakersCar(SelectedGarageCar(screen) + 212).car_id();
   if (id > 22 || kGroups[id] == 0) {
     return ~uint64_t(0);
   }
-  const uint32_t array = guest::LoadU32(base, frame + kGroups[id] + uint32_t(type) * 4);
-  return guest::LoadU32(base, array + uint32_t(item) * 4);
+  const uint32_t array = load(frame + kGroups[id] + uint32_t(type) * 4);
+  return load(array + uint32_t(item) * 4);
 }
 
 }  // namespace tuning_screen

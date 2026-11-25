@@ -20,7 +20,7 @@ constexpr uint32_t kXprData = 8;
 constexpr uint32_t kXprDataAttributes = 0x807F0000;
 
 // sub_82596E68 XPR::XPR: the six words = 0.
-void XprConstruct(uint8_t* base, uint32_t xpr);
+void XprConstruct(uint32_t xpr);
 
 // sub_825970A8 XPR::Release: the header block put off (Memory::FreeLater)
 // when there is one, +0 and +4 = 0, the data block put off
@@ -28,17 +28,17 @@ void XprConstruct(uint8_t* base, uint32_t xpr);
 // = 0. Returns the original's r3 (FreePhysicalLater's, or 0 with no data
 // block); nullopt, with nothing done, where the original must run (the
 // pending frees can't take both blocks natively).
-std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr);
+std::optional<uint32_t> XprRelease(uint32_t xpr);
 
 // sub_82597148 XPR::~XPR: a jump to XPR::Release.
-std::optional<uint32_t> XprDestruct(uint8_t* base, uint32_t xpr);
+std::optional<uint32_t> XprDestruct(uint32_t xpr);
 
 // sub_8235A990 TextureHeader::Relocate: `base_address` added to the upper
 // 20 bits of the header's +0x20 (the low 12 kept), and when the header has
 // more than one mip level (sub_822A5B68: ((+44 >> 6) & 0xF) + 1, merged
 // here) `mip_address` to +0x30's the same way. Returns the level count (the
 // r3 the original leaves).
-uint32_t RelocateTexture(uint8_t* base, uint32_t header, uint32_t base_address,
+uint32_t RelocateTexture(uint32_t header, uint32_t base_address,
                          uint32_t mip_address);
 
 // sub_8235A9F8 Resource::Relocate (probably): by the resource's type
@@ -47,7 +47,7 @@ uint32_t RelocateTexture(uint8_t* base, uint32_t header, uint32_t base_address,
 // (the mip address 0 when +48's upper 20 bits are 0); the others nothing.
 // Returns the r3 the original leaves: the level count after a relocation,
 // else the type.
-uint32_t RelocateResource(uint8_t* base, uint32_t resource, uint32_t address);
+uint32_t RelocateResource(uint32_t resource, uint32_t address);
 
 // sub_82596F68 XPR::Create: `file` an XPR2 bundle; anything else gets the
 // original's debug message (logged) and 0x80004005. Else +4 and +12 the
@@ -62,13 +62,13 @@ uint32_t RelocateResource(uint8_t* base, uint32_t resource, uint32_t address);
 // --native_memcpy off. Only over the allocation layer with the memory
 // blocks' host lock (the adapter's condition).
 constexpr uint32_t kXprDataAllocation = 0xBC7F0000;
-std::optional<uint32_t> XprCreate(uint8_t* base, uint32_t xpr, uint32_t file);
+std::optional<uint32_t> XprCreate(uint32_t xpr, uint32_t file);
 
 // sub_82597118 XPR::GetTexture: the `index`-th record's resource header,
 // the header block (+0) plus the record's +4 (the records at +16, 16 bytes
 // each); an index not below the count (+20) gives record 0. Any record
 // type. A leaf: no stores. The sum is 64-bit, as the original's add of the
 // two zero-extended words leaves r3 (a carry reaches bit 32).
-uint64_t XprGetTexture(uint8_t* base, uint32_t xpr, uint32_t index);
+uint64_t XprGetTexture(uint32_t xpr, uint32_t index);
 
 }  // namespace models

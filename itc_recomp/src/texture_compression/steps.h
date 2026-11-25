@@ -19,8 +19,8 @@
 
 namespace texture_compression::steps {
 
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+inline double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
 inline double Fmuls(double a, double b) {
   return double(float(a * b));

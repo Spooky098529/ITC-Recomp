@@ -28,27 +28,27 @@ ITC_FLAG_BOOL(native_race_hud, true, "ITC",
 // draw only). The original's tail calls keep lr, r1 and r4; state 1's
 // (sub_82212908, merged) runs UiMovie::Run from its 112-byte frame.
 ITC_NATIVE_ENTRY(822141E8, ITC_FLAG(native_race_hud)) {
-  const race_hud::HudMovie movie = race_hud::RunMovie(base, ctx.r3.u32);
+  const race_hud::HudMovie movie = race_hud::RunMovie(ctx.r3.u32);
   switch (movie.call) {
     case race_hud::HudCall::kNone:
       return;
     case race_hud::HudCall::kRun:
       ctx.r3.u64 = movie.movie;
-      lifted::Enter(ctx, base, game::UiMovie::Run);
+      lifted::Enter(ctx, game::UiMovie::Run);
       return;
     case race_hud::HudCall::kDraw:
       ctx.r3.u64 = movie.movie;
-      lifted::Enter(ctx, base, game::UiMovie::Draw_8211D280);
+      lifted::Enter(ctx, game::UiMovie::Draw_8211D280);
       return;
     case race_hud::HudCall::kState3:
       // Never seen in play: the original, r3 and r4 as they came.
-      lifted::Enter(ctx, base, lifted::e82212958);
+      lifted::Enter(ctx, lifted::e82212958);
       return;
     case race_hud::HudCall::kRunTimer: {
       const uint64_t lr = ctx.lr;
-      guest_call::InFrame(ctx, base, 112, 0x8221293C, [&](uint32_t) {
+      guest_call::InFrame(ctx, 112, 0x8221293C, [&](uint32_t) {
         ctx.r3.u64 = movie.movie;
-        lifted::Enter(ctx, base, game::UiMovie::Run);
+        lifted::Enter(ctx, game::UiMovie::Run);
       });
       ctx.lr = lr;
       return;
@@ -62,28 +62,28 @@ namespace race_hud_hooks {
 // and the finished flag set. From a frame like the original's (112 bytes).
 ITC_REGS_STEP(DrawRivalLogo) {
   if (!ITC_FLAG(native_race_hud)) {
-    lifted::original::c82211A28(ctx, base);
+    lifted::original::c82211A28(ctx);
     return;
   }
   const uint32_t entry = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 112, 0x82211A64, [&](uint32_t frame) {
-    const std::optional<uint32_t> movie = race_hud::RivalLogoMovie(base, entry, frame);
+  guest_call::InFrame(ctx, 112, 0x82211A64, [&](uint32_t frame) {
+    const std::optional<uint32_t> movie = race_hud::RivalLogoMovie(entry, frame);
     if (!movie) {
       return;
     }
     ctx.r3.u64 = *movie;
     ctx.r4.u64 = 0;
     ctx.lr = 0x82211A74;
-    lifted::Enter(ctx, base, game::UiMovie::Run);
+    lifted::Enter(ctx, game::UiMovie::Run);
     if (ctx.r3.u32 != 0) {
       return;
     }
     ctx.r3.u64 = *movie;
-    ctx.r4.u64 = schema::RivalLogo(base, entry).movie();
+    ctx.r4.u64 = schema::RivalLogo(entry).movie();
     ctx.lr = 0x82211A88;
-    lifted::Enter(ctx, base, game::UiMovie::FinishNamed);
-    race_hud::RivalLogoFinished(base, entry);
+    lifted::Enter(ctx, game::UiMovie::FinishNamed);
+    race_hud::RivalLogoFinished(entry);
   });
   ctx.lr = lr;
 }

@@ -12,23 +12,23 @@
 namespace hooks {
 
 // The machine's handlers (r3 the machine, r4 the mode where read).
-void UserInfoCreate(lifted::Regs& ctx, uint8_t* base);
-void UserInfoOpenMovie(lifted::Regs& ctx, uint8_t* base);
-void UserInfoWaitForLoad(lifted::Regs& ctx, uint8_t* base);
-void UserInfoReenter(lifted::Regs& ctx, uint8_t* base);
-void UserInfoClose(lifted::Regs& ctx, uint8_t* base);
-void UserInfoDestroy(lifted::Regs& ctx, uint8_t* base);
-void UserInfoUpdatePage(lifted::Regs& ctx, uint8_t* base);
-void UserInfoUpdate(lifted::Regs& ctx, uint8_t* base);
+void UserInfoCreate(lifted::Regs& ctx);
+void UserInfoOpenMovie(lifted::Regs& ctx);
+void UserInfoWaitForLoad(lifted::Regs& ctx);
+void UserInfoReenter(lifted::Regs& ctx);
+void UserInfoClose(lifted::Regs& ctx);
+void UserInfoDestroy(lifted::Regs& ctx);
+void UserInfoUpdatePage(lifted::Regs& ctx);
+void UserInfoUpdate(lifted::Regs& ctx);
 // The page (r3 the mode) and its helper (no arguments).
-void UserInfoMenuPage(lifted::Regs& ctx, uint8_t* base);
-void UserInfoSetPlayTimeText(lifted::Regs& ctx, uint8_t* base);
+void UserInfoMenuPage(lifted::Regs& ctx);
+void UserInfoSetPlayTimeText(lifted::Regs& ctx);
 // The transitions (r3 the started word's address) and the texts (no
 // arguments).
-void UserInfoOpening(lifted::Regs& ctx, uint8_t* base);
-void UserInfoClosing(lifted::Regs& ctx, uint8_t* base);
-void UserInfoSetTexts(lifted::Regs& ctx, uint8_t* base);
+void UserInfoOpening(lifted::Regs& ctx);
+void UserInfoClosing(lifted::Regs& ctx);
+void UserInfoSetTexts(lifted::Regs& ctx);
 // InitStates (r3 the machine).
-void UserInfoInitStates(lifted::Regs& ctx, uint8_t* base);
+void UserInfoInitStates(lifted::Regs& ctx);
 
 }  // namespace hooks

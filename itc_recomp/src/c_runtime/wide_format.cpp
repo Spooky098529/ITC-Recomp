@@ -31,9 +31,9 @@ constexpr uint32_t kSign = 0x1, kSignSpace = 0x2, kLeft = 0x4, kLeadZero = 0x8, 
 // says whether the real run needs nothing native code can't do.
 class WideOutput {
  public:
-  WideOutput(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+  WideOutput(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
              bool dry)
-      : base_(base), out_(buffer), format_(format), args_(args), frame_(frame), dry_(dry) {}
+      : out_(buffer), format_(format), args_(args), frame_(frame), dry_(dry) {}
 
   // False (dry runs only) where the original must run. `*count` the
   // characters written, or -1.
@@ -43,12 +43,12 @@ class WideOutput {
   uint32_t pointer() const { return out_; }
 
  private:
-  uint16_t U16(uint32_t a) { return guest::LoadU16(base_, a); }
-  uint8_t U8(uint32_t a) { return guest::LoadU8(base_, a); }
-  uint32_t U32(uint32_t a) { return guest::LoadU32(base_, a); }
+  uint16_t U16(uint32_t a) { return guest::LoadU16(a); }
+  uint8_t U8(uint32_t a) { return guest::LoadU8(a); }
+  uint32_t U32(uint32_t a) { return guest::LoadU32(a); }
   // The float conversion table's _cfltcvt_l (+24).
   uint32_t CfltcvtL() {
-    return schema::FloatConversionTable(base_, CRuntimeGlobals::float_conversions_address())
+    return schema::FloatConversionTable(CRuntimeGlobals::float_conversions_address())
         .cfltcvt_l();
   }
   // The next argument's slot (8 bytes, aligned): its address.
@@ -56,7 +56,7 @@ class WideOutput {
     args_ = ((args_ + 7) & ~7u) + 8;
     return args_ - 8;
   }
-  uint32_t MbCurMax() { return uint32_t(CRuntimeGlobals::current_locale(base_).mb_cur_max()); }
+  uint32_t MbCurMax() { return uint32_t(CRuntimeGlobals::current_locale().mb_cur_max()); }
   // write_char (sub_825B1368) to the string stream: _putwc_nolock's room
   // taken first (always enough for INT_MAX bytes), the unit stored, the
   // count -1 for 0xFFFF (its failure value) or moved on by one. A dry run
@@ -68,14 +68,13 @@ class WideOutput {
     }
     room_ -= 2;
     if (!dry_) {
-      guest::StoreU16(base_, out_, uint16_t(unit));
+      guest::StoreU16(out_, uint16_t(unit));
     }
     out_ += 2;
     count_ = count_ + 1;
     return true;
   }
 
-  uint8_t* base_;
   uint32_t out_, format_, args_, frame_;
   bool dry_;
   int32_t room_ = 0x7FFFFFFF;
@@ -187,15 +186,15 @@ bool WideOutput::Run(int32_t* result) {
             text_length = 1;
             wide_text = true;
             const uint32_t value = U32(NextSlot() + 4) & 0xFFFF;
-            guest::StoreU16(base_, f + 84, uint16_t(value));
+            guest::StoreU16(f + 84, uint16_t(value));
             if (flags & kShort) {
-              guest::StoreU8(base_, f + 86, uint8_t(value));
-              guest::StoreU8(base_, f + 87, 0);
-              if (Mbtowc(base_, f + 128, f + 86, MbCurMax()) < 0) {
+              guest::StoreU8(f + 86, uint8_t(value));
+              guest::StoreU8(f + 87, 0);
+              if (Mbtowc(f + 128, f + 86, MbCurMax()) < 0) {
                 no_output = true;
               }
             } else {
-              guest::StoreU16(base_, f + 128, uint16_t(value));
+              guest::StoreU16(f + 128, uint16_t(value));
             }
             text = f + 128;
             break;
@@ -207,19 +206,19 @@ bool WideOutput::Run(int32_t* result) {
             int32_t most = precision == -1 ? 0x7FFFFFFF : precision;
             text = U32(NextSlot() + 4);
             if (flags & kShort) {
-              if (text == 0) text = CRuntimeGlobals::narrow_null(base_).address;
+              if (text == 0) text = CRuntimeGlobals::narrow_null().address;
               uint32_t p = text;
               text_length = 0;
               if (most > 0) {
                 while (U8(p) != 0) {
-                  if (IsLeadByte(base_, U8(p)) != 0) p++;
+                  if (IsLeadByte(U8(p)) != 0) p++;
                   text_length++;
                   p++;
                   if (!(int32_t(text_length) < most)) break;
                 }
               }
             } else {
-              if (text == 0) text = CRuntimeGlobals::wide_null(base_).address;
+              if (text == 0) text = CRuntimeGlobals::wide_null().address;
               wide_text = true;
               uint32_t p = text;
               while (most != 0) {
@@ -254,9 +253,9 @@ bool WideOutput::Run(int32_t* result) {
             }
             const uint32_t slot = NextSlot();
             const uint64_t bits = (uint64_t(U32(slot)) << 32) | U32(slot + 4);
-            guest::StoreU32(base_, f + 112, uint32_t(bits >> 32));
-            guest::StoreU32(base_, f + 116, uint32_t(bits));
-            if (!Cftof(base_, bits, text, 512, precision)) {
+            guest::StoreU32(f + 112, uint32_t(bits >> 32));
+            guest::StoreU32(f + 116, uint32_t(bits));
+            if (!Cftof(bits, text, 512, precision)) {
               return false;  // (a real run follows a dry one that succeeded)
             }
             if (U8(text) == '-') {
@@ -287,8 +286,8 @@ bool WideOutput::Run(int32_t* result) {
             hex_add = c == 'x' ? 39 : 7;
             radix = 16;
             if (flags & kAlternate) {
-              guest::StoreU16(base_, f + 90, uint16_t(hex_add + 81));
-              guest::StoreU16(base_, f + 88, '0');
+              guest::StoreU16(f + 90, uint16_t(hex_add + 81));
+              guest::StoreU16(f + 88, '0');
               prefix_length = 2;
             }
             break;
@@ -334,14 +333,14 @@ bool WideOutput::Run(int32_t* result) {
             value /= radix;
             uint32_t ch = uint32_t(digit) + 48;
             if (int32_t(ch) > 57) ch += hex_add;
-            guest::StoreU8(base_, p, uint8_t(ch));
+            guest::StoreU8(p, uint8_t(ch));
             p--;
           }
           text_length = (f + 639) - p;
           text = p + 1;
           if ((flags & kForceOctal) && (text_length == 0 || U8(text) != '0')) {
             text--;
-            guest::StoreU8(base_, text, '0');
+            guest::StoreU8(text, '0');
             text_length++;
           }
         }
@@ -361,7 +360,7 @@ bool WideOutput::Run(int32_t* result) {
         else if (flags & kSign) sign = '+';
         else if (flags & kSignSpace) sign = ' ';
         if (sign != 0) {
-          guest::StoreU16(base_, f + 88, uint16_t(sign));
+          guest::StoreU16(f + 88, uint16_t(sign));
           prefix_length = 1;
         }
       }
@@ -385,7 +384,7 @@ bool WideOutput::Run(int32_t* result) {
         uint32_t p = text;
         for (int32_t left = int32_t(text_length); left > 0;) {
           left--;
-          const int32_t used = Mbtowc(base_, f + 84, p, MbCurMax());
+          const int32_t used = Mbtowc(f + 84, p, MbCurMax());
           if (used <= 0) {
             count_ = -1;
             break;
@@ -416,24 +415,24 @@ bool WideOutput::Run(int32_t* result) {
 
 }  // namespace
 
-bool Vswprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+bool Vswprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
                int32_t* count) {
   if (buffer == 0 || format == 0) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
   {
-    WideOutput dry(base, buffer, format, args, frame, true);
+    WideOutput dry(buffer, format, args, frame, true);
     int32_t ignored;
     if (!dry.Run(&ignored) || dry.room() < 2) {
       return false;
     }
   }
   ITC_NATIVE_RUNNING("sub_825A9980 _vswprintf_l");
-  WideOutput output(base, buffer, format, args, frame, false);
+  WideOutput output(buffer, format, args, frame, false);
   output.Run(count);
   // _vswprintf_l's terminator: two bytes through the stream's putc.
-  guest::StoreU8(base, output.pointer(), 0);
-  guest::StoreU8(base, output.pointer() + 1, 0);
+  guest::StoreU8(output.pointer(), 0);
+  guest::StoreU8(output.pointer() + 1, 0);
   return true;
 }
 

@@ -14,7 +14,7 @@ namespace hooks {
 // render queue at [0x826D83D0] (its slot 4, f1 = 0.0) from a 272-byte frame
 // like the original's; r3 as that call leaves it. The original where the
 // plain C++ declines.
-void SceneTargetTexturedRect(lifted::Regs& ctx, uint8_t* base);
+void SceneTargetTexturedRect(lifted::Regs& ctx);
 
 // SceneTarget::RecordPasses (sub_8209B3D0): r3 = the scene target, r4 =
 // the command list, r5, r6, r7 = the buckets. The passes natively from a
@@ -22,10 +22,10 @@ void SceneTargetTexturedRect(lifted::Regs& ctx, uint8_t* base);
 // render queue's Add as guest calls with the original's return addresses,
 // the rectangles through SceneTargetTexturedRect; r3 as the last call
 // leaves it. The original where the plain C++ declines.
-void SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base);
+void SceneTargetRecordPasses(lifted::Regs& ctx);
 // The same with --native_scene_target (without the command list's
 // diagnostics), else the original: FramePasses::Record's adapter calls it
 // (RecordPasses has no adapter of its own).
-void SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx, uint8_t* base);
+void SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx);
 
 }  // namespace hooks

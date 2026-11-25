@@ -70,23 +70,23 @@ constexpr uint32_t kDispatch = 0x821062E8;
 // sub_822261E0 OpenConfirmStep (128-byte frame): movie 16; the first call
 // MenuSound::Play(5) and the opening (5), then UiMovie::Run; done:
 // ResetPose, the highlight {1, 2}[cursor] and LoopLast.
-uint64_t OpenConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t OpenConfirmStep(uint32_t started, uint32_t sp, const Calls& calls);
 // sub_822262B8 CloseConfirmStep (112): movie 16, the closing (6); done:
 // FinishAll and the data's +4 = 9.
-uint64_t CloseConfirmStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t CloseConfirmStep(uint32_t started, uint32_t sp, const Calls& calls);
 // The steps of one animation (112-byte frames): sub_82226370
 // CloseNoticeStep (movie 17, 3), sub_82226420 OpenConfirm2Step (18, 5),
 // sub_822264B8 CloseConfirm2Step (18, 6) and sub_82226568 CloseNotice2Step
 // (19, 3); a close done: the data's +4 = 9.
 enum class Simple { kCloseNotice, kOpenConfirm2, kCloseConfirm2, kCloseNotice2 };
-uint64_t SimpleStep(uint8_t* base, uint32_t started, Simple which, uint32_t sp,
+uint64_t SimpleStep(uint32_t started, Simple which, uint32_t sp,
                     const Calls& calls);
 // sub_82226618 MoveCursorStep (128): movie 16; the first call the previous
 // highlight finished, the new one played and looped; then UiMovie::Run.
 // Returns 1.
-uint64_t MoveCursorStep(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t MoveCursorStep(uint32_t started, uint32_t sp, const Calls& calls);
 // sub_822266D0 Step9 (96): MenuSound::Play(5). Returns 1.
-uint64_t Step9(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Step9(uint32_t sp, const Calls& calls);
 
 // --- The dialog's pages (dialog_pages.cpp; r3 the dispatcher; each
 // returns the last call's r3) ---
@@ -95,45 +95,45 @@ uint64_t Step9(uint8_t* base, uint32_t sp, const Calls& calls);
 // stepped; accept (159) posts 14 (yes) or 15 (no), back (158) 17, each with
 // the close step 1; a moved cursor step 8; interrupted posts 20 with the
 // close step.
-uint64_t ConfirmPage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
+uint64_t ConfirmPage(uint32_t dispatcher, uint32_t sp, const Calls& calls);
 // sub_82225F30 NoticePage and sub_82226088 Notice2Page (144): accept or
 // back posts 16 with the close step (3 or 7); interrupted posts 20.
-uint64_t NoticePage(uint8_t* base, uint32_t dispatcher, bool second, uint32_t sp,
+uint64_t NoticePage(uint32_t dispatcher, bool second, uint32_t sp,
                     const Calls& calls);
 
 // --- The dialog's handlers (dialog_handlers.cpp) ---
 //
 // sub_822266F8 Draw (r3 the machine, r4 the dispatcher; 112-byte frame): the
 // page from its table with r3 = the dispatcher. The page's r3, or `r4`.
-uint64_t Draw(uint8_t* base, uint64_t machine, uint64_t dispatcher, uint32_t sp,
+uint64_t Draw(uint64_t machine, uint64_t dispatcher, uint32_t sp,
               const Calls& calls);
 // sub_82226788 Update (r3 the machine, r4 the dispatcher; 208-byte frame):
 // the step from its table, or UiMovie::Run; then the queued state. The
 // step's, Run's r3 or the movie.
-uint64_t Update(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t Update(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                 const Calls& calls);
 // sub_82225878 OnEnter (r3 the machine; 112-byte frame): the three blocks
 // VirtualAlloc'ed with their first words, state 1 or 9. The last
 // VirtualAlloc's r3.
-uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+uint64_t OnEnter(uint32_t machine, uint32_t sp, const Calls& calls);
 // sub_82226978 WaitForMovies (r3 the machine; 96-byte frame): movies 16 to
 // 19 loaded, then state 9. IsLoaded's r3 when called, else `r3`.
-uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t WaitForMovies(uint64_t r3, uint32_t sp);
 // sub_82225860 OnInterrupt: the data's +12 = 1. A leaf.
-void OnInterrupt(uint8_t* base);
+void OnInterrupt();
 // sub_82225A90 OpenConfirm (r3 the machine; 112-byte frame): movie 16 reset
 // and shown, the menu's cursor from the movie's +40960, the open step 0
 // started (state 4) or state 1. ResetPose's r3.
-uint64_t OpenConfirm(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+uint64_t OpenConfirm(uint32_t machine, uint32_t sp, const Calls& calls);
 // sub_82225B88 OpenConfirm2 (112): movie 18, step 4. The movie table pair's
 // address.
-uint64_t OpenConfirm2(uint8_t* base, uint32_t machine, uint32_t sp);
+uint64_t OpenConfirm2(uint32_t machine, uint32_t sp);
 // sub_82225980 OpenNotice and sub_82225A08 OpenNotice2 (leaves): movie 17
 // or 19, page 1 or 3, step 2 or 6.
-void OpenNotice(uint8_t* base, uint32_t machine, bool second);
+void OpenNotice(uint32_t machine, bool second);
 // sub_822257A8 OnLeft (112-byte frame): the three blocks VirtualFree'd, the
 // globals 0. The last VirtualFree's r3.
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t OnLeft(uint32_t sp, const Calls& calls);
 
 // --- The dialog's set-up (dialog_init.cpp) ---
 //
@@ -142,38 +142,38 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 // (`frame`, the original's stores in order). The last Add's r3 (an index
 // when `replaced`, else the new transition).
 constexpr uint32_t kDialogInitFrame = 1104;
-uint32_t DialogInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t DialogInit(uint32_t machine, uint32_t frame, bool* replaced);
 
 // --- The mode (mode.cpp) ---
 //
 // sub_8222FD68 ModeType5::Init (r3 the mode; 128-byte frame): see the row;
 // the dialog's Init as plain C++, the other callees through their
 // overrides. LoadingScreen::Show's r3.
-uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t ModeInit(uint32_t mode, uint32_t sp, const Calls& calls);
 // sub_8222FD08 ModeType5::FindShown: the last of machines 3 (the car
 // settings), 16 (the dialog) and 21 (the parking area) in state 4 or 5
 // into the block's +28920. A leaf.
-void FindShown(uint8_t* base, uint32_t block);
+void FindShown(uint32_t block);
 // The delegate functions (r3 the 8-byte answer, r4 the mode; each returns
 // the answer): sub_82230050 WaitForLoads (128-byte frame), sub_82230458
 // NextMode (160), sub_82230260 LeaveScreen (128), sub_82230168
 // WaitForShown (112) and sub_82230328 Leaving (128).
-void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForLoads(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextMode(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void LeaveScreen(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForShown(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void Leaving(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
 // The +32 interface (r3 the mode + 32): sub_8222FED0 Interrupt (0 or 1; a
 // leaf), sub_8222FF60 ForceExit (r4 a number; a leaf writing below the
 // stack pointer) and sub_8222FC38 Resume (a leaf).
-uint32_t Interrupt(uint8_t* base, uint32_t object);
-void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp);
-void Resume(uint8_t* base);
+uint32_t Interrupt(uint32_t object);
+void ForceExit(uint32_t object, uint32_t number, uint32_t sp);
+void Resume();
 // sub_8222FC50 Mode::Slot14Thunk (r3 the answer, r4 an object): the
 // object's vtable slot 14 (+56) tail-called with them, from the caller's
 // frame `sp` with its return address `lr`: this mode's Leaving as plain
 // C++, any other through the guest. The callee's r3.
-uint64_t Slot14Thunk(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
+uint64_t Slot14Thunk(uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,
                      const Calls& calls);
 
 }  // namespace type5_mode

@@ -38,7 +38,7 @@ struct Step {
 #include "save_screen/init_tables.h"
 
 template <size_t n>
-InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t frame) {
+InitResult Run(const Step (&steps)[n], uint32_t object, uint32_t frame) {
   auto at = [&](const Value& v) {
     switch (v.base) {
       case Value::kConst:
@@ -54,14 +54,14 @@ InitResult Run(uint8_t* base, const Step (&steps)[n], uint32_t object, uint32_t 
   for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
         result.machine = at(step.c);
-        result.r3 = game_modes::StateMachineAdd(base, result.machine, at(step.a), at(step.b),
+        result.r3 = game_modes::StateMachineAdd(result.machine, at(step.a), at(step.b),
                                                 &result.replaced);
         break;
     }
@@ -81,11 +81,11 @@ const InitInfo kInits[kInitCount] = {
 #define ITC_SAVE_SCREEN_INIT(address, name)                \
   case 0x##address: {                                      \
     ITC_NATIVE_RUNNING("sub_" #address " " name);          \
-    guest::StoreU32(base, frame, frame + info_frame);      \
-    return Run(base, k##address, object, frame);           \
+    guest::StoreU32(frame, frame + info_frame);      \
+    return Run(k##address, object, frame);           \
   }
 
-InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame) {
+InitResult RunInit(uint32_t address, uint32_t object, uint32_t frame) {
   uint32_t info_frame = 0;
   for (const InitInfo& info : kInits) {
     if (info.address == address) {
@@ -100,8 +100,8 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t fr
     // doesn't take the adapters' macro name for an override).
     case 0x821A87F0: {
       ITC_NATIVE_RUNNING("sub_821A87F0 Type8SaveScreen::Init");
-      guest::StoreU32(base, frame, frame + info_frame);
-      return Run(base, k821A87F0, object, frame);
+      guest::StoreU32(frame, frame + info_frame);
+      return Run(k821A87F0, object, frame);
     }
     default:
       break;

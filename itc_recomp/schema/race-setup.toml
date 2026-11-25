@@ -605,6 +605,7 @@ fields = [
 measure = "RaceScene@+16"
 size = 4292
 origin = "embedded"
+storage = "dual"  # E5 step 4: RaceScene::SetUpCars' view at the race scene's +16 + 4,288 v (race-update.toml's RaceScene, in host memory): +0 the slot count (v 0) or slot v - 1's pool index, +16 slot v's model, +4288 slot v's pool index, each a host member of the scene there; not an embed field (its stride, 4,288, isn't its size)
 fields = [
   { name = "unknown_0", offset = 0, type = "u32" },
   { name = "unknown_16", offset = 16, type = "u32" },

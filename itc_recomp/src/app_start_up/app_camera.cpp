@@ -14,25 +14,49 @@ namespace app_start_up {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
-// Four words (a vector) from `from` to `to`, as the originals' ld/std pairs.
-void Copy16(uint8_t* base, uint32_t to, uint32_t from) {
+void StoreVector(uint32_t to, uint32_t x, uint32_t y, uint32_t z, uint32_t w) {
+  Store(to + 0, x);
+  Store(to + 4, y);
+  Store(to + 8, z);
+  Store(to + 12, w);
+}
+
+// The objects are host (E5 step 4): their words through the view, at the
+// field's address (`at`, an interior handle) less the object's.
+template <typename V>
+uint32_t LoadIn(const V& v, uint32_t at) {
+  return uint32_t(v.load_at(at - v.address, 4));
+}
+template <typename V>
+void StoreIn(const V& v, uint32_t at, uint32_t value) {
+  v.store_at(at - v.address, 4, value);
+}
+// Four words (a vector) from `from` to `to`, as the originals' ld/std pairs:
+// from guest memory (the frame) into a host object.
+template <typename V>
+void Copy16In(const V& v, uint32_t to, uint32_t from) {
   uint32_t words[4];
   for (int i = 0; i < 4; i++) {
-    words[i] = Load(base, from + 4 * i);
+    words[i] = Load(from + 4 * i);
   }
   for (int i = 0; i < 4; i++) {
-    Store(base, to + 4 * i, words[i]);
+    StoreIn(v, to + 4 * i, words[i]);
   }
 }
-void StoreVector(uint8_t* base, uint32_t to, uint32_t x, uint32_t y, uint32_t z, uint32_t w) {
-  Store(base, to + 0, x);
-  Store(base, to + 4, y);
-  Store(base, to + 8, z);
-  Store(base, to + 12, w);
+// The same within a host object.
+template <typename V>
+void Copy16Within(const V& v, uint32_t to, uint32_t from) {
+  uint32_t words[4];
+  for (int i = 0; i < 4; i++) {
+    words[i] = LoadIn(v, from + 4 * i);
+  }
+  for (int i = 0; i < 4; i++) {
+    StoreIn(v, to + 4 * i, words[i]);
+  }
 }
 
 // The floats the constructors load (lfs) and store (stfs), as their bits.
@@ -54,9 +78,9 @@ constexpr uint32_t kMemberDelegateVtable = 0x8200833C;
 
 }  // namespace
 
-uint32_t AppCameraEntryConstruct(uint8_t* base, uint32_t entry) {
+uint32_t AppCameraEntryConstruct(uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_820A75E8 AppCameraEntry::AppCameraEntry");
-  const schema::AppCameraEntry e(base, entry);
+  const schema::AppCameraEntry e(entry);
   e.set_vtable(0x82002580);
   e.set_unknown_4(0);
   e.set_unknown_8(0);
@@ -64,10 +88,12 @@ uint32_t AppCameraEntryConstruct(uint8_t* base, uint32_t entry) {
   return entry;
 }
 
-std::optional<uint32_t> AppCameraListConstruct(uint8_t* base, uint32_t list) {
-  const schema::AppCameraList l(base, list);
+std::optional<uint32_t> AppCameraListConstruct(uint32_t list) {
+  const schema::AppCameraList l(list);
   l.set_vtable(0x82002780);
-  const auto block = memory::crt::OperatorNew(base, 16);
+  // A blob in PC memory (E5 step 5): the vector's words by address.
+  const auto block =
+      std::optional<uint32_t>(schema::NewAny_MessageVector_Allocate::New(16).address);
   if (!block) {
     return std::nullopt;
   }
@@ -75,7 +101,7 @@ std::optional<uint32_t> AppCameraListConstruct(uint8_t* base, uint32_t list) {
   // A std::vector (16 bytes: +4 the first, +8 the last, +12 the end; +0 not
   // written), cleared (sub_820A9198: erase(begin, end), sub_820A8F80, its
   // iterator checks never failing on one vector).
-  const schema::NewAny_MessageVector_Allocate vector(base, *block);
+  const schema::NewAny_MessageVector_Allocate vector(*block);
   if (*block != 0) {
     vector.set_first(0);
     vector.set_last(0);
@@ -92,11 +118,11 @@ std::optional<uint32_t> AppCameraListConstruct(uint8_t* base, uint32_t list) {
   return list;
 }
 
-uint32_t AppCameraCameraConstruct(uint8_t* base, uint32_t camera, uint32_t frame,
+uint32_t AppCameraCameraConstruct(uint32_t camera, uint32_t frame,
                                   const AppCameraCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820A9E28 AppCamera::Camera::Camera");
   calls.call(kCameraConstruct, frame, camera, 0x820A9E40);
-  const schema::AppCameraCamera c(base, camera);
+  const schema::AppCameraCamera c(camera);
   c.set_vtable(0x820027B0);
   // Each vector's fourth word.
   for (const uint32_t at :
@@ -105,39 +131,39 @@ uint32_t AppCameraCameraConstruct(uint8_t* base, uint32_t camera, uint32_t frame
         c.unknown_496_address(), c.unknown_512_address(), c.unknown_560_address(),
         c.unknown_576_address(), c.unknown_592_address(), c.unknown_608_address(),
         c.unknown_624_address(), c.unknown_640_address()}) {
-    Store(base, at + 12, kOne);
+    StoreIn(c, at + 12, kOne);
   }
-  StoreVector(base, frame + 80, kZero, kZero, kZero, kOne);
-  StoreVector(base, frame + 96, kZero, kZero, kZero, kOne);
-  Store(base, c.unknown_656_address() + 12, kOne);
-  Store(base, c.unknown_812_address(), kMinusFortyFive);
-  Store(base, c.unknown_816_address(), kFortyFive);
-  Store(base, c.unknown_804_address(), kMinusEightyNine);
-  Store(base, c.unknown_808_address(), kEightyNine);
-  Store(base, c.unknown_672_address(), kFortyFive);
-  Store(base, c.unknown_676_address(), kPointZeroNine);
-  Store(base, c.unknown_680_address(), kOnePointFive);
-  Store(base, c.unknown_684_address(), kZero);
-  Store(base, c.unknown_688_address(), kThirty);
-  Store(base, c.unknown_692_address(), kTwoHundred);
-  Copy16(base, c.unknown_624_address(), frame + 80);
-  Copy16(base, c.unknown_640_address(), frame + 96);
-  StoreVector(base, frame + 80, kZero, kZero, kZero, kOne);
-  StoreVector(base, frame + 96, kZero, kZero, kZero, kOne);
-  StoreVector(base, frame + 112, kZero, kZero, kTen, kOne);
-  Copy16(base, c.unknown_656_address(), frame + 96);
-  Copy16(base, c.unknown_400_address(), frame + 80);
-  Copy16(base, c.unknown_416_address(), frame + 112);
-  Copy16(base, c.unknown_432_address(), c.position_x_address());  // Camera::Camera's position
-  Copy16(base, c.unknown_448_address(), c.unknown_416_address());
-  Copy16(base, c.unknown_464_address(), c.unknown_416_address());
+  StoreVector(frame + 80, kZero, kZero, kZero, kOne);
+  StoreVector(frame + 96, kZero, kZero, kZero, kOne);
+  StoreIn(c, c.unknown_656_address() + 12, kOne);
+  StoreIn(c, c.unknown_812_address(), kMinusFortyFive);
+  StoreIn(c, c.unknown_816_address(), kFortyFive);
+  StoreIn(c, c.unknown_804_address(), kMinusEightyNine);
+  StoreIn(c, c.unknown_808_address(), kEightyNine);
+  StoreIn(c, c.unknown_672_address(), kFortyFive);
+  StoreIn(c, c.unknown_676_address(), kPointZeroNine);
+  StoreIn(c, c.unknown_680_address(), kOnePointFive);
+  StoreIn(c, c.unknown_684_address(), kZero);
+  StoreIn(c, c.unknown_688_address(), kThirty);
+  StoreIn(c, c.unknown_692_address(), kTwoHundred);
+  Copy16In(c, c.unknown_624_address(), frame + 80);
+  Copy16In(c, c.unknown_640_address(), frame + 96);
+  StoreVector(frame + 80, kZero, kZero, kZero, kOne);
+  StoreVector(frame + 96, kZero, kZero, kZero, kOne);
+  StoreVector(frame + 112, kZero, kZero, kTen, kOne);
+  Copy16In(c, c.unknown_656_address(), frame + 96);
+  Copy16In(c, c.unknown_400_address(), frame + 80);
+  Copy16In(c, c.unknown_416_address(), frame + 112);
+  Copy16Within(c, c.unknown_432_address(), c.position_x_address());  // Camera::Camera's position
+  Copy16Within(c, c.unknown_448_address(), c.unknown_416_address());
+  Copy16Within(c, c.unknown_464_address(), c.unknown_416_address());
   return camera;
 }
 
-std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint32_t block,
+std::optional<uint32_t> AppCameraConstruct(uint32_t object, uint32_t block,
                                            uint32_t frame, const AppCameraCalls& calls) {
-  const schema::AppCamera a(base, object);
-  const schema::AppCameraBlock b(base, block);
+  const schema::AppCamera a(object);
+  const schema::AppCameraBlock b(block);
   a.set_unknown_4(0);
   a.set_vtable_8(0x82002680);
   a.set_vtable_12(0x82002690);
@@ -152,35 +178,17 @@ std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint3
         a.unknown_160_address(), a.unknown_160_address() + 16, a.unknown_160_address() + 32,
         a.unknown_160_address() + 48, a.unknown_240_address(), a.unknown_240_address() + 16,
         a.unknown_240_address() + 32, a.unknown_240_address() + 48}) {
-    Store(base, at + 12, kOne);
+    StoreIn(a, at + 12, kOne);
   }
-  const auto camera_block = memory::crt::OperatorNew(base, kAppCameraCameraBytes);
-  if (!camera_block) {
-    return std::nullopt;
-  }
+  // The camera, the list and the entry in host memory (E5 step 4; operator
+  // new's blocks before: 0x820A8C34, 0x820A8C58 and 0x820A8C7C).
+  static_assert(schema::AppCameraCamera::kSize == kAppCameraCameraBytes);
+  const uint32_t camera_block = schema::AppCameraCamera::New().address;
   ITC_NATIVE_RUNNING("sub_820A8B88 AppCamera::AppCamera");
-  a.set_camera(*camera_block != 0 ? calls.camera(*camera_block) : 0);
-  const auto list_block = memory::crt::OperatorNew(base, 8);
-  uint32_t list = 0;
-  if (list_block && *list_block != 0) {
-    list = calls.list(*list_block);
-  } else if (!list_block) {
-    list = calls.call(0x825A6880, frame, 8, 0x820A8C58);  // operator new's original
-    if (list != 0) {
-      list = calls.list(list);
-    }
-  }
+  a.set_camera(calls.camera(camera_block));
+  const uint32_t list = calls.list(schema::AppCameraList::New().address);
   a.set_list(list);
-  const auto entry_block = memory::crt::OperatorNew(base, 16);
-  uint32_t entry = 0;
-  if (entry_block) {
-    entry = *entry_block != 0 ? AppCameraEntryConstruct(base, *entry_block) : 0;
-  } else {
-    entry = calls.call(0x825A6880, frame, 16, 0x820A8C7C);
-    if (entry != 0) {
-      AppCameraEntryConstruct(base, entry);
-    }
-  }
+  const uint32_t entry = AppCameraEntryConstruct(schema::AppCameraEntry::New().address);
   // The list's slot 1 with the entry; the camera's slot 1 (45.0).
   calls.virtual_call(a.list().address, 4, frame, entry, {}, {}, 0x820A8CAC);
   calls.virtual_call(a.camera().address, 4, frame, {}, {}, kFortyFive, 0x820A8CC8);
@@ -196,20 +204,20 @@ std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint3
   // video output, video-output.toml's).
   const uint32_t service = calls.virtual_call(b.service().address, 4, frame, {}, {}, {}, 0x820A8D08);
   const uint32_t screen = calls.virtual_call(service, 12, frame, {}, {}, {}, 0x820A8D18);
-  Store(base, frame + 92, kOne);
-  Store(base, frame + 108, kOne);
-  Store(base, frame + 80, kZero);
-  Store(base, frame + 96, kZero);
-  Store(base, frame + 100, kZero);
-  Store(base, frame + 104, kZero);
-  Store(base, frame + 84, kMinusTen);
-  Store(base, frame + 88, kMinusTen);
+  Store(frame + 92, kOne);
+  Store(frame + 108, kOne);
+  Store(frame + 80, kZero);
+  Store(frame + 96, kZero);
+  Store(frame + 100, kZero);
+  Store(frame + 104, kZero);
+  Store(frame + 84, kMinusTen);
+  Store(frame + 88, kMinusTen);
   const auto camera = a.camera();
-  Copy16(base, camera.position_x_address(), frame + 80);
-  Copy16(base, a.camera().angles_x_address(), frame + 96);
+  Copy16In(camera, camera.position_x_address(), frame + 80);
+  Copy16In(a.camera(), a.camera().angles_x_address(), frame + 96);
   // The camera's slot 0 (the screen's size), then slot 1 again (45.0).
-  calls.virtual_call(a.camera().address, 0, frame, schema::VideoOutput(base, screen).display_width(),
-                     schema::VideoOutput(base, screen).display_height(), kZero, 0x820A8D98);
+  calls.virtual_call(a.camera().address, 0, frame, schema::VideoOutput(screen).display_width(),
+                     schema::VideoOutput(screen).display_height(), kZero, 0x820A8D98);
   calls.virtual_call(a.camera().address, 4, frame, {}, {}, kFortyFive, 0x820A8DB0);
   // Three handlers (key 0 each) on the block's +0 interface: slots 4, 3 and
   // 1 with member delegates on the frame (+112, +128, +144), the word before
@@ -224,16 +232,16 @@ std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint3
   };
   for (int i = 0; i < 3; i++) {
     const Handler& h = handlers[i];
-    Store(base, frame + 84, 0);
-    Store(base, frame + 80, h.function);
-    Store(base, h.delegate + 0, kMemberDelegateVtable);
-    Store(base, h.delegate + 4, object);
-    Store(base, h.delegate + 8, h.function);
-    Store(base, h.delegate + 12, 0);
+    Store(frame + 84, 0);
+    Store(frame + 80, h.function);
+    Store(h.delegate + 0, kMemberDelegateVtable);
+    Store(h.delegate + 4, object);
+    Store(h.delegate + 8, h.function);
+    Store(h.delegate + 12, 0);
     if (i > 0) {
-      Store(base, handlers[i - 1].delegate, 0x82000ABC);
+      Store(handlers[i - 1].delegate, 0x82000ABC);
     }
-    Store(base, frame + 80, 0);
+    Store(frame + 80, 0);
     calls.virtual_call(b.handlers().address, h.slot, frame, frame + 80, h.delegate, {}, h.ret);
   }
   return object;

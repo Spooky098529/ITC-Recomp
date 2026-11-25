@@ -31,31 +31,31 @@ namespace std_list {
 
 // Whether `count` nodes can be allocated natively (no bad_alloc path; a size
 // malloc takes, with a process heap).
-bool CanAllocate(uint8_t* base, uint32_t count);
+bool CanAllocate(uint32_t count);
 
 // PtrList::AllocateNodes (sub_82099C08, the allocator's allocate): `count`
 // x 12 bytes from operator new. nullopt where the original must run.
-std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count);
+std::optional<uint32_t> AllocateNodes(uint32_t count);
 
 // PtrList::IncSize (sub_820958B8, _Incsize): the size (+8) up by `count`.
 // False, with nothing done, when 0x3FFFFFFF minus the size is below `count`
 // (the original's length_error).
-bool IncSize(uint8_t* base, uint32_t list, uint32_t count);
+bool IncSize(uint32_t list, uint32_t count);
 
 // PtrList::PtrList (sub_820AD058): a head node linked to itself at +4, the
 // size 0. False, with nothing done, where the original must run.
-bool Construct(uint8_t* base, uint32_t list);
+bool Construct(uint32_t list);
 
 // PtrList::Insert (sub_82095958): a node holding `value` linked in before
 // the node `where`, the size up by one. False, with nothing done, where the
 // original must run.
-bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value);
+bool Insert(uint32_t list, uint32_t where, uint32_t value);
 
 // PtrList::Erase (sub_82098E80, erase(where), docs/functions/app-states.md):
 // the iterator's node (`node`, of the list `iterator_list`) unlinked and
 // freed and the size down by one, unless it's `list`'s head; returns the
 // next node (the result iterator's). nullopt, with nothing done, where the
 // original traps (a null iterator list, or `node` its head).
-std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_list, uint32_t node);
+std::optional<uint32_t> Erase(uint32_t list, uint32_t iterator_list, uint32_t node);
 
 }  // namespace std_list

@@ -76,7 +76,7 @@ namespace nm = network_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -87,7 +87,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -102,13 +101,12 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
@@ -118,18 +116,18 @@ uint64_t AddR3(uint64_t machine_r3, uint32_t r3, bool replaced) {
   return replaced ? r3 : machine_r3 + (r3 - uint32_t(machine_r3));
 }
 
-template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t kFrame>
-void InitStatesStep(lifted::Regs& ctx, uint8_t* base) {
+template <uint32_t (*InitStates)(uint32_t, uint32_t, bool*), uint32_t kFrame>
+void InitStatesStep(lifted::Regs& ctx) {
   bool replaced = false;
-  const uint32_t r3 = InitStates(base, ctx.r3.u32, ctx.r1.u32 - kFrame, &replaced);
+  const uint32_t r3 = InitStates(ctx.r3.u32, ctx.r1.u32 - kFrame, &replaced);
   ctx.r3.u64 = AddR3(ctx.r3.u64, r3, replaced);
 }
 
-template <uint32_t (*InitBase)(uint8_t*, uint32_t, uint32_t, uint32_t, bool*)>
-void InitBaseStep(lifted::Regs& ctx, uint8_t* base) {
+template <uint32_t (*InitBase)(uint32_t, uint32_t, uint32_t, bool*)>
+void InitBaseStep(lifted::Regs& ctx) {
   bool replaced = false;
   const uint32_t r3 =
-      InitBase(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - nm::kInitBaseFrame, &replaced);
+      InitBase(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - nm::kInitBaseFrame, &replaced);
   ctx.r3.u64 = AddR3(ctx.r3.u64, r3, replaced);
 }
 
@@ -138,12 +136,12 @@ void InitBaseStep(lifted::Regs& ctx, uint8_t* base) {
 bool NetworkModeNative() { return ITC_FLAG(native_network_mode); }
 
 ITC_REGS_STEP(ModeType12Init) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = nm::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = nm::ModeInit(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_NET_INIT_STATES(name, function, frame) \
-  ITC_REGS_STEP(name) { InitStatesStep<nm::function, nm::frame>(ctx, base); }
+  ITC_REGS_STEP(name) { InitStatesStep<nm::function, nm::frame>(ctx); }
 ITC_NET_INIT_STATES(NetModeSelectInitStates, ModeSelectInitStates, kModeSelectInitFrame)
 ITC_NET_INIT_STATES(Type12Screen1InitStates, Screen1InitStates, kScreen1InitFrame)
 ITC_NET_INIT_STATES(Type12Screen3InitStates, Screen3InitStates, kScreen3InitFrame)
@@ -161,7 +159,7 @@ ITC_NET_INIT_STATES(PowerGraphScreen12InitStates, PowerGraphInitStates, kPowerGr
 #undef ITC_NET_INIT_STATES
 
 #define ITC_NET_INIT_BASE(name, function) \
-  ITC_REGS_STEP(name) { InitBaseStep<nm::function>(ctx, base); }
+  ITC_REGS_STEP(name) { InitBaseStep<nm::function>(ctx); }
 ITC_NET_INIT_BASE(Type12Screen6InitBase, Screen6InitBase)
 ITC_NET_INIT_BASE(Type12Screen7InitBase, Screen7InitBase)
 ITC_NET_INIT_BASE(Type12Screen8InitBase, Screen8InitBase)
@@ -176,7 +174,7 @@ ITC_NET_INIT_BASE(Type12Dialog13InitBase, Dialog13InitBase)
 ITC_REGS_STEP(NetScreenInitBase) {
   bool replaced = false;
   uint32_t r3 = 0;
-  if (nm::InitBase(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &replaced, &r3)) {
+  if (nm::InitBase(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &replaced, &r3)) {
     ctx.r3.u64 = AddR3(ctx.r3.u64, r3, replaced);
   }
 }
@@ -188,20 +186,20 @@ ITC_REGS_STEP(ModeType12Machine) {
 }
 // r3 left as the original's last Machine call leaves it.
 ITC_REGS_STEP(ModeType12FindShown) {
-  ctx.r4.u64 = nm::FindShown(base, ctx.r3.u32);
-  ModeType12Machine(ctx, base);
+  ctx.r4.u64 = nm::FindShown(ctx.r3.u32);
+  ModeType12Machine(ctx);
 }
 ITC_REGS_STEP(ModeType12AllLoaded) {
-  ctx.r3.u64 = nm::AllLoaded(base, ctx.r3.u32);
+  ctx.r3.u64 = nm::AllLoaded(ctx.r3.u32);
 }
 
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE12_DELEGATE(name)                                    \
-  void ModeType12##name(lifted::Regs& ctx, uint8_t* base) {                 \
+  void ModeType12##name(lifted::Regs& ctx) {                 \
     const uint64_t answer = ctx.r3.u64;                                   \
     {                                                                     \
-      GuestCalls guest(ctx, base);                                        \
-      nm::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());  \
+      GuestCalls guest(ctx);                                        \
+      nm::name(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());  \
     }                                                                     \
     ctx.r3.u64 = answer;                                                  \
   }
@@ -215,69 +213,69 @@ ITC_MODE_TYPE12_DELEGATE(Teardown)
 ITC_REGS_STEP(ModeType12ForceExit) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::ForceExit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::ForceExit(ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 ITC_REGS_STEP(ModeType12Resume) {
-  ctx.r3.u64 = nm::Resume(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = nm::Resume(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(SessionFree) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::SessionFree(base, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::SessionFree(ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 
 template <uint32_t kIndex>
-void NetMachineCreate(lifted::Regs& ctx, uint8_t* base) {
+void NetMachineCreate(lifted::Regs& ctx) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::MachineCreate(base, kIndex, ctx.r3.u32, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::MachineCreate(kIndex, ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineOpenMovie(lifted::Regs& ctx, uint8_t* base) {
+void NetMachineOpenMovie(lifted::Regs& ctx) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::MachineOpenMovie(base, kIndex, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::MachineOpenMovie(kIndex, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineWaitForMovie(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = nm::MachineWaitForMovie(base, kIndex, ctx.r3.u64, ctx.r1.u32);
+void NetMachineWaitForMovie(lifted::Regs& ctx) {
+  ctx.r3.u64 = nm::MachineWaitForMovie(kIndex, ctx.r3.u64, ctx.r1.u32);
 }
 template <uint32_t kIndex>
-void NetMachineLeave(lifted::Regs& ctx, uint8_t* base) {
+void NetMachineLeave(lifted::Regs& ctx) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::MachineLeave(base, kIndex, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::MachineLeave(kIndex, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineDestroy(lifted::Regs& ctx, uint8_t* base) {
+void NetMachineDestroy(lifted::Regs& ctx) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::MachineDestroy(base, kIndex, ctx.r3.u32, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::MachineDestroy(kIndex, ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
-#define ITC_NET_MACHINE(index)                                          \
-  template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);       \
-  template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);    \
-  template void NetMachineWaitForMovie<index>(lifted::Regs&, uint8_t*); \
-  template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);        \
-  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);
+#define ITC_NET_MACHINE(index)                                \
+  template void NetMachineCreate<index>(lifted::Regs&);       \
+  template void NetMachineOpenMovie<index>(lifted::Regs&);    \
+  template void NetMachineWaitForMovie<index>(lifted::Regs&); \
+  template void NetMachineLeave<index>(lifted::Regs&);        \
+  template void NetMachineDestroy<index>(lifted::Regs&);
 ITC_NET_MACHINE(0)
 ITC_NET_MACHINE(1)
 ITC_NET_MACHINE(3)
@@ -296,8 +294,8 @@ ITC_NET_MACHINE(13)
 ITC_REGS_STEP(Type12Screen1ResetData) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::Screen1ResetData(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::Screen1ResetData(ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
@@ -305,13 +303,13 @@ ITC_REGS_STEP(Type12Screen1ResetData) {
 ITC_REGS_STEP(SessionMake) {
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
-    r3 = nm::SessionMake(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+    GuestCalls guest(ctx);
+    r3 = nm::SessionMake(ctx.r3.u64, ctx.r1.u32, guest.calls());
   }
   ctx.r3.u64 = r3;
 }
 ITC_REGS_STEP(SessionInit) {
-  ctx.r3.u64 = nm::SessionInit(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = nm::SessionInit(ctx.r3.u64, ctx.r1.u32);
 }
 
 // The mode select's steps: those making guest calls through GuestCalls,
@@ -320,60 +318,60 @@ ITC_REGS_STEP(SessionInit) {
   ITC_REGS_STEP(name) {  \
     uint64_t r3;                               \
     {                                          \
-      GuestCalls guest(ctx, base);             \
+      GuestCalls guest(ctx);             \
       const nm::Calls calls = guest.calls();   \
       r3 = expression;                         \
     }                                          \
     ctx.r3.u64 = r3;                           \
   }
-ITC_NET_SELECT_CALLS(NetModeSelectStart, nm::SelectStart(base, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectSetUp, nm::SelectSetUp(base, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectStart, nm::SelectStart(ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectSetUp, nm::SelectSetUp(ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectDraw,
-                     nm::SelectDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectUpdate, nm::SelectUpdate(base, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectMenuPage, nm::SelectMenuPage(base, ctx.r1.u32, calls))
+                     nm::SelectDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectUpdate, nm::SelectUpdate(ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectMenuPage, nm::SelectMenuPage(ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectBattlePage,
-                     nm::SelectBattlePage(base, ctx.r3.u32, ctx.r1.u32, calls))
+                     nm::SelectBattlePage(ctx.r3.u32, ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectTimeAttackPage,
-                     nm::SelectTimeAttackPage(base, ctx.r3.u32, ctx.r1.u32, calls))
+                     nm::SelectTimeAttackPage(ctx.r3.u32, ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectSignInPage,
-                     nm::SelectSignInPage(base, ctx.r3.u64, ctx.r1.u32, calls))
+                     nm::SelectSignInPage(ctx.r3.u64, ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectSignInPage2,
-                     nm::SelectSignInPage2(base, ctx.r3.u64, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectIntro, nm::SelectIntro(base, ctx.r3.u32, ctx.r1.u32, calls))
+                     nm::SelectSignInPage2(ctx.r3.u64, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectIntro, nm::SelectIntro(ctx.r3.u32, ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectShowCursor,
-                     nm::SelectShowCursor(base, ctx.r3.u32, ctx.r1.u32, calls))
+                     nm::SelectShowCursor(ctx.r3.u32, ctx.r1.u32, calls))
 ITC_NET_SELECT_CALLS(NetModeSelectMoveCursor,
-                     nm::SelectMoveCursor(base, ctx.r3.u32, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectFadeOut, nm::SelectFadeOut(base, ctx.r3.u32, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectFadeIn, nm::SelectFadeIn(base, ctx.r3.u32, ctx.r1.u32, calls))
-ITC_NET_SELECT_CALLS(NetModeSelectUnload, nm::SelectUnload(base, ctx.r3.u32, ctx.r1.u32, calls))
+                     nm::SelectMoveCursor(ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectFadeOut, nm::SelectFadeOut(ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectFadeIn, nm::SelectFadeIn(ctx.r3.u32, ctx.r1.u32, calls))
+ITC_NET_SELECT_CALLS(NetModeSelectUnload, nm::SelectUnload(ctx.r3.u32, ctx.r1.u32, calls))
 #undef ITC_NET_SELECT_CALLS
 
-ITC_REGS_STEP(NetModeSelectOpen) { nm::SelectOpen(base, ctx.r3.u32); }
+ITC_REGS_STEP(NetModeSelectOpen) { nm::SelectOpen(ctx.r3.u32); }
 ITC_REGS_STEP(NetModeSelectLeavePage) {
-  nm::SelectLeavePage(base, ctx.r3.u32);
+  nm::SelectLeavePage(ctx.r3.u32);
 }
 ITC_REGS_STEP(NetModeSelectBackPage) {
-  nm::SelectBackPage(base, ctx.r3.u32);
+  nm::SelectBackPage(ctx.r3.u32);
 }
 ITC_REGS_STEP(NetModeSelectSetCursorY) {
-  ctx.r3.u64 = nm::SelectSetCursorY(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = nm::SelectSetCursorY(ctx.r3.u32, ctx.r1.u32);
 }
-ITC_REGS_STEP(NetModeSelectOnNo) { nm::SelectOnNo(base); }
-ITC_REGS_STEP(NetModeSelectOnYes) { nm::SelectOnYes(base); }
+ITC_REGS_STEP(NetModeSelectOnNo) { nm::SelectOnNo(); }
+ITC_REGS_STEP(NetModeSelectOnYes) { nm::SelectOnYes(); }
 ITC_REGS_STEP(NetModeSelectOnDialogClosed) {
-  nm::SelectOnDialogClosed(base);
+  nm::SelectOnDialogClosed();
 }
 ITC_REGS_STEP(NetModeSelectUnloaded) {
-  nm::SelectUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  nm::SelectUnloaded(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 }  // namespace hooks
 
 #define ITC_NETWORK_MODE(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_network_mode)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 // Init (the mode's vtable 0x82006C6C slot 0, from Modes::Tick).

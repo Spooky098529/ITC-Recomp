@@ -74,14 +74,14 @@ bool TitleScreen_SkipTickWait(bool in_race) {
 ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
   
   int32_t after = ITC_FLAG(attract_after_s) * kTicksPerSecond;
-  const schema::TitleScreenData title = G::data(base);
+  const schema::TitleScreenData title = G::data();
   int32_t before = title ? int32_t(title.idle_ticks()) : 0;
   if (hooks::TitleScreenNative()) {
-    hooks::TitleScreenPressStart(ctx, base);  // src/title_screen/press_start.cpp
+    hooks::TitleScreenPressStart(ctx);  // src/title_screen/press_start.cpp
   } else {
-    lifted::original::c822221A0(ctx, base);
+    lifted::original::c822221A0(ctx);
   }
-  if (after <= 0 || !title || G::data(base).address != title.address) {
+  if (after <= 0 || !title || G::data().address != title.address) {
     return;
   }
   // Only after a tick that counted (the counter went up by one): the next
@@ -101,10 +101,10 @@ ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
     static std::string last;
     std::string now;
     for (uint32_t pointer : {G::pages_address(), G::list_address(), kTitleScreenPointer}) {
-      uint32_t object = guest::LoadU32(base, pointer);
+      uint32_t object = guest::LoadU32(pointer);
       now += std::format(" [{:08X}]={:08X}:", pointer, object);
       for (uint32_t i = 0; object && i < 24; i += 4) {
-        now += std::format(" {}", int32_t(guest::LoadU32(base, object + i)));
+        now += std::format(" {}", int32_t(guest::LoadU32(object + i)));
       }
     }
     if (now != last) {
@@ -113,9 +113,9 @@ ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
     }
   }
   if (hooks::NativeFrameDriver()) {
-    hooks::AppSceneUpdate(ctx, base);  // src/frame_driver/
+    hooks::AppSceneUpdate(ctx);  // src/frame_driver/
   } else {
-    lifted::original::c820988C8(ctx, base);
+    lifted::original::c820988C8(ctx);
   }
 }
 
@@ -129,13 +129,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82107C58) {
   
   if (ITC_FLAG(log_boot_modes)) {
     ITC_LOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
-                 schema::BootMachine(base, ctx.r3.u32).movie_started());
+                 schema::BootMachine(ctx.r3.u32).movie_started());
   }
   g_in_movie_wait = ITC_FLAG(skip_intro);
   if (hooks::BootModeNative()) {
-    hooks::BootWaitForMovie(ctx, base, MovieFinishedEarly);
+    hooks::BootWaitForMovie(ctx, MovieFinishedEarly);
   } else {
-    lifted::original::c82107C58(ctx, base);
+    lifted::original::c82107C58(ctx);
   }
   g_in_movie_wait = false;
 }
@@ -146,14 +146,14 @@ ITC_NATIVE_ENTRY_ALWAYS(82107C58) {
 ITC_NATIVE_ENTRY_ALWAYS(820A4450) {
   
   if (hooks::BootModeNative()) {
-    hooks::BootMoviesState(ctx, base, MovieFinishedEarly);
+    hooks::BootMoviesState(ctx, MovieFinishedEarly);
     return;
   }
   if (MovieFinishedEarly()) {
     ctx.r3.u64 = 1;
     return;
   }
-  lifted::original::c820A4450(ctx, base);
+  lifted::original::c820A4450(ctx);
 }
 
 namespace hooks {

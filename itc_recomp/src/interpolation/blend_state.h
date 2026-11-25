@@ -24,7 +24,7 @@ void BlendState_OnLogicPassStart();
 // by native code calling matrix_math::Multiply directly: notes it as the
 // multiply's wrapper does, `caller` the guest return address of the call it
 // replaces (any thread: only the main thread's are noted).
-void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
+void BlendState_OnMultiply(uint32_t out, uint32_t a, uint32_t b,
                            uint32_t caller);
 
 // After a matrix copy dst = src (Matrix::Copy, sub_820A0AC0) done by native
@@ -32,31 +32,31 @@ void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
 // does, `caller` the guest return address of the call it replaces (any
 // thread: only the main thread's are noted). Not for the motion blur's copy
 // (caller 0x8213653C), which the wrapper notes under another source.
-void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller);
+void BlendState_OnCopy(uint32_t dst, uint32_t src, uint32_t caller);
 
 // Billboards::BuildVertices (sub_8209C6E0) for a native caller
 // (Billboards::Record): sprites::BuildBillboardVertices between the frame's
 // camera blend and its undoing, as the vertex builder's adapter runs it.
 // Returns the vertices counted. Flush-to-zero off at entry.
-uint32_t BlendState_BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
+uint32_t BlendState_BuildBillboardVertices(uint32_t set, uint32_t material,
                                            const sprites::SlotAllocator& slots);
 
 // The motion blur's copy of its previous view-projection (Matrix::Copy at
 // return 0x8213653C in MotionBlur::Record, `view` the motion blur) done by
 // native code: logged and noted as the copy's wrapper does it for that
 // caller, the copy made natively (matrix_math::Copy).
-void BlendState_MotionBlurCopy(uint8_t* base, uint32_t view, uint32_t dst, uint32_t src);
+void BlendState_MotionBlurCopy(uint32_t view, uint32_t dst, uint32_t src);
 
 // Main thread: the message handler being run (its target), 0 after it.
 // Diagnostics (--log_overlay_uploads): after the race overlays recorded on a
 // logic pass, logs every slot they allocated, every 3 s.
-void BlendState_LogOverlayAllocations(uint8_t* base);
+void BlendState_LogOverlayAllocations();
 
 void BlendState_SetHandler(uint32_t handler);
 
 // Main thread, around the delivery of a Draw message.
-void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass);
-void BlendState_AfterDraw(uint8_t* base);
+void BlendState_BeforeDraw(bool render_only_pass);
+void BlendState_AfterDraw();
 
 // Main thread, around a draw posed by our own code (the cockpit dials,
 // hooks/cockpit_dials.cpp): drawn with the tick's pose, so it pairs and is
@@ -70,8 +70,8 @@ float BlendState_Amount();
 
 // Main thread, around the per-object recorder (sub_825953D0): r4 is the
 // camera's view-projection matrix and r5 the object's world matrix.
-void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
-void BlendState_AfterRecordObject(uint8_t* base);
+void BlendState_BeforeRecordObject(uint32_t view_projection, uint32_t world);
+void BlendState_AfterRecordObject();
 // Main thread: while the per-object recorder records natively for a native
 // caller, the caller's return address and r24-r31 at the call it replaces
 // (what its wrapper keeps for pairing products); cleared with all zeros.
@@ -84,7 +84,7 @@ void BlendState_OnReplayTick();
 
 // Render thread, around a shader constant upload (command 7) being replayed:
 // gives constants recorded with a tick's camera the frame's blended camera.
-void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
+void BlendState_ReplayConstants(uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload);
 
 // Diagnostics (--log_frame_times): render thread time spent replaying

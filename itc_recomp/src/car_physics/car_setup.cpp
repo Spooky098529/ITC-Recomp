@@ -48,20 +48,20 @@ constexpr uint32_t kTableScale = 0x82002BE0;    // 294
 
 // A setting byte through the stack as the original converts it (lbz,
 // extsb, std at `at`, lfd, fcfid, frsp): the integer's float.
-double StackIntegerFloat(uint8_t* base, uint32_t at, int64_t value) {
-  guest::StoreU32(base, at, uint32_t(uint64_t(value) >> 32));
-  guest::StoreU32(base, at + 4, uint32_t(value));
+double StackIntegerFloat(uint32_t at, int64_t value) {
+  guest::StoreU32(at, uint32_t(uint64_t(value) >> 32));
+  guest::StoreU32(at + 4, uint32_t(value));
   return double(float(double(value)));
 }
 
 // pow's own stores into its caller's linkage area (x at r1 + 16, y at
 // + 24, stfd), which c_runtime::Pow doesn't make; then pow.
-double PowFromFrame(uint8_t* base, uint32_t frame, double x, double y) {
+double PowFromFrame(uint32_t frame, double x, double y) {
   const uint64_t xb = std::bit_cast<uint64_t>(x), yb = std::bit_cast<uint64_t>(y);
-  guest::StoreU32(base, frame + 24, uint32_t(yb >> 32));
-  guest::StoreU32(base, frame + 28, uint32_t(yb));
-  guest::StoreU32(base, frame + 16, uint32_t(xb >> 32));
-  guest::StoreU32(base, frame + 20, uint32_t(xb));
+  guest::StoreU32(frame + 24, uint32_t(yb >> 32));
+  guest::StoreU32(frame + 28, uint32_t(yb));
+  guest::StoreU32(frame + 16, uint32_t(xb >> 32));
+  guest::StoreU32(frame + 20, uint32_t(xb));
   return c_runtime::Pow(x, y);
 }
 
@@ -73,103 +73,103 @@ double AtLeast(double value, double floor) {
 
 }  // namespace
 
-double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t spec,
+double CarDataApplySettings(uint32_t data, uint32_t car, uint32_t spec,
                             uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820C05C8 CarData::ApplySettings");
   const uint32_t d = data, s = car + 16, f = frame;
-  auto at = [&](uint32_t offset) { return Lfs(base, offset); };
-  auto put = [&](uint32_t offset, double value) { Stfs(base, offset, value); };
+  auto at = [&](uint32_t offset) { return Lfs(offset); };
+  auto put = [&](uint32_t offset, double value) { Stfs(offset, value); };
   auto setting_value = [&](uint32_t offset) {
-    return int64_t(int8_t(guest::LoadU8(base, s + offset)));
+    return int64_t(int8_t(guest::LoadU8(s + offset)));
   };
   // The setting byte at car + 16 + `offset`, through the frame's +80.
   auto setting = [&](uint32_t offset) {
-    return StackIntegerFloat(base, f + 80, setting_value(offset));
+    return StackIntegerFloat(f + 80, setting_value(offset));
   };
 
   // With the tuning +1756 above 0: +1716 and +1800 by setting byte 78.
-  if (int32_t(schema::CarTuning(base, schema::PhysicsCar(base, car).tuning_address()).aero_3()) > 0) {
-    const double v1716 = at(schema::CarData(base, d).unknown_1716_address());
-    const double v1800 = at(schema::CarData(base, d).aero_front_address());
-    const double step = Lfs(base, kStep1716);
-    const double aero_step = Lfs(base, kStep1800);
-    put(schema::CarData(base, d).unknown_1716_address(), Fnmsubs(setting(78), step, v1716));
+  if (int32_t(schema::CarTuning(schema::PhysicsCar(car).tuning_address()).aero_3()) > 0) {
+    const double v1716 = at(schema::CarData(d).unknown_1716_address());
+    const double v1800 = at(schema::CarData(d).aero_front_address());
+    const double step = Lfs(kStep1716);
+    const double aero_step = Lfs(kStep1800);
+    put(schema::CarData(d).unknown_1716_address(), Fnmsubs(setting(78), step, v1716));
     const double b78 = setting(78);
-    put(schema::CarData(base, d).aero_front_address(), Fmuls(Fmadds(b78, aero_step, Lfs(base, kOne)), v1800));
+    put(schema::CarData(d).aero_front_address(), Fmuls(Fmadds(b78, aero_step, Lfs(kOne)), v1800));
   }
 
   // +548 and +820 += asin(byte 62 or 63 x 0.5 / (the radius +388 or +660 x
   // 2000)) in degrees; +544, +816 += bytes 64, 65, +540, +812 += them x 0.25.
-  const double v388 = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).radius_address());
-  const double radius_scale = Lfs(base, kRadiusScale);
+  const double v388 = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).radius_address());
+  const double radius_scale = Lfs(kRadiusScale);
   const double r_front = Fmuls(v388, radius_scale);
   const double b62 = setting(62);
-  const double unit = Lfs(base, kSettingStep);
+  const double unit = Lfs(kSettingStep);
   double sine = Fdivs(Fmuls(b62, unit), r_front);
   double angle = double(float(c_runtime::Asin(sine)));
-  const double v660 = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).radius_address());
-  const double v548 = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address() + 8);
+  const double v660 = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).radius_address());
+  const double v548 = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address() + 8);
   const double r_rear = Fmuls(v660, radius_scale);
-  double degrees = Lfs(base, kDegrees);
-  put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address() + 8, Fmadds(angle, degrees, v548));
+  double degrees = Lfs(kDegrees);
+  put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address() + 8, Fmadds(angle, degrees, v548));
   sine = Fdivs(Fmuls(setting(63), unit), r_rear);
   angle = double(float(c_runtime::Asin(sine)));
-  const double v820 = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address() + 8);
-  const double v544 = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address() + 4);
-  const double v816 = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address() + 4);
-  const double v540 = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address());
-  const double quarter = Lfs(base, kQuarter);
-  put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address() + 8, Fmadds(angle, degrees, v820));
-  const double v812 = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address());
-  put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address() + 4, Fadds(setting(64), v544));
-  put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address() + 4, Fadds(setting(65), v816));
-  put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).angles_address(), Fmadds(setting(64), quarter, v540));
-  put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).angles_address(), Fmadds(setting(65), quarter, v812));
+  const double v820 = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address() + 8);
+  const double v544 = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address() + 4);
+  const double v816 = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address() + 4);
+  const double v540 = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address());
+  const double quarter = Lfs(kQuarter);
+  put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address() + 8, Fmadds(angle, degrees, v820));
+  const double v812 = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address());
+  put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address() + 4, Fadds(setting(64), v544));
+  put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address() + 4, Fadds(setting(65), v816));
+  put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).angles_address(), Fmadds(setting(64), quarter, v540));
+  put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).angles_address(), Fmadds(setting(65), quarter, v812));
 
   // The springs: +1720 and +1732 (bytes 66, 70), +1740 and +1752 (bytes
   // 67, 71): each += byte x step x (the pair's sum), at least 0.0.
-  const double zero = Lfs(base, kZero);
-  const double spring_step = Lfs(base, kSpringStep);
+  const double zero = Lfs(kZero);
+  const double spring_step = Lfs(kSpringStep);
   {
-    const double a = at(schema::CarData(base, d).front_spring_address());
-    const double b = at(schema::CarData(base, d).front_anti_roll_address());
+    const double a = at(schema::CarData(d).front_spring_address());
+    const double b = at(schema::CarData(d).front_anti_roll_address());
     const double scaled = Fmuls(setting(66), spring_step);
     const double sum = Fadds(a, b);
     double value = Fmadds(scaled, sum, a);
-    put(schema::CarData(base, d).front_spring_address(), value);
-    put(schema::CarData(base, d).front_spring_address(), AtLeast(value, zero));
+    put(schema::CarData(d).front_spring_address(), value);
+    put(schema::CarData(d).front_spring_address(), AtLeast(value, zero));
     value = Fmadds(Fmuls(setting(70), spring_step), sum, b);
-    put(schema::CarData(base, d).front_anti_roll_address(), value);
-    put(schema::CarData(base, d).front_anti_roll_address(), AtLeast(value, zero));
+    put(schema::CarData(d).front_anti_roll_address(), value);
+    put(schema::CarData(d).front_anti_roll_address(), AtLeast(value, zero));
   }
   {
-    const double a = at(schema::CarData(base, d).rear_spring_address());
-    const double b = at(schema::CarData(base, d).rear_anti_roll_address());
+    const double a = at(schema::CarData(d).rear_spring_address());
+    const double b = at(schema::CarData(d).rear_anti_roll_address());
     const double scaled = Fmuls(setting(67), spring_step);
     const double sum = Fadds(a, b);
     double value = Fmadds(scaled, sum, a);
-    put(schema::CarData(base, d).rear_spring_address(), value);
-    put(schema::CarData(base, d).rear_spring_address(), AtLeast(value, zero));
+    put(schema::CarData(d).rear_spring_address(), value);
+    put(schema::CarData(d).rear_spring_address(), AtLeast(value, zero));
     value = Fmadds(Fmuls(setting(71), spring_step), sum, b);
-    put(schema::CarData(base, d).rear_anti_roll_address(), value);
-    put(schema::CarData(base, d).rear_anti_roll_address(), AtLeast(value, zero));
+    put(schema::CarData(d).rear_anti_roll_address(), value);
+    put(schema::CarData(d).rear_anti_roll_address(), AtLeast(value, zero));
   }
 
-  // The dampers: +1724 and +1728 x pow(base, byte 68), +1744 and +1748 x
-  // pow(base, byte 69); each pair at most 1.0 (the first compared before
+  // The dampers: +1724 and +1728 x pow(byte 68), +1744 and +1748 x
+  // pow(byte 69); each pair at most 1.0 (the first compared before
   // the second is written).
   const uint64_t pow_bits =
-      (uint64_t(guest::LoadU32(base, kPowBase)) << 32) | guest::LoadU32(base, kPowBase + 4);
+      (uint64_t(guest::LoadU32(kPowBase)) << 32) | guest::LoadU32(kPowBase + 4);
   const double pow_base = std::bit_cast<double>(pow_bits);
   double one = 0.0;
   double f1 = 0.0;
   for (const uint32_t pair : {1724u, 1744u}) {
     const uint32_t byte = pair == 1724 ? 68 : 69;
-    f1 = PowFromFrame(base, f, pow_base, setting(byte));
+    f1 = PowFromFrame(f, pow_base, setting(byte));
     put(d + pair, Fmuls(double(float(f1)), at(d + pair)));
-    f1 = PowFromFrame(base, f, pow_base, setting(byte));
+    f1 = PowFromFrame(f, pow_base, setting(byte));
     const double first = at(d + pair);
-    one = Lfs(base, kOne);
+    one = Lfs(kOne);
     const double second = Fmuls(double(float(f1)), at(d + (pair + 4)));
     put(d + (pair + 4), second);
     if (first > one) {
@@ -183,69 +183,69 @@ double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // The ride heights: +1736 -= byte 72 x the spec's +300 (below 0) or +304
   // (above) x scale; +1756 -= byte 73 x +308 or +312 x scale; +84 += the
   // two x the unit.
-  const double height_scale = Lfs(base, kHeightScale);
+  const double height_scale = Lfs(kHeightScale);
   double front = zero;
   {
     const int64_t b = setting_value(72);
     if (b != 0) {
-      const double x = Lfs(base, spec + (b < 0 ? 300 : 304));
-      const double fb = StackIntegerFloat(base, f + 80, b);
+      const double x = Lfs(spec + (b < 0 ? 300 : 304));
+      const double fb = StackIntegerFloat(f + 80, b);
       front = Fmuls(Fmuls(x, fb), height_scale);
     }
   }
-  put(schema::CarData(base, d).front_height_address(), Fsubs(at(schema::CarData(base, d).front_height_address()), front));
+  put(schema::CarData(d).front_height_address(), Fsubs(at(schema::CarData(d).front_height_address()), front));
   double rear = zero;
   {
     const int64_t b = setting_value(73);
     if (b != 0) {
-      const double x = Lfs(base, spec + (b < 0 ? 308 : 312));
-      const double fb = StackIntegerFloat(base, f + 80, b);
+      const double x = Lfs(spec + (b < 0 ? 308 : 312));
+      const double fb = StackIntegerFloat(f + 80, b);
       rear = Fmuls(Fmuls(x, fb), height_scale);
     }
   }
   const double both = Fadds(rear, front);
-  const double v1756 = at(schema::CarData(base, d).rear_height_address());
-  const double v84 = at(schema::CarData(base, d).center_of_mass_offset_address() + 4);
-  put(schema::CarData(base, d).rear_height_address(), Fsubs(v1756, rear));
-  put(schema::CarData(base, d).unknown_312_address(), unit);
-  const double stiff_step = Lfs(base, kStiffStep);
-  const double v136 = at(schema::CarData(base, d).rear_brake_factor_address());
-  put(schema::CarData(base, d).center_of_mass_offset_address() + 4, Fmadds(both, unit, v84));
+  const double v1756 = at(schema::CarData(d).rear_height_address());
+  const double v84 = at(schema::CarData(d).center_of_mass_offset_address() + 4);
+  put(schema::CarData(d).rear_height_address(), Fsubs(v1756, rear));
+  put(schema::CarData(d).unknown_312_address(), unit);
+  const double stiff_step = Lfs(kStiffStep);
+  const double v136 = at(schema::CarData(d).rear_brake_factor_address());
+  put(schema::CarData(d).center_of_mass_offset_address() + 4, Fmadds(both, unit, v84));
 
   // +132, +136 x (1 + (byte 74 or 75 - center) x step); +148 x a scale;
   // +140, +144 = byte 61 x a step.
-  const double v148 = at(schema::CarData(base, d).unknown_148_address());
-  const double v132 = at(schema::CarData(base, d).front_brake_factor_address());
+  const double v148 = at(schema::CarData(d).unknown_148_address());
+  const double v132 = at(schema::CarData(d).front_brake_factor_address());
   const double b74 = setting(74);
-  const double scale148 = Lfs(base, kScale148);
-  const uint32_t kind = schema::CarData(base, d).drive_type();
+  const double scale148 = Lfs(kScale148);
+  const uint32_t kind = schema::CarData(d).drive_type();
   const double scaled148 = Fmuls(v148, scale148);
-  const double center = Lfs(base, kCenter);
-  put(schema::CarData(base, d).front_brake_factor_address(), Fmuls(Fmadds(Fsubs(b74, center), stiff_step, one), v132));
-  put(schema::CarData(base, d).unknown_148_address(), scaled148);
-  put(schema::CarData(base, d).rear_brake_factor_address(), Fmuls(Fmadds(Fsubs(setting(75), center), stiff_step, one), v136));
+  const double center = Lfs(kCenter);
+  put(schema::CarData(d).front_brake_factor_address(), Fmuls(Fmadds(Fsubs(b74, center), stiff_step, one), v132));
+  put(schema::CarData(d).unknown_148_address(), scaled148);
+  put(schema::CarData(d).rear_brake_factor_address(), Fmuls(Fmadds(Fsubs(setting(75), center), stiff_step, one), v136));
   const double b61 = setting(61);
-  const double step140 = Lfs(base, kStep140);
-  put(schema::CarData(base, d).abs_front_address(), Fmuls(b61, step140));
-  put(schema::CarData(base, d).abs_rear_address(), Fmuls(setting(61), step140));
+  const double step140 = Lfs(kStep140);
+  put(schema::CarData(d).abs_front_address(), Fmuls(b61, step140));
+  put(schema::CarData(d).abs_rear_address(), Fmuls(setting(61), step140));
 
   // With +172 neither 0 nor 1 and setting byte 76 set: +180 = 1 - byte 77 x
   // a step; with +176 1, +260 = 1 + byte 77 x a step (another below 0).
-  if (kind != 0 && kind != 1 && guest::LoadU8(base, s + 76) != 0) {
-    const double step = Lfs(base, kStep180);
-    const uint32_t v176 = schema::CarData(base, d).axle_table_index();
-    put(schema::CarData(base, d).front_torque_share_address(), Fnmsubs(setting(77), step, one));
+  if (kind != 0 && kind != 1 && guest::LoadU8(s + 76) != 0) {
+    const double step = Lfs(kStep180);
+    const uint32_t v176 = schema::CarData(d).axle_table_index();
+    put(schema::CarData(d).front_torque_share_address(), Fnmsubs(setting(77), step, one));
     if (v176 == 1) {
       const double b77 = setting(77);
-      const double factor = b77 < zero ? Lfs(base, kNegativeStep) : stiff_step;
-      put(schema::CarData(base, d).axle_table_record_address() + 76, Fadds(Fmuls(b77, factor), one));
+      const double factor = b77 < zero ? Lfs(kNegativeStep) : stiff_step;
+      put(schema::CarData(d).axle_table_record_address() + 76, Fadds(Fmuls(b77, factor), one));
     }
   }
 
   // +1536 = car +36; +1432 to +1460 = car +40 to +68 (the gear ratios).
-  put(schema::CarData(base, d).final_drive_address(), Lfs(base, schema::PhysicsCar(base, car).final_drive_address()));
+  put(schema::CarData(d).final_drive_address(), Lfs(schema::PhysicsCar(car).final_drive_address()));
   for (uint32_t i = 0; i < 8; i++) {
-    put(schema::CarData(base, d).gear_ratios_address() + 4 + 4 * i, Lfs(base, schema::PhysicsCar(base, car).gear_ratios_address() + 4 * i));
+    put(schema::CarData(d).gear_ratios_address() + 4 + 4 * i, Lfs(schema::PhysicsCar(car).gear_ratios_address() + 4 * i));
   }
 
   // With the tuning +1704 above 0: the table (1.0, 1.0, two constants) on
@@ -253,27 +253,27 @@ double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // (+604, +596, +600) unless +172 is 1, the rear (+876, +868, +872) unless
   // it's 0, by setting bytes 56, 58 and 57, 59; +1700 picks the factor of
   // +600 and +872 (0: 0.0, 1: the unit, else 1.0).
-  const uint32_t index = schema::CarTuning(base, schema::PhysicsCar(base, car).tuning_address()).lsd_b();
-  const uint32_t pick = schema::CarTuning(base, schema::PhysicsCar(base, car).tuning_address()).lsd_a();
+  const uint32_t index = schema::CarTuning(schema::PhysicsCar(car).tuning_address()).lsd_b();
+  const uint32_t pick = schema::CarTuning(schema::PhysicsCar(car).tuning_address()).lsd_a();
   if (int32_t(index) > 0) {
     const double factor = pick == 0 ? zero : pick == 1 ? unit : one;
-    Stfs(base, f + 80, one);
-    Stfs(base, f + 84, one);
-    const uint32_t axles = schema::CarData(base, d).drive_type();
-    Stfs(base, f + 88, Lfs(base, kTable2));
-    Stfs(base, f + 92, Lfs(base, kTable3));
-    const double entry = Lfs(base, (index << 2) + (f + 80));
-    const double tuned = Fmuls(entry, Lfs(base, kTableScale));
-    const double q = Lfs(base, kQuarter);
+    Stfs(f + 80, one);
+    Stfs(f + 84, one);
+    const uint32_t axles = schema::CarData(d).drive_type();
+    Stfs(f + 88, Lfs(kTable2));
+    Stfs(f + 92, Lfs(kTable3));
+    const double entry = Lfs((index << 2) + (f + 80));
+    const double tuned = Fmuls(entry, Lfs(kTableScale));
+    const double q = Lfs(kQuarter);
     if (axles != 1) {
-      put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).unknown_268_address(), Fmuls(setting(56), tuned));
-      put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).unknown_260_address(), Fmuls(setting(58), q));
-      put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).unknown_264_address(), Fmuls(Fmuls(setting(58), factor), q));
+      put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).unknown_268_address(), Fmuls(setting(56), tuned));
+      put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).unknown_260_address(), Fmuls(setting(58), q));
+      put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).unknown_264_address(), Fmuls(Fmuls(setting(58), factor), q));
     }
     if (axles != 0) {
-      put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).unknown_268_address(), Fmuls(setting(57), tuned));
-      put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).unknown_260_address(), Fmuls(setting(59), q));
-      put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).unknown_264_address(), Fmuls(Fmuls(setting(59), factor), q));
+      put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).unknown_268_address(), Fmuls(setting(57), tuned));
+      put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).unknown_260_address(), Fmuls(setting(59), q));
+      put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).unknown_264_address(), Fmuls(Fmuls(setting(59), factor), q));
     }
   }
   return f1;
@@ -394,30 +394,30 @@ bool VehicleApplyTuningCopyFits(uint32_t car, uint32_t frame) {
          c_runtime::InOneView(source, 72) && !c_runtime::MayShare(destination, kCopyBytes, source, 72);
 }
 
-uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+uint64_t VehicleApplyTuning(uint32_t data, uint32_t car, uint32_t frame,
                             double* f1) {
   ITC_NATIVE_RUNNING("sub_820C0D28 Vehicle::ApplyTuning");
-  const uint32_t d = data, f = frame, levels = schema::PhysicsCar(base, car).tuning_address(), parts = car + kAeroParts;
-  auto at = [&](uint32_t offset) { return Lfs(base, offset); };
-  auto put = [&](uint32_t offset, double value) { Stfs(base, offset, value); };
-  auto k = [&](uint32_t constant) { return Lfs(base, constant); };
-  auto level = [&](uint32_t offset) { return int32_t(guest::LoadU32(base, levels + offset)); };
+  const uint32_t d = data, f = frame, levels = schema::PhysicsCar(car).tuning_address(), parts = car + kAeroParts;
+  auto at = [&](uint32_t offset) { return Lfs(offset); };
+  auto put = [&](uint32_t offset, double value) { Stfs(offset, value); };
+  auto k = [&](uint32_t constant) { return Lfs(constant); };
+  auto level = [&](uint32_t offset) { return int32_t(guest::LoadU32(levels + offset)); };
   // A level x 4 (rlwinm: the low 32 bits).
   auto index = [](int32_t value) { return uint32_t(value) << 2; };
   // lfsx: the table at frame + `table`, read at `index4` (unchecked).
-  auto entry = [&](uint32_t table, uint32_t index4) { return Lfs(base, index4 + (f + table)); };
+  auto entry = [&](uint32_t table, uint32_t index4) { return Lfs(index4 + (f + table)); };
   auto fill = [&](std::initializer_list<TableStore> stores) {
     for (const TableStore& s : stores) {
-      CopyWord(base, s.constant, f + s.offset);
+      CopyWord(s.constant, f + s.offset);
     }
   };
   const double one = k(kOne);
   const double zero = k(kZero);
 
   const uint32_t spec = vehicle_accessors::ObjectRecord1888(car);
-  const uint32_t level0 = collision::WordAt8(base, levels);  // car + 1656: the engine stage
+  const uint32_t level0 = collision::WordAt8(levels);  // car + 1656: the engine stage
   uint64_t r3 = level0;  // WordAt8's
-  const double v1420 = at(schema::CarData(base, d).torque_address());
+  const double v1420 = at(schema::CarData(d).torque_address());
   // The mass added at the front (f29) and the rear (f30), the torque curve's
   // factor (f16) and the ride height's change (f17).
   double front = zero;
@@ -428,7 +428,7 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // The engine stage (car + 1656 above 0): the cylinder count by block 2's
   // +68, NA (block 2 +69 0: the table at +160, 17) or turbo (+208, 20).
   if (int32_t(level0) > 0) {
-    const uint32_t code = schema::CarSpecCopies(base, spec).engine_type();
+    const uint32_t code = schema::CarSpecCopies(spec).engine_type();
     fill({{160, kOne}, {164, k1_05}, {168, k1_05}, {172, k1_1},  {176, k1_1},
           {180, k1_1}, {184, k1_15}, {188, k1_15}, {192, k1_3},  {196, k1_4},
           {208, kOne}, {212, k1_05}, {216, k1_05}, {220, k1_1},  {224, k1_1},
@@ -443,15 +443,15 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     }
     const uint32_t i = index(int32_t(level0));
     double factor, scale;
-    if (schema::CarSpecCopies(base, spec).turbo() != 0) {
+    if (schema::CarSpecCopies(spec).turbo() != 0) {
       factor = entry(208, i);
       scale = k(k20);
     } else {
       scale = k(k17);
       factor = entry(160, i);
     }
-    double x = Fdivs(at(schema::CarData(base, d).displacement_address()), cylinders);
-    const double mass = at(schema::CarData(base, d).mass_address());
+    double x = Fdivs(at(schema::CarData(d).displacement_address()), cylinders);
+    const double mass = at(schema::CarData(d).mass_address());
     factor = Fsubs(factor, one);
     fill({{208, kZero}, {212, kZero}, {220, k100}, {224, k100}, {228, k100},
           {216, kZero}, {232, k150}, {236, k150}, {240, k200}, {244, k200}});
@@ -462,9 +462,9 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     const double scaled = Fmuls(x, scale);
     const double inertia = entry(208, i);
     const double weight = Fmuls(scaled, k(k2e_5));
-    put(schema::CarData(base, d).engine_inertia_address(), Fmuls(inertia, at(schema::CarData(base, d).engine_inertia_address())));
+    put(schema::CarData(d).engine_inertia_address(), Fmuls(inertia, at(schema::CarData(d).engine_inertia_address())));
     front = Fmuls(weight, factor);
-    put(schema::CarData(base, d).idle_rpm_address(), Fadds(idle, at(schema::CarData(base, d).idle_rpm_address())));
+    put(schema::CarData(d).idle_rpm_address(), Fadds(idle, at(schema::CarData(d).idle_rpm_address())));
   }
 
   // +1676 (unchecked: the table at +96 is read at any level) and +1672.
@@ -475,16 +475,16 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     rear = entry(96, index(l28));
     r3 = 0xFFFFFFFF82000000ull;  // lis r3 (a constant's base, sign-extended)
     if (l24 > 0) {
-      const bool turbo = schema::CarSpecCopies(base, spec).turbo() != 0;
+      const bool turbo = schema::CarSpecCopies(spec).turbo() != 0;
       fill({{128, kOne}, {132, k1_005}, {136, k1_01}, {140, k1_015}, {144, k1_02},
             {148, k1_025}, {152, k1_03}, {96, kOne},  {112, k1_04},  {100, k1_01},
             {104, k1_02}, {108, k1_03},  {120, k1_06}, {116, k1_05}, {160, kOne},
             {164, k0_8},  {168, k0_75},  {172, k0_7},  {180, k0_6},  {184, k0_5},
             {176, k0_65}});
       const uint32_t i = index(l24);
-      put(schema::CarData(base, d).torque_address(), Fmuls(v1420, entry(turbo ? 96 : 128, i)));
-      const double mass = at(schema::CarData(base, d).mass_address());
-      const double l24_float = StackIntegerFloat(base, f + 80, int64_t(l24));
+      put(schema::CarData(d).torque_address(), Fmuls(v1420, entry(turbo ? 96 : 128, i)));
+      const double mass = at(schema::CarData(d).mass_address());
+      const double l24_float = StackIntegerFloat(f + 80, int64_t(l24));
       const double m = Fmuls(Fsubs(entry(160, i), one), mass);
       rear = Fmadds(m, k(k0_04), rear);
       curve = Fmadds(l24_float, k(k0_05), one);
@@ -493,7 +493,7 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
 
   // +1664: the torque +1420 and the front's mass.
   if (const int32_t l16 = level(16); l16 > 0) {
-    const bool turbo = schema::CarSpecCopies(base, spec).turbo() != 0;
+    const bool turbo = schema::CarSpecCopies(spec).turbo() != 0;
     fill({{104, k1_01}, {164, k1_01}, {96, kOne},   {100, k1_005}, {108, k1_015},
           {112, k1_02}, {116, k1_025}, {120, k1_03}, {160, kOne},   {168, k1_015},
           {172, k1_02}, {176, k1_025}, {180, k1_03}, {184, k1_035}, {208, kOne},
@@ -512,9 +512,9 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
       m = entry(208, i);
     }
     m = Fsubs(m, one);
-    const double v = at(schema::CarData(base, d).torque_address());
-    const double mass = at(schema::CarData(base, d).mass_address());
-    put(schema::CarData(base, d).torque_address(), Fmuls(v, torque));
+    const double v = at(schema::CarData(d).torque_address());
+    const double mass = at(schema::CarData(d).mass_address());
+    put(schema::CarData(d).torque_address(), Fmuls(v, torque));
     front = Fmadds(Fmuls(Fmuls(m, mass), scale), k(k0_01), front);
   }
 
@@ -522,13 +522,13 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // and the mass split by the center of mass.
   if (const int32_t l32 = level(32); l32 > 0) {
     const uint32_t i = index(l32);
-    const double wheelbase = at(schema::CarData(base, d).wheelbase_address());
-    const double x80 = at(schema::CarData(base, d).center_of_mass_offset_address());
+    const double wheelbase = at(schema::CarData(d).wheelbase_address());
+    const double x80 = at(schema::CarData(d).center_of_mass_offset_address());
     const double ahead = Fmadds(wheelbase, k(k0_5), x80);
     fill({{208, kOne}, {212, k0_8}, {216, k0_8}, {220, k0_85}, {224, k0_85},
           {228, k0_9}, {232, k0_9}, {160, k0_4}});
     const double share = Fdivs(ahead, wheelbase);
-    const double mass = at(schema::CarData(base, d).mass_address());
+    const double mass = at(schema::CarData(d).mass_address());
     const double floor = k(k0_1);
     fill({{184, k0_1}, {164, k0_35}, {168, k0_3}, {172, k0_25}, {176, k0_2}, {180, k0_15}});
     const double other = Fsubs(one, share);
@@ -538,9 +538,9 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     front = Fmadds(Fmuls(Fmuls(other, m), mass), weight, front);
     for (uint32_t gear = 1; gear < 9; gear++) {
       const double v = entry(160, i);
-      put(schema::CarData(base, d).shift_times_address() + 4 * gear, v);
+      put(schema::CarData(d).shift_times_address() + 4 * gear, v);
       if (v < floor) {  // bge past it: a NaN kept
-        put(schema::CarData(base, d).shift_times_address() + 4 * gear, floor);
+        put(schema::CarData(d).shift_times_address() + 4 * gear, floor);
       }
     }
   }
@@ -555,17 +555,17 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     fill({{100, k0_95}, {104, k0_9}, {108, k0_85}, {112, k0_8}, {116, k0_7}, {120, k0_5},
           {128, kZero}, {132, k0_01}, {136, k0_015}, {140, k0_02}, {148, k0_03}, {152, k0_04}});
     for (uint32_t j = 0; j < 9; j++) {
-      put(schema::CarData(base, d).gear_table_3_address() + 4 * j, Fadds(add, at(schema::CarData(base, d).gear_table_3_address() + 4 * j)));
+      put(schema::CarData(d).gear_table_3_address() + 4 * j, Fadds(add, at(schema::CarData(d).gear_table_3_address() + 4 * j)));
     }
-    const double wheelbase = at(schema::CarData(base, d).wheelbase_address());
-    const double x80 = at(schema::CarData(base, d).center_of_mass_offset_address());
+    const double wheelbase = at(schema::CarData(d).wheelbase_address());
+    const double x80 = at(schema::CarData(d).center_of_mass_offset_address());
     const double ahead = Fmadds(wheelbase, k(k0_5), x80);
-    const double v1552 = at(schema::CarData(base, d).engine_braking_address());
-    const double mass = at(schema::CarData(base, d).mass_address());
-    const double v1560 = at(schema::CarData(base, d).inertia_2_address());
+    const double v1552 = at(schema::CarData(d).engine_braking_address());
+    const double mass = at(schema::CarData(d).mass_address());
+    const double v1560 = at(schema::CarData(d).inertia_2_address());
     const double m = Fsubs(entry(160, i), one);
-    put(schema::CarData(base, d).engine_braking_address(), Fadds(entry(128, i), v1552));
-    put(schema::CarData(base, d).inertia_2_address(), Fmuls(entry(96, i), v1560));
+    put(schema::CarData(d).engine_braking_address(), Fadds(entry(128, i), v1552));
+    put(schema::CarData(d).inertia_2_address(), Fmuls(entry(96, i), v1560));
     const double share = Fdivs(ahead, wheelbase);
     const double other = Fsubs(one, share);
     const double weight = k(k0_01);
@@ -580,21 +580,21 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     fill({{208, kOne}, {212, k0_95}, {216, k0_9}, {220, k0_85}, {224, k0_85},
           {184, k1_6}, {152, k1_6}, {228, k0_85}, {232, k0_8}});
     const double m = Fsubs(entry(208, i), one);
-    const double mass = at(schema::CarData(base, d).mass_address());
+    const double mass = at(schema::CarData(d).mass_address());
     fill({{168, k1_2}, {172, k1_3}, {176, k1_4}, {160, kOne}, {164, k1_1}, {180, k1_5}});
     const double front_factor = entry(160, i);
-    const double v1720 = at(schema::CarData(base, d).front_spring_address());
+    const double v1720 = at(schema::CarData(d).front_spring_address());
     fill({{136, k1_2}, {140, k1_3}, {144, k1_4}, {128, kOne}, {132, k1_1}, {148, k1_5}});
     const double rear_factor = entry(128, i);
-    const double v1732 = at(schema::CarData(base, d).front_anti_roll_address());
-    put(schema::CarData(base, d).front_spring_address(), Fmuls(v1720, front_factor));
-    const double v1740 = at(schema::CarData(base, d).rear_spring_address());
-    put(schema::CarData(base, d).front_anti_roll_address(), Fmuls(v1732, rear_factor));
-    const double v1752 = at(schema::CarData(base, d).rear_anti_roll_address());
+    const double v1732 = at(schema::CarData(d).front_anti_roll_address());
+    put(schema::CarData(d).front_spring_address(), Fmuls(v1720, front_factor));
+    const double v1740 = at(schema::CarData(d).rear_spring_address());
+    put(schema::CarData(d).front_anti_roll_address(), Fmuls(v1732, rear_factor));
+    const double v1752 = at(schema::CarData(d).rear_anti_roll_address());
     const double weight = k(k0_02);
     front = Fmadds(Fmuls(mass, m), weight, front);
-    put(schema::CarData(base, d).rear_spring_address(), Fmuls(front_factor, v1740));
-    put(schema::CarData(base, d).rear_anti_roll_address(), Fmuls(rear_factor, v1752));
+    put(schema::CarData(d).rear_spring_address(), Fmuls(front_factor, v1740));
+    put(schema::CarData(d).rear_anti_roll_address(), Fmuls(rear_factor, v1752));
     rear = Fmadds(Fmuls(mass, m), weight, rear);
   }
 
@@ -603,24 +603,24 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   if (const int32_t l48 = level(48); l48 > 0) {
     const uint32_t i = index(l48);
     fill({{212, k30}, {208, kZero}});
-    const double v168 = at(schema::CarData(base, d).brake_heat_start_address());
+    const double v168 = at(schema::CarData(d).brake_heat_start_address());
     fill({{180, k1_5}, {216, k75}, {160, kOne}});
-    const double v132 = at(schema::CarData(base, d).front_brake_factor_address());
-    const double v136 = at(schema::CarData(base, d).rear_brake_factor_address());
+    const double v132 = at(schema::CarData(d).front_brake_factor_address());
+    const double v136 = at(schema::CarData(d).rear_brake_factor_address());
     fill({{220, k120}});
-    const double v156 = at(schema::CarData(base, d).unknown_156_address());
-    const double v160 = at(schema::CarData(base, d).unknown_160_address());
-    const double v164 = at(schema::CarData(base, d).brake_heat_limit_address());
+    const double v156 = at(schema::CarData(d).unknown_156_address());
+    const double v160 = at(schema::CarData(d).unknown_160_address());
+    const double v164 = at(schema::CarData(d).brake_heat_limit_address());
     fill({{224, k180}, {228, k240}, {232, k240}});
     double brake = Fadds(entry(208, i), v168);
-    put(schema::CarData(base, d).brake_heat_start_address(), brake);
+    put(schema::CarData(d).brake_heat_start_address(), brake);
     fill({{164, k1_08}, {168, k1_18}, {172, k1_28}, {176, k1_38}, {184, k1_65}});
     const double factor = entry(160, i);
     const double inverse = Fdivs(one, factor);
-    put(schema::CarData(base, d).front_brake_factor_address(), Fmuls(factor, v132));
-    put(schema::CarData(base, d).rear_brake_factor_address(), Fmuls(v136, factor));
-    put(schema::CarData(base, d).unknown_156_address(), Fmuls(v156, inverse));
-    put(schema::CarData(base, d).unknown_160_address(), Fmuls(v160, inverse));
+    put(schema::CarData(d).front_brake_factor_address(), Fmuls(factor, v132));
+    put(schema::CarData(d).rear_brake_factor_address(), Fmuls(v136, factor));
+    put(schema::CarData(d).unknown_156_address(), Fmuls(v156, inverse));
+    put(schema::CarData(d).unknown_160_address(), Fmuls(v160, inverse));
     // bge past each: a NaN kept.
     if (brake < zero) {
       brake = zero;
@@ -630,41 +630,41 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     fill({{208, kOne}, {212, k0_95}, {216, kOne}, {220, k1_05}, {224, k1_1},
           {228, k1_15}, {232, kOne}});
     const double m = Fsubs(entry(208, i), one);
-    const double mass = at(schema::CarData(base, d).mass_address());
-    put(schema::CarData(base, d).brake_heat_start_address(), brake);
-    const double v400 = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address());
-    const double v672 = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_mass_address());
+    const double mass = at(schema::CarData(d).mass_address());
+    put(schema::CarData(d).brake_heat_start_address(), brake);
+    const double v400 = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address());
+    const double v672 = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_mass_address());
     const double weight = k(k0_04);
-    put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address(), Fmadds(Fmuls(mass, m), weight, v400));
-    put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_mass_address(), Fmadds(Fmuls(mass, m), weight, v672));
+    put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address(), Fmadds(Fmuls(mass, m), weight, v400));
+    put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_mass_address(), Fmadds(Fmuls(mass, m), weight, v672));
   }
 
   // The wheels (+1728, +1736 not 0): the axle's wheel mass - 3 + the
   // inch-up (+1732, +1740), both into the front's +400 (as the game has
   // it).
   if (level(80) != 0) {
-    const double v = Fsubs(at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address()), k(k3));
-    put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address(), v);
-    const double inch = StackIntegerFloat(base, f + 80, int64_t(level(84)));
-    put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address(), Fadds(inch, v));
+    const double v = Fsubs(at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address()), k(k3));
+    put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address(), v);
+    const double inch = StackIntegerFloat(f + 80, int64_t(level(84)));
+    put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address(), Fadds(inch, v));
   }
   if (level(88) != 0) {
-    put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_mass_address(), Fsubs(at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_mass_address()), k(k3)));
+    put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_mass_address(), Fsubs(at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_mass_address()), k(k3)));
     const int32_t l92 = level(92);
-    const double v = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address());
-    const double inch = StackIntegerFloat(base, f + 80, int64_t(l92));
-    put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address(), Fadds(inch, v));
+    const double v = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address());
+    const double inch = StackIntegerFloat(f + 80, int64_t(l92));
+    put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address(), Fadds(inch, v));
   }
 
   // The wheels' inertias +536, +808 = mass x radius².
   {
-    const double radius_front = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).radius_address());
-    double m_front = at(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_mass_address());
-    const double radius_rear = at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).radius_address());
+    const double radius_front = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).radius_address());
+    double m_front = at(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_mass_address());
+    const double radius_rear = at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).radius_address());
     m_front = Fmuls(m_front, radius_front);
-    const double m_rear = Fmuls(at(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_mass_address()), radius_rear);
-    put(schema::CarDataAxle(base, schema::CarData(base, d).front_axle_address()).wheel_inertia_address(), Fmuls(m_front, radius_front));
-    put(schema::CarDataAxle(base, schema::CarData(base, d).rear_axle_address()).wheel_inertia_address(), Fmuls(m_rear, radius_rear));
+    const double m_rear = Fmuls(at(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_mass_address()), radius_rear);
+    put(schema::CarDataAxle(schema::CarData(d).front_axle_address()).wheel_inertia_address(), Fmuls(m_front, radius_front));
+    put(schema::CarDataAxle(schema::CarData(d).rear_axle_address()).wheel_inertia_address(), Fmuls(m_rear, radius_rear));
   }
   if (level(152) != 0) {
     front = Fsubs(front, k(k10));
@@ -675,16 +675,16 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     const uint32_t i = index(l60);
     fill({{208, kZero}, {212, k0_01}, {216, k0_02}, {220, k0_03}, {224, k0_04},
           {232, k0_06}, {228, k0_05}});
-    const double v1552 = at(schema::CarData(base, d).engine_braking_address());
+    const double v1552 = at(schema::CarData(d).engine_braking_address());
     const double v = Fadds(entry(208, i), v1552);
-    put(schema::CarData(base, d).engine_braking_address(), v);
+    put(schema::CarData(d).engine_braking_address(), v);
     if (v > one) {  // ble past it: a NaN kept
-      put(schema::CarData(base, d).engine_braking_address(), one);
+      put(schema::CarData(d).engine_braking_address(), one);
     }
     fill({{216, k0_9}, {224, k0_85}, {232, k0_8}, {208, kOne}, {212, k0_95}, {220, k0_875}});
-    const double wheelbase = at(schema::CarData(base, d).wheelbase_address());
-    const double x80 = at(schema::CarData(base, d).center_of_mass_offset_address());
-    const double mass = at(schema::CarData(base, d).mass_address());
+    const double wheelbase = at(schema::CarData(d).wheelbase_address());
+    const double x80 = at(schema::CarData(d).center_of_mass_offset_address());
+    const double mass = at(schema::CarData(d).mass_address());
     fill({{228, k0_83}});
     const double m = Fsubs(entry(208, i), one);
     fill({{208, kZero}, {212, kMinus0_005}, {216, kMinus0_01}, {220, kMinus0_012},
@@ -706,57 +706,57 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // +28, +32 x 0.002 onto the tracks +8, +12). With +1784 set, the record
   // at +204 and only the parts its flags (+24) pick; else the one at +168
   // and every part. Part 3 is -5 at the rear when +1756 is -1.
-  put(schema::CarData(base, d).aero_front_address(), one);
-  put(schema::CarData(base, d).aero_side_address(), one);
+  put(schema::CarData(d).aero_front_address(), one);
+  put(schema::CarData(d).aero_side_address(), one);
   const double track_step = k(k0_002);
-  if (schema::CarSpecCopies(base, spec).list_kind() == 0) {
+  if (schema::CarSpecCopies(spec).list_kind() == 0) {
     const bool flagged = level(136) != 0;
     const double drag = k(kDragStep);
-    c_runtime::Memcpy(base, f + 208, parts + (flagged ? 204 : 168), kCopyBytes);
+    c_runtime::Memcpy(f + 208, parts + (flagged ? 204 : 168), kCopyBytes);
     r3 = f + 208;  // memcpy's r3 (its r3 saved below the stack pointer isn't reproduced)
     auto part = [&](uint32_t p) {
-      put(schema::CarData(base, d).aero_front_address(), Fmuls(Lfs(base, parts + p + 16), at(schema::CarData(base, d).aero_front_address())));
-      rear = Fadds(Lfs(base, parts + p + 4), rear);
-      front = Fadds(Lfs(base, parts + p), front);
-      put(schema::CarData(base, d).aero_side_address(), Fmuls(Lfs(base, parts + p + 20), at(schema::CarData(base, d).aero_side_address())));
-      put(schema::CarData(base, d).unknown_1712_address(), Fnmsubs(Lfs(base, parts + p + 8), drag, at(schema::CarData(base, d).unknown_1712_address())));
-      put(schema::CarData(base, d).unknown_1716_address(), Fnmsubs(Lfs(base, parts + p + 12), drag, at(schema::CarData(base, d).unknown_1716_address())));
+      put(schema::CarData(d).aero_front_address(), Fmuls(Lfs(parts + p + 16), at(schema::CarData(d).aero_front_address())));
+      rear = Fadds(Lfs(parts + p + 4), rear);
+      front = Fadds(Lfs(parts + p), front);
+      put(schema::CarData(d).aero_side_address(), Fmuls(Lfs(parts + p + 20), at(schema::CarData(d).aero_side_address())));
+      put(schema::CarData(d).unknown_1712_address(), Fnmsubs(Lfs(parts + p + 8), drag, at(schema::CarData(d).unknown_1712_address())));
+      put(schema::CarData(d).unknown_1716_address(), Fnmsubs(Lfs(parts + p + 12), drag, at(schema::CarData(d).unknown_1716_address())));
     };
     if (!flagged) {
-      front = Fadds(Lfs(base, parts), front);
-      rear = Fadds(Lfs(base, parts + 4), rear);
-      put(schema::CarData(base, d).aero_front_address(), Lfs(base, parts + 16));
-      put(schema::CarData(base, d).aero_side_address(), Lfs(base, parts + 20));
-      put(schema::CarData(base, d).unknown_1712_address(), Fnmsubs(Lfs(base, parts + 8), drag, at(schema::CarData(base, d).unknown_1712_address())));
-      put(schema::CarData(base, d).unknown_1716_address(), Fnmsubs(Lfs(base, parts + 12), drag, at(schema::CarData(base, d).unknown_1716_address())));
+      front = Fadds(Lfs(parts), front);
+      rear = Fadds(Lfs(parts + 4), rear);
+      put(schema::CarData(d).aero_front_address(), Lfs(parts + 16));
+      put(schema::CarData(d).aero_side_address(), Lfs(parts + 20));
+      put(schema::CarData(d).unknown_1712_address(), Fnmsubs(Lfs(parts + 8), drag, at(schema::CarData(d).unknown_1712_address())));
+      put(schema::CarData(d).unknown_1716_address(), Fnmsubs(Lfs(parts + 12), drag, at(schema::CarData(d).unknown_1716_address())));
       part(28);
       part(56);
     }
-    if (!flagged || (guest::LoadU32(base, f + 232) & 2) != 0) {
+    if (!flagged || (guest::LoadU32(f + 232) & 2) != 0) {
       if (level(108) == -1) {
         rear = Fsubs(rear, k(k5));
       } else {
         part(84);
       }
     }
-    if (!flagged || (guest::LoadU32(base, f + 232) & 1) != 0) {
+    if (!flagged || (guest::LoadU32(f + 232) & 1) != 0) {
       part(112);
     }
     if (!flagged) {
       part(140);
     }
-    put(schema::CarData(base, d).aero_front_address(), Fmuls(Lfs(base, f + 224), at(schema::CarData(base, d).aero_front_address())));
-    put(schema::CarData(base, d).aero_side_address(), Fmuls(at(schema::CarData(base, d).aero_side_address()), Lfs(base, f + 228)));
-    front = Fadds(Lfs(base, f + 208), front);
-    rear = Fadds(Lfs(base, f + 212), rear);
-    const double v1712 = Fnmsubs(Lfs(base, f + 216), drag, at(schema::CarData(base, d).unknown_1712_address()));
-    const double v1716 = Fnmsubs(Lfs(base, f + 220), drag, at(schema::CarData(base, d).unknown_1716_address()));
-    const double v8 = Fmadds(Lfs(base, f + 236), track_step, at(schema::CarData(base, d).front_track_address()));
-    const double v12 = Fmadds(Lfs(base, f + 240), track_step, at(schema::CarData(base, d).rear_track_address()));
-    put(schema::CarData(base, d).unknown_1712_address(), v1712);
-    put(schema::CarData(base, d).unknown_1716_address(), v1716);
-    put(schema::CarData(base, d).front_track_address(), v8);
-    put(schema::CarData(base, d).rear_track_address(), v12);
+    put(schema::CarData(d).aero_front_address(), Fmuls(Lfs(f + 224), at(schema::CarData(d).aero_front_address())));
+    put(schema::CarData(d).aero_side_address(), Fmuls(at(schema::CarData(d).aero_side_address()), Lfs(f + 228)));
+    front = Fadds(Lfs(f + 208), front);
+    rear = Fadds(Lfs(f + 212), rear);
+    const double v1712 = Fnmsubs(Lfs(f + 216), drag, at(schema::CarData(d).unknown_1712_address()));
+    const double v1716 = Fnmsubs(Lfs(f + 220), drag, at(schema::CarData(d).unknown_1716_address()));
+    const double v8 = Fmadds(Lfs(f + 236), track_step, at(schema::CarData(d).front_track_address()));
+    const double v12 = Fmadds(Lfs(f + 240), track_step, at(schema::CarData(d).rear_track_address()));
+    put(schema::CarData(d).unknown_1712_address(), v1712);
+    put(schema::CarData(d).unknown_1716_address(), v1716);
+    put(schema::CarData(d).front_track_address(), v8);
+    put(schema::CarData(d).rear_track_address(), v12);
   }
 
   // The wheels above 0: block 2's +900 (front) and +904 (rear) x 0.002,
@@ -764,25 +764,25 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   if (level(80) > 0) {
     const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
     r3 = block2;
-    put(schema::CarData(base, d).front_track_address(), Fmadds(Lfs(base, schema::CarSpecCopies(base, block2).b1_float_548_address()), track_step, at(schema::CarData(base, d).front_track_address())));
+    put(schema::CarData(d).front_track_address(), Fmadds(Lfs(schema::CarSpecCopies(block2).b1_float_548_address()), track_step, at(schema::CarData(d).front_track_address())));
   }
   if (level(88) > 0) {
     const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
     r3 = block2;
-    put(schema::CarData(base, d).front_track_address(), Fmadds(Lfs(base, schema::CarSpecCopies(base, block2).b1_float_552_address()), track_step, at(schema::CarData(base, d).front_track_address())));
+    put(schema::CarData(d).front_track_address(), Fmadds(Lfs(schema::CarSpecCopies(block2).b1_float_552_address()), track_step, at(schema::CarData(d).front_track_address())));
   }
 
   // The masses added at the axles (half the wheelbase ahead of and behind
   // the center): the mass +0, +36 x new / old, the center of mass +80;
   // +84 += the ride height's change.
   {
-    const double wheelbase = at(schema::CarData(base, d).wheelbase_address());
+    const double wheelbase = at(schema::CarData(d).wheelbase_address());
     const double half = Fmuls(wheelbase, k(k0_5));
-    const double mass = at(schema::CarData(base, d).mass_address());
-    const double x80 = at(schema::CarData(base, d).center_of_mass_offset_address());
-    const double v36 = at(schema::CarData(base, d).inertia_factors_address() + 4);
+    const double mass = at(schema::CarData(d).mass_address());
+    const double x80 = at(schema::CarData(d).center_of_mass_offset_address());
+    const double v36 = at(schema::CarData(d).inertia_factors_address() + 4);
     const double behind = Fmuls(wheelbase, k(kMinus0_5));
-    put(schema::CarData(base, d).center_of_mass_offset_address() + 4, Fadds(at(schema::CarData(base, d).center_of_mass_offset_address() + 4), height));
+    put(schema::CarData(d).center_of_mass_offset_address() + 4, Fadds(at(schema::CarData(d).center_of_mass_offset_address() + 4), height));
     double ahead_mass = Fmuls(mass, behind);
     ahead_mass = Fmsubs(mass, x80, ahead_mass);
     ahead_mass = Fmuls(ahead_mass, k(k0_5));
@@ -791,36 +791,36 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
     const double front_mass = Fadds(ahead_mass, front);
     rear_mass = Fadds(rear_mass, rear);
     const double total = Fadds(rear_mass, front_mass);
-    put(schema::CarData(base, d).mass_address(), total);
+    put(schema::CarData(d).mass_address(), total);
     double moment = Fmuls(rear_mass, behind);
     const double ratio = Fdivs(total, mass);
     moment = Fmadds(front_mass, half, moment);
-    put(schema::CarData(base, d).inertia_factors_address() + 4, Fmuls(ratio, v36));
-    put(schema::CarData(base, d).center_of_mass_offset_address(), Fdivs(moment, total));
+    put(schema::CarData(d).inertia_factors_address() + 4, Fmuls(ratio, v36));
+    put(schema::CarData(d).center_of_mass_offset_address(), Fdivs(moment, total));
   }
   // +1500 to +1532, +1552 and +1832 at most 1 (ble past it: a NaN kept).
   for (uint32_t j = 0; j < 9; j++) {
-    if (at(schema::CarData(base, d).gear_table_3_address() + 4 * j) > one) {
-      put(schema::CarData(base, d).gear_table_3_address() + 4 * j, one);
+    if (at(schema::CarData(d).gear_table_3_address() + 4 * j) > one) {
+      put(schema::CarData(d).gear_table_3_address() + 4 * j, one);
     }
   }
-  if (at(schema::CarData(base, d).engine_braking_address()) > one) {
-    put(schema::CarData(base, d).engine_braking_address(), one);
+  if (at(schema::CarData(d).engine_braking_address()) > one) {
+    put(schema::CarData(d).engine_braking_address(), one);
   }
-  if (at(schema::CarData(base, d).unknown_1832_address()) > one) {
-    put(schema::CarData(base, d).unknown_1832_address(), one);
+  if (at(schema::CarData(d).unknown_1832_address()) > one) {
+    put(schema::CarData(d).unknown_1832_address(), one);
   }
 
   // An array on the stack nothing reads: the engine stage x 10, at most 100,
   // and four zeros.
-  guest::StoreU32(base, f + 100, 0);
-  guest::StoreU32(base, f + 104, 0);
-  guest::StoreU32(base, f + 108, 0);
-  guest::StoreU32(base, f + 112, 0);
-  guest::StoreU32(base, f + 96, uint32_t(int32_t(level0 * 100u) / 10));
+  guest::StoreU32(f + 100, 0);
+  guest::StoreU32(f + 104, 0);
+  guest::StoreU32(f + 108, 0);
+  guest::StoreU32(f + 112, 0);
+  guest::StoreU32(f + 96, uint32_t(int32_t(level0 * 100u) / 10));
   for (uint32_t j = 0; j < 5; j++) {
-    if (int32_t(guest::LoadU32(base, f + 96 + 4 * j)) > 100) {
-      guest::StoreU32(base, f + 96 + 4 * j, 100);
+    if (int32_t(guest::LoadU32(f + 96 + 4 * j)) > 100) {
+      guest::StoreU32(f + 96 + 4 * j, 100);
     }
   }
 
@@ -830,7 +830,7 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   // compares as not below and not above).
   int32_t peak = 0;
   for (uint32_t j = 1; j < 32; j++) {
-    if (at(schema::CarData(base, d).torque_curve_address() + 4 * j) == one) {
+    if (at(schema::CarData(d).torque_curve_address() + 4 * j) == one) {
       peak = int32_t(j);
       break;
     }
@@ -907,43 +907,43 @@ int32_t Fctiwz(double v) {
 
 // The torque curve's point count: fctiwz(+1280 x the scale), stored
 // through frame + 80 (stfiwx) as the original does.
-int32_t CurvePoints(uint8_t* base, uint32_t data, uint32_t frame, double scale) {
-  const int32_t n = Fctiwz(Fmuls(double(schema::CarData(base, data).rev_limit()), scale));
-  guest::StoreU32(base, frame + 80, uint32_t(n));
+int32_t CurvePoints(uint32_t data, uint32_t frame, double scale) {
+  const int32_t n = Fctiwz(Fmuls(double(schema::CarData(data).rev_limit()), scale));
+  guest::StoreU32(frame + 80, uint32_t(n));
   return n;
 }
 
 // A tire's +8 to +36 and +44 to +76 copied to the frame at `to` (+40 left
 // out), as the original's loop and copies order them.
-void CopyTire(uint8_t* base, uint32_t to, uint32_t tire) {
+void CopyTire(uint32_t to, uint32_t tire) {
   for (uint32_t i = 0; i < 4; i++) {
-    CopyWord(base, tire + 8 + 4 * i, to + 4 * i);
-    CopyWord(base, tire + 24 + 4 * i, to + 16 + 4 * i);
+    CopyWord(tire + 8 + 4 * i, to + 4 * i);
+    CopyWord(tire + 24 + 4 * i, to + 16 + 4 * i);
   }
   for (uint32_t i = 0; i < 9; i++) {
-    CopyWord(base, tire + 44 + 4 * i, to + 32 + 4 * i);
+    CopyWord(tire + 44 + 4 * i, to + 32 + 4 * i);
   }
 }
 
 // The axle's widening by its camber setting: radius x (sin(the new camber)
 // - sin(the spec's)), in radians by `radians`; 0.0 when the setting byte is
 // 0.
-double CamberWidening(uint8_t* base, uint32_t data, uint32_t car, uint32_t byte,
+double CamberWidening(uint32_t data, uint32_t car, uint32_t byte,
                       uint32_t spec_angle, uint32_t angle, uint32_t radius, double radians,
                       double zero) {
-  if (guest::LoadU8(base, car + byte) == 0) {
+  if (guest::LoadU8(car + byte) == 0) {
     return zero;
   }
-  const double old_sine = c_runtime::Sin(Fmuls(Lfs(base, spec_angle), radians));
-  const double new_angle = Fmuls(Lfs(base, data + angle), radians);
-  const double old_part = Fneg(Fmuls(double(float(old_sine)), Lfs(base, data + radius)));
+  const double old_sine = c_runtime::Sin(Fmuls(Lfs(spec_angle), radians));
+  const double new_angle = Fmuls(Lfs(data + angle), radians);
+  const double old_part = Fneg(Fmuls(double(float(old_sine)), Lfs(data + radius)));
   const double new_sine = double(float(c_runtime::Sin(new_angle)));
-  return Fmadds(new_sine, Lfs(base, data + radius), old_part);
+  return Fmadds(new_sine, Lfs(data + radius), old_part);
 }
 
 }  // namespace
 
-bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+bool VehicleSetupFromCar(uint32_t data, uint32_t car, uint32_t frame,
                          double* f1) {
   if (!VehicleApplyTuningCopyFits(car, frame - kTuningFrame)) {
     return false;
@@ -952,150 +952,150 @@ bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t fr
   const uint32_t d = data, f = frame;
   const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);  // car + 1888
   const uint32_t block1 = block2 + 352;                               // car + 2240
-  const schema::CarSpecCopies copies(base, block2);                   // its engine stage: car + 2880
+  const schema::CarSpecCopies copies(block2);                   // its engine stage: car + 2880
   const uint32_t front_tire = block2 + 1196;                          // car + 3084
   const uint32_t rear_tire = block2 + 1288;                           // car + 3176
-  auto copy = [&](uint32_t to, uint32_t from) { CopyWord(base, from, to); };
+  auto copy = [&](uint32_t to, uint32_t from) { CopyWord(from, to); };
 
   for (const SetupCopy& c : kSetupCopies) {
-    CopyWord(base, c.from == 0xFFFF ? kOne : block1 + c.from, d + c.to);
+    CopyWord(c.from == 0xFFFF ? kOne : block1 + c.from, d + c.to);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    copy(schema::CarData(base, d).unknown_276_address() + 4 * i, block1 + 324 + 4 * i);
+    copy(schema::CarData(d).unknown_276_address() + 4 * i, block1 + 324 + 4 * i);
   }
-  schema::CarData(base, d).set_gear_count(uint32_t(copies.b1_gear_count()));
-  const double zero = Lfs(base, kZero);
+  schema::CarData(d).set_gear_count(uint32_t(copies.b1_gear_count()));
+  const double zero = Lfs(kZero);
   // The gear ratios' table (+1428, its magnitudes: a value below 0.0 is
   // negated, a NaN kept), +1464, +1500 and +1632, 9 each.
   for (uint32_t i = 0; i < 9; i++) {
-    double v = Lfs(base, copies.b1_gear_ratio_reverse_address() + 4 * i);
+    double v = Lfs(copies.b1_gear_ratio_reverse_address() + 4 * i);
     if (v < zero) {
       v = Fneg(v);
     }
-    Stfs(base, schema::CarData(base, d).gear_ratios_address() + 4 * i, v);
-    copy(schema::CarData(base, d).gear_table_2_address() + 4 * i, copies.b1_gear_table_420_address() + 4 * i);
-    copy(schema::CarData(base, d).gear_table_3_address() + 4 * i, copies.b1_gear_table_456_address() + 4 * i);
-    copy(schema::CarData(base, d).shift_times_address() + 4 * i, copies.b1_shift_time_0_address() + 4 * i);
+    Stfs(schema::CarData(d).gear_ratios_address() + 4 * i, v);
+    copy(schema::CarData(d).gear_table_2_address() + 4 * i, copies.b1_gear_table_420_address() + 4 * i);
+    copy(schema::CarData(d).gear_table_3_address() + 4 * i, copies.b1_gear_table_456_address() + 4 * i);
+    copy(schema::CarData(d).shift_times_address() + 4 * i, copies.b1_shift_time_0_address() + 4 * i);
   }
-  copy(schema::CarData(base, d).final_drive_address(), copies.b1_final_drive_address());
-  copy(schema::CarData(base, d).unknown_1540_address(), copies.b1_float_376_address());
-  copy(schema::CarData(base, d).unknown_1544_address(), copies.b1_float_380_address());
-  copy(schema::CarData(base, d).idle_rpm_address(), copies.b1_idle_rpm_address());
-  copy(schema::CarData(base, d).max_rpm_address(), copies.stage_max_rpm_address());
-  copy(schema::CarData(base, d).unknown_1276_address(), copies.stage_16_address());
-  copy(schema::CarData(base, d).rev_limit_address(), copies.stage_rev_limit_address());
-  copy(schema::CarData(base, d).torque_address(), copies.stage_torque_x10_address());
+  copy(schema::CarData(d).final_drive_address(), copies.b1_final_drive_address());
+  copy(schema::CarData(d).unknown_1540_address(), copies.b1_float_376_address());
+  copy(schema::CarData(d).unknown_1544_address(), copies.b1_float_380_address());
+  copy(schema::CarData(d).idle_rpm_address(), copies.b1_idle_rpm_address());
+  copy(schema::CarData(d).max_rpm_address(), copies.stage_max_rpm_address());
+  copy(schema::CarData(d).unknown_1276_address(), copies.stage_16_address());
+  copy(schema::CarData(d).rev_limit_address(), copies.stage_rev_limit_address());
+  copy(schema::CarData(d).torque_address(), copies.stage_torque_x10_address());
   // +1288 = block 2's word +8 as a float (through frame + 80: std, lfd,
   // fcfid, frsp; the word zero-extended).
   {
     const uint32_t word = copies.displacement();
-    guest::StoreU32(base, f + 80, 0);
-    guest::StoreU32(base, f + 84, word);
-    schema::CarData(base, d).set_displacement(float(double(float(double(int64_t(word))))));
+    guest::StoreU32(f + 80, 0);
+    guest::StoreU32(f + 84, word);
+    schema::CarData(d).set_displacement(float(double(float(double(int64_t(word))))));
   }
   // The torque curve: 32 points from the engine's +28, then again for as
   // many as +1280 x the scale says (counted again after each).
   for (uint32_t i = 0; i < 32; i++) {
-    copy(schema::CarData(base, d).torque_curve_address() + 4 * i, copies.stage_torque_curve_0_address() + 4 * i);
+    copy(schema::CarData(d).torque_curve_address() + 4 * i, copies.stage_torque_curve_0_address() + 4 * i);
   }
   {
-    const double scale = Lfs(base, kCurveScale);
-    if (CurvePoints(base, d, f, scale) > 0) {
+    const double scale = Lfs(kCurveScale);
+    if (CurvePoints(d, f, scale) > 0) {
       int32_t j = 0;
       do {
-        CopyWord(base, copies.stage_torque_curve_0_address() + 4 * uint32_t(j), schema::CarData(base, d).torque_curve_address() + 4 * uint32_t(j));
+        CopyWord(copies.stage_torque_curve_0_address() + 4 * uint32_t(j), schema::CarData(d).torque_curve_address() + 4 * uint32_t(j));
         j++;
-      } while (j < CurvePoints(base, d, f, scale));
+      } while (j < CurvePoints(d, f, scale));
     }
   }
-  copy(schema::CarData(base, d).engine_inertia_address(), copies.stage_156_address());
-  copy(schema::CarData(base, d).engine_braking_address(), copies.stage_160_address());
-  copy(schema::CarData(base, d).engine_braking_2_address(), copies.stage_164_address());
-  copy(schema::CarData(base, d).inertia_2_address(), copies.stage_168_address());
-  schema::CarData(base, d).set_turbo(uint8_t(copies.stage_turbo() != 0 ? 1 : 0));
-  copy(schema::CarData(base, d).boost_1616_address(), copies.stage_boost_address());
-  copy(schema::CarData(base, d).boost_1620_address(), copies.stage_boost_2_address());
-  copy(schema::CarData(base, d).unknown_1624_address(), copies.stage_boost_3_address());
-  copy(schema::CarData(base, d).boost_1612_address(), copies.stage_188_address());
-  schema::CarData(base, d).set_blow_off(uint8_t(copies.stage_blow_off() != 0 ? 1 : 0));
-  copy(schema::CarData(base, d).unknown_1608_address(), copies.stage_196_address());
+  copy(schema::CarData(d).engine_inertia_address(), copies.stage_156_address());
+  copy(schema::CarData(d).engine_braking_address(), copies.stage_160_address());
+  copy(schema::CarData(d).engine_braking_2_address(), copies.stage_164_address());
+  copy(schema::CarData(d).inertia_2_address(), copies.stage_168_address());
+  schema::CarData(d).set_turbo(uint8_t(copies.stage_turbo() != 0 ? 1 : 0));
+  copy(schema::CarData(d).boost_1616_address(), copies.stage_boost_address());
+  copy(schema::CarData(d).boost_1620_address(), copies.stage_boost_2_address());
+  copy(schema::CarData(d).unknown_1624_address(), copies.stage_boost_3_address());
+  copy(schema::CarData(d).boost_1612_address(), copies.stage_188_address());
+  schema::CarData(d).set_blow_off(uint8_t(copies.stage_blow_off() != 0 ? 1 : 0));
+  copy(schema::CarData(d).unknown_1608_address(), copies.stage_196_address());
 
   // The axles from the tires' copies on the frame (front +128, rear +208).
-  CopyTire(base, f + 128, front_tire);
-  CarDataFillAxle(base, d, f + 128, 1);
-  CopyTire(base, f + 208, rear_tire);
-  CarDataFillAxle(base, d, f + 208, 0);
+  CopyTire(f + 128, front_tire);
+  CarDataFillAxle(d, f + 128, 1);
+  CopyTire(f + 208, rear_tire);
+  CarDataFillAxle(d, f + 208, 0);
 
   // The record by +176 (unchecked): +184, +188, +192 to +255, +256, +260.
   {
-    const uint32_t index = schema::CarData(base, d).axle_table_index();
-    const uint32_t record = guest::LoadU32(base, (index << 2) + schema::CarPhysicsGlobals::axle_records_address());
-    copy(schema::CarData(base, d).axle_table_record_address(), record + 4);
-    copy(schema::CarData(base, d).axle_table_record_address() + 4, record + 8);
+    const uint32_t index = schema::CarData(d).axle_table_index();
+    const uint32_t record = guest::LoadU32((index << 2) + schema::CarPhysicsGlobals::axle_records_address());
+    copy(schema::CarData(d).axle_table_record_address(), record + 4);
+    copy(schema::CarData(d).axle_table_record_address() + 4, record + 8);
     for (uint32_t i = 0; i < 16; i++) {
-      copy(schema::CarData(base, d).axle_table_record_address() + 8 + 4 * i, record + 12 + 4 * i);
+      copy(schema::CarData(d).axle_table_record_address() + 8 + 4 * i, record + 12 + 4 * i);
     }
-    copy(schema::CarData(base, d).axle_table_record_address() + 72, record + 76);
-    copy(schema::CarData(base, d).axle_table_record_address() + 76, record + 80);
+    copy(schema::CarData(d).axle_table_record_address() + 72, record + 76);
+    copy(schema::CarData(d).axle_table_record_address() + 76, record + 80);
   }
 
   double tuning_f1 = 0.0;
-  VehicleApplyTuning(base, d, car, f - kTuningFrame, &tuning_f1);
-  CarDataApplySettings(base, d, car, block2, f - kSettingsFrame);
+  VehicleApplyTuning(d, car, f - kTuningFrame, &tuning_f1);
+  CarDataApplySettings(d, car, block2, f - kSettingsFrame);
 
   // The flag +3888 bit 1: +168 = +164, +84 x the scale.
-  if ((schema::PhysicsCar(base, car).flags() >> 1) & 1) {
-    const double v84 = Lfs(base, schema::CarData(base, d).center_of_mass_offset_address() + 4);
-    copy(schema::CarData(base, d).brake_heat_start_address(), schema::CarData(base, d).brake_heat_limit_address());
-    Stfs(base, schema::CarData(base, d).center_of_mass_offset_address() + 4, Fmuls(v84, Lfs(base, k84Scale)));
+  if ((schema::PhysicsCar(car).flags() >> 1) & 1) {
+    const double v84 = Lfs(schema::CarData(d).center_of_mass_offset_address() + 4);
+    copy(schema::CarData(d).brake_heat_start_address(), schema::CarData(d).brake_heat_limit_address());
+    Stfs(schema::CarData(d).center_of_mass_offset_address() + 4, Fmuls(v84, Lfs(k84Scale)));
   }
 
   // The axles' positions (+336 and +608, Vec4::Copy from the frame's +112
   // and +96): x half the wheelbase ahead and behind, y the ride heights
   // +1736 and +1756, z half the track less the inch-up's widening (car +3876,
   // +3880) and the camber setting's (bytes +80, +81), w 0.0.
-  const double radians = Lfs(base, kRadians);
+  const double radians = Lfs(kRadians);
   {
     const double widening =
-        CamberWidening(base, d, car, 80, block1 + 96, 544, 388, radians, zero);
-    const double track = double(schema::CarData(base, d).front_track());
-    const double inch = double(schema::PhysicsCar(base, car).front_axle_z());
-    const double wheelbase = double(schema::CarData(base, d).wheelbase());
-    CopyWord(base, schema::CarData(base, d).front_height_address(), f + 116);
-    const double half = Lfs(base, kHalf);
+        CamberWidening(d, car, 80, block1 + 96, 544, 388, radians, zero);
+    const double track = double(schema::CarData(d).front_track());
+    const double inch = double(schema::PhysicsCar(car).front_axle_z());
+    const double wheelbase = double(schema::CarData(d).wheelbase());
+    CopyWord(schema::CarData(d).front_height_address(), f + 116);
+    const double half = Lfs(kHalf);
     const double z = Fnmsubs(track, half, inch);
-    Stfs(base, f + 124, zero);
-    Stfs(base, f + 112, Fmuls(wheelbase, half));
-    Stfs(base, f + 120, Fadds(z, widening));
-    vector_library::Vec4Copy(base, schema::CarData(base, d).front_axle_address(), f + 112);
+    Stfs(f + 124, zero);
+    Stfs(f + 112, Fmuls(wheelbase, half));
+    Stfs(f + 120, Fadds(z, widening));
+    vector_library::Vec4Copy(schema::CarData(d).front_axle_address(), f + 112);
   }
   {
     const double widening =
-        CamberWidening(base, d, car, 81, block1 + 160, 816, 660, radians, zero);
-    CopyWord(base, schema::CarData(base, d).rear_height_address(), f + 100);
-    const double wheelbase = double(schema::CarData(base, d).wheelbase());
-    const double track = double(schema::CarData(base, d).rear_track());
-    const double inch = double(schema::PhysicsCar(base, car).rear_axle_z());
-    Stfs(base, f + 96, Fmuls(wheelbase, Lfs(base, kMinusHalf)));
-    const double z = Fnmsubs(track, Lfs(base, kHalf), inch);
-    Stfs(base, f + 108, zero);
-    Stfs(base, f + 104, Fadds(z, widening));
-    vector_library::Vec4Copy(base, schema::CarData(base, d).rear_axle_address(), f + 96);
+        CamberWidening(d, car, 81, block1 + 160, 816, 660, radians, zero);
+    CopyWord(schema::CarData(d).rear_height_address(), f + 100);
+    const double wheelbase = double(schema::CarData(d).wheelbase());
+    const double track = double(schema::CarData(d).rear_track());
+    const double inch = double(schema::PhysicsCar(car).rear_axle_z());
+    Stfs(f + 96, Fmuls(wheelbase, Lfs(kMinusHalf)));
+    const double z = Fnmsubs(track, Lfs(kHalf), inch);
+    Stfs(f + 108, zero);
+    Stfs(f + 104, Fadds(z, widening));
+    vector_library::Vec4Copy(schema::CarData(d).rear_axle_address(), f + 96);
   }
 
-  copy(schema::CarData(base, d).unknown_1808_address(), schema::CarData(base, d).unknown_1704_address());
-  copy(schema::CarData(base, d).unknown_1812_address(), schema::CarData(base, d).unknown_1712_address());
-  copy(schema::CarData(base, d).unknown_1816_address(), schema::CarData(base, d).unknown_1716_address());
-  copy(schema::CarData(base, d).front_brake_address(), schema::CarData(base, d).front_brake_factor_address());
-  copy(schema::CarData(base, d).rear_brake_address(), schema::CarData(base, d).rear_brake_factor_address());
-  copy(schema::CarData(base, d).unknown_272_address(), schema::CarData(base, d).unknown_148_address());
+  copy(schema::CarData(d).unknown_1808_address(), schema::CarData(d).unknown_1704_address());
+  copy(schema::CarData(d).unknown_1812_address(), schema::CarData(d).unknown_1712_address());
+  copy(schema::CarData(d).unknown_1816_address(), schema::CarData(d).unknown_1716_address());
+  copy(schema::CarData(d).front_brake_address(), schema::CarData(d).front_brake_factor_address());
+  copy(schema::CarData(d).rear_brake_address(), schema::CarData(d).rear_brake_factor_address());
+  copy(schema::CarData(d).unknown_272_address(), schema::CarData(d).unknown_148_address());
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, schema::CarData(base, d).gear_ratios_copy_address() + 4 * i, guest::LoadU32(base, schema::CarData(base, d).gear_ratios_address() + 4 * i));
+    guest::StoreU32(schema::CarData(d).gear_ratios_copy_address() + 4 * i, guest::LoadU32(schema::CarData(d).gear_ratios_address() + 4 * i));
   }
-  copy(schema::CarData(base, d).torque_copy_address(), schema::CarData(base, d).torque_address());
-  copy(schema::CarData(base, d).final_drive_copy_address(), schema::CarData(base, d).final_drive_address());
-  CarDataConvertUnits(base, d);
-  *f1 = CarDataDerive(base, d, f - kDeriveFrame);
+  copy(schema::CarData(d).torque_copy_address(), schema::CarData(d).torque_address());
+  copy(schema::CarData(d).final_drive_copy_address(), schema::CarData(d).final_drive_address());
+  CarDataConvertUnits(d);
+  *f1 = CarDataDerive(d, f - kDeriveFrame);
   return true;
 }
 

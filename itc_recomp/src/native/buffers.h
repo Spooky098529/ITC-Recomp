@@ -19,7 +19,7 @@ bool Buffers_Logging();
 // standing for the call's return address in the logs. False, with nothing
 // done, where the override would run the original: --native_memcpy off, or
 // ranges that may share memory.
-bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+bool Buffers_Memcpy(uint32_t destination, uint32_t source, uint32_t size,
                     uint32_t caller);
 // Whether Buffers_Memcpy copies at all (--native_memcpy): for native callers
 // checking before they change anything.
@@ -27,7 +27,7 @@ bool Buffers_NativeMemcpy();
 
 // Render thread, before a command handler runs: the buffer objects commands
 // 11 and 12 bind.
-void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count);
+void Buffers_OnCommand(uint32_t id, uint32_t payload, uint32_t count);
 
 // Render thread: the sequence number of the newest write the library's
 // memcpy made into [physical, physical + size), 0 if none; and the newest

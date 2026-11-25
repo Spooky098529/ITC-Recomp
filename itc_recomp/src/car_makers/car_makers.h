@@ -41,27 +41,27 @@ uint32_t BlockOf(uint32_t id);
 // by its halfword +6); then +4040 = 1 and the wheels' colors and floats.
 // The conversions' scratch doublewords at `stack` - 16, - 24, - 32 as the
 // original leaves them (a leaf: `stack` is r1). Returns the record (r3).
-uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, uint32_t stack);
+uint32_t SetPaint(uint32_t record, uint32_t car, uint32_t pick, uint32_t stack);
 // SceneModelRecord::SetWheels (sub_8215B238): r3 = a record, r4 = a car
 // object: +4052, +4068 = the wheel numbers - 1, +4104, +4124 (block 2's
 // +236 when set), the tires' +4080 to +4100. The empty destructor
 // sub_82106540 the original calls on the car twice is left out. Its
 // 112-byte frame below `stack` (the back chain). Returns block 2 (r3).
-uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack);
+uint32_t SetWheels(uint32_t record, uint32_t car, uint32_t stack);
 // SceneModelRecord::SetChoice (sub_8215B1A0): r3 = a 12-byte out, r4:r5 = a
 // 12-byte value {a, b, c} in registers, stored to `stack` + 32 and + 40 (the
 // caller's frame, as the original does) and read back: c 0, out +0 = 0;
 // else out +0 = 1, +4 = c - 1, +8 = 3a - 3 + k (k 1 for (1, 0), 2 for (1,
 // 1), 1 for (2, 1), else 0). r3 is left.
-void SetChoice(uint8_t* base, uint32_t out, uint64_t r4, uint64_t r5, uint32_t stack);
+void SetChoice(uint32_t out, uint64_t r4, uint64_t r5, uint32_t stack);
 // CarRecord::ResetBytes (sub_820D0900): twelve words from `at` = 0, 0, 1,
 // 2, 3, 29, 36, 31, 32, 37, 34, 35 (in the original's store order).
-void ResetBytes(uint8_t* base, uint32_t at);
+void ResetBytes(uint32_t at);
 // CarRecord::SetBytes (sub_8215B0E0): r3 = a car record, r4 = a car's 20
 // bytes at +1568: CarRecord::ResetBytes(+3632), +3632 = 0, +3636 to +3676 =
 // the signed bytes r4 +1 to +11, +3684 = the signed byte r4 +0. Its
 // 112-byte frame below `stack`. Returns the record + 3632 (r3).
-uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack);
+uint32_t SetBytes(uint32_t record, uint32_t bytes, uint32_t stack);
 
 // SceneModelRecord::FromCar (sub_8215B878): r3 = a 4,244-byte record, r4 =
 // a car object, r5 = the paint pick (all 64 bits, for SetPaint). Its
@@ -81,7 +81,7 @@ uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack
 // calls on the car is left out. Callees already ours run as plain C++
 // (memcpy and AeroParts::Get82 through `calls` where theirs refuse).
 // Returns SetBytes' r3 (the record + 3648).
-uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t record,
+uint32_t FromCar(const front_end_car_draw::Calls& calls, uint32_t record,
                  uint32_t car, uint64_t pick, uint32_t stack);
 
 // --- The garage cars (src/car_makers/garage.cpp) ---
@@ -91,12 +91,12 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
 // +1964 = 1; memcpy(+1904, Defaults::Table3044(), 60) (a guest call where
 // memcpy's plain C++ declines). Its 96-byte frame below `stack`. Returns
 // memcpy's r3.
-uint64_t GarageCarReset(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
+uint64_t GarageCarReset(const front_end_car_draw::Calls& calls, uint32_t car,
                         uint32_t stack);
 // GarageCars::StaticInit (sub_825D9EF0): the two 1,972-byte entries at
 // 0x82814EB8, each GarageCar::Reset and its +1968 = 0. Its 112-byte frame
 // below `stack` (Reset's below it). Returns the last Reset's r3.
-uint64_t GarageCarsStaticInit(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
+uint64_t GarageCarsStaticInit(const front_end_car_draw::Calls& calls, uint32_t stack);
 // CarData::FromGarageCar (sub_82179A60): r4 = a garage car, r5 = a car
 // data (r3 not read). Its 4,016-byte frame below `stack`: a car object at
 // frame + 80 (Car::Init, memcpy of the garage car's 1,884 bytes,
@@ -104,14 +104,14 @@ uint64_t GarageCarsStaticInit(uint8_t* base, const front_end_car_draw::Calls& ca
 // data)), then Vehicle::SetupFromCar(data, car) again; each callee's
 // original through `calls` (from the frame) where its plain C++ declines.
 // Returns the last's r3; `f1` gets what it leaves.
-uint64_t FromGarageCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t garage,
+uint64_t FromGarageCar(const front_end_car_draw::Calls& calls, uint32_t garage,
                        uint32_t data, uint32_t stack, double* f1);
 // TuningScreen::SetUpCarData (sub_821DF2F8): r3 = the tuning screen: its
 // selected garage car (the save data [+18904]'s list at +6120 walked
 // [+0x19920] steps from the head halfword +204), then a tail call
 // CarData::FromGarageCar([[0x826D83E0]], the car, the screen + 18912) from
 // the same `stack`. Returns its r3; `f1` as it leaves it.
-uint64_t TuningScreenSetUpCarData(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t TuningScreenSetUpCarData(const front_end_car_draw::Calls& calls,
                                   uint32_t screen, uint32_t stack, double* f1);
 
 // --- The garage stage's makers (src/car_makers/stand.cpp) ---
@@ -123,14 +123,14 @@ uint64_t TuningScreenSetUpCarData(uint8_t* base, const front_end_car_draw::Calls
 // stage's car sizes from it (s +6096 to +6204, the stage reloaded from the
 // holder for each, as the original; sin of the axles' angles x
 // [0x82002948]). Returns SetupFromCar's r3; `f1` gets the second sin's.
-uint64_t GarageStageFitCar(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageFitCar(const front_end_car_draw::Calls& calls,
                            uint32_t holder, uint32_t car, uint32_t stack, double* f1);
 // GarageStage::CopyRecord (sub_8217FC60): r3 = the holder, r4 = a record:
 // SceneModelRecord::Copy(m + 32, r4) on the stage's scene model m
 // (ScenePools::GetB, pool 7, s +8); where its plain C++ declines (the
 // callers' copy onto itself), its adapter through `calls` (from the 96-byte
 // frame below `stack`). Returns the copy's r3.
-uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageCopyRecord(const front_end_car_draw::Calls& calls,
                                uint32_t holder, uint32_t record, uint32_t stack);
 // GarageStage::ReapplyRecord (sub_82178DF8; `decals`) and
 // ReapplyRecordNoDecals (sub_82178E60): r3 = the holder. Its 96-byte frame
@@ -141,7 +141,7 @@ uint64_t GarageStageCopyRecord(uint8_t* base, const front_end_car_draw::Calls& c
 // where it declines: the race's path), SceneModel::ApplyLightKit(m) and, for
 // ReapplyRecord, SceneModel::ReloadDecals(m) (their plain C++). Returns the
 // last call's r3.
-uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageReapplyRecord(const front_end_car_draw::Calls& calls,
                                   const scene_models::ApplyCall& apply, uint32_t holder,
                                   uint32_t stack, bool decals);
 // GarageStage::SetCar (sub_8217FD58): r3 = the holder, r4 = a car object,
@@ -151,14 +151,14 @@ uint64_t GarageStageReapplyRecord(uint8_t* base, const front_end_car_draw::Calls
 // m + 32), GarageStage::FitCar(r3, car) (`f1` gets what it leaves) and
 // GarageStage::ReapplyRecord(r3), their plain C++ from the frame. Returns
 // ReapplyRecord's r3.
-uint64_t GarageStageSetCar(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageSetCar(const front_end_car_draw::Calls& calls,
                            const scene_models::ApplyCall& apply, uint32_t holder, uint32_t car,
                            uint64_t pick, uint32_t stack, double* f1);
 // GarageStage::SetCarClass (sub_8217FDC8): as SetCar from a 128-byte frame,
 // without FitCar: FromCar, then the record's +3768 = 1 when r5's low word
 // is 1, 2 or 4, else 0, CopyRecord and ReapplyRecordNoDecals. Returns its
 // r3.
-uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageSetCarClass(const front_end_car_draw::Calls& calls,
                                 const scene_models::ApplyCall& apply, uint32_t holder,
                                 uint32_t car, uint64_t pick, uint32_t stack);
 // GarageStage::ShowCarById (sub_82182C90) and ShowCarByIdWithClass
@@ -170,7 +170,7 @@ uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& 
 // Car::Refresh, its original through `calls` where it declines), then
 // GarageStage::SetCar([[0x826D83E0]], car, pick) (`f1` gets what it leaves)
 // or SetCarClass. Returns its r3.
-uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageShowCarById(const front_end_car_draw::Calls& calls,
                                 const scene_models::ApplyCall& apply, uint64_t pick,
                                 uint32_t stack, bool with_class, double* f1);
 // sub_8219ED10 and sub_8219EDB0 (the stand's busy marker shown and hidden,
@@ -178,8 +178,8 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
 // 112-byte frame below `stack`), then its named animations through their
 // overrides (`calls`): FinishNamed 86, 87, PlayNamed 86, 85, LoopNamed 85;
 // or FinishNamed 86, 87, 85, PlayNamed 87. Return the last call's r3.
-uint64_t ShowBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
-uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t stack);
+uint64_t ShowBusyMarker(const front_end_car_draw::Calls& calls, uint32_t stack);
+uint64_t HideBusyMarker(const front_end_car_draw::Calls& calls, uint32_t stack);
 
 // GarageStage::ReloadModel (sub_8217F880): r3 = the holder, r4 = a model
 // block or -1. Its 4,400-byte frame below `stack`: the stage's scene model m
@@ -193,7 +193,7 @@ uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, u
 // ScenePools::SetUpB(scene, 7, s +8, the record), m +4296 = 1, the count 0,
 // s +6056, s +16 = 1, s +4 = -1; returns 1. PollLoad, ReleaseB, CarScene::
 // Update and SetUpB through `calls` (their adapters).
-uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& calls,
+uint64_t GarageStageReloadModel(const front_end_car_draw::Calls& calls,
                                 uint32_t holder, uint32_t block, uint32_t stack);
 
 }  // namespace car_makers

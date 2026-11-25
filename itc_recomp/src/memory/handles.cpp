@@ -1,6 +1,8 @@
 #include "memory/handles.h"
 
 #include "base/log.h"
+#include "memory/host_copy.h"
+#include "guest.h"
 
 #include <algorithm>
 #include <atomic>
@@ -25,76 +27,28 @@ struct Entry {
   uint32_t start = 0;  // the object's handle
   uint32_t size = 0;
   const char* type = nullptr;
+  const Layout* layout = nullptr;
+  uint32_t element = 0;  // an array's element size; 0 for one object
 };
 
 Entry* g_entries = nullptr;            // kGranules, allocated once
-std::atomic<uint8_t*> g_base{nullptr};
 std::mutex g_mutex;
 uint32_t g_next = 0;                   // the first granule never handed out
 // Freed spans by their granule count (reused first fit by count).
 std::vector<std::pair<uint32_t, uint32_t>> g_free;  // (first granule, count)
-struct sigaction g_previous {};
 
 uint32_t Granule(uint32_t handle) { return (handle - kHandlesStart) / kHandleGranule; }
 
-// Async-signal-safe enough for a last message: snprintf into a stack
-// buffer, write(2) to stderr, then the log's own line.
-void OnFault(int sig, siginfo_t* info, void* context) {
-  uint8_t* base = g_base.load(std::memory_order_relaxed);
-  const uintptr_t at = reinterpret_cast<uintptr_t>(info->si_addr);
-  const uintptr_t lo = reinterpret_cast<uintptr_t>(base) + kHandlesStart;
-  const uintptr_t hi = reinterpret_cast<uintptr_t>(base) + kHandlesEnd;
-  if (base && at >= lo && at < hi) {
-    const uint32_t guest = uint32_t(at - reinterpret_cast<uintptr_t>(base));
-    const Entry* e = g_entries ? &g_entries[Granule(guest)] : nullptr;
-    char text[256];
-    if (e && e->object) {
-      std::snprintf(text, sizeof(text),
-                    "handle fault: a raw access at %08X, +%u into a %s (handle %08X, %u bytes): "
-                    "code reaching a host object through guest memory\n",
-                    guest, guest - e->start, e->type, e->start, e->size);
-    } else {
-      std::snprintf(text, sizeof(text), "handle fault: a raw access at %08X (no live handle)\n",
-                    guest);
-    }
-    ITC_LOG_ERROR("{}", text);
-    ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
-    (void)ignored;
-    std::_Exit(3);
-  }
-  // Not ours: as before.
-  if (g_previous.sa_flags & SA_SIGINFO) {
-    if (g_previous.sa_sigaction) {
-      g_previous.sa_sigaction(sig, info, context);
-      return;
-    }
-  } else if (g_previous.sa_handler != SIG_DFL && g_previous.sa_handler != SIG_IGN) {
-    g_previous.sa_handler(sig);
-    return;
-  }
-  signal(sig, SIG_DFL);
-  raise(sig);
-}
-
 }  // namespace
 
-bool ProtectHandles(uint8_t* base) {
+bool SetUpHandles() {
   g_entries = new Entry[kGranules]();
-  if (mprotect(base + kHandlesStart, kHandlesEnd - kHandlesStart, PROT_NONE) != 0) {
-    ITC_LOG_ERROR("handles: can't protect {:#x} to {:#x}", kHandlesStart, kHandlesEnd);
-    return false;
-  }
-  struct sigaction action {};
-  action.sa_sigaction = OnFault;
-  action.sa_flags = SA_SIGINFO | SA_ONSTACK;
-  sigemptyset(&action.sa_mask);
-  sigaction(SIGSEGV, &action, &g_previous);
-  g_base.store(base, std::memory_order_relaxed);
-  ITC_LOG_INFO("handles: {:#x} to {:#x}, inaccessible", kHandlesStart, kHandlesEnd);
+  ITC_LOG_INFO("handles: {:#x} to {:#x}", kHandlesStart, kHandlesEnd);
   return true;
 }
 
-uint32_t MakeHandle(void* object, uint32_t size, const char* type) {
+uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout* layout,
+                    uint32_t element) {
   const uint32_t count = std::max<uint32_t>(1, (size + kHandleGranule - 1) / kHandleGranule);
   std::lock_guard lock(g_mutex);
   uint32_t first = UINT32_MAX;
@@ -115,7 +69,7 @@ uint32_t MakeHandle(void* object, uint32_t size, const char* type) {
   }
   const uint32_t handle = kHandlesStart + first * kHandleGranule;
   for (uint32_t i = 0; i < count; i++) {
-    g_entries[first + i] = {object, handle, size, type};
+    g_entries[first + i] = {object, handle, size, type, layout, element};
   }
   return handle;
 }
@@ -138,14 +92,94 @@ void ReleaseHandle(uint32_t handle) {
   g_free.emplace_back(first, count);
 }
 
+bool FreeHandle(uint32_t handle) {
+  void* object = nullptr;
+  {
+    std::lock_guard lock(g_mutex);
+    if (!IsHandle(handle) || !g_entries || !g_entries[Granule(handle)].object ||
+        g_entries[Granule(handle)].start != handle) {
+      ITC_LOG_ERROR("handles: a free of {:08X}, not a live handle's start", handle);
+      return false;
+    }
+    object = g_entries[Granule(handle)].object;
+  }
+  ReleaseHandle(handle);
+  // The schema's host structs are plain data made with `new T()`.
+  ::operator delete(object);
+  return true;
+}
+
+bool DescribeHandle(uint32_t value, HandleInfo* info) {
+  if (!IsHandle(value) || !g_entries) {
+    return false;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  if (!e.object || value - e.start >= std::max<uint32_t>(e.size, 1)) {
+    return false;
+  }
+  *info = {e.object, value - e.start, e.size, e.type, e.layout,
+           e.element ? e.element : std::max<uint32_t>(e.size, 1)};
+  return true;
+}
+
+namespace {
+const Layout kBlobLayout = {nullptr, 0};
+}  // namespace
+
+bool IsBlobLayout(const Layout* layout) { return layout == &kBlobLayout; }
+
+uint32_t NewBlob(uint32_t size, const char* type) {
+  // Whole 4 KB pages, as VirtualAlloc gives them: the game reads past what it
+  // asked for in places (a menu's flags read by index past its count), which
+  // the page's slack covered on the 360. A handle's span is pages anyway.
+  const uint32_t rounded = std::max<uint32_t>(1, (size + kHandleGranule - 1) / kHandleGranule) *
+                           kHandleGranule;
+  void* bytes = ::operator new(rounded);
+  std::memset(bytes, 0, rounded);
+  return MakeHandle(bytes, rounded, type, &kBlobLayout);
+}
+
+uint8_t* BlobPointer(uint32_t value, uint32_t* left) {
+  if (!IsHandle(value) || !g_entries) {
+    return nullptr;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  const uint32_t offset = value - e.start;
+  if (!e.object || e.layout != &kBlobLayout || offset > e.size) {
+    return nullptr;
+  }
+  if (left) {
+    *left = e.size - offset;
+  }
+  return static_cast<uint8_t*>(e.object) + offset;
+}
+
+void* HandleOwn(uint32_t value, const Layout* layout) {
+  if (!IsHandle(value) || !g_entries) {
+    return nullptr;
+  }
+  const Entry& e = g_entries[Granule(value)];
+  const uint32_t offset = value - e.start;
+  if (!e.object || e.layout != layout || offset >= std::max<uint32_t>(e.size, 1)) {
+    return nullptr;
+  }
+  if (offset % (e.element ? e.element : std::max<uint32_t>(e.size, 1)) != 0) {
+    return nullptr;
+  }
+  return static_cast<uint8_t*>(e.object) + offset;
+}
+
 void* HandleObject(uint32_t handle) {
   if (handle == 0) {
     return nullptr;
   }
   if (IsHandle(handle) && g_entries) {
+    // A value inside the object's span names the member there: host
+    // structs keep the guest offsets (tools/schema_gen.py), so an embedded
+    // object's or an interface's address is the owner's handle + offset.
     const Entry& e = g_entries[Granule(handle)];
-    if (e.object && e.start == handle) {
-      return e.object;
+    if (e.object && handle - e.start < std::max<uint32_t>(e.size, 1)) {
+      return static_cast<uint8_t*>(e.object) + (handle - e.start);
     }
   }
   static std::atomic<bool> logged{false};

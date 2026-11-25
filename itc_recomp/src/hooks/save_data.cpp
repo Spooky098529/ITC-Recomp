@@ -38,65 +38,65 @@ namespace sd = save_data;
 
 ITC_REGS_STEP(SaveDataStatsConstruct) {
   ctx.fpscr.disableFlushMode();
-  sd::StatsConstruct(base, ctx.r3.u32);
+  sd::StatsConstruct(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataStatsResetRecords) {
   ctx.fpscr.disableFlushMode();
-  sd::StatsResetRecords(base, ctx.r3.u32);
+  sd::StatsResetRecords(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataStatsReset) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = sd::StatsReset(base, ctx.r3.u32);
+  ctx.r3.u64 = sd::StatsReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataProgressClear) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = sd::ProgressClear(base, ctx.r3.u32);
+  ctx.r3.u64 = sd::ProgressClear(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataBitSetAll) {
-  sd::BitSet400SetAll(base, ctx.r3.u32);
+  sd::BitSet400SetAll(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataProgressSetDefaults) {
   if (!sd::SetDefaultsNative(ctx.r3.u32)) {
-    lifted::original::c82113E60(ctx, base);
+    lifted::original::c82113E60(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = sd::ProgressSetDefaults(base, ctx.r3.u32);
+  ctx.r3.u64 = sd::ProgressSetDefaults(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataControlMapSetDefault) {
-  sd::ControlMapSetDefault(base, ctx.r3.u32);
+  sd::ControlMapSetDefault(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataOptionsSetDefaults) {
   ctx.r7.u64 = ctx.r3.u64;
-  ctx.r3.u64 = sd::OptionsSetDefaults(base, ctx.r3.u32);
+  ctx.r3.u64 = sd::OptionsSetDefaults(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataCourseRecordsReset) {
-  ctx.r3.u64 = sd::CourseRecordsReset(base, ctx.r3.u32);
+  ctx.r3.u64 = sd::CourseRecordsReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(SaveDataCourseRecordsOf) {
   const uint64_t records = ctx.r3.u64;
-  ctx.r10.u64 = schema::CourseRecordKey(base, ctx.r4.u32).traffic();
-  ctx.r3.u64 = sd::CourseRecordsOf(base, records, ctx.r4.u32);
+  ctx.r10.u64 = schema::CourseRecordKey(ctx.r4.u32).traffic();
+  ctx.r3.u64 = sd::CourseRecordsOf(records, ctx.r4.u32);
   // (r11 = r3 - 20, a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(SaveDataDelete) {
   if (hooks::NativeHeapActive()) {
-    if (const auto block = sd::SaveDataDelete(base, ctx.r3.u32)) {
+    if (const auto block = sd::SaveDataDelete(ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  lifted::original::c821055D8(ctx, base);
+  lifted::original::c821055D8(ctx);
 }
 
 ITC_REGS_STEP(SaveDataCreate) {
@@ -105,35 +105,35 @@ ITC_REGS_STEP(SaveDataCreate) {
   }
   if (hooks::NativeHeapActive() && sd::CreateNative()) {
     ctx.fpscr.disableFlushMode();
-    if (const auto holder = sd::SaveDataCreate(base, ctx.r3.u32)) {
+    if (const auto holder = sd::SaveDataCreate(ctx.r3.u32)) {
       ctx.r3.u64 = *holder;
       return;
     }
   }
-  lifted::original::c821057C8(ctx, base);
+  lifted::original::c821057C8(ctx);
 }
 
 ITC_REGS_STEP(SaveDataCreateTwoPlayerBlock) {
   if (hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
-    if (const auto r3 = sd::CreateTwoPlayerBlock(base)) {
+    if (const auto r3 = sd::CreateTwoPlayerBlock()) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82105740(ctx, base);
+  lifted::original::c82105740(ctx);
 }
 
 ITC_REGS_STEP(SaveDataResetControllers) {
-  sd::PlayersResetControllers(base);
+  sd::PlayersResetControllers();
   ctx.r9.u64 = 3;
   ctx.r10.u64 = 0xFFFFFFFF826C0000ull;
   // (r11 = 1, a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(SaveDataMenuListInit) {
-  if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(base, ctx.r3.u32)) {
-    lifted::original::c8220BAC0(ctx, base);
+  if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(ctx.r3.u32)) {
+    lifted::original::c8220BAC0(ctx);
     return;
   }
   const sd::MenuListArgs args{ctx.r4.u32,
@@ -143,26 +143,26 @@ ITC_REGS_STEP(SaveDataMenuListInit) {
                               ctx.r8.u32,
                               ctx.r9.u32,
                               ctx.r10.u32,
-                              guest::LoadU32(base, ctx.r1.u32 + 84),
-                              guest::LoadU32(base, ctx.r1.u32 + 92)};
-  ctx.r3.u64 = sd::MenuListInit(base, ctx.r3.u32, args);
+                              guest::LoadU32(ctx.r1.u32 + 84),
+                              guest::LoadU32(ctx.r1.u32 + 92)};
+  ctx.r3.u64 = sd::MenuListInit(ctx.r3.u32, args);
 }
 
 ITC_REGS_STEP(SaveDataResetPlayer) {
-  if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative(base)) {
-    lifted::original::c82221D00(ctx, base);
+  if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative()) {
+    lifted::original::c82221D00(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (const auto r3 = sd::TitleScreenResetPlayer(base)) {
+  if (const auto r3 = sd::TitleScreenResetPlayer()) {
     ctx.r3.u64 = *r3;
     return;
   }
   // SaveData::Create's plain C++ refused after the delete (operator new's
   // error paths, never seen): the rest as the original does it.
   ctx.r3.u64 = 0;
-  lifted::Enter(ctx, base, game::SaveData::Create);
-  lifted::Enter(ctx, base, game::Players::ResetControllers);
+  lifted::Enter(ctx, game::SaveData::Create);
+  lifted::Enter(ctx, game::Players::ResetControllers);
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \
@@ -181,7 +181,7 @@ ITC_SAVE_DATA_TABLE(Table50E4)
 
 ITC_REGS_STEP(SaveDataTwoPlayerBlock) {
   // (r11 = 0x826C0000, a leftover for recompiled callers: none now)
-  ctx.r3.u64 = sd::TwoPlayerBlock(base);
+  ctx.r3.u64 = sd::TwoPlayerBlock();
 }
 
 }  // namespace hooks
@@ -198,7 +198,7 @@ ITC_REGS_STEP(SaveDataTwoPlayerBlock) {
 
 #define ITC_SAVE_DATA_ADAPTER(address, step) \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_data)) { \
-    hooks::step(ctx, base);                  \
+    hooks::step(ctx);                  \
   }
 
 ITC_SAVE_DATA_ADAPTER(82113BD8, SaveDataProgressClear)
@@ -221,10 +221,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F5E0) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    lifted::original::c8209F5E0(ctx, base);
+    lifted::original::c8209F5E0(ctx);
     return;
   }
-  hooks::SaveDataResetControllers(ctx, base);
+  hooks::SaveDataResetControllers(ctx);
 }
 // MenuList::Init hands its call to the harnesses' recorder first (the race
 // HUD object's).
@@ -234,9 +234,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8220BAC0) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    lifted::original::c8220BAC0(ctx, base);
+    lifted::original::c8220BAC0(ctx);
     return;
   }
-  hooks::SaveDataMenuListInit(ctx, base);
+  hooks::SaveDataMenuListInit(ctx);
 }
 ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)

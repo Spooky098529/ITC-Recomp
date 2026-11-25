@@ -32,10 +32,13 @@
 # modes' three words after it. The measure's +0 and +804/+808 are the
 # transitions (StateMachine::Add) and the mode's ring words reached from the
 # handlers (SaveScreenMode's), joined into the machine.
+# Dual (E5 step 4): embedded in the type 10 mode's host block
+# (ModeType10Block's +9640) and in the other modes' blocks, guest or host.
 [SaveScreen]
 measure = "SaveScreen"
 size = 9616
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
   { name = "transition_count", offset = 9600, type = "u32" },
@@ -50,6 +53,7 @@ fields = [
 measure = "SaveScreen::Leave.r4"
 size = 812
 origin = "embedded"
+storage = "dual"
 fields = [
   { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
   { name = "message_count", offset = 804, type = "u32" },
@@ -61,6 +65,10 @@ fields = [
 measures = ["new<68>@SaveScreen::OnEnter", "new<28>@SaveScreen::OnEnter.+8.+-31660"]
 size = 68
 origin = "allocated"
+# In host memory (E5 step 5, 2026-11-24): made by SaveScreen::OnEnter
+# (src/save_screen/handlers.cpp, in place of its VirtualAlloc at 0x821A26A4),
+# freed by SaveScreen::Destroy's VirtualFree (0x821A1CF8).
+storage = "host"
 fields = [
   { name = "set_up", offset = 0, type = "u32", note = "1 once a dialog is set up" },
   { name = "answer", offset = 4, type = "u32", note = "the result the end pages post by (kind 0: 1 one answer, else the other; kinds 2 to 5: 1 to 3, else 0)" },

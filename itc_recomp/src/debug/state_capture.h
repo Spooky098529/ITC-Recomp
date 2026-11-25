@@ -18,6 +18,6 @@ namespace debug {
 void StateCapture_OnVehicleSeen(uint32_t vehicle);
 
 // Called on the render thread after each logic tick, while logic is paused.
-void StateCapture_OnTickDone(uint8_t* base);
+void StateCapture_OnTickDone();
 
 }  // namespace debug

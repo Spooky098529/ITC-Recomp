@@ -41,10 +41,32 @@
 measure = "new<4096>@UiMovie::GetText"
 size = 4096
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): raw UTF-16 bytes, in PC memory; made by
+# UiMovie::GetText's hand port (ui_movies::GetText, New where the original's
+# VirtualAlloc returned at 0x8211B6D4), written by the formatting and the
+# conversions, read by the font; freed by the texts' free (FreeTexts,
+# VirtualFree; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8211B6D4, reg = "r4" }]
 fields = [
   { name = "char_0", offset = 0, type = "u16", note = "the first character" },
   { name = "char_1", offset = 2, type = "u16" },
 ]
+
+# A movie's file as the archive reads it (an XMD archive: entry 0 the X2D
+# movie file, entry 1, when there, the XPR2 texture set): a blob (E5 step 5,
+# 2026-11-24) in PC memory with the file's bytes, made by UiMovie::Load's
+# hand port (ui_movies::MovieLoad, New where the original's VirtualAlloc
+# returned at 0x8211E7D0), read whole by Archive::Load, then read by
+# UiMovie::OnLoaded (its checks and chunks by address, the X2D file copied
+# out three times and the XPR's header and data copied out by XPR::Create,
+# both through the memcpy's blob path), which frees it (VirtualFree).
+[UiMovieArchiveFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x8211E7D0, reg = "r4" }]
+fields = []
 
 # A movie's text (28 bytes, UiMovie::GetText sub_8211B660; by the TXT node's
 # +108 id, in the movie's texts at +0x9BCC).
@@ -52,6 +74,11 @@ fields = [
 measures = ["new<28>@UiMovie::GetText", "TextMap::Find.ret.+0", "sub_8211AC90.r3.+39888"]
 size = 28
 origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by UiMovie::GetText's hand port
+# (ui_movies::GetText, New where the original's operator new returned at
+# 0x8211B6BC); freed by the texts' free (FreeTexts, operator delete).
+storage = "host"
+host_alloc = [0x8211B6BC]
 fields = [
   { name = "buffer", offset = 0, type = "ptr", to = "UiMovieTextBuffer", note = "a 4 KB UTF-16 buffer (pages from sub_82295398)" },
   { name = "scrolling", offset = 4, type = "u32" },
@@ -96,6 +123,13 @@ fields = [
 measure = "new<65552>@sub_8211B018"
 size = 65552
 origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): an array of 512 embedded text items
+# reached by address (views, copies, matrices), in PC memory with the guest's
+# bytes; made by UiMovie::UiMovie's hand port (ui_movies::ConstructMovie,
+# New where sub_8211B018's operator new[] returned at 0x8211B03C), freed by
+# ~UiMovie (DestroyMovie, operator delete[]; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8211B03C, reg = "r3" }]
 fields = [
   { name = "count", offset = 0, type = "u32", note = "512" },
 ]
@@ -109,6 +143,16 @@ measures = ["sub_8211A9E8.r3", "sub_8211AC90.r3", "sub_8211E378.r3", "sub_8211C4
 # measures from UiMovieObject (tuning-pages), merged at the integration
 size = 40976
 origin = "allocated"
+# Dual (E5 step 5, 2026-11-24): every movie in host memory (the measure's
+# joins and fault_ fields view guest addresses as movies too). Made by
+# UiMovies::Open's adapter (OpenCalls' make) and the data load's movie lists
+# (data_load::MovieListAdd), New where the originals' operator new returned
+# at 0x8211E854, 0x82247AC4 and 0x822912C4; freed by UiMovies::Delete
+# (operator delete; the game's frees take handles). Its parts (the named
+# animations' strings, the draw context, the animation lists, the texts'
+# pairs) stay bytes in the guest's order, reached by address.
+storage = "dual"
+host_alloc = [0x8211E854, 0x82247AC4, 0x822912C4]
 fields = [
   { name = "file_0", offset = 0, type = "u32", note = "the first of three copies of its movie file (pages from sub_82295398); the live scene's" },
   { name = "file_1", offset = 4, type = "u32", note = "the second copy (the saved scene's)" },
@@ -203,6 +247,12 @@ measures = [
 ]
 size = 8
 origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): the movie table's arrays in host memory
+# (NewArray in ui_movies::MakePairs and the pairs' Reserve, where
+# sub_8211B0E8's operator new[] returned at 0x8211B10C); embedded in each
+# movie's texts (+0x9BCC). Freed by the Reserve's operator delete[].
+storage = "dual"
+host_alloc_array = [{ call = 0x8211B10C, reg = "r3" }]
 fields = [
   { name = "key", offset = 0, type = "u32" },
   { name = "value", offset = 4, type = "u32" },

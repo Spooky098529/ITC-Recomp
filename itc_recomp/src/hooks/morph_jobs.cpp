@@ -46,19 +46,19 @@ namespace mj = morph_jobs;
 // function table; lr is the caller's. (The original also leaves r11 the
 // function and r12 the vtable when `with_r12`: leftovers for recompiled
 // callers, none now.)
-void TailCall(lifted::Regs& ctx, uint8_t* base, const mj::TailCall& call, bool with_r4,
+void TailCall(lifted::Regs& ctx, const mj::TailCall& call, bool with_r4,
               [[maybe_unused]] bool with_r12) {
   ctx.r3.u64 = call.r3;
   if (with_r4) {
     ctx.r4.u64 = call.r4;
   }
-  lifted::CallFromContext(ctx, base, call.function);
+  lifted::CallFromContext(ctx, call.function);
 }
 
 // operator delete on `object` from a 96-byte frame returning to `lr`:
 // natively over the native heap, else (or where the layer refuses it) the
 // original.
-void Delete(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t lr) {
+void Delete(lifted::Regs& ctx, uint32_t object, uint32_t lr) {
   if (ITC_FLAG(native_c_runtime_heap) && NativeHeapActive() &&
       memory::crt::OperatorDelete(object)) {
     return;
@@ -67,7 +67,7 @@ void Delete(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t lr) {
   ctx.r1.u64 = ctx.r1.u32 - 96;
   ctx.r3.u64 = object;
   ctx.lr = lr;
-  lifted::original::c825A70E8(ctx, base);
+  lifted::original::c825A70E8(ctx);
   ctx.r1.u64 = stack;
   ctx.lr = link;
 }
@@ -78,22 +78,22 @@ bool MorphJobsMakersNative() {
   return ITC_FLAG(native_morph_jobs) && ITC_FLAG(native_c_runtime_heap) && NativeHeapActive();
 }
 
-mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx, uint8_t* base) {
+mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx) {
   mj::ConstructCalls calls;
-  calls.post = [&ctx, base](uint32_t interface, uint32_t item, uint32_t sp, uint32_t lr) {
+  calls.post = [&ctx](uint32_t interface, uint32_t item, uint32_t sp, uint32_t lr) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
     ctx.r3.u64 = interface;
     ctx.r4.u64 = item;
     ctx.r5.u64 = 1;
-    const uint32_t function = schema::WorkerPoolInterface(base, interface).vtable().post();
+    const uint32_t function = schema::WorkerPoolInterface(interface).vtable().post();
     ctx.ctr.u64 = function;
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
-  calls.memcpy = [&ctx, base](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+  calls.memcpy = [&ctx](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
                               uint32_t lr) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
@@ -101,57 +101,57 @@ mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
     ctx.lr = lr;
-    lifted::original::c825A7410(ctx, base);
+    lifted::original::c825A7410(ctx);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
   return calls;
 }
 
-void MorphJobsMake(lifted::Regs& ctx, uint8_t* base, mj::Kind kind) {
-  const auto job = mj::MakeJob(base, kind, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
-                               MorphJobsConstructCalls(ctx, base));
+void MorphJobsMake(lifted::Regs& ctx, mj::Kind kind) {
+  const auto job = mj::MakeJob(kind, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                               MorphJobsConstructCalls(ctx));
   if (!job) {
     if (kind == mj::Kind::kMorph) {
-      lifted::original::c820AC7F0(ctx, base);
+      lifted::original::c820AC7F0(ctx);
     } else {
-      lifted::original::c820AC8A0(ctx, base);
+      lifted::original::c820AC8A0(ctx);
     }
     return;
   }
   ctx.r3.u64 = *job;
 }
 
-void MorphJobsConstruct(lifted::Regs& ctx, uint8_t* base, mj::Kind kind) {
+void MorphJobsConstruct(lifted::Regs& ctx, mj::Kind kind) {
   const uint64_t r3 = ctx.r3.u64;
-  mj::ConstructJob(base, kind, uint32_t(r3), ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
-                   MorphJobsConstructCalls(ctx, base));
+  mj::ConstructJob(kind, uint32_t(r3), ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                   MorphJobsConstructCalls(ctx));
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(MorphJobsDestroy) {
   const uint64_t r3 = ctx.r3.u64;
-  mj::DestroyJob(base, uint32_t(r3), ctx.r1.u32);
+  mj::DestroyJob(uint32_t(r3), ctx.r1.u32);
   if ((ctx.r4.u32 & 1) != 0) {
-    Delete(ctx, base, uint32_t(r3), 0x820ACBF0);
+    Delete(ctx, uint32_t(r3), 0x820ACBF0);
   }
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(MorphJobsDestroyBase) {
   const uint64_t r3 = ctx.r3.u64;
-  mj::DestroyJobBase(base, uint32_t(r3), ctx.r1.u32);
+  mj::DestroyJobBase(uint32_t(r3), ctx.r1.u32);
   if ((ctx.r4.u32 & 1) != 0) {
-    Delete(ctx, base, uint32_t(r3), 0x820ACA14);
+    Delete(ctx, uint32_t(r3), 0x820ACA14);
   }
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemDestroy) {
   const uint64_t r3 = ctx.r3.u64;
-  mj::WorkItemDestroy(base, uint32_t(r3), ctx.r1.u32);
+  mj::WorkItemDestroy(uint32_t(r3), ctx.r1.u32);
   if ((ctx.r4.u32 & 1) != 0) {
-    Delete(ctx, base, uint32_t(r3), 0x82090E90);
+    Delete(ctx, uint32_t(r3), 0x82090E90);
   }
   ctx.r3.u64 = r3;
 }
@@ -159,76 +159,76 @@ ITC_REGS_STEP(MorphJobsWorkItemDestroy) {
 ITC_REGS_STEP(MorphJobsWorkItemInterfaceDestroy) {
   ITC_NATIVE_RUNNING("sub_82090E38 WorkItem::Interface::~WorkItem");
   ctx.r3.s64 = ctx.r3.s64 - 4;
-  MorphJobsWorkItemDestroy(ctx, base);
+  MorphJobsWorkItemDestroy(ctx);
 }
 
 ITC_REGS_STEP(MorphJobsWait) {
   ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
-  lifted::Enter(ctx, base, game::Job::Wait);  // Job::Wait (--find_menu_selection's wrap)
+  lifted::Enter(ctx, game::Job::Wait);  // Job::Wait (--find_menu_selection's wrap)
 }
 
 ITC_REGS_STEP(MorphJobsIsReleased) {
-  ctx.r3.u64 = mj::IsReleased(base, ctx.r3.u32);
+  ctx.r3.u64 = mj::IsReleased(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(MorphJobsSetReleased) {
-  mj::SetReleased(base, ctx.r3.u32);
+  mj::SetReleased(ctx.r3.u32);
   // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsRun) {
-  const mj::RunTarget run = mj::Run(base, ctx.r3.u32);
+  const mj::RunTarget run = mj::Run(ctx.r3.u32);
   // (r11 a leftover for recompiled callers: none now)
   ctx.r3.s64 = ctx.r3.s64 + (run.morph ? 56 : 8);  // run.record, all 64 bits
   if (!run.morph) {
-    lifted::Enter(ctx, base, lifted::e8258BCD8);  // the skinning blend (not seen in play)
+    lifted::Enter(ctx, lifted::e8258BCD8);  // the skinning blend (not seen in play)
   } else if (ITC_FLAG(native_second_set)) {
-    SecondSetMorphBlend(ctx, base);
+    SecondSetMorphBlend(ctx);
   } else {
-    lifted::original::c8258BD28(ctx, base);
+    lifted::original::c8258BD28(ctx);
   }
 }
 
 ITC_REGS_STEP(MorphJobsRunThunk) {
-  TailCall(ctx, base, mj::RunThunk(base, ctx.r3.u64), false, true);
+  TailCall(ctx, mj::RunThunk(ctx.r3.u64), false, true);
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemPosted) {
-  mj::WorkItemPosted(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  mj::WorkItemPosted(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemStarted) {
-  mj::WorkItemStarted(base, ctx.r3.u32, ctx.r4.u32);
+  mj::WorkItemStarted(ctx.r3.u32, ctx.r4.u32);
   // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemFinished) {
-  mj::WorkItemFinished(base, ctx.r3.u32);
+  mj::WorkItemFinished(ctx.r3.u32);
   // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemSkip) {
-  mj::WorkItemSkip(base, ctx.r3.u32);
+  mj::WorkItemSkip(ctx.r3.u32);
   // (r11 a leftover for recompiled callers: none now)
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemIsSkipped) {
-  ctx.r3.u64 = mj::WorkItemIsSkipped(base, ctx.r3.u32);
+  ctx.r3.u64 = mj::WorkItemIsSkipped(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemInterfaceIsSkipped) {
   ITC_NATIVE_RUNNING("sub_82090DC8 WorkItem::Interface::IsSkipped");
-  ctx.r3.u64 = mj::WorkItemIsSkipped(base, ctx.r3.u32 - 4);
+  ctx.r3.u64 = mj::WorkItemIsSkipped(ctx.r3.u32 - 4);
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemRun) {
-  TailCall(ctx, base, mj::WorkItemRun(base, ctx.r3.u64), true, false);
+  TailCall(ctx, mj::WorkItemRun(ctx.r3.u64), true, false);
 }
 
 ITC_REGS_STEP(MorphJobsWorkItemCall) {
-  TailCall(ctx, base, mj::WorkItemCall(base, ctx.r3.u64), false, false);
+  TailCall(ctx, mj::WorkItemCall(ctx.r3.u64), false, false);
 }
 
 }  // namespace hooks
@@ -236,26 +236,26 @@ ITC_REGS_STEP(MorphJobsWorkItemCall) {
 // Defines an adapter: the flag, else the original.
 #define ITC_MORPH_JOBS(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_morph_jobs)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // The makers: also with operator new natively.
 ITC_NATIVE_ENTRY_ALWAYS(820AC7F0) {
   
   if (!hooks::MorphJobsMakersNative()) {
-    lifted::original::c820AC7F0(ctx, base);
+    lifted::original::c820AC7F0(ctx);
     return;
   }
-  hooks::MorphJobsMake(ctx, base, morph_jobs::Kind::kMorph);
+  hooks::MorphJobsMake(ctx, morph_jobs::Kind::kMorph);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820AC8A0) {
   
   if (!hooks::MorphJobsMakersNative()) {
-    lifted::original::c820AC8A0(ctx, base);
+    lifted::original::c820AC8A0(ctx);
     return;
   }
-  hooks::MorphJobsMake(ctx, base, morph_jobs::Kind::kSkin);
+  hooks::MorphJobsMake(ctx, morph_jobs::Kind::kSkin);
 }
 
 ITC_MORPH_JOBS(820ACB90, MorphJobsDestroy)

@@ -35,12 +35,12 @@ ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
   debug::PauseMenuLog_NoteMapperUpdate(uint32_t(ctx.lr));
   // Natively (--native_action_mappers, src/action_mappers/) when every
   // mapper's repeat and curve objects are the ones seen in play.
-  if (ITC_FLAG(native_action_mappers) && action_mappers::UpdateAllKnown(base, ctx.r3.u32)) {
+  if (ITC_FLAG(native_action_mappers) && action_mappers::UpdateAllKnown(ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
     double f1 = ctx.f1.f64;
-    ctx.r3.u64 = action_mappers::UpdateAll(base, ctx.r3.u32, 0, &f1);
+    ctx.r3.u64 = action_mappers::UpdateAll(ctx.r3.u32, 0, &f1);
     ctx.f1.f64 = f1;
     return;
   }
-  lifted::original::c8210B018(ctx, base);
+  lifted::original::c8210B018(ctx);
 }

@@ -42,7 +42,7 @@ namespace rl = race_loading;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -53,7 +53,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     lifted::Temp* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
@@ -62,23 +61,22 @@ class GuestCalls {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 // Runs `body(calls)` with the guest calls through `ctx`, its r3 into r3.
 template <typename Body>
-void Step(lifted::Regs& ctx, uint8_t* base, Body body) {
+void Step(lifted::Regs& ctx, Body body) {
   ctx.fpscr.disableFlushMode();
   uint64_t r3;
   {
-    GuestCalls guest(ctx, base);
+    GuestCalls guest(ctx);
     r3 = body(guest.calls());
   }
   ctx.r3.u64 = r3;
@@ -91,67 +89,67 @@ ITC_REGS_STEP(CourseSetupInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = rl::Init(base, machine, ctx.r1.u32 - rl::kInitFrame, &replaced);
+  const uint32_t r3 = rl::Init(machine, ctx.r1.u32 - rl::kInitFrame, &replaced);
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
   // transition's address from the machine's 64-bit r3.
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
 ITC_REGS_STEP(CourseSetupStart) {
-  ctx.r3.u64 = rl::Start(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = rl::Start(ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CourseSetupBegin) {
-  rl::Begin(base, ctx.r3.u32);
+  rl::Begin(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CourseSetupOnCourseReady) {
-  rl::OnCourseReady(base, ctx.r3.u32);
+  rl::OnCourseReady(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CourseSetupWaitDraw) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t dispatcher = ctx.r4.u32, sp = ctx.r1.u32;
-  Step(ctx, base,
-       [&](const rl::Calls& c) { return rl::WaitDraw(base, r3, dispatcher, sp, c); });
+  Step(ctx,
+       [&](const rl::Calls& c) { return rl::WaitDraw(r3, dispatcher, sp, c); });
 }
 
 ITC_REGS_STEP(CourseSetupWaitCourse) {
   const uint32_t machine = ctx.r3.u32, dispatcher = ctx.r4.u32, sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rl::Calls& c) {
-    return rl::WaitCourse(base, machine, dispatcher, sp, c);
+  Step(ctx, [&](const rl::Calls& c) {
+    return rl::WaitCourse(machine, dispatcher, sp, c);
   });
 }
 
 ITC_REGS_STEP(CourseSetupEndTick) {
   const uint32_t machine = ctx.r3.u32, dispatcher = ctx.r4.u32, sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rl::Calls& c) {
-    return rl::EndTick(base, machine, dispatcher, sp, c);
+  Step(ctx, [&](const rl::Calls& c) {
+    return rl::EndTick(machine, dispatcher, sp, c);
   });
 }
 
 ITC_REGS_STEP(LoadingScreenShow) {
   const uint64_t tip = ctx.r3.u64;
   const uint32_t which = ctx.r4.u32, frames = ctx.r5.u32, sp = ctx.r1.u32;
-  Step(ctx, base,
-       [&](const rl::Calls& c) { return rl::Show(base, tip, which, frames, sp, c); });
+  Step(ctx,
+       [&](const rl::Calls& c) { return rl::Show(tip, which, frames, sp, c); });
 }
 
 ITC_REGS_STEP(LoadingScreenRun) {
   const uint64_t which = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32, lr = uint32_t(ctx.lr);
-  Step(ctx, base, [&](const rl::Calls& c) { return rl::Run(base, which, sp, lr, c); });
+  Step(ctx, [&](const rl::Calls& c) { return rl::Run(which, sp, lr, c); });
 }
 
 ITC_REGS_STEP(LoadingScreenFinish) {
   const uint64_t which = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32, lr = uint32_t(ctx.lr);
-  Step(ctx, base, [&](const rl::Calls& c) { return rl::Finish(base, which, sp, lr, c); });
+  Step(ctx, [&](const rl::Calls& c) { return rl::Finish(which, sp, lr, c); });
 }
 
 ITC_REGS_STEP(CheckSystemRequest) {
   const uint32_t sp = ctx.r1.u32;
-  Step(ctx, base, [&](const rl::Calls& c) { return rl::CheckSystemRequest(base, sp, c); });
+  Step(ctx, [&](const rl::Calls& c) { return rl::CheckSystemRequest(sp, c); });
 }
 
 }  // namespace hooks
@@ -159,7 +157,7 @@ ITC_REGS_STEP(CheckSystemRequest) {
 // The adapters: the register steps above, or the originals with the flag off.
 #define ITC_RACE_LOADING(address, step)      \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_loading)) { \
-    hooks::step(ctx, base);                  \
+    hooks::step(ctx);                  \
   }
 
 ITC_RACE_LOADING(821517D8, CourseSetupInit)

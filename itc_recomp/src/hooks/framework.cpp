@@ -69,7 +69,7 @@ namespace fw = framework;
 #define ITC_FRAMEWORK_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                   \
   if (!ITC_FLAG(native_framework)) {     \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                              \
   }
 
@@ -77,7 +77,7 @@ namespace fw = framework;
 #define ITC_FRAMEWORK_WORD(address, function) \
   ITC_NATIVE_ENTRY_ALWAYS(address) {        \
     ITC_FRAMEWORK_FALLBACK(address)           \
-    ctx.r3.u64 = fw::function(base, ctx.r3.u32); \
+    ctx.r3.u64 = fw::function(ctx.r3.u32); \
   }
 
 ITC_FRAMEWORK_WORD(82090760, Flag133)
@@ -99,9 +99,9 @@ ITC_FRAMEWORK_WORD(82090908, SceneFrom36)
 // none reads it).
 ITC_NATIVE_ENTRY_ALWAYS(82091050) {
   ITC_FRAMEWORK_FALLBACK(82091050)
-  const uint32_t x = schema::DebugTextCoordinate(base, ctx.r4.u32).value();
-  const uint32_t y = schema::DebugTextCoordinate(base, ctx.r5.u32).value();
-  fw::DebugTextSetPosition(base, ctx.r4.u32, ctx.r5.u32);
+  const uint32_t x = schema::DebugTextCoordinate(ctx.r4.u32).value();
+  const uint32_t y = schema::DebugTextCoordinate(ctx.r5.u32).value();
+  fw::DebugTextSetPosition(ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = x;
   ctx.r4.u64 = y;
 }
@@ -119,8 +119,8 @@ namespace {
 // The functions that allocate: only over the allocation layer.
 bool NativeHeap() { return ITC_FLAG(native_framework) && hooks::NativeHeapActive(); }
 
-fw::Iterator IteratorAt(uint8_t* base, uint32_t address) {
-  const schema::HandlerMapIterator it(base, address);
+fw::Iterator IteratorAt(uint32_t address) {
+  const schema::HandlerMapIterator it(address);
   return {it.map().address, it.node().address};
 }
 
@@ -129,12 +129,12 @@ fw::Iterator IteratorAt(uint8_t* base, uint32_t address) {
 // The map iterator's operator++: r3 = the iterator; r3 left.
 ITC_NATIVE_ENTRY_ALWAYS(82099B18) {
   ITC_FRAMEWORK_FALLBACK(82099B18)
-  fw::Iterator it = IteratorAt(base, ctx.r3.u32);
-  if (!fw::MapIncrement(base, it)) {
-    lifted::original::c82099B18(ctx, base);
+  fw::Iterator it = IteratorAt(ctx.r3.u32);
+  if (!fw::MapIncrement(it)) {
+    lifted::original::c82099B18(ctx);
     return;
   }
-  schema::HandlerMapIterator(base, ctx.r3.u32).set_node(it.node);
+  schema::HandlerMapIterator(ctx.r3.u32).set_node(it.node);
 }
 
 // HandlerMap: r3 = the map; r3 the head.
@@ -145,11 +145,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82099FB0) {
   if (hooks::StartUpRecorded(ctx, 0x82099FB0)) {
     return;
   }
-  if (!NativeHeap() || !fw::CanAllocate(base)) {
-    lifted::original::c82099FB0(ctx, base);
+  if (!NativeHeap() || !fw::CanAllocate()) {
+    lifted::original::c82099FB0(ctx);
     return;
   }
-  ctx.r3.u64 = fw::MapConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = fw::MapConstruct(ctx.r3.u32);
 }
 
 // Insert: r3 = the result (an iterator and the inserted byte), r4 = the
@@ -158,13 +158,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82093740) {
   
   std::optional<fw::InsertResult> result;
   if (NativeHeap()) {
-    result = fw::MapInsertUnique(base, ctx.r4.u32, ctx.r5.u32);
+    result = fw::MapInsertUnique(ctx.r4.u32, ctx.r5.u32);
   }
   if (!result) {
-    lifted::original::c82093740(ctx, base);
+    lifted::original::c82093740(ctx);
     return;
   }
-  const schema::HandlerMapIterator answer(base, ctx.r3.u32);
+  const schema::HandlerMapIterator answer(ctx.r3.u32);
   answer.set_map(result->where.container);
   answer.set_node(result->where.node);
   answer.set_inserted(result->inserted ? 1 : 0);
@@ -174,8 +174,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82093740) {
 // (r1 - 16), as the original leaves it.
 ITC_NATIVE_ENTRY_ALWAYS(8209A080) {
   ITC_FRAMEWORK_FALLBACK(8209A080)
-  if (!fw::RequestsClear(base, ctx.r3.u32)) {
-    lifted::original::c8209A080(ctx, base);
+  if (!fw::RequestsClear(ctx.r3.u32)) {
+    lifted::original::c8209A080(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
@@ -188,10 +188,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A930) {
   
   std::optional<bool> inserted;
   if (NativeHeap()) {
-    inserted = fw::RequestsPushBack(base, ctx.r3.u32, ctx.r4.u32);
+    inserted = fw::RequestsPushBack(ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    lifted::original::c8209A930(ctx, base);
+    lifted::original::c8209A930(ctx);
     return;
   }
   if (*inserted) {
@@ -207,15 +207,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A458) {
   
   std::optional<bool> inserted;
   if (NativeHeap()) {
-    inserted = fw::RunLoopApplyRequest(base, ctx.r3.u32, uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
+    inserted = fw::RunLoopApplyRequest(ctx.r3.u32, uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
                                        uint32_t(ctx.r5.u64 >> 32));
   }
   if (!inserted) {
-    lifted::original::c8209A458(ctx, base);
+    lifted::original::c8209A458(ctx);
     return;
   }
-  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
-  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }
@@ -226,57 +226,57 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A458) {
 namespace {
 
 // A tail call: r3 = the object, the target through ctr, lr left.
-void TailCall(lifted::Regs& ctx, uint8_t* base, fw::VirtualCall call) {
+void TailCall(lifted::Regs& ctx, fw::VirtualCall call) {
   ctx.r3.u64 = call.object;
   ctx.ctr.u64 = call.target;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
 }
 
 }  // namespace
 
 bool hooks::NativeFramework() { return ITC_FLAG(native_framework); }
 
-void hooks::TickHandlerInvoke(lifted::Regs& ctx, uint8_t* base) {
+void hooks::TickHandlerInvoke(lifted::Regs& ctx) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t delegate = ctx.r4.u32;
-  guest::StoreU64(base, ctx.r1.u32 + 24, ctx.r4.u64);
-  const uint32_t target = fw::TickHandlerTarget(base, delegate);
-  guest_call::InFrame(ctx, base, 96, 0x82099AC4, [&](uint32_t) {
+  guest::StoreU64(ctx.r1.u32 + 24, ctx.r4.u64);
+  const uint32_t target = fw::TickHandlerTarget(delegate);
+  guest_call::InFrame(ctx, 96, 0x82099AC4, [&](uint32_t) {
     ctx.r3.u64 = delegate;
     ctx.r4.u64 = loop;
     ctx.ctr.u64 = target;
-    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+    lifted::CallFromContext(ctx, ctx.ctr.u32);
   });
 }
 
-void hooks::DelegateSlot1Thunk(lifted::Regs& ctx, uint8_t* base) {
-  const uint32_t target = fw::DelegateSlot1Target(base, ctx.r3.u32);
-  TailCall(ctx, base, {ctx.r3.u32, target});
+void hooks::DelegateSlot1Thunk(lifted::Regs& ctx) {
+  const uint32_t target = fw::DelegateSlot1Target(ctx.r3.u32);
+  TailCall(ctx, {ctx.r3.u32, target});
 }
 
 // The delegate thunk sub_82096330 (FrameStart's tick handler 4): r3 = the
 // object; its slot 0 as a tail call.
 ITC_NATIVE_ENTRY_ALWAYS(82096330) {
   ITC_FRAMEWORK_FALLBACK(82096330)
-  TailCall(ctx, base, {ctx.r3.u32, fw::DelegateSlot0Target(base, ctx.r3.u32)});
+  TailCall(ctx, {ctx.r3.u32, fw::DelegateSlot0Target(ctx.r3.u32)});
 }
 
 // Framework::Start: r3 = the framework; the app's slot +36 as a tail call.
 ITC_NATIVE_ENTRY_ALWAYS(820902B0) {
   ITC_FRAMEWORK_FALLBACK(820902B0)
-  TailCall(ctx, base, fw::FrameworkStartCall(base, ctx.r3.u32));
+  TailCall(ctx, fw::FrameworkStartCall(ctx.r3.u32));
 }
 
 namespace {
 
 // The app's input source: InputManagerFrom36's plain C++ when that's the
 // target (in play), else a tail call.
-void AppInputSource(lifted::Regs& ctx, uint8_t* base, fw::VirtualCall call) {
+void AppInputSource(lifted::Regs& ctx, fw::VirtualCall call) {
   if (call.target == 0x82090830) {
-    ctx.r3.u64 = fw::InputManagerFrom36(base, call.object);
+    ctx.r3.u64 = fw::InputManagerFrom36(call.object);
     return;
   }
-  TailCall(ctx, base, call);
+  TailCall(ctx, call);
 }
 
 }  // namespace
@@ -284,13 +284,13 @@ void AppInputSource(lifted::Regs& ctx, uint8_t* base, fw::VirtualCall call) {
 // sub_82094350: r3 = app + 4; r3 the input source's answer.
 ITC_NATIVE_ENTRY_ALWAYS(82094350) {
   ITC_FRAMEWORK_FALLBACK(82094350)
-  AppInputSource(ctx, base, fw::AppInputSourceCall(base, ctx.r3.u32));
+  AppInputSource(ctx, fw::AppInputSourceCall(ctx.r3.u32));
 }
 
 // sub_820944C8: r3 = app + 16; as sub_82094350 from app + 4.
 ITC_NATIVE_ENTRY_ALWAYS(820944C8) {
   ITC_FRAMEWORK_FALLBACK(820944C8)
-  AppInputSource(ctx, base, fw::AppInputSourceFrom16Call(base, ctx.r3.u32));
+  AppInputSource(ctx, fw::AppInputSourceFrom16Call(ctx.r3.u32));
 }
 
 // Framework::OnTick: r3 = the framework, r4 = the run loop; its guest calls
@@ -300,14 +300,14 @@ ITC_NATIVE_ENTRY_ALWAYS(820902C8) {
   ITC_FRAMEWORK_FALLBACK(820902C8)
   const uint32_t framework = ctx.r3.u32;
   const uint32_t loop = ctx.r4.u32;
-  guest_call::InFrame(ctx, base, 128, 0x820902FC, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, 128, 0x820902FC, [&](uint32_t frame) {
     // `target` reads the object's vtable slot (after r3 and r4 are set).
     auto call = [&](uint32_t object, const auto& target, uint32_t r4, uint32_t return_address) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = r4;
       ctx.ctr.u64 = target();
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+      lifted::CallFromContext(ctx, ctx.ctr.u32);
       return ctx.r3.u32;
     };
     const fw::OnTickCalls calls{
@@ -315,22 +315,22 @@ ITC_NATIVE_ENTRY_ALWAYS(820902C8) {
           // InputManager::GetProcessor (the input manager's slot 1, input.md;
           // input.toml's InputManager has no vtable type to name it).
           call(manager,
-               [&] { return guest::LoadU32(base, schema::InputManager(base, manager).vtable() + 4); },
+               [&] { return guest::LoadU32(schema::InputManager(manager).vtable() + 4); },
                key, 0x820902FC);
         },
         [&](uint32_t app) {
           ctx.r3.u64 = app;
-          ctx.ctr.u64 = schema::FrameworkAppInterface(base, app).vtable().is_running();
+          ctx.ctr.u64 = schema::FrameworkAppInterface(app).vtable().is_running();
           ctx.lr = 0x82090314;
-          lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+          lifted::CallFromContext(ctx, ctx.ctr.u32);
           return ctx.r3.u32;
         },
         [&](uint32_t run_loop, uint32_t key) {
           call(run_loop,
-               [&] { return schema::RunLoop(base, run_loop).vtable().remove_tick_handler(); }, key,
+               [&] { return schema::RunLoop(run_loop).vtable().remove_tick_handler(); }, key,
                0x8209033C);
         }};
-    fw::FrameworkOnTick(base, framework, loop, frame + 80, calls);
+    fw::FrameworkOnTick(framework, loop, frame + 80, calls);
   });
 }
 
@@ -340,29 +340,29 @@ namespace {
 // address, r5 = the delegate; the copy made with its slot 2 and the request
 // pushed, from a 112-byte frame like the original's (the request at r1 + 80
 // there). r3 as PushBack leaves it.
-void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
+void AddRequest(lifted::Regs& ctx, uint32_t type, uint32_t clone_return,
                 uint32_t push_return) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t key = ctx.r4.u32;
   const uint32_t delegate = ctx.r5.u32;
-  guest_call::InFrame(ctx, base, 112, clone_return, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, 112, clone_return, [&](uint32_t frame) {
     const uint32_t request = frame + 80;
     const auto clone = [&](uint32_t object) {
       ctx.r3.u64 = object;
-      ctx.ctr.u64 = schema::RunLoopDelegate(base, object).vtable().clone();
+      ctx.ctr.u64 = schema::RunLoopDelegate(object).vtable().clone();
       ctx.lr = clone_return;
-      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+      lifted::CallFromContext(ctx, ctx.ctr.u32);
       return ctx.r3.u32;
     };
-    const auto inserted = fw::RunLoopAddRequest(base, loop, type, key, delegate, request, clone);
+    const auto inserted = fw::RunLoopAddRequest(loop, type, key, delegate, request, clone);
     if (!inserted) {
-      ctx.r3.u64 = schema::RunLoop(base, loop).requests_address();
+      ctx.r3.u64 = schema::RunLoop(loop).requests_address();
       ctx.r4.u64 = request;
       ctx.lr = push_return;
-      lifted::original::c8209A930(ctx, base);
+      lifted::original::c8209A930(ctx);
       return;
     }
-    ctx.r3.u64 = *inserted ? frame - 16 : schema::RunLoop(base, loop).requests_address();
+    ctx.r3.u64 = *inserted ? frame - 16 : schema::RunLoop(loop).requests_address();
   });
 }
 
@@ -372,19 +372,19 @@ void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_
 ITC_NATIVE_ENTRY_ALWAYS(8209AAA8) {
   
   if (!NativeHeap()) {
-    lifted::original::c8209AAA8(ctx, base);
+    lifted::original::c8209AAA8(ctx);
     return;
   }
-  AddRequest(ctx, base, 0, 0x8209AAE0, 0x8209AAF0);
+  AddRequest(ctx, 0, 0x8209AAE0, 0x8209AAF0);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8209AB48) {
   
   if (!NativeHeap()) {
-    lifted::original::c8209AB48(ctx, base);
+    lifted::original::c8209AB48(ctx);
     return;
   }
-  AddRequest(ctx, base, 2, 0x8209AB80, 0x8209AB90);
+  AddRequest(ctx, 2, 0x8209AB80, 0x8209AB90);
 }
 
 // --- The framework's and its services' constructors ---
@@ -399,25 +399,25 @@ namespace {
 // A guest call of `object`'s vtable slot (`target` reads it, after r3 is
 // set) with the original's return address; r3 its answer.
 template <typename Target>
-uint32_t VirtualCallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t object, const Target& target,
+uint32_t VirtualCallFrom(lifted::Regs& ctx, uint32_t object, const Target& target,
                          uint32_t return_address) {
   ctx.r3.u64 = object;
   ctx.ctr.u64 = target();
   ctx.lr = return_address;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
 // The PoolMakers: r3 = the maker, r4 = the interface; its slot 1 from a
 // 96-byte frame; r3 the maker.
-void PoolMaker(lifted::Regs& ctx, uint8_t* base, uint32_t vtable, uint32_t return_address) {
+void PoolMaker(lifted::Regs& ctx, uint32_t vtable, uint32_t return_address) {
   const uint32_t maker = ctx.r3.u32;
   const uint32_t interface = ctx.r4.u32;
-  guest_call::InFrame(ctx, base, 96, return_address, [&](uint32_t) {
-    fw::PoolMakerConstruct(base, maker, vtable, interface, [&](uint32_t object) {
+  guest_call::InFrame(ctx, 96, return_address, [&](uint32_t) {
+    fw::PoolMakerConstruct(maker, vtable, interface, [&](uint32_t object) {
       return VirtualCallFrom(
-          ctx, base, object,
-          [&] { return schema::FrameworkInterface(base, object).vtable().slot_1(); },
+          ctx, object,
+          [&] { return schema::FrameworkInterface(object).vtable().slot_1(); },
           return_address);
     });
   });
@@ -428,12 +428,12 @@ void PoolMaker(lifted::Regs& ctx, uint8_t* base, uint32_t vtable, uint32_t retur
 
 ITC_NATIVE_ENTRY_ALWAYS(820AC8F8) {
   ITC_FRAMEWORK_FALLBACK(820AC8F8)
-  PoolMaker(ctx, base, 0x82002848, 0x820AC92C);
+  PoolMaker(ctx, 0x82002848, 0x820AC92C);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820AC848) {
   ITC_FRAMEWORK_FALLBACK(820AC848)
-  PoolMaker(ctx, base, 0x82002840, 0x820AC87C);
+  PoolMaker(ctx, 0x82002840, 0x820AC87C);
 }
 
 // FrameStart::FrameStart: r3 = it, r4 = the block; the run loop's slots
@@ -443,17 +443,16 @@ ITC_NATIVE_ENTRY_ALWAYS(82092710) {
   ITC_FRAMEWORK_FALLBACK(82092710)
   const uint32_t frame_start = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
-  guest_call::InFrame(ctx, base, 144, 0x82092780, [&](uint32_t frame) {
-    fw::FrameStartConstruct(
-        base, frame_start, block, frame,
+  guest_call::InFrame(ctx, 144, 0x82092780, [&](uint32_t frame) {
+    fw::FrameStartConstruct(frame_start, block, frame,
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate) {
           ctx.r4.u64 = key;
           ctx.r5.u64 = delegate;
           const auto slot = [&] {
-            const schema::RunLoopVtable vtable = schema::RunLoop(base, loop).vtable();
+            const schema::RunLoopVtable vtable = schema::RunLoop(loop).vtable();
             return offset == 8 ? vtable.add_tick_handler() : vtable.add_listener();
           };
-          VirtualCallFrom(ctx, base, loop, slot, offset == 8 ? 0x82092780 : 0x820927CC);
+          VirtualCallFrom(ctx, loop, slot, offset == 8 ? 0x82092780 : 0x820927CC);
         });
   });
   ctx.r3.u64 = frame_start;
@@ -465,25 +464,24 @@ ITC_NATIVE_ENTRY_ALWAYS(82092710) {
 ITC_NATIVE_ENTRY_ALWAYS(82091160) {
   
   if (!NativeHeap()) {
-    lifted::original::c82091160(ctx, base);
+    lifted::original::c82091160(ctx);
     return;
   }
-  const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 96 - 160 + 100);
-  const auto text = fw::DebugTextCreate(
-      base, ctx.r3.u32, stack_word, [&](uint32_t interface, uint32_t job) {
-        guest_call::InFrame(ctx, base, 96, 0x8209118C, [&](uint32_t) {
-          guest_call::InFrame(ctx, base, 160, 0x82090F78, [&](uint32_t) {
+  const uint32_t stack_word = guest::LoadU32(ctx.r1.u32 - 96 - 160 + 100);
+  const auto text = fw::DebugTextCreate(ctx.r3.u32, stack_word, [&](uint32_t interface, uint32_t job) {
+        guest_call::InFrame(ctx, 96, 0x8209118C, [&](uint32_t) {
+          guest_call::InFrame(ctx, 160, 0x82090F78, [&](uint32_t) {
             ctx.r4.u64 = job;
             ctx.r5.u64 = 1;
             VirtualCallFrom(
-                ctx, base, interface,
-                [&] { return schema::WorkerPoolInterface(base, interface).vtable().post(); },
+                ctx, interface,
+                [&] { return schema::WorkerPoolInterface(interface).vtable().post(); },
                 0x82090F78);
           });
         });
       });
   if (!text) {
-    lifted::original::c82091160(ctx, base);
+    lifted::original::c82091160(ctx);
     return;
   }
   ctx.r3.u64 = *text;
@@ -493,8 +491,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82091160) {
 // r3 to r5 and lr set, the function run through the function table (its
 // override), r1 put back.
 namespace {
-fw::GuestCall DebugFontCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3, uint64_t r4,
+fw::GuestCall DebugFontCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3, uint64_t r4,
                       uint64_t r5) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -502,24 +500,24 @@ fw::GuestCall DebugFontCall(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   };
 }
 }  // namespace
 
-void hooks::DebugTextLoadFontSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::DebugTextLoadFontSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = fw::DebugTextLoadFont(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
+  ctx.r3.u64 = fw::DebugTextLoadFont(ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx));
   ctx.lr = lr;
 }
 
-void hooks::DebugFontInitSteps(lifted::Regs& ctx, uint8_t* base) {
+void hooks::DebugFontInitSteps(lifted::Regs& ctx) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = fw::DebugFontInit(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
+  ctx.r3.u64 = fw::DebugFontInit(ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx));
   ctx.lr = lr;
 }
 
@@ -529,10 +527,10 @@ void hooks::DebugFontInitSteps(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82090CC0) {
   
   if (!NativeHeap() || !ITC_FLAG(native_file_layer)) {
-    lifted::original::c82090CC0(ctx, base);
+    lifted::original::c82090CC0(ctx);
     return;
   }
-  hooks::DebugTextLoadFontSteps(ctx, base);
+  hooks::DebugTextLoadFontSteps(ctx);
 }
 
 // --- The entry and the main loop (src/framework/main_loop.h) ---
@@ -544,9 +542,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82090CC0) {
 // flag switches them through main. Their register steps stay for the
 // harness.
 
-fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
+fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx) {
   fw::MainLoopCalls calls;
-  calls.call = [&ctx, base](uint32_t target, uint32_t r3, std::optional<uint64_t> r4,
+  calls.call = [&ctx](uint32_t target, uint32_t r3, std::optional<uint64_t> r4,
                             std::optional<uint64_t> r5, uint32_t return_address) {
     ctx.r3.u64 = r3;
     if (r4) {
@@ -557,109 +555,109 @@ fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     ctx.ctr.u64 = target;
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+    lifted::CallFromContext(ctx, ctx.ctr.u32);
     return ctx.r3.u32;
   };
-  calls.in_frame = [&ctx, base](uint32_t bytes, const std::function<void(uint32_t)>& body) {
+  calls.in_frame = [&ctx](uint32_t bytes, const std::function<void(uint32_t)>& body) {
     // (r14 to r31 were kept and put back around the body: nothing to keep
     // without a context)
-    guest_call::InFrame(ctx, base, bytes, uint32_t(ctx.lr), body);
+    guest_call::InFrame(ctx, bytes, uint32_t(ctx.lr), body);
   };
   // The registers set are the original's nonvolatile ones, which reached
   // callees only as the bytes they save: not carried by the view.
   calls.set_register = [](int, uint64_t) {};
-  calls.increment = [&ctx, base](uint32_t iterator) {
+  calls.increment = [&ctx](uint32_t iterator) {
     ctx.r3.u64 = iterator;
     ctx.lr = 0x82099DFC;
-    lifted::original::c82099B18(ctx, base);
+    lifted::original::c82099B18(ctx);
   };
-  calls.clear = [&ctx, base](uint32_t vector) {
+  calls.clear = [&ctx](uint32_t vector) {
     ctx.r3.u64 = vector;
     ctx.lr = 0x8209A870;
-    lifted::original::c8209A080(ctx, base);
+    lifted::original::c8209A080(ctx);
   };
-  calls.construct_run_loop = [&ctx, base](uint32_t loop) {
-    if (NativeHeap() && fw::CanAllocate(base)) {
-      fw::RunLoopConstruct(base, loop);
+  calls.construct_run_loop = [&ctx](uint32_t loop) {
+    if (NativeHeap() && fw::CanAllocate()) {
+      fw::RunLoopConstruct(loop);
       return;
     }
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC04;
-    lifted::original::c8209A9F0(ctx, base);
+    lifted::original::c8209A9F0(ctx);
   };
-  calls.create_framework = [&ctx, base](uint32_t holder) {
-    if (NativeHeap() && fw::FrameworkCreate(base, holder)) {
+  calls.create_framework = [&ctx](uint32_t holder) {
+    if (NativeHeap() && fw::FrameworkCreate(holder)) {
       return;
     }
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090120;
-    lifted::original::c820909B8(ctx, base);
+    lifted::original::c820909B8(ctx);
   };
-  calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
+  calls.destroy_run_loop = [&ctx](uint32_t loop) {
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC18;
-    lifted::Enter(ctx, base, lifted::e8209A6E0);
+    lifted::Enter(ctx, lifted::e8209A6E0);
   };
-  calls.delete_framework = [&ctx, base](uint32_t holder) {
+  calls.delete_framework = [&ctx](uint32_t holder) {
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090130;
-    lifted::Enter(ctx, base, lifted::e82090350);
+    lifted::Enter(ctx, lifted::e82090350);
   };
   return calls;
 }
 
-void hooks::ForEachTickHandler(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ForEachTickHandler(lifted::Regs& ctx) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
-  guest_call::InFrame(ctx, base, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
-    fw::ForEachTickHandler(base, result, first, last, functor, frame, calls);
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
+  guest_call::InFrame(ctx, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
+    fw::ForEachTickHandler(result, first, last, functor, frame, calls);
   });
   ctx.r3.u64 = result;
 }
 
-void hooks::ForEachRequest(lifted::Regs& ctx, uint8_t* base) {
+void hooks::ForEachRequest(lifted::Regs& ctx) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
-  guest_call::InFrame(ctx, base, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
-    fw::ForEachRequest(base, result, first, last, functor, frame, calls);
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
+  guest_call::InFrame(ctx, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
+    fw::ForEachRequest(result, first, last, functor, frame, calls);
   });
   ctx.r3.u64 = result;
 }
 
-void hooks::AppRun(lifted::Regs& ctx, uint8_t* base) {
+void hooks::AppRun(lifted::Regs& ctx) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t framework = ctx.r4.u32;
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
   uint32_t answer = 0;
-  guest_call::InFrame(ctx, base, 208, uint32_t(ctx.lr), [&](uint32_t frame) {
-    answer = fw::AppRun(base, loop, framework, frame, calls);
+  guest_call::InFrame(ctx, 208, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = fw::AppRun(loop, framework, frame, calls);
   });
   ctx.r3.u64 = answer;
 }
 
-void hooks::RunFramework(lifted::Regs& ctx, uint8_t* base) {
+void hooks::RunFramework(lifted::Regs& ctx) {
   const uint32_t framework = ctx.r3.u32;
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
   uint32_t answer = 0;
-  guest_call::InFrame(ctx, base, 160, uint32_t(ctx.lr), [&](uint32_t frame) {
-    answer = fw::RunFramework(base, framework, frame, calls);
+  guest_call::InFrame(ctx, 160, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = fw::RunFramework(framework, frame, calls);
   });
   ctx.r3.u64 = answer;
 }
 
-void hooks::RunFrameworkAt(lifted::Regs& ctx, uint8_t* base) {
+void hooks::RunFrameworkAt(lifted::Regs& ctx) {
   const uint32_t holder = ctx.r3.u32;
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
-  ctx.r3.u64 = fw::RunFrameworkAt(base, holder, calls);
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
+  ctx.r3.u64 = fw::RunFrameworkAt(holder, calls);
 }
 
-void hooks::Main(lifted::Regs& ctx, uint8_t* base) {
-  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+void hooks::Main(lifted::Regs& ctx) {
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx);
   uint32_t answer = 0;
-  guest_call::InFrame(ctx, base, 112, uint32_t(ctx.lr),
-                      [&](uint32_t frame) { answer = fw::Main(base, frame, calls); });
+  guest_call::InFrame(ctx, 112, uint32_t(ctx.lr),
+                      [&](uint32_t frame) { answer = fw::Main(frame, calls); });
   ctx.r3.u64 = answer;
 }
 
@@ -667,5 +665,5 @@ void hooks::Main(lifted::Regs& ctx, uint8_t* base) {
 // answer (never, in play).
 ITC_NATIVE_ENTRY_ALWAYS(82090108) {
   ITC_FRAMEWORK_FALLBACK(82090108)
-  hooks::Main(ctx, base);
+  hooks::Main(ctx);
 }

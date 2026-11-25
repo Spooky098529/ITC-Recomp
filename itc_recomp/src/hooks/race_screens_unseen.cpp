@@ -48,7 +48,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -59,7 +59,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -74,40 +73,39 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
 ITC_REGS_STEP(RaceScreensUnseenPause4Open) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Pause4Open(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Pause4Open(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
                                         guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenPause4Update) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::Pause4Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+      race_screens::Pause4Update(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenPause4Draw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Pause4Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Pause4Draw(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 // The steps without adapters (the harness's).
 #define ITC_UNSEEN_CALLS(name)                                                             \
-  void RaceScreensUnseenPause4##name(lifted::Regs& ctx, uint8_t* base) {                     \
-    GuestCalls guest(ctx, base);                                                           \
-    ctx.r3.u64 = race_screens::Pause4##name(base, ctx.r1.u32, guest.calls());              \
+  void RaceScreensUnseenPause4##name(lifted::Regs& ctx) {                     \
+    GuestCalls guest(ctx);                                                           \
+    ctx.r3.u64 = race_screens::Pause4##name(ctx.r1.u32, guest.calls());              \
   }
 ITC_UNSEEN_CALLS(MainPage)
 ITC_UNSEEN_CALLS(VolumePage)
@@ -119,8 +117,8 @@ ITC_UNSEEN_CALLS(ShowVolumesB)
 #undef ITC_UNSEEN_CALLS
 
 #define ITC_UNSEEN_PLAIN(name)                                             \
-  void RaceScreensUnseenPause4##name(lifted::Regs& ctx, uint8_t* base) {     \
-    ctx.r3.u64 = race_screens::Pause4##name(base, ctx.r1.u32);             \
+  void RaceScreensUnseenPause4##name(lifted::Regs& ctx) {     \
+    ctx.r3.u64 = race_screens::Pause4##name(ctx.r1.u32);             \
   }
 ITC_UNSEEN_PLAIN(AnswerPage)
 ITC_UNSEEN_PLAIN(StepVolume)
@@ -130,9 +128,9 @@ ITC_UNSEEN_PLAIN(ColorItems)
 #undef ITC_UNSEEN_PLAIN
 
 #define ITC_UNSEEN_TRANSITION(name)                                                         \
-  void RaceScreensUnseenPause4##name(lifted::Regs& ctx, uint8_t* base) {                      \
-    GuestCalls guest(ctx, base);                                                            \
-    ctx.r3.u64 = race_screens::Pause4##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());   \
+  void RaceScreensUnseenPause4##name(lifted::Regs& ctx) {                      \
+    GuestCalls guest(ctx);                                                            \
+    ctx.r3.u64 = race_screens::Pause4##name(ctx.r3.u32, ctx.r1.u32, guest.calls());   \
   }
 ITC_UNSEEN_TRANSITION(RunTen)
 ITC_UNSEEN_TRANSITION(OpenMain)
@@ -148,84 +146,84 @@ ITC_UNSEEN_TRANSITION(CloseVolume)
 #undef ITC_UNSEEN_TRANSITION
 
 ITC_REGS_STEP(RaceScreensUnseenPause4ConfirmPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Pause4ConfirmPage(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Pause4ConfirmPage(ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenPause4RestoreNodes) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::Pause4RestoreNodes(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+      race_screens::Pause4RestoreNodes(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenPause4ShowVolume) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::Pause4ShowVolume(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+      race_screens::Pause4ShowVolume(ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenPause4SetArrow) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = race_screens::Pause4SetArrow(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = race_screens::Pause4SetArrow(ctx.r3.u64, ctx.r1.u32);
 }
 
 bool NativeSlotsUnseen() { return ITC_FLAG(native_action_mappers); }
 
 ITC_REGS_STEP(RaceScreensUnseenRaceResultsOpen) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::RaceResultsOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::RaceResultsOpen(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
                                              guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenRaceResultsUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::RaceResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::RaceResultsUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                                NativeSlotsUnseen(), guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenRaceResultsDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::RaceResultsDraw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::RaceResultsDraw(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenRaceResultsSetTexts) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::RaceResultsSetTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::RaceResultsSetTexts(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenRaceResultsMainPage) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::RaceResultsMainPage(base, ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
+      race_screens::RaceResultsMainPage(ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenSplitResultsOpen) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::SplitResultsOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::SplitResultsOpen(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
                                               ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenSplitResultsUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::SplitResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::SplitResultsUpdate(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                                 NativeSlotsUnseen(), guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenSplitResultsDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::SplitResultsDraw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::SplitResultsDraw(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenSplitResultsMainPage) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::SplitResultsMainPage(base, ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
+      race_screens::SplitResultsMainPage(ctx.r1.u32, NativeSlotsUnseen(), guest.calls());
 }
 
 #define ITC_UNSEEN_RESULTS_TRANSITION(name)                                              \
-  void RaceScreensUnseen##name(lifted::Regs& ctx, uint8_t* base) {                         \
-    GuestCalls guest(ctx, base);                                                         \
-    ctx.r3.u64 = race_screens::name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());        \
+  void RaceScreensUnseen##name(lifted::Regs& ctx) {                         \
+    GuestCalls guest(ctx);                                                         \
+    ctx.r3.u64 = race_screens::name(ctx.r3.u32, ctx.r1.u32, guest.calls());        \
   }
 ITC_UNSEEN_RESULTS_TRANSITION(RaceResultsIntro)
 ITC_UNSEEN_RESULTS_TRANSITION(RaceResultsShow)
@@ -236,35 +234,35 @@ ITC_UNSEEN_RESULTS_TRANSITION(SplitResultsClose)
 #undef ITC_UNSEEN_RESULTS_TRANSITION
 
 ITC_REGS_STEP(RaceScreensUnseenKind6Open) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::Kind6Open(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+      race_screens::Kind6Open(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6Draw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6Draw(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6SetUpTexts) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6SetUpTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6SetUpTexts(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6SetCursorX) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = race_screens::Kind6SetCursorX(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = race_screens::Kind6SetCursorX(ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6ShowReplay) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6ShowReplay(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6ShowReplay(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_UNSEEN_KIND6(name)                                                \
-  void RaceScreensUnseenKind6##name(lifted::Regs& ctx, uint8_t* base) {         \
-    GuestCalls guest(ctx, base);                                              \
-    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r1.u32, guest.calls());  \
+  void RaceScreensUnseenKind6##name(lifted::Regs& ctx) {         \
+    GuestCalls guest(ctx);                                              \
+    ctx.r3.u64 = race_screens::Kind6##name(ctx.r1.u32, guest.calls());  \
   }
 ITC_UNSEEN_KIND6(Close)
 ITC_UNSEEN_KIND6(ShowPanelA)
@@ -276,9 +274,9 @@ ITC_UNSEEN_KIND6(ShowList)
 #undef ITC_UNSEEN_KIND6
 
 #define ITC_UNSEEN_KIND6_TRANSITION(name)                                                    \
-  void RaceScreensUnseenKind6##name(lifted::Regs& ctx, uint8_t* base) {                        \
-    GuestCalls guest(ctx, base);                                                             \
-    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls());     \
+  void RaceScreensUnseenKind6##name(lifted::Regs& ctx) {                        \
+    GuestCalls guest(ctx);                                                             \
+    ctx.r3.u64 = race_screens::Kind6##name(ctx.r3.u32, ctx.r1.u32, guest.calls());     \
   }
 ITC_UNSEEN_KIND6_TRANSITION(Intro)
 ITC_UNSEEN_KIND6_TRANSITION(Show)
@@ -298,78 +296,78 @@ ITC_UNSEEN_KIND6_TRANSITION(CloseWaiting)
 #undef ITC_UNSEEN_KIND6_TRANSITION
 
 ITC_REGS_STEP(RaceScreensUnseenKind6Update) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6Update(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6Update(ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6AnswerPage) {
-  ctx.r3.u64 = race_screens::Kind6AnswerPage(base);
+  ctx.r3.u64 = race_screens::Kind6AnswerPage();
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6QuestionAnswerPage) {
-  ctx.r3.u64 = race_screens::Kind6QuestionAnswerPage(base, ctx.r1.u32);
+  ctx.r3.u64 = race_screens::Kind6QuestionAnswerPage(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6WaitingPage) {
-  ctx.r3.u64 = race_screens::Kind6WaitingPage(base, ctx.r1.u32);
+  ctx.r3.u64 = race_screens::Kind6WaitingPage(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6RankingTime) {
-  ctx.r3.u64 = race_screens::Kind6RankingTime(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  ctx.r3.u64 = race_screens::Kind6RankingTime(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6Rank) {
-  ctx.r3.u64 = race_screens::Kind6Rank(base);
+  ctx.r3.u64 = race_screens::Kind6Rank();
 }
 
-void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx, uint8_t*) {
+void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx) {
   ctx.r3.u64 = race_screens::Kind6CarLogo(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6LeaderboardRead) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::Kind6LeaderboardRead(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+      race_screens::Kind6LeaderboardRead(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6ReadSpecSetUp) {
   // r3 the caller's (the original works in r9 to r11; its r11, the spec,
   // was a leftover for recompiled callers: none now).
-  race_screens::Kind6ReadSpecSetUp(base);
+  race_screens::Kind6ReadSpecSetUp();
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6SaveReplay) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6SaveReplay(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6SaveReplay(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenAskSlot) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::RaceDialogAskSlot(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::RaceDialogAskSlot(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenStoreReplay) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::RaceDialogStoreReplay(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+      race_screens::RaceDialogStoreReplay(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenReplayCopyFrom) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 =
-      race_screens::ReplayCopyFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+      race_screens::ReplayCopyFrom(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(RaceScreensUnseenKind6NetState) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = race_screens::Kind6NetState(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = race_screens::Kind6NetState(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_UNSEEN_KIND6_DIALOG_PAGE(name)                                                   \
-  void RaceScreensUnseenKind6##name(lifted::Regs& ctx, uint8_t* base) {                        \
-    GuestCalls guest(ctx, base);                                                             \
-    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r4.u64, ctx.r1.u32, guest.calls());     \
+  void RaceScreensUnseenKind6##name(lifted::Regs& ctx) {                        \
+    GuestCalls guest(ctx);                                                             \
+    ctx.r3.u64 = race_screens::Kind6##name(ctx.r4.u64, ctx.r1.u32, guest.calls());     \
   }
 ITC_UNSEEN_KIND6_DIALOG_PAGE(SavePage)
 ITC_UNSEEN_KIND6_DIALOG_PAGE(OverwritePage)
@@ -378,9 +376,9 @@ ITC_UNSEEN_KIND6_DIALOG_PAGE(QuitPage)
 #undef ITC_UNSEEN_KIND6_DIALOG_PAGE
 
 #define ITC_UNSEEN_KIND6_PAGE(name)                                           \
-  void RaceScreensUnseenKind6##name(lifted::Regs& ctx, uint8_t* base) {         \
-    GuestCalls guest(ctx, base);                                              \
-    ctx.r3.u64 = race_screens::Kind6##name(base, ctx.r1.u32, guest.calls());  \
+  void RaceScreensUnseenKind6##name(lifted::Regs& ctx) {         \
+    GuestCalls guest(ctx);                                              \
+    ctx.r3.u64 = race_screens::Kind6##name(ctx.r1.u32, guest.calls());  \
   }
 ITC_UNSEEN_KIND6_PAGE(MainPage)
 ITC_UNSEEN_KIND6_PAGE(SlotPage)
@@ -402,7 +400,7 @@ ITC_UNSEEN_KIND6_PAGE(ShowRanking)
 
 #define ITC_RACE_SCREENS_UNSEEN(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_screens_unseen)) { \
-    hooks::step(ctx, base);                       \
+    hooks::step(ctx);                       \
   }
 
 ITC_RACE_SCREENS_UNSEEN(82211390, RaceScreensUnseenPause4Open)
@@ -448,13 +446,13 @@ ITC_RACE_SCREENS_UNSEEN(821A66A8, RaceScreensUnseenReplayCopyFrom)
 ITC_NATIVE_ENTRY_ALWAYS(8214AB48) {
   
   if (!ITC_FLAG(native_race_screens_unseen)) {
-    lifted::original::c8214AB48(ctx, base);
+    lifted::original::c8214AB48(ctx);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8214AA70) {
   
   if (!ITC_FLAG(native_race_screens_unseen)) {
-    lifted::original::c8214AA70(ctx, base);
+    lifted::original::c8214AA70(ctx);
   }
 }

@@ -6,10 +6,10 @@ namespace {
 using G = schema::UiMoviesGlobals;
 }  // namespace
 
-uint32_t FindChunk(uint8_t* base, uint32_t chunk, uint32_t tag) {
+uint32_t FindChunk(uint32_t chunk, uint32_t tag) {
   for (;;) {
-    chunk += schema::UiMovieChunk(base, chunk).next();
-    const uint32_t found = schema::UiMovieChunk(base, chunk).tag();
+    chunk += schema::UiMovieChunk(chunk).next();
+    const uint32_t found = schema::UiMovieChunk(chunk).tag();
     if (found == kTagTrm) {
       return tag == kTagTrm ? chunk : 0;
     }
@@ -19,40 +19,40 @@ uint32_t FindChunk(uint8_t* base, uint32_t chunk, uint32_t tag) {
   }
 }
 
-uint32_t FileScene(uint8_t* base, uint32_t file) {
-  const uint32_t scene = file + schema::UiMovieFile(base, file).scene_offset();
-  return schema::UiMovieNode(base, scene).tag() == kTagSce ? scene : 0;
+uint32_t FileScene(uint32_t file) {
+  const uint32_t scene = file + schema::UiMovieFile(file).scene_offset();
+  return schema::UiMovieNode(scene).tag() == kTagSce ? scene : 0;
 }
 
-uint32_t XmdEntry(uint8_t* base, uint32_t file, uint32_t i) {
-  const schema::UiMovieXmd xmd(base, file);
+uint32_t XmdEntry(uint32_t file, uint32_t i) {
+  const schema::UiMovieXmd xmd(file);
   if (i >= xmd.entry_count()) {
     return 0;
   }
-  return file + guest::LoadU32(base, xmd.entries_address() + 4 * i);
+  return file + guest::LoadU32(xmd.entries_address() + 4 * i);
 }
 
-void SetRenderer(uint8_t* base, uint32_t renderer, uint32_t list) {
-  G::set_renderer(base, renderer);
-  G::set_command_list(base, list);
+void SetRenderer(uint32_t renderer, uint32_t list) {
+  G::set_renderer(renderer);
+  G::set_command_list(list);
 }
 
-void ResetDrawContext(uint8_t* base, uint32_t context) {
+void ResetDrawContext(uint32_t context) {
   // The original stores the color's float in each row's w first, then
   // copies the identity over the matrix (memcpy from its stack): only the
   // identity is left.
   constexpr uint32_t kOneBits = 0x3F800000;
-  const schema::UiMovieDrawContext c(base, context);
+  const schema::UiMovieDrawContext c(context);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
-      guest::StoreU32(base, c.matrix_address() + 16 * row + 4 * column,
+      guest::StoreU32(c.matrix_address() + 16 * row + 4 * column,
                       row == column ? kOneBits : 0);
     }
   }
   // The color's words copied from the float 1.0's (its bits).
-  const uint32_t one = guest::LoadU32(base, G::one_address());
+  const uint32_t one = guest::LoadU32(G::one_address());
   for (uint32_t at : {c.red_address(), c.green_address(), c.blue_address(), c.alpha_address()}) {
-    guest::StoreU32(base, at, one);
+    guest::StoreU32(at, one);
   }
   c.set_clip_left(0);
   c.set_clip_top(0);
@@ -71,54 +71,54 @@ constexpr uint32_t kTagPrm = 0x50524D00;  // "PRM\0"
 constexpr uint32_t kTagTfm = 0x54464D00;  // "TFM\0"
 constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
 
-void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t first, uint32_t last) {
+void CopyWords(uint32_t to, uint32_t from, uint32_t first, uint32_t last) {
   for (uint32_t offset = first; offset <= last; offset += 4) {
-    guest::StoreU32(base, to + offset, guest::LoadU32(base, from + offset));
+    guest::StoreU32(to + offset, guest::LoadU32(from + offset));
   }
 }
 }  // namespace
 
-uint32_t RestorePose(uint8_t* base, uint32_t movie, uint32_t live, uint32_t rest, uint32_t group,
+uint32_t RestorePose(uint32_t movie, uint32_t live, uint32_t rest, uint32_t group,
                      uint32_t rest_group) {
   const uint32_t range = group != 0 && rest_group != 0 ? group : live;
   uint32_t result = movie;
   // The floats copied through registers (lfs, stfs) are stored unchanged by
   // the translated code, so every field is copied as a word.
   // The group's first child index (+100) and count (+104), read as words.
-  const schema::UiMovieNode r(base, range);
-  for (int32_t i = int32_t(guest::LoadU32(base, r.width_address()) +
-                           guest::LoadU32(base, r.height_address()) - 1);
-       i >= int32_t(guest::LoadU32(base, r.width_address())); i--) {
-    const uint32_t to = Child(base, live, uint32_t(i));
-    const uint32_t from = Child(base, rest, uint32_t(i));
+  const schema::UiMovieNode r(range);
+  for (int32_t i = int32_t(guest::LoadU32(r.width_address()) +
+                           guest::LoadU32(r.height_address()) - 1);
+       i >= int32_t(guest::LoadU32(r.width_address())); i--) {
+    const uint32_t to = Child(live, uint32_t(i));
+    const uint32_t from = Child(rest, uint32_t(i));
     result = from;
-    const uint32_t tag = schema::UiMovieNode(base, to).tag();
+    const uint32_t tag = schema::UiMovieNode(to).tag();
     if (tag != kTagGrp && tag != kTagPic && tag != kTagPrm && tag != kTagSce && tag != kTagTfm &&
         tag != kTagTxt) {
       continue;
     }
-    CopyWords(base, to, from, 12, 80);
+    CopyWords(to, from, 12, 80);
     result = from + 28;
     switch (tag) {
       case kTagGrp:
-        result = RestorePose(base, movie, live, rest, to, from);
+        result = RestorePose(movie, live, rest, to, from);
         break;
       case kTagSce:
-        result = RestorePose(base, movie, to, from, 0, 0);
+        result = RestorePose(movie, to, from, 0, 0);
         break;
       case kTagPic:
-        CopyWords(base, to, from, 100, 136);
+        CopyWords(to, from, 100, 136);
         break;
       case kTagTxt:
-        CopyWords(base, to, from, 100, 104);
-        CopyWords(base, to, from, 116, 136);
+        CopyWords(to, from, 100, 104);
+        CopyWords(to, from, 116, 136);
         break;
       case kTagPrm:
-        CopyWords(base, to, from, 100, 108);
-        for (uint32_t k = 0; k < guest::LoadU32(base, from + 116); k++) {
-          const uint32_t vertex_to = PrimitiveVertex(base, to, k);
-          const uint32_t vertex_from = PrimitiveVertex(base, from, k);
-          CopyWords(base, vertex_to, vertex_from, 0, 28);
+        CopyWords(to, from, 100, 108);
+        for (uint32_t k = 0; k < guest::LoadU32(from + 116); k++) {
+          const uint32_t vertex_to = PrimitiveVertex(to, k);
+          const uint32_t vertex_from = PrimitiveVertex(from, k);
+          CopyWords(vertex_to, vertex_from, 0, 28);
           result = vertex_from;
         }
         break;

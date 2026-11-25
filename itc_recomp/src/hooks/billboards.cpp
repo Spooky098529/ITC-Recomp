@@ -28,13 +28,13 @@ ITC_FLAG_BOOL(native_billboards, true, "ITC",
 
 // BillboardMaterial::Init: r3 = the material.
 ITC_NATIVE_ENTRY(8209F5A0, ITC_FLAG(native_billboards)) {
-  sprites::InitBillboardMaterial(base, ctx.r3.u32);
+  sprites::InitBillboardMaterial(ctx.r3.u32);
 }
 
 // BillboardMaterial::SetLights: r3 = the material, r4 = light count, r5 =
 // the lights.
 ITC_NATIVE_ENTRY(8209F5C8, ITC_FLAG(native_billboards)) {
-  sprites::SetBillboardLights(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  sprites::SetBillboardLights(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // --- The recording (src/sprites/billboard_record.cpp) ---
@@ -44,21 +44,21 @@ bool hooks::BillboardsNative() {
          !hooks::SceneryListsSlotDiagnostics();
 }
 
-void hooks::BillboardsRecord(lifted::Regs& ctx, uint8_t* base) {
+void hooks::BillboardsRecord(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
-  const uint64_t r3 = sprites::RecordBillboards(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
+  const uint64_t r3 = sprites::RecordBillboards(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
 }
 
-void hooks::BillboardsDraw(lifted::Regs& ctx, uint8_t* base) {
+void hooks::BillboardsDraw(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
-  const uint64_t r3 = sprites::DrawBillboards(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
+  const uint64_t r3 = sprites::DrawBillboards(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -72,11 +72,11 @@ bool hooks::LightGroupsNative() {
          ITC_FLAG(native_course_scenery) && ITC_FLAG(native_scenery_lists);
 }
 
-void hooks::LightGroupsDraw(lifted::Regs& ctx, uint8_t* base) {
+void hooks::LightGroupsDraw(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
-  const uint64_t r3 = sprites::DrawLightGroups(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
+  const uint64_t r3 = sprites::DrawLightGroups(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                                ctx.r5.u32, ctx.r6.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;

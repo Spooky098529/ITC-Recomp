@@ -150,21 +150,19 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.draw = SceneryListsDrawCalls(guest);
   calls.memcpy = [guest](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
-    lifted::original::c825A7410(ctx, base);
+    lifted::original::c825A7410(ctx);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };
   calls.find_nearest = [guest](const uint64_t regs[7], double f1, double f2, double f3,
                                uint32_t sp, uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
@@ -176,7 +174,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.f2.f64 = f2;
     ctx.f3.f64 = f3;
     ctx.fpscr.disableFlushMode();
-    lifted::original::c820F4128(ctx, base);
+    lifted::original::c820F4128(ctx);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -185,9 +183,8 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     calls.make_morph_job = [guest](uint32_t maker, uint32_t morph,
                                    uint32_t sp) -> std::optional<uint32_t> {
       lifted::Regs& ctx = guest->ctx;
-      uint8_t* base = guest->base;
-      const auto job = morph_jobs::MakeJob(base, morph_jobs::Kind::kMorph, maker, morph, sp,
-                                           MorphJobsConstructCalls(ctx, base));
+      const auto job = morph_jobs::MakeJob(morph_jobs::Kind::kMorph, maker, morph, sp,
+                                           MorphJobsConstructCalls(ctx));
       ctx.fpscr.disableFlushMode();
       return job;
     };
@@ -195,7 +192,6 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.call = [guest](uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                        uint32_t lr) {
     lifted::Regs& ctx = guest->ctx;
-    uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
@@ -205,7 +201,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
       registers[i]->u64 = regs[i];
     }
     ctx.fpscr.disableFlushMode();
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -248,18 +244,18 @@ void LeaveDraw(lifted::Regs& ctx, const car_draw::Draw& draw) {
 
 ITC_REGS_STEP(CarDrawCarPartDraw) {
   if (!CarDrawModelCalleesNative()) {
-    lifted::original::c820D06F0(ctx, base);
+    lifted::original::c820D06F0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24 and r28: diagnostic only, not carried)
-  const auto draw = car_draw::CarPartDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+  const auto draw = car_draw::CarPartDraw(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, 0, 0);
   if (!draw) {
-    lifted::original::c820D06F0(ctx, base);
+    lifted::original::c820D06F0(ctx);
     return;
   }
   ctx.lr = lr;
@@ -268,20 +264,20 @@ ITC_REGS_STEP(CarDrawCarPartDraw) {
 
 ITC_REGS_STEP(CarDrawBlinkTimersAdvance) {
   ctx.fpscr.disableFlushMode();
-  car_draw::BlinkTimersAdvance(base, ctx.r3.u32, ctx.r1.u32);
+  car_draw::BlinkTimersAdvance(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CarDrawIsNearPlayerHeight) {
   if (!CarDrawHeightCalleesNative()) {
-    lifted::original::c820DAB58(ctx, base);
+    lifted::original::c820DAB58(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   ctx.r3.u64 =
-      car_draw::SceneModelIsNearPlayerHeight(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+      car_draw::SceneModelIsNearPlayerHeight(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -299,15 +295,15 @@ void LeaveLeft(lifted::Regs& ctx, const car_draw::Left& left) {
 
 ITC_REGS_STEP(CarDrawSceneLightsDraw) {
   if (!CarDrawLightKitCalleesNative()) {
-    lifted::original::c820DDE58(ctx, base);
+    lifted::original::c820DDE58(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24 and r28: diagnostic only, not carried)
-  const auto left = car_draw::SceneLightsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+  const auto left = car_draw::SceneLightsDraw(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                               !CarDrawBlinkTimersHeld(), 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
@@ -319,16 +315,16 @@ bool CarDrawShadowsCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneParts) {
   if (!CarDrawShadowsCalleesNative()) {
-    lifted::original::c820E2EE8(ctx, base);
+    lifted::original::c820E2EE8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::ScenePartsDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0);
+      car_draw::ScenePartsDraw(calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -343,16 +339,16 @@ bool CarDrawInteriorCalleesNative() {
 ITC_REGS_STEP(CarDrawSceneInterior) {
   if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
       !ITC_FLAG(native_scene_models)) {
-    lifted::original::c820E53F0(ctx, base);
+    lifted::original::c820E53F0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24 and r28: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneInteriorDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
+      car_draw::SceneInteriorDraw(calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -366,16 +362,16 @@ bool CarDrawCockpitCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneCockpit) {
   if (!CarDrawCockpitCalleesNative()) {
-    lifted::original::c820DC498(ctx, base);
+    lifted::original::c820DC498(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24 and r28: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneCockpitDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
+      car_draw::SceneCockpitDraw(calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -384,16 +380,16 @@ ITC_REGS_STEP(CarDrawSceneCockpit) {
 
 ITC_REGS_STEP(CarDrawSceneTraffic) {
   if (!CarDrawShadowsCalleesNative()) {
-    lifted::original::c820E6A40(ctx, base);
+    lifted::original::c820E6A40(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneTrafficDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
+      car_draw::SceneTrafficDraw(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -406,16 +402,16 @@ bool CarDrawWheelsCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneWheels) {
   if (!CarDrawWheelsCalleesNative()) {
-    lifted::original::c820ECE28(ctx, base);
+    lifted::original::c820ECE28(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
   // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneWheelsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
+      car_draw::SceneWheelsDraw(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -431,17 +427,17 @@ bool CarDrawUpdateCalleesNative() {
 
 ITC_REGS_STEP(CarDrawUpdate) {
   if (!CarDrawUpdateCalleesNative()) {
-    lifted::original::c820DAC68(ctx, base);
+    lifted::original::c820DAC68(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
+  SceneryDrawGuest guest{ctx};
   const car_draw::Calls calls = CarDrawCalls(&guest);
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  const second_set::ReleaseCalls release = SecondSetReleaseCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  const second_set::ReleaseCalls release = SecondSetReleaseCalls(ctx);
   // (the caller's r24: diagnostic only, not carried)
-  const car_draw::Left left = car_draw::CarDrawUpdate(base, calls, poll, release, ctx.r1.u32,
+  const car_draw::Left left = car_draw::CarDrawUpdate(calls, poll, release, ctx.r1.u32,
                                                       ctx.r3.u64, 0, !CarDrawBlinkTimersHeld());
   ctx.lr = lr;
   LeaveLeft(ctx, left);
@@ -451,7 +447,7 @@ ITC_REGS_STEP(CarDrawUpdate) {
 
 #define ITC_CAR_DRAW(address, step)                         \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_draw)) {    \
-    hooks::step(ctx, base);                                 \
+    hooks::step(ctx);                                 \
   }
 
 // CarPart::Draw's adapter is also what the native cockpit dials call

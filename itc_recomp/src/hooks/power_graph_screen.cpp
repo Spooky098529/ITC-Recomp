@@ -6,6 +6,9 @@
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
+#include "guest.h"
+#include "memory/handles.h"
+#include "schema/power_graph_screen.h"
 #include "power_graph_screen/power_graph_screen.h"
 #include "lifted/sdk.h"
 
@@ -42,7 +45,7 @@ namespace pgs = power_graph_screen;
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -53,7 +56,6 @@ class GuestCalls {
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     lifted::Regs& ctx = self.ctx_;
-    uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = args[0];
@@ -68,97 +70,113 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
   lifted::Regs& ctx_;
-  uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
 ITC_REGS_STEP(PowerGraphScreen6PostLeave) {
-  pgs::SlotPost(base, ctx.r4.u32, 0x82237A88);
+  pgs::SlotPost(ctx.r4.u32, 0x82237A88);
 }
 ITC_REGS_STEP(PowerGraphScreen6PostClosing) {
-  pgs::SlotPost(base, ctx.r4.u32, 0x82237AD8);
+  pgs::SlotPost(ctx.r4.u32, 0x82237AD8);
 }
 ITC_REGS_STEP(PowerGraphScreen6PostClosed) {
-  pgs::SlotPost(base, ctx.r4.u32, 0x82237B28);
+  pgs::SlotPost(ctx.r4.u32, 0x82237B28);
 }
 ITC_REGS_STEP(PowerGraphScreen7PostLeave) {
-  pgs::SlotPost(base, ctx.r4.u32, 0x82246FB8);
+  pgs::SlotPost(ctx.r4.u32, 0x82246FB8);
 }
 ITC_REGS_STEP(PowerGraphScreen7PostClosing) {
-  pgs::SlotPost(base, ctx.r4.u32, 0x82247008);
+  pgs::SlotPost(ctx.r4.u32, 0x82247008);
 }
 ITC_REGS_STEP(PowerGraphScreenOnEnter) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::OnEnter(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenWaitForLoad) {
-  ctx.r3.u64 = pgs::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = pgs::WaitForLoad(ctx.r3.u64, ctx.r1.u32);
 }
-void PowerGraphScreenShown(lifted::Regs&, uint8_t* base) { pgs::Shown(base); }
-ITC_REGS_STEP(PowerGraphScreenOpen) { pgs::Open(base, ctx.r3.u32); }
+void PowerGraphScreenShown(lifted::Regs&) { pgs::Shown(); }
+ITC_REGS_STEP(PowerGraphScreenOpen) { pgs::Open(ctx.r3.u32); }
 ITC_REGS_STEP(PowerGraphScreenLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::Leave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::Leave(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenOnLeft) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::OnLeft(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::OnLeft(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenStep0) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::Step0(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::Step0(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenStep1) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::Step1(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::Step1(ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenSetTexts) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::SetTexts(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::SetTexts(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenSetParts) {
-  ctx.r3.u64 = pgs::SetParts(base, ctx.r4.u32, ctx.r1.u32);
+  // r4 the record's +60: the data's +68, a handle inside the host object
+  // since E5 step 4 (its words through the view, bytes in guest order), or
+  // a guest address (its bytes as they are). SetParts reads bytes 1 to 11.
+  uint8_t parts[20] = {};
+  const uint32_t at = ctx.r4.u32;
+  if (memory::IsHandle(at)) {
+    const schema::PowerGraphScreenData data(at - 68);
+    const uint32_t words[5] = {data.parts_word_0(), data.parts_word_1(), data.parts_word_2(),
+                               data.parts_word_3(), data.parts_word_4()};
+    for (uint32_t i = 0; i < 20; i++) {
+      parts[i] = uint8_t(words[i / 4] >> (24 - 8 * (i % 4)));
+    }
+  } else {
+    for (uint32_t i = 0; i < 12; i++) {
+      parts[i] = guest::LoadU8(at + i);
+    }
+  }
+  ctx.r3.u64 = pgs::SetParts(parts, ctx.r1.u32);
 }
 ITC_REGS_STEP(PowerGraphScreenSetPartIcon) {
-  ctx.r3.u64 = pgs::SetPartIcon(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = pgs::SetPartIcon(ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PowerGraphScreenSetPartRow2) {
-  ctx.r3.u64 = pgs::SetPartRow2(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = pgs::SetPartRow2(ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PowerGraphScreenSetPartRow1) {
-  ctx.r3.u64 = pgs::SetPartRow1(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = pgs::SetPartRow1(ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(PowerGraphScreenMenuPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::MenuPage(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenClosedPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::ClosedPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr),
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::ClosedPage(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr),
                                guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::Draw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(PowerGraphScreenUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = pgs::Update(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = pgs::Update(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
 
 #define ITC_POWER_GRAPH_SCREEN(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_power_graph_screen)) { \
-    hooks::step(ctx, base);                      \
+    hooks::step(ctx);                      \
   }
 
 // The members' vtable slots (vtables 0x82010A68 and 0x82010FD0).

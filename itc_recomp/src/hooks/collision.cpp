@@ -54,7 +54,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
     \
     uint32_t value = 0;                     \
     if (!ITC_FLAG(native_collision) || !call) { \
-      lifted::original::c##address(ctx, base); \
+      lifted::original::c##address(ctx); \
       return;                               \
     }                                       \
     ctx.r3.u64 = value;                     \
@@ -69,23 +69,23 @@ ITC_COLLISION(820B9EE0, ctx.r3.u64 = BoxFaceCount())
 ITC_COLLISION(820B9EF8, ctx.r3.u64 = BoxEdgeCount())
 ITC_COLLISION(820B9ED0, ctx.r3.u64 = BoxCorner(ctx.r3.u32, ctx.r4.u32))
 ITC_COLLISION(820B9EE8, ctx.r3.u64 = BoxFace(ctx.r3.u32, ctx.r4.u32))
-ITC_COLLISION(820B9F98, ctx.r3.u64 = BoxEdgeStart(base, ctx.r4.u32))
-ITC_COLLISION(820B9FB0, ctx.r3.u64 = BoxEdgeEnd(base, ctx.r4.u32))
+ITC_COLLISION(820B9F98, ctx.r3.u64 = BoxEdgeStart(ctx.r4.u32))
+ITC_COLLISION(820B9FB0, ctx.r3.u64 = BoxEdgeEnd(ctx.r4.u32))
 // BoxEdges::Start and End (sub_820B9FC8, sub_820B9FE0) have no adapters:
 // their caller in play, BoxBox::EdgesCrossing, is native.
-ITC_COLLISION(820BA668, BoxSetCacheWord(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_COLLISION(820BA678, ctx.r3.u64 = BoxCacheWord(base, ctx.r3.u32, ctx.r4.u32))
-ITC_COLLISION(820BAA50, BoxCopyCache(base, ctx.r3.u32, ctx.r4.u32))
-ITC_COLLISION(820BAB40, ctx.f1.f64 = ShapeRadius(base, ctx.r3.u32))
-ITC_COLLISION(820BA368, ctx.r3.u64 = BoxLowerCorner(base, ctx.r3.u32, ctx.r4.u32))
+ITC_COLLISION(820BA668, BoxSetCacheWord(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_COLLISION(820BA678, ctx.r3.u64 = BoxCacheWord(ctx.r3.u32, ctx.r4.u32))
+ITC_COLLISION(820BAA50, BoxCopyCache(ctx.r3.u32, ctx.r4.u32))
+ITC_COLLISION(820BAB40, ctx.f1.f64 = ShapeRadius(ctx.r3.u32))
+ITC_COLLISION(820BA368, ctx.r3.u64 = BoxLowerCorner(ctx.r3.u32, ctx.r4.u32))
 // BoxShape::FaceDistance (sub_820BA3B0) has no adapter: its caller in play
 // is native.
 ITC_COLLISION(820B9F00,
-              ctx.r3.u64 = BoxFaceDirection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208))
+              ctx.r3.u64 = BoxFaceDirection(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208))
 // r4 = the offset; r3 comes back as the box + 48.
-ITC_COLLISION(820BA2F0, ctx.f1.f64 = BoxTranslate(base, ctx.r3.u32, ctx.r4.u32);
-              ctx.r3.u64 = schema::BoxShape(base, ctx.r3.u32).center_x_address())
-ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
+ITC_COLLISION(820BA2F0, ctx.f1.f64 = BoxTranslate(ctx.r3.u32, ctx.r4.u32);
+              ctx.r3.u64 = schema::BoxShape(ctx.r3.u32).center_x_address())
+ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(ctx.r3.u32))
 
 // --- The constructors and the placement ---
 
@@ -99,11 +99,11 @@ ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 // 96. A template that isn't a box: the original.
 ITC_NATIVE_ENTRY(820B9C40, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
-  if (!BoxPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
-    lifted::original::c820B9C40(ctx, base);
+  if (!BoxPlace(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
+    lifted::original::c820B9C40(ctx);
     return;
   }
-  ctx.r3.u64 = schema::BoxShape(base, ctx.r3.u32).axis2_x_address();
+  ctx.r3.u64 = schema::BoxShape(ctx.r3.u32).axis2_x_address();
 }
 
 // --- The shape record ---
@@ -113,20 +113,20 @@ ITC_NATIVE_ENTRY(820B9C40, ITC_FLAG(native_collision)) {
 // callers in play are native.
 // CollisionShape::Type (sub_820BACB8) has no adapter: its callers in play,
 // the query's tests, are native.
-ITC_COLLISION_RECORD(820BADF8, CollisionShapePrevious(base, ctx.r3.u32, &value))
-ITC_COLLISION_RECORD(820BAE38, CollisionShapeCurrent(base, ctx.r3.u32, &value))
+ITC_COLLISION_RECORD(820BADF8, CollisionShapePrevious(ctx.r3.u32, &value))
+ITC_COLLISION_RECORD(820BAE38, CollisionShapeCurrent(ctx.r3.u32, &value))
 
-ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(base, ctx.r3.u32))
+ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(ctx.r3.u32))
 // r4 = the matrix. Copies or a template that aren't boxes: the original.
 ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
   
   if (!ITC_FLAG(native_collision)) {
-    lifted::original::c820BB758(ctx, base);
+    lifted::original::c820BB758(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (!CollisionShapePlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 608)) {
-    lifted::original::c820BB758(ctx, base);
+  if (!CollisionShapePlace(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 608)) {
+    lifted::original::c820BB758(ctx);
   }
 }
 // CollisionShape::Translate (sub_820BACD0) has no adapter: its caller in
@@ -145,12 +145,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
     \
     uint32_t result = 0;                    \
     if (!ITC_FLAG(native_collision)) {      \
-      lifted::original::c##address(ctx, base); \
+      lifted::original::c##address(ctx); \
       return;                               \
     }                                       \
     ctx.fpscr.disableFlushMode();           \
     if (!call) {                            \
-      lifted::original::c##address(ctx, base); \
+      lifted::original::c##address(ctx); \
       return;                               \
     }                                       \
     ctx.r3.u64 = result;                    \
@@ -159,7 +159,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
 // have no adapters: their caller in play, CollisionPair::Solve, is native.
 // f1 = the time.
 ITC_COLLISION(820BBB20, uint32_t r3 = 0;
-              ctx.f1.f64 = CollisionPairNextCheckTime(base, ctx.r3.u32, ctx.r1.u32 - 160, &r3);
+              ctx.f1.f64 = CollisionPairNextCheckTime(ctx.r3.u32, ctx.r1.u32 - 160, &r3);
               ctx.r3.u64 = r3)
 
 // --- The impacts ---
@@ -171,11 +171,11 @@ ITC_COLLISION(820BBB20, uint32_t r3 = 0;
 // query + 64.
 ITC_NATIVE_ENTRY(820BF038, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
-  if (!BoxBoxFindImpact(base, ctx.r3.u32)) {
-    lifted::original::c820BF038(ctx, base);
+  if (!BoxBoxFindImpact(ctx.r3.u32)) {
+    lifted::original::c820BF038(ctx);
     return;
   }
-  ctx.r3.u64 = schema::CollisionQuery(base, ctx.r3.u32).contact_push_x_address();
+  ctx.r3.u64 = schema::CollisionQuery(ctx.r3.u32).contact_push_x_address();
 }
 // Query::FindImpact (sub_820BCE80) has no adapter: its caller in play,
 // CollisionPair::Solve, is native.
@@ -189,8 +189,8 @@ ITC_NATIVE_ENTRY(820BF038, ITC_FLAG(native_collision)) {
 ITC_NATIVE_ENTRY(820BFB28, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  if (!BoxBoxFindPushOut(base, ctx.r3.u32, ctx.r1.u32 - 96, &r3)) {
-    lifted::original::c820BFB28(ctx, base);
+  if (!BoxBoxFindPushOut(ctx.r3.u32, ctx.r1.u32 - 96, &r3)) {
+    lifted::original::c820BFB28(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -202,7 +202,7 @@ ITC_NATIVE_ENTRY(820BFB28, ITC_FLAG(native_collision)) {
 
 // CollisionPair::Respond (sub_820BB868) has no adapter: its caller in
 // play, CollisionPair::Solve, is native.
-ITC_COLLISION_TEST(820BBE30, CollisionPairSolve(base, ctx.r3.u32, ctx.r1.u32 - 1632, &result))
+ITC_COLLISION_TEST(820BBE30, CollisionPairSolve(ctx.r3.u32, ctx.r1.u32 - 1632, &result))
 
 // --- The query and its contact ---
 
@@ -224,8 +224,8 @@ bool NativeLifetime() {
 // Slot 0: r4 = the flags; r3 comes back as the shape.
 ITC_NATIVE_ENTRY_ALWAYS(820BB140) {
   
-  if (!NativeLifetime() || !ShapeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c820BB140(ctx, base);
+  if (!NativeLifetime() || !ShapeDeletingDestructor(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820BB140(ctx);
   }
 }
 // Slot 5: r4 = memory or 0; r3 comes back as the copy (or 0).
@@ -233,12 +233,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB218) {
   
   uint32_t copy = 0;
   if (!NativeLifetime()) {
-    lifted::original::c820BB218(ctx, base);
+    lifted::original::c820BB218(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (!BoxClone(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
-    lifted::original::c820BB218(ctx, base);
+  if (!BoxClone(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
+    lifted::original::c820BB218(ctx);
     return;
   }
   ctx.r3.u64 = copy;

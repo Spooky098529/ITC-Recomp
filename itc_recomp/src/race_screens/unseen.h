@@ -43,29 +43,29 @@ namespace race_screens {
 // player; the list's +60 and the data's +72 = 1 for a player other than 0,
 // else 0; +76 = the kind; Go(0, transition 1, then 2), MenuSound::Play(6),
 // LoadVolumes. LoadVolumes' r3 (player 0's save data).
-uint64_t Pause4Open(uint8_t* base, uint32_t screen, uint64_t player, uint64_t kind, uint32_t sp,
+uint64_t Pause4Open(uint32_t screen, uint64_t player, uint64_t kind, uint32_t sp,
                     const Calls& calls);
 // sub_82211458 PauseMenu4::Update: the page's handler (0 MainPage, 1
 // VolumePage, 2 ConfirmPage with `r4`, 3 AnswerPage; their table stored in
 // the frame as the original's), its r3; 0 with no page (-1). A page past 3
 // runs the frame's word through `calls`, as the original's bctrl would.
-uint64_t Pause4Update(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Pause4Update(uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
 // sub_82211590 PauseMenu4::Draw (r3 the screen): with a transition running
 // (the page object's +12), its handler (11, their table stored in the frame)
 // with the page object's +24, then ScreenPages::Finish with its answer; a
 // negative transition other than -1 Finish(1); none UiMovie::Run(the
 // screen's movie, 0). Then on page 2 the confirm dialog's draw. r3 as the
 // original leaves it.
-uint64_t Pause4Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t Pause4Draw(uint32_t screen, uint32_t sp, const Calls& calls);
 
 // The pages (no arguments but ConfirmPage's r4, which RaceDialog::Update
 // passes on). sub_8220FD48 MainPage (its case 0, sub_8220FE3C, merged),
 // sub_82210E58 VolumePage, sub_8220FF30 ConfirmPage: 0. sub_82210910
 // AnswerPage: SaveVolumes, then the data's +56.
-uint64_t Pause4MainPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Pause4VolumePage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Pause4ConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
-uint64_t Pause4AnswerPage(uint8_t* base, uint32_t sp);
+uint64_t Pause4MainPage(uint32_t sp, const Calls& calls);
+uint64_t Pause4VolumePage(uint32_t sp, const Calls& calls);
+uint64_t Pause4ConfirmPage(uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Pause4AnswerPage(uint32_t sp);
 
 // The helpers. sub_82210488 StepVolume: by the list's +28 (-1 or 1) the
 // selected volume (+8, +12) stepped within 0 to 15, or item 2's +60
@@ -74,9 +74,9 @@ uint64_t Pause4AnswerPage(uint8_t* base, uint32_t sp);
 // data's +0 and +4 from or to player 0's save data's bytes +0x1F878 and
 // +0x1F879 (LoadVolumes sign-extends them and sets +16 and +20 to 15); the
 // save data (r3).
-uint32_t Pause4StepVolume(uint8_t* base, uint32_t sp);
-uint32_t Pause4LoadVolumes(uint8_t* base, uint32_t sp);
-uint32_t Pause4SaveVolumes(uint8_t* base, uint32_t sp);
+uint32_t Pause4StepVolume(uint32_t sp);
+uint32_t Pause4LoadVolumes(uint32_t sp);
+uint32_t Pause4SaveVolumes(uint32_t sp);
 // sub_82210C00 SetUpMain: the item count (+52), MenuList::Init(list, count,
 // count, 1, 154, 153, 155, 156; 159, 158 at the frame's +84 and +92), the
 // selection from +64, ShowItems; ShowItems' r3. sub_82210360 ShowItems: the
@@ -84,33 +84,33 @@ uint32_t Pause4SaveVolumes(uint8_t* base, uint32_t sp);
 // first six, else hidden (+80 = 0). sub_82210CD0 ColorItems: each child's
 // +56 to +64 = 205, 235, 67 when MenuList::IsEnabled, else 255 each. Each
 // returns r3 as the original leaves it.
-uint64_t Pause4SetUpMain(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Pause4ShowItems(uint8_t* base, uint32_t sp, const Calls& calls);
-uint32_t Pause4ColorItems(uint8_t* base, uint32_t sp);
+uint64_t Pause4SetUpMain(uint32_t sp, const Calls& calls);
+uint64_t Pause4ShowItems(uint32_t sp, const Calls& calls);
+uint32_t Pause4ColorItems(uint32_t sp);
 // sub_82211250 SetUpVolume: MenuList::Init(list, 3, 3, 1, ..), the edits
 // (+8, +12) from +0 and +4, +60 = 0, RestoreNodes(-1, 6), the labels
 // (SetNodeText: strings 2004 and 2005 on the type-6 node 0's children 5 and
 // 6, 4 and 7 on node 1's children 3 and 4), ShowVolumes, ShowVolumesB; the
 // last's r3.
-uint64_t Pause4SetUpVolume(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Pause4SetUpVolume(uint32_t sp, const Calls& calls);
 // sub_822106E8 RestoreNodes: child `child` (of child `group` unless -1) of
 // the movie's file (+24), live (+16) and saved (+20) scenes;
 // UiMovie::RestorePose(movie, live, file, 0, 0) and (movie, saved, file, 0,
 // 0); the last's r3.
-uint64_t Pause4RestoreNodes(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+uint64_t Pause4RestoreNodes(uint32_t group, uint32_t child, uint32_t sp,
                             const Calls& calls);
 // sub_82210670 ShowVolumes: ShowVolume on the type-6 nodes 5 (+8) and 6
 // (+12). sub_822105F8 ShowVolume (r3 the node, r4 the volume): SetNodeText(
 // movie, child 2, 8, volume), then children 4 to 18's +80 = 1 for the one at
 // the volume, else 0; the last child. sub_82210DE0 ShowVolumesB:
 // Options::ShowVolumeBar on nodes 5 (+8) and 6 (+12). The last's r3.
-uint64_t Pause4ShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls);
-uint32_t Pause4ShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+uint64_t Pause4ShowVolumes(uint32_t sp, const Calls& calls);
+uint32_t Pause4ShowVolume(uint32_t node, uint64_t volume, uint32_t sp,
                           const Calls& calls);
-uint64_t Pause4ShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Pause4ShowVolumesB(uint32_t sp, const Calls& calls);
 // sub_82210420 SetArrow (r3 0 or 40): the type-6 node 0's child 0's float
 // +16 = the value (its double word left at the frame's +80). The child.
-uint32_t Pause4SetArrow(uint8_t* base, uint64_t value, uint32_t sp);
+uint32_t Pause4SetArrow(uint64_t value, uint32_t sp);
 
 // The transitions (r3 the step word: on the first call, 0, their work and
 // the word 1; then UiMovie::Run(movie, 0)), answering whether they're done.
@@ -128,17 +128,17 @@ uint32_t Pause4SetArrow(uint8_t* base, uint64_t value, uint32_t sp);
 // ShowVolume on nodes 6 and 5; 1), sub_82211138 CloseVolume (the row
 // finished, animation 4, SetUpMain; when the run answers 0, Go(0,
 // transition 3) and the step word 0; 0).
-uint64_t Pause4RunTen(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4OpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4ShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4BackToMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4MoveMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4CloseMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4OpenVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4ShowVolumeRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4MoveVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4SetVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Pause4CloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4RunTen(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4OpenMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4ShowMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4BackToMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4MoveMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4CloseMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4OpenVolume(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4ShowVolumeRow(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4MoveVolume(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4SetVolume(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Pause4CloseVolume(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The results at +1028 and +1032 (results.cpp) ---
 //
@@ -158,7 +158,7 @@ uint64_t Pause4CloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // the block copied to +0, UI movie 7 found (the id at the frame's +80) into
 // +20 and its pose reset, ScreenPages::Init(+24, 0) and Go(0, transition 0,
 // then 1), SetTexts. SetTexts' r3.
-uint64_t RaceResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+uint64_t RaceResultsOpen(uint32_t screen, uint32_t block, uint32_t sp,
                          const Calls& calls);
 // sub_8221F628 RaceResults::SetTexts (r3 the screen), from a 160-byte
 // frame: the type-5 texts: items 2 to 5 strings 1976 to 1979; item 6
@@ -167,34 +167,34 @@ uint64_t RaceResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_
 // +80, by +8, unchecked as the original); item 8 string +12 + 1718; item 9
 // by +16 (1985 to 1987 for 0 to 2, 1984 with +16 + 1 for 3 to 9, 1988 for
 // 10, nothing above). The last SetText's r3.
-uint64_t RaceResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsSetTexts(uint32_t screen, uint32_t sp, const Calls& calls);
 // sub_8221F870 RaceResults::MainPage: player 0's mapper entry's slot 10 on
 // accept (159), then back (158): either MenuSound::Play(0) and Go(1,
 // transition 2). Returns 0.
-uint64_t RaceResultsMainPage(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+uint64_t RaceResultsMainPage(uint32_t sp, bool native_slots, const Calls& calls);
 // sub_8221F930 RaceResults::Update (r3 the screen): the page (+24): -1 0,
 // 0 MainPage, 1 the shared "returns 1"; past the table the frame's word
 // through `calls` (r3, r4 the caller's).
-uint64_t RaceResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t RaceResultsUpdate(uint64_t r3, uint64_t r4, uint32_t sp,
                            bool native_slots, const Calls& calls);
 // The transitions (r3 the step word; on the first call the word 1 and
 // their work, then UiMovie::Run(movie, 0)): sub_8221F428 Intro (named 2,
 // or 3 when the block's +0 is 0; the run's 0), sub_8221F4B0 Show (named 4,
 // then 6 or 7 by +0, played and looped; 1), sub_8221F580 Close (named 6, 7
 // and 4 finished, 5 played; the run's 0).
-uint64_t RaceResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t RaceResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t RaceResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsIntro(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsShow(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsClose(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8221F7D0 RaceResults::Draw (r3 the screen): with a transition
 // running (+36 >= 0) its handler with +48, then ScreenPages::Finish(+24,
 // its answer) (r3 +24); else UiMovie::Run(+20, 0) (its r3).
-uint64_t RaceResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t RaceResultsDraw(uint32_t screen, uint32_t sp, const Calls& calls);
 
 // sub_82220050 SplitResults::Open (r3 the screen, r4 the outcome, r5 the
 // mode): +4 and +0 stored, UI movie 8 found into +8 and its pose reset,
 // ScreenPages::Init(+12, 0) and Go(0, transition 0, then 1), the two
 // globals 0. Returns the screen + 12.
-uint64_t SplitResultsOpen(uint8_t* base, uint32_t screen, uint64_t outcome, uint64_t mode,
+uint64_t SplitResultsOpen(uint32_t screen, uint64_t outcome, uint64_t mode,
                           uint32_t sp, const Calls& calls);
 // sub_8221FE70 SplitResults::MainPage, from a 192-byte frame: the stage
 // copied to the frame's +80 (Stages::Copy); in the network battle (race
@@ -202,19 +202,19 @@ uint64_t SplitResultsOpen(uint8_t* base, uint32_t screen, uint64_t outcome, uint
 // and past 210 Go(1, transition 2); else players 0's and 1's mapper
 // entries' slot 10 on accept and back: any MenuSound::Play(0) and Go(1,
 // transition 2). Returns 0.
-uint64_t SplitResultsMainPage(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+uint64_t SplitResultsMainPage(uint32_t sp, bool native_slots, const Calls& calls);
 // sub_8221FFF0 SplitResults::Update (r3 the screen): as RaceResults::
 // Update's on the page +12.
-uint64_t SplitResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t SplitResultsUpdate(uint64_t r3, uint64_t r4, uint32_t sp,
                             bool native_slots, const Calls& calls);
 // sub_8221FAC8 Intro (by the mode +4: 0 the group -1 node 0's +80 = 1 and
 // named 0 to 2 by the outcome; 1 +80 = 0 and named 3, 4, 2; 2 +80 = 1 and
 // named 5; the run's 0), sub_8221FBE8 Show (named 6, then mode 0 8, 9, 10,
 // mode 1 11, 12, 10, mode 2 13, played and looped; 1), sub_8221FD98 Close
 // (named 8 to 10, 6, 11 to 13 finished, 7 played; the run's 0).
-uint64_t SplitResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t SplitResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsIntro(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsShow(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsClose(uint32_t step, uint32_t sp, const Calls& calls);
 
 // The network battle's words SplitResults::Draw reads: the sign-in watch's
 // state and reason, the network manager's peer list (+4 begin, +8 end,
@@ -235,7 +235,7 @@ uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // sends leave) or the record. Otherwise as RaceResults::Draw on +24 (the
 // transition), +36 (the step word), +12 (the page object) and +8 (the
 // movie).
-uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t SplitResultsDraw(uint32_t screen, uint32_t sp, const Calls& calls);
 
 // --- Kind 6's screen after the race (kind6_menu.cpp) ---
 //
@@ -261,7 +261,7 @@ uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Cal
 // sub_8221C168 Kind6Menu::Close: UiMovie::FinishAll on each of the screen's
 // four movies (+24 to +36) that isn't 0. The last call's r3 (or the last
 // movie word, 0).
-uint64_t Kind6Close(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6Close(uint32_t sp, const Calls& calls);
 // sub_8221EC48 Kind6Menu::Open (r3 the screen, r4 the 24-byte block), from
 // a 160-byte frame: the block copied in (memcpy), +4 capped at 59:59.999;
 // UI movies 17, 20, 21 and 14 found (the id at the frame's +96) into +24 to
@@ -273,7 +273,7 @@ uint64_t Kind6Close(uint8_t* base, uint32_t sp, const Calls& calls);
 // +200 = +4 in milliseconds and the result's fields cleared (+348 = 3);
 // +340 = 1, SetUpTexts, and with the word 0 to 2 HidePanels. The last
 // call's r3.
-uint64_t Kind6Open(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+uint64_t Kind6Open(uint32_t screen, uint32_t block, uint32_t sp,
                    const Calls& calls);
 // sub_8221EF60 Kind6Menu::Draw (r3 the screen), from a 144-byte frame: A's
 // transition (+52; 8 handlers stored at the frame's +80) with +64, then
@@ -285,7 +285,7 @@ uint64_t Kind6Open(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
 // 2), 21 (3, 4) or 14 (5) when +336 is set, then with [0x82814E10]'s +344
 // set: the session's +236 = 3, +344 = 0, and by +348 (0 to 3) Go(B, 0,
 // transition 1, 3 or 6) and Go(A, 11). r3 as the original leaves it.
-uint64_t Kind6Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t Kind6Draw(uint32_t screen, uint32_t sp, const Calls& calls);
 
 // The helpers. sub_8221E038 SetUpTexts (r3 the screen; its jump table's
 // case 0, sub_8221E0FC, merged): movie 17's type-3 items 5 to 8 strings
@@ -302,14 +302,14 @@ uint64_t Kind6Draw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& cal
 // last's r3. sub_8221D050 ShowPanelA: type-1 nodes 4 and 5 shown, and when
 // both exist their +108 = 0 and nodes 6 to 9 hidden. sub_8221CFC0
 // HidePanels: type-1 nodes 4 to 9 hidden. Each the last call's r3.
-uint64_t Kind6SetUpTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowCourse(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowHelp(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowPanelA(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6HidePanels(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6SetUpTexts(uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowCourse(uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowHelp(uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowPanelA(uint32_t sp, const Calls& calls);
+uint64_t Kind6HidePanels(uint32_t sp, const Calls& calls);
 // sub_8221D7B0 SetCursorX (r3, unsigned): movie 17's type-3 node 0's float
 // +16 = r3 (its doubleword left at the frame's +80). The node.
-uint32_t Kind6SetCursorX(uint8_t* base, uint64_t value, uint32_t sp);
+uint32_t Kind6SetCursorX(uint64_t value, uint32_t sp);
 // sub_8221DF70 SetUpList: MenuList::Init(+136, the replays' count, at most
 // 9 shown, 1, ..), movie 17's type-14 node 2's child 0's +16 = 40 x the
 // selection (its doubleword at the frame's +96), ShowList, ShowReplay of
@@ -320,9 +320,9 @@ uint32_t Kind6SetCursorX(uint8_t* base, uint64_t value, uint32_t sp);
 // set the date and time, kind, course, time and result texts and the
 // counts' marks (nodes 5 and 6's +108), else the texts cleared and node 0
 // hidden; the last call's r3 or node 6.
-uint64_t Kind6SetUpList(uint8_t* base, uint32_t sp, const Calls& calls);
-uint32_t Kind6ShowList(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowReplay(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls);
+uint64_t Kind6SetUpList(uint32_t sp, const Calls& calls);
+uint32_t Kind6ShowList(uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowReplay(uint32_t record, uint32_t sp, const Calls& calls);
 
 // The transitions (r3 the step word: their first call's work when it's 0,
 // the word 1, then the movie run), answering whether they're done (1, or
@@ -332,21 +332,21 @@ uint64_t Kind6ShowReplay(uint8_t* base, uint32_t record, uint32_t sp, const Call
 // sub_8221C6C8 OpenQuestion, sub_8221C7D8 CloseQuestion, sub_8221C888
 // MoveQuestion, sub_8221CAB8 OpenMessage, sub_8221CB50 CloseMessage,
 // sub_8221C920 OpenWaiting, sub_8221CA20 CloseWaiting. See the rows.
-uint64_t Kind6Intro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6Show(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6RunToEnd(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6MoveMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6BackToQuit(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6OpenList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6CloseList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6MoveList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6OpenQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6CloseQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6MoveQuestion(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6OpenMessage(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6CloseMessage(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6OpenWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6Intro(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6Show(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6RunToEnd(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6BackToQuit(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenList(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseList(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveList(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenQuestion(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseQuestion(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6MoveQuestion(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenMessage(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseMessage(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6OpenWaiting(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Kind6CloseWaiting(uint32_t step, uint32_t sp, const Calls& calls);
 
 
 // --- Kind 6's update and pages (kind6_pages.cpp) ---
@@ -376,9 +376,9 @@ uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // 96-byte frame: sub_8214B330(state) (the original); 4111 then
 // sub_822917B8(session) (the original, the session's start over Xbox
 // Live); 4112 then [0x826C72F4] = the session's +188 and its +180 = 0.
-uint64_t Kind6Rank(uint8_t* base);
+uint64_t Kind6Rank();
 uint32_t Kind6CarLogo(uint32_t car);
-uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& calls);
+uint64_t Kind6NetState(uint64_t state, uint32_t sp, const Calls& calls);
 
 // The leaderboard read's spec (XUSER_STATS_SPEC: +0 the view id, +4 the
 // column count, +8 the column ids as halfwords).
@@ -386,7 +386,7 @@ uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& 
 // sixteen cases sub_82292690 merged): the spec's +0 = [0x826C72F4]; for 1
 // to 16, +4 = 3 and the columns 1, 2, 3. Returns the spec (r11 in the
 // original; its r3 is the caller's, kept by the adapter).
-uint32_t Kind6ReadSpecSetUp(uint8_t* base);
+uint32_t Kind6ReadSpecSetUp();
 // sub_82292CC0 Leaderboard::Read (r3 the session; r4 a rank and r5 a XUID
 // the enumerator would take), from a 144-byte frame: the session's +180 = 4
 // unless XUserGetSigninState of [0x826BABA4] answers 2 (never today); the
@@ -395,7 +395,7 @@ uint32_t Kind6ReadSpecSetUp(uint8_t* base);
 // as no Live (the user's call, 2026-11-14): the read failed, +180 = 4, no
 // buffer. Returns 0 (the original's r3 there is an error code or
 // XEnumerate's answer, read by no caller).
-uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls);
+uint64_t Kind6LeaderboardRead(uint32_t session, uint32_t sp, const Calls& calls);
 // sub_8221D678 Kind6Menu::SaveReplay (no arguments), from a 176-byte frame:
 // the slot (the slot list's +4 scroll + MenuList::Selection); a 36-byte
 // record at the frame's +80 cleared, GetLocalTime into it (through its
@@ -403,7 +403,7 @@ uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, cons
 // time (RaceTime::FromTicks); by the race kind (+0xA3AF0) 1: +32 the last
 // record's +980, +20 0; 2: its +3892, 1; 4: 0, 2; 6: its +3892, 3; then
 // RaceDialog::AskSlot(slot, record, [0x826C5B50]). AskSlot's r3.
-uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Kind6SaveReplay(uint32_t sp, const Calls& calls);
 
 // The helpers: sub_8221CEA0 ShowPanelB (type-1 nodes 4 and 5 shown with
 // +108 0, then 6 and 7 with +108 1, 8 and 9 hidden), sub_8221D3D0
@@ -414,10 +414,10 @@ uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls);
 // time split into the words at `minutes`, `seconds` and `thousandths`,
 // capped at 59:59.999, nothing written for 0; returns `row`). Each the r3
 // the original leaves.
-uint64_t Kind6ShowPanelB(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowTimeOnly(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6RankingTime(uint8_t* base, uint64_t row, uint32_t minutes, uint32_t seconds,
+uint64_t Kind6ShowPanelB(uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowTimeOnly(uint32_t sp, const Calls& calls);
+uint64_t Kind6ShowRanking(uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingTime(uint64_t row, uint32_t minutes, uint32_t seconds,
                           uint32_t thousandths);
 
 // The pages (see the rows; each returns 0 but AnswerPage). A's: sub_8221E788
@@ -429,24 +429,24 @@ uint64_t Kind6RankingTime(uint8_t* base, uint64_t row, uint32_t minutes, uint32_
 // sub_8221D908 UploadResultPage, sub_8221BE90 RankingPage, sub_8221D9D8
 // MessageBackPage. B's: sub_8221E980 QuestionPage, sub_8221C360
 // QuestionAnswerPage, sub_8221EAE8 MessagePage, sub_8221C3F0 WaitingPage.
-uint64_t Kind6MainPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6AnswerPage(uint8_t* base);
-uint64_t Kind6SlotPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6SavePage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
-uint64_t Kind6OverwritePage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
-uint64_t Kind6SavingPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
-uint64_t Kind6QuitPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
-uint64_t Kind6CheckRecordPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6RankingReadPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6MenuBackPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6UploadResultPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6MessageBackPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6QuestionPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6QuestionAnswerPage(uint8_t* base, uint32_t sp);
-uint64_t Kind6MessagePage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Kind6WaitingPage(uint8_t* base, uint32_t sp);
+uint64_t Kind6MainPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6AnswerPage();
+uint64_t Kind6SlotPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6SavePage(uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6OverwritePage(uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6SavingPage(uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6QuitPage(uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t Kind6CheckRecordPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingReadPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6UploadPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6MenuBackPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6UploadResultPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6RankingPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6MessageBackPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6QuestionPage(uint32_t sp, const Calls& calls);
+uint64_t Kind6QuestionAnswerPage(uint32_t sp);
+uint64_t Kind6MessagePage(uint32_t sp, const Calls& calls);
+uint64_t Kind6WaitingPage(uint32_t sp);
 
 // sub_8221F1E8 Kind6Menu::Update (r3 the screen), from a 304-byte frame: the
 // pages' tables stored (B's 6 at +80, A's 15 at +112); A's and B's pages
@@ -454,7 +454,7 @@ uint64_t Kind6WaitingPage(uint8_t* base, uint32_t sp);
 // and +320 = 0; then B's page's handler, then A's (r4 passed on to the
 // dialog pages); A's r3, 0 with A's page -1. A page past its table runs the
 // frame's word through `calls`, as the original's bctrl would.
-uint64_t Kind6Update(uint8_t* base, uint32_t screen, uint64_t r4, uint32_t sp,
+uint64_t Kind6Update(uint32_t screen, uint64_t r4, uint32_t sp,
                      const Calls& calls);
 
 }  // namespace race_screens

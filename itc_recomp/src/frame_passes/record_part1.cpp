@@ -24,8 +24,8 @@ using G = schema::FramePassesGlobals;
 
 // A float as the original moves it: loaded to a double, stored as a float
 // (the host conversion quiets signaling NaNs as the recompiled code does).
-float LoadConverted(uint8_t* base, uint32_t address) {
-  const double value = double(guest::LoadFloat(base, address));
+float LoadConverted(uint32_t address) {
+  const double value = double(guest::LoadFloat(address));
   return float(value);
 }
 
@@ -74,8 +74,8 @@ void RecordPart1(Recorder& r) {
   // The Clear's 280 bytes: flags 49, color 0xFF000000, Z 0.0, stencil 0
   // (+12 to +267 left as they were).
   const uint32_t clear = r.Bytes(280);
-  const float zero = LoadConverted(r.base, G::zero_address());  // the original's f31
-  guest::StoreFloat(r.base, clear + 272, zero);
+  const float zero = LoadConverted(G::zero_address());  // the original's f31
+  guest::StoreFloat(clear + 272, zero);
   r.Store(clear + 276, 0);
   r.Store(clear + 268, 0xFF000000u);
   r.Store(clear + 4, 0);
@@ -92,7 +92,7 @@ void RecordPart1(Recorder& r) {
   for (uint32_t sampler = 0; sampler < 4; sampler++) {
     // The LOD bias (28) through the frame's +84.
     const uint32_t s = r.Slot2(sampler, 28);
-    guest::StoreFloat(r.base, r.frame + 84, LoadConverted(r.base, G::lod_bias_address()));
+    guest::StoreFloat(r.frame + 84, LoadConverted(G::lod_bias_address()));
     r.Store(s + 8, r.LoadFrame(84));
     r.Slot3(sampler, 20, 1);  // min filter
     r.Slot3(sampler, 16, 1);  // mag filter
@@ -124,7 +124,7 @@ void RecordPart1(Recorder& r) {
     r.Slot2(target, 0);
   }
   r.Slot3(8, 1, 0);
-  r.Slot1(models::SharedVertexShader(r.base, 0));
+  r.Slot1(models::SharedVertexShader(0));
   r.Slot3(9, 1, 0);
   r.Slot1(0);
   End(r);
@@ -164,12 +164,12 @@ void RecordPart1(Recorder& r) {
   r.Samplers();
   r.Slot3(30, 1, 0);
   const uint32_t viewport = r.Slot();
-  guest::StoreFloat(r.base, viewport + 8, zero);
-  guest::StoreU16(r.base, viewport + 0, 0);
-  guest::StoreFloat(r.base, viewport + 12, LoadConverted(r.base, G::one_address()));
-  guest::StoreU16(r.base, viewport + 2, 0);
-  guest::StoreU16(r.base, viewport + 6, 720);
-  guest::StoreU16(r.base, viewport + 4, 1280);
+  guest::StoreFloat(viewport + 8, zero);
+  guest::StoreU16(viewport + 0, 0);
+  guest::StoreFloat(viewport + 12, LoadConverted(G::one_address()));
+  guest::StoreU16(viewport + 2, 0);
+  guest::StoreU16(viewport + 6, 720);
+  guest::StoreU16(viewport + 4, 1280);
   End(r);
 }
 

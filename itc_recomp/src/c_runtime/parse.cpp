@@ -184,7 +184,7 @@ LongDouble12Full FromFrame(const Frame& f, uint32_t o) {
 // most 5200 or so), by the tables three bits of the power at a time, each
 // entry copied to `y` (less one in +6 to +9 when +10 is 0x8000 or more),
 // the products built at `r`.
-void MultTenPow(uint8_t* base, Frame& f, uint32_t x, uint32_t r, uint32_t y, int32_t power) {
+void MultTenPow(Frame& f, uint32_t x, uint32_t r, uint32_t y, int32_t power) {
   uint32_t table = kPow10Positive;
   int32_t n = power;
   if (n < 0) {
@@ -200,7 +200,7 @@ void MultTenPow(uint8_t* base, Frame& f, uint32_t x, uint32_t r, uint32_t y, int
     }
     const uint32_t entry = table + index * 12;
     for (uint32_t i = 0; i < 12; i++) {
-      f.b[y + i] = guest::LoadU8(base, entry + i);
+      f.b[y + i] = guest::LoadU8(entry + i);
     }
     if (f.U16(y + 10) >= 0x8000) {
       const uint32_t m = (uint32_t(f.U16(y + 6)) << 16 | f.U16(y + 8)) - 1;
@@ -240,7 +240,7 @@ bool Mtold12(const uint8_t* digits, uint32_t count, LongDouble12Full* out) {
   return true;
 }
 
-bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale, uint32_t decpt,
+bool Strgtold12(uint32_t string, uint32_t mult12, uint32_t scale, uint32_t decpt,
                 uint32_t implicit_e, Strgtold12Result* result) {
   ITC_NATIVE_RUNNING("sub_825B36B8 __strgtold12_l");
   uint8_t buffer[25];
@@ -254,15 +254,15 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
   uint32_t reset = string;  // r5: where parsing ends when what follows fails
   uint32_t p = string;
   for (;;) {
-    const int8_t c = int8_t(guest::LoadU8(base, p));
+    const int8_t c = int8_t(guest::LoadU8(p));
     if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
       break;
     }
     p++;
   }
-  const schema::Lconv lconv = schema::CRuntimeGlobals::lconv(base);
+  const schema::Lconv lconv = schema::CRuntimeGlobals::lconv();
   auto point = [&] {
-    return int32_t(int8_t(guest::LoadU8(base, lconv.decimal_point().address)));
+    return int32_t(int8_t(guest::LoadU8(lconv.decimal_point().address)));
   };
   auto nonzero_digit = [](int32_t c) { return c >= '1' && c <= '9'; };
   // After digits: d, D, e or E starts the exponent, anything else ends.
@@ -280,7 +280,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
   };
   bool done = false;
   while (!done) {
-    uint8_t byte = guest::LoadU8(base, p);
+    uint8_t byte = guest::LoadU8(p);
     p++;
     int32_t c = int8_t(byte);
     switch (state) {
@@ -341,7 +341,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
           found_point = true;
           if (length == 0 && c == '0') {
             do {
-              byte = guest::LoadU8(base, p);
+              byte = guest::LoadU8(p);
               man_exp--;
               p++;
             } while (byte == '0');
@@ -357,7 +357,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
           } else if (!after_point) {
             man_exp++;
           }
-          byte = guest::LoadU8(base, p);
+          byte = guest::LoadU8(p);
           p++;
           c = int8_t(byte);
         }
@@ -406,7 +406,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
         found_exponent = true;
         if (c == '0') {
           do {
-            byte = guest::LoadU8(base, p);
+            byte = guest::LoadU8(p);
             p++;
           } while (byte == '0');
           c = int8_t(byte);
@@ -428,13 +428,13 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
             value = 5201;
             break;
           }
-          byte = guest::LoadU8(base, p);
+          byte = guest::LoadU8(p);
           p++;
           c = int8_t(byte);
         }
         exponent = uint32_t(value);
         while (c >= '0' && c <= '9') {
-          byte = guest::LoadU8(base, p);
+          byte = guest::LoadU8(p);
           p++;
           c = int8_t(byte);
         }
@@ -523,7 +523,7 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
     if (mult12 == 0) {
       f.SetU16(106, 0);
     }
-    MultTenPow(base, f, 96, 80, 112, int32_t(total));
+    MultTenPow(f, 96, 80, 112, int32_t(total));
   }
   result->value = FromFrame(f, 96);
   result->value.value.sign_exponent = uint16_t(result->value.value.sign_exponent | man_sign);
@@ -531,10 +531,10 @@ bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale,
   return true;
 }
 
-bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result) {
+bool Fltin2(uint32_t string, FltinResult* result) {
   ITC_NATIVE_RUNNING("sub_825AFDC8 _fltin2");
   Strgtold12Result parsed;
-  if (!Strgtold12(base, string, 0, 0, 0, 0, &parsed)) {
+  if (!Strgtold12(string, 0, 0, 0, 0, &parsed)) {
     return false;
   }
   uint32_t flags = 0;
@@ -557,32 +557,32 @@ bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result) {
   return true;
 }
 
-bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits) {
+bool AtofL(uint32_t string, uint64_t* bits) {
   ITC_NATIVE_RUNNING("sub_825AB0C0 _atof_l");
   if (string == 0) {
     return false;  // EINVAL through _errno
   }
-  const schema::Locale locale = schema::CRuntimeGlobals::current_locale(base);
+  const schema::Locale locale = schema::CRuntimeGlobals::current_locale();
   for (;;) {
     if (locale.mb_cur_max() > 1) {
       return false;  // multibyte: sub_825AFD98
     }
     const uint32_t table = locale.ctype_table();
-    const uint32_t c = guest::LoadU8(base, string);
-    if ((guest::LoadU16(base, table + 2 * c) & 8) == 0) {
+    const uint32_t c = guest::LoadU8(string);
+    if ((guest::LoadU16(table + 2 * c) & 8) == 0) {
       break;
     }
     string++;
   }
   FltinResult parsed;
-  if (!Fltin2(base, string, &parsed)) {
+  if (!Fltin2(string, &parsed)) {
     return false;
   }
   *bits = parsed.bits;
   return true;
 }
 
-bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
+bool I10Output(const LongDouble12& value, int32_t digits, uint32_t flags,
                FloatOut* out) {
   ITC_NATIVE_RUNNING("sub_825B8B48 $I10_OUTPUT");
   for (bool& w : out->written) {
@@ -633,7 +633,7 @@ bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_
     }
     // strcpy_s into the 22 bytes at +4 (the strings fit).
     for (uint32_t i = 0;; i++) {
-      const uint8_t c = guest::LoadU8(base, text + i);
+      const uint8_t c = guest::LoadU8(text + i);
       put(4 + i, c);
       if (c == 0) {
         break;
@@ -661,7 +661,7 @@ bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_
   }
   const uint32_t estimate = ((manhi >> 24) * 2 + (expn >> 8)) * 77 + expn * 19728 - 0x134312F4u;
   int32_t ir = int16_t(int32_t(estimate) >> 16);
-  MultTenPow(base, f, x, 104, 152, -ir);
+  MultTenPow(f, x, 104, 152, -ir);
   if (f.U16(x) >= 0x3FFF) {
     ir = int16_t(ir + 1);
     Ld12Mul(f, x, 120, 136);

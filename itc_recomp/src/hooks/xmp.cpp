@@ -11,13 +11,13 @@
 // SDK answered 0 and left the last error cleared.
 ITC_NATIVE_ENTRY_ALWAYS(825894C8) {
   
-  last_error::Set(base, ctx.r13.u32, 0);
+  last_error::Set(ctx.r13.u32, 0);
   ctx.r3.u64 = 0;
 }
 
 // Hands it back (from Boot::EndMovie, which returns the answer); the same.
 ITC_NATIVE_ENTRY_ALWAYS(825895A0) {
   
-  last_error::Set(base, ctx.r13.u32, 0);
+  last_error::Set(ctx.r13.u32, 0);
   ctx.r3.u64 = 0;
 }

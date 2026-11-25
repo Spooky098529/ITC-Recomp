@@ -146,6 +146,8 @@ measure = "new<32>@CarDealer::OpenColors"
 size = 32
 origin = "allocated"
 # 2 functions; areas: car-dealer.md, material-passes.md
+storage = "host"
+host_alloc = [0x8218493C]
 fields = [
   { name = "red", offset = 0, type = "u32", note = "HsvToRgb's red x [0x82000C44], truncated (fctiwz)" },
   { name = "green", offset = 4, type = "u32" },

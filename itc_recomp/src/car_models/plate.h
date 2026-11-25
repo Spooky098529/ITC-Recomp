@@ -24,7 +24,7 @@ constexpr uint32_t kCopyRectFrameBytes = 144;
 // frame, native::Buffers_Memcpy); [`pixels_out`] = [`set` + 3656 + 4j], the
 // image's pixels. Returns memcpy's r3 (`header_out`). Only where
 // native::Buffers_NativeMemcpy() (the callers check).
-uint32_t PlateImage(uint8_t* base, uint32_t set, uint32_t kind, uint32_t index,
+uint32_t PlateImage(uint32_t set, uint32_t kind, uint32_t index,
                     uint32_t header_out, uint32_t pixels_out);
 
 // sub_820ED630 (a rectangle copy of 32-bit pixels): its arguments as the
@@ -36,7 +36,7 @@ uint32_t PlateImage(uint8_t* base, uint32_t set, uint32_t kind, uint32_t index,
 // spilled into the caller's frame (`stack` + 32 to + 95, all but r8's), read
 // back from there, then `height` rows of 4 x `width` bytes copied with
 // memcpy (native::Buffers_Memcpy). `stack` is the guest r1 at entry.
-void CopyRect(uint8_t* base, uint32_t dst, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
+void CopyRect(uint32_t dst, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
               uint32_t src, uint64_t r9, uint64_t r10, uint32_t stack);
 
 // sub_820ED630's guest call: Resource::Release (sub_822A67B0) on the first
@@ -58,7 +58,7 @@ using ReleaseCall = std::function<void(uint32_t surface)>;
 // slots 5 to 11 image 2's cell W5 to W11 (+2 from 10); the headers'
 // destructors (empty). `stack` is the guest r1 at entry (the frame is `stack`
 // - 944). nullopt, with nothing done, where memcpy can't be native.
-std::optional<uint32_t> MakePlate(uint8_t* base, uint32_t header_a, uint32_t data_a,
+std::optional<uint32_t> MakePlate(uint32_t header_a, uint32_t data_a,
                                   uint32_t header_b, uint32_t data_b, const uint64_t regs[4],
                                   uint32_t stack, const ReleaseCall& release);
 
