@@ -270,12 +270,12 @@ void NetMachineDestroy(lifted::Regs& ctx) {
   }
   ctx.r3.u64 = r3;
 }
-#define ITC_NET_MACHINE(index)                                          \
-  template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);       \
-  template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);    \
-  template void NetMachineWaitForMovie<index>(lifted::Regs&, uint8_t*); \
-  template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);        \
-  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);
+#define ITC_NET_MACHINE(index)                                \
+  template void NetMachineCreate<index>(lifted::Regs&);       \
+  template void NetMachineOpenMovie<index>(lifted::Regs&);    \
+  template void NetMachineWaitForMovie<index>(lifted::Regs&); \
+  template void NetMachineLeave<index>(lifted::Regs&);        \
+  template void NetMachineDestroy<index>(lifted::Regs&);
 ITC_NET_MACHINE(0)
 ITC_NET_MACHINE(1)
 ITC_NET_MACHINE(3)

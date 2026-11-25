@@ -30,7 +30,7 @@ void AiUpdateAll(lifted::Regs& ctx);
 // functions above), answering with made-up data.
 // On the SDK's context (the harnesses' functions); code on a view calls them
 // through lifted::Sdk.
-using AiStandIn = void (*)(lifted::Regs&, uint8_t*);
+using AiStandIn = void (*)(lifted::Regs&);
 extern AiStandIn g_drive_car_stand_in;
 extern AiStandIn g_update_idle_stand_in;
 extern AiStandIn g_update_all_stand_in;

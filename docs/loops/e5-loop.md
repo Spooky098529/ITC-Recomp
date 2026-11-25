@@ -1259,3 +1259,75 @@ behind handles. Nothing is reached through `base` any more; what's left is
 step 10 (the guest addresses themselves: `base`, `guest.h`'s translation,
 the lifted code's 32-bit addresses).
 
+
+## Step 10 as one swarm (2026-11-25)
+
+`docs/e5-native.md` step 10, the user's call (2026-11-24: "do step 10, make
+use of a swarm"). What step 10 can remove now: `base`, the pointer every
+function took for the guest mapping, which since step 9 only stood for an
+unmapped range. Everything else step 10 lists (`guest.h`'s 32-bit
+addresses, `lifted::Call` and the dispatch table, the lifted runtime) goes
+only when the lifted code is typed C++ (see "What's left of step 10" below).
+
+### Groundwork: `base` dropped (2026-11-25, `d0383928`, `a2232059`)
+
+- `guest.h`: every function takes only the guest address; an address in no
+  block (a null pointer's, a handle's typed object read raw) stops the
+  program, named (`memory::NoBlock`). The 4 GB fault range and the fault
+  handler are gone (`memory/mapping.cpp`, `memory/handles.cpp`); a view is
+  only its address (`schema/view.h`, `explicit View(uint32_t)`).
+- A codemod (parameters `uint8_t* base`, the argument `base`, `x.base` and
+  `memory::Base()`, lambda captures) over `src/` (1,267 files, 368,869
+  edits), and the same over the generators' templates (`lift.py`,
+  `lift_originals.py`, `schema_gen.py`, `entry_list.py`,
+  `import_entries.py`) and `src/lifted/signatures.json`: regenerating gives
+  the codemod's output byte for byte.
+- The lead's fixes by script: function pointer types with an unnamed
+  `uint8_t*`, declarations the codemod turned into most vexing parses (now
+  brace inits), `base` members and their initializers, the machine init
+  tables' enum field `Value::base` the codemod emptied (`switch (v.base)`,
+  put back; the only non-pointer `base` it reached, besides fields it left
+  intact).
+
+### The swarm
+
+39 files the compiler still rejected, in 8 units with their error lines;
+agents fix them by reading (no builds), restoring anything the codemod
+dropped that wasn't the guest base. The script:
+`itc_recomp/tools/workflows/e5-step10-swarm.js`, `args`:
+`{"units": [{name, files, errors_file}]}`; reports in
+`docs/loops/e5-step10-reports.md`.
+
+### The swarm: done (2026-11-25)
+
+8 agents (run `wf_4fc71676-c70`); reports in `docs/loops/e5-step10-reports.md`.
+They fixed what the codemod couldn't: views and calls built with a literal
+`nullptr` base, function pointer types and template instantiations still
+naming `uint8_t*`, braced view returns the explicit constructor refuses, an
+overload pair (`S16`) that collided once base was dropped, leftover
+`(void)base;` lines. Nothing to restore: no other unrelated `base` was hit.
+The lead then fixed three stand-in typedefs in headers the agents named and
+15 definitions with an unnamed `uint8_t*` parameter (linked as overloads of
+nothing). `e5_status.py`'s call patterns follow the new spelling.
+
+**Checked:** the build (clean); an attract race (38 s, no error lines, 150
+to 151 fps); `tick_replay.sh` twice (both races all match, 112 and 1,183
+ticks); a frame dump (normal).
+
+`base` is gone: nothing in the program holds or passes a pointer to guest
+memory, and there's no 4 GB range reserved for it. Every access goes
+through `guest.h` by guest address to the host block holding it.
+
+### What's left of step 10
+
+`guest.h`, `guest_code.h`, `lifted::Call`, the dispatch table and the
+lifted runtime go only when nothing uses a guest address: the lifted code
+(3,726 functions, about 1,000,000 lines of register-level C++) rewritten
+as typed C++ over host structs. Measured now (`tools/e5_status.py`):
+112,420 guest loads and stores in the lifted code and 24,268 in the hand
+ports, 6,522 calls by address, 4,286 functions with guest stack frames,
+11,660 image addresses, 1,590 schema types still guest-shaped. That's the
+type-by-type conversion step 4's swarms began (117 types for 35 agents),
+continued until the last guest type goes, then the lifted functions
+rewritten area by area: many swarms, not one.
+

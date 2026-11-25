@@ -370,7 +370,7 @@ void GatherTiledRow(uint8_t* out, uint32_t layer_address, uint32_t x,
     uint32_t n = std::min(run_blocks - (x & (run_blocks - 1)), end - x);
     uint32_t bytes = n << bytes_per_block_log2;
     if (address + bytes <= kPhysicalMemorySize) {
-      const uint8_t* in = PhysicalHostAddress(const_cast<uint8_t*>(), address);
+      const uint8_t* in = PhysicalHostAddress(address);
       if (bytes == 16) {
         std::memcpy(out, in, 16);
       } else if (bytes == 8) {

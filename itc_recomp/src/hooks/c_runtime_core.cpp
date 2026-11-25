@@ -323,7 +323,7 @@ void hooks::CoreGetSigabrt(lifted::Regs& ctx) {
 
 void hooks::CoreCrtDebuggerHook(lifted::Regs&) { cc::CrtDebuggerHook(); }
 
-void hooks::CoreValidateExecute(lifted::Regs& ctx, uint8_t*) {
+void hooks::CoreValidateExecute(lifted::Regs& ctx) {
   ctx.r3.u64 = cc::ValidateExecute(ctx.r3.u32);
 }
 

@@ -320,7 +320,7 @@ ITC_REGS_STEP(RaceScreensUnseenKind6Rank) {
   ctx.r3.u64 = race_screens::Kind6Rank();
 }
 
-void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx, uint8_t*) {
+void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx) {
   ctx.r3.u64 = race_screens::Kind6CarLogo(ctx.r3.u32);
 }
 

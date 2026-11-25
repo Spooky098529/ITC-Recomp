@@ -39,11 +39,11 @@ uint32_t BoxEdgeCount() {
 }
 uint32_t BoxCorner(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820B9ED0 BoxShape::Corner");
-  return Box(nullptr, box).corner_x_address() + (i << 4);
+  return Box(box).corner_x_address() + (i << 4);
 }
 uint32_t BoxFace(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820B9EE8 BoxShape::Face");
-  return Box(nullptr, box).face_px_distance_address() + (i << 5);
+  return Box(box).face_px_distance_address() + (i << 5);
 }
 uint32_t BoxEdgeStart(uint32_t edge) {
   ITC_NATIVE_RUNNING("sub_820B9F98 BoxShape::EdgeStart");

@@ -98,7 +98,6 @@ struct Threads {
 };
 
 thread_local uint32_t t_pcr = 0;
-thread_local uint8_t* t_base = nullptr;
 
 Threads& All() {
   static Threads threads;
@@ -197,7 +196,6 @@ std::thread Run(const Made& made, std::function<void(lifted::Args)> body) {
       threads.resumed.wait(lock, [&] { return made.thread->suspend_count == 0; });
     }
     t_pcr = made.thread->pcr;
-    t_base = base;
     // The stack's bytes, for guest.h's fast path.
     const uint32_t stack_limit = made.stack_base - made.stack_size;
     memory::t_stack = {stack_limit, made.stack_size, memory::BlobPointer(stack_limit)};
@@ -382,7 +380,7 @@ lifted::Result DereferenceObject(const lifted::Args& args) {
 // as the SDK answers for every thread of the game). Read by RtlCreateHeap
 // (sub_822997B0, kept in the heap's +379) and XAudio (sub_8245A828, checks
 // for 1).
-lifted::Result GetCurrentProcessType(uint8_t*, const lifted::Args&) {
+lifted::Result GetCurrentProcessType(const lifted::Args&) {
   ITC_NATIVE_RUNNING("import KeGetCurrentProcessType");
   return {1, 0.0};
 }
@@ -390,7 +388,7 @@ lifted::Result GetCurrentProcessType(uint8_t*, const lifted::Args&) {
 // ExRegisterTitleTerminateNotification(record, register): plugged in, nothing
 // kept: the SDK never runs title terminate routines either (XAudio's
 // sub_8245B0D0 is the one registered in play).
-lifted::Result RegisterTitleTerminateNotification(uint8_t*, const lifted::Args&) {
+lifted::Result RegisterTitleTerminateNotification(const lifted::Args&) {
   ITC_NATIVE_RUNNING("import ExRegisterTitleTerminateNotification");
   return {0, 0.0};
 }
@@ -432,7 +430,7 @@ uint32_t CurrentThreadIdIfOurs() {
   if (t_pcr == 0) {
     return 0;
   }
-  return guest::LoadU32(t_base, guest::LoadU32(t_base, t_pcr + kPcrCurrentThread) + kThreadId);
+  return guest::LoadU32(guest::LoadU32(t_pcr + kPcrCurrentThread) + kThreadId);
 }
 
 bool CloseThreadHandle(uint32_t handle) {

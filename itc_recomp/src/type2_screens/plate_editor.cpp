@@ -65,7 +65,7 @@ uint64_t PlateCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t PlateOpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t PlateOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198180 PlateEditor::OpenMovie");
   return calls.Call(kMoviesOpen, sp, lr, kPlateMovie, 22556);
 }

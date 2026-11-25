@@ -126,7 +126,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
     uint32_t parts[9];                                                 \
     for (uint32_t i = 0; i < 9; i++) {                                 \
       parts[i] = guest::LoadU32(                                       \
-          base, schema::CarPartTables(ctx.r4.u32).table74_address() + 4 * i); \
+          schema::CarPartTables(ctx.r4.u32).table74_address() + 4 * i); \
     }                                                                  \
     if (!function(ctx.r3.u32, parts, ctx.r5.s32)) {              \
       lifted::original::c##address(ctx);                    \

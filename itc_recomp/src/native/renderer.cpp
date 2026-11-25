@@ -1203,14 +1203,15 @@ void Renderer::LogStats() {
 Renderer* g_renderer = nullptr;
 bool g_failed = false;
 
-// Guest memory's base, from the command hooks (Renderer_EndFrame has none).
-uint8_t* g_base = nullptr;
+// Set by the command hooks: the renderer starts after the first of them
+// (Renderer_EndFrame does nothing before).
+bool g_commands_seen = false;
 
 // Kept out of line: inlined, Init's stack frame was set up on every call to
 // GetRenderer (several per replayed command), ~2% of the render thread.
 [[gnu::noinline]] void StartRenderer() {
   g_renderer = new Renderer();
-  if (!g_base || !g_renderer->Init(g_base)) {
+  if (!g_commands_seen || !g_renderer->Init()) {
     ITC_LOG_ERROR("native renderer: couldn't start; continuing without it");
     g_failed = true;
     g_renderer = nullptr;  // leaked: may hold objects already made
@@ -1228,7 +1229,7 @@ Renderer* GetRenderer() {
 
 void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                         uint32_t arg2) {
-  g_base = base;
+  g_commands_seen = true;
   Buffers_OnCommand(id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
@@ -1262,7 +1263,7 @@ void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
 }
 
 void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
-  g_base = base;
+  g_commands_seen = true;
   if (Renderer* renderer = GetRenderer()) {
     renderer->FrontBufferResolve(device, front_buffer);
   }
@@ -1270,7 +1271,7 @@ void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
 
 void Renderer_DrawMovie(uint32_t device, uint32_t width, uint32_t height,
                         const uint8_t* y, const uint8_t* u, const uint8_t* v) {
-  g_base = base;
+  g_commands_seen = true;
   if (Renderer* renderer = GetRenderer()) {
     renderer->DrawMovie(device, {width, height, y, u, v});
   }
@@ -1316,7 +1317,7 @@ void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {
 }
 
 void Renderer_EndFrame() {
-  if (!g_base) {
+  if (!g_commands_seen) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {

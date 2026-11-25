@@ -91,7 +91,7 @@ void Thunk(lifted::Regs& ctx, uint32_t slot) {
 
 }  // namespace
 
-void Type2ModeMachineOf(lifted::Regs& ctx, uint8_t*) {
+void Type2ModeMachineOf(lifted::Regs& ctx) {
   ctx.r3.u64 = t2m::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
 ITC_REGS_STEP(Type2ModeAllLoaded) {

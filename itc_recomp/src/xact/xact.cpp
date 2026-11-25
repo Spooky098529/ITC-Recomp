@@ -425,7 +425,7 @@ bool WaveEntrySet(uint32_t entry, uint32_t index, uint32_t bank) {
 uint32_t WaveEntryGetLoopRegion(uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_825CEDF8 XACTWaveEntry::GetLoopRegion");
   // An address only: no load, so no memory base.
-  return schema::XACTWaveEntry(nullptr, entry).loop_start_address();
+  return schema::XACTWaveEntry(entry).loop_start_address();
 }
 
 uint32_t WaveEntryGetDuration(uint32_t entry) {

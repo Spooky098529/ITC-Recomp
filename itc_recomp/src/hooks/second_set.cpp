@@ -413,7 +413,6 @@ void DeletingStep(lifted::Regs& ctx, lifted::RegsFunction* original,
   }
 #define ITC_SECOND_SET_POINTS_DESTRUCT(name)                              \
   void SecondSet##name(lifted::Regs& ctx) {                  \
-    (void)base;                                                           \
     ctx.r3.u64 = ss::name(ctx.r3.u32);                                    \
   }
 

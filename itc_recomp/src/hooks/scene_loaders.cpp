@@ -586,7 +586,7 @@ namespace {
 struct CreateAGuest {
   lifted::Regs& ctx;
   static void Construct(void* user, uint32_t pool, uint32_t object, uint32_t list) {
-    using Original = void (*)(lifted::Regs&, uint8_t*);
+    using Original = void (*)(lifted::Regs&);
     static constexpr Original kOriginals[7] = {
         ITC_REGS_FN(lifted::original::c820D5890), ITC_REGS_FN(lifted::original::c820D7428), ITC_REGS_FN(lifted::original::c820D63A0), ITC_REGS_FN(lifted::original::c820D78B8),
         ITC_REGS_FN(lifted::original::c820D6A70), ITC_REGS_FN(lifted::original::c820D9570), ITC_REGS_FN(lifted::original::c820D8908)};

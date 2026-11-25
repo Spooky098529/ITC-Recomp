@@ -143,7 +143,7 @@ ImportAnswer FindImportAnswer(ImportFunction* function) {
   return imports::FindNativeImport(function);
 }
 
-Result ImportFromSdk(uint8_t*, ImportFunction* function, const Args& args) {
+Result ImportFromSdk(ImportFunction* function, const Args& args) {
   NoAnswer(function, args.lr);
 }
 

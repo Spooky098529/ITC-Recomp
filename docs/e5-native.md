@@ -544,6 +544,12 @@ With no access left at a guest address: the mapping
 `src/lifted/`'s runtime and the image loader go. `generated/` stays as long
 as the user keeps it as the reference (the user's call, 2026-11-16).
 
+Begun 2026-11-25 (`docs/loops/e5-loop.md`, "Step 10 as one swarm"): `base`
+is gone from the whole program (`guest.h`, the views, the generators, every
+signature and call; the 4 GB fault range and the fault handler with it; an
+address in no block stops the program, named). The rest waits on the
+lifted code becoming typed C++ ("What's left of step 10" there).
+
 ## Checks
 
 The game is the check, as it has been since the rewiring's stage 4:
@@ -664,3 +670,4 @@ storage.
 | Step 5's swarm (2026-11-24) | 112,420 / 24,530 | 3,041 / 51 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 37 blobs |
 | Step 8 (2026-11-24) | 112,420 / 24,272 | 3,041 / 67 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs |
 | Step 9 (2026-11-24) | 112,420 / 24,272 | 3,041 / 85 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs; all in host memory (the heap, the image and the physical memory in blocks of their own) |
+| Step 10, `base` gone (2026-11-25) | 112,420 / 24,268 | 3,041 / 85 | 4,007 | 2,515 | 2,166 / 20 | 4,286 | 11,660 | 193 / 132 / 1,590, and 41 blobs; no `base` |

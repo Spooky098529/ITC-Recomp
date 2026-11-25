@@ -357,7 +357,6 @@ ITC_REGS_STEP(ModeType4ForceExit) {
 }
 ITC_REGS_STEP(ModeType4Resume) { ts::Resume(ctx.r3.u32); }
 ITC_REGS_STEP(ModeType4MachineOf) {
-  (void)base;
   ctx.r3.u64 = ts::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
 ITC_REGS_STEP(ModeType4AllLoaded) {
@@ -388,7 +387,7 @@ void TitleLoadDebugStep(lifted::Regs& ctx) {
   ctx.r3.u64 = ts::LoadDebugStep(kWhich, ctx.r3.u32, ctx.r1.u32);
 }
 #define ITC_TITLE_LOAD_DEBUG(name, index)                  \
-  template void name<index>(lifted::Regs&, uint8_t*);
+  template void name<index>(lifted::Regs&);
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 0)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 1)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 2)

@@ -170,7 +170,7 @@ ITC_REGS_STEP(SaveInterfaceCopyDisplayName) {
   si::CopyDisplayName(ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceContentSize(lifted::Regs& ctx, uint8_t*) {
+void SaveInterfaceContentSize(lifted::Regs& ctx) {
   ctx.r3.u64 = si::ContentSize(ctx.r3.u32, ctx.r4.u32);
 }
 

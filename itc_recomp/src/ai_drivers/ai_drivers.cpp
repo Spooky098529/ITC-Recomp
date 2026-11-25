@@ -2417,7 +2417,7 @@ uint64_t UpdateState(uint32_t driver, uint32_t speed) {
 namespace {
 // The ring entry k (from the path's start +5138, modulo 80) when k is below
 // the entries' count +5136, else 0.
-uint32_t RingEntry(uint32_t path, int32_t k) {
+uint32_t CountedRingEntry(uint32_t path, int32_t k) {
   if (!(LoadS16(AiPath(path).entry_count_address()) > k)) {
     return 0;
   }
@@ -2449,7 +2449,7 @@ uint64_t LimitForCorner(uint32_t driver, uint32_t scale, uint32_t record,
   const int32_t end = int32_t(uint32_t(middle_at) + uint32_t(offset));
   const uint32_t path = driver + 512;
   if (start >= 0 && start < entries) {
-    const uint32_t entry = RingEntry(path, start);
+    const uint32_t entry = CountedRingEntry(path, start);
     if (entry != 0) {
       double a, b;
       if (Lfs(AiCorner(record).direction_address()) < zero) {
@@ -2476,12 +2476,12 @@ uint64_t LimitForCorner(uint32_t driver, uint32_t scale, uint32_t record,
     r3 = record;
   }
   if (entries > 1) {
-    LimitByCurve(driver, record, frame + 84, frame + 92, RingEntry(path, 1));
+    LimitByCurve(driver, record, frame + 84, frame + 92, CountedRingEntry(path, 1));
     r3 = driver;
     const int32_t look = LoadS16(ahead);
     const int32_t next = look + 1;
     if (entries > next) {
-      const uint32_t entry = RingEntry(path, next);
+      const uint32_t entry = CountedRingEntry(path, next);
       guest::StoreU32(frame + 92, uint32_t(look) + before);
       LimitByCurve(driver, record, frame + 84, frame + 92, entry);
     }
@@ -2809,7 +2809,7 @@ void ApplyCornerLine(uint32_t path, uint32_t index) {
     if (at >= count) {
       return;
     }
-    const uint32_t entry = RingEntry(path, k);
+    const uint32_t entry = CountedRingEntry(path, k);
     CopyWord(uint32_t(at) * 8u + table + 4, AiPathEntry(entry).target_offset_address());
     if (AiCorner(record).joined_before() == 1) {
       const int32_t until = LoadS16(RouteCorner(data).turn_in_address());
@@ -3012,7 +3012,7 @@ void SpreadOffset(uint32_t path, uint32_t first, uint32_t last, uint32_t amount,
     if (i < low) {
       return;
     }
-    const uint32_t entry = RingEntry(path, i);
+    const uint32_t entry = CountedRingEntry(path, i);
     const double offset = Lfs(AiPathEntry(entry).offset_address());
     const double least = Lfs(AiPathEntry(entry).range_low_address());
     const double moved =
@@ -3138,7 +3138,7 @@ uint32_t NarrowBehind(uint32_t path, uint32_t other, uint32_t entry,
     if (k < 0) {
       return r3;
     }
-    entry = RingEntry(path, k);
+    entry = CountedRingEntry(path, k);
     if (entry == 0) {
       return r3;
     }
@@ -3945,7 +3945,7 @@ uint64_t SteerAtCornerPoint(uint32_t driver, uint32_t record, uint32_t at,
     return SteerOutOfCorner(driver, record, frame - 96);
   }
   const uint32_t path = driver + 512;
-  const uint32_t target = RingEntry(path, k);
+  const uint32_t target = CountedRingEntry(path, k);
   if (target == 0) {
     AccumulateSteer(driver);
     return driver;
@@ -4196,7 +4196,7 @@ void ContinueLine(uint32_t path, uint32_t entry, uint32_t index, uint32_t first,
   const double zero = Lfs(kZero);
   uint32_t previous = entry;
   do {
-    const uint32_t at = RingEntry(path, int32_t(Load(index)));
+    const uint32_t at = CountedRingEntry(path, int32_t(Load(index)));
     const double offset = Fadds(Lfs(AiPathEntry(at).step_address()),
                                 Lfs(AiPathEntry(previous).offset_address()));
     Stfs(AiPathEntry(at).offset_address(), offset);
@@ -4225,7 +4225,7 @@ uint32_t ApproachCorner(uint32_t path, uint32_t record, uint32_t index,
   if (!(end > start)) {
     return 0;
   }
-  const uint32_t at = RingEntry(path, end);
+  const uint32_t at = CountedRingEntry(path, end);
   guest::StoreU32(frame + 80, uint32_t(start));
   const double target = at != 0 ? Lfs(AiPathEntry(at).target_offset_address())
                                 : Lfs(AiCorner(record).table().address + 4);
@@ -4251,7 +4251,7 @@ uint32_t ApproachCorner(uint32_t path, uint32_t record, uint32_t index,
   }
   bool more;
   do {
-    const uint32_t entry = RingEntry(path, int32_t(Load(index)));
+    const uint32_t entry = CountedRingEntry(path, int32_t(Load(index)));
     const double from = Fadds(Lfs(Load(previous) + 24),
                               Lfs(AiPathEntry(entry).step_address()));
     Stfs(AiPathEntry(entry).offset_address(), Fadds(from, step));
@@ -4278,7 +4278,7 @@ uint32_t CornerToEntry(uint32_t path, uint32_t record, uint32_t index,
   const double zero = Lfs(kZero);
   bool more;
   do {
-    const uint32_t entry = RingEntry(path, int32_t(Load(index)));
+    const uint32_t entry = CountedRingEntry(path, int32_t(Load(index)));
     const uint32_t before = Load(previous);
     const double target = Lfs(AiPathEntry(entry).target_offset_address());
     const double side = Lfs(AiCorner(record).direction_address());
@@ -4319,7 +4319,7 @@ uint32_t CornerToApex(uint32_t path, uint32_t record, uint32_t index,
   const double zero = Lfs(kZero);
   bool more;
   do {
-    const uint32_t entry = RingEntry(path, int32_t(Load(index)));
+    const uint32_t entry = CountedRingEntry(path, int32_t(Load(index)));
     const uint32_t before = Load(previous);
     const double target = Lfs(AiPathEntry(entry).target_offset_address());
     const double from = Fsubs(Fadds(Lfs(AiPathEntry(before).offset_address()), target),
@@ -4355,7 +4355,7 @@ uint32_t CornerToExit(uint32_t path, uint32_t record, uint32_t index,
   const double zero = Lfs(kZero);
   bool more;
   do {
-    const uint32_t entry = RingEntry(path, int32_t(Load(index)));
+    const uint32_t entry = CountedRingEntry(path, int32_t(Load(index)));
     const uint32_t before = Load(previous);
     const double target = Lfs(AiPathEntry(entry).target_offset_address());
     const double from =
@@ -4385,12 +4385,12 @@ uint32_t PlanCorners(uint32_t path, uint32_t entry, uint32_t index, uint32_t end
     if (!(offset < 1) && int32_t(Load(index)) > offset) {
       guest::StoreU32(index, uint32_t(offset));
       guest::StoreU32(previous,
-                      RingEntry(path, int32_t(uint32_t(offset) - 1)));
+                      CountedRingEntry(path, int32_t(uint32_t(offset) - 1)));
     }
     const int32_t until = int32_t(Load(end));
     if (int32_t(Load(index)) < until) {
       guest::StoreU32(index, uint32_t(until));
-      guest::StoreU32(previous, RingEntry(path, int32_t(uint32_t(until) - 1)));
+      guest::StoreU32(previous, CountedRingEntry(path, int32_t(uint32_t(until) - 1)));
     }
     if (ApproachCorner(path, record, index, previous, frame - 160) == 1 ||
         CornerToEntry(path, record, index, previous, frame - 160) == 1 ||
@@ -4409,7 +4409,7 @@ uint32_t PlanCorners(uint32_t path, uint32_t entry, uint32_t index, uint32_t end
 
 uint32_t PlanLine(uint32_t path, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8213F4B0 AiPath::PlanLine");
-  const uint32_t entry = RingEntry(path, 0);
+  const uint32_t entry = CountedRingEntry(path, 0);
   guest::StoreU32(frame + 80, 1);
   guest::StoreU32(frame + 84, 1);
   if (LoadS16(AiPath(path).corner_count_address()) > 0) {
@@ -4581,7 +4581,7 @@ uint64_t FindSideSection(uint32_t path, uint32_t out, uint32_t point,
 
 void FollowTargets(uint32_t path, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8213D9D8 AiPath::FollowTargets");
-  uint32_t previous = RingEntry(path, 0);
+  uint32_t previous = CountedRingEntry(path, 0);
   int32_t i = 1;
   guest::StoreU32(frame + 80, uint32_t(i));
   if (!(LoadS16(AiPath(path).plan_count_address()) > 1)) {
@@ -4589,7 +4589,7 @@ void FollowTargets(uint32_t path, uint32_t frame) {
   }
   const double zero = Lfs(kZero);
   do {
-    const uint32_t entry = RingEntry(path, i);
+    const uint32_t entry = CountedRingEntry(path, i);
     const double target = Lfs(AiPathEntry(previous).target_offset_address());
     const double before = Lfs(AiPathEntry(previous).offset_address());
     const double step = Lfs(AiPathEntry(entry).step_address());

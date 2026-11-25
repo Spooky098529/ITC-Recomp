@@ -73,12 +73,12 @@ void LogicalPadBind(uint32_t pad, uint32_t index, uint32_t device) {
 
 uint32_t LogicalPadValues(uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_82591B30 LogicalPad::Values");
-  return schema::LogicalPad(nullptr, pad).values().address;
+  return schema::LogicalPad(pad).values().address;
 }
 
 uint32_t PhysicalPadValues(uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_820988B8 PhysicalPad::Values");
-  return schema::PhysicalPad(nullptr, pad).values().address;
+  return schema::PhysicalPad(pad).values().address;
 }
 
 void InputProcessorBaseConstruct(uint32_t p) {
@@ -164,17 +164,17 @@ uint32_t InputProcessorTestRepeat(uint32_t processor, uint32_t mask_address) {
 
 uint32_t ManagerProcessor(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098CB8 InputManager::GetProcessor");
-  return schema::InputManager(nullptr, manager).processor(index).address;
+  return schema::InputManager(manager).processor(index).address;
 }
 
 uint32_t ManagerLogicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098CD0 InputManager::GetLogicalPad");
-  return schema::InputManager(nullptr, manager).logical_pad(index).address;
+  return schema::InputManager(manager).logical_pad(index).address;
 }
 
 uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098FE0 InputManager::GetPhysicalPad");
-  return schema::InputManager(nullptr, manager).physical_pad(index).address;
+  return schema::InputManager(manager).physical_pad(index).address;
 }
 
 std::optional<uint32_t> ManagerAllocate() {

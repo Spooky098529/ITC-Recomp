@@ -89,7 +89,6 @@ class Writer {
     FlushOff();
     return r3;
   }
-  uint8_t* base() const { return base_; }
   uint32_t list() const { return list_; }
 
  private:

@@ -1318,7 +1318,7 @@ cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint32_t frame) {
   cm::SetModeCalls calls;
   calls.construct = [&ctx, frame](uint32_t view, uint32_t object, uint32_t viewport,
                                         uint32_t vehicle, uint32_t back) -> uint32_t {
-    static constexpr void (*kSteps[6])(lifted::Regs&, uint8_t*) = {
+    static constexpr void (*kSteps[6])(lifted::Regs&) = {
         ITC_REGS_FN(CameraModesStep82154548), ITC_REGS_FN(CameraModesStep82154A48), ITC_REGS_FN(CameraModesStep82154D38),
         ITC_REGS_FN(CameraModesStep82158F70), ITC_REGS_FN(CameraModesStep82155288), ITC_REGS_FN(CameraModesStep82156CC0)};
     static constexpr uint32_t kFunctions[6] = {0x82154548, 0x82154A48, 0x82154D38,

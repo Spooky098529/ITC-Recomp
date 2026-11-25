@@ -58,7 +58,7 @@ lifted::Result TlsAlloc(const lifted::Args& args) {
 }
 
 // KeTlsFree(slot): 1, or 0 for kOutOfIndexes.
-lifted::Result TlsFree(uint8_t*, const lifted::Args& args) {
+lifted::Result TlsFree(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTlsFree");
   const uint32_t slot = uint32_t(args.r[0]);
   if (slot == kOutOfIndexes) {

@@ -225,13 +225,13 @@ uint32_t PoolObjectKey(uint32_t, uint32_t* size) {
 uint32_t AreaLightsKey(uint32_t object, uint32_t* size) {
   ITC_NATIVE_RUNNING("sub_820F1C20 AreaLights::Key");
   *size = 4;
-  return schema::AreaLights(nullptr, object).key_address();
+  return schema::AreaLights(object).key_address();
 }
 
 uint32_t AreaModelKey(uint32_t object, uint32_t* size) {
   ITC_NATIVE_RUNNING("sub_820F1CD8 AreaModel::Key");
   *size = 4;
-  return schema::AreaModel(nullptr, object).key_address();
+  return schema::AreaModel(object).key_address();
 }
 
 void ConstructObject(uint32_t object, uint32_t own_size, uint32_t data_size,

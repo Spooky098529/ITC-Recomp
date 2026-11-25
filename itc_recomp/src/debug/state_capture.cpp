@@ -149,7 +149,6 @@ class StateCapture {
   // The memory game state can be in (E5 step 9: the heap's and the image's
   // blocks, memory/mapping.cpp), as guest ranges.
   static std::vector<Region> ReadableGuestRanges() {
-    (void)base;
     return {{memory::kHeapStart, memory::kHeapBytes}, {memory::kImageStart, memory::kImageBytes}};
   }
 

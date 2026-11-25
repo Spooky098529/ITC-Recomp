@@ -64,7 +64,6 @@ uint64_t Slot(uint64_t object_r3, uint32_t slot, uint32_t frame, uint32_t lr,
 
 uint64_t DialogOpenMovies(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82225810 Dialog::OpenMovies");
-  (void)base;
   const uint32_t frame = sp - 96;
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) {

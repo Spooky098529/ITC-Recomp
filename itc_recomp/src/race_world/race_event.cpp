@@ -66,7 +66,7 @@ uint32_t GroupList(uint32_t event, uint32_t group) {
 
 // Entry `i`'s list index (+2), PlaceEntry's `index`.
 uint32_t ListIndex(uint32_t entries, uint32_t i) {
-  return GroupEntry(nullptr, entries + GroupEntry::kSize * i).list_index_address();
+  return GroupEntry(entries + GroupEntry::kSize * i).list_index_address();
 }
 
 }  // namespace

@@ -24,7 +24,7 @@ using Link = schema::TrackMeshLink;
 using OutlinePoint = schema::TrackOutlinePoint;
 using Position = schema::TrackPosition;
 
-uint32_t S16(uint32_t address) {
+uint32_t LoadS16(uint32_t address) {
   return uint32_t(int32_t(int16_t(guest::LoadU16(address))));
 }
 uint32_t S16(uint16_t value) {
@@ -301,7 +301,7 @@ uint32_t TrackPositionSearchLinked(uint32_t position, uint32_t point, uint32_t m
   for (int32_t i = 0; i < int32_t(file.section_count()); i++) {
     bool skip = false;
     for (uint32_t k = 0; k < tried; k++) {
-      if (int32_t(S16(G::linked_tried_address() + 2 * k)) == i) {
+      if (int32_t(LoadS16(G::linked_tried_address() + 2 * k)) == i) {
         skip = true;
         break;
       }

@@ -552,7 +552,6 @@ uint32_t LockFile(uint32_t stream, bool lock, const Calls& calls) {
   } else {
     ITC_NATIVE_RUNNING("sub_825AD688 _unlock_file");
   }
-  (void)base;
   if (stream >= kIob && stream <= kIob + 608) {
     const uint32_t index = uint32_t(int32_t(stream - kIob) >> 5);
     return uint32_t(calls.guest(lock ? kLock : kUnlock, {16 + index}));

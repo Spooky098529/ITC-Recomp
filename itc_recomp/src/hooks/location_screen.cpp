@@ -70,11 +70,11 @@ namespace hooks {
 
 namespace ls = location_screen;
 
-void LocationScreenSceneryConfig(lifted::Regs& ctx, uint8_t*) {
+void LocationScreenSceneryConfig(lifted::Regs& ctx) {
   ctx.r3.u64 = ls::SceneryConfig(ctx.r3.u64, ctx.r4.u64);
 }
 
-void LocationScreenKindText(lifted::Regs& ctx, uint8_t*) {
+void LocationScreenKindText(lifted::Regs& ctx) {
   ctx.r3.u64 = ls::KindText(ctx.r3.u32, ctx.r4.u64);
 }
 

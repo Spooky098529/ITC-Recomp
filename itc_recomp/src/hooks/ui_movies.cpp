@@ -68,7 +68,6 @@ bool SlotDiagnostics() {
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ui_movies)) { \
     const uint32_t object = ctx.r3.u32;           \
     const uint32_t i = ctx.r4.u32;                \
-    (void)base;                                   \
     ctx.r3.u64 = (expression);                    \
   }
 

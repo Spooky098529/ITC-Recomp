@@ -1704,12 +1704,10 @@ uint32_t CreateSubmix(uint32_t description, uint32_t allocator, uint32_t out,
 // --- The API entry points (under the API lock) ---
 
 void ApiEnter(const GuestCall& call) {
-  (void)base;
   call(kRtlEnterCriticalSection, 0, Args({kApiLock}));
 }
 
 void ApiLeave(const GuestCall& call) {
-  (void)base;
   call(kRtlLeaveCriticalSection, 0, Args({kApiLock}));
 }
 

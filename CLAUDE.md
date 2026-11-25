@@ -87,8 +87,13 @@ in `docs/loops/e5-step9-reports.md`): the heap and the image are blocks of
 host memory of their own (`memory::g_heap`, `g_image`, `guest.h`
 translating their addresses); the guest mapping (the memory file, its
 views) is gone, and `base` is an unmapped range whose raw accesses fault and
-are named ("guest fault"). All the game's memory is host memory; left is
-step 10 (`base`, `guest.h` and the 32-bit addresses). A row's
+are named ("guest fault"). All the game's memory is host memory. Step 10
+(2026-11-25, a codemod and a swarm of 8, "Step 10 as one swarm", reports in
+`docs/loops/e5-step10-reports.md`): `base` is gone from the whole program
+(`guest.h` and the views take only guest addresses; no fault range; an
+address in no block stops the program, named by `memory::NoBlock`); left
+of step 10 is the lifted code made typed C++, so `guest.h`'s addresses,
+`lifted::Call` and the dispatch table can go ("What's left of step 10"). A row's
 new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below

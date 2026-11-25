@@ -1085,7 +1085,7 @@ void AtStack(lifted::Regs& ctx, uint32_t sp, Call call) {
 // A recompiled function called with r3 (and r4, r5) from a frame of
 // `bytes` below `sp`, returning to `back`; r3 after it.
 uint32_t CallFrom(lifted::Regs& ctx, uint32_t sp, uint32_t bytes, uint32_t back,
-                  void (*function)(lifted::Regs&, uint8_t*), uint32_t r3, uint32_t r4 = 0,
+                  void (*function)(lifted::Regs&), uint32_t r3, uint32_t r4 = 0,
                   uint32_t r5 = 0) {
   AtStack(ctx, sp, [&] {
     guest_call::InFrame(ctx, bytes, back, [&](uint32_t) {

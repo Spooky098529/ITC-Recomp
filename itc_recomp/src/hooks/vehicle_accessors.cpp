@@ -31,7 +31,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
               "results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter returning a word in r3: `address` the function's
-// (sub_<address>), `expr` the result (using `ctx` and `base`).
+// (sub_<address>), `expr` the result (using `ctx`).
 #define ITC_ACCESSOR_WORD(address, expr)          \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.r3.u64 = uint32_t(expr);                 \
@@ -51,7 +51,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
     ctx.f1.f64 = double(expr);                   \
   }
 
-// The same for a function returning nothing (`call` uses `ctx` and `base`,
+// The same for a function returning nothing (`call` uses `ctx`,
 // and sets r3 where the original leaves it something callers could see).
 #define ITC_ACCESSOR_VOID(address, call)          \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
@@ -97,13 +97,13 @@ ITC_ACCESSOR_VOID(820B68C0, RigidBodyPointVelocity(ctx.r3.u32, ctx.r4.u32, ctx.r
 ITC_ACCESSOR_WORD(820B6928, RigidBodyOrientation(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6948, RigidBodyAngularVelocity(ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B6958, RigidBodyAddForce(ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).force_address())
 ITC_ACCESSOR_VOID(820B6960, RigidBodyAddTorque(ctx.r3.u32, ctx.r4.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).torque_address())
 ITC_ACCESSOR_VOID(820B6968, RigidBodyAddForceAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).force_address())
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).force_address())
 ITC_ACCESSOR_VOID(820B69D8, RigidBodyAddTorqueAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-                  ctx.r3.u64 = schema::RigidBody(nullptr, ctx.r3.u32).torque_address())
+                  ctx.r3.u64 = schema::RigidBody(ctx.r3.u32).torque_address())
 
 // The wheels' slip: r3 = the vehicle, f1 = a threshold. Vehicle::WheelSlip
 // (sub_820C0180) has no adapter: its callers in play, MaxWheelSlip and
@@ -233,7 +233,7 @@ ITC_FLAG_BOOL(native_vector_library, true, "ITC",
               "translated code (same results; checked by --run_harnesses=vehicle_accessors)");
 
 // Defines an adapter for a function returning nothing (r3 left as it was):
-// `call` uses `ctx` and `base`.
+// `call` uses `ctx`.
 #define ITC_VECTOR_VOID(address, call)         \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vector_library)) { \
     ctx.fpscr.disableFlushMode();             \

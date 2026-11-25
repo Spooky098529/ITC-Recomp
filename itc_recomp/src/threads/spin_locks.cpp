@@ -48,13 +48,13 @@ void Release(const lifted::Args& args) {
 }
 
 // KeRaiseIrqlToDpcLevel(): the old IRQL, plugged in.
-lifted::Result RaiseIrqlToDpcLevel(uint8_t*, const lifted::Args&) {
+lifted::Result RaiseIrqlToDpcLevel(const lifted::Args&) {
   ITC_NATIVE_RUNNING("import KeRaiseIrqlToDpcLevel");
   return {0, 0.0};
 }
 
 // KfLowerIrql(old): nothing to do.
-lifted::Result LowerIrql(uint8_t*, const lifted::Args&) {
+lifted::Result LowerIrql(const lifted::Args&) {
   ITC_NATIVE_RUNNING("import KfLowerIrql");
   return {0, 0.0};
 }

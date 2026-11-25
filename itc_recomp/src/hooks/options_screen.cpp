@@ -117,19 +117,19 @@ class GuestCalls {
 
 }  // namespace
 
-void OptionsButtonIndex(lifted::Regs& ctx, uint8_t*) {
+void OptionsButtonIndex(lifted::Regs& ctx) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::ButtonIndex(ctx.r3.u32))));
 }
 
-void OptionsButtonCode(lifted::Regs& ctx, uint8_t*) {
+void OptionsButtonCode(lifted::Regs& ctx) {
   ctx.r3.u64 = options_screen::ButtonCode(ctx.r3.u32);
 }
 
-void OptionsAnalogIndex(lifted::Regs& ctx, uint8_t*) {
+void OptionsAnalogIndex(lifted::Regs& ctx) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::AnalogIndex(ctx.r3.u32))));
 }
 
-void OptionsAnalogPicture(lifted::Regs& ctx, uint8_t*) {
+void OptionsAnalogPicture(lifted::Regs& ctx) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::AnalogPicture(ctx.r3.u32))));
 }
 

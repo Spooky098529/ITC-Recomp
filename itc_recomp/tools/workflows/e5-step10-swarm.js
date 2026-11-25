@@ -6,10 +6,10 @@ export const meta = {
   ],
 }
 
-// args.units: [{ name, files, errors }] (docs/loops/e5-loop.md, "Step 10 as
+// args.units: [{ name, files, errors_file }] (docs/loops/e5-loop.md, "Step 10 as
 // one swarm"): `files` the source files the unit owns (the scheduler's: two
-// units sharing a file never run at once), `errors` the compiler's error
-// lines for them, as the lead's build printed them.
+// units sharing a file never run at once), `errors_file` a file holding the
+// compiler's error lines for them, as the lead's build printed them.
 const UNITS = args.units
 
 // At most 6 agents at once (the user's call), and never two units sharing a
@@ -47,8 +47,8 @@ The repo root is where CLAUDE.md is; branch e5-native-16-11-26 (stay on it). Sev
 - Edit only your unit's files (below). Never edit itc_recomp/src/guest.h, itc_recomp/src/guest_code.h, itc_recomp/src/memory/, itc_recomp/src/lifted/, itc_recomp/src/schema/, itc_recomp/src/image/, itc_recomp/tools/ or docs/functions/. If a fix needs a change outside your files (a header another unit owns, a shared declaration), describe it in for_lead instead.
 - American English. Nothing the player can see may change: the same game, tick for tick, on the same input. Keep the same loads and stores in the same order.`
 
-const HOW = `Read first: docs/loops/e5-loop.md, "Step 10 as one swarm"; the WIP commit (git show d0383928 --stat, and git show d0383928 -- <a file of yours> for what the codemod did to it); itc_recomp/src/guest.h (every function takes only the guest address now), itc_recomp/src/schema/view.h (a view is only its address: \`explicit View(uint32_t)\`), itc_recomp/src/lifted/lifted.h (lifted::Call(address, args), entries take only \`const Args&\`), itc_recomp/src/hooks/native_entry.h.
-What happened: E5 step 10 removed \`base\` (the guest memory base pointer, \`uint8_t* base\`, \`memory::Base()\`) from the whole program by a codemod: parameters \`uint8_t* base\` dropped, the first argument \`base\` (or \`x.base\`, \`memory::Base()\`) dropped from calls, \`[base]\` dropped from lambda captures. Memory is reached only through guest.h's functions by guest address. What the codemod couldn't do is left to you, and the compiler's errors below say where. Typical cases: a member or local holding base (\`uint8_t* base_\`, a struct's \`base\` field, \`uint8_t* base = memory::Base();\`): delete it and its initializers; a function pointer type or a std::function with an unnamed \`uint8_t*\` parameter: drop that parameter; a call the codemod emptied wrongly (\`if ()\`, \`reinterpret_cast<...>()\`, \`static_cast<void*>()\`): read git show d0383928 for what it was and rewrite it without base (a check that base is set goes; a host pointer made from base must become guest::Pointer(address)); an \`int base\` or other unrelated variable named base the codemod dropped from a call: put it back exactly as it was (git show d0383928); a view built from a guest address now needs its explicit constructor (\`schema::T(address)\`); an overload that differed only by base now collides: keep one. Fix every error listed for your files, then read the rest of each file for the same patterns the compiler stopped before reaching (an error early in a file can hide later ones). Don't restyle, don't change anything else.`
+const HOW = `Read first: docs/loops/e5-loop.md, "Step 10 as one swarm"; what the codemod and the lead's fixes did to a file of yours: git diff d0383928~1 -- <file> (d0383928~1 is the tree before step 10; git show d0383928~1:<path> gives a file as it was); itc_recomp/src/guest.h (every function takes only the guest address now), itc_recomp/src/schema/view.h (a view is only its address: \`explicit View(uint32_t)\`), itc_recomp/src/lifted/lifted.h (lifted::Call(address, args), entries take only \`const Args&\`), itc_recomp/src/hooks/native_entry.h.
+What happened: E5 step 10 removed \`base\` (the guest memory base pointer, \`uint8_t* base\`, \`memory::Base()\`) from the whole program by a codemod: parameters \`uint8_t* base\` dropped, the first argument \`base\` (or \`x.base\`, \`memory::Base()\`) dropped from calls, \`[base]\` dropped from lambda captures. Memory is reached only through guest.h's functions by guest address. What the codemod couldn't do is left to you, and the compiler's errors below say where. Typical cases: a member or local holding base (\`uint8_t* base_\`, a struct's \`base\` field, \`uint8_t* base = memory::Base();\`): delete it and its initializers; a function pointer type or a std::function with an unnamed \`uint8_t*\` parameter: drop that parameter; a call the codemod emptied wrongly (\`if ()\`, \`reinterpret_cast<...>()\`, \`static_cast<void*>()\`): read git show d0383928~1:<path> for what it was and rewrite it without base (a check that base is set goes; a host pointer made from base must become guest::Pointer(address)); an \`int base\` or other unrelated variable named base the codemod dropped from a call: put it back exactly as it was (git show d0383928~1:<path>); a view built from a guest address now needs its explicit constructor (\`schema::T(address)\`); an overload that differed only by base now collides: keep one. Fix every error listed for your files, then read the rest of each file for the same patterns the compiler stopped before reaching (an error early in a file can hide later ones). Don't restyle, don't change anything else.`
 
 const REPORT = {
   type: 'object',
@@ -70,8 +70,7 @@ phase('Fix')
 const results = await schedule(UNITS, unit => agent(
 `You're one of several agents doing E5 step 10 (removing the guest memory base pointer) as one swarm, each for one unit of this game port's code. Your unit: \`${unit.name}\`.
 - Your files (held for you while you run): ${unit.files.join(', ')}.
-- The compiler's errors in them (the lead's build; line numbers as of the WIP tree):
-${unit.errors.join('\n')}
+- The compiler's errors in them (the lead's build; line numbers as of the current tree): read ${unit.errors_file} (one error a line, the source line in brackets).
 ${RULES}
 ${HOW}
 

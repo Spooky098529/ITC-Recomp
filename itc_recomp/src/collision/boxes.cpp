@@ -101,7 +101,7 @@ bool ShapeCopyConstruct(uint32_t shape, uint32_t from) {
 }
 
 bool BoxCopyFits(uint32_t box, uint32_t from) {
-  const Box b(nullptr, box), source(nullptr, from);
+  const Box b(box), source(from);
   return CopyFits(b.axis0_x_address(), source.axis0_x_address(), 48) &&
          CopyFits(b.corner_x_address(), source.corner_x_address(), 128) &&
          CopyFits(b.face_px_distance_address(), source.face_px_distance_address(), 192);

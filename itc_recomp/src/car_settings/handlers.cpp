@@ -94,7 +94,7 @@ uint64_t Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t OpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A8DD0 CarSettings::OpenMovie");
   return calls.Call(kMoviesOpen, sp, lr, kMovie, kAsset);
 }

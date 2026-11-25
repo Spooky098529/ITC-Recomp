@@ -690,7 +690,6 @@ struct Passes::State {
   // in flight reads, and each mirror keeps the writes it hasn't had yet.
   // Inline vertices get a part of their region per frame slot.
   bool mirror_by_tick = false, mirror_to_both = false;
-  uint8_t* guest_base = nullptr;
   uint32_t front_mirror = 0;
   std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
   // The writes the front mirror hasn't had, sorted by start, to count drawn
@@ -816,7 +815,7 @@ struct Passes::State {
   uint64_t clobbers = 0, clobbered_bytes = 0, clobber_copies = 0;
   std::map<std::array<uint64_t, 4>, uint64_t> clobbers_by_shaders;
   std::string clobber_sample;
-  uint8_t* last_base = nullptr;
+  bool drew_any = false;  // a draw has run (late writes and resolve dumps wait on one)
   uint64_t late_written = 0, late_checked = 0;
   std::map<uint64_t, uint64_t> late_by_shader;  // vertex shader: count
   std::string late_sample;
@@ -3166,7 +3165,6 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
   ITC_LOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{} (scale {})",
                s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
                s.main_view_extent.height, s.main_view_scale);
-  s.guest_base = base;
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
@@ -3299,7 +3297,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.mirror_frames++;
   if (s.mirror_by_tick) {
     Buffers_KeepSegments(s.MirrorPerDraw());
-    s.MirrorByTickFrameStart(s.guest_base);
+    s.MirrorByTickFrameStart();
   }
   if (Buffers_LogPhysicalWrites()) {
     Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
@@ -3604,13 +3602,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     if (call.inline_vertices) {
       // Its weight: the vertices' color alpha (the shader outputs the
       // history times the color, and the color's alpha).
-      uint8_t* vertices = draw_mirror().mapped;
+      // In the mirror past guest memory, in the guest's byte order.
+      const uint8_t* vertices = draw_mirror().mapped;
+      auto vertex_float = [vertices](uint32_t address) {
+        uint32_t v;
+        std::memcpy(&v, vertices + address, 4);
+        return std::bit_cast<float>(__builtin_bswap32(v));
+      };
       glow_frame.constants += std::format(
           "vertex color {:.4g} {:.4g} {:.4g} {:.4g}; ",
-          guest::LoadFloat(vertices, call.vertex_address + 16),
-          guest::LoadFloat(vertices, call.vertex_address + 20),
-          guest::LoadFloat(vertices, call.vertex_address + 24),
-          guest::LoadFloat(vertices, call.vertex_address + 28));
+          vertex_float(call.vertex_address + 16),
+          vertex_float(call.vertex_address + 20),
+          vertex_float(call.vertex_address + 24),
+          vertex_float(call.vertex_address + 28));
     }
     for (uint32_t c = 0; c < 256; c++) {
       if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
@@ -3631,7 +3635,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
 
   current_vertex_shader = vertex->hash;
   current_pixel_shader = pixel ? pixel->hash : 0;
-  last_base = base;
+  drew_any = true;
 
   // Index buffer: +0 bit 31 = 32-bit, bits 29-30 = endianness; +24 address.
   bool index_32bit = false;
@@ -5139,7 +5143,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   if (s.log_glow) {
     s.LogGlow();
   }
-  if (s.check_late_writes && s.last_base) {
+  if (s.check_late_writes && s.drew_any) {
     for (const State::CopiedRange& r : s.copied_ranges) {
       s.late_checked++;
       if (base::Hash64(PhysicalHostAddress(r.address), r.size) != r.hash) {
@@ -5239,7 +5243,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
       s.DrawIds(commands);
     }
     s.RecordDump(commands, extent, dump_prefix, dump_resolves);
-    if (dump_resolves && s.last_base) {
+    if (dump_resolves && s.drew_any) {
       s.DumpGuestResolves();
     }
   }
@@ -5402,7 +5406,7 @@ void Passes::State::DumpGuestResolves() {
     }
     Dumped d;
     uint32_t width, height;
-    if (!TextureCache::DecodeGuest(last_base, r.fetch, d.cpu, d.format, width, height)) {
+    if (!TextureCache::DecodeGuest(r.fetch, d.cpu, d.format, width, height)) {
       continue;
     }
     d.name = std::format("guest_resolve_{:02}_{:08X}_format{}", i, r.address, r.format);

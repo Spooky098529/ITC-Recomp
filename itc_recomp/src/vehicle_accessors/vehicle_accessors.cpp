@@ -96,17 +96,17 @@ uint32_t VehicleGet(uint32_t index) {
 
 uint32_t VehicleWheelContact(uint32_t vehicle, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_820C0170 Vehicle::WheelContact");
-  return Vehicle(nullptr, vehicle).wheel_track_positions_address() + schema::TrackPosition::kSize * wheel;
+  return Vehicle(vehicle).wheel_track_positions_address() + schema::TrackPosition::kSize * wheel;
 }
 
 uint32_t RigidBodyPosition(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B67D8 RigidBody::Position");
-  return Body(nullptr, body).origin_address();
+  return Body(body).origin_address();
 }
 
 uint32_t RigidBodyMatrix(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6930 RigidBody::Matrix");
-  return Body(nullptr, body).matrix_address();
+  return Body(body).matrix_address();
 }
 
 uint32_t ContactObject(uint32_t contact) {
@@ -120,7 +120,7 @@ uint32_t ContactObject(uint32_t contact) {
 
 uint32_t ContactPosition(uint32_t contact) {
   ITC_NATIVE_RUNNING("sub_820B8D00 Contact::Position");
-  return Contact(nullptr, contact).position_address();
+  return Contact(contact).position_address();
 }
 
 float ContactStrength(uint32_t contact) {
@@ -219,42 +219,42 @@ void RigidBodySetCenterOfMass(uint32_t body, uint32_t offset) {
 
 uint32_t RigidBodyField80(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6880 RigidBody::Field80");
-  return Body(nullptr, body).orientation_address();
+  return Body(body).orientation_address();
 }
 
 uint32_t RigidBodyVelocity(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6888 RigidBody::Velocity");
-  return Body(nullptr, body).velocity_address();
+  return Body(body).velocity_address();
 }
 
 uint32_t RigidBodyField144(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6890 RigidBody::Field144");
-  return Body(nullptr, body).velocity_direction_address();
+  return Body(body).velocity_direction_address();
 }
 
 uint32_t RigidBodyForce(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820988C0 RigidBody::Force");
-  return Body(nullptr, body).force_address();
+  return Body(body).force_address();
 }
 
 uint32_t RigidBodyTorque(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_82379328 RigidBody::Torque");
-  return Body(nullptr, body).torque_address();
+  return Body(body).torque_address();
 }
 
 uint32_t RigidBodyField160(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6898 RigidBody::Field160");
-  return Body(nullptr, body).speed_address();
+  return Body(body).speed_address();
 }
 
 uint32_t RigidBodyOrientation(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6928 RigidBody::Orientation");
-  return Body(nullptr, body).orientation_matrix_address();
+  return Body(body).orientation_matrix_address();
 }
 
 uint32_t RigidBodyAngularVelocity(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6948 RigidBody::AngularVelocity");
-  return Body(nullptr, body).angular_velocity_address();
+  return Body(body).angular_velocity_address();
 }
 
 float RigidBodyFloat48(uint32_t body) {
@@ -367,7 +367,7 @@ float VehicleDistancePerFrame(uint32_t vehicle) {
 
 uint32_t VehicleIdentity(uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0168 Vehicle::Identity");
-  return Vehicle(nullptr, vehicle).own_track_position_address();
+  return Vehicle(vehicle).own_track_position_address();
 }
 
 uint32_t VehicleSetObjectHalf114(uint32_t vehicle, uint32_t value) {

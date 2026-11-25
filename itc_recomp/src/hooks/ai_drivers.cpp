@@ -208,7 +208,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "sub_8213D9D8, sub_8213F4B0, sub_8213E970, sub_8213DC08, sub_8213D020, sub_8213CFC8, "
               "sub_82145CA8, sub_8213E690");
 
-// Defines an adapter: `body` uses `ctx` and `base`.
+// Defines an adapter: `body` uses `ctx`.
 #define ITC_AI_DRIVERS(address, body)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ai_drivers)) { \
     ctx.fpscr.disableFlushMode();       \
@@ -363,7 +363,6 @@ void hooks::AiUpdateAll(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   UpdateCall call;
   call.ctx = &ctx;
-  call.base = base;
   ctx.r3.u64 = UpdateAll(ctx.r1.u32 - 176, CallDriverUpdate, &call);
 }
 ITC_NATIVE_ENTRY_ALWAYS(82139628) {

@@ -74,7 +74,7 @@ uint64_t SheetCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t SheetOpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t SheetOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250328 PowerGraphScreen::OpenMovie");
   return calls.Call(kMoviesOpen, sp, lr, kSheetMovie, 22550);
 }
@@ -156,7 +156,7 @@ uint64_t BuildCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint64_t BuildOpenMovie(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t BuildOpenMovie(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219B950 BuildScreen::OpenMovie");
   return calls.Call(kMoviesOpen, sp, lr, kBuildMovie, 22557);
 }

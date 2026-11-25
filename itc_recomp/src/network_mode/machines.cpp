@@ -519,7 +519,7 @@ using LeaveFn = uint64_t (*)(uint32_t, uint32_t, uint32_t, const Calls&);
 using DestroyFn = uint64_t (*)(uint32_t, uint32_t, const Calls&);
 
 template <size_t I>
-uint64_t OpenAdapter(uint8_t*, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t OpenAdapter(uint32_t sp, uint32_t lr, const Calls& calls) {
   return OpenMovieOf<I>(sp, lr, calls);
 }
 

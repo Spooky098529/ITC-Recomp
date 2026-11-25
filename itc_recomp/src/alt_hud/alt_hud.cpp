@@ -39,7 +39,7 @@ void Frame(uint32_t sp, uint32_t bytes) { guest::StoreU32(sp - bytes, sp); }
 using G = schema::AltHudGlobals;
 
 // The holder's +1004 and its object (+0, loaded at each call).
-schema::AltHudHolder Holder(uint32_t holder) { return {holder}; }
+schema::AltHudHolder Holder(uint32_t holder) { return schema::AltHudHolder(holder); }
 schema::AltHud Object(uint32_t holder) { return Holder(holder).object(); }
 
 // The extra gauges' slot i (slot0 to slot2, +244 + 4 i), through the view (a

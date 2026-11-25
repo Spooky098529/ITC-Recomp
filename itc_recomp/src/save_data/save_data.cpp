@@ -249,11 +249,11 @@ void Copy(uint32_t save, uint32_t table, const TableCopy& copy) {
 
 bool SetDefaultsNative(uint32_t save) {
   return native::Buffers_NativeMemcpy() &&
-         !c_runtime::MayShare(Destination(nullptr, save, kCopy50A8), kCopy50A8.bytes,
+         !c_runtime::MayShare(Destination(save, kCopy50A8), kCopy50A8.bytes,
                               schema::SaveDataGlobals::defaults_50a8_address(), 60) &&
-         !c_runtime::MayShare(Destination(nullptr, save, kCopy3C24), kCopy3C24.bytes,
+         !c_runtime::MayShare(Destination(save, kCopy3C24), kCopy3C24.bytes,
                               schema::SaveDataGlobals::defaults_3c24_address(), 28) &&
-         !c_runtime::MayShare(Destination(nullptr, save, kCopy50E4), kCopy50E4.bytes,
+         !c_runtime::MayShare(Destination(save, kCopy50E4), kCopy50E4.bytes,
                               schema::SaveDataGlobals::defaults_50e4_address(), 28);
 }
 
