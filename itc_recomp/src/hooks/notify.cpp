@@ -9,17 +9,29 @@
 // src/hooks/network.cpp). See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
+#include "base/flags.h"
+#include "hooks/save_interface.h"
+#include "schema/system_services.h"
+#include "schema/save_interface.h"
+#include "schema/files_and_saves.h"
+#include "user/network.h"
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
+ITC_FLAG_DECLARE(bool, native_save_interface);
+
 namespace {
 
-// What the listener wrapper answers: no listener, but not 0 (the readers test
-// for 0, and the storage devices' update runs only with one). Not an SDK
-// handle (those start at 0xF8000000), so XNotifyGetNext, still called by the
-// readers left recompiled, finds no queue and answers nothing.
-constexpr uint32_t kNoListener = 0x4E4F4C53;
+// What the listener wrapper answers (user::kNoListener): no listener, but
+// not 0 (the readers test for 0, and the storage devices' update runs only
+// with one). Not an SDK handle (those start at 0xF8000000), so
+// XNotifyGetNext, still called by the readers left recompiled, finds no
+// queue and answers nothing.
+constexpr uint32_t kNoListener = user::kNoListener;
 
 bool g_users_built = false;
 
@@ -35,8 +47,8 @@ void SetUsersBuilt(bool built) {
 }  // namespace notify_hooks
 
 // XNotifyCreateListener: r3 = the areas (mask). No listener made.
-extern "C" REX_FUNC(sub_822952B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822952B8) {
+  
   ctx.r3.u64 = kNoListener;
 }
 
@@ -44,18 +56,19 @@ extern "C" REX_FUNC(sub_822952B8) {
 // (sub_82099600) and flags it changed (+244) once, on the first call with a
 // listener (+240), as the start-up sign-in changed did; returns 0 otherwise,
 // as an empty queue did.
-extern "C" REX_FUNC(sub_82099828) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099828) {
+  
   const uint32_t app = ctx.r3.u32;
-  if (g_users_built || !guest::LoadU32(base, app + 240)) {
+  const schema::SysUsers users(app);
+  if (g_users_built || !users.listener()) {
     ctx.r3.u64 = 0;
     return;
   }
   g_users_built = true;
-  guest::StoreU32(base, app + 244, 1);
-  InFrame(ctx, base, 112, 0x820998A0, [&](uint32_t) {
+  users.set_users_changed(1);
+  InFrame(ctx, 112, 0x820998A0, [&](uint32_t) {
     ctx.r3.u64 = app;
-    sub_82099600(ctx, base);
+    lifted::Enter(ctx, lifted::e82099600);
   });
 }
 
@@ -63,14 +76,14 @@ namespace {
 
 // Calls guest code at `function` with the link register the recompiled call
 // had.
-void CallAt(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t return_address) {
+void CallAt(lifted::Regs& ctx, uint32_t function, uint32_t return_address) {
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, function);
 }
 
 // An object's method: its vtable's word at `offset`.
-uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+uint32_t Method(uint32_t object, uint32_t offset) {
+  return guest::LoadU32(guest::VtableWord(object) + offset);
 }
 
 }  // namespace
@@ -82,45 +95,63 @@ uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
 // device list (+12's +4, then +8 per slot); a slot whose state isn't 0-3 is
 // asked about (+28) and cleared under 5; then the slot's handler (the object's
 // +76 + 4 x its +988) gives its next state. Runs only with a listener (+56).
-extern "C" REX_FUNC(sub_820A4610) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t devices = ctx.r3.u32;
-  if (!guest::LoadU32(base, devices + 56)) {
+// With --native_save_interface, its plain C++ instead (B7 loop,
+// save_interface/slot_handlers.h: the handlers, the device list and
+// SaveSlot::State native; its prologue written as the original's).
+ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
+  
+  if (ITC_FLAG(native_save_interface)) {
+    hooks::SaveDevicesUpdateSteps(ctx);
     return;
   }
-  auto slot = [&](uint32_t i) { return guest::LoadU32(base, devices + 44) + 1000 * i; };
-  auto count = [&] { return int32_t(guest::LoadU32(base, devices + 48)); };
-  InFrame(ctx, base, 144, 0x820A4640, [&](uint32_t) {
-    const uint32_t source = guest::LoadU32(base, devices + 12);
+  // The save devices (save-interface.toml's SaveDevices) and their slots
+  // (files-and-saves.toml's SaveSlot).
+  const schema::SaveDevices devices(ctx.r3.u32);
+  if (!devices.listener()) {
+    return;
+  }
+  auto slot = [&](uint32_t i) {
+    return schema::SaveSlot(devices.slots<schema::View>().address + 1000 * i);
+  };
+  auto count = [&] { return int32_t(devices.slot_count()); };
+  InFrame(ctx, 144, 0x820A4640, [&](uint32_t) {
+    const uint32_t source = devices.device_list();
     ctx.r3.u64 = source;  // r4 as the caller left it
-    CallAt(ctx, base, Method(base, source, 4), 0x820A4640);
+    CallAt(ctx, Method(source, 4), 0x820A4640);
     const uint32_t list = ctx.r3.u32;
     for (int32_t i = 0; i < count(); i++) {
       ctx.r3.u64 = list;
       ctx.r4.u64 = uint32_t(i);
-      CallAt(ctx, base, Method(base, list, 8), 0x820A4674);
-      guest::StoreU32(base, slot(i) + 956, ctx.r3.u32);
+      CallAt(ctx, Method(list, 8), 0x820A4674);
+      slot(i).set_user(ctx.r3.u32);
     }
     ctx.r3.u64 = 0;  // XNotifyGetNext's answer: nothing
     for (int32_t i = 0; i < count(); i++) {
-      const int32_t state = int32_t(guest::LoadU32(base, slot(i) + 956));
+      const int32_t state = int32_t(slot(i).user());
       if (state < 0 || state > 3) {
-        ctx.r3.u64 = devices;
+        ctx.r3.u64 = devices.address;
         ctx.r4.u64 = uint32_t(i);
-        CallAt(ctx, base, Method(base, devices, 28), 0x820A4758);
+        CallAt(ctx, Method(devices.address, 28), 0x820A4758);
         if (ctx.r3.u32 < 5) {
-          for (uint32_t offset : {36, 988, 984, 960, 964, 968, 972}) {
-            guest::StoreU32(base, slot(i) + offset, 0);
-          }
+          // +36, +988, +984, +960, +964, +968, +972, in the original's order.
+          slot(i).set_device(0);
+          slot(i).set_state(0);
+          slot(i).set_enumerated_saves(0);
+          slot(i).set_request_device_selector(0);
+          slot(i).set_request_enumeration(0);
+          slot(i).set_request_save(0);
+          slot(i).set_request_load(0);
         }
       }
-      const uint32_t s = slot(i);
-      const uint32_t handler =
-          guest::LoadU32(base, devices + 4 * (guest::LoadU32(base, s + 988) + 19));
-      ctx.r3.u64 = devices;
-      ctx.r4.u64 = s;
-      CallAt(ctx, base, handler, 0x820A47D8);
-      guest::StoreU32(base, slot(i) + 988, ctx.r3.u32);
+      const schema::SaveSlot s = slot(i);
+      // The handlers' table from +76 (wait_for_user), by the slot's state.
+      // (The save devices are in host memory: read through their layout.)
+      const uint32_t handler = uint32_t(devices.load_at(
+          devices.wait_for_user_address() - devices.address + 4 * s.state(), 4));
+      ctx.r3.u64 = devices.address;
+      ctx.r4.u64 = s.address;
+      CallAt(ctx, handler, 0x820A47D8);
+      slot(i).set_state(ctx.r3.u32);
     }
   });
 }

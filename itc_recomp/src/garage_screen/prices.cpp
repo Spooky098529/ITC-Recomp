@@ -1,0 +1,91 @@
+// The garage screen's car value and sale price, never seen in play
+// (docs/functions/garage-screen.md): see garage_screen.h.
+
+#include "garage_screen/garage_screen.h"
+
+#include "base/log.h"
+#include "garage_screen/internal.h"
+
+namespace garage_screen {
+
+namespace {
+
+
+// The weight of the car's part bit `n` (0 to 453) in CarValue: the address
+// of its float, or 0 for none (as the original's ranges test it).
+uint32_t WeightAt(uint32_t n) {
+  const uint32_t t = G::value_weights_address();
+  auto in = [n](uint32_t from, uint32_t to) { return n >= from && n <= to; };
+  if (in(1, 9)) return t - 64 + 4 * n;
+  if (in(11, 19)) return t - 104 + 4 * n;
+  if (in(21, 26)) return t - 108 + 4 * n;
+  if (in(28, 33)) return t - 136 + 4 * n;
+  if (in(35, 40)) return t - 140 + 4 * n;
+  if (in(42, 47)) return t - 144 + 4 * n;
+  if (in(49, 54)) return t - 148 + 4 * n;
+  if (in(56, 61)) return t - 152 + 4 * n;
+  if (in(63, 68)) return t - 156 + 4 * n;
+  if (in(70, 75)) return t - 160 + 4 * n;
+  if (in(77, 79)) return t - 164 + 4 * n;
+  if (in(81, 83)) return t - 168 + 4 * n;
+  if (in(85, 87)) return t - 172 + 4 * n;
+  if (in(89, 94)) return t - 176 + 4 * n;
+  // 96 to 99 fall through to the ranges below (the original's test of 96
+  // and 20 can't hold); 100 to 107 one table (its two loads the same).
+  if (in(100, 107)) return t - 148 + 4 * n;
+  if (in(109, 118) || in(120, 129) || in(131, 140) || in(142, 151) || in(153, 157)) {
+    return t + 204;
+  }
+  if (in(165, 169) || in(159, 163)) return t + 212;
+  if (in(171, 173) || in(175, 177) || in(179, 181) || in(183, 185)) return t + 204;
+  if (in(187, 188)) return t + 232;
+  return 0;
+}
+
+}  // namespace
+
+double CarValue(uint32_t car, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82192378 GarageScreen::CarValue");
+  // A leaf below the caller's frame: the count's doubleword at sp - 112.
+  const schema::GarageCar garage_car(car);
+  const double count = IntToFloat(sp - 112, garage_car.spec_744());
+  double f1 = double(G::zero());
+  for (uint32_t n = 0; n < 454; n++) {
+    // The part's bit in the words from +1904 (bit n mod 32 from the low end
+    // of word n / 32).
+    const uint32_t word = Load(garage_car.owned_parts_address() + 4 * (n >> 5));
+    if ((word & (1u << (n & 31))) == 0) {
+      continue;
+    }
+    const uint32_t at = WeightAt(n);
+    if (at != 0) {
+      f1 = double(float(std::fma(count, Lfs(at), f1)));
+    }
+  }
+  return f1;
+}
+
+uint64_t SalePrice(uint32_t car, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82192690 GarageScreen::SalePrice");
+  const uint32_t frame = Frame(sp, 112);
+  const schema::GarageCar garage_car(car);
+  const double f13 = IntToFloat(frame + 80, garage_car.spec_744());
+  const double f8 = double(float(f13 * double(G::price_constants())));
+  const double value = CarValue(car, frame);
+  // The factor: the first of nine thresholds (+52 on) not below the car's
+  // float +1892 picks the one beside it (+84 on), the ninth's past them.
+  const double mileage = double(garage_car.racer_float());
+  uint32_t i = 0;
+  while (i < 8 && Lfs(G::price_constants_address() + 52 + 4 * i) < mileage) {
+    i++;
+  }
+  const double factor = Lfs(G::price_constants_address() + 84 + 4 * i);
+  double f0 = double(float(value * double(G::value_factor())));
+  f0 = double(float(f0 + f8));
+  f0 = double(float(f0 * factor));
+  Store(frame + 80, Fctiwz(f0));
+  const uint32_t price = Load(frame + 80);
+  return int32_t(price) < 50 ? 50 : price;
+}
+
+}  // namespace garage_screen

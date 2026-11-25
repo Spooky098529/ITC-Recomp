@@ -42,7 +42,7 @@ struct Strgtold12Result {
   uint32_t end;
   uint32_t flags;
 };
-bool Strgtold12(uint8_t* base, uint32_t string, uint32_t mult12, uint32_t scale, uint32_t decpt,
+bool Strgtold12(uint32_t string, uint32_t mult12, uint32_t scale, uint32_t decpt,
                 uint32_t implicit_e, Strgtold12Result* result);
 
 // _fltin2 (sub_825AFDC8): __strgtold12_l with no scaling, then _ld12tod:
@@ -53,14 +53,14 @@ struct FltinResult {
   uint32_t used;
   uint64_t bits;
 };
-bool Fltin2(uint8_t* base, uint32_t string, FltinResult* result);
+bool Fltin2(uint32_t string, FltinResult* result);
 
 // _atof_l (sub_825AB0C0, and atof sub_825AB1C0): spaces skipped by the
 // current locale's character type table (0x8266BC28), then _fltin2's
 // double. False, with nothing written, where the original goes through
 // _errno (a null string) or tests spaces for a multibyte locale
 // (sub_825AFD98, never seen in play).
-bool AtofL(uint8_t* base, uint32_t string, uint64_t* bits);
+bool AtofL(uint32_t string, uint64_t* bits);
 
 // $I10_OUTPUT (sub_825B8B48)'s FOS (+0 the decimal exponent, +2 the sign
 // character, +3 the digits' count, +4 the digits and a terminator; 26
@@ -79,7 +79,7 @@ struct FloatOut {
 // from guest memory) for the special values. False where the original
 // would read a byte it didn't write (no digits asked for) or strcpy_s
 // fails (never: the strings fit).
-bool I10Output(uint8_t* base, const LongDouble12& value, int32_t digits, uint32_t flags,
+bool I10Output(const LongDouble12& value, int32_t digits, uint32_t flags,
                FloatOut* out);
 
 }  // namespace c_runtime

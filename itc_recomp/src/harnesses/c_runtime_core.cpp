@@ -1,0 +1,4216 @@
+// The C runtime's core (src/c_runtime/core.cpp,
+// docs/functions/c-runtime-core.md) against the recompiled functions.
+//
+// These call kernel imports with side effects (TLS slots, critical
+// sections) and work on globals every thread shares, so each case gives both
+// sides the same fresh state and puts the game's back right after:
+//
+// - __crtTlsAlloc: a slot allocated, compared, then freed, so the other side
+//   gets the same index.
+// - __set_flsgetvalue and _getptd_noexit on the harness's thread (the main
+//   thread): its getter slot and data slot set per case (0, the game's, or
+//   a random word for the getter slot), the last error set to a random word;
+//   compared: r3, both slots and the last error after. A thread with no data
+//   (its data slot 0): each side's new block is compared by contents, then
+//   freed and the game's put back. The store failing: [0x82971164] pointed
+//   at the shared "returns 0" (sub_825C8388) for the case.
+// - _freefls and _mtdeletelocks: blocks from the C runtime's heap (with
+//   --native_heap and --native_c_runtime_heap) are compared by whether the
+//   layer still holds them after the call. _mtdeletelocks runs on the lock
+//   table with only the entries not made at boot (all 0 in play) given test
+//   blocks for the case, then put back.
+// - _mtterm: the two TLS indexes 0, -1 or fresh slots for the case (the
+//   game's put back right after); compared: both indexes after, whether each
+//   fresh slot was freed (allocated again with the same index), and the lock
+//   table's test entries as _mtdeletelocks'.
+//
+// Nothing here is a float: all exact.
+
+#include "harness.h"
+
+#include "base/log.h"
+#include "c_runtime/core.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime_core.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+
+#include <algorithm>
+#include <cctype>
+#include <climits>
+#include <cmath>
+#include <bit>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <vector>
+
+namespace harness {
+
+namespace {
+
+namespace cc = c_runtime::core;
+
+uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
+void Store(uint8_t* base, uint32_t address, uint32_t value) {
+  guest::StoreU32(base, address, value);
+}
+
+constexpr uint32_t kReturnsZero = 0x825C8388;
+
+uint32_t TlsGet(Context& h, uint32_t index) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = index;
+  __imp__KeTlsGetValue(t, h.base);
+  return t.r3.u32;
+}
+void TlsSet(Context& h, uint32_t index, uint32_t value) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = index;
+  t.r4.u64 = value;
+  __imp__KeTlsSetValue(t, h.base);
+}
+uint32_t TlsAlloc(Context& h) {
+  PPCContext t = CallContext(h);
+  __imp__KeTlsAlloc(t, h.base);
+  return t.r3.u32;
+}
+void TlsFree(Context& h, uint32_t index) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = index;
+  __imp__KeTlsFree(t, h.base);
+}
+uint32_t GuestLastError(Context& h) {
+  PPCContext t = CallContext(h);
+  __imp__sub_82295F18(t, h.base);
+  return t.r3.u32;
+}
+void SetLastError(Context& h, uint32_t error) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = error;
+  __imp__sub_82296FD0(t, h.base);
+}
+
+bool HeapOnLayer() { return hooks::NativeHeapActive(); }
+uint32_t Block(uint8_t* base, uint32_t bytes) {
+  return memory::crt::Malloc(base, bytes).value_or(0);
+}
+
+void TlsAllocCases(Context& h) {
+  Results results("__crtTlsAlloc (sub_825AA3F8)");
+  for (int c = 0; c < 8; c++) {
+    const uint32_t callback = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      t.r3.u64 = callback;
+      (v == 0 ? __imp__sub_825AA3F8 : ITC_CONTEXT_FN(hooks::CoreCrtTlsAlloc))(t, h.base);
+      out[v].Word(t.r3.u32);
+      // The new slot reads 0 on this thread.
+      out[v].Word(TlsGet(h, t.r3.u32));
+      if (t.r3.u32 != 0xFFFFFFFFu) {
+        TlsFree(h, t.r3.u32);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The getter slot's and data slot's values for a case, put back after.
+struct ThreadSlots {
+  Context& h;
+  uint32_t getter_index, data_index, getter, data, error;
+  explicit ThreadSlots(Context& h)
+      : h(h),
+        getter_index(Load(h.base, cc::kGetValueIndex)),
+        data_index(Load(h.base, cc::kFlsIndex)),
+        getter(TlsGet(h, getter_index)),
+        data(TlsGet(h, data_index)),
+        error(GuestLastError(h)) {}
+  ~ThreadSlots() {
+    TlsSet(h, getter_index, getter);
+    TlsSet(h, data_index, data);
+    SetLastError(h, error);
+  }
+};
+
+void SetFlsGetValueCases(Context& h) {
+  Results results("__set_flsgetvalue (sub_825AA400)");
+  ThreadSlots slots(h);
+  for (int c = 0; c < 24; c++) {
+    const uint32_t value = c % 3 == 0 ? 0 : c % 3 == 1 ? slots.getter : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      TlsSet(h, slots.getter_index, value);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AA400 : ITC_CONTEXT_FN(hooks::CoreSetFlsGetValue))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(TlsGet(h, slots.getter_index));
+    }
+    TlsSet(h, slots.getter_index, slots.getter);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void GetptdNoexitCases(Context& h) {
+  Results results("_getptd_noexit (sub_825AA4C0)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _getptd_noexit: no thread data");
+    return;
+  }
+  const uint32_t set_value = Load(h.base, cc::kFlsSetValue);
+  for (int c = 0; c < 40; c++) {
+    // 0: the data there; 1: none (made); 2: none, the store failing.
+    const int kind = c % 4 == 3 ? 2 : c % 4 == 2 ? 1 : 0;
+    if (kind != 0 && !HeapOnLayer()) {
+      continue;
+    }
+    const bool getter_empty = h.random.Below(2) != 0;
+    const uint32_t error = c % 5 == 0 ? 0 : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      TlsSet(h, slots.getter_index, getter_empty ? 0 : slots.getter);
+      TlsSet(h, slots.data_index, kind == 0 ? slots.data : 0);
+      SetLastError(h, error);
+      if (kind == 2) {
+        Store(h.base, cc::kFlsSetValue, kReturnsZero);
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AA4C0 : ITC_CONTEXT_FN(hooks::CoreGetptdNoexit))(t, h.base);
+      Store(h.base, cc::kFlsSetValue, set_value);
+      const uint32_t data = t.r3.u32;
+      const uint32_t slot = TlsGet(h, slots.data_index);
+      out[v].Word(GuestLastError(h));
+      out[v].Word(TlsGet(h, slots.getter_index));
+      if (kind == 0) {
+        out[v].Word(data == slots.data);
+        out[v].Word(slot == slots.data);
+      } else if (kind == 1) {
+        if (data == 0) {
+          ITC_LOG_ERROR("harness: c_runtime_core: _getptd_noexit: case {} made no data", c);
+        }
+        out[v].Word(data != 0 && data != slots.data);
+        out[v].Word(slot == data);
+        if (data != 0) {
+          out[v].Bytes(Read(h.base, data, cc::kThreadDataBytes));
+          memory::crt::Free(data);
+        }
+      } else {
+        out[v].Word(data);
+        out[v].Word(slot);
+      }
+      TlsSet(h, slots.data_index, slots.data);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void FreeFlsCases(Context& h) {
+  Results results("_freefls (sub_825AA5C0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _freefls: the heap isn't on the layer");
+    return;
+  }
+  for (int c = 0; c < 40; c++) {
+    const bool none = c == 0;
+    const uint32_t mask = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      uint32_t data = 0;
+      if (!none) {
+        data = Block(h.base, cc::kThreadDataBytes);
+        blocks.push_back(data);
+        for (uint32_t i = 0; i < cc::kThreadDataBytes; i += 4) {
+          Store(h.base, data + i, uint32_t(i * 0x01010101u));
+        }
+        int bit = 0;
+        for (uint32_t offset : {36u, 44u, 52u, 60u, 68u, 72u}) {
+          uint32_t buffer = 0;
+          if (mask >> bit++ & 1) {
+            buffer = Block(h.base, 16 + 16 * bit);
+            blocks.push_back(buffer);
+          }
+          Store(h.base, data + offset, buffer);
+        }
+        uint32_t table = 0x8266BE60;
+        if (mask >> bit & 1) {
+          table = Block(h.base, 120);
+          blocks.push_back(table);
+        }
+        Store(h.base, data + 92, table);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = data;
+      (v == 0 ? __imp__sub_825AA5C0 : ITC_CONTEXT_FN(hooks::CoreFreeFls))(t, h.base);
+      for (uint32_t block : blocks) {
+        const bool held = memory::IsHeapBlock(block);
+        out[v].Word(held);
+        if (held) {
+          memory::crt::Free(block);
+        }
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The lock table with the entries not made at boot given test blocks (or 0);
+// `blocks` gets them. Returns the table as it was.
+std::vector<uint8_t> TestLocks(Context& h, uint32_t mask, std::vector<uint32_t>& blocks) {
+  std::vector<uint8_t> saved = Read(h.base, cc::kLockTable, 8 * cc::kLockCount);
+  for (uint32_t i = 0; i < cc::kLockCount; i++) {
+    const uint32_t entry = cc::kLockTable + 8 * i;
+    if (Load(h.base, entry + 4) == 1) {
+      continue;
+    }
+    uint32_t section = 0;
+    if (mask >> (i % 32) & 1) {
+      section = Block(h.base, 28);
+      blocks.push_back(section);
+    }
+    Store(h.base, entry + 0, section);
+  }
+  return saved;
+}
+
+void MtDeleteLocksCases(Context& h) {
+  Results results("_mtdeletelocks (sub_825B3260)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _mtdeletelocks: the heap isn't on the layer");
+    return;
+  }
+  for (uint32_t i = 0; i < cc::kLockCount; i++) {
+    const uint32_t entry = cc::kLockTable + 8 * i;
+    if (Load(h.base, entry + 4) != 1 && Load(h.base, entry) != 0) {
+      ITC_LOG_ERROR("harness: c_runtime_core: lock {} made in play; cases skipped", i);
+      return;
+    }
+  }
+  for (int c = 0; c < 16; c++) {
+    const uint32_t mask = c == 0 ? 0 : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      const std::vector<uint8_t> saved = TestLocks(h, mask, blocks);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B3260 : ITC_CONTEXT_FN(hooks::CoreMtDeleteLocks))(t, h.base);
+      std::vector<uint8_t> after = Read(h.base, cc::kLockTable, 8 * cc::kLockCount);
+      Write(h.base, cc::kLockTable, saved.data(), uint32_t(saved.size()));
+      out[v].Bytes(after);
+      for (uint32_t block : blocks) {
+        const bool held = memory::IsHeapBlock(block);
+        out[v].Word(held);
+        if (held) {
+          memory::crt::Free(block);
+        }
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void MtTermCases(Context& h) {
+  Results results("_mtterm (sub_825AA448)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _mtterm: the heap isn't on the layer");
+    return;
+  }
+  for (uint32_t i = 0; i < cc::kLockCount; i++) {
+    const uint32_t entry = cc::kLockTable + 8 * i;
+    if (Load(h.base, entry + 4) != 1 && Load(h.base, entry) != 0) {
+      ITC_LOG_ERROR("harness: c_runtime_core: lock {} made in play; cases skipped", i);
+      return;
+    }
+  }
+  const uint32_t fls_index = Load(h.base, cc::kFlsIndex);
+  const uint32_t getter_index = Load(h.base, cc::kGetValueIndex);
+  for (int c = 0; c < 12; c++) {
+    // Each index: -1 (left alone) or a fresh slot.
+    const bool fresh_fls = c & 1, fresh_getter = c & 2;
+    const uint32_t mask = c < 4 ? 0 : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      const std::vector<uint8_t> saved = TestLocks(h, mask, blocks);
+      const uint32_t a = fresh_fls ? TlsAlloc(h) : 0xFFFFFFFFu;
+      const uint32_t b = fresh_getter ? TlsAlloc(h) : 0xFFFFFFFFu;
+      Store(h.base, cc::kFlsIndex, a);
+      Store(h.base, cc::kGetValueIndex, b);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AA448 : ITC_CONTEXT_FN(hooks::CoreMtTerm))(t, h.base);
+      const uint32_t fls_after = Load(h.base, cc::kFlsIndex);
+      const uint32_t getter_after = Load(h.base, cc::kGetValueIndex);
+      Store(h.base, cc::kFlsIndex, fls_index);
+      Store(h.base, cc::kGetValueIndex, getter_index);
+      std::vector<uint8_t> after = Read(h.base, cc::kLockTable, 8 * cc::kLockCount);
+      Write(h.base, cc::kLockTable, saved.data(), uint32_t(saved.size()));
+      out[v].Word(fls_after);
+      out[v].Word(getter_after);
+      out[v].Bytes(after);
+      for (uint32_t block : blocks) {
+        const bool held = memory::IsHeapBlock(block);
+        out[v].Word(held);
+        if (held) {
+          memory::crt::Free(block);
+        }
+      }
+      // Freed slots come back first (the kernel's lowest free index).
+      std::vector<uint32_t> again;
+      for (uint32_t slot : {a, b}) {
+        if (slot != 0xFFFFFFFFu) {
+          again.push_back(TlsAlloc(h));
+        }
+      }
+      size_t k = 0;
+      for (uint32_t slot : {a, b}) {
+        if (slot != 0xFFFFFFFFu) {
+          out[v].Word(again[k] == a || again[k] == b);
+          k++;
+        }
+      }
+      for (uint32_t slot : again) {
+        TlsFree(h, slot);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The thread data's cases' kinds: 0 the data there, 2 none with the store
+// failing (the fallback words).
+template <typename Body>
+void WithThreadData(Context& h, ThreadSlots& slots, int kind, Body body) {
+  const uint32_t set_value = Load(h.base, cc::kFlsSetValue);
+  TlsSet(h, slots.data_index, kind == 0 ? slots.data : 0);
+  if (kind == 2) {
+    Store(h.base, cc::kFlsSetValue, kReturnsZero);
+  }
+  body();
+  Store(h.base, cc::kFlsSetValue, set_value);
+  TlsSet(h, slots.data_index, slots.data);
+}
+
+void ErrnoCases(Context& h) {
+  ThreadSlots slots(h);
+  if (slots.data == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _errno: no thread data or heap");
+    return;
+  }
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  for (const Fn& fn : {Fn{"_errno (sub_825A81E0)", __imp__sub_825A81E0, ITC_CONTEXT_FN(hooks::CoreErrno)},
+                       Fn{"__doserrno (sub_825A8218)", __imp__sub_825A8218, ITC_CONTEXT_FN(hooks::CoreDosErrno)}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 16; c++) {
+      const int kind = c % 2 == 0 ? 0 : 2;
+      const uint32_t error = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        SetLastError(h, error);
+        WithThreadData(h, slots, kind, [&] {
+          PPCContext t = CallContext(h);
+          (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+          out[v].Word(kind == 0 ? t.r3.u32 - slots.data : t.r3.u32);
+          out[v].Word(GuestLastError(h));
+        });
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+// Windows errors: the table's, its ranges' edges and random words.
+std::vector<uint32_t> OsErrors(Context& h) {
+  std::vector<uint32_t> errors = {0, 1, 18, 19, 36, 37, 187, 188, 202, 203, 0xFFFFFFFFu};
+  for (uint32_t i = 0; i < 45; i++) {
+    errors.push_back(Load(h.base, cc::kOsErrorTable + 8 * i));
+  }
+  for (int i = 0; i < 60; i++) {
+    errors.push_back(h.random.Below(2) ? h.random.Below(260) : uint32_t(h.random.Next()));
+  }
+  return errors;
+}
+
+void OsErrCases(Context& h) {
+  Results results("_get_errno_from_oserr (sub_825A8178)");
+  for (uint32_t error : OsErrors(h)) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      t.r3.u64 = error;
+      (v == 0 ? __imp__sub_825A8178 : ITC_CONTEXT_FN(hooks::CoreGetErrnoFromOsErr))(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "error " + std::to_string(error));
+  }
+  results.Report();
+}
+
+void DosMapErrCases(Context& h) {
+  Results results("_dosmaperr (sub_825A8250)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _dosmaperr: no thread data");
+    return;
+  }
+  const uint32_t errno_word = Load(h.base, slots.data + 8);
+  const uint32_t doserrno_word = Load(h.base, slots.data + 12);
+  const uint32_t errno_fallback = Load(h.base, cc::kErrnoFallback);
+  const uint32_t doserrno_fallback = Load(h.base, cc::kDosErrnoFallback);
+  int c = 0;
+  for (uint32_t error : OsErrors(h)) {
+    const int kind = c % 3 == 2 ? 2 : 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t a : {slots.data + 8, slots.data + 12, cc::kErrnoFallback,
+                         cc::kDosErrnoFallback}) {
+        Store(h.base, a, 0xCDCDCDCDu);
+      }
+      WithThreadData(h, slots, kind, [&] {
+        PPCContext t = CallContext(h);
+        t.r3.u64 = error;
+        (v == 0 ? __imp__sub_825A8250 : ITC_CONTEXT_FN(hooks::CoreDosMapErr))(t, h.base);
+      });
+      for (uint32_t a : {slots.data + 8, slots.data + 12, cc::kErrnoFallback,
+                         cc::kDosErrnoFallback}) {
+        out[v].Word(Load(h.base, a));
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c++));
+  }
+  Store(h.base, slots.data + 8, errno_word);
+  Store(h.base, slots.data + 12, doserrno_word);
+  Store(h.base, cc::kErrnoFallback, errno_fallback);
+  Store(h.base, cc::kDosErrnoFallback, doserrno_fallback);
+  results.Report();
+}
+
+// A thread data block with some buffers from the layer; `blocks` gets them.
+uint32_t TestThreadData(Context& h, uint32_t mask, std::vector<uint32_t>& blocks) {
+  const uint32_t data = Block(h.base, cc::kThreadDataBytes);
+  blocks.push_back(data);
+  for (uint32_t i = 0; i < cc::kThreadDataBytes; i += 4) {
+    Store(h.base, data + i, 0);
+  }
+  int bit = 0;
+  for (uint32_t offset : {36u, 44u, 52u, 60u, 68u, 72u}) {
+    if (mask >> bit++ & 1) {
+      const uint32_t buffer = Block(h.base, 32);
+      blocks.push_back(buffer);
+      Store(h.base, data + offset, buffer);
+    }
+  }
+  Store(h.base, data + 92, cc::kXcptActTab);
+  return data;
+}
+
+void HeldOutputs(Outputs& out, const std::vector<uint32_t>& blocks) {
+  for (uint32_t block : blocks) {
+    const bool held = memory::IsHeapBlock(block);
+    out.Word(held);
+    if (held) {
+      memory::crt::Free(block);
+    }
+  }
+}
+
+void FreePtdCases(Context& h) {
+  Results results("_freeptd (sub_825AA670)");
+  ThreadSlots slots(h);
+  if (slots.data == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _freeptd: no thread data or heap");
+    return;
+  }
+  const uint32_t fls_index = Load(h.base, cc::kFlsIndex);
+  for (int c = 0; c < 32; c++) {
+    // 0: r3 the block; 1: r3 0, the block in the data slot; 2: as 1 with
+    // the getter slot empty; 3: r3 the block, __flsindex -1.
+    const int kind = c % 4;
+    const uint32_t mask = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      const uint32_t data = TestThreadData(h, mask, blocks);
+      TlsSet(h, slots.getter_index, kind == 2 ? 0 : slots.getter);
+      TlsSet(h, slots.data_index, kind == 1 || kind == 2 ? data : 0x1234);
+      if (kind == 3) {
+        Store(h.base, cc::kFlsIndex, 0xFFFFFFFFu);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = kind == 0 || kind == 3 ? data : 0;
+      (v == 0 ? __imp__sub_825AA670 : ITC_CONTEXT_FN(hooks::CoreFreePtd))(t, h.base);
+      Store(h.base, cc::kFlsIndex, fls_index);
+      const uint32_t data_slot = TlsGet(h, slots.data_index);
+      out[v].Word(data_slot == data ? 1 : data_slot == 0x1234 ? 2 : data_slot);
+      out[v].Word(TlsGet(h, slots.getter_index));
+      TlsSet(h, slots.getter_index, slots.getter);
+      TlsSet(h, slots.data_index, slots.data);
+      HeldOutputs(out[v], blocks);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void CritSecCases(Context& h) {
+  Results results("__crtInitCritSecAndSpinCount (sub_825B35A0)");
+  Results no_spin("__crtInitCritSecNoSpinCount (sub_825B3570)");
+  const uint32_t init = Load(h.base, cc::kCritSecInit);
+  const uint32_t section = h.data + 256;
+  for (int c = 0; c < 24; c++) {
+    const uint32_t spin = c % 3 == 0 ? 4000 : uint32_t(h.random.Next());
+    const bool empty = c % 2 == 1;
+    std::vector<uint8_t> fill(28);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Next());
+    }
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, section, fill.data(), 28);
+        Store(h.base, cc::kCritSecInit, empty ? 0 : cc::kCritSecNoSpinCount);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = section;
+        t.r4.u64 = spin;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825B35A0 : ITC_CONTEXT_FN(hooks::CoreInitCritSecAndSpinCount))(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825B3570 : ITC_CONTEXT_FN(hooks::CoreCritSecNoSpinCount))(t, h.base);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Bytes(Read(h.base, section, 28));
+        out[v].Word(Load(h.base, cc::kCritSecInit));
+      }
+      (which == 0 ? results : no_spin).Check(out[0], out[1], "case " + std::to_string(c));
+    }
+  }
+  Store(h.base, cc::kCritSecInit, init);
+  results.Report();
+  no_spin.Report();
+}
+
+void EnterNotifyLock(Context& h, bool enter) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = cc::kNotifyLock;
+  (enter ? __imp__RtlEnterCriticalSection : __imp__RtlLeaveCriticalSection)(t, h.base);
+}
+
+constexpr uint32_t kEmptyFunction = 0x82106540;
+constexpr uint32_t kFilterSetter = 0x82297870;  // SetUnhandledExceptionFilter
+constexpr uint32_t kFilter = 0x829714A0;
+
+void RegisterNotifyCases(Context& h) {
+  Results results("XRegisterThreadNotifyRoutine (sub_82297B98)");
+  const uint32_t block = h.data + 512;
+  EnterNotifyLock(h, true);
+  for (int c = 0; c < 8; c++) {
+    // Which side adds and which removes: bit 0 and bit 1.
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const GuestFunction add = (c & 1) ? ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine) : __imp__sub_82297B98;
+      const GuestFunction remove = (c & 2) ? ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine) : __imp__sub_82297B98;
+      const GuestFunction self =
+          v == 0 ? __imp__sub_82297B98 : ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine);
+      Store(h.base, block, uint32_t(h.random.Next()));
+      Store(h.base, block + 4, uint32_t(h.random.Next()));
+      Store(h.base, block + 8, kEmptyFunction);
+      const uint32_t last = Load(h.base, cc::kNotifyList + 4);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block;
+      t.r4.u64 = c < 4 ? 1 : uint32_t(h.random.Next()) | 1;
+      (c < 4 ? self : add)(t, h.base);
+      out[v].Bytes(Read(h.base, block, 8));
+      out[v].Word(Load(h.base, cc::kNotifyList + 4));
+      out[v].Word(Load(h.base, last));
+      PPCContext r = CallContext(h);
+      r.r3.u64 = block;
+      r.r4.u64 = 0;
+      (c < 4 ? self : remove)(r, h.base);
+      out[v].Bytes(Read(h.base, cc::kNotifyList, 8));
+      out[v].Word(Load(h.base, last));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  EnterNotifyLock(h, false);
+  results.Report();
+}
+
+void CallNotifyCases(Context& h) {
+  Results results("XapiCallThreadNotifyRoutines (sub_82297B38)");
+  const uint32_t blocks = h.data + 512;
+  EnterNotifyLock(h, true);
+  const std::vector<uint8_t> head = Read(h.base, cc::kNotifyList, 8);
+  const uint32_t filter = Load(h.base, kFilter);
+  for (int c = 0; c < 24; c++) {
+    const uint32_t count = h.random.Below(4);
+    const uint32_t routines = uint32_t(h.random.Next());
+    const uint32_t starting = c % 3 == 2 ? uint32_t(h.random.Next()) : c % 3;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      uint32_t previous = cc::kNotifyList;
+      for (uint32_t i = 0; i < count; i++) {
+        const uint32_t b = blocks + 12 * i;
+        Store(h.base, previous, b);
+        Store(h.base, b + 4, previous);
+        Store(h.base, b + 8, routines >> i & 1 ? kFilterSetter : kEmptyFunction);
+        previous = b;
+      }
+      Store(h.base, previous, cc::kNotifyList);
+      Store(h.base, cc::kNotifyList + 4, previous);
+      Store(h.base, kFilter, 0x5EB71E11);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = starting;
+      (v == 0 ? __imp__sub_82297B38 : ITC_CONTEXT_FN(hooks::CoreCallThreadNotifyRoutines))(t, h.base);
+      out[v].Word(Load(h.base, kFilter));
+      out[v].Bytes(Read(h.base, blocks, 36));
+    }
+    Write(h.base, cc::kNotifyList, head.data(), 8);
+    Store(h.base, kFilter, filter);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  EnterNotifyLock(h, false);
+  results.Report();
+}
+
+// The boot locks' count (lock table entries with +4 = 1).
+uint32_t BootLocks(Context& h) {
+  uint32_t n = 0;
+  for (uint32_t i = 0; i < cc::kLockCount; i++) {
+    n += Load(h.base, cc::kLockTable + 8 * i + 4) == 1;
+  }
+  return n;
+}
+
+// Guest ranges saved and put back.
+struct Saved {
+  Context& h;
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> ranges;
+  Saved(Context& h, std::initializer_list<std::pair<uint32_t, uint32_t>> list) : h(h) {
+    for (auto [address, bytes] : list) {
+      ranges.emplace_back(address, Read(h.base, address, bytes));
+    }
+  }
+  void Restore() {
+    for (auto& [address, bytes] : ranges) {
+      Write(h.base, address, bytes.data(), uint32_t(bytes.size()));
+    }
+  }
+};
+
+void MtInitLocksCases(Context& h) {
+  Results results("_mtinitlocks (sub_825B31D8)");
+  const uint32_t n = BootLocks(h);
+  for (int c = 0; c < 12; c++) {
+    // 0: the initializer set; 1: 0 (set by the first call); 2: one that fails.
+    const int kind = c % 3;
+    std::vector<uint8_t> fill(28 * n);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kLockTable, 8 * cc::kLockCount},
+                      {cc::kLockSections, 28 * n},
+                      {cc::kCritSecInit, 4}});
+      Write(h.base, cc::kLockSections, fill.data(), 28 * n);
+      Store(h.base, cc::kCritSecInit,
+            kind == 0 ? cc::kCritSecNoSpinCount : kind == 1 ? 0 : kReturnsZero);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B31D8 : ITC_CONTEXT_FN(hooks::CoreMtInitLocks))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, cc::kLockTable, 8 * cc::kLockCount));
+      out[v].Bytes(Read(h.base, cc::kLockSections, 28 * n));
+      out[v].Word(Load(h.base, cc::kCritSecInit));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The start and end hooks (0x820723A0, 0x820723A4) are read-only image
+// words (the empty function): only the data slot is set per case.
+void ThreadNotifyCases(Context& h) {
+  Results results("the C runtime's thread notify routine (sub_825B3650)");
+  ThreadSlots slots(h);
+  if (slots.data == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: thread notify: no thread data or heap");
+    return;
+  }
+  for (int c = 0; c < 24; c++) {
+    const uint32_t starting = c % 3 == 0 ? 1 : c % 3 == 1 ? 0 : uint32_t(h.random.Next()) | 2;
+    const bool getter_empty = c % 4 == 3;
+    const uint32_t mask = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      std::vector<uint32_t> blocks;
+      const uint32_t data = TestThreadData(h, mask, blocks);
+      TlsSet(h, slots.data_index, data);
+      TlsSet(h, slots.getter_index, getter_empty ? 0 : slots.getter);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = starting;
+      (v == 0 ? __imp__sub_825B3650 : ITC_CONTEXT_FN(hooks::CoreThreadNotify))(t, h.base);
+      const uint32_t data_slot = TlsGet(h, slots.data_index);
+      out[v].Word(data_slot == data ? 1 : data_slot);
+      out[v].Word(TlsGet(h, slots.getter_index));
+      TlsSet(h, slots.getter_index, slots.getter);
+      TlsSet(h, slots.data_index, slots.data);
+      HeldOutputs(out[v], blocks);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _mtinit on the game's globals, saved and put back around each side (the
+// harness holding the notify list's lock, so the C runtime's notify block,
+// linked again at the tail, is put back before any thread starts): its two
+// new TLS slots and the main thread's new data are compared, then freed.
+void MtInitCases(Context& h) {
+  Results results("_mtinit (sub_825AA708)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _mtinit: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t n = BootLocks(h);
+  EnterNotifyLock(h, true);
+  for (int c = 0; c < 6; c++) {
+    std::vector<uint8_t> fill(28 * n);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t last = Load(h.base, cc::kNotifyList + 4);
+      Saved saved(h, {{cc::kFlsAlloc, 16},
+                      {cc::kFlsIndex, 8},
+                      {0x82971170, 4},
+                      {0x82971178, 4},
+                      {0x82978320, 4},
+                      {0x82971328, 8},
+                      {0x8266B7B0, 4},
+                      {cc::kLockTable, 8 * cc::kLockCount},
+                      {cc::kLockSections, 28 * n},
+                      {cc::kCrtNotifyBlock, 12},
+                      {cc::kNotifyList, 8},
+                      {last, 4}});
+      Write(h.base, cc::kLockSections, fill.data(), 28 * n);
+      if (c % 2 == 1) {
+        Store(h.base, cc::kCritSecInit, uint32_t(h.random.Next()));
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AA708 : ITC_CONTEXT_FN(hooks::CoreMtInit))(t, h.base);
+      const uint32_t getter_index = Load(h.base, cc::kGetValueIndex);
+      const uint32_t fls_index = Load(h.base, cc::kFlsIndex);
+      const uint32_t data = TlsGet(h, fls_index);
+      out[v].Word(t.r3.u32);
+      out[v].Word(getter_index);
+      out[v].Word(fls_index);
+      out[v].Word(TlsGet(h, getter_index));
+      for (const auto& range : saved.ranges) {
+        if (range.first != cc::kFlsIndex) {
+          out[v].Bytes(Read(h.base, range.first, uint32_t(range.second.size())));
+        }
+      }
+      out[v].Bytes(Read(h.base, data, cc::kThreadDataBytes));
+      saved.Restore();
+      memory::crt::Free(data);
+      TlsFree(h, fls_index);
+      TlsFree(h, getter_index);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  EnterNotifyLock(h, false);
+  results.Report();
+}
+
+std::string RandomText(Context& h, uint32_t length, const char* alphabet) {
+  std::string text;
+  const size_t n = std::strlen(alphabet);
+  for (uint32_t i = 0; i < length; i++) {
+    text.push_back(alphabet[h.random.Below(uint32_t(n))]);
+  }
+  return text;
+}
+
+void WriteText(Context& h, uint32_t address, const std::string& text) {
+  Write(h.base, address, text.data(), uint32_t(text.size()));
+  guest::StoreU8(h.base, address + uint32_t(text.size()), 0);
+}
+
+void StrtolCases(Context& h) {
+  Results results("strtol (sub_825A85C0) and atol (sub_825AAF08)");
+  ThreadSlots slots(h);  // errno paths write the main thread's errno
+  const uint32_t errno_word = slots.data != 0 ? Load(h.base, slots.data + 8) : 0;
+  const uint32_t text = h.data + 128, end_out = h.data + 64;
+  static const char* kPrefixes[] = {"", " ", "  \t", "-", "+", "0x", "-0x", "0X", "0", " -0"};
+  for (int c = 0; c < 600; c++) {
+    std::string s = kPrefixes[h.random.Below(10)];
+    s += RandomText(h, h.random.Below(c % 50 == 0 ? 30 : 12),
+                    c % 3 == 0 ? "0123456789" : "0123456789abcdefxyzABCZ -+");
+    const bool atol = c % 4 == 0;
+    // Bases out of range go to _invalid_parameter's trap: left out.
+    static const int32_t kRadixes[] = {0, 2, 8, 10, 16, 36};
+    const int32_t radix =
+        c % 7 == 0 ? int32_t(2 + h.random.Below(35)) : kRadixes[h.random.Below(6)];
+    const bool want_end = h.random.Below(2) != 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      WriteText(h, text, s);
+      Store(h.base, end_out, 0xCDCDCDCDu);
+      if (slots.data != 0) {
+        Store(h.base, slots.data + 8, 0);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = text;
+      t.r4.u64 = want_end ? end_out : 0;
+      t.r5.u64 = uint64_t(int64_t(radix));
+      if (atol) {
+        (v == 0 ? __imp__sub_825AAF08 : ITC_CONTEXT_FN(hooks::CoreAtol))(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_825A85C0 : ITC_CONTEXT_FN(hooks::CoreStrtol))(t, h.base);
+      }
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, end_out));
+      out[v].Word(slots.data != 0 ? Load(h.base, slots.data + 8) : 0);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + s + "\"");
+  }
+  if (slots.data != 0) {
+    Store(h.base, slots.data + 8, errno_word);
+  }
+  results.Report();
+}
+
+void StrrchrCases(Context& h) {
+  Results results("strrchr (sub_825A8630)");
+  const uint32_t text = h.data + 128;
+  for (int c = 0; c < 400; c++) {
+    const std::string s = RandomText(h, h.random.Below(40), "aab.c.\xff\x80x");
+    uint32_t ch;
+    switch (c % 5) {
+      case 0: ch = 0; break;
+      case 1: ch = uint8_t(".ax\xff\x80"[h.random.Below(5)]); break;
+      case 2: ch = uint32_t(int32_t(int8_t("\xff\x80"[h.random.Below(2)]))); break;
+      case 3: ch = 0x100 | uint8_t('a'); break;
+      default: ch = uint32_t(h.random.Next()); break;
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      WriteText(h, text, s);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = text;
+      t.r4.u64 = ch;
+      (v == 0 ? __imp__sub_825A8630 : ITC_CONTEXT_FN(hooks::CoreStrrchr))(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void InittermCases(Context& h) {
+  Results results("_initterm (sub_825AA1B8)");
+  const uint32_t table = h.data + 128;
+  const uint32_t filter = Load(h.base, kFilter);
+  for (int c = 0; c < 40; c++) {
+    const uint32_t count = h.random.Below(8);
+    std::vector<uint32_t> entries;
+    for (uint32_t i = 0; i < count; i++) {
+      const uint32_t k = h.random.Below(3);
+      entries.push_back(k == 0 ? 0 : k == 1 ? kEmptyFunction : kFilterSetter);
+    }
+    const uint32_t end = c % 9 == 8 ? table - 4 : table + 4 * count;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < count; i++) {
+        Store(h.base, table + 4 * i, entries[i]);
+      }
+      Store(h.base, kFilter, 0x5EB71E11);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = table;
+      t.r4.u64 = end;
+      (v == 0 ? __imp__sub_825AA1B8 : ITC_CONTEXT_FN(hooks::CoreInitterm))(t, h.base);
+      out[v].Word(Load(h.base, kFilter));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, kFilter, filter);
+  results.Report();
+}
+
+// A function over one global word: the word set to `before`, r3 and r4 set,
+// both versions run; r3 and the word compared, the word put back.
+void GlobalCases(Context& h, const char* name, uint32_t global, GuestFunction recompiled,
+                 GuestFunction native, bool writable = true) {
+  Results results(name);
+  const uint32_t saved = Load(h.base, global);
+  for (int c = 0; c < 40; c++) {
+    const uint32_t before = c == 0 ? saved : uint32_t(h.random.Next());
+    const uint32_t r3 = c % 5 == 0 ? 0 : uint32_t(h.random.Next());
+    const uint32_t r4 = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      if (writable) {
+        Store(h.base, global, before);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      (v == 0 ? recompiled : native)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, global));
+    }
+    if (writable) {
+      Store(h.base, global, saved);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void PositiveCases(Context& h) {
+  Results results("_positive (sub_825ADE90)");
+  const uint32_t number = h.data + 128;
+  static const uint64_t kEdges[] = {0, 0x8000000000000000ull, 1, 0x8000000000000001ull,
+                                    0x7FF0000000000000ull, 0xFFF0000000000000ull,
+                                    0x7FF8000000000000ull, 0xFFF8000000000001ull,
+                                    0x3FF0000000000000ull, 0xBFF0000000000000ull};
+  for (int c = 0; c < 200; c++) {
+    const uint64_t bits = c < 10 ? kEdges[c] : h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      StoreU64(h.base, number, bits);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825ADE90 : ITC_CONTEXT_FN(hooks::CorePositive))(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void NmsgWriteCases(Context& h) {
+  Results results("_NMSG_WRITE (sub_825AEDA0)");
+  // Its message goes to OutputDebugStringA, which drops it: compared, the
+  // scratch area after (nothing written) for numbers in and out of the table.
+  for (int c = 0; c < 46; c++) {
+    const uint32_t number =
+        c < 23 ? Load(h.base, 0x8266BA88 + 8 * c) : uint32_t(h.random.Below(300));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 256);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825AEDA0 : ITC_CONTEXT_FN(hooks::CoreNmsgWrite))(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, 256));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void BufferCases(Context& h) {
+  Results getbuf("_getbuf (sub_825B4790)");
+  Results freebuf("_freebuf (sub_825B0EE0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _getbuf: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t stream = h.data + 128;
+  const uint32_t cflush = Load(h.base, 0x82971174);
+  for (int c = 0; c < 40; c++) {
+    std::vector<uint32_t> words(8);
+    for (auto& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 8; i++) {
+        Store(h.base, stream + 4 * i, words[i]);
+      }
+      Store(h.base, 0x82971174, 7);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825B4790 : ITC_CONTEXT_FN(hooks::CoreGetbuf))(t, h.base);
+      const uint32_t buffer = Load(h.base, stream + 8);
+      const bool held = buffer != 0 && memory::IsHeapBlock(buffer);
+      out[v].Word(held ? 1 : buffer == stream + 20 ? 2 : buffer);
+      out[v].Word(Load(h.base, stream + 0) == buffer);
+      for (uint32_t offset : {4u, 12u, 16u, 20u, 24u, 28u}) {
+        out[v].Word(Load(h.base, stream + offset));
+      }
+      out[v].Word(Load(h.base, 0x82971174));
+      if (held) {
+        out[v].Word(memory::Size(buffer));
+        memory::crt::Free(buffer);
+      }
+    }
+    getbuf.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, 0x82971174, cflush);
+  for (int c = 0; c < 60; c++) {
+    std::vector<uint32_t> words(8);
+    for (auto& w : words) {
+      w = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 8; i++) {
+        Store(h.base, stream + 4 * i, words[i]);
+      }
+      uint32_t block = 0;
+      const uint32_t flags = words[3];
+      if ((flags & 0x83) != 0 && (flags & 8) != 0) {
+        block = Block(h.base, 64);
+        Store(h.base, stream + 8, block);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825B0EE0 : ITC_CONTEXT_FN(hooks::CoreFreebuf))(t, h.base);
+      std::vector<uint8_t> after = Read(h.base, stream, 32);
+      if (block != 0 && Load(h.base, stream + 8) == block) {
+        Store(h.base, stream + 8, 1);  // kept: the same on both sides
+      }
+      out[v].Bytes(Read(h.base, stream, 32));
+      if (block != 0) {
+        HeldOutputs(out[v], {block});
+      }
+    }
+    freebuf.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  getbuf.Report();
+  freebuf.Report();
+}
+
+uint32_t MakeEvent(Context& h, uint32_t type, uint32_t state) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = h.data + 32;
+  t.r4.u64 = 0;
+  t.r5.u64 = type;
+  t.r6.u64 = state;
+  __imp__NtCreateEvent(t, h.base);
+  return int32_t(t.r3.u32) < 0 ? 0 : Load(h.base, h.data + 32);
+}
+
+void HandleCases(Context& h) {
+  Results close("CloseHandle (sub_82294E20)");
+  Results reset("ResetEvent (sub_825BA168)");
+  const uint32_t error = GuestLastError(h);
+  for (int c = 0; c < 30; c++) {
+    // 0: an event of its own; 1: 0; 2: a word that's no handle.
+    const int kind = c % 3;
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t type = h.random.Below(2), state = h.random.Below(2);
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        SetLastError(h, 0xABCD);
+        const uint32_t event = kind == 0 ? MakeEvent(h, type, state) : kind == 1 ? 0 : junk;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_82294E20 : ITC_CONTEXT_FN(hooks::CoreCloseHandle))(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825BA168 : ITC_CONTEXT_FN(hooks::CoreResetEvent))(t, h.base);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(GuestLastError(h));
+        if (kind == 0 && event != 0) {
+          // Signaled after? (a wait with a 0 timeout)
+          StoreU64(h.base, h.data + 40, 0);
+          PPCContext w = CallContext(h);
+          w.r3.u64 = event;
+          w.r4.u64 = 1;
+          w.r5.u64 = 0;
+          w.r6.u64 = h.data + 40;
+          __imp__NtWaitForSingleObjectEx(w, h.base);
+          out[v].Word(which == 1 ? w.r3.u32 : int32_t(w.r3.u32) < 0);
+          if (which == 1) {
+            PPCContext k = CallContext(h);
+            k.r3.u64 = event;
+            __imp__NtClose(k, h.base);
+          }
+        }
+      }
+      (which == 0 ? close : reset).Check(out[0], out[1], "case " + std::to_string(c));
+    }
+  }
+  SetLastError(h, error);
+  close.Report();
+  reset.Report();
+}
+
+// _ioinit on the game's globals, saved and put back: each side's new block
+// compared by contents, then freed.
+void IoInitCases(Context& h) {
+  Results results("_ioinit (sub_825B4668)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _ioinit: the heap isn't on the layer");
+    return;
+  }
+  for (int c = 0; c < 6; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNhandle, 4}, {cc::kPioinfo, 4}});
+      Store(h.base, cc::kNhandle, uint32_t(h.random.Next()));
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4668 : ITC_CONTEXT_FN(hooks::CoreIoInit))(t, h.base);
+      const uint32_t block = Load(h.base, cc::kPioinfo);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kNhandle));
+      out[v].Bytes(Read(h.base, block, 32 * 44));
+      saved.Restore();
+      memory::crt::Free(block);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _initterm_e over the game's table (__onexitinit, _ioinit) on saved
+// globals, the exit lock held: each side's new exit table and handle block
+// compared, then freed, the game's put back.
+void InittermECases(Context& h) {
+  Results results("_initterm_e (sub_82297AC0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initterm_e: the heap isn't on the layer");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> exit_lock(c_runtime::ExitMutex());
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNhandle, 4},
+                      {cc::kPioinfo, 4},
+                      {c_runtime::kExitTableEnd, 4},
+                      {c_runtime::kExitTableBegin, 4}});
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_82297AC0 : ITC_CONTEXT_FN(hooks::CoreInittermE))(t, h.base);
+      const uint32_t block = Load(h.base, cc::kPioinfo);
+      const uint32_t table = Load(h.base, c_runtime::kExitTableBegin);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kNhandle));
+      out[v].Bytes(Read(h.base, block, 32 * 44));
+      out[v].Word(Load(h.base, c_runtime::kExitTableEnd) - table);
+      out[v].Bytes(Read(h.base, table, 128));
+      out[v].Word(memory::Size(table));
+      saved.Restore();
+      memory::crt::Free(block);
+      memory::crt::Free(table);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _initstdio on saved globals (_nstream, __piob, _iob, the first handle
+// block's first three entries' OS handles set per case): each side's new
+// __piob compared by contents, then freed.
+void InitStdioCases(Context& h) {
+  Results results("_initstdio (sub_825AD4D0)");
+  if (!HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initstdio: the heap isn't on the layer");
+    return;
+  }
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  if (handles == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _initstdio: no handle block");
+    return;
+  }
+  static const uint32_t kHandles[] = {0xFFFFFFFFu, 0xFFFFFFFEu, 0, 5, 0xF8000010u};
+  for (int c = 0; c < 30; c++) {
+    const uint32_t k = h.random.Below(4);
+    const uint32_t count = k == 0 ? 0 : k == 1 ? h.random.Below(20) : k == 2 ? 20 + h.random.Below(600) : 512;
+    uint32_t os[3];
+    for (auto& o : os) {
+      o = kHandles[h.random.Below(5)];
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kNstream, 4}, {cc::kPiob, 4}, {cc::kIob, 640}, {handles, 132}});
+      Store(h.base, cc::kNstream, count);
+      for (uint32_t i = 0; i < 3; i++) {
+        Store(h.base, handles + 44 * i, os[i]);
+      }
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AD4D0 : ITC_CONTEXT_FN(hooks::CoreInitStdio))(t, h.base);
+      const uint32_t n = Load(h.base, cc::kNstream);
+      const uint32_t piob = Load(h.base, cc::kPiob);
+      out[v].Word(t.r3.u32);
+      out[v].Word(n);
+      out[v].Bytes(Read(h.base, piob, 4 * n));
+      out[v].Word(memory::Size(piob));
+      out[v].Bytes(Read(h.base, cc::kIob, 640));
+      saved.Restore();
+      memory::crt::Free(piob);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+void FfMsgBannerCases(Context& h) {
+  Results results("_FF_MSGBANNER (sub_825AEDE8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 256);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825AEDE8 : ITC_CONTEXT_FN(hooks::CoreFfMsgBanner))(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, 256));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// A critical section's words: the type and lock count, recursion count and
+// owner (compared exactly; the same thread on both sides).
+std::vector<uint8_t> Section(Context& h, uint32_t section) { return Read(h.base, section, 28); }
+
+void InitSection(Context& h, uint32_t section) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = section;
+  __imp__RtlInitializeCriticalSection(t, h.base);
+}
+
+// The stream locks: each case takes a lock and gives it back, both through
+// one side: a stream outside _iob (its own critical section at +32, in the
+// scratch area), or one of _iob's whose lock is made at boot (the lock
+// table's 16 + index with +4 = 1; others would be made here for good).
+void LockFileCases(Context& h) {
+  Results one("_lock_file and _unlock_file (sub_825AD638, sub_825AD688)");
+  Results two("_lock_file2 and _unlock_file2 (sub_825AD670, sub_825AD6C0)");
+  std::vector<uint32_t> boot_streams;
+  for (uint32_t i = 0; i < 20; i++) {
+    if (Load(h.base, cc::kLockTable + 8 * (16 + i) + 4) == 1 &&
+        Load(h.base, cc::kLockTable + 8 * (16 + i)) != 0) {
+      boot_streams.push_back(i);
+    }
+  }
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 24; c++) {
+    const bool in_iob = !boot_streams.empty() && c % 2 == 1;
+    const uint32_t index = in_iob ? boot_streams[h.random.Below(uint32_t(boot_streams.size()))]
+                                  : 20 + h.random.Below(500);
+    const uint32_t target = in_iob ? cc::kIob + 32 * index : stream;
+    const uint32_t section =
+        in_iob ? Load(h.base, cc::kLockTable + 8 * (16 + index)) : stream + 32;
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (!in_iob) {
+          InitSection(h, section);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = which == 0 ? target : index;
+        t.r4.u64 = target;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825AD638 : ITC_CONTEXT_FN(hooks::CoreLockFile))(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AD670 : ITC_CONTEXT_FN(hooks::CoreLockFile2))(t, h.base);
+        }
+        out[v].Bytes(Section(h, section));
+        PPCContext u = CallContext(h);
+        u.r3.u64 = which == 0 ? target : index;
+        u.r4.u64 = target;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825AD688 : ITC_CONTEXT_FN(hooks::CoreUnlockFile))(u, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AD6C0 : ITC_CONTEXT_FN(hooks::CoreUnlockFile2))(u, h.base);
+        }
+        out[v].Bytes(Section(h, section));
+      }
+      (which == 0 ? one : two).Check(out[0], out[1], "case " + std::to_string(c));
+    }
+  }
+  one.Report();
+  two.Report();
+}
+
+// _unlock_fhandle: a handle's entry in the first block, its critical
+// section (+12) made and entered for the case, the entry put back after.
+void UnlockFhandleCases(Context& h) {
+  Results results("_unlock_fhandle (sub_825B7A58)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  if (handles == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _unlock_fhandle: no handle block");
+    return;
+  }
+  for (int c = 0; c < 32; c++) {
+    const uint32_t handle = h.random.Below(32);
+    const uint32_t entry = handles + 44 * handle;
+    const int depth = 1 + int(h.random.Below(3));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{entry, 44}});
+      InitSection(h, entry + 12);
+      for (int d = 0; d < depth; d++) {
+        PPCContext e = CallContext(h);
+        e.r3.u64 = entry + 12;
+        __imp__RtlEnterCriticalSection(e, h.base);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      (v == 0 ? __imp__sub_825B7A58 : ITC_CONTEXT_FN(hooks::CoreUnlockFhandle))(t, h.base);
+      out[v].Bytes(Read(h.base, entry, 44));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The exit routine _amsg_exit calls ([0x8266B7B0], _exit in play) pointed
+// at a guest function that returns for the case: the shared "returns 0" or
+// _ValidateExecute (r3 != 0, so 1 for its 255), put back after.
+constexpr uint32_t kValidateExecute = 0x825B8910;
+
+struct ExitStub {
+  Context& h;
+  uint32_t saved;
+  ExitStub(Context& h, uint32_t stub) : h(h), saved(Load(h.base, cc::kExitRoutine)) {
+    Store(h.base, cc::kExitRoutine, stub);
+  }
+  ~ExitStub() { Store(h.base, cc::kExitRoutine, saved); }
+};
+
+// _amsg_exit and _fptrap: run-time error numbers in and out of the message
+// table, the exit routine stubbed; r3 compared.
+void AmsgExitCases(Context& h) {
+  Results results("_amsg_exit (sub_825AA158)");
+  for (int c = 0; c < 40; c++) {
+    const uint32_t number =
+        c < 23 ? Load(h.base, 0x8266BA88 + 8 * c) : uint32_t(h.random.Below(300));
+    const uint32_t stub = c % 2 == 0 ? kReturnsZero : kValidateExecute;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      ExitStub exit(h, stub);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = number;
+      (v == 0 ? __imp__sub_825AA158 : ITC_CONTEXT_FN(hooks::CoreAmsgExit))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kExitRoutine));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+  Results fptrap("_fptrap (sub_825B64F8)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      ExitStub exit(h, c % 2 == 0 ? kReturnsZero : kValidateExecute);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = uint32_t(h.random.Next());
+      (v == 0 ? __imp__sub_825B64F8 : ITC_CONTEXT_FN(hooks::CoreFptrap))(t, h.base);
+      out[v].Word(t.r3.u32);
+    }
+    fptrap.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  fptrap.Report();
+}
+
+// _getptd on the harness's thread: its data there (returned), or none with
+// the store failing (_getptd_noexit's 0, then _amsg_exit(16) with the exit
+// routine stubbed); r3 and the last error compared.
+void GetptdCases(Context& h) {
+  Results results("_getptd (sub_825AA580)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _getptd: no thread data");
+    return;
+  }
+  for (int c = 0; c < 16; c++) {
+    const int kind = c % 2 == 0 ? 0 : 2;
+    const uint32_t error = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      SetLastError(h, error);
+      ExitStub exit(h, c % 4 < 2 ? kReturnsZero : kValidateExecute);
+      WithThreadData(h, slots, kind, [&] {
+        PPCContext t = CallContext(h);
+        (v == 0 ? __imp__sub_825AA580 : ITC_CONTEXT_FN(hooks::CoreGetptd))(t, h.base);
+        out[v].Word(kind == 0 ? uint32_t(t.r3.u32 == slots.data) : t.r3.u32);
+        out[v].Word(GuestLastError(h));
+      });
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _invalid_parameter's path with a handler set (its trap path, with none,
+// is checked by reading: the user's call, 2026-11-14): the handler the
+// shared "returns 0", strrchr (r3 a string in the scratch area, r4 a
+// character) or the second memcpy (r3, r4, r5: a copy inside the scratch
+// area), so r3 to r5 reach it as given; r3 and the scratch area compared.
+void InvalidParameterCases(Context& h) {
+  Results results("_invalid_parameter (sub_825AFCC8)");
+  const uint32_t saved = Load(h.base, cc::kInvalidParameterHandler);
+  for (int c = 0; c < 48; c++) {
+    const int kind = c % 3;
+    const uint32_t handler = kind == 0 ? kReturnsZero : kind == 1 ? 0x825A8630 : 0x825A7830;
+    const uint32_t r3 = h.data + h.random.Below(64);
+    const uint32_t r4 = kind == 1 ? h.random.Below(256) : h.data + 128 + h.random.Below(64);
+    const uint32_t r5 = h.random.Below(48);
+    const uint32_t r6 = uint32_t(h.random.Next()), r7 = uint32_t(h.random.Next());
+    std::vector<uint8_t> fill(256);
+    for (auto& b : fill) {
+      b = uint8_t(h.random.Below(8) == 0 ? 0 : 1 + h.random.Below(255));
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, h.data, fill.data(), 256);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      t.r5.u64 = r5;
+      t.r6.u64 = r6;
+      t.r7.u64 = r7;
+      (v == 0 ? __imp__sub_825AFCC8 : ITC_CONTEXT_FN(hooks::CoreInvalidParameter))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, h.data, 256));
+      Store(h.base, cc::kInvalidParameterHandler, saved);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The debug monitor (KeDebugMonitorData's word, at [0x820007F0]: the SDK's
+// system heap, 0 in play) attached for a case: a block in the scratch area
+// whose +24 is `routine`; put back after. _set_abort_behavior (sub_825AD120)
+// as a routine or filter leaves a trace of its r3 and r4 in its global
+// ([0x8266B7C4]), and returns its old value.
+constexpr uint32_t kAbortBehavior = 0x8266B7C4;
+constexpr uint32_t kSetAbortBehavior = 0x825AD120;
+
+struct Monitor {
+  Context& h;
+  uint32_t word, saved;
+  Monitor(Context& h, uint32_t routine)
+      : h(h), word(Load(h.base, cc::kDebugMonitorData)), saved(Load(h.base, word)) {
+    if (routine != 0) {
+      Store(h.base, h.data + 1024 + 24, routine);
+      Store(h.base, word, h.data + 1024);
+    } else {
+      Store(h.base, word, 0);
+    }
+  }
+  ~Monitor() { Store(h.base, word, saved); }
+};
+
+uint32_t PickRoutine(Context& h) {
+  const uint32_t pick = h.random.Below(3);
+  return pick == 0 ? 0 : pick == 1 ? kReturnsZero : kSetAbortBehavior;
+}
+
+// UnhandledExceptionFilter: no monitor or one returning 0 or the abort
+// word's old value; the filter none, the shared "returns 0" or
+// _set_abort_behavior (the abort word -1 now and then, so it returns -1);
+// compared: r3, the abort word and the filter word.
+void UnhandledFilterCases(Context& h) {
+  Results results("UnhandledExceptionFilter (sub_82297940)");
+  const uint32_t filter_saved = Load(h.base, cc::kUnhandledFilter);
+  const uint32_t abort_saved = Load(h.base, kAbortBehavior);
+  for (int c = 0; c < 60; c++) {
+    const uint32_t routine = PickRoutine(h);
+    const uint32_t filter = PickRoutine(h);
+    const uint32_t abort = c % 3 == 0 ? 0xFFFFFFFFu : c % 3 == 1 ? 0 : uint32_t(h.random.Next());
+    const uint32_t pointers = uint32_t(h.random.Next());
+    const uint32_t r4 = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Monitor monitor(h, routine);
+      Store(h.base, cc::kUnhandledFilter, filter);
+      Store(h.base, kAbortBehavior, abort);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pointers;
+      t.r4.u64 = r4;
+      (v == 0 ? __imp__sub_82297940 : ITC_CONTEXT_FN(hooks::CoreUnhandledExceptionFilter))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, kAbortBehavior));
+      out[v].Word(Load(h.base, cc::kUnhandledFilter));
+    }
+    Store(h.base, cc::kUnhandledFilter, filter_saved);
+    Store(h.base, kAbortBehavior, abort_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The debug monitor notification: no monitor, or one that's the shared
+// "returns 0" or _set_abort_behavior (its global then a trace of both
+// calls' r4: the code with 0x02200000, the float's bits); f1 edges and
+// random doubles (a float, so its rounding is compared through the word
+// stored in the caller's frame, exactly: it's a store, not a float the
+// function computes with); compared: that word, the abort word.
+void DebugMonitorCases(Context& h) {
+  Results results("the debug monitor notification (sub_825B9BA8)");
+  const uint32_t abort_saved = Load(h.base, kAbortBehavior);
+  static const uint64_t kEdges[] = {0, 0x8000000000000000ull, 0x3FF0000000000000ull,
+                                    0x7FF0000000000000ull, 0x7FF8000000000000ull,
+                                    0x47EFFFFFF0000000ull, 0x36A0000000000000ull,
+                                    0x3FF0000010000000ull};
+  for (int c = 0; c < 60; c++) {
+    const uint32_t routine = PickRoutine(h);
+    const uint32_t code = uint32_t(h.random.Next());
+    const uint64_t value = c < 8 ? kEdges[c] : h.random.Next();
+    const uint32_t abort = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Monitor monitor(h, routine);
+      Store(h.base, kAbortBehavior, abort);
+      PPCContext t = CallContext(h);
+      Store(h.base, t.r1.u32 + 28, 0xCDCDCDCDu);
+      t.r3.u64 = code;
+      t.f1.u64 = value;
+      (v == 0 ? __imp__sub_825B9BA8 : ITC_CONTEXT_FN(hooks::CoreDebugMonitorNotify))(t, h.base);
+      out[v].Word(Load(h.base, t.r1.u32 + 28));
+      out[v].Word(Load(h.base, kAbortBehavior));
+    }
+    Store(h.base, kAbortBehavior, abort_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// __CxxRestoreUnhandledExceptionFilter: the previous and current filter
+// words random; r3 and both compared, put back after.
+void CxxRestoreFilterCases(Context& h) {
+  Results results("__CxxRestoreUnhandledExceptionFilter (sub_825B4D90)");
+  const uint32_t filter_saved = Load(h.base, cc::kUnhandledFilter);
+  const uint32_t previous_saved = Load(h.base, cc::kCxxPreviousFilter);
+  for (int c = 0; c < 20; c++) {
+    const uint32_t filter = uint32_t(h.random.Next());
+    const uint32_t previous = c % 4 == 0 ? 0 : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, cc::kUnhandledFilter, filter);
+      Store(h.base, cc::kCxxPreviousFilter, previous);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4D90 : ITC_CONTEXT_FN(hooks::CoreCxxRestoreUnhandledExceptionFilter))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(Load(h.base, cc::kUnhandledFilter));
+      out[v].Word(Load(h.base, cc::kCxxPreviousFilter));
+    }
+    Store(h.base, cc::kUnhandledFilter, filter_saved);
+    Store(h.base, cc::kCxxPreviousFilter, previous_saved);
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// Whether the C runtime's lock `n` was made at boot (its table entry's +4 is
+// 1 and its section set): only those are taken here (_lock would make the
+// others for good).
+bool BootLock(Context& h, uint32_t n) {
+  return Load(h.base, cc::kLockTable + 8 * n + 4) == 1 && Load(h.base, cc::kLockTable + 8 * n) != 0;
+}
+void GuestLock(Context& h, uint32_t n, bool lock) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = n;
+  (lock ? harness::Ours<0x825B3430> : harness::Ours<0x825B32D0>)(t, h.base);
+}
+
+// __lock_fhandle: a handle in the first block, its entry's +8 0 (the section
+// made here) or 1 (made for the case), lock 10 taken around a make; compared:
+// r3, the entry (the section entered) and the handle's word in the caller's
+// frame (+20); the section left and the entry put back after.
+void LockFhandleCases(Context& h) {
+  Results results("__lock_fhandle (sub_825B7958)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  if (handles == 0 || !BootLock(h, 10)) {
+    ITC_LOG_ERROR("harness: c_runtime_core: __lock_fhandle: no handle block or lock 10");
+    return;
+  }
+  for (int c = 0; c < 32; c++) {
+    const uint32_t handle = h.random.Below(32);
+    const uint32_t entry = handles + 44 * handle;
+    const bool made = c % 2 == 1;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{entry, 44}});
+      Store(h.base, entry + 8, made ? 1 : 0);
+      if (made) {
+        InitSection(h, entry + 12);
+      }
+      PPCContext t = CallContext(h);
+      Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+      t.r3.u64 = handle;
+      (v == 0 ? __imp__sub_825B7958 : ITC_CONTEXT_FN(hooks::CoreLockFhandle))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, entry, 44));
+      out[v].Word(Load(h.base, t.r1.u32 + 20));
+      if (t.r3.u32 != 0) {
+        PPCContext u = CallContext(h);
+        u.r3.u64 = entry + 12;
+        __imp__RtlLeaveCriticalSection(u, h.base);
+      }
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The __finally funclets, each after the lock it gives back was taken (only
+// locks made at boot); r31 or r12 at a frame in the scratch area of random
+// words; compared: the registers each sets.
+void FinallyCases(Context& h) {
+  {
+    Results results("__lock_fhandle's __finally (sub_825B7A20)");
+    for (int c = 0; c < 16 && BootLock(h, 10); c++) {
+      for (uint32_t i = 0; i < 256; i += 4) {
+        Store(h.base, h.data + 512 + i, uint32_t(h.random.Next()));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        GuestLock(h, 10, true);
+        PPCContext t = CallContext(h);
+        t.r31.u64 = h.data + 512;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825B7A20 : ITC_CONTEXT_FN(hooks::CoreLockFhandleFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r29.u32);
+        out[v].Word(t.r11.u32);
+        out[v].Word(t.r31.u32);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("raise's __finally (sub_825B4C8C)");
+    for (int c = 0; c < 16 && BootLock(h, 0); c++) {
+      const uint32_t locked = c % 2 == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint32_t r3 = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (locked != 0) {
+          GuestLock(h, 0, true);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        t.r28.u64 = locked;
+        t.r31.u64 = 0x1234;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825B4C8C : ITC_CONTEXT_FN(hooks::CoreRaiseFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r28.u32);
+        out[v].Word(t.r31.u32);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled;
+  };
+  for (const Fn& fn : {Fn{"_fcloseall's __finally (sub_825B4F38)", __imp__sub_825B4F38},
+                       Fn{"flsall's outer __finally (sub_825ACEB4)", __imp__sub_825ACEB4}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 8 && BootLock(h, 1); c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        GuestLock(h, 1, true);
+        PPCContext t = CallContext(h);
+        (v == 0 ? fn.recompiled : ITC_CONTEXT_FN(hooks::CoreUnlockStreamsFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("flsall's inner __finally (sub_825ACF04)");
+    std::vector<uint32_t> boot_streams;
+    for (uint32_t i = 0; i < 20; i++) {
+      if (BootLock(h, 16 + i)) {
+        boot_streams.push_back(i);
+      }
+    }
+    for (int c = 0; c < 16 && !boot_streams.empty(); c++) {
+      const uint32_t index = boot_streams[h.random.Below(uint32_t(boot_streams.size()))];
+      const uint32_t section = Load(h.base, cc::kLockTable + 8 * (16 + index));
+      for (uint32_t i = 0; i < 256; i += 4) {
+        Store(h.base, h.data + 512 + i, uint32_t(h.random.Next()));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        GuestLock(h, 16 + index, true);
+        PPCContext t = CallContext(h);
+        t.r28.u64 = index;
+        t.r29.u64 = cc::kPiob;
+        t.r31.u64 = 0x5678;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825ACF04 : ITC_CONTEXT_FN(hooks::CoreFlsallInnerFinally))(t, h.base);
+        for (const PPCRegister* r : {&t.r3, &t.r4, &t.r10, &t.r11, &t.r27, &t.r28, &t.r29, &t.r31}) {
+          out[v].Word(r->u32);
+        }
+        out[v].Bytes(Section(h, section));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+// _free_osfhnd and _get_osfhandle: handles -2, -1, past _nhandle and in the
+// first block, whose entry's flags (+4) and OS handle (+0) are set for the
+// case; errno and _doserrno (the harness thread's) random before; the
+// invalid parameter handler the shared "returns 0" (its trap otherwise
+// logs); compared: r3 (64 bits), the entry, errno and _doserrno.
+void OsHandleCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  if (handles == 0 || slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _free_osfhnd: no handle block or thread data");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "_free_osfhnd (sub_825B77E8)" : "_get_osfhandle (sub_825B7880)");
+    for (int c = 0; c < 48; c++) {
+      const uint32_t pick = h.random.Below(8);
+      const uint32_t handle = pick == 0   ? 0xFFFFFFFEu
+                              : pick == 1 ? 0xFFFFFFFFu
+                              : pick == 2 ? nhandle + h.random.Below(64)
+                                          : h.random.Below(32);
+      const uint32_t entry = handles + 44 * (handle & 31);
+      const uint8_t flags = uint8_t(h.random.Next());
+      const uint32_t os = h.random.Below(3) == 0 ? 0xFFFFFFFFu : uint32_t(h.random.Next());
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+        guest::StoreU8(h.base, entry + 4, flags);
+        Store(h.base, entry + 0, os);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = handle;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_825B77E8 : ITC_CONTEXT_FN(hooks::CoreFreeOsfhnd))(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825B7880 : ITC_CONTEXT_FN(hooks::CoreGetOsfhandle))(t, h.base);
+        }
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, entry, 8));
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+// exp: f1 edges (the overflow and underflow bounds, infinities, NaNs,
+// denormals) and random doubles, small and any; compared: f1 and its scratch
+// words below the stack pointer (-32 a word, or a double when scaled; -24 and
+// -16 doubles), set to 0xCD first.
+void ExpCases(Context& h) {
+  Results results("exp (sub_825ABE30)");
+  static const uint64_t kEdges[] = {
+      0, 0x8000000000000000ull, 0x3FF0000000000000ull, 0xBFF0000000000000ull,
+      0x7FF0000000000000ull, 0xFFF0000000000000ull, 0x7FF8000000000000ull,
+      0xFFF8000000000123ull, 0x0000000000000001ull, 0x8010000000000000ull,
+      0x40862E42FEFA39EFull, 0x40862E42FEFA39F0ull, 0x40862E42FEFA39EEull,
+      0xC086232BDD7ABCD2ull, 0xC086232BDD7ABCD3ull, 0xC0874910D52D3051ull,
+      0x4090000000000000ull, 0xC090000000000000ull, 0x3FE62E42FEFA39EFull,
+      0x43E0000000000000ull, 0xC3E0000000000000ull, 0x41E0000000000000ull};
+  constexpr int kEdgeCount = int(sizeof(kEdges) / sizeof(kEdges[0]));
+  for (int c = 0; c < 400; c++) {
+    uint64_t bits;
+    if (c < kEdgeCount) {
+      bits = kEdges[c];
+    } else if (c % 3 == 0) {
+      bits = h.random.Next();
+    } else {
+      const double x = (double(h.random.Below(1u << 30)) / double(1u << 30) - 0.5) *
+                       (c % 3 == 1 ? 1500.0 : 8.0);
+      bits = std::bit_cast<uint64_t>(x);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 32, 24);
+      t.f1.u64 = bits;
+      (v == 0 ? __imp__sub_825ABE30 : ITC_CONTEXT_FN(hooks::CoreExp))(t, h.base);
+      out[v].Double(t.f1.u64);
+      out[v].Word(Load(h.base, t.r1.u32 - 32));
+      out[v].Word(Load(h.base, t.r1.u32 - 28));
+      out[v].Double(uint64_t(Load(h.base, t.r1.u32 - 24)) << 32 | Load(h.base, t.r1.u32 - 20));
+      out[v].Double(uint64_t(Load(h.base, t.r1.u32 - 16)) << 32 | Load(h.base, t.r1.u32 - 12));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// A number's text as the float conversions write it: an optional sign,
+// digits, maybe a point and more digits (zeros often), maybe an exponent
+// ('e' or 'E', a sign, digits), or a hex form ("0x" digits "p" exponent);
+// sometimes a bare 'e' first or empty.
+std::string NumberText(Context& h) {
+  std::string text;
+  const uint32_t kind = h.random.Below(10);
+  if (kind == 0) {
+    return h.random.Below(2) ? "" : "e+05";
+  }
+  if (h.random.Below(4) == 0) {
+    text += '-';
+  }
+  if (kind == 1) {
+    text += "0x1";
+  }
+  const uint32_t digits = 1 + h.random.Below(8);
+  for (uint32_t i = 0; i < digits; i++) {
+    text += char('0' + (h.random.Below(3) == 0 ? 0 : h.random.Below(10)));
+  }
+  if (h.random.Below(3) != 0) {
+    text += '.';
+    const uint32_t fraction = h.random.Below(8);
+    for (uint32_t i = 0; i < fraction; i++) {
+      text += char('0' + (h.random.Below(2) == 0 ? 0 : h.random.Below(10)));
+    }
+  }
+  if (h.random.Below(2) != 0) {
+    text += kind == 1 ? 'p' : (h.random.Below(2) ? 'e' : 'E');
+    text += h.random.Below(2) ? '+' : '-';
+    text += std::to_string(h.random.Below(400));
+  }
+  return text;
+}
+
+// _forcdecpt_l and _cropzeros_l: such texts in the scratch area (0xCD after
+// them); compared: r3 and the 64 bytes.
+void NumberTextCases(Context& h) {
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool no_point;  // _forcdecpt_l's texts have no point yet
+  };
+  for (const Fn& fn : {Fn{"_forcdecpt_l (sub_825ADD38)", __imp__sub_825ADD38, ITC_CONTEXT_FN(hooks::CoreForcdecpt), true},
+                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, ITC_CONTEXT_FN(hooks::CoreCropzeros), false},
+                       Fn{"_forcdecpt (sub_825ADF18)", __imp__sub_825ADF18,
+                          ITC_CONTEXT_FN(hooks::CoreForcdecptNoLocale), true},
+                       Fn{"_cropzeros (sub_825ADF20)", __imp__sub_825ADF20,
+                          ITC_CONTEXT_FN(hooks::CoreCropzerosNoLocale), false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 300; c++) {
+      std::string text = NumberText(h);
+      if (fn.no_point) {
+        // (an empty text would send it past its terminator: never given)
+        std::erase(text, '.');
+        if (text.empty()) {
+          text = "0";
+        }
+      }
+      const uint32_t at = h.data + 1;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, 64);
+        WriteText(h, at, text);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = at;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, h.data, 64));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + text + "\"");
+    }
+    results.Report();
+  }
+}
+
+// _ld12tof: 12-byte long doubles around the float's range (exponents
+// 16383 - 160 to 16383 + 140, so rounding, denormals, underflow and overflow
+// come up), zeros and long double denormals (exponent 0), 32767 and random
+// bits, with random extra bits; compared: r3 and 8 bytes at the output (the
+// float, and the word after it, which it leaves alone).
+void Ld12ToFloatCases(Context& h) {
+  Results results("_ld12tof (sub_825B70D0)");
+  const uint32_t from = h.data + 64, to = h.data + 96;
+  for (int c = 0; c < 400; c++) {
+    const uint32_t kind = h.random.Below(8);
+    uint16_t sign_exponent;
+    if (kind == 0) {
+      sign_exponent = 0;
+    } else if (kind == 1) {
+      sign_exponent = 0x7FFF;
+    } else if (kind == 2) {
+      sign_exponent = uint16_t(h.random.Next());
+    } else {
+      sign_exponent = uint16_t(16383 - 160 + h.random.Below(300));
+    }
+    if (h.random.Below(2) != 0) {
+      sign_exponent |= 0x8000;
+    }
+    uint32_t high = uint32_t(h.random.Next()), low = uint32_t(h.random.Next());
+    uint16_t extra = uint16_t(h.random.Next());
+    const uint32_t shape = h.random.Below(6);
+    if (shape == 0) {
+      high = low = 0;
+      extra = 0;
+    } else if (shape == 1) {
+      high |= 0x80000000u;
+      low &= 0xFFFFFF00u;  // near a float's halfway point
+      high = (high & 0xFFFFFF00u) | (h.random.Below(2) ? 0x80 : 0x7F);
+      extra = 0;
+    } else if (shape < 5) {
+      high |= 0x80000000u;  // normalized, as the parse leaves it
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU16(h.base, from + 0, sign_exponent);
+      Store(h.base, from + 2, high);
+      Store(h.base, from + 6, low);
+      guest::StoreU16(h.base, from + 10, extra);
+      Fill(h.base, to, 8);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = from;
+      t.r4.u64 = to;
+      (v == 0 ? __imp__sub_825B70D0 : ITC_CONTEXT_FN(hooks::CoreLd12ToFloat))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Float(Load(h.base, to));
+      out[v].Word(Load(h.base, to + 4));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _atodbl_l, _atoflt_l and _fassign_l: number strings (fixed edges: the
+// float's and double's limits, under- and overflow, signs, spaces, junk,
+// hex, nothing) and random ones; compared: r3 and 12 bytes at the output.
+void AtoNumberCases(Context& h) {
+  static const char* kTexts[] = {
+      "0", "1", "-1", "1.5", "  12.25", "\t-0.0", "3.4028234e38", "3.4028236e38", "1e39",
+      "-1e39", "1.17549435e-38", "1.4e-45", "7e-46", "1e-46", "1.7976931348623157e308",
+      "1.8e308", "1e309", "4.9e-324", "2e-324", "1e-400", "abc", "", "+", ".", "1e", "1e+",
+      "0x10", "123456789012345678901234567890", ".5e-3", "5.e2", "1d10", "-.0001E-2"};
+  constexpr int kTextCount = int(sizeof(kTexts) / sizeof(kTexts[0]));
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    int kind;  // 0 _atodbl_l, 1 _atoflt_l, 2 _fassign_l
+  };
+  const uint32_t at = h.data + 128, to = h.data + 64;
+  for (const Fn& fn : {Fn{"_atodbl_l (sub_825B6098)", __imp__sub_825B6098, ITC_CONTEXT_FN(hooks::CoreAtodbl), 0},
+                       Fn{"_atoflt_l (sub_825B6140)", __imp__sub_825B6140, ITC_CONTEXT_FN(hooks::CoreAtoflt), 1},
+                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, ITC_CONTEXT_FN(hooks::CoreFassign), 2},
+                       Fn{"_fassign (sub_825ADF10)", __imp__sub_825ADF10, ITC_CONTEXT_FN(hooks::CoreFassignNoLocale),
+                          2}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 200; c++) {
+      std::string text;
+      if (c < kTextCount) {
+        text = kTexts[c];
+      } else {
+        text = NumberText(h);
+        std::replace(text.begin(), text.end(), 'x', '1');
+        std::replace(text.begin(), text.end(), 'p', 'e');
+      }
+      const uint32_t is_double = h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, to, 12);
+        WriteText(h, at, text);
+        PPCContext t = CallContext(h);
+        if (fn.kind == 2) {
+          t.r3.u64 = c % 2 == 0 ? 0 : is_double;
+          t.r4.u64 = to;
+          t.r5.u64 = at;
+          t.r6.u64 = uint32_t(h.random.Next());
+        } else {
+          t.r3.u64 = to;
+          t.r4.u64 = at;
+          t.r5.u64 = uint32_t(h.random.Next());
+        }
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const bool doubled = fn.kind == 0 || (fn.kind == 2 && c % 2 == 1);
+        if (doubled) {
+          out[v].Double(uint64_t(Load(h.base, to)) << 32 | Load(h.base, to + 4));
+        } else {
+          out[v].Float(Load(h.base, to));
+          out[v].Word(Load(h.base, to + 4));
+        }
+        out[v].Word(Load(h.base, to + 8));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c) + " \"" + text + "\"");
+    }
+    results.Report();
+  }
+}
+
+
+// _fileno: a null stream or one in the scratch area with a random handle
+// word (+16); errno random before, the invalid parameter handler the shared
+// "returns 0"; compared: r3 (64 bits) and errno.
+void FilenoCases(Context& h) {
+  Results results("_fileno (sub_825B0E88)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _fileno: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 24; c++) {
+    const bool null = c % 3 == 0;
+    const uint32_t word = uint32_t(h.random.Next()), err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{slots.data + 8, 4}});
+      Store(h.base, stream + 16, word);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = null ? 0 : stream;
+      (v == 0 ? __imp__sub_825B0E88 : ITC_CONTEXT_FN(hooks::CoreFileno))(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, slots.data + 8));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// The __finally funclets of the stream and handle functions, each after the
+// lock it gives back was taken: a handle's entry in the first block (its
+// section made and entered for the case, put back after) for _close's,
+// _write's and _commit's; for fclose's, a stream outside _iob (its own
+// section at +32) or one of _iob's whose lock was made at boot; for doexit's,
+// the exit lock (the host mutex, through _lock) when r28 isn't 0. Compared:
+// r3, the section and the registers the funclets keep.
+void StreamFinallyCases(Context& h) {
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    int reg;  // 30 or 27: the handle's register
+  };
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  for (const Fn& fn : {Fn{"_close's __finally (sub_825B0E50)", __imp__sub_825B0E50,
+                          ITC_CONTEXT_FN(hooks::CoreCloseFinally), 30},
+                       Fn{"_write's __finally (sub_825B1304)", __imp__sub_825B1304,
+                          ITC_CONTEXT_FN(hooks::CoreCloseFinally), 30},
+                       Fn{"_commit's __finally (sub_825B4978)", __imp__sub_825B4978,
+                          ITC_CONTEXT_FN(hooks::CoreCommitFinally), 27}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 16 && handles != 0; c++) {
+      const uint32_t handle = h.random.Below(32);
+      const uint32_t entry = handles + 44 * handle;
+      const int depth = 1 + int(h.random.Below(3));
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}});
+        InitSection(h, entry + 12);
+        for (int d = 0; d < depth; d++) {
+          PPCContext e = CallContext(h);
+          e.r3.u64 = entry + 12;
+          __imp__RtlEnterCriticalSection(e, h.base);
+        }
+        PPCContext t = CallContext(h);
+        (fn.reg == 30 ? t.r30 : t.r27).u64 = handle;
+        t.r31.u64 = 0x1234;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r27.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Read(h.base, entry, 44));
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  for (const auto& [name, recompiled] :
+       {std::pair<const char*, GuestFunction>{"fclose's __finally (sub_825A9664)", __imp__sub_825A9664},
+        {"fflush's __finally (sub_825AD02C)", __imp__sub_825AD02C},
+        {"fputs's __finally (sub_825AD488)", __imp__sub_825AD488}}) {
+    Results results(name);
+    std::vector<uint32_t> boot_streams;
+    for (uint32_t i = 0; i < 20; i++) {
+      if (BootLock(h, 16 + i)) {
+        boot_streams.push_back(i);
+      }
+    }
+    const uint32_t own = h.data + 256;
+    for (int c = 0; c < 16; c++) {
+      const bool in_iob = !boot_streams.empty() && c % 2 == 1;
+      const uint32_t index = in_iob ? boot_streams[h.random.Below(uint32_t(boot_streams.size()))] : 0;
+      const uint32_t stream = in_iob ? cc::kIob + 32 * index : own;
+      const uint32_t section =
+          in_iob ? Load(h.base, cc::kLockTable + 8 * (16 + index)) : own + 32;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (in_iob) {
+          GuestLock(h, 16 + index, true);
+        } else {
+          InitSection(h, section);
+          PPCContext e = CallContext(h);
+          e.r3.u64 = section;
+          __imp__RtlEnterCriticalSection(e, h.base);
+        }
+        PPCContext t = CallContext(h);
+        t.r30.u64 = stream;
+        t.r31.u64 = 0x5678;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? recompiled : ITC_CONTEXT_FN(hooks::CoreFcloseFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Section(h, section));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("doexit's unwind funclet (sub_825AA338)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t locked = c % 2 == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint32_t r3 = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        if (locked != 0) {
+          GuestLock(h, 8, true);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        t.r28.u64 = locked;
+        t.r31.u64 = 0x9ABC;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825AA338 : ITC_CONTEXT_FN(hooks::CoreExitUnlockFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r28.u32);
+        out[v].Word(t.r31.u32);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+
+// _close_nolock, _close and _commit: handles -2, -1, past _nhandle and in
+// the first block, whose entry (its flags +4, the OS handle +0, the lock +8
+// made with its section) is set for the case; the OS handle an event of the
+// side's own (closed by the call), a word that's no handle (the close fails)
+// or -1; handles 1 and 2 sometimes given the same OS handle with the other
+// open. errno, _doserrno and the last error random before, the invalid
+// parameter handler the shared "returns 0". Compared: r3 (64 bits), the
+// entries (the OS handle only when the side's event isn't in it), errno,
+// _doserrno, the last error and the handle's word in the caller's frame.
+void CloseCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10)) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _close: no handle block, thread data or lock 10");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool caller_frame;  // stores the handle at the caller's frame + 20
+  };
+  for (const Fn& fn : {Fn{"_close_nolock (sub_825B0C28)", __imp__sub_825B0C28,
+                          ITC_CONTEXT_FN(hooks::CoreCloseNolock), false},
+                       Fn{"_close (sub_825B0D10)", __imp__sub_825B0D10, ITC_CONTEXT_FN(hooks::CoreClose), true},
+                       Fn{"_commit (sub_825B4828)", __imp__sub_825B4828, ITC_CONTEXT_FN(hooks::CoreCommit), true}}) {
+    Results results(fn.name);
+    const bool nolock = fn.native == ITC_CONTEXT_FN(hooks::CoreCloseNolock);
+    for (int c = 0; c < 48; c++) {
+      const uint32_t pick = h.random.Below(10);
+      uint32_t handle = pick == 0   ? 0xFFFFFFFEu
+                        : pick == 1 ? 0xFFFFFFFFu
+                        : pick == 2 ? nhandle + h.random.Below(64)
+                        : pick < 5  ? 1 + h.random.Below(2)
+                                    : h.random.Below(32);
+      if (nolock && (pick < 3)) {
+        handle = h.random.Below(32);  // _close_nolock takes only handles in range
+      }
+      const uint32_t entry = handles + 44 * (handle & 31);
+      const uint32_t other = handles + 44 * (handle == 1 ? 2 : 1);
+      // The OS handle: 0 an event of the side's own, 1 a word that's no
+      // handle, 2 -1.
+      const uint32_t os_kind = h.random.Below(3);
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      const uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(4) != 0 ? 1 : 0);
+      const bool pair = (handle == 1 || handle == 2) && h.random.Below(2) == 0;
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{handles, 44 * 3}, {entry, 44}, {slots.data + 8, 8}});
+        const uint32_t os = os_kind == 0 ? MakeEvent(h, 0, 0) : os_kind == 1 ? junk : 0xFFFFFFFFu;
+        guest::StoreU8(h.base, entry + 4, flags);
+        Store(h.base, entry + 0, os);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        if (pair) {
+          guest::StoreU8(h.base, other + 4, 1);
+          Store(h.base, other + 0, os);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = handle;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        const bool own = os_kind == 0;
+        const uint32_t os_after = Load(h.base, entry + 0);
+        out[v].Word(own && os_after == os ? 0x0505u : os_after);
+        out[v].Bytes(Read(h.base, entry + 4, 8));
+        out[v].Bytes(Read(h.base, entry + 12, 28));
+        if (pair) {
+          const uint32_t other_os = Load(h.base, other + 0);
+          out[v].Word(own && other_os == os ? 0x0505u : other_os);
+          out[v].Word(guest::LoadU8(h.base, other + 4));
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.caller_frame) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        // An event the call didn't close is closed here.
+        if (own && os != 0) {
+          PPCContext k = CallContext(h);
+          k.r3.u64 = os;
+          __imp__NtClose(k, h.base);
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  SetLastError(h, slots.error);
+}
+
+// FlushFileBuffers: an event, 0 or a word that's no handle (the SDK answers
+// every one with success); the last error random before; compared: r3 and
+// the last error.
+void FlushCases(Context& h) {
+  Results results("FlushFileBuffers (sub_825BA510)");
+  const uint32_t error = GuestLastError(h);
+  for (int c = 0; c < 24; c++) {
+    const int kind = c % 3;
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      SetLastError(h, last);
+      const uint32_t event = kind == 0 ? MakeEvent(h, 0, 0) : kind == 1 ? 0 : junk;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = event;
+      (v == 0 ? __imp__sub_825BA510 : ITC_CONTEXT_FN(hooks::CoreFlushFileBuffers))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(GuestLastError(h));
+      if (kind == 0 && event != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = event;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
+
+// A file of the SDK's to seek in: game:\default.xex opened for reading
+// through the game's CreateFile (sub_82295508), closed by the destructor;
+// 0 when it can't be opened.
+struct SeekFile {
+  Context& h;
+  uint32_t handle = 0;
+  explicit SeekFile(Context& h, const std::string& path = "game:\\default.xex",
+                    uint32_t access = 0x80000000u /* GENERIC_READ */)
+      : h(h) {
+    Write(h.base, h.data + 2048, reinterpret_cast<const uint8_t*>(path.c_str()),
+          uint32_t(path.size() + 1));
+    PPCContext t = CallContext(h);
+    t.r3.u64 = h.data + 2048;
+    t.r4.u64 = access;
+    t.r5.u64 = 1;  // FILE_SHARE_READ
+    t.r6.u64 = 0;
+    t.r7.u64 = 3;  // OPEN_EXISTING
+    t.r8.u64 = 0x80;
+    t.r9.u64 = 0;
+    harness::Ours<0x82295508>(t, h.base);
+    handle = t.r3.u32 == 0xFFFFFFFFu ? 0 : t.r3.u32;
+  }
+  ~SeekFile() {
+    if (handle != 0) {
+      PPCContext k = CallContext(h);
+      k.r3.u64 = handle;
+      __imp__NtClose(k, h.base);
+    }
+  }
+  // The position set through the recompiled SetFilePointer (from the start).
+  void Set(uint32_t low) {
+    Store(h.base, h.data + 2040, 0);
+    PPCContext t = CallContext(h);
+    t.r3.u64 = handle;
+    t.r4.u64 = low;
+    t.r5.u64 = h.data + 2040;
+    t.r6.u64 = 0;
+    __imp__sub_825B9DD8(t, h.base);
+  }
+  // The position now (high, low), through the recompiled SetFilePointer.
+  uint64_t Get() {
+    Store(h.base, h.data + 2040, 0);
+    PPCContext t = CallContext(h);
+    t.r3.u64 = handle;
+    t.r4.u64 = 0;
+    t.r5.u64 = h.data + 2040;
+    t.r6.u64 = 1;
+    __imp__sub_825B9DD8(t, h.base);
+    return uint64_t(Load(h.base, h.data + 2040)) << 32 | t.r3.u32;
+  }
+};
+
+// A seek's offset: small, around the file's size, negative, past 31 bits or
+// any.
+uint64_t SeekOffset(Context& h) {
+  switch (h.random.Below(6)) {
+    case 0: return h.random.Below(4096);
+    case 1: return 0x01000000u + h.random.Below(0x01000000u);
+    case 2: return uint64_t(-int64_t(h.random.Below(0x20000)));
+    case 3: return 0x80000000u + h.random.Below(0x1000);
+    case 4: return uint64_t(1 + h.random.Below(4)) << 32 | uint32_t(h.random.Next());
+    default: return h.random.Next();
+  }
+}
+
+// SetFilePointer: on the SDK's file (its position set to a random start
+// first, the same for both sides), an event or a word that's no handle; the
+// method 0 to 3 (and a random one), the high word given or not, the low and
+// high words from SeekOffset; the last error random before. Compared: r3 (64
+// bits), the high word, the last error and the file's position after.
+void SetFilePointerCases(Context& h) {
+  Results results("SetFilePointer (sub_825B9DD8)");
+  SeekFile file(h);
+  if (file.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: SetFilePointer: game:\\default.xex not opened");
+  }
+  const uint32_t error = GuestLastError(h);
+  const uint32_t high_word = h.data + 2032;
+  for (int c = 0; c < 96; c++) {
+    const uint32_t kind = file.handle != 0 && h.random.Below(4) != 0 ? 0 : 1 + h.random.Below(2);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint32_t start = h.random.Below(0x00800000u);
+    const uint64_t offset = SeekOffset(h);
+    const bool with_high = h.random.Below(3) != 0;
+    const uint32_t method = h.random.Below(8) == 0 ? uint32_t(h.random.Next()) : h.random.Below(4);
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t event = kind == 2 ? MakeEvent(h, 0, 0) : 0;
+      const uint32_t handle = kind == 0 ? file.handle : kind == 2 ? event : junk;
+      if (kind == 0) {
+        file.Set(start);
+      }
+      Store(h.base, high_word, uint32_t(offset >> 32));
+      SetLastError(h, last);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      t.r4.u64 = uint32_t(offset);
+      t.r5.u64 = with_high ? high_word : 0;
+      t.r6.u64 = method;
+      (v == 0 ? __imp__sub_825B9DD8 : ITC_CONTEXT_FN(hooks::CoreSetFilePointer))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, high_word));
+      out[v].Word(GuestLastError(h));
+      if (kind == 0) {
+        const uint64_t at = file.Get();
+        out[v].Word(uint32_t(at >> 32));
+        out[v].Word(uint32_t(at));
+      }
+      if (event != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = event;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
+// _lseeki64_nolock, _lseeki64 and _lseeki64's __finally: handles -2, -1,
+// past _nhandle and in the first block, whose entry is open (its flags with
+// bit 0) on the SDK's file at a random start, open on a word that's no
+// handle, open on -1, or closed; the lock (+8) made or not; offsets from
+// SeekOffset, origins 0 to 3; errno, _doserrno and the last error random,
+// the invalid parameter handler the shared "returns 0". Compared: r3 (64
+// bits), the entry (the OS handle, flags and lock), errno, _doserrno, the
+// last error, the file's position and the caller's frame + 20.
+void LseekCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  SeekFile file(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || file.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _lseeki64: no handle block, thread data, lock 10 or "
+                  "file");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool nolock;
+  };
+  for (const Fn& fn : {Fn{"_lseeki64_nolock (sub_825B6500)", __imp__sub_825B6500,
+                          ITC_CONTEXT_FN(hooks::CoreLseekNolock), true},
+                       Fn{"_lseeki64 (sub_825B65D0)", __imp__sub_825B65D0, ITC_CONTEXT_FN(hooks::CoreLseek), false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const uint32_t pick = h.random.Below(10);
+      const uint32_t handle = fn.nolock || pick > 2 ? h.random.Below(32)
+                              : pick == 0           ? 0xFFFFFFFEu
+                              : pick == 1           ? 0xFFFFFFFFu
+                                                    : nhandle + h.random.Below(64);
+      const uint32_t entry = handles + 44 * (handle & 31);
+      // 0 the SDK's file, 1 a word that's no handle, 2 -1.
+      const uint32_t os_kind = h.random.Below(4) == 0 ? 1 + h.random.Below(2) : 0;
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      const uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(5) != 0 ? 1 : 0);
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t start = h.random.Below(0x00800000u);
+      const uint64_t offset = SeekOffset(h);
+      const uint32_t origin = h.random.Below(4);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+        file.Set(start);
+        guest::StoreU8(h.base, entry + 4, flags);
+        Store(h.base, entry + 0,
+              os_kind == 0 ? file.handle : os_kind == 1 ? junk : 0xFFFFFFFFu);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = handle;
+        t.r4.u64 = offset;
+        t.r5.u64 = origin;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, entry, 40));
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        const uint64_t at = file.Get();
+        out[v].Word(uint32_t(at >> 32));
+        out[v].Word(uint32_t(at));
+        if (!fn.nolock) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  {
+    Results results("_lseeki64's __finally (sub_825B6730)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t handle = h.random.Below(32);
+      const uint32_t entry = handles + 44 * handle;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}});
+        InitSection(h, entry + 12);
+        PPCContext e = CallContext(h);
+        e.r3.u64 = entry + 12;
+        __imp__RtlEnterCriticalSection(e, h.base);
+        PPCContext t = CallContext(h);
+        t.r30.u64 = handle;
+        t.r31.u64 = 0x1234;
+        t.r12.u64 = h.data + 640;
+        (v == 0 ? __imp__sub_825B6730 : ITC_CONTEXT_FN(hooks::CoreCloseFinally))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r30.u32);
+        out[v].Word(t.r31.u32);
+        out[v].Bytes(Read(h.base, entry, 44));
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  SetLastError(h, slots.error);
+}
+
+
+// Files to write to: the SDK's null device (\Device\Harddisk0\Cache0, every
+// write a success of 0 bytes) and game:\default.xex opened for reading (every
+// write refused: access denied); nothing reaches the host's files.
+struct WriteFiles {
+  SeekFile sink, xex;
+  explicit WriteFiles(Context& h)
+      : sink(h, "\\Device\\Harddisk0\\Cache0", 0xC0000000u), xex(h) {}
+};
+
+// A buffer's bytes for the writes: random, with LFs often and ^Z first now
+// and then.
+void WriteBytes(Context& h, uint32_t address, uint32_t size) {
+  for (uint32_t i = 0; i < size; i++) {
+    const uint32_t pick = h.random.Below(8);
+    guest::StoreU8(h.base, address + i,
+                   pick == 0 ? 10 : pick == 1 ? 13 : uint8_t(h.random.Next()));
+  }
+  if (size != 0 && h.random.Below(4) == 0) {
+    guest::StoreU8(h.base, address, 26);
+  }
+}
+
+// WriteFile: on the null device's file, the read-only file, an event or a
+// word that's no handle; with an overlapped (in the scratch area: its event 0,
+// an event of the side's own with or without the low bit, a random offset)
+// or without (then `written` always given: the original stores it unchecked);
+// sizes 0 to 64. The last error random before. Compared: r3 (64 bits), the
+// written word, the overlapped's +0 to +12 and the last error.
+void WriteFileCases(Context& h) {
+  Results results("WriteFile (sub_82295D50)");
+  WriteFiles files(h);
+  if (files.sink.handle == 0 || files.xex.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: WriteFile: the files weren't opened");
+  }
+  const uint32_t error = GuestLastError(h);
+  const uint32_t buffer = h.data + 1024, written = h.data + 960, overlapped = h.data + 928;
+  for (int c = 0; c < 64; c++) {
+    const uint32_t kind = h.random.Below(4);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const bool with_overlapped = h.random.Below(2) == 0;
+    const uint32_t event_kind = h.random.Below(3);
+    const bool with_written = !with_overlapped || h.random.Below(3) != 0;
+    const uint32_t size = h.random.Below(65);
+    const uint32_t offset_low = uint32_t(h.random.Next()), offset_high = h.random.Below(2);
+    const uint32_t last = uint32_t(h.random.Next());
+    WriteBytes(h, buffer, size);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t own = kind == 2 || event_kind != 0 ? MakeEvent(h, 0, 0) : 0;
+      const uint32_t handle = kind == 0   ? files.sink.handle
+                              : kind == 1 ? files.xex.handle
+                              : kind == 2 ? own
+                                          : junk;
+      Store(h.base, written, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 0, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 4, 0xCDCDCDCDu);
+      Store(h.base, overlapped + 8, offset_low);
+      Store(h.base, overlapped + 12, offset_high);
+      Store(h.base, overlapped + 16,
+            event_kind == 0 ? 0 : event_kind == 1 ? own : (own | 1));
+      SetLastError(h, last);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = handle;
+      t.r4.u64 = buffer;
+      t.r5.u64 = size;
+      t.r6.u64 = with_written ? written : 0;
+      t.r7.u64 = with_overlapped ? overlapped : 0;
+      (v == 0 ? __imp__sub_82295D50 : ITC_CONTEXT_FN(hooks::CoreWriteFile))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, written));
+      out[v].Bytes(Read(h.base, overlapped, 16));
+      out[v].Word(GuestLastError(h));
+      if (own != 0) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = own;
+        __imp__NtClose(k, h.base);
+      }
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  SetLastError(h, error);
+  results.Report();
+}
+
+// _write_nolock and _write: handles in the first block (and for _write -2,
+// -1 and past _nhandle), the entry open on the null device's file, the
+// read-only file or a word that's no handle (or closed for _write); its
+// flags (+4: text, device and append bits among random ones) and mode
+// (+40: ANSI, UTF-8, UTF-16 or random) set per case, the lock made or not;
+// buffers null or random (LFs often, ^Z first now and then) of 0 to 3,000
+// bytes, so the text mode's chunks fill; errno, _doserrno and the last error
+// random, the invalid parameter handler the shared "returns 0". Compared: r3
+// (64 bits), the entry, errno, _doserrno, the last error, the part of the
+// text mode's chunk in _write_nolock's frame its first chunk writes (filled
+// with 0xCD first) and the caller's frame + 20.
+void WriteCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  WriteFiles files(h);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || files.sink.handle == 0 ||
+      files.xex.handle == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _write: no handle block, thread data, lock 10 or "
+                  "files");
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool nolock;
+  };
+  const uint32_t block = memory::Alloc(4096, 0);  // the bytes: past the scratch area's room
+  if (block == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _write: no buffer");
+    return;
+  }
+  for (const Fn& fn : {Fn{"_write_nolock (sub_825B0F48)", __imp__sub_825B0F48,
+                          ITC_CONTEXT_FN(hooks::CoreWriteNolock), true},
+                       Fn{"_write (sub_825B11A8)", __imp__sub_825B11A8, ITC_CONTEXT_FN(hooks::CoreWrite), false}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const uint32_t pick = h.random.Below(10);
+      const uint32_t handle = fn.nolock || pick > 2 ? h.random.Below(32)
+                              : pick == 0           ? 0xFFFFFFFEu
+                              : pick == 1           ? 0xFFFFFFFFu
+                                                    : nhandle + h.random.Below(64);
+      const uint32_t entry = handles + 44 * (handle & 31);
+      const uint32_t os_kind = h.random.Below(5);  // 0-2 the null device, 3 the xex, 4 junk
+      const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+      uint8_t flags = uint8_t(h.random.Next()) | (h.random.Below(6) != 0 ? 1 : 0);
+      if (fn.nolock) {
+        flags |= 1;
+      }
+      const uint32_t mode_pick = h.random.Below(5);
+      const uint8_t mode = mode_pick == 0   ? 2
+                           : mode_pick == 1 ? 4
+                           : mode_pick == 2 ? uint8_t(h.random.Next())
+                                            : uint8_t(h.random.Next() & 1);
+      const bool made = h.random.Below(2) == 0;
+      const uint32_t size_pick = h.random.Below(6);
+      const uint32_t size = size_pick == 0   ? 0
+                            : size_pick == 1 ? 1 + h.random.Below(8)
+                            : size_pick == 2 ? 1000 + h.random.Below(2000)
+                                             : h.random.Below(1100);
+      const bool null = h.random.Below(10) == 0;
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      WriteBytes(h, block, size);
+      // The bytes the text mode's first chunk takes (each LF two), when it
+      // runs: an open handle in range, bytes given, a mode that takes them.
+      const int32_t mode_shift = int8_t(mode) >> 1;
+      const bool in_range = handle < nhandle && (flags & 1) != 0;
+      const bool text = (flags & 0x80) != 0 && !null && size != 0 &&
+                        !((mode_shift == 1 || mode_shift == 2) && (size & 1) != 0) &&
+                        (fn.nolock || in_range);
+      uint32_t converted = 0;
+      for (uint32_t i = 0; text && i < size && converted < 1024; i++) {
+        converted += guest::LoadU8(h.base, block + i) == 10 ? 2 : 1;
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+        files.xex.Set(0);
+        guest::StoreU8(h.base, entry + 4, flags);
+        guest::StoreU8(h.base, entry + 40, mode);
+        Store(h.base, entry + 0,
+              os_kind < 3 ? files.sink.handle : os_kind == 3 ? files.xex.handle : junk);
+        Store(h.base, entry + 8, made ? 1 : 0);
+        if (made) {
+          InitSection(h, entry + 12);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        // _write_nolock's frame: 1,232 bytes below the caller's, or below
+        // _write's 160.
+        const uint32_t chunk = t.r1.u32 - (fn.nolock ? 0 : 160) - 1232 + 96;
+        Fill(h.base, chunk, 1028);
+        t.r3.u64 = handle;
+        t.r4.u64 = null ? 0 : block;
+        t.r5.u64 = size;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, entry, 44));
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        // Only the part of the chunk the text mode wrote: below it are dead
+        // words of the calls before (__lock_fhandle's), the stack's leftovers.
+        out[v].Bytes(Read(h.base, chunk, converted));
+        if (!fn.nolock) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(block);
+  SetLastError(h, slots.error);
+}
+
+
+// _flush: a stream in the scratch area (+0 its pointer, +4 its count, +8 its
+// buffer, a heap block, +12 its flags: the read and write bits, the buffer
+// bits, _IORW and random ones, +16 its handle) whose handle is in the first
+// block, open on the null device's file (writes fail: 0 bytes), the
+// read-only file or a word that's no handle, or closed, or out of range;
+// pointers from below the buffer to 2,000 bytes past it. errno, _doserrno
+// and the last error random, the invalid parameter handler the shared
+// "returns 0". Compared: r3 (64 bits), the stream, the entry, errno,
+// _doserrno and the last error. (No file of the SDK's takes bytes without
+// being the user's, so the path where all are written is checked by
+// reading.)
+void FlushStreamCases(Context& h) {
+  Results results("_flush (sub_825ACC78)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  WriteFiles files(h);
+  const uint32_t block = memory::Alloc(4096, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || files.sink.handle == 0 ||
+      files.xex.handle == 0 || block == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _flush: no handle block, thread data, lock 10, "
+                  "files or buffer");
+    memory::Free(block);
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t stream = h.data + 256;
+  for (int c = 0; c < 64; c++) {
+    const uint32_t handle = h.random.Below(8) == 0 ? nhandle + h.random.Below(8) : h.random.Below(32);
+    const uint32_t entry = handles + 44 * (handle & 31);
+    const uint32_t os_kind = h.random.Below(3);
+    const uint32_t junk = 0x12340000u + h.random.Below(0x10000);
+    const uint8_t entry_flags = uint8_t(h.random.Next()) | (h.random.Below(6) != 0 ? 1 : 0);
+    const uint32_t flags = (uint32_t(h.random.Next()) & ~0x10Bu) | h.random.Below(4) |
+                           (h.random.Below(4) != 0 ? (h.random.Below(2) == 0 ? 8 : 256) : 0);
+    const int32_t used = h.random.Below(6) == 0 ? -int32_t(h.random.Below(8))
+                                                : int32_t(h.random.Below(2000));
+    const uint32_t count = uint32_t(h.random.Next());
+    const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+    const uint32_t last = uint32_t(h.random.Next());
+    WriteBytes(h, block, 2048);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{entry, 44}, {slots.data + 8, 8}});
+      files.xex.Set(0);
+      guest::StoreU8(h.base, entry + 4, entry_flags);
+      Store(h.base, entry + 0,
+            os_kind == 0 ? files.sink.handle : os_kind == 1 ? files.xex.handle : junk);
+      Store(h.base, entry + 8, 1);
+      InitSection(h, entry + 12);
+      Store(h.base, stream + 0, block + 16 + uint32_t(used));
+      Store(h.base, stream + 4, count);
+      Store(h.base, stream + 8, block + 16);
+      Store(h.base, stream + 12, flags);
+      Store(h.base, stream + 16, handle);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, slots.data + 12, doserr);
+      SetLastError(h, last);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = stream;
+      (v == 0 ? __imp__sub_825ACC78 : ITC_CONTEXT_FN(hooks::CoreFlush))(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, stream, 20));
+      out[v].Bytes(Read(h.base, entry, 44));
+      out[v].Bytes(Read(h.base, slots.data + 8, 8));
+      out[v].Word(GuestLastError(h));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  memory::Free(block);
+  SetLastError(h, slots.error);
+  results.Report();
+}
+
+// __CxxUnhandledExceptionFilter: exception records (in the scratch area)
+// near a C++ exception's but never one (its code, parameter count and
+// magic each right or off; a match would end the process through
+// terminate: that path is checked by reading), the previous filter
+// (kCxxPreviousFilter) 0, the shared "returns 0" or _ValidateExecute (1 for
+// the nonzero pointers), put back after. Compared: r3 (64 bits).
+void CxxUnhandledFilterCases(Context& h) {
+  Results results("__CxxUnhandledExceptionFilter (sub_825B4CD0)");
+  const uint32_t previous = Load(h.base, cc::kCxxPreviousFilter);
+  const uint32_t pointers = h.data + 512, record = h.data + 544;
+  for (int c = 0; c < 48; c++) {
+    bool code = h.random.Below(3) != 0, params = h.random.Below(3) != 0,
+         magic = h.random.Below(3) != 0;
+    if (code && params && magic) {
+      magic = false;
+    }
+    const uint32_t magic_word = magic ? 0x19930520u + h.random.Below(3)
+                                      : (h.random.Below(2) == 0 ? 0x1993051Fu + 4 * h.random.Below(2)
+                                                                : uint32_t(h.random.Next()));
+    const uint32_t filter_pick = h.random.Below(3);
+    const uint32_t filter = filter_pick == 0 ? 0 : filter_pick == 1 ? kReturnsZero : kValidateExecute;
+    const uint32_t context = uint32_t(h.random.Next()) | 1;
+    const uint32_t code_word = code ? 0xE06D7363u : uint32_t(h.random.Next());
+    const uint32_t params_word = params ? 3 : h.random.Below(16) + 4;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, pointers, record);
+      Store(h.base, pointers + 4, context);
+      Store(h.base, record + 0, code_word);
+      Store(h.base, record + 16, params_word);
+      Store(h.base, record + 20, magic_word);
+      Store(h.base, cc::kCxxPreviousFilter, filter);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pointers;
+      (v == 0 ? __imp__sub_825B4CD0 : ITC_CONTEXT_FN(hooks::CoreCxxUnhandledExceptionFilter))(t, h.base);
+      Store(h.base, cc::kCxxPreviousFilter, previous);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+
+// A test stream for fclose, _fclose_nolock and _fcloseall: its flags (not in
+// use, a string stream or in use with random bits, the buffer bits among
+// them), its pointer and buffer (a C runtime heap block when _IOMYBUF is set
+// and it's in use, as _freebuf frees it; else a word that's no block), the
+// temporary file's name (+28: 0 or a heap block), its handle (+16: one of
+// 3 to 31, or past _nhandle) and that handle's entry (open or not; its OS
+// handle a fresh file of the side's own on the null device, a word that's no
+// handle or -1), the lock at +32 made for it. Set up the same on each side;
+// the buffer of one not freed is the scratch area's last 1,024 bytes.
+struct TestStream {
+  uint32_t flags, used, count, charbuf, bufsiz, handle, os_kind, junk, name;
+  uint8_t entry_flags;
+  bool tmpname;
+  static TestStream Pick(Context& h, uint32_t nhandle) {
+    TestStream s;
+    const uint32_t use = h.random.Below(8);
+    s.flags = use == 0   ? uint32_t(h.random.Next()) & ~0xC3u
+              : use == 1 ? (uint32_t(h.random.Next()) | 0x40u)
+                         : (uint32_t(h.random.Next()) & ~0x40u) | (1u << h.random.Below(2)) |
+                               (h.random.Below(3) == 0 ? 0x80u : 0u);
+    if (h.random.Below(2) == 0) {
+      s.flags |= 8;
+    }
+    s.used = h.random.Below(6) == 0 ? uint32_t(-int32_t(h.random.Below(8))) : h.random.Below(48);
+    s.count = uint32_t(h.random.Next());
+    s.charbuf = uint32_t(h.random.Next());
+    s.bufsiz = uint32_t(h.random.Next());
+    s.handle = h.random.Below(8) == 0 ? nhandle + h.random.Below(8) : 3 + h.random.Below(29);
+    s.os_kind = h.random.Below(3);
+    s.junk = 0x12340000u + h.random.Below(0x10000);
+    s.entry_flags = uint8_t(h.random.Next()) | (h.random.Below(5) != 0 ? 1 : 0);
+    s.tmpname = h.random.Below(2) == 0;
+    s.name = uint32_t(h.random.Next());
+    return s;
+  }
+  bool Mine() const { return (flags & 0x83) != 0 && (flags & 8) != 0; }
+};
+
+// What a side made for its streams: the heap blocks and the files, released
+// after the call (the files the call didn't close).
+struct StreamWorld {
+  Context& h;
+  uint32_t handles;
+  std::vector<uint32_t> blocks;
+  std::vector<std::pair<uint32_t, uint32_t>> files;  // (entry, OS handle)
+  std::vector<uint32_t> entries;
+  StreamWorld(Context& h, uint32_t handles) : h(h), handles(handles) {}
+  void Set(uint32_t stream, const TestStream& s, bool lock = true) {
+    uint32_t buffer = h.data + 3072;  // the scratch area's last 1,024 bytes
+    if (s.Mine()) {
+      buffer = Block(h.base, 64);
+      blocks.push_back(buffer);
+    }
+    Store(h.base, stream + 0, buffer + s.used);
+    Store(h.base, stream + 4, s.count);
+    Store(h.base, stream + 8, buffer);
+    Store(h.base, stream + 12, s.flags);
+    Store(h.base, stream + 16, s.handle);
+    Store(h.base, stream + 20, s.charbuf);
+    Store(h.base, stream + 24, s.bufsiz);
+    uint32_t name = 0;
+    if (s.tmpname) {
+      name = Block(h.base, 16);
+      blocks.push_back(name);
+    }
+    Store(h.base, stream + 28, name);
+    if (lock) {
+      InitSection(h, stream + 32);
+    }
+    if (s.handle < 32 &&
+        std::find(entries.begin(), entries.end(), s.handle) == entries.end()) {
+      entries.push_back(s.handle);  // set by the first stream that names it
+      const uint32_t entry = handles + 44 * s.handle;
+      uint32_t os = s.os_kind == 1 ? s.junk : 0xFFFFFFFFu;
+      if (s.os_kind == 0) {
+        SeekFile file(h, "\\Device\\Harddisk0\\Cache0", 0xC0000000u);
+        os = file.handle != 0 ? file.handle : 0xFFFFFFFFu;
+        if (file.handle != 0) {
+          files.emplace_back(entry, file.handle);
+        }
+        file.handle = 0;
+      }
+      Store(h.base, entry + 0, os);
+      guest::StoreU8(h.base, entry + 4, s.entry_flags);
+      Store(h.base, entry + 8, 1);
+      InitSection(h, entry + 12);
+    }
+  }
+  // A stream's words with its blocks' addresses as markers (2 + which, or 1
+  // for one freed), an entry's OS handle 0x0505 when it's the side's file.
+  void StreamOutputs(Outputs& out, uint32_t stream) {
+    for (uint32_t offset = 0; offset < 32; offset += 4) {
+      uint32_t word = Load(h.base, stream + offset);
+      for (size_t i = 0; i < blocks.size(); i++) {
+        if (word >= blocks[i] && word < blocks[i] + 64 && offset != 4 && offset != 12) {
+          word = 0x0B000000u + uint32_t(i) * 0x100u + (word - blocks[i]);
+        }
+      }
+      out.Word(word);
+    }
+  }
+  void EntryOutputs(Outputs& out, uint32_t entry) {
+    uint32_t os = Load(h.base, entry + 0);
+    for (auto& [file_entry, file] : files) {
+      if (os == file) {
+        os = 0x0505u;
+      }
+    }
+    out.Word(os);
+    out.Bytes(Read(h.base, entry + 4, 40));
+  }
+  void Release(Outputs& out) {
+    HeldOutputs(out, blocks);
+    for (auto& [entry, file] : files) {
+      const bool open = Load(h.base, entry + 0) == file;
+      out.Word(open);
+      if (open) {
+        PPCContext k = CallContext(h);
+        k.r3.u64 = file;
+        __imp__NtClose(k, h.base);
+      }
+    }
+  }
+};
+
+// _fclose_nolock and fclose: a null stream, or a test stream (TestStream) in
+// a block of its own or, for fclose, one of _iob's whose lock is made at boot
+// (put back after). errno, _doserrno and the last error random before, the
+// invalid parameter handler the shared "returns 0". Compared: r3 (64 bits),
+// the stream (its blocks as markers), its handle's entry, its lock, errno,
+// _doserrno, the last error, the blocks still held, the files still open and,
+// for fclose, the caller's frame + 20.
+void FcloseCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(256, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || own == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: fclose: no handle block, thread data, lock 10, "
+                  "block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  std::vector<uint32_t> boot_streams;
+  for (uint32_t i = 3; i < 20; i++) {
+    if (BootLock(h, 16 + i)) {
+      boot_streams.push_back(i);
+    }
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool fclose;
+  };
+  for (const Fn& fn : {Fn{"_fclose_nolock (sub_825A94C0)", __imp__sub_825A94C0,
+                          ITC_CONTEXT_FN(hooks::CoreFcloseNolock), false},
+                       Fn{"fclose (sub_825A9580)", __imp__sub_825A9580, ITC_CONTEXT_FN(hooks::CoreFclose), true}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 64; c++) {
+      const bool null = h.random.Below(12) == 0;
+      const bool in_iob = fn.fclose && !boot_streams.empty() && h.random.Below(4) == 0;
+      const uint32_t stream =
+          null ? 0
+          : in_iob ? cc::kIob + 32 * boot_streams[h.random.Below(uint32_t(boot_streams.size()))]
+                   : own;
+      const TestStream s = TestStream::Pick(h, nhandle);
+      const uint32_t entry = handles + 44 * (s.handle & 31);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}, {in_iob ? stream : own, 32}});
+        StreamWorld world(h, handles);
+        if (stream != 0) {
+          world.Set(stream, s, !in_iob);
+        }
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = stream;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (stream != 0) {
+          world.StreamOutputs(out[v], stream);
+          if (!in_iob) {
+            out[v].Bytes(Section(h, stream + 32));
+          }
+        }
+        world.EntryOutputs(out[v], entry);
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.fclose) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        world.Release(out[v]);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
+// _fcloseall: _nstream (3 to 40) and __piob swapped for a test table for the
+// case (both put back after), lock 1 made at boot: each slot from 3 empty or
+// a test stream (TestStream; in a block of the harness's below 20, a C
+// runtime heap block from 20, as _fcloseall frees those), the handles' entries
+// set by the streams (3 to 31, the whole first block put back after). errno,
+// _doserrno and the last error random before, the invalid parameter handler
+// the shared "returns 0". Compared: r3 (64 bits), the table, each stream left
+// (below 20), the first block's entries, errno, _doserrno, the last error,
+// the blocks still held and the files still open.
+void FcloseallCases(Context& h) {
+  Results results("_fcloseall (sub_825B4E78)");
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64 * 20 + 4 * 40, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || !BootLock(h, 1) || own == 0 ||
+      !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _fcloseall: no handle block, thread data, locks 1 "
+                  "and 10, block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const uint32_t table = own + 64 * 20;
+  const uint32_t nstream = Load(h.base, cc::kNstream), piob = Load(h.base, cc::kPiob);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  for (int c = 0; c < 32; c++) {
+    const uint32_t count = 3 + h.random.Below(38);
+    std::vector<std::pair<bool, TestStream>> streams;
+    for (uint32_t i = 0; i < count; i++) {
+      streams.emplace_back(i >= 3 && h.random.Below(3) != 0, TestStream::Pick(h, nhandle));
+    }
+    const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+    const uint32_t last = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{handles, 44 * 32}, {slots.data + 8, 8}});
+      StreamWorld world(h, handles);
+      std::vector<uint32_t> heap_streams;
+      for (uint32_t i = 0; i < count; i++) {
+        uint32_t stream = 0;
+        if (streams[i].first) {
+          if (i < 20) {
+            stream = own + 64 * i;
+          } else {
+            stream = Block(h.base, 64);
+            heap_streams.push_back(stream);
+          }
+          world.Set(stream, streams[i].second);
+        }
+        Store(h.base, table + 4 * i, stream);
+      }
+      Store(h.base, cc::kNstream, count);
+      Store(h.base, cc::kPiob, table);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, slots.data + 12, doserr);
+      SetLastError(h, last);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825B4E78 : ITC_CONTEXT_FN(hooks::CoreFcloseall))(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      Store(h.base, cc::kNstream, nstream);
+      Store(h.base, cc::kPiob, piob);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (uint32_t i = 0; i < count; i++) {
+        uint32_t word = Load(h.base, table + 4 * i);
+        for (size_t k = 0; k < heap_streams.size(); k++) {
+          if (word == heap_streams[k]) {
+            word = 0x0C000000u + uint32_t(k);
+          }
+        }
+        out[v].Word(word);
+        if (streams[i].first && i < 20) {
+          world.StreamOutputs(out[v], own + 64 * i);
+          out[v].Bytes(Section(h, own + 64 * i + 32));
+        }
+      }
+      for (uint32_t e = 3; e < 32; e++) {
+        world.EntryOutputs(out[v], handles + 44 * e);
+      }
+      out[v].Bytes(Read(h.base, slots.data + 8, 8));
+      out[v].Word(GuestLastError(h));
+      world.Release(out[v]);
+      HeldOutputs(out[v], heap_streams);
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+  results.Report();
+}
+
+
+// A stream's flags for _flsbuf, _stbuf and _ftbuf: random, the string bit
+// mostly clear, the buffer bits (0x10C) clear half the time, the read and
+// end-of-file bits random.
+uint32_t BufferFlags(Context& h) {
+  uint32_t flags = uint32_t(h.random.Next());
+  if (h.random.Below(4) != 0) {
+    flags &= ~0x40u;
+  }
+  if (h.random.Below(2) == 0) {
+    flags &= ~0x10Cu;
+  }
+  if (h.random.Below(5) == 0) {
+    flags &= ~0x82u;
+  }
+  return flags;
+}
+
+// _flsbuf, _stbuf and _ftbuf: a test stream (TestStream, its flags from
+// BufferFlags; its pointer at the buffer most of the time) in a block of the
+// harness's, or stdout or stderr (put back after), or a null one for
+// _stbuf; its handle's entry as fclose's (writes to the null device's file
+// take no bytes; for _flsbuf only handles below 32, as it reads a handle's
+// entry without a range check); the character random. errno, _doserrno and the last error
+// random before, the invalid parameter handler the shared "returns 0".
+// Compared: r3 (64 bits), the stream (its blocks as markers, and a buffer
+// _getbuf made, then freed), its entry, errno, _doserrno, the last error,
+// _cflush, the scratch buffer's first 64 bytes (and a block buffer's), the
+// caller's frame + 20 for _flsbuf, the blocks held and the files left open.
+void StreamBufferCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || own == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _flsbuf: no handle block, thread data, lock 10, "
+                  "block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t cflush = Load(h.base, 0x82971174);
+  const uint32_t scratch = h.data + 3072;
+  enum Which { kFlsbuf, kStbuf, kFtbuf };
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    Which which;
+  };
+  for (const Fn& fn : {Fn{"_flsbuf (sub_825AEE28)", __imp__sub_825AEE28, ITC_CONTEXT_FN(hooks::CoreFlsbuf), kFlsbuf},
+                       Fn{"_stbuf (sub_825B40B8)", __imp__sub_825B40B8, ITC_CONTEXT_FN(hooks::CoreStbuf), kStbuf},
+                       Fn{"_ftbuf (sub_825B41A0)", __imp__sub_825B41A0, ITC_CONTEXT_FN(hooks::CoreFtbuf), kFtbuf}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 96; c++) {
+      const uint32_t where = h.random.Below(8);
+      const bool null = fn.which == kStbuf && where == 0;
+      const bool standard = !null && where < 3;
+      const uint32_t stream = null ? 0 : standard ? cc::kIob + 32 * (1 + h.random.Below(2)) : own;
+      TestStream s = TestStream::Pick(h, nhandle);
+      s.flags = BufferFlags(h);
+      if (fn.which == kFlsbuf && s.handle >= 32) {
+        // _flsbuf reads the entry of a handle past _nhandle unchecked (the
+        // block after the first is 0: a wild read on both sides).
+        s.handle -= nhandle - 3;
+      }
+      if (h.random.Below(3) != 0) {
+        s.used = 0;
+      }
+      const uint32_t r3 = h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next());
+      const uint32_t entry = handles + 44 * (s.handle & 31);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      std::vector<uint8_t> bytes(64);
+      for (auto& b : bytes) {
+        b = uint8_t(h.random.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}, {standard ? stream : own, 32}});
+        StreamWorld world(h, handles);
+        if (stream != 0) {
+          world.Set(stream, s, !standard);
+        }
+        Write(h.base, scratch, bytes.data(), 64);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        Store(h.base, 0x82971174, 5);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        if (fn.which == kStbuf) {
+          t.r3.u64 = stream;
+        } else {
+          t.r3.u64 = r3;
+          t.r4.u64 = stream;
+        }
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (stream != 0) {
+          // A buffer _getbuf made: compared by its size, then freed.
+          const uint32_t buffer = Load(h.base, stream + 8);
+          const bool made = buffer != scratch && buffer != stream + 20 &&
+                            std::find(world.blocks.begin(), world.blocks.end(), buffer) ==
+                                world.blocks.end() &&
+                            memory::IsHeapBlock(buffer);
+          if (made) {
+            out[v].Word(memory::Size(buffer));
+            out[v].Word(Load(h.base, stream + 0) - buffer);
+            out[v].Word(guest::LoadU8(h.base, buffer));
+            Store(h.base, stream + 0, 0x0D000000u);
+            Store(h.base, stream + 8, 0x0D000000u);
+            memory::crt::Free(buffer);
+          }
+          world.StreamOutputs(out[v], stream);
+          for (uint32_t block : world.blocks) {
+            if (memory::IsHeapBlock(block)) {
+              out[v].Bytes(Read(h.base, block, 64));
+            }
+          }
+        }
+        out[v].Bytes(Read(h.base, scratch, 64));
+        world.EntryOutputs(out[v], entry);
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        out[v].Word(Load(h.base, 0x82971174));
+        if (fn.which == kFlsbuf) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        world.Release(out[v]);
+        Store(h.base, 0x82971174, cflush);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
+
+// bsearch: tables of fixed-width strings (widths 1 to 16, 0 to 40 entries,
+// zero-padded, sorted as _stricmp orders them) in the scratch area, keys
+// from the table (their case changed now and then) or random; the compare
+// _stricmp (sub_825AA100), the shared "returns 0" or "returns 1"
+// (sub_825C8390); and the error cases (a null base with a count, a width of
+// 0, a null compare). errno random before, the invalid parameter handler the
+// shared "returns 0". Compared: r3 (64 bits) and errno.
+void BsearchCases(Context& h) {
+  Results results("bsearch (sub_825AC970)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: bsearch: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t table = h.data + 1024, key = h.data + 960;
+  const auto fold = [](const std::string& a, const std::string& b) {
+    for (size_t i = 0;; i++) {
+      const int x = i < a.size() ? std::tolower(uint8_t(a[i])) : 0;
+      const int y = i < b.size() ? std::tolower(uint8_t(b[i])) : 0;
+      if (x != y || x == 0) {
+        return x < y;
+      }
+    }
+  };
+  for (int c = 0; c < 200; c++) {
+    const uint32_t width = 1 + h.random.Below(16);
+    const uint32_t count = h.random.Below(41);
+    std::vector<std::string> entries;
+    for (uint32_t i = 0; i < count; i++) {
+      entries.push_back(RandomText(h, h.random.Below(width), "abcdefgh"));
+    }
+    std::sort(entries.begin(), entries.end(), fold);
+    std::string wanted = !entries.empty() && h.random.Below(3) != 0
+                             ? entries[h.random.Below(uint32_t(entries.size()))]
+                             : RandomText(h, h.random.Below(17), "abcdefghi");
+    if (h.random.Below(4) == 0) {
+      for (char& ch : wanted) {
+        ch = char(std::toupper(uint8_t(ch)));
+      }
+    }
+    const uint32_t pick = h.random.Below(12);
+    const uint32_t compare = pick == 0 ? kReturnsZero : pick == 1 ? 0x825C8390u : pick == 2 ? 0
+                                                                                            : 0x825AA100u;
+    const uint32_t first = h.random.Below(16) == 0 ? 0 : table;
+    const uint32_t width_arg = h.random.Below(16) == 0 ? 0 : width;
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, table, 16 * 40, 0);
+      for (uint32_t i = 0; i < count; i++) {
+        WriteText(h, table + width * i, entries[i]);
+      }
+      WriteText(h, key, wanted);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = key;
+      t.r4.u64 = first;
+      t.r5.u64 = count;
+      t.r6.u64 = width_arg;
+      t.r7.u64 = compare;
+      (v == 0 ? __imp__sub_825AC970 : ITC_CONTEXT_FN(hooks::CoreBsearch))(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, slots.data + 8));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _cftoe2_l: a buffer in the scratch area (0xCD around it; for the %g flag a
+// digit text in it first, with a sign now and then), sizes 0, -1, around
+// the precision's limit (precision + 9) and larger, precisions -3 to 20, caps
+// or not, _fltout2's result (+0 a sign, '-' or not; +4 decimal exponents
+// near 0, around +-100 and +-10, the extremes; +12 digits, "0" now and then)
+// and _outputformat's bit 0 set or not (put back after). errno random
+// before, the invalid parameter handler the shared "returns 0". Compared:
+// r3 (64 bits), 96 bytes around the buffer and errno.
+void Cftoe2Cases(Context& h) {
+  Results results("_cftoe2_l (sub_825ADF28)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _cftoe2_l: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t format = Load(h.base, 0x82971358);
+  const uint32_t area = h.data + 1024, buffer = area + 16, strflt = h.data + 960,
+                 digits = h.data + 1200;
+  for (int c = 0; c < 400; c++) {
+    const int32_t precision = h.random.Below(8) == 0 ? -int32_t(h.random.Below(4))
+                                                     : int32_t(h.random.Below(21));
+    const uint32_t size_pick = h.random.Below(8);
+    const uint32_t limit = uint32_t(precision > 0 ? precision : 0) + 9;
+    const uint32_t size = size_pick == 0   ? 0
+                          : size_pick == 1 ? 0xFFFFFFFFu
+                          : size_pick == 2 ? limit - h.random.Below(3)
+                          : size_pick == 3 ? limit + 1
+                                           : limit + 1 + h.random.Below(40);
+    const bool null = h.random.Below(20) == 0;
+    const uint32_t caps = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+    const int32_t g_format = h.random.Below(2) == 0 ? 0 : int8_t(h.random.Next() | 1);
+    const uint32_t sign = h.random.Below(2) == 0 ? 45 : h.random.Below(2) == 0 ? 32 : uint32_t(h.random.Next());
+    const uint32_t exponent_pick = h.random.Below(6);
+    const int32_t exponent = exponent_pick == 0   ? int32_t(h.random.Below(5)) - 2
+                             : exponent_pick == 1 ? int32_t(h.random.Below(41)) - 20
+                             : exponent_pick == 2 ? int32_t(h.random.Below(400)) - 200
+                             : exponent_pick == 3 ? (h.random.Below(2) == 0 ? INT32_MIN : INT32_MAX)
+                                                  : int32_t(h.random.Below(700)) - 350;
+    const std::string mantissa = h.random.Below(6) == 0 ? "0" : RandomText(h, 1 + h.random.Below(20), "0123456789");
+    std::string text = RandomText(h, 1 + h.random.Below(22), "0123456789");
+    if (sign == 45 && h.random.Below(4) != 0) {
+      text = "-" + text;
+    }
+    const uint32_t outputformat = h.random.Below(2) == 0 ? (format & ~1u) : (format | 1u);
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, 96);
+      if (g_format != 0) {
+        WriteText(h, buffer, text);
+      }
+      WriteText(h, digits, mantissa);
+      Store(h.base, strflt + 0, sign);
+      Store(h.base, strflt + 4, uint32_t(exponent));
+      Store(h.base, strflt + 8, 0x5A5A5A5Au);
+      Store(h.base, strflt + 12, digits);
+      Store(h.base, 0x82971358, outputformat);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = null ? 0 : buffer;
+      t.r4.u64 = size;
+      t.r5.u64 = uint64_t(int64_t(precision));
+      t.r6.u64 = caps;
+      t.r7.u64 = strflt;
+      t.r8.u64 = uint32_t(g_format);
+      (v == 0 ? __imp__sub_825ADF28 : ITC_CONTEXT_FN(hooks::CoreCftoe2))(t, h.base);
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      Store(h.base, 0x82971358, format);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, area, 96));
+      out[v].Word(Load(h.base, slots.data + 8));
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// __CxxSetUnhandledExceptionFilter: the unhandled filter's word random, the
+// previous one's random; under the exit lock's host mutex (both sides take it
+// again), the exit table's end and the word there put back after each side.
+// Only while the game's table has room for one more (atexit would grow it
+// otherwise: skipped, logged). Compared: r3 (64 bits), both filter words, the
+// end's move and the word atexit stored.
+void CxxSetFilterCases(Context& h) {
+  Results results("__CxxSetUnhandledExceptionFilter (sub_825DAC58)");
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  const uint32_t begin = Load(h.base, c_runtime::kExitTableBegin);
+  const uint32_t end = Load(h.base, c_runtime::kExitTableEnd);
+  const uint32_t size = memory::crt::Msize(begin).value_or(0);
+  if (begin == 0 || size < end - begin + 4) {
+    ITC_LOG_ERROR("harness: c_runtime_core: __CxxSetUnhandledExceptionFilter: the exit table "
+                  "has no room");
+    return;
+  }
+  const uint32_t filter = Load(h.base, kFilter), previous = Load(h.base, cc::kCxxPreviousFilter);
+  const uint32_t word = Load(h.base, end);
+  for (int c = 0; c < 16; c++) {
+    const uint32_t old_filter = c == 0 ? filter : uint32_t(h.random.Next());
+    const uint32_t old_previous = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, kFilter, old_filter);
+      Store(h.base, cc::kCxxPreviousFilter, old_previous);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825DAC58 : ITC_CONTEXT_FN(hooks::CoreCxxSetUnhandledExceptionFilter))(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(Load(h.base, kFilter));
+      out[v].Word(Load(h.base, cc::kCxxPreviousFilter));
+      out[v].Word(Load(h.base, c_runtime::kExitTableBegin) == begin);
+      out[v].Word(Load(h.base, c_runtime::kExitTableEnd) - end);
+      out[v].Word(Load(h.base, end));
+      Store(h.base, c_runtime::kExitTableEnd, end);
+      Store(h.base, end, word);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  Store(h.base, kFilter, filter);
+  Store(h.base, cc::kCxxPreviousFilter, previous);
+  results.Report();
+}
+
+
+// _fflush_nolock, fflush, flsall, _flushall and _endstdio: _nstream (0 to
+// 32) and __piob swapped for a test table for the case (both put back
+// after; for _endstdio a C runtime heap block, as it frees it, and at most 20
+// slots), each slot empty or a test stream (TestStream, its flags from
+// BufferFlags with the commit bit 0x4000 now and then) in a block of the
+// harness's; slots below 20 hold streams only where their lock (16 + the
+// slot) was made at boot (_lock would make the others for good), those from
+// 20 their own lock at +32. Locks 1 and 10 made at boot. The single-stream
+// calls take one of the table's streams, stdout or stderr (fflush), or 0
+// (the whole table). flsall's flag 0, 1 or random; _exitflag ([0x82971144])
+// set or not for _endstdio (put back after). errno, _doserrno and the last
+// error random before, the invalid parameter handler the shared "returns
+// 0". Compared: r3 (64 bits; not for _endstdio, which leaves free's), the
+// table, the streams, the first block's entries, errno, _doserrno, the last
+// error, the caller's frame + 20 (fflush, flsall), the blocks held (the
+// table for _endstdio) and the files left open.
+void FlushAllCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64 * 32 + 4 * 32, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || !BootLock(h, 1) || own == 0 ||
+      !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: flsall: no handle block, thread data, locks 1 and "
+                  "10, block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const uint32_t own_table = own + 64 * 32;
+  const uint32_t nstream = Load(h.base, cc::kNstream), piob = Load(h.base, cc::kPiob);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint8_t exitflag = guest::LoadU8(h.base, 0x82971144);
+  enum Which { kNolock, kFflush, kFlsall, kFlushall, kEndstdio };
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+    Which which;
+  };
+  for (const Fn& fn :
+       {Fn{"_fflush_nolock (sub_825ACD10)", __imp__sub_825ACD10, ITC_CONTEXT_FN(hooks::CoreFflushNolock), kNolock},
+        Fn{"fflush (sub_825ACF70)", __imp__sub_825ACF70, ITC_CONTEXT_FN(hooks::CoreFflush), kFflush},
+        Fn{"flsall (sub_825ACD90)", __imp__sub_825ACD90, ITC_CONTEXT_FN(hooks::CoreFlsall), kFlsall},
+        Fn{"_flushall (sub_825AD068)", __imp__sub_825AD068, ITC_CONTEXT_FN(hooks::CoreFlushall), kFlushall},
+        Fn{"_endstdio (sub_825AD5F8)", __imp__sub_825AD5F8, ITC_CONTEXT_FN(hooks::CoreEndstdio), kEndstdio}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 48; c++) {
+      const uint32_t count = h.random.Below(fn.which == kEndstdio ? 21 : 33);
+      std::vector<std::pair<bool, TestStream>> streams;
+      for (uint32_t i = 0; i < count; i++) {
+        const bool usable = i >= 20 || BootLock(h, 16 + i);
+        TestStream s = TestStream::Pick(h, nhandle);
+        s.flags = BufferFlags(h) & ~0x4000u;
+        if (h.random.Below(4) == 0) {
+          s.flags |= 0x4000;
+        }
+        if (h.random.Below(3) != 0) {
+          s.used = h.random.Below(2) == 0 ? 0 : h.random.Below(16);
+        }
+        streams.emplace_back(usable && h.random.Below(4) != 0, s);
+      }
+      std::vector<uint32_t> present;
+      for (uint32_t i = 0; i < count; i++) {
+        if (streams[i].first) {
+          present.push_back(i);
+        }
+      }
+      const uint32_t pick = h.random.Below(6);
+      uint32_t stream_arg = 0;
+      if ((fn.which == kNolock || fn.which == kFflush) && pick != 0) {
+        if (fn.which == kFflush && pick == 1) {
+          stream_arg = cc::kIob + 32 * (1 + h.random.Below(2));
+        } else if (!present.empty()) {
+          stream_arg = own + 64 * present[h.random.Below(uint32_t(present.size()))];
+        }
+      }
+      const uint32_t flag = h.random.Below(5) == 0 ? uint32_t(h.random.Next()) : h.random.Below(2);
+      const uint8_t exit_byte = h.random.Below(2) == 0 ? 0 : uint8_t(h.random.Next() | 1);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{handles, 44 * 32}, {slots.data + 8, 8}});
+        StreamWorld world(h, handles);
+        const uint32_t table = fn.which == kEndstdio ? Block(h.base, 4 * 32) : own_table;
+        for (uint32_t i = 0; i < count; i++) {
+          uint32_t stream = 0;
+          if (streams[i].first) {
+            stream = own + 64 * i;
+            world.Set(stream, streams[i].second);
+          }
+          Store(h.base, table + 4 * i, stream);
+        }
+        Store(h.base, cc::kNstream, count);
+        Store(h.base, cc::kPiob, table);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        guest::StoreU8(h.base, 0x82971144, exit_byte);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = fn.which == kFlsall ? flag : stream_arg;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        Store(h.base, cc::kNstream, nstream);
+        Store(h.base, cc::kPiob, piob);
+        guest::StoreU8(h.base, 0x82971144, exitflag);
+        if (fn.which != kEndstdio) {
+          out[v].Word(t.r3.u32);
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+        }
+        const bool table_held = memory::IsHeapBlock(table);
+        for (uint32_t i = 0; i < count && (fn.which != kEndstdio || table_held); i++) {
+          out[v].Word(Load(h.base, table + 4 * i));
+        }
+        for (uint32_t i = 0; i < count; i++) {
+          if (streams[i].first) {
+            world.StreamOutputs(out[v], own + 64 * i);
+            if (i >= 20) {
+              out[v].Bytes(Section(h, own + 64 * i + 32));
+            }
+          }
+        }
+        for (uint32_t e = 3; e < 32; e++) {
+          world.EntryOutputs(out[v], handles + 44 * e);
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        if (fn.which == kFflush || fn.which == kFlsall) {
+          out[v].Word(Load(h.base, t.r1.u32 + 20));
+        }
+        world.Release(out[v]);
+        if (fn.which == kEndstdio) {
+          HeldOutputs(out[v], {table});
+        }
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
+
+// doexit and _cexit, only on the path where _C_Exit_Done (0x8297114C) is 1
+// (set for the case, put back after): the exit lock taken and given back,
+// nothing run. Its other paths call the game's exit functions and
+// terminators or end the process (KeBugCheck): checked by reading. doexit's
+// r3 and r4 random, r5 (return to the caller) random but not 0;
+// _C_Termination_Done and _exitflag random (put back after). Compared: r3
+// (64 bits), both words, _exitflag and the caller's frame + 20.
+void DoexitCases(Context& h) {
+  const uint32_t exit_done = Load(h.base, cc::kCExitDone);
+  const uint32_t termination_done = Load(h.base, cc::kCTerminationDone);
+  const uint8_t exitflag = guest::LoadU8(h.base, cc::kExitFlag);
+  struct Fn {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  for (const Fn& fn : {Fn{"doexit (sub_825AA218)", __imp__sub_825AA218, ITC_CONTEXT_FN(hooks::CoreDoexit)},
+                       Fn{"_cexit (sub_825AA388)", __imp__sub_825AA388, ITC_CONTEXT_FN(hooks::CoreCexit)}}) {
+    Results results(fn.name);
+    for (int c = 0; c < 24; c++) {
+      const uint32_t code = uint32_t(h.random.Next());
+      const uint32_t quick = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next());
+      const uint32_t ret = uint32_t(h.random.Next()) | 1;
+      const uint32_t termination = h.random.Below(2) == 0 ? 1 : uint32_t(h.random.Next());
+      const uint8_t flag = uint8_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Store(h.base, cc::kCExitDone, 1);
+        Store(h.base, cc::kCTerminationDone, termination);
+        guest::StoreU8(h.base, cc::kExitFlag, flag);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = code;
+        t.r4.u64 = quick;
+        t.r5.u64 = ret;
+        (v == 0 ? fn.recompiled : fn.native)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(Load(h.base, cc::kCExitDone));
+        out[v].Word(Load(h.base, cc::kCTerminationDone));
+        out[v].Word(guest::LoadU8(h.base, cc::kExitFlag));
+        out[v].Word(Load(h.base, t.r1.u32 + 20));
+        Store(h.base, cc::kCExitDone, exit_done);
+        Store(h.base, cc::kCTerminationDone, termination_done);
+        guest::StoreU8(h.base, cc::kExitFlag, exitflag);
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+// raise on every path but the default action's (0: _exit, which ends the
+// process; checked by reading): SIGINT, SIGBREAK, SIGABRT (6 and 22) and
+// SIGTERM with their action words (put back after) 1 (ignored), the shared
+// "returns 0" or SetUnhandledExceptionFilter (which leaves the signal it's
+// called with in its word, put back after); SIGILL, SIGFPE and SIGSEGV through
+// a copy of the thread's action table in the scratch area (its data's +92
+// pointed there, the data's words put back after), the signal's entry given
+// one of those actions and the others random words; or without thread data
+// (the store failing: -1); and signals raise doesn't take (errno 22 and
+// _invalid_parameter, its handler the shared "returns 0"). Compared: r3 (64
+// bits), the copy, the four action words, the data's +92 to +104, errno, the
+// filter word and the caller's frame + 20.
+void RaiseCases(Context& h) {
+  Results results("raise (sub_825B49C8)");
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: raise: no thread data");
+    return;
+  }
+  const uint32_t count = Load(h.base, cc::kXcptActTabCount);
+  const uint32_t table = Load(h.base, slots.data + 92);
+  const uint32_t first = Load(h.base, cc::kFirstFpe), fpes = Load(h.base, cc::kFpeCount);
+  if (count == 0 || count > 40 || first + fpes > count) {
+    ITC_LOG_ERROR("harness: c_runtime_core: raise: unexpected action table ({} entries, FPE {} + {})",
+                  count, first, fpes);
+    return;
+  }
+  const std::vector<uint8_t> original = Read(h.base, table, 12 * count);
+  const uint32_t copy = h.data + 2048;
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const int32_t signals[] = {2, 21, 6, 22, 15, 4, 8, 11, 0, 1, 3, 5, 7, 9, 10, 12, 14, 16, 20, 23, -1};
+  const uint32_t actions[] = {1, kReturnsZero, 0x82297870};
+  for (int c = 0; c < 96; c++) {
+    const int32_t sig = c < 63 ? signals[c % 21]
+                               : int32_t(h.random.Below(3) == 0 ? h.random.Next() : h.random.Below(30));
+    const uint32_t action = actions[h.random.Below(3)];
+    const bool thread = sig == 4 || sig == 8 || sig == 11;
+    const int kind = thread && h.random.Below(4) == 0 ? 2 : 0;
+    std::vector<uint8_t> fill = original;
+    for (uint32_t e = 0; e < count; e++) {
+      const uint32_t word = uint32_t(h.random.Next());
+      for (int b = 0; b < 4; b++) {
+        fill[12 * e + 8 + b] = uint8_t(word >> (24 - 8 * b));
+      }
+    }
+    // The signal's first entry gets the action (as the original's walk finds it).
+    for (uint32_t e = 0; e < count; e++) {
+      const uint32_t entry_signal = (uint32_t(fill[12 * e + 4]) << 24) | (uint32_t(fill[12 * e + 5]) << 16) |
+                                    (uint32_t(fill[12 * e + 6]) << 8) | fill[12 * e + 7];
+      if (int32_t(entry_signal) == sig) {
+        for (int b = 0; b < 4; b++) {
+          fill[12 * e + 8 + b] = uint8_t(action >> (24 - 8 * b));
+        }
+        break;
+      }
+    }
+    const uint32_t globals[4] = {uint32_t(h.random.Next()), uint32_t(h.random.Next()),
+                                 uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    const uint32_t data_words[2] = {uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    const uint32_t err = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved saved(h, {{cc::kSignalActions, 16}, {kFilter, 4}, {slots.data + 8, 4},
+                      {slots.data + 92, 12}});
+      Write(h.base, copy, fill.data(), uint32_t(fill.size()));
+      for (int i = 0; i < 4; i++) {
+        Store(h.base, cc::kSignalActions + 4 * i, globals[i]);
+      }
+      if (!thread) {
+        const uint32_t slot = sig == 2    ? 0
+                              : sig == 21 ? 4
+                              : sig == 15 ? 12
+                                          : 8;
+        Store(h.base, cc::kSignalActions + slot, action);
+      }
+      Store(h.base, slots.data + 92, copy);
+      Store(h.base, slots.data + 96, data_words[0]);
+      Store(h.base, slots.data + 100, data_words[1]);
+      Store(h.base, slots.data + 8, err);
+      Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+      WithThreadData(h, slots, kind, [&] {
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
+        t.r3.u64 = uint32_t(sig);
+        (v == 0 ? __imp__sub_825B49C8 : ITC_CONTEXT_FN(hooks::CoreRaise))(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(Load(h.base, t.r1.u32 + 20));
+      });
+      Store(h.base, cc::kInvalidParameterHandler, handler);
+      out[v].Bytes(Read(h.base, copy, 12 * count));
+      out[v].Bytes(Read(h.base, cc::kSignalActions, 16));
+      out[v].Bytes(Read(h.base, slots.data + 92, 12));
+      out[v].Word(Load(h.base, slots.data + 8));
+      out[v].Word(Load(h.base, kFilter));
+      saved.Restore();
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
+// _fwrite_nolock and fputs: a test stream (TestStream, its flags from
+// BufferFlags; its pointer within 16 bytes of the buffer, the buffer size
+// +24 random, small or 0) in a block of the harness's, or stdout or stderr
+// (put back after; for fputs only when their locks were made at boot); a
+// handle below 32 (_flsbuf, which they call, reads a handle's entry without
+// a range check), or -1 or -2 (the bad entry) now and then; its entry as
+// fclose's (writes to the null device's file take no bytes), its text mode
+// byte (+40) 0, 1 or random. The text in the
+// scratch area, 0 to 32 bytes (_fwrite_nolock: sizes 0 to 4 and counts to 8
+// within it); a null string or stream for fputs. errno, _doserrno and the
+// last error random before, the invalid parameter handler the shared
+// "returns 0". Compared: r3 (64 bits), the stream (its blocks as markers, a
+// buffer _getbuf made, then freed), its entry, errno, _doserrno, the last
+// error, _cflush, the scratch buffer's first 64 bytes (and a block
+// buffer's), the blocks held, the files left open, and for fputs the caller's
+// frame + 28.
+void FputsCases(Context& h) {
+  const uint32_t handles = Load(h.base, cc::kPioinfo);
+  ThreadSlots slots(h);
+  const uint32_t own = memory::Alloc(64, 0);
+  if (handles == 0 || slots.data == 0 || !BootLock(h, 10) || own == 0 || !HeapOnLayer()) {
+    ITC_LOG_ERROR("harness: c_runtime_core: fputs: no handle block, thread data, lock 10, "
+                  "block or heap on the layer");
+    memory::Free(own);
+    return;
+  }
+  const bool standard_locks = BootLock(h, 17) && BootLock(h, 18);
+  const uint32_t nhandle = Load(h.base, cc::kNhandle);
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t cflush = Load(h.base, 0x82971174);
+  const uint32_t scratch = h.data + 3072;
+  const uint32_t text = h.data;
+  for (const bool fputs : {false, true}) {
+    Results results(fputs ? "fputs (sub_825AD280)" : "_fwrite_nolock (sub_825A96A0)");
+    for (int c = 0; c < 128; c++) {
+      const uint32_t where = h.random.Below(8);
+      const bool null_stream = fputs && where == 0;
+      const bool standard = !null_stream && where < 3 && (!fputs || standard_locks);
+      const uint32_t stream =
+          null_stream ? 0 : standard ? cc::kIob + 32 * (1 + h.random.Below(2)) : own;
+      TestStream s = TestStream::Pick(h, nhandle);
+      s.flags = BufferFlags(h);
+      if (s.handle >= 32) {
+        s.handle -= nhandle - 3;
+      }
+      const uint32_t bad = h.random.Below(10);
+      if (bad == 0) {
+        s.handle = 0xFFFFFFFFu;
+      } else if (bad == 1) {
+        s.handle = 0xFFFFFFFEu;
+      }
+      s.used = h.random.Below(16);
+      const uint32_t size_kind = h.random.Below(3);
+      s.bufsiz = size_kind == 0 ? uint32_t(h.random.Next()) : size_kind == 1 ? h.random.Below(40) : 0;
+      if (h.random.Below(3) == 0) {
+        s.count = h.random.Below(40);
+      }
+      const uint32_t length = h.random.Below(33);
+      std::vector<uint8_t> bytes(64);
+      for (auto& b : bytes) {
+        b = uint8_t(1 + h.random.Below(255));
+      }
+      bytes[length] = 0;
+      const bool null_string = fputs && h.random.Below(12) == 0;
+      const uint32_t mode_pick = h.random.Below(6);
+      const uint8_t mode = mode_pick == 0 ? 1 : mode_pick == 1 ? uint8_t(h.random.Next()) : 0;
+      const uint32_t size = h.random.Below(5), count = h.random.Below(9);
+      const uint32_t item_size = size * count <= 32 ? size : 1;
+      const uint64_t count_word = (uint64_t(h.random.Next()) << 32) | count;
+      const uint32_t entry = handles + 44 * (s.handle & 31);
+      const uint32_t err = uint32_t(h.random.Next()), doserr = uint32_t(h.random.Next());
+      const uint32_t last = uint32_t(h.random.Next());
+      std::vector<uint8_t> scratch_bytes(64);
+      for (auto& b : scratch_bytes) {
+        b = uint8_t(h.random.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved saved(h, {{entry, 44}, {slots.data + 8, 8}, {standard ? stream : own, 32}});
+        StreamWorld world(h, handles);
+        TestStream set = s;
+        if (set.handle >= 32) {
+          set.handle = 0x7FFFFFFFu;  // no entry made by Set
+        }
+        if (stream != 0) {
+          world.Set(stream, set, !standard);
+          Store(h.base, stream + 16, s.handle);
+        }
+        if (s.handle < 32) {
+          guest::StoreU8(h.base, entry + 40, mode);
+        }
+        Write(h.base, text, bytes.data(), 64);
+        Write(h.base, scratch, scratch_bytes.data(), 64);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, slots.data + 12, doserr);
+        Store(h.base, 0x82971174, 5);
+        SetLastError(h, last);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        Store(h.base, t.r1.u32 + 28, 0xCDCDCDCDu);
+        if (fputs) {
+          t.r3.u64 = null_string ? 0 : text;
+          t.r4.u64 = stream;
+          (v == 0 ? __imp__sub_825AD280 : ITC_CONTEXT_FN(hooks::CoreFputs))(t, h.base);
+        } else {
+          t.r3.u64 = text;
+          t.r4.u64 = item_size;
+          t.r5.u64 = count_word;
+          t.r6.u64 = stream;
+          (v == 0 ? __imp__sub_825A96A0 : ITC_CONTEXT_FN(hooks::CoreFwriteNolock))(t, h.base);
+        }
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (stream != 0) {
+          const uint32_t buffer = Load(h.base, stream + 8);
+          const bool made = buffer != scratch && buffer != stream + 20 &&
+                            std::find(world.blocks.begin(), world.blocks.end(), buffer) ==
+                                world.blocks.end() &&
+                            memory::IsHeapBlock(buffer);
+          if (made) {
+            out[v].Word(memory::Size(buffer));
+            out[v].Word(Load(h.base, stream + 0) - buffer);
+            out[v].Bytes(Read(h.base, buffer, 64));
+            Store(h.base, stream + 0, 0x0D000000u);
+            Store(h.base, stream + 8, 0x0D000000u);
+            memory::crt::Free(buffer);
+          }
+          world.StreamOutputs(out[v], stream);
+          for (uint32_t block : world.blocks) {
+            if (memory::IsHeapBlock(block)) {
+              out[v].Bytes(Read(h.base, block, 64));
+            }
+          }
+        }
+        out[v].Bytes(Read(h.base, scratch, 64));
+        out[v].Bytes(Read(h.base, text, 64));
+        if (s.handle < 32) {
+          world.EntryOutputs(out[v], entry);
+        }
+        out[v].Bytes(Read(h.base, slots.data + 8, 8));
+        out[v].Word(GuestLastError(h));
+        out[v].Word(Load(h.base, 0x82971174));
+        if (fputs) {
+          out[v].Word(Load(h.base, t.r1.u32 + 28));
+        }
+        world.Release(out[v]);
+        Store(h.base, 0x82971174, cflush);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+  memory::Free(own);
+  SetLastError(h, slots.error);
+}
+
+// _cftoe_l and _cftog_l (with _fltout2 over guest memory and _fptostr's,
+// _cftof2_l's and _cftoe2_l's plain C++): doubles (zeros, infinities, NaNs,
+// denormals, values that round up a digit at the precision, powers of ten
+// and random bits) at a word in the scratch area, a buffer there (0xCD
+// around it), sizes 0, -1, small and large, null buffers now and then,
+// precisions -3 to 20, caps random, the locale word random, _outputformat's
+// bit 0 set or not (put back after). errno random before, the invalid
+// parameter handler the shared "returns 0". Compared: r3 (64 bits), the
+// buffer's area and errno.
+void CftoeCftogCases(Context& h) {
+  ThreadSlots slots(h);
+  if (slots.data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime_core: _cftoe_l: no thread data");
+    return;
+  }
+  const uint32_t handler = Load(h.base, cc::kInvalidParameterHandler);
+  const uint32_t format = Load(h.base, 0x82971358);
+  const uint32_t area = h.data + 1024, buffer = area + 16, number = h.data + 896;
+  const double specials[] = {0.0, -0.0, 1.0, -1.0, 0.5, 9.5, 9.95, 99.95, 0.00095, 0.0001, 1e-5,
+                             123456.789, 1e21, 1e300, -1e-300, 5e-324, 2.2250738585072014e-308,
+                             9.999999999999999e22, 0.1, 1.0 / 3.0};
+  for (const bool g : {false, true}) {
+    Results results(g ? "_cftog_l (sub_825AE9D0)" : "_cftoe_l (sub_825AE1A8)");
+    for (int c = 0; c < 600; c++) {
+      uint64_t bits;
+      const uint32_t pick = h.random.Below(8);
+      if (pick < 3) {
+        bits = std::bit_cast<uint64_t>(specials[h.random.Below(std::size(specials))]);
+      } else if (pick == 3) {
+        const uint64_t kinds[] = {0x7FF0000000000000ull, 0xFFF0000000000000ull,
+                                  0x7FF8000000000000ull, 0xFFF8000000000001ull,
+                                  0x7FF0000000000001ull, 0x0000000000000001ull,
+                                  0x800FFFFFFFFFFFFFull};
+        bits = kinds[h.random.Below(std::size(kinds))];
+      } else if (pick == 4) {
+        // Nines that round up at some precision.
+        double value = 0;
+        const uint32_t nines = 1 + h.random.Below(17);
+        for (uint32_t k = 0; k < nines; k++) value = value * 10 + 9;
+        value *= std::pow(10.0, int(h.random.Below(40)) - 20);
+        bits = std::bit_cast<uint64_t>(h.random.Below(2) == 0 ? value : -value);
+      } else if (pick == 5) {
+        bits = std::bit_cast<uint64_t>(std::pow(10.0, int(h.random.Below(80)) - 40));
+      } else {
+        bits = (uint64_t(h.random.Next()) << 32) | uint32_t(h.random.Next());
+      }
+      const int32_t precision = h.random.Below(8) == 0 ? -int32_t(h.random.Below(4))
+                                                       : int32_t(h.random.Below(21));
+      const uint32_t size_pick = h.random.Below(8);
+      const uint32_t limit = uint32_t(precision > 0 ? precision : 0) + 9;
+      const uint32_t size = size_pick == 0   ? 0
+                            : size_pick == 1 ? 0xFFFFFFFFu
+                            : size_pick == 2 ? h.random.Below(limit + 2)
+                            : size_pick == 3 ? limit + 1
+                                             : limit + 1 + h.random.Below(40);
+      const bool null = h.random.Below(20) == 0;
+      const uint32_t caps = h.random.Below(2) == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint32_t locale = uint32_t(h.random.Next());
+      const uint32_t outputformat = h.random.Below(2) == 0 ? (format & ~1u) : (format | 1u);
+      const uint32_t err = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, area, 96);
+        Store(h.base, number, uint32_t(bits >> 32));
+        Store(h.base, number + 4, uint32_t(bits));
+        Store(h.base, 0x82971358, outputformat);
+        Store(h.base, slots.data + 8, err);
+        Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = number;
+        t.r4.u64 = null ? 0 : buffer;
+        t.r5.u64 = size;
+        t.r6.u64 = uint64_t(int64_t(precision));
+        t.r7.u64 = caps;
+        t.r8.u64 = locale;
+        if (g) {
+          (v == 0 ? __imp__sub_825AE9D0 : ITC_CONTEXT_FN(hooks::CoreCftog))(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825AE1A8 : ITC_CONTEXT_FN(hooks::CoreCftoe))(t, h.base);
+        }
+        Store(h.base, cc::kInvalidParameterHandler, handler);
+        Store(h.base, 0x82971358, format);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, area, 96));
+        out[v].Word(Load(h.base, slots.data + 8));
+      }
+      results.Check(out[0], out[1], "case " + std::to_string(c));
+    }
+    results.Report();
+  }
+}
+
+}  // namespace
+
+void CRuntimeCore(Context& h) {
+  TlsAllocCases(h);
+  SetFlsGetValueCases(h);
+  GetptdNoexitCases(h);
+  FreeFlsCases(h);
+  MtDeleteLocksCases(h);
+  MtTermCases(h);
+  ErrnoCases(h);
+  OsErrCases(h);
+  DosMapErrCases(h);
+  FreePtdCases(h);
+  CritSecCases(h);
+  RegisterNotifyCases(h);
+  CallNotifyCases(h);
+  MtInitLocksCases(h);
+  ThreadNotifyCases(h);
+  MtInitCases(h);
+  StrtolCases(h);
+  StrrchrCases(h);
+  InittermCases(h);
+  GlobalCases(h, "_set_abort_behavior (sub_825AD120)", 0x8266B7C4, __imp__sub_825AD120,
+              ITC_CONTEXT_FN(hooks::CoreSetAbortBehavior));
+  GlobalCases(h, "__get_sigabrt (sub_825B49B0)", 0x82971340, __imp__sub_825B49B0,
+              ITC_CONTEXT_FN(hooks::CoreGetSigabrt));
+  GlobalCases(h, "_crt_debugger_hook (sub_825B68B8)", 0x8297820C, __imp__sub_825B68B8,
+              ITC_CONTEXT_FN(hooks::CoreCrtDebuggerHook));
+  GlobalCases(h, "_ValidateExecute (sub_825B8910)", h.data + 64, __imp__sub_825B8910,
+              ITC_CONTEXT_FN(hooks::CoreValidateExecute));
+  GlobalCases(h, "SetUnhandledExceptionFilter (sub_82297870)", kFilter, __imp__sub_82297870,
+              ITC_CONTEXT_FN(hooks::CoreSetUnhandledExceptionFilter));
+  GlobalCases(h, "GetCommandLineA (sub_822979D0)", 0x820007EC, __imp__sub_822979D0,
+              ITC_CONTEXT_FN(hooks::CoreGetCommandLineA), false);
+  PositiveCases(h);
+  NmsgWriteCases(h);
+  BufferCases(h);
+  HandleCases(h);
+  IoInitCases(h);
+  InittermECases(h);
+  InitStdioCases(h);
+  FfMsgBannerCases(h);
+  LockFileCases(h);
+  UnlockFhandleCases(h);
+  AmsgExitCases(h);
+  GetptdCases(h);
+  InvalidParameterCases(h);
+  UnhandledFilterCases(h);
+  DebugMonitorCases(h);
+  CxxRestoreFilterCases(h);
+  LockFhandleCases(h);
+  FinallyCases(h);
+  OsHandleCases(h);
+  ExpCases(h);
+  NumberTextCases(h);
+  Ld12ToFloatCases(h);
+  AtoNumberCases(h);
+  FilenoCases(h);
+  StreamFinallyCases(h);
+  CloseCases(h);
+  FlushCases(h);
+  SetFilePointerCases(h);
+  LseekCases(h);
+  WriteFileCases(h);
+  WriteCases(h);
+  FlushStreamCases(h);
+  CxxUnhandledFilterCases(h);
+  FcloseCases(h);
+  FcloseallCases(h);
+  StreamBufferCases(h);
+  BsearchCases(h);
+  Cftoe2Cases(h);
+  CxxSetFilterCases(h);
+  FlushAllCases(h);
+  DoexitCases(h);
+  RaiseCases(h);
+  FputsCases(h);
+  CftoeCftogCases(h);
+}
+
+}  // namespace harness

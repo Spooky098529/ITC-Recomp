@@ -1,0 +1,303 @@
+// The front end's screen helpers natively: adapters in front of
+// src/front_end_screen_helpers/ (docs/functions/front-end-screen-helpers.md),
+// with the register steps the harness shares
+// (hooks/front_end_screen_helpers.h).
+
+#include "hooks/front_end_screen_helpers.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "front_end_screen_helpers/front_end_screen_helpers.h"
+#include "hooks/heap.h"
+
+#include <optional>
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_front_end_screen_helpers, true, "ITC",
+              "Run the front end's screen helpers (docs/functions/front-end-screen-helpers.md: "
+              "the modes' releases ModeType2::Release sub_82196EC0, ModeType4::Release "
+              "sub_82224AB8, ModeType5::Release sub_8222FB90, ModeType9::Release sub_8225D590, "
+              "ModeType10::Release sub_82288898 and ModeType12::Release sub_82277DB0 (the block "
+              "over the allocation layer, the original where it isn't its pages; the sound "
+              "manager's IsCuePlaying and StopCue through its vtable, StandScene::Release's plain "
+              "C++, Strings::Release and UiMovies::DeleteAll's jump through their overrides); "
+              "the dialogs' text setters SaveScreen::SetText sub_821A51C8, SetNote sub_821A52C0 "
+              "and SetMessage sub_821A5360, Options::SetSaveDialogText sub_821C0D70, "
+              "SetSaveDialogNote sub_821C0E50, SetCategory6DialogText sub_821C0BF0 and "
+              "SetCategory6DialogNote sub_821C0CD0 (the UI movie setters through their "
+              "overrides, their unset varargs 0) and SaveScreen::ShowNotice sub_821A63B0; the "
+              "car cards CarCard::Fill sub_821821C8, CarCard::FillDetail sub_821827E0 and "
+              "CarDetail::Open sub_821830C0; SaveScreen::StartCheck sub_821A5450 and Start "
+              "sub_821A5540, Options::SetUpSavePage sub_821C6D48 and SetUpCategory6Page "
+              "sub_821C6E50 (MenuList::Init, SaveSlots::State, ShowPrompts and "
+              "SaveBuffers::Create through their overrides, the setters' varargs 0) and "
+              "CarCards::FillAll sub_821822F8; the dialogs' steps SaveScreen::ShowMessage "
+              "sub_821A5668, ShowMessage3 sub_821A5980 and ShowMessage4 sub_821A5D00 and "
+              "Options::ShowSaveDialog sub_821C6638 and ShowCategory6Dialog sub_821C69D0 (with "
+              "their split-off case 0s; the setters' plain C++, their unset varargs 0; the UI "
+              "movie calls, MenuList::, MenuSound::Play and ShowPrompts through their "
+              "overrides)) natively instead of through the translated code "
+              "(the same writes; checked by --run_harnesses=front_end_screen_helpers)");
+
+namespace hooks {
+
+namespace {
+
+namespace fe = front_end_screen_helpers;
+
+// The guest calls the plain C++ makes (front_end_screen_helpers::Calls),
+// through this context: r1, r3 to r10, f1 when given and lr set, the
+// function run through the function table (its override when it has one),
+// r1 put back. The adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  fe::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  lifted::Regs& ctx_;
+  uint64_t lr_;
+};
+
+bool Set(lifted::Regs& ctx, const std::optional<uint64_t>& r3) {
+  if (!r3) {
+    return false;
+  }
+  ctx.r3.u64 = *r3;
+  return true;
+}
+
+using Release = std::optional<uint64_t> (*)(uint32_t, uint32_t, const fe::Calls&);
+
+bool RunRelease(lifted::Regs& ctx, Release release) {
+  GuestCalls guest(ctx);
+  return Set(ctx, release(ctx.r3.u32, ctx.r1.u32, guest.calls()));
+}
+
+void Varargs(const lifted::Regs& ctx, uint64_t varargs[7]) {
+  const uint64_t from[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                            ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  for (int i = 0; i < 7; i++) {
+    varargs[i] = from[i];
+  }
+}
+
+}  // namespace
+
+bool FrontEndModeType2Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType2Release);
+}
+bool FrontEndModeType4Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType4Release);
+}
+bool FrontEndModeType5Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType5Release);
+}
+bool FrontEndModeType9Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType9Release);
+}
+bool FrontEndModeType10Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType10Release);
+}
+bool FrontEndModeType12Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType12Release);
+}
+
+ITC_REGS_STEP(FrontEndSaveScreenSetText) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 = fe::SaveScreenSetText(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenSetNote) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 = fe::SaveScreenSetNote(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenSetMessage) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 = fe::SaveScreenSetMessage(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetSaveDialogText) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 =
+      fe::OptionsSetDialogText(13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetSaveDialogNote) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 =
+      fe::OptionsSetDialogNote(13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogText) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 =
+      fe::OptionsSetDialogText(14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogNote) {
+  GuestCalls guest(ctx);
+  uint64_t varargs[7];
+  Varargs(ctx, varargs);
+  ctx.r3.u64 =
+      fe::OptionsSetDialogNote(14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenShowNotice) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowNotice(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(FrontEndSaveScreenStartCheck) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenStartCheck(ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenStart) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenStart(ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetUpSavePage) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(13, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsSetUpCategory6Page) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(14, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(0, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage3) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(1, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage4) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(2, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsShowSaveDialog) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsShowDialog(13, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndOptionsShowCategory6Dialog) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsShowDialog(14, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndCarCardsFillAll) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardsFillAll(ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(FrontEndCarCardFill) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardFill(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndCarCardFillDetail) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardFillDetail(ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(FrontEndCarDetailOpen) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarDetailOpen(ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+}  // namespace hooks
+
+#define ITC_FRONT_END_HELPERS(address, step)              \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_front_end_screen_helpers)) { \
+    hooks::step(ctx);                               \
+  }
+
+#define ITC_FRONT_END_RELEASE(address, step)                                         \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                               \
+    \
+    if (!ITC_FLAG(native_front_end_screen_helpers) || !hooks::NativeHeapActive() ||  \
+        !hooks::step(ctx)) {                                                   \
+      lifted::original::c##address(ctx);                                               \
+    }                                                                                \
+  }
+
+// The modes' releases: slot 1 of their vtables, from Modes::Tick (no
+// direct callers).
+ITC_FRONT_END_RELEASE(82196EC0, FrontEndModeType2Release)
+ITC_FRONT_END_RELEASE(82224AB8, FrontEndModeType4Release)
+ITC_FRONT_END_RELEASE(8222FB90, FrontEndModeType5Release)
+ITC_FRONT_END_RELEASE(8225D590, FrontEndModeType9Release)
+ITC_FRONT_END_RELEASE(82288898, FrontEndModeType10Release)
+ITC_FRONT_END_RELEASE(82277DB0, FrontEndModeType12Release)
+
+// No adapters for the dialogs' text setters SaveScreen::SetText
+// sub_821A51C8 and SetNote sub_821A52C0, Options::SetSaveDialogText
+// sub_821C0D70, SetSaveDialogNote sub_821C0E50, SetCategory6DialogText
+// sub_821C0BF0 and SetCategory6DialogNote sub_821C0CD0 (removed, B7 loop,
+// 2026-11-08): their callers in play (the save screen's and the options'
+// steps and starts) are native, the flag switches those; their steps above
+// are the harness's. SaveScreen::ShowMessage5 sub_821A6030 (never seen in
+// play) reaches the originals.
+// The save screen's step 6 (its Update's table, no direct callers).
+ITC_FRONT_END_HELPERS(821A63B0, FrontEndSaveScreenShowNotice)
+// No adapter for SaveScreen::SetMessage sub_821A5360: its only caller,
+// ShowNotice, is native (the flag switches it); its step above is the
+// harness's.
+
+// No adapters for the save screen's starts SaveScreen::StartCheck
+// sub_821A5450 and Start sub_821A5540 (removed, B7 loop, 2026-11-09): their
+// callers, SaveScreen::Show sub_821A6608 and its case 0 sub_821A6650, are
+// native (--native_save_screen switches them); their steps above are the
+// harness's. The options' dialog pages' set-ups (from Options::OpenCategory
+// sub_821C7188, recompiled).
+ITC_FRONT_END_HELPERS(821C6D48, FrontEndOptionsSetUpSavePage)
+ITC_FRONT_END_HELPERS(821C6E50, FrontEndOptionsSetUpCategory6Page)
+// The dialogs' steps: the save screen's Update table (steps 0, 3 and 4)
+// and Options::Update's (43 and 46), no direct callers. Their jump tables'
+// split-off case 0 functions (sub_821A56E8, sub_821A5A00, sub_821A5D7C,
+// sub_821C66BC, sub_821C6A54) are reached only from those tables, so they
+// need no adapters.
+ITC_FRONT_END_HELPERS(821A5668, FrontEndSaveScreenShowMessage)
+ITC_FRONT_END_HELPERS(821A5980, FrontEndSaveScreenShowMessage3)
+ITC_FRONT_END_HELPERS(821A5D00, FrontEndSaveScreenShowMessage4)
+ITC_FRONT_END_HELPERS(821C6638, FrontEndOptionsShowSaveDialog)
+ITC_FRONT_END_HELPERS(821C69D0, FrontEndOptionsShowCategory6Dialog)
+// CarCards::FillAll (from sub_82183DE0 and sub_82184488, recompiled).
+ITC_FRONT_END_HELPERS(821822F8, FrontEndCarCardsFillAll)
+
+// The car cards: Fill from CarCards::FillAll and sub_82183DE0 (recompiled),
+// Open through a functor (no direct callers). No adapter for
+// CarCard::FillDetail sub_821827E0: its only caller, Open, is native (the
+// flag switches it); its step above is the harness's.
+ITC_FRONT_END_HELPERS(821821C8, FrontEndCarCardFill)
+ITC_FRONT_END_HELPERS(821830C0, FrontEndCarDetailOpen)

@@ -1,0 +1,643 @@
+# The schema of docs/functions/texture-compression.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XGraphics' surface compression (XGCompressSurface and D3DX's image
+# blitter linked into the game; in play only the vinyl sheet's A8R8G8B8 to
+# DXT5): the image codecs (one 128-byte object for the 30 plain formats,
+# each with its own vtable; the DXT codec, 256 bytes, and the YUV one, 176,
+# over the same first 128 bytes), the blit object and the image
+# descriptions on XGCompressSurface's stack, the float4 rows and pixels the
+# codecs and block encoders pass around, the DXT codec's block caches and
+# the DXT blocks. Names from src/texture_compression/ (codecs.h's `codec`
+# and `description` namespaces, blitter.h's `blit`), the rows and
+# docs/known-data.md.
+
+# A plain image codec (ImageCodec::ImageCodec sub_823EA800, made by
+# ImageCodec::Create sub_823F6C60): the base and the 30 plain formats'
+# classes (their vtables 0x8203B808 to 0x8203B9D8) are one object.
+[ImageCodec]
+measure = "ImageCodec"
+measures = [
+  "A16B16G16R16Codec",
+  "A16B16G16R16FCodec",
+  "A1R5G5B5Codec",
+  "A2B10G10R10Codec",
+  "A2R10G10B10Codec",
+  "A2W10V10U10Codec",
+  "A32B32G32R32FCodec",
+  "A4R4G4B4Codec",
+  "A8B8G8R8Codec",
+  "A8Codec",
+  "A8L8Codec",
+  "A8R8G8B8Codec",
+  "G16R16Codec",
+  "G16R16FCodec",
+  "G32R32FCodec",
+  "L16Codec",
+  "L6V5U5Codec",
+  "L8Codec",
+  "Q16W16V16U16Codec",
+  "Q8W8V8U8Codec",
+  "R16FCodec",
+  "R32FCodec",
+  "R5G6B5Codec",
+  "V16U16Codec",
+  "V8U8Codec",
+  "X1R5G5B5Codec",
+  "X4R4G4B4Codec",
+  "X8B8G8R8Codec",
+  "X8L8V8U8Codec",
+  "X8R8G8B8Codec",
+]
+size = 128
+origin = "allocated"
+vtable = 0x8203B778
+# Host (E5 step 5, 2026-11-24): made only by ImageCodec::Create's plain C++
+# (src/texture_compression/codecs.cpp, schema::ImageCodec::New; its lifted
+# original has no entry), freed by the scalar deleting destructor's plain C++
+# or its lifted original (operator delete, which frees handles). The surface
+# (+32) stays in guest memory: the renderer reads it (step 7).
+storage = "host"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ImageCodecVtable", note = "the base 0x8203B778 (constructor, destructor), then the format's (0x8203B808-0x8203B9D8)" },
+  { name = "format", offset = 4, type = "u32", note = "the description's, without bit 8 (tiled)" },
+  { name = "kind", offset = 8, type = "u32", note = "the channels: 1 unsigned, 2 mixed signed, 3 signed, 4 float" },
+  { name = "has_bits", offset = 12, type = "u32", note = "bits per pixel isn't 0 (not a block format)" },
+  { name = "srgb", offset = 16, type = "u32", note = "sRGB (in for a decode, out for an encode)" },
+  { name = "srgb_both", offset = 20, type = "u32", note = "both sides sRGB (ImageCodec::Prepare)" },
+  { name = "color_key", offset = 24, type = "u32", note = "the color key (0: none)" },
+  { name = "palette_set", offset = 28, type = "u32", note = "0 (ImageCodec::Create's LoadPalette test)" },
+  { name = "surface", offset = 32, type = "ptr", to = "ImageCodecData", note = "the data, at the box's corner for a plain format (named `data` before E5 step 5: a host view's member)" },
+  { name = "color_key_red", offset = 36, type = "f32", note = "the color key's channels times 1/255" },
+  { name = "color_key_green", offset = 40, type = "f32" },
+  { name = "color_key_blue", offset = 44, type = "f32" },
+  { name = "color_key_alpha", offset = 48, type = "f32" },
+  { name = "rounding", offset = 52, type = "u32", note = "the rounding table: 0x8263C768 (0.5s), or the dither's 0x8263C7E8" },
+  { name = "palette", offset = 56, type = "u32", note = "operator new (ImageCodec::LoadPalette): 1,024 bytes" },
+  { name = "box_left", offset = 60, type = "u32", note = "the box: left, top, right, bottom, front, back (0, 0, 0 at its corner for a plain format)" },
+  { name = "box_top", offset = 64, type = "u32" },
+  { name = "box_right", offset = 68, type = "u32" },
+  { name = "box_bottom", offset = 72, type = "u32" },
+  { name = "box_front", offset = 76, type = "u32" },
+  { name = "box_back", offset = 80, type = "u32" },
+  { name = "convert_from", offset = 84, type = "u32", note = "the other side's channel kind (ConvertRange; 0 none)" },
+  { name = "row", offset = 88, type = "ptr", to = "TcFloat4", note = "a float4 row (operator new, ImageCodec::Prepare)" },
+  { name = "error_row", offset = 92, type = "ptr", to = "TcFloat4", note = "the error diffusion's (width + 2) float4s (operator new), or 0" },
+  { name = "row_pitch", offset = 96, type = "u32" },
+  { name = "slice_pitch", offset = 100, type = "u32" },
+  { name = "width", offset = 104, type = "u32", note = "the box's size" },
+  { name = "height", offset = 108, type = "u32" },
+  { name = "depth", offset = 112, type = "u32" },
+  { name = "row_bytes", offset = 116, type = "u32", note = "width x bytes per pixel" },
+  { name = "bytes_per_pixel", offset = 120, type = "u32" },
+]
+
+# The codecs' vtables (16 bytes each; docs/known-data.md).
+[ImageCodecVtable]
+measure = "ImageCodec.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "the scalar deleting destructor (r4 the flags)" },
+  { name = "decode_row", offset = 4, type = "fn", note = "a row to float4s: r4 the row, r5 the slice, r6 the float4s" },
+  { name = "encode_row", offset = 8, type = "fn", note = "a row from float4s, as decode_row" },
+  { name = "quantize_color_key", offset = 12, type = "fn", note = "the color key quantized to the format" },
+]
+
+# The image's data as the codecs read and write it (a pixel's bytes, by the
+# format; the rows' accesses are indexed). Also the source's swapped copy
+# (HeapAlloc, XGCompressSurface).
+[ImageCodecData]
+measure = "ImageCodec.+32"
+measures = [
+  "A16B16G16R16Codec.+32",
+  "A1R5G5B5Codec.+32",
+  "A2B10G10R10Codec.+32",
+  "A2R10G10B10Codec.+32",
+  "A2W10V10U10Codec.+32",
+  "A4R4G4B4Codec.+32",
+  "A8B8G8R8Codec.+32",
+  "A8Codec.+32",
+  "A8L8Codec.+32",
+  "A8R8G8B8Codec.+32",
+  "G16R16Codec.+32",
+  "G32R32FCodec.+32",
+  "L16Codec.+32",
+  "L6V5U5Codec.+32",
+  "L8Codec.+32",
+  "Q16W16V16U16Codec.+32",
+  "Q8W8V8U8Codec.+32",
+  "R32FCodec.+32",
+  "R5G6B5Codec.+32",
+  "V16U16Codec.+32",
+  "V8U8Codec.+32",
+  "X1R5G5B5Codec.+32",
+  "X4R4G4B4Codec.+32",
+  "X8B8G8R8Codec.+32",
+  "X8L8V8U8Codec.+32",
+  "X8R8G8B8Codec.+32",
+  "YuvCodec.+32",
+  "new<?>@XGCompressSurface",
+]
+size = 4
+origin = "file"
+fields = [
+  { name = "byte0", offset = 0, type = "u8" },
+  { name = "half0", offset = 0, type = "u16" },
+  { name = "byte1", offset = 1, type = "u8" },
+  { name = "half1", offset = 2, type = "u16" },
+]
+
+# A float4: a pixel of the float4 rows the codecs decode to and encode from
+# (red, green, blue, alpha), a block's 16 pixels, the codecs' row and error
+# row, the filters' rows (operator new), and the endpoints the block
+# encoders fit (DxtColor::FitEndpoints' three floats, DxtAlpha's one or
+# 16).
+[TcFloat4]
+measures = [
+  "ImageCodec.+68",
+  "ImageCodec.+88",
+  "ImageCodec::LinearToSrgb.ret",
+  "ImageCodec::ConvertRange.r4",
+  "ImageCodec::ApplyColorKey.r4",
+  "ImageCodec::LinearToSrgb.r4",
+  "ImageCodec::SrgbToLinear.r4",
+  "ImageCodec::AddDiffusionError.r4",
+  "Dxt",
+  "Dxt1::EncodeBlock.r4",
+  "Dxt23::EncodeBlockPremultiplied.r4",
+  "DxtAlpha::EncodeBlock.r4",
+  "DxtColor::EncodeBlock.r4",
+  "DxtColor::FitEndpoints.r4",
+  "DxtColor::FitEndpoints.r5",
+  "DxtAlpha::FitEndpoints.r4",
+  "DxtAlpha::FitEndpoints.r5",
+  "A16B16G16R16Codec.+92",
+  "A1R5G5B5Codec.+92",
+  "A2B10G10R10Codec.+92",
+  "A2R10G10B10Codec.+92",
+  "A2W10V10U10Codec.+92",
+  "A4R4G4B4Codec.+92",
+  "A8B8G8R8Codec.+92",
+  "A8Codec.+92",
+  "A8L8Codec.+92",
+  "A8R8G8B8Codec.+92",
+  "G16R16Codec.+92",
+  "L16Codec.+92",
+  "L6V5U5Codec.+92",
+  "L8Codec.+92",
+  "Q16W16V16U16Codec.+92",
+  "Q8W8V8U8Codec.+92",
+  "R5G6B5Codec.+92",
+  "V16U16Codec.+92",
+  "V8U8Codec.+92",
+  "X1R5G5B5Codec.+92",
+  "X4R4G4B4Codec.+92",
+  "X8B8G8R8Codec.+92",
+  "X8L8V8U8Codec.+92",
+  "X8R8G8B8Codec.+92",
+  "A8R8G8B8Codec::DecodeRow.r6",
+  "X8R8G8B8Codec::DecodeRow.r6",
+  "R5G6B5Codec::DecodeRow.r6",
+  "X1R5G5B5Codec::DecodeRow.r6",
+  "A1R5G5B5Codec::DecodeRow.r6",
+  "A4R4G4B4Codec::DecodeRow.r6",
+  "A2B10G10R10Codec::DecodeRow.r6",
+  "A8B8G8R8Codec::DecodeRow.r6",
+  "X8B8G8R8Codec::DecodeRow.r6",
+  "G16R16Codec::DecodeRow.r6",
+  "A2R10G10B10Codec::DecodeRow.r6",
+  "A16B16G16R16Codec::DecodeRow.r6",
+  "A8Codec::DecodeRow.r6",
+  "X4R4G4B4Codec::DecodeRow.r6",
+  "L8Codec::DecodeRow.r6",
+  "A8L8Codec::DecodeRow.r6",
+  "V8U8Codec::DecodeRow.r6",
+  "L6V5U5Codec::DecodeRow.r6",
+  "X8L8V8U8Codec::DecodeRow.r6",
+  "Q8W8V8U8Codec::DecodeRow.r6",
+  "V16U16Codec::DecodeRow.r6",
+  "A2W10V10U10Codec::DecodeRow.r6",
+  "Q16W16V16U16Codec::DecodeRow.r6",
+  "L16Codec::DecodeRow.r6",
+  "R32FCodec::DecodeRow.r6",
+  "G32R32FCodec::DecodeRow.r6",
+  "DxtCodec::DecodeRow.r6",
+  "new<4294967295>@Blitter::FilterPoint",
+  "new<4294967295>@Blitter::FilterPoint#2",
+  "new<4294967295>@Blitter::FilterBox2D",
+  "new<4294967295>@Blitter::FilterBox3D",
+  "new<4294967295>@Blitter::FilterLinear2D",
+  "new<4294967295>@Blitter::FilterLinear2D#2",
+  "new<4294967295>@Blitter::FilterLinear3D",
+  "new<4294967295>@Blitter::FilterLinear3D#2",
+  "new<4294967295>@Blitter::FilterTriangle3D",
+  "new<4294967295>@Blitter::FilterTriangle3D#2",
+  "new<4294967295>@Blitter::FilterTriangle2D",
+  "new<4294967295>@Blitter::FilterTriangle2D#2",
+  "new<?>@Blitter::FilterBox2D",
+  "new<?>@Blitter::FilterBox3D",
+]
+size = 16
+origin = "file"
+# A blob (E5 step 5, 2026-11-24): the float4 rows and block rows, raw float
+# buffers read by address and by the lifted code's vector loads. Made by
+# the plain C++ (codecs.cpp: Prepare's row, the error row, EncodeRow's
+# block rows; blitter.cpp: ConvertRows' row; schema::TcFloat4::New) and in
+# lifted code by operator new (the size in r3): EncodeRow's original's
+# block row (0x823F6378), DxtCodec::DecodeRow's block row (0x823F68AC), and
+# the filters' rows (FilterNone 0x82369BE0, 0x82369C08; FilterPoint
+# 0x82369E08, 0x82369E3C; FilterBox2D 0x8236A27C, 0x8236A2BC, 0x8236A2E0;
+# FilterBox3D 0x8236A618, 0x8236A65C, 0x8236A698; FilterLinear2D 0x8236ABC4,
+# 0x8236ABF0; FilterLinear3D 0x8236AF8C, 0x8236AFB8; FilterTriangle3D
+# 0x8236B910, 0x8236BA00; FilterTriangle2D 0x8236C090, 0x8236C16C; never
+# seen in play). Freed by operator delete. Stack float4s stay where they
+# are (the view is by address).
+storage = "blob"
+blob_alloc = [
+  { call = 0x823F6378, reg = "r3" },
+  { call = 0x823F68AC, reg = "r3" },
+  { call = 0x82369BE0, reg = "r3" },
+  { call = 0x82369C08, reg = "r3" },
+  { call = 0x82369E08, reg = "r3" },
+  { call = 0x82369E3C, reg = "r3" },
+  { call = 0x8236A27C, reg = "r3" },
+  { call = 0x8236A2BC, reg = "r3" },
+  { call = 0x8236A2E0, reg = "r3" },
+  { call = 0x8236A618, reg = "r3" },
+  { call = 0x8236A65C, reg = "r3" },
+  { call = 0x8236A698, reg = "r3" },
+  { call = 0x8236ABC4, reg = "r3" },
+  { call = 0x8236ABF0, reg = "r3" },
+  { call = 0x8236AF8C, reg = "r3" },
+  { call = 0x8236AFB8, reg = "r3" },
+  { call = 0x8236B910, reg = "r3" },
+  { call = 0x8236BA00, reg = "r3" },
+  { call = 0x8236C090, reg = "r3" },
+  { call = 0x8236C16C, reg = "r3" },
+]
+fields = [
+  { name = "red", offset = 0, type = "f32" },
+  { name = "green", offset = 4, type = "f32" },
+  { name = "blue", offset = 8, type = "f32" },
+  { name = "alpha", offset = 12, type = "f32" },
+]
+
+# The DXT codec (DxtCodec::DxtCodec sub_823F5FA0, 256 bytes, vtable
+# 0x8203B9E8): ImageCodec's first 128 bytes, then the block's.
+[DxtCodec]
+measure = "DxtCodec"
+size = 256
+origin = "allocated"
+vtable = 0x8203B9E8
+# Host (E5 step 5, 2026-11-24): as ImageCodec (ImageCodec::Create's plain
+# C++, schema::DxtCodec::New); ImageCodec's views reach it through this
+# layout.
+storage = "host"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ImageCodecVtable", note = "0x8203B9E8 (the base 0x8203B778 inside ImageCodec's constructor and destructor)" },
+  { name = "format", offset = 4, type = "u32", note = "as ImageCodec's" },
+  { name = "kind", offset = 8, type = "u32" },
+  { name = "has_bits", offset = 12, type = "u32" },
+  { name = "srgb", offset = 16, type = "u32" },
+  { name = "srgb_both", offset = 20, type = "u32" },
+  { name = "color_key", offset = 24, type = "u32" },
+  { name = "palette_set", offset = 28, type = "u32" },
+  { name = "surface", offset = 32, type = "ptr", to = "ImageCodecData" },
+  { name = "color_key_red", offset = 36, type = "f32" },
+  { name = "color_key_green", offset = 40, type = "f32" },
+  { name = "color_key_blue", offset = 44, type = "f32" },
+  { name = "color_key_alpha", offset = 48, type = "f32" },
+  { name = "rounding", offset = 52, type = "u32" },
+  { name = "palette", offset = 56, type = "u32" },
+  { name = "box_left", offset = 60, type = "u32" },
+  { name = "box_top", offset = 64, type = "u32" },
+  { name = "box_right", offset = 68, type = "u32" },
+  { name = "box_bottom", offset = 72, type = "u32" },
+  { name = "box_front", offset = 76, type = "u32" },
+  { name = "box_back", offset = 80, type = "u32" },
+  { name = "convert_from", offset = 84, type = "u32" },
+  { name = "row", offset = 88, type = "ptr", to = "TcFloat4" },
+  { name = "error_row", offset = 92, type = "ptr", to = "TcFloat4" },
+  { name = "row_pitch", offset = 96, type = "u32" },
+  { name = "slice_pitch", offset = 100, type = "u32" },
+  { name = "width", offset = 104, type = "u32" },
+  { name = "height", offset = 108, type = "u32" },
+  { name = "depth", offset = 112, type = "u32" },
+  { name = "row_bytes", offset = 116, type = "u32" },
+  { name = "bytes_per_pixel", offset = 120, type = "u32" },
+  { name = "unknown_128", offset = 128, type = "f32" },
+  { name = "unknown_132", offset = 132, type = "f32" },
+  { name = "block_bytes", offset = 136, type = "u32", note = "8 (DXT1, 3A, 5A) or 16 (DXT2/3, 4/5)" },
+  { name = "decode_block", offset = 140, type = "fn", note = "r3 = 16 float4s, r4 = the block (DXT1 0x82421938, ...)" },
+  { name = "encode_block", offset = 144, type = "fn", note = "r3 = the block, r4 = 16 float4s, r5 = dither (DXT4/5 0x82422A68, ...)" },
+  { name = "extent_left", offset = 148, type = "u32", note = "the surface: 0, 0, width, height, 0, depth (the description's extent)" },
+  { name = "extent_top", offset = 152, type = "u32" },
+  { name = "extent_right", offset = 156, type = "u32" },
+  { name = "extent_bottom", offset = 160, type = "u32" },
+  { name = "extent_front", offset = 164, type = "u32" },
+  { name = "extent_back", offset = 168, type = "u32" },
+  { name = "block_extent_left", offset = 172, type = "u32", note = "the extent rounded out to blocks" },
+  { name = "block_extent_top", offset = 176, type = "u32" },
+  { name = "block_extent_right", offset = 180, type = "u32" },
+  { name = "block_extent_bottom", offset = 184, type = "u32" },
+  { name = "block_extent_front", offset = 188, type = "u32" },
+  { name = "block_extent_back", offset = 192, type = "u32" },
+  { name = "block_left", offset = 196, type = "u32", note = "the box rounded out to blocks (pixels)" },
+  { name = "block_top", offset = 200, type = "u32" },
+  { name = "block_right", offset = 204, type = "u32" },
+  { name = "block_bottom", offset = 208, type = "u32" },
+  { name = "front", offset = 212, type = "u32" },
+  { name = "back", offset = 216, type = "u32" },
+  { name = "block_columns", offset = 220, type = "u32" },
+  { name = "block_rows", offset = 224, type = "u32" },
+  { name = "slices", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u32", note = "-1 from DxtCodec::DxtCodec" },
+  { name = "unknown_236", offset = 236, type = "u32", note = "-1 from DxtCodec::DxtCodec" },
+  { name = "decode_cache", offset = 240, type = "ptr", to = "DxtBlockCacheEntry", note = "DxtCodec::DecodeRow's block row (operator new of block columns x 256 bytes: float4s, a TcFloat4 blob; never seen set), freed by ~DxtCodec" },
+  { name = "cache_count", offset = 244, type = "u32", note = "block rows held" },
+  { name = "cache", offset = 248, type = "ptr", to = "DxtBlockCacheEntry", note = "EncodeRow's: an entry a block row (by slice and block row)" },
+  { name = "dither", offset = 252, type = "u32", note = "the description's dither" },
+]
+
+# An entry of the DXT codec's block caches (8 bytes; EncodeRow's +248,
+# DecodeRow's +240).
+[DxtBlockCacheEntry]
+measures = ["new<4294967295>@DxtCodec::EncodeRow", "new<4294967295>@DxtCodec::DecodeRow"]
+size = 8
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the cache, one block of entries read by
+# address (DxtCodec::EncodeRow's plain C++, schema::DxtBlockCacheEntry::New;
+# its lifted original's operator new returning at 0x823F62F4, the size in
+# r3), cleared by memset; freed by ~DxtCodec (operator delete).
+storage = "blob"
+blob_alloc = [{ call = 0x823F62F4, reg = "r3" }]
+fields = [
+  { name = "rows_in", offset = 0, type = "u32", note = "a bit for each of the block row's four rows in" },
+  { name = "pixels", offset = 4, type = "ptr", to = "TcFloat4", note = "the block row's 16 float4s a block column (operator new)" },
+]
+
+# The YUV codec (YuvCodec::YuvCodec sub_823F55B0, 176 bytes, vtable
+# 0x8203B9F8; never seen in play): ImageCodec's first 128 bytes, then its
+# own.
+[YuvCodec]
+measure = "YuvCodec"
+size = 176
+origin = "allocated"
+vtable = 0x8203B9F8
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ImageCodecVtable" },
+  { name = "format", offset = 4, type = "u32", note = "as ImageCodec's" },
+  { name = "srgb", offset = 16, type = "u32" },
+  { name = "color_key", offset = 24, type = "u32" },
+  { name = "data", offset = 32, type = "ptr", to = "ImageCodecData" },
+  { name = "box_left", offset = 60, type = "u32" },
+  { name = "box_top", offset = 64, type = "u32" },
+  { name = "box_front", offset = 76, type = "u32" },
+  { name = "convert_from", offset = 84, type = "u32" },
+  { name = "row_pitch", offset = 96, type = "u32" },
+  { name = "slice_pitch", offset = 100, type = "u32" },
+  { name = "width", offset = 104, type = "u32" },
+  { name = "buffer", offset = 128, type = "ptr", to = "YuvCodecPixels", note = "the pixel pairs' float4s (operator new)" },
+  { name = "even_left", offset = 132, type = "u32", note = "the box widened to even columns" },
+  { name = "unknown_136", offset = 136, type = "u32" },
+  { name = "even_right", offset = 140, type = "u32" },
+  { name = "unknown_144", offset = 144, type = "u32" },
+  { name = "unknown_148", offset = 148, type = "u32" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "buffer_pixels", offset = 156, type = "u32", note = "the buffer's pixels" },
+  { name = "unknown_160", offset = 160, type = "u32" },
+  { name = "unknown_164", offset = 164, type = "u32", note = "0 without a buffer" },
+  { name = "unknown_168", offset = 168, type = "u32", note = "0 or 8 by the format (with +172: 0 and 8, or 8 and 0)" },
+  { name = "unknown_172", offset = 172, type = "u32" },
+]
+
+# The YUV codec's buffer: float4s (four read at once: two pixel pairs,
+# probably).
+[YuvCodecPixels]
+measure = "YuvCodec.+128"
+size = 64
+origin = "allocated"
+fields = [
+  { name = "pixel0_red", offset = 0, type = "f32" },
+  { name = "pixel0_green", offset = 4, type = "f32" },
+  { name = "pixel0_blue", offset = 8, type = "f32" },
+  { name = "pixel0_alpha", offset = 12, type = "f32" },
+  { name = "pixel1_red", offset = 16, type = "f32" },
+  { name = "pixel1_green", offset = 20, type = "f32" },
+  { name = "pixel1_blue", offset = 24, type = "f32" },
+  { name = "pixel1_alpha", offset = 28, type = "f32" },
+  { name = "pixel2_red", offset = 32, type = "f32" },
+  { name = "pixel2_green", offset = 36, type = "f32" },
+  { name = "pixel2_blue", offset = 40, type = "f32" },
+  { name = "pixel2_alpha", offset = 44, type = "f32" },
+  { name = "pixel3_red", offset = 48, type = "f32" },
+  { name = "pixel3_green", offset = 52, type = "f32" },
+  { name = "pixel3_blue", offset = 56, type = "f32" },
+  { name = "pixel3_alpha", offset = 60, type = "f32" },
+]
+
+# The blit object (12 bytes, on XGCompressSurface's stack at its r1 + 144;
+# Blitter::Blitter sub_82368D20, Init sub_8236C630, Release sub_82368D30).
+[Blitter]
+measures = ["Blitter", "Blitter::Init.ret"]
+size = 12
+origin = "stack"
+fields = [
+  { name = "frame_point_y", offset = -4, type = "u32", note = "not the blit object's: XGCompressSurface's word below it (the destination point's y when none is given), joined by the measure" },
+  { name = "source", offset = 0, type = "ptr", to = "ImageCodec", note = "the source's codec" },
+  { name = "destination", offset = 4, type = "ptr", to = "ImageCodec", note = "the destination's codec" },
+  { name = "filter", offset = 8, type = "u32", note = "the D3DX filter flags: low 16 bits 1 none, 2 point, 3 linear, 4 triangle, 5 box; 0x80000 dither, 0x100000 diffusion, 0x200000 sRGB in, 0x400000 sRGB out; bits 16-18 the mirror flags" },
+  { name = "filter_type", offset = 11, type = "u8", note = "the filter's low byte (its type)" },
+]
+
+# An image description (84 bytes, two on XGCompressSurface's stack at its
+# r1 + 160 (the destination) and + 288 (the source)): what the codecs are
+# made from.
+[ImageDescription]
+measures = ["Blitter::Init.r4", "Blitter::Init.r5"]
+size = 84
+origin = "stack"
+fields = [
+  { name = "data", offset = 0, type = "u32" },
+  { name = "format", offset = 4, type = "u32", note = "the codec's format (0x18280086 A8R8G8B8, 0x1A200054 DXT4/5, ...)" },
+  { name = "row_pitch", offset = 8, type = "u32" },
+  { name = "slice_pitch", offset = 12, type = "u32" },
+  { name = "extent_left", offset = 16, type = "u32", note = "the surface: 0, 0, width, height, 0, depth" },
+  { name = "extent_top", offset = 20, type = "u32" },
+  { name = "extent_right", offset = 24, type = "u32" },
+  { name = "extent_bottom", offset = 28, type = "u32" },
+  { name = "extent_front", offset = 32, type = "u32" },
+  { name = "extent_back", offset = 36, type = "u32" },
+  { name = "box_left", offset = 40, type = "u32", note = "the box: left, top, right, bottom, front, back" },
+  { name = "box_top", offset = 44, type = "u32" },
+  { name = "box_right", offset = 48, type = "u32" },
+  { name = "box_bottom", offset = 52, type = "u32" },
+  { name = "box_front", offset = 56, type = "u32" },
+  { name = "box_back", offset = 60, type = "u32" },
+  { name = "dither", offset = 64, type = "u32", note = "Blitter::Init: the filter's 0x80000" },
+  { name = "diffusion", offset = 68, type = "u32", note = "Blitter::Init: the filter's 0x100000" },
+  { name = "srgb", offset = 72, type = "u32", note = "Blitter::Init: the filter's 0x200000 (source) or 0x400000 (destination)" },
+  { name = "color_key", offset = 76, type = "u32" },
+  { name = "palette", offset = 80, type = "u32", note = "never read by ImageCodec::Create's paths" },
+]
+
+# XGGetBlockDimensions' out words (the block's width and height; on
+# XGCompressSurface's stack at its r1 + 276 and + 272).
+[TcBlockDimension]
+measures = ["XGGetBlockDimensions.r4", "XGGetBlockDimensions.r5"]
+size = 4
+origin = "stack"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# Blitter::LinearWeights' table (sub_8236A9C8, operator new; not read in
+# detail): two taps an entry (probably a source index and its weight each).
+[BlitLinearWeights]
+measures = ["Blitter::LinearWeights.ret", "new<4294967295>@Blitter::LinearWeights"]
+size = 16
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the table, read by address (entry - 8 in
+# the filters); operator new returning at 0x8236A9FC (lifted, size in r3);
+# freed by the linear filters' operator delete. Never seen in play.
+storage = "blob"
+blob_alloc = [{ call = 0x8236A9FC, reg = "r3" }]
+fields = [
+  { name = "first_index", offset = 0, type = "u32", note = "probably" },
+  { name = "first_weight", offset = 4, type = "f32", note = "probably" },
+  { name = "second_index", offset = 8, type = "u32", note = "probably" },
+  { name = "second_weight", offset = 12, type = "f32", note = "probably" },
+]
+
+# Blitter::TriangleWeights' list (sub_8236B418, operator new; not read in
+# detail; freed by sub_8236B718).
+[BlitTriangleWeights]
+measures = ["Blitter::TriangleWeights.ret", "new<?>@Blitter::TriangleWeights"]
+size = 24
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the list, read by address; operator new
+# returning at 0x8236B510 (lifted, size in r3); freed by
+# Blitter::FreeWeights (operator delete). Never seen in play.
+storage = "blob"
+blob_alloc = [{ call = 0x8236B510, reg = "r3" }]
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "first_index", offset = 8, type = "u32", note = "probably a tap's source index" },
+  { name = "first_weight", offset = 12, type = "f32", note = "probably its weight" },
+  { name = "second_index", offset = 16, type = "u32", note = "probably" },
+  { name = "second_weight", offset = 20, type = "f32", note = "probably" },
+]
+
+# A DXT color block (8 bytes: the two 5:6:5 ends and 16 two-bit indices;
+# DxtColor::EncodeBlock's r3, DecodeBlock's r4). The measure's DxtColor
+# also joins float4 pixels at the same pointer (the block encoders' r4):
+# their words below, under the float names.
+[DxtColorBlock]
+measures = ["DxtColor", "DxtColor::DecodeBlock.r4"]
+size = 16
+origin = "file"
+fields = [
+  { name = "color0", offset = 0, type = "u16" },
+  { name = "color1", offset = 2, type = "u16" },
+  { name = "indices", offset = 4, type = "u32" },
+  { name = "red", offset = 0, type = "f32", note = "a float4 pixel's (the measure's join)" },
+  { name = "green", offset = 4, type = "f32" },
+  { name = "blue", offset = 8, type = "f32" },
+  { name = "alpha", offset = 12, type = "f32" },
+]
+
+# A DXT alpha block (8 bytes: two 8-bit ends and 16 three-bit indices;
+# DXT4/5's first half and DXT5A; DxtAlpha::EncodeBlock's r3, DecodeBlock's
+# r4). The measure's DxtAlpha also joins the 16 float4 pixels (144 bytes:
+# their alphas at +12, pixel 8's at +140).
+[DxtAlphaBlock]
+measures = ["DxtAlpha", "DxtAlpha::DecodeBlock.r4"]
+size = 144
+origin = "file"
+fields = [
+  { name = "alpha0", offset = 0, type = "u8" },
+  { name = "ends", offset = 0, type = "u16", note = "both ends" },
+  { name = "alpha1", offset = 1, type = "u8" },
+  { name = "index_bytes", offset = 2, type = "bytes", count = 6, note = "the 16 three-bit indices" },
+  { name = "indices_2", offset = 2, type = "u16" },
+  { name = "indices_4", offset = 4, type = "u16" },
+  { name = "indices_6", offset = 6, type = "u16" },
+  { name = "pixel0_red", offset = 0, type = "f32", note = "the pixels' (the measure's join)" },
+  { name = "pixel0_alpha", offset = 12, type = "f32" },
+  { name = "pixel8_alpha", offset = 140, type = "f32" },
+]
+
+# A DXT3A block (8 bytes: 16 four-bit alphas; Dxt3A::EncodeBlock's r3,
+# DecodeBlock's r4). The measure's Dxt3A also joins the 16 float4 pixels.
+[Dxt3ABlock]
+measures = ["Dxt3A", "Dxt3A::DecodeBlock.r4"]
+size = 144
+origin = "file"
+fields = [
+  { name = "alphas_low", offset = 0, type = "u32", note = "pixels 0-7's four bits each (probably)" },
+  { name = "alphas_high", offset = 4, type = "u32", note = "pixels 8-15's (probably)" },
+  { name = "pixel0_alpha", offset = 12, type = "f32", note = "the pixels' (the measure's join)" },
+  { name = "pixel8_alpha", offset = 140, type = "f32" },
+]
+
+# The triangle filters' arrays of 12-byte entries (operator new of count x
+# 12 + 4: a count word, then the entries, set up in a loop; not read in
+# detail; FilterTriangle3D's 0x8236B8A4, FilterTriangle2D's 0x8236C024, the
+# size in r3; freed by the filters' operator delete; never seen in play). The
+# measure joins them to TcFloat4 (the count's store).
+[BlitTriangleArray]
+size = 0
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24).
+storage = "blob"
+blob_alloc = [{ call = 0x8236B8A4, reg = "r3" }, { call = 0x8236C024, reg = "r3" }]
+fields = []
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+scale_255 = { address = 0x82000C44, type = "f32", note = "probably 255.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "-1.0: DxtColor::FitEndpoints' corrections' factor" }
+half = { address = 0x82001BE4, type = "f32", note = "probably 0.5" }
+inverse_255 = { address = 0x82002200, type = "f32", note = "probably 1/255" }
+inverse_5 = { address = 0x82002208, type = "f32", note = "probably 1/5 (DxtAlpha::EncodeBlock's 6 steps)" }
+third = { address = 0x82002A38, type = "f32", note = "probably 1/3 (DxtColor::EncodeBlock's palette)" }
+eighth = { address = 0x82002A88, type = "f32", note = "0.125: DxtColor::FitEndpoints' weights' factor" }
+alpha_range_min = { address = 0x82008058, type = "f32", note = "DxtAlpha::FitEndpoints' smallest range" }
+weight_below_right = { address = 0x820093A0, type = "f32", note = "the error diffusion's (probably 1/16)" }
+alpha_gradient_min = { address = 0x8201607C, type = "f32", note = "DxtAlpha::FitEndpoints' squared step to stop" }
+extent_min = { address = 0x82018FE0, type = "f32", note = "FLT_MIN: DxtColor::FitEndpoints' smallest squared extent" }
+two_thirds = { address = 0x82038450, type = "f32", note = "probably 2/3 (DxtColor::EncodeBlock's palette)" }
+weight_below_left = { address = 0x8203B78C, type = "f32", note = "the error diffusion's (probably 3/16)" }
+weight_below = { address = 0x8203B790, type = "f32", note = "the error diffusion's (probably 5/16)" }
+scale_5 = { address = 0x8203B7A0, type = "f32", note = "probably 31 (PackR5G6B5's red and blue)" }
+scale_6 = { address = 0x8203B7A4, type = "f32", note = "probably 63 (green)" }
+step_5 = { address = 0x8203B7A8, type = "f32", note = "probably 1/31" }
+step_6 = { address = 0x8203B7AC, type = "f32", note = "probably 1/63" }
+inverse_7 = { address = 0x8203B7B0, type = "f32", note = "probably 1/7 (DxtAlpha::EncodeBlock's 8 steps)" }
+alpha_high_weights_8 = { address = 0x8203EA38, type = "bytes", count = 32, note = "DxtAlpha::FitEndpoints' high end's weights for 8 steps (floats)" }
+alpha_low_weights_8 = { address = 0x8203EA58, type = "bytes", count = 32, note = "the low end's for 8 steps" }
+alpha_high_weights_6 = { address = 0x8203EA78, type = "bytes", count = 24, note = "the high end's for 6 steps" }
+alpha_low_weights_6 = { address = 0x8203EA90, type = "bytes", count = 24, note = "the low end's for 6 steps" }
+color_stop_min = { address = 0x8203EAA8, type = "f32", note = "2^-16: DxtColor::FitEndpoints' squared corrections to stop at" }
+color_length_min = { address = 0x8203EAAC, type = "f32", note = "2^-12: DxtColor::FitEndpoints' smallest squared length" }
+color_high_weights_4 = { address = 0x8203EAB0, type = "bytes", count = 16, note = "DxtColor::FitEndpoints' high end's weights for 4 colors (floats)" }
+color_low_weights_4 = { address = 0x8203EAC0, type = "bytes", count = 16, note = "the low end's for 4 colors" }
+color_high_weights_3 = { address = 0x8203EAD0, type = "bytes", count = 12, note = "the high end's for 3 colors" }
+color_low_weights_3 = { address = 0x8203EADC, type = "bytes", count = 12, note = "the low end's for 3 colors" }
+color_indices_4 = { address = 0x8203EAE8, type = "bytes", count = 16, note = "DxtColor::EncodeBlock's step to palette index (words), 4 colors" }
+color_indices_3 = { address = 0x8203EAF8, type = "bytes", count = 12, note = "3 colors" }
+weight_right = { address = 0x8203EB04, type = "f32", note = "the error diffusion's (probably 7/16)" }
+alpha_indices_8 = { address = 0x8203EB08, type = "bytes", count = 32, note = "DxtAlpha::EncodeBlock's step to index (words), 8 steps" }
+alpha_indices_6 = { address = 0x8203EB28, type = "bytes", count = 32, note = "6 steps (with 0 and 1)" }
+alpha_reference = { address = 0x8263B7E8, type = "f32", note = "XGCompressSurface's f1, stored each call; DXT1's 1-bit alpha below it" }
+rounding_table = { address = 0x8263C768, type = "bytes", count = 128, note = "32 floats of 0.5 (a codec's +52 without dither)" }
+dither_table = { address = 0x8263C7E8, type = "bytes", count = 128, note = "32 floats of a 4 x 4 ordered dither's offsets (with dither)" }
+color_weights = { address = 0x82649B10, type = "bytes", count = 12, note = "in .data: the color weights the color encoder scales pixels by (0.2970, 1.0, 0.1008 in play)" }
+inverse_color_weights = { address = 0x82649B20, type = "bytes", count = 12, note = "their inverses" }
+premultiplied = { address = 0x82954660, type = "u32", note = "XGCompressSurface's flags & 1, stored each call: the DXT2/3 and 4/5 block functions premultiply alpha" }

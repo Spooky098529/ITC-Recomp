@@ -13,7 +13,12 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
+#include "hooks/strings_and_font.h"
+#include "memory/c_runtime_heap.h"
+#include "models/xpr.h"
 #include "memory/heap.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -232,7 +237,7 @@ void Init(Context& h) {
       guest::StoreU32(h.base, sf::kStrings, set);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data;
-      Run(v, __imp__sub_8210A860, NativeStringsInit, t, h.base);
+      Run(v, __imp__sub_8210A860, ITC_CONTEXT_FN(NativeStringsInit), t, h.base);
       const uint32_t table = guest::LoadU32(h.base, sf::kStrings);
       const bool made = set == 0;
       out[v].Word(made ? table == t.r3.u32 : t.r3.u32);
@@ -256,7 +261,7 @@ void OnLoaded(Context& h) {
     const uint32_t flag = h.data + 4 * h.random.Below(64) + (i % 4 == 3 ? 2 : 0);
     Both(
         h, results, [] {}, [&](PPCContext& t) { t.r6.u64 = flag; },
-        __imp__sub_8210A850, NativeStringsOnLoaded, h.data, 512, fmt::format("case {}", i));
+        __imp__sub_8210A850, ITC_CONTEXT_FN(NativeStringsOnLoaded), h.data, 512, fmt::format("case {}", i));
   }
   results.Report();
 }
@@ -299,7 +304,7 @@ void Release(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = table.address;
       t.r4.u64 = (uint64_t(h.random.Next()) << 32) | mask;
-      Run(v, __imp__sub_8210A538, NativeStringsRelease, t, h.base);
+      Run(v, __imp__sub_8210A538, ITC_CONTEXT_FN(NativeStringsRelease), t, h.base);
       for (uint32_t f = 0; f < sf::kStringFiles; f++) {
         const uint32_t now = guest::LoadU32(h.base, table.address + 4 * f);
         out[v].Word(now == files[f] ? 1 : now);
@@ -346,9 +351,9 @@ void Loaded(Context& h) {
     GuestFunction recompiled, native;
   };
   const Function functions[] = {
-      {"sub_82211C90 Text::IsLoaded", __imp__sub_82211C90, NativeTextIsLoaded},
-      {"sub_8210A768 Strings::IsLoaded", __imp__sub_8210A768, NativeStringsIsLoaded},
-      {"sub_821081A0 Font::IsLoaded", __imp__sub_821081A0, NativeFontIsLoaded},
+      {"sub_82211C90 Text::IsLoaded", __imp__sub_82211C90, ITC_CONTEXT_FN(NativeTextIsLoaded)},
+      {"sub_8210A768 Strings::IsLoaded", __imp__sub_8210A768, ITC_CONTEXT_FN(NativeStringsIsLoaded)},
+      {"sub_821081A0 Font::IsLoaded", __imp__sub_821081A0, ITC_CONTEXT_FN(NativeFontIsLoaded)},
   };
   for (const Function& function : functions) {
     Results results(function.name);
@@ -362,7 +367,7 @@ void Loaded(Context& h) {
         guest::StoreU32(h.base, sf::kStrings, h.data);
         guest::StoreU32(h.base, sf::kFont, h.data + 512);
         PPCContext t = CallContext(h);
-        t.r3.u64 = function.native == NativeFontIsLoaded ? h.data + 512 : h.data;
+        t.r3.u64 = function.native == ITC_CONTEXT_FN(NativeFontIsLoaded) ? h.data + 512 : h.data;
         Run(v, function.recompiled, function.native, t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
@@ -388,7 +393,7 @@ void PageCount(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = r3;
       t.r4.u64 = at;
-      Run(v, __imp__sub_8210A5C0, NativePageCount, t, h.base);
+      Run(v, __imp__sub_8210A5C0, ITC_CONTEXT_FN(NativePageCount), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -422,7 +427,7 @@ void CopyPage(Context& h) {
       t.r5.u64 = text;
       t.r6.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(page);
       t.r7.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(skip);
-      Run(v, __imp__sub_8210A5E8, NativeCopyPage, t, h.base);
+      Run(v, __imp__sub_8210A5E8, ITC_CONTEXT_FN(NativeCopyPage), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -443,7 +448,7 @@ void ShaderEntries(Context& h) {
         guest::StoreU32(h.base, sf::kShaderEntries + 4 * k, i == 0 ? 0 : uint32_t(h.random.Next()));
       }
       PPCContext t = CallContext(h);
-      Run(v, __imp__sub_825D9590, NativeInitShaderEntries, t, h.base);
+      Run(v, __imp__sub_825D9590, ITC_CONTEXT_FN(NativeInitShaderEntries), t, h.base);
       out[v].Bytes(Read(h.base, sf::kShaderEntries, 48));
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -474,7 +479,7 @@ void SetParams(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = font.address;
       t.r4.u64 = params;
-      Run(v, __imp__sub_82108368, NativeSetParams, t, h.base);
+      Run(v, __imp__sub_82108368, ITC_CONTEXT_FN(NativeSetParams), t, h.base);
       out[v].Word(guest::LoadU32(h.base, font.address + 16));
       for (uint32_t k : kFloats) {
         out[v].Float(guest::LoadU32(h.base, font.address + k));
@@ -590,21 +595,21 @@ void LayoutCases(Context& h, const Layout& l, const char* name, GuestFunction re
 void FontLayout(Context& h) {
   Layout l;
   SetUpLayout(h, l, true);
-  LayoutCases(h, l, "sub_82108B30 Font::TextWidth", __imp__sub_82108B30, NativeTextWidth, 1000,
+  LayoutCases(h, l, "sub_82108B30 Font::TextWidth", __imp__sub_82108B30, ITC_CONTEXT_FN(NativeTextWidth), 1000,
               true, [&](PPCContext& t, uint32_t text) {
                 t.r4.u64 = h.data + kParams;
                 t.r5.u64 = text;
               });
-  LayoutCases(h, l, "sub_82108458 Font::LineWidth", __imp__sub_82108458, NativeLineWidth, 1000,
+  LayoutCases(h, l, "sub_82108458 Font::LineWidth", __imp__sub_82108458, ITC_CONTEXT_FN(NativeLineWidth), 1000,
               true, [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
   LayoutCases(h, l, "sub_82108810 (a justified line's glyphs)", __imp__sub_82108810,
-              NativeLineGlyphs, 300, false, [&](PPCContext& t, uint32_t text) {
+              ITC_CONTEXT_FN(NativeLineGlyphs), 300, false, [&](PPCContext& t, uint32_t text) {
                 t.r3.u64 = h.random.Next();
                 t.r4.u64 = text;
               });
-  LayoutCases(h, l, "sub_82108FE0 Font::LineX", __imp__sub_82108FE0, NativeLineX, 1500, true,
+  LayoutCases(h, l, "sub_82108FE0 Font::LineX", __imp__sub_82108FE0, ITC_CONTEXT_FN(NativeLineX), 1500, true,
               [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
-  LayoutCases(h, l, "sub_82108568 Font::LineY", __imp__sub_82108568, NativeLineY, 1500, true,
+  LayoutCases(h, l, "sub_82108568 Font::LineY", __imp__sub_82108568, ITC_CONTEXT_FN(NativeLineY), 1500, true,
               [&](PPCContext& t, uint32_t) {
                 const uint32_t lines = h.random.Below(6) == 0 ? uint32_t(h.random.Next())
                                                               : h.random.Below(6);
@@ -612,12 +617,12 @@ void FontLayout(Context& h) {
                 t.r5.u64 = (uint64_t(h.random.Next()) << 32) |
                            (h.random.Below(6) == 0 ? uint32_t(h.random.Next()) : h.random.Below(6));
               });
-  LayoutCases(h, l, "sub_82108210 Font::CountGlyphs", __imp__sub_82108210, NativeCountGlyphs,
+  LayoutCases(h, l, "sub_82108210 Font::CountGlyphs", __imp__sub_82108210, ITC_CONTEXT_FN(NativeCountGlyphs),
               300, false, [&](PPCContext& t, uint32_t text) {
                 t.r4.u64 = h.data + 4 * h.random.Below(8);
                 t.r5.u64 = text;
               });
-  LayoutCases(h, l, "sub_821082A0 Font::OutCode", __imp__sub_821082A0, NativeOutCode, 1000,
+  LayoutCases(h, l, "sub_821082A0 Font::OutCode", __imp__sub_821082A0, ITC_CONTEXT_FN(NativeOutCode), 1000,
               false, [&](PPCContext& t, uint32_t) {
                 const uint32_t vertex = h.data + 3072;
                 guest::StoreU32(h.base, vertex + 0,
@@ -755,7 +760,7 @@ void ClipCases(Context& h, const Layout& l) {
       PPCContext t = CallContext(h);
       t.r3.u64 = l.font.address;
       t.r4.u64 = vertices;
-      Run(v, __imp__sub_82108C90, NativeClipGlyph, t, h.base);
+      Run(v, __imp__sub_82108C90, ITC_CONTEXT_FN(NativeClipGlyph), t, h.base);
       VertexOutputs(h, out[v], vertices, 6);
       out[v].Bytes(Read(h.base, h.data, 3200));
       out[v].Word(t.r3.u32);
@@ -791,7 +796,7 @@ void AddGlyphCases(Context& h, const Layout& l) {
       };
       t.f1.u64 = coordinate();
       t.f2.u64 = coordinate();
-      Run(v, __imp__sub_82109560, NativeAddGlyph, t, h.base);
+      Run(v, __imp__sub_82109560, ITC_CONTEXT_FN(NativeAddGlyph), t, h.base);
       VertexOutputs(h, out[v], area, 26);
       out[v].Bytes(Read(h.base, sf::kDrawGlobals, 48));
       out[v].Bytes(Read(h.base, h.data, 3200));
@@ -821,7 +826,7 @@ void BuildVerticesCases(Context& h, const Layout& l, const Block& area) {
       PPCContext t = CallContext(h);
       t.r3.u64 = l.font.address;
       t.r4.u64 = text;
-      Run(v, __imp__sub_82109AA8, NativeBuildVertices, t, h.base);
+      Run(v, __imp__sub_82109AA8, ITC_CONTEXT_FN(NativeBuildVertices), t, h.base);
       for (uint32_t c = 0; c < 4; c++) {
         VertexOutputs(h, out[v], area.address + 6000 * c, 240);
       }
@@ -929,9 +934,9 @@ void FontDrawing(Context& h) {
   AddGlyphCases(h, l);
   BuildVerticesCases(h, l, area);
   // The adapters (the flag on) against the originals (the flag off).
-  DrawCases(h, l, area, "sub_82109EF0 Font::DrawPass", sub_82109EF0, __imp__sub_82109EF0, 600);
-  DrawCases(h, l, area, "sub_8210A400 Font::Draw", sub_8210A400, __imp__sub_8210A400, 300);
-  DrawCases(h, l, area, "sub_8210A758 Text::Draw", sub_8210A758, __imp__sub_8210A758, 300);
+  DrawCases(h, l, area, "sub_82109EF0 Font::DrawPass", harness::Ours<0x82109EF0>, __imp__sub_82109EF0, 600);
+  DrawCases(h, l, area, "sub_8210A400 Font::Draw", harness::Ours<0x8210A400>, __imp__sub_8210A400, 300);
+  DrawCases(h, l, area, "sub_8210A758 Text::Draw", harness::Ours<0x8210A758>, __imp__sub_8210A758, 300);
 }
 
 // swprintf: formats made of literal characters (some 0xFFxx, a few 0xFFFF:
@@ -1097,7 +1102,7 @@ void SwprintfCase(Context& h, Results& results, const Block& block, const Format
     }
     t.r3.u64 = output;
     t.r4.u64 = format_address != 0 ? format_address : h.data + 512;
-    Run(v, __imp__sub_8210A490, NativeSwprintf, t, h.base);
+    Run(v, __imp__sub_8210A490, ITC_CONTEXT_FN(NativeSwprintf), t, h.base);
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Bytes(Read(h.base, t.r1.u32 + 24, 200));
@@ -1190,7 +1195,7 @@ void FormatGroupedCases(Context& h) {
       t.r3.u64 = h.random.Next();
       t.r4.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(value);
       t.r5.u64 = output;
-      Run(v, __imp__sub_8210A680, NativeFormatGrouped, t, h.base);
+      Run(v, __imp__sub_8210A680, ITC_CONTEXT_FN(NativeFormatGrouped), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -1201,8 +1206,437 @@ void FormatGroupedCases(Context& h) {
 
 }  // namespace
 
+namespace {
+
+// Strings::Get: a table of 18 containers in the scratch area (0 to 6
+// entries each), ids around each file's bound (the game's table at
+// 0x82007E18), past the last and random; r3 and the scratch area exactly.
+void StringsGets(Context& h) {
+  Results results("Strings::Get (sub_8210A800)");
+  Random r(0x737472676574ull);
+  constexpr uint32_t kBounds = 0x82007E18;
+  const uint32_t table = h.data, containers = h.data + 128;
+  for (int c = 0; c < 400; c++) {
+    uint32_t id;
+    const uint32_t file = r.Below(18);
+    const uint32_t bound = guest::LoadU32(h.base, kBounds + 4 * file);
+    switch (r.Below(4)) {
+      case 0: id = r.Below(0x10000); break;
+      case 1: id = guest::LoadU32(h.base, kBounds + 4 * 17) + r.Below(8); break;
+      default: id = bound + r.Below(8); break;
+    }
+    std::vector<uint32_t> counts(18);
+    for (auto& n : counts) n = r.Below(7);
+    const uint32_t r4_high = uint32_t(r.Next()) & 0xFFFF0000u;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 18; i++) {
+        const uint32_t container = containers + 64 * i;
+        guest::StoreU32(h.base, table + 4 * i, container);
+        guest::StoreU32(h.base, container, __builtin_bswap32(counts[i]));
+        for (uint32_t k = 0; k < 8; k++) {
+          guest::StoreU32(h.base, container + 4 + 4 * k, __builtin_bswap32(36 + 2 * k));
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = table;
+      t.r4.u64 = r4_high | id;
+      if (v == 0) {
+        __imp__sub_8210A800(t, h.base);
+      } else if (const auto text = strings_and_font::StringsGet(h.base, table, id)) {
+        t.r3.u64 = *text;
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (id {})", c, id));
+  }
+  results.Report();
+}
+
+// Strings::FormatV: a table at the scratch area's +0 whose 18 files are one
+// container at +128 of 8 strings (from +200, 16 units each with room): 0
+// to 3 plain (letters and the control units but 0xFFD7), 4 to 7 with 0xFFD7
+// too (its slot's id one of the plain strings', or now and then past the
+// last bound).
+// 0xFFD2 (the font's number, never in play) isn't used. The id a string's
+// (by a file's bound at 0x82007E18) or now and then past the last bound
+// (the table read as the text); the va_list at +3072 (16 slots: ints,
+// doubles and ids in the order the string's units ask, then random); the
+// output in a 32 KB block of its own (a string of doubles printed whole can
+// run long), holding a short prefix. Strings::Format (sub_8210ABC0) on the
+// same inputs, the first five slots in r6 to r10 and the rest past its
+// caller's parameter area. Compared: the scratch area, the output's block,
+// the stack above r1 (to the scratch area) and r3.
+void FormatVCases(Context& h) {
+  Results results("Strings::FormatV (sub_8210A990)");
+  Results format_results("Strings::Format (sub_8210ABC0)");
+  Random r(0x666F726D617476ull);  // "formatv"
+  constexpr uint32_t kBounds = 0x82007E18;
+  const uint32_t table = h.data, container = h.data + 128, strings = h.data + 200;
+  const Block output_block(32768);
+  const uint32_t output = output_block.address, args = h.data + 3072;
+  constexpr uint32_t kStringUnits = 24;
+  for (int c = 0; c < 1500; c++) {
+    // The strings: units, and the slot kinds each control unit asks for.
+    std::vector<uint16_t> units[8];
+    for (uint32_t s = 0; s < 8; s++) {
+      const uint32_t length = r.Below(12);
+      for (uint32_t k = 0; k < length; k++) {
+        uint16_t unit;
+        switch (r.Below(8)) {
+          case 0: unit = uint16_t(0xFFEC + r.Below(10)); break;  // %<w>d
+          case 1: unit = uint16_t(0xFFE2 + r.Below(10)); break;  // %.<p>f
+          case 2: unit = uint16_t(0xFFD8 + r.Below(10)); break;  // %0<w>d
+          case 3: unit = 0xFFD3; break;                          // grouped
+          case 4: unit = s >= 4 ? 0xFFD7 : uint16_t('a' + r.Below(26)); break;
+          case 5: {
+            constexpr uint16_t kOther[] = {0xFFD1, 0xFFD6, 0xFFF6, 0xFFFF, 0xFFD4, '\n', 0x00E9};
+            unit = kOther[r.Below(std::size(kOther))];
+            break;
+          }
+          default: unit = uint16_t('A' + r.Below(26)); break;
+        }
+        units[s].push_back(unit);
+      }
+    }
+    // A string's id: string `k` of a file whose bound leaves room for it
+    // (Strings::Get then finds that file), or past the last bound.
+    auto string_id = [&](uint32_t k) {
+      for (;;) {
+        const uint32_t file = r.Below(17);
+        const uint32_t bound = guest::LoadU32(h.base, kBounds + 4 * file);
+        const uint32_t next = guest::LoadU32(h.base, kBounds + 4 * (file + 1));
+        if (int32_t(bound + k) < int32_t(next)) {
+          return bound + k;
+        }
+      }
+    };
+    const uint32_t last = guest::LoadU32(h.base, kBounds + 4 * 17);
+    const uint32_t pick = r.Below(8);
+    const uint32_t id = r.Below(30) == 0 ? last + r.Below(4) : string_id(pick);
+    // The slots, in the order the picked string asks (its inner strings
+    // read on from there), then random.
+    std::vector<uint64_t> slots;
+    auto add = [&](uint16_t unit) {
+      if (unit >= 0xFFE2 && unit <= 0xFFEB) {
+        slots.push_back(r.Below(4) == 0 ? DoubleBits(r)
+                                        : std::bit_cast<uint64_t>(
+                                              double(int32_t(r.Below(2000000)) - 1000000) / 64.0));
+      } else if (unit == 0xFFD7) {
+        slots.push_back(((uint64_t(r.Next()) << 16) & ~0xFFFFull) |
+                        (r.Below(16) == 0 ? last + r.Below(4) : string_id(r.Below(4))));
+      } else if ((unit >= 0xFFD8 && unit <= 0xFFF5) || unit == 0xFFD3) {
+        AddInt(r, slots, r.Below(4) == 0);
+      }
+    };
+    for (uint16_t unit : units[pick]) {
+      add(unit);
+    }
+    while (slots.size() < 16) {
+      const uint32_t kind = r.Below(3);
+      add(kind == 0 ? 0xFFE2 : kind == 1 ? 0xFFEC : 0xFFD7);
+    }
+    const uint32_t prefix = r.Below(4) == 0 ? r.Below(16) : 0;
+    // FormatV (the va_list at +3072), then Format (the first five slots in
+    // r6 to r10, the rest at r1 + 80 on: its caller's parameter area and
+    // the stack arguments past it, compared too).
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, output, output_block.bytes);
+        for (uint32_t i = 0; i < 18; i++) {
+          guest::StoreU32(h.base, table + 4 * i, container);
+        }
+        guest::StoreU32(h.base, container, __builtin_bswap32(8));
+        for (uint32_t s = 0; s < 8; s++) {
+          const uint32_t at = strings + 2 * kStringUnits * s;
+          guest::StoreU32(h.base, container + 4 + 4 * s, __builtin_bswap32(at - container));
+          for (size_t k = 0; k < units[s].size(); k++) {
+            guest::StoreU16(h.base, at + 2 * uint32_t(k), units[s][k]);
+          }
+          guest::StoreU16(h.base, at + 2 * uint32_t(units[s].size()), 0);
+        }
+        PPCContext t = CallContext(h);
+        const uint32_t list = which == 0 ? args : t.r1.u32 + 40;
+        Fill(h.base, t.r1.u32 + 40, 1024 - 40);
+        for (uint32_t i = which == 0 ? 0 : 5; i < 16; i++) {
+          guest::StoreU32(h.base, list + 8 * i, uint32_t(slots[i] >> 32));
+          guest::StoreU32(h.base, list + 8 * i + 4, uint32_t(slots[i]));
+        }
+        for (uint32_t k = 0; k < prefix; k++) {
+          guest::StoreU16(h.base, output + 2 * k, uint16_t('a' + k));
+        }
+        guest::StoreU16(h.base, output + 2 * prefix, 0);
+        t.r3.u64 = table;
+        t.r4.u64 = output;
+        t.r5.u64 = id;
+        if (which == 0) {
+          t.r6.u64 = args;
+          Run(v, __imp__sub_8210A990, ITC_CONTEXT_FN(hooks::StringsFormatVSteps), t, h.base);
+        } else {
+          t.r6.u64 = slots[0];
+          t.r7.u64 = slots[1];
+          t.r8.u64 = slots[2];
+          t.r9.u64 = slots[3];
+          t.r10.u64 = slots[4];
+          Run(v, __imp__sub_8210ABC0, ITC_CONTEXT_FN(hooks::StringsFormatSteps), t, h.base);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, output, output_block.bytes));
+        out[v].Bytes(Read(h.base, t.r1.u32 + 40, 1024 - 40));
+        out[v].Word(t.r3.u32);
+      }
+      (which == 0 ? results : format_results)
+          .Check(out[0], out[1], fmt::format("case {} (id {}, string {})", c, id, pick));
+    }
+  }
+  results.Report();
+  format_results.Report();
+}
+
+// XPR::Release of a slot (sub_82108860): the slot empty, or an XPR (24
+// bytes from operator new, made by XPR::XPR) without blocks. Compared: r3
+// (the XPR's address made an offset) and the slot.
+void XprSlotReleases(Context& h) {
+  Results results("XPR::Release of a slot (sub_82108860)");
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_INFO("harness: XPR::Release of a slot: skipped (the model class isn't native)");
+    return;
+  }
+  const uint32_t slot = h.data;
+  for (int c = 0; c < 16; c++) {
+    const bool set = c % 4 != 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      uint32_t xpr = 0;
+      if (set) {
+        const auto block = memory::crt::OperatorNew(h.base, models::kXprBytes);
+        xpr = block ? *block : 0;
+        models::XprConstruct(h.base, xpr);
+      }
+      guest::StoreU32(h.base, slot, xpr);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = slot;
+      if (v == 0) {
+        __imp__sub_82108860(t, h.base);
+      } else if (const auto r3 = strings_and_font::ReleaseXprSlot(h.base, slot)) {
+        t.r3.u64 = *r3;
+      } else {
+        __imp__sub_82108860(t, h.base);
+      }
+      out[v].Word(xpr != 0 && t.r3.u32 == xpr ? 0xB0000000u : t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, slot));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({})", c, set ? "set" : "empty"));
+  }
+  results.Report();
+}
+
+}  // namespace
+
+namespace {
+
+// --- The loads ---
+
+// What a load left in an object's slots: for each slot that was 0 and now
+// holds an allocation (a 28-byte page from operator new, or pages for a
+// file), a label in its place (in the slots and the recorded calls), the
+// page's +24 word, then the allocation freed. `pages` says which slots hold
+// pages (the rest files).
+struct Made {
+  uint32_t address;
+  uint32_t label;
+  bool page;
+};
+struct Watched {
+  uint32_t object;
+  uint32_t bytes;
+  std::vector<uint32_t> slots;
+  std::vector<bool> pages;
+  std::vector<uint32_t> before;
+};
+void LoadOut(Outputs& out, uint8_t* base, const std::vector<Watched>& objects,
+             const ArchiveLoads& loads, const PPCContext& t) {
+  std::vector<Made> made;
+  uint32_t n = 0;
+  for (const Watched& w : objects) {
+    for (size_t k = 0; k < w.slots.size(); k++, n++) {
+      const uint32_t now = guest::LoadU32(base, w.object + w.slots[k]);
+      if (now != w.before[k] && now != 0) {
+        made.push_back({now, 0x7E000000u + n, w.pages[k]});
+      }
+    }
+  }
+  const auto label = [&](uint32_t word) {
+    for (const Made& m : made) {
+      if (word == m.address) {
+        return m.label;
+      }
+    }
+    return word;
+  };
+  for (const Watched& w : objects) {
+    for (uint32_t offset = 0; offset < w.bytes; offset += 4) {
+      out.Word(label(guest::LoadU32(base, w.object + offset)));
+    }
+  }
+  out.Word(uint32_t(loads.calls().size()));
+  for (const uint32_t w : loads.calls()) {
+    out.Word(label(w));
+  }
+  for (const Made& m : made) {
+    if (m.page) {
+      out.Word(guest::LoadU32(base, m.address + 24));
+      memory::crt::OperatorDelete(m.address);
+    } else {
+      out.Word(memory::IsPages(m.address) ? 1 : 0);
+      memory::FreePages(m.address);
+    }
+  }
+  out.Word(t.r3.u32);
+  out.Word(uint32_t(t.r3.u64 >> 32));
+}
+
+void NativeFontLoad(PPCContext& t, uint8_t* base, const archive::LoadCall& load) {
+  const auto result = sf::FontLoad(base, t.r3.u32, t.r4.u32, load);
+  if (result.handed_back) {
+    __imp__sub_82109498(t, base);
+    return;
+  }
+  if (result.last) {
+    hooks::SetArchiveSerial(t, *result.last);
+  }
+}
+
+void NativeStringsLoad(PPCContext& t, uint8_t* base, const archive::LoadCall& load) {
+  if (const auto last = sf::StringsLoad(base, t.r3.u32, t.r4.u32, load)) {
+    hooks::SetArchiveSerial(t, *last);
+  }
+}
+
+std::vector<int64_t> Serials(Random& random) {
+  std::vector<int64_t> serials;
+  for (int i = 0; i < 24; i++) {
+    serials.push_back(random.Below(5) == 0 ? -1 : int64_t(random.Below(0x7FFFFFFF)));
+  }
+  return serials;
+}
+
+// A word for a slot: 0 (to load) half the time, else random.
+uint32_t SlotWord(Random& random) { return random.Below(2) ? 0 : uint32_t(random.Next()) | 1; }
+
+// Font::Load and Strings::Load on objects in a heap block (random words, the
+// slots 0 or not), Text::Load with the globals pointed at them (put back
+// after); the real TOC's sizes, the loads recorded instead of queued.
+void Loads(Context& h) {
+  // Its own generator: the cases after it keep the inputs they had.
+  Random random(0x7E47104Dull);
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: strings_and_font: the loads need --native_heap and the archive's "
+                 "queue native");
+    return;
+  }
+  const auto block = memory::crt::OperatorNew(h.base, 8192);
+  if (!block || *block == 0) {
+    return;
+  }
+  const uint32_t font = *block;           // 64 bytes looked at
+  const uint32_t table = *block + 128;    // 4,304 bytes
+  constexpr uint32_t kTableBytes = 4304;
+  std::vector<uint32_t> font_slots, table_slots;
+  std::vector<bool> font_pages, table_pages;
+  for (uint32_t i = 0; i < 4; i++) {
+    font_slots.push_back(20 + 4 * i);
+    font_pages.push_back(true);
+    font_slots.push_back(40 + 4 * i);
+    font_pages.push_back(false);
+  }
+  for (uint32_t i = 0; i < sf::kStringFiles; i++) {
+    table_slots.push_back(4 * i);
+    table_pages.push_back(false);
+  }
+  const uint32_t saved_font = guest::LoadU32(h.base, sf::kFont);
+  const uint32_t saved_strings = guest::LoadU32(h.base, sf::kStrings);
+  for (int which = 0; which < 3; which++) {
+    Results results(which == 0   ? "Font::Load (sub_82109498)"
+                    : which == 1 ? "Strings::Load (sub_8210A8D0)"
+                                 : "Text::Load (sub_8210ADF8)");
+    for (int c = 0; c < 12; c++) {
+      const std::vector<int64_t> serials = Serials(random);
+      std::vector<uint32_t> words;
+      for (uint32_t k = 0; k < (128 + kTableBytes) / 4; k++) {
+        words.push_back(uint32_t(random.Next()));
+      }
+      for (uint32_t i = 0; i < 4; i++) {
+        words[(20 + 4 * i) / 4] = SlotWord(random);
+        words[(40 + 4 * i) / 4] = c == 0 ? 0 : SlotWord(random);
+      }
+      for (uint32_t i = 0; i < sf::kStringFiles; i++) {
+        words[(128 + 4 * i) / 4] = c == 0 ? 0 : SlotWord(random);
+      }
+      const uint32_t mask = c == 0 ? (which == 0 ? 15 : 0x1FFFF) : uint32_t(random.Next());
+      const uint64_t r3_in = random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t k = 0; k < words.size(); k++) {
+          guest::StoreU32(h.base, *block + 4 * k, words[k]);
+        }
+        std::vector<Watched> watched = {{font, 64, font_slots, font_pages, {}},
+                                        {table, kTableBytes, table_slots, table_pages, {}}};
+        for (Watched& w : watched) {
+          for (const uint32_t slot : w.slots) {
+            w.before.push_back(guest::LoadU32(h.base, w.object + slot));
+          }
+        }
+        guest::StoreU32(h.base, sf::kFont, font);
+        guest::StoreU32(h.base, sf::kStrings, table);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = which == 0 ? font : which == 1 ? table : r3_in;
+        t.r4.u64 = mask;
+        if (which == 0) {
+          (v == 0 ? (void)__imp__sub_82109498(t, h.base) : NativeFontLoad(t, h.base, loads.Native()));
+        } else if (which == 1) {
+          if (v == 0) {
+            Run(v, __imp__sub_8210A8D0, nullptr, t, h.base);
+          } else {
+            NativeStringsLoad(t, h.base, loads.Native());
+          }
+        } else {
+          if (v == 0) {
+            // The flag off, so its Strings::Load is the original's too (its
+            // adapter would queue the loads for real).
+            Run(v, __imp__sub_8210ADF8, nullptr, t, h.base);
+          } else {
+            hooks::SetArchiveSerial(
+                t, sf::TextLoad(h.base, loads.Native(), [&](uint32_t f, uint32_t m) {
+                  PPCContext u = CallContext(h);
+                  u.r3.u64 = f;
+                  u.r4.u64 = m;
+                  __imp__sub_82109498(u, h.base);
+                }));
+          }
+        }
+        guest::StoreU32(h.base, sf::kFont, saved_font);
+        guest::StoreU32(h.base, sf::kStrings, saved_strings);
+        LoadOut(out[v], h.base, watched, loads, t);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: mask {:X}", c, mask));
+    }
+    results.Report();
+  }
+  memory::crt::OperatorDelete(*block);
+}
+
+}  // namespace
+
 void StringsAndFont(Context& h) {
   Init(h);
+  Loads(h);
   OnLoaded(h);
   Release(h);
   Loaded(h);
@@ -1214,6 +1648,9 @@ void StringsAndFont(Context& h) {
   FontDrawing(h);
   SwprintfCases(h);
   FormatGroupedCases(h);
+  StringsGets(h);
+  FormatVCases(h);
+  XprSlotReleases(h);
 }
 
 }  // namespace harness

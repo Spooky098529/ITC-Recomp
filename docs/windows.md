@@ -54,7 +54,9 @@ branch, merged into `main` 2026-10-16.
 
 ## What differs from Linux
 
-- **SDL is a DLL** (`SDL3.dll`, SDK patch `0003`): a DLL only exports its
+- **SDL is a DLL** (`SDL3.dll`, SDK patch `0003`; since E4, 2026-11-16, the
+  patch is removed, the SDK isn't in our build and SDL is our own static
+  build, so this no longer applies: Windows isn't kept working for now): a DLL only exports its
   own code, so the SDK's static SDL ended up in both `rexruntime.dll` and
   `itc.exe`, and our window and audio would have used another SDL than the
   SDK's event loop (no input, `SDL_RunOnMainThread` never running). The

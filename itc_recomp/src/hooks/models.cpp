@@ -1,0 +1,566 @@
+// The model class natively: adapters in front of src/models/
+// (docs/functions/models.md). The functions that allocate or free run
+// natively only while --native_heap routes the game's heap to the allocation
+// layer, and hand the paths left to the original back to it from the start,
+// nothing having been done. Functions reached only from native callers have
+// no adapters (the flag switches their callers): PendingFrees::IncSize
+// (sub_8258E2F8), from PendingFrees::Insert; PendingFrees::Insert
+// (sub_8258E398), from Memory::FreeLater and FreePhysicalLater;
+// Memory::FreeLater and FreePhysicalLater (sub_8258E410, sub_8258E498), from
+// XPR::Release and Model::Release;
+// TextureProvider::Allocate and UninitializedCopy (sub_825942B8,
+// sub_82594380), from Reserve and InsertN; TextureProvider::Assign
+// (sub_825947D0), from TextureProvider::TextureProvider; Memory::AllocPhysical
+// (sub_8258E138), from XPR::Create; TextureHeader::Relocate (sub_8235A990),
+// from Resource::Relocate and XPR::Create; Mesh::LoadShaders (sub_82594D20)
+// and Mesh::Parse (sub_825963F0), from Mesh::Parse and Model::Load.
+
+#include "base/float_mode.h"
+#include "guest.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
+
+#include "app_start_up/start_up.h"
+
+#include "base/flags.h"
+#include "base/log.h"
+#include "hooks/app_start_up.h"
+#include "hooks/archive.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/model_load.h"
+#include "models/part_model.h"
+#include "models/texture_provider.h"
+#include "models/xpr.h"
+#include "schema/models.h"
+#include "model_animation/model_animation.h"
+#include "shader_objects/shader_objects.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_models, true, "ITC",
+              "Run the model class's pieces (docs/functions/models.md: the memory blocks' "
+              "lock, the critical section at 0x8296BD38, as a host mutex for every user, "
+              "through ScopedLock sub_8258E580 and sub_8258E5B8 for that critical section "
+              "(chosen at start-up, other critical sections the game's); with --native_heap "
+              "Memory::FreeLater sub_8258E410 and FreePhysicalLater sub_8258E498 (no adapters: "
+              "only XPR::Release and Model::Release call them), the pending "
+              "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapters: only the "
+              "put-off frees call Insert, and only Insert IncSize); XPR::XPR sub_82596E68, XPR::GetTexture "
+              "sub_82597118 (its adapter in src/debug/frame_state_diff.cpp, inside its diagnostics' "
+              "wrap), and with --native_heap XPR::Release "
+              "sub_825970A8 and XPR::~XPR sub_82597148; the texture provider's vector: "
+              "Clear sub_82590D68, and with --native_heap Allocate sub_825942B8, "
+              "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
+              "them), Reserve sub_82594570 (no adapter: only the constructor's plain C++ calls it in play), InsertN sub_82590EF0 and Assign sub_825947D0 (no "
+              "adapter: only the constructor calls it), TextureProvider::TextureProvider "
+              "sub_82594850 and ~TextureProvider sub_825943E0; its getters TextureProvider::Get "
+              "sub_825946B8 with At sub_82594648 (no adapter: only Get calls it; _Xran's path the "
+              "original's), slots 5 to 7 sub_825941D0 and 8 to 10 sub_82594230 (XPR::FindTexture "
+              "a guest call); Model::Model sub_825948C0, "
+              "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
+              "plain C++ called directly, and the car part model's sub_820CE928 and "
+              "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
+              "sub_82599AF0 and Skeleton::LocalMatrices sub_82599C58 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
+              "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
+              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/; no adapters: only "
+              "Mesh::LoadShaders and Shaders::OnPairLoaded call them, natively), "
+              "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
+              "Resource::Relocate and XPR::Create call it), Resource::Relocate sub_8235A9F8, "
+              "with --native_heap XPR::Create sub_82596F68 and Mesh::LoadShaders sub_82594D20 "
+              "(no adapter: only Mesh::Parse calls it; their copies as memcpy's override makes them, recorded for the renderer; "
+              "VertexShader::Init's original a guest call where its plain C++ declines), "
+              "with --native_heap "
+              "Model::Load sub_82596920 (with Mesh::Parse sub_825963F0, no adapter: only it "
+              "calls it; the callees' originals, where their plain C++ declines, guest calls), "
+              "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
+              "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
+              "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
+              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0 (no adapter: only LoadAll's plain C++ calls it), the vertex "
+              "declaration sub_82589728 (no adapter: only the recorders' plain C++ calls it in play; "
+              "its message for a type pair the tables don't cover, never seen in play, the "
+              "original's), Model::RecordShape sub_82595550 (in "
+              "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
+              "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
+              "material animation, never seen in play, the original's), Model::RecordMaterials "
+              "sub_820CECA0 (beside it, the same files: the texture provider's slots 5 and 6 and "
+              "CameraPasses::RenderTarget guest calls); with --native_heap and the "
+              "archive's queue native, Shaders::LoadAll sub_820A08A0 with Shaders::LoadPair "
+              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it) and its pixel file's load "
+              "callback Shaders::OnPairLoaded sub_820A06D0 (in src/shader_objects/; the adapter "
+              "stays: the archive's request calls it through its function pointer; VertexShader::Init's "
+              "original a guest call where its plain C++ declines)) natively instead of through the "
+              "translated code (the same writes; "
+              "checked by --run_harnesses=models and, for Model::RecordShape and RecordMaterials, "
+              "scenery_lists)");
+
+bool hooks::ModelsHostLock() {
+  static const bool host = ITC_FLAG(native_models);
+  return host;
+}
+
+// The functions that allocate or free: only over the allocation layer, and
+// with the host lock.
+bool hooks::ModelsNativeLifetime() {
+  return ITC_FLAG(native_models) && hooks::NativeHeapActive() && hooks::ModelsHostLock();
+}
+
+namespace {
+
+bool NativeLifetime() { return hooks::ModelsNativeLifetime(); }
+
+}  // namespace
+
+// --- The memory blocks' lock ---
+//
+// For the critical section at 0x8296BD38 only, whatever --native_models says
+// now (hooks::ModelsHostLock is fixed for the run): every user of it takes
+// the host mutex, the recompiled ones here. The movie wrapper's critical
+// section likewise takes its own host mutex (app_start_up/start_up.h) once
+// the native MovieWrapper::MovieWrapper made it. Other critical sections go
+// to the originals.
+
+// ScopedLock::ScopedLock: r3 = the lock word, r4 = the critical section; r3
+// left as it came.
+ITC_NATIVE_ENTRY_ALWAYS(8258E580) {
+  
+  if (ctx.r4.u32 == models::kMemoryBlocksLock && hooks::ModelsHostLock()) {
+    models::ScopedLockEnter(ctx.r3.u32, ctx.r4.u32);
+    return;
+  }
+  // The movie wrapper's critical section, when the native constructor made
+  // it (app_start_up/start_up.h): its host mutex.
+  if (app_start_up::IsMovieWrapperLock(ctx.r4.u32)) {
+    app_start_up::MovieWrapperLockEnter(ctx.r3.u32, ctx.r4.u32);
+    return;
+  }
+  lifted::original::c8258E580(ctx);
+}
+
+// ScopedLock::~ScopedLock: r3 = the lock word; r3 = the critical section (the
+// original's load before its LeaveCriticalSection).
+ITC_NATIVE_ENTRY_ALWAYS(8258E5B8) {
+  
+  if (hooks::ModelsHostLock() &&
+      guest::LoadU32(ctx.r3.u32) == models::kMemoryBlocksLock) {
+    ctx.r3.u64 = models::ScopedLockLeave(ctx.r3.u32);
+    return;
+  }
+  if (app_start_up::IsMovieWrapperLock(guest::LoadU32(ctx.r3.u32))) {
+    ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(ctx.r3.u32);
+    return;
+  }
+  lifted::original::c8258E5B8(ctx);
+}
+
+// --- The XPR object ---
+
+// XPR::XPR: r3 = the object (left).
+ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
+  models::XprConstruct(ctx.r3.u32);
+}
+
+// XPR::Release and XPR::~XPR: r3 = the object; r3 as the original leaves it.
+#define ITC_MODELS_LIFETIME(address, function)                       \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                               \
+    \
+    if (NativeLifetime()) {                                          \
+      if (const auto r3 = models::function(ctx.r3.u32)) {      \
+        ctx.r3.u64 = *r3;                                            \
+        return;                                                      \
+      }                                                              \
+    }                                                                \
+    lifted::original::c##address(ctx);                                 \
+  }
+
+ITC_MODELS_LIFETIME(825970A8, XprRelease)
+ITC_MODELS_LIFETIME(82597148, XprDestruct)
+
+// --- The texture provider ---
+
+namespace {
+
+void SetR3(lifted::Regs& ctx, const models::R3& r3) {
+  if (!r3.kept) {
+    ctx.r3.u64 = r3.value;
+  }
+}
+
+}  // namespace
+
+// TextureProvider::Reserve (sub_82594570) has no adapter: only native
+// callers reach it in play (TextureProvider::TextureProvider's plain C++
+// calls it directly; TextureProvider::Set's hands an index past the size to
+// the original, never seen in an attract race).
+
+// TextureProvider::InsertN: r3 = the vector, r4 = where, r5 = the count, r6 =
+// the value's address.
+ITC_NATIVE_ENTRY_ALWAYS(82590EF0) {
+  
+  if (NativeLifetime()) {
+    const uint32_t value = schema::TextureSlot(ctx.r6.u32).texture();
+    if (const auto r3 = models::PointersInsertN(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, value)) {
+      SetR3(ctx, *r3);
+      return;
+    }
+  }
+  lifted::original::c82590EF0(ctx);
+}
+
+// TextureProvider::Clear: r3 = the vector; r3 = its first element.
+ITC_NATIVE_ENTRY(82590D68, ITC_FLAG(native_models)) {
+  ctx.r3.u64 = models::PointersClear(ctx.r3.u32);
+}
+
+// The provider's getters (vtable slots). TextureProvider::At (sub_82594648)
+// has no adapter: only Get calls it.
+namespace {
+
+models::ProviderCall ProviderGuestCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t frame, uint32_t lr, uint64_t r3,
+                      uint64_t r4) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    guest::StoreU32(frame, ctx.r1.u32);
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  };
+}
+
+}  // namespace
+
+// TextureProvider::Get: r3 = the provider, r4 = the slot; r3 the texture set.
+ITC_NATIVE_ENTRY(825946B8, ITC_FLAG(native_models)) {
+  ctx.r3.u64 = models::TextureProviderGet(ctx.r3.u32, ctx.r4.u32);
+}
+
+// Slots 5 to 7 and 8 to 10: r3 = the provider, r4 = the slot, r5 = the
+// index (or the name).
+ITC_NATIVE_ENTRY(825941D0, ITC_FLAG(native_models)) {
+  ctx.r3.u64 = models::TextureProviderXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r1.u32, ProviderGuestCall(ctx));
+}
+
+ITC_NATIVE_ENTRY(82594230, ITC_FLAG(native_models)) {
+  ctx.r3.u64 = models::TextureProviderFindXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r1.u32, ProviderGuestCall(ctx));
+}
+
+// TextureProvider::TextureProvider: r3 = the provider (left), r4 = the slot
+// count (-1: 64).
+ITC_NATIVE_ENTRY_ALWAYS(82594850) {
+  
+  if (!NativeLifetime() || !models::TextureProviderConstruct(ctx.r3.u32, ctx.r4.s32)) {
+    lifted::original::c82594850(ctx);
+  }
+}
+
+// TextureProvider::~TextureProvider: r3 = the provider; r3 = its storage.
+ITC_MODELS_LIFETIME(825943E0, TextureProviderDestruct)
+
+// --- The model ---
+
+// Model::Model: r3 = the model (left).
+ITC_NATIVE_ENTRY_ALWAYS(825948C0) {
+  
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (models::ModelConstruct(ctx.r3.u32)) {
+      return;
+    }
+  }
+  lifted::original::c825948C0(ctx);
+}
+
+// Model::Release and Model::~Model: r3 = the model; r3 as the original
+// leaves it (XPR::Release's, XPR::~XPR's).
+ITC_MODELS_LIFETIME(82594970, ModelRelease)
+ITC_MODELS_LIFETIME(82594F58, ModelDestruct)
+
+// --- The car part model ---
+
+// The part model's constructor: r3 = the model (left).
+ITC_NATIVE_ENTRY_ALWAYS(820CE928) {
+  
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();  // as Model::Model's adapter
+    if (models::PartModelConstruct(ctx.r3.u32)) {
+      return;
+    }
+  }
+  lifted::original::c820CE928(ctx);
+}
+
+// The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
+ITC_MODELS_LIFETIME(820CE990, PartModelDestruct)
+
+// sub_820CE9C8: r3 = the model (left).
+ITC_NATIVE_ENTRY(820CE9C8, ITC_FLAG(native_models)) {
+  models::PartModelClear(ctx.r3.u32);
+}
+
+// Model::SetVinylTextures: r3 = the part model, r4 and r5 the words.
+ITC_NATIVE_ENTRY(820CE9F8, ITC_FLAG(native_models)) {
+  models::PartModelSetVinylTextures(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Skeleton::ResetPose: r3 = the skeleton (left). Flush-to-zero off after
+// Skeleton::ApplyAnimation, as its adapter leaves it.
+ITC_NATIVE_ENTRY(82599AF0, ITC_FLAG(native_models)) {
+  if (model_animation::SkeletonResetPose(ctx.r3.u32)) {
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
+// Skeleton::LocalMatrices: r3 = the skeleton (r3 left: no caller reads
+// it). Flush-to-zero off when it did float work, as the original leaves it.
+ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
+  // The float mode is the host's (MXCSR): read and put back through ours.
+  const uint32_t mode = ::base::FloatMode::getcsr();
+  ctx.fpscr.disableFlushMode();
+  if (!model_animation::SkeletonLocalMatrices(ctx.r3.u32, ctx.r1.u32)) {
+    ::base::FloatMode::restoreGuestBits(mode);  // no float work: the mode as it came
+  }
+}
+
+// --- The materials and the shared shaders ---
+
+namespace hooks {
+
+ITC_REGS_STEP(ModelsMaterialCount) {
+  ctx.r3.u64 = models::MaterialCount(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
+}
+
+ITC_REGS_STEP(ModelsMaterial) {
+  ctx.r3.u64 = models::Material(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
+}
+
+ITC_REGS_STEP(ModelsSharedVertexShader) {
+  ctx.r3.u64 = models::SharedVertexShader(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(ModelsSetSharedShaders) {
+  models::SetSharedShaders(ctx.r3.u32, ctx.r4.u32);
+}
+
+ITC_REGS_STEP(ModelsSharedPixelShader) {
+  ctx.r3.u64 = models::SharedPixelShader(ctx.r3.u32);
+}
+
+bool TextureProviderSlotDirect(lifted::Regs& ctx, uint32_t function) {
+  if (!ITC_FLAG(native_models)) {
+    return false;
+  }
+  if (function == models::kTextureProviderGet) {
+    ctx.r3.u64 = models::TextureProviderGet(ctx.r3.u32, ctx.r4.u32);
+    return true;
+  }
+  if (function == models::kTextureProviderXprTexture) {
+    ctx.r3.u64 = models::TextureProviderXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r1.u32, ProviderGuestCall(ctx));
+    return true;
+  }
+  return false;
+}
+
+}  // namespace hooks
+
+#define ITC_MODELS_ACCESSOR(address, steps)  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_models)) { \
+    hooks::steps(ctx);                 \
+  }
+
+ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
+ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
+ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
+ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
+// SetSharedShaders (sub_825896C0) has no adapter: only Shaders::LoadAll's
+// plain C++ calls it in play (hooks::ModelsSetSharedShaders stays for the
+// harness).
+
+// ShaderFile::Parse (sub_822A8568), VertexShader::CopyHeader (sub_822A9FD8)
+// and PixelShader::CopyHeader (sub_822A9EA8) have no adapters: only native
+// callers reach them in play (Mesh::LoadShaders and Shaders::OnPairLoaded, in
+// src/shader_objects/, doing their work on the host).
+
+// Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
+// original leaves it.
+ITC_NATIVE_ENTRY(8235A9F8, ITC_FLAG(native_models)) {
+  ctx.r3.u64 = models::RelocateResource(ctx.r3.u32, ctx.r4.u32);
+}
+
+// XPR::Create: r3 = the XPR object, r4 = the XPR2 file; returns 0 or
+// 0x80004005.
+ITC_NATIVE_ENTRY_ALWAYS(82596F68) {
+  
+  if (NativeLifetime()) {
+    if (const auto r3 = models::XprCreate(ctx.r3.u32, ctx.r4.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c82596F68(ctx);
+}
+
+// SkeletonBase::SetUp: r3 = the skeleton, r4 = the node file, r5 = the
+// matrices or 0, r6 = the instance count. Skeleton::Bind: r3 to r5 the same.
+// No return value read. Flush-to-zero off, as the originals leave it.
+ITC_NATIVE_ENTRY_ALWAYS(8259A9E0) {
+  
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (model_animation::SkeletonSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+      return;
+    }
+  }
+  lifted::original::c8259A9E0(ctx);
+}
+
+ITC_NATIVE_ENTRY_ALWAYS(82599A20) {
+  
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (model_animation::SkeletonBind(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+      return;
+    }
+  }
+  lifted::original::c82599A20(ctx);
+}
+
+namespace {
+
+// The guest calls Model::Load makes where a callee's plain C++ declines,
+// from a frame below the adapter's (room for the original's own frames).
+void ModelLoadInit(void* user, uint32_t object, uint32_t microcode) {
+  auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
+  guest_call::InFrame(c.ctx, 512, 0x82594DEC, [&](uint32_t) {
+    c.ctx.r3.u64 = object;
+    c.ctx.r4.u64 = microcode;
+    lifted::original::c822A8740(c.ctx);
+  });
+}
+void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+                   uint32_t return_address) {
+  auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
+  lifted::Regs& ctx = c.ctx;
+  guest_call::InFrame(ctx, 512, return_address, [&](uint32_t) {
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    lifted::CallFromContext(ctx, function);
+  });
+}
+
+}  // namespace
+
+models::LoadCalls hooks::ModelLoadGuest::Calls() {
+  models::LoadCalls calls;
+  calls.init = &ModelLoadInit;
+  calls.call = &ModelLoadCall;
+  calls.user = this;
+  return calls;
+}
+
+// Model::Load: r3 = the model, r4 = the part file, r5 = an XPR2 file or 0;
+// r3 = the model's shape count (the original's loop counter). Flush-to-zero
+// off, as the original leaves it.
+ITC_NATIVE_ENTRY_ALWAYS(82596920) {
+  
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    const uint32_t model = ctx.r3.u32, file = ctx.r4.u32, xpr = ctx.r5.u32;
+    hooks::ModelLoadGuest guest{ctx};
+    const bool done = models::ModelLoad(model, file, xpr, guest.Calls());
+    ctx.lr = lr;
+    if (done) {
+      ctx.r3.u64 = schema::Model(model).shape_count();
+      return;
+    }
+    ctx.r3.u64 = model;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = xpr;
+  }
+  lifted::original::c82596920(ctx);
+}
+
+// Shaders::LoadAll: no arguments; r3 as the original leaves it (the vertex
+// table's address, sign-extended as lis/addi leave it). Each pair through
+// Shaders::LoadPair's plain C++, the original (from LoadAll's frame) where it
+// hands back.
+ITC_NATIVE_ENTRY_ALWAYS(820A08A0) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x820A08A0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    lifted::original::c820A08A0(ctx);
+    return;
+  }
+  const archive::LoadCall load = hooks::NativeArchiveLoad();
+  const uint32_t r3 = models::ShadersLoadAll([&](uint32_t asset, uint32_t pair) {
+    if (models::ShadersLoadPair(asset, pair, load)) {
+      return;
+    }
+    const uint32_t at = pair < 1000 ? 0x820A08D4 : pair < 2000 ? 0x820A08F8 : 0x820A091C;
+    guest_call::InFrame(ctx, 112, at, [&](uint32_t) {
+      ctx.r3.u64 = asset;
+      ctx.r4.u64 = pair;
+      lifted::original::c820A07F0(ctx);
+    });
+  });
+  ctx.r3.s64 = int32_t(r3);
+}
+
+namespace {
+
+// VertexShader::Init's original, from a frame as the callback's own.
+struct PairLoadedCalls {
+  lifted::Regs& ctx;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<PairLoadedCalls*>(user);
+    guest_call::InFrame(c.ctx, 144, 0x820A0760, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      lifted::original::c822A8740(c.ctx);
+    });
+  }
+};
+
+}  // namespace
+
+// Shaders::OnPairLoaded (Archive::Load's callback; reached through the
+// request's function pointer, so the adapter stays): r6 = the pair's
+// context; r3 = the context, as operator delete leaves it.
+ITC_NATIVE_ENTRY_ALWAYS(820A06D0) {
+  
+  if (hooks::ModelsNativeLifetime()) {
+    const uint64_t lr = ctx.lr;
+    const uint64_t r6 = ctx.r6.u64;
+    const uint32_t context = ctx.r6.u32;
+    PairLoadedCalls guest{ctx};
+    shader_objects::CreateCalls calls;
+    calls.init = &PairLoadedCalls::Init;
+    calls.user = &guest;
+    const auto freed = shader_objects::PairLoaded(context, calls);
+    ctx.lr = lr;
+    if (freed) {
+      ctx.r3.u64 = r6;
+      if (!*freed) {
+        guest_call::InFrame(ctx, 144, 0x820A07E4, [&](uint32_t) {
+          ctx.r3.u64 = r6;
+          lifted::original::c825A70E8(ctx);
+        });
+        ctx.lr = lr;
+      }
+      return;
+    }
+  }
+  lifted::original::c820A06D0(ctx);
+}

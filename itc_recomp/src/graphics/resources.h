@@ -18,11 +18,11 @@ namespace graphics {
 // sub_822A6180 Resource::GetType: the resource's type (D3DRTYPE, probably)
 // from +0's low 4 bits, refined for textures (3) by their dimension and for
 // a texture's surfaces (4) by their parent's.
-uint32_t ResourceType(uint8_t* base, uint32_t resource);
+uint32_t ResourceType(uint32_t resource);
 
 // sub_822A44A8 Texture::Format: the format word rebuilt from the fetch
 // constant's +28, +32 and +40.
-uint32_t TextureFormat(uint8_t* base, uint32_t texture);
+uint32_t TextureFormat(uint32_t texture);
 
 // sub_822A4410 GpuFormat::BlockSize: a GPU texture format's block, in texels.
 struct Block {
@@ -40,7 +40,7 @@ struct Extent {
   uint32_t height;
   uint32_t depth;
 };
-Extent TextureBaseSize(uint8_t* base, uint32_t texture);
+Extent TextureBaseSize(uint32_t texture);
 
 // sub_822A4530 TextureLayout::LevelCount: 1 + log2 of the largest of the
 // sizes less twice the border (the depth at least 1).
@@ -74,7 +74,7 @@ struct LevelLayout {
   uint32_t pitch;
   uint32_t slice;
 };
-LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level);
+LevelLayout TextureLevelLayout(uint32_t texture, uint32_t level);
 
 // sub_822A4A40 TextureLayout::MipTailOffset (not seen in play): a level's
 // place inside the packed mip tail, from its index in the tail, the tail's
@@ -87,7 +87,7 @@ struct MipTailPlace {
   uint32_t z;
   uint32_t offset;
 };
-MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32_t height,
+MipTailPlace MipTailOffset(uint32_t level, uint32_t width, uint32_t height,
                            uint32_t depth, uint32_t pitch, uint32_t slice, uint32_t format);
 
 // sub_822A4FF0 Texture::LevelOffset: where a face's (or array slice's) level
@@ -106,12 +106,12 @@ struct LevelPlace {
   uint32_t depth;
   uint32_t tail;
 };
-LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level);
+LevelPlace TextureLevelOffset(uint32_t texture, uint32_t face, uint32_t level);
 
 // sub_822A4F60 Texture::LevelDesc: fills the 32-byte description at `desc`
 // (+0 the format, +4 the type, +24 and +28 the level's width and height,
 // the rest 0); returns the type (the original's r3).
-uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc);
+uint32_t TextureLevelDesc(uint32_t texture, uint32_t level, uint32_t desc);
 
 // sub_822A5B78 Texture::GetLevelDesc: TextureLevelDesc (the original jumps
 // to it).
@@ -122,7 +122,7 @@ uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint3
 // format +40, +24 and +28 its width and height from +36, +16 the
 // multisample type, +8, +12, +20 = 0); +4 = 4 either way. Returns the
 // original's r3: the level description's type, or the surface.
-uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc);
+uint32_t SurfaceDesc(uint32_t surface, uint32_t desc);
 
 // sub_822A5910 SurfaceHeader::Set: fills a 48-byte surface header (+0 = 4,
 // +4 = 1, +20 unlocked, +24 the pitch and samples, +28 the EDRAM base and
@@ -134,7 +134,7 @@ struct SurfaceSizes {
   uint32_t tiles;
   uint32_t hi_z;
 };
-SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+SurfaceSizes SetSurfaceHeader(uint32_t width, uint32_t height, uint32_t format,
                               int32_t multisample, uint32_t parameters, uint32_t header);
 
 // sub_822A46C8 TextureLayout::Sizes: a texture's base level's aligned width
@@ -151,7 +151,7 @@ struct TextureSizes {
   uint32_t base_size;   // out: the base level's bytes
   uint32_t mip_size;    // out: the mip chain's bytes
 };
-TextureSizes TextureLayoutSizes(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+TextureSizes TextureLayoutSizes(uint32_t width, uint32_t height, uint32_t depth,
                                 uint32_t levels, uint32_t format, uint32_t dimension,
                                 uint32_t tiled, uint32_t packed, uint32_t border, uint32_t pitch);
 
@@ -170,7 +170,7 @@ struct TextureHeaderSizes {
   uint32_t base_size;
   uint32_t mip_size;
 };
-TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width, uint32_t height,
+TextureHeaderSizes SetTextureHeader(uint32_t type, uint32_t width, uint32_t height,
                                     uint32_t depth, uint32_t levels, uint32_t usage,
                                     uint32_t format, uint32_t packed, uint32_t border,
                                     uint32_t field, uint32_t pitch, uint32_t header);
@@ -179,18 +179,18 @@ TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width
 
 // sub_822A6830 Device::CreateVertexBuffer: a 32-byte header and `bytes` of
 // physical memory (write-combined with usage 0x4); 0 when either fails.
-uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage);
+uint32_t CreateVertexBuffer(uint32_t bytes, uint32_t usage);
 
 // sub_822A6968 Device::CreateIndexBuffer: the same with the index format in
 // the header's top 3 bits.
-uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32_t format);
+uint32_t CreateIndexBuffer(uint32_t bytes, uint32_t usage, uint32_t format);
 
 // sub_822A5E28 Device::CreateSurface: a 48-byte header (XMemAlloc) set by
 // SetSurfaceHeader, +0 bit 0x00100000; with no `parameters`, its EDRAM from
 // the allocator (+0 bit 0x80000000, the base in +28's low 12 bits; 0 when
 // none fits or it passes 2,048 tiles) and the first depth surface takes the
 // hi-z. 0 when it fails.
-uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t format,
+uint32_t CreateSurface(uint32_t width, uint32_t height, uint32_t format,
                        int32_t multisample, uint32_t parameters);
 
 // sub_822A5D08 Device::CreateTexture: a 52-byte header (XMemAlloc) set by
@@ -199,7 +199,7 @@ uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
 // with usage 0x4), their addresses in +32's and +48's top 20 bits; 0 when
 // an allocation fails (what was made freed). `type` must be one
 // TextureTypeKnown takes (the adapter runs the original for others).
-uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t depth,
+uint32_t CreateTexture(uint32_t width, uint32_t height, uint32_t depth,
                        uint32_t levels, uint32_t usage, uint32_t format, uint32_t type);
 
 // sub_822A5B80 Texture::GetSurfaceLevel: a 48-byte surface header for a
@@ -207,7 +207,7 @@ uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
 // 0x200000, +4 = 1, +20 unlocked, +24 the texture, +28's top 4 bits the
 // level, face 0), the texture AddRef'ed; 0 when the allocation fails. (The
 // original's Texture::LevelOffset call first only writes its own stack.)
-uint32_t GetSurfaceLevel(uint8_t* base, uint32_t texture, uint32_t level);
+uint32_t GetSurfaceLevel(uint32_t texture, uint32_t level);
 
 // sub_8235A720 XGSetTextureHeaderEx: a texture header built on the stack
 // with SetTextureHeader (+0 = 3, 0x00200003 with usage 0x4, 0x00400000 with
@@ -225,11 +225,11 @@ struct XgTextureHeader {
   uint32_t width, height, depth, levels, usage, format, packed, border, field;
   uint32_t base_address, mip_address, pitch, type, header, base_size_out, mip_size_out;
 };
-uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& args);
+uint32_t XGSetTextureHeaderEx(const XgTextureHeader& args);
 // sub_8235A920 XGSetTextureHeader: XGSetTextureHeaderEx for a 2D texture
 // (type 3) of depth 1, packed mips when more than one level, no border or
 // field.
-uint32_t XGSetTextureHeader(uint8_t* base, uint32_t width, uint32_t height, uint32_t levels,
+uint32_t XGSetTextureHeader(uint32_t width, uint32_t height, uint32_t levels,
                             uint32_t usage, uint32_t format, uint32_t base_address,
                             uint32_t mip_address, uint32_t pitch, uint32_t header,
                             uint32_t base_size_out, uint32_t mip_size_out);
@@ -240,10 +240,10 @@ bool XgHeaderCopyFits(uint32_t header);
 // --- The device's current resources (AddRef'ed when set) ---
 
 // sub_822A3998 Device::GetRenderTarget: device +12184 + 4 x index.
-uint32_t GetRenderTarget(uint8_t* base, uint32_t device, uint32_t index);
+uint32_t GetRenderTarget(uint32_t device, uint32_t index);
 
 // sub_822A39E0 Device::GetDepthStencilSurface: device +12200.
-uint32_t GetDepthStencilSurface(uint8_t* base, uint32_t device);
+uint32_t GetDepthStencilSurface(uint32_t device);
 
 // sub_822A3880 Device::GetStreamSource: the stream's buffer (device +12204 +
 // 4 x stream), its offset (from the stream's fetch constant, 0 with no
@@ -253,7 +253,7 @@ struct StreamSource {
   uint32_t offset;
   uint32_t stride;
 };
-StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
+StreamSource GetStreamSource(uint32_t device, uint32_t stream);
 
 // --- Locks. The library's GPU work around them is Dropped (the user's
 // call, 2026-10-24): the fence waits (sub_8229E908, which pass at once),
@@ -270,13 +270,13 @@ StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
 // locked, `flags` (0x1 no range noted, 0x10 the other view). Notes the range
 // (with flag 0x10 or a write-combined resource, +0 bit 0x200000), adds a lock
 // and returns the address (in the other view, 0x40000000 below, with 0x10).
-uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t data,
+uint32_t LockResource(uint32_t resource, uint32_t mips, uint32_t data,
                       uint32_t mip_data, uint32_t address, uint32_t size, uint32_t flags);
 
 // sub_822A6630 Resource::Unlock: takes a lock; at the last, resets the
 // locked ranges (+20, and +24 when `mip_data`). Returns the original's r3:
 // the resource, or the last range's start address (the flush's argument).
-uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_t mip_data);
+uint32_t UnlockResource(uint32_t resource, uint32_t data, uint32_t mip_data);
 
 // sub_822A54B0 Texture::LockLevel: the level's place (TextureLevelOffset),
 // its pitch times the block's height, and Resource::Lock over it (the tail
@@ -290,43 +290,43 @@ struct LevelLock {
   uint32_t tail;     // out
   uint32_t r3;       // the lock's address
 };
-LevelLock LockTextureLevel(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+LevelLock LockTextureLevel(uint32_t texture, uint32_t face, uint32_t level,
                            uint32_t flags);
 
 // sub_822A5578 Texture::LockRect: LockTextureLevel, then the locked rect at
 // `locked` (+0 the pitch, +4 the bits, moved to `rect`'s left and top when
 // one is given: left x bits a pixel / 8 + top x pitch). Returns the lock's
 // address (the original's r3).
-uint32_t LockTextureRect(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+uint32_t LockTextureRect(uint32_t texture, uint32_t face, uint32_t level,
                          uint32_t locked, uint32_t rect, uint32_t flags);
 
 // sub_822A5C38 Texture::LockRectLevel: LockTextureRect with face 0.
-uint32_t LockTextureRectLevel(uint8_t* base, uint32_t texture, uint32_t level, uint32_t locked,
+uint32_t LockTextureRectLevel(uint32_t texture, uint32_t level, uint32_t locked,
                               uint32_t rect, uint32_t flags);
 
 // sub_822A5FE8 Surface::LockRect: LockTextureRect on the surface's texture
 // (+24), face (+28 bits 22-27) and level (+28's top 4 bits).
-uint32_t LockSurfaceRect(uint8_t* base, uint32_t surface, uint32_t locked, uint32_t rect,
+uint32_t LockSurfaceRect(uint32_t surface, uint32_t locked, uint32_t rect,
                          uint32_t flags);
 
 // sub_822A43E0 Texture::Unlock: UnlockResource over the base and mip data
 // (+32's and +48's top 20 bits); sub_822A43F8 Surface::Unlock the same on
 // the surface's texture (+24).
-uint32_t UnlockTexture(uint8_t* base, uint32_t texture);
-uint32_t UnlockSurface(uint8_t* base, uint32_t surface);
+uint32_t UnlockTexture(uint32_t texture);
+uint32_t UnlockSurface(uint32_t surface);
 
 // sub_822A68F8 VertexBuffer::Lock and sub_822A6A18 IndexBuffer::Lock: the
 // buffer's data (+24; a vertex buffer's low 2 bits off) from `offset`, `size`
 // bytes (0: all of it, +28's size, from 0); an index buffer adds flag 0x2.
-uint32_t LockVertexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+uint32_t LockVertexBuffer(uint32_t buffer, uint32_t offset, uint32_t size,
                           uint32_t flags);
-uint32_t LockIndexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+uint32_t LockIndexBuffer(uint32_t buffer, uint32_t offset, uint32_t size,
                          uint32_t flags);
 
 // sub_822A6958 VertexBuffer::Unlock and sub_822A6A78 IndexBuffer::Unlock:
 // UnlockResource over the data (+24; a vertex buffer's low 2 bits off).
-uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer);
-uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer);
+uint32_t UnlockVertexBuffer(uint32_t buffer);
+uint32_t UnlockIndexBuffer(uint32_t buffer);
 
 // --- Destruction (the allocation layer: run only with --native_heap) ---
 
@@ -335,7 +335,7 @@ uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer);
 // 5120), the hi-z taken back (+32 bit 0: 0x829537C4 = 0), but for a
 // texture's surface (+0 bit 0x40000000); then the header freed. `common` is
 // the header's +0 as the caller read it; returns XMemFree's r3.
-uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common);
+uint32_t DestroySurface(uint32_t surface, uint32_t common);
 
 // sub_822A6210 Resource::Destroy: frees a resource's data by its type
 // (+0's low 4 bits: 1 a vertex buffer's +24, low 2 bits off; 2, 7 and 8 its
@@ -343,6 +343,6 @@ uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common);
 // +48; 4 a surface, DestroySurface; others none), then the header; returns
 // XMemFree's r3. Type 9 (sub_822AD9D8 first, not seen in play) is the
 // adapter's (the original). Its fence waits are Dropped (above).
-uint32_t DestroyResource(uint8_t* base, uint32_t resource);
+uint32_t DestroyResource(uint32_t resource);
 
 }  // namespace graphics

@@ -269,9 +269,9 @@ void Headers(Context& h, Random& r) {
     GuestFunction native;
   };
   const Leaf leaves[] = {
-      {"Resource::GetType (sub_822A6180)", Original<__imp__sub_822A6180>, NativeResourceType},
-      {"Texture::Format (sub_822A44A8)", Original<__imp__sub_822A44A8>, NativeTextureFormat},
-      {"Texture::BaseSize (sub_822A4348)", Original<__imp__sub_822A4348>, NativeBaseSize},
+      {"Resource::GetType (sub_822A6180)", Original<__imp__sub_822A6180>, ITC_CONTEXT_FN(NativeResourceType)},
+      {"Texture::Format (sub_822A44A8)", Original<__imp__sub_822A44A8>, ITC_CONTEXT_FN(NativeTextureFormat)},
+      {"Texture::BaseSize (sub_822A4348)", Original<__imp__sub_822A4348>, ITC_CONTEXT_FN(NativeBaseSize)},
   };
   for (const Leaf& leaf : leaves) {
     Results results(leaf.name);
@@ -351,7 +351,7 @@ void LevelDescs(Context& h, Random& r) {
       t.r3.u64 = h.data + kHeader;
       t.r4.u64 = level;
       t.r5.u64 = h.data + kOut;
-      (v == 0 ? Original<__imp__sub_822A4F60> : NativeLevelDesc)(t, h.base);
+      (v == 0 ? Original<__imp__sub_822A4F60> : ITC_CONTEXT_FN(NativeLevelDesc))(t, h.base);
       out[v].Bytes(Read(h.base, h.data + kOut, 32));
       out[v].Word(t.r3.u32);
     }
@@ -366,12 +366,12 @@ void LevelDescs(Context& h, Random& r) {
     GuestFunction native;
   };
   const Desc descs[] = {
-      {"Texture::GetLevelDesc (sub_822A5B78)", Original<__imp__sub_822A5B78>, NativeLevelDesc},
-      {"Surface::GetDesc (sub_822A5F50)", Original<__imp__sub_822A5F50>, NativeSurfaceDesc},
+      {"Texture::GetLevelDesc (sub_822A5B78)", Original<__imp__sub_822A5B78>, ITC_CONTEXT_FN(NativeLevelDesc)},
+      {"Surface::GetDesc (sub_822A5F50)", Original<__imp__sub_822A5F50>, ITC_CONTEXT_FN(NativeSurfaceDesc)},
   };
   for (const Desc& d : descs) {
     Results more(d.name);
-    const bool surface = d.native == NativeSurfaceDesc;
+    const bool surface = d.native == ITC_CONTEXT_FN(NativeSurfaceDesc);
     for (int i = 0; i < 500; i++) {
       Fill(h.base, h.data, kScratchBytes);
       RandomTexture(h.base, h.data + kHeader, r);
@@ -457,7 +457,7 @@ void TextureHeaders(Context& h, Random& r) {
         t.r8.u64 = dimension;
         t.r9.u64 = tiled;
         t.r10.u64 = packed;
-        (v == 0 ? Original<__imp__sub_822A46C8> : NativeLayoutSizes)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A46C8> : ITC_CONTEXT_FN(NativeLayoutSizes))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kOut, 12));
         out[v].Word(t.r3.u32);
       }
@@ -508,7 +508,7 @@ void TextureHeaders(Context& h, Random& r) {
         t.r8.u64 = usage;
         t.r9.u64 = format;
         t.r10.u64 = packed;
-        (v == 0 ? Original<__imp__sub_822A5608> : NativeSetTextureHeader)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A5608> : ITC_CONTEXT_FN(NativeSetTextureHeader))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kHeader, 64));
         out[v].Bytes(Read(h.base, h.data + kOut, 8));
         out[v].Word(t.r3.u32);
@@ -552,7 +552,7 @@ void LevelOffsets(Context& h, Random& r) {
         t.r8.u64 = slice;
         t.r9.u64 = format;
         t.r10.u64 = h.data + kOut;
-        (v == 0 ? Original<__imp__sub_822A4A40> : NativeMipTailOffset)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A4A40> : ITC_CONTEXT_FN(NativeMipTailOffset))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kOut, 12));
         out[v].Word(t.r3.u32);
       }
@@ -597,7 +597,7 @@ void LevelOffsets(Context& h, Random& r) {
         t.r8.u64 = h.data + kOut + 8;
         t.r9.u64 = h.data + kOut + 12;
         t.r10.u64 = h.data + kOut + 16;
-        (v == 0 ? Original<__imp__sub_822A4FF0> : NativeLevelOffset)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A4FF0> : ITC_CONTEXT_FN(NativeLevelOffset))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kOut, 32));
         out[v].Bytes(Read(h.base, h.data, 64));
       }
@@ -641,7 +641,7 @@ void TextureCreation(Context& h, Random& r) {
         t.r8.u64 = format;
         t.r9.u64 = 0;
         t.r10.u64 = type;
-        (v == 0 ? Original<__imp__sub_822A5D08> : NativeCreateTexture)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A5D08> : ITC_CONTEXT_FN(NativeCreateTexture))(t, h.base);
         const uint32_t header = t.r3.u32;
         out[v].Word(header != 0);
         out[v].Word(header & 0xFFF);
@@ -694,7 +694,7 @@ void TextureCreation(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data + kHeader;
         t.r4.u64 = level;
-        (v == 0 ? Original<__imp__sub_822A5B80> : NativeGetSurfaceLevel)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A5B80> : ITC_CONTEXT_FN(NativeGetSurfaceLevel))(t, h.base);
         const uint32_t surface = t.r3.u32;
         out[v].Word(surface != 0);
         out[v].Bytes(Read(h.base, h.data, 128));
@@ -744,7 +744,7 @@ void TextureCreation(Context& h, Random& r) {
         t.r8.u64 = r8;
         t.r9.u64 = base_address;
         t.r10.u64 = mip_address;
-        (v == 0 ? Original<__imp__sub_8235A920> : NativeXGSetTextureHeader)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8235A920> : ITC_CONTEXT_FN(NativeXGSetTextureHeader))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kHeader, 64));
         out[v].Bytes(Read(h.base, h.data + kOut, 8));
         out[v].Word(t.r3.u32);
@@ -770,7 +770,7 @@ void BlockSizes(Context& h, Random& r) {
       t.r3.u64 = format;
       t.r4.u64 = h.data + kOut;
       t.r5.u64 = h.data + kOut + 4;
-      (v == 0 ? Original<__imp__sub_822A4410> : NativeBlockSize)(t, h.base);
+      (v == 0 ? Original<__imp__sub_822A4410> : ITC_CONTEXT_FN(NativeBlockSize))(t, h.base);
       out[v].Bytes(Read(h.base, h.data + kOut, 8));
       out[v].Word(t.r3.u32);
     }
@@ -807,7 +807,7 @@ void SizeMath(Context& h, Random& r) {
         t.r7.u64 = format;
         t.r8.u64 = dimension;
         t.r9.u64 = tiled;
-        (v == 0 ? Original<__imp__sub_822A45B8> : NativeLevelSize)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A45B8> : ITC_CONTEXT_FN(NativeLevelSize))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + kOut, 12));
         out[v].Word(t.r3.u32);
       }
@@ -829,7 +829,7 @@ void SizeMath(Context& h, Random& r) {
         t.r4.u64 = hh;
         t.r5.u64 = d;
         t.r6.u64 = border;
-        (v == 0 ? Original<__imp__sub_822A4530> : NativeLevelCount)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A4530> : ITC_CONTEXT_FN(NativeLevelCount))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], fmt::format("{} x {} x {}, border {}", w, hh, d, border));
@@ -851,7 +851,7 @@ void SizeMath(Context& h, Random& r) {
         t.r4.u64 = hh;
         t.r5.u64 = format;
         t.r6.u64 = multisample;
-        (v == 0 ? Original<__imp__sub_8209AD68> : NativeEdramTiles)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8209AD68> : ITC_CONTEXT_FN(NativeEdramTiles))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1],
@@ -882,8 +882,8 @@ void Buffers(Context& h, Random& r) {
         t.r4.u64 = usage;
         t.r5.u64 = format;
         t.r6.u64 = 0;
-        GuestFunction f = index ? (v == 0 ? Original<__imp__sub_822A6968> : NativeCreateIndexBuffer)
-                                : (v == 0 ? Original<__imp__sub_822A6830> : NativeCreateVertexBuffer);
+        GuestFunction f = index ? (v == 0 ? Original<__imp__sub_822A6968> : ITC_CONTEXT_FN(NativeCreateIndexBuffer))
+                                : (v == 0 ? Original<__imp__sub_822A6830> : ITC_CONTEXT_FN(NativeCreateVertexBuffer));
         f(t, h.base);
         const uint32_t header = t.r3.u32;
         out[v].Word(header != 0);
@@ -931,11 +931,11 @@ void Getters(Context& h, Random& r) {
   };
   const Getter getters[] = {
       {"Device::GetRenderTarget (sub_822A3998)", Original<__imp__sub_822A3998>,
-       NativeGetRenderTarget},
+       ITC_CONTEXT_FN(NativeGetRenderTarget)},
       {"Device::GetDepthStencilSurface (sub_822A39E0)", Original<__imp__sub_822A39E0>,
-       NativeGetDepthStencilSurface},
+       ITC_CONTEXT_FN(NativeGetDepthStencilSurface)},
       {"Device::GetStreamSource (sub_822A3880)", Original<__imp__sub_822A3880>,
-       NativeGetStreamSource},
+       ITC_CONTEXT_FN(NativeGetStreamSource)},
   };
   for (const Getter& getter : getters) {
     Results results(getter.name);
@@ -1125,7 +1125,7 @@ void SurfaceHeaders(Context& h, Random& r) {
       t.r8.u64 = h.data + kHeader;
       t.r9.u64 = h.data + kOut;
       t.r10.u64 = h.data + kOut + 4;
-      (v == 0 ? Original<__imp__sub_822A5910> : NativeSetSurfaceHeader)(t, h.base);
+      (v == 0 ? Original<__imp__sub_822A5910> : ITC_CONTEXT_FN(NativeSetSurfaceHeader))(t, h.base);
       out[v].Bytes(Read(h.base, h.data + kHeader, 48));
       out[v].Bytes(Read(h.base, h.data + kOut, 8));
       out[v].Word(t.r3.u32);
@@ -1158,7 +1158,7 @@ void EdramLeaves(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = object;
         t.r4.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_822B5C90> : NativeNextRun)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822B5C90> : ITC_CONTEXT_FN(NativeNextRun))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(guest::LoadU32(h.base, h.data));
         out[v].Bytes(AllocatorState(h, object));
@@ -1193,7 +1193,7 @@ void EdramLeaves(Context& h, Random& r) {
         t.r4.u64 = start;
         t.r5.u64 = end;
         t.r6.u64 = used;
-        (v == 0 ? Original<__imp__sub_822B5D70> : NativeMark)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822B5D70> : ITC_CONTEXT_FN(NativeMark))(t, h.base);
         out[v].Bytes(AllocatorState(h, object));
         memory::crt::XMemFree(object, kObjectAttributes);
       }
@@ -1228,7 +1228,7 @@ void EdramAllocator(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = tiles;
         t.r4.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_822B5EF8> : NativeEdramAlloc)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822B5EF8> : ITC_CONTEXT_FN(NativeEdramAlloc))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(guest::LoadU32(h.base, h.data));
         out[v].Word(guest::LoadU32(h.base, edram::kAllocator) == object);
@@ -1255,7 +1255,7 @@ void EdramAllocator(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = tiles;
         t.r4.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_822B5EF8> : NativeEdramAlloc)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822B5EF8> : ITC_CONTEXT_FN(NativeEdramAlloc))(t, h.base);
         const uint32_t object = guest::LoadU32(h.base, edram::kAllocator);
         out[v].Word(t.r3.u32);
         out[v].Word(guest::LoadU32(h.base, h.data));
@@ -1288,7 +1288,7 @@ void EdramAllocator(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = start;
         t.r4.u64 = tiles;
-        (v == 0 ? Original<__imp__sub_822B5EA8> : NativeEdramFree)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822B5EA8> : ITC_CONTEXT_FN(NativeEdramFree))(t, h.base);
         out[v].Bytes(AllocatorState(h, object));
         memory::crt::XMemFree(object, kObjectAttributes);
       }
@@ -1333,7 +1333,7 @@ void EdramAllocator(Context& h, Random& r) {
         t.r1.u64 = top - 112;
         t.r31.u64 = surface;
         t.r11.u64 = common;
-        (v == 0 ? Original<__imp__sub_822A6268> : NativeDestroySurface)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A6268> : ITC_CONTEXT_FN(NativeDestroySurface))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r1.u32 - top);
         out[v].Word(t.r29.u32);
@@ -1389,7 +1389,7 @@ void EdramAllocator(Context& h, Random& r) {
         t.r5.u64 = format;
         t.r6.s64 = multisample;
         t.r7.u64 = with_parameters ? h.data + kParent : 0;
-        (v == 0 ? Original<__imp__sub_822A5E28> : NativeCreateSurface)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A5E28> : ITC_CONTEXT_FN(NativeCreateSurface))(t, h.base);
         const uint32_t surface = t.r3.u32;
         out[v].Word(surface != 0);
         if (surface != 0) {
@@ -1642,7 +1642,7 @@ void LocksAndUnlocks(Context& h, Random& r) {
         t.r9.u64 = size;
         t.r10.u64 = flags;
         const CommandBuffer saved = SaveCommandBuffer(h, d);
-        (v == 0 ? Original<__imp__sub_822A63F8> : NativeLock)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A63F8> : ITC_CONTEXT_FN(NativeLock))(t, h.base);
         left[v].Bytes(RestoreCommandBuffer(h, d, saved));
         out[v].Bytes(Read(h.base, h.data, 128));
         out[v].Word(t.r3.u32);
@@ -1676,7 +1676,7 @@ void LocksAndUnlocks(Context& h, Random& r) {
         t.r3.u64 = h.data + kHeader;
         t.r4.u64 = data;
         t.r5.u64 = mip_data;
-        (v == 0 ? Original<__imp__sub_822A6630> : NativeUnlock)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822A6630> : ITC_CONTEXT_FN(NativeUnlock))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 64));
         out[v].Word(t.r3.u32);
       }
@@ -1718,22 +1718,22 @@ void LockWrappers(Context& h, Random& r) {
                // 4 Texture::Unlock, 5 Surface::Unlock, 6-9 the buffers'
   };
   const Wrapper wrappers[] = {
-      {"Texture::LockLevel (sub_822A54B0)", Original<__imp__sub_822A54B0>, NativeLockLevel, 0},
-      {"Texture::LockRect (sub_822A5578)", Original<__imp__sub_822A5578>, NativeLockRect, 1},
+      {"Texture::LockLevel (sub_822A54B0)", Original<__imp__sub_822A54B0>, ITC_CONTEXT_FN(NativeLockLevel), 0},
+      {"Texture::LockRect (sub_822A5578)", Original<__imp__sub_822A5578>, ITC_CONTEXT_FN(NativeLockRect), 1},
       {"Texture::LockRectLevel (sub_822A5C38)", Original<__imp__sub_822A5C38>,
-       NativeLockRectLevel, 2},
-      {"Surface::LockRect (sub_822A5FE8)", Original<__imp__sub_822A5FE8>, NativeSurfaceLockRect,
+       ITC_CONTEXT_FN(NativeLockRectLevel), 2},
+      {"Surface::LockRect (sub_822A5FE8)", Original<__imp__sub_822A5FE8>, ITC_CONTEXT_FN(NativeSurfaceLockRect),
        3},
-      {"Texture::Unlock (sub_822A43E0)", Original<__imp__sub_822A43E0>, NativeTextureUnlock, 4},
-      {"Surface::Unlock (sub_822A43F8)", Original<__imp__sub_822A43F8>, NativeSurfaceUnlock, 5},
+      {"Texture::Unlock (sub_822A43E0)", Original<__imp__sub_822A43E0>, ITC_CONTEXT_FN(NativeTextureUnlock), 4},
+      {"Surface::Unlock (sub_822A43F8)", Original<__imp__sub_822A43F8>, ITC_CONTEXT_FN(NativeSurfaceUnlock), 5},
       {"VertexBuffer::Lock (sub_822A68F8)", Original<__imp__sub_822A68F8>,
-       NativeVertexBufferLock, 6},
-      {"IndexBuffer::Lock (sub_822A6A18)", Original<__imp__sub_822A6A18>, NativeIndexBufferLock,
+       ITC_CONTEXT_FN(NativeVertexBufferLock), 6},
+      {"IndexBuffer::Lock (sub_822A6A18)", Original<__imp__sub_822A6A18>, ITC_CONTEXT_FN(NativeIndexBufferLock),
        7},
       {"VertexBuffer::Unlock (sub_822A6958)", Original<__imp__sub_822A6958>,
-       NativeVertexBufferUnlock, 8},
+       ITC_CONTEXT_FN(NativeVertexBufferUnlock), 8},
       {"IndexBuffer::Unlock (sub_822A6A78)", Original<__imp__sub_822A6A78>,
-       NativeIndexBufferUnlock, 9},
+       ITC_CONTEXT_FN(NativeIndexBufferUnlock), 9},
   };
   constexpr uint32_t kSurface = 128;  // 64 bytes; kHeader the texture
   constexpr uint32_t kRect = 192;     // the rectangle
@@ -1895,7 +1895,7 @@ void Destroys(Context& h, Random& r) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = header;
-      (v == 0 ? Original<__imp__sub_822A6210> : NativeDestroy)(t, h.base);
+      (v == 0 ? Original<__imp__sub_822A6210> : ITC_CONTEXT_FN(NativeDestroy))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(memory::IsHeapBlock(header));
       out[v].Word(guest::LoadU32(h.base, kHiZTaken));

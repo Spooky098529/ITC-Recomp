@@ -15,12 +15,19 @@
 // docs/native-renderer.md), so the library sees everything done at once.
 // Our renderer draws from the command list replay instead.
 
+#include <format>
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "guest.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 #include "renderer.h"
 #include "state.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/predicated_tiling.h"
+#include "hooks/predicated_tiling.h"
 
 #include <array>
 #include <atomic>
@@ -28,7 +35,12 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include "lifted/sdk.h"
 
+ITC_FLAG_BOOL(native_tiling_worker, true, "ITC",
+              "Run the tiling worker's wake (Device::WakeWorker sub_822B6A78) natively and drop "
+              "its job's work (Device::WorkerJob sub_822B6780: GPU work nothing reads); both "
+              "never seen in play (docs/functions/predicated-tiling.md)");
 ITC_FLAG_BOOL(native_renderer_log_gpu, false, "ITC",
               "Log what the graphics library hands the GPU that has effects outside it "
               "(memory writes, interrupts, waits, swaps), and the GPU's progress (a "
@@ -117,22 +129,22 @@ uint32_t g_rare_traces = 300;
 bool g_rare = false;  // the walk met a rare packet
 std::atomic<int> g_tiling_logs{400};  // see sub_822B6BF8
 
-uint32_t ReadPhysical(uint8_t* base, uint32_t physical) {
-  const uint8_t* p = PhysicalHostAddress(base, physical & 0x1FFFFFFCu);
+uint32_t ReadPhysical(uint32_t physical) {
+  const uint8_t* p = PhysicalHostAddress(physical & 0x1FFFFFFCu);
   return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
 }
 
-std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
+std::string Words(uint32_t address, uint32_t count) {
   std::string out;
   for (uint32_t i = 0; i < count && i < 8; i++) {
-    out += fmt::format("{}{:08X}", i ? " " : "", ReadPhysical(base, address + 4 * i));
+    out += std::format("{}{:08X}", i ? " " : "", ReadPhysical(address + 4 * i));
   }
   return out;
 }
 
 // Walks one buffer's packets (address and size in words as INDIRECT_BUFFER
 // takes them), into indirect buffers too.
-void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::string* trace) {
+void WalkBuffer(uint32_t address, uint32_t size, int depth, std::string* trace) {
   Stats& s = g_stats;
   s.buffers++;
   s.words += size;
@@ -143,7 +155,7 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
   }
   uint32_t i = 0;
   while (i < size) {
-    uint32_t header = ReadPhysical(base, address + 4 * i);
+    uint32_t header = ReadPhysical(address + 4 * i);
     uint32_t type = header >> 30;
     if (type == 0) {
       uint32_t count = ((header >> 16) & 0x3FFF) + 1;
@@ -155,9 +167,9 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
           // Scratch registers (written back to memory) and their set-up.
           g_rare |= (reg >= 0x578 && reg <= 0x57F) || reg == 0x1DC || reg == 0x1DD;
           s.registers[reg]++;
-          s.register_values[reg] = ReadPhysical(base, address + 4 * (i + 1 + k));
+          s.register_values[reg] = ReadPhysical(address + 4 * (i + 1 + k));
           if (trace) {
-            *trace += fmt::format(" [reg {:04X}={:08X}]", reg, s.register_values[reg]);
+            *trace += std::format(" [reg {:04X}={:08X}]", reg, s.register_values[reg]);
           }
         }
       }
@@ -167,7 +179,7 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
       for (uint32_t k = 0; k < 2; k++) {
         if (regs[k] < 0x2000) {
           s.registers[regs[k]]++;
-          s.register_values[regs[k]] = ReadPhysical(base, address + 4 * (i + 1 + k));
+          s.register_values[regs[k]] = ReadPhysical(address + 4 * (i + 1 + k));
         }
       }
       i += 3;
@@ -181,13 +193,13 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
       if (HasOutsideEffect(opcode)) {
         // All but the fences, the coherency waits, cache events and swaps.
         g_rare |= opcode != 0x58 && opcode != 0x3C && opcode != 0x46 && opcode != 0x64;
-        s.opcode_samples[opcode] = Words(base, payload, count);
+        s.opcode_samples[opcode] = Words(payload, count);
         if (trace) {
-          *trace += fmt::format(" [{} {}]", OpcodeName(opcode), Words(base, payload, count));
+          *trace += std::format(" [{} {}]", OpcodeName(opcode), Words(payload, count));
         }
       }
       if ((opcode == 0x3F || opcode == 0x37) && depth < 4) {
-        WalkBuffer(base, ReadPhysical(base, payload), ReadPhysical(base, payload + 4) & 0xFFFFF,
+        WalkBuffer(ReadPhysical(payload), ReadPhysical(payload + 4) & 0xFFFFF,
                    depth + 1, trace);
       }
       i += 1 + count;
@@ -195,26 +207,26 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
   }
 }
 
-std::string ProgressBlock(uint8_t* base, uint32_t device) {
-  uint32_t block = guest::LoadU32(base, device + kDeviceProgressBlock);
+std::string ProgressBlock(uint32_t device) {
+  uint32_t block = guest::LoadU32(device + kDeviceProgressBlock);
   if (!block) {
     return "no progress block";
   }
-  return fmt::format("block {:08X}: +0 {:08X} +4 {:08X} +8 {:08X} +60 {:08X}; command position "
+  return std::format("block {:08X}: +0 {:08X} +4 {:08X} +8 {:08X} +60 {:08X}; command position "
                      "{:08X}, primary write {:08X}, pending kicks {}, vblanks {}",
-                     block, guest::LoadU32(base, block), guest::LoadU32(base, block + 4),
-                     guest::LoadU32(base, block + 8), guest::LoadU32(base, block + 60),
-                     guest::LoadU32(base, device + kDeviceCommandPosition),
-                     guest::LoadU32(base, device + kDevicePrimaryWrite),
-                     guest::LoadU32(base, device + kDevicePendingKicks),
-                     guest::LoadU32(base, device + kDeviceVblankCount));
+                     block, guest::LoadU32(block), guest::LoadU32(block + 4),
+                     guest::LoadU32(block + 8), guest::LoadU32(block + 60),
+                     guest::LoadU32(device + kDeviceCommandPosition),
+                     guest::LoadU32(device + kDevicePrimaryWrite),
+                     guest::LoadU32(device + kDevicePendingKicks),
+                     guest::LoadU32(device + kDeviceVblankCount));
 }
 
-void LogStats(uint8_t* base, uint32_t device) {
+void LogStats(uint32_t device) {
   Stats& s = g_stats;
   std::string opcodes;
   for (auto& [opcode, count] : s.opcodes) {
-    opcodes += fmt::format(" {}({:02X})={}", OpcodeName(opcode), opcode, count);
+    opcodes += std::format(" {}({:02X})={}", OpcodeName(opcode), opcode, count);
   }
   ITC_LOG_INFO("native renderer: gpu: {} kicks ({} by the other path), {} buffers, {} words "
                "({} unreadable); type-3 packets:{}",
@@ -224,10 +236,10 @@ void LogStats(uint8_t* base, uint32_t device) {
   }
   std::string registers;
   for (auto& [reg, count] : s.registers) {
-    registers += fmt::format(" {:04X}={} (last {:08X})", reg, count, s.register_values[reg]);
+    registers += std::format(" {:04X}={} (last {:08X})", reg, count, s.register_values[reg]);
   }
   ITC_LOG_INFO("native renderer: gpu: register writes below 0x2000:{}", registers);
-  ITC_LOG_INFO("native renderer: gpu: {}", ProgressBlock(base, device));
+  ITC_LOG_INFO("native renderer: gpu: {}", ProgressBlock(device));
   s = Stats{};
 }
 
@@ -243,11 +255,11 @@ struct Effects {
   std::map<uint32_t, uint64_t> unhandled;  // opcode: count
 } g_effects;
 
-void StorePhysical(uint8_t* base, uint32_t address, uint32_t value) {
+void StorePhysical(uint32_t address, uint32_t value) {
   // Endianness in the address's low bits as the GPU takes it; the game uses
   // 8-in-32 (2), the guest's own order. 0 (none) stores it little-endian.
   uint32_t endian = address & 3;
-  uint8_t* p = PhysicalHostAddress(base, address & 0x1FFFFFFCu);
+  uint8_t* p = PhysicalHostAddress(address & 0x1FFFFFFCu);
   if (endian == 0) {
     p[0] = uint8_t(value); p[1] = uint8_t(value >> 8);
     p[2] = uint8_t(value >> 16); p[3] = uint8_t(value >> 24);
@@ -263,8 +275,8 @@ void StorePhysical(uint8_t* base, uint32_t address, uint32_t value) {
   p[2] = uint8_t(value >> 8); p[3] = uint8_t(value);
 }
 
-uint32_t LoadPhysical(uint8_t* base, uint32_t address) {
-  uint32_t value = ReadPhysical(base, address);  // big-endian, i.e. 8-in-32
+uint32_t LoadPhysical(uint32_t address) {
+  uint32_t value = ReadPhysical(address);  // big-endian, i.e. 8-in-32
   uint32_t endian = address & 3;
   if (endian == 0) {
     value = __builtin_bswap32(value);
@@ -277,7 +289,7 @@ uint32_t LoadPhysical(uint8_t* base, uint32_t address) {
   return value;
 }
 
-void WriteRegister(uint8_t* base, uint32_t reg, uint32_t value) {
+void WriteRegister(uint32_t reg, uint32_t value) {
   Effects& e = g_effects;
   if (reg >= 0x2000) {
     return;  // context registers: the GPU's own state
@@ -285,7 +297,7 @@ void WriteRegister(uint8_t* base, uint32_t reg, uint32_t value) {
   e.registers[reg] = value;
   // The scratch registers write back to memory where SCRATCH_UMSK says so.
   if (reg >= 0x578 && reg <= 0x57F && (e.registers[0x1DC] >> (reg - 0x578)) & 1) {
-    StorePhysical(base, (e.registers[0x1DD] + 4 * (reg - 0x578)) | 2, value);
+    StorePhysical((e.registers[0x1DD] + 4 * (reg - 0x578)) | 2, value);
     e.scratch_writes++;
   }
 }
@@ -312,15 +324,15 @@ bool Compare(uint32_t function, uint32_t value, uint32_t reference) {
 // interrupt dispatch does: callbacks read it (sub_822B6A78 sets the event of
 // that CPU's worker thread, sub_822B69A8; the render thread's own CPU left
 // it unwoken, hanging loading screens).
-void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
+void Interrupt(lifted::Regs& ctx, uint32_t device, uint32_t mask) {
   Effects& e = g_effects;
-  uint32_t block = guest::LoadU32(base, device + kDeviceCallbackBlock);
+  uint32_t block = guest::LoadU32(device + kDeviceCallbackBlock);
   for (uint32_t cpu = 0; cpu < 6; cpu++) {
     if (!(mask & (1u << cpu)) || !block) {
       continue;
     }
     e.interrupts++;
-    uint32_t function = guest::LoadU32(base, block + 16);
+    uint32_t function = guest::LoadU32(block + 16);
     if (function == kDeferredKickWorkerCallback) {
       // Wakes the worker that submits deferred kicks; there are none (see
       // sub_8229E848).
@@ -329,22 +341,22 @@ void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
       ITC_LOG_ERROR("native renderer: gpu: interrupt with no callback (0BADF00D)");
     } else if (function) {
       e.callbacks++;
-      uint32_t own_cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
+      uint32_t own_cpu = guest::LoadU8(ctx.r13.u32 + 268);
       ITC_LOG_INFO("native renderer: gpu: interrupt on cpu {} (the kicking thread's is {}): "
                    "calling {:08X}({:08X})",
-                   cpu, own_cpu, function, guest::LoadU32(base, block + 20));
-      PPCContext saved = ctx;
-      guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(cpu));
-      ctx.r3.u32 = guest::LoadU32(base, block + 20);
-      REX_CALL_INDIRECT_FUNC(function);
+                   cpu, own_cpu, function, guest::LoadU32(block + 20));
+      lifted::Regs saved = ctx;
+      guest::StoreU8(ctx.r13.u32 + 268, uint8_t(cpu));
+      ctx.r3.u32 = guest::LoadU32(block + 20);
+      lifted::CallFromContext(ctx, function);
       ctx = saved;
-      guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(own_cpu));
+      guest::StoreU8(ctx.r13.u32 + 268, uint8_t(own_cpu));
     }
-    guest::StoreU32(base, block, guest::LoadU32(base, block) & ~(1u << cpu) & 0x3F);
+    guest::StoreU32(block, guest::LoadU32(block) & ~(1u << cpu) & 0x3F);
   }
 }
 
-void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t address,
+void ApplyBuffer(lifted::Regs& ctx, uint32_t device, uint32_t address,
                  uint32_t size, int depth) {
   Effects& e = g_effects;
   e.words += size;
@@ -353,7 +365,7 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
     ITC_LOG_ERROR("native renderer: gpu: buffer {:08X} of {} words out of memory", address, size);
     return;
   }
-  auto word = [&](uint32_t i) { return ReadPhysical(base, address + 4 * i); };
+  auto word = [&](uint32_t i) { return ReadPhysical(address + 4 * i); };
   uint32_t i = 0;
   while (i < size) {
     uint32_t header = word(i);
@@ -364,15 +376,15 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
       if (first < 0x2000) {
         bool one_register = (header >> 15) & 1;
         for (uint32_t k = 0; k < count; k++) {
-          WriteRegister(base, one_register ? first : first + k, word(i + 1 + k));
+          WriteRegister(one_register ? first : first + k, word(i + 1 + k));
         }
       }
       i += 1 + count;
       continue;
     }
     if (type == 1) {
-      WriteRegister(base, header & 0x7FF, word(i + 1));
-      WriteRegister(base, (header >> 11) & 0x7FF, word(i + 2));
+      WriteRegister(header & 0x7FF, word(i + 1));
+      WriteRegister((header >> 11) & 0x7FF, word(i + 2));
       i += 3;
       continue;
     }
@@ -387,7 +399,7 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
       case 0x3F:  // INDIRECT_BUFFER
       case 0x37:  // INDIRECT_BUFFER_PFD
         if (depth < 4) {
-          ApplyBuffer(ctx, base, device, word(p), word(p + 1) & 0xFFFFF, depth + 1);
+          ApplyBuffer(ctx, device, word(p), word(p + 1) & 0xFFFFF, depth + 1);
         }
         break;
       case 0x58: {  // EVENT_WRITE_SHD: the fences
@@ -396,19 +408,19 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
         if (initiator >> 31) {
           e.unhandled[0x158]++;
         }
-        StorePhysical(base, word(p + 1), word(p + 2));
+        StorePhysical(word(p + 1), word(p + 2));
         e.fences++;
         break;
       }
       case 0x3D:  // MEM_WRITE
         for (uint32_t k = 1; k < count; k++) {
-          StorePhysical(base, word(p) + 4 * (k - 1), word(p + k));
+          StorePhysical(word(p) + 4 * (k - 1), word(p + k));
         }
         e.memory_writes++;
         break;
       case 0x3E: {  // REG_TO_MEM
         uint32_t reg = word(p);
-        StorePhysical(base, word(p + 1), reg < 0x2000 ? e.registers[reg] : 0);
+        StorePhysical(word(p + 1), reg < 0x2000 ? e.registers[reg] : 0);
         e.memory_writes++;
         break;
       }
@@ -419,26 +431,26 @@ void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t addre
           uint32_t value = e.registers[reg];
           value &= (info >> 31) ? e.registers[and_mask & 0x1FFF] : and_mask;
           value |= ((info >> 30) & 1) ? e.registers[or_mask & 0x1FFF] : or_mask;
-          WriteRegister(base, reg, value);
+          WriteRegister(reg, value);
         }
         break;
       }
       case 0x45: {  // COND_WRITE
         uint32_t info = word(p), poll = word(p + 1);
-        uint32_t value = (info & 0x10) ? LoadPhysical(base, poll)
+        uint32_t value = (info & 0x10) ? LoadPhysical(poll)
                                        : poll < 0x2000 ? e.registers[poll] : 0;
         if (Compare(info, value & word(p + 3), word(p + 2))) {
           if (info & 0x100) {
-            StorePhysical(base, word(p + 4), word(p + 5));
+            StorePhysical(word(p + 4), word(p + 5));
             e.memory_writes++;
           } else {
-            WriteRegister(base, word(p + 4), word(p + 5));
+            WriteRegister(word(p + 4), word(p + 5));
           }
         }
         break;
       }
       case 0x54:  // INTERRUPT
-        Interrupt(ctx, base, device, word(p));
+        Interrupt(ctx, device, word(p));
         break;
       // No effect outside the GPU: waits (on our own effects or the GPU's
       // caches), cache events, the swap (our window presents itself), and
@@ -465,7 +477,7 @@ void LogEffects() {
   Effects& e = g_effects;
   std::string unhandled;
   for (auto& [opcode, count] : e.unhandled) {
-    unhandled += fmt::format(" {}({:02X})={}", OpcodeName(opcode & 0xFF), opcode, count);
+    unhandled += std::format(" {}({:02X})={}", OpcodeName(opcode & 0xFF), opcode, count);
   }
   ITC_LOG_INFO("native renderer: exclusive: {} kicks ({} words) made by us: {} fences, {} scratch "
                "write-backs, {} memory writes, {} interrupts ({} callbacks, {} deferred kick "
@@ -482,15 +494,15 @@ void LogEffects() {
 // The kick (see "Plan for milestone 6"): r3 device, r4 pairs of (size in
 // words, address), r5 pair count. Writes an INDIRECT_BUFFER per pair into
 // the primary ring and CP_RB_WPTR.
-extern "C" REX_FUNC(sub_8229E3F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229E3F0) {
+  
   using namespace native;
   if (ITC_FLAG(native_renderer_log_gpu)) {
     uint32_t device = ctx.r3.u32, pairs = ctx.r4.u32, count = ctx.r5.u32;
     std::lock_guard lock(g_mutex);
     Stats& s = g_stats;
     s.kicks++;
-    bool other_path = guest::LoadU8(base, device + kDeviceFlags) & 0x2;
+    bool other_path = guest::LoadU8(device + kDeviceFlags) & 0x2;
     s.kicks_other_path += other_path;
     auto now = Clock::now();
     if (!g_trace_kicks && now - g_last_trace >= std::chrono::seconds(10)) {
@@ -499,8 +511,8 @@ extern "C" REX_FUNC(sub_8229E3F0) {
     }
     g_rare = false;
     for (uint32_t i = 0; i < count; i++) {
-      WalkBuffer(base, guest::LoadU32(base, pairs + 8 * i + 4),
-                 guest::LoadU32(base, pairs + 8 * i), 0, nullptr);
+      WalkBuffer(guest::LoadU32(pairs + 8 * i + 4),
+                 guest::LoadU32(pairs + 8 * i), 0, nullptr);
     }
     bool rare = g_rare && g_rare_traces;
     if (g_trace_kicks || rare) {
@@ -508,37 +520,37 @@ extern "C" REX_FUNC(sub_8229E3F0) {
       // Again, describing it (the stats count it twice; it's rare).
       std::string trace;
       for (uint32_t i = 0; i < count; i++) {
-        uint32_t size = guest::LoadU32(base, pairs + 8 * i);
-        uint32_t address = guest::LoadU32(base, pairs + 8 * i + 4);
-        trace += fmt::format(" buffer {:08X} {} words:", address, size);
-        WalkBuffer(base, address, size, 0, &trace);
+        uint32_t size = guest::LoadU32(pairs + 8 * i);
+        uint32_t address = guest::LoadU32(pairs + 8 * i + 4);
+        trace += std::format(" buffer {:08X} {} words:", address, size);
+        WalkBuffer(address, size, 0, &trace);
       }
       g_trace_kicks -= g_trace_kicks != 0;
       ITC_LOG_INFO("native renderer: gpu: kick (lr {:08X}{}): {};{}", uint32_t(ctx.lr),
-                   other_path ? ", other path" : "", ProgressBlock(base, device), trace);
+                   other_path ? ", other path" : "", ProgressBlock(device), trace);
     }
     if (now - g_last_log >= std::chrono::seconds(5)) {
       g_last_log = now;
-      LogStats(base, device);
+      LogStats(device);
     }
   }
   {
     uint32_t device = ctx.r3.u32, pairs = ctx.r4.u32, count = ctx.r5.u32;
     g_effects.kicks++;
-    if (uint32_t cpu = guest::LoadU8(base, ctx.r13.u32 + 268);
+    if (uint32_t cpu = guest::LoadU8(ctx.r13.u32 + 268);
         cpu != 1 && ITC_FLAG(native_renderer_log_gpu) && g_tiling_logs > 0) {
       g_tiling_logs--;
       std::string buffers;
       for (uint32_t i = 0; i < count; i++) {
-        buffers += fmt::format(" {:08X} ({} words)", guest::LoadU32(base, pairs + 8 * i + 4),
-                               guest::LoadU32(base, pairs + 8 * i));
+        buffers += std::format(" {:08X} ({} words)", guest::LoadU32(pairs + 8 * i + 4),
+                               guest::LoadU32(pairs + 8 * i));
       }
       ITC_LOG_INFO("native renderer: tiling: kick on cpu {} (lr {:08X}):{}", cpu,
                    uint32_t(ctx.lr), buffers);
     }
     for (uint32_t i = 0; i < count; i++) {
-      ApplyBuffer(ctx, base, device, guest::LoadU32(base, pairs + 8 * i + 4),
-                  guest::LoadU32(base, pairs + 8 * i), 0);
+      ApplyBuffer(ctx, device, guest::LoadU32(pairs + 8 * i + 4),
+                  guest::LoadU32(pairs + 8 * i), 0);
     }
     static Clock::time_point last_log = Clock::now();
     if (auto now = Clock::now(); now - last_log >= std::chrono::seconds(5)) {
@@ -559,48 +571,73 @@ namespace {
 bool TilingLog() {
   return ITC_FLAG(native_renderer_log_gpu) && g_tiling_logs.fetch_sub(1) > 0;
 }
-uint32_t Cpu(PPCContext& ctx, uint8_t* base) {
-  return guest::LoadU8(base, ctx.r13.u32 + 268);
+uint32_t Cpu(lifted::Regs& ctx) {
+  return guest::LoadU8(ctx.r13.u32 + 268);
 }
 }  // namespace
 }  // namespace native
 
-extern "C" REX_FUNC(sub_822B6BF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B6BF8) {
+  
   if (native::TilingLog()) {
     ITC_LOG_INFO("native renderer: tiling: insert worker callback (822B6BF8) on cpu {}: r4 {:08X} "
                  "r5 {:08X}, lr {:08X}",
-                 native::Cpu(ctx, base), ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
+                 native::Cpu(ctx), ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   }
-  __imp__sub_822B6BF8(ctx, base);
+  // Native with --native_predicated_tiling (src/hooks/predicated_tiling.cpp).
+  hooks::EndTiledSegments(ctx);
 }
 
-extern "C" REX_FUNC(sub_822B6A78) {
-  REX_FUNC_PROLOGUE();
+// Device::WakeWorker: its log kept; the work is its plain C++
+// (src/graphics/predicated_tiling.h, --native_tiling_worker), KeSetEvent
+// through its import as the original's tail call.
+ITC_NATIVE_ENTRY_ALWAYS(822B6A78) {
+  
   if (native::TilingLog()) {
     ITC_LOG_INFO("native renderer: tiling: callback 822B6A78({:08X}) on cpu {}", ctx.r3.u32,
-                 native::Cpu(ctx, base));
+                 native::Cpu(ctx));
   }
-  __imp__sub_822B6A78(ctx, base);
+  if (!ITC_FLAG(native_tiling_worker)) {
+    lifted::original::c822B6A78(ctx);
+    return;
+  }
+  ctx.r3.u64 = graphics::predicated_tiling::WakeWorker(ctx.r3.u32, native::Cpu(ctx),
+      [&ctx](uint32_t event, uint32_t increment, uint32_t wait) {
+        ctx.r3.u64 = event;
+        ctx.r4.u64 = increment;
+        ctx.r5.u64 = wait;
+        lifted::Sdk(ctx, __imp__KeSetEvent);
+        return ctx.r3.u32;
+      });
 }
 
-extern "C" REX_FUNC(sub_822B6780) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B6780) {
+  
   uint32_t block = ctx.r3.u32;
   bool log = native::TilingLog();
-  uint32_t state = log ? guest::LoadU32(base, block) : 0;
+  uint32_t state = log ? guest::LoadU32(block) : 0;
   if (log) {
     ITC_LOG_INFO("native renderer: tiling: worker job 822B6780({:08X}) on cpu {}: +0 {:08X} +4 "
                  "{:08X}; state +4 {:08X} +396 {:08X}",
-                 block, native::Cpu(ctx, base), state, guest::LoadU32(base, block + 4),
-                 state ? guest::LoadU32(base, state + 4) : 0,
-                 state ? guest::LoadU32(base, state + 396) : 0);
+                 block, native::Cpu(ctx), state, guest::LoadU32(block + 4),
+                 state ? guest::LoadU32(state + 4) : 0,
+                 state ? guest::LoadU32(state + 396) : 0);
   }
-  __imp__sub_822B6780(ctx, base);
+  // Its work is Dropped with --native_tiling_worker (the graphics rule; see
+  // docs/functions/predicated-tiling.md): the tiled segment chain kicked once
+  // a tile with the tile's bin select written into the primary ring, the
+  // draws' tile masks and its markers, GPU work nothing reads since our
+  // renderer draws the tiles from the command list replay. Never seen in
+  // play: its wake is skipped.
+  if (!ITC_FLAG(native_tiling_worker)) {
+    lifted::original::c822B6780(ctx);
+  } else {
+    ITC_NATIVE_RUNNING("sub_822B6780 Device::WorkerJob (dropped)");
+  }
   if (log) {
     ITC_LOG_INFO("native renderer: tiling: worker job done on cpu {}: state +4 {:08X} +396 {:08X}",
-                 native::Cpu(ctx, base), state ? guest::LoadU32(base, state + 4) : 0,
-                 state ? guest::LoadU32(base, state + 396) : 0);
+                 native::Cpu(ctx), state ? guest::LoadU32(state + 4) : 0,
+                 state ? guest::LoadU32(state + 396) : 0);
   }
 }
 
@@ -614,19 +651,19 @@ extern "C" REX_FUNC(sub_822B6780) {
 // straight away and leave the count at 0. (Delivering the interrupts at
 // the kick instead raced the worker against the render thread and drove
 // the count below 0, hanging loading screens.)
-extern "C" REX_FUNC(sub_8229E848) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229E848) {
+  
   uint32_t device = ctx.r3.u32, result = ctx.r4.u32;
-  PPCContext saved = ctx;
+  lifted::Regs saved = ctx;
   {
     guest::StackFrame frame(ctx, 96);
     uint32_t pair = frame.Local(80);
-    guest::StoreU32(base, pair, saved.r6.u32);      // size
-    guest::StoreU32(base, pair + 4, saved.r5.u32);  // address
+    guest::StoreU32(pair, saved.r6.u32);      // size
+    guest::StoreU32(pair + 4, saved.r5.u32);  // address
     ctx.r3.u32 = device;
     ctx.r4.u32 = pair;
     ctx.r5.u32 = 1;
-    sub_8229E3F0(ctx, base);
+    lifted::Enter(ctx, game::Device::Kick);
   }
   ctx = saved;
   ctx.r3.u32 = result;

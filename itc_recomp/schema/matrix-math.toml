@@ -1,0 +1,185 @@
+# The schema of docs/functions/matrix-math.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The matrix math works on plain math values wherever its callers keep them
+# (no allocation of its own): 4x4 float matrices (row-major, row vectors,
+# the fourth row the translation), quaternions (x, y, z, w), 3D vectors and
+# single floats it's handed pointers to.
+
+# A 4x4 float matrix: m<row><column>. Also the matrix arguments the measure
+# saw only in one function (Matrix::Copy's source, Multiply's two inputs,
+# Inverse's input, Vec4::Transform's matrix, ProjectPoint's matrix,
+# sub_8209B038's).
+[Matrix]
+measure = "Matrix"
+measures = ["Matrix::Copy.r4", "Matrix::Multiply.r4", "Matrix::Multiply.r5", "Matrix::Inverse.r4", "Vec4::Transform.r4", "Matrix::ProjectPoint.r4", "sub_8209B038.r3", "Matrix::SetTranslation.r3"]
+size = 64
+origin = "file"
+fields = [
+  { name = "m00", offset = 0, type = "f32" },
+  { name = "m00_m01_bits", offset = 0, type = "u64", note = "m00 and m01 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m01", offset = 4, type = "f32" },
+  { name = "m02", offset = 8, type = "f32" },
+  { name = "m02_m03_bits", offset = 8, type = "u64", note = "m02 and m03 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m03", offset = 12, type = "f32", note = "1.0 after sub_8209B038 (SetWsToOne)" },
+  { name = "m10", offset = 16, type = "f32" },
+  { name = "m10_m11_bits", offset = 16, type = "u64", note = "m10 and m11 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m12", offset = 24, type = "f32" },
+  { name = "m12_m13_bits", offset = 24, type = "u64", note = "m12 and m13 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m13", offset = 28, type = "f32", note = "1.0 after sub_8209B038" },
+  { name = "m20", offset = 32, type = "f32" },
+  { name = "m20_m21_bits", offset = 32, type = "u64", note = "m20 and m21 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m21", offset = 36, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m22_m23_bits", offset = 40, type = "u64", note = "m22 and m23 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m23", offset = 44, type = "f32", note = "1.0 after sub_8209B038" },
+  { name = "m30", offset = 48, type = "f32", note = "the translation's x" },
+  { name = "m30_m31_bits", offset = 48, type = "u64", note = "m30 and m31 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m31", offset = 52, type = "f32", note = "the translation's y" },
+  { name = "m32", offset = 56, type = "f32", note = "the translation's z" },
+  { name = "m32_m33_bits", offset = 56, type = "u64", note = "m32 and m33 moved 8 bytes at a time (Matrix::Copy, the multiply's and inverse's first doubleword load)" },
+  { name = "m33", offset = 60, type = "f32", note = "1.0 after sub_8209B038" },
+]
+
+# A quaternion (x, y, z, w). Also Matrix::FromQuaternion's and
+# Quaternion::Multiply's first argument, and Matrix::ProjectPoint's point
+# (its x, y and z). +16 to +60 are a measure fault.
+[Quaternion]
+measure = "Quaternion"
+measures = ["Matrix::FromQuaternion.r4", "Quaternion::Multiply.r4"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "xy_bits", offset = 0, type = "u64", note = "x and y copied 8 bytes at a time (RigidBody::SetOrientation)" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "zw_bits", offset = 8, type = "u64", note = "z and w copied 8 bytes at a time (RigidBody::SetOrientation)" },
+  { name = "w", offset = 12, type = "f32" },
+  { name = "fault_m10", offset = 16, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m10)" },
+  { name = "fault_m11", offset = 20, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m11)" },
+  { name = "fault_m12", offset = 24, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m12)" },
+  { name = "fault_m20", offset = 32, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m20)" },
+  { name = "fault_m21", offset = 36, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m21)" },
+  { name = "fault_m22", offset = 40, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m22)" },
+  { name = "fault_m30", offset = 48, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m30)" },
+  { name = "fault_m31", offset = 52, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m31)" },
+  { name = "fault_m32", offset = 56, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m32)" },
+  { name = "fault_m33", offset = 60, type = "f32", note = "a measure fault: Quaternion::ToMatrix's and ToMatrix3's stores into the matrix they make (a Matrix's m33)" },
+]
+
+# A 3D vector the matrix math reads: Matrix::InverseRotate's vector,
+# Quaternion::FromAxisAngle's axis (probably the vector library's Vec3,
+# vehicle-accessors.md's).
+[MatrixMathVector3]
+measures = ["Matrix::InverseRotate.r5", "Quaternion::FromAxisAngle.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# A single float handed by pointer: the turns' angle (Matrix::RotateX and
+# RotateZ's r5) and SinCos's sine (r4) and cosine (r5) outputs.
+[MatrixMathFloat]
+measures = ["Matrix::RotateX.r5", "Matrix::RotateZ.r5", "SinCos.r4", "SinCos.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f32" },
+]
+
+[globals]
+turn_polynomials = { address = 0x820009C0, type = "bytes", count = 96, note = "the turns' sine and cosine polynomials' coefficients: six 16-byte vectors (Matrix::RotateX, Y and Z)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (probably)" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5 (probably): half angles, the quaternion from a matrix" }
+inverse_two_pi = { address = 0x82001FA4, type = "f32", note = "1/(2 pi) (probably): the turns' angle brought into [-pi, pi]" }
+two_pi = { address = 0x82001FA8, type = "f32", note = "2 pi (probably)" }
+two = { address = 0x820021E8, type = "f32", note = "2.0 (probably): the quaternion's matrix" }
+fourth_row = { address = 0x826382D0, type = "bytes", count = 16, note = "probably (0, 0, 0, 1): Matrix::FromQuaternionAndRow's fourth row" }
+zero_matrix = { address = 0x8266D000, type = "bytes", count = 64, note = "a zero matrix, built at boot by ZeroMatrix::StaticInit (sub_825D8F88)" }
+identity_matrix = { address = 0x8266D040, type = "bytes", count = 64, note = "the identity, built at boot by IdentityMatrix::StaticInit (sub_825D9060)" }
+identity = { address = 0x82953740, type = "bytes", count = 64, note = "probably the identity matrix (Matrix::SetIdentity copies it)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from Matrix.
+[MatrixAt64]
+measure = "CameraTarget::Track.r3@+64"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_48", offset = 48, type = "f32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+  { name = "unknown_56", offset = 56, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt80]
+measure = "RigidBody@+80"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt464]
+measure = "Vehicle@+464"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Matrix.
+[MatrixAt16]
+measure = "Vehicle@+6160@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from Quaternion.
+[QuaternionAt16]
+measure = "VehicleStatus::Update.r3@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

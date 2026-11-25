@@ -1,3 +1,4 @@
+#include <format>
 #include "renderer.h"
 #include "frame_costs.h"
 #include "base/log.h"
@@ -143,7 +144,8 @@ ITC_FLAG_INT32(height, 0, "ITC",
                "from width at 16:9");
 // The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
 // fullscreen); ours follows it.
-ITC_FLAG_DECLARE(bool, fullscreen);
+// The SDK's until A4, same name and default (itc.toml sets it false).
+ITC_FLAG_BOOL(fullscreen, true, "UI/Window", "Start the window in fullscreen mode");
 
 namespace native {
 namespace {
@@ -243,7 +245,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   setup->window =
       SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
   if (!setup->window) {
-    return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
+    return finish(std::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
   if (const SDL_DisplayMode* mode =
           SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(setup->window))) {
@@ -265,7 +267,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   auto get_instance_proc_addr =
       reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
   if (!get_instance_proc_addr || !vk::LoadGlobal(get_instance_proc_addr)) {
-    return finish(fmt::format("no Vulkan loader: {}", SDL_GetError()));
+    return finish(std::format("no Vulkan loader: {}", SDL_GetError()));
   }
   Uint32 extension_count = 0;
   const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&extension_count);
@@ -290,13 +292,13 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
   }
   if (result != VK_SUCCESS) {
-    return finish(fmt::format("vkCreateInstance: {}", int(result)));
+    return finish(std::format("vkCreateInstance: {}", int(result)));
   }
   if (!vk::LoadInstance(setup->instance)) {
     return finish("missing instance functions");
   }
   if (!SDL_Vulkan_CreateSurface(setup->window, setup->instance, nullptr, &setup->surface)) {
-    return finish(fmt::format("SDL_Vulkan_CreateSurface: {}", SDL_GetError()));
+    return finish(std::format("SDL_Vulkan_CreateSurface: {}", SDL_GetError()));
   }
   finish("");
 }
@@ -304,21 +306,21 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
 class Renderer {
  public:
   // Render thread. Returns false if the renderer can't run.
-  bool Init(uint8_t* base);
+  bool Init();
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
-  void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
-  void TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+  void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
+  void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+  void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                     uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
                     uint32_t tile, uint32_t tiles) {
-    passes_.TiledResolve(BeginFrame(), base, device, flags, rect, destination, point, clear_color,
+    passes_.TiledResolve(BeginFrame(), device, flags, rect, destination, point, clear_color,
                          clear_z, tile, tiles);
   }
-  void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
-    passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
+  void FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
+    passes_.FrontBufferResolve(BeginFrame(), device, front_buffer);
   }
-  void DrawMovie(uint8_t* base, uint32_t device, const Passes::MoviePlanes& planes) {
-    passes_.DrawMovie(BeginFrame(), base, device, planes);
+  void DrawMovie(uint32_t device, const Passes::MoviePlanes& planes) {
+    passes_.DrawMovie(BeginFrame(), device, planes);
   }
   void EndFrame();
 
@@ -656,9 +658,9 @@ void Renderer::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool Renderer::Init(uint8_t* base) {
+bool Renderer::Init() {
   if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
+      !passes_.Init(context_, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
     return false;
   }
   passes_.set_mirror_by_tick(ITC_FLAG(native_renderer_mirror_by_tick));
@@ -700,7 +702,7 @@ VkCommandBuffer Renderer::BeginFrame() {
         dumping_ = true;
         dump_step_ = 0;
         dump_steps_.clear();
-        dump_directory_ = fmt::format("{}/{}", dump_root, dumps_++);
+        dump_directory_ = std::format("{}/{}", dump_root, dumps_++);
         std::filesystem::create_directories(dump_directory_, error);
         ITC_LOG_INFO("native renderer: dumping into {}", dump_directory_);
       }
@@ -712,14 +714,14 @@ VkCommandBuffer Renderer::BeginFrame() {
       if (cycle_steps_.empty() && std::filesystem::remove(cycle_root + "/now", error)) {
         cycle_steps_.push_back({"none", 0});
         for (uint64_t hash : passes_.main_view_pixel_shaders()) {
-          cycle_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), hash});
+          cycle_steps_.push_back({std::format("skip_ps_{:016X}", hash), hash});
         }
         cycle_steps_.push_back({"skip_no_pixel_shader", Passes::kSkipNoPixelShader});
         cycle_steps_.push_back({"none_again", 0});
         cycle_step_ = 0;
         cycle_step_start_ = Clock::now();
         cycle_captured_ = false;
-        cycle_directory_ = fmt::format("{}/{}", cycle_root, cycles_++);
+        cycle_directory_ = std::format("{}/{}", cycle_root, cycles_++);
         std::filesystem::create_directories(cycle_directory_, error);
         ITC_LOG_INFO("native renderer: cycling {} steps into {}", cycle_steps_.size(),
                      cycle_directory_);
@@ -763,24 +765,24 @@ VkCommandBuffer Renderer::BeginFrame() {
   return frame.commands;
 }
 
-void Renderer::InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                           uint32_t data) {
-  passes_.InlineDraw(BeginFrame(), base, type, count, stride, data);
+  passes_.InlineDraw(BeginFrame(), type, count, stride, data);
 }
 
-void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
+void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
   // Commands 15 and 19 draw inline vertices, drawn at the library's End
   // (Renderer_InlineDraw).
   if (IsDraw(id) && id != 15 && id != 19) {
-    passes_.AfterDraw(BeginFrame(), base, id, payload, arg1);
+    passes_.AfterDraw(BeginFrame(), id, payload, arg1);
   } else if (id == 25) {
-    passes_.AfterResolve(BeginFrame(), base, payload, arg1);
+    passes_.AfterResolve(BeginFrame(), payload, arg1);
   } else if (id == 26) {
-    passes_.AfterClear(BeginFrame(), base, payload, arg1);
+    passes_.AfterClear(BeginFrame(), payload, arg1);
   } else if (id == 32) {
     // One item of 16 bytes per tiling begun.
     for (uint32_t i = 0; i < arg1; i++) {
-      passes_.BeginTiling(BeginFrame(), base, payload + 16 * i);
+      passes_.BeginTiling(BeginFrame(), payload + 16 * i);
     }
   } else if (id == 33) {
     passes_.EndTiling();
@@ -807,7 +809,7 @@ void Renderer::EndFrame() {
                               dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0)
       : cycle_capture
           ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
-                             fmt::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
+                             std::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
                              false)
           : passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
@@ -953,7 +955,7 @@ void Renderer::EndFrame() {
       // textures from memory, and all resolve destinations, hidden.
       using Hide = TextureCache::Hide;
       for (uint64_t hash : passes_.main_view_pixel_shaders()) {
-        dump_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), Hide::kNone, 0, hash});
+        dump_steps_.push_back({std::format("skip_ps_{:016X}", hash), Hide::kNone, 0, hash});
       }
       dump_steps_.push_back({"hide_memory", Hide::kMemory, 0, 0});
       dump_steps_.push_back({"hide_resolved", Hide::kResolved, 0, 0});
@@ -1004,7 +1006,7 @@ void Renderer::LogStats() {
     std::string reasons;
     for (size_t i = 0; i < view.failed_by.size(); i++) {
       if (view.failed_by[i]) {
-        reasons += fmt::format(" {} {:.1f};", kFailedDrawReasons[i],
+        reasons += std::format(" {} {:.1f};", kFailedDrawReasons[i],
                                double(view.failed_by[i]) / frames);
       }
     }
@@ -1024,7 +1026,7 @@ void Renderer::LogStats() {
     ITC_LOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
                  "differed from guest memory ({:.1f} MB){}",
                  view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
-                 view.mirror_stale ? fmt::format(", e.g. {} {:08X} ({} bytes)",
+                 view.mirror_stale ? std::format(", e.g. {} {:08X} ({} bytes)",
                                                 view.mirror_stale_sample_index ? "index" : "vertex",
                                                 view.mirror_stale_sample_address,
                                                 view.mirror_stale_sample_size)
@@ -1201,14 +1203,15 @@ void Renderer::LogStats() {
 Renderer* g_renderer = nullptr;
 bool g_failed = false;
 
-// Guest memory's base, from the command hooks (Renderer_EndFrame has none).
-uint8_t* g_base = nullptr;
+// Set by the command hooks: the renderer starts after the first of them
+// (Renderer_EndFrame does nothing before).
+bool g_commands_seen = false;
 
 // Kept out of line: inlined, Init's stack frame was set up on every call to
 // GetRenderer (several per replayed command), ~2% of the render thread.
 [[gnu::noinline]] void StartRenderer() {
   g_renderer = new Renderer();
-  if (!g_base || !g_renderer->Init(g_base)) {
+  if (!g_commands_seen || !g_renderer->Init()) {
     ITC_LOG_ERROR("native renderer: couldn't start; continuing without it");
     g_failed = true;
     g_renderer = nullptr;  // leaked: may hold objects already made
@@ -1224,53 +1227,53 @@ Renderer* GetRenderer() {
 
 }  // namespace
 
-void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                         uint32_t arg2) {
-  g_base = base;
-  Buffers_OnCommand(base, id, payload, arg1);
+  g_commands_seen = true;
+  Buffers_OnCommand(id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
   }
 }
 
-void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
   if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterCommand(base, id, payload, arg1);
+    renderer->AfterCommand(id, payload, arg1);
   }
 }
 
-void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                          uint32_t data) {
   if (Renderer* renderer = GetRenderer()) {
-    renderer->InlineDraw(base, type, count, stride, data);
+    renderer->InlineDraw(type, count, stride, data);
   }
 }
 
-void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles) {
   if (Renderer* renderer = GetRenderer()) {
-    renderer->TiledResolve(base, device, flags, rect, destination, point, clear_color, clear_z,
+    renderer->TiledResolve(device, flags, rect, destination, point, clear_color, clear_z,
                            tile, tiles);
   }
 }
 
-void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
-  g_base = base;
+void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
+  g_commands_seen = true;
   if (Renderer* renderer = GetRenderer()) {
-    renderer->FrontBufferResolve(base, device, front_buffer);
+    renderer->FrontBufferResolve(device, front_buffer);
   }
 }
 
-void Renderer_DrawMovie(uint8_t* base, uint32_t device, uint32_t width, uint32_t height,
+void Renderer_DrawMovie(uint32_t device, uint32_t width, uint32_t height,
                         const uint8_t* y, const uint8_t* u, const uint8_t* v) {
-  g_base = base;
+  g_commands_seen = true;
   if (Renderer* renderer = GetRenderer()) {
-    renderer->DrawMovie(base, device, {width, height, y, u, v});
+    renderer->DrawMovie(device, {width, height, y, u, v});
   }
 }
 
@@ -1314,7 +1317,7 @@ void Renderer_TakeListStats(uint64_t& missing, uint64_t& most) {
 }
 
 void Renderer_EndFrame() {
-  if (!g_base) {
+  if (!g_commands_seen) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
@@ -1339,12 +1342,12 @@ std::string Describe() {
   for (size_t i = 0; i < size_t(Kind::kCount); i++) {
     int64_t bytes = totals.bytes[i].load(std::memory_order_relaxed);
     total += bytes;
-    out += fmt::format("{} {:.1f} MB ({}); ", kKinds[i], bytes / 1048576.0,
+    out += std::format("{} {:.1f} MB ({}); ", kKinds[i], bytes / 1048576.0,
                        totals.allocations[i].load(std::memory_order_relaxed));
   }
-  out = fmt::format("{:.1f} MB: ", total / 1048576.0) + out;
+  out = std::format("{:.1f} MB: ", total / 1048576.0) + out;
   for (size_t i = 0; i < size_t(Object::kCount); i++) {
-    out += fmt::format("{}{} {}", i ? ", " : "", kObjects[i],
+    out += std::format("{}{} {}", i ? ", " : "", kObjects[i],
                        totals.objects[i].load(std::memory_order_relaxed));
   }
   return out;

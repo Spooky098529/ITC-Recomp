@@ -73,6 +73,8 @@ ITC_NATIVE_STEP(NativeNodeCount, ctx.r3.u64 = ma::SkeletonNodeCount(base, ctx.r3
 ITC_NATIVE_STEP(NativeLoadNodeValues,
                 ma::SkeletonLoadNodeValues(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeApplyAnimation, ma::SkeletonApplyAnimation(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeResetPose, ma::SkeletonResetPose(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeLocalMatrices, ma::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32))
 ITC_NATIVE_STEP(NativeCursorCurveSample,
                 ctx.f1.f64 = ma::CursorCurveSample(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                                    ctx.f1.f64))
@@ -331,8 +333,8 @@ void Sampling(Context& h) {
     bool time;     // f1 = a step or a time
   };
   const Function functions[] = {
-      {"sub_825A6670 TrackSet::Clear", __imp__sub_825A6670, NativeClear, Result::kNone, 0},
-      {"sub_825A1B70 TrackSet::TrackSet", __imp__sub_825A1B70, NativeConstruct, Result::kR3, 0},
+      {"sub_825A6670 TrackSet::Clear", __imp__sub_825A6670, ITC_CONTEXT_FN(NativeClear), Result::kNone, 0},
+      {"sub_825A1B70 TrackSet::TrackSet", __imp__sub_825A1B70, ITC_CONTEXT_FN(NativeConstruct), Result::kR3, 0},
       {"sub_825A6690 TrackSet::View", __imp__sub_825A6690, NativeView, Result::kNone, 0},
       {"sub_825A66D8 TrackSet::Count", __imp__sub_825A66D8, NativeCount, Result::kR3, 0},
       {"sub_825A1F08 TrackSet::StartTime", __imp__sub_825A1F08, NativeStartTime, Result::kF1, 0},
@@ -453,7 +455,7 @@ void Lifetime(Context& h) {
   };
   const Function functions[] = {
       {"sub_825A11D0 TrackSet::ReleaseArray", __imp__sub_825A11D0, NativeReleaseArray, 0, 16, 0},
-      {"sub_825A1BA8 TrackSet::Release", __imp__sub_825A1BA8, NativeRelease, 0, 0, 0},
+      {"sub_825A1BA8 TrackSet::Release", __imp__sub_825A1BA8, ITC_CONTEXT_FN(NativeRelease), 0, 0, 0},
       {"sub_825A1E08 TrackSet::SetupFloat4", __imp__sub_825A1E08, NativeSetupFloat4, 16, 16, 12},
       {"sub_825A1BE8 TrackSet::SetupFloat", __imp__sub_825A1BE8, NativeSetupFloat, 4, 0, 0},
       {"sub_825A1218 TrackSet::Setup32", __imp__sub_825A1218, NativeSetup32, 32, 16, 16},
@@ -659,7 +661,7 @@ void Skeletons(Context& h) {
   const Function functions[] = {
       {"sub_8259A140 SkeletonBase::SkeletonBase", __imp__sub_8259A140, NativeBaseConstruct,
        Result::kR3, Target::kSkeleton, 0},
-      {"sub_82599758 Skeleton::Skeleton", __imp__sub_82599758, NativeSkeletonConstruct,
+      {"sub_82599758 Skeleton::Skeleton", __imp__sub_82599758, ITC_CONTEXT_FN(NativeSkeletonConstruct),
        Result::kR3, Target::kSkeleton, 0},
       {"sub_825A2068 SkeletonCursor::Clear", __imp__sub_825A2068, NativeCursorClear,
        Result::kNone, Target::kCursor, 0},
@@ -671,12 +673,17 @@ void Skeletons(Context& h) {
        Target::kSkeleton, 0},
       {"sub_825997E0 Skeleton::LoadNodeValues", __imp__sub_825997E0, NativeLoadNodeValues,
        Result::kNone, Target::kSkeleton, 0},
-      {"sub_825998A0 Skeleton::UpdateMatrices", __imp__sub_825998A0, NativeUpdateMatrices,
+      {"sub_825998A0 Skeleton::UpdateMatrices", __imp__sub_825998A0, ITC_CONTEXT_FN(NativeUpdateMatrices),
        Result::kNone, Target::kSkeleton, 0},
       {"sub_8259C3A8 Skeleton::UpdateNodeMatrices", __imp__sub_8259C3A8,
-       NativeUpdateNodeMatrices, Result::kNone, Target::kSkeleton, 0},
+       ITC_CONTEXT_FN(NativeUpdateNodeMatrices), Result::kNone, Target::kSkeleton, 0},
       {"sub_825998B8 Skeleton::ApplyAnimation", __imp__sub_825998B8, NativeApplyAnimation,
        Result::kNone, Target::kSkeleton, 0},
+      // r3 isn't compared: it ends as Skeleton::ApplyAnimation leaves it (its
+      // adapter leaves the skeleton, its original a loop's register), and
+      // every caller sets r3 right after.
+      {"sub_82599AF0 Skeleton::ResetPose", __imp__sub_82599AF0, NativeResetPose, Result::kNone,
+       Target::kSkeleton, 0},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -691,6 +698,14 @@ void Skeletons(Context& h) {
           h, results,
           [&] {
             WriteSkeleton(h, l, f.recompiled == __imp__sub_825998B8);
+            if (f.recompiled == __imp__sub_82599AF0) {
+              // ResetPose's three sources (+88, +92, +96: 16 bytes a node),
+              // past the layout's section.
+              for (uint32_t k = 0; k < 3; k++) {
+                const uint32_t source = h.data + 3584 + 128 * k;
+                guest::StoreU32(h.base, l.skeleton + 88 + 4 * k, source);
+              }
+            }
             // LoadNodeValues reads the bound cursor's count unchecked: a
             // section always (as Mesh::Parse passes).
             section = h.random.Below(5) == 0 && f.recompiled != __imp__sub_825997E0 ? 0 : l.section;
@@ -729,6 +744,73 @@ void Skeletons(Context& h) {
           t.f1.u64 = time;
         },
         __imp__sub_825A20E8, NativeCursorCurveSample, Result::kF1, {}, fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// Skeleton::LocalMatrices: the skeleton's layout with the file's matrices
+// (+104) and the bones' 144-byte records (+140) past the section, all
+// floats; the area (its float words as floats) and the original's frame
+// (320 bytes below the stack: the angles, their turns, the identity) with
+// the rotations' turns below it compared. r3 isn't: no caller reads it.
+void LocalMatricesCases(Context& h) {
+  const SkeletonLayout l = MakeSkeletonLayout(h);
+  const uint32_t file_matrices = h.data + 2816;  // 64 bytes a node
+  const uint32_t bones = h.data + 3072;          // 144 bytes a node
+  std::vector<uint32_t> floats = SkeletonFloats(l);
+  for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+    floats.push_back(file_matrices + 4 * i);
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 36 && bones + 4 * i < h.data + kScratchBytes; i++) {
+    floats.push_back(bones + 4 * i);
+  }
+  for (uint32_t n = 0; n < kMaxNodes; n++) {
+    for (uint32_t i = 0; i < 3; i++) {
+      floats.push_back(l.nodes + 144 * n + 32 + 4 * i);  // the scale
+    }
+  }
+  Results results("sub_82599C58 Skeleton::LocalMatrices");
+  for (int c = 0; c < 400; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      WriteSkeleton(h, l, false);
+      guest::StoreU32(h.base, l.skeleton + 104, file_matrices);
+      guest::StoreU32(h.base, l.skeleton + 140, bones);
+      for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+        StoreFloatWord(h.base, file_matrices + 4 * i, MatrixWord(h.random));
+      }
+      for (uint32_t i = 0; i < kMaxNodes * 36 && bones + 4 * i < h.data + kScratchBytes; i++) {
+        StoreFloatWord(h.base, bones + 4 * i,
+                       h.random.Below(2) ? FloatWord(h.random) : MatrixWord(h.random));
+      }
+      for (uint32_t n = 0; n < kMaxNodes; n++) {
+        // Angles of a few turns either way, now and then.
+        for (uint32_t i = 0; i < 3; i++) {
+          if (h.random.Below(3) == 0) {
+            StoreFloatWord(h.base, l.nodes + 144 * n + 16 + 4 * i,
+                           std::bit_cast<uint32_t>(float(int32_t(h.random.Below(4001)) - 2000) /
+                                                   100.0f));
+          }
+        }
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 320;
+      for (uint32_t i = 0; i < 512; i += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - 512 + i, 0xCDCDCDCDu);
+      }
+      t.r3.u64 = l.skeleton;
+      (v == 0 ? __imp__sub_82599C58 : NativeLocalMatrices)(t, h.base);
+      AreaOutputs(h, out[v], floats);
+      out[v].Bytes(Read(h.base, frame + 80, 128));
+      out[v].Bytes(Read(h.base, (frame - 80) & ~0xFu, 64));
+      after = h.random;
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -822,6 +904,7 @@ void ModelAnimation(Context& h) {
   Curves(h);
   Lifetime(h);
   Skeletons(h);
+  LocalMatricesCases(h);
   SkeletonLifetime(h);
 }
 

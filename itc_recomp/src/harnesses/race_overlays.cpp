@@ -606,7 +606,7 @@ void AccessorCases(Context& h, uint32_t block) {
       GuestFunction recompiled, native;
       uint32_t r3;
     } speeds[] = {
-        {"OverlayView::SpeedKmh (sub_821268C0)", __imp__sub_821268C0, NativeSpeedKmh, block + kView},
+        {"OverlayView::SpeedKmh (sub_821268C0)", __imp__sub_821268C0, ITC_CONTEXT_FN(NativeSpeedKmh), block + kView},
         {"Vehicle::GetSpeedKmh (sub_820C0128)", __imp__sub_820C0128, NativeGetSpeedKmh,
          block + kVehicle},
     };
@@ -726,7 +726,7 @@ void AccessorCases(Context& h, uint32_t block) {
       };
       auto args = [&](PPCContext& t) { t.r3.u64 = block + kView; };
       const std::string what = fmt::format("record {} kind {}", k, kind);
-      Compare(h, ids, {}, setup, args, __imp__sub_82126AE0, NativeRacerId, what);
+      Compare(h, ids, {}, setup, args, __imp__sub_82126AE0, ITC_CONTEXT_FN(NativeRacerId), what);
       if (kind != 3) {  // inside a record: its flags word is the one set
         Compare(h, flags, {}, setup, args, __imp__sub_82127178, NativeRacerFlags, what);
       }
@@ -750,34 +750,34 @@ void SetterCases(Context& h, uint32_t block) {
     uint32_t flag;       // a word the cases set to 0 or not (0: none)
   };
   const Function setters[] = {
-      {"Smoke::SetVelocity (sub_8212A840)", __imp__sub_8212A840, NativeSmokeSetVelocity, 32640,
+      {"Smoke::SetVelocity (sub_8212A840)", __imp__sub_8212A840, ITC_CONTEXT_FN(NativeSmokeSetVelocity), 32640,
        32544, 0},
-      {"Smoke::SetRegion (sub_8212A998)", __imp__sub_8212A998, NativeSmokeSetRegion, 32640, 32608,
+      {"Smoke::SetRegion (sub_8212A998)", __imp__sub_8212A998, ITC_CONTEXT_FN(NativeSmokeSetRegion), 32640, 32608,
        0},
-      {"ParticlesB::SetPosition (sub_8212BA70)", __imp__sub_8212BA70, NativeParticlesBSetPosition,
+      {"ParticlesB::SetPosition (sub_8212BA70)", __imp__sub_8212BA70, ITC_CONTEXT_FN(NativeParticlesBSetPosition),
        2816, 2784, 0},
-      {"ParticlesC::SetPosition (sub_8212C6A8)", __imp__sub_8212C6A8, NativeParticlesCSetPosition,
+      {"ParticlesC::SetPosition (sub_8212C6A8)", __imp__sub_8212C6A8, ITC_CONTEXT_FN(NativeParticlesCSetPosition),
        2720, 2672, 0},
-      {"Sparks::SetPosition (sub_8212DF90)", __imp__sub_8212DF90, NativeSparksSetPosition, 29824,
+      {"Sparks::SetPosition (sub_8212DF90)", __imp__sub_8212DF90, ITC_CONTEXT_FN(NativeSparksSetPosition), 29824,
        28960, 0},
-      {"Trail::SetLastPosition (sub_821299D8)", __imp__sub_821299D8, NativeTrailSetLastPosition,
+      {"Trail::SetLastPosition (sub_821299D8)", __imp__sub_821299D8, ITC_CONTEXT_FN(NativeTrailSetLastPosition),
        64160, 64144, 0},
       {"Marker::SetCameraPosition (sub_8212CE18)", __imp__sub_8212CE18,
-       NativeMarkerSetCameraPosition, 304, 272, 0},
+       ITC_CONTEXT_FN(NativeMarkerSetCameraPosition), 304, 272, 0},
       {"LightSprite::SetPosition (sub_8211EBE0)", __imp__sub_8211EBE0,
-       NativeLightSpriteSetPosition, 288, 192, 240},
+       ITC_CONTEXT_FN(NativeLightSpriteSetPosition), 288, 192, 240},
       {"ModelSprite::PlaceHidden (sub_82121560)", __imp__sub_82121560,
-       NativeModelSpritePlaceHidden, 576, 272, 0},
-      {"Overlay::SetTextures104 (sub_8212C0E0)", __imp__sub_8212C0E0, NativeSetTextures104, 304,
+       ITC_CONTEXT_FN(NativeModelSpritePlaceHidden), 576, 272, 0},
+      {"Overlay::SetTextures104 (sub_8212C0E0)", __imp__sub_8212C0E0, ITC_CONTEXT_FN(NativeSetTextures104), 304,
        104, 0},
-      {"Overlay::SetTextures108 (sub_8212D6D8)", __imp__sub_8212D6D8, NativeSetTextures108, 304,
+      {"Overlay::SetTextures108 (sub_8212D6D8)", __imp__sub_8212D6D8, ITC_CONTEXT_FN(NativeSetTextures108), 304,
        108, 0},
-      {"Marker::SetTextures (sub_8212CC10)", __imp__sub_8212CC10, NativeMarkerSetTextures, 304, 104,
+      {"Marker::SetTextures (sub_8212CC10)", __imp__sub_8212CC10, ITC_CONTEXT_FN(NativeMarkerSetTextures), 304, 104,
        0},
       {"LightSprite::SetTextures (sub_8211E9C8)", __imp__sub_8211E9C8,
-       NativeLightSpriteSetTextures, 288, 104, 0},
+       ITC_CONTEXT_FN(NativeLightSpriteSetTextures), 288, 104, 0},
       {"ModelSprite::SetTextures (sub_8211F408)", __imp__sub_8211F408,
-       NativeModelSpriteSetTextures, 576, 108, 0},
+       ITC_CONTEXT_FN(NativeModelSpriteSetTextures), 576, 108, 0},
   };
   const uint32_t object = block + 0x100;
   const uint32_t source = block + 0x10200;  // past the largest object
@@ -861,7 +861,7 @@ void RandomCases(Context& h) {
                 t.f1.f64 = low;
                 t.f2.f64 = high;
               },
-              __imp__sub_8211F118, NativeRandomRange,
+              __imp__sub_8211F118, ITC_CONTEXT_FN(NativeRandomRange),
               fmt::format("seed {:08X} low {:016X} high {:016X}", seed,
                           std::bit_cast<uint64_t>(low), std::bit_cast<uint64_t>(high)));
     }
@@ -925,7 +925,7 @@ void MarkerCases(Context& h, uint32_t block) {
                 t.r6.u64 = mode;
                 t.r7.u64 = kind;
               },
-              __imp__sub_8212CCE0, NativeMarkerSet,
+              __imp__sub_8212CCE0, ITC_CONTEXT_FN(NativeMarkerSet),
               fmt::format("case {} distance {:016X} kind {:X}", i,
                           std::bit_cast<uint64_t>(distance), kind));
     }
@@ -943,7 +943,7 @@ void MarkerCases(Context& h, uint32_t block) {
                 guest::StoreU32(h.base, marker + 224, shown);
                 guest::StoreU32(h.base, marker + 236, counter);
               },
-              [&](PPCContext& t) { t.r3.u64 = marker; }, __imp__sub_8212CBE0, NativeMarkerUpdate,
+              [&](PPCContext& t) { t.r3.u64 = marker; }, __imp__sub_8212CBE0, ITC_CONTEXT_FN(NativeMarkerUpdate),
               fmt::format("shown {:X} counter {:X}", shown, counter));
     }
     results.Report();
@@ -1020,7 +1020,7 @@ void TrailCases(Context& h, uint32_t block) {
                 }
               }
             },
-            [&](PPCContext& t) { t.r3.u64 = trail; }, __imp__sub_821292E8, NativeTrailUpdate,
+            [&](PPCContext& t) { t.r3.u64 = trail; }, __imp__sub_821292E8, ITC_CONTEXT_FN(NativeTrailUpdate),
             fmt::format("capacity {} start {} count {}", capacity, start, count));
   }
   results.Report();
@@ -1046,7 +1046,7 @@ void ModelSpriteCases(Context& h, uint32_t block) {
                 t.r3.u64 = block;
                 t.r4.u64 = int64_t(int32_t(id));
               },
-              __imp__sub_82123188, NativeModelSpriteKind, fmt::format("id {}", int32_t(id)));
+              __imp__sub_82123188, ITC_CONTEXT_FN(NativeModelSpriteKind), fmt::format("id {}", int32_t(id)));
     }
     results.Report();
   }
@@ -1064,7 +1064,7 @@ void ModelSpriteCases(Context& h, uint32_t block) {
                   t.r4.u64 = kind;
                   t.r5.u64 = index;
                 },
-                __imp__sub_8211F300, NativeModelSpriteEntry,
+                __imp__sub_8211F300, ITC_CONTEXT_FN(NativeModelSpriteEntry),
                 fmt::format("kind {:X} index {:X}", kind, index));
       }
     }
@@ -1127,7 +1127,7 @@ void ParticlesCCases(Context& h, uint32_t block) {
               t.r4.u64 = position;
               t.f1.f64 = 0.0;
             },
-            __imp__sub_8212C1C0, NativeParticlesCEmit,
+            __imp__sub_8212C1C0, ITC_CONTEXT_FN(NativeParticlesCEmit),
             fmt::format("case {} capacity {:X} count {:X} head {}", i, capacity, count, head));
   }
   results.Report();
@@ -1260,7 +1260,7 @@ void TrailAddPointCases(Context& h, uint32_t block) {
               t.f1.f64 = speed;
               t.f2.f64 = width;
             },
-            __imp__sub_82129598, NativeTrailAddPoint,
+            __imp__sub_82129598, ITC_CONTEXT_FN(NativeTrailAddPoint),
             fmt::format("case {} capacity {} count {} tail {} step {} state {:X}", i, capacity,
                         count, tail, step, state));
   }
@@ -1338,7 +1338,7 @@ void ParticlesBCases(Context& h, uint32_t block) {
               t.r4.u64 = position;
               t.f1.f64 = factor;
             },
-            __imp__sub_8212B4A8, NativeParticlesBEmit,
+            __imp__sub_8212B4A8, ITC_CONTEXT_FN(NativeParticlesBEmit),
             fmt::format("case {} capacity {} count {} head {} factor {:016X}", i, capacity, count,
                         head, std::bit_cast<uint64_t>(factor)));
   }
@@ -1595,7 +1595,7 @@ void SparksUpdateStreakCases(Context& h, uint32_t block) {
               t.r8.u64 = mode;
               t.f1.f64 = speed;
             },
-            __imp__sub_8212E660, NativeSparksUpdateStreak,
+            __imp__sub_8212E660, ITC_CONTEXT_FN(NativeSparksUpdateStreak),
             fmt::format("case {} capacity {} head {} count {} streaking {:X} mode {:X} speed {:016X}",
                         i, capacity, head, count, streaking, mode,
                         std::bit_cast<uint64_t>(speed)));
@@ -1696,7 +1696,7 @@ void SparksEmitCases(Context& h, uint32_t block) {
               t.r7.u64 = (uint64_t(vector[2]) << 32) | vector[3];
               t.f2.f64 = strength;
             },
-            __imp__sub_8212D818, NativeSparksEmit,
+            __imp__sub_8212D818, ITC_CONTEXT_FN(NativeSparksEmit),
             fmt::format("case {} capacity {} count {} head {} strength {:016X}", i, capacity,
                         count, head, std::bit_cast<uint64_t>(strength)));
   }
@@ -1834,7 +1834,7 @@ void SmokeCases(Context& h, uint32_t block) {
                 t.r8.u64 = value;
               },
               which == 0 ? __imp__sub_8212A350 : __imp__sub_82123240,
-              which == 0 ? NativeSmokeEmit : NativeEmitSmoke,
+              which == 0 ? ITC_CONTEXT_FN(NativeSmokeEmit) : ITC_CONTEXT_FN(NativeEmitSmoke),
               fmt::format("case {} capacity {} count {} head {} first {:016X} speed {:016X} "
                           "region {:X} wheel {}",
                           i, capacity, count, head, std::bit_cast<uint64_t>(first),
@@ -1858,13 +1858,13 @@ void SetUpCases(Context& h, uint32_t block) {
       const char* name;
       GuestFunction recompiled, native;
     } plain[] = {
-        {"Overlay::Overlay (sub_82126498)", __imp__sub_82126498, NativeOverlayConstruct},
-        {"CarOverlays::ClearViews (sub_82126530)", __imp__sub_82126530, NativeClearViews},
-        {"ViewDesc::Clear (sub_82126860)", __imp__sub_82126860, NativeViewDescClear},
+        {"Overlay::Overlay (sub_82126498)", __imp__sub_82126498, ITC_CONTEXT_FN(NativeOverlayConstruct)},
+        {"CarOverlays::ClearViews (sub_82126530)", __imp__sub_82126530, ITC_CONTEXT_FN(NativeClearViews)},
+        {"ViewDesc::Clear (sub_82126860)", __imp__sub_82126860, ITC_CONTEXT_FN(NativeViewDescClear)},
         {"OverlayView::OverlayView (sub_82126870)", __imp__sub_82126870,
-         NativeOverlayViewConstruct},
-        {"Particle::Particle (sub_8212B3D0)", __imp__sub_8212B3D0, NativeParticleConstruct},
-        {"RaceOverlays::Clear (sub_8215DE80)", __imp__sub_8215DE80, NativeRaceOverlaysClear},
+         ITC_CONTEXT_FN(NativeOverlayViewConstruct)},
+        {"Particle::Particle (sub_8212B3D0)", __imp__sub_8212B3D0, ITC_CONTEXT_FN(NativeParticleConstruct)},
+        {"RaceOverlays::Clear (sub_8215DE80)", __imp__sub_8215DE80, ITC_CONTEXT_FN(NativeRaceOverlaysClear)},
     };
     for (const auto& f : plain) {
       Results results(f.name);
@@ -1904,7 +1904,7 @@ void SetUpCases(Context& h, uint32_t block) {
                 t.r3.u64 = object;
                 t.r4.u64 = desc;
               },
-              __imp__sub_82126890, NativeOverlayViewSet, fmt::format("case {}", i));
+              __imp__sub_82126890, ITC_CONTEXT_FN(NativeOverlayViewSet), fmt::format("case {}", i));
     }
     results.Report();
   }
@@ -1937,7 +1937,7 @@ void SetUpCases(Context& h, uint32_t block) {
                   t.r5.u64 = index;
                   t.r6.u64 = second;
                 },
-                __imp__sub_821264C0, NativeBindViewport,
+                __imp__sub_821264C0, ITC_CONTEXT_FN(NativeBindViewport),
                 fmt::format("entry {} second {}", index, second));
       }
     }
@@ -1958,7 +1958,7 @@ void SetUpCases(Context& h, uint32_t block) {
                 t.r3.u64 = a;
                 t.r4.u64 = b;
               },
-              __imp__sub_82128190, NativeSetRenderTargets, fmt::format("case {}", i));
+              __imp__sub_82128190, ITC_CONTEXT_FN(NativeSetRenderTargets), fmt::format("case {}", i));
     }
     guest::StoreU32(h.base, kTargets, queue);
     guest::StoreU32(h.base, kTargets + 4, list);
@@ -2008,46 +2008,46 @@ void ResetCases(Context& h, uint32_t block) {
     uint32_t max_count;  // counts tried up to this
   };
   const Function resets[] = {
-      {"LightSprite::Reset (sub_8211E9F0)", __imp__sub_8211E9F0, NativeLightSpriteReset, 288,
+      {"LightSprite::Reset (sub_8211E9F0)", __imp__sub_8211E9F0, ITC_CONTEXT_FN(NativeLightSpriteReset), 288,
        false, 0, 0},
-      {"ModelSprite::Reset (sub_8211F430)", __imp__sub_8211F430, NativeModelSpriteReset, 576,
+      {"ModelSprite::Reset (sub_8211F430)", __imp__sub_8211F430, ITC_CONTEXT_FN(NativeModelSpriteReset), 576,
        false, 0, 0},
-      {"Sprite::ResetStyle2 (sub_82123A00)", __imp__sub_82123A00, NativeSpriteResetStyle2, 128,
+      {"Sprite::ResetStyle2 (sub_82123A00)", __imp__sub_82123A00, ITC_CONTEXT_FN(NativeSpriteResetStyle2), 128,
        false, 0, 0},
-      {"Trail::Reset (sub_82129498)", __imp__sub_82129498, NativeTrailReset, 66816, false, 104,
+      {"Trail::Reset (sub_82129498)", __imp__sub_82129498, ITC_CONTEXT_FN(NativeTrailReset), 66816, false, 104,
        520},
-      {"SmokeEmitter::Reset (sub_8212A218)", __imp__sub_8212A218, NativeSmokeEmitterReset, 720,
+      {"SmokeEmitter::Reset (sub_8212A218)", __imp__sub_8212A218, ITC_CONTEXT_FN(NativeSmokeEmitterReset), 720,
        true, 0, 0},
       {"SmokeEmitter::SmokeEmitter (sub_8212B230)", __imp__sub_8212B230,
-       NativeSmokeEmitterConstruct, 720, false, 0, 0},
-      {"ParticlesB::ResetEntry (sub_8212B3E8)", __imp__sub_8212B3E8, NativeParticlesBResetEntry,
+       ITC_CONTEXT_FN(NativeSmokeEmitterConstruct), 720, false, 0, 0},
+      {"ParticlesB::ResetEntry (sub_8212B3E8)", __imp__sub_8212B3E8, ITC_CONTEXT_FN(NativeParticlesBResetEntry),
        176, true, 0, 0},
       // Entry 20 would overwrite the count (+2,700) with 1.0: both versions
       // would run on, so 20 at most.
-      {"ParticlesC::Reset (sub_8212C0E8)", __imp__sub_8212C0E8, NativeParticlesCReset, 2720,
+      {"ParticlesC::Reset (sub_8212C0E8)", __imp__sub_8212C0E8, ITC_CONTEXT_FN(NativeParticlesCReset), 2720,
        false, 2700, 20},
-      {"Marker::Reset (sub_8212CC38)", __imp__sub_8212CC38, NativeMarkerReset, 304, false, 0, 0},
-      {"Sparks::Reset (sub_8212D6E0)", __imp__sub_8212D6E0, NativeSparksReset, 29824, false, 104,
+      {"Marker::Reset (sub_8212CC38)", __imp__sub_8212CC38, ITC_CONTEXT_FN(NativeMarkerReset), 304, false, 0, 0},
+      {"Sparks::Reset (sub_8212D6E0)", __imp__sub_8212D6E0, ITC_CONTEXT_FN(NativeSparksReset), 29824, false, 104,
        200},
-      {"LightSprite::LightSprite (sub_8211F060)", __imp__sub_8211F060, NativeLightSpriteConstruct,
+      {"LightSprite::LightSprite (sub_8211F060)", __imp__sub_8211F060, ITC_CONTEXT_FN(NativeLightSpriteConstruct),
        288, false, 0, 0},
-      {"ModelSprite::ModelSprite (sub_82122880)", __imp__sub_82122880, NativeModelSpriteConstruct,
+      {"ModelSprite::ModelSprite (sub_82122880)", __imp__sub_82122880, ITC_CONTEXT_FN(NativeModelSpriteConstruct),
        576, false, 0, 0},
-      {"Trail::Trail (sub_8212A140)", __imp__sub_8212A140, NativeTrailConstruct, 64160, false, 0,
+      {"Trail::Trail (sub_8212A140)", __imp__sub_8212A140, ITC_CONTEXT_FN(NativeTrailConstruct), 64160, false, 0,
        0},
-      {"Smoke::Smoke (sub_8212B2E8)", __imp__sub_8212B2E8, NativeSmokeConstruct, 32640, false, 0,
+      {"Smoke::Smoke (sub_8212B2E8)", __imp__sub_8212B2E8, ITC_CONTEXT_FN(NativeSmokeConstruct), 32640, false, 0,
        0},
-      {"ParticlesC::ParticlesC (sub_8212CAF8)", __imp__sub_8212CAF8, NativeParticlesCConstruct,
+      {"ParticlesC::ParticlesC (sub_8212CAF8)", __imp__sub_8212CAF8, ITC_CONTEXT_FN(NativeParticlesCConstruct),
        2720, false, 0, 0},
-      {"Marker::Marker (sub_8212D620)", __imp__sub_8212D620, NativeMarkerConstruct, 304, false, 0,
+      {"Marker::Marker (sub_8212D620)", __imp__sub_8212D620, ITC_CONTEXT_FN(NativeMarkerConstruct), 304, false, 0,
        0},
-      {"Sparks::Sparks (sub_8212E9A0)", __imp__sub_8212E9A0, NativeSparksConstruct, 29824, false,
+      {"Sparks::Sparks (sub_8212E9A0)", __imp__sub_8212E9A0, ITC_CONTEXT_FN(NativeSparksConstruct), 29824, false,
        0, 0},
       // The smoke holds 45 emitters; ParticlesB's entries run into its
       // header from the 16th on (both versions alike), 20 at most.
-      {"Smoke::Reset (sub_8212A9E0)", __imp__sub_8212A9E0, NativeSmokeReset, 32640, false, 104,
+      {"Smoke::Reset (sub_8212A9E0)", __imp__sub_8212A9E0, ITC_CONTEXT_FN(NativeSmokeReset), 32640, false, 104,
        45},
-      {"ParticlesB::Reset (sub_8212BA98)", __imp__sub_8212BA98, NativeParticlesBReset, 3648, false,
+      {"ParticlesB::Reset (sub_8212BA98)", __imp__sub_8212BA98, ITC_CONTEXT_FN(NativeParticlesBReset), 3648, false,
        104, 20},
   };
   for (const Function& f : resets) {
@@ -2222,7 +2222,7 @@ void SparksUpdateCases(Context& h, uint32_t block) {
                 guest::StoreU32(h.base, sparks + 128 + 144 * n + 108, life);
               }
             },
-            [&](PPCContext& t) { t.r3.u64 = sparks; }, __imp__sub_8212DDC8, NativeSparksUpdate,
+            [&](PPCContext& t) { t.r3.u64 = sparks; }, __imp__sub_8212DDC8, ITC_CONTEXT_FN(NativeSparksUpdate),
             fmt::format("case {} capacity {} head {} count {}", i, capacity, head, count));
   }
   results.Report();
@@ -2308,7 +2308,7 @@ void SmokeUpdateCases(Context& h, uint32_t block) {
                 }
               }
             },
-            [&](PPCContext& t) { t.r3.u64 = smoke; }, __imp__sub_8212AA78, NativeSmokeUpdate,
+            [&](PPCContext& t) { t.r3.u64 = smoke; }, __imp__sub_8212AA78, ITC_CONTEXT_FN(NativeSmokeUpdate),
             fmt::format("case {} capacity {} head {} count {} region {:X}", i, capacity, head,
                         count, region));
   }
@@ -2395,7 +2395,7 @@ void ParticlesBUpdateCases(Context& h, uint32_t block) {
               }
             },
             [&](PPCContext& t) { t.r3.u64 = effect; }, __imp__sub_8212B748,
-            NativeParticlesBUpdate,
+            ITC_CONTEXT_FN(NativeParticlesBUpdate),
             fmt::format("case {} capacity {} head {} count {}", i, capacity, head, count));
   }
   results.Report();
@@ -2482,7 +2482,7 @@ void ParticlesCUpdateCases(Context& h, uint32_t block) {
               guest::StoreU32(h.base, kSeed, rand_seed);
             },
             [&](PPCContext& t) { t.r3.u64 = effect; }, __imp__sub_8212C2F0,
-            NativeParticlesCUpdate,
+            ITC_CONTEXT_FN(NativeParticlesCUpdate),
             fmt::format("case {} capacity {} oldest {} newest {} count {}", i, capacity, oldest,
                         newest, count));
   }
@@ -2633,7 +2633,7 @@ void ViewBodyCases(Context& h, uint32_t block) {
                   t.r4.u64 = wheel;
                   t.f1.f64 = f1;
                 },
-                Original<__imp__sub_82126A70>, NativeWheelSlip,
+                Original<__imp__sub_82126A70>, ITC_CONTEXT_FN(NativeWheelSlip),
                 fmt::format("seed {} wheel {} f1 {:016X}", seed, wheel,
                             std::bit_cast<uint64_t>(f1)),
                 false);
@@ -2715,7 +2715,7 @@ void IsBehindCameraCases(Context& h, uint32_t block) {
               t.r3.u64 = overlays;
               t.r4.u64 = point;
             },
-            Original<__imp__sub_82124630>, NativeIsBehindCamera,
+            Original<__imp__sub_82124630>, ITC_CONTEXT_FN(NativeIsBehindCamera),
             fmt::format("seed {} kind {} slot {}", seed, kind, slot));
   }
   results.Report();
@@ -2996,7 +2996,7 @@ void UpdateTrailsCases(Context& h, uint32_t block) {
               }
             },
             [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82124EE0>,
-            NativeUpdateTrails, fmt::format("seed {} slot {}", seed, slot), false, false);
+            ITC_CONTEXT_FN(NativeUpdateTrails), fmt::format("seed {} slot {}", seed, slot), false, false);
   }
   results.Report();
   nan_results.Report();
@@ -3095,11 +3095,11 @@ void EffectUpdateCases(Context& h, uint32_t block) {
   };
   const Update updates[] = {
       {"CarOverlays::UpdateLightSprites (sub_821251C0)", Original<__imp__sub_821251C0>,
-       NativeUpdateLightSprites, 256},
+       ITC_CONTEXT_FN(NativeUpdateLightSprites), 256},
       {"CarOverlays::UpdateParticlesB (sub_821252D0)", Original<__imp__sub_821252D0>,
-       NativeUpdateParticlesB, 256},
+       ITC_CONTEXT_FN(NativeUpdateParticlesB), 256},
       {"CarOverlays::UpdateParticlesC (sub_82125798)", Original<__imp__sub_82125798>,
-       NativeUpdateParticlesC, 240},
+       ITC_CONTEXT_FN(NativeUpdateParticlesC), 240},
   };
   for (const Update& update : updates) {
     Results results(update.name);
@@ -3215,7 +3215,7 @@ void UpdateSmokeCases(Context& h, uint32_t block) {
                 t.r3.u64 = block + kSmokeA;
                 t.r4.u64 = frame;
               },
-              __imp__sub_8212B1B0, NativeSmokeSetFrame,
+              __imp__sub_8212B1B0, ITC_CONTEXT_FN(NativeSmokeSetFrame),
               fmt::format("seed {} capacity {} frame {:X}", seed, capacity, frame), false, false);
     }
     results.Report();
@@ -3231,7 +3231,7 @@ void UpdateSmokeCases(Context& h, uint32_t block) {
     const uint32_t slot = r.Below(25);
     Compare(h, results, regions, UpdateSmokeSetup(h, block, seed, odd, slot),
             [&](PPCContext& t) { t.r3.u64 = overlays; }, Original<__imp__sub_82125B60>,
-            NativeUpdateSmoke, fmt::format("seed {} slot {}", seed, slot), false, false);
+            ITC_CONTEXT_FN(NativeUpdateSmoke), fmt::format("seed {} slot {}", seed, slot), false, false);
   }
   results.Report();
   guest::StoreU32(h.base, kSeed, live);
@@ -3254,7 +3254,7 @@ void ModelMatrixCases(Context& h, uint32_t block) {
               t.r3.u64 = out;
               t.r4.u64 = block + kPointView;
             },
-            __imp__sub_821270E8, NativeModelMatrix, fmt::format("seed {} out {:X}", seed, out));
+            __imp__sub_821270E8, ITC_CONTEXT_FN(NativeModelMatrix), fmt::format("seed {} out {:X}", seed, out));
   }
   results.Report();
 }
@@ -3307,15 +3307,15 @@ void ParticleArrayCases(Context& h, uint32_t block) {
     uint32_t bytes;
     Kind kind;
   } functions[] = {
-      {"ParticlesB::ParticlesB (sub_8212BFE8)", __imp__sub_8212BFE8, NativeParticlesBConstruct,
+      {"ParticlesB::ParticlesB (sub_8212BFE8)", __imp__sub_8212BFE8, ITC_CONTEXT_FN(NativeParticlesBConstruct),
        2816, kPlain},
-      {"Smoke::~Smoke (sub_8212B288)", __imp__sub_8212B288, NativeSmokeDestruct, 32640, kPlain},
-      {"ParticlesB::~ParticlesB (sub_8212BF88)", __imp__sub_8212BF88, NativeParticlesBDestruct,
+      {"Smoke::~Smoke (sub_8212B288)", __imp__sub_8212B288, ITC_CONTEXT_FN(NativeSmokeDestruct), 32640, kPlain},
+      {"ParticlesB::~ParticlesB (sub_8212BF88)", __imp__sub_8212BF88, ITC_CONTEXT_FN(NativeParticlesBDestruct),
        2816, kPlain},
-      {"Smoke::~Smoke, deleting (sub_8212B358)", __imp__sub_8212B358, NativeSmokeDeleting, 32640,
+      {"Smoke::~Smoke, deleting (sub_8212B358)", __imp__sub_8212B358, ITC_CONTEXT_FN(NativeSmokeDeleting), 32640,
        kDeleting},
       {"ParticlesB::~ParticlesB, deleting (sub_8212C070)", __imp__sub_8212C070,
-       NativeParticlesBDeleting, 2816, kDeleting},
+       ITC_CONTEXT_FN(NativeParticlesBDeleting), 2816, kDeleting},
   };
   const bool heap = hooks::NativeHeapActive();
   if (!heap) {

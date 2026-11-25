@@ -1,0 +1,535 @@
+// The car models natively: adapters in front of src/car_models/
+// (docs/functions/car-models.md), with the register steps the harness
+// shares (hooks/car_models.h).
+
+#include "hooks/car_models.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
+
+#include "base/flags.h"
+#include "car_models/car_model.h"
+#include "car_models/decals.h"
+#include "car_models/file_loaded.h"
+#include "car_models/load_slots.h"
+#include "car_models/parts.h"
+#include "car_models/plate.h"
+#include "car_models/raster.h"
+#include "car_models/scene_fill.h"
+#include "car_models/tga.h"
+#include "car_models/vinyl.h"
+#include "hooks/archive.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
+#include "hooks/scene_loaders.h"
+#include "hooks/texture_compression.h"
+#include "native/buffers.h"
+#include "schema/accessories.h"
+#include "schema/car_models.h"
+#include "schema/models.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_car_models, true, "ITC",
+              "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
+              "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
+              "sub_820D07C8 and CarModel::LoadExterior sub_820D5EC8 (with LoadSetA sub_820D59D8 and "
+              "LoadSetB sub_820D5AC0), the team "
+              "emblem sub_820D3CF8 and CarModel::LoadDecals sub_820D5B50 (no adapters: their callers in "
+              "play are native), with --native_heap "
+              "CarModel::ReloadDecals sub_820D5D20, SetVinylTextures "
+              "sub_820D5F88, the wheels' set-up sub_820D9110 (with the rims sub_820D8BA8 and brakes "
+              "sub_820D8C50), with --native_heap CarInterior::LoadSetCBody sub_820D67E8, "
+              "CarInterior::Load sub_820D79B0 (its accessories' "
+              "calls through the guest; CarInterior::LoadParts sub_820D7730 under it, no adapter), "
+              "with --native_heap CarModel::MakePlate sub_820ED6D0 (with sub_820C4DD8 and "
+              "sub_820ED630, no adapters: only it calls them; Resource::Release a guest call), "
+              "with --native_heap and --native_models the file-loaded callbacks "
+              "CarModel::OnFileLoaded sub_820D47A8 (with the buffer release sub_820C3CE0, no "
+              "adapter) and OnFileLoadedB sub_820D4F80 (the texture providers' slot +16 and the "
+              "originals where a callee's plain C++ declines guest calls), "
+              "with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
+              "deferred release sub_820C3F50 (no adapter: its callers in play are native); with --native_heap and the memory blocks' host lock "
+              "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
+              "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
+              "header's clear sub_820EEBC0 and, with --native_heap, TGA::CreateImage sub_820ED020 "
+              "with its reader; Vinyl::DrawDecal sub_820EE638 with the software rasterizer under "
+              "it; with --native_heap CarModel::OnDecalLoaded sub_820D5750 with Vinyl::DrawDecals "
+              "sub_820D4078, Vinyl::ClearCorner sub_820D3C80 and Vinyl::Compress sub_820ED090, which "
+              "calls XGCompressSurface sub_8235AAC0's plain C++; with --native_heap, the archive's "
+              "queue, --native_models and native memcpy CarScene::SetUp sub_820C8DE8, the second "
+              "set's fill) natively "
+              "instead of through the translated code (the same writes; checked by "
+              "--run_harnesses=car_models)");
+
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+ITC_FLAG_DECLARE(bool, native_scene_models);
+
+namespace hooks {
+
+namespace cm = car_models;
+
+ITC_REGS_STEP(CarModelsLoadSlotReset) {
+  cm::LoadSlotReset(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(CarModelsLoadSlotReleaseBuffer) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::LoadSlotReleaseBuffer(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820D0758(ctx);
+}
+
+ITC_REGS_STEP(CarModelsLoadSlotLoadShared) {
+  ctx.r3.u64 = cm::LoadSlotLoadShared(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      hooks::NativeArchiveLoad());
+}
+
+ITC_REGS_STEP(CarModelsLoadSlotLoad) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820D07C8(ctx);
+    return;
+  }
+  ctx.r3.u64 = cm::LoadSlotLoad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                ctx.r13.u32, hooks::NativeArchiveLoad());
+}
+
+ITC_REGS_STEP(CarModelsLoadExterior) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::CarModelLoadExterior(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                                 ctx.r13.u32, hooks::NativeArchiveLoad())) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820D5EC8(ctx);
+}
+
+ITC_REGS_STEP(CarModelsReloadDecals) {
+  if (!hooks::NativeHeapActive() ||
+      int32_t(schema::CarModel(ctx.r3.u32).extra_image()) == 1) {
+    lifted::original::c820D5D20(ctx);
+    return;
+  }
+  ctx.r3.u64 = cm::CarModelReloadDecals(ctx.r3.u32, ctx.r1.u32,
+                                        hooks::NativeArchiveLoad());
+}
+
+ITC_REGS_STEP(CarModelsSetVinylTextures) {
+  ctx.r3.u64 = cm::CarModelSetVinylTextures(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(CarModelsWheelsSetUp) {
+  if (const auto r3 =
+          cm::WheelsSetUp(ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad())) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  lifted::original::c820D9110(ctx);
+}
+
+ITC_REGS_STEP(CarModelsCockpitLoadSetC) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::CockpitLoadSetC(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, ctx.r13.u32,
+                                            hooks::NativeArchiveLoad())) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820D67E8(ctx);
+}
+
+ITC_REGS_STEP(CarModelsInteriorLoad) {
+  const uint64_t lr = ctx.lr;
+  std::optional<uint32_t> r3;
+  // The accessories' slot +4 calls from the original's frame (112 bytes).
+  guest_call::InFrame(ctx, 112, 0x820D7A40, [&](uint32_t) {
+    r3 = cm::InteriorLoad(ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(),
+                          [&ctx](uint32_t set, uint32_t r4, uint32_t r5, int which) {
+                            ctx.r3.u64 = set;
+                            ctx.r4.u64 = r4;
+                            ctx.r5.u64 = r5;
+                            ctx.lr = which == 0 ? 0x820D7A40 : 0x820D7A94;
+                            lifted::CallFromContext(
+                                ctx, schema::Accessories(set).vtable().acquire());
+                            return ctx.r3.u32;
+                          });
+  });
+  ctx.lr = lr;
+  if (!r3) {
+    lifted::original::c820D79B0(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+ITC_REGS_STEP(CarModelsMakePlate) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820ED6D0(ctx);
+    return;
+  }
+  const uint64_t regs[4] = {ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  const uint32_t header_a = ctx.r3.u32, data_a = ctx.r4.u32;
+  const uint32_t header_b = ctx.r5.u32, data_b = ctx.r6.u32;
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  std::optional<uint32_t> r3;
+  // Resource::Release from its frame, with the original's return address.
+  guest_call::InFrame(ctx, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
+    r3 = cm::MakePlate(header_a, data_a, header_b, data_b, regs, stack,
+                       [&ctx](uint32_t surface) {
+                         ctx.r3.u64 = surface;
+                         ctx.lr = 0x820ED8E4;
+                         lifted::Enter(ctx, game::Resource::Release);
+                       });
+  });
+  ctx.lr = lr;
+  if (!r3) {
+    lifted::original::c820ED6D0(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void CarModelsFileLoaded(lifted::Regs& ctx, cm::FileLoadedSet set) {
+  const bool a = set == cm::FileLoadedSet::kA;
+  const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, car = ctx.r6.u32;
+  if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
+      !cm::FileLoadedNative(set, request, car)) {
+    (a ? ITC_REGS_FN(lifted::original::c820D47A8) : ITC_REGS_FN(lifted::original::c820D4F80))(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  // The guest calls from the original's frame (1,552 bytes), with its
+  // return addresses.
+  guest_call::InFrame(ctx, cm::kFileLoadedFrameBytes, a ? 0x820D47F4 : 0x820D4FD0,
+                      [&](uint32_t) {
+    cm::FileLoadedCalls calls;
+    calls.skeleton_bind = [&](uint32_t skeleton, uint32_t file) {
+      ctx.r3.u64 = skeleton;
+      ctx.r4.u64 = file;
+      ctx.r5.u64 = 0;
+      ctx.lr = a ? 0x820D483C : 0x820D5018;
+      lifted::original::c82599A20(ctx);
+    };
+    calls.update_matrices = [&](uint32_t skeleton) {
+      ctx.r3.u64 = skeleton;
+      ctx.lr = a ? 0x820D4854 : 0x820D5030;
+      lifted::original::c825998A0(ctx);
+    };
+    calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
+      ctx.r3.u64 = xpr;
+      ctx.r4.u64 = file;
+      ctx.lr = a ? 0x820D4DC8 : 0x820D55A0;
+      lifted::original::c82596F68(ctx);
+    };
+    calls.provider_set = [&](uint32_t provider, uint32_t xpr) {
+      ctx.r3.u64 = provider;
+      ctx.r4.u64 = 0;
+      ctx.r5.u64 = xpr;
+      ctx.lr = a ? 0x820D4DEC : 0x820D55C4;
+      lifted::CallFromContext(ctx, schema::TextureProvider(provider).vtable().set());
+    };
+    calls.plate_release = [&](uint32_t surface) {
+      // From MakePlate's frame (944 bytes below this one).
+      guest_call::InFrame(ctx, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
+        ctx.r3.u64 = surface;
+        lifted::Enter(ctx, game::Resource::Release);
+      });
+    };
+    cm::FileLoaded(set, request, buffer, car, stack, calls);
+  });
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+ITC_REGS_STEP(CarModelsOnFileLoaded) {
+  CarModelsFileLoaded(ctx, cm::FileLoadedSet::kA);
+}
+
+ITC_REGS_STEP(CarModelsOnFileLoadedB) {
+  CarModelsFileLoaded(ctx, cm::FileLoadedSet::kB);
+}
+
+ITC_REGS_STEP(CarModelsCarModelRelease) {
+  if (hooks::ModelsNativeLifetime()) {
+    ctx.fpscr.disableFlushMode();  // as CarModel::Reset
+    if (const auto r3 = cm::CarModelRelease(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820D4508(ctx);
+}
+
+ITC_REGS_STEP(CarModelsTextureCreate) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820ECF08(ctx);
+    return;
+  }
+  ctx.r3.u64 = cm::TextureCreate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                 ctx.r7.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(CarModelsTextureFree) {
+  if (!hooks::NativeHeapActive() || !cm::TextureFreeable(ctx.r3.u32)) {
+    lifted::original::c820ECFC8(ctx);
+    return;
+  }
+  ctx.r3.u64 = cm::TextureFree(ctx.r3.u32, ctx.r4.u32);
+}
+
+uint32_t CarModelsVinylCompressAt(lifted::Regs& ctx, uint32_t width,
+                                  uint32_t height, uint32_t header_in, uint32_t data_in) {
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  std::optional<uint32_t> r3;
+  // Resource::Release from its frame, with the original's return addresses.
+  guest_call::InFrame(ctx, cm::kVinylCompressFrameBytes, 0x820ED1C0, [&](uint32_t) {
+    const cm::VinylCalls calls{TextureCompressionGuestCall(ctx),
+                               [&ctx](uint32_t surface, int which) {
+                                 ctx.r3.u64 = surface;
+                                 ctx.lr = which == 0 ? 0x820ED1C0 : 0x820ED1C8;
+                                 lifted::Enter(ctx, game::Resource::Release);
+                               }};
+    r3 = cm::VinylCompress(width, height, header_in, data_in, stack, calls);
+  });
+  ctx.lr = lr;
+  return *r3;  // the callers checked TextureFreeable
+}
+
+ITC_REGS_STEP(CarModelsOnDecalLoaded) {
+  const uint32_t request = ctx.r3.u32, car = ctx.r6.u32;
+  if (!hooks::NativeHeapActive() || !cm::DecalsNative(request, car)) {
+    lifted::original::c820D5750(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  // Vinyl::Compress from its frame (its guest calls), returning to 0x820D5880.
+  guest_call::InFrame(ctx, cm::kOnDecalLoadedFrameBytes, 0x820D5880, [&](uint32_t) {
+    r3 = cm::OnDecalLoaded(request, car, stack,
+                           [&](uint32_t width, uint32_t height, uint32_t header_in,
+                               uint32_t data_in) {
+                             ctx.lr = 0x820D5880;
+                             return CarModelsVinylCompressAt(ctx, width, height,
+                                                             header_in, data_in);
+                           });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+ITC_REGS_STEP(CarModelsTgaHeaderClear) {
+  cm::TgaHeaderClear(ctx.r3.u32);
+  // (r11 = 0 was a leftover for recompiled callers: none now)
+}
+
+ITC_REGS_STEP(CarModelsTgaCreateImage) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::TgaCreateImage(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                           ctx.r6.u32, ctx.r1.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820ED020(ctx);
+}
+
+bool CarModelsSceneSetUpNative() {
+  return hooks::NativeHeapActive() && hooks::NativeArchiveQueue() &&
+         hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy();
+}
+
+ITC_REGS_STEP(CarModelsSceneSetUp) {
+  if (!CarModelsSceneSetUpNative()) {
+    lifted::original::c820C8DE8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32, scene = ctx.r3.u32, record = ctx.r4.u32, r5 = ctx.r5.u32;
+  // CreateA's fallbacks run below this function's frame.
+  ctx.r1.u64 = sp - cm::kSceneSetUpFrame;
+  const uint32_t r3 = SceneLoadersCreateAWith(ctx, [&](const scene_loaders::CreateCalls& calls) {
+    return cm::SceneSetUp(scene, record, r5, sp, ctx.r13.u32, NativeArchiveLoad(), calls);
+  });
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+ITC_REGS_STEP(CarModelsDrawDecal) {
+  if (!cm::DecalRegionPorted(ctx.r3.u32)) {
+    lifted::original::c820EE638(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  const cm::DecalArguments arguments{ctx.r3.u32,
+                                     ctx.r4.u32,
+                                     {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64},
+                                     {ctx.r8.u64, ctx.r9.u64},
+                                     ctx.f1.f64};
+  ctx.r3.u64 = *cm::DrawDecal(arguments, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(ScenePoolsSetUp) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::PoolSetUps native{ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models),
+                              hooks::NativeHeapActive()};
+  const uint32_t r3 = cm::ScenePoolsSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, ctx.r13.u32,
+      hooks::NativeArchiveLoad(), native,
+      [&ctx, stack](uint32_t function, uint32_t r3, uint32_t r4, uint32_t r1, uint32_t lr) {
+        ctx.r1.u64 = r1;
+        ctx.r3.u64 = r3;
+        ctx.r4.u64 = r4;
+        ctx.lr = lr;
+        lifted::CallFromContext(ctx, function);
+        ctx.r1.u64 = stack;
+        return ctx.r3.u32;
+      });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// The second set's set-ups (scene-models.md): r3 = the object, r4 = the
+// record; r3 as the original leaves it, or the original where the plain C++
+// declines.
+void SecondSetUp(lifted::Regs& ctx, std::optional<uint32_t> (*setup)(uint32_t, uint32_t, uint32_t,
+                                                  const cm::SecondSetUps&),
+                 lifted::RegsFunction* original) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::GuestCall guest = [&ctx, stack](uint32_t function, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r1, uint32_t lr) {
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  const cm::SecondSetUps setups{
+      ctx.r13.u32, hooks::NativeArchiveLoad(),
+      {ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models), hooks::NativeHeapActive()},
+      guest};
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = setup(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, setups);
+  ctx.lr = lr;
+  if (!r3) {
+    lifted::Sdk(ctx, original);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+// ScenePools::SetUpB: r3 = the scene, r4 = a pool, r5 = an index, r6 = a
+// record; r3 = the object, or 0 when it isn't in use. SceneModel::Build:
+// r3 = a scene model; r3 = the last SetUpB's answer. Their set-ups' plain
+// C++ as SecondSetUp's, the guest calls from the frames below ctx.r1.
+template <typename Body>
+static uint32_t WithSecondSetUps(lifted::Regs& ctx, Body body) {
+  const uint64_t lr = ctx.lr;
+  const uint64_t stack = ctx.r1.u64;
+  const cm::GuestCall guest = [&ctx, stack](uint32_t function, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r1, uint32_t lr) {
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
+  };
+  const cm::SecondSetUps setups{
+      ctx.r13.u32, hooks::NativeArchiveLoad(),
+      {ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models), hooks::NativeHeapActive()},
+      guest};
+  ctx.fpscr.disableFlushMode();
+  const uint32_t r3 = body(setups);
+  ctx.lr = lr;
+  return r3;
+}
+
+ITC_REGS_STEP(ScenePoolsSetUpB) {
+  const uint32_t scene = ctx.r3.u32, pool = ctx.r4.u32, index = ctx.r5.u32, record = ctx.r6.u32;
+  const uint32_t stack = ctx.r1.u32;
+  ctx.r3.u64 = WithSecondSetUps(ctx, [&](const cm::SecondSetUps& setups) {
+    return cm::ScenePoolsSetUpB(scene, pool, index, record, stack, setups);
+  });
+}
+
+ITC_REGS_STEP(SceneModelBuild) {
+  const uint32_t model = ctx.r3.u32;
+  const uint32_t stack = ctx.r1.u32;
+  ctx.r3.u64 = WithSecondSetUps(ctx, [&](const cm::SecondSetUps& setups) {
+    return cm::SceneModelBuild(model, stack, setups);
+  });
+}
+
+}  // namespace hooks
+
+// ScenePools::SetUpB (with its pool 0 case sub_820C5B98 merged,
+// SceneCockpit::SetUp sub_820DBE80 and SceneModel::SetUp sub_820DB458, no
+// adapters: only it calls them) and SceneModel::Build (from SceneModel::
+// Update, recompiled) behind --native_scene_models.
+ITC_NATIVE_ENTRY(820C5B28, ITC_FLAG(native_scene_models)) {
+  hooks::ScenePoolsSetUpB(ctx);
+}
+// SceneModel::Build sub_820D9870 has no adapter (removed, B7 loop,
+// 2026-11-06): its callers in play, SceneModel::SetUp's and SceneModel::
+// Update's plain C++, call it (Update through hooks::SceneModelBuild).
+
+// The second set's set-ups (SceneCarModel::SetUp sub_820DB818, SceneParts::
+// SetUp sub_820DF1D0, pool 4's sub_820DCAA0, SceneInterior::SetUp
+// sub_820E37F0, SceneTraffic::SetUp sub_820E5998, the wheels' sub_820E70C0)
+// and ScenePools::SetUp (sub_820C4338, vehicle-accessors.md) have no
+// adapters since ScenePools::SetUpB, their only caller in play, became
+// native: it calls their plain C++ (hooks::SecondSetUp and ScenePoolsSetUp
+// are their register steps, for the harness), and --native_scene_models
+// (--native_vehicle_accessors for ScenePools::SetUp) switches only their
+// callers. ScenePools::SetUp's loaders CarParts::Load sub_820D7510 (with
+// LoadSetA sub_820D7090 and LoadSetB sub_820D70F0), pool 4's sub_820D6B48
+// and TrafficCar::Load sub_820D8A08 (scene-models.md) have none either:
+// their plain C++ with --native_scene_models (and --native_car_models), else
+// their originals.
+
+#define ITC_CAR_MODELS(address, step)    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_models)) { \
+    hooks::step(ctx);              \
+  }
+
+ITC_CAR_MODELS(820D0730, CarModelsLoadSlotReset)
+ITC_CAR_MODELS(820D0758, CarModelsLoadSlotReleaseBuffer)
+ITC_CAR_MODELS(820D0860, CarModelsLoadSlotLoadShared)
+ITC_CAR_MODELS(820D07C8, CarModelsLoadSlotLoad)
+ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
+ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
+ITC_CAR_MODELS(820D5D20, CarModelsReloadDecals)
+ITC_CAR_MODELS(820D9110, CarModelsWheelsSetUp)
+ITC_CAR_MODELS(820D67E8, CarModelsCockpitLoadSetC)
+ITC_CAR_MODELS(820D79B0, CarModelsInteriorLoad)
+ITC_CAR_MODELS(820ED6D0, CarModelsMakePlate)
+ITC_CAR_MODELS(820D47A8, CarModelsOnFileLoaded)
+ITC_CAR_MODELS(820D4F80, CarModelsOnFileLoadedB)
+ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
+ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
+ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
+ITC_CAR_MODELS(820EEBC0, CarModelsTgaHeaderClear)
+ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)
+ITC_CAR_MODELS(820EE638, CarModelsDrawDecal)
+ITC_CAR_MODELS(820D5750, CarModelsOnDecalLoaded)
+ITC_CAR_MODELS(820C8DE8, CarModelsSceneSetUp)

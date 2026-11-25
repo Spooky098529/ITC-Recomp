@@ -1,0 +1,452 @@
+# The schema of docs/functions/xaudio-engine.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XAudio's engine and mixer (the game's own copy of XAudio, translated): the
+# engine's factory and its class tables, the bump allocators, the mastering
+# voice with its render driver, the stages (the voice lists the mix walks),
+# and the out words the engine's functions write. Names from
+# docs/functions/xaudio-engine.md, docs/known-data.md ("XAudio stage",
+# "XAudio factory", "XAudio mastering voice", "XAudio allocator", "XAudio
+# voice") and the hand port (src/xaudio/engine.h).
+#
+# The engine itself (XAudioEngine, 372 bytes at [0x82954F08]), its output
+# buffers (XAudioBuffer) and the voices' base belong to xaudio.md's file:
+# not described here. Types here the measure split from other areas' ones
+# (the lead merges them): XAudioBumpAllocator and its vtable are
+# xaudio-objects.toml's XAudioAllocator and XAudioAllocatorVtable (which see
+# only the vtable); XAudioMasteringDriver is audio.toml's AudioRenderDriver
+# met through the mastering voice; XAudioEngineBase is xaudio.md's
+# XAudioEngine as its base destructor (sub_8245B170) meets it;
+# XAudioEngineInfoOut is xaudio-objects.toml's FactoryInfoOut;
+# XAudioFactoryDescriptorId is the byte view of xaudio-objects.toml's
+# XAudioObjectDescriptor (class_id); XAudioMixVoice is the voice's base
+# (xaudio.md) as XAudioEngine::StageOf meets it.
+#
+# Measure faults, kept as fields with notes so every access fits:
+# XAudioFactory::TableSize's r3 (a pointer to the class table) taken for the
+# factory (the factory's +0 read as the table); `new<?>@XAudio::Alloc` joins
+# every XAudio::Alloc block: the allocators' (their constructors), the XMA
+# object (XmaObject::Create, audio.md) and the factory's classes from id 128
+# (sub_8245D760).
+
+# A bump allocator (docs/known-data.md, "XAudio allocator"): 28 bytes plus
+# its block. Vtables 0x8204A954 and (+4) 0x8204A980 (the default,
+# XAudio::DefaultAllocator) or 0x8204A96C (the sizing one, sub_82460538).
+# Met as every engine object's allocator (the engine's +8, a voice's +8).
+[XAudioBumpAllocator]
+measure = "XAudioAllocator"
+measures = ["XAudioEngine.+8", "XAudioMasteringVoice.+8", "sub_8245B170.r3.+8", "XAudioEngine::XAudioEngine.r4", "AudioRenderDriver::Create.r4", "PcmCodec::Create.r4", "Reverb::Create.r4", "VolumeMeter::Create.r4", "XAudioMatrix::Create.r4", "XmaCodec::Create.r4", "PacketLists::Alloc.r5", "VolumeMeter::Init.r5", "XAudioMatrix::Init.r5", "XmaCodec::XmaCodec.r5", "sub_825A50E0.r4", "sub_825A5DB8.r4", "XAudioVoice.+8", "XAudio::GetAllocator.r5.+0", "XAudioObject.+8", "XAudioBuffer::XAudioBuffer.r5", "XAudioBuffer::Create.r4", "sub_824603A0.r3@-4"]
+# measures from XAudioVoiceAllocator (xaudio), merged at the integration
+# measures from XAudioAllocator (xaudio-objects), merged at the integration
+size = 28
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioBumpAllocatorVtable", note = "0x8204A954" },
+  { name = "interface_vtable", offset = 4, type = "u32", note = "the +4 interface's: 0x8204A980 the default, 0x8204A96C the sizing one; 0x8204A940 while the base destroys, the root's after" },
+  { name = "ref_count", offset = 8, type = "u32" },
+  { name = "attributes", offset = 12, type = "u32", note = "XMemAlloc's attributes, handed to XAudio::Free" },
+  { name = "capacity", offset = 16, type = "u32", note = "the block's size (the sizing allocator adds each reservation)" },
+  { name = "used", offset = 20, type = "u32" },
+  { name = "block", offset = 24, type = "u32", note = "the default's is its own +28" },
+  { name = "chain_count", offset = 0, type = "u8", note = "measure fault: BaseSize's description +8 (the effect chain: its count) (from XAudioVoiceAllocator, xaudio)" },
+]
+
+# The allocator's vtable (0x8204A954).
+[XAudioBumpAllocatorVtable]
+# measures from XAudioAllocatorVtable (xaudio-objects), merged at the integration
+measures = ["XAudioAllocator.+0", "XAudioEngine.+8.+0", "XAudioMasteringVoice.+8.+0", "sub_8245B170.r3.+8.+0", "XAudioEngine::XAudioEngine.r4.+0",
+  "AudioRenderDriver::Create.r4.+0", "PcmCodec::Create.r4.+0", "Reverb::Create.r4.+0", "VolumeMeter::Create.r4.+0", "XAudioMatrix::Create.r4.+0", "XmaCodec::Create.r4.+0", "PacketLists::Alloc.r5.+0", "VolumeMeter::Init.r5.+0", "XAudioMatrix::Init.r5.+0", "XmaCodec::XmaCodec.r5.+0", "sub_825A50E0.r4.+0", "sub_825A5DB8.r4.+0"]
+size = 24
+origin = "image"
+fields = [
+  { name = "add_ref", offset = 0, type = "fn" },
+  { name = "release", offset = 4, type = "fn" },
+  { name = "reserve", offset = 8, type = "fn", note = "XAudioAllocator::Reserve sub_824601F8 (probably)" },
+  { name = "commit", offset = 12, type = "fn", note = "XAudioAllocator::Commit sub_82460210 (probably)" },
+  { name = "remaining", offset = 16, type = "fn", note = "XAudioAllocator::Remaining sub_82460388" },
+  { name = "allocate", offset = 20, type = "fn", note = "XAudioAllocator::Alloc sub_82460288: (the allocator, bytes), 0 when out of memory" },
+]
+
+# The allocator's +4 interface (its free and AddRef thunks' r3).
+[XAudioAllocatorInterface]
+measure = "sub_824603A8.r3"
+measures = ["sub_8246D330.r3@-4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioAllocatorInterfaceVtable" },
+  { name = "attributes", offset = 8, type = "u32", note = "the allocator's +12, the free's attributes; sub_82460370 adds one to it as a count (probably another class's interface: not read)" },
+]
+
+[XAudioAllocatorInterfaceVtable]
+measure = "sub_824603A8.r3.+0"
+size = 4
+origin = "image"
+fields = [
+  { name = "destructor", offset = 0, type = "fn", note = "called with r4 1 before the free" },
+]
+
+# Every block XAudio::Alloc hands out (a measure fault: see the top). As the
+# allocators' constructors write it, with the XMA object's and the factory
+# classes' words beside.
+[XAudioAllocBlock]
+measure = "new<?>@XAudio::Alloc"
+measures = ["new<?>@XAudio::Alloc.+8"]
+size = 76
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "an allocator's 0x8204A954; the XMA object's stream count; a factory class's first function (sub_8245D760)" },
+  { name = "interface_vtable", offset = 4, type = "u32", note = "an allocator's +4 interface; the XMA object's flags; a factory class's second function" },
+  { name = "ref_count", offset = 8, type = "u32", note = "an allocator's (1); the XMA object's 96-byte entries" },
+  { name = "attributes", offset = 12, type = "u32" },
+  { name = "capacity", offset = 16, type = "u32" },
+  { name = "used", offset = 20, type = "u32" },
+  { name = "block", offset = 24, type = "u32" },
+  { name = "xma_unknown_28", offset = 28, type = "u32", note = "XmaObject::Create's (audio.md), not read" },
+  { name = "xma_unknown_32", offset = 32, type = "u32", note = "XmaObject::Create's (audio.md), not read" },
+  { name = "xma_output_buffer", offset = 68, type = "u32", note = "an XMA entry's output buffer (audio.md)" },
+  { name = "xma_work_buffer", offset = 72, type = "u32", note = "an XMA entry's work buffer (audio.md)" },
+]
+
+# The word an allocator, object or interface is written to.
+[XAudioEngineOutWord]
+measures = ["XAudioEngine::Create.r5", "sub_82460538.r3", "sub_8245F8D0.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "object", offset = 0, type = "u32", note = "the engine (XAudioEngine::Create), the sizing allocator (sub_82460538), a buffer's interface (sub_8245F8D0)" },
+]
+
+# The size word the Size functions write.
+[XAudioSizeOut]
+# measures from XAudioVoiceSizeOut (xaudio), merged at the integration
+measures = ["XAudioFactory::SizeOf.r4", "XAudioEngine::Size.r4", "XAudioMasteringVoice::Size.r4",
+  "XAudioBuffer::Size.r4", "XAudioSourceVoice::Size.r4", "XAudioVoice::OutputsSize.r4", "XAudioVoice::BaseSize.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "size", offset = 0, type = "u32" },
+]
+
+# The 12 bytes XAudioBuffer::GetFormat writes (the buffer's +20, +24, +28).
+[XAudioBufferFormatOut]
+measures = ["XAudioBuffer::GetFormat.r4", "XAudioBuffer::GetFormatThunk.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "format_word", offset = 0, type = "u32", note = "the buffer's +20 (its byte +21 the channels in use)" },
+  { name = "sample_rate", offset = 4, type = "u32", note = "the buffer's +24 (48,000)" },
+  { name = "samples", offset = 8, type = "u32", note = "the buffer's +28 (the float samples)" },
+]
+
+# XAudioEngineInfoOut: merged into xaudio-objects.toml's FactoryInfoOut at the integration (the same object).
+
+# XAudioMasteringVoice::Process's in/out word: the mixed frame's buffer.
+[XAudioMixInOut]
+measure = "XAudioMasteringVoice::Process.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "buffer", offset = 0, type = "u32", note = "handed to the render driver's submit" },
+]
+
+# The 8 bytes XAudio::SetUpProcessors writes: the processor threads.
+[XAudioProcessors]
+measure = "XAudio::SetUpProcessors.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "masked_count", offset = 0, type = "u8", note = "the hardware threads in the mask" },
+  { name = "processor_count", offset = 1, type = "u8", note = "the processors (1 outside the title's process)" },
+  { name = "thread_kinds", offset = 2, type = "bytes", count = 6, note = "a byte a hardware thread: 0 none, 1 the main (MasterThread), 2 a worker (WorkerThread); +6 = 4 outside the title's process" },
+]
+
+# --- The factory ---
+
+# The factory (docs/known-data.md, "XAudio factory"): 24 bytes, vtable
+# 0x8204A6F4; the engine's +60 holds it + 8 (its interface).
+[XAudioFactory]
+measure = "XAudioFactory"
+measures = ["sub_8245D650.r3", "sub_8245D6D8.r3", "sub_8245D760.r3", "sub_8245D970.r3", "XAudioEngine.+0"]
+size = 24
+origin = "allocated"
+vtable = 0x8204A6F4
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A6F4 (0x8204A6B8 after the destructor); the measure fault: TableSize's r3 (the class table's pointer) read here" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "class_count", offset = 8, type = "u32", note = "the largest id + 1" },
+  { name = "classes", offset = 12, type = "ptr", to = "XAudioFactoryEntries", note = "8 bytes an id: its two functions" },
+  { name = "high_class_count", offset = 16, type = "u32", note = "the classes from id 128" },
+  { name = "high_classes", offset = 20, type = "u32", note = "8 bytes an id from 128 (sub_8245D760 grows them)" },
+]
+
+# The factory's entries (+12): 8 bytes an id, the class table entry's two
+# functions. The measure saw only entry 2's (a constant offset).
+[XAudioFactoryEntries]
+measure = "sub_8245D6D8.r3.+12"
+size = 24
+origin = "allocated"
+fields = [
+  { name = "entry2_first_function", offset = 16, type = "u32" },
+  { name = "entry2_second_function", offset = 20, type = "u32" },
+]
+
+# A class table (docs/known-data.md, "XAudio class tables"): XAudio's
+# default 0x8204A7B0, the game's (count 7, entries at 0x820713E0).
+[XAudioClassTable]
+measures = ["XAudioFactory.+0", "XAudioFactory::XAudioFactory.r4.+0", "sub_8245D760.r4", "sub_8245D970.r4"]
+size = 8
+origin = "image"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "entries", offset = 4, type = "ptr", to = "XAudioClassTableEntry", note = "12 bytes each" },
+]
+
+# A class table's entry.
+[XAudioClassTableEntry]
+measures = ["XAudioFactory.+0.+4", "XAudioFactory::XAudioFactory.r4.+0.+4", "sub_8245D760.r4.+4"]
+size = 12
+origin = "image"
+fields = [
+  { name = "id", offset = 0, type = "u8", note = "sub_8245D760 writes the id it gives (128 + its slot)" },
+  { name = "first_function", offset = 4, type = "u32", note = "the factory entry's +0, which its create slot (sub_8245D650) hands out; xaudio-objects.md calls class 0's the size" },
+  { name = "second_function", offset = 8, type = "u32", note = "the factory entry's +4 (its size slot sub_8245D6D8's)" },
+]
+
+# A pointer to a class table (the factory's constructor's r4).
+[XAudioClassTableRef]
+measure = "XAudioFactory::XAudioFactory.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "table", offset = 0, type = "ptr", to = "XAudioClassTable" },
+]
+
+# The descriptor's class id byte as the factory's slots read it.
+[XAudioFactoryDescriptorId]
+measures = ["sub_8245D650.r4", "sub_8245D6D8.r4"]
+size = 1
+origin = "embedded"
+fields = [
+  { name = "class_id", offset = 0, type = "u8", note = "below 128 in +8/+12, from 128 in +16/+20" },
+]
+
+# --- The stages ---
+
+# A stage (docs/known-data.md, "XAudio stage"): 44 bytes, the source voices'
+# at the engine's +80, the submix stages at the engine's +124 (a count word,
+# then 44 bytes a stage).
+[XAudioStage]
+measures = ["XAudioStage", "XAudioEngine::RunStage.r4", "XAudioEngine::StageOf.ret"]
+size = 44
+origin = "embedded"
+fields = [
+  { name = "voices_next", offset = 0, type = "u32", note = "the stage's voices: a list head" },
+  { name = "voices_prev", offset = 4, type = "u32" },
+  { name = "voices_node_offset", offset = 8, type = "u32", note = "16" },
+  { name = "list_a_next", offset = 12, type = "u32", note = "one of the two lists to mix and mixed" },
+  { name = "list_a_prev", offset = 16, type = "u32" },
+  { name = "list_a_node_offset", offset = 20, type = "u32", note = "24" },
+  { name = "list_b_next", offset = 24, type = "u32", note = "the other" },
+  { name = "list_b_prev", offset = 28, type = "u32" },
+  { name = "list_b_node_offset", offset = 32, type = "u32", note = "24" },
+  { name = "to_mix", offset = 36, type = "ptr", to = "XAudioList", note = "the list to mix (+12 or +24), swapped with +40 each mix" },
+  { name = "mixed", offset = 40, type = "ptr", to = "XAudioList", note = "the list mixed" },
+]
+
+# A list head (next, prev, the node's offset in its object) or a node in it
+# (next, prev).
+[XAudioList]
+measure = "XAudioEngine::RunStage.r4.+36"
+measures = ["XAudioEngine::RunStage.r4.+40", "XAudioEngine::StageOf.ret.+40", "PacketList::Next.ret", "sub_8245FE88.r3@+24"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "next", offset = 0, type = "u32" },
+  { name = "prev", offset = 4, type = "u32" },
+  { name = "node_offset", offset = 8, type = "u32", note = "a list head's only: the node's offset in its object" },
+]
+
+# What the engine's teardown (sub_8245B940) reads from a node's next.
+[XAudioTeardownNodeData]
+measure = "PacketList::Next.ret.+0"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# A voice as XAudioEngine::StageOf meets it (the voice's base, xaudio.md).
+[XAudioMixVoice]
+measure = "XAudioEngine::StageOf.r4"
+size = 77
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioMixVoiceVtable" },
+  { name = "submix_stage", offset = 76, type = "u8", note = "a submix voice's stage (its index in the engine's +124)" },
+]
+
+[XAudioMixVoiceVtable]
+measure = "XAudioEngine::StageOf.r4.+0"
+size = 56
+origin = "image"
+fields = [
+  { name = "get_format", offset = 52, type = "fn", note = "the voice's format (byte +0 the type: 0 source, 1 submix)" },
+]
+
+# --- The mastering voice ---
+
+# The mastering voice (docs/known-data.md, "XAudio mastering voice"): 72
+# bytes, vtable 0x8204A8E8, the engine's +64; the voice's base (type 2,
+# xaudio.md's "XAudio voice") then the render driver.
+[XAudioMasteringVoice]
+measures = ["XAudioMasteringVoice", "XAudioEngine.+64", "sub_8245FE88.r3"]
+size = 72
+origin = "allocated"
+vtable = 0x8204A8E8
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioMasteringVoiceVtable", note = "0x8204A8E8" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "allocator", offset = 8, type = "ptr", to = "XAudioBumpAllocator" },
+  { name = "active_next", offset = 24, type = "ptr", to = "XAudioList", note = "the active list's node (sub_8245FE88 unlinks it)" },
+  { name = "active_prev", offset = 28, type = "ptr", to = "XAudioList" },
+  { name = "output_buffer", offset = 32, type = "u32", note = "an XAudioBuffer's interface (its +8)" },
+  { name = "flags", offset = 61, type = "u8", note = "bit 0 playing" },
+  { name = "driver", offset = 68, type = "ptr", to = "XAudioMasteringDriver", note = "the render driver object (20 bytes)" },
+]
+
+# The mastering voice's vtable (0x8204A8E8).
+[XAudioMasteringVoiceVtable]
+measures = ["XAudioMasteringVoice.+0", "XAudioEngine.+64.+0"]
+size = 72
+origin = "image"
+fields = [
+  { name = "delete_object", offset = 12, type = "fn", note = "the delete (the teardown's)" },
+  { name = "start", offset = 56, type = "fn", note = "XAudioMasteringVoice::Start sub_8245FE20" },
+  { name = "pass", offset = 68, type = "fn", note = "the mix's pass" },
+]
+
+# The render driver as the mastering voice holds it (audio.toml's
+# AudioRenderDriver: vtables 0x8204AAEC and 0x8204AAD0).
+[XAudioMasteringDriver]
+measures = ["XAudioMasteringVoice.+68", "XAudioEngine.+64.+68"]
+size = 20
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioMasteringDriverVtable", note = "0x8204AAEC" },
+  { name = "inner_vtable", offset = 4, type = "ptr", to = "XAudioMasteringDriverInnerVtable", note = "0x8204AAD0" },
+  { name = "handle", offset = 16, type = "u32", note = "the render driver client's handle (audio.md)" },
+]
+
+[XAudioMasteringDriverVtable]
+measures = ["XAudioMasteringVoice.+68.+0", "XAudioEngine.+64.+68.+0"]
+size = 32
+origin = "image"
+fields = [
+  { name = "submit", offset = 24, type = "fn", note = "(the driver, the frame's buffer, 0): the frame to our audio output" },
+  { name = "register_callback", offset = 28, type = "fn", note = "AudioRenderDriver::Register sub_824657E0: the mixer's callback to our audio output" },
+]
+
+[XAudioMasteringDriverInnerVtable]
+measure = "XAudioMasteringVoice.+68.+4"
+size = 4
+origin = "image"
+fields = [
+  { name = "delete_object", offset = 0, type = "fn", note = "called with r4 1 by the voice's destructor" },
+]
+
+# The render driver's description (AudioRenderDriver::AudioRenderDriver's r4).
+[XAudioDriverDescription]
+measure = "AudioRenderDriver::AudioRenderDriver.r4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "type", offset = 0, type = "u8", note = "2" },
+  { name = "voice", offset = 4, type = "u32", note = "the mastering voice: the driver's +12" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0" },
+]
+
+# --- The destructors' objects ---
+
+# The engine as its base destructor (sub_8245B170) meets it (xaudio.md's
+# XAudioEngine).
+[XAudioEngineBase]
+measure = "sub_8245B170.r3"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A6CC, then the root's 0x8204A6B8" },
+  { name = "allocator", offset = 8, type = "ptr", to = "XAudioBumpAllocator", note = "released (slot +4), then 0" },
+]
+
+# An object the root destructors (sub_8245B118, sub_8245EF28) end.
+[XAudioRootObject]
+measures = ["sub_8245B118.r3", "sub_8245EF28.r3"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A6B8 (sub_8245B118) or 0x8204A868's (sub_8245EF28) written" },
+]
+
+# The object XAudioObject::Delete (sub_8245AAB8) deletes.
+[XAudioDeletable]
+measure = "sub_8245AAB8.r3"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioDeletableVtable" },
+]
+
+[XAudioDeletableVtable]
+measure = "sub_8245AAB8.r3.+0"
+size = 4
+origin = "image"
+fields = [
+  { name = "delete_object", offset = 0, type = "fn", note = "the deleting destructor (r4 1), tail-called" },
+]
+
+# The codecs' destructor thunks (sub_82465398, sub_82465590): r3 a
+# subobject 192 or 52 bytes into the object, whose +0 is a virtual base
+# table pointer (probably, the compiler's layout: its +4 the virtual base's
+# offset). Not read further.
+[XAudioCodecInner192]
+measure = "sub_82465398.r3"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "outer_vbtable", offset = -192, type = "ptr", to = "XAudioCodecVbtable", note = "the object's +0 (probably its virtual base table)" },
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+[XAudioCodecInner52]
+measure = "sub_82465590.r3"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "outer_vbtable", offset = -52, type = "ptr", to = "XAudioCodecVbtable", note = "the object's +0 (probably its virtual base table)" },
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+[XAudioCodecVbtable]
+measures = ["sub_82465398.r3.+-192", "sub_82465590.r3.+-52"]
+size = 8
+origin = "image"
+fields = [
+  { name = "vbase_offset", offset = 4, type = "u32", note = "probably the virtual base's offset" },
+]
+
+[globals]
+stats = { address = 0x82954F24, type = "bytes", count = 28, note = "XAudio's 7 statistics counters (XAudio::AddStat)" }
+stats_copy = { address = 0x82954F40, type = "bytes", count = 28, note = "the counters' copies, last frame's (XAudioEngine::TakeStats)" }
+debug_monitor = { address = 0x820007F0, type = "u32", note = "the debug monitor's data (a pointer to a pointer; its slot +24 registers XAudio's statistics)" }
+thread_type = { address = 0x820007FC, type = "u32", note = "probably PsThreadObjectType" }
+terminate_registration = { address = 0x82954EB4, type = "bytes", count = 16, note = "the title terminate notification (routine 0x8245B0D0, priority 0x7D800000)" }
+terminating = { address = 0x82954EC4, type = "bytes", count = 16, note = "a notification event (title terminating)" }
+worker_semaphore = { address = 0x82954ED4, type = "bytes", count = 20, note = "a kernel semaphore (count 0, limit 6): the workers' wake-up" }
+mix_done = { address = 0x82954EE8, type = "bytes", count = 16, note = "a synchronization event (the master thread's mix done)" }
+mix_now = { address = 0x82954EF8, type = "bytes", count = 16, note = "a synchronization event (the master thread's mix now)" }
+mixer_lock = { address = 0x8264D4F8, type = "bytes", count = 28, note = "the mixer's kernel critical section (at the lock object 0x8264D4F4's +4)" }
+free_heap = { address = 0x82954F20, type = "bytes", count = 4, note = "XAudio::Free's r3 (its address, unused)" }

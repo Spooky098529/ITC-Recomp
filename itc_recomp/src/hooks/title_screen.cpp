@@ -7,9 +7,18 @@
 // state (+4) to 5, which loads an attract-mode race. See
 // docs/title-screen.md.
 
+#include <format>
 #include "title_screen.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "hooks/boot_mode.h"
+#include "hooks/frame_driver.h"
+#include "hooks/title_screen_native.h"
 
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/title_screen.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -29,8 +38,8 @@ ITC_FLAG_INT32(attract_after_s, 0, "ITC",
 
 namespace {
 
-constexpr uint32_t kTitleScreenPointer = 0x82814E34;
-constexpr uint32_t kIdleTicksOffset = 36;
+using G = schema::TitleScreenGlobals;
+constexpr uint32_t kTitleScreenPointer = G::data_address();
 constexpr int32_t kAttractTicks = 600;
 constexpr int32_t kTicksPerSecond = 30;
 
@@ -39,6 +48,12 @@ bool g_in_movie_wait = false;
 // Set by the render thread once it has started the boot movie (see
 // sub_820AE958).
 std::atomic<bool> g_movie_started{false};
+
+// --skip_intro: the movie step's Movies::State answers 1 (finished) once the
+// render thread has started the movie.
+bool MovieFinishedEarly() {
+  return g_in_movie_wait && g_movie_started;
+}
 
 }  // namespace
 
@@ -53,36 +68,43 @@ bool TitleScreen_SkipTickWait(bool in_race) {
 
 }  // namespace hooks
 
-// TitleScreen_Update.
-extern "C" REX_FUNC(sub_822221A0) {
-  REX_FUNC_PROLOGUE();
+// TitleScreen_Update: its plain C++ (src/title_screen/press_start.cpp) with
+// --native_title_screen, the original without; the idle wait shortened
+// around either.
+ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
+  
   int32_t after = ITC_FLAG(attract_after_s) * kTicksPerSecond;
-  uint32_t title = guest::LoadU32(base, kTitleScreenPointer);
-  int32_t before = title ? int32_t(guest::LoadU32(base, title + kIdleTicksOffset)) : 0;
-  __imp__sub_822221A0(ctx, base);
-  if (after <= 0 || !title || guest::LoadU32(base, kTitleScreenPointer) != title) {
+  const schema::TitleScreenData title = G::data();
+  int32_t before = title ? int32_t(title.idle_ticks()) : 0;
+  if (hooks::TitleScreenNative()) {
+    hooks::TitleScreenPressStart(ctx);  // src/title_screen/press_start.cpp
+  } else {
+    lifted::original::c822221A0(ctx);
+  }
+  if (after <= 0 || !title || G::data().address != title.address) {
     return;
   }
   // Only after a tick that counted (the counter went up by one): the next
   // one reaches the game's limit.
-  int32_t now = int32_t(guest::LoadU32(base, title + kIdleTicksOffset));
+  int32_t now = int32_t(title.idle_ticks());
   if (now == before + 1 && now >= after && now < kAttractTicks - 1) {
-    guest::StoreU32(base, title + kIdleTicksOffset, uint32_t(kAttractTicks - 1));
+    title.set_idle_ticks(uint32_t(kAttractTicks - 1));
   }
 }
 
-// Scene::Update: r3 = scene. Hooked for --log_boot_modes: logs the front
+// Scene::Update: r3 = scene (its plain C++ with --native_frame_driver,
+// src/frame_driver/). Hooked for --log_boot_modes: logs the front
 // end's state objects at [0x82814E2C] and [0x82814E34] as they change.
-extern "C" REX_FUNC(sub_820988C8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
+  
   if (ITC_FLAG(log_boot_modes)) {
     static std::string last;
     std::string now;
-    for (uint32_t pointer : {0x82814E2Cu, 0x82814E30u, kTitleScreenPointer}) {
-      uint32_t object = guest::LoadU32(base, pointer);
-      now += fmt::format(" [{:08X}]={:08X}:", pointer, object);
+    for (uint32_t pointer : {G::pages_address(), G::list_address(), kTitleScreenPointer}) {
+      uint32_t object = guest::LoadU32(pointer);
+      now += std::format(" [{:08X}]={:08X}:", pointer, object);
       for (uint32_t i = 0; object && i < 24; i += 4) {
-        now += fmt::format(" {}", int32_t(guest::LoadU32(base, object + i)));
+        now += std::format(" {}", int32_t(guest::LoadU32(object + i)));
       }
     }
     if (now != last) {
@@ -90,33 +112,48 @@ extern "C" REX_FUNC(sub_820988C8) {
       last = now;
     }
   }
-  __imp__sub_820988C8(ctx, base);
+  if (hooks::NativeFrameDriver()) {
+    hooks::AppSceneUpdate(ctx);  // src/frame_driver/
+  } else {
+    lifted::original::c820988C8(ctx);
+  }
 }
 
-// The boot's movie step, run every tick while a movie plays (the Ubisoft
-// logo): ends the step when the movie is skippable (0x826C5BC4) and a button
+// Boot::WaitForMovie, the boot's movie step, run every tick while a movie
+// plays (the Ubisoft logo; its plain C++ with --native_boot_mode,
+// src/boot_mode/): ends the step when the movie is skippable (0x826C5BC4) and a button
 // is pressed, or when the movie has finished (sub_820A4450 returns 1) and
 // this+9608 is 1. With --skip_intro the movie reports finished as soon as
 // the render thread has started it.
-extern "C" REX_FUNC(sub_82107C58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82107C58) {
+  
   if (ITC_FLAG(log_boot_modes)) {
     ITC_LOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
-                 guest::LoadU32(base, ctx.r3.u32 + 9608));
+                 schema::BootMachine(ctx.r3.u32).movie_started());
   }
   g_in_movie_wait = ITC_FLAG(skip_intro);
-  __imp__sub_82107C58(ctx, base);
+  if (hooks::BootModeNative()) {
+    hooks::BootWaitForMovie(ctx, MovieFinishedEarly);
+  } else {
+    lifted::original::c82107C58(ctx);
+  }
   g_in_movie_wait = false;
 }
 
-// Whether the playing movie has finished (1 = finished).
-extern "C" REX_FUNC(sub_820A4450) {
-  REX_FUNC_PROLOGUE();
-  if (g_in_movie_wait && g_movie_started) {
+// Whether the playing movie has finished (1 = finished). With
+// --native_boot_mode, Boot::WaitForMovie's plain C++ asks the same through
+// MovieFinishedEarly; this wrap is reached by the recompiled callers only.
+ITC_NATIVE_ENTRY_ALWAYS(820A4450) {
+  
+  if (hooks::BootModeNative()) {
+    hooks::BootMoviesState(ctx, MovieFinishedEarly);
+    return;
+  }
+  if (MovieFinishedEarly()) {
     ctx.r3.u64 = 1;
     return;
   }
-  __imp__sub_820A4450(ctx, base);
+  lifted::original::c820A4450(ctx);
 }
 
 namespace hooks {

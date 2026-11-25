@@ -1,0 +1,116 @@
+// The archive loader's four semaphores: see semaphores.h.
+
+#include "archive/semaphores.h"
+
+#include "base/log.h"
+#include "guest.h"
+#include "schema/video_output.h"
+
+namespace archive {
+
+HostSemaphore::HostSemaphore(uint32_t semaphore, int32_t count)
+    : count_(count), semaphore_(semaphore) {}
+
+void HostSemaphore::Mirror() {
+  if (semaphore_ != 0) {
+    schema::Semaphore(semaphore_).set_count(count_.load(std::memory_order_relaxed));
+  }
+}
+
+void HostSemaphore::Wait() {
+  ITC_NATIVE_RUNNING("sub_82592670 Semaphore::Wait (the archive's four, host)");
+  std::unique_lock<std::mutex> lock(mutex_);
+  used_.store(true, std::memory_order_release);
+  if (count_.load(std::memory_order_relaxed) <= 0) {
+    waiters_.fetch_add(1, std::memory_order_acq_rel);
+    wake_.wait(lock, [&] { return count_.load(std::memory_order_relaxed) > 0; });
+    waiters_.fetch_sub(1, std::memory_order_acq_rel);
+  }
+  count_.fetch_sub(1, std::memory_order_acq_rel);
+  Mirror();
+}
+
+void HostSemaphore::Signal() {
+  ITC_NATIVE_RUNNING("sub_825926E8 Semaphore::Signal (the archive's four, host)");
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    used_.store(true, std::memory_order_release);
+    count_.fetch_add(1, std::memory_order_acq_rel);
+    Mirror();
+  }
+  wake_.notify_one();
+}
+
+void HostSemaphore::SetCount(int32_t count) {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    count_.store(count, std::memory_order_release);
+    Mirror();
+  }
+  wake_.notify_all();
+}
+
+HostSemaphore* Semaphores::At(uint32_t address) {
+  switch (address) {
+    case kQueueLock:
+      return &queue_lock;
+    case kWork:
+      return &work;
+    case kRequestDone:
+      return &request_done;
+    case kIdle:
+      return &idle;
+    default:
+      return nullptr;
+  }
+}
+
+void Semaphores::MirrorAll() {
+  for (HostSemaphore* s : {&queue_lock, &work, &request_done, &idle}) {
+    s->Mirror();
+  }
+}
+
+bool Semaphores::Used() const {
+  return queue_lock.Used() || work.Used() || request_done.Used() || idle.Used();
+}
+
+namespace {
+constexpr uint32_t kAll[4] = {kQueueLock, kWork, kRequestDone, kIdle};
+thread_local Semaphores* g_test = nullptr;
+}  // namespace
+
+Semaphores& LiveSemaphores() {
+  static Semaphores live;
+  return live;
+}
+
+Semaphores* TestSemaphores() {
+  return g_test;
+}
+
+Semaphores& CurrentSemaphores() {
+  return g_test ? *g_test : LiveSemaphores();
+}
+
+ScopedTestSemaphores::ScopedTestSemaphores() : previous_(g_test) {
+  for (int i = 0; i < 4; i++) {
+    saved_[i] = uint32_t(schema::Semaphore(kAll[i]).count());
+  }
+  set_.MirrorAll();
+  g_test = &set_;
+}
+
+ScopedTestSemaphores::~ScopedTestSemaphores() {
+  g_test = previous_;
+  Semaphores& outer = previous_ ? *previous_ : LiveSemaphores();
+  if (outer.Used()) {
+    outer.MirrorAll();
+  } else {
+    for (int i = 0; i < 4; i++) {
+      schema::Semaphore(kAll[i]).set_count(int32_t(saved_[i]));
+    }
+  }
+}
+
+}  // namespace archive

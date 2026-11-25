@@ -1,0 +1,902 @@
+// The type 6 and type 7 modes' screen constructors as plain C++
+// (screen_constructors.h, docs/functions/screen-constructors.md), read from
+// the generated code.
+
+#include "screen_constructors/screen_constructors.h"
+
+#include "base/log.h"
+#include "boot_mode/boot_mode.h"
+#include "guest.h"
+#include "schema/car_list.h"
+#include "schema/screen_constructors.h"
+#include "schema/type67_screens.h"
+#include "schema/type6_type7_modes.h"
+
+#include <cstring>
+
+namespace screen_constructors {
+
+namespace {
+
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
+}
+// `value` in the words from `from` to `to` (both included).
+void Fill(uint32_t from, uint32_t to, uint32_t value) {
+  for (uint32_t a = from; a <= to; a += 4) {
+    Store(a, value);
+  }
+}
+
+constexpr uint32_t kNone = 0xFFFFFFFF;  // -1
+
+// The panels are host or guest objects (E5 step 4, dual views). A word of a
+// `bytes` field, kept in guest order in either shape (the view's pointer).
+void SetBytesWord(uint8_t* at, uint32_t value) {
+  at[0] = uint8_t(value >> 24);
+  at[1] = uint8_t(value >> 16);
+  at[2] = uint8_t(value >> 8);
+  at[3] = uint8_t(value);
+}
+// `value` (0 or -1: the same bytes in either order) in the panel's words
+// from +`from` to +`to` (both included).
+template <typename Panel>
+void FillPanel(const Panel& panel, uint32_t from, uint32_t to, uint32_t value) {
+  if (panel.on_host()) {
+    std::memset(reinterpret_cast<uint8_t*>(panel.data()) + from, int(value & 0xFF), to + 4 - from);
+  } else {
+    Fill(panel.address + from, panel.address + to, value);
+  }
+}
+// The panels' vtable (PanelGroupBase's too).
+constexpr uint32_t kPanelVtable = 0x82010974;
+
+// Panel6C's and Panel7C's words.
+void PanelC(uint32_t panel, uint32_t group, uint32_t vtable, uint32_t w20,
+            uint32_t w24, uint32_t w32) {
+  PanelCBase(panel);
+  const schema::CarPanel p(panel);
+  p.set_group(group);
+  p.set_node(w20);
+  p.set_vtable(vtable);
+  p.set_shows_price(0);
+  p.set_stats_node(w24);
+  p.set_buttons_node(w32);
+  p.set_show_anim_a(109);
+  p.set_show_anim_b(kNone);
+  p.set_hide_anim_a(kNone);
+  p.set_hide_anim_b(kNone);
+  p.set_show_again_anim(kNone);
+  p.set_arrow_a(112);
+  SetBytesWord(p.action_anims() + 0, 5);
+  SetBytesWord(p.action_anims() + 4, 6);
+  p.set_scroll_back(15);
+  p.set_scroll_on(16);
+  p.set_loop_a(0);
+  p.set_loop_b(43);
+  p.set_text_maker(13);
+  p.set_text_name(14);
+  p.set_text_third(15);
+  p.set_texts(5);
+  p.set_cursor(0);
+  for (uint32_t i = 0; i < 4; i++) {
+    SetBytesWord(p.stats_children() + 4 * i, 5 + i);  // +160 to +172: 5 to 8
+  }
+  SetBytesWord(p.stats_children() + 16, 11);  // +176
+  SetBytesWord(p.stats_children() + 20, 12);  // +180
+  SetBytesWord(p.stats_children() + 56, 9);   // +216
+  SetBytesWord(p.stats_children() + 60, 10);  // +220
+  SetBytesWord(p.stats_children() + 64, 13);  // +224
+  SetBytesWord(p.stats_children() + 68, 14);  // +228
+  p.set_buttons(4);
+  p.set_text_a(123);
+  p.set_text_b(112);
+}
+
+// Panel6D's and Panel7D's words (+28 to +40: `w28` up).
+void PanelD(uint32_t panel, uint32_t group, uint32_t w12, uint32_t w24,
+            uint32_t w28, uint32_t w60) {
+  PanelDBase(panel);
+  const schema::ColorPanel p(panel);
+  p.set_vtable(kPanelVtable);
+  p.set_group(group);
+  p.set_node(w12);
+  p.set_show_anim(110);
+  p.set_hide_anim(111);
+  p.set_item_anims(w24);
+  // +28 to +40: scroll_back, scroll_on, swatches_on, swatches_back
+  p.set_scroll_back(w28 + 0);
+  p.set_scroll_on(w28 + 1);
+  p.set_swatches_on(w28 + 2);
+  p.set_swatches_back(w28 + 3);
+  p.set_arrows_node(w60);
+  p.set_cursor(0);
+  p.set_swatches(1);
+  p.set_swatch_color(2);
+}
+
+// Panel6F's and Panel7F's words (the same in both).
+void PanelF(uint32_t panel, uint32_t group) {
+  PanelFBase(panel);
+  const schema::TabPanel p(panel);
+  p.set_vtable(kPanelVtable);
+  p.set_group(group);
+  p.set_texts_node(3);
+  p.set_tabs_node(6);
+  p.set_buttons_node(0);
+  p.set_cursor(0);
+  p.set_tab0_text(5);
+  p.set_tab1_text(6);
+  p.set_tab2_text(7);
+  p.set_buttons(4);
+  p.set_tab_word_a(1);
+  p.set_tab_word_b(0);
+  p.set_tab_anims(5);
+  p.set_scroll_down(15);
+  p.set_scroll_up(16);
+  p.set_unknown_108(29);
+  p.set_unknown_112(30);
+  p.set_show_anim(79);
+  p.set_move_anim(73);
+  p.set_loop_a(2);
+  p.set_loop_c(75);
+  p.set_loop_d(83);
+}
+
+// The three PanelGroups' words.
+void PanelGroupWords(uint32_t group, uint32_t w4, uint32_t w12) {
+  PanelGroupBase(group);
+  const schema::PanelGroup g(group);
+  g.set_movie(w4);
+  g.set_vtable(0x82010E8C);
+  g.set_caption_node_set(w12);
+  g.set_unknown_32(0);
+}
+
+// The node tables' four pairs (0, -1) at +428 to +456.
+void NodeTablePairs(uint32_t table) {
+  const schema::PairedNodeTable t(table);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(t.pairs_address() + 8 * i, 0);
+    Store(t.pairs_address() + 4 + 8 * i, kNone);
+  }
+}
+
+// slw: 1 shifted left by `amount`'s low six bits (0 from 32 up).
+uint32_t Bit(uint32_t amount) {
+  return (amount & 0x20) != 0 ? 0 : 1u << (amount & 0x1F);
+}
+
+// The panel screens: `group_b`, `panel_c`, `panel_d` and `panel_f` the
+// screen type's constructors, `last_zero` the last word cleared (+11676 or
+// +11680).
+struct PanelScreenType {
+  uint32_t vtable;
+  void (*group_b)(uint32_t);
+  void (*panel_c)(uint32_t, uint32_t);
+  void (*panel_d)(uint32_t, uint32_t);
+  void (*panel_f)(uint32_t, uint32_t);
+  uint32_t last_zero;
+};
+
+void PanelScreen(uint32_t screen, uint32_t sp, const New& new_panel,
+                 const PanelScreenType& type) {
+  const uint32_t frame = sp - kPanelScreenFrame;
+  const schema::Type67PanelScreen s(screen);
+  MachineScreen(screen);
+  s.set_vtable(type.vtable);
+  const uint32_t group_a = s.group_a_address();
+  PanelGroup(group_a);
+  const uint32_t group_b = s.group_b_address();
+  type.group_b(group_b);
+  // Each panel built unless operator new gave 0 (the original's check).
+  // The panels live in host memory (E5 step 4): their handles in place of
+  // operator new's blocks (`new_panel` no longer called).
+  (void)new_panel;
+  auto make = [&](uint32_t panel, void (*construct)(uint32_t, uint32_t),
+                  uint32_t group) {
+    if (panel != 0) {
+      construct(panel, group);
+    }
+    return panel;
+  };
+  const uint32_t c = make(schema::CarPanel::New().address, type.panel_c, group_b);
+  const uint32_t d = make(schema::ColorPanel::New().address, type.panel_d, group_b);
+  const uint32_t e = make(schema::RowPanel::New().address, PanelE, group_a);
+  const uint32_t f = make(schema::TabPanel::New().address, type.panel_f, group_a);
+  const uint32_t set = s.set_address();
+  PanelSet(set, f, e, d, c, group_b, frame);
+  const uint32_t pair = s.pair_address();
+  GroupPair(pair, group_a, group_b);
+  s.set_car_list(set);
+  s.set_group_pair(pair);
+  s.set_set_group_pair(pair);
+  // +11672 (the set's +1920) to +11676 or +11680.
+  Fill(s.set_unknown_1920_address(), screen + type.last_zero, 0);
+  s.set_set_unknown_1964(45);
+  s.set_set_unknown_1968(44);
+  s.set_set_unknown_1972(46);
+}
+
+// The empty base many classes share (as ListNode's in archive.md).
+constexpr uint32_t kEmptyBaseVtable = 0x82010B5C;
+
+}  // namespace
+
+// --- The panels and their groups ---
+
+void NodeBase(uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82258FB0 NodeBase::NodeBase");
+  const schema::NodeBase node(object);
+  node.set_unknown_4(0);
+  node.set_vtable(kEmptyBaseVtable);
+}
+
+void PanelGroupBase(uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_8224EEA8 PanelGroupBase::PanelGroupBase");
+  NodeBase(group);
+  const schema::PanelGroupBase g(group);
+  g.set_vtable(0x82010974);
+  Fill(g.unknown_8_address(), g.caption_node_address(), kNone);  // +8 to +32
+}
+
+void PanelCBase(uint32_t panel) {
+  ITC_NATIVE_RUNNING("sub_8224D6D0 PanelCBase::PanelCBase");
+  const schema::CarPanel p(panel);
+  p.set_vtable(0x820111C0);
+  p.set_shows_price(1);
+  p.set_action(kNone);
+  p.set_group(0);
+  p.set_node_set(kNone);
+  FillPanel(p, 24, 140, kNone);  // +24 (stats_node) to +140 (texts)
+  // +148 to +244 (unknown_148 to the stats children's 22nd word).
+  FillPanel(p, 148, 160 + 84, kNone);
+  FillPanel(p, 260, 272, kNone);  // +260 (price_child) to +272 (buttons)
+  FillPanel(p, 276, 316, 0);      // +276 (text_a) to +316 (two_players)
+}
+
+void PanelDBase(uint32_t panel) {
+  ITC_NATIVE_RUNNING("sub_8224CFA0 PanelDBase::PanelDBase");
+  const schema::ColorPanel p(panel);
+  p.set_group(0);
+  p.set_vtable(kEmptyBaseVtable);
+  FillPanel(p, 8, 80, kNone);  // +8 (node_set) to +80 (swatch_color)
+  p.set_two_players(0);
+}
+
+void PanelEBase(uint32_t panel) {
+  ITC_NATIVE_RUNNING("sub_8224EF78 PanelEBase::PanelEBase");
+  const schema::RowPanel p(panel);
+  p.set_group(0);
+  p.set_row_count(0);
+  FillPanel(p, 8, 148, kNone);  // +8 (row) to +148 (arrows)
+  p.set_show_alt(0);
+  p.set_two_players(0);
+}
+
+void PanelE(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82230800 PanelE::PanelE");
+  PanelEBase(panel);
+  const schema::RowPanel p(panel);
+  p.set_group(group);  // no vtable
+  p.set_row_count(4);
+  p.set_node(4);
+  for (uint32_t i = 0; i < 4; i++) {
+    SetBytesWord(p.row_nodes() + 4 * i, 5 + i);  // +20 to +32: 5 to 8
+    // +124 to +136 (text_maker, text_name, text_third, unknown_136): 5 to 8
+    switch (i) {
+      case 0: p.set_text_maker(5); break;
+      case 1: p.set_text_name(6); break;
+      case 2: p.set_text_third(7); break;
+      default: p.set_unknown_136(8); break;
+    }
+  }
+  p.set_spare_row_node(9);
+  p.set_unknown_64(5);
+  p.set_unknown_68(15);
+  p.set_unknown_72(16);
+  p.set_show_anim(80);
+  p.set_show_anim_alt(81);
+  p.set_hide_anim(82);
+  p.set_row_anims(62);
+  p.set_scroll_up(67);
+  p.set_scroll_down(68);
+  p.set_arrow_up(72);
+  p.set_loop_a(2);
+  p.set_loop_b(83);
+  p.set_logo(3);
+  p.set_unknown_140(kNone);
+  p.set_cursor(1);
+  p.set_arrows(3);
+}
+
+void PanelFBase(uint32_t panel) {
+  ITC_NATIVE_RUNNING("sub_8224FA88 PanelFBase::PanelFBase");
+  const schema::TabPanel p(panel);
+  p.set_group(0);
+  p.set_vtable(kEmptyBaseVtable);
+  FillPanel(p, 24, 136, kNone);  // +24 (node_set) to +136 (loop_d)
+  p.set_two_players(0);
+}
+
+void Panel6C(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82231CD0 Panel6C::Panel6C");
+  PanelC(panel, group, 0x82010980, 7, 0, 5);
+}
+
+void Panel7C(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_822416D8 Panel7C::Panel7C");
+  PanelC(panel, group, 0x82010EE4, 6, 4, 3);
+}
+
+void Panel6D(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82231E40 Panel6D::Panel6D");
+  PanelD(panel, group, 22, 96, 105, 21);
+}
+
+void Panel7D(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_822418B8 Panel7D::Panel7D");
+  PanelD(panel, group, 20, 94, 103, 19);
+}
+
+void Panel6F(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_822308E8 Panel6F::Panel6F");
+  PanelF(panel, group);
+}
+
+void Panel7F(uint32_t panel, uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82240268 Panel7F::Panel7F");
+  PanelF(panel, group);
+}
+
+void PanelGroup(uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82240110 PanelGroup::PanelGroup");
+  PanelGroupWords(group, 4, 1);
+}
+
+void PanelGroup6B(uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82231C68 PanelGroup6B::PanelGroup6B");
+  PanelGroupWords(group, 28, 4);
+}
+
+void PanelGroup7B(uint32_t group) {
+  ITC_NATIVE_RUNNING("sub_82241680 PanelGroup7B::PanelGroup7B");
+  PanelGroupWords(group, 28, 2);
+}
+
+void PanelSetBase(uint32_t set_base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224AD28 PanelSetBase::PanelSetBase");
+  const schema::PanelSetBase s(set_base);
+  s.set_vtable(0x820110C4);
+  // The original clears eleven words below its r1 (it has no frame) and
+  // reads ten of them back into its fields: all 0, written as 0 (the words
+  // are read by nothing else: not written, E5 step 6).
+  (void)sp;
+  s.set_page_menu_items(0);
+  s.set_page_menu_player(0);
+  s.set_rows_menu_items(0);
+  s.set_rows_menu_player(0);
+  s.set_list0_count(0);
+  s.set_list1_count(0);
+  s.set_list2_count(0);
+  s.set_color_count(0);
+  s.set_unknown_224(kNone);
+  s.set_answer_record(0);
+  s.set_unknown_208(0);
+  s.set_unknown_212(0);
+  s.set_unknown_216(0);
+  s.set_unknown_220(0);
+  Fill(s.tab_shown_address(), s.color_scroll_address(), 0);  // +228 to +248
+  s.set_rows_shown(0);
+  s.set_unknown_1920(1);
+  s.set_built(0);
+  s.set_done(0);
+  s.set_open_kind(1);
+  Fill(s.power_graph_asked_address(), s.busy_playing_address(), 0);  // +16 to +28
+  schema::CarListGlobals::set_two_players(0);
+  s.set_page_drawn(kNone);
+  s.set_page_changed(1);
+  s.set_may_leave(1);
+  s.set_cancelled(0);
+  s.set_fade_with_steps(1);
+  s.set_player(kNone);
+  Fill(s.back_object_address(), s.confirm_panel_address(), 0);  // +1892 to +1912
+  s.set_group_b(0);
+  Fill(s.busy_anim_a_address(), s.busy_anim_done_address(), kNone);  // +1960 to +1968
+}
+
+void PanelSet(uint32_t set, uint32_t f, uint32_t e, uint32_t d, uint32_t c,
+              uint32_t group_b, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8224B660 PanelSet::PanelSet");
+  const schema::PanelSet s(set);
+  s.set_vtable(0x820110C8);
+  PanelSetBase(s.base_vtable_address(), sp - kPanelSetFrame);
+  // The panels get the word as it reads after each store (not checked for 0).
+  schema::CarListGlobals::set_two_players(0);
+  s.set_tabs(f);
+  schema::TabPanel(f).set_two_players(schema::CarListGlobals::two_players());
+  s.set_rows(e);
+  schema::RowPanel(e).set_two_players(schema::CarListGlobals::two_players());
+  s.set_color_panel(d);
+  schema::ColorPanel(d).set_two_players(schema::CarListGlobals::two_players());
+  s.set_car_panel(c);
+  schema::CarPanel(c).set_two_players(schema::CarListGlobals::two_players());
+  s.set_group_b(group_b);
+}
+
+void GroupPair(uint32_t pair, uint32_t group_a, uint32_t group_b) {
+  ITC_NATIVE_RUNNING("sub_82249C08 GroupPair::GroupPair");
+  const schema::GroupPair p(pair);
+  p.set_group_a(group_a);
+  p.set_group_b(group_b);
+  p.set_vtable(0x82011084);
+}
+
+// --- The screens' bases ---
+
+void MachineScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_8224CF58 MachineScreen::MachineScreen");
+  const schema::MachineScreen s(screen);
+  boot_mode::ScreenMachineConstruct(s.machine_address());
+  s.set_opens_itself(0);
+  s.set_vtable(0x82011168);
+}
+
+void Type6Screen0(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82235BD8 Type6Screen0::Type6Screen0");
+  boot_mode::ScreenMachineConstruct(schema::Type6Screen0(screen).machine_address());
+}
+
+void Type7Screen0(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82245FF8 Type7Screen0::Type7Screen0");
+  const schema::Type7Screen0 s(screen);
+  boot_mode::ScreenMachineConstruct(s.machine_address());
+  s.set_vtable(kEmptyBaseVtable);
+}
+
+// --- The list screens' parts ---
+
+void NodeTable(uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_82247BE8 NodeTable::NodeTable");
+  const schema::NodeTable t(table);
+  t.set_vtable(0x82010FF0);
+  // +8 to +308 (node_set_a to the children's last word).
+  Fill(t.node_set_a_address(), t.children_address() + 12, kNone);
+  Fill(t.item_masks_address(), t.item_masks_address() + 104, 0);  // +312 to +416
+  t.set_extra_node_base(kNone);
+  t.set_text_node_base(kNone);
+}
+
+void PairedNodeTable(uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_82247C60 PairedNodeTable::PairedNodeTable");
+  NodeTable(table);
+  schema::PairedNodeTable(table).set_vtable(0x82010FF8);
+  NodeTablePairs(table);
+}
+
+void ColorNodeTable(uint32_t table) {
+  ITC_NATIVE_RUNNING("sub_82247D08 ColorNodeTable::ColorNodeTable");
+  NodeTable(table);
+  const schema::ColorNodeTable t(table);
+  t.set_vtable(0x82011000);
+  NodeTablePairs(table);  // +460 to +472 (the marks) not written
+  // +476 to +548 (color_child, the two grids).
+  Fill(t.color_child_address(), t.grid_b_address() + 32, kNone);
+  Fill(t.color_a_address(), t.color_a_address() + 12, 255);  // +552 to +564
+  Store(t.color_b_address() + 0, 205);
+  Store(t.color_b_address() + 4, 235);
+  Store(t.color_b_address() + 8, 67);
+  Store(t.color_b_address() + 12, 255);
+}
+
+void ListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82252290 ListScreen::ListScreen");
+  const schema::ListScreen s(screen);
+  boot_mode::ScreenMachineConstruct(s.machine_address());
+  s.set_vtable(0x82011218);
+  s.set_list_part(0);
+  s.set_movie(1);
+  s.set_unknown_9684(1);
+  s.set_part_nodes(0);
+  Fill(s.title_child_address(), s.selection_child_address(), kNone);  // +9712 to +9768
+  s.set_previous_children(0);
+  s.set_selection_children(0);  // +9780 not written
+  s.set_children_count(0);
+  s.set_shown_child_on(1);
+  // +9792 to +9932, then five runs of ten words from +9936 (to +10132).
+  Fill(s.unknown_9792_address(), s.item_anims_c_address() + 36, kNone);
+  s.set_scroll_text_shown(0);
+  s.set_scroll_text(kNone);
+}
+
+void ListPartBase(uint32_t part) {
+  ITC_NATIVE_RUNNING("sub_822523F8 ListPartBase::ListPartBase");
+  const schema::ListPart p(part);
+  p.set_vtable(0x820112A0);
+  Fill(p.yes_address(), p.inner_address(), 0);  // +4 to +16
+}
+
+void ListPartInnerBase(uint32_t inner) {
+  ITC_NATIVE_RUNNING("sub_822525E0 ListPartInnerBase::ListPartInnerBase");
+  const schema::ListPartInner p(inner);
+  p.set_vtable(0x820112CC);
+  p.set_yes(0);
+  p.set_back(0);
+}
+
+void ListPartInner(uint32_t inner) {
+  ITC_NATIVE_RUNNING("sub_822526A0 ListPartInner::ListPartInner");
+  ListPartInnerBase(inner);
+  const schema::ListPartInner p(inner);
+  p.set_vtable(0x820112F8);
+  p.set_menu_player(0);
+  p.set_menu_enabled(0);
+  p.set_prompt_state(3);
+  p.set_leave_asked(0);
+}
+
+void ListPart(uint32_t part) {
+  ITC_NATIVE_RUNNING("sub_82252908 ListPart::ListPart");
+  ListPartBase(part);
+  const schema::ListPart p(part);
+  p.set_vtable(0x82011314);
+  ListPartInner(p.inner_storage_address());
+  p.set_movie(16);
+  p.set_inner(p.inner_storage_address());
+}
+
+void ColorListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_822550F8 ColorListScreen::ColorListScreen");
+  ListScreen(screen);
+  const schema::ColorListScreen s(screen);
+  s.set_vtable(0x820114E0);
+  s.set_course_list_player(0);
+  s.set_course_list_enabled(0);
+  s.set_color_list_player(0);
+  s.set_color_list_enabled(0);
+  s.set_toggle_player(0);
+  s.set_toggle_enabled(0);
+  s.set_kind_list_player(0);
+  s.set_kind_list_enabled(0);
+  ColorNodeTable(s.color_table_address());
+  const uint32_t count = s.movie();
+  s.set_node_table(s.color_table_address());
+  s.set_table_movie(count);
+  for (uint32_t i = 0; i < 5; i++) {
+    // +11016 to +11032 (text_items to text_colors): 545 to 549
+    Store(s.text_items_address() + 4 * i, 545 + i);
+  }
+  s.set_text_part(kNone);
+}
+
+void Type7ListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82242BE8 Type7ListScreen::Type7ListScreen");
+  ColorListScreen(screen);
+  const schema::Type7ListScreen s(screen);
+  s.set_vtable(0x82010F18);
+  ListPart(s.part_address());
+  s.set_list_part(s.part_address());
+  s.set_open_anim(165);
+  s.set_first_to_items_anim(166);
+  s.set_items_to_first_anim(168);
+  s.set_items_to_colors_anim(167);
+  s.set_colors_to_items_anim(169);
+  s.set_open_loop_a(170);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(47);
+  s.set_items_loop(171);
+  s.set_shown_loop_b(5);
+  s.set_shown_loop_d(82);
+  s.set_toggle_anim_a(6);
+  s.set_toggle_anim_b(7);
+  s.set_selection_anim(87);
+  s.set_item_up_anim(139);
+  s.set_item_down_anim(140);
+  s.set_first_back_anim(100);
+  s.set_first_forward_anim(101);
+  s.set_color_back_anim(20);
+  s.set_color_forward_anim(21);
+  s.set_text_sub_scene(6);
+  s.set_selection_sub_scene(16);
+  s.set_text_child_b(11);
+  s.set_table_word_10916(79);
+  s.set_table_word_10920(76);
+  s.set_table_word_10924(77);
+  s.set_table_word_10932(78);
+  s.set_table_word_10936(80);
+  s.set_table_word_10940(81);
+  s.set_table_word_10952(67);
+  s.set_table_word_10956(64);
+  s.set_table_word_10960(65);
+  s.set_table_word_10968(66);
+  s.set_table_word_10972(68);
+  s.set_table_word_10976(69);
+  s.set_table_node_set_a(12);  // the node table's +8 and +12, stored directly
+  s.set_table_node_set_b(11);
+  const uint32_t table = s.node_table().address;
+  s.set_text_child_a(10);
+  s.set_title_child(0);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_arrow_off_frame(1);
+  s.set_selection_child(3);
+  s.set_shown_child(0);
+  Store(schema::ColorNodeTable(table).children_address(), 6);
+  for (uint32_t i = 1; i < 4; i++) {
+    const schema::ColorNodeTable t(s.node_table().address);
+    Store(t.children_address() + 4 * i, 6 + i);  // +300 to +308: 7 to 9
+  }
+  s.set_children_count(2);
+  s.set_shown_child_on(1);
+  // 15 items, through the table at +10432 directly: +16 + 4i = 48 + i,
+  // +156 + 4i = 1 + i, +312 + 4i = the record's mask.
+  for (uint32_t i = 0; i < 15; i++) {
+    Store(s.table_item_anim_0_address() + 4 * i, 48 + i);
+    Store(s.table_item_node_0_address() + 4 * i, 1 + i);
+    const schema::Type7ListRecord record(schema::ScreenConstructorsGlobals::type7_list_records_address() +
+                  schema::Type7ListRecord::kSize * i);
+    const int32_t count = record.count();
+    uint32_t mask = 0;
+    if (count >= 2) {
+      mask = Bit(record.bit_b()) | Bit(record.bit_a());
+    } else if (count != 0) {
+      mask = Bit(record.bit_a());
+    }
+    Store(s.table_item_mask_0_address() + 4 * i, mask);
+  }
+  s.set_table_extra_node_base(5);
+  s.set_table_text_node_base(20);
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(s.item_anims_address() + 4 * i, 129 + i);
+    Store(s.first_anims_address() + 4 * i, 90 + i);
+    Store(s.color_anims_address() + 4 * i, 10 + i);
+  }
+  s.set_color_cursor_node(9);
+  s.set_color_cursor_child(0);
+  s.set_icon_sub_scene(2);
+  s.set_scroll_sub_scene(1);
+  s.set_scroll_child(0);
+  s.set_item_cursor_node(21);
+  s.set_item_anim_b_0(141);
+  s.set_selection_children(0x826371A4);
+  s.set_item_anim_b_1(142);
+  s.set_item_anim_b_2(143);
+  s.set_item_anim_c_0(155);
+  s.set_item_anim_c_2(157);
+  s.set_icon_child(4);
+  s.set_item_anim_c_1(156);
+  s.set_item_cursor_child(0);
+  s.set_unknown_9684(0);
+  s.set_scroll_down_anim(152);
+  s.set_scroll_up_anim(151);
+}
+
+void NodeListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_82256F68 NodeListScreen::NodeListScreen");
+  ListScreen(screen);
+  const schema::NodeListScreen s(screen);
+  s.set_vtable(0x82011558);
+  s.set_kind_list_player(0);
+  s.set_kind_list_enabled(0);
+  s.set_course_list_player(0);
+  s.set_course_list_enabled(0);
+  s.set_toggle_player(0);
+  s.set_toggle_enabled(0);
+  PairedNodeTable(s.paired_table_address());
+  s.set_node_table(s.paired_table_address());
+  s.set_movie(25);
+  s.set_table_movie(25);
+}
+
+void TitledListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_822570F0 TitledListScreen::TitledListScreen");
+  NodeListScreen(screen);
+  const schema::Type6ListScreen s(screen);  // TitledListScreen's layout
+  s.set_vtable(0x820115C8);
+  s.set_scroll_text_id(923);
+}
+
+void Type6ListScreen(uint32_t screen) {
+  ITC_NATIVE_RUNNING("sub_822330F0 Type6ListScreen::Type6ListScreen");
+  TitledListScreen(screen);
+  const schema::Type6ListScreen s(screen);
+  s.set_vtable(0x820109A8);
+  ListPart(s.part_address());
+  s.set_list_part(s.part_address());
+  s.set_title_child(0);
+  s.set_text_child_a(10);
+  s.set_text_child_b(11);
+  s.set_selection_sub_scene(15);
+  s.set_text_sub_scene(7);
+  s.set_icon_sub_scene(2);
+  s.set_scroll_sub_scene(1);
+  s.set_item_cursor_node(8);
+  s.set_shown_child(0);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_selection_node(19);
+  s.set_selection_child(3);
+  s.set_children_count(0);
+  s.set_shown_child_on(0);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_off_frame(1);
+  s.set_icon_child(4);
+  s.set_scroll_child(0);
+  s.set_item_cursor_child(0);
+  s.set_open_anim(104);
+  s.set_open_loop_a(105);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(98);
+  s.set_items_loop(107);
+  s.set_shown_loop_b(5);
+  s.set_shown_loop_c(106);
+  s.set_toggle_anim_a(6);
+  s.set_toggle_anim_b(7);
+  s.set_selection_anim(103);
+  s.set_item_up_anim(20);
+  s.set_item_down_anim(21);
+  s.set_scroll_down_anim(33);
+  s.set_scroll_up_anim(32);
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(s.item_anims_address() + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
+  }
+  // The node table's words, each through [+9672] read again.
+  auto table = [&] { return schema::PairedNodeTable(s.node_table().address); };
+  table().set_node_set_a(10);
+  table().set_node_set_b(9);
+  for (uint32_t i = 0; i < 4; i++) {
+    const auto t = table();
+    Store(t.children_address() + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+  }
+  for (uint32_t i = 0; i < 27; i++) {
+    const auto t = table();
+    Store(t.item_nodes_address() + 4 * i, 1 + i);  // +156 to +260: 1 to 27
+    const auto u = table();
+    Store(u.item_anims_address() + 4 * i, 46 + i);  // +16 to +120: 46 to 72
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    const auto t = table();
+    Store(t.more_anims_address() + 4 * i, 77 + i);  // +124 to +152: 77 to 84
+  }
+  table().set_extra_node_base(6);
+  table().set_text_node_base(55);
+}
+
+uint32_t NodeScreen(uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8225A3D8 NodeScreen::NodeScreen");
+  // The original's words in its frame (+80 to +100) and `screen` in its
+  // caller's (+20) are read back by it alone: host values (E5 step 6).
+  (void)sp;
+  boot_mode::ScreenMachineConstruct(schema::NodeScreen(screen).machine_address());
+  PairedNodeTable(screen);  // the screen's +0
+  schema::NodeScreen(screen).set_vtable(0x820116B8);
+  const uint32_t toggle_enabled = 0;  // +84
+  const uint32_t toggle_player = 0;   // +88
+  const uint32_t runs = schema::NodeScreen(screen).record_texts_address() + 40;  // +100
+  const schema::NodeScreen s(screen);
+  s.set_course_list_enabled(0);
+  s.set_course_list_player(0);
+  s.set_toggle_enabled(toggle_enabled);
+  s.set_toggle_player(toggle_player);
+  s.set_table_movie(15);
+  s.set_movie(15);
+  s.set_sub_scene(kNone);
+  Fill(s.open_anim_address(), s.item_down_anim_address(), kNone);  // +10284 to +10340
+  Fill(s.records_anim_address(), s.text_child_b_address(), kNone);  // +10392 to +10412
+  s.set_arrow_on_frame(kNone);
+  s.set_arrow_off_frame(kNone);
+  // Three runs of ten words through the frame's word (+10416 to +10532).
+  for (uint32_t i = 0; i < 10; i++) {
+    Store(runs - 40 + 4 * i, kNone);
+    Store(runs + 4 * i, kNone);
+    Store(runs + 40 + 4 * i, kNone);
+  }
+  Fill(s.item_anims_address(), s.item_anims_address() + 36, kNone);  // +10352 to +10388
+  return s.address;
+}
+
+void Type6NodeScreen(uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82236C30 Type6NodeScreen::Type6NodeScreen");
+  NodeScreen(screen, sp - kType6NodeScreenFrame);
+  const schema::NodeScreen s(screen);
+  s.set_vtable(0x82010A80);
+  // The node table (the screen's +0).
+  s.set_table_node_set_a(11);
+  s.set_table_node_set_b(10);
+  for (uint32_t i = 0; i < 27; i++) {
+    Store(s.table_item_anims_address() + 4 * i, 48 + i);  // +16 to +120: 48 to 74
+    Store(s.table_item_nodes_address() + 4 * i, 1 + i);   // +156 to +260: 1 to 27
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(s.table_more_anims_address() + 4 * i, 79 + i);  // +124 to +152: 79 to 86
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(s.table_children_address() + 4 * i, 6 + i);  // +296 to +308: 6 to 9
+  }
+  s.set_table_extra_node_base(6);
+  s.set_table_text_node_base(55);
+  s.set_sub_scene(8);
+  s.set_cursor_node(5);
+  s.set_open_anim(101);
+  s.set_open_loop_b(0);
+  s.set_shown_loop_a(47);
+  s.set_shown_loop_b(102);
+  s.set_shown_loop_c(43);
+  s.set_toggle_anim_a(44);
+  s.set_toggle_anim_b(45);
+  s.set_item_up_anim(16);
+  s.set_item_down_anim(17);
+  s.set_scroll_down_anim(29);
+  s.set_scroll_up_anim(28);
+  s.set_records_anim(103);
+  s.set_arrow_child_a(8);
+  s.set_arrow_child_b(9);
+  s.set_title_child(0);
+  s.set_text_child_a(10);
+  s.set_text_child_b(11);
+  s.set_arrow_on_frame(0);
+  s.set_arrow_off_frame(1);
+  s.set_course_node(15);
+  s.set_cursor_child(0);
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(s.item_anims_address() + 4 * i, 6 + i);  // +10352 to +10372: 6 to 11
+  }
+  for (uint32_t i = 0; i < 10; i++) {
+    Store(s.record_texts_address() + 4 * i, 30 + 5 * i);       // 30, 35, ... 75
+    Store(s.record_texts_address() + 40 + 4 * i, 31 + 5 * i);  // 31, 36, ... 76
+    Store(s.record_texts_address() + 80 + 4 * i, 32 + 5 * i);  // 32, 37, ... 77
+  }
+}
+
+void Type6PanelScreen(uint32_t screen, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822309C8 Type6PanelScreen::Type6PanelScreen");
+  PanelScreen(screen, sp, new_panel,
+              {0x82010920, PanelGroup6B, Panel6C, Panel6D, Panel6F, 11676});
+}
+
+void Type7PanelScreen(uint32_t screen, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822403A0 Type7PanelScreen::Type7PanelScreen");
+  PanelScreen(screen, sp, new_panel,
+              {0x82010E90, PanelGroup7B, Panel7C, Panel7D, Panel7F, 11680});
+}
+
+void Type6Screens(uint32_t block, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_822366F0 Type6Screens::Type6Screens");
+  const uint32_t members = sp - kScreensFrame;
+  const schema::Type6Screens b(block);
+  b.set_vtable(0x82010A78);
+  Type6Screen0(block + 4);
+  boot_mode::ScreenMachineConstruct(block + 9672);
+  Type6ListScreen(b.list_screen().address);
+  Type6NodeScreen(b.node_screen().address, members);
+  Type6PanelScreen(b.panel_screen().address, members, new_panel);
+  boot_mode::ScreenMachineConstruct(block + 52696);
+  b.set_power_graph_vtable(0x82010A68);
+  boot_mode::ScreenMachineConstruct(block + 62336);
+  boot_mode::ScreenMachineConstruct(block + 71976);
+  boot_mode::ScreenMachineConstruct(block + 81616);
+  b.set_answer_word(0);
+  b.set_answer(0);
+  b.set_phase(0);
+}
+
+void Type7Screens(uint32_t block, uint32_t sp, const New& new_panel) {
+  ITC_NATIVE_RUNNING("sub_82246B28 Type7Screens::Type7Screens");
+  const uint32_t members = sp - kScreensFrame;
+  const schema::Type7Screens b(block);
+  b.set_vtable(0x82010FE0);
+  Type7Screen0(block + 4);
+  boot_mode::ScreenMachineConstruct(block + 9664);
+  Type7ListScreen(b.list_screen().address);
+  Type7PanelScreen(b.panel_screen().address, members, new_panel);
+  boot_mode::ScreenMachineConstruct(block + 42356);
+  b.set_power_graph_vtable(0x82010FD0);
+  boot_mode::ScreenMachineConstruct(block + 51996);
+  boot_mode::ScreenMachineConstruct(block + 61636);
+  b.set_answer_word(0);
+  b.set_answer(0);
+  b.set_phase(0);
+}
+
+}  // namespace screen_constructors

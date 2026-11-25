@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "memory/heap.h"
+#include "schema/heap.h"
 
 #include <cstring>
 
@@ -11,30 +12,23 @@ namespace memory::crt {
 
 namespace {
 
-// GetProcessHeap's word.
-constexpr uint32_t kProcessHeapHandle = 0x8297149C;
 // The largest size malloc, calloc and realloc take (-4096).
 constexpr uint32_t kMaxSize = 0xFFFFF000;
 // XMemAlloc's attributes.
 constexpr uint32_t kPhysical = 0x80000000;
 constexpr uint32_t kZero = 0x40000000;
-// XMemAlloc's protections for physical memory, by (attributes >> 28) & 3.
-constexpr uint32_t kProtectionTable = 0x82638770;
-// Read by XPhysicalAlloc (sub_822964C8): when not 0, it clears
-// X_MEM_LARGE_PAGES from the protection (as its adapter in hooks/heap.cpp).
-constexpr uint32_t kNoLargePhysicalPages = 0x829537B0;
 constexpr uint32_t kMemLargePages = 0x20000000;
 
 }  // namespace
 
-uint32_t GetProcessHeap(uint8_t* base) {
+uint32_t GetProcessHeap() {
   ITC_NATIVE_RUNNING("sub_8229B670 GetProcessHeap");
-  return guest::LoadU32(base, kProcessHeapHandle);
+  return schema::HeapGlobals::process_heap().address;
 }
 
-std::optional<uint32_t> Malloc(uint8_t* base, uint32_t size) {
+std::optional<uint32_t> Malloc(uint32_t size) {
   ITC_NATIVE_RUNNING("sub_825A9A90 malloc");
-  if (size > kMaxSize || GetProcessHeap(base) == 0) {
+  if (size > kMaxSize || GetProcessHeap() == 0) {
     return std::nullopt;
   }
   const uint32_t block = memory::Alloc(size == 0 ? 1 : size, 0);
@@ -70,10 +64,10 @@ std::optional<uint32_t> Calloc(uint32_t count, uint32_t size) {
   return CallocImpl(count, size);
 }
 
-std::optional<uint32_t> Realloc(uint8_t* base, uint32_t block, uint32_t size) {
+std::optional<uint32_t> Realloc(uint32_t block, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_825AEBC8 realloc");
   if (block == 0) {
-    return Malloc(base, size);
+    return Malloc(size);
   }
   if (size == 0) {
     if (!Free(block)) {
@@ -109,7 +103,7 @@ uint32_t LocalFree(uint32_t block) {
   return memory::Free(block) ? 0 : block;
 }
 
-uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes) {
+uint32_t XMemAlloc(uint32_t size, uint32_t attributes) {
   ITC_NATIVE_RUNNING("sub_822976F8 XMemAlloc");
   if (!(attributes & kPhysical)) {
     return LocalAlloc((attributes >> 24) & 0x40, size);
@@ -119,18 +113,26 @@ uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes) {
     attributes |= 0x0C000000;
   }
   const uint32_t alignment = 1u << ((attributes >> 24) & 0xF);
-  uint32_t protection = guest::LoadU32(base, kProtectionTable + ((attributes >> 28) & 3) * 4);
+  uint32_t protection = guest::LoadU32(schema::HeapGlobals::physical_protections_address() + ((attributes >> 28) & 3) * 4);
   // XPhysicalAlloc (sub_822964C8) with any physical address.
-  if (guest::LoadU32(base, kNoLargePhysicalPages) != 0) {
+  if (schema::HeapGlobals::no_large_physical_pages() != 0) {
     protection &= ~kMemLargePages;
   }
   const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFF, alignment, protection);
   if (block != 0 && (attributes & kZero)) {
-    guest::ForEachHostPart(base, block, size, [](uint8_t* host, uint32_t, uint32_t bytes) {
+    guest::ForEachHostPart(block, size, [](uint8_t* host, uint32_t, uint32_t bytes) {
       std::memset(host, 0, bytes);
     });
   }
   return block;
+}
+
+uint32_t XPhysicalAllocEx(uint32_t size, uint32_t low, uint32_t high,
+                          uint32_t alignment, uint32_t protection) {
+  if (schema::HeapGlobals::no_large_physical_pages() != 0) {
+    protection &= ~kMemLargePages;
+  }
+  return memory::AllocPhysical(size, low, high, alignment, protection);
 }
 
 uint32_t XMemFree(uint32_t block, uint32_t attributes) {
@@ -145,14 +147,14 @@ uint32_t XMemFree(uint32_t block, uint32_t attributes) {
   return block;
 }
 
-std::optional<uint32_t> OperatorNew(uint8_t* base, uint32_t size) {
+std::optional<uint32_t> OperatorNew(uint32_t size) {
   ITC_NATIVE_RUNNING("sub_825A6880 operator new");
-  return Malloc(base, size);
+  return Malloc(size);
 }
 
-std::optional<uint32_t> OperatorNewArray(uint8_t* base, uint32_t size) {
+std::optional<uint32_t> OperatorNewArray(uint32_t size) {
   ITC_NATIVE_RUNNING("sub_825A6940 operator new[]");
-  return OperatorNew(base, size);
+  return OperatorNew(size);
 }
 
 bool OperatorDelete(uint32_t block) {

@@ -1,3 +1,4 @@
+#include <format>
 #include "textures.h"
 #include "frame_costs.h"
 
@@ -357,7 +358,7 @@ void SwapEndian(uint8_t* data, size_t size, xenos::Endian endian) {
 // tiled layout keeps runs of 16 bytes contiguous (8 for 1-byte blocks: the
 // micro tile's 8 columns), aligned in x, so whole runs are copied at once
 // rather than block by block.
-void GatherTiledRow(uint8_t* out, const uint8_t* base, uint32_t layer_address, uint32_t x,
+void GatherTiledRow(uint8_t* out, uint32_t layer_address, uint32_t x,
                     uint32_t y, uint32_t count, uint32_t pitch_blocks,
                     uint32_t bytes_per_block_log2) {
   uint32_t run_blocks_log2 = bytes_per_block_log2 ? 4 - std::min(bytes_per_block_log2, 4u) : 3;
@@ -369,7 +370,7 @@ void GatherTiledRow(uint8_t* out, const uint8_t* base, uint32_t layer_address, u
     uint32_t n = std::min(run_blocks - (x & (run_blocks - 1)), end - x);
     uint32_t bytes = n << bytes_per_block_log2;
     if (address + bytes <= kPhysicalMemorySize) {
-      const uint8_t* in = PhysicalHostAddress(const_cast<uint8_t*>(base), address);
+      const uint8_t* in = PhysicalHostAddress(address);
       if (bytes == 16) {
         std::memcpy(out, in, 16);
       } else if (bytes == 8) {
@@ -624,20 +625,20 @@ struct TextureCache::State {
   uint32_t write_lines = 200;
   std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
   void LogFirstLoad(const Texture& t);
-  void LogUnrecordedChange(uint8_t* base, const Texture& t);
+  void LogUnrecordedChange(const Texture& t);
   void LogWriteSummary();
 
   bool CreateTexture(Texture& texture);
-  uint64_t Hash(uint8_t* base, const Texture& texture) const;
+  uint64_t Hash(const Texture& texture) const;
   VkImageView GetSwizzledView(Texture& texture, uint32_t swizzle, VkImageViewType natural);
-  bool Upload(uint8_t* base, Texture& texture);
+  bool Upload(Texture& texture);
   VkCommandBuffer Uploads();
 };
 
 std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
   std::string text;
   for (auto& [caller, count] : callers) {
-    text += fmt::format(" {:08X}={}", caller, count);
+    text += std::format(" {:08X}={}", caller, count);
   }
   return text.empty() ? " none" : text;
 }
@@ -678,21 +679,21 @@ void TextureCache::State::LogFirstLoad(const Texture& t) {
     ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
                  "{} bytes written by memcpy{}",
                  address, t.layout.width, t.layout.height, size, bytes,
-                 bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
+                 bytes ? std::format(" (first from {:08X})", first_caller) : std::string());
   }
 }
 
 // A texture whose memory changed with no write recorded: which bytes of its
 // first range changed since the last such change.
-void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
+void TextureCache::State::LogUnrecordedChange(const Texture& t) {
   uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
   auto& [count, text] = writes.unrecorded_by[address];
   if (!count++) {
-    text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
+    text = std::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
                        int(t.format.format), t.layout.min_level, t.layout.max_level);
   }
   auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
-  const uint8_t* now = PhysicalHostAddress(base, start);
+  const uint8_t* now = PhysicalHostAddress(start);
   std::vector<uint8_t>& was = write_snapshots[address];
   if (was.size() == range_size && write_lines) {
     uint32_t first = UINT32_MAX, last = 0, changed = 0;
@@ -810,12 +811,12 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   return true;
 }
 
-uint64_t TextureCache::State::Hash(uint8_t* base, const Texture& t) const {
+uint64_t TextureCache::State::Hash(const Texture& t) const {
   ScopedCost cost(g_frame_costs.hash_ns);
   uint64_t hash = 0;
   for (const auto& [address, size] : t.ranges) {
     if (size) {
-      hash = base::Hash64(PhysicalHostAddress(base, address), size, hash);
+      hash = base::Hash64(PhysicalHostAddress(address), size, hash);
     }
   }
   return hash;
@@ -832,7 +833,7 @@ VkCommandBuffer TextureCache::State::Uploads() {
   return f.uploads;
 }
 
-bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
+bool TextureCache::State::Upload(Texture& t) {
   const Layout& l = t.layout;
   const Format& f = t.format;
   uint32_t out_bytes_per_block = f.conversion == Conversion::k4444To8888 ? 4 : f.bytes_per_block;
@@ -871,13 +872,13 @@ bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
       for (uint32_t y = 0; y < height_blocks; y++) {
         // Gather a row of blocks, swap, then convert into staging.
         if (l.tiled) {
-          GatherTiledRow(row.data(), base, layer_address, p.x, y + p.y, width_blocks,
+          GatherTiledRow(row.data(), layer_address, p.x, y + p.y, width_blocks,
                          p.pitch_blocks, bytes_per_block_log2);
         } else {
           uint32_t address =
               layer_address + (y + p.y) * p.row_pitch_bytes + p.x * f.bytes_per_block;
           if (address + row_bytes <= kPhysicalMemorySize) {
-            std::memcpy(row.data(), PhysicalHostAddress(base, address), row_bytes);
+            std::memcpy(row.data(), PhysicalHostAddress(address), row_bytes);
           }
         }
         SwapEndian(row.data(), row_bytes, t.endian);
@@ -1065,7 +1066,7 @@ void TextureCache::State::LogAges() {
   }
   std::string ages;
   for (size_t i = 0; i < 5; i++) {
-    ages += fmt::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
+    ages += std::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
                         bytes[i] / 1048576.0);
   }
   ITC_LOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "
@@ -1272,13 +1273,13 @@ Handle FromBits(uint64_t bits) {
 }
 }  // namespace
 
-VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
+VkImageView TextureCache::GetView(const uint32_t fetch_words[6],
                                   VkImageViewType view_type, uint32_t fetch_constant) {
   bool cacheable;
   // Hashing every texture every frame needs every call.
   if (!cache_bindings_ || verify_every_frame_) {
     unkept_answers_++;
-    return LookUpView(base, fetch_words, view_type, cacheable);
+    return LookUpView(fetch_words, view_type, cacheable);
   }
   State& s = *state_;
   BindingTable::Key key(fetch_words, uint32_t(view_type));
@@ -1290,7 +1291,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   }
   BindingTable::Entry& e = s.view_answers.Find(key);
   if (e.generation != generation_) {
-    VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
+    VkImageView view = LookUpView(fetch_words, view_type, cacheable);
     e.value = HandleBits(view);
     // Not kept: nothing (a placeholder, maybe only until staging has room),
     // or a texture still to be reloaded.
@@ -1301,7 +1302,7 @@ VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
   return FromBits<VkImageView>(e.value);
 }
 
-VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6],
+VkImageView TextureCache::LookUpView(const uint32_t fetch_words[6],
                                      VkImageViewType view_type, bool& cacheable) {
   State& s = *state_;
   cacheable = false;
@@ -1399,10 +1400,10 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
   bool log_writes = log_writes_;
   if (!t.loaded) {
     if (verify_every_frame_) {
-      t.hash = s.Hash(base, t);
+      t.hash = s.Hash(t);
       t.verified_frame = s.frame_number;
     }
-    if (!s.Upload(base, t)) {
+    if (!s.Upload(t)) {
       return VK_NULL_HANDLE;
     }
     t.changed = false;
@@ -1411,15 +1412,15 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
       s.LogFirstLoad(t);
     }
   } else if (t.changed) {
-    uint64_t hash = verify_every_frame_ ? s.Hash(base, t) : 0;
-    if (s.Upload(base, t)) {  // else the old contents until it fits
+    uint64_t hash = verify_every_frame_ ? s.Hash(t) : 0;
+    if (s.Upload(t)) {  // else the old contents until it fits
       t.changed = false;
       t.hash = hash;
       t.verified_frame = s.frame_number;
     }
   } else if (verify_every_frame_ && t.verified_frame != s.frame_number) {
     t.verified_frame = s.frame_number;
-    if (uint64_t hash = s.Hash(base, t); hash != t.hash) {
+    if (uint64_t hash = s.Hash(t); hash != t.hash) {
       s.stats.unrecorded++;
       if (s.stats.unrecorded_sample == UINT32_MAX) {
         s.stats.unrecorded_sample =
@@ -1427,9 +1428,9 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
         s.stats.unrecorded_frames = uint32_t(s.frame_number - t.loaded_frame);
       }
       if (log_writes) {
-        s.LogUnrecordedChange(base, t);
+        s.LogUnrecordedChange(t);
       }
-      if (s.Upload(base, t)) {
+      if (s.Upload(t)) {
         t.hash = hash;
       }
     }
@@ -1540,7 +1541,7 @@ uint64_t TextureCache::mismatched_total() const {
   return state_->mismatched_total;
 }
 
-bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],
+bool TextureCache::DecodeGuest(const uint32_t fetch_words[6],
                                std::vector<uint8_t>& out, VkFormat& format, uint32_t& width,
                                uint32_t& height) {
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
@@ -1560,7 +1561,7 @@ bool TextureCache::DecodeGuest(uint8_t* base, const uint32_t fetch_words[6],
           p.address + (l.tiled ? TiledOffset2D(x, y, p.pitch_blocks, bytes_per_block_log2)
                                : y * p.row_pitch_bytes + x * f.bytes_per_block);
       if (address + f.bytes_per_block <= kPhysicalMemorySize) {
-        std::memcpy(row + x * f.bytes_per_block, PhysicalHostAddress(base, address),
+        std::memcpy(row + x * f.bytes_per_block, PhysicalHostAddress(address),
                     f.bytes_per_block);
       }
     }

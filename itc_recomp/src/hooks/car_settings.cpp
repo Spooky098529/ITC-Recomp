@@ -1,0 +1,126 @@
+// The car settings screen natively: adapters in front of src/car_settings/
+// (docs/functions/car-settings.md), with the register steps the harness
+// shares (hooks/car_settings.h).
+
+#include "hooks/car_settings.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "car_settings/car_settings.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_car_settings, true, "ITC",
+              "Run the car settings screen's machine (docs/functions/car-settings.md: the "
+              "type 2 mode's +0x173D0 machine and the type 5 mode's +848 one, UI movie 3) "
+              "natively instead of through the translated code, as far as it was seen in play: "
+              "its handlers Create sub_821AA2F8 and Destroy sub_821AA408 (VirtualAlloc and "
+              "VirtualFree through their overrides), OpenMovie sub_821A8DD0, WaitForMovie "
+              "sub_821AA490 (UiMovies::IsLoaded's plain C++) and Close sub_821AAF70 "
+              "(UiMovie::FinishAll and UiMovies::Delete through their overrides); the "
+              "set-ups CarSettings::Init sub_821B6FC0 and InitType5 sub_821B7878 (their step "
+              "tables, StateMachine::Add's plain C++) (the same writes; checked by "
+              "--run_harnesses=car_settings)");
+
+namespace hooks {
+
+namespace {
+
+namespace cs = car_settings;
+
+// The guest calls the plain C++ makes (car_settings::Calls), through this
+// context: r1, r3 to r10, f1 when given and lr set, the function run through
+// the function table (its override when it has one), r1 put back. The
+// adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  cs::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  lifted::Regs& ctx_;
+  uint64_t lr_;
+};
+
+}  // namespace
+
+ITC_REGS_STEP(CarSettingsCreate) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = cs::Create(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+// A tail call: UiMovies::Open runs with the adapter's own sp and lr.
+ITC_REGS_STEP(CarSettingsOpenMovie) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = cs::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
+}
+ITC_REGS_STEP(CarSettingsWaitForMovie) {
+  ctx.r3.u64 = cs::WaitForMovie(ctx.r3.u64, ctx.r1.u32);
+}
+ITC_REGS_STEP(CarSettingsClose) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = cs::Close(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+ITC_REGS_STEP(CarSettingsDestroy) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = cs::Destroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+// StateMachine::Add's adapter's r3: a new transition's address from the
+// machine's 64-bit r3, as the race menu's Init.
+ITC_REGS_STEP(CarSettingsInit) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = cs::Init(machine, ctx.r1.u32 - cs::kInitFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+ITC_REGS_STEP(CarSettingsInitType5) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = cs::InitType5(machine, ctx.r1.u32 - cs::kInitType5Frame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+}  // namespace hooks
+
+#define ITC_CAR_SETTINGS(address, step)  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_settings)) { \
+    hooks::step(ctx);              \
+  }
+
+// The machine's handlers (functors, from the recompiled state machine).
+ITC_CAR_SETTINGS(821AA2F8, CarSettingsCreate)
+ITC_CAR_SETTINGS(821A8DD0, CarSettingsOpenMovie)
+ITC_CAR_SETTINGS(821AA490, CarSettingsWaitForMovie)
+ITC_CAR_SETTINGS(821AAF70, CarSettingsClose)
+ITC_CAR_SETTINGS(821AA408, CarSettingsDestroy)
+// The set-ups (from the type 2 mode's Init sub_82197278 and the type 5
+// mode's set-up sub_8222FD68, recompiled).
+ITC_CAR_SETTINGS(821B6FC0, CarSettingsInit)
+ITC_CAR_SETTINGS(821B7878, CarSettingsInitType5)

@@ -22,10 +22,13 @@
 // (sub_822A6268), from Resource::Destroy.
 
 #include "guest.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "graphics/resources.h"
 #include "hooks/heap.h"
+#include "schema/graphics_resources.h"
 
 ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
               "Run the graphics library's resources (docs/functions/graphics-resources.md: "
@@ -65,21 +68,16 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_GRAPHICS_RESOURCES(address, ...)       \
-  extern "C" REX_FUNC(sub_##address) {             \
-    REX_FUNC_PROLOGUE();                           \
-    if (!ITC_FLAG(native_graphics_resources)) {    \
-      __imp__sub_##address(ctx, base);             \
-      return;                                      \
-    }                                              \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_graphics_resources)) { \
     __VA_ARGS__;                                   \
   }
 
 // The same for those that allocate: the game's own with --native_heap off.
 #define ITC_GRAPHICS_RESOURCES_HEAP(address, ...)                           \
-  extern "C" REX_FUNC(sub_##address) {                                      \
-    REX_FUNC_PROLOGUE();                                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
+    \
     if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) { \
-      __imp__sub_##address(ctx, base);                                      \
+      lifted::original::c##address(ctx);                                      \
       return;                                                               \
     }                                                                       \
     __VA_ARGS__;                                                            \
@@ -91,29 +89,29 @@ namespace {
 
 // Texture::LevelOffset's outputs, through the pointers in r6-r10 and the
 // caller's stack (+84, +92, +100), in the original's order.
-void StoreLevelPlace(uint8_t* base, const PPCContext& ctx, const LevelPlace& place) {
+void StoreLevelPlace(const lifted::Regs& ctx, const LevelPlace& place) {
   const uint32_t stack = ctx.r1.u32;
-  guest::StoreU32(base, guest::LoadU32(base, stack + 100), place.offset);
-  guest::StoreU32(base, ctx.r6.u32, place.pitch);
-  guest::StoreU32(base, ctx.r7.u32, place.slice);
-  guest::StoreU32(base, ctx.r8.u32, place.size);
-  guest::StoreU32(base, ctx.r10.u32, place.width);
-  guest::StoreU32(base, guest::LoadU32(base, stack + 84), place.height);
-  guest::StoreU32(base, guest::LoadU32(base, stack + 92), place.depth);
-  guest::StoreU32(base, ctx.r9.u32, place.tail);
+  guest::StoreU32(guest::LoadU32(stack + 100), place.offset);
+  guest::StoreU32(ctx.r6.u32, place.pitch);
+  guest::StoreU32(ctx.r7.u32, place.slice);
+  guest::StoreU32(ctx.r8.u32, place.size);
+  guest::StoreU32(ctx.r10.u32, place.width);
+  guest::StoreU32(guest::LoadU32(stack + 84), place.height);
+  guest::StoreU32(guest::LoadU32(stack + 92), place.depth);
+  guest::StoreU32(ctx.r9.u32, place.tail);
 }
 
 }  // namespace
 
 // --- Headers: r3 = the header ---
 
-ITC_GRAPHICS_RESOURCES(822A6180, ctx.r3.u64 = ResourceType(base, ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A6180, ctx.r3.u64 = ResourceType(ctx.r3.u32))
 
 // r3 = the format, r4, r5 = the block's width and height out (in that order).
 ITC_GRAPHICS_RESOURCES(822A4410, {
   const Block block = GpuBlockSize(ctx.r3.u32);
-  guest::StoreU32(base, ctx.r4.u32, block.width);
-  guest::StoreU32(base, ctx.r5.u32, block.height);
+  schema::GpuOutWord(ctx.r4.u32).set_value(block.width);
+  schema::GpuOutWord(ctx.r5.u32).set_value(block.height);
 })
 
 // r3 width, r4 height, r5 format, r6 the multisample type.
@@ -121,11 +119,11 @@ ITC_GRAPHICS_RESOURCES(8209AD68, ctx.r3.u64 = SurfaceEdramTiles(ctx.r3.u32, ctx.
                                                                 ctx.r5.u32, ctx.r6.s32))
 
 // r3 = the texture, r4 = the level, r5 = the description; returns the type.
-ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(base, ctx.r3.u32, ctx.r4.u32,
+ITC_GRAPHICS_RESOURCES(822A5B78, ctx.r3.u64 = TextureLevelDesc(ctx.r3.u32, ctx.r4.u32,
                                                                ctx.r5.u32))
 
 // r3 = the surface, r4 = the description.
-ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.r4.u32))
+ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(ctx.r3.u32, ctx.r4.u32))
 
 // --- Texture headers: arguments past r10 on the caller's stack (+84 on).
 // TextureHeader::Set has no adapter: only CreateTexture and
@@ -136,76 +134,76 @@ ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.
 // the stack's +84 the height, +92 the depth, +100 the level's offset (stored
 // in the original's order). r3 is left as it came (no caller reads it).
 // Levels from 2^31 on run the original (it reads uninitialized stack words).
-extern "C" REX_FUNC(sub_822A4FF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A4FF0) {
+  
   if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
-    __imp__sub_822A4FF0(ctx, base);
+    lifted::original::c822A4FF0(ctx);
     return;
   }
-  StoreLevelPlace(base, ctx, TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+  StoreLevelPlace(ctx, TextureLevelOffset(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // r3-r5 width, height, depth, r6 levels, r7 usage, r8 format, r10 the type
 // (others than TextureHeader::Set takes run the original).
-extern "C" REX_FUNC(sub_822A5D08) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A5D08) {
+  
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
       !TextureTypeKnown(ctx.r10.u32)) {
-    __imp__sub_822A5D08(ctx, base);
+    lifted::original::c822A5D08(ctx);
     return;
   }
-  ctx.r3.u64 = CreateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  ctx.r3.u64 = CreateTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                              ctx.r8.u32, ctx.r10.u32);
 }
 
 // r3 = the texture, r4 = the level.
-ITC_GRAPHICS_RESOURCES_HEAP(822A5B80, ctx.r3.u64 = GetSurfaceLevel(base, ctx.r3.u32, ctx.r4.u32))
+ITC_GRAPHICS_RESOURCES_HEAP(822A5B80, ctx.r3.u64 = GetSurfaceLevel(ctx.r3.u32, ctx.r4.u32))
 
 // r3, r4 width and height, r5 levels, r6 usage, r7 format, r9 and r10 the
 // base and mip addresses; the stack: +84 the pitch, +92 the header (copied
 // there), +100 and +108 the base and mip sizes out. XGSetTextureHeaderEx
 // has no adapter: only this calls it. A header in the physical views or
 // across two views runs the original (its memcpy records those copies).
-extern "C" REX_FUNC(sub_8235A920) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8235A920) {
+  
   const uint32_t stack = ctx.r1.u32;
-  const uint32_t header = guest::LoadU32(base, stack + 92);
+  const uint32_t header = guest::LoadU32(stack + 92);
   if (!ITC_FLAG(native_graphics_resources) || !XgHeaderCopyFits(header)) {
-    __imp__sub_8235A920(ctx, base);
+    lifted::original::c8235A920(ctx);
     return;
   }
-  ctx.r3.u64 = XGSetTextureHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = XGSetTextureHeader(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                   ctx.r7.u32, ctx.r9.u32, ctx.r10.u32,
-                                  guest::LoadU32(base, stack + 84), header,
-                                  guest::LoadU32(base, stack + 100),
-                                  guest::LoadU32(base, stack + 108));
+                                  guest::LoadU32(stack + 84), header,
+                                  guest::LoadU32(stack + 100),
+                                  guest::LoadU32(stack + 108));
 }
 
 // --- Surfaces: r3 width, r4 height, r5 format, r6 the multisample type, r7
 // the parameters (or 0). SurfaceHeader::Set has no adapter: only
 // CreateSurface calls it. ---
 
-ITC_GRAPHICS_RESOURCES_HEAP(822A5E28, ctx.r3.u64 = CreateSurface(base, ctx.r3.u32, ctx.r4.u32,
+ITC_GRAPHICS_RESOURCES_HEAP(822A5E28, ctx.r3.u64 = CreateSurface(ctx.r3.u32, ctx.r4.u32,
                                                                  ctx.r5.u32, ctx.r6.s32,
                                                                  ctx.r7.u32))
 
 // --- Buffers: r3 = the bytes, r4 = the usage (r5 = the index format) ---
 
-ITC_GRAPHICS_RESOURCES_HEAP(822A6830, ctx.r3.u64 = CreateVertexBuffer(base, ctx.r3.u32,
+ITC_GRAPHICS_RESOURCES_HEAP(822A6830, ctx.r3.u64 = CreateVertexBuffer(ctx.r3.u32,
                                                                       ctx.r4.u32))
-ITC_GRAPHICS_RESOURCES_HEAP(822A6968, ctx.r3.u64 = CreateIndexBuffer(base, ctx.r3.u32,
+ITC_GRAPHICS_RESOURCES_HEAP(822A6968, ctx.r3.u64 = CreateIndexBuffer(ctx.r3.u32,
                                                                      ctx.r4.u32, ctx.r5.u32))
 
 // --- The device's current resources: r3 = the device ---
 
-ITC_GRAPHICS_RESOURCES(822A3998, ctx.r3.u64 = GetRenderTarget(base, ctx.r3.u32, ctx.r4.u32))
-ITC_GRAPHICS_RESOURCES(822A39E0, ctx.r3.u64 = GetDepthStencilSurface(base, ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A3998, ctx.r3.u64 = GetRenderTarget(ctx.r3.u32, ctx.r4.u32))
+ITC_GRAPHICS_RESOURCES(822A39E0, ctx.r3.u64 = GetDepthStencilSurface(ctx.r3.u32))
 
 // r4 = the stream, r5, r6 = the offset and stride out (in that order).
 ITC_GRAPHICS_RESOURCES(822A3880, {
-  const StreamSource source = GetStreamSource(base, ctx.r3.u32, ctx.r4.u32);
-  guest::StoreU32(base, ctx.r5.u32, source.offset);
-  guest::StoreU32(base, ctx.r6.u32, source.stride);
+  const StreamSource source = GetStreamSource(ctx.r3.u32, ctx.r4.u32);
+  schema::GpuOutWord(ctx.r5.u32).set_value(source.offset);
+  schema::GpuOutWord(ctx.r6.u32).set_value(source.stride);
   ctx.r3.u64 = source.buffer;
 })
 
@@ -216,33 +214,33 @@ ITC_GRAPHICS_RESOURCES(822A3880, {
 
 // r3 the texture, r4 the level, r5 the locked rect, r6 the rectangle, r7
 // the flags: face 0.
-extern "C" REX_FUNC(sub_822A5C38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A5C38) {
+  
   if (!ITC_FLAG(native_graphics_resources) || ctx.r4.u32 >= 0x80000000u) {
-    __imp__sub_822A5C38(ctx, base);
+    lifted::original::c822A5C38(ctx);
     return;
   }
-  ctx.r3.u64 = LockTextureRectLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = LockTextureRectLevel(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                     ctx.r7.u32);
 }
 
 // r3 the surface, r4 the locked rect, r5 the rectangle, r6 the flags.
-ITC_GRAPHICS_RESOURCES(822A5FE8, ctx.r3.u64 = LockSurfaceRect(base, ctx.r3.u32, ctx.r4.u32,
+ITC_GRAPHICS_RESOURCES(822A5FE8, ctx.r3.u64 = LockSurfaceRect(ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r6.u32))
 
 // r3 the texture, or a texture's surface (its texture, +24, unlocked).
-ITC_GRAPHICS_RESOURCES(822A43E0, ctx.r3.u64 = UnlockTexture(base, ctx.r3.u32))
-ITC_GRAPHICS_RESOURCES(822A43F8, ctx.r3.u64 = UnlockSurface(base, ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A43E0, ctx.r3.u64 = UnlockTexture(ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A43F8, ctx.r3.u64 = UnlockSurface(ctx.r3.u32))
 
 // r3 the buffer, r4 the offset, r5 the size (0: all), r6 the flags.
-ITC_GRAPHICS_RESOURCES(822A68F8, ctx.r3.u64 = LockVertexBuffer(base, ctx.r3.u32, ctx.r4.u32,
+ITC_GRAPHICS_RESOURCES(822A68F8, ctx.r3.u64 = LockVertexBuffer(ctx.r3.u32, ctx.r4.u32,
                                                                ctx.r5.u32, ctx.r6.u32))
-ITC_GRAPHICS_RESOURCES(822A6A18, ctx.r3.u64 = LockIndexBuffer(base, ctx.r3.u32, ctx.r4.u32,
+ITC_GRAPHICS_RESOURCES(822A6A18, ctx.r3.u64 = LockIndexBuffer(ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r6.u32))
 
 // r3 the buffer.
-ITC_GRAPHICS_RESOURCES(822A6958, ctx.r3.u64 = UnlockVertexBuffer(base, ctx.r3.u32))
-ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(base, ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A6958, ctx.r3.u64 = UnlockVertexBuffer(ctx.r3.u32))
+ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(ctx.r3.u32))
 
 // --- Destruction ---
 
@@ -250,12 +248,12 @@ ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(base, ctx.r3.u32
 // (its sub_822AD9D8, not seen in play). Its surface case (sub_822A6268, a
 // piece the recompiler split off) has no adapter: the original's runs only
 // from the original Destroy.
-extern "C" REX_FUNC(sub_822A6210) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A6210) {
+  
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
-      (guest::LoadU32(base, ctx.r3.u32) & 0xF) == 9) {
-    __imp__sub_822A6210(ctx, base);
+      (schema::ResourceHeader(ctx.r3.u32).common() & 0xF) == 9) {
+    lifted::original::c822A6210(ctx);
     return;
   }
-  ctx.r3.u64 = DestroyResource(base, ctx.r3.u32);
+  ctx.r3.u64 = DestroyResource(ctx.r3.u32);
 }

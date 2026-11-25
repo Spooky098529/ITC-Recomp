@@ -1,0 +1,122 @@
+// The save defaults' bit sets (data_load.h, docs/functions/data-load.md):
+// Defaults::Init and its two fills. The original sets most bits one by one
+// (an inlined bitset::set) and ORs fixed masks into the other words; every
+// set is cleared first, so the bits listed here are what each holds after.
+
+#include "data_load/data_load.h"
+
+#include "base/log.h"
+#include "guest.h"
+#include "schema/data_load.h"
+
+#include <cstddef>
+
+namespace data_load {
+
+namespace {
+
+using G = schema::DataLoadGlobals;
+
+struct Range {
+  uint32_t first;
+  uint32_t end;  // one past the last bit
+};
+
+void Clear(uint32_t set, uint32_t words) {
+  for (uint32_t i = 0; i < words; i++) {
+    guest::StoreU32(set + 4 * i, 0);
+  }
+}
+
+// bitset::set for bits first to end - 1 (all positive here).
+void SetBits(uint32_t set, uint32_t first, uint32_t end) {
+  for (uint32_t bit = first; bit < end; bit++) {
+    const uint32_t word = set + 4 * (bit >> 5);
+    guest::StoreU32(word, guest::LoadU32(word) | (1u << (bit & 31)));
+  }
+}
+
+template <size_t N>
+void SetRanges(uint32_t set, const Range (&ranges)[N]) {
+  for (const Range& r : ranges) {
+    SetBits(set, r.first, r.end);
+  }
+}
+
+// 0x826C3044 after its fixed masks and bits 404-409: the first bit of most
+// of the 48 sets' ranges.
+constexpr Range kBits3044[] = {
+    {0, 1},     {10, 11},   {20, 21},   {27, 28},   {34, 35},   {41, 42},   {48, 49},
+    {55, 56},   {62, 63},   {69, 70},   {76, 77},   {80, 81},   {84, 85},   {88, 89},
+    {95, 96},   {108, 109}, {119, 120}, {130, 131}, {141, 142}, {152, 153}, {170, 171},
+    {174, 175}, {178, 179}, {182, 183}, {186, 187}, {189, 190}, {389, 390}, {391, 392},
+    {395, 396}, {400, 401}, {404, 411}, {415, 416}, {420, 421}, {425, 426}, {430, 431},
+    {435, 436}};
+// 0x826C50A8 after its fixed masks and bits 189-388, 410-434 and 435-453.
+constexpr Range kBits50A8[] = {
+    {0, 3},     {10, 13},   {20, 23},   {27, 30},   {34, 37},   {41, 44},   {48, 51},
+    {55, 58},   {62, 65},   {69, 72},   {76, 78},   {80, 82},   {84, 86},   {88, 91},
+    {95, 97},   {100, 101}, {104, 105}, {108, 114}, {119, 125}, {130, 136}, {141, 147},
+    {152, 164}, {170, 187}, {189, 391}, {395, 399}, {400, 454}};
+// The 48 sets' ranges (the original's jump table on the index; 29 none).
+constexpr Range kSetRanges[48] = {
+    {0, 20},    {0, 10},    {10, 20},   {20, 34},   {20, 27},   {27, 34},   {34, 41},
+    {41, 48},   {48, 55},   {55, 62},   {62, 69},   {69, 76},   {76, 88},   {76, 80},
+    {80, 84},   {84, 88},   {88, 95},   {95, 108},  {95, 96},   {96, 100},  {100, 104},
+    {104, 108}, {108, 119}, {119, 130}, {130, 141}, {141, 152}, {152, 170}, {152, 158},
+    {158, 164}, {0, 0},     {170, 174}, {174, 178}, {178, 182}, {182, 186}, {186, 189},
+    {189, 389}, {389, 391}, {391, 395}, {395, 400}, {400, 404}, {404, 410}, {410, 435},
+    {410, 415}, {415, 420}, {420, 425}, {425, 430}, {430, 435}, {435, 454}};
+// The sets ORed into 0x826C4064 (the original's list on its frame).
+constexpr uint32_t kOred[5] = {17, 35, 38, 41, 47};
+
+}  // namespace
+
+void Bits224Fill(uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820CCD10 Bits224::Fill");
+  const uint32_t words = schema::Bits224(set).words_address();
+  Clear(words, 7);
+  SetBits(words, 0, 199);
+}
+
+void Bits480Fill(uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820CCD68 Bits480::Fill");
+  const uint32_t words = schema::Bits480(set).words_address();
+  Clear(words, 15);
+  SetBits(words, 0, 454);
+}
+
+uint32_t DefaultsInit(uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820CCDC0 Defaults::Init");
+  const uint32_t table3044 = G::defaults_3044_address();
+  Clear(table3044, 15);
+  SetRanges(table3044, kBits3044);
+  Clear(G::defaults_3c24_address(), 7);
+  SetBits(G::defaults_3c24_address(), 0, 61);
+  Bits224Fill(G::defaults_50e4_address());
+  Clear(G::defaults_50a8_address(), 15);
+  SetRanges(G::defaults_50a8_address(), kBits50A8);
+  for (uint32_t i = 0; i < 48; i++) {
+    const uint32_t set = schema::Bits480(G::defaults_sets_address() + schema::Bits480::kSize * i).words_address();
+    Clear(set, 15);
+    SetBits(set, kSetRanges[i].first, kSetRanges[i].end);
+  }
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(frame + 80 + 4 * i, kOred[i]);
+  }
+  const uint32_t defaults = G::defaults_4064_address();
+  Clear(defaults, 15);
+  for (const uint32_t index : kOred) {
+    const uint32_t set = G::defaults_sets_address() + schema::Bits480::kSize * index;
+    for (uint32_t w = 0; w < 15; w++) {
+      const uint32_t word = defaults + 4 * w;
+      guest::StoreU32(word, guest::LoadU32(word) | guest::LoadU32(set + 4 * w));
+    }
+  }
+  Bits480Fill(defaults);
+  // andc of each word with itself.
+  Clear(defaults, 15);
+  return defaults;
+}
+
+}  // namespace data_load

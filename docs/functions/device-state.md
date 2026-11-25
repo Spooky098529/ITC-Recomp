@@ -93,12 +93,11 @@ list (`DeviceCalls` in `device_state.h`); `b7_groups.py` still counts their
 dropped callees (the command buffer's functions) as calls.
 
 Callers in other files: the command replay's handlers (`Command::*` 1-4,
-7, 11, 12, 15, 23, 24, 29-31, 34, 35, `sub_8258F5C0` and `sub_8258F0F0` (no row, probably the single commands' constants),
-`functions.md`), `Device::Init`, `Device::SetUpDisplay`,
+7, 11, 12, 15, 23, 24, 29-31, 34, 35, `functions.md`; the single commands' 15 and 7, `sub_8258F5C0` and `sub_8258F0F0`, and the rest of that table in `single-commands.md`), `Device::Init`, `Device::SetUpDisplay`,
 `Device::SetDisplayMode` and `Device::Swap` (`functions.md`, overridden:
 they call the setters through `ctx`), `VideoOutput::SetUpDisplay`,
 `VideoOutput::UnbindAll`, `VideoOutput::Present` and `sub_8258D958`
-(`video-output.md`), predicated tiling (`sub_825BED08`, `functions.md`;
+(`video-output.md`), predicated tiling (`sub_825BED08`, `predicated-tiling.md`;
 `EndTiling`, `sub_825BF200`), and the boot movie player's draw
 (`sub_82482CA8`, `sub_824829A0`, `sub_82483FB8`, `sub_824840C8`,
 `sub_824842C8`, a lead). Shared: `sub_82106540` (empty) in `audio.md`;
@@ -148,6 +147,17 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

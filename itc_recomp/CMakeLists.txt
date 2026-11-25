@@ -1,45 +1,17 @@
-# itc - ReXGlue Recompiled Project
+# itc - Import Tuner Challenge, native
 #
-# SDK boilerplate lives in generated/rexglue.cmake.
+# Our own build: no ReXGlue SDK in it but its shader translator, a static
+# dependency (cmake/xenos_translator.cmake; E4 in docs/rexglue-removal.md);
+# the third-party libraries are our own copies (cmake/thirdparty.cmake).
+# generated/ (the recompiled code) stays in the repo, out of the build.
 
 cmake_minimum_required(VERSION 3.25)
-project(itc LANGUAGES CXX)
+project(itc LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Apply this project's patches to the rexglue-sdk submodule, skipping any
-# already applied. See patches/rexglue-sdk/ for what each one works around.
-if(REXSDK_DIR)
-    file(GLOB ITC_SDK_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/../patches/rexglue-sdk/*.patch")
-    list(SORT ITC_SDK_PATCHES)
-    # Patches touching nearby lines can't each be checked alone once a later
-    # one is applied. They're always applied in order, so if the last one is
-    # applied, they all are.
-    list(GET ITC_SDK_PATCHES -1 last_patch)
-    execute_process(
-        COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${last_patch}"
-        RESULT_VARIABLE all_applied OUTPUT_QUIET ERROR_QUIET)
-    if(all_applied EQUAL 0)
-        set(ITC_SDK_PATCHES "")
-    endif()
-    foreach(patch IN LISTS ITC_SDK_PATCHES)
-        execute_process(
-            COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${patch}"
-            RESULT_VARIABLE already_applied OUTPUT_QUIET ERROR_QUIET)
-        if(NOT already_applied EQUAL 0)
-            execute_process(
-                COMMAND git -C "${REXSDK_DIR}" apply "${patch}"
-                RESULT_VARIABLE apply_result)
-            if(NOT apply_result EQUAL 0)
-                message(FATAL_ERROR "Failed to apply SDK patch ${patch}")
-            endif()
-            message(STATUS "Applied SDK patch ${patch}")
-        endif()
-    endforeach()
-endif()
-
-# ThinLTO with lld, for the game and the SDK (set before the SDK is added).
+# ThinLTO with lld, for the game and its libraries (set before they're added).
 option(ITC_LTO "Build with ThinLTO (needs lld)" OFF)
 if(ITC_LTO)
     add_compile_options(-flto=thin)
@@ -55,15 +27,19 @@ if(WIN32 AND ITC_WIN_LTO)
     add_link_options(-flto=thin "LINKER:/lldltocache:${CMAKE_BINARY_DIR}/thinlto-cache")
 endif()
 
-include(generated/rexglue.cmake)
+include(cmake/thirdparty.cmake)
+include(cmake/xenos_translator.cmake)
+include(cmake/version.cmake)
 include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
-    src/main.cpp
+    src/app/main.cpp
+    src/app/start_up.cpp
+    src/base/flags.cpp
     src/base/log.cpp
-    src/base/log_sdk.cpp
     src/audio/native_audio.cpp
+    src/audio/render_driver.cpp
     src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
@@ -94,27 +70,50 @@ set(ITC_SOURCES
     src/hooks/profile.cpp
     src/hooks/saves.cpp
     src/saves/saves.cpp
+    src/saves/slot_steps.cpp
     src/hooks/file_class.cpp
     src/hooks/movie_files.cpp
     src/hooks/archive_streaming.cpp
     src/hooks/memory_status.cpp
     src/hooks/heap.cpp
     src/memory/heap.cpp
+    src/memory/mapping.cpp
+    src/memory/handles.cpp
+    src/memory/host_copy.cpp
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
+    src/memory/memory_imports.cpp
+    src/memory/kernel_variables.cpp
+    src/image/image.cpp
+    src/image/image_rdata.cpp
+    src/image/image_data.cpp
+    src/imports/native_imports.cpp
+    src/threads/spin_locks.cpp
+    src/threads/critical_sections.cpp
+    src/threads/events.cpp
+    src/threads/tls.cpp
+    src/threads/threads.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
+    src/sprites/billboard_record.cpp
+    src/sprites/world_sprites.cpp
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
+    src/ui_movies/animation.cpp
+    src/ui_movies/track_properties.cpp
     src/ui_movies/recording.cpp
     src/ui_movies/draw.cpp
     src/ui_movies/files.cpp
     src/hooks/ui_movies_game.cpp
     src/ui_movies/game.cpp
+    src/ui_movies/objects.cpp
+    src/ui_movies/effect.cpp
+    src/ui_movies/texts.cpp
+    src/ui_movies/update.cpp
     src/hooks/race_overlays.cpp
     src/race_overlays/race_overlays.cpp
     src/hooks/vehicle_accessors.cpp
@@ -129,6 +128,230 @@ set(ITC_SOURCES
     src/car_physics/vehicle_state.cpp
     src/car_physics/collision_world.cpp
     src/car_physics/car_data.cpp
+    src/car_physics/car_setup.cpp
+    src/car_physics/vehicle_physics.cpp
+    src/hooks/vehicle_native.cpp
+    src/vehicle/vehicle.cpp
+    src/hooks/app_states.cpp
+    src/app_states/containers.cpp
+    src/app_states/app.cpp
+    src/app_states/layers.cpp
+    src/hooks/scene_loaders.cpp
+    src/scene_loaders/pools.cpp
+    src/scene_loaders/loads.cpp
+    src/scene_loaders/objects.cpp
+    src/scene_loaders/file_loaded.cpp
+    src/scene_loaders/model_point.cpp
+    src/hooks/second_set.cpp
+    src/hooks/load_poll.cpp
+    src/load_poll/load_poll.cpp
+    src/hooks/car_draw.cpp
+    src/car_draw/car_draw.cpp
+    src/car_draw/lighting.cpp
+    src/car_draw/blink.cpp
+    src/car_draw/morph.cpp
+    src/car_draw/light_kit.cpp
+    src/car_draw/parts.cpp
+    src/car_draw/lamps.cpp
+    src/car_draw/shadows.cpp
+    src/car_draw/interior.cpp
+    src/car_draw/cockpit.cpp
+    src/car_draw/traffic.cpp
+    src/car_draw/wheels.cpp
+    src/car_draw/update.cpp
+    src/hooks/boot_mode.cpp
+    src/boot_mode/boot_mode.cpp
+    src/second_set/points.cpp
+    src/second_set/point_groups.cpp
+    src/second_set/blocks.cpp
+    src/second_set/finds.cpp
+    src/second_set/objects.cpp
+    src/second_set/morph.cpp
+    src/second_set/wheels.cpp
+    src/hooks/car_models.cpp
+    src/car_models/load_slots.cpp
+    src/car_models/car_model.cpp
+    src/car_models/vinyl.cpp
+    src/car_models/scene_fill.cpp
+    src/car_models/tga.cpp
+    src/car_models/raster.cpp
+    src/car_models/decals.cpp
+    src/car_models/parts.cpp
+    src/car_models/plate.cpp
+    src/car_models/file_loaded.cpp
+    src/hooks/save_data.cpp
+    src/save_data/save_data.cpp
+    src/hooks/race_world.cpp
+    src/race_world/race_world.cpp
+    src/race_world/race_world_init.cpp
+    src/race_world/race_world_reset.cpp
+    src/race_world/race_start.cpp
+    src/race_world/race_event.cpp
+    src/race_world/race_manager.cpp
+    src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
+    src/hooks/race_states.cpp
+    src/race_states/race_progress.cpp
+    src/race_states/race_checks.cpp
+    src/race_states/handlers.cpp
+    src/race_states/racers.cpp
+    src/race_states/follow_route.cpp
+    src/race_states/race_states_init.cpp
+    src/race_states/route_distance.cpp
+    src/race_states/race_end.cpp
+    src/hooks/archive.cpp
+    src/archive/archive.cpp
+    src/archive/semaphores.cpp
+    src/hooks/save_interface.cpp
+    src/hooks/car_sounds.cpp
+    src/car_sounds/car_sounds.cpp
+    src/car_sounds/x3daudio.cpp
+    src/car_sounds/car_sound_3d.cpp
+    src/car_sounds/car_sound_voices.cpp
+    src/car_sounds/car_sound_parts.cpp
+    src/hooks/xaudio.cpp
+    src/xaudio/voices.cpp
+    src/hooks/xaudio_engine.cpp
+    src/xaudio/engine.cpp
+    src/hooks/xaudio_objects.cpp
+    src/xaudio/objects.cpp
+    src/xaudio/resampler.cpp
+    src/xaudio/reverb_stages.cpp
+    src/xaudio/reverb_core.cpp
+    src/xaudio/reverb_setup.cpp
+    src/hooks/app_start_up.cpp
+    src/app_start_up/start_up.cpp
+    src/app_start_up/network_set_up.cpp
+    src/app_start_up/scene_target.cpp
+    src/app_start_up/billboards_init.cpp
+    src/app_start_up/text_init.cpp
+    src/app_start_up/movie.cpp
+    src/app_start_up/audio_manager.cpp
+    src/app_start_up/app_camera.cpp
+    src/app_start_up/app.cpp
+    src/hooks/data_load.cpp
+    src/data_load/defaults.cpp
+    src/data_load/records.cpp
+    src/data_load/objects.cpp
+    src/data_load/boot.cpp
+    src/hooks/career.cpp
+    src/career/accessors.cpp
+    src/career/records.cpp
+    src/career/unlocks.cpp
+    src/career/race_result.cpp
+    src/career/progress.cpp
+    src/career/event_setup.cpp
+    src/career/garage.cpp
+    src/hooks/race_event.cpp
+    src/race_event/conditions.cpp
+    src/race_event/event.cpp
+    src/hooks/camera_modes.cpp
+    src/camera_modes/camera_modes.cpp
+    src/camera_modes/anims.cpp
+    src/camera_modes/views.cpp
+    src/camera_modes/paths.cpp
+    src/camera_modes/chase.cpp
+    src/camera_modes/director.cpp
+    src/camera_modes/cutscene.cpp
+    src/camera_modes/cutscene_scripts.cpp
+    src/hooks/location_screen.cpp
+    src/location_screen/helpers.cpp
+    src/location_screen/movies.cpp
+    src/location_screen/pages.cpp
+    src/location_screen/init_states.cpp
+    src/location_screen/pictures.cpp
+    src/location_screen/race.cpp
+    src/location_screen/transitions.cpp
+    src/location_screen/results.cpp
+    src/location_screen/opponents.cpp
+    src/location_screen/view.cpp
+    src/location_screen/pose.cpp
+    src/hooks/material_passes.cpp
+    src/material_passes/colors.cpp
+    src/material_passes/helpers.cpp
+    src/material_passes/passes.cpp
+    src/material_passes/set_materials.cpp
+    src/material_passes/paint.cpp
+    src/material_passes/projector.cpp
+    src/material_passes/palette.cpp
+    src/hooks/race_hud_object.cpp
+    src/race_hud_object/gauges.cpp
+    src/race_hud_object/dashboard.cpp
+    src/race_hud_object/setup.cpp
+    src/race_hud_object/signs.cpp
+    src/race_hud_object/tick.cpp
+    src/race_hud_object/movies.cpp
+    src/hooks/alt_hud.cpp
+    src/alt_hud/menu_list.cpp
+    src/alt_hud/alt_hud.cpp
+    src/hooks/race_scene.cpp
+    src/race_scene/race_scene.cpp
+    src/race_scene/race_scene_init.cpp
+    src/hooks/race_hud_machine.cpp
+    src/race_hud_machine/handlers.cpp
+    src/race_hud_machine/race_hud_machine_init.cpp
+    src/hooks/race_flow.cpp
+    src/race_flow/race_flow_init.cpp
+    src/hooks/race_loading.cpp
+    src/hooks/race_end.cpp
+    src/race_end/race_end.cpp
+    src/race_loading/race_loading.cpp
+    src/race_loading/race_loading_init.cpp
+    src/hooks/car_scene_draw.cpp
+    src/car_scene_draw/geometry.cpp
+    src/car_scene_draw/vector16.cpp
+    src/car_scene_draw/projectors.cpp
+    src/car_scene_draw/lights.cpp
+    src/car_scene_draw/texture_projection.cpp
+    src/car_scene_draw/scene_draw.cpp
+    src/hooks/front_end_car_draw.cpp
+    src/front_end_car_draw/garage_stage.cpp
+    src/front_end_car_draw/lights.cpp
+    src/front_end_car_draw/pose.cpp
+    src/front_end_car_draw/draw.cpp
+    src/hooks/replay_snapshots.cpp
+    src/replay_snapshots/records.cpp
+    src/replay_snapshots/race_replay.cpp
+    src/hooks/race_screens.cpp
+    src/hooks/race_screens_unseen.cpp
+    src/race_screens/menu_list.cpp
+    src/race_screens/screens.cpp
+    src/race_screens/pages.cpp
+    src/race_screens/transitions.cpp
+    src/race_screens/options.cpp
+    src/race_screens/after_race.cpp
+    src/race_screens/dialog.cpp
+    src/race_screens/career.cpp
+    src/race_screens/draws.cpp
+    src/race_screens/pause_menu4.cpp
+    src/race_screens/results.cpp
+    src/race_screens/kind6_menu.cpp
+    src/race_screens/kind6_pages.cpp
+    src/hooks/menu_sounds.cpp
+    src/menu_sounds/menu_sounds.cpp
+    src/hooks/race_sounds.cpp
+    src/race_sounds/race_sounds.cpp
+    src/race_sounds/race_sounds_cars.cpp
+    src/race_sounds/race_sounds_ticks.cpp
+    src/race_sounds/race_sounds_init.cpp
+    src/hooks/accessories.cpp
+    src/accessories/accessories.cpp
+    src/hooks/scene.cpp
+    src/scene/scene.cpp
+    src/scene/lighting.cpp
+    src/save_interface/save_devices.cpp
+    src/save_interface/save_interface.cpp
+    src/save_interface/save_layer.cpp
+    src/save_interface/slot_handlers.cpp
+    src/hooks/file_layer.cpp
+    src/file_layer/file_layer.cpp
+    src/hooks/texture_compression.cpp
+    src/texture_compression/dxt_alpha.cpp
+    src/texture_compression/dxt_color.cpp
+    src/texture_compression/dxt45.cpp
+    src/texture_compression/codecs.cpp
+    src/texture_compression/blitter.cpp
+    src/texture_compression/compress_surface.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -156,15 +379,317 @@ set(ITC_SOURCES
     src/graphics/edram.cpp
     src/hooks/video_output.cpp
     src/graphics/video_output.cpp
+    src/hooks/command_buffer.cpp
+    src/graphics/command_buffer.cpp
     src/hooks/device_state.cpp
     src/graphics/device_state.cpp
+    src/hooks/device_shaders.cpp
+    src/graphics/device_shaders.cpp
+    src/hooks/render_queue.cpp
+    src/graphics/render_queue.cpp
+    src/hooks/single_commands.cpp
+    src/graphics/single_commands.cpp
+    src/graphics/replay_commands.cpp
+    src/graphics/shader_patch.cpp
+    src/graphics/inline_draws.cpp
+    src/graphics/resolve.cpp
+    src/hooks/predicated_tiling.cpp
+    src/graphics/predicated_tiling.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
+    src/post_effects/create.cpp
+    src/post_effects/record.cpp
+    src/hooks/scene_target.cpp
+    src/scene_target/scene_target.cpp
+    src/hooks/power_graph.cpp
+    src/power_graph/power_graph.cpp
+    src/hooks/car_makers.cpp
+    src/car_makers/record.cpp
+    src/car_makers/garage.cpp
+    src/car_makers/stand.cpp
+    src/hooks/menu_helpers.cpp
+    src/menu_helpers/menu_helpers.cpp
+    src/hooks/morph_jobs.cpp
+    src/morph_jobs/morph_jobs.cpp
+    src/hooks/race_update.cpp
+    src/race_update/race_update.cpp
+    src/race_update/draw_step.cpp
+    src/hooks/stand_models.cpp
+    src/stand_models/setters.cpp
+    src/stand_models/wheels.cpp
+    src/hooks/build_screen.cpp
+    src/build_screen/lists.cpp
+    src/build_screen/rows.cpp
+    src/build_screen/transitions.cpp
+    src/build_screen/builds.cpp
+    src/hooks/tuning_screen.cpp
+    src/tuning_screen/tables.cpp
+    src/tuning_screen/debug.cpp
+    src/tuning_screen/garage_car.cpp
+    src/tuning_screen/aero.cpp
+    src/tuning_screen/marks.cpp
+    src/tuning_screen/nodes.cpp
+    src/tuning_screen/lists.cpp
+    src/tuning_screen/pages.cpp
+    src/tuning_screen/stand.cpp
+    src/tuning_screen/menus.cpp
+    src/tuning_screen/rows.cpp
+    src/tuning_screen/refresh_menu.cpp
+    src/tuning_screen/refresh_movie13.cpp
+    src/tuning_screen/refresh_pages.cpp
+    src/tuning_screen/stats.cpp
+    src/tuning_screen/refresh.cpp
+    src/tuning_screen/refresh_level.cpp
+    src/tuning_screen/refresh_type.cpp
+    src/tuning_screen/refresh_choice.cpp
+    src/tuning_screen/update.cpp
+    src/tuning_screen/commands.cpp
+    src/hooks/tuning_pages.cpp
+    src/tuning_pages/tables.cpp
+    src/tuning_pages/editor.cpp
+    src/tuning_pages/decals.cpp
+    src/tuning_pages/vinyls.cpp
+    src/tuning_pages/nodes.cpp
+    src/tuning_pages/choices.cpp
+    src/tuning_pages/loads.cpp
+    src/tuning_pages/pages.cpp
+    src/tuning_pages/dialogs.cpp
+    src/tuning_pages/vinyl_pages.cpp
+    src/tuning_pages/sticker_pages.cpp
+    src/tuning_pages/sticker_commands.cpp
+    src/tuning_pages/handle_input.cpp
+    src/hooks/screen_constructors.cpp
+    src/screen_constructors/screen_constructors.cpp
+    src/hooks/options_screen.cpp
+    src/options_screen/category_pages.cpp
+    src/options_screen/controls.cpp
+    src/options_screen/handlers.cpp
+    src/options_screen/inits.cpp
+    src/options_screen/load_save.cpp
+    src/options_screen/nodes.cpp
+    src/options_screen/pages.cpp
+    src/options_screen/settings.cpp
+    src/options_screen/steps.cpp
+    src/hooks/type67_modes.cpp
+    src/type67_modes/dialogs.cpp
+    src/type67_modes/garage.cpp
+    src/type67_modes/garage_camera.cpp
+    src/type67_modes/handlers.cpp
+    src/type67_modes/inits.cpp
+    src/type67_modes/modes.cpp
+    src/type67_modes/screen0.cpp
+    src/type67_modes/screens.cpp
+    src/hooks/type67_screens.cpp
+    src/type67_screens/list_helpers.cpp
+    src/type67_screens/list_part.cpp
+    src/type67_screens/list_screens.cpp
+    src/type67_screens/node_tables.cpp
+    src/type67_screens/panel_parts.cpp
+    src/type67_screens/panel_screens.cpp
+    src/type67_screens/pick_car.cpp
+    src/type67_screens/slots.cpp
+    src/type67_screens/titled_list.cpp
+    src/type67_screens/color_list.cpp
+    src/type67_screens/node_screen.cpp
+    src/type67_screens/type6_list.cpp
+    src/type67_screens/type7_list.cpp
+    src/type67_screens/type6_node.cpp
+    src/type67_screens/screen_blocks.cpp
+    src/hooks/car_list.cpp
+    src/hooks/type8_screens.cpp
+    src/type8_screens/panels.cpp
+    src/type8_screens/panel_screen.cpp
+    src/type8_screens/screen.cpp
+    src/type8_screens/init_machine.cpp
+    src/type8_screens/list_part.cpp
+    src/type8_screens/color_part.cpp
+    src/type8_screens/list_screen.cpp
+    src/type8_screens/color_list_screen.cpp
+    src/hooks/type8_mode.cpp
+    src/type8_mode/dialog.cpp
+    src/type8_mode/screen0.cpp
+    src/type8_mode/screen0_update.cpp
+    src/type8_mode/mode.cpp
+    src/car_list/panels.cpp
+    src/car_list/set.cpp
+    src/car_list/pages.cpp
+    src/car_list/update.cpp
+    src/hooks/front_end_screen_helpers.cpp
+    src/front_end_screen_helpers/releases.cpp
+    src/front_end_screen_helpers/dialogs.cpp
+    src/front_end_screen_helpers/car_cards.cpp
+    src/hooks/car_dealer.cpp
+    src/car_dealer/init_states.cpp
+    src/car_dealer/handlers.cpp
+    src/car_dealer/texts.cpp
+    src/car_dealer/lifecycle.cpp
+    src/car_dealer/info.cpp
+    src/car_dealer/transitions.cpp
+    src/car_dealer/update.cpp
+    src/car_dealer/pages.cpp
+    src/car_dealer/menus.cpp
+    src/hooks/save_screen.cpp
+    src/save_screen/steps.cpp
+    src/save_screen/handlers.cpp
+    src/save_screen/update.cpp
+    src/save_screen/inits.cpp
+    src/save_screen/pages.cpp
+    src/save_screen/pages_load.cpp
+    src/save_screen/pages_replays.cpp
+    src/hooks/type2_dialog.cpp
+    src/type2_dialog/steps.cpp
+    src/type2_dialog/pages.cpp
+    src/type2_dialog/handlers.cpp
+    src/type2_dialog/init.cpp
+    src/hooks/power_graph_screen.cpp
+    src/power_graph_screen/handlers.cpp
+    src/power_graph_screen/pages.cpp
+    src/power_graph_screen/steps.cpp
+    src/hooks/achievements.cpp
+    src/achievements/achievements.cpp
+    src/hooks/user_info.cpp
+    src/user_info/handlers.cpp
+    src/user_info/pages.cpp
+    src/user_info/init.cpp
+    src/hooks/type2_mode.cpp
+    src/type2_mode/block.cpp
+    src/type2_mode/delegates.cpp
+    src/type2_mode/init.cpp
+    src/hooks/title_screen_native.cpp
+    src/title_screen/title_load.cpp
+    src/title_screen/init.cpp
+    src/title_screen/screen_handlers.cpp
+    src/title_screen/transitions.cpp
+    src/title_screen/pages.cpp
+    src/title_screen/mode.cpp
+    src/title_screen/press_start.cpp
+    src/title_screen/debug.cpp
+    src/hooks/type10_mode.cpp
+    src/hooks/type5_mode.cpp
+    src/type5_mode/dialog_steps.cpp
+    src/type5_mode/dialog_pages.cpp
+    src/type5_mode/dialog_handlers.cpp
+    src/type5_mode/dialog_init.cpp
+    src/type5_mode/mode.cpp
+    src/type10_mode/init.cpp
+    src/type10_mode/mode.cpp
+    src/type10_mode/theater.cpp
+    src/type10_mode/pages.cpp
+    src/type10_mode/transitions.cpp
+    src/hooks/todays_result.cpp
+    src/todays_result/init.cpp
+    src/todays_result/mode.cpp
+    src/todays_result/result.cpp
+    src/todays_result/event.cpp
+    src/hooks/network_mode.cpp
+    src/network_mode/init.cpp
+    src/network_mode/machines.cpp
+    src/network_mode/mode.cpp
+    src/network_mode/mode_select.cpp
+    src/hooks/garage_screen.cpp
+    src/garage_screen/helpers.cpp
+    src/garage_screen/transitions.cpp
+    src/garage_screen/pages.cpp
+    src/garage_screen/update.cpp
+    src/garage_screen/handlers.cpp
+    src/garage_screen/init.cpp
+    src/garage_screen/texts.cpp
+    src/garage_screen/stand.cpp
+    src/garage_screen/prices.cpp
+    src/garage_screen/cars.cpp
+    src/garage_screen/menu.cpp
+    src/garage_screen/view.cpp
+    src/hooks/tuning_machine.cpp
+    src/tuning_machine/handlers.cpp
+    src/tuning_machine/dialog_no.cpp
+    src/tuning_machine/init.cpp
+    src/tuning_machine/set_up.cpp
+    src/tuning_machine/owned_parts.cpp
+    src/tuning_machine/prices.cpp
+    src/tuning_machine/unlocked_parts.cpp
+    src/tuning_machine/start.cpp
+    src/hooks/race_menu.cpp
+    src/race_menu/handlers.cpp
+    src/race_menu/init.cpp
+    src/race_menu/start.cpp
+    src/race_menu/events.cpp
+    src/race_menu/refresh.cpp
+    src/race_menu/transitions.cpp
+    src/race_menu/pages.cpp
+    src/race_menu/draw.cpp
+    src/hooks/car_settings.cpp
+    src/car_settings/handlers.cpp
+    src/car_settings/init.cpp
+    src/hooks/type2_screens.cpp
+    src/type2_screens/plate_editor.cpp
+    src/type2_screens/plate_cells.cpp
+    src/type2_screens/plate_transitions.cpp
+    src/type2_screens/plate_pages.cpp
+    src/type2_screens/init_states.cpp
+    src/type2_screens/sheet_build.cpp
+    src/type2_screens/hub.cpp
+    src/type2_screens/hub_images.cpp
+    src/type2_screens/hub_movie.cpp
+    src/type2_screens/hub_pages.cpp
+    src/type2_screens/build_enter.cpp
+    src/type2_screens/build_pages.cpp
+    src/type2_screens/hub_update.cpp
+    src/scene_models/apply.cpp
+    src/hooks/frame_driver.cpp
+    src/frame_driver/frame_driver.cpp
+    src/frame_driver/thread.cpp
+    src/frame_driver/scene_set_up.cpp
+    src/hooks/frame_passes.cpp
+    src/frame_passes/frame_passes.cpp
+    src/frame_passes/record.cpp
+    src/frame_passes/record_part1.cpp
+    src/frame_passes/record_part2.cpp
+    src/frame_passes/record_part3.cpp
+    src/hooks/framework.cpp
+    src/framework/framework.cpp
+    src/framework/run_loop.cpp
+    src/framework/main_loop.cpp
+    src/hooks/game_modes.cpp
+    src/game_modes/game_modes.cpp
+    src/game_modes/race_overlays_machine.cpp
+    src/hooks/mode_tick.cpp
+    src/hooks/minimap.cpp
+    src/mode_tick/mode_tick.cpp
+    src/mode_tick/modes_tick.cpp
+    src/minimap/minimap.cpp
+    src/minimap/draw.cpp
+    src/hooks/scenery_lists.cpp
+    src/scenery_lists/scenery_lists.cpp
+    src/scenery_lists/model_draws.cpp
+    src/hooks/scene_models.cpp
+    src/scene_models/scene_models.cpp
+    src/hooks/models.cpp
+    src/models/memory_blocks.cpp
+    src/models/xpr.cpp
+    src/models/texture_provider.cpp
+    src/models/model.cpp
+    src/models/shader_pairs.cpp
+    src/models/part_model.cpp
+    src/models/model_load.cpp
+    src/hooks/shader_objects.cpp
+    src/shader_objects/shader_objects.cpp
+    src/hooks/race_hud.cpp
+    src/race_hud/race_hud.cpp
+    src/hooks/race_setup.cpp
+    src/race_setup/car.cpp
+    src/race_setup/race_data.cpp
+    src/race_setup/course_routes.cpp
+    src/race_setup/set_up.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
+    src/screen_objects/record.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
+    src/course_scenery/collect.cpp
+    src/course_scenery/headlights.cpp
+    src/course_scenery/draw_area.cpp
+    src/course_scenery/draw.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -181,9 +706,15 @@ set(ITC_SOURCES
     src/hooks/std_string.cpp
     src/std_string/std_string.cpp
     src/hooks/sound_cues.cpp
+    src/sound_cues/manager_update.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
     src/xact/xact.cpp
+    src/hooks/xact_waves.cpp
+    src/xact/voices.cpp
+    src/xact/waves.cpp
+    src/hooks/xact_tracks.cpp
+    src/xact/tracks.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -192,70 +723,25 @@ set(ITC_SOURCES
     src/c_runtime/strings.cpp
     src/c_runtime/format.cpp
     src/c_runtime/wide_format.cpp
+    src/c_runtime/narrow_format.cpp
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
+    src/c_runtime/exit.cpp
+    src/c_runtime/random.cpp
+    src/hooks/c_runtime_core.cpp
+    src/c_runtime/core.cpp
     src/game_data/game_data.cpp
+    src/game_data/data_file.cpp
+    src/game_data/create_file.cpp
+    src/hooks/data_file.cpp
     src/display/gamma.cpp
-    src/harnesses/harness.cpp
-    src/harnesses/clock.cpp
-    src/harnesses/last_error.cpp
-    src/harnesses/gamma.cpp
-    src/harnesses/object_attributes.cpp
-    src/harnesses/strings.cpp
-    src/harnesses/time.cpp
-    src/harnesses/start_up.cpp
-    src/harnesses/user.cpp
-    src/harnesses/xmp.cpp
-    src/harnesses/network.cpp
-    src/harnesses/notify.cpp
-    src/harnesses/profile.cpp
-    src/harnesses/saves.cpp
-    src/harnesses/file_class.cpp
-    src/harnesses/movie_files.cpp
-    src/harnesses/xma.cpp
-    src/harnesses/sprites.cpp
-    src/harnesses/billboards.cpp
-    src/harnesses/command_list.cpp
-    src/harnesses/c_runtime.cpp
-    src/harnesses/heap.cpp
-    src/harnesses/c_runtime_heap.cpp
-    src/harnesses/math.cpp
-    src/harnesses/ui_movies.cpp
-    src/harnesses/ui_movies_game.cpp
-    src/harnesses/race_overlays.cpp
-    src/harnesses/vehicle_accessors.cpp
-    src/harnesses/matrix_math.cpp
-    src/harnesses/car_physics.cpp
-    src/harnesses/collision.cpp
-    src/harnesses/collision_world.cpp
-    src/harnesses/collision_world_walls.cpp
-    src/harnesses/track_route.cpp
-    src/harnesses/ai_drivers.cpp
-    src/harnesses/racer_controllers.cpp
-    src/harnesses/track_zones.cpp
-    src/harnesses/graphics_resources.cpp
-    src/harnesses/video_output.cpp
-    src/harnesses/device_state.cpp
-    src/harnesses/course_scenery.cpp
-    src/harnesses/post_effects.cpp
-    src/harnesses/screen_objects.cpp
-    src/harnesses/hardcoded_shaders.cpp
-    src/harnesses/action_mappers.cpp
-    src/harnesses/data_tables.cpp
-    src/harnesses/model_animation.cpp
-    src/harnesses/car_specs.cpp
-    src/harnesses/cameras.cpp
-    src/harnesses/strings_and_font.cpp
-    src/harnesses/std_string.cpp
-    src/harnesses/sound_cues.cpp
-    src/harnesses/xact.cpp
-    src/harnesses/input.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
     src/helpers/clock.cpp
     src/helpers/strings.cpp
+    src/helpers/compare_string.cpp
     src/helpers/executable.cpp
     src/user/profile.cpp
     src/input/gamepads.cpp
@@ -264,9 +750,11 @@ set(ITC_SOURCES
     src/input/logical_pad.cpp
     src/input/physical_pad.cpp
     src/input/xinput.cpp
+    src/input/pad_ticks.cpp
     src/frame_pacing/frame_pacer.cpp
     src/frame_pacing/renderer_hooks.cpp
     src/debug/state_capture.cpp
+    src/debug/state_digest.cpp
     src/debug/frame_state_diff.cpp
     src/debug/idle_timer_scan.cpp
     src/debug/menu_selection_scan.cpp
@@ -305,7 +793,10 @@ set(ITC_SOURCES
 # negation into an addition (LLVM's default model treats a NaN's sign as
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
-# (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) likewise (docs/functions/ui-movies.md), and the
+# (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) and the
+# game's texts drawn (src/ui_movies/texts.cpp), the full-frame effect's quad
+# (src/ui_movies/effect.cpp) and the update's time steps
+# (src/ui_movies/update.cpp) likewise (docs/functions/ui-movies.md), and the
 # matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md)
 # and the car physics (src/car_physics/, docs/functions/car-physics.md) and
 # the collision shapes (src/collision/, docs/functions/collision.md) and the
@@ -316,14 +807,32 @@ set(ITC_SOURCES
 # docs/functions/cameras.md) and the string table and font
 # (src/strings_and_font/, docs/functions/strings-and-font.md) and the
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
-# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
-# objects (src/screen_objects/, docs/functions/screen-objects.md).
+# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the course
+# scenery's collection and draws (src/course_scenery/collect.cpp,
+# docs/functions/course-scenery.md) and the screen
+# objects (src/screen_objects/, docs/functions/screen-objects.md) and the
+# model draws (src/scenery_lists/model_draws.cpp,
+# docs/functions/scenery-lists.md) and the model's load (its weights,
+# src/models/model_load.cpp, docs/functions/models.md) and the race's set-up
+# (src/race_setup/, docs/functions/race-setup.md) and the vehicle above the
+# car physics (src/vehicle/, docs/functions/vehicle.md) and the DXT block
+# encoders (src/texture_compression/, docs/functions/texture-compression.md)
+# and the career (src/career/, docs/functions/career.md) and the race event
+# (src/race_event/, docs/functions/race-event.md) and the camera modes
+# (src/camera_modes/, docs/functions/camera-modes.md) and the car draw
+# (src/car_draw/, docs/functions/car-draw.md) and the car scene's draw
+# (src/car_scene_draw/, docs/functions/car-scene-draw.md) and the front
+# end's car draw (src/front_end_car_draw/,
+# docs/functions/front-end-car-draw.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
-    src/ui_movies/draw.cpp
+    src/ui_movies/animation.cpp
+    src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
+    src/ui_movies/effect.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp
-    src/car_physics/car_data.cpp src/collision/shapes.cpp
+    src/car_physics/car_data.cpp src/car_physics/car_setup.cpp
+    src/car_physics/vehicle_physics.cpp src/collision/shapes.cpp
     src/collision/boxes.cpp src/collision/shape_record.cpp
     src/collision/box_box.cpp src/collision/impacts.cpp src/collision/pairs.cpp
     src/track_collision/track_world.cpp src/track_collision/track_mesh.cpp
@@ -333,7 +842,85 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
-    src/screen_objects/screen_objects.cpp PROPERTIES
+    src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
+    src/models/model_load.cpp src/course_scenery/collect.cpp src/course_scenery/headlights.cpp
+    src/sprites/billboard_record.cpp src/course_scenery/draw_area.cpp src/course_scenery/draw.cpp
+    src/minimap/draw.cpp
+    src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
+    src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
+    src/race_world/race_world_reset.cpp
+    src/race_world/race_start.cpp
+    src/race_world/race_event.cpp
+    src/race_world/race_manager.cpp
+    src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
+    src/race_states/race_progress.cpp
+    src/race_states/race_checks.cpp
+    src/race_states/racers.cpp
+    src/race_states/follow_route.cpp
+    src/race_states/race_states_init.cpp
+    src/race_states/route_distance.cpp
+    src/race_scene/race_scene.cpp
+    src/race_update/race_update.cpp
+    src/stand_models/setters.cpp
+    src/stand_models/wheels.cpp
+    src/menu_sounds/menu_sounds.cpp
+    src/race_sounds/race_sounds.cpp
+    src/race_sounds/race_sounds_cars.cpp
+    src/race_sounds/race_sounds_ticks.cpp
+    src/race_sounds/race_sounds_init.cpp
+    src/accessories/accessories.cpp
+    src/scene/lighting.cpp
+    src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
+    src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
+    src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
+    src/car_models/raster.cpp src/car_models/decals.cpp src/car_models/file_loaded.cpp
+    src/scene_loaders/file_loaded.cpp src/scene_loaders/model_point.cpp
+    src/second_set/finds.cpp src/second_set/morph.cpp src/second_set/wheels.cpp
+    src/load_poll/load_poll.cpp
+    src/car_draw/car_draw.cpp src/car_draw/lighting.cpp src/car_draw/blink.cpp
+    src/car_draw/morph.cpp
+    src/car_draw/light_kit.cpp src/car_draw/parts.cpp src/car_draw/lamps.cpp
+    src/car_draw/shadows.cpp
+    src/car_draw/interior.cpp
+    src/car_draw/cockpit.cpp
+    src/car_draw/traffic.cpp
+    src/car_draw/wheels.cpp
+    src/car_draw/update.cpp
+    src/car_scene_draw/geometry.cpp src/car_scene_draw/projectors.cpp
+    src/car_scene_draw/lights.cpp src/car_scene_draw/texture_projection.cpp
+    src/car_scene_draw/scene_draw.cpp
+    src/front_end_car_draw/garage_stage.cpp src/front_end_car_draw/lights.cpp
+    src/front_end_car_draw/pose.cpp src/front_end_car_draw/draw.cpp
+    src/post_effects/record.cpp
+    src/scene_target/scene_target.cpp
+    src/power_graph/power_graph.cpp
+    src/car_makers/record.cpp src/car_makers/stand.cpp
+    src/frame_passes/record_part1.cpp src/frame_passes/record_part2.cpp
+    src/frame_passes/record_part3.cpp
+    src/car_sounds/x3daudio.cpp
+    src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
+    src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
+    src/xact/tracks.cpp src/xaudio/objects.cpp src/xaudio/resampler.cpp
+    src/xaudio/reverb_stages.cpp src/xaudio/reverb_core.cpp src/xaudio/reverb_setup.cpp
+    src/career/accessors.cpp src/career/records.cpp src/career/unlocks.cpp
+    src/career/race_result.cpp src/career/progress.cpp src/career/event_setup.cpp
+    src/career/garage.cpp
+    src/race_event/conditions.cpp
+    src/race_event/event.cpp
+    src/camera_modes/camera_modes.cpp src/camera_modes/anims.cpp src/camera_modes/views.cpp
+    src/camera_modes/paths.cpp src/camera_modes/chase.cpp src/camera_modes/director.cpp
+    src/camera_modes/cutscene.cpp src/camera_modes/cutscene_scripts.cpp
+    src/build_screen/rows.cpp
+    src/tuning_screen/garage_car.cpp src/tuning_screen/lists.cpp
+    src/tuning_screen/stand.cpp src/tuning_screen/menus.cpp src/tuning_screen/rows.cpp
+    src/tuning_screen/stats.cpp src/tuning_screen/refresh.cpp
+    src/tuning_screen/refresh_level.cpp src/tuning_screen/refresh_type.cpp
+    src/tuning_screen/refresh_choice.cpp src/tuning_screen/commands.cpp
+    src/tuning_screen/refresh_pages.cpp
+    src/tuning_machine/set_up.cpp
+    src/tuning_machine/start.cpp
+    src/tuning_machine/prices.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
@@ -349,44 +936,18 @@ add_library(itc_movies STATIC src/movies/player.cpp)
 target_include_directories(itc_movies PUBLIC src)
 target_link_libraries(itc_movies PRIVATE itc_avformat)
 
-# The SDK's Xenos shader translator (to SPIR-V), built into our binary for
-# the native renderer (docs/native-renderer.md: reused for now, to be
-# replaced). The plugin has its own copy with hidden symbols.
-set(ITC_SDK_GRAPHICS ${REXSDK_DIR}/src/graphics)
-add_library(itc_xenos_shaders STATIC
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/shader.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator_disasm.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_builder.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_alu.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_fetch.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_memexport.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_rb.cpp
-    ${ITC_SDK_GRAPHICS}/format/ucode.cpp
-    ${ITC_SDK_GRAPHICS}/util/draw.cpp
-    ${ITC_SDK_GRAPHICS}/registers.cpp
-    ${ITC_SDK_GRAPHICS}/register_file.cpp
-)
-target_include_directories(itc_xenos_shaders PUBLIC ${REXSDK_DIR}/thirdparty/renderdoc)
-set_target_properties(itc_xenos_shaders PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON)
-target_compile_options(itc_xenos_shaders PRIVATE -Wno-unused-variable)
-target_link_libraries(itc_xenos_shaders PUBLIC
-    rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
-    MachineIndependent GenericCodeGen OSDependent OGLCompiler)
+# The lift sweep's functions (docs/loops/lift-sweep.md): written by
+# tools/lift.py, so taken by glob rather than listed.
+file(GLOB ITC_LIFTED_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lifted/*.cpp")
+list(APPEND ITC_SOURCES ${ITC_LIFTED_SOURCES})
 
-# The game's executable, from our sources and the recompiled code.
-# The harnesses (src/harnesses/, --run_harnesses: "Checking with a harness" in
-# docs/rexglue-removal.md) are for development: CI's builds, the releases'
-# among them, leave them out (-DITC_HARNESSES=OFF; the user's call,
-# 2026-10-25), and so does --run_harnesses with them.
-option(ITC_HARNESSES "Build the harnesses (src/harnesses/, --run_harnesses)" ON)
-if(NOT ITC_HARNESSES)
-    list(FILTER ITC_SOURCES EXCLUDE REGEX "^src/harnesses/")
-endif()
+# The game's executable, from our sources (the recompiled code, generated/,
+# and the harnesses that compared against it, src/harnesses/, aren't built
+# since the rewiring's stage 5: docs/rexglue-removal.md, "Before E1: the
+# rewiring"; the user's call: translated code needs no harnesses, git
+# history keeps them).
+set(ITC_HARNESSES OFF)
 
 function(itc_add_executable name)
     if(WIN32)
@@ -395,51 +956,35 @@ function(itc_add_executable name)
         add_executable(${name} ${ARGN})
     endif()
 
-    rexglue_setup_target(${name})
-
-    target_include_directories(${name} PRIVATE src)
+    target_include_directories(${name} PRIVATE src ${CMAKE_BINARY_DIR}/itc_include)
     if(NOT ITC_HARNESSES)
         target_compile_definitions(${name} PRIVATE ITC_NO_HARNESSES)
     endif()
 
     # Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
-    # included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
-    # include path can't stand in for them.
+    # included with their folder (<xxHash/xxhash.h>).
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders)
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil
+        SDL3::SDL3-static itc_vulkan_headers itc_simde)
 
-    # The native renderer (src/native/) uses SDL, which lives in librexruntime,
-    # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
-    # third-party copies.
-    target_include_directories(${name} PRIVATE
-        ${REXSDK_DIR}/thirdparty/sdl3/include
-        ${REXSDK_DIR}/thirdparty/vulkan-headers/include)
-
-    # rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
-    # the app header need. Headers only: the symbols already live in librexruntime.
-    target_include_directories(${name} PRIVATE
-        $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+    # The flags the SDK's target set-up gave us (rexglue_apply_target_settings),
+    # kept: the large code model (with no linker relaxation) and SSE4.1.
+    if(UNIX AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        target_compile_options(${name} PRIVATE -mcmodel=large)
+        target_link_options(${name} PRIVATE -Wl,--no-relax)
+    endif()
+    if(NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        target_compile_options(${name} PRIVATE -msse4.1)
+    endif()
 endfunction()
 
 itc_add_executable(itc ${ITC_SOURCES})
 
-# The coverage build: which recompiled functions run in play ("Functions
-# seen in play" in docs/rexglue-removal.md). A second executable beside itc,
-# not built by default ('cmake --build ... --target itc_coverage'), whose
-# copy of the recompiled code marks each function the first time it runs;
-# src/debug/coverage.cpp writes the marks out. Its own target rather than a
-# build directory of its own, as the SDK writes its libraries to one place
-# (rexglue-sdk/out/<platform>) whatever the build directory. Linux only.
-option(ITC_COVERAGE "Add the itc_coverage target" OFF)
-if(ITC_COVERAGE)
-    itc_add_executable(itc_coverage ${ITC_SOURCES} src/debug/coverage.cpp)
-    set_target_properties(itc_coverage itc_coverage_recomp PROPERTIES EXCLUDE_FROM_ALL ON)
-    # Without LTO: ThinLTO's import leaves the coverage tables' private
-    # globals (__sancov_gen_*) undefined at the link.
-    target_compile_options(itc_coverage_recomp PRIVATE
-        -fsanitize-coverage=func,inline-bool-flag,pc-table -fno-lto)
-endif()
+# The coverage build (itc_coverage: which recompiled functions ran in play,
+# docs/coverage.md) instrumented the recompiled code, which isn't built since
+# the rewiring's stage 5: no recompiled function runs. Its last list stays in
+# coverage/seen_in_play.txt.
 
 # Decodes one XMA wave from a game bank with our FFmpeg (B2 in
 # docs/rexglue-removal.md; how to run it is at the top of the file). Not

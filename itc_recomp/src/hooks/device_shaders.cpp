@@ -1,0 +1,111 @@
+// The graphics device's shader setters and the render queue's pass lists
+// natively: adapters in front of src/graphics/device_shaders.h
+// (docs/functions/device-shaders.md). Each leaves r3 as the original does.
+//
+// Device::SetVertexShader (sub_822A8808) was Wrapped by src/native/refcount.cpp
+// (the rebind skip: AddRef and Release of the shader already bound skipped);
+// the native one skips the pair itself. Its only caller in play is
+// sub_822A8958, whose adapter calls its plain C++, so it has no adapter of
+// its own; the entry's fallback runs it recompiled with the wrapper's skip.
+// PassList::PassList (sub_82590B38) likewise: only RenderQueue::RenderQueue
+// calls it. PassList::Clear (sub_8258EB38) has no adapter either: its
+// callers in play (the queue's constructor, PassList::PassList and
+// RenderQueue::ClearRecording, src/hooks/render_queue.cpp) call its plain
+// C++.
+
+#include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "graphics/device_shaders.h"
+#include "hooks/heap.h"
+#include "native/refcount.h"
+#include "lifted/sdk.h"
+#include "schema/device_state.h"
+
+ITC_FLAG_BOOL(native_device_shaders, true, "ITC",
+              "Run the graphics device's shader setters (docs/functions/device-shaders.md: "
+              "D3DDevice_SetVertexShader sub_822A8958 with Device::SetVertexShader "
+              "sub_822A8808, SetPixelShader sub_822A8618, SetVertexDeclaration sub_822A8960) "
+              "and the render queue: RenderQueue::RenderQueue sub_825915E0, PassList::PassList "
+              "sub_82590B38 (both with the native heap only; PassList::Clear sub_8258EB38 under them and RenderQueue::ClearRecording) natively instead of through "
+              "the translated code (the same writes to the bound objects, the register shadow "
+              "and the dirty masks; checked by --run_harnesses=device_shaders)");
+ITC_FLAG_DECLARE(bool, refcount_global_lock);
+
+namespace dsh = graphics::device_shaders;
+
+namespace {
+
+// Release and memcpy through the guest, with the original's return addresses.
+dsh::ShaderCalls Calls(lifted::Regs& ctx, uint32_t release_at) {
+  dsh::ShaderCalls calls;
+  calls.release = [&ctx, release_at](uint32_t resource) {
+    ctx.r3.u64 = resource;
+    ctx.lr = release_at;
+    lifted::Enter(ctx, game::Resource::Release);
+    return ctx.r3.u32;
+  };
+  calls.memcpy = [&ctx](uint32_t destination, uint32_t source, uint32_t size,
+                              uint32_t at) {
+    ctx.r3.u64 = destination;
+    ctx.r4.u64 = source;
+    ctx.r5.u64 = size;
+    ctx.lr = at;
+    lifted::Enter(ctx, game::memcpy_825A7410);
+  };
+  return calls;
+}
+
+// The recompiled SetVertexShader with refcount.cpp's rebind skip around it
+// (the wrapper as it was), for the entry's fallback.
+ITC_REGS_STEP(RecompiledSetVertexShader) {
+  if (ITC_FLAG(refcount_global_lock)) {
+    lifted::original::c822A8808(ctx);
+    return;
+  }
+  const uint32_t shader = ctx.r4.u32;
+  const bool same = shader && shader == schema::Device(ctx.r3.u32).vertex_shader();
+  refcount::NoteSetVertexShader(same);
+  if (same) refcount::SetUnchangedShader(shader);
+  lifted::original::c822A8808(ctx);
+  refcount::SetUnchangedShader(0);
+}
+
+}  // namespace
+
+ITC_NATIVE_ENTRY_ALWAYS(822A8958) {
+  
+  if (!ITC_FLAG(native_device_shaders)) {
+    // The original's store, then its tail call with refcount.cpp's skip.
+    schema::Device(ctx.r3.u32).set_entry_vertex_shader(ctx.r4.u32);
+    RecompiledSetVertexShader(ctx);
+    return;
+  }
+  const dsh::ShaderCalls calls = Calls(ctx, 0x822A883C);
+  ctx.r3.u64 = dsh::SetVertexShaderEntry(ctx.r3.u32, ctx.r4.u32, calls);
+}
+
+ITC_NATIVE_ENTRY(822A8618, ITC_FLAG(native_device_shaders)) {
+  const dsh::ShaderCalls calls = Calls(ctx, 0);
+  ctx.r3.u64 = dsh::SetPixelShader(ctx.r3.u32, ctx.r4.u32, calls);
+}
+
+ITC_NATIVE_ENTRY(822A8960, ITC_FLAG(native_device_shaders)) {
+  dsh::SetVertexDeclaration(ctx.r3.u32, ctx.r4.u32);  // r3: the device, as given
+}
+
+// r3: the queue, as given (the original returns it).
+ITC_NATIVE_ENTRY_ALWAYS(825915E0) {
+  
+  if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    if (dsh::RenderQueueConstruct(ctx.r3.u32)) {
+      return;
+    }
+  }
+  lifted::original::c825915E0(ctx);
+}

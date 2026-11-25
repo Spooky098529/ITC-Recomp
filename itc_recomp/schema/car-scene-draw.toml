@@ -1,0 +1,325 @@
+# The schema of docs/functions/car-scene-draw.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car scene's draw (CarScene::Draw, sub_820C5DE8) and the small geometry
+# library under TextureProjection::Fit: the frustum, its planes, the box over
+# a std::vector of 16-byte points, the projectors' matrices; the scene pass
+# description (the scene's +5072) and the image tables the draw reads.
+# Vectors are described lane by lane, with their two doublewords beside the
+# lanes (the originals copy them with ld/std). Most of the draw's
+# temporaries are on its frames (not objects). Hand ports:
+# src/car_scene_draw/, src/hooks/car_scene_draw.cpp.
+#
+# TextureProjection::Fit's r4 (the measure's "TextureProjection::Fit.r4") is
+# a camera pass (+16 the view, +80 the projection, +368 the field of view,
+# +376 and +380 the width and height, +384 and +388 the near and far
+# planes): cameras.toml's CameraPass, not described here.
+
+# A 16-byte point (x, y, z, w): std::vector<16-byte>'s elements, the values
+# its insert and push_back copy, and the points the projectors and a plane's
+# crossing read (the measure sees only the 12 bytes they read: eye, target,
+# segment ends; they are 16-byte vectors on the callers' frames). Dual (E5
+# step 4): the vector's points are in Vector16Storage's host array (the same
+# layout, a handle into it) as well as on the callers' frames.
+[CarScenePoint]
+measures = ["Vector16.+8", "Vector16::InsertN.r4", "Vector16::InsertN.r5", "Vector16::InsertN.r6", "Vector16::PushBack.r4", "Plane::SegmentCrossing.r5", "Plane::SegmentCrossing.r6", "Matrix::LookAt_82597378.r4", "Matrix::LookAt_82597378.r5"]
+size = 16
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the copies' ld/std)" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w as one doubleword" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 for a position" },
+]
+
+# std::vector's storage (Vector16::Allocate: operator new(16 x count)): the
+# 16-byte points (CarScenePoint) up to the capacity. One element a point:
+# the storage is one array (E5 step 4), its handle in the vector's first,
+# last and end (handles into the array). Dual: Vector16::Allocate's port
+# makes it in host memory (NewArray(count)); the lifted original's operator
+# new (return 0x825981B4) keeps guest memory, since it runs only under the
+# lifted TextureProjection::Fit (a NaN or infinite field of view), whose
+# lvx128 reads the points through guest::Pointer. Freed by operator delete
+# (Vector16::InsertN when it grows, TextureProjection::Fit at its end),
+# which tells handles from guest blocks. The measure saw the first two
+# points (32 bytes): its +16 and +24 are the array's next element.
+[Vector16Storage]
+measure = "new<?>@Vector16::Allocate"
+size = 16
+origin = "allocated"
+storage = "dual"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the copies' ld/std); the vector's first, last and end are handles into the array" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w as one doubleword" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 for a position" },
+]
+
+# std::vector of 16-byte points (TextureProjection::Fit's frustum corners on
+# its frame, +128).
+[Vector16]
+measures = ["Vector16", "Box::FromPoints.r4"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "ptr", to = "CarScenePoint", note = "std::vector's allocator word, not read by it; the measure's two pointer reads here are probably Vector16::Insert's iterator (its r3) joined with the vector" },
+  { name = "first", offset = 4, type = "ptr", to = "CarScenePoint", note = "0 with no storage" },
+  { name = "last", offset = 8, type = "ptr", to = "CarScenePoint", note = "one past the last point" },
+  { name = "end", offset = 12, type = "ptr", to = "CarScenePoint", note = "the end of the storage (the capacity)" },
+]
+
+# A box over points (Box::FromPoints, Box::Extend): min and max, w 1.0.
+[CarSceneBox]
+measure = "Box"
+size = 32
+origin = "embedded"
+fields = [
+  { name = "min_x", offset = 0, type = "f32", note = "starts at [0x8206CE44] (probably FLT_MAX)" },
+  { name = "min_y", offset = 4, type = "f32" },
+  { name = "min_z", offset = 8, type = "f32" },
+  { name = "min_w", offset = 12, type = "f32", note = "1.0" },
+  { name = "max_x", offset = 16, type = "f32", note = "starts at [0x8206CE40] (probably -FLT_MAX)" },
+  { name = "max_y", offset = 20, type = "f32" },
+  { name = "max_z", offset = 24, type = "f32" },
+  { name = "max_w", offset = 28, type = "f32", note = "1.0" },
+]
+
+# A plane (x, y, z, d): the normal and the distance term (plane . p + d).
+[CarScenePlane]
+measures = ["Plane", "Plane::SegmentCrossing.r4"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the copies' ld/std)" },
+  { name = "x", offset = 0, type = "f32", note = "the normal (unit length in a frustum)" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zd", offset = 8, type = "u64", note = "z and d as one doubleword" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "d", offset = 12, type = "f32" },
+]
+
+# The frustum (Frustum::FromMatrix, 256 bytes on TextureProjection::Fit's
+# frame at +784).
+[CarSceneFrustum]
+measure = "Frustum"
+size = 256
+origin = "embedded"
+fields = [
+  { name = "planes", offset = 0, type = "bytes", count = 96, note = "six CarScenePlanes from the matrix's w column with and against x, y, z: w - x, w + x, w - y, w + y, w - z, w + z" },
+  { name = "plane_codes", offset = 96, type = "bytes", count = 24, note = "six words: each plane's code, 1 for x < 0, 2 for y, 4 for z" },
+  { name = "unknown_120", offset = 120, type = "bytes", count = 8, note = "not written by FromMatrix" },
+  { name = "corners", offset = 128, type = "bytes", count = 128, note = "eight CarScenePoints (w 1.0), corner k from planes 4 or 5, 2 or 3 and 0 or 1 by k's bits" },
+]
+
+# A 4x4 matrix (row vectors, row-major): Frustum::FromMatrix's argument.
+[CarSceneMatrix]
+measure = "Frustum::FromMatrix.r4"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "m00", offset = 0, type = "f32", note = "row 0, column 0" },
+  { name = "m01", offset = 4, type = "f32" },
+  { name = "m02", offset = 8, type = "f32" },
+  { name = "m03", offset = 12, type = "f32" },
+  { name = "m10", offset = 16, type = "f32" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m12", offset = 24, type = "f32" },
+  { name = "m13", offset = 28, type = "f32" },
+  { name = "m20", offset = 32, type = "f32" },
+  { name = "m21", offset = 36, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m23", offset = 44, type = "f32" },
+  { name = "m30", offset = 48, type = "f32" },
+  { name = "m31", offset = 52, type = "f32" },
+  { name = "m32", offset = 56, type = "f32" },
+  { name = "m33", offset = 60, type = "f32" },
+]
+
+# The scene pass description (docs/known-data.md): the scene's (+5072, set
+# by CarScene::Draw from the tables at 0x82002DF8, 0x82002EF8 and 0x82002F38
+# before each Car::DrawUpdate; the first 64 bytes from the table). The
+# measure sees it through ScenePass::SetLight; the draw reaches it through
+# the scene.
+[ScenePass]
+measure = "CarScene@+5072"
+size = 176
+origin = "embedded"
+fields = [
+  { name = "camera_pass", offset = 0, type = "u32", note = "the camera pass index (0x826BAC00 + 592 x it)" },
+  { name = "shadow_pass_a", offset = 4, type = "u32", note = "the shadows' camera passes" },
+  { name = "shadow_pass_b", offset = 8, type = "u32" },
+  { name = "light_kit_pass", offset = 12, type = "u32" },
+  { name = "parts_shadow_pass", offset = 16, type = "u32", note = "probably" },
+  { name = "group0_key", offset = 20, type = "u32", note = "copied to the render queue's [0x8296B90C] (Model::Draw's group 0)" },
+  { name = "group1_key", offset = 24, type = "u32", note = "copied to [0x8296B900] (group 1)" },
+  { name = "depth_key", offset = 28, type = "u32", note = "copied to [0x8296B908] (the depth buckets)" },
+  { name = "shadow_set_key_0", offset = 32, type = "u32", note = "the shadow sets' keys, +32 to +48" },
+  { name = "shadow_set_key_1", offset = 36, type = "u32" },
+  { name = "shadow_set_key_2", offset = 40, type = "u32" },
+  { name = "shadow_set_key_3", offset = 44, type = "u32" },
+  { name = "shadow_set_key_4", offset = 48, type = "u32" },
+  { name = "light_kit_key", offset = 52, type = "u32" },
+  { name = "parts_shadow_key", offset = 56, type = "u32" },
+  { name = "pass_mask", offset = 60, type = "u32", note = "0x4, 0x10 the plain shadow sets and the tires' depth pass, 0x8 the light kit, 0x20/0x40/0x80 the planar shadows from lights 0 to 2, 0x100 the parts' second depth draw" },
+  { name = "saved_group0_key", offset = 64, type = "u32", note = "[0x8296B90C] while a car draws (put back after it)" },
+  { name = "saved_group1_key", offset = 68, type = "u32", note = "[0x8296B900] while a car draws" },
+  { name = "saved_depth_key", offset = 72, type = "u32", note = "[0x8296B908] while a car draws" },
+  { name = "saved_key_8296B8FC", offset = 76, type = "u32", note = "[0x8296B8FC] saved (car-draw.md)" },
+  { name = "saved_key_8296B8F8", offset = 80, type = "u32", note = "[0x8296B8F8] saved (car-draw.md)" },
+  { name = "unknown_84", offset = 84, type = "bytes", count = 12 },
+  { name = "light_x", offset = 96, type = "f32", note = "ScenePass::SetLight: the light's direction normalized (stvx of the 16 bytes; probably the planar shadow's light)" },
+  { name = "light_y", offset = 100, type = "f32" },
+  { name = "light_z", offset = 104, type = "f32" },
+  { name = "light_w", offset = 108, type = "f32" },
+  { name = "light_matrix", offset = 112, type = "bytes", count = 48, note = "SetLight: rows 0 to 2 of the identity (memcpy of 64 bytes from +112, its last row overwritten below)" },
+  { name = "light_shift_xy", offset = 160, type = "u64", note = "the matrix's last row: -distance x the light's x, y, z, then w 1.0; x and y as one doubleword" },
+  { name = "light_shift_x", offset = 160, type = "f32" },
+  { name = "light_shift_y", offset = 164, type = "f32" },
+  { name = "light_shift_zw", offset = 168, type = "u64", note = "z and w as one doubleword" },
+  { name = "light_shift_z", offset = 168, type = "f32" },
+  { name = "light_shift_w", offset = 172, type = "f32", note = "1.0" },
+]
+
+# One of the three records at 0x82002D40 (60 bytes, 15 words; "car scene
+# draw tables" in docs/known-data.md). An image table: no measure.
+[CarSceneDrawRecord]
+size = 60
+origin = "image"
+fields = [
+  { name = "car_pass", offset = 0, type = "u32", note = "w0: the car view's camera pass (0x826BAC00 + 592 x it)" },
+  { name = "headlight_pass", offset = 4, type = "u32", note = "w1: the pass whose view-projection (+144) gets the headlight projector's" },
+  { name = "fit_down_pass", offset = 8, type = "u32", note = "w2: the first height fit's (straight down)" },
+  { name = "fit_band_pass", offset = 12, type = "u32", note = "w3: the second height fit's" },
+  { name = "light_pass", offset = 16, type = "u32", note = "w4: the light's projection's" },
+  { name = "headlight_target", offset = 20, type = "u32", note = "w5: the CameraPasses::RenderTarget id on sampler 8" },
+  { name = "fit_down_target", offset = 24, type = "u32", note = "w6: on sampler 9" },
+  { name = "fit_band_target", offset = 28, type = "u32", note = "w7: on sampler 10" },
+  { name = "light_target", offset = 32, type = "u32", note = "w8: on sampler 7" },
+  { name = "model_index", offset = 36, type = "u32", note = "w9: the scene model's index (through CarScene::PlayerModel)" },
+  { name = "headlight_key", offset = 40, type = "u32", note = "w10: the render queue keys of the five chunks: the headlight projector" },
+  { name = "shared_textures_key", offset = 44, type = "u32", note = "w11: samplers 11 to 15" },
+  { name = "fit_down_key", offset = 48, type = "u32", note = "w12" },
+  { name = "fit_band_key", offset = 52, type = "u32", note = "w13" },
+  { name = "light_key", offset = 56, type = "u32", note = "w14" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+light_far_plane = { address = 0x82000C34, type = "f32", note = "the first path's light projection's far plane" }
+fit_light_cut = { address = 0x82000D44, type = "f32", note = "the light's fit: its far cut (x the ratio)" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "-1.0" }
+half = { address = 0x82001BE4, type = "f32", note = "probably 0.5: Matrix::Perspective's field-of-view factor, the fit's box center, the second path's ambient light" }
+light_x = { address = 0x82001BE8, type = "f32", note = "the second path's light direction's x; also TextureProjection::Fit's flip +484" }
+fit_down_raise = { address = 0x82001FD8, type = "f32", note = "the first fit's top above the car" }
+light_eye_distance = { address = 0x820021E4, type = "f32", note = "the first path: the light's eye from the model's position along the direction" }
+two = { address = 0x820021E8, type = "f32", note = "probably 2.0 (BuildOrtho's and the fit's scale)" }
+fit_height_band = { address = 0x820021F4, type = "f32", note = "the fits' height band around the car; the first path's orthographic size" }
+fit_down_scale = { address = 0x82002204, type = "f32", note = "the first fit's distance scale; the second path's SetLight distance" }
+fit_light_scale = { address = 0x8200222C, type = "f32", note = "the light's fit's distance scale" }
+fit_light_least = { address = 0x82002674, type = "f32", note = "the light's fit's least distance (x the ratio)" }
+flip_488 = { address = 0x820027A8, type = "f32", note = "TextureProjection::Fit's flip +488" }
+diffuse = { address = 0x8200296C, type = "f32", note = "the second path's second light vector's x, y, z" }
+beam_scale = { address = 0x820029D4, type = "f32", note = "the high beams' color factor" }
+fit_band_cut = { address = 0x82002A0C, type = "f32", note = "the second fit's far cut (x the ratio)" }
+fit_band_scale = { address = 0x82002A1C, type = "f32", note = "the second fit's distance scale" }
+fit_down_cut = { address = 0x82002C38, type = "f32", note = "the first fit's far cut (x the ratio)" }
+fit_band_least = { address = 0x82002CAC, type = "f32", note = "the second fit's least distance (x the ratio)" }
+headlight_far_plane = { address = 0x82002FA8, type = "f32", note = "the headlight projector's far plane" }
+fit_ratio_scale = { address = 0x82002FAC, type = "f32", note = "over the car view's field of view: the fits' ratio" }
+light_distance = { address = 0x82002FB0, type = "f32", note = "the first path's SetLight distance" }
+box_max = { address = 0x8206CE40, type = "f32", note = "Box::FromPoints' starting max (probably -FLT_MAX)" }
+box_min = { address = 0x8206CE44, type = "f32", note = "Box::FromPoints' starting min (probably FLT_MAX)" }
+crossing_epsilon = { address = 0x8206CE48, type = "f32", note = "Plane::SegmentCrossing's smallest |plane . direction|" }
+flip_264 = { address = 0x8206CE4C, type = "f32", note = "TextureProjection::Fit's second +208 matrix's +264" }
+records = { address = 0x82002D40, type = "bytes", count = 180, note = "three CarSceneDrawRecords" }
+pass_descriptions = { address = 0x82002DF8, type = "bytes", count = 256, note = "four 64-byte pass descriptions (ScenePass's first 64 bytes) for the scene's +4 not 0" }
+front_end_description = { address = 0x82002EF8, type = "bytes", count = 64, note = "the one for the scene's +4 = 0" }
+mode8_description = { address = 0x82002F38, type = "bytes", count = 64, note = "instead when the mode type [0x826032DC] is 8 (never made in play)" }
+queue_key_a_start = { address = 0x82601854, type = "u32", note = "the render queue's [0x8296B90C] at the pass loop's start" }
+queue_key_b_start = { address = 0x82601858, type = "u32", note = "[0x8296B900] at the pass loop's start" }
+mode_type = { address = 0x826032DC, type = "u32", note = "the mode type (8 picks 0x82002F38)" }
+view_matrix = { address = 0x8265ECA0, type = "bytes", count = 64, note = "the draws' shared view matrix (scenery-lists.md): the pass's +16" }
+view_eye = { address = 0x8265ECE0, type = "bytes", count = 16, note = "the draws' shared eye: the pass's +400" }
+light_vector = { address = 0x8265ED00, type = "bytes", count = 16, note = "pixel c40's x, y, z: the scene's +5280" }
+bias_matrix = { address = 0x8265EED0, type = "bytes", count = 64, note = "the bias matrix the projectors and the fit end with" }
+render_manager = { address = 0x826BABA0, type = "ptr", note = "the render manager (app-start-up.md)" }
+viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports' pointer array (camera-modes.md): +4 v viewport v (+1860 its view mode)" }
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (scene.md)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (+0xA3AF0 the race kind, +0x59614, +0x59620 the stages, +0x59AE4)" }
+second_human = { address = 0x826C7824, type = "u32", note = "the word Minimap::Draw reads for the human car (0x826C7820's +4)" }
+shared_texture = { address = 0x8296B8F0, type = "u32", note = "the shared assets' texture, or render target 1" }
+queue_key_group1 = { address = 0x8296B900, type = "u32", note = "the render queue's key for Model::Draw's group 1" }
+queue_key_depth = { address = 0x8296B908, type = "u32", note = "the depth buckets' key" }
+queue_key_group0 = { address = 0x8296B90C, type = "u32", note = "group 0's key" }
+light_direction = { address = 0x8296B950, type = "bytes", count = 16, note = "the scene lights' first vector (the light's direction)" }
+light_vectors_a = { address = 0x8296B980, type = "bytes", count = 48, note = "three scene light vectors: +0 the ambient ([0x82001BE4] x3, 1.0), +16 the position, +32 (0, 0, 0, 1)" }
+light_vectors_b = { address = 0x8296B9B0, type = "bytes", count = 48, note = "three: +0 ([0x8200296C] x3, 1.0), +16 and +32 (0, 0, 0, 1)" }
+headlight_positions = { address = 0x8296B9E0, type = "bytes", count = 128, note = "the scene lights' slots 0 to 7 (16 bytes): the other cars' headlight positions" }
+headlight_shapes = { address = 0x8296BA60, type = "bytes", count = 128, note = "slots 0 to 7: the beams' shapes (SceneModel::BeamShape)" }
+headlight_colors_a = { address = 0x8296BAE0, type = "bytes", count = 128, note = "slots 0 to 7: the first colors (the scene's +5248 to +5256 x BeamColor)" }
+headlight_colors_b = { address = 0x8296BB60, type = "bytes", count = 128, note = "slots 0 to 7: the second colors (the scene's +5264 to +5272)" }
+headlight_directions = { address = 0x8296BBE0, type = "bytes", count = 128, note = "slots 0 to 7: the beams' directions" }
+headlight_vectors = { address = 0x8296BC60, type = "bytes", count = 128, note = "slots 0 to 7: the scene's +5440" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt16]
+measure = "Frustum@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt32]
+measure = "Frustum@+32"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from CarSceneFrustum.
+[CarSceneFrustumAt80]
+measure = "Frustum@+80"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from CarScenePlane.
+[CarScenePlaneAt128]
+measure = "Frustum@+128"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]

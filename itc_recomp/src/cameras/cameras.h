@@ -19,6 +19,9 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+#include "schema/cameras.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -28,7 +31,7 @@ namespace cameras {
 // Camera::SetFieldOfView (sub_82593278, vtable slot 1): +368 = `degrees`
 // (f1, a double) times pi/180 (0x82002948), wrapped into [-pi, pi] as
 // Matrix::RotateZ does.
-void SetFieldOfView(uint8_t* base, uint32_t camera, double degrees);
+void SetFieldOfView(uint32_t camera, double degrees);
 
 // Camera::BuildProjection (sub_825932E8): the projection at camera + 80
 // from the floats at `fov`, `aspect`, `far` and `near`: the half angle
@@ -39,13 +42,13 @@ void SetFieldOfView(uint8_t* base, uint32_t camera, double degrees);
 // (0, 0, 0, 1) before any input is read, as the original does. Its stack
 // words (r1 - 112 to r1 - 16) are held here instead: the same values when
 // the stack pointer is 16-byte aligned (the adapter checks).
-void BuildProjection(uint8_t* base, uint32_t camera, uint32_t fov, uint32_t aspect, uint32_t far,
+void BuildProjection(uint32_t camera, uint32_t fov, uint32_t aspect, uint32_t far,
                      uint32_t near);
 
 // Camera::SetViewportSize (sub_82593500, vtable slot 0): +376 and +380 =
 // the width and height (unsigned 32-bit integers) as floats, +392 = width /
 // height, then BuildProjection(camera, +368, +392, +388, +384).
-void SetViewportSize(uint8_t* base, uint32_t camera, uint32_t width, uint32_t height);
+void SetViewportSize(uint32_t camera, uint32_t width, uint32_t height);
 
 // Camera::Update (sub_82593568, vtable slot 2): the view from the Euler
 // angles (+288, +292, +296) and the position (+272): an identity built at
@@ -61,7 +64,7 @@ void SetViewportSize(uint8_t* base, uint32_t camera, uint32_t width, uint32_t he
 // 0x825936C4, 0x825936D4 and 0x82593798; the turns note their own). The
 // original's vertical angle (tan and atan of a constant over the aspect) is
 // left out: nothing reads its result.
-void Update(uint8_t* base, uint32_t camera, uint32_t frame);
+void Update(uint32_t camera, uint32_t frame);
 
 // Camera::Camera (sub_82593908): +0 the vtable (0x82001EC0), 1.0 at +28 and
 // every 16 bytes to +364, the position +272 (0, the floats at 0x8200277C and
@@ -70,7 +73,7 @@ void Update(uint8_t* base, uint32_t camera, uint32_t frame);
 // 0x82009EB8's, 0x8200B5CC's), the aspect +392 (0x82052CFC's), the field of
 // view +368 (0x82001FC4's, wrapped into [-pi, pi]); then BuildProjection and
 // Update (its frame 320 bytes below `frame`, this one's 128-byte frame).
-void Construct(uint8_t* base, uint32_t camera, uint32_t frame);
+void Construct(uint32_t camera, uint32_t frame);
 
 // --- The camera passes (592 bytes each from kPasses) ---
 //
@@ -79,13 +82,14 @@ void Construct(uint8_t* base, uint32_t camera, uint32_t frame);
 // zoom, +564 the clear color, +572 the clear depth, +576 and +580 its
 // surfaces, +584 its type (0-20), +588 whether it's enabled.
 
-constexpr uint32_t kPasses = 0x826BAC00;
-constexpr uint32_t kPassBytes = 592;
+constexpr uint32_t kPasses = schema::CamerasGlobals::passes_address();
+constexpr uint32_t kPassBytes = schema::CameraPass::kSize;
 constexpr uint32_t kPassCount = 21;
 // The mode (CameraPasses::SetMode), the render targets' textures, the
-// viewports' block.
-constexpr uint32_t kMode = 0x826BABC0;
-constexpr uint32_t kViewports = 0x826C2CE8;
+// viewports' block (schema/cameras.h names them; these for other areas'
+// code).
+constexpr uint32_t kMode = schema::CamerasGlobals::mode_address();
+constexpr uint32_t kViewports = schema::CamerasGlobals::viewports_address();
 
 constexpr uint32_t Pass(uint32_t i) {
   return kPasses + kPassBytes * i;
@@ -93,7 +97,7 @@ constexpr uint32_t Pass(uint32_t i) {
 
 // CameraPasses::Mode (sub_8209F718): the mode when `which` is 1, else -1
 // (as a word).
-uint32_t Mode(uint8_t* base, int32_t which);
+uint32_t Mode(int32_t which);
 
 // CameraPasses::SetMode (sub_8209F738): nothing unless `which` is 1; then
 // the mode = `mode`, and mode 0 sets pass 4's field of view to the float at
@@ -101,12 +105,12 @@ uint32_t Mode(uint8_t* base, int32_t which);
 // vtable slot 1 (a tail call): Camera::SetFieldOfView's plain C++ here. False,
 // with nothing done, when that slot isn't Camera::SetFieldOfView (the
 // original then makes the call; never so in play).
-bool SetMode(uint8_t* base, int32_t which, uint32_t mode);
+bool SetMode(int32_t which, uint32_t mode);
 
 // CameraPasses::RenderTarget (sub_8209F7A8, with its case 0, sub_8209F7DC,
 // merged): render target `id`'s texture (0 above 12, unsigned), id 1's by
 // the mode (0 for modes other than 0 and 1).
-uint32_t RenderTarget(uint8_t* base, uint32_t id);
+uint32_t RenderTarget(uint32_t id);
 
 // The guest calls the device's users make (the adapters' guest calls):
 // the video output (`[0x8266D088]`'s vtable slot 7, then that object's slot
@@ -130,7 +134,7 @@ struct DeviceCalls {
 // unlocked. Returns the video output from the last call (r3 as the original
 // leaves it). Needs --native_heap and --native_graphics_resources (the
 // adapter checks).
-uint32_t MakeRenderTarget(uint8_t* base, uint32_t frame, uint32_t id, const DeviceCalls& calls);
+uint32_t MakeRenderTarget(uint32_t frame, uint32_t id, const DeviceCalls& calls);
 
 // CameraPass::SetUpSurfaces' guest calls (the adapter's): the video output
 // (`at` 0 for the lock, 1 for the unlock), CameraPasses::RenderTarget
@@ -163,7 +167,7 @@ struct SurfaceCalls {
 // none in other modes; types above 20 none. The color and depth surfaces
 // (0 for none) into +576 and +580. Needs --native_heap and
 // --native_graphics_resources (the adapter checks).
-void SetUpSurfaces(uint8_t* base, uint32_t frame, uint32_t pass, const SurfaceCalls& calls);
+void SetUpSurfaces(uint32_t frame, uint32_t pass, const SurfaceCalls& calls);
 
 // CameraPass::Init's guest calls (the adapter's): Camera::Camera on the
 // pass, the video output (type 0's two reads; `at` 0 and 1), and
@@ -185,7 +189,7 @@ struct PassInitCalls {
 // +388 (near and far) from +544 and +548, +584 the type, +588 = 0, +376 and
 // +380 the size as floats, CameraPass::Update and CameraPass::SetUpSurfaces.
 // Returns 0.
-uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCalls& calls);
+uint32_t InitPass(uint32_t pass, uint32_t type, const PassInitCalls& calls);
 
 // CameraPasses::InitPasses' guest calls (the adapter's): CameraPass::Init
 // on `pass` with `type` and r5 = `r5` (not read by it), through its
@@ -200,18 +204,18 @@ struct PassesInitCalls {
 // CameraPass::Init(Pass(i), i, [0x826BABE4]) for i = 0 to 20 (the word
 // read each time), then CameraPasses::SetMode(1, [kMode]). Returns the
 // mode it was given.
-uint32_t InitPasses(uint8_t* base, const PassesInitCalls& calls);
+uint32_t InitPasses(const PassesInitCalls& calls);
 
 // CameraPasses::Init (sub_8209F9B8): the 15 words at kMode to 0x826BABFC
 // but 0x826BABC4 (the mode, 0x826BABE4 and 13 of the render targets'
 // textures) set to 0 in the original's order, then InitPasses (a tail
 // call). Returns InitPasses' answer.
-uint32_t InitAll(uint8_t* base, const PassesInitCalls& calls);
+uint32_t InitAll(const PassesInitCalls& calls);
 
 // CameraPass::Enable (sub_820A0968) and CameraPass::Disable (sub_820A0958):
 // +588 = 1 or 0.
-void Enable(uint8_t* base, uint32_t pass);
-void Disable(uint8_t* base, uint32_t pass);
+void Enable(uint32_t pass);
+void Disable(uint32_t pass);
 
 // CameraPasses::EnableForView (sub_820AA1A8): the passes the view needs
 // enabled (Enable): with one viewport ([kViewports] +8 = 0) passes 0, 10,
@@ -219,17 +223,17 @@ void Disable(uint8_t* base, uint32_t pass);
 // in split screen 1, 2, 13 to 18 and 20; then pass 4, and 5 to 9 too when
 // the mode (Mode(1)) is 1. Returns the last pass enabled (4 or 9; the
 // original leaves it in r3).
-uint32_t EnableForView(uint8_t* base);
+uint32_t EnableForView();
 
 // CameraPasses::SetNear (sub_820AA368): pass 0's near plane (+384) = `near`
 // (f1) as a float.
-void SetNear(uint8_t* base, double near);
+void SetNear(double near);
 
 // CameraPass::ReleaseSurfaces (sub_820A0C40): for types 3, 4 and 10 to 20
 // (+584), each surface (+576, then +580) that's set is handed to `release`
 // with its field's offset (Resource::Release, sub_822A67B0: a guest call,
 // made by the adapter) and cleared. Returns whether the type has surfaces.
-bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
+bool ReleaseSurfaces(uint32_t pass,
                      const std::function<void(uint32_t surface, uint32_t field)>& release);
 
 // CameraPass::RecordViewport (sub_820A0978)'s chunk on the command list
@@ -240,7 +244,7 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
 // render queue (slot 8 then 2; the queue's slot 4 with the sort key); nothing
 // done (nullopt) where the original's command list calls would print a
 // message (another chunk open, the list full).
-std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pass);
+std::optional<uint32_t> RecordViewport(uint32_t list, uint32_t pass);
 
 // RecordClear (sub_8209FA38)'s chunk on the command list `list` (as
 // RecordViewport's): a header (+2 = 5), command 26 (1) and a 280-byte item
@@ -249,7 +253,7 @@ std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pa
 // then command 36, in one chunk. Returns its first slot (the adapter hands
 // it to the render queue with the key); nullopt, with nothing done, where
 // the original's command list calls would print a message.
-std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color,
+std::optional<uint32_t> RecordClear(uint32_t list, uint32_t flags, uint32_t color,
                                     uint32_t depth);
 
 // What a pass's recording hands to the render queue: up to two chunks (their
@@ -276,7 +280,7 @@ struct Submissions {
 // Other types: nothing. Nullopt, with nothing done, where the original's
 // command list calls would print a message (another chunk open, the list
 // full): the original then runs.
-std::optional<Submissions> RecordBegin(uint8_t* base, uint32_t list, uint32_t pass);
+std::optional<Submissions> RecordBegin(uint32_t list, uint32_t pass);
 
 // CameraPass::RecordEnd (sub_820A1C30, with its type 3 part sub_820A1CA8
 // merged)'s chunks: a header, command 25 (1) and a resolve
@@ -291,14 +295,14 @@ std::optional<Submissions> RecordBegin(uint8_t* base, uint32_t list, uint32_t pa
 // 18 2 to 10, 19 11, 20 12. Keys: 54, 60, 66, 72, 78, 84, 90 for types 3 to
 // 9, 105 for 19; 20, 12, 15 (then 603) for types 10 to 15, 45, 37, 40 (then
 // 603) for 16 to 18, 24 (then 603) for 20. Nullopt as RecordBegin's.
-std::optional<Submissions> RecordEnd(uint8_t* base, uint32_t list, uint32_t pass,
+std::optional<Submissions> RecordEnd(uint32_t list, uint32_t pass,
                                      const std::function<uint32_t(uint32_t id)>& render_target);
 
 // CameraPasses::RecordBegins (sub_8209F8A0) and RecordEnds (sub_8209F900):
 // `record(pass)` (RecordBegin or RecordEnd, the adapter's) for each enabled
 // pass (+588 not 0) of the 21, in order.
-void RecordBegins(uint8_t* base, const std::function<void(uint32_t pass)>& record);
-void RecordEnds(uint8_t* base, const std::function<void(uint32_t pass)>& record);
+void RecordBegins(const std::function<void(uint32_t pass)>& record);
+void RecordEnds(const std::function<void(uint32_t pass)>& record);
 
 // CameraPass::Update (sub_820A3978): types 0 to 2 (+584, unsigned) first
 // have their viewport recorded (`record_viewport(key)`: RecordViewport with
@@ -319,7 +323,7 @@ void RecordEnds(uint8_t* base, const std::function<void(uint32_t pass)>& record)
 // their return addresses 0x820A3D18 and 0x820A3D90; the turn notes its own).
 // False, with nothing done, where slot 0 isn't Camera::SetViewportSize
 // (never so in play).
-bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
+bool PassUpdate(uint32_t pass, uint32_t frame,
                 const std::function<void(uint32_t key)>& record_viewport);
 
 // CameraPass::FromViewport (sub_820AA4A8)'s work before its tail:
@@ -328,12 +332,12 @@ bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
 // the pass's +400 to +447, PassSetZoom(pass, entry +68), the far plane +388
 // = entry +72, the roll +448 = entry +64. The adapter then calls
 // CameraPass::Update (through its wrapper, which keeps its diagnostics).
-void FromViewport(uint8_t* base, uint32_t pass, uint32_t player, uint32_t entry);
+void FromViewport(uint32_t pass, uint32_t player, uint32_t entry);
 
 // CameraPass::SetZoom (sub_820AA378): +516 = `zoom` (f1) as a float; the
 // field of view +368 = atan(height (+508, a signed integer) x 0.5 / zoom),
 // wrapped into [-pi, pi]; atan the C runtime's (src/c_runtime/math.h).
-void PassSetZoom(uint8_t* base, uint32_t pass, double zoom);
+void PassSetZoom(uint32_t pass, double zoom);
 
 // --- The viewports ([kViewports]: a 12-byte block, +0 and +4 two 1,872-byte
 // viewports, +8 whether both are in use) ---
@@ -346,20 +350,54 @@ void PassSetZoom(uint8_t* base, uint32_t pass, double zoom);
 // (VirtualFree MEM_RELEASE: memory::FreePages), [kViewports] = 0. False,
 // with nothing done, where one isn't the allocation layer's pages (the
 // original frees it).
-bool ReleaseViewports(uint8_t* base);
+bool ReleaseViewports();
+
+// The guest calls the viewports' set-up makes (its adapter's): the video
+// output (`[0x8266D088]`'s vtable slot 7, then that object's slot 3) with
+// r1 = `frame` (Viewport::Init's frame), and atexit where the native one
+// can't.
+struct ViewportCalls {
+  std::function<uint32_t(uint32_t frame)> video_output;
+  c_runtime::AtexitCall atexit;
+};
+// The originals' frames: Viewports::Init's 112 bytes, Viewport::Init's 160
+// below it.
+constexpr uint32_t kViewportsInitFrame = 112;
+constexpr uint32_t kViewportInitFrame = 160;
+
+// Viewport::Init (sub_820AAFF0): Viewport::SetZoom(the video output's width
+// (+296, an integer) x tan(the double at 0x82002818) x 0.5, in single
+// precision; `tangent` is that tan), Viewport::SetRoll(0.0); camera pass 0's
+// near plane (+384) = 1.0; +1860 = 0; the entries' far planes (+72) from
+// passes 0, 3 to 18, 10,000.0, 19 and 20; their +0 = 0; the three vectors
+// at 0x826C2D10 (0, 0, 0, 1), 0x826C2D00 (10, 0, 0, 1) and 0x826C2CF0 (0,
+// 1, 0, 1) made once each (guard bits 1, 2, 4 of 0x826C2D20, each with an
+// atexit: 0x825DAE00, 0x825DADF8, 0x825DADF0), copied to +1680, +1696,
+// +1712; seven (0, 0, 0, 1) from +1728; +1864 = entry 0's zoom, +1868 = pass
+// 0's near plane, +1856 and +1512 = 8,000.0, +1508 = 4.096.
+void ViewportInit(uint32_t viewport, double tangent, uint32_t frame,
+                  const ViewportCalls& calls);
+// Viewports::Init (sub_820AB358): [kViewports] = a 12-byte block
+// (VirtualAlloc: memory::AllocPages) cleared (XMemSet), +0 and +4 two
+// 1,872-byte viewports made and cleared the same way, each Viewport::Init'd
+// (with Viewport::Init's frame below `frame`, Viewports::Init's own); +8 = 0.
+// Returns the second viewport (the original's r3). nullopt, with nothing
+// done, where tan would go to the original (a rounding mode other than
+// nearest).
+std::optional<uint32_t> ViewportsInit(uint32_t frame, const ViewportCalls& calls);
 
 // Viewport::SetZoom (sub_820AAE90): the entries' zoom (+68): entries 0, 1,
 // 8 to 17 and 19 = `zoom` (f1) as a float; 2 to 7 = atan(the integer at
 // 0x82001EF0 (256) x 0.5) times the float at 0x82002808; 18 = 1 / +1856
 // times the float at 0x82002800.
-void ViewportSetZoom(uint8_t* base, uint32_t viewport, double zoom);
+void ViewportSetZoom(uint32_t viewport, double zoom);
 
 // Viewport::SetRoll (sub_820AA2D0): `angle` (f1) wrapped into [-pi, pi] by
 // adding pi, taking off 2 pi while above 2 pi, adding it while below 0 and
 // taking off pi; stored as the roll (+64) of entries 0, 2 to 17 and 19,
 // negated for entry 1. An infinite angle never leaves the first loop, as
 // in the original (the game's are numbers).
-void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle);
+void ViewportSetRoll(uint32_t viewport, double angle);
 
 // Viewport::UpdateEntries (sub_820AA550): entry 0's eye, target and up
 // (+16 to +63) kept at +1760, then the twenty entries' eye (+16), target
@@ -373,20 +411,20 @@ void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle);
 // +z and -z (a cube map's faces); 8 to 16 and 19 from entry 0's eye along
 // -z; 17 the viewport's eye, target and up; 18 above +1648 (y +1856 x 0.5)
 // looking down. Returns entry 16's address (the original's r3).
-uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport);
+uint32_t ViewportUpdateEntries(uint32_t viewport);
 
 // Viewport::Update (sub_820AAE40): ViewportUpdateEntries (a tail call).
-uint32_t ViewportUpdate(uint8_t* base, uint32_t viewport);
+uint32_t ViewportUpdate(uint32_t viewport);
 
 // Viewport::Set (sub_820AAE48): the eye, target, up and fourth vector (16
 // bytes each, from `eye`, `target`, `up`, `fourth`, eight bytes at a time)
 // into +1600 to +1663, then ViewportUpdateEntries (a tail call).
-uint32_t ViewportSet(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target, uint32_t up,
+uint32_t ViewportSet(uint32_t viewport, uint32_t eye, uint32_t target, uint32_t up,
                      uint32_t fourth);
 
 // Viewport::LookAt (sub_820AAF68): +1600 = the eye, +1616 and +1648 = the
 // target, +1632 = (0, 1, 0, 1) (eight bytes at a time), then
 // ViewportUpdateEntries.
-uint32_t ViewportLookAt(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target);
+uint32_t ViewportLookAt(uint32_t viewport, uint32_t eye, uint32_t target);
 
 }  // namespace cameras

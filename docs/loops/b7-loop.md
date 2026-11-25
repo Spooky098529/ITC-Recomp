@@ -17,6 +17,19 @@ know lives in the repo (this file, `docs/loops/b7-progress.md`,
 `docs/loops/leads.md`, the function files, commits), not in the session's
 memory.
 
+## B7's goal (the user's call, 2026-11-14)
+
+A translation of the game that still calls into the SDK to function
+(its kernel and XAM imports), but runs no PPC code for anything: every
+`sub_` function reachable from `main` ours, except the libraries
+replaced wholesale and System Link ("Rules that still hold"). Only the
+imports themselves wait for the core; the game's wrappers over them
+(the critical section wrappers, `_mtinit`, `_getptd` and the like) are
+PPC code, so they are ported too, calling the imports as the original
+does. Never-seen functions count the same as seen ones. The static map
+(`docs/loops/static-map.md`) measures how far there is to go and feeds
+`leads.md`.
+
 ## Settings (set by the user, 2026-10-22)
 
 - **Branch:** the branch the user made for the run and checked out
@@ -41,10 +54,11 @@ memory.
 ## The cycle
 
 1. **Pick a subsystem.** The first is the top of `docs/loops/leads.md`;
-   after that, the lead picks from `leads.md`: the lead whose functions
-   run most often or are closest to being ready
-   (`itc_recomp/tools/b7_groups.py <its functions>`), not one that needs
-   a decision only the user can make. Its line is deleted from `leads.md`
+   after that, the lead picks from `leads.md`: the lead that unblocks
+   the most (the static map's blocker ranking, below), seen in play or
+   not (the user's call, 2026-11-14, replacing "runs most often or
+   closest to being ready"), not one that needs a decision only the
+   user can make. Its line is deleted from `leads.md`
    when picked. A lead marked "no mapping" (cleanup in files
    already mapped, such as adapters to remove) goes straight to a
    migration agent (step 6) with the files it names, and doesn't count as
@@ -107,7 +121,7 @@ nothing runs and there's work, about a minute.
 ## The tooling (what the agents use)
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play
-  (`docs/coverage.md`). Functions that never ran get no rows.
+  (`docs/coverage.md`). Functions that never ran get rows too, marked "Not seen in play" (2026-10-23), and count as work toward B7's goal (2026-11-14).
 - `itc_recomp/tools/b7_status.py`: B7's measure (ours, wrapped, known,
   unknown), by function file; checks rows that say "never called" whose
   function ran.
@@ -118,6 +132,15 @@ nothing runs and there's work, about a minute.
   may go (see "Removing an adapter"). Groups are made native from the
   bottom up, as native code can
   only call what's already ours.
+- `itc_recomp/tools/static_map.py`: the static call graph from `main`
+  (direct calls, address constants, vtables and tables read from the
+  image; an ours function's edges from our C++, `src_edges.py`),
+  writing `docs/loops/static-map.md` (made fresh each run): the
+  totals toward B7's goal, the blockers ranked by how many functions
+  wait on them (what leads are picked by), the frontier's clusters,
+  the unmapped areas and the originals no longer called; `b7_groups.py --static [root ...]` gives groups
+  and blockers for never-seen functions from it (`../coverage.md`, "The
+  static map").
 - `itc_recomp/tools/check_function_statuses.py`: the Status column
   against `src/` (run after any row change); a function in rows of two
   files is an error.
@@ -162,7 +185,9 @@ code, no builds, no game runs):
   cover it, the Status definitions copied from the top of `functions.md`
   word for word, then the table (`| Address | Name | Status | Notes |`,
   one function a row, in the order that reads best; no sorting required).
-  Only functions seen in play get rows. Notes say how much is known ("Not
+  Functions not seen in play get rows too, marked "Not seen in play"
+  (the user's call, 2026-10-23: a session may not have taken their
+  path). Notes say how much is known ("Not
   read", "Not read in detail", "probably" for guesses), as the other files
   do. Fields and globals worked out go in `docs/known-data.md`.
 - **Moves rows, never copies them:** a function already in `functions.md`
@@ -199,7 +224,8 @@ Before any migration, the lead checks, and halts on any failure:
   file is in play.
 - The report's `stop:` is `none`, and nothing in the file needs a
   decision only the user can make: a kernel import replaced, behavior
-  changed on purpose, a new dependency. Allocating guest memory isn't
+  changed on purpose, a new dependency (a decision the user has already
+  made for the same case doesn't count: "Precedent first" below). Allocating guest memory isn't
   one (since 2026-10-22): native code calls the allocation layer
   (`src/memory/heap.h`: `memory::Alloc`, `Free`, `Realloc`, `AllocPages`,
   `FreePages`, `AllocPhysical`; `docs/native-memory.md`), which every
@@ -243,12 +269,17 @@ skips Merged rows). Never
    differ)" groups and no explanations of NaN-sign differences (the
    user's call, 2026-10-23). Every other case matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
-   -j$(nproc)`) and runs `attract_race.sh 40 --run_harnesses=all` (40 s:
-   the harnesses run before the race starts and take longer as they
-   grow; the user's call, 2026-10-23, after 25 and then 30): no new error lines, ~20 seconds at 30 ticks/s (fewer
-   is fine when only the harnesses' growing time took them: the user's
-   call, 2026-10-23), every harness at 0 differing
-   (outside "(expected to differ)" groups); a stalled boot restarted once.
+   -j$(nproc)`) and runs `attract_race.sh 40 --run_harnesses=<list>`
+   with only the harnesses of the subsystem it works on and of any
+   other subsystem whose `src/` files the batch touched (the user's
+   call, 2026-10-28: running them all took ~30 s of the 40 and left
+   ~8 s of race; the validation agent runs them all once, after the
+   migration). The harnesses run before the race starts (40 s: the
+   user's call, 2026-10-23, after 25 and then 30): no new error lines,
+   ~20 seconds at 30 ticks/s (fewer is fine when only the harnesses'
+   time took them: the user's call, 2026-10-23), every harness run at 0
+   differing (outside "(expected to differ)" groups); a stalled boot
+   restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
    dump against one with the fallback flag (attract races put a random
@@ -348,7 +379,8 @@ adapters stay. For each candidate, before removing its adapter:
 Then the adapter is deleted, the row set to Native (saying which native
 callers reach it, and that the fallback flag now switches only them),
 `check_function_statuses.py` run (it refuses Native with an override
-left), and the usual build and `attract_race.sh 40 --run_harnesses=all`.
+left), and the usual build and `attract_race.sh 40 --run_harnesses=<list>`
+(the subsystem's harnesses, and those of the files touched).
 
 It works in batches (a group, or small related groups together, each
 built, raced and committed before the next), one after another in its
@@ -393,8 +425,16 @@ made native, or whose adapter it removed:
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
-2. **Runs** the build and `attract_race.sh 40 --run_harnesses=all` with
-   the default flags, and checks the log has a `native running
+2. **Runs** the build and `attract_race.sh 180 --run_harnesses=all` with
+   the default flags (every harness, once a migration: the migration
+   agent runs only its own, so this run is what shows that nothing else
+   was broken; the user's call, 2026-10-28; 60 s since all of them
+   outgrew 40, the user's call, 2026-10-30; 120 s since they took 56.7
+   of the 60, the user's call, 2026-10-31; 180 s since they took ~85 of
+   the 120, the user's call, 2026-11-07; migration agents stay at 40), checks every harness is at
+   0 differing outside "(expected to differ)" groups (one that isn't,
+   in any subsystem, goes in the report's `race:` line, and the lead
+   halts), and checks the log has a `native running
    (harness):` line for each function: its harness ran our code. A
    function with none didn't (a harness calling the adapter, or `__imp__`
    on both sides once its adapter is gone), or its harness doesn't reach
@@ -455,7 +495,8 @@ file, when:
   expected: the user's call, 2026-10-23; the report still gives the
   seconds);
 - an agent left work uncommitted, or a commit doesn't build;
-- a report's `stop:` isn't `none`;
+- a report's `stop:` isn't `none`, and the user's answer ("Precedent
+  first" below) is to halt;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the run's limit is reached;
 - the tree has changes the loop didn't make, or isn't on the run's branch.
@@ -467,6 +508,173 @@ step 9 of the cycle): the "B7 in progress" line near the top of
 `docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
 (which subsystems are done, the branch, what the rest waits on), and
 commits them with the "Stopped" entry. The user reviews and merges.
+
+## Precedent first
+
+(The user's rule, 2026-10-25, after a run waited on a question.) A
+decision the user has already made holds for every later case like it:
+the lead and the agents follow it without asking again. Before raising
+anything as a `stop:` or a question, look for the user's call: this
+file, `docs/rexglue-removal.md`, the function files' notes and intros,
+`docs/loops/review.md`, CLAUDE.md and the memory notes ("the user's
+call, <date>"). Say in the report or the row which call was followed.
+Calls so far for decisions the loop meets often:
+
+- Allocating guest memory: through `src/memory/heap.h` (2026-10-22).
+- An allocation's size the kernel answers (`MmQueryAllocationSize`
+  under `XPhysicalSize` `sub_822965C0`): answered from our allocation
+  layer, which records each physical block's size, one answer for
+  recompiled and native callers (2026-11-06).
+- A kernel critical section a subsystem's code locks: a host
+  `std::mutex` for that lock, taken by every user of it, native and
+  recompiled (`Edram::Alloc`, 2026-10-24; the memory blocks' lock
+  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stayed
+  recompiled for the other critical sections until 2026-11-14; since
+  "B7's goal" above they are ported too, calling the
+  `Rtl*CriticalSection` imports as the original does. A device-wide lock over a
+  host semaphore: the device lock (2026-10-24).
+- A kernel critical section or a game-built recursive spin lock whose
+  depth the code reads, or which is entered again on purpose: a host
+  recursive lock whose depth can be read, taken by every user, native
+  and recompiled, left and re-entered by the count as the original does
+  (XAudio's API lock `0x8264D518`, 2026-10-29). A lock taken inline
+  (no lock or unlock function to route) whose users aren't all ours:
+  native code takes the game's own lock exactly as the original does,
+  and it becomes the host lock once every user is native (XAudio's
+  voice-list spin lock `0x82954F10`, 2026-10-29).
+- Kernel threads, events, semaphores and notifications a translated
+  library makes and uses itself (XAudio's master and worker threads,
+  its mix events, semaphore and title terminate notification): native
+  code calls their imports (`ExCreateThread`, `KeSetEvent`,
+  `KeWaitFor*`, `KeReleaseSemaphore` and the rest) exactly as the
+  original does; host objects later, once every user is native
+  (2026-10-29).
+  The game's own framework worker pools (`WorkerPool::Create`
+  `sub_82094F30` and the rest: their event, critical sections and
+  threads) follow the same call (the user's call, 2026-11-14).
+- The kernel's clocks a subsystem waits on: answered from the host's
+  steady clock, no flag, recompiled and native callers sharing one
+  clock (GetTickCount, 2026-10-23; QueryPerformanceCounter at the
+  50 MHz timebase recompiled `mftb` reads, 2026-10-29).
+- The game's Semaphore objects a subsystem's code uses: host counting
+  semaphores with a readable count, taken by every user, native and
+  recompiled (the archive loader's four, 2026-10-28); the Semaphore
+  class itself stays recompiled for the others.
+- The graphics: native if the renderer needs it, else Dropped (fence
+  waits, cache flushes, packets nothing reads).
+  `Device::Clear`'s worker `sub_8229FC40` too: native, its packets
+  Dropped, the device state it updates (the bound surfaces, the dirty
+  flags) kept exactly as the original leaves it (the user's call,
+  2026-11-14).
+- XACT is translated (2026-10-23), the music too: it is XACT banks
+  loaded through the sound manager (`Music::Play`,
+  `AudioManager::LoadBank`), not a separate player to replace with a
+  host library (2026-10-31); libraries replaced wholesale aren't mapped
+  ("Rules that still hold").
+- B7 changes no game behavior: stack leftovers and unwritten words are
+  copied as the original leaves them (track zones, the race overlays'
+  machine).
+- Xbox features a subsystem sets up for its own use (voice, XHV): not
+  made, their game-level users seen in play skipped natively with what
+  they'd read with the feature absent, Status Dropped (the voice
+  engine under the app's start-up, 2026-10-30).
+- Multiplayer is bypassed, not ported (the user's call, 2026-11-14,
+  replacing the 2026-11-12 call below for these modes): selecting the
+  Xbox Live item (the type 12 mode) or the split screen item (the type
+  8 mode) on the main menu does nothing. The cut is made there, in
+  native code; the modes' code, the race's kind 4 (split screen) and
+  kind 6 (Live time attack) screens and the network battle become
+  unreachable and get Dropped rows, not ports. Native code already
+  made for them stays until the user says otherwise.
+  Where our native code still names the multiplayer code on a branch
+  play can't take now (the mode factory's type 12, the race HUD
+  machine's kind 4 and 6 branches), that branch goes under the same
+  flag, so the static map stops counting it (`Mode::Create`'s guard
+  kept; the race screens' to follow; the user's call, 2026-11-14). The
+  items are silent (no refusal cue) and look as they did.
+- (Superseded for the Live modes by the bypass above.) An Xbox Live front-end mode the player can open (the type 12 mode,
+  the network battle and time attack, `network-mode.md`): its screens
+  are made native as any front-end mode's, and its Xbox Live calls
+  (sign-in, gamer card, sessions, privileges, leaderboards, the network
+  manager's functions) are answered by plugging in data: the native
+  callers use the values the SDK's XAM imports return today (one
+  signed-in local user, no Live, as B5's `Network::Update` stub), with
+  no 360-style stand-ins; calls whose results aren't read are skipped
+  (Dropped), and nothing the game shows or does changes; not skipped at
+  its entry. Asked to minimize the code left recompiled (the user's
+  call, 2026-11-12, replacing the same day's "Live calls stay
+  recompiled").
+  The network battle's sends (`sub_8214AB48`, `sub_8214AA70`, on the
+  system link socket B5 no longer makes): Dropped. A Live read the
+  SDK's stub answers with "success" and garbage (the leaderboard read
+  `sub_82292CC0`, `XamUserCreateStatsEnumerator`): answered natively as
+  no Live (the read failed, no buffer), though memory differs from
+  today's garbage (both the user's calls, 2026-11-14).
+- Achievements: the game's achievement write keeps calling
+  `XUserWriteAchievements` through the guest (not skipped), so the
+  SDK goes on recording unlocks in its `achievements/<title id>.toml`;
+  the code around it is made native (`Achievements::Write`
+  `sub_82290A30`, 2026-11-13).
+- Register leftovers a varargs callee stores (`UiMovie::SetText`
+  `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
+  the call site): native callers pass 0 for the arguments they don't
+  set (only dead frame words differ), and the harness cases use strings
+  without argument codes for those calls (the parking area, 2026-10-30).
+  Memory leftovers are still copied as the original leaves them.
+- A register leftover a function stores into live state (read later by
+  the game, so it can change behavior), which native code can't
+  reproduce: the function stays recompiled, its row says why
+  (`BuildScreen::BackToBuilds` `sub_821A1258` storing the r7
+  `UiMovie::Run` leaves into its machine's +24, 2026-11-06).
+- Harness run times: migration agents `attract_race.sh 40` with their
+  own harnesses; the validation agent `attract_race.sh 180
+  --run_harnesses=all` (60 s on 2026-10-30, when all of them outgrew
+  40 s; 120 s on 2026-10-31, when they took 56.7 of the 60; 180 s on
+  2026-11-07, when they took ~85 of the 120). If they outgrow 180 too,
+  that's a new case for the user.
+- Adapters a new harness would use as hooks (to see which callees a
+  recompiled caller calls): deleted anyway once their callers in play
+  are ours, and the harness built the bigger way, with the callees'
+  world as their own harnesses build it; no stand-in recorders in
+  adapters (the race HUD machine, 2026-10-31).
+- Functions that end the process or the thread, which a harness
+  can't run on its thread (the C runtime's `KeBugCheck` stub
+  `sub_825AA1A0`, `_CxxThrowException`, `RaiseException`,
+  `XapiThreadStartup`'s `ExTerminateThread`, `_invalid_parameter`'s
+  trap): ported, calling the import exactly as the original, checked
+  by reading against `generated/` instead of a harness; their rows say
+  "no harness: ends the process" (or the thread), and the validation
+  agent counts them like Merged rows. Their callers' other paths are
+  harnessed as usual (the user's call, 2026-11-14).
+- A validation that fails on a harness fault (a harness case reading
+  a wild guest address, or giving a case inputs play never does) rather
+  than a native difference: an agent finds the cause with logging and
+  fixes the harness, the validation is run again, and the loop goes on
+  (`RaceMenu::Transition3`, 2026-11-10; `GarageScreen::Transition6` and
+  `TuningScreen::Update`'s debug handlers, 2026-11-11). A real
+  difference between native and recompiled still halts.
+- The C runtime's per-thread data over the kernel's TLS (`_mtinit`
+  `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
+  here"): left for the core, not taken (2026-10-25). Only when it
+  becomes a blocker (a subsystem's ready work waits on it) does the lead
+  raise it with the user (AskUserQuestion), with what it blocks. A C
+  runtime function over that data that blocks work, like `rand`: native
+  plain C++ reading and writing the same per-thread guest words, found
+  through the guest TLS as the original does (the original's results,
+  one state for recompiled and native callers), while `_getptd` and
+  `_mtinit` stay for the core (`rand`, 2026-11-04).
+  Since 2026-11-14 ("B7's goal" above), `_mtinit`, `_getptd` and the
+  rest are ported too, as plain C++ over the same guest words, calling
+  the kernel's TLS imports as the original does; only the imports wait
+  for the core.
+
+Only something new (no call covers it, or it's unclear whether one
+does) goes to the user. Then the lead asks the user directly
+(AskUserQuestion: the case, the precedent nearest to it, the options)
+and waits for the answer instead of halting the loop; once answered, it
+records the call in the progress file, `review.md` and, when it's one
+the loop will meet again, the list above, and goes on. It halts only if
+the user says to.
 
 ## Rules that still hold
 
@@ -487,9 +695,12 @@ the user's desktop; find problems with logs, not guesses.
 Libraries replaced wholesale aren't mapped or ported, and no lead goes
 into them (the user's call, 2026-10-25): their code no longer runs, and
 the coverage list may still show what ran before (`../coverage.md`). So
-far: the HLSL compiler, everything under `sub_822B8F10` (answered with
+far: the HLSL compiler, everything under `sub_822B8F10`, through calls
+and through its objects' vtables (answered with
 stored shaders, `--use_hardcoded_shaders`, `functions/functions.md`), and
-the movie library, `82481A70`-`82575B07` under the movie class (the
+the movie library, `82481A70`-`82575B07` and the `.embsec_` sections
+`825DC200`-`825FC1B8` (its decoder's code, called only from the library)
+under the movie class (the
 movies played through our FFmpeg, `--play_movies_with_ffmpeg`,
 `functions/movies.md`, `../native-movies.md`). A function in such a range
 is checked against its callers first: one the game's own code still calls

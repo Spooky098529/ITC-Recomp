@@ -1,0 +1,786 @@
+// The camera director's state machine and views (docs/functions/
+// camera-modes.md): CameraDirector::InitStates. Plain C++ over guest
+// memory, the originals' loads and stores in their order.
+
+#include "camera_modes/camera_modes.h"
+
+#include "camera_modes/steps.h"
+
+#include "base/log.h"
+#include "game_modes/game_modes.h"
+#include "guest.h"
+#include "memory/host_copy.h"
+#include "cameras/cameras.h"
+#include "post_effects/post_effects.h"
+#include "track_zones/track_zones.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+#include "schema/camera_modes.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
+
+namespace camera_modes {
+
+using namespace steps;
+
+using G = schema::CameraModesGlobals;
+using Director = schema::CameraDirector;
+
+namespace {
+
+// --- CameraDirector::InitStates's transitions ---
+//
+// As RaceWorld::Init (src/race_world/race_world_init.cpp), the original
+// builds each transition's functor and key in its own stack frame (2,368
+// bytes) and copies the functor's six storage words from a temporary there,
+// some of which it never writes: the transitions keep whatever the stack
+// held. So the stores and copies are replayed in the original's frame, in
+// its order (the table below, read from the generated code), and the
+// transitions get the same words. The functor's member function pointer is
+// stored as two words (+80 and +84) and read back as one doubleword, whose
+// halves the original stores apart: those are the kCopy steps. The frame's
+// back chain and saved registers aren't written.
+
+// A value: a constant, or an offset from the director or the frame.
+struct Value {
+  enum Base : uint8_t { kConst, kDirector, kFrame } base;
+  uint32_t value;
+};
+constexpr Value C(uint32_t value) { return {Value::kConst, value}; }
+constexpr Value M(uint32_t offset) { return {Value::kDirector, offset}; }
+constexpr Value F(uint32_t offset) { return {Value::kFrame, offset}; }
+
+// kStore: [a] = b; kCopy: one word from a to b; kCopy6: six words from a to
+// b, word by word; kAdd: StateMachine::Add(the director's +16, key a,
+// functor part b).
+enum class Op : uint8_t { kStore, kCopy, kCopy6, kAdd };
+struct Step {
+  Op op;
+  Value a;
+  Value b;
+};
+
+constexpr Step kInitSteps[] = {
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(80), C(0x82152338)},
+    {Op::kStore, F(584), M(0)},
+    {Op::kStore, F(580), C(0x82010978)},
+    {Op::kStore, M(9620), C(0x00000001)},
+    {Op::kCopy, F(84), F(592)},
+    {Op::kCopy, F(80), F(588)},
+    {Op::kStore, F(576), F(580)},
+    {Op::kCopy6, F(580), F(836)},
+    {Op::kStore, F(80), C(0x00000001)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(832), F(836)},
+    {Op::kStore, F(860), C(0x00000003)},
+    {Op::kAdd, F(80), F(832)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(452), C(0x82010978)},
+    {Op::kStore, F(456), M(0)},
+    {Op::kStore, F(80), C(0x821596B0)},
+    {Op::kCopy, F(84), F(464)},
+    {Op::kCopy, F(80), F(460)},
+    {Op::kStore, F(448), F(452)},
+    {Op::kCopy6, F(452), F(1348)},
+    {Op::kStore, F(80), C(0x00000003)},
+    {Op::kStore, F(84), C(0x00000003)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1344), F(1348)},
+    {Op::kStore, F(1372), C(0x00000004)},
+    {Op::kAdd, F(80), F(1344)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(196), C(0x82010978)},
+    {Op::kStore, F(200), M(0)},
+    {Op::kStore, F(80), C(0x821594B8)},
+    {Op::kCopy, F(84), F(208)},
+    {Op::kCopy, F(80), F(204)},
+    {Op::kStore, F(192), F(196)},
+    {Op::kCopy6, F(196), F(900)},
+    {Op::kStore, F(924), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(896), F(900)},
+    {Op::kAdd, F(80), F(896)},
+    {Op::kStore, F(1956), C(0x820069BC)},
+    {Op::kStore, F(1952), F(1956)},
+    {Op::kCopy6, F(1956), F(1604)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(1628), C(0x00000005)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(84), C(0x00000005)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1600), F(1604)},
+    {Op::kAdd, F(80), F(1600)},
+    {Op::kStore, F(2212), C(0x820069BC)},
+    {Op::kStore, F(2208), F(2212)},
+    {Op::kCopy6, F(2212), F(772)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x0000000E)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(768), F(772)},
+    {Op::kStore, F(796), C(0x0000000A)},
+    {Op::kAdd, F(80), F(768)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(708), C(0x82010978)},
+    {Op::kStore, F(712), M(0)},
+    {Op::kStore, F(80), C(0x82152400)},
+    {Op::kCopy, F(84), F(720)},
+    {Op::kCopy, F(80), F(716)},
+    {Op::kStore, F(704), F(708)},
+    {Op::kCopy6, F(708), F(1412)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x0000002B)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1408), F(1412)},
+    {Op::kStore, F(1436), C(0x00000026)},
+    {Op::kAdd, F(80), F(1408)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(260), C(0x82010978)},
+    {Op::kStore, F(264), M(0)},
+    {Op::kStore, F(80), C(0x82152400)},
+    {Op::kCopy, F(84), F(272)},
+    {Op::kCopy, F(80), F(268)},
+    {Op::kStore, F(256), F(260)},
+    {Op::kCopy6, F(260), F(1028)},
+    {Op::kStore, F(1052), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x0000002E)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1024), F(1028)},
+    {Op::kAdd, F(80), F(1024)},
+    {Op::kStore, F(2020), C(0x820069BC)},
+    {Op::kStore, F(2016), F(2020)},
+    {Op::kCopy6, F(2020), F(1732)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x0000002C)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1728), F(1732)},
+    {Op::kStore, F(1756), C(0x00000020)},
+    {Op::kAdd, F(80), F(1728)},
+    {Op::kStore, F(2148), C(0x820069BC)},
+    {Op::kStore, F(2144), F(2148)},
+    {Op::kCopy6, F(2148), F(1092)},
+    {Op::kStore, F(1116), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000004)},
+    {Op::kStore, F(84), C(0x00000011)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1088), F(1092)},
+    {Op::kAdd, F(80), F(1088)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(516), C(0x82010978)},
+    {Op::kStore, F(520), M(0)},
+    {Op::kStore, F(80), C(0x821594B8)},
+    {Op::kCopy, F(84), F(528)},
+    {Op::kCopy, F(80), F(524)},
+    {Op::kStore, F(512), F(516)},
+    {Op::kCopy6, F(516), F(1476)},
+    {Op::kStore, F(1500), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000005)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1472), F(1476)},
+    {Op::kAdd, F(80), F(1472)},
+    {Op::kStore, F(1892), C(0x820069BC)},
+    {Op::kStore, F(1888), F(1892)},
+    {Op::kCopy6, F(1892), F(1156)},
+    {Op::kStore, F(1180), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000005)},
+    {Op::kStore, F(84), C(0x00000007)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1152), F(1156)},
+    {Op::kAdd, F(80), F(1152)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(324), C(0x82010978)},
+    {Op::kStore, F(328), M(0)},
+    {Op::kStore, F(80), C(0x821594B8)},
+    {Op::kCopy, F(84), F(336)},
+    {Op::kCopy, F(80), F(332)},
+    {Op::kStore, F(320), F(324)},
+    {Op::kCopy6, F(324), F(1668)},
+    {Op::kStore, F(1692), C(0x00000000)},
+    {Op::kStore, F(80), C(0x0000000A)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1664), F(1668)},
+    {Op::kAdd, F(80), F(1664)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(644), C(0x82010978)},
+    {Op::kStore, F(648), M(0)},
+    {Op::kStore, F(80), C(0x821524B8)},
+    {Op::kCopy, F(84), F(656)},
+    {Op::kCopy, F(80), F(652)},
+    {Op::kStore, F(640), F(644)},
+    {Op::kCopy6, F(644), F(1220)},
+    {Op::kStore, F(80), C(0x0000000A)},
+    {Op::kStore, F(84), C(0x0000000A)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1216), F(1220)},
+    {Op::kStore, F(1244), C(0x0000000B)},
+    {Op::kAdd, F(80), F(1216)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(388), C(0x82010978)},
+    {Op::kStore, F(392), M(0)},
+    {Op::kStore, F(80), C(0x82159948)},
+    {Op::kCopy, F(84), F(400)},
+    {Op::kCopy, F(80), F(396)},
+    {Op::kStore, F(384), F(388)},
+    {Op::kCopy6, F(388), F(1540)},
+    {Op::kStore, F(1564), C(0x00000000)},
+    {Op::kStore, F(80), C(0x0000000B)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1536), F(1540)},
+    {Op::kAdd, F(80), F(1536)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(100), C(0x82010978)},
+    {Op::kStore, F(104), M(0)},
+    {Op::kStore, F(80), C(0x821524D8)},
+    {Op::kCopy, F(84), F(112)},
+    {Op::kCopy, F(80), F(108)},
+    {Op::kStore, F(96), F(100)},
+    {Op::kCopy6, F(100), F(1284)},
+    {Op::kStore, F(1308), C(0x00000026)},
+    {Op::kStore, F(80), C(0x0000000B)},
+    {Op::kStore, F(84), C(0x0000000B)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1280), F(1284)},
+    {Op::kAdd, F(80), F(1280)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(132), C(0x82010978)},
+    {Op::kStore, F(136), M(0)},
+    {Op::kStore, F(80), C(0x821594B8)},
+    {Op::kCopy, F(84), F(144)},
+    {Op::kCopy, F(80), F(140)},
+    {Op::kStore, F(128), F(132)},
+    {Op::kCopy6, F(132), F(1796)},
+    {Op::kStore, F(1820), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1792), F(1796)},
+    {Op::kAdd, F(80), F(1792)},
+    {Op::kStore, F(1924), C(0x820069BC)},
+    {Op::kStore, F(1920), F(1924)},
+    {Op::kCopy6, F(1924), F(804)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x0000001D)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(800), F(804)},
+    {Op::kStore, F(828), C(0x00000018)},
+    {Op::kAdd, F(80), F(800)},
+    {Op::kStore, F(1988), C(0x820069BC)},
+    {Op::kStore, F(1984), F(1988)},
+    {Op::kCopy6, F(1988), F(868)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x00000031)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(864), F(868)},
+    {Op::kStore, F(892), C(0x00000025)},
+    {Op::kAdd, F(80), F(864)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(164), C(0x82010978)},
+    {Op::kStore, F(168), M(0)},
+    {Op::kStore, F(80), C(0x821597F0)},
+    {Op::kCopy, F(84), F(176)},
+    {Op::kCopy, F(80), F(172)},
+    {Op::kStore, F(160), F(164)},
+    {Op::kCopy6, F(164), F(932)},
+    {Op::kStore, F(956), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x00000025)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(928), F(932)},
+    {Op::kAdd, F(80), F(928)},
+    {Op::kStore, F(2052), C(0x820069BC)},
+    {Op::kStore, F(2048), F(2052)},
+    {Op::kCopy6, F(2052), F(996)},
+    {Op::kStore, F(1020), C(0x0000000A)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x0000000E)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(992), F(996)},
+    {Op::kAdd, F(80), F(992)},
+    {Op::kStore, F(2116), C(0x820069BC)},
+    {Op::kStore, F(2112), F(2116)},
+    {Op::kCopy6, F(2116), F(1060)},
+    {Op::kStore, F(1084), C(0x0000000A)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x00000018)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1056), F(1060)},
+    {Op::kAdd, F(80), F(1056)},
+    {Op::kStore, F(2180), C(0x820069BC)},
+    {Op::kStore, F(2176), F(2180)},
+    {Op::kCopy6, F(2180), F(1124)},
+    {Op::kStore, F(1148), C(0x00000020)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x0000002C)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1120), F(1124)},
+    {Op::kAdd, F(80), F(1120)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(228), C(0x82010978)},
+    {Op::kStore, F(232), M(0)},
+    {Op::kStore, F(80), C(0x82152400)},
+    {Op::kCopy, F(84), F(240)},
+    {Op::kCopy, F(80), F(236)},
+    {Op::kStore, F(224), F(228)},
+    {Op::kCopy6, F(228), F(1188)},
+    {Op::kStore, F(1212), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x0000002B)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1184), F(1188)},
+    {Op::kAdd, F(80), F(1184)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(292), C(0x82010978)},
+    {Op::kStore, F(296), M(0)},
+    {Op::kStore, F(80), C(0x82153160)},
+    {Op::kCopy, F(84), F(304)},
+    {Op::kCopy, F(80), F(300)},
+    {Op::kStore, F(288), F(292)},
+    {Op::kCopy6, F(292), F(1252)},
+    {Op::kStore, F(80), C(0x00000026)},
+    {Op::kStore, F(84), C(0x0000001B)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1248), F(1252)},
+    {Op::kStore, F(1276), C(0x00000015)},
+    {Op::kAdd, F(80), F(1248)},
+    {Op::kStore, F(2244), C(0x820069BC)},
+    {Op::kStore, F(2240), F(2244)},
+    {Op::kCopy6, F(2244), F(1316)},
+    {Op::kStore, F(1340), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000018)},
+    {Op::kStore, F(84), C(0x0000001D)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1312), F(1316)},
+    {Op::kAdd, F(80), F(1312)},
+    {Op::kStore, F(2084), C(0x820069BC)},
+    {Op::kStore, F(2080), F(2084)},
+    {Op::kCopy6, F(2084), F(1380)},
+    {Op::kStore, F(1404), C(0x00000025)},
+    {Op::kStore, F(80), C(0x00000018)},
+    {Op::kStore, F(84), C(0x00000031)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1376), F(1380)},
+    {Op::kAdd, F(80), F(1376)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(356), C(0x82010978)},
+    {Op::kStore, F(360), M(0)},
+    {Op::kStore, F(80), C(0x82106540)},
+    {Op::kCopy, F(84), F(368)},
+    {Op::kCopy, F(80), F(364)},
+    {Op::kStore, F(352), F(356)},
+    {Op::kCopy6, F(356), F(1444)},
+    {Op::kStore, F(1468), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000018)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1440), F(1444)},
+    {Op::kAdd, F(80), F(1440)},
+    {Op::kStore, F(1860), C(0x820069BC)},
+    {Op::kStore, F(1856), F(1860)},
+    {Op::kCopy6, F(1860), F(1508)},
+    {Op::kStore, F(1532), C(0x00000020)},
+    {Op::kStore, F(80), C(0x00000018)},
+    {Op::kStore, F(84), C(0x0000002C)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1504), F(1508)},
+    {Op::kAdd, F(80), F(1504)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(420), C(0x82010978)},
+    {Op::kStore, F(424), M(0)},
+    {Op::kStore, F(80), C(0x821594B8)},
+    {Op::kCopy, F(84), F(432)},
+    {Op::kCopy, F(80), F(428)},
+    {Op::kStore, F(416), F(420)},
+    {Op::kCopy6, F(420), F(1572)},
+    {Op::kStore, F(1596), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000015)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1568), F(1572)},
+    {Op::kAdd, F(80), F(1568)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(484), C(0x82010978)},
+    {Op::kStore, F(488), M(0)},
+    {Op::kStore, F(80), C(0x821597F0)},
+    {Op::kCopy, F(84), F(496)},
+    {Op::kCopy, F(80), F(492)},
+    {Op::kStore, F(480), F(484)},
+    {Op::kCopy6, F(484), F(1636)},
+    {Op::kStore, F(1660), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000015)},
+    {Op::kStore, F(84), C(0x0000001A)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1632), F(1636)},
+    {Op::kAdd, F(80), F(1632)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(548), C(0x82010978)},
+    {Op::kStore, F(552), M(0)},
+    {Op::kStore, F(80), C(0x821597F0)},
+    {Op::kCopy, F(84), F(560)},
+    {Op::kCopy, F(80), F(556)},
+    {Op::kStore, F(544), F(548)},
+    {Op::kCopy6, F(548), F(1700)},
+    {Op::kStore, F(1724), C(0x00000026)},
+    {Op::kStore, F(80), C(0x00000015)},
+    {Op::kStore, F(84), C(0x00000013)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1696), F(1700)},
+    {Op::kAdd, F(80), F(1696)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(612), C(0x82010978)},
+    {Op::kStore, F(616), M(0)},
+    {Op::kStore, F(80), C(0x82153150)},
+    {Op::kCopy, F(84), F(624)},
+    {Op::kCopy, F(80), F(620)},
+    {Op::kStore, F(608), F(612)},
+    {Op::kCopy6, F(612), F(1764)},
+    {Op::kStore, F(1788), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000020)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1760), F(1764)},
+    {Op::kAdd, F(80), F(1760)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(676), C(0x82010978)},
+    {Op::kStore, F(680), M(0)},
+    {Op::kStore, F(80), C(0x82106540)},
+    {Op::kCopy, F(84), F(688)},
+    {Op::kCopy, F(80), F(684)},
+    {Op::kStore, F(672), F(676)},
+    {Op::kCopy6, F(676), F(1828)},
+    {Op::kStore, F(1852), C(0x00000000)},
+    {Op::kStore, F(80), C(0x00000025)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(1824), F(1828)},
+    {Op::kAdd, F(80), F(1824)},
+    {Op::kStore, F(84), C(0x00000000)},
+    {Op::kStore, F(740), C(0x82010978)},
+    {Op::kStore, F(744), M(0)},
+    {Op::kStore, F(80), C(0x82153098)},
+    {Op::kCopy, F(84), F(752)},
+    {Op::kCopy, F(80), F(748)},
+    {Op::kStore, F(736), F(740)},
+    {Op::kCopy6, F(740), F(964)},
+    {Op::kStore, F(80), C(0x00000025)},
+    {Op::kStore, F(960), F(964)},
+    {Op::kStore, F(84), C(0x00000032)},
+    {Op::kStore, F(88), C(0x00000000)},
+    {Op::kStore, F(92), C(0x00000000)},
+    {Op::kStore, F(988), C(0x00000023)},
+    {Op::kAdd, F(80), F(960)},
+    {Op::kStore, M(9628), C(0x00000000)},
+    {Op::kStore, M(9632), C(0x00000000)},
+    {Op::kStore, M(9624), C(0x00000000)},
+};
+
+}  // namespace
+
+uint32_t DirectorInitStates(uint32_t director, uint32_t frame, bool* replaced) {
+  ITC_NATIVE_RUNNING("sub_82159950 CameraDirector::InitStates");
+  auto at = [&](const Value& v) {
+    switch (v.base) {
+      case Value::kConst:
+        return v.value;
+      case Value::kDirector:
+        return director + v.value;
+      case Value::kFrame:
+        break;
+    }
+    return frame + v.value;
+  };
+  uint32_t r3 = 0;
+  for (const Step& step : kInitSteps) {
+    switch (step.op) {
+      case Op::kStore:
+        guest::StoreU32(at(step.a), at(step.b));
+        break;
+      case Op::kCopy:
+        guest::StoreU32(at(step.b), guest::LoadU32(at(step.a)));
+        break;
+      case Op::kCopy6:
+        for (uint32_t i = 0; i < 6; i++) {
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
+        }
+        break;
+      case Op::kAdd:
+        r3 = game_modes::StateMachineAdd(Director(director).machine_address(),
+                                         at(step.a), at(step.b), replaced);
+        break;
+    }
+  }
+  return r3;
+}
+
+uint32_t DirectorSetMode(uint32_t director, uint32_t view, uint32_t frame,
+                         const SetModeCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821591F0 CameraDirector::SetMode");
+  const uint32_t first_vehicle = track_zones::RacersVehicle(0);
+  guest::StoreU32(frame + 80, first_vehicle);
+  const uint32_t second_vehicle = track_zones::RacersVehicle(1);
+  const schema::Viewports viewports = G::viewports();
+  guest::StoreU32(frame + 84, second_vehicle);
+  const schema::Viewport first = viewports.first();
+  const schema::Viewport second = viewports.second();
+  const Director d(director);
+  d.set_view(view);
+  first.set_view_mode(view);
+  second.set_view_mode(d.view());
+  ResetRoll();
+  // ResetRoll's r3: viewport 1 (its adapter's), what a view past 5 leaves.
+  uint32_t r3 = G::viewports().second().address;
+  const uint32_t mode = d.view();
+  d.set_camera(0);
+  d.set_camera2(0);
+  // The followed player's vehicle from the two kept in the frame (a player
+  // past 1 reads the frame's next words, as the original does).
+  auto followed = [&] { return guest::LoadU32(frame + 80 + 4 * d.followed()); };
+  // The view's object made in place; 0 where its address is 0 (never in play).
+  auto make = [&](uint32_t view_index, uint32_t offset, uint32_t viewport, uint32_t vehicle,
+                  uint32_t back) -> uint32_t {
+    const uint32_t object = director + offset;
+    if (object == 0) {
+      return 0;
+    }
+    return calls.construct(view_index, object, viewport, vehicle, back);
+  };
+  struct View {
+    uint32_t offset;
+    uint32_t back;
+  };
+  const Director at0(0);
+  const View views[6] = {
+      {at0.view0_camera_address(), 0x821593C0}, {at0.view1_camera_address(), 0x8215939C},
+      {at0.view2_camera_address(), 0x82159378}, {at0.intro_camera_address(), 0x82159300},
+      {at0.tv_camera_address(), 0x821592D8},    {at0.cutscene_address(), 0x821592B4}};
+  if (mode > 5) {
+    return r3;
+  }
+  if (mode == 2 && G::viewports().split() != 0) {
+    // Split screen: player 0's and player 1's in-car views.
+    r3 = make(2, at0.view2_camera_address(), first.address, first_vehicle, 0x82159328);
+    d.set_camera(r3);
+    r3 = make(2, at0.view2_camera2_address(), second.address, second_vehicle, 0x8215934C);
+    d.set_camera2(r3);
+    return r3;
+  }
+  r3 = director + views[mode].offset == 0
+           ? 0
+           : make(mode, views[mode].offset, first.address, followed(), views[mode].back);
+  d.set_camera(r3);
+  return r3;
+}
+
+namespace {
+
+// OnRaceStart's and Resume's choice of the followed player: with the race's
+// kind 6 and the current stage's copy's first word (Stages::Copy of stage
+// -1 into `frame` + 80) not 1, 1 when [0x826C7824] is 0, else 0; nullopt
+// where the original leaves them.
+std::optional<uint32_t> Followed(uint32_t frame, const StagesCopyCall& stages_copy) {
+  const uint32_t race = G::race_data();
+  if (int32_t(schema::RaceData(race).kind()) != 6) {
+    return std::nullopt;
+  }
+  const uint32_t stages = schema::RaceData(race).stages_address();
+  if (!vehicle_accessors::StagesCopy(frame + 80, stages, 0xFFFFFFFF)) {
+    stages_copy(frame + 80, stages, 0xFFFFFFFF);
+  }
+  if (int32_t(schema::StageCopy(frame + 80).first()) == 1) {
+    return std::nullopt;
+  }
+  return G::two_player() == 0 ? 1u : 0u;
+}
+
+}  // namespace
+
+void DirectorOnRaceStart(uint32_t director, uint32_t frame,
+                         const StagesCopyCall& stages_copy,
+                         const std::function<void(uint32_t view)>& set_mode) {
+  ITC_NATIVE_RUNNING("sub_821596B0 CameraDirector::OnRaceStart");
+  const schema::Viewports holder = G::viewports();
+  const schema::Viewport first = holder.first();
+  const schema::Viewport second = holder.second();
+  const Director d(director);
+  const schema::SaveData save(vehicle_accessors::SaveDataOf(0));
+  if (int32_t(schema::RaceData(G::race_data()).kind()) == 4) {
+    G::viewports().set_split(1);
+  }
+  if (const auto followed = Followed(frame, stages_copy)) {
+    d.set_followed(*followed);
+    d.set_followed_input(*followed);
+  }
+  if (G::viewports().split() == 0) {
+    d.set_start_view(0);
+    const uint32_t setting = save.camera_view();
+    if (setting == 0) {
+      d.set_start_view(2);
+    } else if (setting == 1) {
+      d.set_start_view(1);
+    } else if (setting == 2) {
+      d.set_start_view(0);
+    }
+    first.set_view_mode(d.start_view());
+  } else {
+    d.set_start_view(2);
+    first.set_view_mode(2);
+    second.set_view_mode(d.start_view());
+  }
+  set_mode(d.start_view());
+  d.set_view_kept(d.start_view());
+}
+
+bool DirectorResumeReady() {
+  const uint32_t filter = post_effects::Get(2);
+  if (filter == 0) {
+    return true;
+  }
+  // Its slots 4, 6 and 7: ColorFilter::SetColor0, Set8112 and Set8116.
+  const uint32_t vtable = guest::LoadU32(filter);
+  return guest::LoadU32(vtable + 16) == 0x821350F8 &&
+         guest::LoadU32(vtable + 24) == 0x82135138 &&
+         guest::LoadU32(vtable + 28) == 0x82135140;
+}
+
+void DirectorResume(uint32_t director, uint32_t frame,
+                    const StagesCopyCall& stages_copy,
+                    const std::function<void(uint32_t view)>& set_mode) {
+  ITC_NATIVE_RUNNING("sub_821597F0 CameraDirector::Resume");
+  const schema::Viewports holder = G::viewports();
+  const schema::Viewport first = holder.first();
+  const schema::Viewport second = holder.second();
+  const Director d(director);
+  const uint32_t followed = Followed(frame, stages_copy).value_or(0);
+  // Without the kind 6 path, or with [0x826C7824] set, both are 0.
+  d.set_followed(followed);
+  d.set_followed_input(followed);
+  if (int32_t(schema::RaceData(G::race_data()).kind()) == 4) {
+    G::viewports().set_split(1);
+    first.set_view_mode(2);
+    second.set_view_mode(2);
+    set_mode(2);
+  } else {
+    first.set_view_mode(d.view_kept());
+  }
+  const uint32_t filter = post_effects::Get(2);
+  if (filter == 0) {
+    return;
+  }
+  const double zero = G::zero();
+  post_effects::ColorFilterSet(filter, 8112, zero);
+  const double one = G::one();
+  post_effects::ColorFilterSetColor0(filter, one, one, one);
+  post_effects::ColorFilterSet(filter, 8116, zero);
+}
+
+void DirectorUpdate(uint32_t director, uint32_t frame,
+                    const DirectorUpdateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821594B8 CameraDirector::Update");
+  const schema::Viewports holder = G::viewports();
+  const schema::Viewport first = holder.first();
+  const Director d(director);
+  // The followed player's car input record (0x826C5B30 + 4 x its low byte):
+  // five words copied into the frame at +96.
+  const uint32_t player = d.followed_input() & 0xFF;
+  const uint32_t input = guest::LoadU32(G::input_records_address() + 4 * player);
+  // A host record (E5 step 4) is copied with each field swapped.
+  if (!memory::CopyWithHandles(frame + 96, input, 20)) {
+    for (uint32_t i = 0; i < 5; i++) {
+      guest::StoreU32(frame + 96 + 4 * i, guest::LoadU32(input + 4 * i));
+    }
+  }
+  const uint32_t buttons = guest::LoadU32(frame + 96);
+  auto tv_flag = [&] { return (schema::RaceData(G::race_data()).flags() >> 7) & 1; };
+  if (buttons & 0x40) {
+    // The camera button: viewport 0's view mode cycles.
+    const uint32_t mode = first.view_mode();
+    std::optional<uint32_t> next;
+    if (tv_flag()) {
+      next = mode == 0 ? std::optional<uint32_t>(4)
+             : mode == 1 ? std::optional<uint32_t>(2)
+             : mode == 2 ? std::optional<uint32_t>(0)
+             : mode == 4 ? std::optional<uint32_t>(1)
+                         : std::nullopt;
+    } else if (holder.split() == 0) {
+      next = mode == 0 ? std::optional<uint32_t>(1)
+             : mode == 1 ? std::optional<uint32_t>(2)
+             : mode == 2 ? std::optional<uint32_t>(0)
+                         : std::nullopt;
+    }
+    if (next) {
+      first.set_view_mode(*next);
+    }
+  }
+  if (tv_flag() && int32_t(first.view_mode()) != 4) {
+    // The camera's track position's +4 (its tracker's +228).
+    calls.track(d.tv_camera_address(), d.camera() + 260);
+  }
+  const uint32_t mode = first.view_mode();
+  if (int32_t(mode) != int32_t(d.view())) {
+    calls.set_mode(mode);
+  }
+  if ((buttons & 0x80) && d.view() == 0) {
+    d.set_view0_state(1);
+  }
+  if (d.view() == 1) {
+    // The input's +12 halfword (the camera stick, probably), as a
+    // doubleword at +80 and then a float.
+    const int64_t stick = int16_t(guest::LoadU16(frame + 108));
+    guest::StoreU32(frame + 80, uint32_t(uint64_t(stick) >> 32));
+    guest::StoreU32(frame + 84, uint32_t(stick));
+    const double value = Single(double(stick));
+    d.set_view1_look_angle(
+        float(Fmuls(Fmuls(value, Lfs(0x82002BD4)), Lfs(0x820093CC))));
+  }
+  calls.slot0(d.camera(), 0);
+  if (G::viewports().split() != 0) {
+    const uint32_t second = d.camera2();
+    if (second != 0) {
+      calls.slot0(second, 1);
+    }
+  }
+  cameras::ViewportUpdate(first.address);
+  const schema::Viewports again = G::viewports();
+  if (again.split() != 0) {
+    cameras::ViewportUpdate(again.second().address);
+  }
+}
+
+}  // namespace camera_modes

@@ -1,0 +1,277 @@
+# The schema of docs/functions/tuning-pages.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The tuning screen's pages (src/tuning_pages/): the screen itself is
+# tuning-screen.toml's TuningScreen. Here: the decal images at its +10048,
+# the UI movie as UiMovies::Find's table gives it (its +28 texture table,
+# which the vinyl and sticker editors rewrite), the UI primitives' vertices
+# and the type 2 mode's message ring as Leave posts to it.
+#
+# Left to other areas' files (the measure gave them to this area by a tie
+# or a split; see the area's report):
+# - "TuningScreen.+10040" is the category menu, a FrontEndMenu
+#   (menu-helpers.toml).
+# - "TuningScreen::GarageDecal.ret" is car-makers.toml's CarMakersCarDecal
+#   (the garage car's 32-byte decal record).
+# - "Color::HsvToRgb_8224AB50.r4" is material-passes.toml's HsvColor.
+# - "new<32>@PanelSetBase::SetUpColors" is car-list.toml's CarListColor.
+# - "UiMovies::Find.ret.+0.+28.+636" (tuning-machine.toml) is one more
+#   UiMovieTexture.
+
+# UiMovieObject: merged into ui-movies-game.toml's UiMovie at the integration (the same object).
+
+# A UI movie's texture table ([movie + 28]): pointers to its textures, one
+# a texture index n (+4n). The vinyl editor rewrites movie 13's, the
+# sticker editor movie 14's (known-data.md, the tuning screen: +640 to
+# +692, +700 to +736, +764 to +784, 4 x (191 + layer), 4 x (194 + layer)).
+[UiMovieTextureTable]
+measure = "UiMovies::Find.ret.+0.+28"
+size = 2048
+origin = "embedded"
+fields = [
+  { name = "slots", offset = 0, type = "bytes", count = 2048, note = "512 texture pointers (UiMovieTexture), by index" },
+  { name = "texture_8", offset = 32, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_9", offset = 36, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_159", offset = 636, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_160", offset = 640, type = "ptr", to = "UiMovieTexture", note = "movie 13: the vinyl images' first (to 165)" },
+  { name = "texture_161", offset = 644, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_162", offset = 648, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_163", offset = 652, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_164", offset = 656, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_165", offset = 660, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_168", offset = 672, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_169", offset = 676, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_170", offset = 680, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_171", offset = 684, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_172", offset = 688, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_173", offset = 692, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_175", offset = 700, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_177", offset = 708, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_178", offset = 712, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_181", offset = 724, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_183", offset = 732, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_184", offset = 736, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_191", offset = 764, type = "ptr", to = "UiMovieTexture", note = "4 x (191 + layer): a vinyl layer's texture" },
+  { name = "texture_192", offset = 768, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_193", offset = 772, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_194", offset = 776, type = "ptr", to = "UiMovieTexture", note = "4 x (194 + layer)" },
+  { name = "texture_195", offset = 780, type = "ptr", to = "UiMovieTexture" },
+  { name = "texture_196", offset = 784, type = "ptr", to = "UiMovieTexture" },
+]
+
+# One of a UI movie's textures, as its texture table points to it: the
+# pages write its +0 (a decal image's texture or a placeholder).
+[UiMovieTexture]
+measures = [
+  "UiMovies::Find.ret.+0.+28.+640", "UiMovies::Find.ret.+0.+28.+644",
+  "UiMovies::Find.ret.+0.+28.+648", "UiMovies::Find.ret.+0.+28.+652",
+  "UiMovies::Find.ret.+0.+28.+656", "UiMovies::Find.ret.+0.+28.+660",
+  "UiMovies::Find.ret.+0.+28.+672", "UiMovies::Find.ret.+0.+28.+676",
+  "UiMovies::Find.ret.+0.+28.+680", "UiMovies::Find.ret.+0.+28.+684",
+  "UiMovies::Find.ret.+0.+28.+688", "UiMovies::Find.ret.+0.+28.+692",
+  "UiMovies::Find.ret.+0.+28.+700", "UiMovies::Find.ret.+0.+28.+708",
+  "UiMovies::Find.ret.+0.+28.+712", "UiMovies::Find.ret.+0.+28.+724",
+  "UiMovies::Find.ret.+0.+28.+732", "UiMovies::Find.ret.+0.+28.+736",
+  "UiMovies::Find.ret.+0.+28.+764", "UiMovies::Find.ret.+0.+28.+768",
+  "UiMovies::Find.ret.+0.+28.+772", "UiMovies::Find.ret.+0.+28.+776",
+  "UiMovies::Find.ret.+0.+28.+780", "UiMovies::Find.ret.+0.+28.+784",
+  "UiMovies::Find.ret.+0.+28.+636"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "the texture (header)" },
+]
+
+# The decal images (DecalImages::, the tuning screen's +10048; 8,856
+# bytes): 200 entries of 36 bytes (DecalImage) the vinyl and sticker
+# editors load from the archive, a swap entry, 200 kept textures and the
+# movies' placeholder textures.
+[DecalImages]
+measure = "DecalImages"
+measures = ["TuningScreen.+10048", "DecalImages::Load.r3", "DecalImages::SwapKept.r3", "DecalImages::Request.r3", "DecalImages::Reload.r3", "DecalImages::Unload.r3", "DecalImages::Scroll.r3", "DecalImages::UnloadAll.r3", "DecalImages::SetSlot.r3"]
+size = 8856
+origin = "embedded"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 7200, note = "200 DecalImage entries: page 0's window 12 to 20, page 1's 33 to 41 and its group's 42 to 50, the layers' 0 to 8 and 21 to 29" },
+  { name = "swap_entry", offset = 7200, type = "bytes", count = 36, note = "a DecalImage used for swaps" },
+  { name = "kept", offset = 7236, type = "bytes", count = 1600, note = "200 kept textures of 8 bytes (the texture's header and data, as an entry's +28 and +32)" },
+  { name = "vinyl_placeholder_0", offset = 8836, type = "u32", note = "movie 13's placeholder texture (w 0; DecalImages::SavePlaceholders)" },
+  { name = "vinyl_placeholder_1", offset = 8840, type = "u32", note = "movie 13's placeholder texture (w 1)" },
+  { name = "sticker_placeholder_0", offset = 8844, type = "u32", note = "movie 14's placeholder texture (w 2)" },
+  { name = "sticker_placeholder_1", offset = 8848, type = "u32", note = "movie 14's placeholder texture (w 3)" },
+  { name = "unknown_8852", offset = 8852, type = "u32", note = "0 at reset" },
+]
+
+# One decal image (36 bytes): DecalImages::OnLoaded's r6.
+[DecalImageEntry]
+measure = "DecalImages::OnLoaded.r6"
+size = 36
+origin = "embedded"
+fields = [
+  { name = "asset_id", offset = 0, type = "u32" },
+  { name = "handle", offset = 4, type = "u32", note = "the archive request's handle" },
+  { name = "state", offset = 8, type = "u32", note = "0 none, 1 loading, 2 loaded" },
+  { name = "file", offset = 12, type = "u32", note = "the TGA buffer" },
+  { name = "file_size", offset = 16, type = "u32" },
+  { name = "to_make", offset = 20, type = "u32", note = "loaded and not yet made a texture" },
+  { name = "requested", offset = 24, type = "u32" },
+  { name = "texture_header", offset = 28, type = "u32" },
+  { name = "texture_data", offset = 32, type = "u32" },
+]
+
+# One kept texture (8 bytes, DecalImages' +7236 + 8k).
+[DecalImageKept]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "texture_header", offset = 0, type = "u32" },
+  { name = "texture_data", offset = 4, type = "u32" },
+]
+
+# A vertex of a UI movie primitive (32 bytes; sub_8259D628 answers vertex i
+# of a primitive node, ui-movies.md): the pages set the bars' and the
+# gradients' vertices.
+[UiMovieVertex]
+measure = "sub_8259D628.ret"
+size = 32
+origin = "file"
+fields = [
+  { name = "x", offset = 0, type = "f32", note = "also copied as a word" },
+  { name = "y", offset = 4, type = "f32", note = "also copied as a word" },
+  { name = "red", offset = 8, type = "u32", note = "0 to 255" },
+  { name = "green", offset = 12, type = "u32" },
+  { name = "blue", offset = 16, type = "u32" },
+  { name = "alpha", offset = 20, type = "f32", note = "probably" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "probably a texture coordinate" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "probably a texture coordinate" },
+]
+
+# The type 2 mode (type2-mode.md) as Leave (state 59's page) sees it (r4):
+# only its message ring, which it posts message 11 to (as CarDealerMode).
+[TuningPagesMode]
+measure = "TuningScreen::Leave.r4"
+size = 812
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (ModeMessage: id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The screen's words +33548 (the interior's kind pick) and +33576 (its
+# slot), which the measure splits off TuningScreen as embedded objects
+# (their values index the screen's tables).
+[TuningPagesScreenWord]
+measures = ["TuningScreen.+33548", "TuningScreen.+33576"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "measure split: the screen's own word" },
+]
+
+# What the measure calls the pointees of the screen's +10048, +33548 and
+# +33576: index math over the screen (an index word times 4 plus a table's
+# offset), not objects.
+[TuningPagesIndexFault]
+measures = ["TuningScreen.+10048.+0", "TuningScreen.+33548.+0", "TuningScreen.+33576.+0"]
+size = 44
+origin = "embedded"
+fields = [
+  { name = "fault_40", offset = 40, type = "u32", note = "measure fault: a table word of the screen indexed by the value, not a field" },
+]
+
+[globals]
+fade_in_counts = { address = 0x826A50DC, type = "u32", note = "layer 0's fade-in count (0 once done)" }
+fade_out_counts = { address = 0x826A50E4, type = "u32", note = "layer 0's fade-out count" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the fade-in's pass count" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "the fade-out's pass count" }
+show_picker_node = { address = 0x82636358, type = "u32", note = "the layer's node shown when set" }
+keep_counter = { address = 0x826D84A4, type = "u32", note = "InputVinylPages' kept page's counter" }
+group_wait = { address = 0x826D84A8, type = "u32", note = "a group change's frame count" }
+scroll_way = { address = 0x826D84AC, type = "u32", note = "the scroll's direction (1 left, 2 right)" }
+scroll_wait = { address = 0x826D84B0, type = "u32", note = "a scroll's loads awaited" }
+pick_wait = { address = 0x826D84B4, type = "u32", note = "A's: the pick's loads awaited" }
+layers_wait = { address = 0x826D84B8, type = "u32", note = "InputVinylLayers' load wait (a frame count)" }
+actions_wait = { address = 0x826D84BC, type = "u32", note = "InputLayerActions' load wait (a frame count)" }
+order_count = { address = 0x826D84C0, type = "u32", note = "InputLayerOrder's frame count" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "probably -1.0" }
+bar_step = { address = 0x82001FB0, type = "f32", note = "40.0, a bar's step" }
+byte_scale = { address = 0x82002200, type = "f32", note = "probably 1/255" }
+byte_max = { address = 0x82000C44, type = "f32", note = "probably 255.0" }
+bar_short = { address = 0x82002C30, type = "f32", note = "the light bars' first scale" }
+bar_long = { address = 0x8200B5CC, type = "f32", note = "the light bars' second scale" }
+bar_length = { address = 0x820021FC, type = "f32", note = "the light bars' length" }
+mirror_angle = { address = 0x82002244, type = "f32", note = "StoreStickers' mirrored angle's offset" }
+store_scale = { address = 0x82002948, type = "f32", note = "pi/180: the decals' angle scale on store" }
+load_scale = { address = 0x8200294C, type = "f32", note = "the decals' angle scale on load (probably 180/pi)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from DecalImages.
+[DecalImagesAt28]
+measure = "TuningScreen@+10048@+28"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from DecalImages.
+[DecalImagesAt32]
+measure = "TuningScreen@+10048@+32"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from DecalImages.
+[DecalImagesAt10048]
+measure = "TuningMachine@+10048"
+size = 8856
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_8836", offset = 8836, type = "u32" },
+  { name = "unknown_8840", offset = 8840, type = "u32" },
+  { name = "unknown_8844", offset = 8844, type = "u32" },
+  { name = "unknown_8848", offset = 8848, type = "u32" },
+  { name = "unknown_8852", offset = 8852, type = "u32" },
+]
+
+# Split from DecalImages.
+[DecalImagesAt10048_2]
+measure = "TuningScreen@+10048"
+size = 860
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_784", offset = 784, type = "u32" },
+  { name = "unknown_820", offset = 820, type = "u32" },
+  { name = "unknown_856", offset = 856, type = "u32" },
+]

@@ -1,11 +1,12 @@
 // Logging for our code: lines formatted with std::format and written to the
 // log file (logs/itc_<n>.log) with stdio, one write a line, flushed. A2 in
-// docs/rexglue-removal.md. Until our own app shell (A4), the SDK names the
-// file and its own lines are forwarded into ours (log_sdk.cpp).
+// docs/rexglue-removal.md; since A4 we name the file too. The SDK's shader
+// translator logs into it through its shims (src/translator_shims/).
 
 #pragma once
 
 #include <atomic>
+#include <filesystem>
 #include <format>
 #include <string>
 #include <string_view>
@@ -38,6 +39,10 @@ void WriteLogLine(LogLevel level, std::string_view category, std::string_view te
 // SDK's), then writes the lines kept until now that pass it. Nothing is
 // opened with the level off.
 void StartLogFile(const std::string& path, std::string_view level);
+
+// The next log file in `dir`: `<name>_<n>.log`, n one more than the highest
+// there (at least three digits), the folder made if needed.
+std::filesystem::path NextLogPath(const std::filesystem::path& dir, std::string_view name);
 
 template <typename... Args>
 void Log(LogLevel level, std::format_string<Args...> format, Args&&... args) {

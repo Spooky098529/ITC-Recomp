@@ -16,10 +16,18 @@
 // Tire::InchUp sub_820C46B8) have none: only its plain C++ calls them.
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_specs/car_specs.h"
+#include "hooks/app_start_up.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "lifted/sdk.h"
+#include "schema/car_specs.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "Run the car parameter tables (docs/functions/car-specs.md: the loads' "
@@ -30,7 +38,7 @@ ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "sub_820C9DD8; the aero parts' getters, sub_820CB848 to sub_820CBC90, their "
               "swaps and sub_820CBD20; Car::Refresh, sub_820C4998, with sub_820C4888, "
               "sub_820C4568 and Tire::InchUp, sub_820C46B8; Params::Init, sub_820C9960, "
-              "with --native_heap) natively "
+              "with --native_heap; Params::Load, sub_820CC2A8, with the archive's queue native) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=car_specs)");
 
@@ -39,16 +47,16 @@ using namespace car_specs;
 #define ITC_CAR_SPECS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                  \
   if (!ITC_FLAG(native_car_specs)) {    \
-    __imp__sub_##address(ctx, base);    \
+    lifted::original::c##address(ctx); \
     return;                             \
   }
 
 namespace {
 
 // The archive's TOC for an asset (r3 = the id): the guest function.
-uint32_t Toc(PPCContext& ctx, uint8_t* base, uint32_t id) {
+uint32_t Toc(lifted::Regs& ctx, uint32_t id) {
   ctx.r3.u64 = id;
-  sub_8209D868(ctx, base);
+  lifted::Enter(ctx, game::Archive::Toc);
   return ctx.r3.u32;
 }
 
@@ -56,54 +64,55 @@ uint32_t Toc(PPCContext& ctx, uint8_t* base, uint32_t id) {
 
 // The swapping callbacks turn flush-to-zero off, as the originals leave it
 // (their lfs set it); f0 and f13 (volatile, read by no caller) aren't set.
-extern "C" REX_FUNC(sub_820CC248) {
+ITC_NATIVE_ENTRY_ALWAYS(820CC248) {
   ITC_CAR_SPECS_FALLBACK(820CC248)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 72);
+  const uint32_t toc = Toc(ctx, 72);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnCarSpecsLoaded(base, object, toc);
+  ctx.r3.u64 = OnCarSpecsLoaded(object, toc);
 }
 
-extern "C" REX_FUNC(sub_820CC0A8) {
+ITC_NATIVE_ENTRY_ALWAYS(820CC0A8) {
   ITC_CAR_SPECS_FALLBACK(820CC0A8)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 73);
+  const uint32_t toc = Toc(ctx, 73);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnWheelsLoaded(base, object, toc);
+  ctx.r3.u64 = OnWheelsLoaded(object, toc);
 }
 
-extern "C" REX_FUNC(sub_820C9DF0) {
+ITC_NATIVE_ENTRY_ALWAYS(820C9DF0) {
   ITC_CAR_SPECS_FALLBACK(820C9DF0)
-  OnLoaded(base, ctx.r6.u32);
+  OnLoaded(ctx.r6.u32);
 }
 
-extern "C" REX_FUNC(sub_820CBD90) {
+ITC_NATIVE_ENTRY_ALWAYS(820CBD90) {
   ITC_CAR_SPECS_FALLBACK(820CBD90)
   const uint32_t object = ctx.r6.u32;
-  const uint32_t toc = Toc(ctx, base, 83);
+  const uint32_t toc = Toc(ctx, 83);
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnTable83Loaded(base, object, toc);
+  ctx.r3.u64 = OnTable83Loaded(object, toc);
 }
 
 // The getters: r3 a word (zero-extended; the originals' carry the
 // arguments' upper halves, which the game's 32-bit code doesn't read).
 #define ITC_CAR_SPECS_WORD(address, expr) \
-  extern "C" REX_FUNC(sub_##address) {   \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {   \
     ITC_CAR_SPECS_FALLBACK(address)      \
     ctx.r3.u64 = uint32_t(expr);         \
   }
 
-ITC_CAR_SPECS_WORD(820C9E98, GetCarSpec(base, ctx.r3.u32))
-ITC_CAR_SPECS_WORD(820C9EE0, FirstWheelOfModel(base, ctx.r3.s32))
-ITC_CAR_SPECS_WORD(820C9DD8, Exists(base))
+ITC_CAR_SPECS_WORD(820C9E98, GetCarSpec(ctx.r3.u32))
+ITC_CAR_SPECS_WORD(820C9EE0, FirstWheelOfModel(ctx.r3.s32))
+ITC_CAR_SPECS_WORD(820C9DD8, Exists())
 
 // Params::GetCarParts: r3 = out, left as it came.
-extern "C" REX_FUNC(sub_820C9E00) {
+ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
   ITC_CAR_SPECS_FALLBACK(820C9E00)
   uint32_t parts[9];
-  GetCarParts(base, ctx.r4.u32, parts);
+  GetCarParts(ctx.r4.u32, parts);
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, ctx.r3.u32 + 4 * i, parts[i]);
+    guest::StoreU32(schema::CarPartTables(ctx.r3.u32).table74_address() + 4 * i,
+                    parts[i]);
   }
 }
 
@@ -112,14 +121,15 @@ extern "C" REX_FUNC(sub_820C9E00) {
 // the original where memcpy's copy wouldn't be the host's. They turn
 // flush-to-zero off, as the originals' lfs leave it.
 #define ITC_CAR_SPECS_AERO(address, function)                          \
-  extern "C" REX_FUNC(sub_##address) {                                 \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                 \
     ITC_CAR_SPECS_FALLBACK(address)                                    \
     uint32_t parts[9];                                                 \
     for (uint32_t i = 0; i < 9; i++) {                                 \
-      parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
+      parts[i] = guest::LoadU32(                                       \
+          schema::CarPartTables(ctx.r4.u32).table74_address() + 4 * i); \
     }                                                                  \
-    if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
-      __imp__sub_##address(ctx, base);                                 \
+    if (!function(ctx.r3.u32, parts, ctx.r5.s32)) {              \
+      lifted::original::c##address(ctx);                    \
       return;                                                          \
     }                                                                  \
     ctx.fpscr.disableFlushMode();                                      \
@@ -130,22 +140,22 @@ ITC_CAR_SPECS_AERO(820CBC90, AeroPart82)
 
 // sub_820CBD20: r3 = the parts; the count. Flush-to-zero off first, as the
 // original's lfs sets it before its compare.
-extern "C" REX_FUNC(sub_820CBD20) {
+ITC_NATIVE_ENTRY_ALWAYS(820CBD20) {
   ITC_CAR_SPECS_FALLBACK(820CBD20)
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = CountBodyKits(base, ctx.r3.u32);
+  ctx.r3.u64 = CountBodyKits(ctx.r3.u32);
 }
 
 // Car::Refresh: r3 = the car; r3 as the original leaves it (its last
 // memcpy's destination). The original where one of its memcpys wouldn't be
 // the host's copy. Flush-to-zero off first, as its first lfs sets it (the
 // tires' float steps need it).
-extern "C" REX_FUNC(sub_820C4998) {
+ITC_NATIVE_ENTRY_ALWAYS(820C4998) {
   ITC_CAR_SPECS_FALLBACK(820C4998)
   ctx.fpscr.disableFlushMode();
   uint32_t r3;
-  if (!CarRefresh(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820C4998(ctx, base);
+  if (!CarRefresh(ctx.r3.u32, &r3)) {
+    lifted::original::c820C4998(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -156,20 +166,37 @@ extern "C" REX_FUNC(sub_820C4998) {
 // allocates the object and the block); the archive's TOC lookup
 // (sub_8209D868) a guest call for each asset first. The original where an
 // allocation would fail.
-extern "C" REX_FUNC(sub_820C9960) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C9960) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x820C9960)) {
+    return;
+  }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeHeapActive()) {
-    __imp__sub_820C9960(ctx, base);
+    lifted::original::c820C9960(ctx);
     return;
   }
   uint32_t tocs[12];
   for (uint32_t k = 0; k < 12; k++) {
-    tocs[k] = Toc(ctx, base, 72 + k);
+    tocs[k] = Toc(ctx, 72 + k);
   }
   uint32_t r3;
-  if (!ParamsInit(base, tocs, &r3)) {
-    __imp__sub_820C9960(ctx, base);
+  if (!ParamsInit(tocs, &r3)) {
+    lifted::original::c820C9960(ctx);
     return;
   }
   ctx.r3.u64 = r3;
+}
+
+// Params::Load: no arguments; r3 the last serial. Natively with the archive's
+// queue native (the loads through its plain C++).
+ITC_NATIVE_ENTRY_ALWAYS(820CC2A8) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x820CC2A8)) {
+    return;
+  }
+  if (!ITC_FLAG(native_car_specs) || !hooks::NativeArchiveQueue()) {
+    lifted::original::c820CC2A8(ctx);
+    return;
+  }
+  hooks::SetArchiveSerial(ctx, ParamsLoad(hooks::NativeArchiveLoad()));
 }

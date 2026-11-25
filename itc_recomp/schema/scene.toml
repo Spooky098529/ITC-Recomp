@@ -1,0 +1,106 @@
+# The schema of docs/functions/scene.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car scene's shared assets (the scene + 64, src/scene/) and the image
+# words the scene's code uses. The scene itself (5,536 bytes,
+# [0x826C2E44]) is car-draw.toml's CarScene; the first set of scene pools
+# ([0x826C2E40]) scene-loaders.toml's ScenePools, its deferred release
+# records car-models.toml's CarModelsDeferredRelease; the set-up record
+# (the scene + 4) car-models.toml's CarSceneSetUpRecord.
+#
+# Left to other files (the measure's names to add there, not copied here):
+# - "CarScene::OnFileLoaded.r6" (its r6, the scene: the assets' slots at
+#   +64 on) and "VirtualFree.ret" (CarScene::Update's +48, the teardown's
+#   count: a measure fault, the register is the scene) are CarScene;
+# - "new<140>@ScenePools::MakeA" is ScenePools, "new<140>@ScenePools::MakeA.+52"
+#   CarModelsDeferredRelease;
+# - "SceneSetUp" (SceneSetUp::SceneSetUp's r3, +36 and +40) is
+#   CarSceneSetUpRecord;
+# - "SceneAssets.+144", "+164", "+232", "+300", "+368", "+1000", "+1068",
+#   "+4800" (their +8, slot 2) and "CarScene::OnFileLoaded.r6.+296", "+364",
+#   "+432", "+1064", "+1132" (their +16, slot 4) are a texture provider's
+#   vtable word: models.toml's TextureProviderVtable;
+# - "List::At.ret.+24" (+4088, the decals' state) is the first set's car
+#   model (car-models.toml's CarModel); "List::At.ret.+5068" (+11616, the
+#   accessory word) a scene model's interior (SceneInterior's owner).
+
+# The scene's shared assets (4,880 bytes at the scene's +64; SceneAssets::
+# SceneAssets sub_820C5008, Reset sub_820C4A70, Release sub_820C4C80,
+# ~SceneAssets sub_820C5168; docs/functions/scene.md's intro). The load
+# slots are car-models.toml's LoadSlot (24 bytes: +4 the request, +16 the
+# buffer, +20 the state, 2 loading, 3 done), the XPRs models.toml's XPR (24
+# bytes), the texture providers models.toml's TextureProvider (20 bytes,
+# given the bundle as slot 0; named here by their vtable word, the word the
+# measure sees), the part models material-passes.toml's PartModel (464
+# bytes), the TGA headers car-models.toml's TgaHeader (20 bytes).
+[SceneAssets]
+measure = "SceneAssets"
+size = 4880
+origin = "embedded"
+fields = [
+  { name = "slot_141", offset = 0, type = "bytes", count = 24, note = "asset 141's load slot (not loaded in set b unless the scene's +5044 is set)" },
+  { name = "xpr_141", offset = 24, type = "bytes", count = 24 },
+  { name = "slot_586", offset = 48, type = "bytes", count = 24, note = "asset 586's slot" },
+  { name = "slot_72", offset = 72, type = "bytes", count = 24, note = "a slot CarScene::LoadAssets doesn't load" },
+  { name = "xpr_586", offset = 96, type = "bytes", count = 24 },
+  { name = "xpr_72", offset = 120, type = "bytes", count = 24 },
+  { name = "tires_provider_vtable", offset = 144, type = "ptr", to = "TextureProviderVtable", note = "asset 586's texture provider (the tires', the scene's +208), its vtable word" },
+  { name = "slot_72_provider_vtable", offset = 164, type = "ptr", to = "TextureProviderVtable", note = "the +72 slot's texture provider" },
+  { name = "slot_888", offset = 184, type = "bytes", count = 24, note = "asset 888's slot" },
+  { name = "xpr_888", offset = 208, type = "bytes", count = 24 },
+  { name = "calipers_provider_vtable", offset = 232, type = "ptr", to = "TextureProviderVtable", note = "asset 888's texture provider (the calipers', the scene's +296)" },
+  { name = "slot_144", offset = 252, type = "bytes", count = 24, note = "asset 144's slot" },
+  { name = "xpr_144", offset = 276, type = "bytes", count = 24 },
+  { name = "light_kit_provider_vtable", offset = 300, type = "ptr", to = "TextureProviderVtable", note = "asset 144's texture provider (the scene's +364: the light kits' model +48, SceneLights::Finish)" },
+  { name = "slot_145", offset = 320, type = "bytes", count = 24, note = "asset 145's slot" },
+  { name = "xpr_145", offset = 344, type = "bytes", count = 24 },
+  { name = "provider_145_vtable", offset = 368, type = "ptr", to = "TextureProviderVtable", note = "asset 145's texture provider (the scene's +432)" },
+  { name = "glow_part_file_slot", offset = 388, type = "bytes", count = 24, note = "asset 142, the glow model's part file (LoadSlot::Load, the scene's own buffer)" },
+  { name = "glow_model", offset = 416, type = "bytes", count = 464, note = "the shared glow model (a part model; +412 its shape count, the assets' +828)" },
+  { name = "glow_textures_slot", offset = 880, type = "bytes", count = 24, note = "asset 143, the glow model's textures" },
+  { name = "tga_slot", offset = 904, type = "bytes", count = 24, note = "asset 146, a TGA image" },
+  { name = "tga_header", offset = 928, type = "bytes", count = 20, note = "its header (CarScene::GetTga copies it)" },
+  { name = "tga_pixels", offset = 948, type = "u32", note = "its pixels' pages (TGA::CreateImage; freed by FreePagesIn)" },
+  { name = "slot_106", offset = 952, type = "bytes", count = 24, note = "asset 106's slot" },
+  { name = "xpr_106", offset = 976, type = "bytes", count = 24 },
+  { name = "digits_a_provider_vtable", offset = 1000, type = "ptr", to = "TextureProviderVtable", note = "asset 106's texture provider (the digits', the scene's +1064)" },
+  { name = "slot_107", offset = 1020, type = "bytes", count = 24, note = "asset 107's slot" },
+  { name = "xpr_107", offset = 1044, type = "bytes", count = 24 },
+  { name = "digits_b_provider_vtable", offset = 1068, type = "ptr", to = "TextureProviderVtable", note = "asset 107's texture provider (the digits', the scene's +1132)" },
+  { name = "part_file_slots", offset = 1088, type = "bytes", count = 96, note = "four part files' slots, 24 bytes each (assets 129 to 132 in set a, 133 to 136 in set b; LoadSlot::Load)" },
+  { name = "part_models", offset = 1184, type = "bytes", count = 1856, note = "their four part models, 464 bytes each" },
+  { name = "part_texture_slots", offset = 3040, type = "bytes", count = 96, note = "their textures' slots, 24 bytes each (assets 137 to 140)" },
+  { name = "plate_tga_slots", offset = 3136, type = "bytes", count = 456, note = "19 TGA images' slots, 24 bytes each (assets 110 to 128; probably the license plate's, CarModel::MakePlate)" },
+  { name = "plate_tga_pixels", offset = 3592, type = "bytes", count = 76, note = "their pixels' pages, a word each" },
+  { name = "plate_tga_headers", offset = 3668, type = "bytes", count = 380, note = "their headers, 20 bytes each" },
+  { name = "slot_108", offset = 4048, type = "bytes", count = 24, note = "asset 108, a part file (set a only)" },
+  { name = "slot_109", offset = 4072, type = "bytes", count = 24, note = "asset 109, its textures (set a only)" },
+  { name = "model_108", offset = 4096, type = "bytes", count = 464, note = "their part model" },
+  { name = "slot_105", offset = 4560, type = "bytes", count = 24, note = "asset 105's slot" },
+  { name = "plate_xpr", offset = 4584, type = "bytes", count = 24, note = "asset 105's XPR: the number plates' blank texture" },
+  { name = "bundle_slots", offset = 4608, type = "bytes", count = 96, note = "four bundles' slots, 24 bytes each (assets 97 to 100 in set a, 101 to 104 in set b)" },
+  { name = "bundle_xprs", offset = 4704, type = "bytes", count = 96, note = "their XPRs, 24 bytes each" },
+  { name = "bundle_providers", offset = 4800, type = "bytes", count = 80, note = "their texture providers, 20 bytes each (+0 each one's vtable word)" },
+]
+
+# A word holding a block's pages: FreePagesIn's r3 (VirtualFree([r3])) and
+# CarScene::GetTga's r5 (out: the TGA pixels' word, the assets' +948).
+[ScenePagesWord]
+measures = ["FreePagesIn.r3", "CarScene::GetTga.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "pages", offset = 0, type = "u32" },
+]
+
+[globals]
+first_set = { address = 0x826C2E40, type = "ptr", to = "ScenePools", note = "the first set of scene pools (ScenePools::MakeA, scene-loaders.md)" }
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (CarScene::Create, 5,536 bytes)" }
+queue_key_a = { address = 0x82601854, type = "u32", note = "167 (CarScene::Create); the scene's draw copies it to 0x8296B90C" }
+queue_key_b = { address = 0x82601858, type = "u32", note = "270 (CarScene::Create); copied to 0x8296B900" }
+scene_ticks = { address = 0x8260185C, type = "u32", note = "3 on each CarScene::Update while the scene isn't torn down, down by one a tick (Modes::Tick)" }
+one = { address = 0x82000A30, type = "u32", note = "1.0f, as its bits (the image's constant)" }
+accessories_scale = { address = 0x82002FE8, type = "u32", note = "the accessories' scale CarScene::Create gives, a float's bits" }

@@ -1,0 +1,417 @@
+// The cockpit body's and the traffic body's texture binds (see
+// file_loaded.h), load for load and store for store as the recompiled
+// functions.
+
+#include "scene_loaders/file_loaded.h"
+
+#include "base/log.h"
+#include "c_runtime/format.h"
+#include "car_models/load_slots.h"
+#include "car_physics/float_ops.h"
+#include "game_data/data_file.h"
+#include "guest.h"
+#include "interpolation/blend_state.h"
+#include "matrix_math/matrix_math.h"
+#include "model_animation/model_animation.h"
+#include "models/part_model.h"
+#include "models/xpr.h"
+#include "native/buffers.h"
+#include "scene_loaders/loads.h"
+#include "scene_loaders/objects.h"
+#include "scene_loaders/pools.h"
+#include "schema/car_models.h"
+#include "schema/material_passes.h"
+#include "schema/model_animation.h"
+#include "schema/models.h"
+#include "schema/scene_loaders.h"
+#include "schema/stand_models.h"
+
+#include <bit>
+#include <cstdlib>
+
+namespace scene_loaders {
+
+namespace {
+
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
+}
+
+using G = schema::SceneLoadersGlobals;
+
+// sprintf into the frame's +80, called with r5 to r7 = `args` (64-bit, as
+// the registers hold them; r8 to r10, which the calls don't set, as 0: only
+// dead frame words differ), spilled into the frame's parameter area (+32,
+// 8-byte slots) as sprintf spills them, its own frames below.
+bool Print(uint32_t frame, uint32_t format, const uint64_t (&args)[3]) {
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint64_t value = i < 3 ? args[i] : 0;
+    Store(frame + 32 + 8 * i, uint32_t(value >> 32));
+    Store(frame + 36 + 8 * i, uint32_t(value));
+  }
+  int32_t written;
+  return c_runtime::Sprintf(frame + 80, format, frame + 32, frame - 144 - 1328, &written);
+}
+
+// A lis/addi constant as the register holds it (sign-extended).
+uint64_t Constant(uint32_t address) { return uint64_t(int64_t(int32_t(address))); }
+
+bool Loading(uint32_t state) { return int32_t(Load(state)) == 2; }
+
+using namespace car_physics::ops;
+
+void Require(bool done, const char* what) {
+  if (!done) {
+    ITC_LOG_ERROR("Scene loaders: {} refused after its checks", what);
+    std::abort();
+  }
+}
+
+// ld then std: a doubleword moved.
+void Move8(uint32_t from, uint32_t to) {
+  const uint32_t hi = Load(from);
+  const uint32_t lo = Load(from + 4);
+  Store(to, hi);
+  Store(to + 4, lo);
+}
+
+
+// strcmp(a, b) == 0 as the original's inline loop: byte by byte until a's
+// terminator or a difference.
+bool SameName(uint32_t constant, uint32_t name) {
+  for (uint32_t i = 0;; i++) {
+    const uint32_t a = guest::LoadU8(constant + i);
+    const uint32_t b = guest::LoadU8(name + i);
+    if (a == 0 || a != b) {
+      return a == b;
+    }
+  }
+}
+
+// The identity (vupkd3d128's rows, stored aligned) at `at`, copied to `to`
+// (eight doublewords), and turned a quarter about y there by the angle
+// stored at `angle` (Matrix::RotateY, its turn at `frame` - 80).
+void QuarterTurn(uint32_t at, uint32_t to, uint32_t angle, uint32_t frame) {
+  const uint32_t aligned = at & ~0xFu;
+  const uint32_t one = std::bit_cast<uint32_t>(1.0f);
+  for (uint32_t w = 0; w < 16; w++) {
+    Store(aligned + 4 * w, w % 5 == 0 ? one : 0);
+  }
+  for (uint32_t w = 0; w < 8; w++) {
+    Move8(at + 8 * w, to + 8 * w);
+  }
+  CopyWord(G::quarter_turn_address(), angle);
+  matrix_math::RotateY(to, to, angle, frame - 80);
+}
+
+// The skeleton bound to `file` and posed: Skeleton::Bind (r5 = 0),
+// ResetPose, LocalMatrices (its frame below `frame`), UpdateMatrices; the
+// originals where the plain C++ declines.
+void BindAndPose(uint32_t skeleton, uint32_t file, uint32_t frame,
+                 const FileLoadedCalls& calls) {
+  if (!model_animation::SkeletonBind(skeleton, file, 0)) {
+    calls.skeleton_bind(skeleton, file);
+  }
+  model_animation::SkeletonResetPose(skeleton);
+  model_animation::SkeletonLocalMatrices(skeleton, frame);
+  if (model_animation::SkeletonUpdateMatrices(skeleton) ==
+      model_animation::MatricesResult::kOriginal) {
+    calls.update_matrices(skeleton);
+  }
+}
+
+// A part model's file arrived: Model::Load (its original where the plain
+// C++ declines), LoadSlot::ReleaseBuffer, the state 3. ReleaseBuffer's r3.
+uint32_t PartArrived(uint32_t slot, uint32_t model, const FileLoadedCalls& calls) {
+  const schema::LoadSlot s(slot);
+  const uint32_t file = s.buffer();
+  if (!models::ModelLoad(model, file, 0, calls.model_load)) {
+    calls.model_load_original(model, file);
+  }
+  const auto r3 = car_models::LoadSlotReleaseBuffer(slot);
+  Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
+  s.set_state(3);
+  return *r3;
+}
+
+// An XPR2 arrived: XPR::Create (its original where the plain C++ declines),
+// the provider's slot +16. Its r3.
+uint64_t XprArrived(uint32_t xpr, uint32_t file, uint32_t provider,
+                    const FileLoadedCalls& calls) {
+  if (!models::XprCreate(xpr, file)) {
+    calls.xpr_create(xpr, file);
+  }
+  return calls.provider_set(provider, xpr);
+}
+
+}  // namespace
+
+std::optional<uint32_t> CockpitBindTextures(uint32_t cockpit, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D6108 Cockpit::BindTextures");
+  const schema::Cockpit c(cockpit);
+  for (uint32_t i = 0; i < 6; i++) {
+    if (Loading(c.part_slot_state_address() + 24 * i)) {
+      return 0;
+    }
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    if (Loading(c.xpr_slot_state_address() + 24 * i)) {
+      return 0;
+    }
+  }
+  if (Loading(c.node_file_state_address())) {
+    return 0;
+  }
+  const uint32_t frame = stack - kCockpitBindFrameBytes;
+  const uint32_t number = c.texture_number();
+  const int32_t block = int32_t(c.car_model<schema::CarModel>().block());
+  const uint32_t name = Load((uint32_t(block) << 2) + G::cockpit_names_address());
+  const bool printed =
+      number == 0
+          ? Print(frame, G::two_strings_address(),
+                  {name, Constant(G::inte_on_address()), number})
+          : Print(frame, G::numbered_address(),
+                  {name, Constant(G::inte_on_numbered_address()), number});
+  if (!printed) {
+    return std::nullopt;
+  }
+  const uint32_t xpr = c.xprs_address();
+  int32_t index = -1;
+  if (block < 18) {
+    index = XprFindByName(xpr, frame + 80);
+    c.set_texture(uint32_t(models::XprGetTexture(xpr, uint32_t(index))));
+  }
+  for (uint32_t i = 0; i < 6; i++) {
+    // The part model's provider (the Model's +48) and category 3's texture.
+    const uint32_t part = c.part_models_address() + 464 * i;
+    schema::Model(part).set_texture_provider(c.providers_address());
+    if (block < 18) {
+      schema::PartModel(part).set_category3_texture(
+          uint32_t(models::XprGetTexture(xpr, uint32_t(index))));
+    }
+  }
+  return 1;
+}
+
+std::optional<uint32_t> TrafficBindTextures(uint32_t traffic, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D7D38 TrafficCar::BindTextures");
+  const schema::TrafficCar t(traffic);
+  if (Loading(t.file_state_address())) {
+    return 0;
+  }
+  const uint32_t frame = stack - kTrafficBindFrameBytes;
+  // TrafficLoads' first XPR (traffic +4016).
+  const uint32_t xpr = traffic + kTrafficLoads + kTrafficMembers.xprs[0];
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t part = t.part_models_address() + 464 * i;
+    schema::Model(part).set_texture_provider(t.texture_provider_address());
+    models::PartModelSetVinylTextures(part, t.texture_word0(), 0);
+    const uint32_t number = t.texture_name_count();
+    if (int32_t(number) <= 0 || int32_t(t.xpr_record()) == -1) {
+      continue;
+    }
+    const uint32_t name = Load((t.car_number() << 2) + G::traffic_names_address());
+    if (!Print(frame, G::numbered_address(),
+               {name, Constant(G::traffic_suffix_address()), number})) {
+      return std::nullopt;
+    }
+    const int32_t index = XprFindByName(xpr, frame + 80);
+    t.set_xpr_record2(uint32_t(index));
+    if (index == -1) {
+      continue;
+    }
+    const schema::PartModel pm(part);
+    pm.set_replacement_texture(uint32_t(models::XprGetTexture(xpr, uint32_t(index))));
+    pm.set_replaced_texture_index(t.xpr_record());
+  }
+  return 1;
+}
+
+bool CockpitFileLoadedNative(uint32_t request, uint32_t cockpit) {
+  const schema::Cockpit c(cockpit);
+  for (uint32_t i = 0; i < 6; i++) {
+    if (Load(c.part_slot_request_address() + 24 * i) == request) {
+      uint32_t freed = 0;
+      return car_models::LoadSlotReleasable(c.part_slots_address() + 24 * i, &freed);
+    }
+  }
+  return true;
+}
+
+uint64_t CockpitFileLoaded(uint32_t request, uint32_t buffer, uint32_t cockpit,
+                           uint32_t stack, const FileLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D6528 Cockpit::OnFileLoaded");
+  const uint32_t f = stack - kCockpitLoadedFrameBytes;
+  const schema::Cockpit c(cockpit);
+  for (uint32_t i = 0; i < 6; i++) {
+    if (Load(c.part_slot_request_address() + 24 * i) == request) {
+      return PartArrived(c.part_slots_address() + 24 * i,
+                         c.part_models_address() + 464 * i, calls);
+    }
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    if (Load(c.xpr_slot_request_address() + 24 * i) == request) {
+      const uint64_t r3 = XprArrived(c.xprs_address() + 24 * i, buffer,
+                                     c.providers_address() + 20 * i, calls);
+      Store(c.xpr_slot_state_address() + 24 * i, 3);
+      return r3;
+    }
+  }
+  if (c.node_file_request() != request) {
+    return request;
+  }
+  const uint32_t skeleton = c.skeleton_address();
+  BindAndPose(skeleton, c.node_file_buffer(), f, calls);
+  c.set_node_file_state(3);
+  const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(skeleton));
+  uint64_t r3 = uint32_t(nodes);
+  if (nodes > 0) {
+    const uint32_t names = c.skeleton_node_names().address;
+    for (uint32_t n = 0; n < uint32_t(nodes); n++) {
+      if (SameName(G::accessory_node_name_address(), names + 160 * n)) {
+        c.set_accessory_node(c.skeleton_node_matrices<schema::View>().address + 64 * n);
+      }
+    }
+    r3 = 0;
+  }
+  const uint32_t node = c.accessory_node<schema::View>().address;
+  if (node == 0) {
+    return r3;
+  }
+  const uint32_t turn = f + 160;
+  QuarterTurn(f + 96, turn, f + 80, f);
+  const uint32_t point = c.accessory_point_address();
+  Move8(node + 48, point);
+  Move8(node + 56, point + 8);
+  const double x = Lfs(point + 0);
+  const double y = Lfs(point + 4);
+  const double z = Lfs(point + 8);
+  CopyWord(G::one_address(), c.accessory_point_w_address());
+  const double tenth = Lfs(G::tenth_address());
+  Stfs(point + 0, Fmuls(x, tenth));
+  Stfs(point + 4, Fmuls(y, tenth));
+  Stfs(point + 8, Fmuls(z, tenth));
+  matrix_math::Vec4Transform(point, turn, point);
+  return point;
+}
+
+bool TrafficFileLoadedNative(uint32_t request, uint32_t traffic) {
+  if (!native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  const schema::TrafficCar t(traffic);
+  if (schema::LoadSlot(t.file_slot_address()).request() != request) {
+    return true;
+  }
+  uint32_t freed = 0;
+  return car_models::LoadSlotReleasable(t.file_slot_address(), &freed);
+}
+
+std::optional<uint64_t> TrafficFileLoaded(uint32_t request, uint32_t traffic,
+                                          uint32_t stack, const FileLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D8430 TrafficCar::OnFileLoaded");
+  const uint32_t f = stack - kTrafficLoadedFrameBytes;
+  const schema::TrafficCar t(traffic);
+  // sprintf's call: r5 the name, r6 the suffix (r7 to r10, which the call
+  // doesn't set, as 0: only dead frame words differ).
+  const uint32_t name = Load((t.car_number() << 2) + G::traffic_names_address());
+  const uint64_t args[6] = {name, Constant(G::traffic_file_suffix_address()), 0, 0, 0, 0};
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(f + 32 + 8 * i, uint32_t(args[i] >> 32));
+    Store(f + 36 + 8 * i, uint32_t(args[i]));
+  }
+  int32_t written;
+  if (!c_runtime::Sprintf(f + 240, G::two_strings_address(), f + 32, f - 144 - 1328,
+                          &written)) {
+    return std::nullopt;
+  }
+  if (schema::LoadSlot(t.file_slot_address()).request() != request) {
+    return uint64_t(uint32_t(written));
+  }
+  const uint32_t file = t.file_buffer();
+  const auto entry = [&](uint32_t index) {
+    game_data::GetEntry(file, index, true);  // asked twice, as the original
+    return game_data::GetEntry(file, index, true);
+  };
+  const uint32_t xpr = traffic + kTrafficLoads + kTrafficMembers.xprs[0];
+  XprArrived(xpr, entry(0), t.texture_provider_address(), calls);
+  // The plate: the struct's last 16 bytes into the frame's parameter area.
+  Require(native::Buffers_Memcpy(f + 80, traffic + 3696, 16, 0x820D84E0), "memcpy");
+  const uint32_t plate = traffic + 3664;
+  const uint64_t regs[4] = {
+      (uint64_t(Load(plate + 0)) << 32) | Load(plate + 4),
+      (uint64_t(Load(plate + 8)) << 32) | Load(plate + 12),
+      (uint64_t(Load(plate + 16)) << 32) | Load(plate + 20),
+      (uint64_t(Load(plate + 24)) << 32) | Load(plate + 28)};
+  Require(car_models::MakePlate(t.texture2_word0_address(), t.texture2_word1_address(),
+                                t.texture2_word2_address(), t.texture2_word3_address(), regs, f,
+                                calls.plate_release)
+              .has_value(),
+          "MakePlate");
+  t.set_xpr_record(uint32_t(XprFindByName(xpr, f + 240)));
+  // The node file: the skeleton bound and posed, the tires' nodes found.
+  const uint32_t skeleton = t.skeleton_address();
+  const schema::Skeleton sk(skeleton);
+  BindAndPose(skeleton, entry(1), f, calls);
+  const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(skeleton));
+  static constexpr uint32_t kTireNames[4] = {
+      G::tire_names_address(), G::tire_names_address() + 8, G::tire_names_address() + 16,
+      G::tire_names_address() + 24};
+  static constexpr uint32_t kTireReturns[4] = {0x820D85EC, 0x820D8630, 0x820D8674, 0x820D86B8};
+  if (nodes > 0) {
+    for (uint32_t n = 0; n < uint32_t(nodes); n++) {
+      const uint32_t node_name = sk.node_records() + 160 * n;
+      for (uint32_t k = 0; k < 4; k++) {
+        if (SameName(kTireNames[k], node_name)) {
+          const uint32_t to = traffic + 7136 + 64 * k;
+          const uint32_t from = sk.matrices() + 64 * n;
+          matrix_math::Copy(to, from);
+          interpolation::BlendState_OnCopy(to, from, kTireReturns[k]);
+        }
+      }
+    }
+  }
+  const uint32_t turn = f + 176;
+  QuarterTurn(f + 112, turn, f + 96, f);
+  // The tires' positions: their matrices' rows 3, w = 1.0, x, y, z scaled
+  // (every word read before it's written: the order of the original's
+  // multiplies doesn't matter), turned, then w = 0.0.
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t at = traffic + 7072 + 16 * k;
+    Move8(traffic + 7136 + 64 * k + 48, at);
+    Move8(traffic + 7136 + 64 * k + 56, at + 8);
+    if (k < 3) {
+      CopyWord(G::one_address(), at + 12);
+    }
+  }
+  const double tenth = Lfs(G::tenth_address());
+  for (uint32_t k = 0; k < 4; k++) {
+    for (uint32_t w = 0; w < 3; w++) {
+      const uint32_t at = traffic + 7072 + 16 * k + 4 * w;
+      Stfs(at, Fmuls(Lfs(at), tenth));
+    }
+  }
+  CopyWord(G::one_address(), traffic + 7132);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t at = traffic + 7072 + 16 * k;
+    matrix_math::Vec4Transform(at, turn, at);
+  }
+  for (uint32_t k = 0; k < 4; k++) {
+    CopyWord(G::zero_address(), traffic + 7072 + 16 * k + 12);
+  }
+  // The six part models.
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t model = t.part_models_address() + 464 * i;
+    const uint32_t part = entry(2 + i);
+    if (!models::ModelLoad(model, part, 0, calls.model_load)) {
+      calls.model_load_original(model, part);
+    }
+  }
+  const auto r3 = car_models::LoadSlotReleaseBuffer(t.file_slot_address());
+  Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
+  t.set_file_state(3);
+  return *r3;
+}
+
+}  // namespace scene_loaders

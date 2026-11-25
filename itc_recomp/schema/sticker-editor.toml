@@ -1,0 +1,84 @@
+# The schema of docs/functions/sticker-editor.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The seed's two types aren't described here:
+# - "TuningScreen.+10044" is the sticker menu, the tuning screen's second
+#   front-end menu (68 bytes, VirtualAlloc'ed by TuningMachine::Create):
+#   menu-helpers.toml's FrontEndMenu (a measure name to add there).
+# - "MenuSound::Play.ret" is a measure fault: the +0 and +36 loads it saw
+#   follow a branch past the call (loc_821F90D4 and loc_821F9684, reached
+#   by `beq` before `li r3,4; bl MenuSound::Play`), where r3 still holds
+#   the sticker menu [s+10044]: FrontEndMenu's cursor and side.
+# The sticker editor's other fields are the tuning screen's (+30724 the
+# area, +30732 the slot, +30832 the edited sticker, +32360 and +33320 the
+# placed stickers' records and ids, +33500 to +33536 the holds and waits;
+# docs/known-data.md, "tuning screen"): tuning-screen's TuningScreen.
+
+# The sticker groups (0x8200B5E8, six records): the picker's group g holds
+# the sticker ids first_id to last_id; its name is string 1242 + g.
+[StickerGroup]
+size = 12
+origin = "image"
+fields = [
+  { name = "first_id", offset = 0, type = "s32" },
+  { name = "last_id", offset = 4, type = "s32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# The sticker layouts (0x8200B728, one by the garage car's +224 × 8 +
+# area): where an area's slots are drawn on movie 14 (PlaceStickerNode
+# copies the record into its frame).
+[StickerLayout]
+size = 16
+origin = "image"
+fields = [
+  { name = "x", offset = 0, type = "s32", note = "the area's origin on the movie (plus 816 or 824 by the node)" },
+  { name = "y", offset = 4, type = "s32", note = "plus 284 or 252 by the node" },
+  { name = "size", offset = 8, type = "f32", note = "times the sticker's scale: the node's size" },
+  { name = "position_scale", offset = 12, type = "f32", note = "times the sticker's x and y" },
+]
+
+# The move bounds (0x8200C2A8, one an area): StepSticker moves the edited
+# sticker's x and y only while inside them (signed word compares).
+[StickerMoveBounds]
+size = 16
+origin = "image"
+fields = [
+  { name = "x_min", offset = 0, type = "s32" },
+  { name = "x_max", offset = 4, type = "s32" },
+  { name = "y_min", offset = 8, type = "s32" },
+  { name = "y_max", offset = 12, type = "s32" },
+]
+
+# A placed sticker's record (24 bytes): the tuning screen's +32360 + 120 x
+# area + 24 x slot, its edited copy at +30832 (edited_x to edited_word) and
+# the backup at +33512. PlaceStickerNode draws one on movie 14.
+[StickerRecord]
+size = 24
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "s32", note = "times the layout's position scale, plus its origin" },
+  { name = "y", offset = 4, type = "s32" },
+  { name = "angle", offset = 8, type = "f32", note = "degrees (0.0 to 359.0): the node's rotation" },
+  { name = "scale", offset = 12, type = "f32", note = "times the layout's size: the node's scale" },
+  { name = "flip", offset = 16, type = "u32", note = "copied into the node's flip_x" },
+  { name = "word", offset = 20, type = "u32", note = "0 at the reset" },
+]
+
+[globals]
+groups = { address = 0x8200B5E8, type = "bytes", count = 72, note = "six StickerGroup records" }
+second_node = { address = 0x8200B630, type = "bytes", count = 244, note = "61 words: 1 when sticker i is drawn on its slot's second node (read for any i below 61, negative too)" }
+layouts = { address = 0x8200B728, type = "bytes", count = 16, note = "StickerLayout records, 16 bytes a car id (the garage car's +224) and area (8 a car id); the table's length isn't known" }
+move_bounds = { address = 0x8200C2A8, type = "bytes", count = 128, note = "eight StickerMoveBounds, one an area" }
+first_node_scale = { address = 0x8200C548, type = "f32", note = "the first node's extra size factor" }
+angle_max = { address = 0x8200C54C, type = "f32", note = "359.0: the rotation wraps between 0.0 and it" }
+scale_step = { address = 0x8200222C, type = "f32", note = "the scale's step" }
+scale_min = { address = 0x82001FBC, type = "f32", note = "the scale's lower clamp" }
+scale_max = { address = 0x820021E8, type = "f32", note = "the scale's upper clamp" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0: the reset angle" }
+one = { address = 0x82000A30, type = "f32", note = "1.0: the reset scale and the rotation's step" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (garage-screen.toml's stand_holder): +0 the garage stage's holder" }

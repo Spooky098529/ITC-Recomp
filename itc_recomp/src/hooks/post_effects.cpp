@@ -3,14 +3,22 @@
 // Flush-to-zero is left off, as the translated code leaves it. The setters
 // are vtable slots (the glow's 2-12 and 24, the color filter's 4 and 6-8),
 // so their adapters stay. Glow::Record (sub_821379D8) is frame
-// interpolation's wrap (src/interpolation/glow.cpp), MotionBlur::Record
-// (sub_821363F0) is recompiled with interpolation's notes at its return
-// 8213653C, and PostEffects::RecordAll (sub_82133960) is the diagnostics'
-// rewrite (src/debug/frame_state_diff.cpp): none of them is here.
+// interpolation's wrap (src/interpolation/glow.cpp), which calls
+// hooks::PostEffectsGlowRecord (here) for the work, and
+// PostEffects::RecordAll (sub_82133960) is the diagnostics' rewrite
+// (src/debug/frame_state_diff.cpp): neither is here. MotionBlur::Record's
+// plain C++ notes its copy as Matrix::Copy's wrapper does at its return
+// 8213653C (interpolation::BlendState_MotionBlurCopy).
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
-// them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
-// either: only GlareDef::Init's plain C++ calls it; nor RenderTexture::Release
+// them, and the flag switches it; nor Race::ToggleEffects (sub_8215B690):
+// only the race scene machine's plain C++ calls it (race_scene); nor
+// PostEffect::RecordPixelBool (sub_82133D70): only ColorFilter::Record's
+// plain C++ calls it. StarDef::Init (sub_8212EA98) has none
+// either: only GlareDef::Init's plain C++ calls it; nor GlareDef::GlareDef
+// (sub_8212ED78) and GlareDef::Init (sub_8212EC90): only Glow::Glow's plain
+// C++ calls them; nor TargetFilter::TargetFilter (sub_82135AA8): only
+// PostEffects::Create's plain C++ calls it; nor RenderTexture::Release
 // (sub_82133070): only RenderTextures::Release's plain C++ calls it; nor
 // RenderTextures::Release (sub_821332F0), PostEffect::ReleaseSurface
 // (sub_82133C60) and the destructors Glow::~Glow (sub_82136E30),
@@ -21,52 +29,74 @@
 // isn't native).
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
+#include "hooks/direct_slots.h"
 #include "hooks/heap.h"
 #include "hooks/post_effects.h"
 #include "post_effects/post_effects.h"
+#include "schema/app_start_up.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
-ITC_FLAG_DECLARE(bool, native_graphics_resources);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
-              "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38 (no adapter: only "
+              "sub_82133AE8, MarkUpdated sub_82133A08 (no adapter: only RaceScene::Update's plain C++ "
+              "calls it, and --native_race_update switches that), ToggleNoHistory sub_82133A38 (no adapter: only "
               "Race::ToggleEffects' plain C++ calls it, and the flag switches that), DestroyRace "
-              "sub_82133A70, Race::ToggleEffects sub_8215B690 with ScreenObject::ToggleHidden "
+              "sub_82133A70, Race::ToggleEffects sub_8215B690 (no adapter: only the race scene "
+              "machine's plain C++ calls it, and --native_race_scene switches that) with ScreenObject::ToggleHidden "
               "sub_8212EDE0 (no adapter, the same), the glow's setters sub_82136EF8 to sub_82136F48 and "
               "Glow::SetFromSpeed sub_82133878, the color filter's setters sub_821350F8, "
               "sub_82135138, sub_82135140 and sub_82135148; the recording helpers "
               "PostEffect::RecordBeginStates sub_82133340, RecordEndStates sub_82133608, "
               "RecordTargets sub_82133790, RecordPixelConstants sub_82133D00, RecordPixelBool "
-              "sub_82133D70, RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
+              "sub_82133D70 (no adapter: only ColorFilter::Record's plain C++ calls it, and the flag "
+              "switches that), RecordTexelSize sub_82133DD8, AddQuad sub_82133E30 and RecordResolve "
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
-              "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98 (no adapter: only "
+              "sub_8212ED78 and GlareDef::Init sub_8212EC90 (no adapters: only Glow::Glow's plain C++ "
+              "calls them, and the flag switches that) and StarDef::Init sub_8212EA98 (no adapter: only "
               "GlareDef::Init's plain C++ calls it, and the flag switches that); "
               "RenderTexture::Release sub_82133070 (no adapter: only RenderTextures::Release's "
               "plain C++ calls it, and the flag switches that) and RenderTextures::Release sub_821332F0 (with "
               "--native_heap and --native_c_runtime_heap), PostEffect::ReleaseSurface sub_82133C60 "
-              "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (with "
-              "--native_graphics_resources and --native_heap); the destructors Glow::~Glow "
+              "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (no adapter: "
+              "only PostEffects::Create's plain C++ calls it, and the flag switches that); the "
+              "destructors Glow::~Glow "
               "sub_82136E30, ColorFilter::~ColorFilter sub_821351A8 and MotionBlur::~MotionBlur "
               "sub_82136390 (no adapters, nor for RenderTextures::Release and ReleaseSurface: only "
               "the deleting destructors' and the destructors' plain C++ call them, and the flag "
               "switches those) and their deleting ones sub_821389C8, sub_82138570 and sub_821385C0 "
-              "(operator delete with --native_c_runtime_heap)) natively instead of through the "
+              "(operator delete with --native_c_runtime_heap); PostEffects::InitEdramBase "
+              "sub_825D99D0; PostEffects::Create sub_82138A18 (with --native_heap) with the "
+              "constructors Glow::Glow sub_82138610, ColorFilter::ColorFilter sub_82135008 and "
+              "MotionBlur::MotionBlur sub_82136130 and the render textures' "
+              "RenderTextures::Acquire sub_82133190 and RenderTexture::Create sub_821330D0 (no "
+              "adapters: only Create's plain C++ calls them, and the flag switches that), and "
+              "PostEffects::InitBoot sub_82138C38 (no adapter: only FramePasses::Boot's adapter calls its work; with --native_heap, over "
+              "CreateVertexDeclaration's plain C++); the records ColorFilter::Record "
+              "sub_821351F0, TargetFilter::Record sub_82135B50 and MotionBlur::Record sub_821363F0 "
+              "(frame interpolation's note of its copy kept), and the glow's star streaks "
+              "Glow::RecordStar sub_82136FA8 with Glow::RecordStarPass sub_82134060 (no adapters: "
+              "only Glow::Record's plain C++ calls the first, its plain C++ the second, and the "
+              "flag switches that), and Glow::Record "
+              "sub_821379D8 inside frame interpolation's wrap (with --native_scene_target's "
+              "RecordBoundTargets), without the "
+              "command list's diagnostics) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_post_effects)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_post_effects)) { \
     __VA_ARGS__;                          \
   }
 
@@ -74,37 +104,29 @@ using namespace post_effects;
 
 // --- The effects: no arguments but Get's r3 = the index ---
 
-ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(base, ctx.r3.u32))
-ITC_POST_EFFECTS(82133A08, MarkUpdated(base))
+ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(ctx.r3.u32))
+// MarkUpdated (sub_82133A08) has no adapter: its only caller in play,
+// RaceScene::Update, calls its plain C++ (--native_race_update switches it).
 // The deleting destructors through the effects' slot 1 (r4 = 1), from the
 // original's 112-byte frame.
 ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
-                 guest_call::InFrame(ctx, base, 112, 0x82133ABC, [&](uint32_t) {
-                   r3 = DestroyRace(base, [&](uint32_t function, uint32_t effect) {
+                 guest_call::InFrame(ctx, 112, 0x82133ABC, [&](uint32_t) {
+                   r3 = DestroyRace([&](uint32_t function, uint32_t effect) {
                      ctx.r3.u64 = effect;
                      ctx.r4.u64 = 1;
                      ctx.lr = 0x82133ABC;
-                     ctx.ctr.u64 = function;
-                     REX_CALL_INDIRECT_FUNC(function);
+                     lifted::CallFromContext(ctx, function);
                      return ctx.r3.u32;
                    });
                  });
                  ctx.lr = lr; ctx.r3.u64 = r3)
 
-// r3 = the race object.
-ITC_POST_EFFECTS(8215B690, ctx.r3.u64 = ToggleRaceEffects(base, ctx.r3.u32))
-
 // --- The glow's setters: r3 = the glow, f1 = the value ---
 
 #define ITC_GLOW_SET(address, offset)                   \
-  extern "C" REX_FUNC(sub_##address) {                  \
-    REX_FUNC_PROLOGUE();                                \
-    if (!ITC_FLAG(native_post_effects)) {               \
-      __imp__sub_##address(ctx, base);                  \
-      return;                                           \
-    }                                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_post_effects)) { \
     ctx.fpscr.disableFlushMode();                       \
-    GlowSet(base, ctx.r3.u32, offset, ctx.f1.f64);      \
+    GlowSet(ctx.r3.u32, offset, ctx.f1.f64);      \
   }
 
 ITC_GLOW_SET(82136EF8, 8436)
@@ -123,15 +145,14 @@ ITC_GLOW_SET(82136F48, 8476)
 // original's 112-byte frame; r3 and f1 come back as the last one leaves them.
 ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = ctx.r3.u32;
                  const double speed = ctx.f1.f64; const uint64_t lr = ctx.lr;
-                 guest_call::InFrame(ctx, base, 112, 0x821338FC, [&](uint32_t) {
+                 guest_call::InFrame(ctx, 112, 0x821338FC, [&](uint32_t) {
                    static constexpr uint32_t kReturns[3] = {0x821338FC, 0x82133920, 0x82133944};
                    int call = 0;
-                   GlowSetFromSpeed(base, glow, speed, [&](uint32_t function, double value) {
+                   GlowSetFromSpeed(glow, speed, [&](uint32_t function, double value) {
                      ctx.r3.u64 = glow;
                      ctx.f1.f64 = value;
                      ctx.lr = kReturns[call++];
-                     ctx.ctr.u64 = function;
-                     REX_CALL_INDIRECT_FUNC(function);
+                     lifted::CallFromContext(ctx, function);
                    });
                  });
                  ctx.lr = lr)
@@ -140,60 +161,50 @@ ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = c
 
 // f1, f2, f3 = the color.
 ITC_POST_EFFECTS(821350F8, ctx.fpscr.disableFlushMode();
-                 ColorFilterSetColor0(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
+                 ColorFilterSetColor0(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
 ITC_POST_EFFECTS(82135138, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8112, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8112, ctx.f1.f64))
 ITC_POST_EFFECTS(82135140, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8116, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8116, ctx.f1.f64))
 ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8120, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8120, ctx.f1.f64))
 
 // --- The recording helpers: r3 = the effect, r4 = the command list ---
 
 // Runs the original when the plain C++ has no answer (the list full).
 #define ITC_POST_EFFECTS_RECORD(address, ...)                 \
-  extern "C" REX_FUNC(sub_##address) {                        \
-    REX_FUNC_PROLOGUE();                                      \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                        \
+    \
     std::optional<uint32_t> r3;                               \
     if (ITC_FLAG(native_post_effects)) {                      \
       r3 = __VA_ARGS__;                                       \
     }                                                         \
     if (!r3) {                                                \
-      __imp__sub_##address(ctx, base);                        \
+      lifted::original::c##address(ctx);                        \
       return;                                                 \
     }                                                         \
     ctx.r3.u64 = *r3;                                         \
   }
 
-ITC_POST_EFFECTS_RECORD(82133340, RecordBeginStates(base, ctx.r4.u32))
-ITC_POST_EFFECTS_RECORD(82133608, RecordEndStates(base, ctx.r4.u32))
+ITC_POST_EFFECTS_RECORD(82133340, RecordBeginStates(ctx.r4.u32))
+ITC_POST_EFFECTS_RECORD(82133608, RecordEndStates(ctx.r4.u32))
 // r5 = the surface, r6 = the depth surface.
-ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r5 = the 16 bytes, r6 = the register, r7 = the count.
 ITC_POST_EFFECTS_RECORD(82133D00,
-                        RecordPixelConstants(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
-// r5 = the value, r6 = the register.
-ITC_POST_EFFECTS_RECORD(82133D70, RecordPixelBool(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+                        RecordPixelConstants(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
 // f1 = width, f2 = height.
 ITC_POST_EFFECTS_RECORD(82133DD8, (ctx.fpscr.disableFlushMode(),
-                                   RecordTexelSize(base, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))
+                                   RecordTexelSize(ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))
 // r5 = the texture, r6, r7 = the flags, r8 = by the view's rectangle.
-ITC_POST_EFFECTS_RECORD(82133F58, RecordResolve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_POST_EFFECTS_RECORD(82133F58, RecordResolve(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                 ctx.r6.u32, ctx.r7.u32, ctx.r8.u32 != 0))
 
 // PostEffect::AddQuad: r4 = width, r5 = height, f1 = the value, r7 = at the
 // view's position.
 ITC_POST_EFFECTS(82133E30, ctx.fpscr.disableFlushMode();
-                 ctx.r3.u64 = AddQuad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
+                 ctx.r3.u64 = AddQuad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
                                       ctx.r7.u32 != 0))
-
-// --- The glare's definition ---
-
-// r3 = the glare definition.
-ITC_POST_EFFECTS(8212ED78, ctx.fpscr.disableFlushMode(); GlareDefConstruct(base, ctx.r3.u32))
-// r4 = the glare type.
-ITC_POST_EFFECTS(8212EC90, ctx.fpscr.disableFlushMode();
-                 ctx.r3.u64 = GlareDefInit(base, ctx.r3.u32, ctx.r4.u32))
 
 // --- The render textures and surfaces ---
 
@@ -207,14 +218,18 @@ bool FreesNative() {
 // The video output, as the device's users reach it: `[0x8266D088]`'s vtable
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
-uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+uint32_t VideoOutputCall(lifted::Regs& ctx, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app().address;
   ctx.lr = first;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
+  const uint32_t slot7 =
+      guest::LoadU32(schema::AppInterface16(ctx.r3.u32).vtable() + 28);
+  if (!hooks::DirectSlotCall(ctx, slot7)) {
+    lifted::CallFromContext(ctx, slot7);
+  }
+  ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 12);
   ctx.lr = second;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -225,13 +240,13 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
 
 namespace hooks {
 
-void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PostEffectsReleaseTexture) {
   std::optional<uint32_t> r3;
   if (FreesNative()) {
-    r3 = RenderTexturesRelease(base, ctx.r3.u32);
+    r3 = RenderTexturesRelease(ctx.r3.u32);
   }
   if (!r3) {
-    __imp__sub_821332F0(ctx, base);
+    lifted::original::c821332F0(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -241,90 +256,246 @@ void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base) {
 // pointer) natively, its guest calls from a frame like the original's (112
 // bytes), or the original without the native device lock; its adapter's
 // body, as ReleaseTexture.
-void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PostEffectsReleaseSurface) {
   if (!ITC_FLAG(native_video_output)) {
-    __imp__sub_82133C60(ctx, base);
+    lifted::original::c82133C60(ctx);
     return;
   }
   const uint32_t at = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, 112, 0x82133C90, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, 112, 0x82133C90, [&](uint32_t frame) {
     const SurfaceCalls calls{
         [&](int which) {
-          return which == 0 ? VideoOutputCall(ctx, base, 0x82133C90, 0x82133CA0)
-                            : VideoOutputCall(ctx, base, 0x82133CCC, 0x82133CDC);
+          return which == 0 ? VideoOutputCall(ctx, 0x82133C90, 0x82133CA0)
+                            : VideoOutputCall(ctx, 0x82133CCC, 0x82133CDC);
         },
         [&](uint32_t resource) {
           ctx.r3.u64 = resource;
           ctx.lr = 0x82133CB0;
-          sub_822A67B0(ctx, base);
+          lifted::Enter(ctx, game::Resource::Release);
         }};
-    r3 = ReleaseSurface(base, frame, at, calls);
+    r3 = ReleaseSurface(frame, at, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
 // The destructors' calls: the two above, r3 = the field's address.
-DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* base) {
-  return {[&ctx, base](uint32_t at) {
+DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx) {
+  return {[&ctx](uint32_t at) {
             ctx.r3.u64 = at;
-            PostEffectsReleaseSurface(ctx, base);
+            PostEffectsReleaseSurface(ctx);
             return ctx.r3.u32;
           },
-          [&ctx, base](uint32_t at) {
+          [&ctx](uint32_t at) {
             ctx.r3.u64 = at;
-            PostEffectsReleaseTexture(ctx, base);
+            PostEffectsReleaseTexture(ctx);
             return ctx.r3.u32;
           }};
 }
 
 }  // namespace hooks
 
-// TargetFilter::TargetFilter: r3 = the object, r4 = the table entry. The
-// surface's parameters in a frame like the original's (112 bytes).
-extern "C" REX_FUNC(sub_82135AA8) {
-  REX_FUNC_PROLOGUE();
-  std::optional<uint32_t> r3;
-  if (ITC_FLAG(native_post_effects) && ITC_FLAG(native_graphics_resources) &&
-      hooks::NativeHeapActive()) {
-    const uint32_t filter = ctx.r3.u32;
-    const uint32_t entry = ctx.r4.u32;
-    const uint64_t lr = ctx.lr;
-    guest_call::InFrame(ctx, base, 112, 0x82135AD4, [&](uint32_t frame) {
-      r3 = TargetFilterConstruct(base, frame, filter, entry);
-    });
+// PostEffects::InitEdramBase: no arguments (a static initializer, through
+// _cinit's table).
+ITC_POST_EFFECTS(825D99D0, ctx.r3.u64 = InitEdramBase())
+
+namespace {
+
+// PostEffects::Create's guest calls (the video output's slots with the
+// original's return addresses; the constructors of kinds 1 and 4).
+CreateCalls MakeCreateCalls(lifted::Regs& ctx) {
+  return {[&ctx](int which) {
+            return which == 0 ? VideoOutputCall(ctx, 0x82138A54, 0x82138A64)
+                              : VideoOutputCall(ctx, 0x82138C18, 0x82138C28);
+          },
+          [&ctx](uint32_t function, uint32_t object, uint32_t entry, uint32_t device) {
+            ctx.r3.u64 = object;
+            ctx.r4.u64 = entry;
+            ctx.r5.u64 = device;
+            if (function == 0x82134410) {
+              ctx.lr = 0x82138BB8;
+              lifted::Enter(ctx, lifted::e82134410);
+            } else {
+              ctx.lr = 0x82138B10;
+              lifted::Enter(ctx, lifted::e82133B10);
+            }
+            return ctx.r3.u32;
+          }};
+}
+
+}  // namespace
+
+// PostEffects::Create: r3 = the device or 0, r4 = the effect's index. The
+// guest calls from a frame like the original's (128 bytes); with the
+// allocation layer only.
+ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
+  
+  if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
+    lifted::original::c82138A18(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint32_t device = ctx.r3.u32;
+  const uint32_t index = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, 128, 0x82138A54, [&](uint32_t) {
+    r3 = Create(stack, device, index, MakeCreateCalls(ctx));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// PostEffects::InitBoot: r3 = the device or 0. The guest calls from a
+// frame like the original's (112 bytes; PostEffects::Create's below it, 128
+// bytes, and memcpy's, where CreateVertexDeclaration's plain C++ hands it
+// back, below CreateVertexDeclaration's, 160 bytes).
+void hooks::PostEffectsInitBoot(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
+    lifted::original::c82138C38(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint32_t device = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, 112, 0x82138C78, [&](uint32_t) {
+    const InitBootCalls calls{
+        [&](int which) {
+          return which == 0 ? VideoOutputCall(ctx, 0x82138C78, 0x82138C88)
+                            : VideoOutputCall(ctx, 0x82138CCC, 0x82138CDC);
+        },
+        [&](uint32_t to, uint32_t from, uint32_t size) {
+          guest_call::InFrame(ctx, 160, 0x822A8A54, [&](uint32_t) {
+            ctx.r3.u64 = to;
+            ctx.r4.u64 = from;
+            ctx.r5.u64 = size;
+            lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
+          });
+        },
+        [&](const std::function<uint32_t(const CreateCalls&)>& create) {
+          uint32_t made = 0;
+          guest_call::InFrame(ctx, 128, 0x82138A54,
+                              [&](uint32_t) { made = create(MakeCreateCalls(ctx)); });
+          return made;
+        }};
+    r3 = InitBoot(stack, device, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// --- The records (vtable slot 0: PostEffects::RecordAll's guest calls) ---
+
+namespace hooks {
+
+RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx) {
+  RecordCalls calls;
+  calls.call = [&ctx](uint32_t function, const uint64_t* regs, int count,
+                            const double* fregs, int fcount, uint32_t sp,
+                            uint32_t lr) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
     ctx.lr = lr;
+    lifted::Temp* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                            &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+    for (int i = 0; i < count; i++) {
+      gprs[i]->u64 = regs[i];
+    }
+    lifted::Temp* fprs[4] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4};
+    for (int i = 0; i < fcount; i++) {
+      fprs[i]->f64 = fregs[i];
+    }
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  calls.tan = [&ctx](double x, uint32_t sp, uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.f1.f64 = x;
+    lifted::Enter(ctx, game::tan);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.f1.f64;
+  };
+  return calls;
+}
+
+}  // namespace hooks
+
+// r3 = the effect. The original where the plain C++ declines (a full list,
+// an open chunk), with r3 the effect again.
+#define ITC_POST_EFFECT_RECORD(address, Record)                                         \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
+    \
+    std::optional<uint32_t> r3;                                                        \
+    if (ITC_FLAG(native_post_effects)) {                                               \
+      ctx.fpscr.disableFlushMode();                                                    \
+      const uint64_t lr = ctx.lr;                                                      \
+      const uint64_t effect = ctx.r3.u64;                                              \
+      r3 = Record(ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx)); \
+      ctx.lr = lr;                                                                     \
+      ctx.r3.u64 = effect;                                                             \
+    }                                                                                  \
+    if (!r3) {                                                                         \
+      lifted::original::c##address(ctx);                                                 \
+      return;                                                                          \
+    }                                                                                  \
+    ctx.r3.u64 = *r3;                                                                  \
+  }
+
+void hooks::PostEffectsGlowRecord(lifted::Regs& ctx) {
+  std::optional<uint32_t> r3;
+  if (ITC_FLAG(native_post_effects)) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    const uint64_t glow = ctx.r3.u64;
+    r3 = GlowRecord(ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx));
+    ctx.lr = lr;
+    ctx.r3.u64 = glow;
   }
   if (!r3) {
-    __imp__sub_82135AA8(ctx, base);
+    lifted::original::c821379D8(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
 }
+
+ITC_POST_EFFECT_RECORD(821351F0, ColorFilterRecord)
+ITC_POST_EFFECT_RECORD(82135B50, TargetFilterRecord)
+ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
+// Glow::RecordStar (sub_82136FA8) and Glow::RecordStarPass have no
+// adapters: only Glow::Record's plain C++ calls the first, and its plain
+// C++ the second.
 
 // --- The destructors ---
 
 // The deleting destructors (vtable slot 1): r4 bit 0 = delete. The
 // original where the delete isn't native.
 #define ITC_POST_EFFECT_DELETE(address, kind)                                          \
-  extern "C" REX_FUNC(sub_##address) {                                                 \
-    REX_FUNC_PROLOGUE();                                                               \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
+    \
     if (!ITC_FLAG(native_post_effects) || ((ctx.r4.u32 & 1) != 0 && !FreesNative())) { \
-      __imp__sub_##address(ctx, base);                                                 \
+      lifted::original::c##address(ctx);                                                 \
       return;                                                                          \
     }                                                                                  \
     const uint64_t lr = ctx.lr;                                                        \
     const uint32_t effect = ctx.r3.u32;                                                \
     const uint32_t flags = ctx.r4.u32;                                                 \
     std::optional<uint32_t> r3;                                                        \
-    guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {                             \
-      r3 = DeleteEffect(base, kind, effect, flags, hooks::PostEffectsDestroyCalls(ctx, base));       \
+    guest_call::InFrame(ctx, 112, 0, [&](uint32_t) {                             \
+      r3 = DeleteEffect(kind, effect, flags, hooks::PostEffectsDestroyCalls(ctx));       \
     });                                                                                \
     ctx.lr = lr;                                                                       \
     if (!r3) {                                                                         \
-      __imp__sub_##address(ctx, base);                                                 \
+      lifted::original::c##address(ctx);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \

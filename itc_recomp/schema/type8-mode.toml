@@ -1,0 +1,88 @@
+# The schema of docs/functions/type8-mode.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 8 mode's first screen and its dialog (known-data.md: "type 8
+# first screen and dialog"), both inline in the mode's member
+# (ModeType8Member, boot-mode.toml's ModeType8 +848): Type8Screen0 at the
+# member's +0, Type8Dialog at +9792. Their machines are StateMachines
+# (game-modes.toml), their page blocks PageObjects and the dialog's menu a
+# FrontEndMenu (menu-helpers.toml), the screen's list a MenuList
+# (race-screens.toml), all inline (bytes fields: view them at the field's
+# address).
+
+# The first screen (9,792 bytes, the member's +0): the mode's five-item
+# menu over UI movie 24 (asset 22583) and the two players' cars on the stand.
+[Type8Screen0]
+measure = "Type8Screen0"
+size = 9792
+origin = "embedded"
+vtable = 0x82010B74
+# 2 functions; areas: type8-mode.md
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B74 (one slot, DeletingDestructor)" },
+  { name = "machine", offset = 4, type = "bytes", count = 9616, note = "a StateMachine (game-modes.toml): its state at the screen's +9608, its loaded (movie 24 loaded) at +9612, its reenter (open on its message) at +9616" },
+  { name = "delete_movie", offset = 9620, type = "u32", note = "delete movie 24 when suspended (0 from ModeType8::Init: kept)" },
+  { name = "menu_input", offset = 9644, type = "u32", note = "the menu takes input" },
+  { name = "dialog_answer", offset = 9648, type = "u32", note = "-1 none, 0 no, 1 yes, 2 back" },
+  { name = "pages", offset = 9652, type = "bytes", count = 28, note = "a PageObject (menu-helpers.toml): pages 0 the menu, 1 the quit confirm, 2 none, 3 chosen; steps 0 the opening, 1 the item, 2 the cursor, 3 the fade out" },
+  { name = "menu_list", offset = 9680, type = "bytes", count = 72, note = "a MenuList (race-screens.toml), 5 items; its +60 (+9740) and +68 (+9748) cleared by the constructor, its +24 (+9704) the last move" },
+  { name = "stand_0", offset = 9752, type = "bytes", count = 20, note = "player 0's Type8StandBlock (animations 45, 44, 46)" },
+  { name = "stand_1", offset = 9772, type = "bytes", count = 20, note = "player 1's Type8StandBlock (animations 48, 47, 49)" },
+]
+
+# A player's stand block (20 bytes, Type8Screen0's +9752 and +9772): the
+# loading animations of movie 24 shown while the player's stage model loads.
+[Type8StandBlock]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "loading_shown", offset = 0, type = "u32", note = "the loading animations are playing" },
+  { name = "loading_start_anim", offset = 4, type = "u32", note = "a named animation of movie 24 (45, 48): played once when the loading starts" },
+  { name = "loading_loop_anim", offset = 8, type = "u32", note = "a named animation (44, 47): played and looped while loading" },
+  { name = "loaded_anim", offset = 12, type = "u32", note = "a named animation (46, 49): played once the model is in" },
+  { name = "model_made", offset = 16, type = "u32", note = "GarageStage::ReloadModel's answer once asked (0 until then; cleared by Show)" },
+]
+
+# The dialog (9,752 bytes, the member's +9792): Type6Dialog's yes/no and
+# notice over movies 16 to 20, its machine at +0. The measure never met it
+# (all its functions are hand ports).
+[Type8Dialog]
+size = 9752
+origin = "embedded"
+fields = [
+  { name = "machine", offset = 0, type = "bytes", count = 9616, note = "a StateMachine (game-modes.toml): its state at +9604, its loaded (movies 16 to 20 loaded) at +9608, its reenter (open on its message) at +9612" },
+  { name = "delete_movies", offset = 9616, type = "u32", note = "0 from ModeType8::Init (as each machine's word after its reenter)" },
+  { name = "pages", offset = 9640, type = "bytes", count = 28, note = "a PageObject (menu-helpers.toml): pages 0 the yes/no, 1 the notice; steps 0 OpenConfirmStep, 1 CloseConfirmStep, 2 OpenNoticeStep, 3 CloseNoticeStep, 4 MoveCursorStep" },
+  { name = "menu", offset = 9668, type = "bytes", count = 68, note = "a FrontEndMenu (menu-helpers.toml), items 0 to 1; its player (+9732) the asking player ([0x82814E6C])" },
+  { name = "shown", offset = 9736, type = "u32", note = "1 once its movies are loaded and drawn once" },
+  { name = "queued_state", offset = 9740, type = "u32", note = "21 none; 9 posts the closed message 13" },
+  { name = "movie", offset = 9744, type = "u32", note = "the movie shown: 16 (the yes/no) or 19 (the notice)" },
+  { name = "reopen", offset = 9748, type = "u32", note = "a reopen queued (Type7Dialog::QueueReopen)" },
+]
+
+# A player's entry of the stand table (12 bytes, 0x82636FDC + 12 x player;
+# known-data.md), read by Type8Screen0::UpdateStand.
+[Type8StandEntry]
+size = 12
+origin = "image"
+fields = [
+  { name = "stage_index", offset = 0, type = "u32", note = "the garage stage's index into [0x826D83E0] (1, 2)" },
+  { name = "car_flag", offset = 4, type = "u32", note = "ORed into the stand car's +3888 (1, 0x80)" },
+  { name = "command", offset = 8, type = "u32", note = "the stage's command once its model is in (56, 57)" },
+]
+
+[globals]
+dialog_player = { address = 0x82814E6C, type = "u32", note = "the player the quit dialog was asked for (Type8PanelScreen::AskQuit, Type8Screen0::Confirm; read by Type8Dialog::OpenConfirm)" }
+step_table = { address = 0x82814E70, type = "bytes", count = 32, note = "Type8Screen0::Update's steps: four member pointers {function, adjustment}, built on its first call" }
+step_table_guard = { address = 0x82814E90, type = "u32", note = "bit 0: step_table built" }
+page_table = { address = 0x82814E94, type = "bytes", count = 32, note = "Type8Screen0::Draw's pages: four member pointers {function, adjustment}, built on its first call" }
+page_table_guard = { address = 0x82814EB4, type = "u32", note = "bit 0: page_table built" }
+stand_table = { address = 0x82636FDC, type = "bytes", count = 24, note = "two Type8StandEntry, one a player" }
+garage_cars = { address = 0x82814EB8, type = "bytes", count = 3944, note = "the two players' garage cars (car-makers.toml's GarageCarSlot, 1,972 bytes each)" }
+stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +4 and +8 the two players' garage stages' holders" }
+mode_before = { address = 0x826032E0, type = "u32", note = "the game mode before (1 the race)" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn is given" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "the passes word ScreenFades::FadeOut is given" }

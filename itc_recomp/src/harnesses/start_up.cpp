@@ -9,7 +9,7 @@ namespace harness {
 void StartUp(Context& h) {
   {
     Results results("CheckPal50 (sub_82296AB0)");
-    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82296AB0, sub_82296AB0, h.data, 0,
+    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82296AB0, harness::Ours<0x82296AB0>, h.data, 0,
          "the console");
     results.Report();
   }
@@ -17,13 +17,13 @@ void StartUp(Context& h) {
   const uint32_t heap = 0x8297149C;
   {
     Results results("CreateHeap (sub_82297C08), made");
-    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82297C08, sub_82297C08, heap, 4,
+    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82297C08, harness::Ours<0x82297C08>, heap, 4,
          "the heap made");
     results.Report();
   }
   {
     Results results("CheckHeap (sub_82297CE0), made");
-    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82297CE0, sub_82297CE0, heap, 4,
+    Both(h, results, [] {}, [](PPCContext&) {}, __imp__sub_82297CE0, harness::Ours<0x82297CE0>, heap, 4,
          "the heap made");
     results.Report();
   }

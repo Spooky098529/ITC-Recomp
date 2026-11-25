@@ -1,0 +1,360 @@
+// The save slots' steps on our own saves/ folder, as plain C++ (slot_steps.h).
+
+#include "saves/slot_steps.h"
+
+#include "guest.h"
+
+#include "base/log.h"
+#include "save_interface/save_interface.h"
+#include "saves/saves.h"
+#include "schema/achievements.h"
+#include "schema/c_runtime_core.h"
+#include "schema/files_and_saves.h"
+#include "schema/save_interface.h"
+
+#include <string>
+#include <vector>
+
+namespace saves::slot {
+
+namespace {
+
+using schema::SaveSlot;
+using schema::XContentData;
+
+constexpr uint32_t kDevice = 1;
+// The device's free bytes, as the SDK answered (the game only checks there's
+// room for the save's 188,416).
+constexpr uint64_t kFreeBytes = 3221225472;
+constexpr uint32_t kSavedGame = 1;  // the content type
+constexpr const char* kContentName = "SystemData.bin";
+constexpr const char* kSaveFile = "TXR_DATA_1";
+constexpr uint32_t kContentDataBytes = XContentData::kSize;
+// The XOVERLAPPED (achievements.toml's AchievementOverlapped) the content
+// steps finish, and the Win32 OVERLAPPED (c-runtime-core.toml's CrtOverlapped)
+// of the file steps.
+using XOverlapped = schema::AchievementOverlapped;
+constexpr uint32_t kOverlappedBytes = XOverlapped::kSize;
+
+// Win32 errors the steps' overlappeds hold.
+constexpr uint32_t kFileNotFound = 2;
+constexpr uint32_t kNoMoreFiles = 1627;
+constexpr uint32_t kIncomplete = 996;
+constexpr uint32_t kPending = 997;
+
+void Clear(uint32_t address, uint32_t bytes) {
+  for (uint32_t i = 0; i < bytes; i++) {
+    guest::StoreU8(address + i, 0);
+  }
+}
+
+void StoreU64(uint32_t address, uint64_t value) {
+  guest::StoreU32(address, uint32_t(value >> 32));
+  guest::StoreU32(address + 4, uint32_t(value));
+}
+
+// An overlapped finished: its status (a Win32 error, 0 for done) and
+// information.
+void Finish(uint32_t overlapped, uint32_t status, uint32_t information = 0) {
+  const XOverlapped o(overlapped);
+  o.set_internal_low(status);
+  o.set_internal_high(information);
+}
+
+// What XGetOverlappedResult (sub_82295C98) answers without waiting: 996 while
+// pending, else the status (the information to `result` when given).
+uint32_t OverlappedResult(uint32_t overlapped, uint32_t result = 0) {
+  const XOverlapped o(overlapped);
+  uint32_t status = o.internal_low();
+  if (status == kPending) {
+    return kIncomplete;
+  }
+  if (result) {
+    guest::StoreU32(result, o.internal_high());
+  }
+  return status;
+}
+
+std::string GuestString(uint32_t address, uint32_t max) {
+  std::string s;
+  for (uint32_t i = 0; i < max; i++) {
+    char c = char(guest::LoadU8(address + i));
+    if (!c) {
+      break;
+    }
+    s += c;
+  }
+  return s;
+}
+
+// The save slot's content data (+164) for its device: the display name
+// (+504, UTF-16, wcscpy) and the file name (+760, strcpy), as
+// SaveSlot::Create and SaveSlot::Delete build it.
+void BuildContentData(const SaveSlot& slot) {
+  const XContentData data(slot.content_data_address());
+  Clear(data.address, kContentDataBytes);
+  for (uint32_t i = 0;; i++) {
+    uint8_t c = guest::LoadU8(slot.file_name_address() + i);
+    guest::StoreU8(data.file_name_address() + i, c);
+    if (!c) {
+      break;
+    }
+  }
+  for (uint32_t i = 0;; i += 2) {
+    uint16_t c = guest::LoadU16(slot.display_name_address() + i);
+    guest::StoreU16(data.display_name_address() + i, c);
+    if (!c) {
+      break;
+    }
+  }
+  data.set_device(slot.device());
+  data.set_content_type(kSavedGame);
+}
+
+// The one save, as an enumerated XCONTENT_DATA at `address`: the device, the
+// type, "GAME DATA   " and the file's date (the display name the game writes),
+// and SystemData.bin.
+void StoreSaveContentData(uint32_t address) {
+  const XContentData data(address);
+  Clear(address, kContentDataBytes);
+  data.set_device(kDevice);
+  data.set_content_type(kSavedGame);
+  std::string display = "GAME DATA   " + saves::WrittenAt(kSaveFile).value_or("");
+  for (uint32_t i = 0; i < display.size() && i < 127; i++) {
+    guest::StoreU16(data.display_name_address() + 2 * i, uint8_t(display[i]));
+  }
+  for (uint32_t i = 0; kContentName[i]; i++) {
+    guest::StoreU8(data.file_name_address() + i, uint8_t(kContentName[i]));
+  }
+}
+
+// The file a read or write step opens: the path at +802 ("TXR360:\TXR_DATA_1").
+std::string SlotFileName(const SaveSlot& slot) {
+  std::string path = GuestString(slot.file_path_address(), 128);
+  auto name = saves::FileName(path);
+  if (!name) {
+    ITC_LOG_WARN("saves: not a save file: \"{}\"", path);
+    return {};
+  }
+  return *name;
+}
+
+// The read and write steps' file overlapped (+472, 20 bytes cleared, its event
+// +488 none) done with `bytes`, and no file or event handle (+496, +492).
+void FinishFileStep(const SaveSlot& slot, uint32_t bytes) {
+  const schema::CrtOverlapped overlapped(slot.file_overlapped_address());
+  Clear(overlapped.address, schema::CrtOverlapped::kSize);
+  overlapped.set_internal(0);
+  overlapped.set_internal_high(bytes);
+  slot.set_file_event(0);
+  slot.set_file_handle(0xFFFFFFFF);
+  slot.set_file_bytes(bytes);
+}
+
+// A read or write step's start: the content's create (+136) has to be done.
+// 0 to poll again, -7 for an error (no handles), else 1 to go on.
+int32_t WaitForCreate(const SaveSlot& slot) {
+  uint32_t result = OverlappedResult(slot.content_op_address());
+  if (result == 0) {
+    return 1;
+  }
+  if (result == kIncomplete) {
+    return 0;
+  }
+  slot.set_file_event(0);
+  slot.set_file_handle(0xFFFFFFFF);
+  return -7;
+}
+
+}  // namespace
+
+uint32_t CheckDevice(uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820A45C0 SaveSlot::CheckDevice");
+  return SaveSlot(slot).device();
+}
+
+int32_t WaitDeviceSelector(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A48B8 SaveSlot::WaitDeviceSelector");
+  const SaveSlot slot(address);
+  if (XOverlapped(slot.device_selector_address()).internal_low() == kPending) {
+    return 4;
+  }
+  uint32_t result = OverlappedResult(slot.device_selector_address());
+  if (slot.device() && result == 0) {
+    slot.set_request_device_selector(0);
+    slot.set_request_enumeration(1);
+    StoreU64(slot.device_free_bytes_address(), kFreeBytes);
+  } else if (result == kIncomplete) {
+    return 4;
+  } else {
+    slot.set_request_device_selector(0);
+    StoreU64(slot.device_free_bytes_address(), 0);
+  }
+  return 3;
+}
+
+int32_t ShowDeviceSelector(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A4960 SaveSlot::ShowDeviceSelector");
+  const SaveSlot slot(address);
+  Clear(slot.device_selector_address(), kOverlappedBytes);
+  slot.set_device(kDevice);
+  Finish(slot.device_selector_address(), 0);
+  return 1;
+}
+
+int32_t Enumerate(uint32_t owner, uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A49D0 SaveSlot::Enumerate");
+  const SaveSlot slot(address);
+  if (!slot.device()) {
+    return -2;
+  }
+  const uint32_t count = schema::SaveDevices(owner).saves_to_enumerate();
+  slot.set_enumeration_buffer_size(count * kContentDataBytes);
+  slot.set_enumerator(0);
+  Clear(slot.enumeration_address(), kOverlappedBytes);
+  uint32_t found = 0;
+  if (count && saves::Exists(kSaveFile)) {
+    StoreSaveContentData(slot.enumeration_buffer());
+    found = 1;
+  }
+  Finish(slot.enumeration_address(), 0, found);
+  return 1;
+}
+
+int32_t WaitEnumerate(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A4A88 SaveSlot::WaitEnumerate");
+  const SaveSlot slot(address);
+  uint32_t result =
+      OverlappedResult(slot.enumeration_address(), slot.enumerated_count_address());
+  if (result == 0) {
+    slot.set_enumerated_saves(slot.enumerated_count());
+  } else if (result == kNoMoreFiles) {
+    slot.set_enumerated_saves(0);
+  } else {
+    return result == kIncomplete ? 0 : -6;
+  }
+  return 1;
+}
+
+int32_t OpenItem(uint32_t address, uint32_t item_index) {
+  ITC_NATIVE_RUNNING("sub_820A4B18 SaveSlot::OpenItem");
+  const SaveSlot slot(address);
+  if (!slot.device()) {
+    return -2;
+  }
+  const XContentData item(slot.enumeration_buffer() + item_index * kContentDataBytes);
+  Clear(slot.open_address(), kOverlappedBytes);
+  if (!item.device()) {
+    return -5;
+  }
+  Finish(slot.open_address(), saves::Exists(kSaveFile) ? 0 : kFileNotFound);
+  return 1;
+}
+
+int32_t WaitOpenItem(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A4B98 SaveSlot::WaitOpenItem");
+  uint32_t result = OverlappedResult(SaveSlot(address).open_address());
+  return result == 0 ? 1 : result == kIncomplete ? 0 : -7;
+}
+
+int32_t Create(uint32_t owner, uint32_t address, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_820A4C58 SaveSlot::Create");
+  const SaveSlot slot(address);
+  if (!slot.device()) {
+    return -2;
+  }
+  if (mode == 3) {
+    // XContentCalculateSize (game code, sub_82295C18's plain C++) of the
+    // owner's +60 and +64.
+    const schema::SaveDevices devices(owner);
+    const uint64_t size = save_interface::ContentSize(devices.content_bytes(),
+                                                      devices.content_count());
+    if (kFreeBytes < size) {
+      return -10;
+    }
+  }
+  Clear(slot.content_op_address(), kOverlappedBytes);
+  BuildContentData(slot);
+  const bool create_always = mode == 1;
+  Finish(slot.content_op_address(), create_always || saves::Exists(kSaveFile) ? 0 : kFileNotFound);
+  return 1;
+}
+
+int32_t WriteFile(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A4D68 SaveSlot::WriteFile");
+  const SaveSlot slot(address);
+  if (int32_t waited = WaitForCreate(slot); waited != 1) {
+    return waited;
+  }
+  const uint32_t data = slot.data(), size = slot.data_size();
+  std::string name = SlotFileName(slot);
+  std::vector<uint8_t> bytes(size);
+  for (uint32_t i = 0; i < size; i++) {
+    bytes[i] = guest::LoadU8(data + i);
+  }
+  if (name.empty() || !saves::Write(name, bytes.data(), size)) {
+    ITC_LOG_WARN("saves: can't write the save \"{}\" ({} bytes)", name, size);
+    slot.set_file_event(0);
+    slot.set_file_handle(0xFFFFFFFF);
+    return -3;
+  }
+  FinishFileStep(slot, size);
+  return 1;
+}
+
+int32_t ReadFile(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A4EF8 SaveSlot::ReadFile");
+  const SaveSlot slot(address);
+  if (int32_t waited = WaitForCreate(slot); waited != 1) {
+    return waited;
+  }
+  const uint32_t data = slot.data(), size = slot.data_size();
+  std::string name = SlotFileName(slot);
+  auto bytes = name.empty() ? std::nullopt : saves::Read(name, size);
+  if (!bytes) {
+    ITC_LOG_WARN("saves: can't read the save \"{}\"", name);
+    slot.set_file_event(0);
+    slot.set_file_handle(0xFFFFFFFF);
+    return -3;
+  }
+  for (uint32_t i = 0; i < bytes->size(); i++) {
+    guest::StoreU8(data + i, (*bytes)[i]);
+  }
+  FinishFileStep(slot, uint32_t(bytes->size()));
+  return 1;
+}
+
+int32_t SetThumbnail(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A5110 SaveSlot::SetThumbnail");
+  const SaveSlot slot(address);
+  if (!slot.device()) {
+    return -2;
+  }
+  Clear(slot.content_op_address(), kOverlappedBytes);
+  Finish(slot.content_op_address(), 0);
+  return 1;
+}
+
+int32_t Delete(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_820A51E0 SaveSlot::Delete");
+  const SaveSlot slot(address);
+  if (!slot.device()) {
+    return -2;
+  }
+  Clear(slot.content_op_address(), kOverlappedBytes);
+  BuildContentData(slot);
+  bool deleted = saves::Delete(kSaveFile);
+  Finish(slot.content_op_address(), deleted ? 0 : kFileNotFound);
+  return 1;
+}
+
+uint32_t ContentClose(uint32_t overlapped) {
+  ITC_NATIVE_RUNNING("sub_82295BF0 XContentClose");
+  if (overlapped) {
+    Finish(overlapped, 0);
+    return kPending;
+  }
+  return 0;
+}
+
+}  // namespace saves::slot

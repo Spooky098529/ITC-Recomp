@@ -1,0 +1,168 @@
+// The graphics library's command buffer natively: adapters in front of
+// src/graphics/command_buffer.h (docs/functions/command-buffer.md). Each
+// leaves r3 as the original does (the return value, or r3 as it came for
+// those with none).
+
+#include "guest.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "hooks/command_buffer.h"
+
+#include "base/flags.h"
+#include "graphics/command_buffer.h"
+#include "hooks/guest_call.h"
+#include "lifted/sdk.h"
+#include "schema/command_buffer.h"
+#include "schema/device_state.h"
+
+ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
+              "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
+              "Device::WriteSegmentTail sub_8229E768, Device::SaveSegment sub_8229DBF0, "
+              "CommandChain::Close sub_8229DFB8, Device::WriteCallback sub_8229E9D0, "
+              "Device::NextSpace sub_8229E100 (its wait for the GPU, sub_8229DC28, dropped), "
+              "Device::AllocateFromCommandBuffer sub_8229E308, "
+              "Device::WriteDefaultDrawRegisters sub_822AF978 without its packets, "
+              "CommandChain::NewBlock sub_8229EB10, CommandChain::Init sub_8229ED60, the segment "
+              "flow (Device::EndSegment sub_8229EF48, Device::KickSegment sub_8229EDA8, "
+              "Device::NextSegment sub_8229EC00, Device::WaitForFence sub_8229E908, its waits "
+              "for the GPU dropped), Device::ReserveWords sub_8229F148, "
+              "Device::InsertCallback sub_8229F228, sub_8229F0E0 and the full GPU wait sub_8229F1B0 "
+              "without their packets (and its spin); the "
+              "coherency flush packets sub_8229E5D0 and the data cache flush sub_822AC470 "
+              "dropped) "
+              "natively instead of through the translated code (the same results; checked by "
+              "--run_harnesses=command_buffer).");
+
+namespace cb = graphics::command_buffer;
+
+#define ITC_COMMAND_BUFFER(address, ...)      \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_command_buffer)) { \
+    __VA_ARGS__;                              \
+  }
+
+// The adapters of sub_8229DBF0, sub_8229DFB8 and sub_8229ED60 are gone
+// (2026-11-06): their only callers, predicated tiling's start and end, are
+// native (src/graphics/predicated_tiling.cpp), and --native_predicated_tiling
+// switches only those callers.
+ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(ctx.r3.u32, ctx.r4.u32,
+                                                          ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+// Reserve: the recording command buffer's path (never in play) is the
+// original's.
+ITC_COMMAND_BUFFER(8229E308, {
+  if (schema::Device(ctx.r3.u32).recorder().address != 0) {
+    lifted::original::c8229E308(ctx);
+    return;
+  }
+  ctx.r3.u64 = cb::Reserve(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+})
+// The chains: a recording command buffer (+13160, never in play) makes
+// Reserve the original's, so they run the original whole.
+ITC_COMMAND_BUFFER(8229EB10, {
+  if (schema::Device(schema::CommandChain(ctx.r3.u32).device()).recorder().address !=
+      0) {
+    lifted::original::c8229EB10(ctx);
+    return;
+  }
+  ctx.r3.u64 = cb::NewBlock(ctx.r3.u32);
+})
+// The segment flow: with a recording command buffer (never in play), the
+// originals whole. The adapters of sub_8229E768, sub_8229E100, sub_8229EDA8,
+// sub_8229EC00 and sub_8229E908 are gone (2026-11-06): their callers in play
+// are native (Device::Swap's call to sub_8229EC00 through
+// hooks::NextCommandSegment), and the flag switches only those callers.
+graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx) {
+  return [&ctx](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
+                      uint32_t interrupts, uint32_t list) {
+    uint32_t r3 = 0;
+    guest_call::InFrame(ctx, 128, 0x8229EEE0, [&](uint32_t) {
+      ctx.r3.u64 = device;
+      ctx.r4.u64 = result;
+      ctx.r5.u64 = address;
+      ctx.r6.u64 = words;
+      ctx.r7.u64 = interrupts;
+      ctx.r8.u64 = list;
+      lifted::Enter(ctx, game::Device::DeferredKick);
+      r3 = ctx.r3.u32;
+    });
+    return r3;
+  };
+}
+
+void hooks::EndCommandSegment(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {
+    lifted::original::c8229EF48(ctx);
+    return;
+  }
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::EndSegment(device, CommandBufferKick(ctx));
+}
+
+void hooks::NextCommandSegment(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {
+    lifted::original::c8229EC00(ctx);
+    return;
+  }
+  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
+  ctx.r3.u64 = cb::NextSegment(device, words, CommandBufferKick(ctx));
+}
+
+#define ITC_SEGMENT_FLOW(address, ...)                                             \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                           \
+    \
+    if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {   \
+      lifted::original::c##address(ctx);                              \
+      return;                                                                    \
+    }                                                                            \
+    const cb::Kick kick = hooks::CommandBufferKick(ctx);                   \
+    __VA_ARGS__;                                                                 \
+  }
+
+ITC_SEGMENT_FLOW(8229F148, {
+  const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
+  ctx.r3.u64 = cb::ReserveWords(device, words, kick);
+})
+ITC_SEGMENT_FLOW(8229F228, {
+  const uint32_t device = ctx.r3.u32, flags = ctx.r4.u32, function = ctx.r5.u32,
+                 argument = ctx.r6.u32;
+  ctx.r3.u64 = cb::InsertCallback(device, flags, function, argument, kick);
+})
+// Without their packets (and the full wait without its spin on the pending
+// kicks): see command_buffer.h.
+ITC_SEGMENT_FLOW(8229F0E0, {
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::WriteIdlePackets(device, kick);
+})
+ITC_SEGMENT_FLOW(8229F1B0, {
+  const uint32_t device = ctx.r3.u32;
+  ctx.r3.u64 = cb::WaitForIdle(device, kick);
+})
+
+ITC_COMMAND_BUFFER(822AF978,
+                   ctx.r3.u64 = cb::WriteDefaultDrawRegisters(ctx.r3.u32, ctx.r4.u32))
+
+// Device::WriteFlushPackets (sub_8229E5D0): Dropped. Its block only made the
+// GPU flush caches for memory the CPU wrote (COHER_* registers and a
+// WAIT_REG_MEM on them), which our kick doesn't act on
+// (src/native/gpu_link.cpp: waits have no effect, and those registers are
+// read by nothing); the graphics rule on cache flushes (2026-10-24,
+// graphics-resources.md). Answers "no block" (r5's word 0, r4's left
+// alone), as the original does when there's nothing to flush, so its callers
+// (sub_8229EF48, the tiling worker sub_822B6BF8) kick none. The pending
+// range it took (sub_8229DE48) has had no writer in play since
+// Resource::Lock is native.
+ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
+  schema::CommandFlushWords(ctx.r5.u32).set_words(0);
+}
+
+// The data cache flush (sub_822AC470): Dropped (no data cache to flush on
+// PC, the user's call, 2026-10-24, as Resource::Unlock leaves it out). Its
+// translation writes only its own stack and leaves r3; so does this.
+ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
+  
+  if (!ITC_FLAG(native_command_buffer)) {
+    lifted::original::c822AC470(ctx);
+  }
+}

@@ -1,0 +1,1254 @@
+# The schema of docs/functions/camera-modes.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The camera modes (src/camera_modes/): the camera director (the race mode's
+# member at +10512), its six views' cameras, the viewports they drive, the
+# TV camera's paths, the cutscene and the camera animations.
+#
+# Measure splits left to other areas (not described here): the vehicle
+# (car-physics' Vehicle: +336 the rigid body, +5712 the spec's handle) is met
+# as TvCamera.+16, IntroCamera.+16, ViewCamera2.+16, IntroCamera.+4,
+# IntroCamera::MakeShot.r5, CameraTarget::Track.r4, CutsceneShot.+8 and
+# Racers::NearestHumanVehicle.ret; RouteRange::Advance.r4 is track-zones'
+# RouteRange; CameraPath::OnLoaded.r6 is game-modes' Buffer28;
+# ScenePools::FindModel.ret is a scene model (+48 its index).
+
+# One player's viewport (1,872 bytes, [[0x826C2CE8] + 4 x player]; cameras.md and known-data.md).
+# IntroCamera.+0 is the shot's viewport (the measure joins IntroCamera with its 20-byte shots).
+[Viewport]
+measure = "Viewport"
+measures = ["Cutscene.+20", "TvCamera.+20", "ViewCamera1.+20", "ViewCamera2.+20", "IntroCamera.+0", "new<12>@Viewports::Init.+4"]
+size = 1872
+origin = "file"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 1600, note = "twenty 80-byte entries (ViewportEntry)" },
+  { name = "eye", offset = 1600, type = "bytes", count = 16, note = "the eye (Viewport::Set, LookAt)" },
+  { name = "eye_x", offset = 1600, type = "f32" },
+  { name = "eye_y", offset = 1604, type = "f32" },
+  { name = "eye_z", offset = 1608, type = "f32" },
+  { name = "eye_w", offset = 1612, type = "f32" },
+  { name = "target", offset = 1616, type = "bytes", count = 16, note = "the look-at target" },
+  { name = "target_x", offset = 1616, type = "f32" },
+  { name = "target_y", offset = 1620, type = "f32" },
+  { name = "target_z", offset = 1624, type = "f32" },
+  { name = "target_w", offset = 1628, type = "f32" },
+  { name = "up", offset = 1632, type = "bytes", count = 16, note = "the up vector" },
+  { name = "up_x", offset = 1632, type = "f32" },
+  { name = "up_y", offset = 1636, type = "f32" },
+  { name = "up_z", offset = 1640, type = "f32" },
+  { name = "up_w", offset = 1644, type = "f32" },
+  { name = "look", offset = 1648, type = "bytes", count = 16, note = "a fourth vector: the look point" },
+  { name = "look_x", offset = 1648, type = "f32" },
+  { name = "look_y", offset = 1652, type = "f32" },
+  { name = "look_z", offset = 1656, type = "f32" },
+  { name = "look_w", offset = 1660, type = "f32" },
+  { name = "view1_target", offset = 1664, type = "bytes", count = 16, note = "the target view mode 1 uses; the cameras' look offset" },
+  { name = "view1_target_x", offset = 1664, type = "f32" },
+  { name = "view1_target_y", offset = 1668, type = "f32" },
+  { name = "view1_target_z", offset = 1672, type = "f32" },
+  { name = "view1_target_w", offset = 1676, type = "f32" },
+  { name = "base_eye", offset = 1680, type = "bytes", count = 16, note = "the camera's eye offset (ChaseCamera::Place, MakeShot)" },
+  { name = "base_eye_x", offset = 1680, type = "f32" },
+  { name = "base_eye_y", offset = 1684, type = "f32" },
+  { name = "base_eye_z", offset = 1688, type = "f32" },
+  { name = "base_eye_w", offset = 1692, type = "f32" },
+  { name = "base_target", offset = 1696, type = "bytes", count = 16, note = "the camera's target offset" },
+  { name = "base_target_x", offset = 1696, type = "f32" },
+  { name = "base_target_y", offset = 1700, type = "f32" },
+  { name = "base_target_z", offset = 1704, type = "f32" },
+  { name = "base_target_w", offset = 1708, type = "f32" },
+  { name = "base_up", offset = 1712, type = "bytes", count = 16, note = "the camera's up vector, (0, 1, 0, 1)" },
+  { name = "base_up_x", offset = 1712, type = "f32" },
+  { name = "base_up_y", offset = 1716, type = "f32" },
+  { name = "base_up_z", offset = 1720, type = "f32" },
+  { name = "base_up_w", offset = 1724, type = "f32" },
+  { name = "unknown_1728", offset = 1728, type = "bytes", count = 16, note = "a working vector" },
+  { name = "base_look", offset = 1744, type = "bytes", count = 16, note = "the camera's look offset (ChaseCamera::Place)" },
+  { name = "base_look_x", offset = 1744, type = "f32" },
+  { name = "base_look_y", offset = 1748, type = "f32" },
+  { name = "base_look_z", offset = 1752, type = "f32" },
+  { name = "base_look_w", offset = 1756, type = "f32" },
+  { name = "last_view", offset = 1760, type = "bytes", count = 48, note = "entry 0's last eye, target and up (Viewport::UpdateEntries)" },
+  { name = "unknown_1808", offset = 1808, type = "bytes", count = 32, note = "working vectors" },
+  { name = "next_eye", offset = 1840, type = "bytes", count = 16, note = "the TV camera's eye at the next spot (TvCamera::Step)" },
+  { name = "next_eye_x", offset = 1840, type = "f32" },
+  { name = "next_eye_y", offset = 1844, type = "f32" },
+  { name = "next_eye_z", offset = 1848, type = "f32" },
+  { name = "next_eye_w", offset = 1852, type = "f32" },
+  { name = "far_18", offset = 1856, type = "f32", note = "8,000.0: entry 18's far plane" },
+  { name = "view_mode", offset = 1860, type = "u32", note = "the view (0-5; 1 and 2 enable pass 3, the car overlays read it)" },
+  { name = "zoom", offset = 1864, type = "f32", note = "entry 0's zoom at set-up (Viewport::Init)" },
+  { name = "near", offset = 1868, type = "f32", note = "pass 0's near plane at set-up" },
+]
+
+# A viewport's entry (80 bytes, twenty at the viewport's +0; the measure sees them as the viewport's).
+[ViewportEntry]
+size = 80
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 at set-up" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "eye", offset = 16, type = "bytes", count = 16, note = "the eye" },
+  { name = "eye_x", offset = 16, type = "f32" },
+  { name = "eye_y", offset = 20, type = "f32" },
+  { name = "eye_z", offset = 24, type = "f32" },
+  { name = "eye_w", offset = 28, type = "f32" },
+  { name = "target", offset = 32, type = "bytes", count = 16, note = "the target" },
+  { name = "target_x", offset = 32, type = "f32" },
+  { name = "target_y", offset = 36, type = "f32" },
+  { name = "target_z", offset = 40, type = "f32" },
+  { name = "target_w", offset = 44, type = "f32" },
+  { name = "up", offset = 48, type = "bytes", count = 16, note = "the up vector (CameraPass::FromViewport)" },
+  { name = "up_x", offset = 48, type = "f32" },
+  { name = "up_y", offset = 52, type = "f32" },
+  { name = "up_z", offset = 56, type = "f32" },
+  { name = "up_w", offset = 60, type = "f32" },
+  { name = "roll", offset = 64, type = "f32", note = "Viewport::SetRoll" },
+  { name = "zoom", offset = 68, type = "f32", note = "Viewport::SetZoom: probably a focal length in pixels" },
+  { name = "far", offset = 72, type = "f32", note = "the far plane" },
+]
+
+# The two viewports ([0x826C2CE8], 12 bytes, Viewports::Init).
+[Viewports]
+measure = "new<12>@Viewports::Init"
+size = 12
+origin = "allocated"
+# In host memory since E5 step 5 (2026-11-24): made by Viewports::Init
+# (cameras::ViewportsInit; the original's VirtualAlloc(12) at 0x820AB380),
+# freed by Viewports::Release (cameras::ReleaseViewports; the original's
+# VirtualFree at 0x820AA484, which returned 1); [0x826C2CE8] holds its
+# handle. Its two viewports stay guest pages.
+storage = "host"
+host_alloc = [0x820AB380]
+host_free = [{ call = 0x820AA484, reg = "r3", returns = 1 }]
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "Viewport", note = "player 1's viewport" },
+  { name = "second", offset = 4, type = "ptr", to = "Viewport", note = "player 2's viewport" },
+  { name = "split", offset = 8, type = "u32", note = "not 0 in split screen" },
+]
+
+# The camera director: the race mode's member at +10512 (CameraDirector::Start, Update).
+[CameraDirector]
+measure = "CameraDirector"
+size = 77412
+origin = "embedded"
+fields = [
+  { name = "machine", offset = 16, type = "bytes", count = 4, note = "its StateMachine (game-modes.toml; CameraDirector::InitStates)" },
+  { name = "state", offset = 9620, type = "u32", note = "1 at set-up, 3 by SetState3" },
+  { name = "start_view", offset = 9624, type = "u32", note = "the view picked at the race's start (from the save data's camera setting)" },
+  { name = "view", offset = 9628, type = "u32", note = "the view shown (0-5), also each viewport's +1860" },
+  { name = "view_kept", offset = 9632, type = "u32", note = "the view to go back to after views 3-5" },
+  { name = "followed", offset = 9636, type = "u32", note = "the player the views follow" },
+  { name = "view2_camera", offset = 9648, type = "bytes", count = 1104, note = "view 2's camera (ViewCamera2)" },
+  { name = "view2_camera2", offset = 10752, type = "bytes", count = 1104, note = "player 2's view 2 camera in split screen (ViewCamera2)" },
+  { name = "view1_camera", offset = 11856, type = "bytes", count = 1104, note = "view 1's camera (ViewCamera1)" },
+  { name = "view1_look_angle", offset = 12960, type = "f32", note = "view 1's camera's look angle (its +1104, from the camera stick)" },
+  { name = "view0_camera", offset = 12976, type = "bytes", count = 372, note = "view 0's camera (ChaseCamera)" },
+  { name = "view0_angle", offset = 13348, type = "u32", note = "view 0's camera's angle index (its +372): 2 at the start" },
+  { name = "view0_state", offset = 13356, type = "u32", note = "view 0's camera's +380: set by the camera button" },
+  { name = "tv_camera", offset = 13360, type = "bytes", count = 43524, note = "view 4's camera (TvCamera)" },
+  { name = "cutscene", offset = 56896, type = "bytes", count = 10768, note = "view 5's camera (Cutscene)" },
+  { name = "intro_camera", offset = 67760, type = "bytes", count = 760, note = "view 3's camera (IntroCamera)" },
+  { name = "camera", offset = 68528, type = "u32", note = "the view's camera object" },
+  { name = "camera2", offset = 68532, type = "u32", note = "player 2's in split screen" },
+  { name = "followed_input", offset = 77408, type = "u32", note = "the player whose input record the update reads (its low byte)" },
+]
+
+# Any view's camera object: the head the six share (vtable, vehicle,
+# viewport, tracker), for the helpers every camera uses.
+[CameraObject]
+size = 340
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "a view camera's vtable" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+]
+
+# A camera's target tracker (camera + 32, CameraTarget::Track).
+[CameraTarget]
+measure = "CameraTarget::Track.r3"
+size = 308
+origin = "embedded"
+fields = [
+  { name = "position", offset = 0, type = "bytes", count = 16, note = "the body's position, w 1.0" },
+  { name = "position_x", offset = 0, type = "f32" },
+  { name = "position_y", offset = 4, type = "f32" },
+  { name = "position_z", offset = 8, type = "f32" },
+  { name = "position_w", offset = 12, type = "f32" },
+  { name = "last_position", offset = 16, type = "bytes", count = 16, note = "the last position" },
+  { name = "point", offset = 32, type = "bytes", count = 16, note = "the mean of the vehicle's +1216 and +1584, w 1.0" },
+  { name = "point_x", offset = 32, type = "f32" },
+  { name = "point_y", offset = 36, type = "f32" },
+  { name = "point_z", offset = 40, type = "f32" },
+  { name = "point_w", offset = 44, type = "f32" },
+  { name = "last_point", offset = 48, type = "bytes", count = 16, note = "the last point" },
+  { name = "turn", offset = 64, type = "bytes", count = 64, note = "the body's turn (a matrix, Matrix::FromQuat)" },
+  { name = "last_turn", offset = 128, type = "bytes", count = 64, note = "the last turn" },
+  { name = "rotation", offset = 192, type = "bytes", count = 16, note = "the body's rotation (a quaternion)" },
+  { name = "rotation_x", offset = 192, type = "f32" },
+  { name = "rotation_y", offset = 196, type = "f32" },
+  { name = "rotation_z", offset = 200, type = "f32" },
+  { name = "rotation_w", offset = 204, type = "f32" },
+  { name = "last_rotation", offset = 208, type = "bytes", count = 16, note = "the last rotation (or the chase camera's blended one)" },
+  { name = "last_rotation_x", offset = 208, type = "f32" },
+  { name = "last_rotation_y", offset = 212, type = "f32" },
+  { name = "last_rotation_z", offset = 216, type = "f32" },
+  { name = "last_rotation_w", offset = 220, type = "f32" },
+  { name = "track_position", offset = 224, type = "bytes", count = 84, note = "the vehicle's track position (TrackPosition, 84 bytes)" },
+]
+
+# View 0's camera (also the TV camera's fallback at +43136).
+[ChaseCamera]
+measure = "ChaseCamera"
+measures = ["TvCamera.+43136"]
+size = 384
+origin = "embedded"
+vtable = 0x82006B24
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006B24 (slot 0 ChaseCamera::Update)" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "unknown_4", offset = 4, type = "f32", note = "measure fault: Quat::Rotate's quaternion joined with the camera" },
+  { name = "unknown_8", offset = 8, type = "f32", note = "as unknown_4" },
+  { name = "unknown_12", offset = 12, type = "f32", note = "as unknown_4" },
+  { name = "eye", offset = 352, type = "bytes", count = 12, note = "the eye at set-up and after each update" },
+  { name = "eye_x", offset = 352, type = "f32" },
+  { name = "eye_y", offset = 356, type = "f32" },
+  { name = "eye_z", offset = 360, type = "f32" },
+  { name = "unknown_364", offset = 364, type = "f32", note = "1.0 at set-up" },
+  { name = "unknown_368", offset = 368, type = "f32", note = "0.0 by ChaseCamera::Place" },
+  { name = "angle", offset = 372, type = "u32", note = "the angle's index in the table at 0x8200930C" },
+  { name = "section", offset = 376, type = "u16", note = "the track position's section (Place)" },
+  { name = "slice", offset = 378, type = "u16", note = "its slice" },
+  { name = "state", offset = 380, type = "u32", note = "set by the camera button: the eye moved along the view's line once" },
+]
+
+# View 1's camera.
+[ViewCamera1]
+measure = "ViewCamera1"
+size = 1108
+origin = "embedded"
+vtable = 0x82006B2C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006B2C or 0x82006B34" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "curve", offset = 352, type = "bytes", count = 736, note = "a CameraCurve::Load(+352, 0, 30) object" },
+  { name = "rotation", offset = 1088, type = "bytes", count = 16, note = "the tracker's rotation at set-up; w 1.0" },
+  { name = "rotation_x", offset = 1088, type = "f32" },
+  { name = "rotation_y", offset = 1092, type = "f32" },
+  { name = "rotation_z", offset = 1096, type = "f32" },
+  { name = "rotation_w", offset = 1100, type = "f32" },
+  { name = "look_angle", offset = 1104, type = "f32", note = "the look angle (Matrix::RotateY), from the camera stick" },
+]
+
+# View 2's camera.
+[ViewCamera2]
+measure = "ViewCamera2"
+size = 1104
+origin = "embedded"
+vtable = 0x82006B34
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006B2C or 0x82006B34" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "curve", offset = 352, type = "bytes", count = 736, note = "a CameraCurve::Load(+352, 0, 30) object" },
+  { name = "rotation", offset = 1088, type = "bytes", count = 16, note = "the tracker's rotation at set-up; w 1.0" },
+  { name = "rotation_x", offset = 1088, type = "f32" },
+  { name = "rotation_y", offset = 1092, type = "f32" },
+  { name = "rotation_z", offset = 1096, type = "f32" },
+  { name = "rotation_w", offset = 1100, type = "f32" },
+]
+
+# View 3's camera (+67760). The measure joins it with its 20-byte shots
+# (IntroShot: its +0 the viewport, +4 the vehicle, +8, +12, +16), so the
+# shots' accesses at +4 to +16 land here too.
+[IntroCamera]
+measure = "IntroCamera"
+size = 760
+origin = "embedded"
+vtable = 0x820093C4
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820093C4 (slot 0 IntroCamera::Update)" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "shot_vehicle", offset = 4, type = "u32", note = "measure fault: IntroShot's +4 (the shots joined with the camera)" },
+  { name = "shot_frames", offset = 8, type = "u32", note = "measure fault: IntroShot's +8" },
+  { name = "shot_length", offset = 12, type = "f32", note = "measure fault: IntroShot's +12" },
+  { name = "shots", offset = 352, type = "bytes", count = 396, note = "a 16-slot List16 of 20-byte shots (IntroShot)" },
+  { name = "shot", offset = 748, type = "u32", note = "the current shot's index" },
+  { name = "frames", offset = 752, type = "u32", note = "the frame count" },
+  { name = "phase", offset = 756, type = "u32", note = "0 shots, 1 and 2 the orbit" },
+]
+
+# An intro shot (20 bytes, IntroCamera::MakeShot, StepShot).
+[IntroShot]
+measure = "List16::Insert20.r4"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "viewport", offset = 0, type = "ptr", to = "Viewport" },
+  { name = "vehicle", offset = 4, type = "u32", note = "the vehicle" },
+  { name = "frames", offset = 8, type = "u32", note = "its frame count" },
+  { name = "length", offset = 12, type = "f32", note = "the spec's +88 x the float at 0x82002CCC" },
+  { name = "phase", offset = 16, type = "u32", note = "set to 3 once the count reaches 29" },
+]
+
+# View 4's camera (+13360).
+[TvCamera]
+measure = "TvCamera"
+measures = ["Key::Vec3.r4"]
+size = 43524
+origin = "embedded"
+vtable = 0x820093BC
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820093BC (slot 0 TvCamera::Update)" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "measure fault: a path buffer's or a vector's word (CameraPath::Request, Key::Vec3) joined with the camera" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "as unknown_4" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "as unknown_4 (a path buffer's index)" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "as unknown_4 (a path buffer's state)" },
+  { name = "slice", offset = 352, type = "u32", note = "the slice the last step saw" },
+  { name = "next", offset = 356, type = "u32", note = "the slice one past the record's far end" },
+  { name = "spot", offset = 360, type = "u32", note = "the route range it's on" },
+  { name = "path_out", offset = 368, type = "bytes", count = 72, note = "CameraPath::Evaluate's out" },
+  { name = "eye", offset = 384, type = "bytes", count = 16, note = "the eye (path_out +16)" },
+  { name = "eye_x", offset = 384, type = "f32" },
+  { name = "eye_y", offset = 388, type = "f32" },
+  { name = "eye_z", offset = 392, type = "f32" },
+  { name = "eye_w", offset = 396, type = "f32" },
+  { name = "target", offset = 400, type = "bytes", count = 16, note = "the target (path_out +32)" },
+  { name = "target_x", offset = 400, type = "f32" },
+  { name = "target_y", offset = 404, type = "f32" },
+  { name = "target_z", offset = 408, type = "f32" },
+  { name = "target_w", offset = 412, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "bytes", count = 16, note = "4 floats (copied 8 bytes at a time too)" },
+  { name = "unknown_416_x", offset = 416, type = "f32" },
+  { name = "unknown_416_y", offset = 420, type = "f32" },
+  { name = "unknown_416_z", offset = 424, type = "f32" },
+  { name = "unknown_416_w", offset = 428, type = "f32" },
+  { name = "roll", offset = 432, type = "f32", note = "path_out +64" },
+  { name = "zoom", offset = 436, type = "f32", note = "path_out +68" },
+  { name = "paused", offset = 448, type = "u32", note = "0 while it steps" },
+  { name = "range_count", offset = 452, type = "u32", note = "the route ranges' count" },
+  { name = "ranges", offset = 456, type = "bytes", count = 42560, note = "up to 40 RouteRanges, 1,064 bytes apart" },
+  { name = "buffers", offset = 43016, type = "bytes", count = 112, note = "four 28-byte camera path buffers (Buffer28: +12 the index, +24 the state)" },
+  { name = "fallback", offset = 43136, type = "bytes", count = 384, note = "its fallback ChaseCamera" },
+  { name = "filter_state", offset = 43520, type = "u32", note = "0 for the attract filter; the path's state (0, 1, 2)" },
+]
+
+# View 5's camera (+56896): the rival intro.
+[Cutscene]
+measure = "Cutscene"
+size = 10848
+origin = "embedded"
+vtable = 0x82006B3C
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006B3C (slot 0 Cutscene::Update, 1 OnPad)" },
+  { name = "vehicle", offset = 16, type = "u32", note = "the vehicle followed" },
+  { name = "viewport", offset = 20, type = "ptr", to = "Viewport" },
+  { name = "tracker", offset = 32, type = "bytes", count = 308, note = "the target tracker (CameraTarget, with its track position at +224)" },
+  { name = "script", offset = 352, type = "u32", note = "the script, or -1" },
+  { name = "frame", offset = 356, type = "u32", note = "counted on each step" },
+  { name = "shot", offset = 360, type = "u32", note = "the shot stepped" },
+  { name = "cues", offset = 364, type = "bytes", count = 588, note = "a 16-slot List16 of 32-byte FadeCues" },
+  { name = "shots", offset = 952, type = "bytes", count = 9804, note = "a 16-slot List16 of 608-byte CutsceneShots" },
+  { name = "unknown_10756", offset = 10756, type = "u32", note = "0 at set-up; shots step while 0" },
+  { name = "rival_logo", offset = 10760, type = "bytes", count = 88, note = "the rival logo (RivalLogo: +4 its flags, +20 the XPR holder)" },
+]
+
+# A cutscene shot (608 bytes, CutsceneShot::Init, Step).
+[CutsceneShot]
+measure = "CutsceneShot"
+size = 608
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "the script entry's kind" },
+  { name = "anim", offset = 4, type = "u32", note = "the animation's asset id (22824 + kind)" },
+  { name = "vehicle", offset = 8, type = "u32", note = "the vehicle" },
+  { name = "cues", offset = 12, type = "bytes", count = 588, note = "a 16-slot List16 of 32-byte FadeCues" },
+  { name = "time", offset = 600, type = "u32", note = "the frame" },
+  { name = "flags", offset = 604, type = "u32", note = "1 at set-up; 0x20 done, 0x10 held, 0x4, 4 not loaded" },
+]
+
+# A cutscene script's entry (CutsceneShot::Init's r4).
+[CutsceneScriptEntry]
+measure = "CutsceneShot::Init.r4"
+size = 84
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32" },
+  { name = "vehicle", offset = 4, type = "u32" },
+  { name = "cues", offset = 8, type = "bytes", count = 76, note = "a List16 of 32-byte FadeCues (count at +80)" },
+  { name = "cue_count", offset = 80, type = "u16", note = "the cue list's count" },
+]
+
+# A fade cue (32 bytes, FadeCue::Step).
+[FadeCue]
+measure = "FadeCue"
+size = 32
+origin = "embedded"
+fields = [
+  { name = "start", offset = 0, type = "s32", note = "the start frame" },
+  { name = "end", offset = 4, type = "s32", note = "the end frame" },
+  { name = "kind", offset = 8, type = "u32", note = "0 ScreenFades::FadeIn, 1 FadeOut" },
+  { name = "red", offset = 12, type = "u32" },
+  { name = "green", offset = 16, type = "u32" },
+  { name = "blue", offset = 20, type = "u32" },
+  { name = "frame", offset = 24, type = "s32", note = "the frame counted up to the end" },
+  { name = "hold", offset = 28, type = "s32", note = "not 0: the frame held" },
+]
+
+# A shot's camera (CutsceneShot::Step's and CameraPath::Evaluate's out).
+[CameraShotOut]
+measure = "CutsceneShot::Step.r4"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "eye", offset = 16, type = "bytes", count = 16, note = "the eye" },
+  { name = "eye_x", offset = 16, type = "f32" },
+  { name = "eye_y", offset = 20, type = "f32" },
+  { name = "eye_z", offset = 24, type = "f32" },
+  { name = "eye_w", offset = 28, type = "f32" },
+  { name = "target", offset = 32, type = "bytes", count = 16, note = "the target" },
+  { name = "target_x", offset = 32, type = "f32" },
+  { name = "target_y", offset = 36, type = "f32" },
+  { name = "target_z", offset = 40, type = "f32" },
+  { name = "target_w", offset = 44, type = "f32" },
+  { name = "roll", offset = 64, type = "f32", note = "the roll (radians), or the path's field of view" },
+  { name = "zoom", offset = 68, type = "f32", note = "the zoom" },
+]
+
+# The rival logo's entry (the cutscene's +10760, RivalLogo::RivalLogo).
+# The measure joins it with the XPR holder at its +20 (RivalLogo::InitXpr's
+# r3), so the holder's +28 and +56 to +68 land at +28 and +56 to +68.
+[RivalLogo]
+measure = "RivalLogo"
+size = 92
+origin = "embedded"
+fields = [
+  { name = "logo", offset = 0, type = "u32", note = "the logo (0 to 28), -1 none" },
+  { name = "flags", offset = 4, type = "u32", note = "0x1, 0x2 ready, 0x4 opening, 0x8 playing" },
+  { name = "movie", offset = 8, type = "u32", note = "the UI movie's id" },
+  { name = "anim", offset = 12, type = "u32", note = "the named animation" },
+  { name = "asset", offset = 16, type = "u32", note = "the movie's asset" },
+  { name = "holder", offset = 20, type = "u32", note = "the XPR holder's +0: -1" },
+  { name = "xpr", offset = 24, type = "bytes", count = 24, note = "the holder's XPR (XPR::XPR)" },
+  { name = "xpr_flags", offset = 48, type = "u32", note = "the holder's +28: 2 at set-up, bit 0x10 loaded" },
+  { name = "textures", offset = 52, type = "bytes", count = 24, note = "two 12-byte texture records (the logo's)" },
+  { name = "old_texture0", offset = 76, type = "u32", note = "the movie's texture swapped out" },
+  { name = "old_texture1", offset = 80, type = "u32" },
+  { name = "texture_name0", offset = 84, type = "u32", note = "3: the movie's texture to swap" },
+  { name = "texture_name1", offset = 88, type = "u32", note = "4" },
+]
+
+# The camera animations' table's entry (264 bytes, at 0x826C79B8).
+[CameraAnimEntry]
+size = 264
+origin = "embedded"
+fields = [
+  { name = "id", offset = 0, type = "u32", note = "the asset id" },
+  { name = "objects", offset = 4, type = "bytes", count = 256, note = "up to 64 CameraAnim pointers (CameraAnimObjects)" },
+  { name = "count", offset = 260, type = "u32", note = "their count" },
+]
+
+# A table entry's objects (CameraAnims::Find's answer: the entry's +4).
+[CameraAnimObjects]
+measure = "CameraAnims::Find.ret"
+size = 260
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "CameraAnim", note = "the first object (64 pointers)" },
+  { name = "objects", offset = 0, type = "bytes", count = 256, note = "64 CameraAnim pointers" },
+  { name = "count", offset = 256, type = "u32", note = "their count" },
+]
+
+# A camera animation's object (340 bytes, CameraAnim::ParseObject's copy).
+[CameraAnim]
+measure = "CameraAnim"
+measures = ["new<340>@CameraAnim::ParseObject", "CameraAnim::EvalTarget.r4", "CameraAnims::Find.ret.+0"]
+size = 340
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82150128]
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "6 a camera, 7 a target, 1 a matrix, 14 the end" },
+  { name = "header_size", offset = 4, type = "u32", note = "the file's +4: its blocks start there" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "block_count", offset = 12, type = "u32", note = "the file object's blocks" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_48", offset = 48, type = "bytes", count = 32, note = "0" },
+  { name = "blocks", offset = 80, type = "bytes", count = 256, note = "up to 64 CameraAnimBlock pointers" },
+  { name = "first_block", offset = 80, type = "ptr", to = "CameraAnimBlock" },
+  { name = "blocks_used", offset = 336, type = "u32", note = "their count" },
+]
+
+# A camera animation's block (64 bytes): one channel's values by frame.
+[CameraAnimBlock]
+measure = "CameraAnimBlock"
+measures = ["new<64>@CameraAnim::ParseObject", "CameraAnim::EvalTarget.r4.+80", "CameraAnims::Find.ret.+0.+80", "CameraAnim::EvalTarget.r4.+80.+60"]
+size = 64
+origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by CameraAnim::ParseObject
+# (the original's VirtualAlloc(64) at 0x82150220), freed by CameraAnim::Free
+# (its VirtualFree at 0x821500E8); the anim's +80 list holds their handles,
+# their data (+60) stays guest pages. The measure's
+# "CameraAnim::EvalTarget.r4.+80.+60" (once CameraAnimData) is this +60
+# read in EvalTarget's other switch cases (a measure fault, folded in).
+storage = "host"
+host_alloc = [0x82150220]
+host_free = [{ call = 0x821500E8, reg = "r3", returns = 1 }]
+fields = [
+  { name = "channel", offset = 0, type = "u32", note = "0 x, 1 y, 2 -z, 101 the film's height, 102 the focal length, 109 -roll" },
+  { name = "header_size", offset = 4, type = "u32", note = "the file block's (CameraAnimFileBlock)" },
+  { name = "data_size", offset = 8, type = "u32", note = "its data's bytes" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "duration", offset = 16, type = "f32", note = "CameraAnims::Duration's answer" },
+  { name = "unknown_20", offset = 20, type = "bytes", count = 40, note = "0" },
+  { name = "values", offset = 60, type = "u32", note = "its floats, one a frame (CameraAnimValues, a blob since E5 step 5); \"data\" before E5 step 3 (a host view's data() is its struct)" },
+]
+
+# A camera animation block's values (CameraAnimBlock +60): the file block's
+# data copied out, one float a frame. A blob (E5 step 5, 2026-11-24): made by
+# CameraAnim::ParseObject (camera_modes::AnimParseObject; the original's
+# VirtualAlloc(data_size) returning at 0x82150294), cleared and filled by
+# XMemSet and XMemCpy, read by address (CameraAnim::EvalCamera, EvalTarget,
+# Matrix), freed by CameraAnimBlock::Free's VirtualFree.
+[CameraAnimValues]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82150294, reg = "r4" }]
+fields = []
+
+# A camera animation file as loaded (CameraAnims::Load's buffer, the
+# archive's callback CameraAnims::OnLoaded gets it as r4): its objects
+# (CameraAnimFileObject) one after another. A blob (E5 step 5, 2026-11-24):
+# made by CameraAnims::Load (camera_modes::AnimsLoad; the original's
+# VirtualAlloc(Archive::AssetSize(id)) returning at 0x82150B54), filled by
+# Archive::Load, read by CameraAnim::ParseObject, freed by OnLoaded's
+# VirtualFree.
+[CameraAnimsFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x82150B54, reg = "r4" }]
+fields = []
+
+# An object in a camera animation file (CameraAnims::OnLoaded).
+[CameraAnimFileObject]
+measure = "CameraAnims::OnLoaded.r4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "14 the end" },
+  { name = "header_size", offset = 4, type = "u32", note = "its blocks after this" },
+  { name = "data_size", offset = 8, type = "u32", note = "the next object after this" },
+]
+
+# A block in a camera animation file object (CameraAnim::ParseObject's
+# source, from the object's +header_size): CameraAnimBlock's first fields.
+[CameraAnimFileBlock]
+size = 20
+origin = "file"
+fields = [
+  { name = "channel", offset = 0, type = "u32" },
+  { name = "header_size", offset = 4, type = "u32", note = "its data after this" },
+  { name = "data_size", offset = 8, type = "u32", note = "the next block after its data" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "duration", offset = 16, type = "f32" },
+]
+
+# CameraAnims::Load's record (4 bytes, VirtualAlloc'd).
+[CameraAnimLoad]
+measure = "new<4>@CameraAnims::Load"
+measures = ["CameraAnims::OnLoaded.r6"]
+size = 4
+origin = "allocated"
+# In host memory since E5 step 3 (batch 3): made by CameraAnims::Load
+# (camera_modes::AnimsLoad; the original's VirtualAlloc(4) at 0x82150B3C),
+# freed by CameraAnims::OnLoaded (camera_modes::AnimsOnLoaded; the
+# original's VirtualFree at 0x82150940, which returned 1). Its handle is the
+# archive load's callback context (the queue entry's +32, handed back as r6).
+storage = "host"
+host_alloc = [0x82150B3C]
+host_free = [{ call = 0x82150940, reg = "r3", returns = 1 }]
+fields = [
+  { name = "id", offset = 0, type = "u32", note = "the asset id" },
+]
+
+# CameraAnim::EvalCamera's out.
+[CameraAnimOut]
+measure = "CameraAnim::EvalCamera.r5"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+  { name = "position", offset = 16, type = "bytes", count = 16, note = "x, y, -z, 1.0" },
+  { name = "x", offset = 16, type = "f32" },
+  { name = "y", offset = 20, type = "f32" },
+  { name = "z", offset = 24, type = "f32" },
+  { name = "w", offset = 28, type = "f32" },
+  { name = "roll", offset = 32, type = "f32", note = "the roll (degrees)" },
+  { name = "zoom", offset = 36, type = "f32" },
+]
+
+# A camera path's key (216 bytes; CameraPath::Evaluate, FixKey). Each value
+# a (kind, value) pair: kind 0 the float, 1 a curve's address (kind 2 in the
+# file: the value a curve index). The measure joins it with the path buffer
+# (Buffer28: +0 the vtable 0x82009390, +12 the index, +16, +20, +24).
+[CameraPathKey]
+measure = "CameraPath"
+size = 216
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "also Buffer28's vtable by the measure's join" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "fov_kind", offset = 8, type = "u32" },
+  { name = "fov", offset = 12, type = "u32" },
+  { name = "zoom_kind", offset = 16, type = "u32" },
+  { name = "zoom", offset = 20, type = "u32" },
+  { name = "eye_position_x_kind", offset = 24, type = "u32" },
+  { name = "eye_position_x", offset = 28, type = "u32" },
+  { name = "eye_position_y_kind", offset = 32, type = "u32" },
+  { name = "eye_position_y", offset = 36, type = "u32" },
+  { name = "eye_position_z_kind", offset = 40, type = "u32" },
+  { name = "eye_position_z", offset = 44, type = "u32" },
+  { name = "eye_offset_x_kind", offset = 48, type = "u32" },
+  { name = "eye_offset_x", offset = 52, type = "u32" },
+  { name = "eye_offset_y_kind", offset = 56, type = "u32" },
+  { name = "eye_offset_y", offset = 60, type = "u32" },
+  { name = "eye_offset_z_kind", offset = 64, type = "u32" },
+  { name = "eye_offset_z", offset = 68, type = "u32" },
+  { name = "eye_route_offset_x_kind", offset = 80, type = "u32" },
+  { name = "eye_route_offset_x", offset = 84, type = "u32" },
+  { name = "eye_route_offset_y_kind", offset = 88, type = "u32" },
+  { name = "eye_route_offset_y", offset = 92, type = "u32" },
+  { name = "eye_route_offset_z_kind", offset = 96, type = "u32" },
+  { name = "eye_route_offset_z", offset = 100, type = "u32" },
+  { name = "eye_weight_kind", offset = 72, type = "u32" },
+  { name = "eye_weight", offset = 76, type = "u32" },
+  { name = "eye_route_weight_kind", offset = 104, type = "u32" },
+  { name = "eye_route_weight", offset = 108, type = "u32" },
+  { name = "eye_route_slices_kind", offset = 112, type = "u32" },
+  { name = "eye_route_slices", offset = 116, type = "u32" },
+  { name = "target_position_x_kind", offset = 120, type = "u32" },
+  { name = "target_position_x", offset = 124, type = "u32" },
+  { name = "target_position_y_kind", offset = 128, type = "u32" },
+  { name = "target_position_y", offset = 132, type = "u32" },
+  { name = "target_position_z_kind", offset = 136, type = "u32" },
+  { name = "target_position_z", offset = 140, type = "u32" },
+  { name = "target_offset_x_kind", offset = 144, type = "u32" },
+  { name = "target_offset_x", offset = 148, type = "u32" },
+  { name = "target_offset_y_kind", offset = 152, type = "u32" },
+  { name = "target_offset_y", offset = 156, type = "u32" },
+  { name = "target_offset_z_kind", offset = 160, type = "u32" },
+  { name = "target_offset_z", offset = 164, type = "u32" },
+  { name = "target_route_offset_x_kind", offset = 176, type = "u32" },
+  { name = "target_route_offset_x", offset = 180, type = "u32" },
+  { name = "target_route_offset_y_kind", offset = 184, type = "u32" },
+  { name = "target_route_offset_y", offset = 188, type = "u32" },
+  { name = "target_route_offset_z_kind", offset = 192, type = "u32" },
+  { name = "target_route_offset_z", offset = 196, type = "u32" },
+  { name = "target_weight_kind", offset = 168, type = "u32" },
+  { name = "target_weight", offset = 172, type = "u32" },
+  { name = "target_route_weight_kind", offset = 200, type = "u32" },
+  { name = "target_route_weight", offset = 204, type = "u32" },
+  { name = "target_route_slices_kind", offset = 208, type = "u32" },
+  { name = "target_route_slices", offset = 212, type = "u32" },
+]
+
+# A camera path file's header (CameraPath::OnLoaded's r4): the paths from +16,
+# then the keys, then the curves.
+[CameraPathFile]
+measure = "CameraPath::OnLoaded.r4"
+size = 16
+origin = "file"
+# A blob (E5 step 5, 2026-11-24): the whole file, made by CameraPath::Load
+# (camera_modes::PathRequest; the original's VirtualAlloc returning at
+# 0x82152DC0), kept at the path buffer's +20 (CameraPathBuffer block), filled
+# by Archive::Load, its keys' indexes made addresses inside it by
+# CameraPath::OnLoaded (values in its handle's span), read by address
+# (CameraPath::Evaluate, Curve::Evaluate), freed by Buffer28::Free's
+# VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x82152DC0, reg = "r4" }]
+fields = [
+  { name = "path_count", offset = 0, type = "u32", note = "its 20-byte paths (CameraPathRecord) at +16" },
+  { name = "key_count", offset = 4, type = "u32", note = "its 216-byte keys after them" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# A camera path (20 bytes in the path file, CameraPath::OnLoaded).
+[CameraPathRecord]
+size = 20
+origin = "file"
+fields = [
+  { name = "near", offset = 0, type = "u32", note = "one end slice" },
+  { name = "far", offset = 4, type = "u32", note = "the other" },
+  { name = "key_count", offset = 8, type = "u32", note = "its keys" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "keys", offset = 16, type = "u32", note = "the first key's index, made its address (FixKeys)" },
+]
+
+# A curve (Curve::Evaluate): 24-byte keys to the end key (kind 3); its first key's fields named.
+[CameraCurve]
+measure = "Curve::Evaluate.r4"
+size = 72
+origin = "file"
+fields = [
+  { name = "time", offset = 0, type = "f32" },
+  { name = "value", offset = 4, type = "f32" },
+  { name = "leave", offset = 8, type = "f32" },
+  { name = "tangent", offset = 16, type = "f32" },
+  { name = "kind", offset = 20, type = "u32", note = "3 the end key" },
+  { name = "keys", offset = 0, type = "bytes", count = 72, note = "24-byte keys (CameraCurveKey)" },
+]
+
+# A curve's key (24 bytes).
+[CameraCurveKey]
+size = 24
+origin = "file"
+fields = [
+  { name = "time", offset = 0, type = "f32" },
+  { name = "value", offset = 4, type = "f32" },
+  { name = "leave", offset = 8, type = "f32", note = "the value it leaves" },
+  { name = "tangent_in", offset = 12, type = "f32", note = "probably: the tangent Curve::Evaluate's Hermite takes at the next key" },
+  { name = "tangent", offset = 16, type = "f32", note = "the tangent it leaves with" },
+  { name = "kind", offset = 20, type = "u32", note = "0 hold, 1 a line, 2 Hermite, 3 the end" },
+]
+
+# Hermite::Basis's keys (a value pair and their tangents).
+[HermiteKey]
+measure = "Hermite::Basis.r4"
+measures = ["Hermite::Basis.r5"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "value0", offset = 0, type = "f32" },
+  { name = "value1", offset = 4, type = "f32" },
+  { name = "tangent0", offset = 8, type = "f32" },
+  { name = "tangent1", offset = 12, type = "f32" },
+]
+
+# Hermite::Basis's out (2 floats).
+[HermiteOut]
+measure = "Hermite"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "a", offset = 0, type = "f32" },
+  { name = "b", offset = 4, type = "f32" },
+]
+
+# A 4-float vector the camera code takes (rows, ChaseCamera::Place's vectors).
+[CameraVec4]
+measure = "Matrix::FromRows3.r4"
+measures = ["Matrix::FromRows3.r5", "Matrix::FromRows3.r6", "ChaseCamera::Place.r4", "ChaseCamera::Place.r5", "ChaseCamera::Place.r6", "ChaseCamera::Place.r7"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32" },
+]
+
+# A 3-float vector the camera code takes (offsets, Quat::Rotate's vector).
+[CameraVec3]
+measure = "Quat::Rotate.r5"
+measures = ["Viewport::Offset.r5", "Viewport::PullBack.r5", "CameraPath::Evaluate.r6"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# A quaternion (x, y, z, w; Quat::Rotate, Matrix::FromQuat).
+[CameraQuat]
+measure = "Quat"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y, copied as one" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zw", offset = 8, type = "u64" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32" },
+]
+
+# A float Matrix::FromFloats copies (its 16 pointers).
+[CameraFloat]
+measure = "Matrix::FromFloats.r4"
+measures = ["Matrix::FromFloats.r5", "Matrix::FromFloats.r6", "Matrix::FromFloats.r7", "Matrix::FromFloats.r8", "Matrix::FromFloats.r9", "Matrix::FromFloats.r10"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f32" },
+]
+
+# A 4x4 matrix (the body's, RigidBody::Matrix; CameraAnim::Matrix's out): row 3 the position.
+[CameraMatrix]
+measure = "RigidBody::Matrix.ret"
+measures = ["CameraAnim::Matrix.r5"]
+size = 64
+origin = "embedded"
+fields = [
+  { name = "row0", offset = 0, type = "bytes", count = 16, note = "the right axis (copied 8 bytes at a time too)" },
+  { name = "m00", offset = 0, type = "f32" },
+  { name = "m01", offset = 4, type = "f32" },
+  { name = "m02", offset = 8, type = "f32" },
+  { name = "m03", offset = 12, type = "f32" },
+  { name = "m10", offset = 16, type = "f32" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m12", offset = 24, type = "f32" },
+  { name = "m13", offset = 28, type = "f32" },
+  { name = "m20", offset = 32, type = "f32" },
+  { name = "m21", offset = 36, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m23", offset = 44, type = "f32" },
+  { name = "m30", offset = 48, type = "f32" },
+  { name = "m31", offset = 52, type = "f32" },
+  { name = "m32", offset = 56, type = "f32" },
+  { name = "m33", offset = 60, type = "f32" },
+]
+
+# Stages::Copy's out (its first word).
+[StageCopy]
+measure = "Stages::Copy.ret"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "u32", note = "the stage's first word (1: ... OnRaceStart checks it)" },
+]
+
+# A 16-slot list (List16::Link; track_zones.h): the slots from +76.
+[List16]
+measure = "List16"
+measures = ["CutsceneShot::Init.r4@+8"]
+size = 76
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 64, note = "16 nodes: (next, slot) halfwords" },
+  { name = "free", offset = 64, type = "u16", note = "the free list's head" },
+  { name = "unknown_66", offset = 66, type = "u16" },
+  { name = "head", offset = 68, type = "u16", note = "the head" },
+  { name = "unknown_70", offset = 70, type = "u16" },
+  { name = "count", offset = 72, type = "u16" },
+  { name = "unknown_74", offset = 74, type = "u16" },
+]
+
+# A 40-slot list of words (List40::Link): the words from +172.
+[List40]
+measure = "List40"
+size = 172
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 160, note = "40 nodes: (next, slot) halfwords" },
+  { name = "free", offset = 160, type = "u16", note = "the free list's head" },
+  { name = "head", offset = 164, type = "u16" },
+  { name = "count", offset = 168, type = "u16" },
+]
+
+# List40::Insert's word.
+[List40Word]
+measure = "List40::Insert.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+[globals]
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the two viewports" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer)" }
+route = { address = 0x826C5B10, type = "u32", note = "the course's route (its file)" }
+input_records = { address = 0x826C5B30, type = "bytes", count = 40, note = "the car input records by player (20 bytes each)" }
+two_player = { address = 0x826C7824, type = "u32", note = "[0x826C7820 + 4]: 0 for player 2 followed" }
+anims = { address = 0x826C79B8, type = "bytes", count = 67584, note = "the camera animations' table: 256 264-byte CameraAnimEntries" }
+anim_count = { address = 0x826D81B8, type = "u32", note = "its count" }
+shake_step = { address = 0x826D81C0, type = "f32", note = "Camera::ShakeRandom's step" }
+shake_guard = { address = 0x826D81C4, type = "u32", note = "its guard (bit 1)" }
+intro_offset = { address = 0x826D81D0, type = "bytes", count = 16, note = "MakeShot's static (0.75, 1.8, 0, 1), probably" }
+intro_up = { address = 0x826D81E0, type = "bytes", count = 16, note = "MakeShot's static (0, 1, 0, 1)" }
+intro_guard = { address = 0x826D81F0, type = "u32", note = "their guard (bits 1 and 2)" }
+chase_look = { address = 0x826D8200, type = "bytes", count = 16, note = "ChaseCamera's static look offset" }
+chase_up = { address = 0x826D8210, type = "bytes", count = 16, note = "ChaseCamera's static (0, 1, 0, 1)" }
+chase_guard = { address = 0x826D8220, type = "u32", note = "their guard" }
+pull_back = { address = 0x826D8224, type = "f32", note = "ChaseCamera::Update's pull back" }
+last_speed = { address = 0x826D8228, type = "f32", note = "the speed it last saw" }
+view1_statics = { address = 0x826D8230, type = "bytes", count = 64, note = "ViewCamera1's four statics (0x826D8230 to 0x826D826F)" }
+view1_guard = { address = 0x826D8270, type = "u32", note = "their guard (bits 1 to 8)" }
+view2_statics = { address = 0x826D8280, type = "bytes", count = 64, note = "ViewCamera2's four statics (0x826D8280 to 0x826D82BF)" }
+view2_guard = { address = 0x826D82C0, type = "u32", note = "their guard" }
+intro_kept = { address = 0x826D82C4, type = "u32", note = "the frame the intro's shots ended at" }
+filter_style = { address = 0x826D82C8, type = "bytes", count = 4, note = "the attract race's color filter style (a word)" }
+filter_guard = { address = 0x826D82CC, type = "u32", note = "its guard (bit 1)" }
+racers_manager = { address = 0x826D82F4, type = "u32", note = "the racers' manager (a pointer)" }
+spline_matrix = { address = 0x826C2D30, type = "bytes", count = 64, note = "TrackRoute::SplinePoint's Catmull-Rom basis (64 bytes)" }
+spline_guard = { address = 0x826C2D70, type = "u32", note = "its guard (bit 1)" }
+path_assets = { address = 0x82618D30, type = "bytes", count = 64, note = "the camera paths' records by index (pointers)" }
+paused = { address = 0x826A50D4, type = "u32", note = "set: the intro's frame counts held" }
+view1_offsets = { address = 0x82618DC0, type = "bytes", count = 64, note = "ViewCamera1's eye offsets by model (32 bytes each)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+two = { address = 0x820021E8, type = "f32", note = "2.0" }
+two_pi = { address = 0x82001FA8, type = "f32" }
+over_two_pi = { address = 0x82001FA4, type = "f32", note = "1 / (2 pi)" }
+radians_per_degree = { address = 0x82002948, type = "f32", note = "pi / 180" }
+film_scale = { address = 0x82002D0C, type = "f32", note = "CameraAnim::EvalCamera's length scale" }
+zoom_scale = { address = 0x82002C30, type = "f32", note = "CameraAnim::EvalCamera's zoom numerator" }
+first_turn = { address = 0x82001FB4, type = "f32", note = "CameraAnim::Matrix's first RotateY" }
+flip = { address = 0x82001BE0, type = "f32", note = "the z flip (-1.0, probably)" }
+chase_degrees = { address = 0x82009300, type = "f32", note = "the cameras' zoom angle (55.0)" }
+follow_degrees = { address = 0x82000D44, type = "f32", note = "ChaseCamera::Follow's (55.0)" }
+logo_textures = { address = 0x8200CEA0, type = "bytes", count = 184, note = "the rival logo's textures by index; its 12-byte records 304 bytes before" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from ChaseCamera.
+[ChaseCameraAt224]
+measure = "ChaseCamera@+224"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Split from TvCamera.
+[TvCameraAt32]
+measure = "TvCamera@+32"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from TvCamera.
+[TvCameraAt368]
+measure = "TvCamera@+368"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "f32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_32", offset = 32, type = "f32" },
+  { name = "unknown_36", offset = 36, type = "f32" },
+  { name = "unknown_40", offset = 40, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "f32" },
+  { name = "unknown_68", offset = 68, type = "f32" },
+]
+
+# Split from ViewCamera1.
+[ViewCamera1At1104]
+measure = "ViewCamera1@+1104"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from TvCamera.
+[TvCameraAt13360]
+measure = "CameraDirector@+13360"
+size = 43044
+origin = "embedded"
+fields = [
+  { name = "unknown_452", offset = 452, type = "u32" },
+  { name = "unknown_43028", offset = 43028, type = "u32" },
+  { name = "unknown_43040", offset = 43040, type = "u32" },
+]
+
+# Split from CameraPathKey.
+[CameraPathKeyAt16]
+measure = "CameraPath::OnLoaded.r4@+16"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt10760]
+measure = "Cutscene@+10760"
+size = 88
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt20]
+measure = "Cutscene@+10760@+20"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+]
+
+# Split from List16.
+[List16At952]
+measure = "Cutscene@+952"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from List16.
+[List16At12]
+measure = "CutsceneShot@+12"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from List16.
+[List16At352]
+measure = "IntroCamera@+352"
+size = 70
+origin = "embedded"
+fields = [
+  { name = "unknown_68", offset = 68, type = "u16" },
+]
+
+# Split from CameraDirector.
+[CameraDirectorAt10512]
+measure = "RaceMode@+10512"
+size = 77392
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_9616", offset = 9616, type = "u32" },
+  { name = "unknown_9620", offset = 9620, type = "u32" },
+  { name = "unknown_9624", offset = 9624, type = "u32" },
+  { name = "unknown_9628", offset = 9628, type = "u32" },
+  { name = "unknown_9632", offset = 9632, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_9664", offset = 9664, type = "u32" },
+  { name = "unknown_9668", offset = 9668, type = "u32" },
+  { name = "unknown_9692", offset = 9692, type = "f32" },
+  { name = "unknown_9708", offset = 9708, type = "f32" },
+  { name = "unknown_9724", offset = 9724, type = "f32" },
+  { name = "unknown_9740", offset = 9740, type = "f32" },
+  { name = "unknown_9756", offset = 9756, type = "f32" },
+  { name = "unknown_9772", offset = 9772, type = "f32" },
+  { name = "unknown_9788", offset = 9788, type = "f32" },
+  { name = "unknown_9804", offset = 9804, type = "f32" },
+  { name = "unknown_9820", offset = 9820, type = "f32" },
+  { name = "unknown_9836", offset = 9836, type = "f32" },
+  { name = "unknown_9852", offset = 9852, type = "f32" },
+  { name = "unknown_9868", offset = 9868, type = "f32" },
+  { name = "unknown_9884", offset = 9884, type = "f32" },
+  { name = "unknown_9900", offset = 9900, type = "f32" },
+  { name = "unknown_9932", offset = 9932, type = "f32" },
+  { name = "unknown_9948", offset = 9948, type = "f32" },
+  { name = "unknown_9964", offset = 9964, type = "f32" },
+  { name = "unknown_9980", offset = 9980, type = "f32" },
+  { name = "unknown_10748", offset = 10748, type = "f32" },
+  { name = "unknown_11856", offset = 11856, type = "u32" },
+  { name = "unknown_11872", offset = 11872, type = "u32" },
+  { name = "unknown_11876", offset = 11876, type = "u32" },
+  { name = "unknown_11900", offset = 11900, type = "f32" },
+  { name = "unknown_11916", offset = 11916, type = "f32" },
+  { name = "unknown_11932", offset = 11932, type = "f32" },
+  { name = "unknown_11948", offset = 11948, type = "f32" },
+  { name = "unknown_11964", offset = 11964, type = "f32" },
+  { name = "unknown_11980", offset = 11980, type = "f32" },
+  { name = "unknown_11996", offset = 11996, type = "f32" },
+  { name = "unknown_12012", offset = 12012, type = "f32" },
+  { name = "unknown_12028", offset = 12028, type = "f32" },
+  { name = "unknown_12044", offset = 12044, type = "f32" },
+  { name = "unknown_12060", offset = 12060, type = "f32" },
+  { name = "unknown_12076", offset = 12076, type = "f32" },
+  { name = "unknown_12092", offset = 12092, type = "f32" },
+  { name = "unknown_12108", offset = 12108, type = "f32" },
+  { name = "unknown_12140", offset = 12140, type = "f32" },
+  { name = "unknown_12156", offset = 12156, type = "f32" },
+  { name = "unknown_12172", offset = 12172, type = "f32" },
+  { name = "unknown_12188", offset = 12188, type = "f32" },
+  { name = "unknown_12956", offset = 12956, type = "f32" },
+  { name = "unknown_12976", offset = 12976, type = "u32" },
+  { name = "unknown_12992", offset = 12992, type = "u32" },
+  { name = "unknown_12996", offset = 12996, type = "u32" },
+  { name = "unknown_13020", offset = 13020, type = "f32" },
+  { name = "unknown_13036", offset = 13036, type = "f32" },
+  { name = "unknown_13052", offset = 13052, type = "f32" },
+  { name = "unknown_13068", offset = 13068, type = "f32" },
+  { name = "unknown_13084", offset = 13084, type = "f32" },
+  { name = "unknown_13100", offset = 13100, type = "f32" },
+  { name = "unknown_13116", offset = 13116, type = "f32" },
+  { name = "unknown_13132", offset = 13132, type = "f32" },
+  { name = "unknown_13148", offset = 13148, type = "f32" },
+  { name = "unknown_13164", offset = 13164, type = "f32" },
+  { name = "unknown_13180", offset = 13180, type = "f32" },
+  { name = "unknown_13196", offset = 13196, type = "f32" },
+  { name = "unknown_13212", offset = 13212, type = "f32" },
+  { name = "unknown_13228", offset = 13228, type = "f32" },
+  { name = "unknown_13260", offset = 13260, type = "f32" },
+  { name = "unknown_13276", offset = 13276, type = "f32" },
+  { name = "unknown_13292", offset = 13292, type = "f32" },
+  { name = "unknown_13308", offset = 13308, type = "f32" },
+  { name = "unknown_13340", offset = 13340, type = "f32" },
+  { name = "unknown_69628", offset = 69628, type = "f32" },
+  { name = "unknown_77376", offset = 77376, type = "u32" },
+  { name = "unknown_77380", offset = 77380, type = "u32" },
+  { name = "unknown_77384", offset = 77384, type = "u32" },
+  { name = "unknown_77388", offset = 77388, type = "u32" },
+]
+
+# Split from RivalLogo.
+[RivalLogoAt20_2]
+measure = "RivalLogo@+20"
+size = 72
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+# Split from CameraPathKey.
+[CameraPathKeyAt43016]
+measure = "TvCamera@+43016"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+# Split from ChaseCamera.
+[ChaseCameraAt43136]
+measure = "TvCamera@+43136"
+size = 380
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_108", offset = 108, type = "f32" },
+  { name = "unknown_124", offset = 124, type = "f32" },
+  { name = "unknown_140", offset = 140, type = "f32" },
+  { name = "unknown_156", offset = 156, type = "f32" },
+  { name = "unknown_172", offset = 172, type = "f32" },
+  { name = "unknown_188", offset = 188, type = "f32" },
+  { name = "unknown_204", offset = 204, type = "f32" },
+  { name = "unknown_220", offset = 220, type = "f32" },
+  { name = "unknown_224", offset = 224, type = "f32" },
+  { name = "unknown_224_8i", offset = 224, type = "u64" },
+  { name = "unknown_228", offset = 228, type = "f32" },
+  { name = "unknown_232", offset = 232, type = "f32" },
+  { name = "unknown_232_8i", offset = 232, type = "u64" },
+  { name = "unknown_236", offset = 236, type = "f32" },
+  { name = "unknown_240", offset = 240, type = "f32" },
+  { name = "unknown_240_8i", offset = 240, type = "u64" },
+  { name = "unknown_244", offset = 244, type = "f32" },
+  { name = "unknown_248", offset = 248, type = "f32" },
+  { name = "unknown_248_8i", offset = 248, type = "u64" },
+  { name = "unknown_252", offset = 252, type = "f32" },
+  { name = "unknown_260", offset = 260, type = "u16" },
+  { name = "unknown_262", offset = 262, type = "u16" },
+  { name = "unknown_284", offset = 284, type = "f32" },
+  { name = "unknown_300", offset = 300, type = "f32" },
+  { name = "unknown_316", offset = 316, type = "f32" },
+  { name = "unknown_332", offset = 332, type = "f32" },
+  { name = "unknown_352", offset = 352, type = "f32" },
+  { name = "unknown_356", offset = 356, type = "f32" },
+  { name = "unknown_360", offset = 360, type = "f32" },
+  { name = "unknown_364", offset = 364, type = "f32" },
+  { name = "unknown_368", offset = 368, type = "f32" },
+  { name = "unknown_372", offset = 372, type = "u32" },
+  { name = "unknown_376", offset = 376, type = "u16" },
+  { name = "unknown_378", offset = 378, type = "u16" },
+]
+
+# Split from Viewport.
+[ViewportPart]
+measure = "TvCamera@+43136.+20"
+size = 1872
+origin = "embedded"
+fields = [
+  { name = "unknown_1600", offset = 1600, type = "f32" },
+  { name = "unknown_1604", offset = 1604, type = "f32" },
+  { name = "unknown_1608", offset = 1608, type = "f32" },
+  { name = "unknown_1612", offset = 1612, type = "f32" },
+  { name = "unknown_1664", offset = 1664, type = "f32" },
+  { name = "unknown_1668", offset = 1668, type = "f32" },
+  { name = "unknown_1672", offset = 1672, type = "f32" },
+  { name = "unknown_1676", offset = 1676, type = "f32" },
+  { name = "unknown_1680", offset = 1680, type = "f32" },
+  { name = "unknown_1684", offset = 1684, type = "f32" },
+  { name = "unknown_1688", offset = 1688, type = "f32" },
+  { name = "unknown_1692", offset = 1692, type = "f32" },
+  { name = "unknown_1696", offset = 1696, type = "f32" },
+  { name = "unknown_1700", offset = 1700, type = "f32" },
+  { name = "unknown_1704", offset = 1704, type = "f32" },
+  { name = "unknown_1708", offset = 1708, type = "f32" },
+  { name = "unknown_1712", offset = 1712, type = "f32" },
+  { name = "unknown_1716", offset = 1716, type = "f32" },
+  { name = "unknown_1720", offset = 1720, type = "f32" },
+  { name = "unknown_1724", offset = 1724, type = "f32" },
+  { name = "unknown_1744", offset = 1744, type = "f32" },
+  { name = "unknown_1748", offset = 1748, type = "f32" },
+  { name = "unknown_1752", offset = 1752, type = "f32" },
+  { name = "unknown_1756", offset = 1756, type = "f32" },
+  { name = "unknown_1864", offset = 1864, type = "f32" },
+  { name = "unknown_1868", offset = 1868, type = "f32" },
+]

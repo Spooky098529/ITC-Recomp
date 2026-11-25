@@ -22,15 +22,22 @@
 // Drawing runs a tick behind: the logic pass's frame shows the previous tick
 // (amount 0) and the frames after it move towards the current one.
 
+#include <format>
+#include "lifted/names.h"
+#include "lifted/entries.h"
 #include "blend_state.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
 #include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
+#include "native/replay_hooks.h"
 
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/guest_call.h"
+#include "hooks/scenery_lists.h"
 #include "matrix_math/matrix_math.h"
 #include "sprites/billboards.h"
 #include "transform.h"
@@ -77,6 +84,7 @@ ITC_FLAG_BOOL(log_overlay_uploads, false, "ITC",
 ITC_FLAG_DECLARE(bool, log_frame_times);
 ITC_FLAG_DECLARE(bool, native_billboards);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_replay_commands);
 ITC_FLAG_BOOL(strict_pixel_pairing, true, "ITC",
               "Leave per-object pixel constants unblended after a draw that isn't a known "
               "camera product, instead of pairing them by the product before it");
@@ -184,17 +192,19 @@ constexpr float kCutDistance = 8.0f;  // meters
 constexpr float kCutAngle = 0.5f;     // radians, ~30 degrees
 
 // Whether a matrix's 16 words at address are all on one side of 0xE0000000,
-// where the host offset changes (see guest::CopyU32s).
+// where the host offset changes (see guest::CopyU32s), and in guest memory
+// (a handle's, a host object's matrix, E5 step 4, goes word by word through
+// guest::LoadFloat and StoreFloat).
 bool OneHostRange(uint32_t address) {
-  return address >= 0xE0000000u || address + 60u < 0xE0000000u;
+  return !memory::IsHandle(address) && (address >= 0xE0000000u || address + 60u < 0xE0000000u);
 }
 
 // Four words at a time (pshufb), rather than LoadFloat's volatile loads one
 // by one.
-Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
+Matrix4 LoadMatrix(uint32_t address) {
   Matrix4 m;
   if (OneHostRange(address)) {
-    const uint8_t* p = REX_RAW_ADDR(address);
+    const uint8_t* p = guest::Pointer(address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + 16 * i));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(&m[4 * i]), guest::SwapVector(v));
@@ -202,14 +212,14 @@ Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
     return m;
   }
   for (int i = 0; i < 16; i++) {
-    m[i] = guest::LoadFloat(base, address + 4 * i);
+    m[i] = guest::LoadFloat(address + 4 * i);
   }
   return m;
 }
 
-void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
+void StoreMatrix(uint32_t address, const Matrix4& m) {
   if (OneHostRange(address)) {
-    uint8_t* p = REX_RAW_ADDR(address);
+    uint8_t* p = guest::Pointer(address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&m[4 * i]));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(p + 16 * i), guest::SwapVector(v));
@@ -217,7 +227,7 @@ void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
     return;
   }
   for (int i = 0; i < 16; i++) {
-    guest::StoreFloat(base, address + 4 * i, m[i]);
+    guest::StoreFloat(address + 4 * i, m[i]);
   }
 }
 
@@ -245,14 +255,14 @@ bool IsFinite(const Matrix4& m) {
   return std::all_of(m.begin(), m.end(), [](float v) { return std::isfinite(v); });
 }
 
-Vec3 LoadVec3(uint8_t* base, uint32_t address) {
-  return {guest::LoadFloat(base, address), guest::LoadFloat(base, address + 4),
-          guest::LoadFloat(base, address + 8)};
+Vec3 LoadVec3(uint32_t address) {
+  return {guest::LoadFloat(address), guest::LoadFloat(address + 4),
+          guest::LoadFloat(address + 8)};
 }
 
-void StoreVec3(uint8_t* base, uint32_t address, const Vec3& v) {
+void StoreVec3(uint32_t address, const Vec3& v) {
   for (int k = 0; k < 3; k++) {
-    guest::StoreFloat(base, address + 4 * k, v[k]);
+    guest::StoreFloat(address + 4 * k, v[k]);
   }
 }
 
@@ -260,17 +270,17 @@ bool IsFinite(const Vec3& v) {
   return std::all_of(v.begin(), v.end(), [](float x) { return std::isfinite(x); });
 }
 
-Matrix4 Load(uint8_t* base, uint32_t address, const Matrix4*) {
-  return LoadMatrix(base, address);
+Matrix4 Load(uint32_t address, const Matrix4*) {
+  return LoadMatrix(address);
 }
-Vec3 Load(uint8_t* base, uint32_t address, const Vec3*) {
-  return LoadVec3(base, address);
+Vec3 Load(uint32_t address, const Vec3*) {
+  return LoadVec3(address);
 }
-void Store(uint8_t* base, uint32_t address, const Matrix4& m) {
-  StoreMatrix(base, address, m);
+void Store(uint32_t address, const Matrix4& m) {
+  StoreMatrix(address, m);
 }
-void Store(uint8_t* base, uint32_t address, const Vec3& v) {
-  StoreVec3(base, address, v);
+void Store(uint32_t address, const Vec3& v) {
+  StoreVec3(address, v);
 }
 
 bool IsCut(const Transform& a, const Transform& b) {
@@ -542,7 +552,7 @@ bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b,
   if (!same && ITC_FLAG(log_blend_state)) {
     std::lock_guard lock(g_camera_rejects_mutex);
     if (g_camera_rejects.size() < 1500) {
-      g_camera_rejects += fmt::format(
+      g_camera_rejects += std::format(
           "\n  camera {:08X}, world {:08X}, handler {:08X}, from {:08X}->{:08X}: "
           "moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
           "depth {:.4g}->{:.4g} {:.4g}->{:.4g}",
@@ -1018,14 +1028,14 @@ class DrawState {
 
  public:
   // Main thread, after the matrix multiply wrote out = a * b.
-  void OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, uint32_t caller) {
+  void OnMultiply(uint32_t out, uint32_t a, uint32_t b, uint32_t caller) {
     // Draw and game logic run on the main thread; loading threads multiply too.
     if (std::this_thread::get_id() != main_thread_) {
       return;
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     bool recorder = caller == kRecorderMultiplyReturn;
-    ProductInputs inputs{LoadMatrix(base, a), LoadMatrix(base, b)};
+    ProductInputs inputs{LoadMatrix(a), LoadMatrix(b)};
     inputs.caller = caller;
     if (recorder) {
       inputs.context = g_record_context;
@@ -1039,27 +1049,27 @@ class DrawState {
     // Only the recorder's multiply is a live pose's own product (its draw also
     // multiplies other matrices by the camera).
     noting_live_ = recorder && g_live_pose;
-    Note(base, out, a, b, inputs, render_only);
+    Note(out, a, b, inputs, render_only);
     noting_live_ = false;
   }
 
   // Main thread, after the matrix copy dst = src. A copy of a camera (as
   // identity * camera) or of a noted product carries on as that product.
-  void OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller) {
+  void OnCopy(uint32_t dst, uint32_t src, uint32_t caller) {
     if (std::this_thread::get_id() != main_thread_) {
       return;
     }
     bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
     // Read from the copy: `src` can be the address it's noted under rather
     // than where it came from (--motion_blur_by_tick).
-    Matrix4 value = LoadMatrix(base, dst);
+    Matrix4 value = LoadMatrix(dst);
     if (PassOfViewProjection(src) >= 0 || camera_ids_.Of(value) != 0) {
       // A copy of a camera (a camera pass's, or a perspective one built on
       // the stack, like the headlight projector's).
       Matrix4 identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
       ProductInputs inputs{identity, value};
       inputs.caller = caller;
-      Note(base, dst, 0, src, inputs, render_only);
+      Note(dst, 0, src, inputs, render_only);
       counts_.copies++;
       return;
     }
@@ -1079,17 +1089,17 @@ class DrawState {
     if (it == outputs.end() && !render_only) {
       return;
     }
-    if (it->second.written != LoadMatrix(base, src)) {
+    if (it->second.written != LoadMatrix(src)) {
       return;
     }
-    outputs[dst] = {it->second.key, LoadMatrix(base, dst)};
+    outputs[dst] = {it->second.key, LoadMatrix(dst)};
     tick_published_stale_ |= !render_only;
     counts_.copies++;
   }
 
   // A product out = world * camera, by the operands' addresses (world 0 for
   // an identity) and their values.
-  void Note(uint8_t* base, uint32_t out, uint32_t world, uint32_t camera,
+  void Note(uint32_t out, uint32_t world, uint32_t camera,
             const ProductInputs& inputs, bool render_only) {
 
     // The race overlays read the camera passes as game logic left them (put
@@ -1126,7 +1136,7 @@ class DrawState {
       // pass's exactly (same state, the logic pass's cameras put back), but
       // numbers its products differently, so each is matched to the logic
       // pass's product with the same value instead.
-      Matrix4 written = LoadMatrix(base, out);
+      Matrix4 written = LoadMatrix(out);
       uint64_t value = HashMatrix(written);
       if (!render_only) {
         overlay_keys_this_tick_[value] = key;
@@ -1195,7 +1205,7 @@ class DrawState {
       live = int32_t(worlds.size());
       worlds.push_back(g_live_world);
     }
-    outputs[out] = {key, LoadMatrix(base, out), tick_product, live};
+    outputs[out] = {key, LoadMatrix(out), tick_product, live};
     tick_published_stale_ |= !render_only;
   }
 
@@ -1208,13 +1218,13 @@ class DrawState {
   // The amount this pass's frame blends its ticks by (as published).
   float amount() const { return ITC_FLAG(interpolate_draw_state) ? amount_ : 1.0f; }
 
-  void BeforeDraw(uint8_t* base, bool logic_pass) {
+  void BeforeDraw(bool logic_pass) {
     drawing_ = true;
     billboard_cameras_ready_ = false;
     main_thread_ = std::this_thread::get_id();
     logic_pass_ = logic_pass;
     if (logic_pass) {
-      OnTick(base);
+      OnTick();
     }
     amount_ = frame_pacing::GetFramePacer().TickProgress();
     recorded_.clear();
@@ -1231,7 +1241,7 @@ class DrawState {
         for (int k = 0; k < 3; k++) {
           v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
         }
-        Replace(base, saved_vec3_, CameraPass(blend.pass) + kLookAtOffsets[i], v);
+        Replace(saved_vec3_, CameraPass(blend.pass) + kLookAtOffsets[i], v);
       }
       counts_.look_ats++;
     }
@@ -1239,15 +1249,14 @@ class DrawState {
     for (const CameraBlend& camera : camera_blends_) {
       uint32_t pass = CameraPass(camera.pass);
       Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
-      Replace(base, saved_, pass + kViewOffset, view);
-      Replace(base, saved_, pass + kViewProjectionOffset, Multiply(view, camera.projection));
+      Replace(saved_, pass + kViewOffset, view);
+      Replace(saved_, pass + kViewProjectionOffset, Multiply(view, camera.projection));
       counts_.cameras++;
     }
   }
 
-  void AfterDraw(uint8_t* base) {
+  void AfterDraw() {
     drawing_ = false;
-    base_ = base;
     if (logic_pass_) {
       ticks_++;
       if (ticks_ % 90 == 0 || ticks_ % 90 == 1) {
@@ -1273,8 +1282,8 @@ class DrawState {
     pass_live_worlds_.clear();
     product_occurrences_.clear();
     tick_cursor_ = 0;
-    Restore(base, saved_);
-    Restore(base, saved_vec3_);
+    Restore(saved_);
+    Restore(saved_vec3_);
     counts_.draws++;
     LogCounts();
     if (ITC_FLAG(log_moving_products) && logic_pass_) {
@@ -1375,7 +1384,7 @@ class DrawState {
       std::string before;
       for (const auto& [old, old_inputs] : previous_tick_) {
         if (old.world == 0 && old.camera == key.camera && old.handler == key.handler) {
-          before += fmt::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
+          before += std::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
                                 current_tick_.count(old) ? " still here" : "");
           // The same occurrence under another number: a cut, or the same
           // camera changed (its eye's movement and turn, and its scales).
@@ -1383,7 +1392,7 @@ class DrawState {
             std::optional<PerspectiveCamera> a = SplitViewProjection(old_inputs.view_projection);
             std::optional<PerspectiveCamera> b = SplitViewProjection(inputs.view_projection);
             if (a && b) {
-              before += fmt::format(
+              before += std::format(
                   " (moved {:.3f} m, turned {:.3f} rad, x {:.4f}->{:.4f} y {:.4f}->{:.4f} depth "
                   "{:.6g}->{:.6g} {:.6g}->{:.6g})",
                   Distance(a->camera.position, b->camera.position),
@@ -1413,13 +1422,13 @@ class DrawState {
     }
   }
 
-  void BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
+  void BeforeRecordObject(uint32_t view_projection, uint32_t world) {
     object_saved_.clear();
     if (PassOfViewProjection(view_projection) < 0) {
       return;
     }
     ObjectKey key{world, recorded_[world]++};
-    Matrix4 now = LoadMatrix(base, world);
+    Matrix4 now = LoadMatrix(world);
     std::optional<ScaledTransform> transform;
     if (IsFinite(now)) {
       transform = ScaledTransformFromWorldMatrix(now);
@@ -1443,20 +1452,20 @@ class DrawState {
       counts_.object_cuts++;
       return;
     }
-    Replace(base, object_saved_, world,
+    Replace(object_saved_, world,
             WorldMatrixFromScaledTransform(Blend(before->second, *transform, amount_)));
     counts_.objects++;
   }
 
-  void AfterRecordObject(uint8_t* base) {
-    Restore(base, object_saved_);
+  void AfterRecordObject() {
+    Restore(object_saved_);
   }
 
   // Main thread, around the light billboards' vertex generation
   // (sub_8209C6E0), which turns each quad to face the camera pass at
   // `pass_address`: give it the frame's blended camera, so the quads face the
   // camera they're drawn from (their camera constants are blended at replay).
-  void BeforeBillboards(uint8_t* base, uint32_t pass_address) {
+  void BeforeBillboards(uint32_t pass_address) {
     billboard_saved_.clear();
     billboard_saved_vec3_.clear();
     // Only while Draw runs, where amount_ is this frame's: billboards built
@@ -1473,15 +1482,15 @@ class DrawState {
       for (const BlendedLookAt& look_at : billboard_look_ats_) {
         if (look_at.pass_address == pass_address) {
           for (int i = 0; i < 3; i++) {
-            Replace(base, billboard_saved_vec3_, pass_address + kLookAtOffsets[i],
+            Replace(billboard_saved_vec3_, pass_address + kLookAtOffsets[i],
                     look_at.vectors[i]);
           }
         }
       }
       for (const BlendedCamera& camera : billboard_cameras_) {
         if (camera.pass_address == pass_address) {
-          Replace(base, billboard_saved_, pass_address + kViewOffset, camera.view);
-          Replace(base, billboard_saved_, pass_address + kViewProjectionOffset,
+          Replace(billboard_saved_, pass_address + kViewOffset, camera.view);
+          Replace(billboard_saved_, pass_address + kViewProjectionOffset,
                   camera.view_projection);
         }
       }
@@ -1496,7 +1505,7 @@ class DrawState {
         for (int k = 0; k < 3; k++) {
           v[k] = blend.from[i][k] + (blend.to[i][k] - blend.from[i][k]) * amount_;
         }
-        Replace(base, billboard_saved_vec3_, pass_address + kLookAtOffsets[i], v);
+        Replace(billboard_saved_vec3_, pass_address + kLookAtOffsets[i], v);
       }
     }
     for (const CameraBlend& camera : camera_blends_) {
@@ -1504,8 +1513,8 @@ class DrawState {
         continue;
       }
       Matrix4 view = ViewMatrixFromTransform(Blend(camera.from, camera.to, amount_));
-      Replace(base, billboard_saved_, pass_address + kViewOffset, view);
-      Replace(base, billboard_saved_, pass_address + kViewProjectionOffset,
+      Replace(billboard_saved_, pass_address + kViewOffset, view);
+      Replace(billboard_saved_, pass_address + kViewProjectionOffset,
               Multiply(view, camera.projection));
     }
   }
@@ -1542,9 +1551,9 @@ class DrawState {
   std::vector<BlendedCamera> billboard_cameras_;
   bool billboard_cameras_ready_ = false;  // for this Draw
 
-  void AfterBillboards(uint8_t* base) {
-    Restore(base, billboard_saved_);
-    Restore(base, billboard_saved_vec3_);
+  void AfterBillboards() {
+    Restore(billboard_saved_);
+    Restore(billboard_saved_vec3_);
   }
 
   // Main thread, before a logic pass's Update: a new tick's products start.
@@ -1595,37 +1604,37 @@ class DrawState {
   };
 
   template <typename T>
-  static void Replace(uint8_t* base, std::vector<Saved<T>>& saved, uint32_t address,
+  static void Replace(std::vector<Saved<T>>& saved, uint32_t address,
                       const T& value) {
-    saved.push_back({address, Load(base, address, &value), value});
-    Store(base, address, value);
+    saved.push_back({address, Load(address, &value), value});
+    Store(address, value);
   }
 
   // Puts the originals back, except where the game has since written
   // something else there (the memory may have been freed and reused, as when
   // a race loads).
   template <typename T>
-  static void Restore(uint8_t* base, std::vector<Saved<T>>& saved) {
+  static void Restore(std::vector<Saved<T>>& saved) {
     for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
-      if (Load(base, it->address, &it->written) == it->written) {
-        Store(base, it->address, it->original);
+      if (Load(it->address, &it->written) == it->written) {
+        Store(it->address, it->original);
       }
     }
     saved.clear();
   }
 
   // Main thread, before the Draw of a logic pass (after its Update).
-  void OnTick(uint8_t* base) {
+  void OnTick() {
     camera_blends_.clear();
     look_at_blends_.clear();
     for (int pass = 0; pass < kCameraPassCount; pass++) {
-      std::optional<Transform> camera = CameraOf(base, pass);
+      std::optional<Transform> camera = CameraOf(pass);
       if (camera && cameras_[pass]) {
         if (IsCut(*cameras_[pass], *camera)) {
           counts_.camera_cuts++;
         } else {
           camera_blends_.push_back({pass, *cameras_[pass], *camera,
-                                    LoadMatrix(base, CameraPass(pass) + kProjectionOffset)});
+                                    LoadMatrix(CameraPass(pass) + kProjectionOffset)});
         }
       }
       cameras_[pass] = camera;
@@ -1633,7 +1642,7 @@ class DrawState {
       std::array<Vec3, 3> look_at;
       bool finite = true;
       for (int i = 0; i < 3; i++) {
-        look_at[i] = LoadVec3(base, CameraPass(pass) + kLookAtOffsets[i]);
+        look_at[i] = LoadVec3(CameraPass(pass) + kLookAtOffsets[i]);
         finite &= IsFinite(look_at[i]);
       }
       const auto& before = look_ats_[pass];
@@ -1775,11 +1784,11 @@ class DrawState {
   }
 
   // The camera of a pass whose view-projection is its view * projection.
-  static std::optional<Transform> CameraOf(uint8_t* base, int pass) {
+  static std::optional<Transform> CameraOf(int pass) {
     uint32_t address = CameraPass(pass);
-    Matrix4 view = LoadMatrix(base, address + kViewOffset);
-    Matrix4 projection = LoadMatrix(base, address + kProjectionOffset);
-    Matrix4 view_projection = LoadMatrix(base, address + kViewProjectionOffset);
+    Matrix4 view = LoadMatrix(address + kViewOffset);
+    Matrix4 projection = LoadMatrix(address + kProjectionOffset);
+    Matrix4 view_projection = LoadMatrix(address + kViewProjectionOffset);
     if (!IsFinite(view) || !IsFinite(projection) || !IsFinite(view_projection) ||
         !IsProduct(view_projection, view, projection)) {
       return std::nullopt;
@@ -1811,7 +1820,7 @@ class DrawState {
     }
     if (ITC_FLAG(log_replayed_constants)) {
       auto print = [&](const char* name, uint32_t offset) {
-        Matrix4 m = LoadMatrix(base_, CameraPass(0) + offset);
+        Matrix4 m = LoadMatrix(CameraPass(0) + offset);
         ITC_LOG_INFO("pass 0 {}: {:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g} | "
                      "{:.4g} {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} {:.4g}",
                      name, m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
@@ -1829,7 +1838,6 @@ class DrawState {
   uint32_t handler_ = 0;
   bool drawing_ = false;  // between BeforeDraw and AfterDraw
   int overlay_keys_logged_ = 0;
-  uint8_t* base_ = nullptr;
   uint64_t ticks_ = 0;
   bool logic_pass_ = false;
   bool noting_live_ = false;  // Note: a live pose's product (OnMultiply)
@@ -2282,14 +2290,14 @@ class MovingProductsLog {
   }
   bool Line() { return lines_++ < 40; }
   std::string Describe(const Record& r) const {
-    std::string before = r.before ? fmt::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
+    std::string before = r.before ? std::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
                                                 (*r.before)[1], (*r.before)[2])
                                   : std::string("-");
     auto context = [](const std::array<uint32_t, 9>& c) {
-      return fmt::format("lr {:08X} r24-r31 {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}",
+      return std::format("lr {:08X} r24-r31 {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}",
                          c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]);
     };
-    return fmt::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
+    return std::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
                        "{:.3f} shown {:.3f} {:.3f} {:.3f}, moved {:.3f} turned {:.3f}; now {}; "
                        "before {}",
                        r.identity, r.payload, r.handler, Name(r.outcome), before, r.now[0],
@@ -2632,7 +2640,7 @@ class ReplayCameras {
   }
 
   // Render thread, for each vertex constant upload of 4+ registers.
-  void CountUpload(uint8_t* base, uint32_t payload, bool substituted) {
+  void CountUpload(uint32_t payload, bool substituted) {
     if (!ITC_FLAG(log_blend_state)) {
       return;
     }
@@ -2640,7 +2648,7 @@ class ReplayCameras {
     if (substituted) {
       return;
     }
-    Matrix4 m = LoadMatrix(base, payload);
+    Matrix4 m = LoadMatrix(payload);
     auto it = last_values_.find(payload);
     if (it != last_values_.end() && it->second == m) {
       stats_.not_substituted_same++;
@@ -2813,7 +2821,7 @@ class ReplayedConstantsLog {
 
   void OnTick() { frames_since_tick_ = 0; }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
+  void OnUpload(uint32_t payload, uint32_t packed, bool substituted) {
     if (!ITC_FLAG(log_replayed_constants)) {
       return;
     }
@@ -2821,7 +2829,7 @@ class ReplayedConstantsLog {
     if (stage != 0 || count < 4) {
       return;
     }
-    Matrix4 m = LoadMatrix(base, payload);
+    Matrix4 m = LoadMatrix(payload);
     size_t index = frame_.size();
     bool changed = index >= previous_.size() || previous_[index] != m;
     changed_ += changed;
@@ -2830,14 +2838,14 @@ class ReplayedConstantsLog {
       full_lines_++;
       std::string values;
       for (uint32_t i = 0; i < 20; i++) {
-        values += fmt::format("{}{:.4g}", i % 4 == 0 ? (i ? " | " : "") : " ",
-                              guest::LoadFloat(base, payload + 4 * i));
+        values += std::format("{}{:.4g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+                              guest::LoadFloat(payload + 4 * i));
       }
-      lines_.push_back(fmt::format("#{} c9 x5 from {:08X} {}: {}", index, payload,
+      lines_.push_back(std::format("#{} c9 x5 from {:08X} {}: {}", index, payload,
                                    changed ? "changed" : "same", values));
     }
     if (logging_ && lines_.size() < 120) {
-      lines_.push_back(fmt::format(
+      lines_.push_back(std::format(
           "#{} c{} x{} from {:08X} {}{} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | {:.4g} {:.4g} "
           "{:.4g} {:.4g}]",
           index, start, count, payload, changed ? "changed" : "same",
@@ -2898,7 +2906,7 @@ class PixelConstantBlender {
 
   // Blends the upload in place and returns true; recorded() then holds the
   // upload as recorded, to put back after.
-  bool Apply(uint8_t* base, uint32_t payload, uint32_t packed, float amount, uint64_t object) {
+  bool Apply(uint32_t payload, uint32_t packed, float amount, uint64_t object) {
     outcome_ = Outcome::kNoObject;
     switch_jumps_ = 0;
     if (object == 0) {
@@ -2924,7 +2932,7 @@ class PixelConstantBlender {
     // value (the entry's node stays put until OnFrameStart).
     std::vector<float>& now = first || from_latest ? entry.current : now_;
     now.resize(count * 4);
-    guest::CopyFloats(base, payload, now.data(), count * 4);
+    guest::CopyFloats(payload, now.data(), count * 4);
     entry.current_tick = tick_;
     recorded_ = &now;
     last_key_ = {object, key.occurrence};
@@ -3098,7 +3106,7 @@ class PixelConstantBlender {
       bool blend = (a != b) & (jumps[i] == 0);
       out[i] = blend ? std::bit_cast<uint32_t>(a + (b - a) * amount) : std::bit_cast<uint32_t>(b);
     }
-    guest::StoreU32s(base, payload, out, size);
+    guest::StoreU32s(payload, out, size);
     if (keep_blended_) {
       std::memcpy(last_blended_.data(), out, size * sizeof(float));
     }
@@ -3188,7 +3196,7 @@ void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
   last = now;
   std::string line;
   for (const auto& [index, n] : rejections) {
-    line += fmt::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
+    line += std::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
   }
   ITC_LOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
                i / 4, "xyzw"[i % 4], a, b);
@@ -3226,20 +3234,20 @@ class PixelOutcomesLog {
       for (const auto& d : blender.differing()) {
         differing_[d.i]++;
         if (components.size() < 160) {
-          components += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + d.i / 4, "xyzw"[d.i % 4],
+          components += std::format(" c{}.{} {:.4g}->{:.4g}", start + d.i / 4, "xyzw"[d.i % 4],
                                     d.first, d.now);
         }
       }
       if (not_as_recorded_examples_.size() < 6) {
         not_as_recorded_examples_.push_back(
-            fmt::format("{} differ:{}", blender.differing().size(), components));
+            std::format("{} differ:{}", blender.differing().size(), components));
       }
     }
     if (outcome == Outcome::kRejected && moving) {
       auto [a, b] = blender.rejected_values();
       rejected_[blender.rejected()]++;
       if (rejected_examples_.size() < 400) {
-        rejected_examples_ += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
+        rejected_examples_ += std::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
                                           "xyzw"[blender.rejected() % 4], a, b);
       }
       const ReplayedProduct* product = GetReplayCameras().last_parts().product;
@@ -3250,7 +3258,7 @@ class PixelOutcomesLog {
         if (product->tick->before) {
           const Matrix4& v = product->tick->before->world;
           const auto& d = product->tick->before->context;
-          before = fmt::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
+          before = std::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
                                d[0], d[8]);
         }
         ITC_LOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
@@ -3274,7 +3282,7 @@ class PixelOutcomesLog {
     std::map<std::pair<std::string, uint32_t>, std::string> lines;
     for (const auto& [key, n] : counts_) {
       const auto& [kind, start, outcome] = key;
-      lines[{kind, start}] += fmt::format(" {} {:.1f}", kNames[outcome], double(n) / frames_);
+      lines[{kind, start}] += std::format(" {} {:.1f}", kNames[outcome], double(n) / frames_);
     }
     for (const auto& [key, line] : lines) {
       auto jumps = switch_jumps_.find(key);
@@ -3285,7 +3293,7 @@ class PixelOutcomesLog {
     if (!rejected_.empty()) {
       std::string line;
       for (const auto& [i, n] : rejected_) {
-        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
                    line, rejected_examples_);
@@ -3293,7 +3301,7 @@ class PixelOutcomesLog {
     if (!differing_.empty()) {
       std::string line;
       for (const auto& [i, n] : differing_) {
-        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects not as recorded, differing (register from "
                    "start.component:count):{}", line);
@@ -3307,7 +3315,7 @@ class PixelOutcomesLog {
       }
       std::string line;
       for (const auto& [i, n] : *changes) {
-        line += fmt::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects' lighting, frame-to-frame {} (register from "
                    "start.component:count):{}",
@@ -3362,7 +3370,7 @@ class PixelOutcomesLog {
           follow_key_ = {object, occurrence, start};
           follow_frames_ = 10;
           auto line = [&](const std::vector<float>& v) {
-            return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | "
+            return std::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | "
                                "c8 {:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} "
                                "{:.4g} {:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
                                v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32],
@@ -3381,7 +3389,7 @@ class PixelOutcomesLog {
                        "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
                        flip ? "flip" : "jump", start + r, "xyzw"[i % 4],
                        slot ? "light slot" : "other", object,
-                       has_older ? fmt::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
+                       has_older ? std::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
                        h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
         }
       }
@@ -3392,7 +3400,7 @@ class PixelOutcomesLog {
       follow_frames_--;
       const std::vector<float>& rec = blender.last_values();
       auto line = [&](const std::vector<float>& v) {
-        return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | c8 "
+        return std::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | c8 "
                            "{:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} {:.4g} "
                            "{:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
                            v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32], v[33],
@@ -3464,12 +3472,12 @@ class PixelOutcomesLog {
     const std::vector<float>& u = blender.last_blended();
     auto uploaded = [&](uint32_t r) {
       return r * 4 + 2 < u.size()
-                 ? fmt::format("{:.3f} {:.3f} {:.3f}", u[r * 4], u[r * 4 + 1], u[r * 4 + 2])
+                 ? std::format("{:.3f} {:.3f} {:.3f}", u[r * 4], u[r * 4 + 1], u[r * 4 + 2])
                  : std::string("-");
     };
     auto reg = [&](uint32_t r) {
       return r * 4 + 2 < v.size()
-                 ? fmt::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
+                 ? std::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
                  : std::string("-");
     };
     ITC_LOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
@@ -3548,7 +3556,7 @@ class SteppingConstantsLog {
     frames_ = 0;
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted) {
+  void OnUpload(uint32_t payload, uint32_t packed, bool substituted) {
     if (!ITC_FLAG(log_stepping_constants)) {
       return;
     }
@@ -3563,7 +3571,7 @@ class SteppingConstantsLog {
     uint32_t words = std::min<uint32_t>(key.count * 4, 16);
     std::array<float, 16> value{};
     for (uint32_t i = 0; i < words; i++) {
-      value[i] = guest::LoadFloat(base, payload + 4 * i);
+      value[i] = guest::LoadFloat(payload + 4 * i);
     }
     Entry& entry = entries_[key];
     entry.frames++;
@@ -3574,7 +3582,7 @@ class SteppingConstantsLog {
     entry.last = value;
     if (entry.sample.empty()) {
       for (uint32_t i = 0; i < std::min<uint32_t>(words, 8); i++) {
-        entry.sample += fmt::format("{:.4g} ", value[i]);
+        entry.sample += std::format("{:.4g} ", value[i]);
       }
     }
   }
@@ -3627,7 +3635,7 @@ class OverlayUploadsLog {
     }
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload, uint32_t packed, bool substituted,
+  void OnUpload(uint32_t payload, uint32_t packed, bool substituted,
                 const std::optional<Matrix4>& original) {
     if (!ITC_FLAG(log_overlay_uploads) || frames_left_ == 0) {
       return;
@@ -3642,12 +3650,12 @@ class OverlayUploadsLog {
     uint32_t stage = packed >> 24, start = (packed >> 8) & 0xFF, count = packed & 0xFF;
     std::string values;
     for (uint32_t i = 0; i < std::min<uint32_t>(count * 4, 20); i++) {
-      values += fmt::format("{}{:.5g}", i % 4 == 0 ? (i ? " | " : "") : " ",
-                            guest::LoadFloat(base, payload + 4 * i));
+      values += std::format("{}{:.5g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+                            guest::LoadFloat(payload + 4 * i));
     }
     std::string was;
     if (original) {
-      was = fmt::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
+      was = std::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
                         (*original)[13], (*original)[14], (*original)[15]);
     }
     ITC_LOG_INFO("overlay upload: frame {} tick {} amount {:.2f} #{} recorded on {} pass {} "
@@ -3673,7 +3681,7 @@ OverlayUploadsLog& GetOverlayUploadsLog() {
 
 }  // namespace
 
-void BlendState_LogOverlayAllocations(uint8_t* base) {
+void BlendState_LogOverlayAllocations() {
   static auto last = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
   if (!ITC_FLAG(log_overlay_uploads) || frame_pacing::GameMessages_IsRenderOnlyPass()) {
@@ -3684,13 +3692,13 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
     for (const OverlayAllocation& a : g_overlay_allocations) {
       std::string words;
       for (uint32_t i = 0; i < std::min<uint32_t>(a.count * 4, 24); i++) {
-        uint32_t w = guest::LoadU32(base, a.address + 4 * i);
+        uint32_t w = guest::LoadU32(a.address + 4 * i);
         float f;
         std::memcpy(&f, &w, 4);
         words += (i % 4 == 0 && i) ? " | " : " ";
         words += (std::isfinite(f) && std::abs(f) > 1e-4f && std::abs(f) < 1e6f)
-                     ? fmt::format("{:.5g}", f)
-                     : fmt::format("{:08X}", w);
+                     ? std::format("{:.5g}", f)
+                     : std::format("{:08X}", w);
       }
       ITC_LOG_INFO("overlay alloc: {:08X} x{} by {:08X}:{}", a.address, a.count, a.caller, words);
     }
@@ -3698,29 +3706,29 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
   g_overlay_allocations.clear();
 }
 
-void BlendState_BeforeDraw(uint8_t* base, bool render_only_pass) {
-  GetDrawState().BeforeDraw(base, !render_only_pass);
+void BlendState_BeforeDraw(bool render_only_pass) {
+  GetDrawState().BeforeDraw(!render_only_pass);
 }
 
 void BlendState_OnLogicPassStart() {
   GetDrawState().OnLogicPassStart();
 }
 
-void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
+void BlendState_OnMultiply(uint32_t out, uint32_t a, uint32_t b,
                            uint32_t caller) {
-  GetDrawState().OnMultiply(base, out, a, b, caller);
+  GetDrawState().OnMultiply(out, a, b, caller);
 }
 
-void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller) {
-  GetDrawState().OnCopy(base, dst, src, caller);
+void BlendState_OnCopy(uint32_t dst, uint32_t src, uint32_t caller) {
+  GetDrawState().OnCopy(dst, src, caller);
 }
 
 void BlendState_SetHandler(uint32_t handler) {
   GetDrawState().SetHandler(handler);
 }
 
-void BlendState_AfterDraw(uint8_t* base) {
-  GetDrawState().AfterDraw(base);
+void BlendState_AfterDraw() {
+  GetDrawState().AfterDraw();
 }
 
 void BlendState_SetLivePose(const float* world) {
@@ -3773,11 +3781,11 @@ class ObjectExtrasLog {
     }
   }
 
-  void OnUpload(uint8_t* base, uint32_t payload) {
+  void OnUpload(uint32_t payload) {
     uploads_++;
     std::array<float, 20> extras;
     for (uint32_t i = 0; i < 20; i++) {
-      extras[i] = guest::LoadFloat(base, payload + 64 + 4 * i);
+      extras[i] = guest::LoadFloat(payload + 64 + 4 * i);
     }
     auto it = last_.find(payload);
     if (it != last_.end()) {
@@ -3786,7 +3794,7 @@ class ObjectExtrasLog {
       world_changes_ += world;
       c8_changes_ += c8;
       if ((world || c8) && examples_.size() < 6) {
-        examples_.push_back(fmt::format(
+        examples_.push_back(std::format(
             "{:08X} c7 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}; "
             "c8 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}",
             payload, it->second[12], it->second[13], it->second[14], it->second[15], extras[12],
@@ -3814,12 +3822,16 @@ ObjectExtrasLog& GetObjectExtrasLog() {
   return log;
 }
 
-void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world) {
-  GetDrawState().BeforeRecordObject(base, view_projection, world);
+void BlendState_BeforeRecordObject(uint32_t view_projection, uint32_t world) {
+  GetDrawState().BeforeRecordObject(view_projection, world);
 }
 
-void BlendState_AfterRecordObject(uint8_t* base) {
-  GetDrawState().AfterRecordObject(base);
+void BlendState_AfterRecordObject() {
+  GetDrawState().AfterRecordObject();
+}
+
+void BlendState_SetRecordContext(const std::array<uint32_t, 9>& context) {
+  g_record_context = context;
 }
 
 void BlendState_OnReplayFrameStart() {
@@ -3848,26 +3860,26 @@ void BlendState_OnReplayTick() {
 class MotionBlurLog {
  public:
   // Main thread, at the copy.
-  void OnCopy(uint8_t* base, uint32_t view, uint32_t src) {
+  void OnCopy(uint32_t view, uint32_t src) {
     std::lock_guard lock(mutex_);
     if (!Sampling(copies_)) {
       return;
     }
-    Matrix4 at_8080 = LoadMatrix(base, view + 8080), at_8144 = LoadMatrix(base, view + 8144);
+    Matrix4 at_8080 = LoadMatrix(view + 8080), at_8144 = LoadMatrix(view + 8144);
     std::optional<PerspectiveCamera> a = SplitViewProjection(at_8080);
     std::optional<PerspectiveCamera> b = SplitViewProjection(at_8144);
     std::string motion = "not perspective";
     if (a && b) {
-      motion = fmt::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
+      motion = std::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
                            Distance(a->camera.position, b->camera.position),
                            AngleBetween(a->camera.rotation, b->camera.rotation));
     }
-    copies_.lines += fmt::format(
+    copies_.lines += std::format(
         "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}; "
         "+8080 row 3 {:.6g} {:.6g} {:.6g} {:.6g}, +8144 row 3 {:.6g} {:.6g} {:.6g} {:.6g}",
         frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
-        GetDrawState().amount(), view, guest::LoadU32(base, view + 44),
-        guest::LoadU32(base, view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion,
+        GetDrawState().amount(), view, guest::LoadU32(view + 44),
+        guest::LoadU32(view + 48), src - view, at_8080 == at_8144 ? " (same)" : "", motion,
         at_8080[12], at_8080[13], at_8080[14], at_8080[15], at_8144[12], at_8144[13],
         at_8144[14], at_8144[15]);
     copies_.count++;
@@ -3884,12 +3896,12 @@ class MotionBlurLog {
     if (original) {
       std::optional<PerspectiveCamera> a = SplitViewProjection(*original);
       std::optional<PerspectiveCamera> b = SplitViewProjection(uploaded);
-      change = a && b ? fmt::format("substituted, moved {:.3f} m, turned {:.4f} rad",
+      change = a && b ? std::format("substituted, moved {:.3f} m, turned {:.4f} rad",
                                     Distance(a->camera.position, b->camera.position),
                                     AngleBetween(a->camera.rotation, b->camera.rotation))
                       : "substituted (not perspective)";
     }
-    uploads_.lines += fmt::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
+    uploads_.lines += std::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
     uploads_.count++;
   }
 
@@ -3926,9 +3938,9 @@ MotionBlurLog& GetMotionBlurLog() {
   return log;
 }
 
-void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
+void BlendState_LogMotionBlurCopy(uint32_t view, uint32_t src) {
   if (std::this_thread::get_id() == GetDrawState().main_thread()) {
-    GetMotionBlurLog().OnCopy(base, view, src);
+    GetMotionBlurLog().OnCopy(view, src);
   }
 }
 
@@ -3941,7 +3953,7 @@ void BlendState_LogMotionBlurCopy(uint8_t* base, uint32_t view, uint32_t src) {
 // render-only frames had it as recorded, a tick nearer: the blur's length
 // pulsed at 30 Hz. A render-only copy of the matrix the logic pass copied
 // is noted under the logic pass's address. Main thread only.
-uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t src) {
+uint32_t BlendState_MotionBlurNotedSource(uint32_t view, uint32_t src) {
   struct Copied {
     uint32_t src;
     Matrix4 value;
@@ -3951,7 +3963,7 @@ uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t
       std::this_thread::get_id() != GetDrawState().main_thread()) {
     return src;
   }
-  Matrix4 value = LoadMatrix(base, src);
+  Matrix4 value = LoadMatrix(src);
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
     logic_copies[view] = {src, value};
     return src;
@@ -3960,15 +3972,24 @@ uint32_t BlendState_MotionBlurNotedSource(uint8_t* base, uint32_t view, uint32_t
   return it != logic_copies.end() && it->second.value == value ? it->second.src : src;
 }
 
-void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed,
+void BlendState_MotionBlurCopy(uint32_t view, uint32_t dst, uint32_t src) {
+  if (ITC_FLAG(log_motion_blur_velocity)) {
+    BlendState_LogMotionBlurCopy(view, src);
+  }
+  const uint32_t noted = BlendState_MotionBlurNotedSource(view, src);
+  matrix_math::Copy(dst, src);
+  GetDrawState().OnCopy(dst, noted, 0x8213653C);
+}
+
+void BlendState_ReplayConstants(uint32_t payload, uint32_t packed,
                                 const std::function<void()>& upload) {
   uint32_t stage = packed >> 24, count = packed & 0xFF;
   std::optional<Matrix4> original;
   if (ITC_FLAG(interpolate_draw_state) && stage == 0 && count >= 4) {
-    Matrix4 m = LoadMatrix(base, payload);
+    Matrix4 m = LoadMatrix(payload);
     if (std::optional<Matrix4> substitute = GetReplayCameras().Substitute(payload, m)) {
       original = m;
-      StoreMatrix(base, payload, *substitute);
+      StoreMatrix(payload, *substitute);
       GetDrawState().CountReplayedProduct();
     }
   }
@@ -3981,11 +4002,11 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   if (extras) {
     const ProductBlendParts& parts = GetReplayCameras().last_parts();
     for (uint32_t i = 0; i < 20; i++) {
-      original_extras[i] = guest::LoadFloat(base, payload + 64 + 4 * i);
+      original_extras[i] = guest::LoadFloat(payload + 64 + 4 * i);
     }
-    bool world = LoadMatrix(base, payload + 64) == parts.world_now;
+    bool world = LoadMatrix(payload + 64) == parts.world_now;
     if (world) {
-      StoreMatrix(base, payload + 64, parts.world);
+      StoreMatrix(payload + 64, parts.world);
     }
     float eye_distance = -1;
     if (parts.eye_now && parts.eye) {
@@ -3993,7 +4014,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       eye_distance = Distance({c8[0], c8[1], c8[2]}, *parts.eye_now);
       if (eye_distance < 0.05f) {
         for (uint32_t i = 0; i < 3; i++) {
-          guest::StoreFloat(base, payload + 128 + 4 * i, (*parts.eye)[i]);
+          guest::StoreFloat(payload + 128 + 4 * i, (*parts.eye)[i]);
         }
       }
     }
@@ -4005,7 +4026,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   if (ITC_FLAG(interpolate_draw_state) && ITC_FLAG(blend_pixel_constants) && stage == 1 &&
       ((packed >> 16) & 0xFF) == 1) {
     pixel_blended =
-        GetPixelConstantBlender().Apply(base, payload, packed, GetReplayCameras().amount(),
+        GetPixelConstantBlender().Apply(payload, packed, GetReplayCameras().amount(),
                                         GetReplayCameras().last_identity());
     if (ITC_FLAG(log_pixel_outcomes)) {
       const ProductBlendParts& parts = GetReplayCameras().last_parts();
@@ -4016,26 +4037,26 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
           {parts.world[12], parts.world[13], parts.world[14]});
     }
   }
-  GetSteppingConstantsLog().OnUpload(base, payload, packed,
+  GetSteppingConstantsLog().OnUpload(payload, packed,
                                      original.has_value() || pixel_blended);
   if (ITC_FLAG(log_motion_blur_velocity) && stage == 0 && ((packed >> 8) & 0xFF) == 100 &&
       count == 4) [[unlikely]] {
-    GetMotionBlurLog().OnUpload(LoadMatrix(base, payload), original, GetReplayCameras().tick(),
+    GetMotionBlurLog().OnUpload(LoadMatrix(payload), original, GetReplayCameras().tick(),
                                 GetReplayCameras().amount());
   }
   if (ITC_FLAG(log_object_extras) && stage == 0 && count == 9 && original) {
-    GetObjectExtrasLog().OnUpload(base, payload);
+    GetObjectExtrasLog().OnUpload(payload);
   }
   if (stage == 0 && count >= 4) {
-    GetReplayCameras().CountUpload(base, payload, original.has_value());
+    GetReplayCameras().CountUpload(payload, original.has_value());
     if (!original && ITC_FLAG(log_overlay_products)) {
-      GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(base, payload));
+      GetReplayCameras().LogOverlayMiss(payload, LoadMatrix(payload));
     }
     // Diagnostics (--log_replayed_constants): main-camera matrices uploaded
     // to c0, with their status.
     if (ITC_FLAG(log_replayed_constants)) {
       uint32_t start = (packed >> 8) & 0xFF;
-      Matrix4 m = original ? *original : LoadMatrix(base, payload);
+      Matrix4 m = original ? *original : LoadMatrix(payload);
       static auto last = std::chrono::steady_clock::now();
       static int logged = 0;
       auto now = std::chrono::steady_clock::now();
@@ -4053,7 +4074,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
       }
     }
   }
-  GetReplayedConstantsLog().OnUpload(base, payload, packed, original.has_value());
+  GetReplayedConstantsLog().OnUpload(payload, packed, original.has_value());
   std::vector<uint32_t> zeroed;
   if (stage == 0) {
     if (ITC_FLAG(log_upload_owners)) {
@@ -4072,7 +4093,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
         last = now;
         std::string line;
         for (const auto& [who, n] : owners) {
-          line += fmt::format(" {:08X}:{}", who, n / std::max(frames, 1));
+          line += std::format(" {:08X}:{}", who, n / std::max(frames, 1));
         }
         ITC_LOG_INFO("upload owners (caller:uploads per tick):{}", line);
         owners.clear();
@@ -4083,30 +4104,30 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   // Vertex or pixel constants, by the code that allocated the header.
   if (const std::string& list = ITC_FLAG(debug_zero_owners); !list.empty()) {
     uint32_t owner = SlotOwner(payload - 16);
-    if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
+    if (owner != 0 && list.find(std::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {
-        zeroed.push_back(guest::LoadU32(base, payload + 4 * i));
-        guest::StoreU32(base, payload + 4 * i, 0);
+        zeroed.push_back(guest::LoadU32(payload + 4 * i));
+        guest::StoreU32(payload + 4 * i, 0);
       }
     }
   }
-  GetOverlayUploadsLog().OnUpload(base, payload, packed,
+  GetOverlayUploadsLog().OnUpload(payload, packed,
                                   original.has_value() || pixel_blended, original);
   upload();
   for (uint32_t i = 0; i < zeroed.size(); i++) {
-    guest::StoreU32(base, payload + 4 * i, zeroed[i]);
+    guest::StoreU32(payload + 4 * i, zeroed[i]);
   }
   if (original) {
-    StoreMatrix(base, payload, *original);
+    StoreMatrix(payload, *original);
   }
   if (extras) {
     for (uint32_t i = 0; i < 20; i++) {
-      guest::StoreFloat(base, payload + 64 + 4 * i, original_extras[i]);
+      guest::StoreFloat(payload + 64 + 4 * i, original_extras[i]);
     }
   }
   if (pixel_blended) {
     const std::vector<float>& recorded = GetPixelConstantBlender().recorded();
-    guest::StoreU32s(base, payload, recorded.data(), uint32_t(recorded.size()));
+    guest::StoreU32s(payload, recorded.data(), uint32_t(recorded.size()));
   }
 }
 
@@ -4115,17 +4136,17 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
 // Matrix_Multiply: r3 = out, r4 = a, r5 = b; out = a * b (4x4). The work
 // natively (src/matrix_math/matrix_math.cpp, --native_matrix_math; the
 // translated code leaves flush-to-zero on) or translated, then noted.
-extern "C" REX_FUNC(sub_8209BD50) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209BD50) {
+  
   uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   uint32_t caller = uint32_t(ctx.lr);
   if (ITC_FLAG(native_matrix_math)) {
-    matrix_math::Multiply(base, out, a, b);
+    matrix_math::Multiply(out, a, b);
     ctx.fpscr.enableFlushMode();
   } else {
-    __imp__sub_8209BD50(ctx, base);
+    lifted::original::c8209BD50(ctx);
   }
-  interpolation::GetDrawState().OnMultiply(base, out, a, b, caller);
+  interpolation::GetDrawState().OnMultiply(out, a, b, caller);
 }
 
 // Diagnostics (--log_slot_callers): who allocates command list slots for
@@ -4150,7 +4171,7 @@ std::chrono::steady_clock::time_point g_slot_callers_logged{};
 namespace {
 // AllocateSlots' diagnostics, kept out of the override so its fast path needs
 // no stack frame (they made it reserve ~700 bytes and save six registers).
-[[gnu::noinline]] void AllocateSlots_Diagnostics(PPCContext& ctx, uint32_t count,
+[[gnu::noinline]] void AllocateSlots_Diagnostics(lifted::Regs& ctx, uint32_t count,
                                                  uint32_t caller) {
   if (ITC_FLAG(log_overlay_uploads) && ctx.r3.u32 != 0 &&
       std::this_thread::get_id() == interpolation::GetDrawState().main_thread()) {
@@ -4225,8 +4246,8 @@ namespace {
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_8258CAA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
+  
   uint32_t count = ctx.r4.u32;
   // The game makes ~50,000 of these calls a frame (most for one slot), and the
   // translated original spent ~45 cycles on each, mostly on its stack frame
@@ -4238,18 +4259,16 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   uint32_t list = ctx.r3.u32;
   uint32_t first = 0;
   if (ITC_FLAG(native_allocate_slots)) {
-    first = command_list::AllocateSlots(base, list, count);
+    first = command_list::AllocateSlots(list, count);
   }
   if (first != 0) {
-    ctx.cr6.compare<uint32_t>(guest::LoadU32(base, list + 12), guest::LoadU32(base, list + 8),
-                              ctx.xer);
-    ctx.r12.u64 = ctx.lr;
-    ctx.r11.u64 = list;
+    // (cr6, r11 and r12 as the original leaves them: leftovers for
+    // recompiled callers, none now)
     ctx.r10.u64 = uint64_t(count << 4) + first;
     ctx.r9.u64 = count << 4;
     ctx.r3.u64 = first;
   } else {
-    __imp__sub_8258CAA0(ctx, base);
+    lifted::original::c8258CAA0(ctx);
   }
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) [[unlikely]] {
@@ -4257,28 +4276,25 @@ extern "C" REX_FUNC(sub_8258CAA0) {
   }
 }
 
-// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix.
-extern "C" REX_FUNC(sub_820A0AC0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
-  uint32_t caller = uint32_t(ctx.lr);
-  uint32_t noted_src = src;
-  if (caller == 0x8213653C) [[unlikely]] {
-    // The motion blur's previous view-projection (c100 x4); r29 is the view.
-    if (ITC_FLAG(log_motion_blur_velocity)) {
-      interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
-    }
-    noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
-  }
+// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix, then
+// noted. The motion blur's copy of its previous view-projection (from
+// 0x8213653C, MotionBlur::Record) is noted by MotionBlur::Record's port
+// itself (BlendState_MotionBlurCopy, with the view it has); only the
+// recompiled MotionBlur::Record (--native_post_effects off) still reaches
+// this from there, and its r29 (the view) isn't carried: noted as a plain
+// copy then.
+ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
+  const uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
+  const uint32_t caller = uint32_t(ctx.lr);
   // The copy natively (src/matrix_math/matrix_math.cpp, --native_matrix_math)
   // or translated, then noted.
   if (ITC_FLAG(native_matrix_math)) {
     ctx.fpscr.disableFlushMode();
-    matrix_math::Copy(base, dst, src);
+    matrix_math::Copy(dst, src);
   } else {
-    __imp__sub_820A0AC0(ctx, base);
+    lifted::original::c820A0AC0(ctx);
   }
-  interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
+  interpolation::GetDrawState().OnCopy(dst, src, caller);
 }
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it
@@ -4288,8 +4304,7 @@ extern "C" REX_FUNC(sub_820A0AC0) {
 // the frame's camera blend and its undoing.
 namespace {
 struct BillboardSlots {
-  PPCContext& ctx;
-  uint8_t* base;
+  lifted::Regs& ctx;
   uint32_t list;
 };
 
@@ -4298,33 +4313,41 @@ struct BillboardSlots {
 uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_address) {
   auto& s = *static_cast<BillboardSlots*>(user);
   uint32_t first = 0;
-  guest_call::InFrame(s.ctx, s.base, 304, return_address, [&](uint32_t) {
+  guest_call::InFrame(s.ctx, 304, return_address, [&](uint32_t) {
     s.ctx.r3.u64 = s.list;
     s.ctx.r4.u64 = count;
-    sub_8258CAA0(s.ctx, s.base);
+    lifted::Enter(s.ctx, game::CommandList::AllocateSlots);
     first = s.ctx.r3.u32;
   });
   return first;
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_8209C6E0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
-  interpolation::GetDrawState().BeforeBillboards(base, pass);
+uint32_t interpolation::BlendState_BuildBillboardVertices(uint32_t set,
+                                                          uint32_t material,
+                                                          const sprites::SlotAllocator& slots) {
+  GetDrawState().BeforeBillboards(guest::LoadU32(set));
+  const uint32_t counted = sprites::BuildBillboardVertices(set, material, slots);
+  GetDrawState().AfterBillboards();
+  return counted;
+}
+
+ITC_NATIVE_ENTRY_ALWAYS(8209C6E0) {
+  
   if (ITC_FLAG(native_billboards)) {
     const uint32_t set = ctx.r3.u32, material = ctx.r5.u32;
     const uint64_t lr = ctx.lr;
-    BillboardSlots user{ctx, base, ctx.r4.u32};
+    BillboardSlots user{ctx, ctx.r4.u32};
     ctx.fpscr.disableFlushMode();
-    uint32_t counted =
-        sprites::BuildBillboardVertices(base, set, material, {AllocateBillboardSlots, &user});
+    uint32_t counted = interpolation::BlendState_BuildBillboardVertices(set, material, {AllocateBillboardSlots, &user});
     ctx.lr = lr;
     ctx.r3.u64 = counted;
-  } else {
-    __imp__sub_8209C6E0(ctx, base);
+    return;
   }
-  interpolation::GetDrawState().AfterBillboards(base);
+  uint32_t pass = guest::LoadU32(ctx.r3.u32);
+  interpolation::GetDrawState().BeforeBillboards(pass);
+  lifted::original::c8209C6E0(ctx);
+  interpolation::GetDrawState().AfterBillboards();
 }
 
 // Command 7, set shader constants (render thread): r3 = payload, r4 =
@@ -4340,35 +4363,57 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
   upload_ns = upload;
 }
 
-extern "C" REX_FUNC(sub_8258FD48) {
-  REX_FUNC_PROLOGUE();
+// The upload is Command::SetShaderConstants' plain C++
+// (src/graphics/replay_commands.h) with --native_replay_commands, else the
+// original.
+namespace {
+ITC_REGS_STEP(SetShaderConstants) {
+  if (!ITC_FLAG(native_replay_commands)) {
+    lifted::original::c8258FD48(ctx);
+    return;
+  }
+  const uint32_t payload = ctx.r3.u32, count = ctx.r4.u32, packed = ctx.r5.u32;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = graphics::replay_commands::SetShaderConstants(payload, count, packed,
+                                                             ctx.r1.u32,
+                                                             native::ReplayCall(ctx));
+}
+}  // namespace
+
+ITC_NATIVE_ENTRY_ALWAYS(8258FD48) {
+  
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
-  debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
-  native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
+  debug::ReplayStats_OnCommand(7, payload, ctx.r4.u32, packed);
+  native::Renderer_OnCommand(7, payload, ctx.r4.u32, packed);
   if (!ITC_FLAG(log_frame_times)) {
-    interpolation::BlendState_ReplayConstants(base, payload, packed,
-                                              [&] { __imp__sub_8258FD48(ctx, base); });
+    interpolation::BlendState_ReplayConstants(payload, packed,
+                                              [&] { SetShaderConstants(ctx); });
     return;
   }
   using Clock = std::chrono::steady_clock;
   Clock::time_point start = Clock::now();
-  interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
+  interpolation::BlendState_ReplayConstants(payload, packed, [&] {
     Clock::time_point upload_start = Clock::now();
-    __imp__sub_8258FD48(ctx, base);
+    SetShaderConstants(ctx);
     g_replay_upload_ns += (Clock::now() - upload_start).count();
   });
   g_replay_total_ns += (Clock::now() - start).count();
 }
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera
-// view-projection, r5 = the object's world matrix.
-extern "C" REX_FUNC(sub_825953D0) {
-  REX_FUNC_PROLOGUE();
-  interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
-  interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
-                                     ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
-                                     ctx.r31.u32};
-  __imp__sub_825953D0(ctx, base);
+// view-projection, r5 = the object's world matrix. Its interpolation hooks
+// stay here around the recording, native or translated. The record context
+// is the caller's lr and r24 to r31: the pairing key reads lr and r31 (the
+// part being drawn), both carried by the call (lifted::Args); r24 to r30
+// were only logged and aren't carried (0).
+ITC_NATIVE_ENTRY_ALWAYS(825953D0) {
+  interpolation::BlendState_BeforeRecordObject(ctx.r4.u32, ctx.r5.u32);
+  interpolation::g_record_context = {uint32_t(ctx.lr), 0, 0, 0, 0, 0, 0, 0, ctx.caller_r31};
+  // The recording natively (src/scenery_lists/model_draws.cpp,
+  // --native_scenery_lists) or translated.
+  if (!hooks::SceneryListsRecordObject(ctx)) {
+    lifted::original::c825953D0(ctx);
+  }
   interpolation::g_record_context = {};
-  interpolation::BlendState_AfterRecordObject(base);
+  interpolation::BlendState_AfterRecordObject();
 }

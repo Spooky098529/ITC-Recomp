@@ -1,0 +1,298 @@
+// The minimap's parts natively: adapters in front of src/minimap/
+// (docs/functions/minimap.md), with the register steps the harness shares
+// (hooks/minimap.h). Minimap::Draw's (sub_820F5740) register steps are here;
+// its override is frame interpolation's wrap
+// (src/frame_pacing/per_frame_logic.cpp), which runs them.
+
+#include "hooks/minimap.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "car_scene_draw/car_scene_draw.h"
+#include "hooks/c_runtime.h"
+#include "hooks/car_scene_draw.h"
+#include "hooks/guest_call.h"
+#include "hooks/scenery_lists.h"
+#include "minimap/minimap.h"
+#include "schema/device_shaders.h"
+#include "schema/minimap.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_minimap, true, "ITC",
+              "Run the minimap's parts (docs/functions/minimap.md: Race::FindPlayerEntry "
+              "sub_82170608, Race::RacerVehicle sub_82170578, SetList::Point sub_82147D18, "
+              "Minimap::RacerMarkerType sub_820F2D28 (with its switch's case 1, sub_820F2E68; "
+              "sub_820F2CA8's chained record the original's), Minimap::Scaling sub_820F2EF8, "
+              "Triangle::Init sub_820F4040 (no adapter: only the marker draws' plain C++ calls it), List80::Insert sub_820F5238 (with List80::Link "
+              "sub_820F40C0, no adapter: only it calls it) and List80::Copy sub_820F51A8, Primitive::RecordTransform sub_8217AEA8, Triangle::Record "
+              "sub_8217DAA0 (with Triangle::RecordFlat sub_8217C370, no adapter: only it calls "
+              "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
+              "original's), Minimap::DrawCarMarker sub_820F4888 and Minimap::DrawPointMarker "
+              "sub_820F4BA8 (with native atexit; Triangle::Record from their frames, through "
+              "its adapter), Minimap::Draw sub_820F5740 (inside frame interpolation's wrap; with "
+              "--native_scenery_lists, --native_matrix_math, --native_vehicle_accessors, "
+              "--native_car_physics, --native_math and --native_c_runtime and the command list's "
+              "diagnostics off, else its original); since it is native, RacerVehicle, SetList::Point, "
+              "RacerMarkerType, Scaling, List80::Insert and Copy and the marker draws have no "
+              "adapters: the flag switches their callers) natively instead "
+              "of through the translated code (the same writes; checked by "
+              "--run_harnesses=minimap)");
+
+// The command list's diagnostics (blend_state.cpp) see who allocates slots:
+// with any of them on, the original runs.
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_car_physics);
+ITC_FLAG_DECLARE(bool, native_c_runtime);
+ITC_FLAG_DECLARE(bool, native_math);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_scenery_lists);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+
+namespace hooks {
+
+ITC_REGS_STEP(MinimapFindPlayerEntry) {
+  ctx.r3.u64 = minimap::RaceFindPlayerEntry(ctx.r3.u32, ctx.r4.u32);
+}
+
+ITC_REGS_STEP(MinimapRacerVehicle) {
+  ctx.r3.u64 = minimap::RaceRacerVehicle(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(MinimapSetListPoint) {
+  minimap::SetListPoint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+ITC_REGS_STEP(MinimapRacerMarkerType) {
+  const auto type = minimap::RacerMarkerType(ctx.r3.u32, ctx.r4.s32);
+  if (!type) {
+    lifted::original::c820F2D28(ctx);
+    return;
+  }
+  ctx.r3.s64 = *type;
+}
+
+ITC_REGS_STEP(MinimapScaling) {
+  if (!minimap::Scaling(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820F2EF8(ctx);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32;
+}
+
+ITC_REGS_STEP(MinimapTriangleInit) {
+  minimap::TriangleInit(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(MinimapList80Insert) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = minimap::List80Insert(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(MinimapList80Copy) {
+  if (!minimap::List80Copy(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c820F51A8(ctx);
+    return;
+  }
+  ctx.r3.u64 = ctx.r3.u32;
+}
+
+ITC_REGS_STEP(MinimapRecordTransform) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    lifted::original::c8217AEA8(ctx);
+    return;
+  }
+  const auto slot = minimap::RecordTransform(ctx.r3.u32, ctx.r4.u32,
+                                             ctx.r1.u32 - minimap::kTransformProduct);
+  if (!slot) {
+    lifted::original::c8217AEA8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *slot;
+}
+
+ITC_REGS_STEP(MinimapTriangleRecordFlat) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    lifted::original::c8217C370(ctx);
+    return;
+  }
+  const uint32_t key = ctx.r5.u32;
+  const auto chunk = minimap::TriangleRecordFlat(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - minimap::kRecordFlatFrame);
+  if (!chunk) {
+    lifted::original::c8217C370(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, minimap::kRecordFlatFrame, 0x8217C4B8, [&](uint32_t) {
+    // The render queue's slot 4 (sub_8258EDC8 in play): r4 = the chunk, r5 =
+    // the key, f1 = 0.0.
+    const uint32_t queue = schema::MinimapGlobals::triangle_queue();
+    ctx.r3.u64 = queue;
+    ctx.r4.u64 = *chunk;
+    ctx.r5.u64 = key;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(schema::MinimapGlobals::zero());
+    lifted::CallFromContext(ctx, schema::RenderQueue(queue).vtable().add());
+  });
+  ctx.lr = lr;
+}
+
+ITC_REGS_STEP(MinimapTriangleRecord) {
+  switch (minimap::TriangleRecord(ctx.r3.u32)) {
+    case minimap::TriangleRecording::kFlat:
+      MinimapTriangleRecordFlat(ctx);
+      return;
+    case minimap::TriangleRecording::kOther:
+      lifted::Enter(ctx, lifted::e8217C4C0);
+      return;
+    case minimap::TriangleRecording::kNone:
+      return;
+  }
+}
+
+namespace {
+
+// A marker draw's guest calls (minimap::MarkerCalls), made from its frame
+// with the original's return addresses.
+struct MarkerContext {
+  lifted::Regs& ctx;
+  uint32_t frame;
+  uint32_t record_return;
+  uint32_t memcpy_return;
+  GuestAtexit atexit;
+
+  static void Record(void* self, uint32_t triangle, uint32_t pass, uint32_t key) {
+    auto& m = *static_cast<MarkerContext*>(self);
+    const uint64_t stack = m.ctx.r1.u64;
+    m.ctx.r1.u64 = m.frame;
+    m.ctx.lr = m.record_return;
+    m.ctx.r3.u64 = triangle;
+    m.ctx.r4.u64 = pass;
+    m.ctx.r5.u64 = key;
+    lifted::Enter(m.ctx, game::Triangle::Record);
+    m.ctx.r1.u64 = stack;
+  }
+  static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
+    auto& m = *static_cast<MarkerContext*>(self);
+    const uint64_t stack = m.ctx.r1.u64;
+    m.ctx.r1.u64 = m.frame;
+    m.ctx.lr = m.memcpy_return;
+    m.ctx.r3.u64 = to;
+    m.ctx.r4.u64 = from;
+    m.ctx.r5.u64 = size;
+    lifted::Enter(m.ctx, game::memcpy_825A7410);
+    m.ctx.r1.u64 = stack;
+  }
+};
+
+using MarkerDraw = void (*)(uint32_t, uint32_t, uint32_t, uint32_t,
+                            const minimap::MarkerCalls&);
+
+void DrawMarker(lifted::Regs& ctx, MarkerDraw draw, uint32_t frame_bytes,
+                uint32_t record_return, uint32_t memcpy_return) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t pass = ctx.r3.u32, color = ctx.r4.u32, matrix = ctx.r5.u32;
+  const uint32_t frame = ctx.r1.u32 - frame_bytes;
+  guest::StoreU32(frame, ctx.r1.u32);  // the back chain, as stwu
+  MarkerContext m{ctx, frame, record_return, memcpy_return, {ctx}};
+  minimap::MarkerCalls calls;
+  calls.atexit = m.atexit.Call();
+  calls.record = &MarkerContext::Record;
+  calls.memcpy = &MarkerContext::Memcpy;
+  calls.user = &m;
+  draw(pass, color, matrix, frame, calls);
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+bool MinimapDrawNative() {
+  return ITC_FLAG(native_minimap) && hooks::NativeAtexit() && ITC_FLAG(native_scenery_lists) &&
+         ITC_FLAG(native_matrix_math) && ITC_FLAG(native_vehicle_accessors) &&
+         ITC_FLAG(native_car_physics) && ITC_FLAG(native_math) && ITC_FLAG(native_c_runtime) &&
+         !hooks::SceneryListsSlotDiagnostics();
+}
+
+void MinimapDraw(lifted::Regs& ctx) {
+  // (the caller's r24: diagnostic only, not carried)
+  MinimapDraw(ctx, 0);
+}
+void MinimapDraw(lifted::Regs& ctx, uint32_t caller_r24) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  constexpr uint32_t kFrame = 28336;
+  const uint32_t f = ctx.r1.u32 - kFrame;
+  hooks::SceneryDrawGuest guest{ctx};
+  const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
+  // The marker draws' guest calls from their frames below Minimap::Draw's.
+  MarkerContext car{ctx, f - minimap::kCarMarkerFrame, 0x820F4B94, 0x820F4B84, {ctx}};
+  MarkerContext point{ctx,       f - minimap::kPointMarkerFrame,
+                      0x820F5188, 0x820F5178, {ctx}};
+  minimap::MarkerCalls car_calls, point_calls;
+  for (auto [m, c] : {std::pair{&car, &car_calls}, std::pair{&point, &point_calls}}) {
+    c->atexit = m->atexit.Call();
+    c->record = &MarkerContext::Record;
+    c->memcpy = &MarkerContext::Memcpy;
+    c->user = m;
+  }
+  GuestAtexit atexit{ctx};
+  minimap::DrawCalls all;
+  all.draws = &draws;
+  all.calls = &calls;
+  all.car_marker = &car_calls;
+  all.point_marker = &point_calls;
+  all.atexit = atexit.Call();
+  minimap::Draw(all, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, caller_r24);
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+// r3 = the camera pass, r4 = the color, r5 = the matrix; r3 as the last
+// Triangle::Record leaves it.
+ITC_REGS_STEP(MinimapDrawCarMarker) {
+  DrawMarker(ctx, minimap::DrawCarMarker, minimap::kCarMarkerFrame, 0x820F4B94,
+             0x820F4B84);
+}
+ITC_REGS_STEP(MinimapDrawPointMarker) {
+  DrawMarker(ctx, minimap::DrawPointMarker, minimap::kPointMarkerFrame, 0x820F5188,
+             0x820F5178);
+}
+
+}  // namespace hooks
+
+// Triangle::RecordFlat (sub_8217C370) has no adapter: only Triangle::Record
+// calls it.
+
+// List80::Link (sub_820F40C0) has no adapter: only List80::Insert calls it.
+
+// Triangle::Init (sub_820F4040) has no adapter: only the marker draws call
+// it, and their plain C++ calls its plain C++ (MinimapTriangleInit is the
+// harness's register steps).
+
+// Defines an adapter: the flag, else the original.
+#define ITC_MINIMAP(address, step)      \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_minimap)) { \
+    hooks::step(ctx);             \
+  }
+
+ITC_MINIMAP(82170608, MinimapFindPlayerEntry)
+ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
+ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)
+
+// No adapters (removed 2026-11-13, B7 loop, once Minimap::Draw, their only
+// caller in play, was native and calls their plain C++; a temporary counter
+// showed none called in an attract race): Race::RacerVehicle (sub_82170578,
+// also from Racers::NearestHumanVehicle's plain C++), SetList::Point
+// (sub_82147D18), Minimap::RacerMarkerType (sub_820F2D28), Minimap::Scaling
+// (sub_820F2EF8), List80::Insert (sub_820F5238), List80::Copy (sub_820F51A8),
+// Minimap::DrawCarMarker (sub_820F4888) and DrawPointMarker (sub_820F4BA8).
+// Their register steps above stay for the harness.

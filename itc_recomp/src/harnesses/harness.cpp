@@ -1,5 +1,7 @@
 #include "harness.h"
 
+#include "hooks/app_start_up.h"
+
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -11,7 +13,7 @@
 ITC_FLAG_STRING(run_harnesses, "", "ITC",
                 "Run harnesses comparing native functions with the recompiled ones, once at "
                 "the first input update: \"all\" or a comma-separated list "
-                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, collision_world, heap, c_runtime_heap, sound_cues, xact, action_mappers, action_mappers_binding, data_tables, model_animation, car_specs, cameras, strings_and_font, std_string, track_route, ai_drivers, racer_controllers, track_zones, graphics_resources, video_output, device_state, course_scenery, post_effects, input, screen_objects, hardcoded_shaders)");
+                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, collision_world, heap, c_runtime_heap, sound_cues, xact, action_mappers, action_mappers_binding, data_tables, model_animation, car_specs, cameras, strings_and_font, std_string, track_route, ai_drivers, racer_controllers, track_zones, graphics_resources, video_output, device_state, course_scenery, post_effects, input, screen_objects, hardcoded_shaders, framework, game_modes, models, mode_tick, minimap, c_runtime_exit, c_runtime_core, scene_models, race_hud, ui_movie_objects, scenery_lists, shader_objects, data_file, race_setup, vehicle, app_states, scene_loaders, car_models, save_data, texture_compression, race_world, race_states, archive, file_layer, c_runtime_format, save_interface, save_handlers, car_sounds, x3daudio, xaudio, xact_waves, xact_tracks, xaudio_engine, xaudio_objects, app_start_up, data_load, career, race_event, camera_modes, location_screen, material_passes, race_hud_object, alt_hud, race_scene, menu_sounds, accessories, race_hud_machine, race_screens, race_screens_unseen, device_shaders, render_queue, scene, second_set, load_poll, boot_mode, car_draw, race_flow, car_scene_draw, front_end_car_draw, replay_snapshots, race_sounds, race_loading, scene_target, frame_passes, command_buffer, single_commands, predicated_tiling, power_graph, car_makers, menu_helpers, race_update, stand_models, build_screen, tuning_screen, tuning_pages, screen_constructors, type67_modes, options_screen, options_load_save, type67_screens, car_list, front_end_screen_helpers, car_dealer, type2_screens, save_screen, type2_dialog, garage_screen, tuning_machine, race_menu, car_settings, user_info, type2_mode, title_screen, type10_mode, type5_mode, todays_result, network_mode, race_end, power_graph_screen, achievements, frame_driver, morph_jobs, type8_screens, type8_mode, lifted, audio_wraps, create_file)");
 
 namespace harness {
 
@@ -173,6 +175,47 @@ std::string Hex(const std::vector<uint8_t>& bytes) {
   return s;
 }
 
+namespace {
+ArchiveLoads* g_archive_loads = nullptr;
+bool RecordArchiveLoad(PPCContext& t, uint32_t address) {
+  if (address != 0x8209DE48 || g_archive_loads == nullptr) {
+    return false;
+  }
+  const int64_t serial =
+      g_archive_loads->Answer(t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32, t.r8.u32);
+  if (serial < 0) {
+    t.r3.s64 = -1;
+  } else {
+    t.r3.u64 = uint64_t(serial);
+  }
+  return true;
+}
+}  // namespace
+
+ArchiveLoads::ArchiveLoads(std::vector<int64_t> serials)
+    : serials_(std::move(serials)),
+      saved_recorder_(reinterpret_cast<void*>(hooks::g_start_up_recorder)) {
+  g_archive_loads = this;
+  hooks::g_start_up_recorder = RecordArchiveLoad;
+}
+
+ArchiveLoads::~ArchiveLoads() {
+  g_archive_loads = nullptr;
+  hooks::g_start_up_recorder = reinterpret_cast<hooks::StartUpRecorder>(saved_recorder_);
+}
+
+int64_t ArchiveLoads::Answer(uint32_t id, uint32_t destination, uint32_t callback,
+                             uint32_t context, uint32_t r7, uint32_t r8) {
+  calls_.insert(calls_.end(), {id, destination, callback, context, r7, r8});
+  return next_ < serials_.size() ? serials_[next_++] : 0;
+}
+
+std::function<int64_t(uint32_t, uint32_t, uint32_t, uint32_t)> ArchiveLoads::Native() {
+  return [this](uint32_t id, uint32_t destination, uint32_t callback, uint32_t context) {
+    return Answer(id, destination, callback, context, 0, 0);
+  };
+}
+
 PPCContext CallContext(const Context& h) {
   PPCContext t = h.ctx;
   t.r1.u64 = h.data - 1024;
@@ -239,11 +282,118 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"graphics_resources", GraphicsResources},
       {"video_output", VideoOutput},
       {"device_state", DeviceState},
+      {"device_shaders", DeviceShaders},
+      {"render_queue", RenderQueue},
       {"course_scenery", CourseScenery},
       {"post_effects", PostEffects},
       {"input", Input},
       {"screen_objects", ScreenObjects},
       {"hardcoded_shaders", HardcodedShaders},
+      {"framework", Framework},
+      {"game_modes", GameModes},
+      {"models", Models},
+      {"mode_tick", ModeTick},
+      {"minimap", Minimap},
+      {"c_runtime_exit", CRuntimeExit},
+      {"c_runtime_core", CRuntimeCore},
+      {"scene_models", SceneModels},
+      {"race_hud", RaceHud},
+      {"ui_movie_objects", UiMovieObjects},
+      {"scenery_lists", SceneryLists},
+      {"shader_objects", ShaderObjects},
+      {"data_file", DataFile},
+      {"race_setup", RaceSetup},
+      {"vehicle", Vehicle},
+      {"app_states", AppStates},
+      {"scene_loaders", SceneLoaders},
+      {"car_models", CarModels},
+      {"save_data", SaveData},
+      {"race_world", RaceWorld},
+      {"race_states", RaceStates},
+      {"texture_compression", TextureCompression},
+      {"archive", Archive},
+      {"file_layer", FileLayer},
+      {"c_runtime_format", CRuntimeFormat},
+      {"save_interface", SaveInterface},
+      {"save_handlers", SaveHandlers},
+      {"car_sounds", CarSounds},
+      {"x3daudio", X3DAudioMath},
+      {"xaudio", XAudio},
+      {"xact_waves", XactWaves},
+      {"xact_tracks", XactTracks},
+      {"xaudio_engine", XAudioEngine},
+      {"xaudio_objects", XAudioObjects},
+      {"app_start_up", AppStartUp},
+      {"data_load", DataLoad},
+      {"career", Career},
+      {"race_event", RaceEvent},
+      {"camera_modes", CameraModes},
+      {"location_screen", LocationScreen},
+      {"material_passes", MaterialPasses},
+      {"race_hud_object", RaceHudObject},
+      {"alt_hud", AltHud},
+      {"race_scene", RaceScene},
+      {"menu_sounds", MenuSounds},
+      {"race_sounds", RaceSounds},
+      {"accessories", Accessories},
+      {"race_hud_machine", RaceHudMachine},
+      {"race_screens", RaceScreens},
+      {"race_screens_unseen", RaceScreensUnseen},
+      {"scene", Scene},
+      {"second_set", SecondSet},
+      {"load_poll", LoadPoll},
+      {"boot_mode", BootMode},
+      {"car_draw", CarDraw},
+      {"race_flow", RaceFlow},
+      {"car_scene_draw", CarSceneDraw},
+      {"front_end_car_draw", FrontEndCarDraw},
+      {"replay_snapshots", ReplaySnapshots},
+      {"race_loading", RaceLoading},
+      {"scene_target", SceneTarget},
+      {"frame_passes", FramePasses},
+      {"frame_driver", FrameDriver},
+      {"command_buffer", CommandBuffer},
+      {"single_commands", SingleCommands},
+      {"predicated_tiling", PredicatedTiling},
+      {"power_graph", PowerGraph},
+      {"menu_helpers", MenuHelpers},
+      {"race_update", RaceUpdate},
+      {"car_makers", CarMakers},
+      {"stand_models", StandModels},
+      {"build_screen", BuildScreen},
+      {"tuning_screen", TuningScreen},
+      {"tuning_pages", TuningPages},
+      {"screen_constructors", ScreenConstructors},
+      {"type67_modes", Type67Modes},
+      {"options_screen", OptionsScreen},
+      {"options_load_save", OptionsLoadSave},
+      {"type67_screens", Type67Screens},
+      {"car_list", CarList},
+      {"front_end_screen_helpers", FrontEndScreenHelpers},
+      {"car_dealer", CarDealer},
+      {"type2_screens", Type2Screens},
+      {"save_screen", SaveScreen},
+      {"type2_dialog", Type2Dialog},
+      {"garage_screen", GarageScreen},
+      {"tuning_machine", TuningMachine},
+      {"race_menu", RaceMenu},
+      {"car_settings", CarSettings},
+      {"user_info", UserInfo},
+      {"type2_mode", Type2Mode},
+      {"title_screen", TitleScreen},
+      {"type10_mode", Type10Mode},
+      {"type5_mode", Type5Mode},
+      {"todays_result", TodaysResult},
+      {"network_mode", NetworkMode},
+      {"race_end", RaceEnd},
+      {"power_graph_screen", PowerGraphScreen},
+      {"achievements", Achievements},
+      {"morph_jobs", MorphJobs},
+      {"type8_screens", Type8Screens},
+      {"type8_mode", Type8Mode},
+      {"lifted", Lifted},
+      {"audio_wraps", AudioWraps},
+      {"create_file", CreateFile},
   };
   auto wanted = [&](const char* name) {
     if (requested == "all") {

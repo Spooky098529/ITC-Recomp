@@ -4,8 +4,9 @@
 // called). See B6 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 // r3 = the MEMORYSTATUS (out), unread.
-extern "C" REX_FUNC(sub_82294DA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82294DA0) {
+  
 }

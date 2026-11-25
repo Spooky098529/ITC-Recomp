@@ -1,0 +1,461 @@
+// The pause menu's main and options pages (docs/functions/race-screens.md):
+// see race_screens.h.
+
+#include "race_screens/race_screens.h"
+#include "race_screens/pause_data.h"
+#include "race_screens/ui_node.h"
+
+#include "base/log.h"
+#include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/race_states.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+namespace race_screens {
+
+namespace {
+
+constexpr uint64_t kNone = ~uint64_t(0);
+
+using G = schema::RaceScreensGlobals;
+using RaceGlobals = schema::RaceStatesGlobals;
+
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  guest::StoreU32(sp - bytes, sp);
+  return sp - bytes;
+}
+
+uint32_t PauseMovie() { return G::pause_screen().movie().address; }
+
+// UiMovie::SetNodeText(movie, node, id) through its override, its varargs 0.
+uint64_t NodeText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint32_t node,
+                  uint64_t id) {
+  return calls.Call(kSetNodeText, frame, lr, movie, node, id);
+}
+
+}  // namespace
+
+uint64_t PauseMenuMainPage(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D898 PauseMenu::MainPage");
+  const uint32_t frame = Frame(sp, 208);
+  // The debug texts (the kind's title, the items, the cursor at the list's
+  // selection) go to the empty sub_82106540 (audio.md): only their loads,
+  // which change nothing, are left out with them.
+  calls.Call(kListUpdate, frame, 0x8220D970, G::pause_list().address);
+  const uint32_t selection = ListSelection(G::pause_list().address);
+  // MenuList::GetPreviousSelection (sub_8220BC28): the word at +20.
+  const uint32_t before = G::pause_list().selection_before();
+  if (selection != before) {
+    calls.Call(kPagesGo, frame, 0x8220D9A4, G::pause_pages().address, 0, 4, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220D9AC, 4);
+  } else if (uint32_t(calls.Call(kListPressed152, frame, 0x8220D9B8, G::pause_list().address)) != 0 ||
+             uint32_t(calls.Call(kListCancelled, frame, 0x8220D9C8, G::pause_list().address)) != 0) {
+    G::pause_data().set_answer(1);
+    calls.Call(kPagesGo, frame, 0x8220DB80, G::pause_pages().address, 5, 5, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220DB88, 2);
+    return 0;
+  }
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220D9D8, G::pause_list().address)) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8220D9E8, 0);
+  const uint32_t at = ListSelection(G::pause_list().address);
+  const uint32_t kind = G::pause_data().kind();
+  const uint32_t item = guest::LoadU32(kPauseItems + ((kind * 6 + at) << 2));
+  auto go = [&](uint64_t page, uint64_t transition, uint64_t queued) {
+    calls.Call(kPagesGo, frame, 0x8220DA54, G::pause_pages().address, page, transition, queued);
+    return 0;
+  };
+  // The items that end or restart the race: the answer (+140), then the
+  // confirm dialog in `mode` and page 4.
+  auto confirm = [&](uint32_t answer, uint32_t mode) {
+    G::pause_data().set_answer(answer);
+    RaceDialogOpen(mode, 0, frame, calls);
+    return go(4, kNone, kNone);
+  };
+  switch (item) {
+    case 0:  // sub_8220DA38, the resume (merged)
+      G::pause_data().set_answer(1);
+      return go(5, 5, kNone);
+    case 1:
+      return go(1, 6, 7);
+    case 2:
+      return go(2, 11, 12);
+    case 3:
+      return go(3, 16, 17);
+    case 4: {
+      // Stages::Copy of the current stage into the frame's +80 (its plain
+      // C++, or the original through its adapter where it declines).
+      const uint32_t stages = RaceGlobals::race_data().stages_address();
+      if (!vehicle_accessors::StagesCopy(frame + 80, stages, 0xFFFFFFFFu)) {
+        calls.Call(kStagesCopy, frame, 0x8220DAA4, frame + 80, stages, kNone);
+      }
+      uint32_t answer = 4;
+      if (int32_t(RaceGlobals::race_data().kind()) == 6 &&
+          int32_t(guest::LoadU32(frame + 80)) != 1 &&
+          guest::LoadU32(kStageWord) == 0) {
+        answer = 5;
+      }
+      return confirm(answer, 4);
+    }
+    case 5:
+      return confirm(2, 1);
+    case 6:
+      return confirm(3, 3);
+    case 7:
+      return confirm(6, 2);
+    case 8:
+      return confirm(7, 2);
+    case 9:
+      return confirm(9, 2);
+    case 10:
+      return confirm(4, 5);
+    default:
+      G::pause_data().set_answer(0);
+      return 0;
+  }
+}
+
+uint32_t PauseMenuToggleOption(uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8220CDA0 PauseMenu::ToggleOption");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t list = G::pause_list().address;
+  const int32_t side = int32_t(schema::MenuList(list).side());
+  const uint32_t selection = ListSelection(list);
+  const schema::PauseMenuData data = G::pause_data();
+  // The edits' places (hud_edit_0 to hud_edit_3, then last_item_ok) at the
+  // frame's +80: the original's field addresses, the handle plus the field's
+  // offset since the data is in host memory (E5 step 3), read back as the
+  // offset into the host struct.
+  for (const uint32_t k : {0u, 4u, 8u, 12u}) {
+    guest::StoreU32(frame + 80 + k, data.address + kPauseHudEdit0 + k);
+  }
+  guest::StoreU32(frame + 96, data.address + kPauseLastItemOk);
+  if (side != -1 && side != 1) {
+    return 0;
+  }
+  const uint32_t edit = guest::LoadU32(((selection << 2) + frame + 80)) - data.address;
+  const int32_t value = int32_t(PauseWord(data, edit));
+  if (side == -1 ? value != 0 : value != 1) {
+    return 0;
+  }
+  SetPauseWord(data, edit, side == -1 ? 1 : 0);
+  PauseMenuShowOptions(frame);
+  return 1;
+}
+
+uint64_t PauseMenuOptionsPage(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220DB98 PauseMenu::OptionsPage");
+  const uint32_t frame = Frame(sp, 112);
+  calls.Call(kListUpdate, frame, 0x8220DBB8, G::pause_list().address);
+  if (G::pause_list().move() != 0) {
+    calls.Call(kPagesGo, frame, 0x8220DBE0, G::pause_pages().address, 1, 8, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220DBE8, 4);
+    return 0;
+  }
+  if (PauseMenuToggleOption(frame) != 0) {
+    calls.Call(kPagesGo, frame, 0x8220DC28, G::pause_pages().address, 1, 9, kNone);
+    PauseMenuSaveHudOptions(frame);
+    calls.Call(kMenuSoundPlay, frame, 0x8220DC34, 4);
+    return 8;
+  }
+  // Back to the list with the options kept: ShowOptions, Go(-1, 0, then 10),
+  // SaveOptions.
+  auto back = [&]() -> uint64_t {
+    PauseMenuShowOptions(frame);
+    calls.Call(kPagesGo, frame, 0x8220DCB8, G::pause_pages().address, kNone, 0, 10);
+    PauseMenuSaveOptions(frame);
+    return 8;
+  };
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220DC44, G::pause_list().address)) != 0) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220DC54, 0);
+    if (int32_t(ListSelection(G::pause_list().address)) == 4) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (int32_t(data.last_item_ok()) == 1) {
+        CopyPauseWords(data, kPauseHudOption0, kPauseHudEdit0, 4);
+        return back();
+      }
+    }
+    if (int32_t(ListSelection(G::pause_list().address)) == 4) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (int32_t(data.last_item_ok()) == 0) {
+        CopyPauseWords(data, kPauseHudEdit0, kPauseHudDefault0, 4);
+        PauseMenuShowOptions(frame);
+        PauseMenuSaveHudOptions(frame);
+        return 8;
+      }
+    }
+    ListSetSelection(G::pause_list().address, 4);
+    G::pause_data().set_last_item_ok(1);
+    calls.Call(kPagesGo, frame, 0x8220DD4C, G::pause_pages().address, 1, 8, kNone);
+    return 0;
+  }
+  if (uint32_t(calls.Call(kListCancelled, frame, 0x8220DD58, G::pause_list().address)) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8220DD68, 2);
+  const schema::PauseMenuData data = G::pause_data();
+  CopyPauseWords(data, kPauseHudEdit0, kPauseHudOption0, 4);
+  return back();
+}
+
+uint64_t PauseMenuAdjustPage(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220EBD8 PauseMenu::AdjustPage");
+  const uint32_t frame = Frame(sp, 112);
+  calls.Call(kListUpdate, frame, 0x8220EBF8, G::pause_list().address);
+  uint64_t transition = 0;
+  if (G::pause_list().move() != 0) {
+    transition = 18;
+  } else if (PauseMenuStepAdjust(frame) != 0) {
+    transition = 19;
+  }
+  if (transition != 0) {
+    calls.Call(kPagesGo, frame, 0x8220EC34, G::pause_pages().address, 3, transition, kNone);
+    calls.Call(kMenuSoundPlay, frame, 0x8220EC3C, 4);
+    return 0;
+  }
+  // Back to the list: Go(-1, 0, then 20).
+  auto back = [&]() {
+    calls.Call(kPagesGo, frame, 0x8220ED70, G::pause_pages().address, kNone, 0, 20);
+    return 0;
+  };
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220EC48, G::pause_list().address)) != 0) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220EC58, 0);
+    if (int32_t(ListSelection(G::pause_list().address)) == 3) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (data.last_item_ok() == 0) {
+        CopyPauseWords(data, kPauseAdjustSaved0, kPauseAdjust0, 3);
+        PauseMenuShowAdjustB(frame, calls);
+        return back();
+      }
+    }
+    if (int32_t(ListSelection(G::pause_list().address)) == 3) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (int32_t(data.last_item_ok()) == 1) {
+        CopyPauseWords(data, kPauseAdjust0, kPauseAdjustDefault0, 3);
+        PauseMenuShowAdjust(frame, calls);
+        return 0;
+      }
+    }
+    ListSetSelection(G::pause_list().address, 3);
+    G::pause_data().set_last_item_ok(0);
+    calls.Call(kPagesGo, frame, 0x8220ED70, G::pause_pages().address, 3, 18, kNone);
+    return 0;
+  }
+  if (uint32_t(calls.Call(kListCancelled, frame, 0x8220ED1C, G::pause_list().address)) == 0) {
+    return 0;
+  }
+  calls.Call(kMenuSoundPlay, frame, 0x8220ED2C, 2);
+  const schema::PauseMenuData data = G::pause_data();
+  CopyPauseWords(data, kPauseAdjust0, kPauseAdjustSaved0, 3);
+  PauseMenuShowAdjust(frame, calls);
+  return back();
+}
+
+uint32_t PauseMenuSaveVolumes(uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8220D7A0 PauseMenu::SaveVolumes");
+  Frame(sp, 96);
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
+  // The options' bytes +28 and +29 (race-event.toml's SaveData names them
+  // effects_volume and music_volume, the other way round from the pause
+  // data's).
+  const schema::SaveData options(save);
+  options.set_effects_volume(uint8_t(G::pause_data().music_volume()));
+  options.set_music_volume(uint8_t(G::pause_data().effects_volume()));
+  return save;
+}
+
+uint64_t PauseMenuVolumePage(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E988 PauseMenu::VolumePage");
+  const uint32_t frame = Frame(sp, 112);
+  // SoundOptions::SetEffectsVolume and SetMusicVolume through their
+  // overrides with the data's edits (effects_volume, music_volume) or, with
+  // `saved`, the saved volumes (their low bytes sign-extended).
+  auto set_volumes = [&](bool saved, uint32_t effects_lr, uint32_t music_lr) {
+    auto setting = [&](uint32_t word) { return uint64_t(int64_t(int8_t(word & 0xFF))); };
+    calls.Call(kSetEffectsVolume, frame, effects_lr,
+               setting(saved ? G::pause_data().effects_volume_saved()
+                             : G::pause_data().effects_volume()));
+    calls.Call(kSetMusicVolume, frame, music_lr,
+               setting(saved ? G::pause_data().music_volume_saved()
+                             : G::pause_data().music_volume()));
+  };
+  auto sound = [&](uint64_t cue) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220EBBC, cue);
+    return 0;
+  };
+  calls.Call(kListUpdate, frame, 0x8220E9A8, G::pause_list().address);
+  if (G::pause_list().move() != 0) {
+    calls.Call(kMenuSoundPlay, frame, 0x8220E9C0, 4);
+    calls.Call(kPagesGo, frame, 0x8220E9D8, G::pause_pages().address, 2, 13, kNone);
+    return 0;
+  }
+  if (PauseMenuStepVolume(frame) != 0) {
+    calls.Call(kPagesGo, frame, 0x8220EA00, G::pause_pages().address, 2, 14, kNone);
+    PauseMenuSaveVolumes(frame);
+    set_volumes(false, 0x8220EA18, 0x8220EA28);
+    return sound(4);
+  }
+  if (uint32_t(calls.Call(kListAccepted, frame, 0x8220EA38, G::pause_list().address)) != 0) {
+    if (int32_t(ListSelection(G::pause_list().address)) == 2) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (data.last_item_ok() == 0) {
+        CopyPauseWords(data, kPauseMusicVolumeSaved, kPauseMusicVolume, 2);
+        PauseMenuShowVolumesB(frame, calls);
+        calls.Call(kPagesGo, frame, 0x8220EA98, G::pause_pages().address, kNone, 0, 15);
+        set_volumes(true, 0x8220EAA8, 0x8220EB10);
+        return sound(0);
+      }
+    }
+    if (int32_t(ListSelection(G::pause_list().address)) == 2) {
+      const schema::PauseMenuData data = G::pause_data();
+      if (int32_t(data.last_item_ok()) == 1) {
+        CopyPauseWords(data, kPauseMusicVolume, kPauseMusicVolumeDefault, 2);
+        PauseMenuShowVolumes(frame, calls);
+        set_volumes(false, 0x8220EB00, 0x8220EB10);
+        return sound(0);
+      }
+    }
+    ListSetSelection(G::pause_list().address, 2);
+    G::pause_data().set_last_item_ok(0);
+    calls.Call(kPagesGo, frame, 0x8220EB44, G::pause_pages().address, 2, 13, kNone);
+    return sound(0);
+  }
+  if (uint32_t(calls.Call(kListCancelled, frame, 0x8220EB50, G::pause_list().address)) == 0) {
+    return 0;
+  }
+  {
+    const schema::PauseMenuData data = G::pause_data();
+    CopyPauseWords(data, kPauseMusicVolume, kPauseMusicVolumeSaved, 2);
+  }
+  PauseMenuShowVolumes(frame, calls);
+  calls.Call(kPagesGo, frame, 0x8220EB94, G::pause_pages().address, kNone, 0, 15);
+  set_volumes(true, 0x8220EBA4, 0x8220EBB4);
+  return sound(2);
+}
+
+uint64_t PauseMenuSetUpOptions(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E530 PauseMenu::SetUpOptions");
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t movie = PauseMovie();
+  guest::StoreU32(frame + 92, 158);
+  guest::StoreU32(frame + 84, 159);
+  const uint64_t init[8] = {G::pause_list().address, 5, 5, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220E580, init);
+  {
+    const schema::PauseMenuData data = G::pause_data();
+    CopyPauseWords(data, kPauseHudEdit0, kPauseHudOption0, 4);
+  }
+  G::pause_data().set_last_item_ok(1);
+  PauseMenuRestoreNodes(0xFFFFFFFFu, 8, frame, calls);
+  const uint32_t labels = ui_movies::FindNode(movie, 8, 0);
+  for (uint32_t k = 0; k < 4; k++) {
+    NodeText(calls, frame, 0x8220E5FC, movie, ui_movies::Child(labels, 5 + k), 2000 + k);
+  }
+  const uint32_t marks = ui_movies::FindNode(movie, 8, 1);
+  NodeText(calls, frame, 0x8220E634, movie, ui_movies::Child(marks, 3), 4);
+  NodeText(calls, frame, 0x8220E650, movie, ui_movies::Child(marks, 4), 7);
+  const uint32_t rows = ui_movies::FindNode(movie, 8, 2);
+  for (int32_t i = 0; i < int32_t(ChildCount(rows)); i++) {
+    const uint32_t row =
+        ui_movies::FindNode(movie, 8, FirstChild(rows) + uint32_t(i));
+    const uint32_t on = ui_movies::FindNode(movie, 8, FirstChild(row));
+    NodeText(calls, frame, 0x8220E6B4, movie, ui_movies::Child(on, 1), 0);
+    const uint32_t off = ui_movies::FindNode(movie, 8, FirstChild(row) + 1);
+    NodeText(calls, frame, 0x8220E6E0, movie, ui_movies::Child(off, 1), 1);
+  }
+  return PauseMenuShowOptions(frame);
+}
+
+uint64_t PauseMenuSetUpVolume(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F3C0 PauseMenu::SetUpVolume");
+  const uint32_t frame = Frame(sp, 128);
+  guest::StoreU32(frame + 92, 158);
+  const uint32_t movie = PauseMovie();
+  guest::StoreU32(frame + 84, 159);
+  const uint64_t init[8] = {G::pause_list().address, 3, 3, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220F418, init);
+  {
+    const schema::PauseMenuData data = G::pause_data();
+    data.set_music_volume(data.music_volume_saved());
+    data.set_effects_volume(data.effects_volume_saved());
+  }
+  G::pause_data().set_last_item_ok(0);
+  PauseMenuRestoreNodes(0xFFFFFFFFu, 9, frame, calls);
+  const uint32_t labels = ui_movies::FindNode(movie, 9, 0);
+  NodeText(calls, frame, 0x8220F47C, movie, ui_movies::Child(labels, 5), 2004);
+  NodeText(calls, frame, 0x8220F498, movie, ui_movies::Child(labels, 6), 2005);
+  const uint32_t marks = ui_movies::FindNode(movie, 9, 1);
+  NodeText(calls, frame, 0x8220F4C4, movie, ui_movies::Child(marks, 3), 4);
+  NodeText(calls, frame, 0x8220F4E0, movie, ui_movies::Child(marks, 4), 7);
+  PauseMenuShowVolumes(frame, calls);
+  return PauseMenuShowVolumesB(frame, calls);
+}
+
+uint64_t PauseMenuSetUpAdjust(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F500 PauseMenu::SetUpAdjust");
+  const uint32_t frame = Frame(sp, 144);
+  guest::StoreU32(frame + 92, 158);
+  const uint32_t movie = PauseMovie();
+  guest::StoreU32(frame + 84, 159);
+  const uint64_t init[8] = {G::pause_list().address, 4, 4, 1, 154, 153, 155, 156};
+  calls.CallArgs(kListInit, frame, 0x8220F550, init);
+  {
+    const schema::PauseMenuData data = G::pause_data();
+    CopyPauseWords(data, kPauseAdjust0, kPauseAdjustSaved0, 3);
+  }
+  G::pause_data().set_last_item_ok(0);
+  PauseMenuRestoreNodes(0xFFFFFFFFu, 10, frame, calls);
+  const uint32_t labels = ui_movies::Child(ui_movies::FindNode(movie, 10, 0), 0);
+  for (uint32_t k = 0; k < 3; k++) {
+    NodeText(calls, frame, 0x8220F5D0, movie, ui_movies::Child(labels, 5 + k), 2006 + k);
+  }
+  const uint32_t marks = ui_movies::FindNode(movie, 10, 1);
+  NodeText(calls, frame, 0x8220F608, movie, ui_movies::Child(marks, 3), 4);
+  NodeText(calls, frame, 0x8220F624, movie, ui_movies::Child(marks, 4), 7);
+  PauseMenuShowAdjust(frame, calls);
+  return PauseMenuShowAdjustB(frame, calls);
+}
+
+uint64_t PauseMenuSetAdjust(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220F1B8 PauseMenu::SetAdjust");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = PauseMovie();
+  if (guest::LoadU32(step) == 0) {
+    if (int32_t(ListSelection(G::pause_list().address)) == 3) {
+      const bool off = int32_t(G::pause_data().last_item_ok()) == 0;
+      const uint64_t from = off ? 196 : 195, to = off ? 195 : 196;
+      calls.Call(kFinishNamed, frame, off ? 0x8220F21C : 0x8220F248, movie, from);
+      const uint64_t args[8] = {movie, to, 0, 0, 0, 0, 0, 0};
+      calls.CallArgs(kPlayNamed, frame, off ? 0x8220F238 : 0x8220F264, args);
+      calls.Call(kLoopNamed, frame, 0x8220F270, movie, to);
+    } else {
+      PauseMenuShowAdjust(frame, calls);
+    }
+    guest::StoreU32(step, 1);
+  }
+  calls.Call(kRun, frame, 0x8220F28C, movie, 0);
+  return 1;
+}
+
+uint64_t PauseMenuOpenOptions(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220EEF0 PauseMenu::OpenOptions");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = PauseMovie();
+  if (guest::LoadU32(step) == 0) {
+    const uint32_t selection = ListSelection(G::pause_list().address);
+    G::pause_data().set_main_selection(selection);
+    calls.Call(kFinish, frame, 0x8220EF4C, movie, 7, uint64_t(selection) + 1);
+    const uint64_t play[8] = {movie, kNone, 3, 0, 0, 0, 0, 0};
+    calls.CallArgs(kPlay, frame, 0x8220EF6C, play);
+    PauseMenuSetUpOptions(frame, calls);
+    guest::StoreU32(step, 1);
+  }
+  return uint32_t(calls.Call(kRun, frame, 0x8220EF84, movie, 0)) == 0 ? 1 : 0;
+}
+
+}  // namespace race_screens

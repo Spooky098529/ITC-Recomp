@@ -1,0 +1,185 @@
+# The schema of docs/functions/minimap.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Fields named `fault_*` are accesses the measure files under the type though
+# they're another object's (a measure fault, reported to the lead).
+
+# The triangle (176 bytes, docs/known-data.md "triangle"; made on the stack
+# by the marker draws): a primitive Triangle::Record draws with
+# Triangle::RecordFlat (kind 0) or sub_8217C4C0 (kind 1, never seen in play).
+[MinimapTriangle]
+measure = "Triangle"
+size = 176
+origin = "embedded"
+fields = [
+  { name = "world", offset = 0, type = "bytes", count = 64, note = "its world matrix (rows of four floats); an identity from Triangle::Init, then the marker's matrix copied in" },
+  { name = "world_row0_w", offset = 12, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "world_row1_w", offset = 28, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "world_row2_w", offset = 44, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "world_row3_w", offset = 60, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "kind", offset = 64, type = "u32", note = "0 flat (Triangle::RecordFlat), 1 sub_8217C4C0 (never seen in play), above 1 none" },
+  { name = "mode_a", offset = 68, type = "u32", note = "0 from Triangle::Init; not read by RecordFlat (probably a render mode, as the sprite list's +68)" },
+  { name = "mode_b", offset = 72, type = "u32", note = "2 from Triangle::Init; not read by RecordFlat (probably a render mode, as the sprite list's +72)" },
+  { name = "vertices", offset = 80, type = "bytes", count = 48, note = "three vertices of four floats (x, y, z, w)" },
+  { name = "vertex0_x", offset = 80, type = "f32" },
+  { name = "vertex0_y", offset = 84, type = "f32" },
+  { name = "vertex0_z", offset = 88, type = "f32" },
+  { name = "vertex0_w", offset = 92, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "vertex1_x", offset = 96, type = "f32" },
+  { name = "vertex1_y", offset = 100, type = "f32" },
+  { name = "vertex1_z", offset = 104, type = "f32" },
+  { name = "vertex1_w", offset = 108, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "vertex2_x", offset = 112, type = "f32" },
+  { name = "vertex2_y", offset = 116, type = "f32" },
+  { name = "vertex2_z", offset = 120, type = "f32" },
+  { name = "vertex2_w", offset = 124, type = "f32", note = "1.0 from Triangle::Init" },
+  { name = "colors", offset = 128, type = "bytes", count = 48, note = "the three vertices' colors, four words each (red, green, blue, alpha)" },
+  { name = "color0_red", offset = 128, type = "u32" },
+  { name = "color0_red_byte", offset = 131, type = "u8", note = "the red word's low byte, which the recorders read" },
+  { name = "color0_green", offset = 132, type = "u32" },
+  { name = "color0_green_byte", offset = 135, type = "u8" },
+  { name = "color0_blue", offset = 136, type = "u32" },
+  { name = "color0_blue_byte", offset = 139, type = "u8" },
+  { name = "color0_alpha", offset = 140, type = "u32", note = "shifted into the ARGB's top byte" },
+  { name = "color1_red", offset = 144, type = "u32" },
+  { name = "color1_red_byte", offset = 147, type = "u8" },
+  { name = "color1_green", offset = 148, type = "u32" },
+  { name = "color1_green_byte", offset = 151, type = "u8" },
+  { name = "color1_blue", offset = 152, type = "u32" },
+  { name = "color1_blue_byte", offset = 155, type = "u8" },
+  { name = "color1_alpha", offset = 156, type = "u32" },
+  { name = "color2_red", offset = 160, type = "u32" },
+  { name = "color2_red_byte", offset = 163, type = "u8" },
+  { name = "color2_green", offset = 164, type = "u32" },
+  { name = "color2_green_byte", offset = 167, type = "u8" },
+  { name = "color2_blue", offset = 168, type = "u32" },
+  { name = "color2_blue_byte", offset = 171, type = "u8" },
+  { name = "color2_alpha", offset = 172, type = "u32" },
+]
+
+# An 80-slot list of 64-byte matrices (List80::, track_zones' layout for 80
+# slots): the car markers' five pools on Minimap::Draw's frame (each at the
+# pool's +32).
+[MinimapList80]
+measures = ["List80", "List80::Copy.r4"]
+size = 5456
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 320, note = "80 nodes of two halfwords: the next node (-1 none) and the node's data slot" },
+  { name = "fault_out_row0_w", offset = 12, type = "f32", note = "measure fault: List80::Copy's r3 is its out matrix (row 0's w, 1.0)" },
+  { name = "fault_out_row1_w", offset = 28, type = "f32", note = "measure fault: List80::Copy's out matrix (row 1's w, 1.0)" },
+  { name = "fault_out_row2_w", offset = 44, type = "f32", note = "measure fault: List80::Copy's out matrix (row 2's w, 1.0)" },
+  { name = "fault_out_row3_w", offset = 60, type = "f32", note = "measure fault: List80::Copy's out matrix (row 3's w, 1.0)" },
+  { name = "free_head", offset = 320, type = "u16", note = "the first free node (taken by List80::Link)" },
+  { name = "unknown_322", offset = 322, type = "u16", note = "0xFFFF from Minimap::Draw" },
+  { name = "head", offset = 324, type = "u16", note = "the first node (-1 none, signed)" },
+  { name = "unknown_326", offset = 326, type = "u16", note = "0xFFFF from Minimap::Draw" },
+  { name = "count", offset = 328, type = "u16" },
+  { name = "data", offset = 336, type = "bytes", count = 5120, note = "80 slots of 64-byte matrices" },
+]
+
+# The racers' manager's 28-byte entries (the manager [0x826D82F4]'s + 4 + 28i,
+# docs/known-data.md; entry i goes with racer i), as the minimap reads them.
+# The measure joins Minimap::Scaling's out matrix with them (both its
+# functions' r3).
+[MinimapRacerEntry]
+measures = ["Minimap", "Race::FindPlayerEntry.ret",
+            "RaceManager::GiveVehicle.r4", "RaceManager::EntryOfRecord.ret", "Race.+2308"]
+size = 28
+origin = "embedded"
+fields = [
+  { name = "flags", offset = 0, type = "u32", note = "0x4 and 0x8 the two human cars (probably), 0x1 a racer the minimap shows unless 0x20, 0x10 shown without a rival type; also 0x2 traffic, 0x40 has a vehicle (race-world.md)" },
+  { name = "number", offset = 4, type = "u32", note = "the entry's number (race-world.md)" },
+  { name = "position", offset = 8, type = "u32", note = "section and slice read as one word (Minimap::Draw's copy of the player's)" },
+  { name = "section", offset = 8, type = "u16", note = "the route section it's on (-1 none, signed)" },
+  { name = "slice", offset = 10, type = "u16", note = "the section's slice it's on (-1 none, signed)" },
+  { name = "slice_ticks", offset = 12, type = "f32", note = "ticks gathered toward the next slice while it has no vehicle (race-world.md)" },
+  { name = "traffic_number", offset = 16, type = "u32", note = "the traffic's, mod 42 (race-world.md)" },
+  { name = "vehicle_index", offset = 20, type = "u32", note = "-1 none (race-world.md)" },
+  { name = "record", offset = 24, type = "u32", note = "its racer record's index in the race data's +48 (3,936 bytes each)" },
+  { name = "fault_scaling_m22", offset = 40, type = "f32", note = "measure fault: Minimap::Scaling's out matrix (the z scale)" },
+]
+
+# Minimap::Scaling's vector: the x, y and z scales.
+[MinimapScale]
+measure = "Minimap::Scaling.r4"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 where Minimap::Draw makes one; not read" },
+]
+
+# A marker's color (four words: red, green, blue, alpha), given to the
+# marker draws (the pools' +16, the point markers' on the frame).
+[MinimapColor]
+measures = ["Minimap::DrawCarMarker.r4", "Minimap::DrawPointMarker.r4"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "red", offset = 0, type = "u32" },
+  { name = "green", offset = 4, type = "u32" },
+  { name = "blue", offset = 8, type = "u32" },
+  { name = "alpha", offset = 12, type = "u32" },
+]
+
+# SetList::Point's out: a point (x, y, z, 1.0), stored as two doublewords.
+[MinimapPoint]
+measure = "SetList::Point.r4"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y as one doubleword (the original's std)" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w as one doubleword (the original's std)" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0" },
+]
+
+[globals]
+car_marker_table = { address = 0x826C5520, type = "bytes", count = 336, note = "the car marker's 7 triangles: 3 vertices of 16 bytes (x, 0.0, z, 1.0) each" }
+car_marker_guard = { address = 0x826C5670, type = "u32", note = "bit 0: the car marker's table made" }
+point_marker_table = { address = 0x826C5680, type = "bytes", count = 1056, note = "the point marker's 22 triangles, as the car marker's" }
+point_marker_guard = { address = 0x826C5AA0, type = "u32", note = "bit 0: the point marker's table made" }
+blink_frames = { address = 0x826C5AA4, type = "u32", note = "Minimap::Draw's calls, 0 to 4" }
+blink_phase = { address = 0x826C5AA8, type = "u32", note = "0 to 5, stepped each wrap of blink_frames; added to a car marker's type to pick its pool" }
+type_colors = { address = 0x826C5AB0, type = "bytes", count = 80, note = "the five marker types' colors (MinimapColor)" }
+type_colors_guard = { address = 0x826C5B00, type = "u32", note = "bit 0: type_colors made" }
+route = { address = 0x826C5B10, type = "u32", note = "the course's route (its +12 the sections)" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (+20 flags, +48 the racer records, +0x59620 the stages, +0xA3AF0 the mode)" }
+human_flag = { address = 0x826C7824, type = "u32", note = "in mode 6, picks which human car's entry (flags 0x4 or 0x8) gets type 1" }
+racers_manager = { address = 0x826D82F4, type = "u32", note = "the racers' manager (+4 its 28-byte MinimapRacerEntry's, +2368 their count)" }
+triangle_queue = { address = 0x826D83D0, type = "u32", note = "the render queue the triangles go to (the color rectangles')" }
+triangle_list = { address = 0x826D83D4, type = "u32", note = "the command list the triangles are recorded on" }
+view_copy = { address = 0x8265ECA0, type = "bytes", count = 64, note = "the pass's view, copied by Minimap::Draw" }
+draw_key_b = { address = 0x8296B900, type = "u32", note = "group 1's sort key (the pass description's +28)" }
+draw_key_a = { address = 0x8296B90C, type = "u32", note = "group 0's sort key (the pass description's +24)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0 (image)" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (image)" }
+quarter_turn = { address = 0x82001FB4, type = "f32", note = "pi / 2 (image)" }
+range_near = { address = 0x82002814, type = "f32", note = "the map's draws' near range (image)" }
+marker_scale = { address = 0x82002A0C, type = "f32", note = "the markers' x and z scale (image)" }
+range_far = { address = 0x82006804, type = "f32", note = "the map's draws' far range (image)" }
+lowest = { address = 0x82006808, type = "f32", note = "-1000.0: points below aren't drawn (image)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from MinimapRacerEntry.
+[MinimapRacerEntryAt4]
+measure = "new<363592>@RaceManager::Create@+4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u16" },
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

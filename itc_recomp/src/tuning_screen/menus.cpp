@@ -1,0 +1,877 @@
+// The tuning screen's page set-ups for the category bar and the level, type
+// and option lists (docs/functions/tuning-screen.md): see tuning_screen.h.
+// The UI movie calls (UiMovie::Play, Loop, Finish, FinishNamed, PlayNamed,
+// LoopNamed, SetText, ScrollText and sub_8211C5F8) through their overrides
+// from each original's frame with its return addresses; movie 2's nodes
+// through the UI movies' plain C++ (FindNode, Child); SetText's unset varargs
+// passed as 0 (the user's call, 2026-10-30).
+
+#include "tuning_screen/tuning_screen.h"
+
+#include "action_mappers/action_mappers.h"
+#include "base/log.h"
+#include "camera_modes/steps.h"
+#include "car_specs/car_specs.h"
+#include "debug/pause_menu_log.h"
+#include "guest.h"
+#include "schema/race_event.h"
+#include "schema/career.h"
+#include "schema/car_specs.h"
+#include "schema/car_makers.h"
+#include "native/buffers.h"
+#include "schema/action_mappers.h"
+#include "schema/menu_helpers.h"
+#include "schema/mode_tick.h"
+#include "schema/racer_controllers.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
+
+#include <bit>
+#include <optional>
+
+namespace tuning_screen {
+
+namespace {
+
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+uint32_t Byte(uint32_t address) { return guest::LoadU8(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
+}
+
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  Store(sp - bytes, sp);
+  return sp - bytes;
+}
+
+namespace steps = camera_modes::steps;
+
+// The ints made floats through the frame: the doubleword stored at frame +
+// 80 (std), loaded (lfd), converted (fcfid, frsp) and multiplied by the
+// 40.0 at 0x82001FB0 (fmuls); the float's bits for the stfs.
+uint32_t Scaled(uint32_t frame, int64_t x) {
+  Store(frame + 80, uint32_t(uint64_t(x) >> 32));
+  Store(frame + 84, uint32_t(x));
+  return steps::Bits(steps::Fmuls(steps::Single(double(x)), steps::Lfs(0x82001FB0)));
+}
+
+// lwa: a word, signed. lbz: a byte.
+int64_t Signed(uint32_t address) { return int32_t(Load(address)); }
+int64_t Unsigned8(uint32_t address) { return Byte(address); }
+
+// The animation's flags after a +9716 set-up: +9720 = 0 when set, +9716 = 0.
+void ClearFlags(uint32_t screen) {
+  if (TS(screen).command_end_after_setup() != 0) {
+    TS(screen).set_command_end_after_setup(0);
+  }
+  TS(screen).set_command_first_run(0);
+}
+
+// The queue's step with +9724, then +9724 = 0.
+void StepWith9724(uint32_t screen) {
+  if (TS(screen).command_end_now() != 0) {
+    Advance(screen);
+    TS(screen).set_command_end_now(0);
+  }
+}
+
+// The player's action mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
+uint32_t PlayerMappers() {
+  return schema::ModeTickGlobals::player0_user() * 8 +
+         schema::RacerControllersGlobals::mapper_entries_address();
+}
+using MapperEntry = schema::PlayerMapperEntry;
+constexpr uint32_t kPressedSlot = 0x8210BF40;  // ActionMapper::Pressed
+
+// The mapper's slot 10 (+40) on `action`, as the original's bctrl from
+// `frame` returning to `lr`: ActionMapper::Pressed's plain C++ when the
+// vtable holds it and `native_slots` (logged for --log_pause_menu as its
+// adapter does), else the slot through `call`. Its r3.
+uint64_t PressedSlot(const GuestCall& call, uint32_t mapper, uint64_t action,
+                     uint32_t frame, uint32_t lr, bool native_slots) {
+  const uint32_t function = Load(schema::ActionMapper(mapper).vtable() + 40);
+  if (native_slots && function == kPressedSlot) {
+    const uint32_t id = uint32_t(action);
+    const uint32_t r3 = action_mappers::Pressed(mapper, id);
+    debug::PauseMenuLog_NoteSlotRead(10, mapper, id, lr, double(r3));
+    return r3;
+  }
+  return call(function, {mapper, action}, frame, lr);
+}
+
+constexpr uint32_t kHeldSlot = 0x8210BE70;  // ActionMapper::Held
+
+// The mapper's slot 8 (+32, ActionMapper::Held's plain C++ when the vtable
+// holds it and `native_slots`, logged as its adapter does) or 11 (+44,
+// sub_8210BFA8: through `call`) on `action`, from `frame` returning to
+// `lr`. Its r3.
+uint64_t HeldSlot(const GuestCall& call, uint32_t mapper, uint64_t action,
+                  uint32_t frame, uint32_t lr, bool native_slots) {
+  const uint32_t function = Load(schema::ActionMapper(mapper).vtable() + 32);
+  if (native_slots && function == kHeldSlot) {
+    const uint32_t id = uint32_t(action);
+    const uint32_t r3 = action_mappers::Held(mapper, id);
+    debug::PauseMenuLog_NoteSlotRead(8, mapper, id, lr, double(r3));
+    return r3;
+  }
+  return call(function, {mapper, action}, frame, lr);
+}
+uint64_t Slot11(const GuestCall& call, uint32_t mapper, uint64_t action,
+                uint32_t frame, uint32_t lr) {
+  return call(Load(schema::ActionMapper(mapper).vtable() + 44), {mapper, action}, frame,
+              lr);
+}
+
+}  // namespace
+
+uint64_t MoveCategory(const GuestCall& call, uint32_t screen, uint32_t sp,
+                      bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_821D07D8 TuningScreen::MoveCategory");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t mappers = PlayerMappers();
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const uint32_t menu = TS(screen).category_menu().address;
+  const uint32_t movie = Load(entry);
+  const int32_t step = int32_t(Load(menu + 8));
+  auto category = [&] { return uint64_t(TS(screen).category()); };
+  auto finish = [&](uint64_t index, uint32_t lr) {
+    return call(kFinish, {movie, 27, index}, frame, lr);
+  };
+  if (step == -1 || step == 1) {
+    const bool wrapped = Load(menu + 40) != 0;
+    uint64_t first;
+    if (wrapped) {
+      // The bar snapped to the category: node (27, 0)'s +16 = float(+9656)
+      // × 40.0.
+      finish(12, step == -1 ? 0x821D0848 : 0x821D08EC);
+      finish(13, step == -1 ? 0x821D0858 : 0x821D08FC);
+      const uint32_t node = ui_movies::FindNode(movie, 27, 0);
+      Store(UiNode(node).y_address(),
+            Scaled(frame, Signed(TS(screen).category_address())));
+      first = step == -1 ? 8 : 2;
+    } else {
+      // The bar slid one way: 12 (down) or 13 (up) restarted.
+      const uint64_t slide = step == -1 ? 12 : 13;
+      finish(slide, step == -1 ? 0x821D089C : 0x821D0928);
+      call(kPlay, {movie, 27, slide, 1, 0, 0, 0}, frame, step == -1 ? 0x821D08BC : 0x821D0948);
+      first = category() + (step == -1 ? 3 : 1);
+    }
+    finish(first, 0x821D095C);
+    finish(category() + 2, 0x821D0970);
+    call(kPlay, {movie, 27, category() + 2, 1, 0, 0, 0}, frame, 0x821D0994);
+    return call(kLoop, {movie, 27, category() + 2}, frame, 0x821D09A8);
+  }
+  // No step: with action 159 pressed the category animations 2 to 13
+  // finished; else action 158 asked (its answer not used). The entry's +4
+  // and +0 read again on each try.
+  uint64_t r3 = entry;
+  if (int32_t(MapperEntry(mappers).unread()) != 1) {
+    r3 = PressedSlot(call, MapperEntry(mappers).mapper().address, 159, frame,
+                     0x821D09D0, native_slots);
+    if ((r3 & 0xFF) != 0) {
+      for (uint64_t k = 0; k < 10; k++) {
+        finish(k + 2, 0x821D09EC);
+      }
+      finish(12, 0x821D0A08);
+      return finish(13, 0x821D0A18);
+    }
+  }
+  if (int32_t(MapperEntry(mappers).unread()) != 1) {
+    r3 = PressedSlot(call, MapperEntry(mappers).mapper().address, 158, frame,
+                     0x821D0A40, native_slots);
+  }
+  return r3;
+}
+
+uint64_t MarkPick(const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D6420 TuningScreen::MarkPick");
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const int32_t state = int32_t(TS(screen).state());
+  const uint32_t movie = Load(entry);
+  TS(screen).set_command_end_after_setup(1);
+  uint64_t r3 = entry;
+  // The row of `field`'s byte k on sub-scene n: Child(FindNode(n, 1), k + 5)
+  // and FindNode(n, 0)'s children k + 15 and k + 26, their +16 = float(k) ×
+  // 40.0 (the byte read again for each).
+  auto row = [&](uint32_t n, uint32_t field) {
+    const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, n, 1),
+                                           Byte(screen + field) + 5);
+    Store(UiNode(mark).y_address(),
+          Scaled(frame, Unsigned8(screen + field)));
+    const uint32_t node = ui_movies::FindNode(movie, n, 0);
+    const uint32_t a = ui_movies::Child(node, Byte(screen + field) + 15);
+    Store(UiNode(a).y_address(), Scaled(frame, Unsigned8(screen + field)));
+    const uint32_t b = ui_movies::Child(node, Byte(screen + field) + 26);
+    Store(UiNode(b).y_address(), Scaled(frame, Unsigned8(screen + field)));
+  };
+  auto restart = [&](uint64_t named, uint32_t finish_lr, uint32_t play_lr, uint32_t chained) {
+    FinishNamed(call, frame, finish_lr, movie, named);
+    return PlayNamed(call, frame, play_lr, movie, named, chained);
+  };
+  bool marked = false;  // 486 restarted
+  if (state == 4) {
+    const int32_t category = int32_t(TS(screen).category());
+    auto item = [&] { return uint32_t(TS(screen).item()); };
+    if ((category == 0 && item() == 2) || (category == 1 && item() == 3)) {
+      row(28, kLevel);
+      marked = true;
+    } else if (category == 3) {
+      const uint32_t node = ui_movies::FindNode(movie, 27, item() + 5);
+      Store(UiNode(node).y_address(),
+            Scaled(frame, Unsigned8(TS(screen).item_address())));
+      row(30, kLevel);
+      r3 = restart(629, 0x821D6754, 0x821D6958, 1);
+    } else if (category == 4 && item() == 4) {
+      row(28, kType);
+      marked = true;
+    } else if (category == 5 && item() == 4) {
+      restart(981, 0x821D6834, 0x821D6850, 1);
+      r3 = restart(1010, 0x821D685C, 0x821D6958, 0);
+    } else if (category == 6 && item() == 0) {
+      row(28, kType);
+      marked = true;
+    }
+  } else if (state == 53) {
+    // k = [+33548]; 3 puts the marks at 80.0 (0x82001E8C).
+    const uint32_t k_at = TS(screen).interior_pick_address();
+    const uint32_t far = steps::Bits(steps::Lfs(0x82001E8C));
+    if (int32_t(Load(k_at)) == 3) {
+      const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 28, 1), 7);
+      Store(UiNode(mark).y_address(), far);
+    } else {
+      const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 28, 1),
+                                             Load(k_at) + 5);
+      Store(UiNode(mark).y_address(), Scaled(frame, Signed(k_at)));
+    }
+    const uint32_t node = ui_movies::FindNode(movie, 28, 0);
+    if (int32_t(Load(k_at)) == 3) {
+      Store(UiNode(ui_movies::Child(node, 17)).y_address(), far);
+      Store(UiNode(ui_movies::Child(node, 28)).y_address(), far);
+    } else {
+      const uint32_t a = ui_movies::Child(node, Load(k_at) + 15);
+      Store(UiNode(a).y_address(), Scaled(frame, Signed(k_at)));
+      const uint32_t b = ui_movies::Child(node, Load(k_at) + 26);
+      Store(UiNode(b).y_address(), Scaled(frame, Signed(k_at)));
+    }
+    marked = true;
+  }
+  if (marked) {
+    r3 = restart(486, 0x821D693C, 0x821D6958, 1);
+  }
+  Advance(screen);
+  return r3;
+}
+
+uint64_t Command16(const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821FF6F0 TuningScreen::Command16");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = MovieEntry(frame, 13);
+  const uint32_t movie = Load(entry);
+  if (TS(screen).command_first_run() != 0) {
+    if (TS(screen).command_end_after_setup() != 0) {
+      PlayNamed(call, frame, 0x821FF754, movie, 219, 1);
+      FinishNamed(call, frame, 0x821FF760, movie, 219);
+      Advance(screen);
+      TS(screen).set_command_end_after_setup(0);
+    } else {
+      FinishNamed(call, frame, 0x821FF7A0, movie, 219);
+      PlayNamed(call, frame, 0x821FF7BC, movie, 219, 1);
+    }
+    TS(screen).set_command_first_run(0);
+  }
+  const uint32_t pick = TS(screen).layer_cursor();
+  if (pick <= 2) {
+    // 195 + pick (169 + pick with the set +30724 not 0) restarted and
+    // looped, 44 and 45 finished, 46 restarted.
+    struct Lr {
+      uint32_t finish, play;
+    };
+    static constexpr Lr kLr[3][2] = {
+        {{0x821FFA4C, 0x821FFA68}, {0x821FFA78, 0x821FFA94}},
+        {{0x821FF9E4, 0x821FFA00}, {0x821FFA10, 0x821FFA2C}},
+        {{0x821FF97C, 0x821FF998}, {0x821FF9A8, 0x821FF9C4}},
+    };
+    const bool other = int32_t(TS(screen).editor_page()) != 0;
+    const uint64_t named = (other ? 169 : 195) + pick;
+    const Lr& lr = kLr[pick][other ? 1 : 0];
+    FinishNamed(call, frame, lr.finish, movie, named);
+    PlayNamed(call, frame, lr.play, movie, named, 1);
+    LoopNamed(call, frame, 0x821FFAA0, movie, named);
+    FinishNamed(call, frame, 0x821FFAAC, movie, 44);
+    FinishNamed(call, frame, 0x821FFAB8, movie, 45);
+    FinishNamed(call, frame, 0x821FFAC4, movie, 46);
+    PlayNamed(call, frame, 0x821FFAE0, movie, 46, 1);
+  } else if (pick <= 4) {
+    // 195 to 197 and 213 (169 to 171 and 189) finished, 213 (189) played,
+    // 44 (pick 3) or 45 (4) restarted and looped.
+    const bool other = int32_t(TS(screen).editor_page()) != 0;
+    static constexpr uint32_t kFinishLr[2][2][4] = {
+        {{0x821FF8B8, 0x821FF8C4, 0x821FF8D0, 0x821FF8DC},
+         {0x821FF8EC, 0x821FF8F8, 0x821FF904, 0x821FF910}},
+        {{0x821FF7FC, 0x821FF808, 0x821FF814, 0x821FF820},
+         {0x821FF830, 0x821FF83C, 0x821FF848, 0x821FF854}},
+    };
+    const uint32_t (&lr)[4] = kFinishLr[pick - 3][other ? 1 : 0];
+    const uint64_t first = other ? 169 : 195, last = other ? 189 : 213;
+    for (uint64_t k = 0; k < 3; k++) {
+      FinishNamed(call, frame, lr[k], movie, first + k);
+    }
+    FinishNamed(call, frame, lr[3], movie, last);
+    const uint64_t bar = pick == 3 ? 44 : 45;
+    PlayNamed(call, frame, pick == 3 ? 0x821FF92C : 0x821FF870, movie, last, 1);
+    FinishNamed(call, frame, pick == 3 ? 0x821FF938 : 0x821FF87C, movie, bar);
+    PlayNamed(call, frame, pick == 3 ? 0x821FF954 : 0x821FF898, movie, bar, 1);
+    LoopNamed(call, frame, 0x821FF960, movie, bar);
+  }
+  call(kResetTextScroll, {movie, 2, 0}, frame, 0x821FFAF0);
+  SetText(call, frame, 0x821FFB04, movie, 2, 0, 805, 0);
+  return call(kScrollText, {movie, 2, 0, 1}, frame, 0x821FFB18);
+}
+
+namespace {
+
+// The tire's pictures on FindNode(n, 0) (ShowLevels' n 30 with [+35948] and
+// [+36076], ShowOptions' 33 with [+35952] and [+36080]): item 0, with the
+// front's and the rear's the same, child 2's +16 = float(front) × 40.0 (and
+// with `clear` children 11, 10 and 1's +80 = 0); else child 2's the same,
+// child 11 shown, the node found again, child 1's +16 = float(rear) × 40.0
+// and child 5 shown; item 1 child 2's front, child 11 shown; item 2 child
+// 2's rear, child 10 shown. `match` the item-0 test's two pairs.
+void TirePictures(uint32_t screen, uint32_t frame, uint32_t movie, uint32_t n,
+                  uint32_t front, uint32_t rear, bool match, bool clear) {
+  const uint32_t item = uint32_t(TS(screen).item());
+  if (item == 0) {
+    const uint32_t node = ui_movies::FindNode(movie, n, 0);
+    const uint32_t picture = ui_movies::Child(node, 2);
+    Store(UiNode(picture).y_address(),
+          Scaled(frame, Signed(screen + front)));
+    if (match) {
+      if (clear) {
+        UiNode(ui_movies::Child(node, 11)).set_visible(0);
+        UiNode(ui_movies::Child(node, 10)).set_visible(0);
+        UiNode(ui_movies::Child(node, 1)).set_visible(0);
+      }
+      return;
+    }
+    UiNode(ui_movies::Child(node, 11)).set_visible(1);
+    const uint32_t again = ui_movies::FindNode(movie, n, 0);
+    const uint32_t back = ui_movies::Child(again, 1);
+    Store(UiNode(back).y_address(), Scaled(frame, Signed(screen + rear)));
+    UiNode(ui_movies::Child(again, 5)).set_visible(1);
+  } else if (item == 1 || item == 2) {
+    const uint32_t node = ui_movies::FindNode(movie, n, 0);
+    const uint32_t picture = ui_movies::Child(node, 2);
+    Store(UiNode(picture).y_address(),
+          Scaled(frame, Signed(screen + (item == 1 ? front : rear))));
+    UiNode(ui_movies::Child(node, item == 1 ? 11 : 10)).set_visible(1);
+  }
+}
+
+// FinishNamed(named), PlayNamed(named, chained), LoopNamed(named), from the
+// return addresses `lr`. LoopNamed's r3.
+uint64_t Restarted(const GuestCall& call, uint32_t frame, uint32_t movie, uint64_t named,
+                   uint32_t chained, const uint32_t (&lr)[3]) {
+  FinishNamed(call, frame, lr[0], movie, named);
+  PlayNamed(call, frame, lr[1], movie, named, chained);
+  return LoopNamed(call, frame, lr[2], movie, named);
+}
+
+}  // namespace
+
+uint64_t ShowOptions(const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D5028 TuningScreen::ShowOptions");
+  const uint32_t frame = Frame(sp, 160);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const int32_t category = int32_t(TS(screen).category());
+  const uint32_t movie = Load(entry);
+  uint64_t r3 = entry;
+  auto option = [&] { return uint64_t(uint32_t(TS(screen).option())); };
+  auto scene = [&](uint64_t index, uint32_t finish_lr, uint32_t play_lr) {
+    call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
+    call(kPlay, {movie, kAllScenes, index, 0, 0, 0, 0}, frame, play_lr);
+  };
+  if (category == 3) {
+    if (TS(screen).command_first_run() != 0) {
+      scene(30, 0x821D508C, 0x821D50AC);
+      bool match = false;
+      if (uint32_t(TS(screen).item()) == 0) {
+        match = int32_t(TS(screen).tire_front_option()) ==
+                    int32_t(TS(screen).tire_rear_option()) &&
+                int32_t(TS(screen).tire_front_choice()) ==
+                    int32_t(TS(screen).tire_rear_choice());
+      }
+      TirePictures(screen, frame, movie, 33, 35952, 36080, match, true);
+      ClearFlags(screen);
+    }
+    const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 33, 1), 0);
+    Store(UiNode(mark).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).option_address())));
+    Restarted(call, frame, movie, option() + 844, 1, {0x821D5310, 0x821D5330, 0x821D5340});
+    r3 = Restarted(call, frame, movie, option() + 783, 0, {0x821D5350, 0x821D5370, 0x821D55BC});
+  } else if (category == 4 && uint32_t(TS(screen).item()) == 4) {
+    if (TS(screen).command_first_run() != 0) {
+      scene(34, 0x821D53AC, 0x821D53CC);
+      ClearFlags(screen);
+    }
+    const uint32_t mark = ui_movies::FindNode(movie, 31, 0);
+    Store(UiNode(mark).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).option_address())));
+    r3 = Restarted(call, frame, movie, option() + 675, 1, {0x821D5428, 0x821D5448, 0x821D55BC});
+  } else if (category == 5 && uint32_t(TS(screen).item()) == 1) {
+    if (TS(screen).command_first_run() != 0) {
+      scene(6, 0x821D548C, 0x821D54AC);
+      const uint32_t picture = ui_movies::Child(ui_movies::FindNode(movie, 28, 0), 2);
+      UiNode(picture).set_visible(1);
+      Store(UiNode(picture).y_address(),
+            Scaled(frame, Signed(TS(screen).exterior1_choice_address())));
+      ClearFlags(screen);
+    }
+    const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 28, 1), 0);
+    Store(UiNode(mark).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).option_address())));
+    Restarted(call, frame, movie, option() + 489, 1, {0x821D554C, 0x821D556C, 0x821D557C});
+    r3 = Restarted(call, frame, movie, option() + 428, 0, {0x821D558C, 0x821D55AC, 0x821D55BC});
+  }
+  StepWith9724(screen);
+  return r3;
+}
+
+uint64_t ShowLevels(const GuestCall& call, uint32_t screen, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_821D12C0 TuningScreen::ShowLevels");
+  const uint32_t frame = Frame(sp, 160);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const int32_t category = int32_t(TS(screen).category());
+  const uint32_t movie = Load(entry);
+  uint64_t r3 = entry;
+  auto level = [&] { return uint64_t(uint32_t(TS(screen).level())); };
+  auto scene = [&](uint64_t index, uint32_t finish_lr, uint32_t play_lr) {
+    call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
+    call(kPlay, {movie, kAllScenes, index, 0, 0, 0, 0}, frame, play_lr);
+  };
+  if (category >= 0 && category <= 2) {
+    // Power (0), power train and body (1, 2). The extended levels: the
+    // category 0 item 0 (1 item 4) with the byte +9677 above 8 (the +9656
+    // and bytes read again for each test).
+    const int32_t want_category = category == 0 ? 0 : 1;
+    const uint32_t want_item = category == 0 ? 0 : 4;
+    auto picked = [&] {
+      return int32_t(TS(screen).category()) == want_category &&
+             uint32_t(TS(screen).item()) == want_item;
+    };
+    auto extended = [&] { return picked() && uint32_t(TS(screen).level_count()) > 8; };
+    if (TS(screen).command_first_run() != 0) {
+      if (category == 0) {
+        scene(5, 0x821D1324, 0x821D1344);
+      } else {
+        scene(6, 0x821D1794, 0x821D17B4);
+      }
+      const uint32_t picture = ui_movies::Child(ui_movies::FindNode(movie, 28, 0), 2);
+      UiNode(picture).set_visible(1);
+      int64_t x;
+      if (extended()) {
+        const uint32_t choice = GetCurrentChoice(screen);
+        const uint32_t pick = uint32_t(TS(screen).level());
+        x = int32_t(TS(screen).list_scroll_row() - pick + choice);
+      } else {
+        x = int32_t(GetCurrentChoice(screen));
+      }
+      Store(UiNode(picture).y_address(), Scaled(frame, x));
+      ClearFlags(screen);
+    }
+    const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 28, 1), 0);
+    const int64_t x = extended() ? Signed(TS(screen).list_scroll_row_address())
+                                 : Unsigned8(TS(screen).level_address());
+    Store(UiNode(mark).y_address(), Scaled(frame, x));
+    if (extended()) {
+      auto word = [&] { return uint64_t(TS(screen).list_scroll_row()); };
+      FinishNamed(call, frame, 0x821D1488, movie, word() + 428);
+      PlayNamed(call, frame, 0x821D14A8, movie, word() + 428, 1);
+      LoopNamed(call, frame, 0x821D14B8, movie, word() + 428);
+      FinishNamed(call, frame, 0x821D14C8, movie, word() + 489);
+      PlayNamed(call, frame, 0x821D14E8, movie, word() + 489, 0);
+      r3 = LoopNamed(call, frame, 0x821D195C, movie, word() + 489);
+    } else {
+      FinishNamed(call, frame, 0x821D18EC, movie, level() + 428);
+      PlayNamed(call, frame, 0x821D190C, movie, level() + 428, 1);
+      LoopNamed(call, frame, 0x821D191C, movie, level() + 428);
+      FinishNamed(call, frame, 0x821D192C, movie, level() + 489);
+      PlayNamed(call, frame, 0x821D194C, movie, level() + 489, 0);
+      r3 = LoopNamed(call, frame, 0x821D195C, movie, level() + 489);
+    }
+  } else if (category == 3) {
+    if (TS(screen).command_first_run() != 0) {
+      scene(7, 0x821D152C, 0x821D154C);
+      bool match = false;
+      if (uint32_t(TS(screen).item()) == 0) {
+        match = int32_t(TS(screen).tire_front_choice()) ==
+                int32_t(TS(screen).tire_rear_choice());
+      }
+      TirePictures(screen, frame, movie, 30, 35948, 36076, match, false);
+      ClearFlags(screen);
+    }
+    const uint32_t mark = ui_movies::Child(ui_movies::FindNode(movie, 30, 1), 0);
+    Store(UiNode(mark).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).level_address())));
+    FinishNamed(call, frame, 0x821D1744, movie, level() + 632);
+    PlayNamed(call, frame, 0x821D1764, movie, level() + 632, 1);
+    r3 = LoopNamed(call, frame, 0x821D195C, movie, level() + 632);
+  }
+  if (uint32_t(TS(screen).level_count()) > 8) {
+    FinishNamed(call, frame, 0x821D1974, movie, 976);
+    PlayNamed(call, frame, 0x821D1990, movie, 976, 1);
+    FinishNamed(call, frame, 0x821D199C, movie, 1013);
+    PlayNamed(call, frame, 0x821D19B8, movie, 1013, 1);
+    r3 = LoopNamed(call, frame, 0x821D19C4, movie, 1013);
+  }
+  StepWith9724(screen);
+  return r3;
+}
+
+namespace {
+
+// Movie 13's items lit (HighlightItem, HighlightSelected): nodes 19 to 21
+// (+30724 0) or 22 to 24 (1; other pages nothing) of the live scene, +68 =
+// 1.0 ([0x82000A30]) for the item (`item`, else +30732 read again each pass)
+// and 0.0 ([0x82000A34]) for the others; with `all` not 0, +9708 = 1 and all
+// three 1.0. The floats stored as the original's lfs and stfs leave them.
+// 144-byte frame; the last FindNode's r3, else the movie's entry.
+uint64_t LightItems(uint64_t r3_in, uint64_t all, std::optional<uint64_t> item,
+                    uint32_t sp) {
+  const uint32_t screen = uint32_t(r3_in);
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t entry = MovieEntry(frame, 13);
+  const int32_t page = int32_t(TS(screen).editor_page());
+  const uint32_t movie = Load(entry);
+  auto single = [&](uint32_t address) {
+    const float f = std::bit_cast<float>(Load(address));
+    return std::bit_cast<uint32_t>(float(double(f)));
+  };
+  if (int32_t(uint32_t(all)) != 0) {
+    TS(screen).set_refresh_pending(1);
+  }
+  if (page != 0 && page != 1) {
+    return entry;
+  }
+  const uint32_t first = page == 0 ? 19 : 22;
+  const uint32_t lit = single(0x82000A30);
+  const uint32_t unlit = single(0x82000A34);
+  uint64_t r3 = entry;
+  for (int32_t k = 0; k < 3; k++) {
+    bool on = true;
+    if (int32_t(uint32_t(all)) == 0) {
+      const int32_t selected =
+          item ? int32_t(uint32_t(*item)) : int32_t(TS(screen).layer_cursor());
+      on = k == selected;
+    }
+    const uint32_t node = ui_movies::FindNode(movie, 0xFFFFFFFFu, first + uint32_t(k));
+    Store(UiNode(node).alpha_address(), on ? lit : unlit);
+    r3 = node;
+  }
+  return r3;
+}
+
+}  // namespace
+
+uint64_t HighlightItem(uint64_t r3, uint64_t all, uint64_t item, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82203400 TuningScreen::HighlightItem");
+  return LightItems(r3, all, item, sp);
+}
+
+uint64_t HighlightSelected(uint64_t r3, uint64_t all, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82203570 TuningScreen::HighlightSelected");
+  return LightItems(r3, all, std::nullopt, sp);
+}
+
+uint64_t UpdateItems(const GuestCall& call, uint64_t r3_in, uint32_t sp,
+                     bool native_slots) {
+  ITC_NATIVE_RUNNING("sub_822036E8 TuningScreen::UpdateItems");
+  const uint32_t screen = uint32_t(r3_in);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t mappers = PlayerMappers();
+  const uint32_t entry = MovieEntry(frame, 13);
+  const int32_t state = int32_t(TS(screen).state());
+  const uint32_t movie = Load(entry);
+  uint64_t r3 = entry;
+  auto asks = [&] { return int32_t(MapperEntry(mappers).unread()) != 1; };
+  auto mapper = [&] { return MapperEntry(mappers).mapper().address; };
+  if (state == 27) {
+    // HighlightItem (sub_82203400, its plain C++) on +30756,
+    // r4 0 with 164 held, 1 with slot 11's 164.
+    std::optional<uint64_t> all;
+    if (asks()) {
+      r3 = HeldSlot(call, mapper(), 164, frame, 0x822039DC, native_slots);
+      if ((r3 & 0xFF) != 0) {
+        all = 0;
+      }
+    }
+    if (!all) {
+      if (!asks()) {
+        return r3;
+      }
+      r3 = Slot11(call, mapper(), 164, frame, 0x82203A10);
+      if ((r3 & 0xFF) == 0) {
+        return r3;
+      }
+      all = 1;
+    }
+    return HighlightItem(r3_in, *all, TS(screen).order_position(), frame);
+  }
+  if (state != 28) {
+    return r3;
+  }
+  // HighlightSelected (sub_82203570, its plain C++), r4 0
+  // with 164 held, 1 with slot 11's 164.
+  std::optional<uint64_t> all;
+  if (asks()) {
+    r3 = HeldSlot(call, mapper(), 164, frame, 0x82203764, native_slots);
+    if ((r3 & 0xFF) != 0) {
+      all = 0;
+    }
+  }
+  if (!all && asks()) {
+    r3 = Slot11(call, mapper(), 164, frame, 0x82203798);
+    if ((r3 & 0xFF) != 0) {
+      all = 1;
+    }
+  }
+  if (all) {
+    r3 = HighlightSelected(r3_in, *all, frame);
+  }
+  if (asks()) {
+    r3 = HeldSlot(call, mapper(), 163, frame, 0x822037D0, native_slots);
+    if ((r3 & 0xFF) != 0) {
+      return LayOutItems(screen, frame);
+    }
+  }
+  r3 = LayOutItems(screen, frame);
+  const int32_t variant = int32_t(TS(screen).editor_page());
+  if (variant != 0 && variant != 1) {
+    return r3;
+  }
+  // The selected item's node put back at the origin (+12, +16 through the
+  // frame's doubleword at +80), its size halved (+20, +24 from the first
+  // lookup), +36 = 0.0, +28 = +32 = the size, +132 = 0 (the first lookup).
+  const bool second = variant == 1;
+  const uint32_t first = second ? 22 : 19;
+  const uint32_t origin_x = second ? TS(screen).page1_origin_x_address()
+                                   : TS(screen).page0_origin_x_address();
+  const uint32_t origin_y = second ? TS(screen).page1_origin_y_address()
+                                   : TS(screen).page0_origin_y_address();
+  const uint32_t scale = second ? TS(screen).page1_position_scale_address()
+                                : TS(screen).page0_position_scale_address();
+  const uint32_t size = second ? TS(screen).page1_size_scale_address()
+                               : TS(screen).page0_size_scale_address();
+  const uint32_t looked = ui_movies::FindNode(movie, uint32_t(kAllScenes),
+                                              TS(screen).layer_cursor() + first);
+  const uint32_t node = ui_movies::FindNode(movie, uint32_t(kAllScenes),
+                                            TS(screen).layer_cursor() + first);
+  auto through_frame = [&](uint32_t at) {
+    const int64_t x = int32_t(Load(at));
+    Store(frame + 80, uint32_t(uint64_t(x) >> 32));
+    Store(frame + 84, uint32_t(x));
+    return steps::Single(double(x));
+  };
+  const double zero = steps::Lfs(0x82000A34);
+  {
+    const double s = steps::Lfs(scale);
+    const double x = through_frame(origin_x);
+    steps::Stfs(UiNode(node).x_address(), steps::Fadds(steps::Fmadds(s, zero, x),
+                                              steps::Lfs(second ? 0x8200CAECu : 0x8200CAF4u)));
+  }
+  {
+    const int64_t y_word = int32_t(Load(origin_y));
+    const double s = steps::Lfs(scale);
+    Store(frame + 80, uint32_t(uint64_t(y_word) >> 32));
+    Store(frame + 84, uint32_t(y_word));
+    const double y = steps::Single(double(y_word));
+    steps::Stfs(UiNode(node).y_address(), steps::Fadds(steps::Fmadds(s, zero, y),
+                                              steps::Lfs(second ? 0x8200CAE8u : 0x8200CAF0u)));
+  }
+  const double half = steps::Lfs(0x82001BE4);
+  UiNode(node).set_pivot_x(uint32_t(steps::Fctiwz(
+            steps::Fmuls(steps::Lfs(UiNode(looked).width_address()), half))));
+  const double height = steps::Fmuls(steps::Lfs(UiNode(looked).height_address()), half);
+  steps::Stfs(UiNode(node).rotation_address(), zero);
+  UiNode(node).set_pivot_y(uint32_t(steps::Fctiwz(height)));
+  steps::Stfs(UiNode(node).scale_x_address(), steps::Lfs(size));
+  steps::Stfs(UiNode(node).scale_y_address(), steps::Lfs(size));
+  UiNode(looked).set_flip_x(0);
+  return node;
+}
+
+namespace {
+
+constexpr uint32_t kGetCarParts = 0x820C9E00;  // Params::GetCarParts(out, car)
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kGet77 = 0x820CB9E0;  // AeroParts::Get77(out, parts, level)
+constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82(out, parts, level)
+
+// ShowTypes' item 3 text (629 or 630): the selected garage car's parts
+// (Params::GetCarParts into frame + 176, copied to frame + 96), its aero
+// parts 77 at the type (frame + 144) and 82 at [+36588] (frame + 224): their
+// plain C++ with `native_specs` (the original's where the plain C++
+// declines), else the originals; memcpy native where Buffers_Memcpy takes
+// it.
+uint64_t AeroText(const GuestCall& call, uint32_t screen, uint32_t frame,
+                  bool native_specs) {
+  const schema::SaveData save(TS(screen).save_data().address);
+  const uint32_t list = save.garage_address();
+  uint32_t count = save.selected_car();
+  uint32_t at =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(list).head()))) * 4 + list;
+  while (count != 0) {
+    at = uint32_t(int32_t(int16_t(guest::LoadU16(at)))) * 4 + list;
+    count--;
+  }
+  const int32_t slot = int16_t(guest::LoadU16(at + 2));
+  const uint32_t car = schema::CarMakersCar(uint32_t(slot * 1968) + list + 212).car_id();
+  const uint32_t parts_out = frame + 176, parts = frame + 96;
+  uint32_t parts_at = parts_out;
+  if (native_specs) {
+    uint32_t words[9];
+    car_specs::GetCarParts(car, words);
+    for (uint32_t i = 0; i < 9; i++) {
+      Store(parts_out + 4 * i, words[i]);
+    }
+  } else {
+    parts_at = uint32_t(call(kGetCarParts, {parts_out, car}, frame, 0x821D2E60));
+  }
+  if (!native::Buffers_Memcpy(parts, parts_at, 36, 0x821D2E70)) {
+    call(kMemcpy, {parts, parts_at, 36}, frame, 0x821D2E70);
+  }
+  auto get = [&](uint32_t function, uint32_t out, uint64_t level, uint32_t lr,
+                 bool (*plain)(uint32_t, const uint32_t[9], int32_t)) {
+    if (native_specs) {
+      uint32_t words[9];
+      for (uint32_t i = 0; i < 9; i++) {
+        words[i] = Load(parts + 4 * i);
+      }
+      if (plain(out, words, int32_t(level))) {
+        return out;
+      }
+    }
+    return uint32_t(call(function, {out, parts, level}, frame, lr));
+  };
+  const uint32_t kit77 = get(kGet77, frame + 144, uint32_t(TS(screen).type()), 0x821D2E80,
+                             car_specs::AeroPart77);
+  const uint32_t a = schema::AeroPartRecord(kit77).flags();
+  const uint32_t kit82 = get(kGet82, frame + 224, TS(screen).aero9_type(), 0x821D2EA0,
+                             car_specs::AeroPart82);
+  const bool none = TS(screen).aero9_type() == 0;
+  const uint32_t b = schema::AeroPartRecord(kit82).flags();
+  if (none || (b & 2) != 0) {
+    return (a & 1) != 0 ? 629 : 630;
+  }
+  return (b & 4) != 0 ? 629 : 630;
+}
+
+}  // namespace
+
+uint64_t ShowTypes(const GuestCall& call, uint32_t screen, uint32_t sp,
+                   bool native_specs) {
+  ITC_NATIVE_RUNNING("sub_821D2A80 TuningScreen::ShowTypes");
+  const uint32_t frame = Frame(sp, 320);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const int32_t category = int32_t(TS(screen).category());
+  const uint32_t movie = Load(entry);
+  uint64_t r3 = entry;
+  auto type = [&] { return uint64_t(uint32_t(TS(screen).type())); };
+  auto item = [&] { return uint32_t(TS(screen).item()); };
+  auto scene = [&](uint64_t index, uint32_t chained, uint32_t finish_lr, uint32_t play_lr) {
+    call(kFinish, {movie, kAllScenes, index}, frame, finish_lr);
+    call(kPlay, {movie, kAllScenes, index, chained, 0, 0, 0}, frame, play_lr);
+  };
+  // The current choice's picture: node (28, 0)'s child 2 shown, its +16 =
+  // float(x) × 40.0; the flags cleared.
+  auto picture = [&](auto x) {
+    const uint32_t node = ui_movies::Child(ui_movies::FindNode(movie, 28, 0), 2);
+    UiNode(node).set_visible(1);
+    Store(UiNode(node).y_address(), Scaled(frame, x(node)));
+    ClearFlags(screen);
+  };
+  auto choice = [&](uint32_t) { return int64_t(int32_t(GetCurrentChoice(screen))); };
+  // The type's mark: node (28, 1)'s child 0 +16 = float(type) × 40.0.
+  auto mark = [&] {
+    const uint32_t node = ui_movies::Child(ui_movies::FindNode(movie, 28, 1), 0);
+    Store(UiNode(node).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).type_address())));
+  };
+  if (category == 0 && item() == 2) {
+    if (TS(screen).command_first_run() != 0) {
+      FinishNamed(call, frame, 0x821D2AE4, movie, 989);
+      PlayNamed(call, frame, 0x821D2B00, movie, 989, 0);
+      ClearFlags(screen);
+    }
+    const uint32_t node = ui_movies::FindNode(movie, 29, 0);
+    Store(UiNode(node).y_address(),
+          Scaled(frame, Unsigned8(TS(screen).type_address())));
+    FinishNamed(call, frame, 0x821D2B5C, movie, type() + 532);
+    PlayNamed(call, frame, 0x821D2B7C, movie, type() + 532, 1);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 532);
+  } else if (category == 4) {
+    if (TS(screen).command_first_run() != 0) {
+      if (item() == 4) {
+        scene(8, 1, 0x821D2BC0, 0x821D2BF0);
+      } else {
+        scene(6, 1, 0x821D2BD0, 0x821D2BF0);
+      }
+      FinishNamed(call, frame, 0x821D2BFC, movie, 1011);
+      PlayNamed(call, frame, 0x821D2C18, movie, 1011, 0);
+      picture([&](uint32_t) {
+        return item() == 4 ? int64_t(int32_t(TS(screen).aero4_type()))
+                           : int64_t(int32_t(GetCurrentChoice(screen)));
+      });
+    }
+    mark();
+    Restarted(call, frame, movie, type() + 428, 1, {0x821D2CE0, 0x821D2D00, 0x821D2D10});
+    Restarted(call, frame, movie, type() + 489, 0, {0x821D2D20, 0x821D2D40, 0x821D2D50});
+    if (uint32_t(TS(screen).type_count()) > 8) {
+      FinishNamed(call, frame, 0x821D2D68, movie, 976);
+      PlayNamed(call, frame, 0x821D2D84, movie, 976, 1);
+      Restarted(call, frame, movie, 1013, 1, {0x821D2D90, 0x821D2DAC, 0x821D2DB8});
+    }
+    call(kResetTextScroll, {movie, 10, 0}, frame, 0x821D2DC8);
+    const uint32_t which = item();
+    if (which <= 9) {
+      // The item's text (item 0 the split piece sub_821D2DFC, merged).
+      static constexpr uint32_t kTexts[10] = {626, 627, 628, 0, 631, 632, 633, 634, 635, 636};
+      const uint64_t id = which == 3 ? AeroText(call, screen, frame, native_specs)
+                                     : kTexts[which];
+      SetText(call, frame, 0x821D2F20, movie, 10, 0, uint32_t(id), 0);
+    }
+    r3 = call(kScrollText, {movie, 10, 0, 1}, frame, 0x821D2F34);
+  } else if ((category == 5 || category == 6) && item() == 2) {
+    if (TS(screen).command_first_run() != 0) {
+      scene(8, 0, 0x821D2F84, 0x821D2FA4);
+      picture(choice);
+    }
+    mark();
+    FinishNamed(call, frame, 0x821D3048, movie, type() + 489);
+    PlayNamed(call, frame, 0x821D3268, movie, type() + 489, 1);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 489);
+  } else if ((category == 5 && item() == 3) || (category == 6 && item() <= 1)) {
+    const uint32_t which = item();
+    if (TS(screen).command_first_run() != 0) {
+      if (category == 6 && which == 0) {
+        scene(6, 1, 0x821D30C0, 0x821D30E0);
+        FinishNamed(call, frame, 0x821D30EC, movie, 1011);
+        PlayNamed(call, frame, 0x821D3108, movie, 1011, 0);
+        FinishNamed(call, frame, 0x821D3114, movie, 0);
+        PlayNamed(call, frame, 0x821D3130, movie, 0, 0);
+      } else {
+        scene(6, 0, 0x821D3144, 0x821D3164);
+      }
+      picture(choice);
+    }
+    mark();
+    Restarted(call, frame, movie, type() + 428, 1, {0x821D3208, 0x821D3228, 0x821D3238});
+    FinishNamed(call, frame, 0x821D3248, movie, type() + 489);
+    PlayNamed(call, frame, 0x821D3268, movie, type() + 489, 0);
+    r3 = LoopNamed(call, frame, 0x821D3278, movie, type() + 489);
+  }
+  StepWith9724(screen);
+  return r3;
+}
+
+}  // namespace tuning_screen

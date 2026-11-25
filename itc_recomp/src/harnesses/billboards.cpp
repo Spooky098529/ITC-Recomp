@@ -12,6 +12,8 @@
 
 namespace harness {
 
+void BillboardRecordCases(Context& h);
+
 namespace {
 
 // The vertex ring and its globals (the vertex builder's outputs outside the
@@ -62,7 +64,7 @@ void Billboards(Context& h) {
                }
              }
            },
-           [&](PPCContext& t) { t.r3.u64 = data; }, __imp__sub_8209F5A0, sub_8209F5A0, data, 64,
+           [&](PPCContext& t) { t.r3.u64 = data; }, __imp__sub_8209F5A0, harness::Ours<0x8209F5A0>, data, 64,
            fmt::format("case {}", i));
     }
     results.Report();
@@ -78,7 +80,7 @@ void Billboards(Context& h) {
              t.r4.u64 = count;
              t.r5.u64 = lights;
            },
-           __imp__sub_8209F5C8, sub_8209F5C8, data, 64,
+           __imp__sub_8209F5C8, harness::Ours<0x8209F5C8>, data, 64,
            fmt::format("count {} lights {:08X}", count, lights));
     }
     results.Report();
@@ -188,7 +190,7 @@ void Billboards(Context& h) {
         t.r3.u64 = data + kSet;
         t.r4.u64 = data + kList;
         t.r5.u64 = data + kMaterial;
-        (v == 0 ? __imp__sub_8209C6E0 : sub_8209C6E0)(t, base);
+        (v == 0 ? __imp__sub_8209C6E0 : harness::Ours<0x8209C6E0>)(t, base);
         result[v] = Read(base, data, kScratchBytes);
         const std::vector<uint8_t> ring = Read(base, window, kWindowBytes);
         result[v].insert(result[v].end(), ring.begin(), ring.end());
@@ -217,6 +219,7 @@ void Billboards(Context& h) {
     Write(base, kRingVertices, saved_ring.data(), kRingBytes);
     results.Report();
   }
+  BillboardRecordCases(h);
 }
 
 }  // namespace harness

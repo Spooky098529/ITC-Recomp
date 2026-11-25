@@ -1,0 +1,679 @@
+// The car sounds natively: adapters in front of src/car_sounds/
+// (docs/functions/car-sounds.md), with the register steps the harness shares
+// (hooks/car_sounds.h).
+
+#include "hooks/car_sounds.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "car_sounds/car_sounds.h"
+#include "car_sounds/x3daudio.h"
+#include "hooks/app_start_up.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
+#include "hooks/mode_tick.h"
+#include "hooks/models.h"
+#include "hooks/xaudio.h"
+#include "memory/c_runtime_heap.h"
+
+#include <cstring>
+#include "lifted/sdk.h"
+
+ITC_FLAG_DECLARE(bool, native_shader_objects);
+
+ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
+              "Run the car sounds (docs/functions/car-sounds.md: the wave bank views' Init "
+              "sub_8210C9D8, Format sub_8210C850, Length sub_8210C920, Data sub_8210C958 and "
+              "Entry sub_8210C998 (XMemCpy's plain C++); CarSounds::SetBanks sub_8210CB48; "
+              "TireSound::Amount sub_8210CA28; CarSound::CarSound sub_8210CC18 with "
+              "EngineSound::EngineSound sub_8210CBA0 (no adapter: only its plain C++ calls it); CarSounds::Destroy sub_8210DCA8 (operator "
+              "delete through its plain C++); CarSound::SetUp sub_8210DDC8 (operator new[] through "
+              "its plain C++); SoundGlobals::Init sub_82110258 (with the memory blocks native: "
+              "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
+              "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
+              "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++); the tires: TireSound::Update sub_8210E5C0 with TireLayer::Update sub_8210D890 (Vehicle::SlipWheelValue's, MaxWheelSlip's, TireSound::Amount's, IsPlaying's and SetPitch's plain C++); RollSound::Update sub_8210DB60 (Vehicle::GetSpeedKmh's and SetPitch's plain C++); the horn: HornSound::Update sub_8210F118 (PlayOnce's, SetPitchScaled's, IsPlaying's and UpdateVoices' plain C++); the turbo: TurboSound::Update sub_8210F4E8 (PlayOnce's, IsPlaying's, SetPitch's and UpdateVoices' plain C++); CarSound::Update sub_82110048 (Update3D's, the parts' updates' and SetEffectParameters' plain C++); no adapters (only plain C++ calls them in play) for Update3D, TireSound::Amount, SetPitch, SetPitchScaled, IsPlaying, UpdateVoices, PlayOnce, the parts' updates and the engine's and tires' layers (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
+              "--run_harnesses=car_sounds)");
+
+namespace hooks {
+
+namespace cs = car_sounds;
+
+ITC_REGS_STEP(CarSoundsWaveBankViewInit) {
+  ctx.r3.u64 = cs::WaveBankViewInit(ctx.r3.u32, ctx.r4.u32);
+}
+
+ITC_REGS_STEP(CarSoundsWaveBankFormat) {
+  ctx.r3.u64 = cs::WaveBankFormat(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsWaveBankLength) {
+  ctx.r3.u64 = cs::WaveBankLength(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsWaveBankData) {
+  ctx.r3.u64 = cs::WaveBankData(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsWaveBankEntry) {
+  if (const auto r3 = cs::WaveBankEntry(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  lifted::original::c8210C998(ctx);
+}
+
+ITC_REGS_STEP(CarSoundsSetBanks) {
+  cs::SetBanks(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsTireSoundAmount) {
+  cs::TireSoundAmount(ctx.r3.u32, ctx.f1.f64);
+}
+
+ITC_REGS_STEP(CarSoundsEngineSoundConstruct) {
+  cs::EngineSoundConstruct(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(CarSoundsCarSoundConstruct) {
+  ctx.r3.u64 = cs::CarSoundConstruct(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(CarSoundsDestroy) {
+  const cs::Destroyed done = cs::CarSoundsDestroy(ctx.r3.u32, ctx.r4.u32);
+  if (done.to_free != 0) {
+    const bool freed = done.array ? memory::crt::OperatorDeleteArray(done.to_free)
+                                  : memory::crt::OperatorDelete(done.to_free);
+    if (!freed) {
+      ctx.r3.u64 = done.to_free;
+      lifted::CallFromContext(ctx, done.array ? 0x825A71C0 : 0x825A70E8);
+    }
+  }
+  ctx.r3.u64 = done.r3;
+}
+
+ITC_REGS_STEP(CarSoundsSetUp) {
+  const uint32_t sound = ctx.r3.u32;
+  uint32_t matrix;
+  if (const auto made = memory::crt::OperatorNewArray(24)) {
+    matrix = *made;
+  } else {
+    ctx.r3.u64 = 24;
+    lifted::Enter(ctx, lifted::entry::e825A6940);
+    matrix = ctx.r3.u32;
+  }
+  ctx.r3.u64 = cs::SetUp(sound, matrix);
+}
+
+bool CarSoundsGlobalsNative() {
+  // The memory blocks' native path, as Memory::AllocPhysicalEx's adapter
+  // (src/hooks/shader_objects.cpp) takes it.
+  return ITC_FLAG(native_shader_objects) && NativeHeapActive() && ModelsHostLock();
+}
+
+ITC_REGS_STEP(CarSoundsGlobalsInit) {
+  cs::SoundGlobalsInit(ctx.r3.u32);
+  // Music::Play(r3 = a word 0 at +84, r4 = the name, r5 = a byte 0 at +80).
+  guest_call::InFrame(ctx, 112, 0x82110358, [&](uint32_t frame) {
+    guest::StoreU8(frame + 80, 0);
+    guest::StoreU32(frame + 84, 0);
+    ctx.r3.u64 = frame + 84;
+    ctx.r4.u64 = cs::kMusicName;
+    ctx.r5.u64 = frame + 80;
+    ModeTickMusicPlay(ctx);
+  });
+  ctx.r3.u64 = cs::SoundGlobalsInit3D();
+}
+
+ITC_REGS_STEP(CarSoundsX3DVecSub) {
+  ctx.fpscr.disableFlushMode();
+  x3daudio::VecSub(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsX3DVecLength) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::VecLength(ctx.r3.u32));
+}
+
+ITC_REGS_STEP(CarSoundsX3DVecDot) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::VecDot(ctx.r3.u32, ctx.r4.u32));
+}
+
+ITC_REGS_STEP(CarSoundsX3DVecCross) {
+  ctx.fpscr.disableFlushMode();
+  x3daudio::VecCross(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(CarSoundsX3DEvaluateCurve) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::EvaluateCurve(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64));
+}
+
+ITC_REGS_STEP(CarSoundsX3DCurves) {
+  ctx.fpscr.disableFlushMode();
+  // The original's 128-byte frame, where Curves builds its default curves
+  // (their address the r3 it may leave). Its prologue's saves (lr, r31) and
+  // back chain are no longer stored (E5 step 6): read by nothing, and no
+  // guest code runs on this frame.
+  const uint32_t frame = ctx.r1.u32 - 128;
+  if (const uint32_t r3 = x3daudio::Curves(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, frame)) {
+    ctx.r3.u64 = r3;
+  }
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+namespace {
+
+// tan through the translated code (its adapter, then its original where that
+// can't give it), from Pan's frame and return address: r1 and lr put back
+// after.
+struct GuestTanUser {
+  lifted::Regs* ctx;
+};
+
+x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
+  const GuestTanUser& u = *static_cast<GuestTanUser*>(user);
+  lifted::Regs& ctx = *u.ctx;
+  const uint64_t stack = ctx.r1.u64;
+  const uint64_t lr = ctx.lr;
+  ctx.r1.u64 = sp;
+  ctx.lr = 0x8248133C;
+  ctx.f1.f64 = x;
+  lifted::Enter(ctx, game::tan);
+  ctx.r1.u64 = stack;
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  return {ctx.f1.f64, ctx.r3.u64};
+}
+
+}  // namespace
+
+ITC_REGS_STEP(CarSoundsX3DPan) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::PanSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0};
+  ctx.r3.u64 = x3daudio::Pan(ctx.r3.u64, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64, ctx.r1.u32,
+                             saves, {GuestTan, &user});
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+ITC_REGS_STEP(CarSoundsX3DMatrix) {
+  ctx.fpscr.disableFlushMode();
+  // The back chain of the original's 304-byte frame (Pan's frame, and the
+  // guest tan's, below it). Its prologue's saves (__savegprlr_26,
+  // __savefpr_23: zeros, the caller's registers not carried by the view)
+  // are no longer stored (E5 step 6): read by nothing.
+  const uint32_t sp = ctx.r1.u32;
+  const uint32_t frame = sp - 304;
+  guest::StoreU32(frame, sp);
+  GuestTanUser user{&ctx};
+  ctx.r3.u64 = x3daudio::Matrix(ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64,
+                                0 /* the caller's f31, for Pan's save: not carried */, frame,
+                                {GuestTan, &user});
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+ITC_REGS_STEP(CarSoundsX3DCone) {
+  ctx.fpscr.disableFlushMode();
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::ConeSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0, 0};
+  ctx.r3.u64 = x3daudio::Cone(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                              ctx.r1.u32, saves);
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+ITC_REGS_STEP(CarSoundsX3DDoppler) {
+  ctx.fpscr.disableFlushMode();
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::DopplerSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0};
+  ctx.r3.u64 = x3daudio::Doppler(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                 ctx.r1.u32, saves);
+  ctx.lr = uint32_t(ctx.lr);  // the epilogue's (r12, also it there: not carried)
+}
+
+ITC_REGS_STEP(CarSoundsX3DCalculate) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx};
+  const x3daudio::CalculateArgs args{ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::CalculateSaves saves{uint32_t(ctx.lr)};
+  const auto r3 = x3daudio::Calculate(args, ctx.r1.u32, saves, {GuestTan, &user});
+  if (!r3) {
+    // EmitterAngle or Delay asked for: the original, its callees through
+    // their adapters.
+    lifted::original::c82481880(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+  ctx.lr = uint32_t(ctx.lr);  // the epilogue's (r12, also it there: not carried)
+}
+
+ITC_REGS_STEP(CarSoundsUpdate3D) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx};
+  // (The caller's saved registers (and v126, v127), which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  cs::Update3DSaves saves{uint32_t(ctx.lr)};
+  ctx.r3.u64 = cs::Update3D(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32, saves,
+                            {GuestTan, &user});
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+ITC_REGS_STEP(CarSoundsSetPitch) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32;
+  const double f1 = ctx.f1.f64;
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return cs::SetPitch(holder, slot, f1, r7, sp, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsSetPitchScaled) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32, r9 = ctx.r9.u32;
+  const double f1 = ctx.f1.f64, f3 = ctx.f3.f64;
+  XAudioFramed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::SetPitchScaled(holder, slot, f1, f3, r7, r9, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsIsPlaying) {
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::IsPlaying(holder, slot, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsUpdateVoices) {
+  const uint32_t holder = ctx.r3.u32;
+  const uint64_t output = ctx.r4.u64;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::UpdateVoices(holder, output, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsClear) {
+  const uint32_t holder = ctx.r3.u32;
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Clear(holder, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsPause) {
+  const uint32_t holder = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Pause(holder, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsResume) {
+  const uint32_t holder = ctx.r3.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Resume(holder, thread, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsPauseAll) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::PauseAll(sound, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsResumeAll) {
+  const uint32_t sound = ctx.r3.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::ResumeAll(sound, thread, frame, call);
+  });
+}
+
+namespace {
+cs::Voices VoicesOf(lifted::Regs& ctx) {
+  return {XAudioThreadOf(ctx), NativeHeapActive()};
+}
+}  // namespace
+
+ITC_REGS_STEP(CarSoundsAddVoice) {
+  const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r6.u32;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 496, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::AddVoice(holder, view, wave, loop, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsPlayOnce) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r8.u32;
+  const double volume = ctx.f1.f64, pitch = ctx.f2.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::PlayOnce(holder, view, wave, loop, volume, pitch, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsEngineLayerStart) {
+  const uint32_t layer = ctx.r3.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerStart(layer, view, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsEngineSoundStart) {
+  const uint32_t engine = ctx.r3.u32, views = ctx.r5.u32;
+  const uint64_t index = ctx.r4.u64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineSoundStart(engine, index, views, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsTireSoundStart) {
+  const uint32_t part = ctx.r3.u32, index = ctx.r4.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::TireSoundStart(part, index, view, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsCarSoundStart) {
+  const uint32_t sound = ctx.r3.u32, views = ctx.r4.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::CarSoundStart(sound, views, view, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsStop) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Stop(sound, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsStopAll) {
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::StopAll(frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsRelease) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Release(sound, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsReleaseAll) {
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::CarSoundsRelease(frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsInit) {
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 368, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::CarSoundsInit(voices, frame, call);
+  });
+}
+
+namespace {
+
+// A part's update: r3 the part, r4 the vehicle, r5 the output, in a frame of
+// the original's size.
+template <typename Fn>
+void PartUpdate(lifted::Regs& ctx, uint32_t frame_bytes, Fn fn) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
+  const uint64_t output = ctx.r5.u64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, frame_bytes, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return fn(part, vehicle, output, voices, frame, call);
+  });
+}
+
+// The hits' parts: r3 the part, r4 the vehicle.
+template <typename Fn>
+void HitPart(lifted::Regs& ctx, uint32_t frame_bytes, Fn fn) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, frame_bytes, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return fn(part, vehicle, voices, frame, call);
+  });
+}
+
+}  // namespace
+
+ITC_REGS_STEP(CarSoundsHitImpact) {
+  HitPart(ctx, 144, cs::HitImpact);
+}
+
+ITC_REGS_STEP(CarSoundsHitScrape) {
+  HitPart(ctx, 192, cs::HitScrape);
+}
+
+ITC_REGS_STEP(CarSoundsHitWave9) {
+  HitPart(ctx, 96, cs::HitWave9);
+}
+
+ITC_REGS_STEP(CarSoundsHitSoundsUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32;
+  const uint64_t vehicle = ctx.r4.u64, output = ctx.r5.u64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::HitSoundsUpdate(part, vehicle, output, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsPart736Update) {
+  PartUpdate(ctx, 112, cs::Part736Update);
+}
+
+ITC_REGS_STEP(CarSoundsPart840Update) {
+  PartUpdate(ctx, 128, cs::Part840Update);
+}
+
+ITC_REGS_STEP(CarSoundsPart888Update) {
+  PartUpdate(ctx, 144, cs::Part888Update);
+}
+
+ITC_REGS_STEP(CarSoundsWindSoundUpdate) {
+  PartUpdate(ctx, 128, cs::WindSoundUpdate);
+}
+
+ITC_REGS_STEP(CarSoundsPassBySoundUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32, passed = ctx.r6.u32;
+  const uint64_t output = ctx.r5.u64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::PassBySoundUpdate(part, vehicle, output, passed, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsEngineLayerUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t layer = ctx.r3.u32;
+  const uint64_t output = ctx.r7.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f4 = ctx.f4.f64, f5 = ctx.f5.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 272, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerUpdate(layer, f1, f2, f4, f5, output, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsEngineLayerUpdatePitched) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t engine = ctx.r3.u32;
+  const uint64_t output = ctx.r6.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64, f4 = ctx.f4.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 144, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerUpdatePitched(engine, f1, f2, f3, f4, output, voices, frame,
+                                        call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsTireLayerUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32, layer = ctx.r4.u32, active = ctx.r5.u32;
+  const uint64_t output = ctx.r7.u64;
+  const double f1 = ctx.f1.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::TireLayerUpdate(part, layer, active, output, f1, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsTireSoundUpdate) {
+  PartUpdate(ctx, 160, cs::TireSoundUpdate);
+}
+
+ITC_REGS_STEP(CarSoundsRollSoundUpdate) {
+  PartUpdate(ctx, 144, cs::RollSoundUpdate);
+}
+
+ITC_REGS_STEP(CarSoundsHornSoundUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
+  const uint64_t output = ctx.r5.u64;
+  const double f1 = ctx.f1.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 192, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::HornSoundUpdate(part, vehicle, output, f1, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsTurboSoundUpdate) {
+  PartUpdate(ctx, 144, cs::TurboSoundUpdate);
+}
+
+ITC_REGS_STEP(CarSoundsEngineSoundUpdate) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t engine = ctx.r3.u32, vehicle = ctx.r4.u32;
+  const uint64_t output = ctx.r5.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64;
+  const cs::Voices voices = VoicesOf(ctx);
+  XAudioFramed(ctx, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineSoundUpdate(engine, vehicle, output, f1, f2, voices, frame, call);
+  });
+}
+
+ITC_REGS_STEP(CarSoundsUpdate) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx};
+  // (The caller's saved registers (and v126, v127), which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  cs::Update3DSaves saves{uint32_t(ctx.lr)};
+  const uint64_t sound = ctx.r3.u64;
+  const cs::Voices voices = VoicesOf(ctx);
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = cs::CarSoundUpdate(sound, saves, voices, frame, call, {GuestTan, &user});
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
+}
+
+}  // namespace hooks
+
+#define ITC_CAR_SOUNDS_ADAPTER(address, step) \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_sounds)) { \
+    hooks::step(ctx);                   \
+  }
+
+ITC_CAR_SOUNDS_ADAPTER(8210C9D8, CarSoundsWaveBankViewInit)
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Format sub_8210C850.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Length sub_8210C920.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Data sub_8210C958.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Entry sub_8210C998.
+ITC_CAR_SOUNDS_ADAPTER(8210CB48, CarSoundsSetBanks)
+// No adapter (removed 2026-10-29: only TireSound::Update's plain C++ calls it in play) for TireSound::Amount sub_8210CA28.
+// No adapter (removed 2026-10-28: only `CarSound::CarSound`'s plain C++ calls it in play)
+// for EngineSound::EngineSound sub_8210CBA0.
+// No adapter (removed 2026-10-29: only CarSounds::Init's plain C++ calls it in play) for CarSound::CarSound sub_8210CC18.
+// No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSounds::Destroy sub_8210DCA8.
+// No adapter (removed 2026-10-29: only CarSounds::Init's plain C++ calls it in play) for CarSound::SetUp sub_8210DDC8.
+// No adapter (removed 2026-10-28: only Cone's, Doppler's, Matrix's and Calculate's plain C++ calls it in play) for X3DVec::Sub sub_824819E0.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DVec::Length sub_82481998.
+// No adapter (removed 2026-10-28: only Cone's and Doppler's plain C++ calls it in play) for X3DVec::Dot sub_824819B8.
+// No adapter (removed 2026-10-28: only Matrix's plain C++ calls it in play) for X3DVec::Cross sub_82481A18.
+// No adapter (removed 2026-10-28: only Curves' plain C++ calls it in play) for X3DAudio::EvaluateCurve sub_82480818.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Curves sub_82480918.
+// No adapter (removed 2026-10-28: only Matrix's plain C++ calls it in play) for X3DAudio::Pan sub_82480F80.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Matrix sub_82481390.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Cone sub_82480BA8.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Doppler sub_82480E90.
+// No adapter (removed 2026-10-28: only CarSound::Update3D's plain C++ calls it in play) for X3DAudioCalculate sub_82481880.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for CarSound::Update3D sub_8210F820.
+// No adapter (removed 2026-10-29: only TireLayer::Update's, RollSound::Update's, PlayOnce's and TurboSound::Update's plain C++ calls it in play) for CarSound::SetPitch sub_8210D158.
+// No adapter (removed 2026-10-29: only EngineLayer::Update's and HornSound::Update's plain C++ calls it in play) for CarSound::SetPitchScaled sub_8210D080.
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::IsPlaying sub_8210D1D8.
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::UpdateVoices sub_8210D378.
+// No adapter (removed 2026-10-29: only CarSound::Stop's and Release's plain C++ calls it in play) for CarSound::Clear sub_8210D320.
+// No adapter (removed 2026-10-29: only CarSound::PauseAll's plain C++ calls it) for CarSound::Pause sub_8210D240.
+// No adapter (removed 2026-10-29: only CarSound::ResumeAll's plain C++ calls it) for CarSound::Resume sub_8210D2C0.
+ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
+ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
+// No adapter (removed 2026-10-29: only PlayOnce's and the Starts' plain C++ calls it in play) for CarSound::AddVoice sub_8210CE38.
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::PlayOnce sub_8210E3E8.
+// No adapter (removed 2026-10-29: only EngineSound::Start's plain C++ calls it in play) for EngineLayer::Start sub_8210D410.
+// No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for EngineSound::Start sub_8210D6C0.
+// No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for TireSound::Start sub_8210D7F8.
+ITC_CAR_SOUNDS_ADAPTER(8210E030, CarSoundsCarSoundStart)
+ITC_CAR_SOUNDS_ADAPTER(8210E218, CarSoundsStop)
+ITC_CAR_SOUNDS_ADAPTER(8210F7C8, CarSoundsStopAll)
+// No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSound::Release sub_8210E170.
+// No adapter (removed 2026-11-04: only RaceSounds::Unload's plain C++ calls it in play, through its register step) for CarSounds::Release sub_8210F750.
+ITC_CAR_SOUNDS_ADAPTER(8210FE00, CarSoundsInit)
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E778 (the impact).
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E938 (the scrape).
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210EB90 (wave 9).
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for HitSounds::Update sub_8210FD78.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +736 sub_8210EBF0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +840 sub_8210ECF0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +888 sub_8210EEE0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for WindSound::Update sub_8210EDB0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for PassBySound::Update sub_8210F088.
+// No adapter (removed 2026-10-29: only EngineSound::Update's and EngineLayer::UpdatePitched's plain C++ calls it in play) for EngineLayer::Update sub_8210D478.
+// No adapter (removed 2026-10-29: only EngineSound::Update's plain C++ calls it in play) for EngineLayer::UpdatePitched sub_8210D718.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for EngineSound::Update sub_8210E470.
+// No adapter (removed 2026-10-29: only TireSound::Update's plain C++ calls it in play) for TireLayer::Update sub_8210D890.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for TireSound::Update sub_8210E5C0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for RollSound::Update sub_8210DB60.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for HornSound::Update sub_8210F118.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for TurboSound::Update sub_8210F4E8.
+ITC_CAR_SOUNDS_ADAPTER(82110048, CarSoundsUpdate)
+
+ITC_NATIVE_ENTRY_ALWAYS(82110258) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x82110258)) {
+    return;
+  }
+  if (!ITC_FLAG(native_car_sounds) || !hooks::CarSoundsGlobalsNative()) {
+    lifted::original::c82110258(ctx);
+    return;
+  }
+  hooks::CarSoundsGlobalsInit(ctx);
+}

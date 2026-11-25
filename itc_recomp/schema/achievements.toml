@@ -1,0 +1,84 @@
+# The schema of docs/functions/achievements.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The achievements: after a race, which of the game's 27 achievements it
+# earned (Achievements::Check) and their write (Achievements::Write), over
+# three .rdata tables and two write blocks in the image
+# (docs/known-data.md). Arrays are described by their element types; the
+# globals name each array's first element (its address the array's).
+
+# A packed time (Time::Less's two arguments point to one each): minutes in
+# bits 16-30, seconds 10-15, thousandths 0-9, bit 31 negative.
+[AchievementsPackedTime]
+measure = "Time::Less.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "packed", offset = 0, type = "u32" },
+]
+
+# One of the 27 words Achievements::Check writes (its r4: the caller's
+# array, one word per pair of the table, in its order).
+[AchievementFlag]
+measure = "Achievements::Check.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "earned", offset = 0, type = "u32", note = "1 when the pair of the check's kind was earned, else 0" },
+]
+
+# One of the 27 pairs of the achievements' table (.rdata 0x82011FB8).
+[AchievementPair]
+size = 8
+origin = "image"
+fields = [
+  { name = "kind", offset = 0, type = "s32", note = "0 items beaten, 1 a course time, 2 a count of the player's" },
+  { name = "id", offset = 4, type = "u32", note = "2 to 28, in order" },
+]
+
+# One of the 8 course time targets (.rdata 0x82012090).
+[AchievementCourseTarget]
+size = 8
+origin = "image"
+fields = [
+  { name = "route", offset = 0, type = "s32" },
+  { name = "time", offset = 4, type = "u32", note = "a packed time" },
+]
+
+# One of the 27 entries the write hands XUserWriteAchievements (0x828164F0).
+[AchievementEntry]
+size = 8
+origin = "image"
+fields = [
+  { name = "user", offset = 0, type = "u32", note = "player 0's controller's user ([0x826BABA4])" },
+  { name = "id", offset = 4, type = "u32" },
+]
+
+# One of the write's 27 XOVERLAPPEDs (0x828161F8), handed to
+# XUserWriteAchievements; nothing in the game reads or writes them (the
+# plugged-in wrapper neither). XAM's XOVERLAPPED layout.
+[AchievementOverlapped]
+size = 28
+origin = "image"
+fields = [
+  { name = "internal_low", offset = 0, type = "u32", note = "InternalLow: the result" },
+  { name = "internal_high", offset = 4, type = "u32", note = "InternalHigh" },
+  { name = "internal_context", offset = 8, type = "u32", note = "InternalContext" },
+  { name = "event", offset = 12, type = "u32", note = "hEvent" },
+  { name = "completion_routine", offset = 16, type = "fn", note = "pCompletionRoutine" },
+  { name = "completion_context", offset = 20, type = "u32", note = "dwCompletionContext" },
+  { name = "extended_error", offset = 24, type = "u32", note = "dwExtendedError" },
+]
+
+[globals]
+table = { address = 0x82011FB8, type = "s32", note = "the first of the 27 AchievementPair (its kind)" }
+thresholds = { address = 0x82012074, type = "u32", note = "read as this + 4 x the pair's index (23 to 26 land on the thresholds at 0x820120D0: 1, 10, 50, 100)" }
+course_targets = { address = 0x82012090, type = "s32", note = "the first of the 8 AchievementCourseTarget (its route)" }
+player_user = { address = 0x826BABA4, type = "u32", note = "player 0's controller's user" }
+user_counts = { address = 0x826C77DC, type = "u32", note = "the user table's (0x826C7670) +364: a word per signed-in slot, probably the network battles' wins" }
+progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states' RaceProgress: +6076 the route, +2204 the player's time)" }
+overlappeds = { address = 0x828161F8, type = "u32", note = "the first of the write's 27 AchievementOverlapped (its InternalLow)" }
+entries = { address = 0x828164F0, type = "u32", note = "the first of the write's 27 AchievementEntry (its user)" }

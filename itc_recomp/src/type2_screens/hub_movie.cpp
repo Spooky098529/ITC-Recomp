@@ -1,0 +1,346 @@
+// The hub's page dispatch, movie helpers and transitions
+// (docs/functions/type2-screens.md): see type2_screens.h.
+
+#include "type2_screens/type2_screens.h"
+
+#include "base/log.h"
+#include "data_tables/data_tables.h"
+#include "type2_screens/internal.h"
+#include "ui_movies/game.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+namespace type2_screens {
+
+namespace {
+
+constexpr uint32_t kNone = 0xFFFFFFFFu;
+constexpr uint64_t kAll = 0xFFFFFFFFFFFFFFFFull;  // li rN,-1
+// The hub's page handlers, in UpdatePage's table (its frame's +80 on):
+// MenuPage, the empty sub_82106540 twice, Choose, NoticePage, RecordPage,
+// SavePromptPage.
+constexpr uint32_t kHubPagesTable[7] = {0x8218FCC8, kEmpty,     kEmpty,    0x8218E768,
+                                        0x8218E8F8, 0x821900B8, 0x82190168};
+// The screen fades' counts, and the fades' layer words.
+constexpr uint32_t kFadeOutCount = 0x826A50E4;
+constexpr uint32_t kFadeInCount = 0x826A50DC;
+constexpr uint32_t kFadeInLayer = 0x82001BEC;
+constexpr uint32_t kFadeOutLayer = 0x82001BF0;
+// The floats Transition2 stores into node (11, 0)'s +16.
+constexpr uint32_t kWrapLast = 0x82008914;
+constexpr uint32_t kZero = 0x82000A34;
+
+schema::Type2HubData Data() { return Globals::hub_data(); }
+
+uint64_t Play(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t sub,
+              uint64_t child, uint64_t r6 = 0) {
+  return calls.Call(kPlay, frame, lr, movie, sub, child, r6);
+}
+uint64_t PlayNamed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t id,
+                   uint64_t r5 = 0, uint64_t r6 = 0) {
+  return calls.Call(kPlayNamed, frame, lr, movie, id, r5, r6);
+}
+uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie, uint64_t sub,
+                 uint64_t child, uint64_t text) {
+  return calls.Call(kSetText, frame, lr, movie, sub, child, text);
+}
+uint64_t Run(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie) {
+  return calls.Call(kRun, frame, lr, movie, 0);
+}
+uint32_t FadesDone() {
+  return (Load(kFadeOutCount) | Load(kFadeInCount)) == 0 ? 1 : 0;
+}
+// The description's string for the menu's item (`item`, the cursor + 1),
+// from `first` on: 587 and 588 for items 2 and 3 with a second-list car.
+uint32_t Description(uint32_t item, uint32_t first) {
+  if (item == 2 && Data().car_refused() != 0) {
+    return 587;
+  }
+  if (item == 3 && Data().car_refused() != 0) {
+    return 588;
+  }
+  return first + item;
+}
+
+}  // namespace
+
+uint64_t HubUpdatePage(uint64_t r3, uint32_t mode, uint32_t sp,
+                       const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82190498 Type2Hub::UpdatePage");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t machine = uint32_t(r3);
+  for (uint32_t i = 0; i < 7; i++) {
+    Store(frame + 80 + 4 * i, kHubPagesTable[i]);
+  }
+  const uint32_t page = Globals::hub_pages().page();
+  if (page != kNone) {
+    r3 = calls.Call(Load(frame + 80 + (page << 2)), frame, 0x82190530, mode, machine);
+  }
+  return r3;
+}
+
+uint64_t HubSetRecordText(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218F4D8 Type2Hub::SetRecordText");
+  const uint32_t frame = Frame(sp, 96);
+  const uint32_t movie = FindMovie(17, frame + 80);
+  return SetText(calls, frame, 0x8218F51C, movie, kAll, 1, Data().record_string() + 7527);
+}
+
+uint64_t HubRecordPage(uint32_t mode, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821900B8 Type2Hub::RecordPage");
+  const uint32_t frame = Frame(sp, 96);
+  const uint64_t r3 = HubSetRecordText(frame, calls);
+  const schema::PageObject pages = Globals::hub_pages();
+  const uint32_t before = pages.page();
+  if (before != kNone) {
+    pages.set_previous_page(before);
+  }
+  pages.set_page(kNone);
+  pages.set_step(kNone);
+  pages.set_queued_step(kNone);
+  Post(mode, 35);
+  Data().set_dialog_step(2);
+  return r3;
+}
+
+uint64_t HubShowBusy(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218EA90 Type2Hub::ShowBusy");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  PlayNamed(calls, frame, 0x8218EAD8, movie, 56);
+  PlayNamed(calls, frame, 0x8218EAF4, movie, 54);
+  return calls.Call(kLoopLast, frame, 0x8218EAFC, movie);
+}
+
+uint64_t HubHideBusy(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218EB10 Type2Hub::HideBusy");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  PlayNamed(calls, frame, 0x8218EB58, movie, 57);
+  return calls.Call(kFinishNamed, frame, 0x8218EB64, movie, 54);
+}
+
+uint32_t HubShowNoticeImage(uint32_t image, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8218F3F8 Type2Hub::ShowNoticeImage");
+  const uint32_t frame = Frame(sp, 112);
+  Store(frame + 80, kHubMovie);
+  const uint32_t pair = ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80);
+  const uint32_t movie = Load(pair);
+  static constexpr struct {
+    uint32_t (schema::Type2HubData::*images)() const;
+    uint32_t (schema::Type2HubData::*count)() const;
+    uint32_t slot;  // the movie's texture word
+  } kLists[2] = {{&schema::Type2HubData::images_address, &schema::Type2HubData::image_count, 9},
+                 {&schema::Type2HubData::images2_address, &schema::Type2HubData::image2_count, 8}};
+  for (const auto& list : kLists) {
+    const schema::Type2HubData data = Data();
+    const uint32_t count = (data.*list.count)();
+    uint32_t texture = 0;
+    for (uint32_t i = 0; i < count; i++) {
+      const schema::Type2HubImage record{uint32_t(data.load_at((data.*list.images)() - data.address + 4 * i, 4))};
+      if (record.index() == image) {
+        texture = record.texture().address;
+        break;
+      }
+    }
+    Store(MovieTextureSlot(movie, list.slot), texture);
+  }
+  return pair;
+}
+
+uint32_t HubShowNotice(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821903D0 Type2Hub::ShowNotice");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  const uint32_t entry =
+      data_tables::Entry56(Data().notice_table(), Data().notice_entry());
+  SetText(calls, frame, 0x8219042C, movie, 0, 1, schema::CareerEntry56(entry).text() + 4650);
+  SetText(calls, frame, 0x82190448, movie, 0, 2, Data().notice_entry() + 6683);
+  HubShowNoticeImage(schema::CareerEntry56(entry).image(), frame);
+  const uint32_t more = uint32_t(calls.Call(kHasMoreText, frame, 0x82190460, movie, 0, 2));
+  const uint32_t node = ui_movies::FindNode(movie, 0, 0);
+  Node(node).set_visible(more != 0 ? 1 : 0);
+  return node;
+}
+
+uint64_t HubFillMenu(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218FB20 Type2Hub::FillMenu");
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  static constexpr uint32_t kItems[8] = {109, 116, 111, 117, 118, 119, 113, 114};
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(frame + 96 + 4 * i, kItems[i]);
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    SetText(calls, frame, 0x8218FBA4, movie, 11, 5 + i, Load(frame + 96 + 4 * i));
+  }
+  const uint32_t cursor = Globals::hub_menu().cursor();
+  calls.Call(kScrollText, frame, 0x8218FBD4, movie, 9, 0, 1);
+  calls.Call(kScrollReset, frame, 0x8218FBE4, movie, 9, 0);
+  uint32_t text = 536 + cursor;
+  if (cursor == 2 && Data().car_refused() != 0) {
+    text = 587;
+  } else if (cursor == 3 && Data().car_refused() != 0) {
+    text = 588;
+  }
+  SetText(calls, frame, 0x8218FC38, movie, 9, 0, text);
+  static constexpr uint32_t kPrompts[6] = {0, 0, 6, 2, 7, 3};
+  HubSetPrompts(kPrompts, frame);
+  const uint32_t car = SelectedGarageCar(vehicle_accessors::SaveDataOf(0));
+  const uint64_t r3 =
+      calls.Call(kGetCarSpec, frame, 0x8218FCA0, schema::CarMakersCar(car + 212).car_id());
+  const bool second = schema::CarSpec(uint32_t(r3)).list_kind() == 1;
+  Data().set_car_refused(second ? 1 : 0);
+  return r3;
+}
+
+uint64_t HubTransition0(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821901C0 Type2Hub::Transition0");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    Play(calls, frame, 0x82190220, movie, kAll, 0);
+    Play(calls, frame, 0x82190240, movie, 8, 0);
+    calls.Call(kLoopLast, frame, 0x82190248, movie);
+    Play(calls, frame, 0x82190268, movie, 15, 0);
+    calls.Call(kLoopLast, frame, 0x82190270, movie);
+    calls.Call(kFadeIn, frame, 0x8219028C, Load(kFadeInLayer), 0, 0, 0);
+    HubFillMenu(frame, calls);
+    Store(step, 1);
+  }
+  return uint32_t(Run(calls, frame, 0x821902A4, movie)) == 0 ? 1 : 0;
+}
+
+uint64_t HubTransition1(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218EC78 Type2Hub::Transition1");
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    const uint32_t item = Globals::hub_menu().cursor() + 1;
+    const uint32_t second = Data().car_refused();
+    if (second == 0 || (item != 2 && item != 3)) {
+      Play(calls, frame, 0x8218ED04, movie, 11, item + 1);
+      calls.Call(kLoopLast, frame, 0x8218ED0C, movie);
+    }
+    Play(calls, frame, 0x8218ED2C, movie, 12, 1);
+    calls.Call(kLoop, frame, 0x8218ED3C, movie, 12, 1);
+    if (Data().car_refused() != 0) {
+      calls.Call(kSetNodeColor, frame, 0x8218ED60, movie, 11, 6, 2);
+      calls.Call(kSetNodeColor, frame, 0x8218ED74, movie, 11, 7, 2);
+    }
+    Store(step, 1);
+  }
+  Run(calls, frame, 0x8218ED88, movie);
+  return 1;
+}
+
+uint64_t HubTransition2(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218EE48 Type2Hub::Transition2");
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    const schema::FrontEndMenu menu = Globals::hub_menu();
+    const uint32_t before = menu.previous();
+    const uint32_t item = menu.cursor() + 1;
+    calls.Call(kFinish, frame, 0x8218EEA4, movie, 11, before + 2);
+    if (Data().car_refused() != 0 && (item == 2 || item == 3)) {
+      PlayNamed(calls, frame, 0x8218EEE4, movie, 39);
+      calls.Call(kFinishNamed, frame, 0x8218EEF0, movie, 39);
+      PlayNamed(calls, frame, 0x8218EF0C, movie, 40, 1, 1);
+      calls.Call(kFinishNamed, frame, 0x8218EF18, movie, 40);
+    } else {
+      Play(calls, frame, 0x8218EF44, movie, 11, Globals::hub_menu().cursor() + 2, 1);
+      calls.Call(kLoopLast, frame, 0x8218EF4C, movie);
+    }
+    calls.Call(kFinish, frame, 0x8218EF5C, movie, 11, 13);
+    calls.Call(kFinish, frame, 0x8218EF6C, movie, 11, 12);
+    const uint32_t cursor = item - 1;
+    const uint32_t way = Globals::hub_menu().moved();
+    if (way == 1) {
+      if (cursor == 7) {
+        Store(Node(ui_movies::FindNode(movie, 11, 0)).y_address(), Load(kWrapLast));
+      } else {
+        Play(calls, frame, 0x8218EFDC, movie, 11, 13);
+      }
+    } else if (way == kNone) {
+      if (cursor == 0) {
+        Store(Node(ui_movies::FindNode(movie, 11, 0)).y_address(), Load(kZero));
+      } else {
+        Play(calls, frame, 0x8218EFDC, movie, 11, 12);
+      }
+    }
+    const uint32_t now = Globals::hub_menu().cursor() + 1;
+    calls.Call(kScrollText, frame, 0x8218F014, movie, 9, 0, 1);
+    SetText(calls, frame, 0x8218F064, movie, 9, 0, Description(now, 535));
+    calls.Call(kScrollReset, frame, 0x8218F074, movie, 9, 0);
+    Store(step, 1);
+  }
+  Run(calls, frame, 0x8218F088, movie);
+  return 1;
+}
+
+uint64_t HubTransition3(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218ED98 Type2Hub::Transition3");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    calls.Call(kFadeOut, frame, 0x8218EDF4, Load(kFadeOutLayer), 0, 0, 0);
+    Store(step, 1);
+  }
+  Run(calls, frame, 0x8218EE08, movie);
+  return FadesDone();
+}
+
+uint64_t HubTransition5(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82190548 Type2Hub::Transition5");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    Play(calls, frame, 0x821905A8, movie, kAll, 2);
+    Play(calls, frame, 0x821905C8, movie, 8, 0);
+    calls.Call(kLoopLast, frame, 0x821905D0, movie);
+    Play(calls, frame, 0x821905F0, movie, 15, 0);
+    calls.Call(kLoopLast, frame, 0x821905F8, movie);
+    PlayNamed(calls, frame, 0x82190614, movie, 2);
+    calls.Call(kLoopNamed, frame, 0x82190620, movie, 2);
+    calls.Call(kFadeIn, frame, 0x8219063C, Load(kFadeInLayer), 0, 0, 0);
+    static constexpr uint32_t kPrompts[6] = {0, 0, kNone, kNone, kNone, kNone};
+    HubSetPrompts(kPrompts, frame);
+    HubShowNotice(frame, calls);
+    Store(step, 1);
+  }
+  return uint32_t(Run(calls, frame, 0x82190670, movie)) == 0 ? 1 : 0;
+}
+
+uint64_t HubTransition6(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8218F098 Type2Hub::Transition6");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    calls.Call(kFinishNamed, frame, 0x8218F0E4, movie, 2);
+    calls.Call(kFadeOut, frame, 0x8218F0FC, 60, 0, 0, 0);
+    Store(step, 1);
+  }
+  Run(calls, frame, 0x8218F110, movie);
+  return FadesDone();
+}
+
+uint64_t HubTransition7(uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821902C8 Type2Hub::Transition7");
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  if (Load(step) == 0) {
+    Play(calls, frame, 0x82190328, movie, kAll, 3);
+    calls.Call(kFadeIn, frame, 0x82190340, 60, 0, 0, 0);
+    HubFillMenu(frame, calls);
+    Store(step, 1);
+  }
+  Run(calls, frame, 0x82190358, movie);
+  const uint32_t done = FadesDone();
+  if (done != 0 && Data().car_refused() != 0) {
+    calls.Call(kSetNodeColor, frame, 0x821903A0, movie, 11, 6, 2);
+    calls.Call(kSetNodeColor, frame, 0x821903B4, movie, 11, 7, 2);
+  }
+  return done;
+}
+
+}  // namespace type2_screens

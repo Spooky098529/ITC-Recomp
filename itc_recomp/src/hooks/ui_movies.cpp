@@ -2,24 +2,32 @@
 // src/ui_movies/ (docs/functions/ui-movies.md).
 
 #include "guest.h"
+#include "lifted/names.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
 
 #include <bit>
 #include <optional>
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/ui_movies.h"
+#include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "lifted/sdk.h"
+#include "schema/ui_movies_game.h"
 
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "Run the UI movie library's functions (the movies the HUD and the menus are made "
-              "of: the accessors sub_825A6508, sub_825A6518, sub_825A6528, sub_825A6540, "
-              "sub_825A6558, sub_8259D600, sub_8259D618, sub_8259D628, sub_8259D648, "
+              "of: the accessors "
+              "sub_8259D618, sub_8259D628, sub_8259D648, "
               "UiMovie::Child sub_8259D658 and sub_8259D670; the chunk and file helpers "
               "sub_8259D5C8, sub_825A0EB0 and sub_825A0CD0; UiMovie::SetRenderer sub_8259D798; "
-              "the draw context reset sub_8259D930; the keys sub_8259FA20, sub_8259FB30 and "
-              "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
+              "the draw context reset sub_8259D930; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
               "the helpers without adapters (the flag switches their callers); "
@@ -30,7 +38,14 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
               "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
-              "UiMovie::QueueText sub_8259F770) "
+              "UiMovie::QueueText sub_8259F770; UiMovie::ApplyAnimation sub_825A08E0 (its tracks "
+              "through sub_825A0548's override; the accessors only it calls, without adapters: "
+              "sub_825A6508, sub_825A6518, sub_825A6528, sub_825A6540, sub_825A6558); UiMovie::ApplyTrack sub_825A0548, with native "
+              "atexit, and under it, without adapters (the flag switches ApplyTrack), "
+              "UiMovie::TrackProperty sub_8259FE68, the keys sub_8259FA20, sub_8259FB30 "
+              "and sub_8259FC18, and the accessor sub_8259D600); UiMovie::Update sub_8211D2F8 (its "
+              "calls through their overrides, from its override's wrapper in "
+              "src/frame_pacing/per_frame_logic.cpp) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -50,234 +65,154 @@ bool SlotDiagnostics() {
 // An accessor: r3 = the object, r4 = i; returns the address (or the pointer)
 // `native` gives.
 #define UI_MOVIE_ACCESSOR(address, expression)    \
-  extern "C" REX_FUNC(sub_##address) {            \
-    REX_FUNC_PROLOGUE();                          \
-    if (!ITC_FLAG(native_ui_movies)) {            \
-      __imp__sub_##address(ctx, base);            \
-      return;                                     \
-    }                                             \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ui_movies)) { \
     const uint32_t object = ctx.r3.u32;           \
     const uint32_t i = ctx.r4.u32;                \
-    (void)base;                                   \
     ctx.r3.u64 = (expression);                    \
   }
 
-UI_MOVIE_ACCESSOR(825A6508, ui_movies::NodeTrack(object, i))
-UI_MOVIE_ACCESSOR(825A6518, ui_movies::Key(object, i))
-UI_MOVIE_ACCESSOR(825A6528, ui_movies::NodeTrackList(base, object, i))
-UI_MOVIE_ACCESSOR(825A6540, ui_movies::KeyList(base, object, i))
-UI_MOVIE_ACCESSOR(825A6558, ui_movies::SubAnimation(base, object, i))
-UI_MOVIE_ACCESSOR(8259D600, ui_movies::VertexOffset(object, i))
 UI_MOVIE_ACCESSOR(8259D618, ui_movies::PrimitiveTexture(object, i))
-UI_MOVIE_ACCESSOR(8259D628, ui_movies::PrimitiveVertex(base, object, i))
+UI_MOVIE_ACCESSOR(8259D628, ui_movies::PrimitiveVertex(object, i))
 UI_MOVIE_ACCESSOR(8259D648, ui_movies::PictureTexture(object, i))
-UI_MOVIE_ACCESSOR(8259D658, ui_movies::Child(base, object, i))
-UI_MOVIE_ACCESSOR(8259D670, ui_movies::SceneAnimation(base, object, i))
+UI_MOVIE_ACCESSOR(8259D658, ui_movies::Child(object, i))
+UI_MOVIE_ACCESSOR(8259D670, ui_movies::SceneAnimation(object, i))
 #undef UI_MOVIE_ACCESSOR
 
 // UiMovie::DrawPicture and DrawPrimitive: r3 = the draw context, r5 = the
 // node, r6 = the layer (src/hooks/ui_movies.h).
-extern "C" REX_FUNC(sub_8259ED40) {
-  REX_FUNC_PROLOGUE();
-  ui_movies_hooks::DrawPicture(ctx, base);
+ITC_NATIVE_ENTRY_ALWAYS(8259ED40) {
+  
+  ui_movies_hooks::DrawPicture(ctx);
 }
-extern "C" REX_FUNC(sub_8259F348) {
-  REX_FUNC_PROLOGUE();
-  ui_movies_hooks::DrawPrimitive(ctx, base);
+ITC_NATIVE_ENTRY_ALWAYS(8259F348) {
+  
+  ui_movies_hooks::DrawPrimitive(ctx);
 }
 
 // sub_8259D5C8: r3 = a chunk, r4 = a tag; the next chunk with that tag.
-extern "C" REX_FUNC(sub_8259D5C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D5C8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FindChunk(base, ctx.r3.u32, ctx.r4.u32);
+ITC_NATIVE_ENTRY(8259D5C8, ITC_FLAG(native_ui_movies)) {
+  ctx.r3.u64 = ui_movies::FindChunk(ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_825A0EB0: r3 = a movie file; its scene, or 0.
-extern "C" REX_FUNC(sub_825A0EB0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0EB0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FileScene(base, ctx.r3.u32);
+ITC_NATIVE_ENTRY(825A0EB0, ITC_FLAG(native_ui_movies)) {
+  ctx.r3.u64 = ui_movies::FileScene(ctx.r3.u32);
 }
 
 // sub_825A0CD0: r3 = an XMD file, r4 = i; its entry i, or 0.
-extern "C" REX_FUNC(sub_825A0CD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0CD0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::XmdEntry(base, ctx.r3.u32, ctx.r4.u32);
+ITC_NATIVE_ENTRY(825A0CD0, ITC_FLAG(native_ui_movies)) {
+  ctx.r3.u64 = ui_movies::XmdEntry(ctx.r3.u32, ctx.r4.u32);
 }
 
 // UiMovie::SetRenderer: r3 = the renderer, r4 = the command list.
-extern "C" REX_FUNC(sub_8259D798) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D798(ctx, base);
-    return;
-  }
-  ui_movies::SetRenderer(base, ctx.r3.u32, ctx.r4.u32);
+ITC_NATIVE_ENTRY(8259D798, ITC_FLAG(native_ui_movies)) {
+  ui_movies::SetRenderer(ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_8259D930: r3 = a draw context, reset; returns it.
-extern "C" REX_FUNC(sub_8259D930) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D930(ctx, base);
-    return;
-  }
-  ui_movies::ResetDrawContext(base, ctx.r3.u32);
+ITC_NATIVE_ENTRY(8259D930, ITC_FLAG(native_ui_movies)) {
+  ui_movies::ResetDrawContext(ctx.r3.u32);
 }
 
-// The keys: r3, r4 = the two keys, f1 = t.
-// sub_8259FA20: an integer track's eased value in r3.
-extern "C" REX_FUNC(sub_8259FA20) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259FA20(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
-}
+// The keys (sub_8259FA20, sub_8259FB30, sub_8259FC18) have no adapters:
+// only the native ApplyTrack reaches them in play.
 
-// sub_8259FB30: a float track's value in f1. r3 and r4, which tan leaves
-// as its second _ctrlfp does, aren't read by the one caller (sub_825A0548)
-// and are left as they were.
-extern "C" REX_FUNC(sub_8259FB30) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ui_movies)) {
-    ctx.fpscr.disableFlushMode();
-    if (const std::optional<double> value =
-            ui_movies::CubicFloat(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
-      ctx.f1.f64 = *value;
-      return;
-    }
-  }
-  __imp__sub_8259FB30(ctx, base);
-}
-
-// sub_8259FC18: an integer track's cubic value in r3.
-extern "C" REX_FUNC(sub_8259FC18) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ui_movies)) {
-    ctx.fpscr.disableFlushMode();
-    if (const std::optional<uint32_t> value =
-            ui_movies::CubicInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
-      ctx.r3.u64 = *value;
-      return;
-    }
-  }
-  __imp__sub_8259FC18(ctx, base);
-}
 
 namespace {
 // Hands a recorded chunk to the renderer (vtable slot 4: r3 = the renderer,
 // r4 = the chunk, r5 = the key, f1 = the float at `depth`), from a frame like
 // the original's, with its return address.
-void Submit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t return_address,
+void Submit(lifted::Regs& ctx, uint32_t frame_bytes, uint32_t return_address,
             uint32_t chunk, uint32_t key, uint32_t depth) {
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
-    const uint32_t renderer = guest::LoadU32(base, ui_movies::kRenderer);
-    ctx.r3.u64 = renderer;
+  guest_call::InFrame(ctx, frame_bytes, return_address, [&](uint32_t) {
+    const schema::UiMovieRenderer renderer = schema::UiMoviesGlobals::renderer();
+    ctx.r3.u64 = renderer.address;
     ctx.r4.u64 = chunk;
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, depth)));
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, renderer) + 16));
+    ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(depth)));
+    lifted::CallFromContext(ctx, renderer.vtable().submit());
   });
   ctx.lr = lr;
 }
 
-constexpr uint32_t kQuadDepth = 0x82000A34;        // 0.0 (the caller's f1 isn't read)
-constexpr uint32_t kClipResetDepth = 0x82001C00;
-constexpr uint32_t kStateResetDepth = 0x82001BFC;
+// The depths' floats: 0.0 for the quads (the caller's f1 isn't read).
+constexpr uint32_t kQuadDepth = schema::UiMoviesGlobals::zero_address();
+constexpr uint32_t kClipResetDepth = schema::UiMoviesGlobals::clip_reset_depth_address();
+constexpr uint32_t kStateResetDepth = schema::UiMoviesGlobals::state_reset_depth_address();
+
+// The command list the recorders record into.
+uint32_t MovieCommandList() {
+  return schema::UiMoviesGlobals::command_list<schema::View>().address;
+}
 
 // A quad recorder: r3 = the quad, r4 = the key (f1 isn't read).
-bool RecordQuad(PPCContext& ctx, uint8_t* base, bool textured, uint32_t return_address) {
+bool RecordQuad(lifted::Regs& ctx, bool textured, uint32_t return_address) {
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics()) {
     return false;
   }
   const uint32_t key = ctx.r4.u32;
-  const std::optional<uint32_t> chunk = ui_movies::RecordQuad(
-      base, guest::LoadU32(base, ui_movies::kCommandList), ctx.r3.u32, textured);
+  const std::optional<uint32_t> chunk = ui_movies::RecordQuad(MovieCommandList(), ctx.r3.u32, textured);
   if (!chunk) {
     return false;
   }
-  Submit(ctx, base, 160, return_address, *chunk, key, kQuadDepth);
+  Submit(ctx, 160, return_address, *chunk, key, kQuadDepth);
   return true;
 }
 }  // namespace
 
 // sub_8259DAD0: a textured quad or primitive recorded and handed on.
-extern "C" REX_FUNC(sub_8259DAD0) {
-  REX_FUNC_PROLOGUE();
-  if (!RecordQuad(ctx, base, true, 0x8259E090)) {
-    __imp__sub_8259DAD0(ctx, base);
+ITC_NATIVE_ENTRY_ALWAYS(8259DAD0) {
+  
+  if (!RecordQuad(ctx, true, 0x8259E090)) {
+    lifted::original::c8259DAD0(ctx);
   }
 }
 
 // sub_8259E098: the same, untextured.
-extern "C" REX_FUNC(sub_8259E098) {
-  REX_FUNC_PROLOGUE();
-  if (!RecordQuad(ctx, base, false, 0x8259E618)) {
-    __imp__sub_8259E098(ctx, base);
+ITC_NATIVE_ENTRY_ALWAYS(8259E098) {
+  
+  if (!RecordQuad(ctx, false, 0x8259E618)) {
+    lifted::original::c8259E098(ctx);
   }
 }
 
 // sub_8259D7B0: r3 = a key (f1 isn't read): the clip reset to the whole
 // screen and the state reset, each recorded and handed on.
-extern "C" REX_FUNC(sub_8259D7B0) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t list = guest::LoadU32(base, ui_movies::kCommandList);
+ITC_NATIVE_ENTRY_ALWAYS(8259D7B0) {
+  
+  const uint32_t list = MovieCommandList();
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics() ||
-      !ui_movies::ChunksFit(base, list,
+      !ui_movies::ChunksFit(list,
                             {ui_movies::kResetChunkSlots, ui_movies::kResetChunkSlots})) {
-    __imp__sub_8259D7B0(ctx, base);
+    lifted::original::c8259D7B0(ctx);
     return;
   }
   const uint32_t key = ctx.r3.u32;
-  Submit(ctx, base, 144, 0x8259D888, ui_movies::RecordClipReset(base, list), key,
+  Submit(ctx, 144, 0x8259D888, ui_movies::RecordClipReset(list), key,
          kClipResetDepth);
   // The renderer only takes the chunk (it doesn't record into the list), so
   // the second still fits; checked again all the same.
-  const uint32_t list_now = guest::LoadU32(base, ui_movies::kCommandList);
-  if (!ui_movies::ChunksFit(base, list_now, {ui_movies::kResetChunkSlots})) {
+  const uint32_t list_now = MovieCommandList();
+  if (!ui_movies::ChunksFit(list_now, {ui_movies::kResetChunkSlots})) {
     ITC_LOG_ERROR("ui_movies: the state reset chunk no longer fits after the clip reset's");
     return;
   }
-  Submit(ctx, base, 144, 0x8259D924, ui_movies::RecordStateReset(base, list_now), key,
+  Submit(ctx, 144, 0x8259D924, ui_movies::RecordStateReset(list_now), key,
          kStateResetDepth);
 }
 
 // The file fix-ups: r3 = the file; each returns its result in r3. Their
 // helpers (sub_825A0C60, sub_825A0E40, sub_825A0ED8, sub_8259D688 and
 // sub_825A6570) have no adapters: only these reach them, natively.
-extern "C" REX_FUNC(sub_825A0CF8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0CF8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::CheckXmd(base, ctx.r3.u32);
+ITC_NATIVE_ENTRY(825A0CF8, ITC_FLAG(native_ui_movies)) {
+  ctx.r3.u64 = ui_movies::CheckXmd(ctx.r3.u32);
 }
 
 // UiMovie::FixUpFile.
-extern "C" REX_FUNC(sub_825A0EF0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0EF0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ui_movies::FixUpFile(base, ctx.r3.u32);
+ITC_NATIVE_ENTRY(825A0EF0, ITC_FLAG(native_ui_movies)) {
+  ctx.r3.u64 = ui_movies::FixUpFile(ctx.r3.u32);
 }
 
 // sub_8259EBE8: r3 = a quad or primitive, r4 = its key, f1 = a depth (passed
@@ -285,32 +220,36 @@ extern "C" REX_FUNC(sub_825A0EF0) {
 // textured by its +84, then, when clipped (+100), the resets with key r4 + 1.
 // The recorders (ours, above) are called from a frame like the original's
 // (112 bytes) with its return addresses.
-extern "C" REX_FUNC(sub_8259EBE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
+  
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259EBE8, ctx)) {
+    return;
+  }
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259EBE8(ctx, base);
+    lifted::original::c8259EBE8(ctx);
     return;
   }
   const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
   const double depth = ctx.f1.f64;
   const uint64_t lr = ctx.lr;
-  const bool textured = guest::LoadU32(base, quad + 84) != 0;
-  guest_call::InFrame(ctx, base, 112, textured ? 0x8259EC24 : 0x8259EC1C, [&](uint32_t) {
+  const schema::UiMovieQuad q(quad);
+  const bool textured = q.texture() != 0;
+  guest_call::InFrame(ctx, 112, textured ? 0x8259EC24 : 0x8259EC1C, [&](uint32_t) {
     ctx.r3.u64 = quad;
     ctx.r4.u64 = key;
     ctx.f1.f64 = depth;
     if (textured) {
-      sub_8259DAD0(ctx, base);
+      lifted::Enter(ctx, lifted::entry::e8259DAD0);
     } else {
-      sub_8259E098(ctx, base);
+      lifted::Enter(ctx, lifted::entry::e8259E098);
     }
   });
-  if (guest::LoadU32(base, quad + 100) != 0) {
-    guest_call::InFrame(ctx, base, 112, 0x8259EC3C, [&](uint32_t) {
+  if (q.clipped() != 0) {
+    guest_call::InFrame(ctx, 112, 0x8259EC3C, [&](uint32_t) {
       ctx.r3.u64 = uint64_t(key) + 1;
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = depth;
-      sub_8259D7B0(ctx, base);
+      lifted::Enter(ctx, lifted::entry::e8259D7B0);
     });
   }
   ctx.lr = lr;
@@ -322,55 +261,55 @@ namespace {
 // The quad built natively, then handed to sub_8259EBE8 from a frame of
 // `frame_bytes` (the original's) returning to `return_address`.
 template <typename Build>
-void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+void BuildAndRecord(lifted::Regs& ctx, uint32_t frame_bytes,
                     uint32_t return_address, Build build) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const ui_movies::QuadCall call = build(ctx.r1.u32 - frame_bytes);
-  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, frame_bytes, return_address, [&](uint32_t) {
     ctx.r3.u64 = call.quad;
     ctx.r4.u64 = call.key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = call.depth;
-    sub_8259EBE8(ctx, base);
+    lifted::Enter(ctx, lifted::entry::e8259EBE8);
   });
   ctx.lr = lr;
 }
 }  // namespace
 
-void DrawPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawPicture) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259ED40(ctx, base);
+    lifted::original::c8259ED40(ctx);
     return;
   }
   // Without a texture the original faults (its size read at guest address
   // 4; never so in play): it's left to run.
-  if (ui_movies::PictureTextureOf(base, ctx.r3.u32, ctx.r5.u32) == 0) {
-    __imp__sub_8259ED40(ctx, base);
+  if (ui_movies::PictureTextureOf(ctx.r3.u32, ctx.r5.u32) == 0) {
+    lifted::original::c8259ED40(ctx);
     return;
   }
-  RecordPicture(ctx, base);
+  RecordPicture(ctx);
 }
 
-void RecordPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordPicture) {
   const uint32_t context = ctx.r3.u32, picture = ctx.r5.u32, layer = ctx.r6.u32;
-  BuildAndRecord(ctx, base, 1088, 0x8259F338, [&](uint32_t frame) {
-    return ui_movies::BuildPicture(base, context, picture, layer, frame);
+  BuildAndRecord(ctx, 1088, 0x8259F338, [&](uint32_t frame) {
+    return ui_movies::BuildPicture(context, picture, layer, frame);
   });
 }
 
-void DrawPrimitive(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawPrimitive) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259F348(ctx, base);
+    lifted::original::c8259F348(ctx);
     return;
   }
-  RecordPrimitive(ctx, base);
+  RecordPrimitive(ctx);
 }
 
-void RecordPrimitive(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordPrimitive) {
   const uint32_t context = ctx.r3.u32, primitive = ctx.r5.u32, layer = ctx.r6.u32;
-  BuildAndRecord(ctx, base, 1152, 0x8259F6EC, [&](uint32_t frame) {
-    return ui_movies::BuildPrimitive(base, context, primitive, layer, frame);
+  BuildAndRecord(ctx, 1152, 0x8259F6EC, [&](uint32_t frame) {
+    return ui_movies::BuildPrimitive(context, primitive, layer, frame);
   });
 }
 
@@ -378,13 +317,12 @@ namespace {
 // DrawNode's calls that need the guest context: from the level's frame
 // (`stack`, the r1 the original has there) with its return address.
 struct Walk {
-  PPCContext* ctx;
-  uint8_t* base;
+  lifted::Regs* ctx;
 };
 uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, uint32_t scene,
                       uint32_t node, uint64_t layer, uint32_t stack, uint32_t return_address) {
   Walk& walk = *static_cast<Walk*>(user);
-  PPCContext& ctx = *walk.ctx;
+  lifted::Regs& ctx = *walk.ctx;
   const uint64_t r1 = ctx.r1.u64, lr = ctx.lr;
   ctx.r1.u64 = stack;
   ctx.lr = return_address;
@@ -394,13 +332,13 @@ uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, ui
   ctx.r6.u64 = layer;
   switch (kind) {
     case ui_movies::DrawCall::kPicture:
-      DrawPicture(ctx, walk.base);
+      DrawPicture(ctx);
       break;
     case ui_movies::DrawCall::kPrimitive:
-      DrawPrimitive(ctx, walk.base);
+      DrawPrimitive(ctx);
       break;
     case ui_movies::DrawCall::kText:
-      __imp__sub_8259F770(ctx, walk.base);
+      lifted::original::c8259F770(ctx);
       break;
   }
   ctx.r1.u64 = r1;
@@ -410,45 +348,329 @@ uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, ui
 }
 }  // namespace
 
-void Draw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Draw) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259FA00(ctx, base);
+    lifted::original::c8259FA00(ctx);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8259FA00 UiMovie::Draw");
-  const uint32_t context = ctx.r3.u32;
-  guest::StoreU32(base, context + 104, ctx.r7.u32);
-  guest::StoreU32(base, context + 96, ctx.r5.u32);
-  guest::StoreU32(base, context + 100, ctx.r6.u32);
+  const schema::UiMovieDrawContext context(ctx.r3.u32);
+  context.set_unknown_104(ctx.r7.u32);
+  context.set_textures(ctx.r5.u32);
+  context.set_text_list(ctx.r6.u32);
   ctx.r5.u64 = ctx.r4.u64;
   ctx.r6.u64 = 0;
-  RecordDrawNode(ctx, base);
+  RecordDrawNode(ctx);
 }
 
-void RecordDrawNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordDrawNode) {
   ctx.fpscr.disableFlushMode();
-  Walk walk{&ctx, base};
-  ctx.r3.u64 = ui_movies::DrawNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64,
+  Walk walk{&ctx};
+  ctx.r3.u64 = ui_movies::DrawNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64,
                                    ctx.r1.u32, CallFromWalk, &walk);
 }
 
-void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ResetAfterMovie) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259DAC0(ctx, base);
+    lifted::original::c8259DAC0(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r4.u64;
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, kClipResetDepth)));
-  sub_8259D7B0(ctx, base);
+  ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(kClipResetDepth)));
+  lifted::Enter(ctx, lifted::entry::e8259D7B0);
 }
 
-void RestorePose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RestorePose) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_82119B80(ctx, base);
+    lifted::original::c82119B80(ctx);
     return;
   }
-  ctx.r3.u64 = ui_movies::RestorePose(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = ui_movies::RestorePose(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                       ctx.r7.u32);
 }
 }  // namespace ui_movies_hooks
+
+namespace {
+// ApplyTrack's key functions through the translated code (ui_movies::KeyCall),
+// from a frame like the original's (224 bytes) with its return addresses.
+struct GuestKeys {
+  lifted::Regs& ctx;
+  ui_movies::KeyCall Call() { return {&GuestKeys::Run, this}; }
+  static ui_movies::KeyResult Run(void* self, uint32_t function, uint32_t k0, uint32_t k1,
+                                  double t) {
+    auto& keys = *static_cast<GuestKeys*>(self);
+    lifted::Regs& ctx = keys.ctx;
+    uint32_t return_address = 0;
+    switch (function) {
+      case 0x8259FB30: return_address = 0x825A0840; break;
+      case 0x8259FC18: return_address = 0x825A0700; break;
+      case 0x8259FD40: return_address = 0x825A0670; break;
+      case 0x8259FAA8: return_address = 0x825A065C; break;
+      default: ITC_LOG_ERROR("ui_movies: ApplyTrack: no key function {:08X}", function); return {};
+    }
+    const uint64_t lr = ctx.lr;
+    guest_call::InFrame(ctx, 224, return_address, [&](uint32_t) {
+      ctx.r3.u64 = k0;
+      ctx.r4.u64 = k1;
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = t;
+      switch (function) {
+        case 0x8259FB30: lifted::original::c8259FB30(ctx); break;
+        case 0x8259FC18: lifted::original::c8259FC18(ctx); break;
+        case 0x8259FD40: lifted::Enter(ctx, lifted::e8259FD40); break;
+        default: lifted::Enter(ctx, lifted::e8259FAA8); break;
+      }
+    });
+    ctx.lr = lr;
+    return {ctx.r3.u64, ctx.f1.f64};
+  }
+};
+}  // namespace
+
+namespace ui_movies_hooks {
+ITC_REGS_STEP(ApplyTrackNative) {
+  ctx.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{ctx};
+  GuestKeys keys{ctx};
+  ui_movies::ApplyTrack(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r5.u32, ctx.r6.u32,
+                        ctx.r1.u32 - 224, atexit.Call(), keys.Call());
+}
+
+ITC_REGS_STEP(ApplyTrack) {
+  if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
+    lifted::original::c825A0548(ctx);
+    return;
+  }
+  ApplyTrackNative(ctx);
+}
+}  // namespace ui_movies_hooks
+
+namespace {
+// ApplyAnimation's tracks (ui_movies::TrackCall): sub_825A0548 (its override)
+// from the level's frame, with the original's return address.
+struct GuestTracks {
+  lifted::Regs& ctx;
+  ui_movies::TrackCall Call() { return {&GuestTracks::Run, this}; }
+  static void Run(void* self, uint32_t frame, uint32_t node, uint32_t track, double t,
+                  uint32_t k0, uint32_t k1) {
+    auto& tracks = *static_cast<GuestTracks*>(self);
+    lifted::Regs& ctx = tracks.ctx;
+    const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = node;
+    ctx.r4.u64 = track;
+    ctx.r5.u64 = k0;
+    ctx.r6.u64 = k1;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = t;
+    ctx.lr = 0x825A0AF4;
+    lifted::Enter(ctx, game::UiMovie::ApplyTrack);
+    ctx.r1.u64 = stack;
+    ctx.lr = lr;
+  }
+};
+}  // namespace
+
+void ui_movies_hooks::ApplyAnimationNative(lifted::Regs& ctx) {
+  ctx.fpscr.disableFlushMode();
+  GuestTracks tracks{ctx};
+  const uint32_t node = ctx.r3.u32, animation = ctx.r4.u32, loop = ctx.r6.u32;
+  const double time = ctx.f1.f64;
+  ctx.r3.u64 =
+      ui_movies::ApplyAnimation(node, animation, time, loop, ctx.r1.u32 - 224, tracks.Call());
+}
+
+// UiMovie::ApplyAnimation: r3 = the node, r4 = the animation, f1 = the time,
+// r6 = loop; r3 = 1 while playing.
+ITC_NATIVE_ENTRY_ALWAYS(825A08E0) {
+  
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x825A08E0, ctx)) {
+    return;
+  }
+  if (!ITC_FLAG(native_ui_movies)) {
+    lifted::original::c825A08E0(ctx);
+    return;
+  }
+  ui_movies_hooks::ApplyAnimationNative(ctx);
+}
+
+ui_movies_hooks::UpdateCalleeStandIn ui_movies_hooks::g_update_callee_stand_in = nullptr;
+
+bool ui_movies_hooks::UpdateCalleeStoodInOnView(uint32_t function, lifted::Regs& ctx) {
+  return ui_movies_hooks::g_update_callee_stand_in(function, ctx);
+}
+
+// UiMovie::Update: its calls made as the original's (r1 its frame, lr the
+// return address after each call), the rest in src/ui_movies/update.cpp.
+void ui_movies_hooks::Update(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    lifted::original::c8211D2F8(ctx);
+    return;
+  }
+  const uint32_t movie = ctx.r3.u32;
+  const bool draw_only = ctx.r4.s32 != 0;
+  const schema::UiMovie m(movie);
+  const uint32_t queue = m.queue_address();
+  const uint32_t looping = m.looping_address();
+  const uint64_t lr = ctx.lr;
+  bool playing = false;
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, ui_movies::kUpdateFrame, 0x8211D330, [&](uint32_t frame) {
+    const uint32_t local = frame + ui_movies::kUpdateLocal;
+    auto count = [&](uint32_t list) {
+      return int32_t(int16_t(schema::UiMovieAnimationList(list).count()));
+    };
+    auto slot_of = [&](uint32_t slot) { return schema::UiMovieAnimationSlot(slot); };
+    // UiMovie::RestorePose(movie, live, rest, 0, 0).
+    auto restore_pose = [&](uint32_t live, uint32_t rest, uint32_t return_address) {
+      ctx.r3.u64 = movie;
+      ctx.r4.u64 = live;
+      ctx.r5.u64 = rest;
+      ctx.r6.u64 = 0;
+      ctx.r7.u64 = 0;
+      ctx.lr = return_address;
+      lifted::Enter(ctx, game::UiMovie::RestorePose);
+    };
+    // UiMovie::ApplyAnimation on a slot (+12 the tree, +16 the animation,
+    // +20 the time); its r3.
+    auto apply = [&](uint32_t slot, uint64_t loop, uint32_t return_address) {
+      ctx.r3.u64 = slot_of(slot).scene();
+      ctx.r4.u64 = slot_of(slot).animation();
+      ctx.r6.u64 = loop;
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = double(guest::LoadFloat(slot_of(slot).time_address()));
+      ctx.lr = return_address;
+      lifted::Enter(ctx, game::UiMovie::ApplyAnimation);
+      ctx.fpscr.disableFlushMode();
+      return ctx.r3.s32;
+    };
+    // AnimationList::Insert of a slot at the local list's end.
+    auto keep = [&](uint32_t slot, uint32_t return_address) {
+      ctx.r3.u64 = local;
+      ctx.r4.u64 = slot;
+      ctx.r5.s64 = count(local);
+      ctx.lr = return_address;
+      lifted::Enter(ctx, game::AnimationList::Insert);
+    };
+    // The drawing: UiMovie::Draw, DrawTexts, and sub_8259DAC0 with 678 and
+    // 148.
+    auto draw = [&](uint64_t texts_r5, const uint32_t (&returns)[4]) {
+      ctx.r3.u64 = m.draw_context_address();
+      ctx.r4.u64 = m.live_scene();
+      ctx.r5.u64 = m.textures_address();
+      ctx.r6.u64 = m.text_items_address();
+      ctx.r7.s64 = -1;
+      ctx.lr = returns[0];
+      lifted::Enter(ctx, game::UiMovie::Draw_8259FA00);
+      ctx.r3.u64 = movie;
+      ctx.r4.u64 = m.text_items_address();
+      ctx.r5.u64 = texts_r5;
+      ctx.lr = returns[1];
+      lifted::Enter(ctx, game::UiMovie::DrawTexts);
+      for (uint32_t k = 0; k < 2; k++) {
+        ctx.r3.u64 = m.draw_context_address();
+        ctx.r4.u64 = k == 0 ? 678 : 148;
+        ctx.lr = returns[2 + k];
+        lifted::Enter(ctx, lifted::entry::e8259DAC0);
+      }
+    };
+    restore_pose(m.saved_scene(), m.live_scene(),
+                 0x8211D330);
+    ui_movies::UpdateBegin(local);
+    if (draw_only) {
+      // The queue's first chain applied, then the looping animations; no
+      // time steps.
+      const int32_t queued = count(queue);
+      for (int32_t i = 0; i < queued; i++) {
+        const uint32_t slot = ui_movies::SlotOf(queue, ui_movies::LinkAt(queue, i));
+        apply(slot, slot_of(slot).reversed(), 0x8211D3E4);
+        if (int32_t(slot_of(slot).chained()) == 0) {
+          break;
+        }
+      }
+      for (uint32_t i = 0; i < uint32_t(count(looping)); i++) {
+        apply(ui_movies::SlotOf(looping, ui_movies::LinkAt(looping, i)), 0,
+              0x8211D468);
+      }
+      draw(1, {0x8211D498, 0x8211D4A8, 0x8211D4B4, 0x8211D4C0});
+      restore_pose(m.live_scene(), m.saved_scene(),
+                   0x8211D4D8);
+      playing = true;
+      return;
+    }
+    // The queue's first chain: each slot applied and its time stepped
+    // (unless paused, +36); a finished chained slot with +32 set moved to
+    // the local list.
+    int32_t queued = count(queue);
+    if (queued == 0) {
+      playing = true;
+    } else {
+      int32_t applied = 0;
+      for (int32_t i = 0; i < queued; i++) {
+        const uint32_t slot = ui_movies::SlotOf(queue, ui_movies::LinkAt(queue, i));
+        const int32_t result = apply(slot, slot_of(slot).reversed(), 0x8211D578);
+        applied++;
+        if (int32_t(slot_of(slot).paused()) == 0) {
+          ui_movies::StepQueuedTime(slot);
+        }
+        if (result != 0) {
+          playing = true;
+        }
+        if (int32_t(slot_of(slot).chained()) == 0) {
+          break;
+        }
+        if (result == 0 && int32_t(slot_of(slot).keep_end()) != 0) {
+          keep(slot, 0x8211D608);
+          ctx.r3.u64 = queue;
+          ctx.r4.u64 = uint32_t(i);
+          ctx.lr = 0x8211D614;
+          lifted::Enter(ctx, game::AnimationList::RemoveAt);
+          applied--;
+          queued--;
+          i--;
+        }
+      }
+      // A chain that has finished: the slots applied moved to the local
+      // list.
+      if (!playing && schema::UiMovieAnimationList(queue).count() != 0 && applied != 0) {
+        do {
+          const uint32_t link = ui_movies::LinkAt(queue, 0);
+          keep(ui_movies::SlotOf(queue, link), 0x8211D674);
+          ui_movies::UnlinkQueueFirst(queue);
+          applied--;
+        } while (applied != 0);
+      }
+    }
+    // The looping animations, their times stepped and wrapped.
+    for (uint32_t i = 0; i < uint32_t(count(looping)); i++) {
+      const uint32_t slot = ui_movies::SlotOf(looping, ui_movies::LinkAt(looping, i));
+      apply(slot, 0, 0x8211D720);
+      if (int32_t(slot_of(slot).paused()) == 0) {
+        ui_movies::StepLoopingTime(slot);
+      }
+    }
+    draw(0, {0x8211D78C, 0x8211D79C, 0x8211D7A8, 0x8211D7B4});
+    restore_pose(m.live_scene(), m.saved_scene(),
+                 0x8211D7CC);
+    // The slots moved off the queue: applied once more, after the drawing,
+    // and dropped; the pose saved again.
+    int32_t kept = count(local);
+    if (kept != 0) {
+      do {
+        const uint16_t first = schema::UiMovieAnimationList(local).first();
+        const uint32_t link = local + (uint32_t(int32_t(int16_t(first))) << 2);
+        apply(ui_movies::SlotOf(local, link), 0, 0x8211D810);
+        kept--;
+        ui_movies::UnlinkLocalFirst(local, link, first);
+      } while (kept != 0);
+      restore_pose(m.saved_scene(), m.live_scene(),
+                   0x8211D858);
+      if (schema::UiMovieAnimationList(queue).count() != 0) {
+        playing = true;
+      }
+    }
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = playing ? 1 : 0;
+}

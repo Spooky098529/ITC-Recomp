@@ -5,23 +5,22 @@
 // See docs/functions/ and docs/known-data.md for what is known about each address.
 
 #include "hooks/vehicle.h"
+#include "hooks/native_entry.h"
 
 #include "base/log.h"
 #include "debug/state_capture.h"
 #include "guest.h"
+#include "schema/car_physics.h"
 
 namespace {
-
-// Offsets into the vehicle object.
-constexpr uint32_t kVehicleSpeedOffset = 48;  // float, meters per second
 
 constexpr float kMetersPerSecondToKmh = 3.6f;
 
 }  // namespace
 
-float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
+float Vehicle_GetSpeedKmh(uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0128 Vehicle::GetSpeedKmh");
-  float speed = guest::LoadFloat(base, vehicle + kVehicleSpeedOffset);
+  float speed = schema::Vehicle(vehicle).speed();  // meters per second
   return speed * kMetersPerSecondToKmh;
 }
 
@@ -29,9 +28,9 @@ float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
 // the function table reach them; they only unpack registers and forward.
 
 // Vehicle_GetSpeedKmh: r3 = vehicle, returns f1.
-extern "C" REX_FUNC(sub_820C0128) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C0128) {
+  
   ctx.fpscr.disableFlushMode();
   debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
-  ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));
+  ctx.f1.f64 = double(Vehicle_GetSpeedKmh(ctx.r3.u32));
 }

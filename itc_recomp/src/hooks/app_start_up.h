@@ -1,0 +1,76 @@
+// The app's start-up's adapters, for other code and the harness
+// (src/hooks/app_start_up.cpp).
+
+#pragma once
+
+#include "guest.h"
+#include "hooks/native_entry.h"
+
+namespace hooks {
+
+// For the app_start_up harness: while set, App::StartUp's callees' adapters
+// (SceneTarget::Create, Archive::Init, ActionMappers::Init,
+// CameraPasses::Init, ScreenFades::Init, Billboards::Init,
+// SoundGlobals::Init, SaveInterface::Init, Network::SetUp, Text::Init,
+// Players::ResetControllers, Archive::WaitIdle; and Archive::Load, for the
+// data load's harness; Career::EventQuery's and Race::SetUp's register
+// steps, for the location screen's; TrackZones::Create, UiMovie::SetText,
+// ClearText and SetNodeText, the UI movies' start sub_8211AD00,
+// UiMovies::Open (and UiMovies::Delete, for the options screen's), Strings::Load,
+// operator new and MenuList::Init, for the
+// race HUD object's) hand their call to it first;
+// when it answers true, the adapter returns (the recorder set r3), so the
+// harness sees what App::StartUp hands each without setting anything up
+// again.
+// (Set only by the harnesses, which aren't built: always null.)
+using StartUpRecorder = bool (*)(lifted::Regs& ctx, uint32_t address);
+extern StartUpRecorder g_start_up_recorder;
+bool StartUpRecordedOnView(lifted::Regs& ctx, uint32_t address);
+inline bool StartUpRecorded(lifted::Regs& ctx, uint32_t address) {
+  return g_start_up_recorder != nullptr && StartUpRecordedOnView(ctx, address);
+}
+
+// The register steps without the flag (the adapters' and the harness's):
+// App::StartUp (sub_82106548: r3 the interface), Text::Init (sub_8210ADD0)
+// and Font::Font (sub_82109228: r3 the font; no adapter of its own), each
+// from frames like the originals'. Text::Init's and Font::Font's need the
+// device lock native and --native_heap (DeviceUsersNative).
+void AppStartUpSteps(lifted::Regs& ctx);
+// Movie::Movie (sub_820AEA88: r3 the movie, r4 the block) and
+// MovieWrapper::MovieWrapper (sub_82593DC0: r3 the wrapper), each with the
+// original's prologue saves; need --native_heap (the adapters check).
+void MovieConstructSteps(lifted::Regs& ctx);
+void MovieWrapperSteps(lifted::Regs& ctx);
+// AudioManager::Create (sub_82119B38: r3 the owner, r4 the name, r5 the
+// count's address) in frames like the original's, with its constructor and
+// StartXAudio; needs --native_heap (the adapter checks).
+void AudioManagerCreateSteps(lifted::Regs& ctx);
+// AudioEngine::StartXAudio (sub_8259CD50: r3 the engine, not read) alone,
+// for the harness (no adapter: only AudioManager's plain C++ calls it).
+void StartXAudioSteps(lifted::Regs& ctx);
+// The second camera class (sub_820A8B88: r3 the object, r4 the block) in a
+// frame like the original's, and for the harness its camera's and list's
+// constructors alone (sub_820A9E28, sub_820A98C0: r3 the block; no
+// adapters); need --native_heap (the adapter checks).
+void AppCameraSteps(lifted::Regs& ctx);
+void AppCameraCameraConstructSteps(lifted::Regs& ctx);
+void AppCameraListConstructSteps(lifted::Regs& ctx);
+// App::App (sub_82094590: r3 the app, r4 the block) in a frame like the
+// original's, its saved registers set as it sets them; needs --native_heap
+// (the adapter checks).
+void AppConstructSteps(lifted::Regs& ctx);
+// App::Create (sub_82094AB8: r3 the block) in a frame like the original's,
+// App::App through its adapter; needs --native_heap (the adapter checks).
+void AppCreateSteps(lifted::Regs& ctx);
+void TextInitSteps(lifted::Regs& ctx);
+void FontConstructSteps(lifted::Regs& ctx);
+// Whether Text::Init's and Font::Font's native steps can run.
+bool TextInitNative();
+
+// A guest call of `function` (r3 set, lr the caller's) made natively when
+// it's the render manager's slot 8 or 7 and app_start_up::RenderManagerCall
+// answers: r3, r11 and ctr left as the original's (and its adapter's).
+// False where the caller makes the guest call.
+bool RenderManagerSlotDirect(lifted::Regs& ctx, uint32_t function);
+
+}  // namespace hooks

@@ -1,0 +1,104 @@
+// The race scene natively (B7 in docs/rexglue-removal.md; the functions are
+// in docs/functions/race-scene.md): the race scene's state machine
+// (RaceSceneMachine::, race mode + 87936) and the 31,168-byte object it
+// keeps at [0x826D82D4] (RaceScene::). Plain C++ over guest memory (the
+// object and the machine are shared with the recompiled code), with the
+// originals' loads and stores in their order. Adapters:
+// src/hooks/race_scene.cpp.
+
+#pragma once
+
+#include <cstdint>
+#include <optional>
+
+namespace race_scene {
+
+// The race scene's pointer is schema::RaceSceneGlobals::scene ([0x826D82D4];
+// "[scene]" below), the machine schema::RaceSceneMachine.
+constexpr uint32_t kSceneBytes = 31168;
+// RaceSceneMachine::Init's frame (its r1 less this).
+constexpr uint32_t kInitFrame = 864;
+
+// sub_8215D6C8 RaceScene::RaceScene: the seven car slots' records
+// (SceneModelRecord::SceneModelRecord on +48 + 4,288 i), then the w of the
+// 11 light entries' five vectors (+30080 + 96 i, +28 to +92) = the float at
+// 0x82000A30. Returns the object.
+uint32_t SceneConstruct(uint32_t scene);
+// sub_8215D738 RaceScene::Create: [scene] = 0, the object made in host
+// memory (E5 step 4: schema::RaceScene::New, for the original's operator
+// new(31,168)) and RaceScene::RaceScene on it into [scene]. True.
+bool SceneCreate();
+// sub_8215D808 RaceSceneMachine::Init: RaceScene::Create, the state = 1 and
+// the 11 transitions added (StateMachine::Add), built in the original's
+// stack frame at `frame` (its r1 less kInitFrame: see race_scene_init.cpp).
+// Returns the last StateMachine::Add's answer (`replaced` as its), or
+// nothing, with only [scene] = 0 written, where RaceScene::Create refuses.
+std::optional<uint32_t> MachineInit(uint32_t machine, uint32_t frame,
+                                    bool* replaced);
+
+// --- The light set (the object's +30064) ---
+
+// sub_8215C368 RaceLights::InitEntry (probably): a 96-byte entry for its
+// index (11 or more, as signed: nothing): +0 = 0, then kind 1 (indices
+// below 3) or 2 with their vectors from the image's constants (the cone's
+// two cosines, cos, for kind 2), and the color +16 by index. Returns
+// nothing: r3 is left as it was, f1 as the last cos leaves it.
+void LightsInitEntry(uint32_t entry, int32_t index);
+// sub_8215CF78 RaceLights::SetUp (probably): +0, +1072, +8, +4 = 0, then
+// the 11 entries (+16 + 96 i) set up and counted (+4 kind 1, +8 kind 2, +0
+// both).
+void LightsSetUp(uint32_t set);
+// f1 as the last entry's InitEntry leaves it: cos of the double at
+// 0x82002FE0.
+double LightsLastF1();
+
+// --- The post effects' parameters (post-effects.md) ---
+
+// Whether the race's post effects are split screen's: [[0x826C2CE8] + 8].
+bool SplitScreen();
+// Whether SetEffectParams' and Glows::SetParams' vtable calls reach the
+// setters' plain C++: the glows (effects 5 and 9 in split screen, else 1)
+// and the color filters (6 and 10, else 2) are there, the glows' slots 2 to
+// 12 are Glow::Set8436 to Set8476 (sub_82136EF8 to sub_82136F48) and the
+// filters' slot 8 ColorFilter::Set8120 (sub_82135148). Else the originals
+// run (they'd call through whatever is there, or through address 0).
+bool EffectParamsReady();
+// sub_8228F0B0 Glows::SetParams (probably): the 11 floats at `entry` given
+// to each glow's slots 2 to 12 in order. Returns the last glow (r3 as the
+// original leaves it). Only where EffectParamsReady.
+uint32_t GlowsSetParams(uint32_t entry);
+// sub_8228F5C0 RaceScene::SetEffectParams (probably): the 44-byte entry at
+// 0x82637CC0 + 44 (3 kind + index) (kind below 8, as signed; else the one at
+// 0x82637C94) through Glows::SetParams, then the color filters' slot 8 with
+// the float at 0x82002204. Returns the last filter (r3 as the original
+// leaves it), `f1` the value (f1 as it leaves it). Only where
+// EffectParamsReady.
+uint32_t SetEffectParams(uint32_t kind, uint32_t index, double* f1);
+
+// --- The machine's toggle ---
+
+// sub_8215C750 RaceSceneMachine::TogglePause (probably): +9608 = (+9608 ==
+// 0), then Race::ToggleEffects([scene]) (post-effects.md). Returns r3 as
+// that leaves it.
+uint32_t TogglePause(uint32_t machine);
+// sub_8215D0D8 RaceSceneMachine::Resume (probably; not seen in play): when
+// +9608 is set, +9608 = 0 and Race::ToggleEffects([scene]), returning its
+// r3; else nothing (r3 left).
+std::optional<uint32_t> Resume(uint32_t machine);
+
+// --- The scene's freeing ---
+
+// sub_8215D548 RaceScene::DestroyCars: the seven car slots' records' arrays
+// through the array destructor iterator with the empty destructor, last to
+// first (nothing is written).
+void DestroyCars(uint32_t cars);
+// Whether RaceScene::Destroy's operator delete is the plain C++'s: no scene,
+// or a block of the allocation layer's.
+bool DestroyReady();
+// sub_8215D790 RaceScene::Destroy: when [scene] is set, DestroyCars(+16)
+// and the object freed (schema::RaceScene::Delete, for the original's
+// operator delete; the pointer left). Returns the scene (0: r3
+// left as it was). Only where DestroyReady.
+uint32_t Destroy();
+
+}  // namespace race_scene

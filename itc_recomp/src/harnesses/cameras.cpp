@@ -9,9 +9,13 @@
 // --native_cameras off.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
+#include "base/log.h"
+#include "c_runtime/exit.h"
 #include "cameras/cameras.h"
+#include "hooks/c_runtime.h"
 #include "command_list/command_list.h"
 #include "hooks/cameras.h"
 #include "hooks/heap.h"
@@ -27,6 +31,7 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -101,7 +106,7 @@ void NativeReleaseSurfaces(PPCContext& ctx, uint8_t* base) {
   const bool has_surfaces =
       cm::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
         ctx.r3.u64 = surface;
-        sub_822A67B0(ctx, base);
+        harness::Ours<0x822A67B0>(ctx, base);
         released_580 = field == 580;
       });
   if (!has_surfaces) {
@@ -132,12 +137,13 @@ void NativeViewportSetRoll(PPCContext& ctx, uint8_t* base) {
 }
 
 void NativeCameraUpdate(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraUpdate(ctx, base)) {
+  if (!harness::OnView(ctx, [&](lifted::Regs& regs) { return hooks::CameraUpdate(regs, base); })) {
     __imp__sub_82593568(ctx, base);
   }
 }
 void NativeCameraConstruct(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraConstruct(ctx, base)) {
+  if (!harness::OnView(ctx,
+                       [&](lifted::Regs& regs) { return hooks::CameraConstruct(regs, base); })) {
     __imp__sub_82593908(ctx, base);
   }
 }
@@ -162,7 +168,8 @@ void NativeViewportLookAt(PPCContext& ctx, uint8_t* base) {
 // As the adapters: the guest calls made by hooks/cameras.cpp, the work the
 // plain C++'s.
 void NativePassUpdate(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassUpdate(ctx, base)) {
+  if (!harness::OnView(ctx,
+                       [&](lifted::Regs& regs) { return hooks::CameraPassUpdate(regs, base); })) {
     __imp__sub_820A3978(ctx, base);
   }
 }
@@ -173,7 +180,7 @@ void NativeFromViewport(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cm::FromViewport(base, pass, ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = pass;
-  sub_820A3978(ctx, base);
+  harness::Ours<0x820A3978>(ctx, base);
 }
 
 // Runs the recompiled version with the flag off, so the functions it calls
@@ -315,7 +322,7 @@ void SetFieldOfViewCases(Context& h) {
           t.r3.u64 = camera;
           t.f1.f64 = degrees;
         },
-        __imp__sub_82593278, NativeSetFieldOfView, fmt::format("case {} degrees {}", i, degrees));
+        __imp__sub_82593278, ITC_CONTEXT_FN(NativeSetFieldOfView), fmt::format("case {} degrees {}", i, degrees));
   }
   results.Report();
 }
@@ -369,7 +376,7 @@ void BuildProjectionCases(Context& h) {
           t.r6.u64 = far;
           t.r7.u64 = near;
         },
-        __imp__sub_825932E8, NativeBuildProjection,
+        __imp__sub_825932E8, ITC_CONTEXT_FN(NativeBuildProjection),
         fmt::format("case {} kind {} layout {}", i, kind, layout));
   }
   results.Report();
@@ -400,7 +407,7 @@ void SetViewportSizeCases(Context& h) {
           t.r4.u64 = high | width;
           t.r5.u64 = high | height;
         },
-        __imp__sub_82593500, NativeSetViewportSize,
+        __imp__sub_82593500, ITC_CONTEXT_FN(NativeSetViewportSize),
         fmt::format("case {} {} x {} kind {}", i, width, height, kind));
   }
   results.Report();
@@ -433,7 +440,7 @@ void CameraUpdateCases(Context& h) {
             guest::StoreU32(h.base, camera + 380, FloatBits(h.random.Below(2) ? 720.0f : 480.0f));
           }
         },
-        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593568, NativeCameraUpdate,
+        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593568, ITC_CONTEXT_FN(NativeCameraUpdate),
         fmt::format("case {} kind {} game {}", i, kind, game));
   }
   results.Report();
@@ -447,7 +454,7 @@ void CameraConstructCases(Context& h) {
     Case(
         h, results, camera, {{16, 272}, {272, 304}, {368, 396}},
         [&] { RandomWords(h, camera, 100); },
-        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593908, NativeCameraConstruct,
+        [&](PPCContext& t) { t.r3.u64 = camera; }, __imp__sub_82593908, ITC_CONTEXT_FN(NativeCameraConstruct),
         fmt::format("case {}", i));
   }
   results.Report();
@@ -475,7 +482,7 @@ void PassStateCases(Context& h) {
       const uint32_t mode = RandomMode(h.random);
       Case(
           h, results, h.data, {}, [&] { guest::StoreU32(h.base, cm::kMode, mode); },
-          [&](PPCContext& t) { t.r3.s64 = which; }, __imp__sub_8209F718, NativeMode,
+          [&](PPCContext& t) { t.r3.s64 = which; }, __imp__sub_8209F718, ITC_CONTEXT_FN(NativeMode),
           fmt::format("case {} which {} mode {:08X}", i, which, mode),
           mode_word, &globals);
     }
@@ -497,7 +504,7 @@ void PassStateCases(Context& h) {
             t.r3.s64 = which;
             t.r4.u64 = mode;
           },
-          __imp__sub_8209F738, NativeSetMode,
+          __imp__sub_8209F738, ITC_CONTEXT_FN(NativeSetMode),
           fmt::format("case {} which {} mode {:08X}", i, which, mode),
           [&](Outputs& out) {
             mode_word(out);
@@ -514,7 +521,7 @@ void PassStateCases(Context& h) {
       const uint32_t mode = RandomMode(h.random);
       Case(
           h, results, h.data, {}, [&] { guest::StoreU32(h.base, cm::kMode, mode); },
-          [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8209F7A8, NativeRenderTarget,
+          [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8209F7A8, ITC_CONTEXT_FN(NativeRenderTarget),
           fmt::format("case {} id {} mode {:08X}", i, int32_t(id), mode), mode_word, &globals);
     }
     results.Report();
@@ -526,11 +533,11 @@ void PassStateCases(Context& h) {
       const uint32_t pass = h.data + 4 * h.random.Below(64);
       Case(
           h, enable, pass, {}, [&] { RandomWords(h, h.data, 256); },
-          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0968, NativeEnable,
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0968, ITC_CONTEXT_FN(NativeEnable),
           fmt::format("case {}", i));
       Case(
           h, disable, pass, {}, [&] { RandomWords(h, h.data, 256); },
-          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0958, NativeDisable,
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0958, ITC_CONTEXT_FN(NativeDisable),
           fmt::format("case {}", i));
     }
     enable.Report();
@@ -561,7 +568,7 @@ void PassStateCases(Context& h) {
               guest::StoreU32(h.base, cm::Pass(p) + 588, enabled[p]);
             }
           },
-          [](PPCContext&) {}, __imp__sub_820AA1A8, NativeEnableForView,
+          [](PPCContext&) {}, __imp__sub_820AA1A8, ITC_CONTEXT_FN(NativeEnableForView),
           fmt::format("case {} split {} view mode {} mode {:08X}", i, split, view_mode, mode),
           [&](Outputs& out) {
             for (uint32_t p = 0; p < cm::kPassCount; p++) {
@@ -578,7 +585,7 @@ void PassStateCases(Context& h) {
       const double near = RandomF1(h.random);
       Case(
           h, results, h.data, {}, [] {}, [&](PPCContext& t) { t.f1.f64 = near; },
-          __imp__sub_820AA368, NativeSetNear, fmt::format("case {} near {}", i, near),
+          __imp__sub_820AA368, ITC_CONTEXT_FN(NativeSetNear), fmt::format("case {} near {}", i, near),
           [&](Outputs& out) { out.Float(guest::LoadU32(h.base, cm::Pass(0) + 384)); }, &globals);
     }
     results.Report();
@@ -604,7 +611,7 @@ void PassStateCases(Context& h) {
             guest::StoreU32(h.base, pass + 580, second);
             guest::StoreU32(h.base, pass + 584, uint32_t(type));
           },
-          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0C40, NativeReleaseSurfaces,
+          [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A0C40, ITC_CONTEXT_FN(NativeReleaseSurfaces),
           fmt::format("case {} type {} surfaces {:08X} {:08X}", i, type, first, second));
     }
     results.Report();
@@ -642,7 +649,7 @@ void ViewportCases(Context& h) {
             t.r3.u64 = pass;
             t.f1.f64 = zoom;
           },
-          __imp__sub_820AA378, NativePassSetZoom,
+          __imp__sub_820AA378, ITC_CONTEXT_FN(NativePassSetZoom),
           fmt::format("case {} height {} zoom {}", i, int32_t(height), zoom));
     }
     results.Report();
@@ -663,7 +670,7 @@ void ViewportCases(Context& h) {
             t.r3.u64 = viewport;
             t.f1.f64 = zoom;
           },
-          __imp__sub_820AAE90, NativeViewportSetZoom,
+          __imp__sub_820AAE90, ITC_CONTEXT_FN(NativeViewportSetZoom),
           fmt::format("case {} zoom {} distance {:08X}", i, zoom, distance), {}, nullptr, 2048);
     }
     results.Report();
@@ -691,7 +698,7 @@ void ViewportCases(Context& h) {
             t.r3.u64 = viewport;
             t.f1.f64 = angle;
           },
-          __imp__sub_820AA2D0, NativeViewportSetRoll, fmt::format("case {} angle {}", i, angle), {},
+          __imp__sub_820AA2D0, ITC_CONTEXT_FN(NativeViewportSetRoll), fmt::format("case {} angle {}", i, angle), {},
           nullptr, 2048);
     }
     results.Report();
@@ -714,7 +721,7 @@ void ViewportCases(Context& h) {
             guest::StoreU32(h.base, blocks[0] + 8, h.random.Below(2));
             guest::StoreU32(h.base, cm::kViewports, blocks[0]);
           },
-          [](PPCContext&) {}, __imp__sub_820AA430, NativeReleaseViewports,
+          [](PPCContext&) {}, __imp__sub_820AA430, ITC_CONTEXT_FN(NativeReleaseViewports),
           fmt::format("case {}", i),
           [&](Outputs& out) {
             out.Word(guest::LoadU32(h.base, cm::kViewports));
@@ -802,10 +809,10 @@ void ViewportEntriesCases(Context& h) {
     GuestFunction recompiled, native;
   };
   const Kind kinds[] = {
-      {"sub_820AA550 Viewport::UpdateEntries", __imp__sub_820AA550, NativeViewportUpdateEntries},
-      {"sub_820AAE40 Viewport::Update", __imp__sub_820AAE40, NativeViewportUpdate},
-      {"sub_820AAE48 Viewport::Set", __imp__sub_820AAE48, NativeViewportSet},
-      {"sub_820AAF68 Viewport::LookAt", __imp__sub_820AAF68, NativeViewportLookAt},
+      {"sub_820AA550 Viewport::UpdateEntries", __imp__sub_820AA550, ITC_CONTEXT_FN(NativeViewportUpdateEntries)},
+      {"sub_820AAE40 Viewport::Update", __imp__sub_820AAE40, ITC_CONTEXT_FN(NativeViewportUpdate)},
+      {"sub_820AAE48 Viewport::Set", __imp__sub_820AAE48, ITC_CONTEXT_FN(NativeViewportSet)},
+      {"sub_820AAF68 Viewport::LookAt", __imp__sub_820AAF68, ITC_CONTEXT_FN(NativeViewportLookAt)},
   };
   for (const Kind& kind : kinds) {
     Results results(kind.name);
@@ -881,7 +888,7 @@ void RecordViewportCases(Context& h) {
           t.r3.u64 = pass;
           t.r4.u64 = key;
         },
-        __imp__sub_820A0978, hooks::CameraPassRecordViewport,
+        __imp__sub_820A0978, ITC_CONTEXT_FN(hooks::CameraPassRecordViewport),
         fmt::format("case {} kind {} used {} key {}", i, kind, used, key),
         [&](Outputs& out) {
           out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -893,12 +900,14 @@ void RecordViewportCases(Context& h) {
 }
 
 void NativeRecordBegin(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassRecordBegin(ctx, base)) {
+  if (!harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::CameraPassRecordBegin(regs, base); })) {
     __imp__sub_820A0CC0(ctx, base);
   }
 }
 void NativeRecordEnd(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::CameraPassRecordEnd(ctx, base)) {
+  if (!harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::CameraPassRecordEnd(regs, base); })) {
     __imp__sub_820A1C30(ctx, base);
   }
 }
@@ -926,8 +935,8 @@ void RecordPassCases(Context& h) {
     GuestFunction recompiled, native;
   };
   const Kind kinds[] = {
-      {"sub_820A0CC0 CameraPass::RecordBegin", __imp__sub_820A0CC0, NativeRecordBegin},
-      {"sub_820A1C30 CameraPass::RecordEnd", __imp__sub_820A1C30, NativeRecordEnd},
+      {"sub_820A0CC0 CameraPass::RecordBegin", __imp__sub_820A0CC0, ITC_CONTEXT_FN(NativeRecordBegin)},
+      {"sub_820A1C30 CameraPass::RecordEnd", __imp__sub_820A1C30, ITC_CONTEXT_FN(NativeRecordEnd)},
   };
   const uint32_t pass = h.data + FakeScene::kPass;
   for (const Kind& k : kinds) {
@@ -970,8 +979,8 @@ void RecordPassesCases(Context& h) {
   };
   const Kind kinds[] = {
       {"sub_8209F8A0 CameraPasses::RecordBegins", __imp__sub_8209F8A0,
-       hooks::CameraPassesRecordBegins},
-      {"sub_8209F900 CameraPasses::RecordEnds", __imp__sub_8209F900, hooks::CameraPassesRecordEnds},
+       ITC_CONTEXT_FN(hooks::CameraPassesRecordBegins)},
+      {"sub_8209F900 CameraPasses::RecordEnds", __imp__sub_8209F900, ITC_CONTEXT_FN(hooks::CameraPassesRecordEnds)},
   };
   for (const Kind& k : kinds) {
     Results results(k.name);
@@ -1031,7 +1040,7 @@ void RecordClearCases(Context& h) {
           t.r6.u64 = color;
           t.r7.u64 = depth;
         },
-        __imp__sub_8209FA38, hooks::RecordClear,
+        __imp__sub_8209FA38, ITC_CONTEXT_FN(hooks::RecordClear),
         fmt::format("case {} kind {} used {} depth {:X}", i, kind, used, depth),
         [&](Outputs& out) {
           out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -1084,7 +1093,7 @@ void PassUpdateCases(Context& h) {
             guest::StoreU32(h.base, pass + 508, RandomSize(h.random));
           }
         },
-        [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A3978, NativePassUpdate,
+        [&](PPCContext& t) { t.r3.u64 = pass; }, __imp__sub_820A3978, ITC_CONTEXT_FN(NativePassUpdate),
         fmt::format("case {} type {} kind {} game {}", i, int32_t(type), kind, game),
         [&](Outputs& out) {
           out.Word(guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -1141,7 +1150,7 @@ void FromViewportCases(Context& h) {
           t.r4.u64 = player;
           t.r5.u64 = entry;
         },
-        __imp__sub_820AA4A8, NativeFromViewport,
+        __imp__sub_820AA4A8, ITC_CONTEXT_FN(NativeFromViewport),
         fmt::format("case {} type {} kind {} player {} entry {} game {}", i, type, kind, player,
                     entry, game),
         [&](Outputs& out) {
@@ -1207,7 +1216,9 @@ void MakeRenderTargetCases(Context& h) {
         __imp__sub_8209FBF0(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        ran = hooks::CameraPassesMakeRenderTarget(t, h.base);
+        ran = harness::OnView(t, [&](lifted::Regs& regs) {
+          return hooks::CameraPassesMakeRenderTarget(regs, h.base);
+        });
       }
       out[v].Word(ran);
       out[v].Word(t.r3.u32);
@@ -1310,7 +1321,8 @@ void SetUpSurfacesCases(Context& h) {
         __imp__sub_820A2F40(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        ran = hooks::CameraPassSetUpSurfaces(t, h.base);
+        ran = harness::OnView(
+            t, [&](lifted::Regs& regs) { return hooks::CameraPassSetUpSurfaces(regs, h.base); });
       }
       out[v].Word(ran);
       out[v].Word(guest::LoadU32(h.base, fakes + 4));
@@ -1346,7 +1358,7 @@ void SetUpSurfacesCases(Context& h) {
           if (device && surface != 0) {
             PPCContext r = CallContext(h);
             r.r3.u64 = surface;
-            sub_822A67B0(r, h.base);
+            harness::Ours<0x822A67B0>(r, h.base);
           }
           continue;
         }
@@ -1437,7 +1449,8 @@ void PassesInitCases(Context& h) {
           (all ? __imp__sub_8209F9B8 : __imp__sub_8209F960)(t, h.base);
           ITC_FLAG(native_cameras) = flag;
         } else {
-          hooks::CameraPassesInit(t, h.base, all);
+          harness::OnView(
+              t, [&](lifted::Regs& regs) { return hooks::CameraPassesInit(regs, h.base, all); });
         }
         hooks::camera_pass_init_calls = nullptr;
         out[v].Word(uint32_t(calls.size()));
@@ -1508,7 +1521,7 @@ void InitPassCases(Context& h) {
         __imp__sub_820A3DB0(t, h.base);
         ITC_FLAG(native_cameras) = flag;
       } else {
-        hooks::CameraPassInit(t, h.base);
+        harness::OnView(t, [&](lifted::Regs& regs) { return hooks::CameraPassInit(regs, h.base); });
       }
       out[v].Word(t.r3.u32);
       out[v].Word(guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -1551,7 +1564,7 @@ void InitPassCases(Context& h) {
           if (device && surface != 0) {
             PPCContext r = CallContext(h);
             r.r3.u64 = surface;
-            sub_822A67B0(r, h.base);
+            harness::Ours<0x822A67B0>(r, h.base);
           }
           continue;
         }
@@ -1587,6 +1600,81 @@ void InitPassCases(Context& h) {
   results.Report();
 }
 
+// --- Viewports::Init (with Viewport::Init): on the game's viewports
+// pointer, camera pass 0's near plane, the three vectors and their guard,
+// and the exit table, each put back after a side; the new blocks compared
+// by their contents, then freed. ---
+
+void NativeViewportsInit(PPCContext& ctx, uint8_t* base) {
+  if (const auto viewport = harness::OnView(
+          ctx, [&](lifted::Regs& regs) { return hooks::ViewportsInit(regs, base); })) {
+    ctx.r3.u64 = *viewport;
+  } else {
+    __imp__sub_820AB358(ctx, base);
+  }
+}
+
+void ViewportsInitCases(Context& h) {
+  Results results("sub_820AB358 Viewports::Init, sub_820AAFF0 Viewport::Init");
+  if (!hooks::NativeHeapActive() || !hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: cameras: --native_heap or native atexit off: Viewports::Init's "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kVectors = 0x826C2CF0, kVectorBytes = 0x34;  // to the guard, 0x826C2D20
+  constexpr uint32_t kNear = 0x826BAC00 + 384;
+  const uint32_t saved_viewports = guest::LoadU32(h.base, cm::kViewports);
+  const uint32_t saved_near = guest::LoadU32(h.base, kNear);
+  const auto saved_vectors = Read(h.base, kVectors, kVectorBytes);
+  for (int c = 0; c < 12; c++) {
+    // 0-1: as the game has them (made); then each guard bit cleared at
+    // random over random bytes.
+    std::vector<uint8_t> vectors = saved_vectors;
+    if (c >= 2) {
+      for (auto& byte : vectors) {
+        byte = uint8_t(h.random.Next());
+      }
+      uint32_t guard = uint32_t(h.random.Next());
+      if (c == 2) {
+        guard &= ~7u;
+      }
+      for (int k = 0; k < 4; k++) {
+        vectors[0x30 + k] = uint8_t(guard >> (24 - 8 * k));
+      }
+    }
+    const uint32_t near_plane = c >= 2 ? uint32_t(h.random.Next()) : saved_near;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, kVectors, vectors.data(), kVectorBytes);
+      guest::StoreU32(h.base, kNear, near_plane);
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_820AB358 : ITC_CONTEXT_FN(NativeViewportsInit))(t, h.base);
+      const uint32_t block = guest::LoadU32(h.base, cm::kViewports);
+      const uint32_t first = guest::LoadU32(h.base, block);
+      const uint32_t second = guest::LoadU32(h.base, block + 4);
+      out[v].Word(guest::LoadU32(h.base, block + 8));
+      out[v].Bytes(Read(h.base, first, 1872));
+      out[v].Bytes(Read(h.base, second, 1872));
+      out[v].Word(t.r3.u32 == second);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(guest::LoadU32(h.base, kNear));
+      out[v].Bytes(Read(h.base, kVectors, kVectorBytes));
+      exit_table::Take(h.base, mark, out[v]);
+      memory::FreePages(first);
+      memory::FreePages(second);
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, cm::kViewports, saved_viewports);
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, cm::kViewports, saved_viewports);
+  guest::StoreU32(h.base, kNear, saved_near);
+  Write(h.base, kVectors, saved_vectors.data(), kVectorBytes);
+  results.Report();
+}
+
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
@@ -1606,6 +1694,7 @@ void Cameras(Context& h) {
   SetUpSurfacesCases(h);
   InitPassCases(h);
   PassesInitCases(h);
+  ViewportsInitCases(h);
 }
 
 }  // namespace harness

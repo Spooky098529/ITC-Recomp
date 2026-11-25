@@ -1,0 +1,106 @@
+// The data load itself and the two UI movie sets it makes (data_load.h,
+// docs/functions/data-load.md).
+
+#include "data_load/data_load.h"
+
+#include "base/log.h"
+#include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "schema/data_load.h"
+#include "schema/ui_movies_game.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
+
+namespace data_load {
+
+namespace {
+
+using G = schema::DataLoadGlobals;
+
+// A movie list: its movies, then their count at +64.
+std::optional<int64_t> MovieListAdd(uint32_t list, uint32_t count_address, uint32_t id,
+                                    const MovieCalls& calls) {
+  // In host memory (E5 step 5), where the originals' operator new returned.
+  static_assert(schema::UiMovie::kSize == kMovieBytes);
+  uint32_t movie = schema::UiMovie::New().address;
+  if (movie != 0) {
+    movie = calls.construct(movie);
+  }
+  ui_movies::InitAnimationLists(movie);
+  const int64_t serial = ui_movies::MovieLoad(movie, id, calls.load);
+  const uint32_t count = guest::LoadU32(count_address);
+  guest::StoreU32(count_address, count + 1);
+  guest::StoreU32(list + 4 * count, movie);
+  return serial;
+}
+
+}  // namespace
+
+std::optional<int64_t> LoadingScreenAddMovie(uint32_t id, const MovieCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82247AA0 LoadingScreen::AddMovie");
+  return MovieListAdd(G::loading_movies_address(), G::loading_movie_count_address(), id, calls);
+}
+
+std::optional<int64_t> OtherMoviesAdd(uint32_t id, const MovieCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822912A0 (the other UI movie set's add)");
+  return MovieListAdd(G::other_movies_address(), G::other_movie_count_address(), id, calls);
+}
+
+int64_t LoadingScreenLoad(const MovieAdd& add) {
+  ITC_NATIVE_RUNNING("sub_82247B98 LoadingScreen::Load");
+  G::set_loading_movie_count(0);
+  G::set_loading_shown(0);
+  add(22575);
+  add(22574);
+  return add(22576);
+}
+
+uint32_t OtherMoviesLoad(const MovieAdd& add,
+                         const std::function<uint32_t(int which)>& render_object) {
+  ITC_NATIVE_RUNNING("sub_82291328 (the other UI movie set's load)");
+  for (uint32_t i = 0; i < 3; i++) {
+    add(guest::LoadU32(G::other_movie_ids_address() + 4 * i));
+  }
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(G::unknown_828165D0_address() + 4 * i, 0);
+  }
+  G::set_unknown_82816600(0);
+  G::set_unknown_82638130(0);
+  const uint32_t list = render_object(0);
+  const uint32_t renderer = render_object(1);
+  ui_movies::SetRenderer(renderer, list);
+  return renderer;
+}
+
+uint32_t CreateObjects(const BootCall& call) {
+  ITC_NATIVE_RUNNING("sub_82105868 BootData::CreateObjects");
+  call(0x821057C8, 0, 0x8210587C);                    // SaveData::Create(0)
+  call(0x82102208, std::nullopt, 0x82105880);         // RaceData::Create
+  call(0x821021A8, std::nullopt, 0x82105884);         // RaceData::ResetGlobal
+  call(0x820CCDC0, std::nullopt, 0x82105888);         // Defaults::Init
+  call(0x82105508, std::nullopt, 0x8210588C);         // InputRecordings::Create
+  call(0x82105560, std::nullopt, 0x82105890);         // Replay::Create
+  call(0x82116DB0, std::nullopt, 0x82105894);         // DataTables::Init
+  return call(0x82117240, std::nullopt, 0x82105898);  // DataTables::Load
+}
+
+std::optional<uint32_t> BootDataLoad(uint32_t frame, const BootCall& call) {
+  ITC_NATIVE_RUNNING("sub_82106618 BootData::Load");
+  if (G::loaded() != 0) {
+    return std::nullopt;
+  }
+  G::set_loaded(1);
+  // GlobalMemoryStatus(frame + 80) (Dropped) left out: r3 its buffer, as
+  // Shaders::LoadAll gets it.
+  call(0x820A08A0, frame + 80, 0x82106648);  // Shaders::LoadAll
+  call(0x8210ADF8, std::nullopt, 0x8210664C);  // Text::Load
+  call(0x82105868, std::nullopt, 0x82106650);  // BootData::CreateObjects
+  call(0x82247B98, std::nullopt, 0x82106654);  // LoadingScreen::Load
+  call(0x82291328, std::nullopt, 0x82106658);  // the other movie set
+  call(0x820C9960, std::nullopt, 0x8210665C);  // Params::Init
+  call(0x820CC2A8, std::nullopt, 0x82106660);  // Params::Load
+  // GlobalMemoryStatus(frame + 80) again (Dropped): r3 its buffer.
+  return frame + 80;
+}
+
+}  // namespace data_load

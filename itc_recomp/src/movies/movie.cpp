@@ -12,6 +12,8 @@
 #include "movies/player.h"
 #include "native/renderer.h"
 #include "native/state.h"
+#include "schema/device_shaders.h"
+#include "schema/movies.h"
 
 namespace movies::movie {
 
@@ -29,18 +31,18 @@ std::shared_ptr<Player> PlayerOf(uint32_t movie) {
   return it == g_players.end() ? nullptr : it->second;
 }
 
-bool CommandDone(uint8_t* base, uint32_t movie) {
-  return guest::LoadU32(base, movie + kCommandStatus) == kCommandDone;
+bool CommandDone(uint32_t movie) {
+  return schema::Movie(movie).command_status() == kCommandDone;
 }
 
-void SetState(uint8_t* base, uint32_t movie, uint32_t state) {
-  guest::StoreU32(base, movie + kState, state);
+void SetState(uint32_t movie, uint32_t state) {
+  schema::Movie(movie).set_state(state);
 }
 
-std::string GuestString(uint8_t* base, uint32_t address, uint32_t max) {
+std::string GuestString(uint32_t address, uint32_t max) {
   std::string s;
   for (uint32_t i = 0; address && i < max; i++) {
-    char c = char(guest::LoadU8(base, address + i));
+    char c = char(guest::LoadU8(address + i));
     if (!c) {
       break;
     }
@@ -51,12 +53,14 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max) {
 
 }  // namespace
 
-void Play(uint8_t* base, uint32_t movie, uint32_t path) {
+void Play(uint32_t movie, uint32_t path) {
   ITC_NATIVE_RUNNING("sub_820AEC10 Movie::Play");
   // strncpy(+48, path, 260): the path, then zeros to 260 bytes.
-  std::string name = GuestString(base, path, kPathBytes);
+  std::string name = GuestString(path, kPathBytes);
+  // The movie's in host memory (E5 step 4): the path's bytes, guest order.
+  uint8_t* const to = schema::Movie(movie).path();
   for (uint32_t i = 0; i < kPathBytes; i++) {
-    guest::StoreU8(base, movie + kPath + i, i < name.size() ? uint8_t(name[i]) : 0);
+    to[i] = i < name.size() ? uint8_t(name[i]) : 0;
   }
   std::shared_ptr<Player> player;
   std::string error = "isn't in the game's data";
@@ -74,64 +78,64 @@ void Play(uint8_t* base, uint32_t movie, uint32_t path) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_players[movie] = player;
   }
-  guest::StoreU32(base, movie + kCommandStatus, kCommandDone);
-  SetState(base, movie, kLoaded);
+  schema::Movie(movie).set_command_status(kCommandDone);
+  SetState(movie, kLoaded);
 }
 
-void Start(uint8_t* base, uint32_t movie) {
+void Start(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE4E0 Movie::Start");
-  if (!CommandDone(base, movie) || GetState(base, movie) == kNone) {
+  if (!CommandDone(movie) || GetState(movie) == kNone) {
     return;
   }
-  SetState(base, movie, kPlaying);
+  SetState(movie, kPlaying);
   if (std::shared_ptr<Player> player = PlayerOf(movie)) {
     player->Start();
     SetSounding(player.get());
   }
 }
 
-void Stop(uint8_t* base, uint32_t movie) {
+void Stop(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE828 Movie::Stop");
-  uint32_t state = GetState(base, movie);
-  if (!CommandDone(base, movie) || (state != kPlaying && state != kPaused)) {
+  uint32_t state = GetState(movie);
+  if (!CommandDone(movie) || (state != kPlaying && state != kPaused)) {
     return;
   }
-  SetState(base, movie, kLoaded);
+  SetState(movie, kLoaded);
   if (std::shared_ptr<Player> player = PlayerOf(movie)) {
     player->Pause();
     SetSounding(nullptr);
   }
 }
 
-void Pause(uint8_t* base, uint32_t movie) {
+void Pause(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE898 Movie::Pause");
-  if (!CommandDone(base, movie) || GetState(base, movie) != kPlaying) {
+  if (!CommandDone(movie) || GetState(movie) != kPlaying) {
     return;
   }
-  SetState(base, movie, kPaused);
+  SetState(movie, kPaused);
   if (std::shared_ptr<Player> player = PlayerOf(movie)) {
     player->Pause();
   }
 }
 
-void Resume(uint8_t* base, uint32_t movie) {
+void Resume(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE8F8 Movie::Resume");
-  if (!CommandDone(base, movie) || GetState(base, movie) != kPaused) {
+  if (!CommandDone(movie) || GetState(movie) != kPaused) {
     return;
   }
-  SetState(base, movie, kPlaying);
+  SetState(movie, kPlaying);
   if (std::shared_ptr<Player> player = PlayerOf(movie)) {
     player->Resume();
   }
 }
 
-uint32_t GetState(uint8_t* base, uint32_t movie) {
-  return guest::LoadU32(base, movie + kState);
+uint32_t GetState(uint32_t movie) {
+  return schema::Movie(movie).state();
 }
 
-void Release(uint8_t* base, uint32_t movie) {
+void Release(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE528 Movie::Release");
-  if (!CommandDone(base, movie) || GetState(base, movie) == kPlaying) {
+  if (!CommandDone(movie) || GetState(movie) == kPlaying) {
     return;
   }
   std::shared_ptr<Player> player;
@@ -147,21 +151,21 @@ void Release(uint8_t* base, uint32_t movie) {
   SetSounding(nullptr);
 }
 
-void RenderFrame(uint8_t* base, uint32_t movie) {
+void RenderFrame(uint32_t movie) {
   ITC_NATIVE_RUNNING("sub_820AE958 Movie::RenderFrame");
   std::shared_ptr<Player> player = PlayerOf(movie);
   if (!player) {
     // Not opened (the file's missing): it ends at once.
-    SetState(base, movie, kLoaded);
+    SetState(movie, kLoaded);
     return;
   }
   if (const Frame* frame = player->CurrentFrame()) {
-    native::Renderer_DrawMovie(base, guest::LoadU32(base, native::kDevicePointer), frame->width,
-                               frame->height, frame->y.data(), frame->u.data(),
+    native::Renderer_DrawMovie(schema::DeviceShadersGlobals::replay_device(),
+                               frame->width, frame->height, frame->y.data(), frame->u.data(),
                                frame->v.data());
   }
   if (player->Ended()) {
-    SetState(base, movie, kLoaded);
+    SetState(movie, kLoaded);
   }
 }
 

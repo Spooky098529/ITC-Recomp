@@ -12,8 +12,11 @@
 // so they run only with --native_heap (the adapters' condition).
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/log.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -24,6 +27,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -289,7 +293,7 @@ void TidyCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = built;
       t.r5.u64 = new_length;
-      (v == 0 ? __imp__sub_82091328 : NativeTidy)(t, h.base);
+      (v == 0 ? __imp__sub_82091328 : ITC_CONTEXT_FN(NativeTidy))(t, h.base);
       Collect(h, out[v], t, blocks, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -311,7 +315,7 @@ void AllocateCases(Context& h) {
       const uint32_t count = i < int(std::size(kCounts)) ? kCounts[i] : h.random.Below(5000);
       PPCContext t = CallContext(h);
       t.r3.u64 = count;
-      (v == 0 ? __imp__sub_820912B0 : NativeAllocate)(t, h.base);
+      (v == 0 ? __imp__sub_820912B0 : ITC_CONTEXT_FN(NativeAllocate))(t, h.base);
       Blocks blocks;
       blocks.Add(t.r3.u32);
       Collect(h, out[v], t, blocks, {});
@@ -383,7 +387,7 @@ void CopyCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = new_length;
       t.r5.u64 = keep;
-      (v == 0 ? __imp__sub_82091458 : NativeCopy)(t, h.base);
+      (v == 0 ? __imp__sub_82091458 : ITC_CONTEXT_FN(NativeCopy))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -413,7 +417,7 @@ void GrowCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = new_length;
       t.r5.u64 = kTrim[h.random.Below(4)];
-      (v == 0 ? __imp__sub_82091540 : NativeGrow)(t, h.base);
+      (v == 0 ? __imp__sub_82091540 : ITC_CONTEXT_FN(NativeGrow))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -457,7 +461,7 @@ void AssignFromCases(Context& h) {
       t.r4.u64 = source;
       t.r5.u64 = offset;
       t.r6.u64 = count;
-      (v == 0 ? __imp__sub_82091720 : NativeAssignFrom)(t, h.base);
+      (v == 0 ? __imp__sub_82091720 : ITC_CONTEXT_FN(NativeAssignFrom))(t, h.base);
       Collect(h, out[v], t, blocks, {string, source});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -489,9 +493,9 @@ void FromTextCases(Context& h, bool append) {
       t.r4.u64 = text;
       t.r5.u64 = count;
       if (append) {
-        (v == 0 ? __imp__sub_820A6F60 : NativeAppend)(t, h.base);
+        (v == 0 ? __imp__sub_820A6F60 : ITC_CONTEXT_FN(NativeAppend))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_82091808 : NativeAssignText)(t, h.base);
+        (v == 0 ? __imp__sub_82091808 : ITC_CONTEXT_FN(NativeAssignText))(t, h.base);
       }
       Collect(h, out[v], t, blocks, {string});
     }
@@ -515,7 +519,7 @@ void ConstructCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = string;
       t.r4.u64 = h.random.Next();
-      (v == 0 ? __imp__sub_825929E8 : NativeConstruct)(t, h.base);
+      (v == 0 ? __imp__sub_825929E8 : ITC_CONTEXT_FN(NativeConstruct))(t, h.base);
       Collect(h, out[v], t, {}, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -546,9 +550,9 @@ void ConstructFromTextCases(Context& h, bool allocator) {
       t.r4.u64 = text;
       t.r5.u64 = h.random.Next();
       if (allocator) {
-        (v == 0 ? __imp__sub_82593248 : NativeConstructFromTextWithAllocator)(t, h.base);
+        (v == 0 ? __imp__sub_82593248 : ITC_CONTEXT_FN(NativeConstructFromTextWithAllocator))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_825931D0 : NativeConstructFromText)(t, h.base);
+        (v == 0 ? __imp__sub_825931D0 : ITC_CONTEXT_FN(NativeConstructFromText))(t, h.base);
       }
       Collect(h, out[v], t, {}, {string});
     }
@@ -585,7 +589,7 @@ void ConstructFromCases(Context& h) {
       t.r5.u64 = offset;
       t.r6.u64 = count;
       t.r7.u64 = h.random.Next();
-      (v == 0 ? __imp__sub_82593040 : NativeConstructFrom)(t, h.base);
+      (v == 0 ? __imp__sub_82593040 : ITC_CONTEXT_FN(NativeConstructFrom))(t, h.base);
       Collect(h, out[v], t, blocks, {string, source});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -654,7 +658,7 @@ void WildcardSearchCases(Context& h) {
       t.r4.u64 = p;
       t.r5.u64 = h.random.Below(4) == 0 ? 0 : outs;
       t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
-      (v == 0 ? __imp__sub_82592740 : NativeWildcardSearch)(t, h.base);
+      (v == 0 ? __imp__sub_82592740 : ITC_CONTEXT_FN(NativeWildcardSearch))(t, h.base);
       Collect(h, out[v], t, {}, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -688,7 +692,7 @@ void FindCases(Context& h) {
       t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
       t.r7.u64 = h.random.Below(length + 1);
       guest::StoreU32(h.base, outs, h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()));
-      (v == 0 ? __imp__sub_82592970 : NativeFind)(t, h.base);
+      (v == 0 ? __imp__sub_82592970 : ITC_CONTEXT_FN(NativeFind))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -735,7 +739,7 @@ void ReplaceAllCases(Context& h) {
       t.r4.u64 = p;
       t.r5.u64 = replacement;
       t.r6.u64 = h.random.Below(3);
-      (v == 0 ? __imp__sub_82593088 : NativeReplaceAll)(t, h.base);
+      (v == 0 ? __imp__sub_82593088 : ITC_CONTEXT_FN(NativeReplaceAll))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -744,6 +748,70 @@ void ReplaceAllCases(Context& h) {
 }
 
 }  // namespace
+
+// --- The global strings' static set-ups (on the game's strings and exit
+// table, each put back after a side). ---
+
+void NativeStaticInit(PPCContext& ctx, uint8_t* base, bool second) {
+  const auto result = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::GuestAtexit guest{regs, base};
+    return second ? ss::InitGlobalString8265EE98(base, guest.Call())
+                  : ss::InitGlobalString8265EE7C(base, guest.Call());
+  });
+  if (result) {
+    ctx.r3.s64 = *result;
+  } else {
+    g_fallbacks++;
+    (second ? __imp__sub_825DA580 : __imp__sub_825DA540)(ctx, base);
+  }
+}
+
+void StaticInitCases(Context& h) {
+  Results results("sub_825DA540, sub_825DA580 (the global strings' static set-ups)");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: std_string: native atexit off: the static set-ups' cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  for (int c = 0; c < 16; c++) {
+    const bool second = (c & 1) != 0;
+    const uint32_t string = second ? 0x8265EE98 : 0x8265EE7C;
+    const auto saved = Read(h.base, string, 28);
+    // The game's string as it is, or another in place (its capacity 15).
+    std::vector<uint8_t> start = saved;
+    if (c >= 2) {
+      for (auto& byte : start) {
+        byte = uint8_t(h.random.Next());
+      }
+      const uint32_t length = h.random.Below(16);
+      for (uint32_t i = 0; i < 16; i++) {
+        start[4 + i] = i < length ? uint8_t('a' + h.random.Below(26)) : 0;
+      }
+      for (int k = 0; k < 4; k++) {
+        start[20 + k] = uint8_t(length >> (24 - 8 * k));
+        start[24 + k] = uint8_t(15 >> (24 - 8 * k));
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, string, start.data(), 28);
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        (second ? __imp__sub_825DA580 : __imp__sub_825DA540)(t, h.base);
+      } else {
+        NativeStaticInit(t, h.base, second);
+      }
+      out[v].Bytes(Read(h.base, string, 28));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    Write(h.base, string, saved.data(), 28);
+    results.Check(out[0], out[1], fmt::format("case {} ({})", c, second ? "0x8265EE98" : "0x8265EE7C"));
+  }
+  results.Report();
+}
 
 void StdString(Context& h) {
   if (!hooks::NativeHeapActive()) {
@@ -765,6 +833,7 @@ void StdString(Context& h) {
   WildcardSearchCases(h);
   FindCases(h);
   ReplaceAllCases(h);
+  StaticInitCases(h);
   if (g_fallbacks != 0) {
     ITC_LOG_INFO("harness: std_string: {} cases handed to the original by the plain C++",
                  g_fallbacks);

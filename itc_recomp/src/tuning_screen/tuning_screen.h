@@ -1,0 +1,865 @@
+// The tuning screen natively (B7 in docs/rexglue-removal.md; the functions
+// are in docs/functions/tuning-screen.md, the fields in docs/known-data.md's
+// "tuning screen"): the front end's tuning shop, its part tables, its debug
+// state handlers and its page set-ups. Plain C++ over guest memory (the
+// screen is shared with the recompiled code), with the originals' loads and
+// stores in their order; `sp` is the caller's stack pointer, and the
+// original's frame (its back chain and the words it stores there) is
+// written as the original leaves it, its register saves aren't. Adapters:
+// src/hooks/tuning_screen.cpp (behind --native_tuning_screen), register
+// steps shared with the harness in src/hooks/tuning_screen.h.
+
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <optional>
+
+#include "schema/tuning_screen.h"
+
+namespace front_end_car_draw {
+struct Calls;
+struct DrawCallees;
+}
+namespace load_poll {
+struct Calls;
+}
+
+namespace tuning_screen {
+
+// The screen's view (itc_recomp/schema/tuning-screen.toml).
+using TS = schema::TuningScreen;
+// A UI movie node's view.
+using UiNode = schema::UiMovieNode;
+
+// The screen's fields other areas' code still names by offset.
+constexpr uint32_t kState = 9652;      // the state machine (3 to 58)
+constexpr uint32_t kCategory = 9656;   // m: 0 power to 6 interior
+constexpr uint32_t kItem = 9660;       // p: a byte, the item in the category
+constexpr uint32_t kLevel = 9661;      // a byte: the level pick
+constexpr uint32_t kType = 9662;       // a byte: the type pick
+constexpr uint32_t kType2 = 9663;      // a byte
+constexpr uint32_t kOption = 9664;     // a byte: the option pick
+constexpr uint32_t kPartSet = 33900;   // the power and power train tables' row
+constexpr uint32_t kSaveData = 18904;
+constexpr uint32_t kMovieId = 2;       // the screen's UI movie (13 and 14 the editors')  // the save data (its +6120 the garage's list)
+
+// --- The part tables (tables.cpp): leaves with no frame ---
+
+// sub_821CC6C0 TuningScreen::CategoryItemCount: the items in category +9656
+// (unsigned): 4, 5, 1, 3, 10, 8, 4, else 0.
+uint32_t CategoryItemCount(uint32_t screen);
+// sub_821CDB18 TuningScreen::IsItemAvailable: the screen's word for item
+// `item` of the current list, 1 where there's none (r3, zero-extended).
+uint32_t IsItemAvailable(uint32_t screen, uint64_t item);
+// sub_821CDED8 TuningScreen::WheelNumber (its case 0 the split piece
+// sub_821CDF0C, merged): `model` + the brand's first number (all 64 bits),
+// 0 above brand 16.
+uint64_t WheelNumber(uint64_t brand, uint64_t model);
+// sub_821CD160 TuningScreen::GetPrice (its case 0 the split piece
+// sub_821CD308, merged): +25120 = 0, then the current choice's word of the
+// price tables where there's one; r3 = +25120.
+uint32_t GetPrice(uint32_t screen);
+// sub_821CD868 TuningScreen::GetCurrentChoice: the current item's word, 0
+// where there's none.
+uint32_t GetCurrentChoice(uint32_t screen);
+// sub_821CDC38 TuningScreen::GetChoiceFlag: the current item's word for
+// choice `choice`, 0 where there's none.
+uint32_t GetChoiceFlag(uint32_t screen, uint64_t choice);
+
+// --- The selected garage car (garage_car.cpp) ---
+
+// The selected garage car's record g (the save data's list at +6120 walked
+// [+0x19920] steps from the head halfword +204, cars of 1,968 bytes from
+// it); the fields the screen writes are at g + 212 + k ("c+k").
+uint32_t SelectedGarageCar(uint32_t screen);
+// sub_821DCC28 TuningScreen::StoreToGarageCar: r3 = the screen (all 64
+// bits). The screen's current choices into the car. No frame: its tables
+// and conversion temporaries below `sp` as the original leaves them (its
+// register saves, sp - 64 to sp, aren't written). Returns r3 as the
+// original leaves it: the sticker loop's last tens x 10 (64 bits), else the
+// screen.
+uint64_t StoreToGarageCar(uint64_t r3, uint32_t sp);
+// sub_821DF448 TuningScreen::EquipChoice: the choice just made into the car,
+// by the state (5 to 8). A leaf; r3 left as it is.
+void EquipChoice(uint32_t screen);
+
+// sub_821DE2D8 TuningScreen::AeroPartValue (its case 0 the split piece
+// sub_821DF24C, merged; aero.cpp): r4 = the type - 1, r5 = the aero item,
+// both unchecked. Its frame's constant tables written below `sp` as the
+// original leaves them, then the selected car's table[type][item] (r3
+// zero-extended), all 64 bits set for the ids with none.
+uint64_t AeroPartValue(uint32_t screen, uint64_t type, uint64_t item,
+                       uint32_t sp);
+
+// --- The part list's marks (marks.cpp) ---
+
+// Movie 2: its id at `frame` + 80, then UiMovies::Find's movie.
+uint32_t Movie(uint32_t frame);
+// sub_821EE6D0 TuningScreen::HidePartMarks: the six rows' (sub-scene 1's
+// nodes 14 to 19) children 3 to 5 hidden. Its 128-byte frame below `sp`.
+// r3 the last child.
+uint32_t HidePartMarks(uint32_t sp);
+// sub_821EE760 TuningScreen::ShowPartMarks: r3 = the screen (all 64 bits),
+// `row` a row node, `group` and `index` a wheel (WheelNumber's). By +25196
+// (0 both, 1 front, 2 rear): child 5 shown, with 4 for the front wheel's
+// match (+27836) and 3 for the rear's (+27840). Its 128-byte frame. r3 as
+// the original leaves it: the last child shown, else WheelNumber's, else
+// the screen.
+uint64_t ShowPartMarks(uint64_t r3, uint32_t row, uint64_t group, uint64_t index,
+                       uint32_t sp);
+
+// --- Movie 2's node setters (nodes.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the movie
+// id at +80) and r3 as the original leaves it.
+
+// sub_821DA3F8 TuningScreen::ShowInteriorPicture: `type` 0 hides node
+// (-1, 0); else it's shown and its child 0's +108 = `index` (+0, +4, +8,
+// +11 for the byte +9662 1 to 4; untouched otherwise). r3 the node or the
+// child.
+uint32_t ShowInteriorPicture(uint32_t screen, uint32_t type, uint32_t index,
+                             uint32_t sp);
+// sub_821DFB20 TuningScreen::HideTireMarks: nodes (30, 0) and (33, 0)'s
+// children 11, 10 and 1 hidden. r3 the last child.
+uint32_t HideTireMarks(uint32_t sp);
+// sub_821DFBE8 TuningScreen::HideNode19: node (-1, 19) hidden by the state
+// and picks (its row). r3 the node hidden, else the movie.
+uint64_t HideNode19(uint64_t r3, uint32_t sp);
+// sub_821E22E8 TuningScreen::ShowTireMarks: the tire's level and option
+// marks on nodes (30, 0) and (33, 0) (its row), HideTireMarks from its
+// frame outside the tire states. r3 the last child, or GetCurrentChoice's.
+uint32_t ShowTireMarks(uint32_t screen, uint32_t sp);
+
+// --- The lists on movies 2 and 13 (lists.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the movie
+// id at +80) and r3 as the original leaves it; `show` r4's low word.
+
+// sub_821EE9B0 TuningScreen::UpdateListDots: node (1, 6)'s 38 children
+// hidden with +108 sized by n = +25224, children 0 to n shown, and the dots
+// around the cursor +25220 (wrapped over n + 1) sized 4 at it, one less a
+// step away (its row). 176-byte frame; r3 the last child.
+uint32_t UpdateListDots(uint32_t screen, uint32_t sp);
+// sub_82202F30 TuningScreen::ShowOptionMarks: movie 13's option marks in
+// sub-scene 28 or 27 (+30724) by +30756 and +30732 (its row). 112-byte
+// frame; r3 the last node shown or hidden, else the movie's entry.
+uint32_t ShowOptionMarks(uint32_t screen, uint32_t show, uint32_t sp);
+// sub_82202C08 TuningScreen::PlaceStateNodes: movie 13's nodes (29, 4) to
+// (29, 10) placed by the state from the table at 0x8200C860 (its row); the
+// last conversion's doubleword left at frame + 80. 128-byte frame; r3 the
+// last node, else the movie's entry.
+uint32_t PlaceStateNodes(uint32_t screen, uint32_t sp);
+// sub_82203110 TuningScreen::LayOutItems: movie 13's nodes 19 to 21 (+30724
+// 0) or 22 to 24 (1) laid out from their records (its row); the
+// conversions' doublewords left at frame + 80 to + 111. 192-byte frame; r3
+// the last node, else the movie's entry.
+uint32_t LayOutItems(uint32_t screen, uint32_t sp);
+// sub_82203B00 TuningScreen::ShowItems: movie 13's nodes 19 to 24 hidden, or
+// the set +30724 picks shown with its marks (its row). 144-byte frame; r3
+// the last node shown or hidden, else the movie's entry.
+uint32_t ShowItems(uint32_t screen, uint32_t show, uint32_t sp);
+
+// --- The movie calls (pages.cpp) ---
+
+// A guest function `function` (through the function table: its override
+// when it has one) with r3 on from `args` (all 64 bits each; the registers
+// past them left), r1 = `frame` and the link register `lr` (the original's
+// return address); its r3. Flush-to-zero off after it. (The same type as
+// stand_models::GuestCall: hooks::StandModelsGuestCall makes it.)
+using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_list<uint64_t> args,
+                                         uint32_t frame, uint32_t lr)>;
+
+constexpr uint32_t kFinishNamed = 0x8211DF20;  // UiMovie::FinishNamed(movie, named)
+constexpr uint32_t kPlayNamed = 0x8211DAC8;    // UiMovie::PlayNamed(movie, named, chained, 0, 0, 0)
+constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText(movie, sub, child, id, ...)
+constexpr uint32_t kLoopNamed = 0x8211DDE0;    // UiMovie::LoopNamed(movie, named)
+constexpr uint32_t kResetTextScroll = 0x8211C5F8;  // (movie, sub, child): the scroll counter 0
+constexpr uint32_t kScrollText = 0x8211C570;   // UiMovie::ScrollText(movie, sub, child, scrolling)
+constexpr uint32_t kPlay = 0x8211D978;     // UiMovie::Play(movie, sub, index, chained, 0, 0, 0)
+constexpr uint32_t kLoop = 0x8211DDD8;     // UiMovie::Loop(movie, sub, index)
+constexpr uint32_t kFinish = 0x8211DE38;   // UiMovie::Finish(movie, sub, index)
+constexpr uint64_t kAllScenes = ~0ull;     // sub-scene -1 (li r4,-1): the scene itself
+
+// The movie table's entry for movie `id` (UiMovies::Find, the id at
+// `frame` + 80): the address of the movie's word.
+uint32_t MovieEntry(uint32_t frame, uint32_t id);
+// The UI movie calls from the frame `frame` with the return address `lr`:
+// FinishNamed, PlayNamed(movie, named, chained, 0, 0, 0), LoopNamed and
+// SetText with one argument (r7; r8 to r10 0). Their r3.
+uint64_t FinishNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                     uint64_t named);
+uint64_t PlayNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                   uint64_t named, uint32_t chained);
+uint64_t LoopNamed(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                   uint64_t named);
+uint64_t SetText(const GuestCall& call, uint32_t frame, uint32_t lr, uint32_t movie,
+                 uint32_t sub_scene, uint32_t child, uint32_t id, uint64_t argument);
+// The command queue's step at [+10036] the handlers make inline: its next
+// (+16) made current (+12) with +20 = 0 and +16 = -1, or with no next +12 =
+// -1 and +0 = +4; then +24 = 0.
+void Advance(uint32_t screen);
+
+// sub_821EED00 TuningScreen::UpdateListCounter: SetText(movie 2, 1, 23,
+// string 8, +25220 + 1), (1, 24, 449), (1, 25, 8, +25224 + 1). 112-byte
+// frame; the last SetText's r3.
+uint64_t UpdateListCounter(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2068 TuningScreen::SetPartName: the 180-word table at frame + 96
+// (376, then 1000 to 1178), SetText(movie 2, 1, 20, table[WheelNumber(
+// +25204, +25220)]) (unchecked). 848-byte frame; SetText's r3.
+uint64_t SetPartName(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EE880 TuningScreen::PlayGroupAnimation (with its piece
+// sub_821EE8E8, merged): the group +25204's animation (65, 66, 67, 68)
+// restarted (FinishNamed, PlayNamed chained), and 71 with +25208 11 and the
+// group 10 or 12. 112-byte frame; the last PlayNamed's r3, else the movie's
+// entry.
+uint64_t PlayGroupAnimation(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202880 TuningScreen::Command31: +9720 = 1; movie 13's 220 (state 23)
+// or 222 (24) restarted. 112-byte frame; PlayNamed's r3, else the entry.
+uint64_t Command31(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9050 TuningScreen::Command9: with +9716 set 61 restarted, +9720
+// and +9716 0; with +9724 set the queue's step (+9724 left). 128-byte
+// frame; PlayNamed's r3, else the entry.
+uint64_t Command9(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D6230 TuningScreen::ShowDialog: r3 = the screen (all 64 bits),
+// `dispatcher` the update's r4 (its message ring at +204). +9728 = 0; by the
+// state: 9, 11 to 14 movie 16's texts (string 14, 15, 18, 19, 16 into (-1,
+// 0), 2 into (1, 3), 3 into (1, 4)), its +40960 = 0, message 34 posted; 10
+// movie 19's (-1, 1) string 23, message 37; then the queue's step. 128-byte
+// frame; the last SetText's r3, else the screen.
+uint64_t ShowDialog(const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                    uint32_t sp);
+// sub_82202750 TuningScreen::Command30: the same dialog texts for the states
+// 35 to 37 (strings 18, 19, 16), message 34; no step. 128-byte frame; the
+// last SetText's r3, else the screen.
+uint64_t Command30(const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp);
+// sub_821E8B68 TuningScreen::Command7: movie 2's 415 + x (x = +25196), 1008
+// and 1012 or 964 by +9716 and +9720; node (27, 0)'s +16 = float(x × 40)
+// (the doubleword at frame + 80); the queue's step with +9724. 128-byte
+// frame; r3 the node.
+uint64_t Command7(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202368 TuningScreen::Command23: the set +30724's six words into the
+// movie 13's +28 table's pointers, then 165, 160, 164 or 159 by +9640;
+// +9640 = 0. 112-byte frame; PlayNamed's r3, else the entry.
+uint64_t Command23(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82200600 TuningScreen::Command18: the queue's step or 225 / 239 by
+// +9716 and +9720; node (11, 1)'s child 0 +16 = float(+30748) × 40.0 (the
+// doubleword at frame + 80); +30748 + 130 restarted and looped. 128-byte
+// frame; LoopNamed's r3.
+uint64_t Command18(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82204888 TuningScreen::Command25: the queue's step or 227 by +9716 and
+// +9720; PlaceStateNodes from its frame; text (2, 0)'s scroll reset, string
+// 820, scrolled. 128-byte frame; ScrollText's r3.
+uint64_t Command25(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D06B0 TuningScreen::PlayIntro: with +9716 set, sub-scene 9's
+// animation 0 restarted and looped; then with +9720 the scene's animation 0
+// snapped to its end (Play, Finish), the queue's step, +9720 = 0, else
+// restarted (Finish, Play); +9716 = 0. 128-byte frame; the last call's r3,
+// else the entry.
+uint64_t PlayIntro(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D0A48 TuningScreen::OpenItems: aero (+9656 4): with +9716 the
+// scene's animation 2 snapped (with 1012 played and finished, the queue's
+// step) or restarted by +9720; then 976 and 1013 restarted, 1013 looped.
+// Others: with +9716 the same for animation 1 (with 1012 and 1 played and
+// finished). 128-byte frame; the last call's r3, else the entry.
+uint64_t OpenItems(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821FF1D0 TuningScreen::Command15: with +9716 the queue's step (+9720)
+// or 218, 1 and 153 restarted (1 and 153 looped); node (3, 0)'s +16 =
+// float(+30724) × 40.0 (the doubleword at frame + 80); +30724 + 6 restarted
+// and looped; text (2, 0)'s scroll reset, string 804, scrolled. 128-byte
+// frame; ScrollText's r3.
+uint64_t Command15(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82202090 TuningScreen::Command22: with +9716 the queue's step (+9720)
+// or 233 / 223 restarted by the word at +31192 + 4 × (3 × +30724 +
+// +30732); by the set +30724, 167 and 166 or 162 and 161 restarted and
+// looped, its six words copied as Command23's; text (2, 0)'s scroll reset,
+// string 811, scrolled. 128-byte frame; ScrollText's r3.
+uint64_t Command22(const GuestCall& call, uint32_t screen, uint32_t sp);
+
+// --- The category bar and the level, type and option lists (menus.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the
+// doubleword at frame + 80 the ints are made floats through) and r3 as the
+// original leaves it.
+
+// sub_821D07D8 TuningScreen::MoveCategory: by the front-end menu [+10040]'s
+// step (+8) and wrap (+40), sub-scene 27's bar slid or snapped (node (27,
+// 0)'s +16 = float(+9656) × 40.0) and the category's animation (+9656 + 2)
+// restarted and looped; with no step, action 159 pressed (the player's
+// mapper's slot 10: ActionMapper::Pressed's plain C++ when the vtable holds
+// it and `native_slots`, else the slot) finishes animations 2 to 13, else
+// action 158 is asked. 128-byte frame; the last call's r3, else the entry.
+uint64_t MoveCategory(const GuestCall& call, uint32_t screen, uint32_t sp,
+                      bool native_slots);
+// sub_821D6420 TuningScreen::MarkPick: +9720 = 1; by the state (4, 53), the
+// category and the item, the picked row's marks on sub-scene 28 or 30 at
+// float(pick) × 40.0 (80.0 for state 53's pick 3), then 486, 629 or 981 and
+// 1010 restarted (its row); the queue's step. 144-byte frame; the last
+// PlayNamed's r3, else the entry.
+uint64_t MarkPick(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821FF6F0 TuningScreen::Command16: movie 13's 219 snapped (with the
+// queue's step) or restarted by +9716 and +9720; by +30732 the set's
+// animations (its row); text (2, 0)'s scroll reset, string 805, scrolled.
+// 128-byte frame; ScrollText's r3.
+uint64_t Command16(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D5028 TuningScreen::ShowOptions: tire, aero item 4 and exterior
+// item 1's option page (its row): with +9716 the scene's animation 30, 34 or
+// 6 played and the tire's pictures placed; the option +9664's mark and
+// animations; the queue's step with +9724. 160-byte frame; the last
+// LoopNamed's r3, else the entry.
+uint64_t ShowOptions(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821D12C0 TuningScreen::ShowLevels: power, power train, body and tire's
+// level page (its row): with +9716 the scene's animation 5, 6 or 7 played and
+// the current level's picture placed (GetCurrentChoice); the level's mark
+// and animations; 976 and 1013 with the byte +9677 above 8; the queue's step
+// with +9724. 160-byte frame; the last LoopNamed's r3, else the entry.
+uint64_t ShowLevels(const GuestCall& call, uint32_t screen, uint32_t sp);
+
+// sub_82203400 TuningScreen::HighlightItem and sub_82203570
+// HighlightSelected: movie 13's items lit, nodes 19 to 21 (+30724 0) or 22
+// to 24 (1) +68 = 1.0 for the item (r5 `item`, or +30732 read again each
+// pass) and 0.0 for the others; with `all` not 0, +9708 = 1 and all three
+// 1.0. 144-byte frame (saves not written); the last FindNode's r3, else the
+// movie's entry.
+uint64_t HighlightItem(uint64_t r3, uint64_t all, uint64_t item, uint32_t sp);
+uint64_t HighlightSelected(uint64_t r3, uint64_t all, uint32_t sp);
+// sub_822036E8 TuningScreen::UpdateItems: r3 = the screen (all 64 bits).
+// Movie 13's items by the state (its row): 27 TuningScreen::HighlightItem
+// and 28 HighlightSelected (both recompiled, through `call`) by the player's
+// mapper's slots 8 (ActionMapper::Held's plain C++ when the vtable holds it
+// and `native_slots`, else the slot) and 11 (through `call`) on action 164;
+// in 28 LayOutItems, and unless 163 is held the selected item's node put
+// back at the origin. 128-byte frame (the last conversion's doubleword at
+// frame + 80); r3 the node, LayOutItems', the last call's, else the entry.
+uint64_t UpdateItems(const GuestCall& call, uint64_t r3, uint32_t sp,
+                     bool native_slots);
+// sub_821D2A80 TuningScreen::ShowTypes (its case 0 the split piece
+// sub_821D2DFC, merged): power item 2, aero, exterior and interior's type
+// page (its row): with +9716 the scene's animations and the current choice's
+// picture; the type's mark and animations; aero's help text by the item
+// (item 3's by the selected garage car's aero parts 77 and 82: their plain
+// C++ with `native_specs`, else the originals); the queue's step with +9724.
+// 320-byte frame (the parts at frame + 96 to + 259); the last call's r3,
+// else the entry.
+uint64_t ShowTypes(const GuestCall& call, uint32_t screen, uint32_t sp,
+                   bool native_specs);
+
+// --- Movie 2's command runners never seen in play (commands.cpp) ---
+// Called only by the update's plain C++. Each with the original's frame
+// below `sp` (its back chain, the movie id at +80, then the doubleword the
+// ints are made floats through) and r3 as the original leaves it.
+
+// sub_821D4180 TuningScreen::Command5: the color pages (its row): body's
+// item 3 (scene animation 28, node (32, 1) at float(+9663) × 40.0, 734 +
+// +9663), aero's item 4 (32; node (30, 0)'s child 2 by GetCurrentChoice,
+// marked when [+36368] is the byte +9662; (30, 1)'s child 0; 571 and 632 +
+// +9663) and interior's item 0 (36; node (32, 1); 771 + +9663); the queue's
+// step with +9724. 128-byte frame; the last LoopNamed's r3, else the entry.
+uint64_t Command5(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9730 TuningScreen::Command11: 980 snapped (with the queue's
+// step) or 980 and 1009 played by +9716 and +9720; node (36, 0)'s +16 =
+// float(+30492 × 40); 887 + +30492 restarted and looped; help text (10, 0)
+// string 642 scrolled; the queue's step with +9724. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command11(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E9CA0 TuningScreen::Command12: 983 restarted with +9716; node (37,
+// 0)'s +16 = float(+30500 × 40); 926 + +30500 restarted and looped; the
+// queue's step with +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command12(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EB8E8 TuningScreen::Command54: 1001 snapped (with the queue's
+// step) or played by +9716 and +9720; the queue's step with +9724. 128-byte
+// frame; the last call's r3, else the entry.
+uint64_t Command54(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EBDC8 TuningScreen::Command55: with +9716 1002 played and node
+// (28, 0)'s child 2 shown at the current choice (80.0 for 3, else float(c
+// × 40)); node (28, 1)'s child 0 at the pick [+33548] the same way; 428 +
+// pick (430 for 3) restarted and looped, 489 + pick (491) played and
+// looped; the queue's step with +9724. 144-byte frame; LoopNamed's r3.
+uint64_t Command55(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EC6A0 TuningScreen::Command56: with +9716 999 played and node (32,
+// 1)'s +16 = float([+33556] × 40); 771 + [+33556] restarted and looped; the
+// queue's step with +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command56(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821ECC68 TuningScreen::Command57: the meter pages (its row): with
+// neither 1005 nor 144 playing (UiMovie::NamedAnimationTime -1.0) and +9720
+// 0, 79 or 74 + the page [+33564] restarted and looped; 144 and 1011
+// snapped (the queue's step, +9720 = 0 on page 4) or 1005 played by +9716
+// and +9720; the point [+33572] 0 to 4's pair (118/116 to 138/136); off
+// page 4 sub-scene 2's rows 9 to 13 named (string 379, the row's number),
+// marked by GetChoiceFlag and pictured (child 6's +108 = 5 × page + row);
+// the queue's step with +9724. 176-byte frame; r3 the last call's or the
+// movie; `*f1` the last NamedAnimationTime's (the caller applies it before
+// each later guest call).
+uint64_t Command57(const GuestCall& call, uint32_t screen, uint32_t sp,
+                   std::optional<double>* f1);
+// sub_821EDB70 TuningScreen::Command58: with +9716 143 restarted and 1012
+// played; 111 + [+33576] restarted and looped; the queue's step with
+// +9724. 128-byte frame; LoopNamed's r3.
+uint64_t Command58(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F35C0 TuningScreen::Command10 (the paint page): 979 and 1009
+// played by +9716 and +9720; node (21, 5)'s children 4 and 5 +68 by
+// +30456; the sliders (nodes (21, 2 to 4)'s children 10 and 11 +12 from
+// +30444/+30476 × [0x8200B5D4], +30448/+30480 and +30452/+30484 ×
+// [0x8200B5D0]); by +30440 0 or 4 the rows' alphas and 212, or 178/179 by
+// +30460, restarted and looped; help (10, 0) 794 scrolled;
+// SetPaintGradients' plain C++ (tuning_pages); the queue's step with +9724.
+// 144-byte frame; SetPaintGradients' r3.
+uint64_t Command10(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EA460 TuningScreen::Command13 (the neon edit): 985, 228, 238 and
+// 248 played by +9716 and +9720 (node (23, 1)'s child 1 +68 0.0); the bars'
+// sliders (nodes (23, 2 to 4)'s children 6 and 7 +12); by the row +30508
+// 304 to 307 (with 294 + +30524) or 219 + +30528 restarted and looped;
+// SetLightKind0Bars' plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind0Bars' r3.
+uint64_t Command13(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821EAFA0 TuningScreen::Command14 (the LED edit): 987 and 320 played
+// by +9716 and +9720; node (24, 3)'s children 6 and 7 +12 from +30552;
+// SetNodeText (24, 14) 450 with +30548 + 1; by the row +30544 384 to 386
+// (with 366 + +30556) or 309 + +30560 restarted and looped;
+// SetLightKind1Bar's plain C++; the queue's step with +9724. 144-byte
+// frame; SetLightKind1Bar's r3.
+uint64_t Command14(const GuestCall& call, uint32_t screen, uint32_t sp);
+
+// --- The editors' command runners never seen in play (commands.cpp) ---
+// Movies 13 and 14 (and 16 for Command52's dialog), called only by the
+// update's plain C++, as movie 2's above.
+
+// sub_82200100 TuningScreen::Command17: 221 restarted (chained) or the
+// queue's step by +9716 and +9720; node (10, 0)'s +16 = float(+30740) ×
+// 40.0; 49 + +30740 restarted and looped. 128-byte frame; LoopNamed's r3.
+uint64_t Command17(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201C58 TuningScreen::Command19: by +9716 and +9720 the queue's step,
+// or 236 restarted and 4 × [+30732] + 201 (set +30724 0) or + 175 (set 1)
+// played chained; help text (2, 0) string 810 scrolled. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command19(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_82201FA0 TuningScreen::Command20 (`a`, `b` the update's +9644 and
+// +9648): by the set +30724 0 4a + 204 restarted chained then 4b + 203, or
+// 1 4a + 178 then 4b + 177; other sets nothing. 128-byte frame; the last
+// PlayNamed's r3, else the movie's entry.
+uint64_t Command20(const GuestCall& call, uint32_t screen, uint32_t sp, uint64_t a,
+                   uint64_t b);
+// sub_822087C8 TuningScreen::Command21 (r3 the screen, all 64 bits): the
+// layer order's move, the layer +30756 stepped to the cursor +30732 one at a
+// time (either way): the work list's ids (+31228 + 4i) exchanged, +9644 and
+// +9648 the two ids, SwapLayerRecords and SwapOrderTextures (tuning_pages'
+// plain C++ with `native_pages`, else through the guest), on page +30724 0
+// or 1 the decal images' two entries' textures exchanged and movie 13's
+// slots +764 to +772 (+776 to +784) set from entries 6 to 8 (27 to 29),
+// Command20; then the layer's row finished and played chained (4 x layer +
+// 202, or 4 x (layer + 44)), LayOutItems, the queue's step. 144-byte frame
+// (the movie's id at + 80); r3 LayOutItems'.
+uint64_t Command21(const GuestCall& call, uint64_t r3, uint32_t sp,
+                   bool native_pages);
+// sub_82204980 TuningScreen::Command26 and sub_82204A78 Command27: as
+// Command25 with 229 and string 821, or 230 and 822. 128-byte frame;
+// ScrollText's r3.
+uint64_t Command26(const GuestCall& call, uint32_t screen, uint32_t sp);
+uint64_t Command27(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F7498 TuningScreen::Command32Done: with [+33508] set movie 14's
+// nodes (3, 11) and (3, 12) given color 1 (UiMovie::SetNodeColor's stores).
+// 112-byte frame; r3 the last node, else the movie's entry.
+uint64_t Command32Done(uint32_t screen, uint32_t sp);
+// sub_821F7618 TuningScreen::Command42: movie 14's 181, 182, ..., 197, 198
+// finished; the list position +30756 stepped toward its target (the word
+// at +33480 + 4 × position): one animation played from each end, the
+// target slid along, the position's word set to the target; node (30, 12 +
+// 5 × position) hidden; the queue's step when the position's word isn't the
+// position. 128-byte frame; r3 the hidden node.
+uint64_t Command42(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F77F0 TuningScreen::Command52: +9728 = 0; for the states 50 to 52
+// movie 16's dialog texts (strings 18, 19, 16), message 34 posted to the
+// dispatcher; movie 14's node (1, 1) shown. 144-byte frame; r3 the node.
+uint64_t Command52(const GuestCall& call, uint64_t r3, uint32_t dispatcher,
+                   uint32_t sp);
+// sub_821F7948 TuningScreen::Command53: the queue's step (a leaf; r3 left).
+void Command53(uint32_t screen);
+
+// The dialogs' helpers (pages.cpp): message `event` posted to the
+// dispatcher's ring (+204), and movie 16's three texts at `entry`'s movie
+// (string `title`, 2, 3) from the return addresses `lr`, its +40960 = 0
+// (the last SetText's r3).
+void PostDialogMessage(uint32_t dispatcher, uint32_t event);
+uint64_t DialogTexts(const GuestCall& call, uint32_t frame, uint32_t entry,
+                     uint32_t title, const uint32_t (&lr)[3]);
+
+// --- The help texts and the part list's rows (rows.cpp) ---
+
+// sub_821F1DE0 TuningScreen::SetStateTexts: by the state, 17 the wheel
+// inch's text (785 + +25228) and node (-1, 17) by the group; 16 the group
+// tabs (unless 1007 or 62 plays, or +9716; the table at frame + 96), the
+// arrows (1, 26) and (1, 27), text 784; 15 the textures (3, 1) and (3, 2)
+// with +9716, text 637 (its row). 224-byte frame; r3 the node, the last
+// ScrollText's, else the entry; `*f1` the last NamedAnimationTime's (state
+// 16).
+uint64_t SetStateTexts(const GuestCall& call, uint32_t screen, uint32_t sp,
+                       std::optional<double>* f1);
+// sub_821D8978 TuningScreen::RefreshMenu (refresh_menu.cpp): movie 2's
+// menus by the state once their animation's time is reached (its row): 16
+// the group tabs, 15 the three-choice menu, 4 a category's items, 3 the
+// categories, 17 a setting list, 57 and 58, 56, 53 two choices; the
+// highlight (a node's +16) float(pick) x 40.0 through the doubleword at
+// frame + 80, state 16's tab table at frame + 96. 240-byte frame; r3 the
+// last call's, else the entry; `*f1` the last AnimationTime's or
+// NamedAnimationTime's (the caller applies it before each later guest call).
+uint64_t RefreshMenu(const GuestCall& call, uint32_t screen, uint32_t sp,
+                     std::optional<double>* f1);
+
+// sub_822076E8 TuningScreen::RefreshMovie13 (refresh_movie13.cpp): movie
+// 13's common texts, textures and nodes (the name record +20792 and the
+// money +25116 through SetChildNameText and SetNumberText; +30840 as an int
+// through the frame's +80, +30844 a double in r7 through the frame's +48 and
+// in f1; LayOutItems outside state 28, ShowOptionMarks 0), then by the state
+// (23 the top menu, 24 the layer lists with the movie's +28 table's
+// pointers, 25 the kinds and 26 the edit menu with their help texts
+// scrolled, 27 the option marks, 28 a layer's settings, 34 the view; its
+// row). 128-byte frame; r3 the last call's (a node, a list's or a text
+// call's); `*f1` the double the 37th text's call is made with (the caller
+// applies it before the next guest call).
+uint64_t RefreshMovie13(const GuestCall& call, uint32_t screen, uint32_t sp,
+                        std::optional<double>* f1);
+// sub_821F4BF8 TuningScreen::FillPartRows (its case 0 the split piece
+// sub_821F4CF0, merged): r3 = the screen (all 64 bits). HidePartMarks, then
+// by n = +25224 rows 1 (0; the group 0's the car's picture), 1 and 2 (1), 0
+// to 2 wrapped over 3 (2), nothing (3, negative), 0 to 4 wrapped over n + 1
+// (4 and above), each with WheelNumber, the owned mark and ShowPartMarks
+// (its row). 176-byte frame; r3 ShowPartMarks', else the entry.
+uint64_t FillPartRows(uint64_t r3, uint32_t sp);
+// One of FillPartRows' rows (no frame of its own; the wheel list's slides,
+// tuning_pages::FillPartRowsRight and Left, share it): node (1, `node`) of
+// `movie` filled with the item `index()` (all 64 bits; called again for
+// each of its three uses, as the original recomputes it): the picture
+// (child 2) +108 = WheelNumber(+25204, i) - 1, the owned mark (child 1) +80
+// by the word at screen + 27856 + 152 G + 4 i, ShowPartMarks from `frame`,
+// the picture clamped to 0..206. ShowPartMarks' r3.
+uint64_t FillPartRow(uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
+                     const std::function<uint64_t()>& index);
+// sub_821F5F70 TuningScreen::Command8: r3 = the screen (all 64 bits). Movie
+// 2; with +9716, 1007 and 1011 restarted, +9720 = 0 when set, +9716 = 0;
+// 70 and 69 restarted and looped; PlayGroupAnimation, SetPartName,
+// FillPartRows; with +9724 the queue's step and +9724 = 0. 128-byte frame;
+// FillPartRows' r3.
+uint64_t Command8(const GuestCall& call, uint64_t r3, uint32_t sp);
+
+// --- The calls onto the stand (stand.cpp) ---
+// Each with the original's frame below `sp` (its back chain and the words it
+// stores there; its callees' frames below it as their plain C++ writes them)
+// and r3 as the original leaves it. The stand's holder is [[0x826D83E0]].
+
+// The guest calls (`call`: the UI movies' and the stand's setters', as
+// hooks::StandModelsGuestCall makes them) and the car makers' (`calls`, with
+// the load poll's calls; hooks::FrontEndCarDrawCalls).
+struct StandCalls {
+  const GuestCall& call;
+  const front_end_car_draw::Calls& calls;
+};
+
+// sub_821CCC50 TuningScreen::SetInteriorPair: k = r4 for 0 to 4 (else 0),
+// the word by (k, r5) (its row), then the tail call
+// GarageStage::SetInteriorPair(holder, k, word) from `sp` (its r3).
+uint64_t SetInteriorPair(const GuestCall& call, uint64_t r4, uint64_t r5,
+                         uint32_t sp);
+// sub_8217DAC0 GarageStage::FitSelectedCar: SaveData::Of(0)'s selected garage
+// car's bytes +88 and +89 set to r4's and r5's low bytes while a car object
+// made from it at frame + 96 (Car::Init, memcpy, Car::Refresh) is fitted
+// (GarageStage::FitCar), then put back through their conversions (the
+// doublewords at frame + 80 and + 88). 4,048-byte frame; FitCar's r3, `*f1`
+// its f1.
+uint64_t FitSelectedCar(const front_end_car_draw::Calls& calls, uint32_t holder,
+                        uint64_t r4, uint64_t r5, uint32_t sp, double* f1);
+// sub_821D99A0 TuningScreen::PickCameraPreset (its case 0 the split piece
+// sub_821D9B60, merged): r3 = the screen (all 64 bits). +25072 by the state,
+// the category and the item (its row), FitSelectedCar and
+// GarageStage::SetWord5016 for some, then GarageStage::Command(holder,
+// +25072) when 0 or more. 112-byte frame.
+uint64_t PickCameraPreset(const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821D6100 TuningScreen::UpdateBusyIcon: r3 = the screen (all 64 bits).
+// With the movie +10020 (0 or more): by GarageStage::IsBusy and +10016 the
+// icon's animations started (+10024, +10028 looped) or ended (+10028,
+// +10032). 112-byte frame.
+uint64_t UpdateBusyIcon(const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821E0E00 TuningScreen::PreviewWheels: r3 = the screen (all 64 bits).
+// States 16 and 17: the selected garage car's +1944 and +1952 by +25196
+// (its row); states 15 to 17, +25196 0 to 2: TuningScreen::PreviewWheel(the
+// screen, WheelNumber(+25204, +25220), +25196); outside 17 +25244 = 1.
+// 96-byte frame; `*f1` as PreviewWheel leaves it.
+uint64_t PreviewWheels(const GuestCall& call, uint64_t r3, uint32_t sp,
+                       std::optional<double>* f1);
+// sub_822042D8 TuningScreen::ApplyDecals: r3 = the screen (all 64 bits). By
+// +10012: 5 and 8 the stand's decals cleared, 6 the selected garage car put
+// on the stand (a car object at frame + 144: Car::Init, memcpy, +3888 |= 1,
+// Car::Refresh, GarageStage::SetCar), 7 the screen's decals set (its row);
+// GarageStage::ReloadDecals after 5, 7 and 8; then +10012 = -1. 4,112-byte
+// frame.
+uint64_t ApplyDecals(const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821F7B90 TuningScreen::ApplyAreaDecals: r3 = the screen (all 64
+// bits). By +10012 (its row): 1 the area +30724's five stickers cleared
+// (GarageStage::SetSticker), ReloadDecals and FitSelectedCar(holder, 0, 0);
+// 2 the selected garage car put on the stand (as ApplyDecals' 6); 3
+// GarageStage::Command(holder, 58) and the five set from the screen's
+// records (areas 2 and 7 mirrored), ReloadDecals; 4 Commands 1, the camera
+// command 20 and a + 42, the five cleared, ReloadDecals; then +10012 = -1.
+// Each SetSticker's size memcpy'd to frame + 96 (the argument word it reads
+// from its caller's frame), its position the doublewords at frame + 112 and
+// + 120, the conversions' doublewords at + 144 and + 160 as the original
+// leaves them. 4,160-byte frame (its register and f28 to f31 saves not
+// written); r3 the last call's, else the entry. Never seen in play.
+uint64_t ApplyAreaDecals(const StandCalls& stand, uint64_t r3, uint32_t sp);
+// sub_821FE4E0 TuningScreen::ApplyDecalWord: r3 = the screen (all 64 bits).
+// +10012 9: GarageStage::SetDecalWord(holder, 1); 10: (holder, 0); then
+// +10012 = -1. 96-byte frame; SetDecalWord's r3, else the entry. Never seen
+// in play.
+uint64_t ApplyDecalWord(const GuestCall& call, uint64_t r3, uint32_t sp);
+// sub_822019D0 TuningScreen::DecalCommand: movie 13; with +9716 the queue's
+// step (+9720 set, then 0) or 240 restarted and GarageStage::Command(holder,
+// 58), +9716 = 0; then +10012 = 7, FitSelectedCar(holder, the selected
+// garage car's bytes +300 and +301), text (2, 0)'s scroll reset, string 824,
+// scrolled. 128-byte frame; ScrollText's r3, `*f1` its f1 (the text calls
+// made with f1 as FitSelectedCar leaves it).
+uint64_t DecalCommand(const StandCalls& stand, uint32_t screen, uint32_t sp,
+                      double* f1);
+// sub_821CCAA8 TuningScreen::PreviewParts: r3 = the screen (all 64 bits),
+// `pick` (r4, all 64 bits) 0 the screen's parts set, else an aero set + 1.
+// The wing word w from +36300 (by +25172, its row); pick 0:
+// GarageStage::SetParts(holder, +36164, +36252, +36208, +36544, +36368, w),
+// else SetAeroSet(holder, pick - 1, +36368, w) (stand_models' plain C++);
+// then +10012 = 9 (parts) or 10 (aero) when +36372 is 1 and +36376 is 0.
+// 96-byte frame (r31 and lr's saves not written); the setter's r3. Never
+// seen in play; needs --native_car_specs (SetAeroSet's).
+uint64_t PreviewParts(const GuestCall& call, uint64_t r3, uint64_t pick,
+                      uint32_t sp);
+// sub_821E07B0 TuningScreen::PreviewItem: r3 = the screen (all 64 bits).
+// The highlighted item put on the stand by the state, the category and the
+// item bytes (its row): the stand's setters' plain C++, IsItemAvailable's,
+// SetInteriorPair's, PreviewParts', SetCaliper's, RefitAxles' and
+// SetAccessory's (the last three and GarageStage::SetChoice, SetAero2 and
+// SetDoorKind never seen in play). The choice tables at frame + 80 and + 96,
+// read unchecked. 160-byte frame; r3 the last call's, else the entry
+// (nothing in states 3 and 4); `*f1` set where RefitAxles leaves f1 (nullopt
+// where its FitAxles ran the original), else left.
+uint64_t PreviewItem(const StandCalls& stand, uint64_t r3, uint32_t sp,
+                     std::optional<double>* f1);
+// sub_821DA330 TuningScreen::SetCaliper: the calipers' texture w by
+// `choice` (unsigned; 0 by the selected garage car's id +224: 4 gives 6, 7,
+// 12 and 14 give 5, others 4; 1 gives 4, 2 gives 6, 3 gives 0, 4 gives 5,
+// 5 and up 0), then the tail call GarageStage::SetWheelExtras(holder, r4,
+// w) from `sp` (with `stand.calls.poll`); its r3.
+uint64_t SetCaliper(const StandCalls& stand, uint32_t screen, uint32_t r4,
+                    uint32_t choice, uint32_t sp);
+// sub_821CCBE8 TuningScreen::SetAccessory: the kind turned around (0 gives
+// 3 with the choice 0; 1 gives 2 with the choices 3 and 4 swapped; 2 gives
+// 1; 3 and up 0), then the tail call GarageStage::SetAccessory(holder, kind,
+// choice) from `sp`; its r3.
+uint64_t SetAccessory(const GuestCall& call, uint32_t kind, uint32_t choice,
+                      uint32_t sp);
+// sub_821DF9D0 TuningScreen::RefitAxles: a car object at frame + 80 from the
+// selected garage car (Car::Init, memcpy 1,884 bytes, +3888 |= 1,
+// Car::Refresh), then GarageStage::FitAxles(holder, car). 4,000-byte frame;
+// its r3, `*f1` its f1 (nullopt where it ran the original).
+uint64_t RefitAxles(const StandCalls& stand, uint32_t screen, uint32_t sp,
+                    std::optional<double>* f1);
+// sub_821E7E48 TuningScreen::PreviewInteriorChoices: the tables A (3, 2, 1,
+// 0) and B (2, 1, 0, 4, 3) at frame + 80 and + 96; for the five choice codes
+// +33800 + 4i the stand's choice (6, 5, 4, then 0 or 2 and 1 or 3 by
+// +35708, the other cleared), cleared for -1, else
+// GarageStage::SetChoice(holder, c, A[w / 10], B[w % 10]); then the slot
+// +33576's choice with (A[+33564], B[+33572]) (indexes unchecked). 208-byte
+// frame; the last SetChoice's r3.
+uint64_t PreviewInteriorChoices(const GuestCall& call, uint32_t screen,
+                                uint32_t sp);
+// sub_821CC930 TuningScreen::PreviewLightKit: in state 21 or 22 (+9652),
+// GarageStage::SetLightKit(holder, +30492, ...) with the group's floats
+// (each word times [0x820021FC], their conversions' doublewords at frame +
+// 80 to + 96), else nothing (r3 left). 112-byte frame; SetLightKit's r3,
+// `*f1` its f1 (left in the other states).
+uint64_t PreviewLightKit(const StandCalls& stand, uint64_t r3, uint32_t sp,
+                         std::optional<double>* f1);
+// --- The refresh's pages never seen in play (refresh_pages.cpp) ---
+
+// sub_821F2110 TuningScreen::RefreshPaint (state 18): movie 2's header
+// textures (3, 1) 6 and (3, 2) 34 with +9716 set, node (8, 1) hidden,
+// sub-scene 21's labels (SetNodeText 221 to 229, 4 and 5), its children 3's
+// and 4's child 4 +104 = 1. 112-byte frame below `sp`; r3 the last child.
+uint64_t RefreshPaint(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2378 TuningScreen::RefreshLightKits (states 19 to 22): r3 = the
+// screen (all 64 bits). By the state: 19 the light kits' list (sub-scene
+// 36), 20 the kinds' (37) with the help line by +30500, 21 the neon edit
+// (sub-scene 23) and 22 the LED edit (24): their labels, PreviewLightKit's
+// plain C++ (`*f1` its), the eight swatches' colors and the help line by
+// +30508 or +30544. 144-byte frame below `sp`; r3 its last call's.
+uint64_t RefreshLightKits(const StandCalls& stand, uint64_t r3, uint32_t sp,
+                          std::optional<double>* f1);
+// sub_821F7A98 TuningScreen::RefreshMovie14: movie 14's texts (0, 9) 9 with
+// +25116 and (0, 13) 8 with +25092, texture (0, 11) +25096, nodes (1, 2),
+// (1, 10), (1, 8), (1, 9) hidden, textures (1, 6) and (1, 7) 1. 112-byte
+// frame below `sp`; SetNodeTexture's r3.
+uint64_t RefreshMovie14(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821F2AD8 TuningScreen::RefreshInterior (states 53 to 58, the
+// interior item's pages; its row): 57 and 58 the slots' nodes, the help line
+// by IsSlotAvailable's plain C++ (tuning_pages), the mode +33564 and the
+// slot's code, and in 57 PreviewInteriorChoices' plain C++; 56 the pair's
+// picture and the help by the mode; 55 sub-scene 32's six swatches by the
+// kind +33548; 54 sub-scene 28's rows (SetNodeText 375 and 379, marks by
+// GetChoiceFlag) and the help by the kind; 53 the textures and help 648.
+// 176-byte frame below `sp`; r3 its last call's (the entry for other
+// states).
+uint64_t RefreshInterior(const GuestCall& call, uint32_t screen, uint32_t sp);
+// sub_821E7DA0 UiNode::SetRgb: the node's +56, +60, +64 = `r`, `g`, `b`. A
+// leaf.
+void SetRgb(uint32_t node, uint32_t r, uint32_t g, uint32_t b);
+// sub_821E0FB0 TuningScreen::RestoreStand: r3 = the screen (all 64 bits).
+// The current page's saved values put back on the stand by the category and
+// the item (its row): the stand's setters', PreviewWheel's, SetInteriorPair's
+// GarageStage::SetLightKit's and PreviewParts' plain C++; SetCaliper,
+// SetCaliper's, RefitAxles', SetAccessory's, GarageStage::SetChoice's,
+// SetAero2's, SetDoorKind's and ClearLightKit's (never seen in play; f1 left
+// by all but RefitAxles); GarageStage::SetColor (never seen in play) by its plain C++
+// (stand_models', with `stand.calls.poll`; f1 left as its f1). The choice
+// tables at frame + 112 and + 128, the tire grades' at + 128, the
+// conversions' doublewords at + 80 to + 112 as the original leaves them.
+// 224-byte frame; r3 the last call's, else the entry; `*f1` set where the
+// function or a native callee leaves f1, nullopt where a guest call left it
+// (or nothing touched it).
+uint64_t RestoreStand(const StandCalls& stand, uint64_t r3, uint32_t sp,
+                      std::optional<double>* f1);
+// sub_821DF788 TuningScreen::SetCarStats: SetUpCarData (car_makers), a power
+// curve on the frame (+96: PowerCurve::FromEngine on +20180, ShiftPeak 0),
+// the stats +20768 to +20780 from the car data and the curve, the texts of
+// movie 2's sub-scene 18 (children 5 to 14; child 12's argument a double in
+// r7 and f1, through the frame's +48). 1,200-byte frame; the last SetText's
+// r3, `*f1` its f1.
+uint64_t SetCarStats(const front_end_car_draw::Calls& calls, uint32_t screen,
+                     uint32_t sp, double* f1);
+
+// sub_821E3AD0 TuningScreen::Refresh (refresh.cpp, its pieces in refresh.h):
+// r3 = the screen (all 64 bits). Movie 2 set up for the state +9652: the
+// header (the money, EquipChoice, SetCarStats and sub-scene 18's stats, the
+// price, ShowTireMarks, PickCameraPreset, PreviewItem,
+// GarageStage::SetLightsOn), then the state's page (3 to 8 here, in
+// refresh.cpp and refresh_level, _type and _choice.cpp; 15 to 17 SetStateTexts,
+// 23 to 37 RefreshMovie13 for the vinyl, RefreshPaint, RefreshLightKits,
+// RefreshMovie14 and RefreshInterior through the guest). 368-byte frame
+// (movie 2's id, then the weight's conversion at frame + 80; child 12's
+// double at + 48); returns 1, or 0 for the states 10, 12 to 14 and outside 3
+// to 58. `*f1` as RefreshMenu's (the caller applies it before each later
+// guest call and at the end).
+uint64_t Refresh(const StandCalls& stand, uint64_t r3, uint32_t sp,
+                 std::optional<double>* f1);
+
+// sub_821D9F10 TuningScreen::UpdateStand: the screen's per-update calls
+// onto the stand (its row): the bonnet's, the roof's (cars 14 and 15) and
+// the doors' animations opened or closed by the page (the open states at
+// 0x826D84A0, 0x826D849C, 0x826D8498; GarageStage::Command's plain C++), the
+// paint's three colors in state 18 (GarageStage::SetColor's plain C++,
+// stand_models', its paints as `paint_poll` decides; the conversions'
+// doublewords at frame + 80 to + 103 as the original leaves them), the decals waiting at +10012 once the stand isn't
+// busy (ApplyDecals', ApplyAreaDecals' and ApplyDecalWord's plain C++, the
+// last two never seen in play), StepSecondWheels and SetWheelWord's
+// plain C++ (`paint_poll` as StepSecondWheels' adapter gives it), then
+// GarageStage::Draw's (`draw` as its adapter decides). 144-byte frame (its
+// saved registers and f31 not written); GarageStage::Draw's r3.
+uint64_t UpdateStand(const StandCalls& stand,
+                     const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
+                     uint32_t screen, uint32_t sp);
+
+// sub_821E6C50 TuningScreen::Update (update.cpp; its pieces sub_821E6CD4 and
+// sub_821E6F90 merged): r3 = the screen (all 64 bits), r4 = the mode's
+// dispatcher (all 64 bits; commands 30, 52 and 63). The refresh while +9708
+// is 1 (+9708 = whether it answered 0), the state's debug handler, movie
+// 2, 13 or 14 by the state (UiMovies::Find, the id at frame + 80),
+// UpdateBusyIcon, the queue [+10036]'s current command's runner on its first
+// update (+24), UiMovie::Run and the queue's step when it stops
+// (Command32Done after command 32), then UpdateItems, DrawPowerGraph,
+// RefreshMenu, UpdateListDots, UpdateListCounter, UpdateStand, and while
+// +9732 is set StoreToGarageCar, SetCarStats and RestoreStand (+9732 = 0).
+// The callees seen in play by their plain C++; DrawPowerGraph, UiMovie::Run
+// and those never seen in play (16 debug handlers, 39 command runners,
+// Command32Done) through the guest. 144-byte frame (movie's id at + 80);
+// r3 UpdateStand's or RestoreStand's; `*f1` as Refresh's (the caller applies
+// it before each later guest call and at the end).
+struct UpdateCalls {
+  const StandCalls& stand;
+  const front_end_car_draw::DrawCallees& draw;
+  load_poll::Calls* paint_poll;  // as UpdateStand's adapter gives it
+  bool native_slots;             // --native_action_mappers
+  bool native_specs;             // --native_car_specs
+  bool native_pages;             // --native_tuning_pages (Command21's callees and the
+                                 // sticker commands)
+  // TuningScreen::DrawPowerGraph (sub_821DF350) through its override from
+  // `frame` with r3 and r31 = `r3`, r30 = `r30` (its adapter saves them) and
+  // the original's return address; f1 left in the guest's.
+  std::function<void(uint32_t frame, uint64_t r3, uint64_t r30)> draw_power_graph;
+};
+uint64_t Update(const UpdateCalls& calls, uint64_t r3, uint64_t r4, uint32_t sp,
+                std::optional<double>* f1);
+
+// --- The debug state handlers (debug.cpp) ---
+// Each only prints a debug menu through the empty sub_82106540, left out:
+// its frame's back chain and string tables written as the original leaves
+// them; r3 the last print's first argument. sub_821CBE08
+// TuningScreen::DebugMainMenu (state 3), sub_821CBEE8 DebugLevelSelect (5),
+// sub_821CBFC0 DebugTypeSelect (6), sub_821CC248 DebugOptionSelect (8; 500
+// or 520 by the category and item), sub_821CC3A8 DebugConfirmBuy (9),
+// sub_821CC488 DebugConfirmEquip (11), sub_821CFCE8 DebugCategoryMenu (4;
+// r3 CategoryItemCount's last answer), sub_821E8068 DebugWheelPartSelect
+// (15), sub_821E8128 DebugWheelKindSelect (16), sub_821E8298
+// DebugWheelInchSelect (17), sub_821FD710 DebugDecalTopMenu (23, 38),
+// sub_821FD880 DebugLayerSelect (24, 39), sub_821FDCB8 DebugLayerEdit (26,
+// 41), sub_821FE080 DebugLayerSet (28, 43), sub_821FE100 DebugEditPosition
+// (29, 44; no frame), sub_821FE178 DebugEditView (34, 49; no frame),
+// sub_821FE190 DebugPaintConfirm (35, 50).
+uint32_t DebugMainMenu(uint32_t sp);
+uint32_t DebugLevelSelect(uint32_t sp);
+uint32_t DebugTypeSelect(uint32_t sp);
+uint32_t DebugOptionSelect(uint32_t screen, uint32_t sp);
+uint32_t DebugConfirmBuy(uint32_t sp);
+uint32_t DebugConfirmEquip(uint32_t sp);
+uint32_t DebugCategoryMenu(uint32_t screen, uint32_t sp);
+uint32_t DebugWheelPartSelect(uint32_t sp);
+uint32_t DebugWheelKindSelect(uint32_t sp);
+uint32_t DebugWheelInchSelect(uint32_t sp);
+uint32_t DebugDecalTopMenu(uint32_t screen, uint32_t sp);
+uint32_t DebugLayerSelect(uint32_t screen, uint32_t sp);
+uint32_t DebugLayerEdit(uint32_t sp);
+uint32_t DebugLayerSet(uint32_t sp);
+uint32_t DebugEditPosition();
+uint32_t DebugEditView();
+uint32_t DebugPaintConfirm(uint32_t sp);
+// The handlers never seen in play: sub_821CC078 DebugColorSelect (7; 500 or
+// 520 by the category and item), sub_821CC430 DebugWarnMoney (10),
+// sub_821CC510 DebugReflectSet (12), sub_821CC598 DebugAnnulSet (13),
+// sub_821CC620 DebugRemoveConfirm (14), sub_821E8358 DebugBodyColor (18),
+// sub_821E8440 DebugNeonPart (19), sub_821E84F8 DebugNeonKind (20),
+// sub_821E85A0 DebugNeonEdit (21), sub_821E8688 DebugLedEdit (22),
+// sub_821E8758 DebugCockpitTop (53), sub_821E8800 DebugCockpitType (54),
+// sub_821E88C0 DebugCockpitColor (55), sub_821E8998 DebugMeterKind (56),
+// sub_821E8A88 DebugMeterPoint (57, 58), sub_821FDA80 DebugLayerOperate (25,
+// 40), sub_821FDF10 DebugLayerOrder (27, 42), sub_821FE118 DebugEditRotate
+// (30, 45), sub_821FE130 DebugEditScale (31, 46), sub_821FE148
+// DebugEditColor (32, 47), sub_821FE160 DebugEditFlip (33, 48; these four
+// with no frame), sub_821FE230 DebugPaintCancelConfirm (36, 51),
+// sub_821FE2D0 DebugPaintRemoveConfirm (37, 52).
+uint32_t DebugColorSelect(uint32_t screen, uint32_t sp);
+uint32_t DebugWarnMoney(uint32_t sp);
+uint32_t DebugReflectSet(uint32_t sp);
+uint32_t DebugAnnulSet(uint32_t sp);
+uint32_t DebugRemoveConfirm(uint32_t sp);
+uint32_t DebugBodyColor(uint32_t sp);
+uint32_t DebugNeonPart(uint32_t sp);
+uint32_t DebugNeonKind(uint32_t sp);
+uint32_t DebugNeonEdit(uint32_t sp);
+uint32_t DebugLedEdit(uint32_t sp);
+uint32_t DebugCockpitTop(uint32_t sp);
+uint32_t DebugCockpitType(uint32_t sp);
+uint32_t DebugCockpitColor(uint32_t sp);
+uint32_t DebugMeterKind(uint32_t sp);
+uint32_t DebugMeterPoint(uint32_t sp);
+uint32_t DebugLayerOperate(uint32_t screen, uint32_t sp);
+uint32_t DebugLayerOrder(uint32_t screen, uint32_t sp);
+uint32_t DebugEditRotate();
+uint32_t DebugEditScale();
+uint32_t DebugEditColor();
+uint32_t DebugEditFlip();
+uint32_t DebugPaintCancelConfirm(uint32_t sp);
+uint32_t DebugPaintRemoveConfirm(uint32_t sp);
+
+}  // namespace tuning_screen

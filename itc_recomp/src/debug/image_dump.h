@@ -9,6 +9,6 @@ namespace debug {
 
 // Main thread, once per main loop pass. On the first call with --dump_image
 // set, writes the image and exits.
-void ImageDump_OnPass(uint8_t* base);
+void ImageDump_OnPass();
 
 }  // namespace debug

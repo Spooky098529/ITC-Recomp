@@ -5,15 +5,19 @@
 // leaves a value there) as the original does.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
+#include "hooks/car_physics.h"
 #include "hooks/heap.h"
 #include "track_collision/track_collision.h"
 
 ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "Run the collision world's owner and the track's collision "
               "(docs/functions/collision-world.md: sub_8228F090, Race::RacerCount sub_821705F8, "
-              "Racers::CarsCollide sub_820FEFF8, TrackCollision::ResetWorld sub_820FEAF8; the "
+              "Racers::CarsCollide sub_820FEFF8, TrackCollision::ResetWorld sub_820FEAF8, "
+              "TrackCollision::Tick sub_820FF050; the "
               "mesh's and the route's lifetime, sub_820F68E8 with sub_820F6898, sub_820F6940, "
               "sub_820F8600, sub_820F8618, TrackCollision::Unload sub_820FEFB0 with the collision "
               "world's teardown, sub_820B86B8, sub_820B9110, sub_820B7B40 (those allocating or "
@@ -41,22 +45,17 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_collision_world)) { \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_collision_world)) { \
     ctx.fpscr.disableFlushMode();            \
     body;                                    \
   }
 // The same for one allocating or freeing pages: the original unless
 // --native_heap routes VirtualAlloc to the allocation layer.
 #define ITC_COLLISION_WORLD_PAGES(address, body)                              \
-  extern "C" REX_FUNC(sub_##address) {                                        \
-    REX_FUNC_PROLOGUE();                                                      \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                        \
+    \
     if (!ITC_FLAG(native_collision_world) || !hooks::NativeHeapActive()) {     \
-      __imp__sub_##address(ctx, base);                                        \
+      lifted::original::c##address(ctx);                           \
       return;                                                                 \
     }                                                                         \
     body;                                                                     \
@@ -67,35 +66,39 @@ using namespace track_collision;
 // --- The world's owner ---
 
 ITC_COLLISION_WORLD(8228F090, ctx.r3.u64 = TimesThreePlus(ctx.r3.u32, ctx.r4.u32))
-ITC_COLLISION_WORLD(821705F8, ctx.r3.u64 = RaceRacerCount(base))
-ITC_COLLISION_WORLD(820FEFF8, ctx.r3.u64 = RacersCarsCollide(base, ctx.r3.u32))
-ITC_COLLISION_WORLD(820FEAF8, ctx.r3.u64 = TrackCollisionResetWorld(base))
+ITC_COLLISION_WORLD(821705F8, ctx.r3.u64 = RaceRacerCount())
+ITC_COLLISION_WORLD(820FEFF8, ctx.r3.u64 = RacersCarsCollide(ctx.r3.u32))
+ITC_COLLISION_WORLD(820FEAF8, ctx.r3.u64 = TrackCollisionResetWorld())
+// No arguments; r3 not kept (no caller reads it). The update's guest calls
+// as its adapter's.
+ITC_COLLISION_WORLD(820FF050, TrackCollisionTick(ctx.r1.u32 - 144,
+                                                 hooks::CollisionWorldUpdateCalls(ctx)))
 
 // --- The mesh's and the route's lifetime ---
 
 // TrackMesh::InitScratch (sub_820F6898) has no adapter: its only caller,
 // TrackMesh::Prepare, is native.
-ITC_COLLISION_WORLD_PAGES(820F68E8, ctx.r3.u64 = TrackMeshPrepare(base, ctx.r3.u32))
+ITC_COLLISION_WORLD_PAGES(820F68E8, ctx.r3.u64 = TrackMeshPrepare(ctx.r3.u32))
 // A block that isn't the layer's: the original.
 ITC_COLLISION_WORLD_PAGES(820F6940, uint32_t r3 = 0;
-                          if (!TrackMeshFree(base, ctx.r3.u32, &r3)) {
-                            __imp__sub_820F6940(ctx, base);
+                          if (!TrackMeshFree(ctx.r3.u32, &r3)) {
+                            lifted::original::c820F6940(ctx);
                             return;
                           } ctx.r3.u64 = r3)
-ITC_COLLISION_WORLD(820F8600, TrackRoutePrepare(base, ctx.r3.u32))
+ITC_COLLISION_WORLD(820F8600, TrackRoutePrepare(ctx.r3.u32))
 ITC_COLLISION_WORLD_PAGES(820F8618, uint32_t r3 = 0;
-                          if (!TrackRouteFree(base, ctx.r3.u32, &r3)) {
-                            __imp__sub_820F8618(ctx, base);
+                          if (!TrackRouteFree(ctx.r3.u32, &r3)) {
+                            lifted::original::c820F8618(ctx);
                             return;
                           } ctx.r3.u64 = r3)
 // No arguments; r3 isn't kept (its caller doesn't read it). A block to free
 // that isn't the layer's: the original.
-ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload(base)) {
-  __imp__sub_820FEFB0(ctx, base);
+ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload()) {
+  lifted::original::c820FEFB0(ctx);
   return;
 })
 // Archive::Load's callback: r6 = the mesh.
-ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
+ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(ctx.r6.u32))
 
 // --- The mesh's lookups ---
 
@@ -113,19 +116,19 @@ ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
 // play, GroundCallback and GroundHits, are native.
 // The collision world's +8 (CollisionWorld::Callback).
 ITC_COLLISION_WORLD(820FEAB0,
-                    ctx.r3.u64 = TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
+                    ctx.r3.u64 = TrackCollisionGroundCallback(ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
 // The collision world's second query: r3 = the hit records, r4 = the shape
 // (r5 not read). A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FEBD0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820FEBD0) {
+  
   uint32_t count = 0;
   if (ITC_FLAG(native_collision_world)) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
-      !TrackCollisionGroundHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
-    __imp__sub_820FEBD0(ctx, base);
+      !TrackCollisionGroundHits(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
+    lifted::original::c820FEBD0(ctx);
     return;
   }
   ctx.r3.u64 = count;
@@ -143,14 +146,14 @@ extern "C" REX_FUNC(sub_820FEBD0) {
 // r3 left as it came (no caller reads it). They call the course's route's
 // Follow and Point (src/track_route/) natively whatever --native_track_route
 // says.
-ITC_COLLISION_WORLD(820F8470, TrackPositionUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144))
-ITC_COLLISION_WORLD(820F8578, TrackPositionInit(base, ctx.r3.u32, ctx.r1.u32 - 128))
+ITC_COLLISION_WORLD(820F8470, TrackPositionUpdate(ctx.r3.u32, ctx.r1.u32 - 144))
+ITC_COLLISION_WORLD(820F8578, TrackPositionInit(ctx.r3.u32, ctx.r1.u32 - 128))
 
 // --- The route ---
 
 // Archive::Load's callback: r6 = the route; r3 comes back as 12 (the
 // original's count of route bits).
-ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
+ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(ctx.r6.u32); ctx.r3.u64 = 12)
 
 // --- The wall query ---
 
@@ -163,15 +166,15 @@ ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 =
 // The collision world's first query ([0x826C2D78]): r3 = the hit records,
 // r4 = the shape record (r5 not read). A shape that isn't a box: the
 // original.
-extern "C" REX_FUNC(sub_820FF1B0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820FF1B0) {
+  
   uint32_t count = 0;
   if (ITC_FLAG(native_collision_world)) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
-      !TrackCollisionWallHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1584, &count)) {
-    __imp__sub_820FF1B0(ctx, base);
+      !TrackCollisionWallHits(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1584, &count)) {
+    lifted::original::c820FF1B0(ctx);
     return;
   }
   ctx.r3.u64 = count;

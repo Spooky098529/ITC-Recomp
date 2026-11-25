@@ -50,9 +50,9 @@ void Saves(Context& h) {
   };
 
   Results results("save slot steps");
-  run("SaveSlot::CheckDevice (sub_820A45C0)", __imp__sub_820A45C0, sub_820A45C0, results, 1, 0,
+  run("SaveSlot::CheckDevice (sub_820A45C0)", __imp__sub_820A45C0, harness::Ours<0x820A45C0>, results, 1, 0,
       0, "device 1");
-  run("SaveSlot::CheckDevice (sub_820A45C0)", __imp__sub_820A45C0, sub_820A45C0, results, 0, 0,
+  run("SaveSlot::CheckDevice (sub_820A45C0)", __imp__sub_820A45C0, harness::Ours<0x820A45C0>, results, 0, 0,
       0, "no device");
   const struct {
     uint32_t device, status;
@@ -62,7 +62,7 @@ void Saves(Context& h) {
       {1, 996, "incomplete"},    {1, 1223, "cancelled"},    {0, 1223, "cancelled, no device"},
   };
   for (const auto& c : selector_cases) {
-    run("SaveSlot::WaitDeviceSelector (sub_820A48B8)", __imp__sub_820A48B8, sub_820A48B8,
+    run("SaveSlot::WaitDeviceSelector (sub_820A48B8)", __imp__sub_820A48B8, harness::Ours<0x820A48B8>,
         results, c.device, c.status, 0, c.what);
   }
   const struct {
@@ -73,7 +73,7 @@ void Saves(Context& h) {
       {997, 0, "pending"}, {5, 0, "an error"},
   };
   for (const auto& c : enumerate_cases) {
-    run("the enumeration's wait (sub_820A4A88)", __imp__sub_820A4A88, sub_820A4A88, results, 1,
+    run("the enumeration's wait (sub_820A4A88)", __imp__sub_820A4A88, harness::Ours<0x820A4A88>, results, 1,
         c.status, c.information, c.what);
   }
   results.Report();

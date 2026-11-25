@@ -1,0 +1,136 @@
+// The race's states' register steps (src/race_states/,
+// docs/functions/race-states.md), shared by the adapters
+// (src/hooks/race_states.cpp, behind --native_race_states) and the harness
+// (without the flag). Each turns flush-to-zero off first and leaves r3 as
+// the original does where a caller reads it.
+
+#pragma once
+
+#include "guest.h"
+#include "hooks/native_entry.h"
+
+namespace hooks {
+
+// RaceProgress::Create sub_821698B0: no arguments; r3 = the block (the
+// original where operator new's plain C++ refuses).
+void RaceStatesProgressCreate(lifted::Regs& ctx);
+// RaceProgress::Reset sub_821648E0: r3 = the progress (r3 not kept: no
+// caller reads it); the original where RecordReset's copies aren't native.
+void RaceStatesProgressReset(lifted::Regs& ctx);
+// RaceProgress::SetChecks sub_821649B8: r3 = the progress, r4 = the kind,
+// r5 = the stage's type, r6 = its word +4 (r3 left).
+void RaceStatesSetChecks(lifted::Regs& ctx);
+// RaceProgress::ReleaseRacers sub_82163440: r3 = the progress (r3 not kept:
+// no caller reads it; RaceManager::Refresh's callees' originals as its
+// adapter's).
+void RaceStatesReleaseRacers(lifted::Regs& ctx);
+// RaceProgress::CountTime sub_82162E08: r3 = out, r4 = the progress, r5 =
+// the entry's index; r3 = out.
+void RaceStatesCountTime(lifted::Regs& ctx);
+// RaceProgress::TickFraction sub_82163140: r3 = the progress, r4 = the
+// slot's index, r5 = &a packed time (r3 not kept: no caller reads it).
+void RaceStatesTickFraction(lifted::Regs& ctx);
+// RaceProgress::Rank sub_82162D80: r3 = the progress (r3 not kept: no caller
+// reads it).
+void RaceStatesRank(lifted::Regs& ctx);
+// RouteSections::Beside sub_82162F78: r3, r4 = two sections; r3 = 0 or 1.
+void RaceStatesSectionsBeside(lifted::Regs& ctx);
+// RouteSections::Before sub_82162E70: r3, r4 = two sections; r3 = r3 left,
+// a section or -1.
+void RaceStatesSectionsBefore(lifted::Regs& ctx);
+// RoutePosition::NotAfter sub_821622A8: r3, r4 = &two positions; r3 = 0 or
+// 1.
+void RaceStatesPositionNotAfter(lifted::Regs& ctx);
+
+// The race's checks: r3 = out, r4 = the progress, r5 = the entry's index
+// (DrainSp: r3 = out, r4 = the progress); r3 = out.
+// RaceProgress::CountHits sub_82164F08, Damage sub_82164228, DrainSp
+// sub_821650A0, CheckLap sub_82164090 (the original where the course
+// route's copies aren't native) and CheckFinish sub_82164E18.
+void RaceStatesCountHits(lifted::Regs& ctx);
+void RaceStatesDamage(lifted::Regs& ctx);
+void RaceStatesDrainSp(lifted::Regs& ctx);
+void RaceStatesCheckLap(lifted::Regs& ctx);
+void RaceStatesCheckFinish(lifted::Regs& ctx);
+// RoutePosition::MapToSection sub_82163930: r3 = a section, r4 = &a
+// position; r3 = 0 or 1.
+void RaceStatesMapToSection(lifted::Regs& ctx);
+
+// The state machine's handlers: r3 = the machine, r4 = the dispatcher (r3
+// not kept: the handler call doesn't read it; OnStandingStart's r3 as
+// AiDrivers::StartRanked leaves it). RaceStates::FadeInFree sub_82163398,
+// FadeOut sub_82162310, EndWhenFaded sub_82168F50, Unload sub_82163920 (the
+// original unless --native_heap routes the game's heap to the allocation
+// layer), OnRollingStart sub_821632C8, OnStandingStart sub_821643B0,
+// ClearStep sub_82163348, OnQuit sub_82163378, OnReplay sub_821647B0,
+// FreeStartTick sub_82168B80, QuitTick sub_82168500, AfterRaceTick
+// sub_82167970 and RollingStartTick sub_82166E50 (RaceManager::Refresh's and
+// RaceStart::PlaceRolling's callees' originals as their adapters make them).
+void RaceStatesFadeInFree(lifted::Regs& ctx);
+void RaceStatesFadeOut(lifted::Regs& ctx);
+void RaceStatesEndWhenFaded(lifted::Regs& ctx);
+void RaceStatesUnload(lifted::Regs& ctx);
+void RaceStatesOnRollingStart(lifted::Regs& ctx);
+void RaceStatesOnStandingStart(lifted::Regs& ctx);
+void RaceStatesClearStep(lifted::Regs& ctx);
+void RaceStatesOnQuit(lifted::Regs& ctx);
+void RaceStatesOnReplay(lifted::Regs& ctx);
+void RaceStatesFreeStartTick(lifted::Regs& ctx);
+void RaceStatesQuitTick(lifted::Regs& ctx);
+void RaceStatesAfterRaceTick(lifted::Regs& ctx);
+void RaceStatesRollingStartTick(lifted::Regs& ctx);
+
+// RaceStates::RacersNear sub_82165AB0 and RacersClose sub_82165C78: no
+// arguments; r3 = 0 or 1. RaceStates::RacersStill sub_82164A90: r3 = &the
+// count; r3 = 0 or 1. RaceStates::CountdownTick sub_821674A0: a handler (r3
+// = the machine, r4 = the dispatcher; r3 not kept).
+void RaceStatesRacersNear(lifted::Regs& ctx);
+void RaceStatesRacersClose(lifted::Regs& ctx);
+void RaceStatesRacersStill(lifted::Regs& ctx);
+void RaceStatesCountdownTick(lifted::Regs& ctx);
+
+// RaceStates::Begin sub_82164DC0: a handler (r3 = the machine; r3 not
+// kept); the original where RaceProgress::Reset's copies aren't native.
+void RaceStatesBegin(lifted::Regs& ctx);
+// RaceProgress::FollowRoute sub_82163C50: r3 = out, r4 = the progress, r5 =
+// the entry's index; r3 = out. sub_82163000 (no adapter: its only caller,
+// FollowRoute, is native): r3, r4 = two sections, r5, r6 = the out words;
+// r3 = 0 or 1 (the harness's).
+void RaceStatesFollowRoute(lifted::Regs& ctx);
+void RaceStatesSectionsJoin(lifted::Regs& ctx);
+// RaceProgress::StartRoute sub_821635D0: r3 = the race's states (r3 not
+// kept: neither caller reads it); the original where StartRouteNative says
+// the course route's copies aren't native. RaceProgress::RouteDistance
+// sub_82162330 (no adapter: its only caller, StartRoute, is native): r3 =
+// the progress, r4 = the course route's index (r3 not kept; the original
+// where RouteDistanceNative says no; the harness's).
+void RaceStatesStartRoute(lifted::Regs& ctx);
+void RaceStatesRouteDistance(lifted::Regs& ctx);
+// RaceStates::RaceTick sub_82167610: a handler (r3 not kept); the original
+// where RaceTickNative says so.
+void RaceStatesRaceTick(lifted::Regs& ctx);
+// RaceStates::OnGo sub_82164458: a handler (r3 = the machine; r3 not kept);
+// the original where OnGoNative says so.
+void RaceStatesOnGo(lifted::Regs& ctx);
+
+// RaceStates::StandingStartTick sub_821692C8: a handler (r3 not kept); the
+// original in the System Link case (StandingStartTickNative); the callees'
+// originals as their adapters make them.
+void RaceStatesStandingStartTick(lifted::Regs& ctx);
+
+// RaceStates::Init sub_82169920: r3 = the machine; r3 as the last
+// StateMachine::Add leaves it (its adapter's: a new transition's address
+// from the machine's 64-bit r3, or a replaced one's index). The original
+// where RaceProgress::Create's plain C++ would refuse (--native_heap not
+// routing the game's heap, or operator new refusing) or Reset's copies
+// aren't native.
+void RaceStatesInit(lifted::Regs& ctx);
+
+// RaceStates::OnRaceEnd sub_821644D8: a handler (r3 = the machine); r3 as
+// the original leaves it. The callees' originals through the function table
+// where their plain C++ refuses. Time::Add sub_820FF458: r3, r4 = &the two
+// packed times.
+void RaceStatesOnRaceEnd(lifted::Regs& ctx);
+void RaceStatesTimeAdd(lifted::Regs& ctx);
+
+}  // namespace hooks

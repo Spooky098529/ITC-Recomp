@@ -1,0 +1,529 @@
+# The schema of docs/functions/race-states.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's states (the race mode's state machine at +107168, RaceStates::,
+# src/race_states/), the race's progress ([0x826D82E8], RaceProgress::) and
+# the race data ([0x826C5B2C], the measure's Racers, which the race's states
+# touch most) with the small records their code passes around.
+#
+# Not here (other areas' types the measure filed under this one):
+# "RaceProgress.+48", "Achievements.+48" and "RaceManager::EntryOfRecord.ret"
+# are the racers' manager's 28-byte entry (minimap.toml's
+# MinimapRacerEntry); "Vehicle::Get.ret.+340" is a vehicle's collision
+# object (car-physics.toml's CollisionWorldObject, +240 its first contact);
+# "Achievements.+6112" is a pointee the measure never reads. The results
+# record at the progress's +2184 is race-hud-machine.toml's
+# RacerResultsRecord, its 972-byte entries race-setup.md's.
+
+# The race data ([0x826C5B2C], 0xA3B00 bytes, RaceData::Create; known-data.md
+# 0x826C5B2C): the race's route, its racer records (+48, 93 of 3,936 bytes),
+# the stage list (+0x59620), the flags (+0x59AE4), the 77 results records
+# (+0x59AE8) and the words after them. The measure joins three bases into
+# this one: the race data, the racers object at its +48 (Racers::Reset's;
+# racer records at +0 there) and a racer record or a stage list met at +0;
+# what those see is named `fault_...` with the offset in their own object.
+[RaceData]
+measure = "Racers"
+measures = ["[826C5B2C]", "Vehicle.+5712", "Vehicle::ResetForCar.r4", "Vehicle::SetUpSurfaceGrip.r4", "AiDriver.+160.+5712", "AiDriver::Setup.r4"]
+size = 670464
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "read as a float and a word by AiDriver::Setup and Racers::NearestHumanVehicle: probably a racer record's +0 (the measure's join)" },
+  { name = "route", offset = 4, type = "bytes", count = 16, note = "the race's route (16 bytes, Route::Set; race-setup.md)" },
+  { name = "route_course", offset = 4, type = "u32", note = "a course route's index (0 to 22, probably the course; AiPath::BranchMasks reads 0 to 7)" },
+  { name = "route_location", offset = 8, type = "u32", note = "the location (1 to 46 in Race::StartPosition)" },
+  { name = "route_first_position", offset = 12, type = "u32", note = "the route's first position (section, slice)" },
+  { name = "route_last_position", offset = 16, type = "u32", note = "the route's last position (section, slice)" },
+  { name = "branch_flags", offset = 20, type = "u32", note = "0x4 to 0x20: which branch kinds the AI drivers take (AiPath::BranchMasksFor); from the save data's +0x199E0" },
+  { name = "drawn_entries", offset = 24, type = "u32", note = "0x1 to 0x800: which entries of the course set's +2124 list are drawn" },
+  { name = "effects_word", offset = 28, type = "u32", note = "0 at the reset; passed to the overlays (their effects update with 0 or 3); read by RaceStates::OnRaceEnd" },
+  { name = "mode", offset = 32, type = "u32", note = "the mode (the save data's +6104, sub_820FF968)" },
+  { name = "racer_records", offset = 48, type = "bytes", count = 366048, note = "93 racer records of 3,936 bytes (the racers object, Racers::Reset)" },
+  { name = "record0_place", offset = 60, type = "u32", note = "racer record 0's +12 (its first entry's place), read by Kind6Menu::SaveReplay and RaceHudMachine::ShowResults" },
+  { name = "fault_record_byte_76", offset = 76, type = "u8", note = "measure fault: a racer record's byte +76 (Vehicle::SetUp's record at +0)" },
+  { name = "fault_record_byte_77", offset = 77, type = "u8", note = "measure fault: a racer record's byte +77 (Vehicle::SetUp's record at +0)" },
+  { name = "fault_record_word_1656", offset = 1656, type = "u32", note = "measure fault: a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)" },
+  { name = "fault_record_word_1672", offset = 1672, type = "u32", note = "measure fault: a racer record's +1672 (Vehicle::SetUp)" },
+  { name = "fault_record_word_1676", offset = 1676, type = "u32", note = "measure fault: a racer record's +1676 (Vehicle::SetUp)" },
+  { name = "fault_record_tuning_4", offset = 1700, type = "u32", note = "measure fault: a racer record's car tuning (+1696) word +4 (EventCondition::Tuning4)" },
+  { name = "fault_record_tuning_8", offset = 1704, type = "u32", note = "measure fault: the record's car tuning +8 (EventCondition::PartsAtLeast, StockParts)" },
+  { name = "fault_record_tuning_16", offset = 1712, type = "u32", note = "measure fault: the record's car tuning +16" },
+  { name = "fault_record_tuning_20", offset = 1716, type = "u32", note = "measure fault: the record's car tuning +20 (Vehicle::SetUpSurfaceGrip)" },
+  { name = "fault_record_tuning_24", offset = 1720, type = "u32", note = "measure fault: the record's car tuning +24" },
+  { name = "fault_record_tuning_28", offset = 1724, type = "u32", note = "measure fault: the record's car tuning +28" },
+  { name = "fault_record_tuning_32", offset = 1728, type = "u32", note = "measure fault: the record's car tuning +32" },
+  { name = "fault_record_tuning_36", offset = 1732, type = "u32", note = "measure fault: the record's car tuning +36" },
+  { name = "fault_record_tuning_40", offset = 1736, type = "u32", note = "measure fault: the record's car tuning +40" },
+  { name = "fault_record_tuning_48", offset = 1744, type = "u32", note = "measure fault: the record's car tuning +48" },
+  { name = "fault_record_tuning_56", offset = 1752, type = "u32", note = "measure fault: the record's car tuning +56" },
+  { name = "fault_record_tuning_60", offset = 1756, type = "u32", note = "measure fault: the record's car tuning +60" },
+  { name = "fault_record_tuning_64", offset = 1760, type = "u32", note = "measure fault: the record's car tuning +64" },
+  { name = "fault_record_tuning_68", offset = 1764, type = "u32", note = "measure fault: the record's car tuning +68" },
+  { name = "fault_record_tuning_72", offset = 1768, type = "u32", note = "measure fault: the record's car tuning +72" },
+  { name = "fault_record_tuning_76", offset = 1772, type = "u32", note = "measure fault: the record's car tuning +76" },
+  { name = "fault_record_tuning_80", offset = 1776, type = "u32", note = "measure fault: the record's car tuning +80" },
+  { name = "fault_record_tuning_88", offset = 1784, type = "u32", note = "measure fault: the record's car tuning +88" },
+  { name = "fault_record_tuning_96", offset = 1792, type = "u32", note = "measure fault: the record's car tuning +96 (EventCondition::AeroFitted)" },
+  { name = "fault_record_tuning_100", offset = 1796, type = "u32", note = "measure fault: the record's car tuning +100 (also HornSound::Update)" },
+  { name = "fault_record_tuning_104", offset = 1800, type = "u32", note = "measure fault: the record's car tuning +104" },
+  { name = "fault_record_tuning_108", offset = 1804, type = "u32", note = "measure fault: the record's car tuning +108" },
+  { name = "fault_record_tuning_112", offset = 1808, type = "u32", note = "measure fault: the record's car tuning +112" },
+  { name = "fault_record_tuning_116", offset = 1812, type = "u32", note = "measure fault: the record's car tuning +116" },
+  { name = "fault_record_tuning_120", offset = 1816, type = "u32", note = "measure fault: the record's car tuning +120" },
+  { name = "fault_record_tuning_124", offset = 1820, type = "u32", note = "measure fault: the record's car tuning +124" },
+  { name = "fault_record_tuning_128", offset = 1824, type = "u32", note = "measure fault: the record's car tuning +128" },
+  { name = "fault_record_tuning_132", offset = 1828, type = "u32", note = "measure fault: the record's car tuning +132" },
+  { name = "fault_record_tuning_136", offset = 1832, type = "u32", note = "measure fault: the record's car tuning +136 (the extra gauges' part, RaceHud::SetUpExtraGauges)" },
+  { name = "fault_record_tuning_144", offset = 1840, type = "u32", note = "measure fault: the record's car tuning +144" },
+  { name = "fault_record_tuning_148", offset = 1844, type = "u32", note = "measure fault: the record's car tuning +148" },
+  { name = "fault_record_tuning_184", offset = 1880, type = "u32", note = "measure fault: the record's car tuning +184" },
+  { name = "fault_record_byte_2019", offset = 2019, type = "u8", note = "measure fault: a racer record's byte +2019 (sub_8210EBF0's horn scale when 1)" },
+  { name = "fault_record_flags", offset = 3888, type = "u32", note = "measure fault: a racer record's +3888 flags (0x1 and 0x80 the players, 0x2 rivals and opponents, 0x4 traffic, 0x100, 0x200, 0x400, 0x800)" },
+  { name = "fault_record_word_3892", offset = 3892, type = "u32", note = "measure fault: a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
+  { name = "record0_flags", offset = 3936, type = "u32", note = "racer record 0's flags (+3888; 0x1 the player, RaceStates::RacersNear)" },
+  { name = "record0_word_3892", offset = 3940, type = "u32", note = "racer record 0's +3892 (Replay::Keep)" },
+  { name = "record0_start_section", offset = 3952, type = "u16", note = "racer record 0's start section (Replay::Keep, SetUpRace)" },
+  { name = "record0_start_slice", offset = 3954, type = "u16", note = "racer record 0's start slice" },
+  { name = "record0_start_value", offset = 3956, type = "f32", note = "racer record 0's +3908 float" },
+  { name = "record0_racer_id", offset = 3960, type = "u32", note = "racer record 0's racer id (+3912)" },
+  { name = "record0_car_value", offset = 3968, type = "f32", note = "racer record 0's +3920 float (Racers::Add's f1: the garage car's +1892)" },
+  { name = "fault_car_count", offset = 366048, type = "u32", note = "measure fault: the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)" },
+  { name = "car_count", offset = 366096, type = "u32", note = "+0x59610 the car count" },
+  { name = "added_count", offset = 366100, type = "u32", note = "+0x59614 the racers Race::AddRacer added (also tested for 2 with the race kind 6)" },
+  { name = "word_59618", offset = 366104, type = "u32", note = "+0x59618: nonzero adds the 16 traffic cars (2 for mode 1, 1 for mode 2, else 3)" },
+  { name = "word_5961c", offset = 366108, type = "u32", note = "+0x5961C: 5 at the set-up" },
+  { name = "stages", offset = 366112, type = "bytes", count = 1220, note = "+0x59620 the stage list (Stages::; its course record at +812, 408 bytes)" },
+  { name = "stage_count", offset = 366912, type = "u32", note = "the stage list's +800: the stage count (Race::AddStage)" },
+  { name = "current_stage", offset = 366916, type = "u32", note = "the stage list's +804: the current stage" },
+  { name = "stages_course_record", offset = 366924, type = "bytes", count = 408, note = "the stage list's course record (+812, 408 bytes; CourseTimeList)" },
+  { name = "stages_course_record_count", offset = 366972, type = "u16", note = "the stage list's course record (+812)'s count (+48; CourseTimeList)" },
+  { name = "flags", offset = 367332, type = "u32", note = "+0x59AE4: 0x1 the racers settled, 0x8 an event race, 0x10 a rival race, 0x20 the human cars' input recorded, 0x40 replayed, 0x80 a replay, 0x100 frozen, 0x800, 0x1000, 0x2000 no traffic, 0x4000 traffic removed, 0x8000 to the title, 0x10000 to type 12, 0x20000 a replay ran out" },
+  { name = "results", offset = 367336, type = "bytes", count = 303072, note = "+0x59AE8: 77 results records of 3,936 bytes (RacerResultsRecord; RacerRecords::Add, At)" },
+  { name = "results_count", offset = 670408, type = "u32", note = "+0xA3AC8: the results records' count" },
+  { name = "stat_0", offset = 670416, type = "u32", note = "+0xA3AD0: 1 at the reset; added to the stats' +5956 after a race (Progress::AfterRace); RaceStates::LinkTick" },
+  { name = "stat_1", offset = 670420, type = "u32", note = "+0xA3AD4: added to the stats' +5952 (Progress::AfterRace); RaceStates::LinkTick" },
+  { name = "finish_count", offset = 670424, type = "u32", note = "+0xA3AD8: raised by PlayerControl::Update (player 0 letting go of 0x20000, kind 1); added to the stats' +5960" },
+  { name = "stat_3", offset = 670428, type = "u32", note = "+0xA3ADC: added to the stats' +5964 (divided by 50 first)" },
+  { name = "random_10", offset = 670432, type = "u32", note = "+0xA3AE0: rand() % 10 at the set-up" },
+  { name = "replay_word", offset = 670436, type = "u32", note = "+0xA3AE4: kept with a replay (Replay::Keep, SetUpRace)" },
+  { name = "word_a3ae8", offset = 670440, type = "u32", note = "+0xA3AE8: 0 at the reset" },
+  { name = "word_a3aec", offset = 670444, type = "u32", note = "+0xA3AEC: 0 at the reset" },
+  { name = "kind", offset = 670448, type = "u32", note = "+0xA3AF0: the kind of race (0 the attract race's demo, 1 the career, 2 type 6, 3 type 7, 4 type 8, 5 the replay theater, 6 two human cars; 7 at the reset)" },
+  { name = "race_mode", offset = 670452, type = "u32", note = "+0xA3AF4: probably the race mode (2 at the set-up, 3 a rival race of kind 4 or 5; 0 or 4 a course record)" },
+]
+
+# The race's states: a StateMachine (game-modes.toml) at the race mode's
+# +107168 with the race's words after its count and state. The measure
+# meets it as the handlers' r3 (the lifted handlers' own names too); its +0
+# to +1696 accesses are other objects joined in (faults).
+[RaceStates]
+measures = ["RaceStates", "sub_82167D88.r3", "sub_82168018.r3", "sub_821683A8.r3", "sub_82168620.r3"]
+size = 9644
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition, game-modes.toml); 87 added by RaceStates::Init" },
+  { name = "fault_record_word_4", offset = 4, type = "u16", note = "measure fault: SceneModelRecord::FromCar's halfword +4" },
+  { name = "fault_car_word_12", offset = 12, type = "u32", note = "measure fault: EventCondition::CarIs's +12" },
+  { name = "fault_wheels_1692", offset = 1692, type = "u32", note = "measure fault: SceneModelRecord::SetWheels's +1692" },
+  { name = "fault_wheels_1696", offset = 1696, type = "u32", note = "measure fault: SceneModelRecord::SetWheels's +1696" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at set-up; 3 waiting for the load, 16 a stage loading, 10 to 12 and 21 the starts, 22 the countdown, 23 racing, 25 paused, 26 the end, 17 and 18 the replay, 30 the menu after a race, 36, 37, 35 the end" },
+  { name = "pause_quit", offset = 9608, type = "u32", note = "0 or 1 by the pause menu's two quits (OnQuit, OnQuit2)" },
+  { name = "step", offset = 9612, type = "u32", note = "a step within a state" },
+  { name = "ticks", offset = 9616, type = "u32", note = "a tick count" },
+  { name = "word_9620", offset = 9620, type = "u32", note = "cleared with the tick count; never read" },
+  { name = "progress", offset = 9624, type = "ptr", to = "RaceProgress", note = "[0x826D82E8] (RaceStates::Init)" },
+  { name = "still_ticks", offset = 9628, type = "u32", note = "ticks with no racer touching anything (to 30, RaceStates::RacersStill)" },
+  { name = "word_9632", offset = 9632, type = "u32", note = "cleared with the still count" },
+  { name = "settled", offset = 9636, type = "u32", note = "the racers settled (StandingStartTick)" },
+  { name = "settled_ticks", offset = 9640, type = "u32", note = "ticks since the racers settled" },
+]
+
+# The race mode's dispatcher (the race mode's +36; boot-mode.toml's
+# ModeDispatcher): the handlers' r4. A handler posts a message by appending
+# to its ring (StateMachine handlers' Post).
+[RaceStatesDispatcher]
+measures = [
+  "RaceStates::AbortTick.r4", "RaceStates::AfterRaceTick.r4", "RaceStates::AfterReplayTick.r4",
+  "RaceStates::CountdownTick.r4", "RaceStates::DemoTick.r4", "RaceStates::EndWhenFaded.r4",
+  "RaceStates::FreeStartTick.r4", "RaceStates::LinkTick.r4", "RaceStates::MenuLoadTick.r4",
+  "RaceStates::OnContinue.r4", "RaceStates::OnWorldLoaded.r4", "RaceStates::QuitTick.r4",
+  "RaceStates::RaceTick.r4", "RaceStates::ReplayLoadTick.r4", "RaceStates::ReplaySetUpTick.r4",
+  "RaceStates::RollingLoadTick.r4", "RaceStates::RollingStartTick.r4", "RaceStates::StageLoadTick.r4",
+  "RaceStates::StandingLoadTick.r4", "RaceStates::StandingStartTick.r4", "sub_82167D88.r4",
+  "sub_82168018.r4", "sub_821683A8.r4", "sub_82168620.r4", "sub_82168858.r4", "sub_82168C80.r4",
+]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "handlers", offset = 0, type = "bytes", count = 200, note = "50 handler pointers (state machines)" },
+  { name = "handler_count", offset = 200, type = "u32" },
+  { name = "ring", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (ModeMessage: +0 the message, +4 and +8 0)" },
+  { name = "ring_count", offset = 804, type = "u32" },
+  { name = "ring_start", offset = 808, type = "u32" },
+  { name = "fault_word_1008", offset = 1008, type = "u32", note = "measure fault: RollingLoadTick's and sub_82168018's r4 +1008 (the race mode's +1044, in the course set-up machine's table): another object kept in the register, not read further" },
+  { name = "fault_word_1012", offset = 1012, type = "u32", note = "measure fault: as +1008" },
+]
+
+# The race's progress ([0x826D82E8], 7,248 bytes, RaceProgress::Create
+# sub_821698B0, reset by RaceProgress::Reset, freed by RaceStates::Unload;
+# known-data.md). The measure also calls it Achievements (the achievements'
+# check reads it) and meets it as the machine's +9624. The check functions'
+# out pair (r3) and StartRoute's machine are joined in (faults).
+[RaceProgress]
+measure = "RaceProgress"
+measures = ["Achievements", "sub_82167D88.r3.+9624", "RaceStates.+9624@+2184"]
+size = 7248
+origin = "allocated"
+fields = [
+  { name = "racer_records", offset = 0, type = "bytes", count = 40, note = "ten racer record indexes (-1 none; racers whose item's byte +35 is set, RaceStates::SetUpStage)" },
+  { name = "racer_record_0", offset = 0, type = "u32", note = "the first (also the checks' out pair's end, a measure fault: RaceCheckResult)" },
+  { name = "racer_record_1", offset = 4, type = "u32", note = "the second (also the checks' out pair's reason, a measure fault)" },
+  { name = "slots", offset = 40, type = "bytes", count = 2144, note = "four racer slots of 536 bytes (RaceProgressSlot)" },
+  { name = "slot0_hold_0", offset = 40, type = "u32", note = "slot 0's +0 (0 at the reset; probably a 15-tick hold after hits)" },
+  { name = "slot0_hold_1", offset = 44, type = "u32", note = "slot 0's +4 (as +0)" },
+  { name = "slot0_entry", offset = 48, type = "ptr", to = "MinimapRacerEntry", note = "slot 0's manager entry (the racers' manager [0x826D82F4]'s)" },
+  { name = "slot0_sections", offset = 52, type = "bytes", count = 512, note = "slot 0's route sections passed (256 halfwords)" },
+  { name = "slot0_section_count", offset = 564, type = "u32" },
+  { name = "slot0_level", offset = 568, type = "u32", note = "slot 0's stage slot word (a level, 0 to 4, scaling the SP drain; 2 at the reset)" },
+  { name = "slot0_start_section", offset = 572, type = "u16", note = "slot 0's start (-1 at the reset)" },
+  { name = "slot0_start_slice", offset = 574, type = "u16" },
+  { name = "results", offset = 2184, type = "bytes", count = 3936, note = "the results record (RacerResultsRecord, race-hud-machine.toml): its count, then 972-byte entries E at +2188 + 972i, one a racer" },
+  { name = "results_count", offset = 2184, type = "u32", note = "the results' count" },
+  { name = "e0_record_index", offset = 2188, type = "u32", note = "entry 0's racer record index" },
+  { name = "e0_item", offset = 2192, type = "u32", note = "entry 0's item" },
+  { name = "e0_place", offset = 2196, type = "u32", note = "entry 0's place (0 the leader)" },
+  { name = "e0_ticks", offset = 2200, type = "u32", note = "entry 0's ticks raced" },
+  { name = "e0_time", offset = 2204, type = "u32", note = "entry 0's time (RaceTime::FromTicks, a packed time)" },
+  { name = "e0_first_lap_record", offset = 2208, type = "bytes", count = 76, note = "entry 0's first lap record (76 bytes; copied as the course record's best, RaceStates::OnRaceEnd)" },
+  { name = "e0_lap_times", offset = 2208, type = "bytes", count = 60, note = "entry 0's first lap record (76 bytes each from E +20, the one at E +832 when +6096 is set): its 15 lap times (packed times)" },
+  { name = "e0_lap_time_count", offset = 2268, type = "u32", note = "entry 0's first lap record's +60: the lap times' count (RaceProgress::CheckLap)" },
+  { name = "e0_lap_record_64", offset = 2272, type = "u32", note = "entry 0's +84: its first lap record's +64 (RaceStates::OnRaceEnd)" },
+  { name = "e0_lap_track_hits", offset = 2276, type = "u32", note = "entry 0's first lap record's +68: its track hits (at most 999, RaceProgress::CountHits)" },
+  { name = "e0_lap_car_hits", offset = 2280, type = "u32", note = "entry 0's first lap record's +72: its car hits (at most 999)" },
+  { name = "e0_vehicle_byte_ticks", offset = 2968, type = "u32", note = "entry 0's +780: ticks with its vehicle's byte +2424 set (RaceProgress::FollowRoute)" },
+  { name = "e0_sp", offset = 2972, type = "u32", note = "entry 0's SP (+784; probably spirit points, 0 is out)" },
+  { name = "e0_start_sp", offset = 2976, type = "u32", note = "entry 0's starting SP (+788)" },
+  { name = "e0_mean_speed", offset = 2980, type = "f32", note = "entry 0's running mean of the speed in km/h (+792; [0x82000A34] at the creation)" },
+  { name = "e0_mean_count", offset = 2984, type = "u32", note = "entry 0's running mean's count (+796; 0 at the creation)" },
+  { name = "e0_top_speed", offset = 2988, type = "f32", note = "entry 0's +800: its top speed in km/h (RaceProgress::FollowRoute)" },
+  { name = "e0_strong_hit", offset = 2992, type = "u32", note = "entry 0's +804: 1 after a hit of at least [0x82009814] (RaceProgress::CountHits)" },
+  { name = "e0_track_hits", offset = 2996, type = "u32", note = "entry 0's track hits (+808)" },
+  { name = "e0_car_hits", offset = 3000, type = "u32", note = "entry 0's car hits (+812)" },
+  { name = "e0_distance_km", offset = 3004, type = "f32", note = "entry 0's +816: the distance driven in km (RaceProgress::FollowRoute)" },
+  { name = "e0_route_distance", offset = 3012, type = "f32", note = "entry 0's distance along the stage's route (+824, the place's key)" },
+  { name = "e0_lap_record", offset = 3020, type = "u32", note = "entry 0's lap record index (+832)" },
+  { name = "e0_input_seen", offset = 3156, type = "u32", note = "entry 0's +968: 1 once its input record's halfword +6 or +10 was nonzero (RaceProgress::FollowRoute)" },
+  { name = "e1_route_distance", offset = 3984, type = "f32", note = "entry 1's distance along the route (RaceManager::StreamTwoPlayers)" },
+  { name = "route", offset = 6076, type = "bytes", count = 16, note = "the stage's route (16 bytes from the stage's +24)" },
+  { name = "route_course", offset = 6076, type = "u32", note = "the route's course route index" },
+  { name = "route_location", offset = 6080, type = "u32" },
+  { name = "route_first_position", offset = 6084, type = "u32" },
+  { name = "route_finish", offset = 6088, type = "u32", note = "the finish position (section, slice)" },
+  { name = "route_finish_section", offset = 6088, type = "u16", note = "the finish's section (RaceProgress::CheckFinish)" },
+  { name = "lap_records_on", offset = 6096, type = "u32", note = "when set, an entry's lap records are indexed by its +832" },
+  { name = "stage_type", offset = 6100, type = "u32", note = "the stage's type (RaceProgress::SetChecks; 1 or 3 also tested with the race mode 5)" },
+  { name = "end", offset = 6104, type = "u32", note = "the race's end (3 retired)" },
+  { name = "end_reason", offset = 6108, type = "u32", note = "the end's reason (1 or 2 by the pause menu's quit)" },
+  { name = "player_start_sp", offset = 6112, type = "u32", note = "the player's starting SP" },
+  { name = "ticks", offset = 6116, type = "u32", note = "the race's tick count (shown as a time by RaceTime::FromTicks)" },
+  { name = "sections_passed", offset = 6120, type = "bytes", count = 512, note = "the route sections passed by the race (256 halfwords, -1 at the reset)" },
+  { name = "sections_passed_count", offset = 6632, type = "u32" },
+  { name = "path", offset = 6636, type = "bytes", count = 512, note = "the stage's path (256 halfwords, -1 at the reset; RaceProgress::RouteDistance)" },
+  { name = "path_count", offset = 7148, type = "u32" },
+  { name = "start", offset = 7152, type = "u32", note = "the start (section, slice) as a word" },
+  { name = "start_section", offset = 7152, type = "u16" },
+  { name = "start_slice", offset = 7154, type = "u16" },
+  { name = "race_length", offset = 7156, type = "f32", note = "the finish distance ([0x82000A34] at the reset)" },
+  { name = "lap_distances", offset = 7160, type = "bytes", count = 60, note = "15 lap distances (floats; 0 at the reset)" },
+  { name = "lap_distance_0", offset = 7160, type = "f32" },
+  { name = "lap_distance_1", offset = 7164, type = "f32" },
+  { name = "race_checks", offset = 7220, type = "u32", note = "which race checks RaceStates::RaceTick runs (0x11 for stage types 1 and 3, 0x3 for 0 and 2, | 0x8 for kind 1 with the word; 0x8 sub_821653E8)" },
+  { name = "entry_checks", offset = 7224, type = "u32", note = "which checks run for each entry (0x417 for 1 and 3, 0x481 for 0 and 2; 0x4 RaceProgress::CheckLap)" },
+  { name = "word_7228", offset = 7228, type = "u32", note = "0 at the reset" },
+  { name = "track_hit_cost", offset = 7232, type = "f32", note = "a hit cost factor (1.0 at the reset; RaceProgress::Damage)" },
+  { name = "car_hit_cost", offset = 7236, type = "f32", note = "a hit cost factor (1.0 at the reset; RaceProgress::Damage)" },
+  { name = "item_shown", offset = 7240, type = "u32", note = "-1 at the reset; the race HUD's item shown (RaceHud::UpdateItem), set by RaceStates::LinkTick" },
+  { name = "kind8_position", offset = 7244, type = "u32", note = "a position (kind 8; SplitResults::Draw)" },
+  { name = "kind8_section", offset = 7244, type = "u16", note = "its section (RaceStates::OnRaceEnd)" },
+  { name = "kind8_slice", offset = 7246, type = "u16" },
+  { name = "fault_machine_progress", offset = 9624, type = "u32", note = "measure fault: RaceProgress::StartRoute's machine +9624 (the progress)" },
+]
+
+# One of the progress's four racer slots (536 bytes at +40 + 536i).
+[RaceProgressSlot]
+size = 536
+origin = "embedded"
+fields = [
+  { name = "hold_0", offset = 0, type = "u32", note = "0 at the reset (probably a 15-tick hold after hits)" },
+  { name = "hold_1", offset = 4, type = "u32", note = "0 at the reset (as +0)" },
+  { name = "entry", offset = 8, type = "ptr", to = "MinimapRacerEntry", note = "its manager entry (0 none)" },
+  { name = "sections", offset = 12, type = "bytes", count = 512, note = "the route sections passed (256 halfwords)" },
+  { name = "section_count", offset = 524, type = "u32", note = "at most 256" },
+  { name = "level", offset = 528, type = "u32", note = "the stage's slot word (a level, 0 to 4, scaling the SP drain; 2 at the reset)" },
+  { name = "start_section", offset = 532, type = "u16", note = "-1 at the reset" },
+  { name = "start_slice", offset = 534, type = "u16", note = "-1 at the reset" },
+]
+
+# The race's checks' out pair (an end and a reason; 0 none): r3 of
+# RaceProgress::CountHits, Damage, DrainSp, CheckLap, CheckFinish,
+# FollowRoute and sub_821653E8, read back by RaceStates::RaceTick as a
+# doubleword.
+[RaceCheckResult]
+measures = [
+  "RaceProgress::CheckFinish.ret", "RaceProgress::Damage.ret", "RaceProgress::DrainSp.ret",
+  "RaceProgress::FollowRoute.ret", "sub_821653E8.r3", "sub_821653E8.ret",
+]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "pair", offset = 0, type = "u64", note = "the two words read as one" },
+  { name = "end", offset = 0, type = "u32", note = "the race's end (0 none)" },
+  { name = "reason", offset = 4, type = "u32" },
+]
+
+# A packed time (4 bytes): minutes in bits 16-30, seconds 10-15,
+# thousandths 0-9, bit 31 negative (Time::Add, Time::Sub, the compare
+# sub_820FF680, RaceProgress::TickFraction's r5).
+[PackedTime]
+measures = ["Time", "Time::Add.r4", "Time::Sub.r4", "sub_820FF680.r3", "sub_820FF680.r4", "RaceProgress::TickFraction.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "packed", offset = 0, type = "u32" },
+]
+
+# A route position (4 bytes): signed halfwords section and slice (-1 none),
+# met whole as a word. RoutePosition::NotAfter's and MapToSection's
+# argument, the copies sub_820FFE98 and sub_820FFF10 answer.
+[RoutePosition]
+measure = "RoutePosition::MapToSection.r4"
+measures = ["RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret", "RoutePosition", "AiDriver::UpdateStarting.ret@+4", "TrackPosition@+4", "RoutePosition::StepToMainRoad.r3"]
+# measures from VehicleRoutePosition (vehicle), merged at the integration
+size = 4
+origin = "embedded"
+fields = [
+  { name = "word", offset = 0, type = "u32", note = "section and slice read or written as one word" },
+  { name = "section", offset = 0, type = "u16", note = "signed" },
+  { name = "slice", offset = 2, type = "u16", note = "signed" },
+]
+
+# A link index sub_82163000 (SectionsJoin) writes out (r5, r6): a forward
+# link (0 to 2) or -1.
+[SectionsJoinLink]
+measures = ["sub_82163000.r5", "sub_82163000.r6"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "link", offset = 0, type = "u32", note = "-1 none" },
+]
+
+# A stage's route (16 bytes, the stage's +24 copied by sub_820FFD48; the
+# race data's +4 route and the progress's +6076 have the same layout).
+[StageRoute]
+# measures from AccessorStageRoute (vehicle-accessors), merged at the integration
+measures = ["sub_820FFD48.r3"]
+measure = "sub_820FFD48.ret"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "course", offset = 0, type = "u32", note = "a course route's index" },
+  { name = "location", offset = 4, type = "u32" },
+  { name = "first_position", offset = 8, type = "u32", note = "section and slice" },
+  { name = "last_position", offset = 12, type = "u32", note = "section and slice (the finish)" },
+]
+
+# A course record's entry (28 bytes; never seen in play): CourseEntry::Clear
+# sub_82105BC8 sets +0 to +16 to 0 and +20, +24 to [0x82006924].
+[CourseTimeEntry]
+measure = "CourseEntry"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "word_0", offset = 0, type = "u32", note = "0 at the clear" },
+  { name = "word_4", offset = 4, type = "u32", note = "0 at the clear" },
+  { name = "word_8", offset = 8, type = "u32", note = "0 at the clear" },
+  { name = "word_12", offset = 12, type = "u32", note = "0 at the clear" },
+  { name = "word_16", offset = 16, type = "u32", note = "0 at the clear" },
+  { name = "time_a", offset = 20, type = "u32", note = "a packed time ([0x82006924] empty), added to time_b for the entry's total" },
+  { name = "time_b", offset = 24, type = "u32", note = "a packed time" },
+]
+
+# A course record (408 bytes; the stage list's +812, CourseRecords::Save;
+# never seen in play): a list of ten nodes, then ten entries.
+[CourseTimeList]
+measure = "CourseRecord"
+measures = ["CourseRecord::Reset.r3"]
+size = 408
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 40, note = "ten nodes of two signed halfwords: +0 the next node, +2 an entry index" },
+  { name = "node0_next", offset = 0, type = "u16", note = "CourseRecord::Reset" },
+  { name = "node0_entry", offset = 2, type = "u16" },
+  { name = "node9_next", offset = 36, type = "u16", note = "the last node's next (CourseRecord::Reset)" },
+  { name = "free_first", offset = 40, type = "u16", note = "the free list's first node (signed)" },
+  { name = "word_42", offset = 42, type = "u16", note = "set by CourseRecord::Reset" },
+  { name = "first", offset = 44, type = "u16", note = "the list's first node (signed)" },
+  { name = "word_46", offset = 46, type = "u16", note = "set by CourseRecord::Reset" },
+  { name = "count", offset = 48, type = "u16", note = "the list's count" },
+  { name = "entries", offset = 52, type = "bytes", count = 280, note = "ten 28-byte entries (CourseTimeEntry)" },
+  { name = "best", offset = 332, type = "bytes", count = 76, note = "the best's details" },
+]
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data" }
+progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress" }
+racers_manager = { address = 0x826D82F4, type = "u32", note = "the racers' manager (a pointer)" }
+route = { address = 0x826C5B10, type = "u32", note = "the course's route file (a pointer; +12 its section table)" }
+input_records = { address = 0x826C5B30, type = "u32", note = "the first of the cars' input records (pointers)" }
+recordings = { address = 0x826C5B4C, type = "u32", note = "the input recordings (a pointer)" }
+replay = { address = 0x826C5B50, type = "u32", note = "the kept replay (a pointer)" }
+settled_word = { address = 0x826C6B04, type = "u32", note = "0 by RaceStates::OnStandingStart" }
+fade_alpha = { address = 0x826A50D4, type = "u32", note = "the screen fades' alpha (255 black)" }
+fade_in_count = { address = 0x826A50DC, type = "u32", note = "the screen fades' in count (mode-tick.md)" }
+fade_out_count = { address = 0x826A50E4, type = "u32", note = "the screen fades' out count" }
+sign_in_state = { address = 0x826BAB3C, type = "u32", note = "set to 1 by RaceStates::StandingStartTick's kind 6 case when 0" }
+sign_in_reason = { address = 0x826BAB5C, type = "u32", note = "6 with it" }
+tick_seconds = { address = 0x826193A4, type = "f32", note = "1/30" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+thousand = { address = 0x82001BDC, type = "f32", note = "1000.0" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "5" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "15" }
+wall_hit = { address = 0x82001FB0, type = "f32", note = "40.0" }
+car_hit = { address = 0x82001FD8, type = "f32", note = "10.0" }
+drain_base = { address = 0x820021E8, type = "f32", note = "the SP drain's base" }
+close_distance = { address = 0x8200257C, type = "f32", note = "50.0 (RaceStates::RacersClose; the gap's least)" }
+km = { address = 0x820029D8, type = "f32", note = "0.001" }
+drain_scale = { address = 0x82002C6C, type = "f32", note = "the SP drain's scale" }
+no_time = { address = 0x82006924, type = "u32", note = "a course entry's empty time" }
+drain_slope = { address = 0x82008540, type = "f32", note = "the SP drain's slope" }
+gap_most = { address = 0x82009808, type = "f32", note = "200.0" }
+hit_strength = { address = 0x82009814, type = "f32", note = "230.0 (a hard hit)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceProgress.
+[RaceProgressAt6636]
+measure = "RaceProgress@+6636"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from RaceProgress.
+[RaceProgressPart]
+measure = "new<7248>@RaceProgress::Create"
+size = 7248
+origin = "embedded"
+fields = [
+  { name = "unknown_2184", offset = 2184, type = "u32" },
+  { name = "unknown_2192", offset = 2192, type = "u32" },
+  { name = "unknown_2196", offset = 2196, type = "u32" },
+  { name = "unknown_2980", offset = 2980, type = "f32" },
+  { name = "unknown_2984", offset = 2984, type = "u32" },
+  { name = "unknown_3012", offset = 3012, type = "f32" },
+  { name = "unknown_3020", offset = 3020, type = "u32" },
+  { name = "unknown_3984", offset = 3984, type = "f32" },
+  { name = "unknown_6076", offset = 6076, type = "u32" },
+  { name = "unknown_6100", offset = 6100, type = "u32" },
+  { name = "unknown_6116", offset = 6116, type = "u32" },
+  { name = "unknown_7156", offset = 7156, type = "f32" },
+  { name = "unknown_7240", offset = 7240, type = "u32" },
+  { name = "unknown_7244", offset = 7244, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceStates.
+[RaceStatesAt107168]
+measure = "RaceMode@+107168"
+size = 9628
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9624", offset = 9624, type = "u32" },
+]
+
+# Split from RoutePosition.
+[RoutePositionAt6088]
+measure = "RaceProgress@+6088"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from RaceData.
+[RaceDataPart]
+measure = "RaceScreens@+16.+440.+5712"
+size = 3896
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "record_tuning_136", offset = 1832, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's car tuning +136 (the extra gauges' part, RaceHud::SetUpExtraGauges)" },
+  { name = "record_word_3892", offset = 3892, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
+]
+
+# Split from RaceStates.
+[RaceStatesAt9628]
+measure = "RaceStates@+9628"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "still_count", offset = 0, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): RaceStates::RacersStill's count word (its r3 is the machine's +9628, not the machine)" },
+]
+
+# Split from CourseTimeList.
+[CourseTimeListAt366924]
+measure = "[826C5B2C]@+366924"
+size = 50
+origin = "embedded"
+fields = [
+  { name = "unknown_40", offset = 40, type = "u16" },
+  { name = "unknown_44", offset = 44, type = "u16" },
+  { name = "unknown_48", offset = 48, type = "u16" },
+]
+
+# Split from RaceData.
+[RaceDataAt48]
+measure = "[826C5B2C]@+48"
+size = 366052
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "record_byte_76", offset = 76, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +76 (Vehicle::SetUp's record at +0)" },
+  { name = "record_byte_77", offset = 77, type = "u8", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's byte +77 (Vehicle::SetUp's record at +0)" },
+  { name = "record_word_1656", offset = 1656, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1656 (its car's; sub_8210EBF0's horn scale below 2 or 5)" },
+  { name = "record_word_1672", offset = 1672, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1672 (Vehicle::SetUp)" },
+  { name = "record_word_1676", offset = 1676, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +1676 (Vehicle::SetUp)" },
+  { name = "record_flags", offset = 3888, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3888 flags (0x1 and 0x80 the players, 0x2 rivals and opponents, 0x4 traffic, 0x100, 0x200, 0x400, 0x800)" },
+  { name = "record_word_3892", offset = 3892, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3892 (RaceHud::Tick, Vehicle::SetUp)" },
+  { name = "record_start_section", offset = 3904, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's start section (RaceManager::AddRacers)" },
+  { name = "record_start", offset = 3904, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): a racer record's +3904 start position (section, slice) as a word (Racers::SetStart)" },
+  { name = "record_start_slice", offset = 3906, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's start slice" },
+  { name = "record_start_value", offset = 3908, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's +3908 float ([0x8200692C], or 0.0 for stage types 2 and 3)" },
+  { name = "record_racer_id", offset = 3912, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's racer id (Racers::IndexOf)" },
+  { name = "record_event_index", offset = 3916, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the record's index in the event's list" },
+  { name = "record1_start_section", offset = 7840, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start section, the records met at +0" },
+  { name = "record1_start", offset = 7840, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start position as a word, the records met at +0 (RaceManager::AddRacers)" },
+  { name = "record1_start_slice", offset = 7842, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): racer record 1's start slice" },
+  { name = "car_count", offset = 366048, type = "u32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): the racers object's (+48) car count, +0x59610 here (Racers::Add, SetStart)" },
+]
+
+# Split from RaceProgress.
+[RaceProgressAt6076]
+measure = "new<7248>@RaceProgress::Create@+6076"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

@@ -3,7 +3,7 @@
 //
 // Each pass, the game posts an Update and a Draw message (see
 // game_messages.h), then waits for the render thread in
-// Renderer::WaitForFrame, swaps buffers and has the render thread draw the
+// FrameDriver::WaitForFrame, swaps buffers and has the render thread draw the
 // new recording. That wait is replaced to pace the passes: when the next
 // 30 Hz tick is due, the coming pass runs normally (a logic pass);
 // otherwise it waits for the next frame slot (per --max_fps) and the coming
@@ -14,7 +14,11 @@
 // Render thread: draws exactly one frame each time it's asked (as the game
 // originally did), without the game's 2-vblank wait.
 
+#include <format>
+#include "lifted/functions.h"
+#include "lifted/originals.h"
 #include "debug/frame_state_diff.h"
+#include "hooks/native_entry.h"
 #include "debug/idle_timer_scan.h"
 #include "debug/image_dump.h"
 #include "debug/menu_selection_scan.h"
@@ -23,6 +27,7 @@
 #include "frame_pacer.h"
 #include "game_messages.h"
 #include "guest.h"
+#include "hooks/frame_driver.h"
 #include "hooks/title_screen.h"
 #include "interpolation/blend_state.h"
 #include "native/renderer.h"
@@ -33,6 +38,7 @@
 #include <ctime>
 #include "base/log.h"
 #include "base/flags.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(log_frame_times, false, "ITC",
               "Log where frame time goes (main thread work, waits, render thread "
@@ -54,7 +60,7 @@ class FrameTimes {
     kPacing,          // main thread: held back by the frame cap
     kDraw,            // render thread: drawing a frame, present included
     kDrawCpu,         // render thread: CPU time used while drawing (kDraw less waits)
-    kPresent,         // render thread: present (Renderer::Present)
+    kPresent,         // render thread: present (FrameDriver::Present)
     kParts
   };
 
@@ -85,7 +91,7 @@ class FrameTimes {
     int frames = std::max(stats_[kDraw].count, 1);
     for (int i = 0; i < kParts; i++) {
       const Stat& s = stats_[i];
-      line += fmt::format(" | {} {:.2f} avg {:.2f} worst ({})", kNames[i],
+      line += std::format(" | {} {:.2f} avg {:.2f} worst ({})", kNames[i],
                           s.count ? s.total / s.count : 0.0, s.worst, s.count);
       stats_[i] = {};
     }
@@ -124,7 +130,7 @@ FrameTimes& GetFrameTimes() {
   return times;
 }
 
-// Renderer object (see Renderer::Init, sub_82092358).
+// The frame driver object (see FrameDriver::Init, sub_82092358).
 constexpr uint32_t kRendererTickDoneEventOffset = 388;   // set by logic after a tick
 constexpr uint32_t kRendererFrameDoneEventOffset = 392;  // set to let logic tick
 constexpr uint32_t kRendererRunningOffset = 396;         // u8
@@ -136,30 +142,30 @@ constexpr uint32_t kInfiniteTimeout = 0xFFFFFFFF;
 
 // Waits for a game event; the timeout is in milliseconds (sub_82297D38
 // converts it for NtWaitForSingleObjectEx). Returns whether it was set.
-bool Event_Wait(PPCContext& ctx, uint8_t* base, uint32_t event,
+bool Event_Wait(lifted::Regs& ctx, uint32_t event,
                 uint32_t timeout_ms = kInfiniteTimeout) {
   guest::StackFrame frame(ctx, 96);
   uint32_t timeout = frame.Local(80);
-  guest::StoreU32(base, timeout, timeout_ms);
+  guest::StoreU32(timeout, timeout_ms);
   ctx.r3.u64 = event;
   ctx.r4.u64 = timeout;
-  sub_8258DD90(ctx, base);
+  lifted::Enter(ctx, lifted::e8258DD90);
   return ctx.r3.u32 != 0;
 }
 
-void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
+void Event_Signal(lifted::Regs& ctx, uint32_t event) {
   ctx.r3.u64 = event;
-  sub_8258DD78(ctx, base);
+  lifted::Enter(ctx, lifted::e8258DD78);
 }
 
-void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+void Renderer_DrawFrame(lifted::Regs& ctx, uint32_t renderer) {
   bool timing = ITC_FLAG(log_frame_times);
   auto start = FrameTimes::Clock::now();
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
-  sub_82091E58(ctx, base);
+  hooks::FrameDriverDrawFrame(ctx);  // FrameDriver::DrawFrame (src/frame_driver/)
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
   if (timing) {
@@ -168,23 +174,23 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   }
 }
 
-bool Renderer_IsRunning(uint8_t* base, uint32_t renderer) {
-  return guest::LoadU8(base, renderer + kRendererRunningOffset) != 0;
+bool Renderer_IsRunning(uint32_t renderer) {
+  return guest::LoadU8(renderer + kRendererRunningOffset) != 0;
 }
 
 // Render thread: one frame per request from the main thread.
-void Renderer_ThreadLoop(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
-  while (Renderer_IsRunning(base, renderer)) {
-    Event_Wait(ctx, base, renderer + kRendererTickDoneEventOffset);
-    debug::StateCapture_OnTickDone(base);
-    Renderer_DrawFrame(ctx, base, renderer);
-    Event_Signal(ctx, base, renderer + kRendererFrameDoneEventOffset);
+void Renderer_ThreadLoop(lifted::Regs& ctx, uint32_t renderer) {
+  while (Renderer_IsRunning(renderer)) {
+    Event_Wait(ctx, renderer + kRendererTickDoneEventOffset);
+    debug::StateCapture_OnTickDone();
+    Renderer_DrawFrame(ctx, renderer);
+    Event_Signal(ctx, renderer + kRendererFrameDoneEventOffset);
   }
 }
 
 // Main thread, once per main-loop pass: the game's own wait for the frame in
 // flight (and its deferred work), then pacing for the coming pass.
-void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
+void Renderer_WaitForFrame(lifted::Regs& ctx, uint32_t renderer) {
   bool timing = ITC_FLAG(log_frame_times);
   FrameTimes& times = GetFrameTimes();
   auto wait_start = FrameTimes::Clock::now();
@@ -192,10 +198,10 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     times.Add(times.pass_render_only ? FrameTimes::kRenderOnlyWork : FrameTimes::kLogicWork,
               wait_start - times.pass_start);
   }
-  debug::ImageDump_OnPass(base);
+  debug::ImageDump_OnPass();
   native::Renderer_OnListHandedOver(!frame_pacing::GameMessages_IsRenderOnlyPass());
   ctx.r3.u64 = renderer;
-  __imp__sub_820920D8(ctx, base);
+  lifted::original::c820920D8(ctx);
   auto pacing_start = FrameTimes::Clock::now();
 
   auto& pacer = GetFramePacer();
@@ -229,17 +235,17 @@ void Renderer_WaitForFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
     times.MaybeLog();
   }
   frame_pacing::GameMessages_SetRenderOnlyPass(render_only);
-  debug::FrameStateDiff_OnPassStart(base, render_only);
-  debug::IdleTimerScan_OnPassStart(base, render_only, frame_pacing::GameMessages_InRace());
-  debug::MenuSelectionScan_OnPassStart(base, render_only, frame_pacing::GameMessages_Paused(),
+  debug::FrameStateDiff_OnPassStart(render_only);
+  debug::IdleTimerScan_OnPassStart(render_only, frame_pacing::GameMessages_InRace());
+  debug::MenuSelectionScan_OnPassStart(render_only, frame_pacing::GameMessages_Paused(),
                                        frame_pacing::GameMessages_InputListener0());
 }
 
-void VideoOutput_WaitForVblank(PPCContext& ctx, uint8_t* base, uint32_t video_output) {
+void VideoOutput_WaitForVblank(lifted::Regs& ctx, uint32_t video_output) {
   // Keep the graphics device call that precedes the wait; drop the wait
   // itself, which held each frame for the game's 2-vblank interval.
-  ctx.r3.u64 = guest::LoadU32(base, video_output + kVideoOutputDeviceOffset);
-  sub_822A0718(ctx, base);
+  ctx.r3.u64 = guest::LoadU32(video_output + kVideoOutputDeviceOffset);
+  lifted::Enter(ctx, lifted::e822A0718);
 }
 
 }  // namespace
@@ -248,37 +254,37 @@ void VideoOutput_WaitForVblank(PPCContext& ctx, uint8_t* base, uint32_t video_ou
 // the function table reach them; they only unpack registers and forward.
 
 // Renderer_ThreadLoop: r3 = renderer.
-extern "C" REX_FUNC(sub_82091EF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82091EF8) {
+  
   uint32_t r1 = ctx.r1.u32;
-  Renderer_ThreadLoop(ctx, base, ctx.r3.u32);
+  Renderer_ThreadLoop(ctx, ctx.r3.u32);
   ctx.r1.u32 = r1;
   ctx.r3.u64 = 0;
 }
 
 // Renderer_WaitForFrame: r3 = renderer. A tick handler on the main thread.
-extern "C" REX_FUNC(sub_820920D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820920D8) {
+  
   uint32_t r1 = ctx.r1.u32;
-  Renderer_WaitForFrame(ctx, base, ctx.r3.u32);
+  Renderer_WaitForFrame(ctx, ctx.r3.u32);
   ctx.r1.u32 = r1;
 }
 
-// Renderer::Present: r3 = renderer. Wrapped only to time it
-// (--log_frame_times).
-extern "C" REX_FUNC(sub_82091A60) {
-  REX_FUNC_PROLOGUE();
+// FrameDriver::Present: r3 = the frame driver. Its work is the original,
+// lifted (lifted::original, the rewiring's stage 4: no recompiled code in
+// play); timed for --log_frame_times.
+ITC_NATIVE_ENTRY_ALWAYS(82091A60) {
   if (!ITC_FLAG(log_frame_times)) {
-    __imp__sub_82091A60(ctx, base);
+    lifted::original::c82091A60(ctx);
     return;
   }
   auto start = FrameTimes::Clock::now();
-  __imp__sub_82091A60(ctx, base);
+  lifted::original::c82091A60(ctx);
   GetFrameTimes().Add(FrameTimes::kPresent, FrameTimes::Clock::now() - start);
 }
 
 // VideoOutput_WaitForVblank: r3 = video output.
-extern "C" REX_FUNC(sub_8258DAA8) {
-  REX_FUNC_PROLOGUE();
-  VideoOutput_WaitForVblank(ctx, base, ctx.r3.u32);
+ITC_NATIVE_ENTRY_ALWAYS(8258DAA8) {
+  
+  VideoOutput_WaitForVblank(ctx, ctx.r3.u32);
 }

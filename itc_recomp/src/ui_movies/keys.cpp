@@ -1,14 +1,16 @@
 // The UI movie keys' interpolation (sub_8259FA20, sub_8259FB30,
-// sub_8259FC18) as plain C++: see ui_movies.h. Step for step as the
+// sub_8259FC18) and the track that applies them (UiMovie::ApplyTrack,
+// sub_825A0548) as plain C++: see ui_movies.h. Step for step as the
 // translated code: each single-precision operation is the double operation
 // rounded to float (R below), each fmadds std::fma rounded to float. Built
 // with -ffp-model=strict and -ffp-contract=off (CMakeLists.txt).
 
 #include "ui_movies/ui_movies.h"
 
+#include "base/log.h"
 #include "c_runtime/math.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse2.h>
 
 #include <bit>
@@ -19,19 +21,24 @@ namespace ui_movies {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;       // 1.0
-constexpr uint32_t kTangentScale = 0x82002A38;
-constexpr uint32_t kEaseScale = 0x820021E4;
+using G = schema::UiMoviesGlobals;
+using KeyView = schema::UiMovieKey;
 
 double R(double x) { return double(float(x)); }
 
-double LoadFloat(uint8_t* base, uint32_t address) {
-  return double(std::bit_cast<float>(guest::LoadU32(base, address)));
+double LoadFloat(uint32_t address) {
+  return double(std::bit_cast<float>(guest::LoadU32(address)));
 }
 
-double LoadInteger(uint8_t* base, uint32_t address) {
+// A key's fields as the translated code reads them (lfs).
+double Time(uint32_t k) { return double(KeyView(k).time()); }
+double Value(uint32_t k) { return double(KeyView(k).value()); }
+double TangentIn(uint32_t k) { return double(KeyView(k).tangent_in()); }
+double TangentOut(uint32_t k) { return double(KeyView(k).tangent_out()); }
+
+double IntValue(uint32_t k) {
   // lwa, std, lfd, fcfid: the word sign-extended, converted exactly.
-  return double(int64_t(int32_t(guest::LoadU32(base, address))));
+  return double(int64_t(int32_t(KeyView(k).int_value())));
 }
 
 // fctiwz, as translated: NaN gives 0x80000000, too large INT_MAX, else
@@ -46,10 +53,33 @@ uint32_t Fctiwz(double x) {
   return uint32_t(simde_mm_cvttsd_si32(simde_mm_load_sd(&x)));
 }
 
+// fctidz, as translated: NaN gives 0x8000000000000000, too large LLONG_MAX,
+// else truncated (cvttsd2si: too small gives 0x8000000000000000). The low
+// word is what stfiwx stores.
+uint32_t FctidzLow(double x) {
+  if (std::isnan(x)) {
+    return 0;
+  }
+  if (x > double(LLONG_MAX)) {
+    return uint32_t(uint64_t(LLONG_MAX));
+  }
+  return uint32_t(uint64_t(simde_mm_cvttsd_si64(simde_mm_load_sd(&x))));
+}
+
+// The step keys (kind 0): the second key when t is within the float at
+// 0x82002A44 of 1 (or t is NaN), else the first.
+bool StepToSecond(double t) {
+  const double one = double(G::one());
+  const double distance = t > one ? R(t - one) : R(one - t);
+  return !(distance > double(G::near_zero()));
+}
+
+uint32_t FloatBits(double x) { return std::bit_cast<uint32_t>(float(x)); }
+
 // tan (sub_825A8A50) as its adapter gives it with nearest rounding set: the
 // result, or nullopt where the original must run.
 std::optional<double> Tan(double x) {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0) {
     return std::nullopt;
   }
@@ -62,11 +92,12 @@ std::optional<double> Tan(double x) {
 
 }  // namespace
 
-uint32_t EaseInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
-  const double one = LoadFloat(base, kOne);
-  const double c = LoadFloat(base, kEaseScale);
-  double f11 = R(LoadFloat(base, k1 + 16) * t);
-  double f10 = LoadFloat(base, k1 + 12);
+uint32_t EaseInteger(uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FA20 EaseInteger");
+  const double one = double(G::one());
+  const double c = double(G::ease_scale());
+  double f11 = R(TangentOut(k1) * t);
+  double f10 = TangentIn(k1);
   double f0 = R(one - t);
   f11 = R(f11 * c);
   f10 = R(f10 * f0);
@@ -76,33 +107,34 @@ uint32_t EaseInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
   f12 = R(f12 * t);
   f0 = R(std::fma(f12, t, f0));
   const double s_rest = R(one - f0);
-  const double v1 = R(LoadInteger(base, k1 + 8));
-  const double v0 = R(LoadInteger(base, k0 + 8));
+  const double v1 = R(IntValue(k1));
+  const double v0 = R(IntValue(k0));
   f0 = R(v1 * f0);
   f0 = R(std::fma(v0, s_rest, f0));
   return Fctiwz(f0);
 }
 
-std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
-  const double one = LoadFloat(base, kOne);
-  const double v0 = LoadFloat(base, k0 + 8);
+std::optional<double> CubicFloat(uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FB30 CubicFloat");
+  const double one = double(G::one());
+  const double v0 = Value(k0);
   const double u = R(one - t);
-  const double dt = R(LoadFloat(base, k1 + 4) - LoadFloat(base, k0 + 4));
-  const std::optional<double> tan1 = Tan(LoadFloat(base, k1 + 16));
+  const double dt = R(Time(k1) - Time(k0));
+  const std::optional<double> tan1 = Tan(TangentOut(k1));
   if (!tan1) {
     return std::nullopt;
   }
-  const double v1 = LoadFloat(base, k1 + 8);
+  const double v1 = Value(k1);
   const double f26 = R(*tan1);
-  const std::optional<double> tan2 = Tan(LoadFloat(base, k1 + 12));
+  const std::optional<double> tan2 = Tan(TangentIn(k1));
   if (!tan2) {
     return std::nullopt;
   }
-  const double c1 = LoadFloat(base, kTangentScale);
-  const double c2 = LoadFloat(base, kEaseScale);
+  const double c1 = double(G::tangent_scale());
+  const double c2 = double(G::ease_scale());
   double f12 = R(f26 * dt);
-  double f11 = R(LoadFloat(base, k1 + 8) * t);
-  double f10 = R(LoadFloat(base, k0 + 8) * u);
+  double f11 = R(Value(k1) * t);
+  double f10 = R(Value(k0) * u);
   f12 = R(std::fma(f12, c1, v0));
   f11 = R(f11 * t);
   f10 = R(f10 * u);
@@ -121,30 +153,31 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
   return R(std::fma(f10, u, f0));
 }
 
-std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
-  const double one = LoadFloat(base, kOne);
+std::optional<uint32_t> CubicInteger(uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FC18 CubicInteger");
+  const double one = double(G::one());
   const double u = R(one - t);
-  const double dt = R(LoadFloat(base, k1 + 4) - LoadFloat(base, k0 + 4));
-  const std::optional<double> tan1 = Tan(LoadFloat(base, k1 + 16));
+  const double dt = R(Time(k1) - Time(k0));
+  const std::optional<double> tan1 = Tan(TangentOut(k1));
   if (!tan1) {
     return std::nullopt;
   }
   const double f28 = R(*tan1);
-  const std::optional<double> tan2 = Tan(LoadFloat(base, k1 + 12));
+  const std::optional<double> tan2 = Tan(TangentIn(k1));
   if (!tan2) {
     return std::nullopt;
   }
-  const double c1 = LoadFloat(base, kTangentScale);
-  const double c2 = LoadFloat(base, kEaseScale);
+  const double c1 = double(G::tangent_scale());
+  const double c2 = double(G::ease_scale());
   double f11 = R(f28 * dt);
   double f12 = R(*tan2);
   f12 = R(f12 * dt);
   // The values: k0's and k1's +8 (read before the tan calls in the
   // original, and again after them).
-  const double f10 = R(LoadInteger(base, k0 + 8));
-  const double f9 = R(LoadInteger(base, k1 + 8));
-  double f8 = LoadInteger(base, k1 + 8);
-  double f7 = LoadInteger(base, k0 + 8);
+  const double f10 = R(IntValue(k0));
+  const double f9 = R(IntValue(k1));
+  double f8 = IntValue(k1);
+  double f7 = IntValue(k0);
   f11 = R(std::fma(f11, c1, f10));
   double f0 = R(std::fma(f12, c1, f9));
   f8 = R(f8);
@@ -164,6 +197,117 @@ std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, do
   f0 = R(std::fma(g10, t, f0));
   f0 = R(std::fma(f8, u, f0));
   return Fctiwz(f0);
+}
+
+void ApplyTrack(uint32_t node, uint32_t track, double t, uint32_t k0,
+                uint32_t k1, uint32_t frame, const c_runtime::AtexitCall& atexit,
+                const KeyCall& keys) {
+  ITC_NATIVE_RUNNING("sub_825A0548 UiMovie::ApplyTrack");
+  // The descriptor, from TrackProperty called from the original's frame
+  // (its own frame 128 bytes below).
+  const schema::UiMovieTrack the_track(track);
+  const schema::UiMovieTrackProperty descriptor{uint32_t(TrackProperty(the_track.property(), frame - 128, atexit))};
+  const double zero = double(G::zero());
+  // The stand-in first key at frame + 112 (+0 kind 0, +4 zero, +8 0, +12 and
+  // +16 zero), written whether or not it's used.
+  const KeyView stand_in_key(frame + 112);
+  const uint32_t stand_in = stand_in_key.address;
+  stand_in_key.set_kind(0);
+  guest::StoreU32(stand_in_key.time_address(), FloatBits(zero));
+  guest::StoreU32(stand_in_key.tangent_in_address(), FloatBits(zero));
+  guest::StoreU32(stand_in_key.tangent_out_address(), FloatBits(zero));
+  stand_in_key.set_int_value(0);
+  uint32_t target = descriptor.node_offset() + node;
+  if (descriptor.indirect() != 0) {
+    target += VertexOffset(schema::UiMovieNode(node).unknown_112(), the_track.vertex());
+  }
+  const bool sets = descriptor.sets() != 0;
+  if (k0 == 0) {
+    // No first key: the stand-in, holding the target's value when the track
+    // sets it (as a float for type 0, the word for 1 and 2).
+    k0 = stand_in;
+    if (sets) {
+      const uint32_t type = descriptor.type();
+      if (type == 0) {
+        stand_in_key.set_int_value(FloatBits(LoadFloat(target)));
+      } else if (type < 3) {
+        stand_in_key.set_int_value(guest::LoadU32(target));
+      }
+    }
+  }
+  if (k1 == 0) {
+    k1 = k0;
+  }
+  const uint32_t type = descriptor.type();
+  if (type >= 3) {
+    return;
+  }
+  const uint32_t kind = KeyView(k1).kind();
+  const double one = double(G::one());
+  if (type == 0) {
+    double value = zero;
+    if (kind == 0) {
+      value = Value(StepToSecond(t) ? k1 : k0);
+    } else if (kind == 1) {
+      const double f13 = R(Value(k1) * t);
+      value = R(std::fma(R(one - t), Value(k0), f13));
+    } else if (kind == 2) {
+      if (const std::optional<double> cubic = CubicFloat(k0, k1, t)) {
+        value = *cubic;
+      } else {
+        value = keys.guest(keys.user, 0x8259FB30, k0, k1, t).f1;
+      }
+    } else if (kind == 3) {
+      const double c = double(G::ease_scale());
+      double f11 = R(TangentOut(k1) * t);
+      double f10 = TangentIn(k1);
+      const double f9 = Value(k1);
+      const double f8 = Value(k0);
+      double f0 = R(one - t);
+      f11 = R(f11 * c);
+      f10 = R(f10 * f0);
+      f11 = R(f11 * f0);
+      double f12 = R(std::fma(f10, c, t));
+      f0 = R(f11 * f0);
+      f12 = R(f12 * t);
+      f0 = R(std::fma(f12, t, f0));
+      const double f13 = R(one - f0);
+      f0 = R(f9 * f0);
+      value = R(std::fma(f13, f8, f0));
+    }
+    const double start = sets ? zero : LoadFloat(target);
+    guest::StoreU32(target, FloatBits(R(start + value)));
+    return;
+  }
+  // Types 1 (signed) and 2 (unsigned) integers.
+  uint32_t value = 0;
+  if (kind == 0) {
+    value = KeyView(StepToSecond(t) ? k1 : k0).int_value();
+  } else if (kind == 1) {
+    const uint32_t w1 = KeyView(k1).int_value(), w0 = KeyView(k0).int_value();
+    const double v1 = type == 1 ? double(int64_t(int32_t(w1))) : double(int64_t(w1));
+    const double v0 = type == 1 ? double(int64_t(int32_t(w0))) : double(int64_t(w0));
+    const double f13 = R(R(v1) * t);
+    const double f0 = R(std::fma(R(v0), R(one - t), f13));
+    value = type == 1 ? Fctiwz(f0) : FctidzLow(f0);
+  } else if (kind == 2) {
+    if (type == 1) {
+      if (const std::optional<uint32_t> cubic = CubicInteger(k0, k1, t)) {
+        value = *cubic;
+      } else {
+        value = uint32_t(keys.guest(keys.user, 0x8259FC18, k0, k1, t).r3);
+      }
+    } else {
+      // sub_8259FD40, never seen in play: the original.
+      value = uint32_t(keys.guest(keys.user, 0x8259FD40, k0, k1, t).r3);
+    }
+  } else if (kind == 3) {
+    // sub_8259FAA8 (type 2), never seen in play: the original.
+    value = type == 1 ? EaseInteger(k0, k1, t)
+                      : uint32_t(keys.guest(keys.user, 0x8259FAA8, k0, k1, t).r3);
+  }
+  const uint32_t start = sets ? 0 : guest::LoadU32(target);
+  guest::StoreU32(target, start + value);
 }
 
 }  // namespace ui_movies

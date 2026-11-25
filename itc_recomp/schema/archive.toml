@@ -1,0 +1,204 @@
+# The schema of docs/functions/archive.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The archive streaming (src/archive/): the TOCs, the request queue (a
+# 20-byte List at 0x826BAB08), its 960 request slots (0x826A5168) and the
+# loader thread's functor. The four semaphores are the game's Semaphore
+# class (video-output.md's); docs/known-data.md has the globals.
+
+# A request slot (92 bytes; 960 of them at 0x826A5168, made by
+# RequestSlots::StaticInit, vtable 0x82001DD8 over the list node's
+# 0x82010B5C): a queue node with the 40-byte request Archive::Load builds at
+# +12 and the loader's state after +52 (from sub_8209D490). The measure met
+# it as the queue's head and tail (List.+12, List.+16) and their links.
+[ArchiveRequestSlot]
+measures = ["List.+12", "List.+12.+4", "List.+16", "List.+16.+4"]
+size = 92
+origin = "file"
+vtable = 0x82001DD8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "link", offset = 4, type = "ptr", to = "ArchiveRequestSlot", note = "the next queued slot" },
+  { name = "serial", offset = 8, type = "u32", note = "the request's serial; -1 when the slot is free" },
+  { name = "flags", offset = 12, type = "u32", note = "0x4, 0x20, 0x4000 (cancellable) always; 0x80 with Archive::Load's r7, 0x100 compressed, 0x200 a loose file or 0x800 from an archive, 0x2000 a callback; 0x1, 0x8, 0x10, 0x40, 0x400, 0x1000, 0x2 tested by the loader" },
+  { name = "id", offset = 16, type = "u32", note = "the asset id (from 23011 in BUILD_CRS.DAT)" },
+  { name = "loose_path", offset = 20, type = "ptr", to = "CString", note = "the loose file's path, 0 for none" },
+  { name = "byte_offset", offset = 24, type = "u32", note = "the TOC's start sector x 2,048" },
+  { name = "load_r7", offset = 28, type = "u32", note = "Archive::Load's r7 (flag 0x80)" },
+  { name = "size", offset = 32, type = "u32", note = "the unpacked size when compressed, else Archive::Load's r8 or the stored size" },
+  { name = "stored_size", offset = 36, type = "u32", note = "the stored size when compressed, else 0" },
+  { name = "destination", offset = 40, type = "u32", note = "the caller's buffer (with flag 0x20 and 0x1, a word the fresh allocation is written to)" },
+  { name = "context", offset = 44, type = "u32", note = "the callback's context" },
+  { name = "callback", offset = 48, type = "fn", note = "called by the finish as callback(serial, data, size, context)" },
+  { name = "state", offset = 52, type = "u32", note = "0 queued, 1 next, 2 chained, 3 to 8 by kind (5 an archive read, 7 a loose read)" },
+  { name = "read_offset", offset = 56, type = "u32", note = "the byte offset read from (+24, flag 0x800)" },
+  { name = "sectors", offset = 60, type = "u32", note = "the 2,048-byte sectors read" },
+  { name = "read_r7", offset = 64, type = "u32", note = "+28 copied (flag 0x80); the loose read passes it on" },
+  { name = "read_stored_size", offset = 68, type = "u32" },
+  { name = "read_unpacked_size", offset = 72, type = "u32" },
+  { name = "data", offset = 76, type = "u32", note = "where it's read: the destination, an allocation or the staging ring's half" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "chained", offset = 84, type = "ptr", to = "ArchiveRequestSlot", note = "the compressed request kept to unpack (itself when no next)" },
+  { name = "unpack_destination", offset = 88, type = "u32", note = "a compressed request's destination, unpacked into from +76" },
+]
+
+# The request queue's class (List::List, Append, Remove: sub_82294B80,
+# sub_82294BA8, sub_82294C00; 20 bytes, vtable 0x820128C8, the queue's own
+# 0x82001DD4). No measure: the measure's "List" joins it with
+# vehicle-accessors.md's 12-byte list and app-states.md's std::list (a
+# measure fault, reported); its one instance is the queue at 0x826BAB08.
+[ArchiveList]
+size = 20
+origin = "file"
+vtable = 0x820128C8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820128C8; the queue's 0x82001DD4" },
+  { name = "deletes_nodes", offset = 4, type = "u32", note = "0 for the queue" },
+  { name = "count", offset = 8, type = "u32" },
+  { name = "head", offset = 12, type = "ptr", to = "ArchiveRequestSlot", note = "the nodes are request slots, linked by +4" },
+  { name = "tail", offset = 16, type = "ptr", to = "ArchiveRequestSlot" },
+]
+
+# The list node's base (ListNode::ListNode, ~ListNode: sub_82294B68,
+# sub_8224FB10; vtable 0x82010B5C): shared with other node classes (the
+# destructor has 9 call sites).
+[ArchiveListNode]
+measure = "ListNode"
+size = 8
+origin = "file"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "link", offset = 4, type = "u32" },
+]
+
+# A TOC entry (BUILD.TOC, BUILD_CRS.TOC: a 16-byte header, then an asset's
+# entry at (id + 1) x 16). No measure: reached by a computed index.
+[ArchiveTocEntry]
+size = 16
+origin = "file"
+# A blob (E5 step 5, 2026-11-24): each TOC's buffer, read whole by
+# Archive::Init's hand port (src/hooks/archive_streaming.cpp, New where the
+# original's VirtualAlloc returned at 0x8209E2D8 and 0x8209E2F4), in PC
+# memory with the file's bytes; read by address (Archive::Load, the asset
+# sizes); freed by the archive's teardown's VirtualFree (never in play).
+storage = "blob"
+fields = [
+  { name = "start_sector", offset = 0, type = "u32", note = "2,048-byte sectors" },
+  { name = "stored_size", offset = 4, type = "u32" },
+  { name = "unpacked_size", offset = 8, type = "u32", note = "0 when stored as is" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+# The staging ring (10 MiB: two 5 MiB halves, staging_halves and
+# staging_half_1): a compressed request is read into a half, then unpacked
+# from it into its destination by Ucl::Unpack (guest loads). A blob (E5 step
+# 5, 2026-11-24): made by Archive::Init's hand port
+# (src/hooks/archive_streaming.cpp, New where the original's VirtualAlloc
+# returned at 0x8209E37C); freed by the archive's teardown's VirtualFree
+# (Archive::Shutdown, never in play). Not the shared load buffer
+# (load_buffer), which stays in guest memory: the shader pairs' microcode.
+[ArchiveStaging]
+size = 0
+origin = "allocated"
+storage = "blob"
+fields = []
+
+# A loose file's entry (the tables at 0x82600AC8 and 0x82678240, 8 bytes;
+# a path of 0 ends them). No measure: reached by a computed index.
+[ArchiveLooseFile]
+size = 8
+origin = "file"
+fields = [
+  { name = "id", offset = 0, type = "u32" },
+  { name = "path", offset = 4, type = "ptr", to = "CString" },
+]
+
+# The loader thread's functor (vtable 0x82001DDC: slot 0 sub_82094D20, 1
+# LoaderFunctor::Invoke, 2 LoaderFunctor::Clone); its one instance at
+# 0x82600B68 (the loader thread's parameters +24), and Clone's 8-byte copy.
+[LoaderFunctor]
+measures = ["LoaderFunctor", "new<8>@LoaderFunctor::Clone"]
+size = 8
+origin = "file"
+# Dual (E5 step 5, 2026-11-24): the static instance stays in the loader
+# thread's parameters (guest); Clone's copy (lifted, its operator new
+# returning at 0x8209DF6C; never seen in play) in host memory, freed by the
+# deleting destructor's operator delete (the game's frees take handles).
+storage = "dual"
+host_alloc = [0x8209DF6C]
+vtable = 0x82001DDC
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "target", offset = 4, type = "fn", note = "the function Invoke calls (0x8209E118, the loader thread)" },
+]
+
+# The functors' base, probably (sub_82094D20's r3: its deleting destructor
+# stores the vtable 0x82000ABC); slot 0 of five vtables, the loader's
+# functor among them.
+[ArchiveFunctorBase]
+measure = "sub_82094D20.r3"
+size = 4
+origin = "file"
+vtable = 0x82000ABC
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+# sub_8258D508's r3: the video output (video-output.md; vtable 0x8206CAF8,
+# its device lock a Semaphore at +224), whose deleting destructor calls
+# Semaphore::~Semaphore. Filed here by the measure since that destructor is
+# this file's row (a measure fault: video-output.md's object, reported).
+[ArchiveVideoOutputDeleting]
+measure = "sub_8258D508.r3"
+size = 4
+origin = "file"
+vtable = 0x8206CAF8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+# sub_8258DD60's r3 (probably Event::Close): an event, its handle at +0 (a
+# Semaphore's +0 from Semaphore::~Semaphore). Video-output.md's Event
+# (a measure fault: filed here through Semaphore::~Semaphore, reported).
+[ArchiveClosedEvent]
+measure = "sub_8258DD60.r3"
+size = 4
+origin = "file"
+fields = [
+  { name = "handle", offset = 0, type = "u32", note = "-1 when none" },
+]
+
+[globals]
+archive_handles = { address = 0x82600A9C, type = "bytes", count = 8, note = "BUILD.DAT's and BUILD_CRS.DAT's file handles (-1 when not open)" }
+callback_serial = { address = 0x82600AA4, type = "u32", note = "the serial of the request whose callback runs last (-1 at Archive::Init)" }
+build_toc_count = { address = 0x82600AA8, type = "u32", note = "23011" }
+crs_toc_count = { address = 0x82600AB8, type = "u32", note = "1359" }
+loose_files = { address = 0x82600AC8, type = "u32", note = "the first ArchiveLooseFile (the walk's first 23,011 steps)" }
+loader_thread = { address = 0x82600B50, type = "bytes", count = 32, note = "the loader thread's parameters: +8, +12 = 0, +16 = 0, +17 = 1, +18 = 0, +20 a word, +24 a LoaderFunctor, +28 the entry 0x8209E118" }
+loader_functor = { address = 0x82600B68, type = "bytes", count = 8, note = "a LoaderFunctor" }
+crs_loose_files = { address = 0x82678240, type = "u32", note = "the first ArchiveLooseFile after the walk's first 23,011 steps" }
+overlapped = { address = 0x826A50EC, type = "bytes", count = 20, note = "the archive reads' XOVERLAPPED" }
+streaming = { address = 0x826A5100, type = "ptr", note = "the streaming object (Archive::Init's r3)" }
+serial = { address = 0x826A5104, type = "u32", note = "the next request's serial (wraps at 0x7FFFFFFF)" }
+idle_wanted = { address = 0x826A5108, type = "u32", note = "1 while Archive::WaitIdle waits for the queue to drain" }
+staging_half_size = { address = 0x826A510C, type = "u32", note = "half the staging ring (5 MiB)" }
+staging_count = { address = 0x826A5110, type = "u32", note = "alternates the staging ring's halves" }
+staging_halves = { address = 0x826A5114, type = "u32", note = "the staging ring's first half (the second at 0x826A5118)" }
+staging_half_1 = { address = 0x826A5118, type = "u32" }
+staging_in_use = { address = 0x826A511C, type = "u32", note = "the staging half a compressed request was read into" }
+build_toc = { address = 0x826A5120, type = "ptr", to = "ArchiveTocEntry", note = "BUILD.TOC's buffer (its header, then the entries)" }
+build_toc_size = { address = 0x826A5124, type = "u32" }
+crs_toc = { address = 0x826A5128, type = "ptr", to = "ArchiveTocEntry", note = "BUILD_CRS.TOC's buffer" }
+crs_toc_size = { address = 0x826A512C, type = "u32" }
+load_buffer_size = { address = 0x826A5130, type = "u32", note = "the shared load buffer's size (12.5 MiB)" }
+load_buffer = { address = 0x826A5134, type = "u32", note = "the shared load buffer (0 when its size is 0)" }
+slots = { address = 0x826A5168, type = "bytes", count = 88320, note = "the 960 ArchiveRequestSlot (92 bytes each)" }
+request_done_semaphore = { address = 0x826BAA68, type = "bytes", count = 40, note = "a Semaphore: a request done" }
+idle_semaphore = { address = 0x826BAA90, type = "bytes", count = 40, note = "a Semaphore: the queue drained" }
+work_semaphore = { address = 0x826BAAB8, type = "bytes", count = 40, note = "a Semaphore: the loader's work" }
+queue_lock = { address = 0x826BAAE0, type = "bytes", count = 40, note = "a Semaphore: the queue lock (count 1)" }
+queue = { address = 0x826BAB08, type = "bytes", count = 20, note = "an ArchiveList: the request queue (vtable 0x82001DD4)" }

@@ -1,0 +1,2625 @@
+// XAudio's factory objects (src/xaudio/objects.h,
+// docs/functions/xaudio-objects.md) against the recompiled functions. The
+// game's live objects aren't touched: each case builds its objects in a
+// block from the allocation layer (and, for the functions that allocate, a
+// real default allocator for each version), filled with the same random
+// words for both versions, and runs the original or the plain C++ through
+// the register steps (hooks/xaudio_objects.h). The block and r3 (all 64
+// bits) are compared with harness::Outputs, exactly except where a field is
+// shown to be a float.
+
+#include "harness.h"
+
+#include "base/log.h"
+#include "helpers/clock.h"
+#include "hooks/heap.h"
+#include "hooks/xaudio.h"
+#include "hooks/xaudio_objects.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+#include "xaudio/objects.h"
+#include "xaudio/voices.h"
+
+#include <fmt/format.h>
+
+#include <bit>
+#include <initializer_list>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace harness {
+
+namespace {
+
+namespace xa = xaudio;
+
+constexpr uint32_t kBlockBytes = 0x2000;
+constexpr uint32_t kAllocatorBytes = 0x10000;
+constexpr uint32_t kAddRef = 0x8245F860;  // +4 up by one, the count to r3
+
+struct Block {
+  Block() : address(memory::Alloc(kBlockBytes, 0)) {}
+  ~Block() { memory::Free(address); }
+  Block(const Block&) = delete;
+  Block& operator=(const Block&) = delete;
+  uint32_t address;
+};
+
+void Store(uint8_t* base, uint32_t address, uint32_t value) {
+  guest::StoreU32(base, address, value);
+}
+
+// The live spin lock (0x82954F10) after a call: whether this thread (r13
+// `thread`) owns it, and its depth when it does. The game's audio thread
+// takes it too while the harnesses run, so another thread's depth isn't
+// the case's (a case once read the audio thread's depth 1 in one version
+// only, 2026-10-30).
+void LockWords(Outputs& out, uint8_t* base, uint32_t thread) {
+  const bool owned = guest::LoadU32(base, xa::kSpinLock + 8) == thread;
+  out.Word(owned ? guest::LoadU32(base, xa::kSpinLock + 4) : 0);
+  out.Word(owned);
+}
+
+void R3(Outputs& out, uint64_t r3) {
+  out.Word(uint32_t(r3));
+  out.Word(uint32_t(r3 >> 32));
+}
+
+// The block and the stack below the call filled with the same random
+// words for both versions, then `setup(random, t)`; the block and r3
+// compared.
+template <typename Setup>
+void Case(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+          GuestFunction native, Setup setup, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// The words of [address, address + bytes) with those pointing into the
+// allocator's block as offsets in it (marked), the rest as they are.
+void Normalized(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
+                uint32_t allocator, uint32_t allocator_bytes) {
+  std::vector<uint8_t> words = Read(base, address, bytes);
+  for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+    const uint32_t word = guest::LoadU32(base, address + i);
+    if (word >= allocator && word < allocator + allocator_bytes) {
+      const uint32_t offset = 0xA110C000u ^ (word - allocator);
+      words[i] = uint8_t(offset >> 24);
+      words[i + 1] = uint8_t(offset >> 16);
+      words[i + 2] = uint8_t(offset >> 8);
+      words[i + 3] = uint8_t(offset);
+    }
+  }
+  out.Bytes(words);
+}
+
+// A case over a real default allocator for each version (its data filled
+// with the same pattern): `setup(random, t, allocator)`, the call, then
+// `after(out, allocator)`; the block and the allocator's block compared
+// with pointers into the allocator as offsets, then the allocator freed.
+template <typename Setup, typename After>
+void RealCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+              GuestFunction native, Setup setup, After after, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  const uint32_t bytes = kAllocatorBytes + 28;
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    xa::DefaultAllocator(h.base, 0x61820006, kAllocatorBytes, block + 0x1FFC);
+    const uint32_t allocator = guest::LoadU32(h.base, block + 0x1FFC);
+    Store(h.base, block + 0x1FFC, 0);
+    out[v].Word(allocator != 0);
+    if (allocator == 0) {
+      continue;
+    }
+    for (uint32_t i = 28; i < bytes; i += 4) {
+      Store(h.base, allocator + i, 0x5EED0000u + i);
+    }
+    setup(random, t, allocator);
+    (v == 0 ? recompiled : native)(t, h.base);
+    R3(out[v], t.r3.u64 - ((t.r3.u64 >= allocator && t.r3.u64 < allocator + bytes) ? allocator : 0));
+    after(out[v], allocator);
+    Normalized(out[v], h.base, block, kBlockBytes, allocator, bytes);
+    Normalized(out[v], h.base, allocator, bytes, allocator, bytes);
+    memory::crt::XMemFree(allocator, 0x61820006);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A float worth testing: ordinary values most of the time, and zeros,
+// denormals, infinities, NaNs and the extremes.
+uint32_t AnyFloat(Random& random) {
+  static constexpr uint32_t kEdges[] = {0x00000000, 0x80000000, 0x00000001, 0x807FFFFF,
+                                        0x7F800000, 0xFF800000, 0x7FC00000, 0x7F800001,
+                                        0xFFC00001, 0x7F7FFFFF, 0xFF7FFFFF, 0x00800000,
+                                        0x42F00000, 0xC2F00000, 0x4B000000, 0x3F800000};
+  switch (random.Below(4)) {
+    case 0:
+      return kEdges[random.Below(16)];
+    case 1:
+      return uint32_t(random.Next());
+    default:
+      return std::bit_cast<uint32_t>(float(int32_t(random.Below(64001)) - 32000) / 1000.0f);
+  }
+}
+
+// --- Leaves ---
+
+void Leaves(Context& h, uint32_t block) {
+  {
+    Results results("XAudioCodec::Size (sub_82466B78), with PcmCodec::Size (sub_8246D720) and "
+                    "XmaCodec::Size (sub_8246B458)");
+    for (int i = 0; i < 64; i++) {
+      Case(h, results, block, __imp__sub_82466B78, ITC_CONTEXT_FN(hooks::XAudioCodecSize),
+           [&](Random& random, PPCContext& t) {
+             guest::StoreU8(h.base, block + 8, uint8_t(random.Below(3) == 0 ? random.Next() : random.Below(6)));
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x100;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioMatrix::Size (sub_82466840)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_82466840, ITC_CONTEXT_FN(hooks::XAudioMatrixSize),
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block + 12, random.Below(4) == 0 ? 0 : block + 0x200);
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x100;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Size (sub_82463B78)");
+    for (int i = 0; i < 8; i++) {
+      Case(h, results, block, __imp__sub_82463B78, ITC_CONTEXT_FN(hooks::XAudioReverbSize),
+           [&](Random& random, PPCContext& t) {
+             t.r3.u64 = random.Next();
+             t.r4.u64 = block + 4 * random.Below(16);
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("VolumeMeter::Size (sub_825A60E0)");
+    for (int i = 0; i < 32; i++) {
+      Case(h, results, block, __imp__sub_825A60E0, ITC_CONTEXT_FN(hooks::XAudioMeterSize),
+           [&](Random& random, PPCContext& t) {
+             if (i < 16) {
+               Store(h.base, block + 8, random.Below(9));
+               Store(h.base, block + 12, random.Below(64));
+             }
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x100;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  struct Leaf {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Leaf leaves[] = {
+      {"XAudioCodec::GetInfo (sub_82466E80)", __imp__sub_82466E80, ITC_CONTEXT_FN(hooks::XAudioCodecGetInfo)},
+      {"XAudioMatrix::GetInfo (sub_82465BE0)", __imp__sub_82465BE0, ITC_CONTEXT_FN(hooks::XAudioMatrixGetInfo)},
+      {"VolumeMeter::GetInfo (sub_825A5778)", __imp__sub_825A5778, ITC_CONTEXT_FN(hooks::XAudioMeterGetInfo)},
+      {"XAudioCodec::GetState (sub_8246A920)", __imp__sub_8246A920, ITC_CONTEXT_FN(hooks::XAudioCodecGetState)},
+      {"XAudioMatrix::SetOverwrite (sub_82465C08)", __imp__sub_82465C08,
+       ITC_CONTEXT_FN(hooks::XAudioMatrixSetOverwrite)},
+      {"ReverbCore::SetStereo (sub_824679F8)", __imp__sub_824679F8, ITC_CONTEXT_FN(hooks::XAudioReverbSetStereo)},
+  };
+  for (const Leaf& leaf : leaves) {
+    Results results(leaf.name);
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, leaf.recompiled, leaf.native,
+           [&](Random& random, PPCContext& t) {
+             const bool stores_r4 = leaf.native == ITC_CONTEXT_FN(hooks::XAudioMatrixSetOverwrite) ||
+                                    leaf.native == ITC_CONTEXT_FN(hooks::XAudioReverbSetStereo);
+             t.r3.u64 = block + 4 * random.Below(64);
+             t.r4.u64 = stores_r4 ? random.Next() : block + 0x400 + random.Below(64);
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The inner's slot +12 is AddRef (on the inner: +8 of the object), so
+    // the call shows; counts of 0, 1 and others.
+    Results results("XAudioObject::Release (sub_8246CE70)");
+    for (int i = 0; i < 32; i++) {
+      Case(h, results, block, __imp__sub_8246CE70, ITC_CONTEXT_FN(hooks::XAudioObjectRelease),
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block + 4, block + 0x1C00);
+             Store(h.base, block + 0x1C00 + 12, kAddRef);
+             Store(h.base, block + 8, i % 4 == 0 ? 1 : i % 4 == 1 ? 0 : random.Below(5));
+             t.r3.u64 = block;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+// --- The packet lists ---
+
+// A list head at `head` (offset `offset`) with `count` entries at
+// `entries` (120 bytes apart), linked in order.
+void MakeList(uint8_t* base, uint32_t head, uint32_t offset, uint32_t entries, uint32_t count) {
+  Store(base, head + 8, offset);
+  uint32_t prev = head;
+  for (uint32_t k = 0; k < count; k++) {
+    const uint32_t node = entries + 120 * k + offset;
+    Store(base, prev, node);
+    Store(base, node + 4, prev);
+    prev = node;
+  }
+  Store(base, prev, head);
+  Store(base, head + 4, prev);
+}
+
+void Lists(Context& h, uint32_t block) {
+  {
+    Results results("PacketList::Next (sub_82466EA0)");
+    for (int i = 0; i < 64; i++) {
+      Case(h, results, block, __imp__sub_82466EA0, ITC_CONTEXT_FN(hooks::XAudioPacketListNext),
+           [&](Random& random, PPCContext& t) {
+             const uint32_t head = block + 0x100;
+             Store(h.base, head + 8, 8 * random.Below(8));
+             if (random.Below(3) == 0) {
+               Store(h.base, head + (random.Below(2) == 0 ? 0 : 4), head);
+             }
+             t.r3.u64 = head;
+             t.r4.u64 = random.Below(4) == 0 ? 0 : block + 0x200 + 8 * random.Below(64);
+             t.r5.u64 = random.Below(3) == 0 ? 0 : random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("PacketList::Clear (sub_8246E060)");
+    for (int i = 0; i < 32; i++) {
+      Case(h, results, block, __imp__sub_8246E060, ITC_CONTEXT_FN(hooks::XAudioPacketListClear),
+           [&](Random& random, PPCContext& t) {
+             const uint32_t head = block + 0x100;
+             MakeList(h.base, head, 8 * random.Below(4), block + 0x400, random.Below(12));
+             t.r3.u64 = head;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A PCM codec's inner at +4 (its base at +16, the lists at +20 and +32),
+    // through the inner destructor (sub_8246CE68 -> PcmCodec::~PcmCodec ->
+    // XAudioCodec::Destruct -> CodecBase::~CodecBase -> PacketLists::Clear).
+    Results results("sub_8246CE68 (PcmCodec::~PcmCodec sub_8246CF50, XAudioCodec::Destruct "
+                    "sub_82466EE8, CodecBase::~CodecBase sub_82469960, PacketLists::Clear "
+                    "sub_8246E0E8)");
+    for (int i = 0; i < 32; i++) {
+      Case(h, results, block, __imp__sub_8246CE68, ITC_CONTEXT_FN(hooks::XAudioPcmCodecInnerDestroy),
+           [&](Random& random, PPCContext& t) {
+             const uint32_t codec = block;
+             MakeList(h.base, codec + 20, 0, block + 0x400, random.Below(6));
+             MakeList(h.base, codec + 32, 0, block + 0x400 + 120 * 6, random.Below(6));
+             t.r3.u64 = codec + 4;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioCodec::Destruct (sub_82466EE8)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_82466EE8, ITC_CONTEXT_FN(hooks::XAudioCodecDestruct),
+           [&](Random& random, PPCContext& t) {
+             const uint32_t inner = block + 4;
+             MakeList(h.base, inner + 16, 0, block + 0x400, random.Below(6));
+             MakeList(h.base, inner + 28, 0, block + 0x400 + 120 * 6, random.Below(6));
+             t.r3.u64 = inner;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82465BD8 (XAudioMatrix::Destruct sub_82466418)");
+    for (int i = 0; i < 8; i++) {
+      Case(h, results, block, __imp__sub_82465BD8, ITC_CONTEXT_FN(hooks::XAudioMatrixInnerDestroy),
+           [&](Random& random, PPCContext& t) { t.r3.u64 = block + 4 + 4 * random.Below(64); },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+// --- Construction (a real allocator) ---
+
+// A source codec's descriptor at `at`: +0 the class (0), +4 the owner, the
+// format at +8 (+8 the type, +12 the channels or streams, +16 the rate, the
+// streams' rates and channels from +16), +64 a float, +68 the packets, +69
+// a byte, +72 and +76 the callbacks.
+void CodecDescriptor(uint8_t* base, uint32_t at, Random& random, uint8_t type, bool small) {
+  guest::StoreU8(base, at, 0);
+  guest::StoreU8(base, at + 8, type);
+  if (type == 4) {
+    const uint8_t streams = uint8_t(1 + random.Below(small ? 2 : 4));
+    guest::StoreU8(base, at + 12, streams);
+    // Each stream's rate and channels (the codec's +60 + 8i and +64 + 8i).
+    static constexpr uint32_t kRates[] = {48000, 44100, 32000, 24000};
+    for (uint32_t s = 0; s < 4; s++) {
+      Store(base, at + 16 + 8 * s, kRates[random.Below(4)]);
+      guest::StoreU8(base, at + 20 + 8 * s, uint8_t(1 + random.Below(2)));
+      guest::StoreU8(base, at + 21 + 8 * s, uint8_t(random.Below(3) == 0 ? 255 : random.Below(8)));
+    }
+    Store(base, at + 64, AnyFloat(random));
+  } else {
+    guest::StoreU8(base, at + 12, uint8_t(1 + random.Below(6)));
+    static constexpr uint32_t kRates[] = {48000, 44100, 22050, 24000, 8000, 96000};
+    Store(base, at + 16, random.Below(4) != 0 ? kRates[random.Below(6)] : uint32_t(random.Next()));
+    Store(base, at + 64, AnyFloat(random));
+  }
+  guest::StoreU8(base, at + 68, uint8_t(random.Below(small ? 16 : 64)));
+}
+
+void Construction(Context& h, uint32_t block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const auto none = [](Outputs&, uint32_t) {};
+  {
+    Results results("PacketLists::Alloc (sub_8246E120)");
+    for (int i = 0; i < 32; i++) {
+      RealCase(h, results, block, __imp__sub_8246E120, ITC_CONTEXT_FN(hooks::XAudioPacketListsAlloc),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 PPCContext init = t;
+                 init.r3.u64 = block + 0x100;
+                 __imp__sub_8246E1E0(init, h.base);
+                 Store(h.base, block + 0x10C + 8, 8 * random.Below(8));  // the free list's offset
+                 t.r3.u64 = block + 0x100;
+                 t.r4.u64 = (random.Next() & ~0xFFull) | (i < 4 ? 0 : random.Below(256));
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::Init (sub_82469978)");
+    for (int i = 0; i < 32; i++) {
+      RealCase(h, results, block, __imp__sub_82469978, ITC_CONTEXT_FN(hooks::XAudioCodecBaseInit),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 PPCContext init = t;
+                 init.r3.u64 = block + 0x104;
+                 __imp__sub_8246E1E0(init, h.base);
+                 t.r3.u64 = block + 0x100;
+                 t.r4.u64 = block + 0x400 + 4 * random.Below(16);
+                 t.r5.u64 = random.Below(32);
+                 t.r6.u64 = random.Next();
+                 t.r7.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("PcmCodec::PcmCodec (sub_8246D750), with XAudioCodec::Construct "
+                    "(sub_82466BC8), CodecBase::CodecBase (sub_82469920), PacketLists::Init "
+                    "(sub_8246E1E0) and XAudioCodec::Init (sub_82466960)");
+    for (int i = 0; i < 64; i++) {
+      RealCase(h, results, block, __imp__sub_8246D750, ITC_CONTEXT_FN(hooks::XAudioPcmCodecConstruct),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 CodecDescriptor(h.base, block + 0x1800, random, uint8_t(random.Below(4)), false);
+                 t.r3.u64 = block + 0x100;
+                 t.r4.u64 = block + 0x1800;
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The block size (+192) from vexptefp of +64: every edge float.
+    Results results("XmaCodec::XmaCodec (sub_8246C1D0)");
+    for (int i = 0; i < 96; i++) {
+      RealCase(h, results, block, __imp__sub_8246C1D0, ITC_CONTEXT_FN(hooks::XAudioXmaCodecConstruct),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 CodecDescriptor(h.base, block + 0x1800, random, 4, false);
+                 Store(h.base, block + 0x1800 + 64, AnyFloat(random));
+                 t.r3.u64 = block + 0x100;
+                 t.r4.u64 = block + 0x1800;
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // PCM codecs (made and destroyed by their inner destructor afterwards
+    // in both versions), the XMA codec (its XMA object's handle, a system
+    // heap block, compared as made or not, then released by the XMA
+    // side's release), and other types (E_NOTIMPL).
+    Results results("XAudioCodec::Create (sub_82466BA0), with PcmCodec::Create (sub_8246DF78) "
+                    "and XmaCodec::Create (sub_8246CDB0)");
+    for (int i = 0; i < 48; i++) {
+      const uint8_t type = uint8_t(i % 6 == 5 ? 5 + i : i % 6 == 4 ? 4 : i % 4);
+      RealCase(h, results, block, __imp__sub_82466BA0, ITC_CONTEXT_FN(hooks::XAudioCodecCreate),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 CodecDescriptor(h.base, block + 0x1800, random, type, true);
+                 Store(h.base, block + 0x1F00, 0);
+                 t.r3.u64 = block + 0x1800;
+                 t.r4.u64 = allocator;
+                 t.r5.u64 = block + 0x1F00;
+               },
+               [&](Outputs& out, uint32_t allocator) {
+                 const uint32_t codec = guest::LoadU32(h.base, block + 0x1F00);
+                 if (type != 4 || codec == 0) {
+                   return;
+                 }
+                 const uint32_t handle = guest::LoadU32(h.base, codec + 184);
+                 out.Word(handle != 0);
+                 Store(h.base, codec + 184, 0);
+                 Normalized(out, h.base, allocator, kAllocatorBytes + 28, allocator,
+                            kAllocatorBytes + 28);
+                 Store(h.base, codec + 184, handle);
+                 PPCContext release = CallContext(h);
+                 release.r3.u64 = codec;
+                 __imp__sub_8246A758(release, h.base);
+               },
+               fmt::format("type {} case {}", type, i));
+    }
+    results.Report();
+  }
+  {
+    // An XMA codec made by the recompiled create in both versions, then
+    // destroyed through its inner's slot +0 (the recompiled one, or ours,
+    // which runs XmaCodec::~XmaCodec): the XMA side's release (sub_8246A758,
+    // recompiled in both) frees the XMA object and zeroes +184. A create
+    // that failed (none seen) destroys a zeroed codec in the block instead.
+    Results results("sub_8246A918 (XmaCodec::~XmaCodec sub_8246AAD0, with the XMA side's "
+                    "release sub_8246A758)");
+    for (int i = 0; i < 24; i++) {
+      RealCase(h, results, block, __imp__sub_8246A918, ITC_CONTEXT_FN(hooks::XAudioXmaCodecInnerDestroy),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 CodecDescriptor(h.base, block + 0x1800, random, 4, true);
+                 Store(h.base, block + 0x1F00, 0);
+                 PPCContext create = t;
+                 create.r3.u64 = block + 0x1800;
+                 create.r4.u64 = allocator;
+                 create.r5.u64 = block + 0x1F00;
+                 __imp__sub_82466BA0(create, h.base);
+                 uint32_t codec = guest::LoadU32(h.base, block + 0x1F00);
+                 if (codec == 0) {
+                   codec = block + 0x100;
+                   for (uint32_t k = 0; k < 0x200; k += 4) {
+                     Store(h.base, codec + k, 0);
+                   }
+                 }
+                 t.r3.u64 = codec + 4;
+               },
+               [&](Outputs& out, uint32_t) {
+                 out.Word(guest::LoadU32(h.base, block + 0x1F00) != 0);
+               },
+               fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A default matrix (count byte, entries of channel bytes and a level)
+    // at +0x200; the matrix's slot +52 is the game's Init (under the voice
+    // lists' spin lock, which this thread takes as the game does).
+    Results results("XAudioMatrix::Create (sub_82466888)");
+    for (int i = 0; i < 32; i++) {
+      RealCase(h, results, block, __imp__sub_82466888, ITC_CONTEXT_FN(hooks::XAudioMatrixCreate),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 const uint32_t descriptor = block + 0x1800;
+                 Store(h.base, descriptor + 4, block);
+                 const uint8_t entries = uint8_t(1 + random.Below(8));
+                 guest::StoreU8(h.base, descriptor + 8, entries);
+                 guest::StoreU8(h.base, descriptor + 9, uint8_t(random.Below(2)));
+                 const uint32_t matrix = block + 0x200;
+                 Store(h.base, descriptor + 12, matrix);
+                 guest::StoreU8(h.base, matrix, uint8_t(random.Below(entries + 2)));
+                 Store(h.base, matrix + 4, matrix + 16);
+                 for (uint32_t k = 0; k < 10; k++) {
+                   guest::StoreU8(h.base, matrix + 16 + 8 * k, uint8_t(random.Below(6)));
+                   guest::StoreU8(h.base, matrix + 17 + 8 * k, uint8_t(random.Below(6)));
+                   Store(h.base, matrix + 20 + 8 * k, AnyFloat(random));
+                 }
+                 Store(h.base, block + 0x1F00, 0);
+                 t.r3.u64 = descriptor;
+                 t.r4.u64 = allocator;
+                 t.r5.u64 = block + 0x1F00;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("VolumeMeter::Create (sub_825A6460)");
+    for (int i = 0; i < 24; i++) {
+      RealCase(h, results, block, __imp__sub_825A6460, ITC_CONTEXT_FN(hooks::XAudioMeterCreate),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 const uint32_t descriptor = block + 0x1800;
+                 Store(h.base, descriptor + 8, 1 + random.Below(8));
+                 Store(h.base, descriptor + 12, 1 + random.Below(16));
+                 t.r3.u64 = descriptor;
+                 t.r4.u64 = allocator;
+                 t.r5.u64 = block + 0x1F00;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("VolumeMeter::Init (sub_825A6138)");
+    for (int i = 0; i < 24; i++) {
+      RealCase(h, results, block, __imp__sub_825A6138, ITC_CONTEXT_FN(hooks::XAudioMeterInit),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 const uint32_t descriptor = block + 0x1800;
+                 Store(h.base, descriptor + 8, i < 2 ? 0 : 1 + random.Below(8));
+                 Store(h.base, descriptor + 12, 1 + random.Below(16));
+                 t.r3.u64 = block + 0x100;
+                 t.r4.u64 = descriptor;
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+// --- The packet queue and the codecs' slots (under the spin lock) ---
+
+constexpr uint32_t kSetFlags = 0x82467078;
+constexpr uint32_t kRetirePacket = 0x8246A430;
+constexpr uint32_t kCompletePacket = 0x824674D8;
+constexpr uint32_t kSetFloat112 = 0x820B6950;  // RigidBody::SetFloat112: f1 to +112 of r3
+constexpr uint32_t kPcmBaseRatio = 0x8246D320;
+
+// The live spin lock (0x82954F10) is taken as the game takes it, by this
+// thread. With `hold`, the case holds it around the call (so the function
+// takes it again) and its depth and owner after the call are compared.
+// `after(out)` adds outputs before the block's.
+// `block_out(out)` adds the block's outputs (LockedCase: its bytes).
+template <typename Setup, typename After, typename BlockOut>
+void LockedCaseWith(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                    GuestFunction native, bool hold, Setup setup, After after,
+                    BlockOut block_out, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    const uint32_t sp = t.r1.u32;
+    PPCContext lock = t;
+    if (hold) {
+      hooks::XAudioSpinTake(lock, h.base);
+    }
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v], sp);
+    LockWords(out[v], h.base, t.r13.u32);
+    if (hold) {
+      hooks::XAudioSpinRelease(lock, h.base);
+    }
+    block_out(out[v]);
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+template <typename Setup, typename After>
+void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, bool hold, Setup setup, After after,
+                const std::string& what) {
+  LockedCaseWith(h, results, block, recompiled, native, hold, setup, after,
+                 [&](Outputs& out) { out.Bytes(Read(h.base, block, kBlockBytes)); }, what);
+}
+
+// A codec at `codec` in the block (the PCM layout: its base at +16, the
+// queued list at +20 and the free list at +32, their entries from +0x400
+// and +0x800), the base's vtable at +0x1C00 with the game's SetFlags
+// (+84), CompletePacket or RetirePacket (+92) and the PCM base's
+// SetFrequencyRatio or a recorder (+80); the callback (+176) 0 or AddRef;
+// the state byte, the block size (1-8) and the converter's words random.
+void Codec(uint8_t* base, uint32_t block, uint32_t codec, Random& random) {
+  const uint32_t codec_base = codec + 16;
+  Store(base, codec_base, block + 0x1C00);
+  Store(base, block + 0x1C00 + 84, kSetFlags);
+  Store(base, block + 0x1C00 + 92, random.Below(2) == 0 ? kCompletePacket : kRetirePacket);
+  Store(base, block + 0x1C00 + 80, random.Below(2) == 0 ? kPcmBaseRatio : kSetFloat112);
+  MakeList(base, codec_base + 4, 8 * random.Below(3), block + 0x400, random.Below(6));
+  MakeList(base, codec_base + 16, 0, block + 0x800, random.Below(6));
+  Store(base, codec_base + 160, random.Below(3) == 0 ? 0 : kAddRef);
+  guest::StoreU8(base, codec_base + 156, uint8_t(random.Next()));
+  guest::StoreU16(base, codec_base + 92, uint16_t(1 + random.Below(8)));
+}
+
+uint32_t QueuedEntry(uint8_t* base, uint32_t codec, Random& random) {
+  const uint32_t head = codec + 20;
+  const uint32_t next = guest::LoadU32(base, head);
+  if (next == head || random.Below(4) == 0) {
+    return 0;
+  }
+  return next - guest::LoadU32(base, head + 8);
+}
+
+void Queue(Context& h, uint32_t block) {
+  const auto none = [](Outputs&, uint32_t) {};
+  const uint32_t codec = block;
+  {
+    Results results("CodecBase::SetFlags (sub_82467078)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82467078, ITC_CONTEXT_FN(hooks::XAudioCodecSetFlags), i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = random.Next();
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::RetirePacket (sub_8246A430)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_8246A430, ITC_CONTEXT_FN(hooks::XAudioCodecRetirePacket),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = QueuedEntry(h.base, codec, random);
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The callback's struct in CompletePacket's frame (r1 - 128 + 80)
+    // compared when the callback ran.
+    Results results("CodecBase::CompletePacket (sub_824674D8)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_824674D8, ITC_CONTEXT_FN(hooks::XAudioCodecCompletePacket),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = QueuedEntry(h.base, codec, random);
+                   t.r5.u64 = random.Next();
+                 },
+                 [&](Outputs& out, uint32_t sp) { out.Bytes(Read(h.base, sp - 48, 12)); },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::FlushPackets (sub_824699E0)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_824699E0, ITC_CONTEXT_FN(hooks::XAudioCodecFlushPackets),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   Store(h.base, codec + 16 + 160, 0);
+                   if (random.Below(2) == 0) {
+                     guest::StoreU8(h.base, codec + 16 + 156,
+                                    guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   }
+                   t.r3.u64 = codec + 16;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8246CEC8 (the codecs' flush)");
+    for (int i = 0; i < 16; i++) {
+      LockedCase(h, results, block, __imp__sub_8246CEC8, ITC_CONTEXT_FN(hooks::XAudioCodecFlush), i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   Store(h.base, codec + 16 + 160, 0);
+                   guest::StoreU8(h.base, codec + 16 + 156,
+                                  guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   t.r3.u64 = codec;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::SetFormat (sub_82469E58)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82469E58, ITC_CONTEXT_FN(hooks::XAudioCodecBaseSetFormat),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   if (random.Below(2) == 0) {
+                     guest::StoreU8(h.base, codec + 16 + 156,
+                                    guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   }
+                   if (random.Below(2) == 0) {
+                     MakeList(h.base, codec + 20, 0, block + 0x400, 0);
+                   }
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = block + 0x1800;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("PcmCodec::SetFormat (sub_8246CFA8)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8246CFA8, ITC_CONTEXT_FN(hooks::XAudioPcmCodecSetFormat),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   guest::StoreU8(h.base, codec + 16 + 156,
+                                  guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   if (random.Below(3) != 0) {
+                     MakeList(h.base, codec + 20, 0, block + 0x400, 0);
+                   }
+                   guest::StoreU8(h.base, block + 0x1800, uint8_t(random.Below(4)));
+                   guest::StoreU8(h.base, block + 0x1804, uint8_t(1 + random.Below(6)));
+                   t.r3.u64 = codec;
+                   t.r4.u64 = block + 0x1800;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  struct Slot {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    bool f1;
+  };
+  const Slot slots[] = {
+      {"PcmCodec::Start (sub_8246D410)", __imp__sub_8246D410, ITC_CONTEXT_FN(hooks::XAudioPcmCodecStart), false},
+      {"PcmCodec::Stop (sub_8246D500)", __imp__sub_8246D500, ITC_CONTEXT_FN(hooks::XAudioPcmCodecStop), false},
+      {"XAudioCodec::EndOfStream (sub_8246D630)", __imp__sub_8246D630,
+       ITC_CONTEXT_FN(hooks::XAudioCodecEndOfStream), false},
+      {"PcmCodec::SetVolume (sub_8246D008)", __imp__sub_8246D008, ITC_CONTEXT_FN(hooks::XAudioPcmCodecSetVolume),
+       true},
+      {"PcmCodec::SetPitch (sub_8246D0C8)", __imp__sub_8246D0C8, ITC_CONTEXT_FN(hooks::XAudioPcmCodecSetPitch),
+       true},
+      {"PcmCodec::SetFrequencyRatio (sub_8246D1E0)", __imp__sub_8246D1E0,
+       ITC_CONTEXT_FN(hooks::XAudioPcmCodecSetFrequencyRatio), true},
+      {"sub_8246D320 (the PCM base's SetFrequencyRatio)", __imp__sub_8246D320,
+       ITC_CONTEXT_FN(hooks::XAudioPcmCodecBaseSetFrequencyRatio), true},
+      {"XmaCodec::SetVolume (sub_8246AB48)", __imp__sub_8246AB48, ITC_CONTEXT_FN(hooks::XAudioXmaCodecSetVolume),
+       true},
+      {"XmaCodec::SetPitch (sub_8246AC40)", __imp__sub_8246AC40, ITC_CONTEXT_FN(hooks::XAudioXmaCodecSetPitch),
+       true},
+  };
+  for (const Slot& slot : slots) {
+    Results results(slot.name);
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, slot.recompiled, slot.native, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   // The XMA codec's streams (up to 4) at +0x1000.
+                   guest::StoreU8(h.base, codec + 56, uint8_t(random.Below(5)));
+                   Store(h.base, codec + 188, block + 0x1000);
+                   static constexpr uint32_t kRates[] = {48000, 44100, 22050, 8000};
+                   Store(h.base, codec + 60, random.Below(4) != 0 ? kRates[random.Below(4)]
+                                                                  : uint32_t(random.Next()));
+                   for (uint32_t k = 1; k < 4; k++) {
+                     Store(h.base, codec + 60 + 8 * k, kRates[random.Below(4)]);
+                   }
+                   t.r3.u64 = slot.native == ITC_CONTEXT_FN(hooks::XAudioPcmCodecBaseSetFrequencyRatio)
+                                  ? codec + 16
+                                  : codec;
+                   t.r4.u64 = random.Next();
+                   if (slot.f1) {
+                     t.f1.f64 = random.Below(4) == 0
+                                    ? double(std::bit_cast<float>(AnyFloat(random)))
+                                    : random.Below(3) == 0
+                                          ? std::bit_cast<double>(random.Next())
+                                          : double(int32_t(random.Below(8001)) - 4000) / 1000.0;
+                   }
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::OnSubmit (sub_82469AF8)");
+    for (int i = 0; i < 64; i++) {
+      LockedCase(h, results, block, __imp__sub_82469AF8, ITC_CONTEXT_FN(hooks::XAudioCodecOnSubmit), i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   const uint32_t entry = block + 0x1400;
+                   for (uint32_t k = 12; k <= 32; k += 4) {
+                     Store(h.base, entry + k, random.Below(3) == 0 ? 0 : random.Below(16));
+                   }
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = entry;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A packet at +0x1800 (+0 the data, +4 its size, +8 the loops, +12 and
+    // +16 the loop's start and length, +84 the context), its sizes small so
+    // the bounds checks pass and fail.
+    const auto packet = [&](Random& random) {
+      const uint32_t at = block + 0x1800;
+      for (uint32_t k = 4; k <= 16; k += 4) {
+        Store(h.base, at + k, random.Below(3) == 0 ? 0 : random.Below(64));
+      }
+      return at;
+    };
+    struct Submit {
+      const char* name;
+      GuestFunction recompiled;
+      GuestFunction native;
+      uint32_t r3;  // the codec's offset in r3: 16 for the base's
+    };
+    const Submit submits[] = {
+        {"CodecBase::SubmitPacket (sub_82469EF8)", __imp__sub_82469EF8,
+         ITC_CONTEXT_FN(hooks::XAudioCodecSubmitPacket), 16},
+        {"CodecBase::SubmitRegion (sub_8246A1C0)", __imp__sub_8246A1C0,
+         ITC_CONTEXT_FN(hooks::XAudioCodecSubmitRegion), 16},
+        {"sub_8246CEB8 (the PCM codec's SubmitPacket)", __imp__sub_8246CEB8,
+         ITC_CONTEXT_FN(hooks::XAudioPcmCodecSubmitPacket), 0},
+        {"XmaCodec::SubmitRegion (sub_8246A860)", __imp__sub_8246A860,
+         ITC_CONTEXT_FN(hooks::XAudioXmaCodecSubmitRegion), 0},
+    };
+    for (const Submit& submit : submits) {
+      Results results(submit.name);
+      for (int i = 0; i < 64; i++) {
+        LockedCase(h, results, block, submit.recompiled, submit.native, i % 2 == 0,
+                   [&](Random& random, PPCContext& t) {
+                     Codec(h.base, block, codec, random);
+                     guest::StoreU8(h.base, codec + 266, uint8_t(random.Below(3)));
+                     const uint32_t at = packet(random);
+                     if (random.Below(4) == 0) {
+                       Store(h.base, at + 8, random.Below(2) == 0 ? 0xFFFFFFFF : random.Below(1000));
+                     }
+                     t.r3.u64 = codec + submit.r3;
+                     t.r4.u64 = at;
+                     t.r5.u64 = random.Next();
+                   },
+                   none, fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
+}
+
+// --- The output matrix and the volume meter ---
+
+constexpr uint32_t kSamplesBytes = 0x3000;
+
+// A sample worth mixing: mostly in [-1, 1], with the edge floats now and
+// then.
+uint32_t Sample(Random& random) {
+  if (random.Below(32) == 0) {
+    return AnyFloat(random);
+  }
+  return std::bit_cast<uint32_t>(float(int32_t(random.Below(20001)) - 10000) / 10000.0f);
+}
+
+// The block and a samples region (16-aligned, from the allocation layer)
+// filled with the same random words and samples for both versions, the
+// stack below the call too; the block, the samples (their floats compared
+// as floats), the spin lock's depth and owner and r3 compared.
+template <typename Setup>
+void SamplesCase(Context& h, Results& results, uint32_t block, uint32_t samples,
+                 GuestFunction recompiled, GuestFunction native, Setup setup,
+                 const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < kSamplesBytes; i += 4) {
+      Store(h.base, samples + i, Sample(random));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    LockWords(out[v], h.base, t.r13.u32);
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Floats(h.base, samples, kSamplesBytes / 4);
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A matrix object at `matrix` (+16 its count of entries at +20, +24 the
+// entries allowed, +25 the highest output channel + 1, +26 overwrite).
+void Matrix(uint8_t* base, uint32_t matrix, uint32_t entries, Random& random,
+            uint32_t in_channels, uint32_t out_channels) {
+  guest::StoreU8(base, matrix + 16, uint8_t(random.Below(7)));
+  Store(base, matrix + 20, entries);
+  guest::StoreU8(base, matrix + 24, 8);
+  guest::StoreU8(base, matrix + 25, uint8_t(random.Below(6) == 0 ? 4 + random.Below(4) : random.Below(4)));
+  guest::StoreU8(base, matrix + 26, uint8_t(random.Below(8) == 0 ? 2 : random.Below(2)));
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU8(base, entries + 12 * k, uint8_t(random.Below(in_channels)));
+    guest::StoreU8(base, entries + 12 * k + 1, uint8_t(random.Below(out_channels)));
+    Store(base, entries + 12 * k + 4, random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+    Store(base, entries + 12 * k + 8, random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+  }
+}
+
+// A buffer object at `buffer` (its interface at +8) over `samples`: +12
+// its own format (3 channels of capacity at 48 kHz), +20 the current one
+// (`channels` at 48 kHz), +28 the samples.
+void Buffer(uint8_t* base, uint32_t buffer, uint32_t samples, uint32_t channels) {
+  guest::StoreU8(base, buffer + 12, 0);
+  guest::StoreU8(base, buffer + 13, 3);
+  Store(base, buffer + 16, 48000);
+  guest::StoreU8(base, buffer + 20, 0);
+  guest::StoreU8(base, buffer + 21, uint8_t(channels));
+  Store(base, buffer + 24, 48000);
+  Store(base, buffer + 28, samples);
+}
+
+void MatrixAndMeter(Context& h, uint32_t block) {
+  const auto none = [](Outputs&, uint32_t) {};
+  {
+    Results results("XAudioMatrix::SetMatrix (sub_82465E50)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_82465E50, ITC_CONTEXT_FN(hooks::XAudioMatrixSetMatrix),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t matrix = block + 0x100, levels = block + 0x200;
+                   Store(h.base, matrix + 20, block + 0x140);
+                   guest::StoreU8(h.base, matrix + 24, uint8_t(random.Below(9)));
+                   guest::StoreU8(h.base, levels, uint8_t(random.Below(10)));
+                   Store(h.base, levels + 4, levels + 0x10);
+                   for (uint32_t k = 0; k < 10; k++) {
+                     Store(h.base, levels + 0x14 + 8 * k, AnyFloat(random));
+                   }
+                   t.r3.u64 = matrix;
+                   t.r4.u64 = i % 8 == 7 ? 0 : levels;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioMatrix::SetLevels (sub_82466188)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_82466188, ITC_CONTEXT_FN(hooks::XAudioMatrixSetLevels),
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t matrix = block + 0x100, levels = block + 0x200;
+                   Store(h.base, matrix + 20, block + 0x140);
+                   guest::StoreU8(h.base, matrix + 16, uint8_t(random.Below(9)));
+                   guest::StoreU8(h.base, levels, uint8_t(random.Below(8)));
+                   Store(h.base, levels + 4, levels + 0x10);
+                   for (uint32_t k = 0; k < 8; k++) {
+                     guest::StoreU8(h.base, levels + 0x10 + 8 * k, uint8_t(random.Below(9)));
+                     Store(h.base, levels + 0x14 + 8 * k, AnyFloat(random));
+                   }
+                   t.r3.u64 = matrix;
+                   t.r4.u64 = levels;
+                   t.r5.u64 = random.Below(2) == 0 ? 0 : random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The matrix's slots +40 and +32 the game's SetMatrix and SetOverwrite.
+    Results results("XAudioMatrix::Init (sub_82465C30)");
+    for (int i = 0; i < 32; i++) {
+      RealCase(h, results, block, __imp__sub_82465C30, ITC_CONTEXT_FN(hooks::XAudioMatrixInit),
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 const uint32_t matrix = block + 0x100, descriptor = block + 0x1800;
+                 Store(h.base, matrix, block + 0x1C00);
+                 Store(h.base, block + 0x1C00 + 40, 0x82465E50);
+                 Store(h.base, block + 0x1C00 + 32, 0x82465C08);
+                 guest::StoreU8(h.base, descriptor + 8, uint8_t(random.Below(8)));
+                 guest::StoreU8(h.base, descriptor + 9, uint8_t(random.Below(3)));
+                 const uint32_t levels = block + 0x200;
+                 Store(h.base, descriptor + 12, i % 8 == 7 ? 0 : levels);
+                 guest::StoreU8(h.base, levels, uint8_t(random.Below(9)));
+                 Store(h.base, levels + 4, levels + 0x10);
+                 t.r3.u64 = matrix;
+                 t.r4.u64 = descriptor;
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const uint32_t samples_block = memory::Alloc(kSamplesBytes + 16, 0);
+  const uint32_t samples = (samples_block + 15) & ~15u;
+  {
+    Results results("XAudioMatrix::MixRamp (sub_82466310)");
+    for (int i = 0; i < 48; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_82466310, ITC_CONTEXT_FN(hooks::XAudioMatrixMixRamp),
+                  [&](Random& random, PPCContext& t) {
+                    for (uint32_t k = 0; k < 8; k++) {
+                      Store(h.base, block + 0x100 + 4 * k,
+                            random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+                    }
+                    t.r3.u64 = samples + 0x1000 + 16 * random.Below(4);
+                    t.r4.u64 = samples + 4 * random.Below(8);
+                    t.r5.u64 = block + 0x100 + 4 * random.Below(2);
+                    t.r6.u64 = block + 0x110;
+                    t.r7.u64 = i < 8 ? 256 : random.Below(257);
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Sources of 1-2 channels at +0x400, targets of 1-3 at +0x500 (their
+    // interfaces at +8), the matrix at +0x100 with up to 6 entries over
+    // channels 0-2 in and 0-3 out; the same buffer as both now and then (no
+    // entries: nothing).
+    Results results("XAudioMatrix::Mix (sub_82466440)");
+    for (int i = 0; i < 96; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_82466440, ITC_CONTEXT_FN(hooks::XAudioMatrixMix),
+                  [&](Random& random, PPCContext& t) {
+                    const uint32_t matrix = block + 0x100;
+                    Matrix(h.base, matrix, block + 0x140, random, 3, 4);
+                    if (i % 4 == 0) {
+                      guest::StoreU8(h.base, matrix + 16, 0);
+                    }
+                    Buffer(h.base, block + 0x400, samples, 1 + random.Below(2));
+                    Buffer(h.base, block + 0x500, samples + 0x1000, 1 + random.Below(3));
+                    t.r3.u64 = matrix;
+                    t.r4.u64 = block + 0x408;
+                    t.r5.u64 = i % 16 == 15 ? block + 0x408 : block + 0x508;
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // 1-8 meter channels over buffers of 1-8 (8 over 6 for the
+    // fold-downs), a history of 0-4 slots.
+    Results results("VolumeMeter::Process (sub_825A6210)");
+    for (int i = 0; i < 48; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_825A6210, ITC_CONTEXT_FN(hooks::XAudioMeterProcess),
+                  [&](Random& random, PPCContext& t) {
+                    const uint32_t meter = block + 0x100;
+                    const bool fold = i % 3 == 0;
+                    Store(h.base, meter + 16, fold ? 8 : 1 + random.Below(8));
+                    Store(h.base, meter + 20, random.Below(5));
+                    Store(h.base, meter + 24, random.Below(11));
+                    Store(h.base, meter + 28, block + 0x800);
+                    Store(h.base, meter + 32, block + 0xC00);
+                    Store(h.base, meter + 36, block + 0x1000);
+                    Buffer(h.base, block + 0x400, samples, fold ? 6 : 1 + random.Below(8));
+                    t.r3.u64 = meter;
+                    t.r4.u64 = block + 0x408;
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(samples_block);
+}
+
+// --- The render driver's set-up and the reverb's small parts ---
+
+void ReverbParts(Context& h, uint32_t block) {
+  {
+    // The driver's slot +28 a recompiled leaf that leaves a trace
+    // (sub_820CE9F8: r4 and r5 to +444 and +448).
+    Results results("sub_824657C8 (the render driver's set-up)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_824657C8, ITC_CONTEXT_FN(hooks::XAudioRenderDriverSetUp),
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block, block + 0x1C00);
+             Store(h.base, block + 0x1C00 + 28, 0x820CE9F8);
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x400 + 4 * random.Below(16);
+             t.r5.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The core's vtable (+16) at +0x1C00, its +4 word the second vtable's
+    // offset (small).
+    Results results("sub_82465410 (Reverb::Destruct sub_824656B8)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_82465410, ITC_CONTEXT_FN(hooks::XAudioReverbInnerDestroy),
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block + 16, block + 0x1C00);
+             Store(h.base, block + 0x1C04, 4 * random.Below(64));
+             t.r3.u64 = block + 4;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("ReverbCore::Defaults (sub_82467538)");
+    for (int i = 0; i < 8; i++) {
+      Case(h, results, block, __imp__sub_82467538, ITC_CONTEXT_FN(hooks::XAudioReverbDefaults),
+           [&](Random& random, PPCContext& t) { t.r3.u64 = block + 4 * random.Below(64); },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("LargestPrimeBelow (sub_8246DFE8)");
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, __imp__sub_8246DFE8, ITC_CONTEXT_FN(hooks::XAudioLargestPrimeBelow),
+           [&](Random& random, PPCContext& t) {
+             t.r3.u64 = i < 8 ? uint64_t(i) : i < 16 ? 9970 + i - 8
+                                             : i < 24 ? random.Next() : random.Below(10000);
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    struct Fill {
+      const char* name;
+      GuestFunction recompiled;
+      GuestFunction native;
+      uint32_t groups;
+    };
+    const Fill fills[] = {
+        {"sub_82467720 (a delay line's fill, 2,048)", __imp__sub_82467720,
+         ITC_CONTEXT_FN(hooks::XAudioFillDelayLine2048), 2048},
+        {"sub_82467788 (64)", __imp__sub_82467788, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine64), 64},
+        {"sub_824677F0 (16)", __imp__sub_824677F0, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine16), 16},
+        {"sub_82467858 (256)", __imp__sub_82467858, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine256), 256},
+        {"sub_824678C0 (32)", __imp__sub_824678C0, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine32), 32},
+        {"sub_82467928 (128)", __imp__sub_82467928, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine128), 128},
+        {"sub_82467990 (512)", __imp__sub_82467990, ITC_CONTEXT_FN(hooks::XAudioFillDelayLine512), 512},
+    };
+    // The line in a region of its size from the allocation layer (2,048 x 32
+    // bytes + 12), its +4 an edge float now and then.
+    const uint32_t region = memory::Alloc(2048 * 32 + 64, 0);
+    for (const Fill& fill : fills) {
+      Results results(fill.name);
+      for (int i = 0; i < 8; i++) {
+        const Random start = h.random;
+        Random random = start;
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          random = start;
+          harness::Fill(h.base, region, 2048 * 32 + 64);
+          Store(h.base, region + 4, i < 4 ? AnyFloat(random) : Sample(random));
+          PPCContext t = CallContext(h);
+          t.r3.u64 = region;
+          (v == 0 ? fill.recompiled : fill.native)(t, h.base);
+          out[v].Bytes(Read(h.base, region, fill.groups * 32 + 40));
+          R3(out[v], t.r3.u64);
+        }
+        h.random = random;
+        results.Check(out[0], out[1], fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+    memory::Free(region);
+  }
+  {
+    // The filter's four inputs: times and frequencies as the reverb's
+    // parameters give them, and edge floats now and then; +24 and +28
+    // compared as floats.
+    Results results("ReverbCore::FilterCoefficient (sub_824675B8)");
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < 64; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        for (uint32_t k = 0; k < 16; k += 4) {
+          const float value = k == 0 ? float(8000 + random.Below(40001))
+                              : float(random.Below(20001)) / 1000.0f;
+          Store(h.base, block + k,
+                random.Below(8) == 0 ? AnyFloat(random) : std::bit_cast<uint32_t>(value));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        (v == 0 ? __imp__sub_824675B8 : ITC_CONTEXT_FN(hooks::XAudioFilterCoefficient))(t, h.base);
+        out[v].Bytes(Read(h.base, block, 24));
+        out[v].Floats(h.base, block + 24, 2);
+        out[v].Bytes(Read(h.base, block + 32, 32));
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+// The block's bytes, with the word ranges in `floats` ({offset, count},
+// in order) as floats.
+void BlockWithFloats(Outputs& out, uint8_t* base, uint32_t block,
+                     std::initializer_list<std::pair<uint32_t, uint32_t>> floats) {
+  uint32_t at = 0;
+  for (const auto& [offset, count] : floats) {
+    out.Bytes(Read(base, block + at, offset - at));
+    out.Floats(base, block + offset, count);
+    at = offset + 4 * count;
+  }
+  out.Bytes(Read(base, block + at, kBlockBytes - at));
+}
+
+// An I3DL2 parameter set at `at`: realistic values (the I3DL2 ranges: room
+// and room HF -10000 to 0, rolloff 0 to 10, decay time 0.1 to 20 s, decay
+// HF ratio 0.1 to 2, reflections -10000 to 1000, reflections delay 0 to 0.3
+// s, reverb -10000 to 2000, reverb delay 0 to 0.1 s, diffusion and density
+// 0 to 100, HF reference 20 to 20000 Hz), or with `edges` each field now
+// and then a random word or an edge float, or out of range.
+void I3dl2Parameters(uint8_t* base, uint32_t at, Random& random, bool edges) {
+  const auto real = [&](double low, double high) {
+    return std::bit_cast<uint32_t>(
+        float(low + (high - low) * double(random.Below(100001)) / 100000.0));
+  };
+  const auto level = [&](int32_t low, int32_t high) {
+    return uint32_t(low + int32_t(random.Below(uint32_t(high - low + 1))));
+  };
+  uint32_t words[12] = {
+      level(-10000, 0),   level(-10000, 0),    real(0, 10),    real(0.1, 20),
+      real(0.1, 2),       level(-10000, 1000), real(0, 0.3),   level(-10000, 2000),
+      real(0, 0.1),       real(0, 100),        real(0, 100),   real(20, 20000)};
+  // The ratio at 1.0 exactly now and then (the branch's edge).
+  if (random.Below(6) == 0) {
+    words[4] = 0x3F800000;
+  }
+  if (edges) {
+    for (uint32_t i = 0; i < 12; i++) {
+      if (random.Below(3) != 0) {
+        continue;
+      }
+      const bool integer = i == 0 || i == 1 || i == 5 || i == 7;
+      switch (random.Below(3)) {
+        case 0:
+          words[i] = uint32_t(random.Next());
+          break;
+        case 1:
+          words[i] = integer ? uint32_t(int32_t(random.Below(40001)) - 20000) : AnyFloat(random);
+          break;
+        default:
+          words[i] = integer ? (random.Below(2) == 0 ? 0x80000000u : 0x7FFFFFFFu)
+                             : std::bit_cast<uint32_t>(float(int32_t(random.Below(2001)) - 1000));
+          break;
+      }
+    }
+  }
+  for (uint32_t i = 0; i < 12; i++) {
+    Store(base, at + 4 * i, words[i]);
+  }
+}
+
+void ReverbParameters(Context& h, uint32_t block) {
+  {
+    // r4 the I3DL2 parameters at +0x400, r5 the native ones at +0x800 (the
+    // block's random words, or the defaults as the callers leave them); the
+    // native floats (+52 to +80) compared as floats, the frame's scratch
+    // words (+80, 8 bytes), f1 (log10's result) and r3 too.
+    Results results("I3dl2::ToNative (sub_82469418)");
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        PPCContext t = CallContext(h);
+        for (uint32_t k = 4; k <= 0x400; k += 4) {
+          Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+        }
+        I3dl2Parameters(h.base, block + 0x400, random, i >= 48);
+        if (random.Below(2) == 0) {
+          xa::ReverbDefaults(h.base, block + 0x800);
+        }
+        t.r3.u64 = random.Next();
+        t.r4.u64 = block + 0x400;
+        t.r5.u64 = block + 0x800;
+        t.f1.f64 = double(float(random.Below(1001)) / 1000.0f);
+        t.fpscr.loadFromHost();
+        const uint32_t sp = t.r1.u32;
+        (v == 0 ? __imp__sub_82469418 : ITC_CONTEXT_FN(hooks::XAudioI3dl2ToNative))(t, h.base);
+        out[v].Bytes(Read(h.base, sp - 128 + 80, 8));
+        out[v].Double(t.f1.u64);
+        BlockWithFloats(out[v], h.base, block, {{0x800 + 52, 8}});
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The reverb at the block (its core at +16), r6 the data at +0x1000: for
+    // kind 2 a float (a gain, or an edge float), for 0 and 1 a pointer to the
+    // parameters at +0x400 (the native ones: a delay word, the 12 bytes
+    // small, the floats as the reverb's; or the I3DL2 ones); kinds past 2
+    // (r4's upper bytes random). The spin lock held around the call in half
+    // the cases. +200 and the frame's floats (+132 to +160) compared as
+    // floats, the frame's other words (+80 to +128) exactly.
+    Results results("Reverb::SetParameters (sub_82462148)");
+    for (int i = 0; i < 96; i++) {
+      const uint32_t kind = i < 80 ? uint32_t(i % 3) : 3 + uint32_t(i % 7) * 37;
+      LockedCaseWith(
+          h, results, block, __imp__sub_82462148, ITC_CONTEXT_FN(hooks::XAudioReverbSetParameters), i % 2 == 0,
+          [&](Random& random, PPCContext& t) {
+            const uint32_t data = block + 0x1000;
+            const bool edges = i >= 40;
+            if (kind == 2) {
+              Store(h.base, data,
+                    edges ? AnyFloat(random)
+                          : std::bit_cast<uint32_t>(float(random.Below(20001)) / 10000.0f));
+            } else {
+              Store(h.base, data, block + 0x400);
+            }
+            if (kind == 1) {
+              I3dl2Parameters(h.base, block + 0x400, random, edges);
+            } else if (kind == 0) {
+              const uint32_t params = block + 0x400;
+              Store(h.base, params, edges ? uint32_t(random.Next()) : random.Below(301));
+              for (uint32_t k = 4; k < 16; k++) {
+                guest::StoreU8(h.base, params + k,
+                               uint8_t(edges ? random.Next() : random.Below(31)));
+              }
+              for (uint32_t k = 16; k < 48; k += 4) {
+                const float value = k < 40 ? float(int32_t(random.Below(20001)) - 10000) / 100.0f
+                                            : float(random.Below(20001)) / 100.0f;
+                Store(h.base, params + k,
+                      edges && random.Below(3) == 0 ? AnyFloat(random)
+                                                    : std::bit_cast<uint32_t>(value));
+              }
+            }
+            t.r3.u64 = block;
+            t.r4.u64 = (random.Next() & ~uint64_t(0xFF)) | kind;
+            t.r5.u64 = random.Next();
+            t.r6.u64 = data;
+            t.fpscr.loadFromHost();
+          },
+          [&](Outputs& out, uint32_t sp) {
+            out.Bytes(Read(h.base, sp - 240 + 80, 52));
+            out.Floats(h.base, sp - 240 + 132, 8);
+          },
+          [&](Outputs& out) { BlockWithFloats(out, h.base, block, {{200, 1}}); },
+          fmt::format("case {} (kind {})", i, kind));
+    }
+    results.Report();
+  }
+}
+
+// --- The resampler ---
+
+// A converter state at `state` in the block: 16-bit input (+0) in the
+// block's random words from +0x200 (aligned, or at a halfword when not
+// `aligned`) with room for its frames (+4), a position (+8) before them,
+// format 1 and `channels`; the output (+20) at +0x1000 (planar, 1,024 bytes
+// a channel; aligned or at a word), 256 frames (+24, or fewer when not
+// aligned) with +28 written (a multiple of 8 when aligned); a volume ramp
+// (+36, +40), a ratio (+44: 1.0, common ones, or 0 to 4), a fraction (+48,
+// mostly in [0, 1), now and then negative) and the kept frame (+52, +56).
+void ConverterState(uint8_t* base, uint32_t block, uint32_t state, Random& random,
+                    uint32_t channels, bool aligned) {
+  const uint32_t input = block + 0x200 + (aligned ? 16 * random.Below(4) : 2 * random.Below(32));
+  const uint32_t room = 0xD00 / (2 * channels);
+  const uint32_t end = random.Below(4) == 0 ? 1 + random.Below(24) : 1 + random.Below(room);
+  Store(base, state + 0, input);
+  Store(base, state + 4, end);
+  Store(base, state + 8, random.Below(end));
+  guest::StoreU8(base, state + 12, 1);
+  guest::StoreU8(base, state + 13, uint8_t(channels));
+  const uint32_t frames = aligned || random.Below(2) == 0 ? 256 : 1 + random.Below(256);
+  Store(base, state + 20, block + 0x1000 + (aligned ? 0 : 4 * random.Below(4)));
+  Store(base, state + 24, frames);
+  Store(base, state + 28, aligned ? 8 * random.Below(frames / 8) : random.Below(frames));
+  Store(base, state + 36, Sample(random));
+  Store(base, state + 40, random.Below(4) == 0 ? guest::LoadU32(base, state + 36) : Sample(random));
+  static constexpr float kRatios[] = {1.0f, 0.91875f, 0.5f, 0.6666667f, 0.459375f, 2.0f};
+  const float ratio = random.Below(3) == 0 ? kRatios[random.Below(6)]
+                                           : float(random.Below(40000)) / 10000.0f;
+  Store(base, state + 44, std::bit_cast<uint32_t>(ratio));
+  const float fraction = random.Below(8) == 0   ? -float(random.Below(10000)) / 10000.0f
+                         : random.Below(8) == 0 ? 0.0f
+                                                : float(random.Below(1u << 24)) / float(1u << 24);
+  Store(base, state + 48, std::bit_cast<uint32_t>(fraction));
+  Store(base, state + 52, Sample(random));
+  Store(base, state + 56, Sample(random));
+}
+
+void Resampler(Context& h, uint32_t block) {
+  const uint32_t state = block + 0x40;
+  struct Kernel {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t channels;
+  };
+  static const Kernel kKernels[] = {
+      {"sub_8247E188 (the mono resampler, with its vector path sub_8246E208 and scalar "
+       "sub_82473E48)",
+       __imp__sub_8247E188, ITC_CONTEXT_FN(hooks::XAudioResampleMono), 1},
+      {"sub_8247E260 (the stereo resampler, with its vector path sub_8246E4C8 and scalar "
+       "sub_82474188)",
+       __imp__sub_8247E260, ITC_CONTEXT_FN(hooks::XAudioResampleStereo), 2},
+      {"sub_82473E48 (the mono resampler's scalar path)", __imp__sub_82473E48,
+       ITC_CONTEXT_FN(hooks::XAudioResampleMonoScalar), 1},
+      {"sub_82474188 (the stereo resampler's scalar path)", __imp__sub_82474188,
+       ITC_CONTEXT_FN(hooks::XAudioResampleStereoScalar), 2},
+      {"sub_8247F558 (the stereo copy, with its scalar path sub_82478E60)", __imp__sub_8247F558,
+       ITC_CONTEXT_FN(hooks::XAudioCopyStereo), 2},
+      {"sub_82478E60 (the stereo copy's scalar path)", __imp__sub_82478E60,
+       ITC_CONTEXT_FN(hooks::XAudioCopyStereoScalar), 2},
+  };
+  for (const Kernel& kernel : kKernels) {
+    Results results(kernel.name);
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, kernel.recompiled, kernel.native,
+           [&](Random& random, PPCContext& t) {
+             ConverterState(h.base, block, state, random, kernel.channels, i % 3 != 2);
+             t.r3.u64 = state;
+             // The context's flush setting as the host's (in the game they
+             // agree; a translated kernel before may leave flush on).
+             t.fpscr.loadFromHost();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The kernel kept (+80 0, or without its low bits) or picked again from
+    // the rates (+16 to +32, never 2:1 with flags bit 0, whose entries are
+    // past the table's 100) and flags (+84 bits 0 and 7); ours and the
+    // translated ones (the equal-rate mono entries 31 and 106, not seen in
+    // play) both run. Some cases have the input or the output used up.
+    Results results("Resampler::Process (sub_8246F140)");
+    static constexpr uint32_t kMono[] = {0x8247E188, 0x82473E48};
+    static constexpr uint32_t kStereo[] = {0x8247E260, 0x82474188, 0x8247F558, 0x82478E60};
+    static constexpr uint32_t kRates[] = {48000, 44100, 32000, 22050, 16000, 11025};
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, __imp__sub_8246F140, ITC_CONTEXT_FN(hooks::XAudioResamplerProcess),
+           [&](Random& random, PPCContext& t) {
+             const uint32_t channels = 1 + random.Below(2);
+             ConverterState(h.base, block, state, random, channels, i % 3 != 2);
+             Store(h.base, state + 16, kRates[random.Below(6)]);
+             Store(h.base, state + 32, 48000);
+             Store(h.base, state + 76, channels == 1 ? kMono[random.Below(2)]
+                                                     : kStereo[random.Below(4)]);
+             static constexpr uint32_t kChanged[] = {0, 1, 2, 3, 4, 0x10};
+             Store(h.base, state + 80, kChanged[random.Below(6)]);
+             Store(h.base, state + 84, uint32_t(random.Next()) & 0xFFFFFF7Eu |
+                                           (random.Below(2) << 7) | random.Below(2));
+             if (i % 16 == 15) {
+               Store(h.base, state + 8, guest::LoadU32(h.base, state + 4));
+             } else if (i % 16 == 14) {
+               Store(h.base, state + 28, guest::LoadU32(h.base, state + 24));
+             }
+             t.r3.u64 = state;
+             t.fpscr.loadFromHost();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
+// --- The reverb core's stages ---
+
+constexpr uint32_t kStageBytes = 0x3000;
+
+// A region of kStageBytes (from the allocation layer) filled with samples
+// (Sample: mostly in [-1, 1], the edge floats now and then) for both
+// versions, `setup` writing the stage's words over them; the region and r3
+// compared exactly.
+template <typename Setup>
+void StageCase(Context& h, Results& results, uint32_t region, GuestFunction recompiled,
+               GuestFunction native, Setup setup, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kStageBytes; i += 4) {
+      Store(h.base, region + i, Sample(random));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    t.fpscr.loadFromHost();
+    (v == 0 ? recompiled : native)(t, h.base);
+    out[v].Bytes(Read(h.base, region, kStageBytes));
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// The crossfading delay lines (sub_824624F8: 16,384 entries; sub_82463620:
+// 256) in a region of kCrossfadeBytes: the state at +0 (its line from +32),
+// the input at +0x10C00 and the output at +0x11200, or (as the core calls
+// sub_82463620) at the input less 8. The state's words +0, +8 to +16 (the
+// taps), +24 (the write index) and +28 and the stack word the original
+// writes compared exactly; the rest of the region (+4 the position, +20 the
+// last output, the line and the buffers, loaded and stored as floats) as
+// floats.
+constexpr uint32_t kCrossfadeBytes = 0x11800;
+
+void CrossfadeDelays(Context& h) {
+  const uint32_t region = memory::Alloc(kCrossfadeBytes, 0);
+  if (region == 0) {
+    return;
+  }
+  const uint32_t in = region + 0x10C00;
+  struct Line {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t entries, stack;
+    bool overlap;
+  };
+  static const Line kLines[] = {
+      {"sub_824624F8 (the reverb's crossfading 16,384-entry delay line)", __imp__sub_824624F8,
+       ITC_CONTEXT_FN(hooks::XAudioReverbCrossfadeDelay), 16384, 176, false},
+      {"sub_82463620 (the reverb's crossfading 256-entry delay line)", __imp__sub_82463620,
+       ITC_CONTEXT_FN(hooks::XAudioReverbCrossfadeDelay256), 256, 128, true},
+  };
+  for (const Line& line : kLines) {
+    Results results(line.name);
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      const uint32_t output = line.overlap && i % 2 == 0 ? in - 8 : region + 0x11200;
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < kCrossfadeBytes; k += 4) {
+          Store(h.base, region + k, Sample(random));
+        }
+        // The position: mid-fade (a block or less left, or a few frames),
+        // past the fade (1.0 and over), or any float.
+        const uint32_t kind = random.Below(8);
+        const float position = kind < 3   ? float(random.Below(1001)) / 1000.0f
+                               : kind < 4 ? float(random.Below(16)) / 512.0f
+                               : kind < 6 ? 1.0f + float(random.Below(4))
+                                          : 0.0f;
+        Store(h.base, region + 4, kind == 7 ? AnyFloat(random) : std::bit_cast<uint32_t>(position));
+        // The write index a multiple of 256 (as the game keeps it) or any in
+        // the line; the taps up to it (so the copy path is taken), within 4 of
+        // each other now and then, +16 the same as +8 now and then.
+        const uint32_t blocks = line.entries / 256;
+        const uint32_t write = i % 8 == 7 ? random.Below(line.entries) : 256 * random.Below(blocks);
+        Store(h.base, region + 24, write);
+        const uint32_t tap8 = random.Below(2) == 0 ? random.Below(write + 1) : random.Below(line.entries);
+        const uint32_t tap12 = random.Below(2) == 0 ? tap8 + random.Below(9) - 4
+                                                    : random.Below(line.entries);
+        Store(h.base, region + 8, tap8);
+        Store(h.base, region + 12, tap12);
+        Store(h.base, region + 16, random.Below(2) == 0 ? tap8 : random.Below(line.entries));
+        PPCContext t = CallContext(h);
+        for (uint32_t k = 4; k <= 0x400; k += 4) {
+          Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+        }
+        t.r3.u64 = region;
+        t.r4.u64 = in;
+        t.r5.u64 = output;
+        t.fpscr.loadFromHost();
+        const uint32_t sp = t.r1.u32;
+        (v == 0 ? line.recompiled : line.native)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, sp - line.stack));
+        out[v].Word(guest::LoadU32(h.base, region + 0));
+        out[v].Floats(h.base, region + 4, 1);
+        out[v].Bytes(Read(h.base, region + 8, 12));
+        out[v].Floats(h.base, region + 20, 1);
+        out[v].Bytes(Read(h.base, region + 24, 8));
+        out[v].Floats(h.base, region + 32, (kCrossfadeBytes - 32) / 4);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(region);
+}
+
+void ReverbStages(Context& h) {
+  const uint32_t region = memory::Alloc(kStageBytes, 0);
+  if (region == 0) {
+    return;
+  }
+  // The stage's state at +0 (its line's data after it), the input at
+  // +0x2200, the outputs at +0x2600 and +0x2A00.
+  const uint32_t in = region + 0x2200, out_a = region + 0x2600, out_b = region + 0x2A00;
+  {
+    Results results("sub_82462BC8 (the reverb's low-pass)");
+    for (int i = 0; i < 48; i++) {
+      StageCase(h, results, region, __imp__sub_82462BC8, ITC_CONTEXT_FN(hooks::XAudioReverbLowPass),
+                [&](Random& random, PPCContext& t) {
+                  static constexpr uint32_t kCounts[] = {0, 1, 2, 3, 4, 5, 7, 8, 13, 255, 257};
+                  t.r3.u64 = region;
+                  t.r4.u64 = in;
+                  t.r5.u64 = out_a;
+                  t.r6.u64 = i < 24 ? 256 : kCounts[random.Below(11)];
+                },
+                fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  struct Delay {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t entries, write, taps[3];  // the write index's and taps' offsets
+  };
+  static const Delay kDelays[] = {
+      {"sub_82462CF8 (the reverb's 512-entry delay line)", __imp__sub_82462CF8,
+       ITC_CONTEXT_FN(hooks::XAudioReverbDelay512), 512, 36, {0, 12, 24}},
+      {"sub_82463060 (the reverb's 2,048-entry delay line)", __imp__sub_82463060,
+       ITC_CONTEXT_FN(hooks::XAudioReverbDelay2048), 2048, 36, {0, 12, 24}},
+      {"sub_82463578 (the reverb's 1,024-entry delay line)", __imp__sub_82463578,
+       ITC_CONTEXT_FN(hooks::XAudioReverbDelay1024), 1024, 24, {0, 12, 12}},
+  };
+  for (const Delay& delay : kDelays) {
+    Results results(delay.name);
+    for (int i = 0; i < 32; i++) {
+      StageCase(h, results, region, delay.recompiled, delay.native,
+                [&](Random& random, PPCContext& t) {
+                  // The write index a multiple of 256 (as the game's), or
+                  // any index leaving room for the block.
+                  const uint32_t blocks = delay.entries / 256;
+                  Store(h.base, region + delay.write,
+                        i % 4 == 3 ? random.Below(delay.entries - 255)
+                                   : 256 * random.Below(blocks));
+                  for (const uint32_t tap : delay.taps) {
+                    Store(h.base, region + tap,
+                          random.Below(2) == 0 ? random.Below(delay.entries)
+                                               : uint32_t(random.Next()));
+                  }
+                  t.r3.u64 = region;
+                  t.r4.u64 = in;
+                  t.r5.u64 = out_a;
+                  t.r6.u64 = out_b;
+                },
+                fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The all-passes: their state's words +0 (the tap) and +16 (the write
+    // index) compared exactly, the rest of the region (the gains, the last
+    // output, the line and the buffers, all loaded and stored as floats) as
+    // floats.
+    struct AllPass {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t entries;
+      bool to_buffer;
+    };
+    static const AllPass kAllPasses[] = {
+        {"sub_82462DC8 (the reverb's 128-entry all-pass)", __imp__sub_82462DC8,
+         ITC_CONTEXT_FN(hooks::XAudioReverbAllPass128), 128, false},
+        {"sub_82463130 (the reverb's 256-entry all-pass)", __imp__sub_82463130,
+         ITC_CONTEXT_FN(hooks::XAudioReverbAllPass256), 256, false},
+        {"sub_824632A0 (the reverb's 512-entry all-pass)", __imp__sub_824632A0,
+         ITC_CONTEXT_FN(hooks::XAudioReverbAllPass512), 512, false},
+        {"sub_82463410 (the reverb's 512-entry all-pass to a buffer)", __imp__sub_82463410,
+         ITC_CONTEXT_FN(hooks::XAudioReverbAllPass512To), 512, true},
+    };
+    for (const AllPass& pass : kAllPasses) {
+      Results results(pass.name);
+      for (int i = 0; i < 32; i++) {
+        const Random start = h.random;
+        Random random = start;
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          random = start;
+          for (uint32_t k = 0; k < kStageBytes; k += 4) {
+            Store(h.base, region + k, Sample(random));
+          }
+          // The tap within the line or any; the write index within the
+          // line (as the game keeps it) or, now and then, at its last entry.
+          Store(h.base, region + 0,
+                random.Below(2) == 0 ? random.Below(pass.entries) : uint32_t(random.Next()));
+          Store(h.base, region + 16,
+                i % 8 == 7 ? pass.entries - 1 : random.Below(pass.entries));
+          PPCContext t = CallContext(h);
+          for (uint32_t k = 4; k <= 0x400; k += 4) {
+            Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+          }
+          t.r3.u64 = region;
+          t.r4.u64 = in;
+          t.r5.u64 = out_b;
+          t.fpscr.loadFromHost();
+          (v == 0 ? pass.recompiled : pass.native)(t, h.base);
+          out[v].Word(guest::LoadU32(h.base, region + 0));
+          out[v].Floats(h.base, region + 4, 3);
+          out[v].Word(guest::LoadU32(h.base, region + 16));
+          out[v].Floats(h.base, region + 20, (kStageBytes - 20) / 4);
+          R3(out[v], t.r3.u64);
+        }
+        h.random = random;
+        results.Check(out[0], out[1], fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
+  memory::Free(region);
+  CrossfadeDelays(h);
+}
+
+// --- The reverb core ---
+
+// ReverbCore::Process (sub_82463B90) over a real reverb: Reverb::Reverb
+// (sub_82465608: ReverbCore::Init, the I3DL2 defaults, ReverbCore::Defaults)
+// and ReverbCore::Apply (sub_82467A18) on its default parameters, built once
+// by the translated code. Each case starts from it and, the same for both
+// versions, runs a few blocks of random samples through the recompiled core
+// (its lines filled, its indices moved on), then sets the stereo flag (+100:
+// 0, 1, 2 or any), the gain (+92) and, by case, the stages' states at their
+// edges (crossfades mid-fade, write indices and taps at the lines' ends) or
+// edge floats in the inputs; the core, the stack and the buffers kept and
+// put back for each version. The stack pointer moves by 16 from case to case
+// (the frame's 128-aligned buffers fall at each offset). Compared: the
+// reverb object and the buffers as floats (their integer words are indices,
+// counts, flags and pointers, none a NaN's pattern), the frame's first 400
+// bytes (spilled addresses and counters, and floats copied as words) exactly
+// past its back chain, the rest of it (the stages' buffers) as floats up to
+// the register saves, the caller's word at sp + 20, the stages' stack words
+// (sp - 17888 - 176 and - 128) and r3.
+constexpr uint32_t kReverbBytes = 0x4BAB0;
+constexpr uint32_t kCoreStackBytes = 0x8000;
+constexpr uint32_t kCoreStackTop = 0x7000;
+constexpr uint32_t kCoreFrameBytes = 17888;
+constexpr uint32_t kCoreSavesBytes = 296;  // __savegprlr_14 and __savefpr_14
+constexpr uint32_t kCoreIoBytes = 0x2000;
+
+void ReverbCoreCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t io_block = memory::Alloc(kCoreIoBytes + 128, 0);
+  if (reverb_block == 0 || stack == 0 || io_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(io_block);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t io = (io_block + 127) & ~127u;
+  // Two inputs and five outputs of 256 floats, then the pointer arrays and
+  // the descriptor Reverb::Reverb reads (+4).
+  const uint32_t in_ptrs = io + 0x1C00, out_ptrs = io + 0x1C10, descriptor = io + 0x1C40;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, io, kCoreIoBytes, 0);
+  Fill(h.base, stack, kCoreStackBytes, 0);
+  for (uint32_t k = 0; k < 2; k++) {
+    Store(h.base, in_ptrs + 4 * k, io + 0x400 * k);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    Store(h.base, out_ptrs + 4 * k, io + 0x800 + 0x400 * k);
+  }
+  Store(h.base, descriptor + 4, 0x10);
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.r5.u64 = 0;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+    t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = core;
+    t.r4.u64 = core + 52;
+    t.fpscr.loadFromHost();
+    __imp__sub_82467A18(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  auto run = [&](GuestFunction function, uint32_t sp) {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = sp;
+    t.r3.u64 = core;
+    t.r4.u64 = in_ptrs;
+    t.r5.u64 = out_ptrs;
+    t.r6.u64 = 256;
+    t.fpscr.loadFromHost();
+    function(t, h.base);
+    return t.r3.u64;
+  };
+  auto inputs = [&](Random& random, bool edges) {
+    for (uint32_t k = 0; k < 0x800; k += 4) {
+      Store(h.base, io + k, edges ? AnyFloat(random) : Sample(random));
+    }
+  };
+  // The stages' states: {offset, entries, the write index's offset, the
+  // taps' offsets (0 for none past the first)}.
+  struct Stage {
+    uint32_t offset, entries, write, taps[3];
+    bool all_pass;
+  };
+  static const Stage kStages[] = {
+      {0x200F0, 512, 36, {0, 12, 24}, false},  {0x247B8, 512, 36, {0, 12, 24}, false},
+      {0x20B34, 2048, 36, {0, 12, 24}, false}, {0x251FC, 2048, 36, {0, 12, 24}, false},
+      {0x23790, 1024, 24, {0, 12, 12}, false}, {0x27E58, 1024, 24, {0, 12, 12}, false},
+      {0x2091C, 128, 16, {0, 0, 0}, true},     {0x24FE4, 128, 16, {0, 0, 0}, true},
+      {0x22B60, 256, 16, {0, 0, 0}, true},     {0x27228, 256, 16, {0, 0, 0}, true},
+      {0x22F78, 512, 16, {0, 0, 0}, true},     {0x27640, 512, 16, {0, 0, 0}, true},
+      {0x49130, 512, 16, {0, 0, 0}, true},     {0x49948, 512, 16, {0, 0, 0}, true},
+      {0x4A160, 512, 16, {0, 0, 0}, true},     {0x4A978, 512, 16, {0, 0, 0}, true},
+  };
+  struct Crossfade {
+    uint32_t offset, entries;
+  };
+  static const Crossfade kCrossfades[] = {
+      {104, 16384}, {0x10088, 16384}, {0x4B190, 256}, {0x4B5B0, 256}};
+  Results results("sub_82463B90 (ReverbCore::Process)");
+  for (int i = 0; i < 24; i++) {
+    const Random start = h.random;
+    Random random = start;
+    // The case's state, made once with the recompiled core.
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    const uint32_t sp = stack + kCoreStackTop - 16 * uint32_t(i % 8);
+    const uint32_t warm = i < 2 ? uint32_t(i) : 1 + random.Below(6);
+    for (uint32_t w = 0; w < warm; w++) {
+      inputs(random, false);
+      Store(h.base, core + 100, random.Below(3));
+      run(__imp__sub_82463B90, sp);
+    }
+    static constexpr uint32_t kFlags[] = {0, 1, 2, 3, 0xFFFFFFFF, 0};
+    Store(h.base, core + 100, i % 6 == 5 ? uint32_t(random.Next()) : kFlags[i % 6]);
+    Store(h.base, core + 92, i % 4 == 3 ? AnyFloat(random) : Sample(random));
+    const int kind = i % 4;
+    if (kind == 1) {
+      // Crossfades under way: the position within (0, 1], the tap asked for
+      // anywhere in the line, the others at the line's ends now and then.
+      for (const Crossfade& c : kCrossfades) {
+        const uint32_t state = core + c.offset;
+        Store(h.base, state + 4,
+              std::bit_cast<uint32_t>(float(1 + random.Below(1000)) / 1000.0f));
+        Store(h.base, state + 16, random.Below(c.entries));
+        Store(h.base, state + 8, random.Below(2) == 0 ? c.entries - 1 : random.Below(c.entries));
+        Store(h.base, state + 12, random.Below(2) == 0 ? 0 : random.Below(c.entries));
+      }
+    } else if (kind == 2) {
+      // The integer states at their edges: write indices at the lines' last
+      // block (the delay lines, as the game moves them on by 256) or last
+      // entry (the all-passes), taps at 0 or the line's last entry.
+      for (const Stage& stage : kStages) {
+        const uint32_t state = core + stage.offset;
+        Store(h.base, state + stage.write,
+              stage.all_pass ? stage.entries - 1 : stage.entries - 256);
+        for (const uint32_t tap : stage.taps) {
+          Store(h.base, state + tap, random.Below(2) == 0 ? 0 : stage.entries - 1);
+        }
+      }
+      for (const Crossfade& c : kCrossfades) {
+        Store(h.base, core + c.offset + 24, c.entries - 256);
+      }
+    }
+    inputs(random, kind == 3);
+    for (uint32_t k = 0x800; k < 0x1C00; k += 4) {
+      Store(h.base, io + k, uint32_t(random.Next()));
+    }
+    for (uint32_t k = 0; k < kCoreStackBytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> io_state = Read(h.base, io, kCoreIoBytes);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, kCoreStackBytes);
+    Outputs out[2];
+    const uint32_t r1 = sp - kCoreFrameBytes;
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, io, io_state.data(), kCoreIoBytes);
+      Write(h.base, stack, stack_state.data(), kCoreStackBytes);
+      const uint64_t r3 = run(v == 0 ? __imp__sub_82463B90 : ITC_CONTEXT_FN(hooks::XAudioReverbCoreProcess), sp);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Floats(h.base, io, 0x1C00 / 4);
+      out[v].Bytes(Read(h.base, io + 0x1C00, kCoreIoBytes - 0x1C00));
+      out[v].Bytes(Read(h.base, r1 + 4, 396));
+      out[v].Floats(h.base, r1 + 400, (kCoreFrameBytes - kCoreSavesBytes - 400) / 4);
+      out[v].Word(guest::LoadU32(h.base, sp + 20));
+      out[v].Word(guest::LoadU32(h.base, r1 - 176));
+      out[v].Word(guest::LoadU32(h.base, r1 - 128));
+      R3(out[v], r3);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {} ({} warm-up blocks, kind {})", i, warm, kind));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(io_block);
+}
+
+// ReverbCore::Apply (sub_82467A18) over a real reverb built as for
+// ReverbCore::Process (Reverb::Reverb by the translated code, the same for
+// both versions): the native parameters made by I3dl2::ToNative's plain C++
+// from I3DL2 parameters (realistic, or with edges), then now and then a word
+// or a float changed (the table indices up to 255, as Reverb::SetParameters'
+// bytes allow; the delay word anything; edge floats), and the rate (+88)
+// changed now and then; the parameters either in the block or at the core's
+// +52 (as Reverb::Run passes them: memcpy then copies them over themselves,
+// and its original runs). The stack pointer moves by 16 from case to case.
+// Compared: the reverb object as floats (its integer words are lengths,
+// indices and pointers, none a NaN's pattern), the parameters' copy, the
+// frame's words the original writes (+80 to +124) exactly, and r3.
+void ReverbApplyCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t params_block = memory::Alloc(0x400, 0);
+  if (reverb_block == 0 || stack == 0 || params_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(params_block);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t i3dl2 = params_block, native = params_block + 0x100, descriptor = params_block + 0x200;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, params_block, 0x400, 0);
+  Fill(h.base, stack, kCoreStackBytes, 0);
+  Store(h.base, descriptor + 4, 0x10);
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.r5.u64 = 0;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  Results results("ReverbCore::Apply (sub_82467A18)");
+  for (int i = 0; i < 48; i++) {
+    const Random start = h.random;
+    Random random = start;
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    const bool edges = i >= 24;
+    I3dl2Parameters(h.base, i3dl2, random, edges);
+    xa::ReverbDefaults(h.base, native);
+    xa::I3dl2ToNative(h.base, i3dl2, native, stack + 0x100);
+    if (edges) {
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t field = random.Below(21);
+        if (field == 0) {
+          Store(h.base, native, uint32_t(random.Next()));
+        } else if (field < 13) {
+          Store(h.base, native + 4 * field, random.Below(2) == 0 ? random.Below(16) : random.Below(256));
+        } else {
+          Store(h.base, native + 4 * field, AnyFloat(random));
+        }
+      }
+      if (random.Below(4) == 0) {
+        Store(h.base, core + 88, random.Below(2) == 0 ? AnyFloat(random)
+                                                       : std::bit_cast<uint32_t>(float(8000 + random.Below(40001))));
+      }
+    }
+    const bool in_core = i % 2 == 1;
+    if (in_core) {
+      Write(h.base, core + 52, Read(h.base, native, 84).data(), 84);
+    }
+    const uint32_t params = in_core ? core + 52 : native;
+    for (uint32_t k = 0; k < kCoreStackBytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const uint32_t sp = stack + kCoreStackTop - 16 * uint32_t(i % 8);
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, kCoreStackBytes);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, stack, stack_state.data(), kCoreStackBytes);
+      PPCContext t = CallContext(h);
+      t.r1.u64 = sp;
+      t.r3.u64 = core;
+      t.r4.u64 = params;
+      t.fpscr.loadFromHost();
+      (v == 0 ? __imp__sub_82467A18 : ITC_CONTEXT_FN(hooks::XAudioReverbCoreApply))(t, h.base);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Bytes(Read(h.base, native, 84));
+      out[v].Bytes(Read(h.base, sp - 432 + 80, 48));
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {} ({}{})", i, edges ? "edges" : "realistic",
+                                              in_core ? ", in the core" : ""));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(params_block);
+}
+
+// ReverbCore::Init (sub_82468848) over a reverb-sized block of random words
+// (the same for both versions), r3 the core's +208; the block compared as
+// floats (Init writes the lines' fills and the filters' floats, and words
+// that are lengths, indices and pointers, none a NaN's pattern) and r3.
+void ReverbInitCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  if (reverb_block == 0) {
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  Results results("ReverbCore::Init (sub_82468848)");
+  for (int i = 0; i < 8; i++) {
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      for (uint32_t k = 0; k < kReverbBytes; k += 4) {
+        Store(h.base, reverb + k, i % 2 == 0 ? uint32_t(random.Next()) : AnyFloat(random));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = reverb + 16 + 208;
+      t.fpscr.loadFromHost();
+      (v == 0 ? __imp__sub_82468848 : ITC_CONTEXT_FN(hooks::XAudioReverbCoreInit))(t, h.base);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+}
+
+// The reverb's construction. I3dl2Params::I3dl2Params (sub_82469848) with
+// 0 on an object in a block of random words (its vtable's +4, the offset of
+// its second vtable, anywhere in the block), or with 1 in a reverb-sized
+// block (then ReverbCore::Init on its +52); Reverb::Reverb (sub_82465608) on
+// a reverb-sized block of random words, the descriptor's +4 random;
+// Reverb::Create (sub_82465710) with a real default allocator big enough for
+// the reverb, or too small (E_OUTOFMEMORY). (Its failure path after the
+// outer vtable's slot +28 isn't reached: that slot is a stub returning 0.)
+// Compared: the blocks as floats (the I3DL2 defaults are floats, the rest
+// lengths, indices and pointers, none a NaN's pattern; for Create, exactly
+// with the pointers into the allocator as offsets), the frames' words (the
+// back chains and +80 of each frame) and r3.
+void ReverbConstructionCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t small = memory::Alloc(0x400, 0);
+  if (reverb_block == 0 || stack == 0 || small == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(small);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t sp = stack + kCoreStackTop;
+  const auto fill = [&](Random& random, uint32_t at, uint32_t bytes) {
+    for (uint32_t k = 0; k < bytes; k += 4) {
+      Store(h.base, at + k, uint32_t(random.Next()));
+    }
+  };
+  const auto frame_words = [&](Outputs& out, uint32_t frame) {
+    out.Word(guest::LoadU32(h.base, frame));
+    out.Word(guest::LoadU32(h.base, frame + 80));
+  };
+  {
+    Results results("I3dl2Params::I3dl2Params (sub_82469848)");
+    for (int i = 0; i < 24; i++) {
+      const Random start = h.random;
+      Random random = start;
+      const bool flag = i % 4 == 3;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        uint32_t object;
+        if (flag) {
+          fill(random, reverb, kReverbBytes);
+          object = reverb + 16;
+        } else {
+          fill(random, small, 0x400);
+          object = small + 0x100;
+          Store(h.base, object, small + 0x80);
+          Store(h.base, small + 0x84, 4 * random.Below(0x80));
+        }
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = object;
+        t.r4.u64 = flag ? 1 + random.Below(0xFFFF) : 0;
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82469848 : ITC_CONTEXT_FN(hooks::XAudioI3dl2ParamsConstruct))(t, h.base);
+        if (flag) {
+          out[v].Floats(h.base, reverb, kReverbBytes / 4);
+        } else {
+          out[v].Floats(h.base, small, 0x400 / 4);
+        }
+        frame_words(out[v], sp - 112);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {} (flag {})", i, flag ? 1 : 0));
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Reverb (sub_82465608)");
+    for (int i = 0; i < 8; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        fill(random, reverb, kReverbBytes);
+        fill(random, small, 0x400);
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = reverb;
+        t.r4.u64 = small;
+        t.r5.u64 = random.Next();
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82465608 : ITC_CONTEXT_FN(hooks::XAudioReverbConstruct))(t, h.base);
+        out[v].Floats(h.base, reverb, kReverbBytes / 4);
+        frame_words(out[v], sp - 128);
+        frame_words(out[v], sp - 128 - 112);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Create (sub_82465710), with Reverb::Reverb");
+    for (int i = 0; i < 8; i++) {
+      const Random start = h.random;
+      Random random = start;
+      const uint32_t bytes = i % 4 == 3 ? 0x1000 : kReverbBytes + 0x1000;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        fill(random, small, 0x400);
+        xa::DefaultAllocator(h.base, 0x61820006, bytes, small + 0x3FC);
+        const uint32_t allocator = guest::LoadU32(h.base, small + 0x3FC);
+        Store(h.base, small + 0x3FC, 0);
+        out[v].Word(allocator != 0);
+        if (allocator == 0) {
+          continue;
+        }
+        Fill(h.base, allocator + 28, bytes, 0x5E);
+        const uint32_t out_word = small + 0x200;
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = small;
+        t.r4.u64 = allocator;
+        t.r5.u64 = out_word;
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82465710 : ITC_CONTEXT_FN(hooks::XAudioReverbCreate))(t, h.base);
+        const uint32_t span = bytes + 28;
+        R3(out[v], t.r3.u64);
+        if (i == 0 && v == 0 && guest::LoadU32(h.base, out_word) == 0) {
+          ITC_LOG_WARN("harness: Reverb::Create's case 0 allocated nothing");
+        }
+        frame_words(out[v], sp - 128);
+        frame_words(out[v], sp - 256);
+        frame_words(out[v], sp - 256 - 112);
+        Normalized(out[v], h.base, small, 0x400, allocator, span);
+        Normalized(out[v], h.base, allocator, span, allocator, span);
+        memory::crt::XMemFree(allocator, 0x61820006);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {} ({} bytes)", i, bytes));
+    }
+    results.Report();
+  }
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(small);
+}
+
+// The reverb's pass over a real reverb built as for ReverbCore::Process
+// (Reverb::Reverb and ReverbCore::Apply on its defaults, by the translated
+// code), the spin lock held around the call in half the cases.
+// I3dl2::SetParameter (sub_824696F0): r4 0 to 14 or a random word, r5 the
+// I3DL2 parameters (realistic or with edges). Reverb::Run (sub_82465258):
+// the pending bytes +188 (with a gain at +184), +189 (the native parameters
+// at +52 from I3dl2::ToNative's plain C++) and +190 (the I3DL2 ones at
+// +136) set by case, the stereo flag and the inputs random. Reverb::Process
+// (sub_82465428): two buffers (their interfaces at +8): the input's
+// channels 0 to 4, the output's capacity 6 channels (or 4: ClearThunk's
+// error), a fixed performance counter (both versions read the same) and
+// the timers random. Compared: the reverb object and the buffers' samples
+// as floats, the frames' words the originals write exactly (SetParameter's
+// +80 to +164, ToNative's +80, Apply's +80 to +124; the core's frame as its
+// own cases compare it), the spin lock's depth and owner, and r3.
+void ReverbPassCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes + 0x8000, 0);
+  const uint32_t io_block = memory::Alloc(0x2800 + 128, 0);
+  if (reverb_block == 0 || stack == 0 || io_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(io_block);
+    return;
+  }
+  const uint32_t stack_bytes = kCoreStackBytes + 0x8000;
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t io = (io_block + 127) & ~127u;
+  // The samples: the input's two channels at +0, the output's six at +0x800;
+  // the pointer arrays at +0x2000, the descriptor at +0x2040, the buffers at
+  // +0x2100 and +0x2140, the I3DL2 parameters at +0x2200.
+  const uint32_t in_ptrs = io + 0x2000, out_ptrs = io + 0x2010, descriptor = io + 0x2040;
+  const uint32_t in_buffer = io + 0x2100, out_buffer = io + 0x2140, i3dl2 = io + 0x2200;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, io, 0x2800, 0);
+  Fill(h.base, stack, stack_bytes, 0);
+  for (uint32_t k = 0; k < 2; k++) {
+    Store(h.base, in_ptrs + 4 * k, io + 0x400 * k);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    Store(h.base, out_ptrs + 4 * k, io + 0x800 + 0x400 * k);
+  }
+  Store(h.base, descriptor + 4, 0x10);
+  const uint32_t top = stack + stack_bytes - 0x1000;
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = top;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+    t = CallContext(h);
+    t.r1.u64 = top;
+    t.r3.u64 = core;
+    t.r4.u64 = core + 52;
+    t.fpscr.loadFromHost();
+    __imp__sub_82467A18(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  const auto store64 = [&](uint32_t at, uint64_t value) {
+    Store(h.base, at, uint32_t(value >> 32));
+    Store(h.base, at + 4, uint32_t(value));
+  };
+  // One kind of case: `setup(random, t)` the same for both versions on the
+  // built reverb and fresh random stack and samples; `extra(out, sp)` the
+  // frames' words.
+  const auto run = [&](Results& results, GuestFunction recompiled, GuestFunction native, int i,
+                       auto setup, auto extra) {
+    const Random start = h.random;
+    Random random = start;
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    for (uint32_t k = 0; k < 0x2000; k += 4) {
+      Store(h.base, io + k, k < 0x800 ? Sample(random) : uint32_t(random.Next()));
+    }
+    for (uint32_t k = 0; k < stack_bytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const uint32_t sp = top - 16 * uint32_t(i % 8);
+    PPCContext setup_t = CallContext(h);
+    setup(random, setup_t);
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> io_state = Read(h.base, io, 0x2800);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, stack_bytes);
+    const bool hold = i % 2 == 1;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, io, io_state.data(), 0x2800);
+      Write(h.base, stack, stack_state.data(), stack_bytes);
+      PPCContext t = setup_t;
+      t.r1.u64 = sp;
+      t.fpscr.loadFromHost();
+      PPCContext lock = t;
+      if (hold) {
+        hooks::XAudioSpinTake(lock, h.base);
+      }
+      (v == 0 ? recompiled : native)(t, h.base);
+      LockWords(out[v], h.base, t.r13.u32);
+      if (hold) {
+        hooks::XAudioSpinRelease(lock, h.base);
+      }
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Floats(h.base, io, 0x2000 / 4);
+      out[v].Bytes(Read(h.base, io + 0x2000, 0x800));
+      extra(out[v], sp);
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {}{}", i, hold ? " (lock held)" : ""));
+  };
+  // The core's frame below Reverb::Run's frame at `frame`, as
+  // ReverbCore::Process's own cases compare it, up to where ReverbCore::Apply's
+  // register saves fall when Run applies the parameters first (its frame
+  // 432 bytes below Run's, or below I3dl2::SetParameter's 192: the saves'
+  // 296 bytes at its top, from `frame` - 624 + 136 or - 432 + 136, which the
+  // plain C++ doesn't write and the core's pass leaves).
+  const auto core_frame = [&](Outputs& out, uint32_t frame) {
+    const uint32_t r1 = frame - kCoreFrameBytes;
+    out.Bytes(Read(h.base, r1 + 4, 396));
+    const uint32_t saves = frame - 624 + 136;
+    out.Floats(h.base, r1 + 400, (saves - (r1 + 400)) / 4);
+    out.Word(guest::LoadU32(h.base, frame + 20));
+  };
+  {
+    Results results("I3dl2::SetParameter (sub_824696F0), with ReverbCore::Apply");
+    for (int i = 0; i < 32; i++) {
+      run(results, __imp__sub_824696F0, ITC_CONTEXT_FN(hooks::XAudioI3dl2SetParameter), i,
+          [&](Random& random, PPCContext& t) {
+            I3dl2Parameters(h.base, i3dl2, random, i >= 16);
+            t.r3.u64 = core;
+            t.r4.u64 = i < 30 ? uint32_t(i % 15) : uint32_t(random.Next());
+            t.r5.u64 = i3dl2;
+          },
+          [&](Outputs& out, uint32_t sp) {
+            // (ToNative's +80 isn't compared: ReverbCore::Apply's register
+            // saves, which the plain C++ doesn't write, fall over it.)
+            out.Bytes(Read(h.base, sp - 192 + 80, 84));
+            out.Bytes(Read(h.base, sp - 192 - 432 + 80, 48));
+          });
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Run (sub_82465258), with ReverbCore::SetGain (sub_82467A00)");
+    for (int i = 0; i < 24; i++) {
+      run(results, __imp__sub_82465258, ITC_CONTEXT_FN(hooks::XAudioReverbRun), i,
+          [&](Random& random, PPCContext& t) {
+            const uint32_t pending = uint32_t(i % 8);
+            guest::StoreU8(h.base, core + 188, (pending & 1) ? 1 + random.Below(255) : 0);
+            guest::StoreU8(h.base, core + 189, (pending & 2) ? 1 : 0);
+            guest::StoreU8(h.base, core + 190, (pending & 4) ? 1 : 0);
+            Store(h.base, core + 184, i >= 16 ? AnyFloat(random)
+                                              : std::bit_cast<uint32_t>(float(random.Below(2001)) / 1000.0f));
+            I3dl2Parameters(h.base, core + 136, random, i >= 16);
+            xa::ReverbDefaults(h.base, core + 52);
+            I3dl2Parameters(h.base, i3dl2, random, false);
+            xa::I3dl2ToNative(h.base, i3dl2, core + 52, stack + 0x100);
+            Store(h.base, core + 100, random.Below(3));
+            t.r3.u64 = core;
+            t.r4.u64 = in_ptrs;
+            t.r5.u64 = out_ptrs;
+          },
+          [&](Outputs& out, uint32_t sp) { core_frame(out, sp - 144); });
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Process (sub_82465428), with Reverb::Run");
+    for (int i = 0; i < 24; i++) {
+      run(results, __imp__sub_82465428, ITC_CONTEXT_FN(hooks::XAudioReverbProcess), i,
+          [&](Random& random, PPCContext& t) {
+            static constexpr uint32_t kChannels[] = {1, 2, 1, 2, 0, 3, 4, 2};
+            Buffer(h.base, in_buffer, io, kChannels[i % 8]);
+            Buffer(h.base, out_buffer, io + 0x800, 2);
+            guest::StoreU8(h.base, out_buffer + 13, i % 12 == 11 ? 4 : 6);
+            store64(reverb + 0x4BAA0, random.Next());
+            store64(reverb + 0x4BAA8, random.Below(100000));
+            helpers::SetClocksForHarness(random.Next() >> 8, std::nullopt);
+            t.r3.u64 = reverb;
+            t.r4.u64 = in_buffer + 8;
+            t.r5.u64 = out_buffer + 8;
+          },
+          [&](Outputs& out, uint32_t sp) {
+            out.Bytes(Read(h.base, sp - 192 + 80, 84));
+            core_frame(out, sp - 192 - 144);
+          });
+    }
+    helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+    results.Report();
+  }
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(io_block);
+}
+
+// --- The PCM codec's pass ---
+
+// PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
+// builds one, its queued list at offset 0: the base's vtable at +0x1C00 with SetFlags at +84 and
+// CompletePacket or RetirePacket at +92; the codec's own at +0x1C80 with
+// PcmCodec::Stop, or AddRef now and then, at +52), its queued packets (0-5
+// at +0x400, each with a play region, a loop region inside it, loops 0-2 or
+// -1, started or not, data in the second region), the converter (+184) set
+// as the codec's set-up leaves it (16-bit, 1 or 2 channels, a game rate and
+// 48 kHz out, the kernel kept or picked again), the loop-end callback
+// (+180) 0 or AddRef, and the buffer at +0x1D00 (its interface in r5, 3
+// channels of capacity) over the second region's first 0x800 bytes. The
+// state byte (+172) and the fade count (+174) set to reach each branch:
+// not playing, starved, Clear's error (4 channels), just started,
+// stopping (at its last pass or not), the end of stream, an empty queue.
+// The spin lock held around the call in half the cases. The block and the
+// second region compared, the volume (+224) and the converter's ramp start
+// (+220) as floats, and the frame's words (+80, 12 bytes: the format, then
+// the loop-end callback's struct). The callees' frames below aren't: their
+// words there are shared with the translated callees' register saves
+// (Resampler::Process's and CompletePacket's own cases compare them).
+void PcmProcess(Context& h, uint32_t block) {
+  constexpr uint32_t kDataBytes = 0x3000;
+  const uint32_t data = memory::Alloc(kDataBytes, 0);
+  const uint32_t codec = block;
+  const uint32_t buffer = block + 0x1D00;
+  static constexpr uint32_t kRates[] = {48000, 44100, 32000, 22050, 16000, 11025};
+  static constexpr uint32_t kMono[] = {0x8247E188, 0x82473E48};
+  static constexpr uint32_t kStereo[] = {0x8247E260, 0x82474188, 0x8247F558, 0x82478E60};
+  Results results("PcmCodec::Process (sub_8246D860)");
+  for (int i = 0; i < 96; i++) {
+    const int kind = i % 12;
+    LockedCaseWith(
+        h, results, block, __imp__sub_8246D860, ITC_CONTEXT_FN(hooks::XAudioPcmCodecProcess), i % 2 == 0,
+        [&](Random& random, PPCContext& t) {
+          for (uint32_t k = 0; k < kDataBytes; k += 4) {
+            Store(h.base, data + k, uint32_t(random.Next()));
+          }
+          Codec(h.base, block, codec, random);
+          const uint32_t channels = 1 + random.Below(2);
+          Store(h.base, codec, block + 0x1C80);
+          Store(h.base, block + 0x1C80 + 52, random.Below(4) == 0 ? kAddRef : 0x8246D500);
+          guest::StoreU8(h.base, codec + 56, uint8_t(kind == 2 ? 4 : channels));
+          Store(h.base, codec + 112, Sample(random));
+          Store(h.base, codec + 224, Sample(random));
+          Store(h.base, codec + 180, random.Below(3) == 0 ? 0 : kAddRef);
+          // The state: bits 5-7 random, the rest by the case's kind.
+          uint8_t state = uint8_t(random.Next() & 0xE0);
+          uint8_t bits = uint8_t(random.Next() & 0x0E);  // just started, stopping, end
+          switch (kind) {
+            case 0: bits = uint8_t(random.Next() & 0x1E); break;  // not playing
+            case 1: bits = 0x11 | bits; break;                    // starved
+            case 3: bits = 0x03; break;
+            case 4:
+            case 5: bits = 0x05 | (bits & 0x0A); break;
+            case 6: bits = 0x09 | (bits & 0x06); break;
+            case 7: bits = 0x01 | (bits & 0x06); break;
+            default: bits |= 1; break;
+          }
+          state |= bits;
+          guest::StoreU8(h.base, codec + 172, state);
+          guest::StoreU16(h.base, codec + 174,
+                          uint16_t(kind == 4 ? 1 : kind == 5 ? 2 + random.Below(8)
+                                                             : random.Below(4)));
+          // The queued list at offset 0, as the codec's set-up makes it (the
+          // entries' fields from +8 clear of the links).
+          const bool empty =
+              kind == 7 || (kind == 6 && random.Below(2) == 0) || random.Below(10) == 0;
+          MakeList(h.base, codec + 20, 0, block + 0x400, empty ? 0 : 1 + random.Below(5));
+          // The queued packets.
+          const uint32_t head = codec + 20;
+          const uint32_t offset = guest::LoadU32(h.base, head + 8);
+          const uint32_t room = (kDataBytes - 0x800 - 0x80) / (2 * channels);
+          bool first = true;
+          for (uint32_t node = guest::LoadU32(h.base, head); node != head;
+               node = guest::LoadU32(h.base, node)) {
+            const uint32_t entry = node - offset;
+            const uint32_t end = random.Below(4) == 0 ? 1 + random.Below(8)
+                                                      : 1 + random.Below(room < 900 ? room : 900);
+            const uint32_t loop_start = random.Below(end);
+            const uint32_t loop_end = loop_start + 1 + random.Below(end - loop_start);
+            Store(h.base, entry + 8, data + 0x800 + 16 * random.Below(8));
+            const uint32_t loops = random.Below(4) == 0 ? 0xFFFFFFFFu : random.Below(3);
+            Store(h.base, entry + 16, loops);
+            Store(h.base, entry + 20, loop_start);
+            Store(h.base, entry + 24, loop_end);
+            Store(h.base, entry + 28, random.Below(3) == 0 ? 0 : random.Below(end + 1));
+            Store(h.base, entry + 32, end);
+            guest::StoreU8(h.base, entry + 117, uint8_t(random.Below(2)));
+            if (first) {
+              // The position: inside the region, at its end or past it now
+              // and then.
+              const uint32_t limit = loops != 0 ? loop_end : end;
+              Store(h.base, codec + 120, random.Below(6) == 0   ? limit
+                                         : random.Below(8) == 0 ? limit + random.Below(50)
+                                                                : random.Below(limit));
+              first = false;
+            }
+          }
+          // The converter.
+          const uint32_t converter = codec + 184;
+          guest::StoreU8(h.base, converter + 12, 1);
+          guest::StoreU8(h.base, converter + 13, uint8_t(channels));
+          Store(h.base, converter + 16, kRates[random.Below(6)]);
+          Store(h.base, converter + 32, 48000);
+          Store(h.base, converter + 36, Sample(random));
+          Store(h.base, converter + 40, Sample(random));
+          static constexpr float kRatios[] = {1.0f, 0.91875f, 0.5f, 0.6666667f, 0.459375f, 0.2296875f};
+          Store(h.base, converter + 44, std::bit_cast<uint32_t>(kRatios[random.Below(6)]));
+          const float fraction = random.Below(8) == 0 ? 0.0f
+                                                      : float(random.Below(1u << 24)) / float(1u << 24);
+          Store(h.base, converter + 48, std::bit_cast<uint32_t>(fraction));
+          Store(h.base, converter + 52, Sample(random));
+          Store(h.base, converter + 56, Sample(random));
+          Store(h.base, converter + 76, channels == 1 ? kMono[random.Below(2)]
+                                                     : kStereo[random.Below(4)]);
+          Store(h.base, converter + 80, random.Below(2) == 0 ? 3 : 0);
+          Store(h.base, converter + 84, uint32_t(random.Next()) & 0xFFFFFF7Eu |
+                                            (random.Below(4) == 0 ? 0x80 : 0) |
+                                            random.Below(2));
+          Buffer(h.base, buffer, data, channels);
+          t.r3.u64 = codec;
+          t.r4.u64 = random.Next();
+          t.r5.u64 = buffer + 8;
+          t.fpscr.loadFromHost();
+        },
+        [&](Outputs& out, uint32_t sp) {
+          out.Bytes(Read(h.base, sp - 192 + 80, 12));
+          out.Bytes(Read(h.base, data, 0x800));
+        },
+        [&](Outputs& out) { BlockWithFloats(out, h.base, block, {{220, 2}}); },
+        fmt::format("case {} (kind {})", i, kind));
+  }
+  results.Report();
+  memory::Free(data);
+}
+
+}  // namespace
+
+void XAudioObjects(Context& h) {
+  Block block;
+  Leaves(h, block.address);
+  Lists(h, block.address);
+  Construction(h, block.address);
+  Queue(h, block.address);
+  MatrixAndMeter(h, block.address);
+  ReverbParts(h, block.address);
+  ReverbParameters(h, block.address);
+  Resampler(h, block.address);
+  PcmProcess(h, block.address);
+  ReverbStages(h);
+  ReverbCoreCases(h);
+  ReverbApplyCases(h);
+  ReverbInitCases(h);
+  ReverbConstructionCases(h);
+  ReverbPassCases(h);
+}
+
+}  // namespace harness

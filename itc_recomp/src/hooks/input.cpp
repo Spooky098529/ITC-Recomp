@@ -11,6 +11,8 @@
 // passes leaves what the logic pass set in place for them, as at 30 fps.
 
 #include "action_mappers/action_mappers.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -23,21 +25,22 @@ ITC_FLAG_BOOL(input_mappers_by_tick, true, "ITC",
               "Update the action mappers (sub_8210B018) on logic passes only, so menu "
               "input repeats at the game's rate at any frame rate");
 
-extern "C" REX_FUNC(sub_8210B018) {
-  REX_FUNC_PROLOGUE();
+// The held word's bits 30 and 31 (actions 30 and 31: none; the original's
+// come from an uninitialized stack word, the high half of its caller's r25)
+// are 0 (the rewiring, stage 3: stack words aren't carried).
+ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
   if (ITC_FLAG(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
   debug::PauseMenuLog_NoteMapperUpdate(uint32_t(ctx.lr));
   // Natively (--native_action_mappers, src/action_mappers/) when every
   // mapper's repeat and curve objects are the ones seen in play.
-  if (ITC_FLAG(native_action_mappers) && action_mappers::UpdateAllKnown(base, ctx.r3.u32)) {
+  if (ITC_FLAG(native_action_mappers) && action_mappers::UpdateAllKnown(ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
     double f1 = ctx.f1.f64;
-    ctx.r3.u64 =
-        action_mappers::UpdateAll(base, ctx.r3.u32, uint32_t(ctx.r25.u64 >> 32), &f1);
+    ctx.r3.u64 = action_mappers::UpdateAll(ctx.r3.u32, 0, &f1);
     ctx.f1.f64 = f1;
     return;
   }
-  __imp__sub_8210B018(ctx, base);
+  lifted::original::c8210B018(ctx);
 }

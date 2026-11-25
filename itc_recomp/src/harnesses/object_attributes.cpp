@@ -28,7 +28,7 @@ void ObjectAttributes(Context& h) {
            t.r4.u64 = data + 16;
            t.r5.u64 = text ? data + 32 : 0;
          },
-         __imp__sub_822970A8, sub_822970A8, data, 24, text ? std::string(text).substr(0, 30) : "(none)");
+         __imp__sub_822970A8, harness::Ours<0x822970A8>, data, 24, text ? std::string(text).substr(0, 30) : "(none)");
   }
   results.Report();
 }

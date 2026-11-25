@@ -1,0 +1,75 @@
+# The schema of docs/functions/xact-waves.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XACT's voice class and waves (src/xact/voices.cpp, src/xact/waves.cpp):
+# the measure files none of their accesses (it types no XACT object these
+# functions reach), so these types carry no `measure` and schema_check
+# lists them as never seen. The owner (the play-wave event), the track,
+# the sound, the cue, the engine and the wave bank the waves reach are
+# xact.md's and xact-tracks.md's types.
+
+# XACTVoice (24 bytes, XACTVoice::Create sub_825C9C40, vtable 0x82075B98):
+# XACT's wrapper over one XAudio source voice.
+[XACTVoice]
+size = 24
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82075B98" },
+  { name = "source_voice", offset = 4, type = "u32", note = "the XAudio source voice" },
+  { name = "reverb_voice", offset = 8, type = "u32", note = "the reverb submix's XAudio voice (the holder's slot +4), 0 without a send; never set in play" },
+  { name = "channels", offset = 12, type = "u8", note = "the channel count (the description's byte +4)" },
+  { name = "reverb_level", offset = 16, type = "f32", note = "the reverb send level (1.0 when made)" },
+  { name = "outputs_unset", offset = 20, type = "u32", note = "the outputs not yet set by SetChannelMatrix (1 when made)" },
+]
+
+# XACTReverb (8 bytes, sub_825CA4B8, vtable 0x82075BD4): the reverb submix;
+# never made in play.
+[XACTReverb]
+size = 8
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82075BD4" },
+  { name = "submix_voice", offset = 4, type = "u32", note = "the XAudio submix voice (2 channels, 48 kHz)" },
+]
+
+# XACTWave (base sub_825D23F0, vtable 0x82076A38) with the in-memory wave's
+# fields (96 bytes, sub_825D37A8, vtable 0x82076A74; XMemAlloc 0x2084801A):
+# every wave in play is an in-memory wave, so one view holds both. The
+# streaming wave (vtable 0x82076AA4, never in play) has other fields from
+# +64 on, to at least +176.
+[XACTWave]
+size = 96
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82076A38 the base, 0x82076A74 the in-memory wave" },
+  { name = "node_next", offset = 4, type = "u32", note = "the node in the wave bank's wave list (bank +240): the next node's object (self when unlinked)" },
+  { name = "node_previous", offset = 8, type = "u32", note = "the previous node's object (self when unlinked)" },
+  { name = "listener_vtable", offset = 12, type = "u32", note = "the listener interface on the wave bank (0x82076A70; 0x8203DF00 the base first)" },
+  { name = "stopped_at_once", offset = 16, type = "u32", note = "set by Stop with mode 0" },
+  { name = "engine", offset = 20, type = "u32", note = "XACT's engine" },
+  { name = "loop_count", offset = 24, type = "u8", note = "255 forever" },
+  { name = "flags", offset = 25, type = "u8", note = "0x2 started, 0x4 released, 0x8 prepare the next wave, 0x10 finished, 0x20 loops, 0x40 flushed, 0x80 paused" },
+  { name = "request_owner", offset = 28, type = "u32", note = "set atomically: the audio callback calls the owner's slot +32" },
+  { name = "request_stop", offset = 32, type = "u32", note = "set atomically (RequestNext): stop now and hand the next wave to the owner" },
+  { name = "wave_bank", offset = 36, type = "u32", note = "the wave bank (its +4 the listener interface, +240 the wave list)" },
+  { name = "state", offset = 40, type = "u32", note = "1 preparing, 2 prepared, 3 playing, 4 stopping, 5 stopped" },
+  { name = "voice", offset = 44, type = "ptr", to = "XACTVoice" },
+  { name = "owner", offset = 48, type = "u32", note = "probably the play-wave event of a sound's track ([[[owner + 44] + 16] + 20] the sound, its +48 the cue)" },
+  { name = "wave_index", offset = 52, type = "u16", note = "the entry in the wave bank" },
+  { name = "next_wave", offset = 56, type = "ptr", to = "XACTWave", note = "the next wave of a loop or variation" },
+  { name = "prepared", offset = 60, type = "u32" },
+  { name = "packet_context", offset = 64, type = "u32", note = "in-memory wave: the packets' context (16 bytes, the packet's +36 points here): the wave at first" },
+  { name = "unknown_68", offset = 68, type = "u32", note = "in-memory wave: the context's +4, 0 when made" },
+  { name = "packet_context_looped", offset = 72, type = "u32", note = "in-memory wave: the context's +8, 1 with the loop region in the one packet, 0 with the loop packet" },
+  { name = "unknown_76", offset = 76, type = "u32", note = "in-memory wave: the context's +12, 0 when made" },
+  { name = "loop_context", offset = 80, type = "u32", note = "in-memory wave: the loop packet's context when the start lies inside the loop (+64 to +76 copied here): the wave at first" },
+  { name = "unknown_84", offset = 84, type = "u32", note = "in-memory wave: the loop context's +4" },
+  { name = "loop_context_looped", offset = 88, type = "u32", note = "in-memory wave: the loop context's +8 (1)" },
+  { name = "unknown_92", offset = 92, type = "u32", note = "in-memory wave: the loop context's +12" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0f (the voice's and the reverb's level without one)" }

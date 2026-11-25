@@ -1,0 +1,79 @@
+# The schema of docs/functions/race-scene.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race scene: its state machine (race mode + 87936) and the glows'
+# parameter entries it gives the post effects (src/race_scene/). The scene
+# object at [0x826D82D4] (RaceScene) and its light set (RaceLights) are
+# filed by the measure under race-update.md, which touches them most. Left
+# out of the seed: PostEffects::Get.ret and its +0 are post-effects.toml's
+# PostEffect and PostEffectVtable; Race.+31156 and Race.+31160 are the
+# split screen's two ScreenObjects (screen-objects.md), the measure's Race
+# there joining the race scene's +31152 to +31160 (reported).
+
+# The race scene's machine: a StateMachine (game-modes.toml) whose +9608 is
+# the pause toggle (known-data.md, "0x826D82D4").
+[RaceSceneMachine]
+measure = "RaceSceneMachine"
+size = 9612
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions of 48 bytes (StateMachine's; 11 used)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at Init, 2 the scenery loading, 38 the race, 32 after message 44, 37 after 49, 35 the end" },
+  { name = "paused", offset = 9608, type = "u32", note = "the toggle of messages 29 and 58 (probably the pause; TogglePause, Resume); 0 from OnStart" },
+]
+
+# One entry of the glows' parameters (11 floats, 44 bytes): the table at
+# 0x82637CC0 (3 a kind, below 8) or the one at 0x82637C94, given to each
+# glow's setters, vtable slots 2 to 12, in order (Glows::SetParams). The
+# names are the glow fields the setters write (post-effects.toml's Glow).
+[RaceGlowParams]
+measure = "Glows"
+size = 44
+origin = "image"
+fields = [
+  { name = "c33_x_second", offset = 0, type = "f32", note = "Glow::Set8436 (slot 2)" },
+  { name = "c33_x_first", offset = 4, type = "f32", note = "Glow::Set8440 (slot 3)" },
+  { name = "c34_x", offset = 8, type = "f32", note = "Glow::Set8444 (slot 4)" },
+  { name = "c34_y", offset = 12, type = "f32", note = "Glow::Set8448 (slot 5)" },
+  { name = "strength", offset = 16, type = "f32", note = "Glow::SetStrength (slot 6)" },
+  { name = "c33_z", offset = 20, type = "f32", note = "Glow::Set8456 (slot 7)" },
+  { name = "history_weight", offset = 24, type = "f32", note = "Glow::SetHistoryWeight (slot 8)" },
+  { name = "param_8464", offset = 28, type = "f32", note = "Glow::Set8464 (slot 9)" },
+  { name = "star_step", offset = 32, type = "f32", note = "Glow::Set8468 (slot 10)" },
+  { name = "star_attenuation", offset = 36, type = "f32", note = "Glow::Set8472 (slot 11)" },
+  { name = "c33_w", offset = 40, type = "f32", note = "Glow::Set8476 (slot 12)" },
+]
+
+[globals]
+scene = { address = 0x826D82D4, type = "ptr", to = "RaceScene", note = "the race scene (31,168 bytes, RaceScene::Create; RaceScene::Destroy leaves the pointer)" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports (Viewports::Init): +8 nonzero in split screen" }
+glow_params = { address = 0x82637CC0, type = "bytes", count = 1056, note = "24 RaceGlowParams: 3 a kind (0 to 7) and its index" }
+glow_params_other = { address = 0x82637C94, type = "bytes", count = 44, note = "the RaceGlowParams for kinds 8 and up (just before the table)" }
+filter_value = { address = 0x82002204, type = "f32", note = "the color filters' Set8120 value (0.05, probably)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0: the light entries' vectors' w" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+light_kind1_value = { address = 0x82001070, type = "f32", note = "kind 1 entries' +32 x, y and z" }
+light_kind2_x = { address = 0x82001BE4, type = "f32", note = "kind 2 entries' +32 x (probably 0.5)" }
+light_kind2_64_x = { address = 0x82002578, type = "f32", note = "kind 2 entries' +64 x" }
+light_kind2_64_y = { address = 0x8200222C, type = "f32", note = "kind 2 entries' +64 y" }
+light_color_p = { address = 0x82001FC0, type = "f32", note = "the entries' +16 p (500.0)" }
+light_color_q = { address = 0x82009798, type = "f32", note = "the entries' +16 q" }
+light_cone_inner = { address = 0x82009790, type = "f64", note = "kind 2 entries' +84: cos of it (probably the cone's inner angle)" }
+light_cone_outer = { address = 0x82002FE0, type = "f64", note = "kind 2 entries' +80: cos of it (probably the cone's outer angle)" }
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceSceneMachine.
+[RaceSceneMachineAt87936]
+measure = "RaceMode@+87936"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+]

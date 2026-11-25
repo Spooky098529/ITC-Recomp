@@ -33,7 +33,9 @@ itc_recomp/tools/scripted_run.sh <recording> [extra flags]
 ```
 
 It starts the game with the standard flags, `--log_level=info` and
-`--skip_intro`, waits for the boot's first draw ("called from 8248466C" in
+`--skip_intro`, waits for the boot's first draw (its first resolve, "Resolve (822AFA58)
+called from 8258D9E8"; "called from 8248466C", the movie library's draw,
+until the movies moved to our FFmpeg on 2026-10-25, in
 the log; if it doesn't come in 30 s, the boot stalled and the game is
 restarted once), waits `PAD_DELAY` seconds (3), and runs `pad_play.py`.
 The game is closed 5 s after the last input (or, if it hangs, the
@@ -75,7 +77,73 @@ node gets the user's ACL from udev.
   functions to run; it doesn't reproduce a drive.
 - The virtual pad is seen system-wide while a replay runs.
 - `--native_renderer_dump` slows the frames it writes, which threw a replay
-  off; replay without it.
+  off; replay without it. To dump a menu frame anyway, start the replay
+  after the dump the renderer makes on its own in the title's background
+  race (~4 s after the boot mark): `PAD_DELAY=8` (the title waits for the
+  input), then `touch <dir>/now` at the moment wanted. With
+  `race_test.jsonl`, 24.5 s after the boot mark is the tuning shop with the
+  car and its floor reflection (2026-11-04, the front end's car draw).
+
+## By tick (the state digest)
+
+The virtual pad presses by the clock, so a press lands a tick early or late
+from run to run: two runs of the same build drift apart within seconds of
+a race, and a missed menu press sometimes leaves a run in the front end.
+For checks that need the same game twice (E5's step 3, `docs/e5-native.md`
+"Checks"), the pad is replayed by tick instead (2026-11-22):
+
+- `--pad_ticks_record=<file>` writes every pad read the game makes (once a
+  tick per user, `input::PhysicalPad_Read` through `XInput_GetState`) as a
+  line, and a line `race <n>` when the game enters a race
+  (`src/input/pad_ticks.cpp`).
+- `--pad_ticks_play=<file>` answers the game's reads from such a file, in
+  order, with no virtual pad (only user 0 connected, rumble ignored). The
+  number of ticks before a race varies with load times, so playback lines
+  up on each race's marks: reads left before one are skipped when the game
+  gets there sooner, the last read repeated while it hasn't yet. Each race
+  has two: `race <n>`, entered (its draw step seen), and `start <n>`, the
+  race world loaded (the course set-up's message 4,
+  `CourseSetup::WaitDraw`, after the race's loads; since 2026-11-22). The
+  second is needed because the race's loads vary in length too: with only
+  the first, a build whose loads ended one tick later started the race a
+  tick later, and the recorded input then fell a tick early for the whole
+  race (the world the same, one tick late, until the input differed). A
+  file without start marks plays as before.
+- `--state_digest` logs a line each race tick from the race's start (its
+  first `start` mark; the still ticks of its loading left out)
+  (`src/debug/state_digest.cpp`):
+  the racers' count, a hash of each racer's body matrix and squared speed,
+  a hash of user 0's last pad read, and the player's position.
+- `itc_recomp/tools/tick_replay.sh [ticks] [baseline]` plays
+  `itc_recomp/pad_recordings/race_test.ticks`, stops after it ends, and
+  compares the digest with `race_test.digest`, printing each race's first
+  differing tick. A change meant to change the game makes a new baseline
+  (the run's `<log>.digest`).
+
+`race_test.ticks` was recorded from `race_test.jsonl` with
+`scripted_run.sh ... --pad_ticks_record --state_digest` (user 0's lines and
+the marks kept); recorded again 2026-11-22 with the start marks, on E5 step
+3's batch 1 build with `FloatPair`'s move left out (that build had matched
+the old baseline, from the build before step 3, in both races), the
+recording run's digest the baseline (`race_test.digest`: 112 and 1,183
+ticks); two playbacks matched it, one lined up a read later at race 1's
+start. Before that: Checked
+2026-11-22: the recording run and three playbacks matched in both races,
+all 124 and 1,196 ticks (a playback skipped 47 or 58 reads at the first
+race, 0 at the second). Tried and dropped: waiting for the archive's
+loads before each logic tick (so loads end on a fixed tick) deadlocked the
+boot (the main thread waiting on the frame driver while its draw thread
+looped in the render replay); the race marks made it unnecessary.
+
+The game's own random generator is lined up too (2026-11-22, E5 step 4):
+at each race's start mark, recording and playback alike set its seed
+(`0x82638188`) to a fixed value per race (`PadTicks_OnRaceStarted`). The
+camera shake draws from it on every tick of a race's loading, whose length
+varies, so the next race's traffic (`Car::SetModel`'s random parts) moved
+with the load times before. With that and `--game_rand_by_tick`
+(`docs/frame-interpolation.md`), the baseline was made again (2026-11-22,
+from E5 step 4's pilot build, `ae77718d`, with both; batch 1 matched it in
+both races, twice).
 
 ## Recordings
 

@@ -1,9 +1,15 @@
 // Finds the pause menu's selection (--find_menu_selection).
 
+#include <format>
 #include "menu_selection_scan.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/frame_passes.h"
+#include "hooks/lifted_call.h"
+#include "sound_cues/manager_update.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -18,6 +24,13 @@
 ITC_FLAG_BOOL(find_menu_selection, false, "ITC",
               "While paused, find words that change on render-only passes only while a "
               "direction is held, and log the code changing them by pass type");
+ITC_FLAG_BOOL(native_audio_manager_update, true, "ITC",
+              "Run AudioManager::Update's callees (docs/functions/sound-cues.md: "
+              "AudioEngine::DoWork sub_8259D1A8, AudioManager::FreeReleasedBanks sub_821184E8, "
+              "UpdateSounds sub_82118FB0 and RemoveStoppedSounds sub_82118C18) natively inside "
+              "their --find_menu_selection wraps instead of through the translated code (their "
+              "callees through the dispatch table; checked by "
+              "--run_harnesses=audio_wraps)");
 ITC_FLAG_STRING(menu_watch, "", "ITC",
                 "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
                 "candidates, without its scan");
@@ -28,7 +41,7 @@ struct Range {
   uint32_t start;
   uint32_t size;
 };
-std::vector<Range> ReadableGuestRanges(uint8_t* base);  // frame_state_diff.cpp
+std::vector<Range> ReadableGuestRanges();  // frame_state_diff.cpp
 
 namespace {
 
@@ -38,7 +51,7 @@ constexpr int kMaxChangeLines = 300;  // per 2 s
 
 class MenuSelectionScan {
  public:
-  void OnPassStart(uint8_t* base, bool render_only, bool paused, uint32_t listener) {
+  void OnPassStart(bool render_only, bool paused, uint32_t listener) {
     render_only_ = render_only;
     before_.clear();
     if (!watch_parsed_) {
@@ -57,7 +70,7 @@ class MenuSelectionScan {
       return;
     }
     if (sampling_) {
-      Compare(base);
+      Compare();
       sampling_ = false;
     }
     auto now = std::chrono::steady_clock::now();
@@ -69,37 +82,38 @@ class MenuSelectionScan {
       return;
     }
     last_sample_ = now;
-    held_ = guest::LoadU32(base, listener + 0x180) != 0 ||
-            guest::LoadU32(base, listener + 0x190) != 0;
-    ranges_ = ReadableGuestRanges(base);
+    held_ = guest::LoadU32(listener + 0x180) != 0 ||
+            guest::LoadU32(listener + 0x190) != 0;
+    ranges_ = ReadableGuestRanges();
     snapshot_.clear();
     for (const Range& r : ranges_) {
-      snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+      snapshot_.insert(snapshot_.end(), guest::Pointer(r.start),
+                       guest::Pointer(r.start) + r.size);
     }
     sampling_ = true;
   }
 
   bool Active() const { return !candidates_.empty(); }
 
-  void Before(uint8_t* base) {
+  void Before() {
     if (candidates_.empty()) {
       return;
     }
     std::vector<uint32_t> values(candidates_.size());
     for (size_t i = 0; i < candidates_.size(); i++) {
-      values[i] = guest::LoadU32(base, candidates_[i]);
+      values[i] = guest::LoadU32(candidates_[i]);
     }
     before_.push_back(std::move(values));
   }
 
-  void After(uint8_t* base, const char* kind, uint32_t id) {
+  void After(const char* kind, uint32_t id) {
     if (before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
     before_.pop_back();
     for (size_t i = 0; i < values.size() && i < candidates_.size(); i++) {
-      uint32_t now = guest::LoadU32(base, candidates_[i]);
+      uint32_t now = guest::LoadU32(candidates_[i]);
       if (now != values[i] && change_lines_ < kMaxChangeLines) {
         change_lines_++;
         ITC_LOG_INFO("menu selection: pass {} {} {} {:08X} changed {:08X}: {} -> {}",
@@ -111,11 +125,11 @@ class MenuSelectionScan {
   }
 
  private:
-  void Compare(uint8_t* base) {
+  void Compare() {
     size_t offset = 0;
     int changed = 0;
     for (const Range& r : ranges_) {
-      const uint8_t* now = base + r.start;
+      const uint8_t* now = guest::Pointer(r.start);
       const uint8_t* then = snapshot_.data() + offset;
       offset += r.size;
       for (uint32_t block = 0; block < r.size; block += 4096) {
@@ -130,7 +144,7 @@ class MenuSelectionScan {
           changed++;
           uint32_t address = r.start + i;
           uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
-          uint32_t after = guest::LoadU32(base, address);
+          uint32_t after = guest::LoadU32(address);
           Hits& hits = hits_[address];
           if (!held_) {
             hits.idle++;
@@ -166,7 +180,7 @@ class MenuSelectionScan {
       }
       candidates.push_back(address);
       const Hits& hits = hits_[address];
-      list += fmt::format(" {:08X}x{}({}->{})", address, n, hits.before, hits.after);
+      list += std::format(" {:08X}x{}({}->{})", address, n, hits.before, hits.after);
     }
     ITC_LOG_INFO(
         "menu selection: sample ({}): {} words changed; {} held and {} idle samples; "
@@ -203,64 +217,59 @@ MenuSelectionScan& Get() {
 
 }  // namespace
 
-void MenuSelectionScan_OnPassStart(uint8_t* base, bool render_only, bool paused,
+void MenuSelectionScan_OnPassStart(bool render_only, bool paused,
                                    uint32_t listener) {
-  Get().OnPassStart(base, render_only, paused, listener);
+  Get().OnPassStart(render_only, paused, listener);
 }
 
 bool MenuSelectionScan_Active() {
   return Get().Active();
 }
 
-void MenuSelectionScan_Before(uint8_t* base) {
-  Get().Before(base);
+void MenuSelectionScan_Before() {
+  Get().Before();
 }
 
-void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
-  Get().After(base, kind, id);
+void MenuSelectionScan_After(const char* kind, uint32_t id) {
+  Get().After(kind, id);
 }
 
 }  // namespace debug
 
-// Wrapped to name them in --find_menu_selection's log: Scene::Update's two
-// screen calls (slot 6 and slot 2 of the screen object at scene + 64), and
-// others below.
-#define ITC_MENU_SCAN_WRAP(address)                         \
-  extern "C" REX_FUNC(sub_##address) {                      \
-    REX_FUNC_PROLOGUE();                                    \
-    debug::MenuSelectionScan_Before(base);                  \
-    __imp__sub_##address(ctx, base);                        \
-    debug::MenuSelectionScan_After(base, "call", 0x##address); \
+// Wrapped to name them in --find_menu_selection's log. Scene::Update's two
+// screen calls (slot 6 and slot 2 of the render queue at scene + 64,
+// sub_8258E5E0 and sub_8258ED78) are wrapped in their adapters
+// (src/hooks/render_queue.cpp); others below. Inside the wrap, the work is
+// its plain C++ (`step`, src/sound_cues/manager_update.h) with
+// --native_audio_manager_update, else the original.
+#define ITC_MENU_SCAN_WRAP(address, step)                   \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                      \
+    \
+    debug::MenuSelectionScan_Before();                  \
+    if (ITC_FLAG(native_audio_manager_update)) {            \
+      lifted_call::EnterR3<sound_cues::step>(ctx);    \
+    } else {                                                \
+      lifted::original::c##address(ctx);         \
+    }                                                       \
+    debug::MenuSelectionScan_After("call", 0x##address); \
   }
-ITC_MENU_SCAN_WRAP(8258E5E0)
-ITC_MENU_SCAN_WRAP(8258ED78)
 // The callees of component update 82119118 (component 40066EE0 in the
 // user's race), which posts the events the pause screen's Update consumes.
-ITC_MENU_SCAN_WRAP(8259D1A8)
-ITC_MENU_SCAN_WRAP(82094B10)
-ITC_MENU_SCAN_WRAP(821184E8)
-ITC_MENU_SCAN_WRAP(82118FB0)
-ITC_MENU_SCAN_WRAP(82118C18)
+ITC_MENU_SCAN_WRAP(8259D1A8, AudioEngineDoWork)
+ITC_MENU_SCAN_WRAP(821184E8, ManagerFreeReleasedBanks)
+ITC_MENU_SCAN_WRAP(82118FB0, ManagerUpdateSounds)
+ITC_MENU_SCAN_WRAP(82118C18, ManagerRemoveStoppedSounds)
 #undef ITC_MENU_SCAN_WRAP
 
-// The app's update (tick handler 82093DC0) runs its component lists through
-// this: r4's low word is a component, whose vtable slot 1 it calls (r4 =
-// the app + 20). Logged as "component <address>" with that slot's target
-// (a delegate's, sub_8223A3F0 or sub_82233460, is at +8).
-extern "C" REX_FUNC(sub_82092968) {
-  REX_FUNC_PROLOGUE();
-  if (!debug::MenuSelectionScan_Active()) {
-    __imp__sub_82092968(ctx, base);
-    return;
-  }
-  uint32_t component = ctx.r4.u32;
-  uint32_t update = component ? guest::LoadU32(base, guest::LoadU32(base, component) + 4) : 0;
-  if (update == 0x8223A3F0 || update == 0x82233460) {
-    update = guest::LoadU32(base, component + 8);
-  }
-  debug::MenuSelectionScan_Before(base);
-  __imp__sub_82092968(ctx, base);
-  static thread_local std::string kind;
-  kind = fmt::format("component {:08X}", component);
-  debug::MenuSelectionScan_After(base, kind.c_str(), update);
+// Job::Wait: its native body (src/hooks/frame_passes.cpp, --native_frame_passes)
+// inside the wrap.
+ITC_NATIVE_ENTRY_ALWAYS(82094B10) {
+  
+  debug::MenuSelectionScan_Before();
+  hooks::FramePassesJobWait(ctx);
+  debug::MenuSelectionScan_After("call", 0x82094B10);
 }
+
+// The app's update (tick handler 82093DC0) runs its component lists through
+// App::RunHandler (sub_82092968), wrapped for this scan in its adapter in
+// src/hooks/app_states.cpp ("component <address>").

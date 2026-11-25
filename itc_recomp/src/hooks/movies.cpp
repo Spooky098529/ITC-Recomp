@@ -6,6 +6,8 @@
 // r3 but State's: the rest leave r3 as it came. See docs/native-movies.md.
 
 #include "guest.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/title_screen.h"
@@ -19,33 +21,28 @@ ITC_FLAG_BOOL(play_movies_with_ffmpeg, true, "ITC",
 namespace mv = movies::movie;
 
 #define ITC_MOVIE(address, ...)                 \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(play_movies_with_ffmpeg)) {   \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(play_movies_with_ffmpeg)) { \
     __VA_ARGS__;                                \
   }
 
-ITC_MOVIE(820AEC10, mv::Play(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MOVIE(820AE4E0, mv::Start(base, ctx.r3.u32))
-ITC_MOVIE(820AE828, mv::Stop(base, ctx.r3.u32))
-ITC_MOVIE(820AE898, mv::Pause(base, ctx.r3.u32))
-ITC_MOVIE(820AE8F8, mv::Resume(base, ctx.r3.u32))
-ITC_MOVIE(820AEA80, ctx.r3.u64 = mv::GetState(base, ctx.r3.u32))
-ITC_MOVIE(820AE528, mv::Release(base, ctx.r3.u32))
+ITC_MOVIE(820AEC10, mv::Play(ctx.r3.u32, ctx.r4.u32))
+ITC_MOVIE(820AE4E0, mv::Start(ctx.r3.u32))
+ITC_MOVIE(820AE828, mv::Stop(ctx.r3.u32))
+ITC_MOVIE(820AE898, mv::Pause(ctx.r3.u32))
+ITC_MOVIE(820AE8F8, mv::Resume(ctx.r3.u32))
+ITC_MOVIE(820AEA80, ctx.r3.u64 = mv::GetState(ctx.r3.u32))
+ITC_MOVIE(820AE528, mv::Release(ctx.r3.u32))
 
 #undef ITC_MOVIE
 
 // Movie::RenderFrame, on the render thread from command 28. --skip_intro
 // waits for it to have returned once (hooks/title_screen.cpp).
-extern "C" REX_FUNC(sub_820AE958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AE958) {
+  
   if (ITC_FLAG(play_movies_with_ffmpeg)) {
-    mv::RenderFrame(base, ctx.r3.u32);
+    mv::RenderFrame(ctx.r3.u32);
   } else {
-    __imp__sub_820AE958(ctx, base);
+    lifted::original::c820AE958(ctx);
   }
   hooks::TitleScreen_MovieRendered();
 }

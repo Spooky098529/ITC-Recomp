@@ -1,8 +1,10 @@
 #include "sprites/billboards.h"
 
 #include "guest.h"
+#include "schema/cameras.h"
+#include "schema/sprites.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -11,53 +13,43 @@
 
 namespace sprites {
 
-void InitBillboardMaterial(uint8_t* base, uint32_t material) {
-  guest::StoreU32(base, material + 8, 0);
-  guest::StoreU32(base, material + 0, 1);
-  guest::StoreU32(base, material + 4, 1);
-  guest::StoreU32(base, material + 12, 0);
-  guest::StoreU32(base, material + 16, 0);
-  guest::StoreU32(base, material + 32, 0);
-  guest::StoreU32(base, material + 36, 0);
+using G = schema::SpritesGlobals;
+using Material = schema::BillboardMaterial;
+using Light = schema::BillboardLight;
+
+void InitBillboardMaterial(uint32_t material) {
+  const Material m(material);
+  m.set_unknown_8(0);
+  m.set_alpha_mode(1);
+  m.set_blend_mode(1);
+  m.set_texture(0);
+  m.set_unknown_16(0);
+  m.set_light_count(0);
+  m.set_lights(0u);
 }
 
-void SetBillboardLights(uint8_t* base, uint32_t material, uint32_t count, uint32_t lights) {
+void SetBillboardLights(uint32_t material, uint32_t count, uint32_t lights) {
   if (count == 0) {
     return;
   }
-  guest::StoreU32(base, material + 32, count);
-  guest::StoreU32(base, material + 36, lights);
+  const Material m(material);
+  m.set_light_count(count);
+  m.set_lights(lights);
 }
 
 namespace {
 
-// Globals and constants the translated code reads.
-constexpr uint32_t kRingCount = 0x826A509C;   // vertices written into the ring so far
-constexpr uint32_t kRingHandle = 0x826A50A8;  // recorded with command 10
-constexpr uint32_t kRingIndex = 0x826A5098;   // the ring's part, 4,096 vertices each
-constexpr uint32_t kRingVertices = 0x8266D098;
+// The ring's halves hold 4,096 vertices each (SpritesGlobals' ring_*).
 constexpr uint32_t kRingRoom = 4096;
-constexpr uint32_t kOne = 0x82000A30;         // 1.0
-constexpr uint32_t kZero = 0x82000A34;        // 0.0
-constexpr uint32_t kForward = 0x82001BE8;     // the camera's forward axis' scale
-constexpr uint32_t kSizeScale = 0x82001BE4;   // the light's width and height scale
-constexpr uint32_t kOffsetW = 0x82001BE0;     // w of the light's offset (not read)
-constexpr uint32_t kFarthest = 0x82001BDC;    // the draw distance's cap
 constexpr uint32_t kVertexBytes = 28;
-constexpr uint32_t kLightBytes = 48;
-
-// Camera pass fields.
-constexpr uint32_t kView = 16;  // its columns' x, y and z are the quad's axes
-constexpr uint32_t kEye = 400;
-constexpr uint32_t kLookAt = 416;
-constexpr uint32_t kDrawDistance = 548;
+constexpr uint32_t kLightBytes = 48;  // a BillboardLight
 
 // The command list slots' return addresses in the original.
 constexpr uint32_t kBeginCall = 0x8209C754, kHandleCall = 0x8209C77C;
 constexpr uint32_t kDrawCall = 0x8209CBDC, kDrawArgsCall = 0x8209CBFC;
 
-float Load(uint8_t* base, uint32_t address) {
-  return guest::LoadFloat(base, address);
+float Load(uint32_t address) {
+  return guest::LoadFloat(address);
 }
 
 // fctidz then stfiwx: the low word of the 64-bit integer, truncated.
@@ -99,21 +91,22 @@ simde__m128 Normalize(simde__m128 v, simde__m128 length_squared, simde__m128 hal
   return simde_mm_or_ps(simde_mm_andnot_ps(zero, normalized), simde_mm_and_ps(zero, length_squared));
 }
 
-void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void StoreU32(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
-void StoreF(uint8_t* base, uint32_t address, float value) {
-  guest::StoreFloat(base, address, value);
+void StoreF(uint32_t address, float value) {
+  guest::StoreFloat(address, value);
 }
 
 }  // namespace
 
-uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
+uint32_t BuildBillboardVertices(uint32_t set, uint32_t material,
                                 const SlotAllocator& slots) {
-  using Fpscr = rex::platform::FPSCRPlatform;
-  const int32_t alpha_mode = int32_t(guest::LoadU32(base, material + 0));
-  uint32_t total = guest::LoadU32(base, material + 32);
+  using Fpscr = ::base::FloatMode;
+  const Material m(material);
+  const int32_t alpha_mode = int32_t(m.alpha_mode());
+  uint32_t total = m.light_count();
   uint32_t type = 2;
   switch (alpha_mode) {
     case 2: case 4: case 8: case 16: case 32: case 64:
@@ -126,47 +119,47 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
   }
 
   uint32_t slot = slots(1, kBeginCall);
-  StoreU32(base, slot + 0, 10);
-  StoreU32(base, slot + 4, 1);
-  StoreU32(base, slot + 8, 0);
+  StoreU32(slot + 0, 10);
+  StoreU32(slot + 4, 1);
+  StoreU32(slot + 8, 0);
   slot = slots(1, kHandleCall);
-  const uint32_t handle = guest::LoadU32(base, kRingHandle);
-  const uint32_t ring_index = guest::LoadU32(base, kRingIndex);
-  StoreU32(base, slot + 0, handle);
-  const uint32_t ring_count = guest::LoadU32(base, kRingCount);
-  const uint32_t first_vertex = ((ring_index << 12) + ring_count) * kVertexBytes + kRingVertices;
+  const uint32_t handle = G::ring_declaration();
+  const uint32_t ring_index = G::ring_half();
+  StoreU32(slot + 0, handle);
+  const uint32_t ring_count = G::ring_count();
+  const uint32_t first_vertex =
+      ((ring_index << 12) + ring_count) * kVertexBytes + G::ring_vertices_address();
   uint32_t vertex = first_vertex;
 
-  if (guest::LoadU32(base, material + 32) != 0) {
-    const float one = Load(base, kOne);
-    const float zero = Load(base, kZero);
-    const float forward = Load(base, kForward);
-    const float size_scale = Load(base, kSizeScale);
-    const float offset_w = Load(base, kOffsetW);
-    const float farthest = Load(base, kFarthest);
+  if (m.light_count() != 0) {
+    const float one = G::one();
+    const float zero = G::zero();
+    const float forward = G::forward_scale();
+    const float size_scale = G::size_scale();
+    const float offset_w = G::offset_w();
+    const float farthest = G::farthest();
     const simde__m128 half = simde_mm_set1_ps(0.5f);
     const uint32_t csr = Fpscr::getcsr();
     const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
-    for (uint32_t i = 0; i < guest::LoadU32(base, material + 32); i++) {
-      const uint32_t light = guest::LoadU32(base, material + 36) + i * kLightBytes;
-      if (!(Load(base, light + 32) > zero) && !(Load(base, light + 36) > zero)) {
+    for (uint32_t i = 0; i < m.light_count(); i++) {
+      const Light light(m.lights().address + i * kLightBytes);
+      if (!(light.width() > zero) && !(light.height() > zero)) {
         total -= 4;
         continue;
       }
-      const uint32_t pass = guest::LoadU32(base, set);
-      const float dx = Load(base, pass + kEye) - Load(base, light + 0);
-      const float dy = Load(base, pass + kEye + 4) - Load(base, light + 4);
-      const float dz = Load(base, pass + kEye + 8) - Load(base, light + 8);
-      float distance = Load(base, pass + kDrawDistance);
+      const schema::CameraPass pass = schema::BillboardPass(set).camera_pass();
+      const float dx = pass.eye_x() - light.x();
+      const float dy = pass.eye_y() - light.y();
+      const float dz = pass.eye_z() - light.z();
+      float distance = pass.init_far();  // the draw distance
       if (!(distance < farthest)) {
         distance = farthest;
       }
       distance = distance * distance;
       const simde__m128 offset = Vector(dx, dy, dz, one);
       const simde__m128 to_light = Vector(-dx, zero, -dz, offset_w);
-      const simde__m128 look = Vector(Load(base, pass + kLookAt) - Load(base, pass + kEye), zero,
-                                      Load(base, pass + kLookAt + 8) - Load(base, pass + kEye + 8),
-                                      one);
+      const simde__m128 look = Vector(pass.target_x() - pass.eye_x(), zero,
+                                      pass.target_z() - pass.eye_z(), one);
       Fpscr::setcsr(flushing);
       const float distance_squared = Word0(simde_mm_dp_ps(offset, offset, 0xEF));
       const simde__m128 to_light_squared = simde_mm_dp_ps(to_light, to_light, 0xEF);
@@ -181,22 +174,24 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
       }
 
       // The quad's axes: the view's columns times the light's width, its
-      // height and the forward scale.
-      const float width = Load(base, light + 32) * size_scale;
-      const float height = Load(base, light + 36) * size_scale;
-      const float rx = Load(base, pass + kView + 0) * width;
-      const float ry = Load(base, pass + kView + 16) * width;
-      const float rz = Load(base, pass + kView + 32) * width;
-      const float ux = Load(base, pass + kView + 4) * height;
-      const float uy = Load(base, pass + kView + 20) * height;
-      const float uz = Load(base, pass + kView + 36) * height;
-      const float fx = Load(base, pass + kView + 8) * forward;
-      const float fy = Load(base, pass + kView + 24) * forward;
-      const float fz = Load(base, pass + kView + 40) * forward;
-      const uint32_t r = ToInteger(Load(base, light + 16));
-      const uint32_t g = ToInteger(Load(base, light + 20));
-      const uint32_t b = ToInteger(Load(base, light + 24));
-      const uint32_t a = ToInteger(Load(base, light + 28));
+      // height and the forward scale (its columns' x, y and z are the
+      // quad's axes).
+      const uint32_t view = pass.view_address();
+      const float width = light.width() * size_scale;
+      const float height = light.height() * size_scale;
+      const float rx = Load(view + 0) * width;
+      const float ry = Load(view + 16) * width;
+      const float rz = Load(view + 32) * width;
+      const float ux = Load(view + 4) * height;
+      const float uy = Load(view + 20) * height;
+      const float uz = Load(view + 36) * height;
+      const float fx = Load(view + 8) * forward;
+      const float fy = Load(view + 24) * forward;
+      const float fz = Load(view + 40) * forward;
+      const uint32_t r = ToInteger(light.red());
+      const uint32_t g = ToInteger(light.green());
+      const uint32_t b = ToInteger(light.blue());
+      const uint32_t a = ToInteger(light.alpha());
       const uint32_t color = (((((a << 8) | r) << 8) | g) << 8) | b;
 
       // Corners: +right +up, -right +up, -right -up, +right -up, each
@@ -208,18 +203,18 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
       const Corner corners[4] = {
           {1, 1, true, true}, {-1, 1, false, true}, {-1, -1, false, false}, {1, -1, true, false}};
       for (const Corner& c : corners) {
-        const uint32_t at = guest::LoadU32(base, material + 36) + i * kLightBytes;
-        const float px = Load(base, at + 0), py = Load(base, at + 4), pz = Load(base, at + 8);
+        const Light at(m.lights().address + i * kLightBytes);
+        const float px = at.x(), py = at.y(), pz = at.z();
         const float x = (c.sx > 0 ? px + rx : px - rx);
         const float y = (c.sx > 0 ? py + ry : py - ry);
         const float z = (c.sx > 0 ? pz + rz : pz - rz);
-        StoreF(base, vertex + 0, (c.sy > 0 ? x + ux : x - ux) + fx);
-        StoreF(base, vertex + 4, (c.sy > 0 ? y + uy : y - uy) + fy);
-        StoreF(base, vertex + 8, (c.sy > 0 ? z + uz : z - uz) + fz);
-        StoreF(base, vertex + 12, one);
-        StoreU32(base, vertex + 16, color);
-        StoreF(base, vertex + 20, c.u ? one : zero);
-        StoreF(base, vertex + 24, c.v ? one : zero);
+        StoreF(vertex + 0, (c.sy > 0 ? x + ux : x - ux) + fx);
+        StoreF(vertex + 4, (c.sy > 0 ? y + uy : y - uy) + fy);
+        StoreF(vertex + 8, (c.sy > 0 ? z + uz : z - uz) + fz);
+        StoreF(vertex + 12, one);
+        StoreU32(vertex + 16, color);
+        StoreF(vertex + 20, c.u ? one : zero);
+        StoreF(vertex + 24, c.v ? one : zero);
         vertex += kVertexBytes;
       }
     }
@@ -227,15 +222,15 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
 
   if (total != 0) {
     slot = slots(1, kDrawCall);
-    StoreU32(base, slot + 4, 1);
-    StoreU32(base, slot + 0, 19);
-    StoreU32(base, slot + 8, 0);
+    StoreU32(slot + 4, 1);
+    StoreU32(slot + 0, 19);
+    StoreU32(slot + 8, 0);
     slot = slots(1, kDrawArgsCall);
-    StoreU32(base, slot + 0, type);
-    guest::StoreU16(base, slot + 4, uint16_t(total));
-    guest::StoreU16(base, slot + 6, uint16_t(kVertexBytes));
-    StoreU32(base, slot + 8, first_vertex);
-    StoreU32(base, kRingCount, guest::LoadU32(base, kRingCount) + total);
+    StoreU32(slot + 0, type);
+    guest::StoreU16(slot + 4, uint16_t(total));
+    guest::StoreU16(slot + 6, uint16_t(kVertexBytes));
+    StoreU32(slot + 8, first_vertex);
+    G::set_ring_count(G::ring_count() + total);
   }
   return total;
 }

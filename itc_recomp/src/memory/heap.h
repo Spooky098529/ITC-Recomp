@@ -1,10 +1,11 @@
 // The native allocation layer: every allocation the game makes, recompiled
 // and native alike, goes through these functions (the recompiled ones by the
 // adapters in src/hooks/heap.cpp; native code calls them directly). The heap
-// and the pages come from one guest range reserved once from the SDK's 4 KiB
-// virtual heap, first fit over the free ranges, with block sizes kept here
-// (no headers in guest memory); physical memory comes from the SDK's
-// physical heaps. Addresses are guest addresses. See docs/native-memory.md.
+// and the pages come from one guest range of our own mapping
+// (memory/mapping.h, 384 MiB at 0x10000), first fit over the free ranges,
+// with block sizes kept here (no headers in guest memory); physical memory
+// from our own allocator over its 512 MB, seen through the mapping's
+// physical views. Addresses are guest addresses. See docs/native-memory.md.
 
 #pragma once
 
@@ -48,18 +49,26 @@ bool FreePages(uint32_t address);
 // free.
 bool IsPages(uint32_t address);
 // Whether `address` is inside the layer's range (false before the first
-// allocation).
+// allocation), or a handle (a host object, E5: ours too, freed through it).
 bool InRange(uint32_t address);
 
 // MmAllocatePhysicalMemoryEx as XPhysicalAlloc (sub_822964C8) and
 // XPhysicalAllocEx (sub_82296550) call it: `size` bytes in physical
 // memory whose physical address is within [low, high], at `alignment`, with
 // the Xbox protection bits (X_PAGE_*, X_MEM_LARGE_PAGES for 64 KiB pages,
-// X_MEM_16MB_PAGES); from the SDK's physical heap for the page size, as the
-// SDK's import does. Out of memory logs and aborts.
+// X_MEM_16MB_PAGES); top down, at the view for the page size (0xA0000000,
+// 0xC0000000, 0xE0000000), as the SDK's import did. Out of memory logs and
+// aborts.
 uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alignment,
                        uint32_t protection);
-// XPhysicalFree (sub_822965C8): MmFreePhysicalMemory's release.
+// XPhysicalFree (sub_822965C8): MmFreePhysicalMemory's release; logged once
+// for an address AllocPhysical didn't give.
 void FreePhysical(uint32_t address);
+// XPhysicalSize (sub_822965C0, MmQueryAllocationSize's wrapper): the block's
+// allocated size, as the SDK's import answers it (the size AllocPhysical
+// asked for rounded up to its page size, one page for 0), recorded by
+// AllocPhysical; 0
+// (logged once) for an address it didn't give. The user's call, 2026-11-06.
+uint32_t PhysicalSize(uint32_t address);
 
 }  // namespace memory

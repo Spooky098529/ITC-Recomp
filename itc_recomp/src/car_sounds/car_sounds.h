@@ -1,0 +1,432 @@
+// The car sounds natively (docs/functions/car-sounds.md): the game's own
+// sounds for the cars over XAudio's voices, their wave bank views and their
+// objects' set-up. Plain C++ over the guest layout; the adapters are in
+// src/hooks/car_sounds.cpp (behind --native_car_sounds). XAudio's entry
+// points are called through their plain C++ (src/xaudio/), each in a frame
+// below the caller's (xaudio::FrameBelow), with the registers set as the
+// original sets them before the call.
+
+#pragma once
+
+#include "car_sounds/x3daudio.h"
+#include "xaudio/voices.h"
+
+#include <cstdint>
+#include <optional>
+
+namespace car_sounds {
+
+// The voice holder's vtable (the 44-byte base of every sound part) and the
+// engine layer's.
+constexpr uint32_t kHolderVtable = 0x82010B5C;
+constexpr uint32_t kLayerVtable = 0x82008018;
+constexpr uint32_t kCarSoundBytes = 1264;
+
+// --- The wave bank views (24 bytes over an XWB in memory) ---
+
+// sub_8210C9D8 WaveBankView::Init: the view over `bank`; returns 0 (r3).
+uint32_t WaveBankViewInit(uint32_t view, uint32_t bank);
+// sub_8210C850 WaveBankView::Format: wave `wave`'s PCM format into `out`
+// (+0 the sample type, +4 the channels, +8 the rate); 1 (nothing written)
+// past the count or for a format other than PCM, else 0.
+uint32_t WaveBankFormat(uint32_t view, uint32_t wave, uint32_t out);
+// sub_8210C920 WaveBankView::Length: the entry's +12 into `out`; 1 past the
+// count, else 0.
+uint32_t WaveBankLength(uint32_t view, uint32_t wave, uint32_t out);
+// sub_8210C958 WaveBankView::Data: the entry's +8 plus the wave data's
+// start into `out`; 1 past the count, else 0.
+uint32_t WaveBankData(uint32_t view, uint32_t wave, uint32_t out);
+// sub_8210C998 WaveBankView::Entry: the wave's 24-byte entry copied into
+// `out` (XMemCpy); 0. Nullopt, with nothing copied, where XMemCpy's
+// original must run.
+std::optional<uint32_t> WaveBankEntry(uint32_t view, uint32_t wave, uint32_t out);
+
+// --- The car sound objects ---
+
+// sub_8210CB48 CarSounds::SetBanks: the car's sound parameters
+// [[0x82616318 + 16 i] + 4 j] into the car sound's banks.
+constexpr uint32_t kSoundParameters = 0x82616318;
+void SetBanks(uint32_t sound, uint32_t i, uint32_t j);
+// sub_8210CA28 TireSound::Amount: the tires' part's +80 and +76 stepped by
+// `f1` (a double, as the register holds it).
+void TireSoundAmount(uint32_t part, double f1);
+// sub_8210CBA0 EngineSound::EngineSound: the engine part's two layers.
+void EngineSoundConstruct(uint32_t engine);
+// sub_8210CC18 CarSound::CarSound: the engine and the ten holders; returns
+// the car sound.
+uint32_t CarSoundConstruct(uint32_t sound);
+
+// sub_8210DCA8 CarSounds::Destroy (the vector deleting destructor): the
+// vtables put back, for the array (flags bit 1; the count at r3 - 16) or one
+// car sound. Returns r3 as the original leaves it (the array's block or the
+// object) and, in `to_free`, the block operator delete (`array`: delete[])
+// is to free (flags bit 0), or 0.
+struct Destroyed {
+  uint32_t r3;
+  uint32_t to_free;
+  bool array;
+};
+Destroyed CarSoundsDestroy(uint32_t sound, uint32_t flags);
+
+// sub_8210DDC8 CarSound::SetUp: the car sound's X3DAudio listener (+4),
+// emitter (+52, its curves and channel azimuths), DSP settings (+176 the
+// matrix `matrix`, 24 bytes from operator new[] that the adapter makes
+// first; one source and six destination channels) and the floats +1192 to
+// +1244 from the game's constants; the vectors +368 and +384 stored as stvx
+// does (at their addresses rounded down to 16). Returns the matrix (r3).
+uint32_t SetUp(uint32_t sound, uint32_t matrix);
+
+// sub_82110258 SoundGlobals::Init, in two parts around its call to
+// Music::Play (the adapter's guest call): the music player kept, the
+// volumes and the scene models' sound picks set, and bank pair 2's two
+// physical buffers made (Memory::AllocPhysicalEx's plain C++, so only while
+// the memory blocks are native); then X3DAudioInitialize's plain C++ for
+// 5.1 into the handle at 0x826C5C90, whose r3 it returns.
+constexpr uint32_t kMusicName = 0x820080FC;
+constexpr uint32_t kX3DAudioHandle = 0x826C5C90;
+void SoundGlobalsInit(uint32_t music_player);
+uint32_t SoundGlobalsInit3D();
+
+// sub_8210F820 CarSound::Update3D (car_sound_3d.cpp), every tick from
+// CarSound::Update for each car: r3 = the car sound, r4 = Update's case
+// flag, r5 = the vehicle (all three whole registers). The camera pass
+// (0x826BAC00, or its +592 when the race data's +0xA3AF0 is 4 and
+// [0x826C2CE8]+8 is set): the listener's position (+28, and +384) its +400,
+// its front (+4) its +464 and +472 with y 0; the emitter's position (+80,
+// and +368) the vehicle's rigid body's (+336, RigidBody::Position,
+// Vec4::Copy), or the camera's when the car is the one at the camera (view
+// mode [[0x826C2CE8]]+1860 1 and r4 1; in race mode +0xA3AF4 8 also the
+// vehicle's +6148 bit 0x1 or 0x80 by [0x826C7824]); both velocities (+40,
+// +92) from the old +384 and +368 (vectors, flush to zero on) times
+// [0x82001FD8] and [0x820021E4]; then X3DAudioCalculate's plain C++ (the
+// handle 0x826C5C90, flags 0x3D, the DSP settings +176); the output maps
+// +272 (the matrix times [0x82616C38], or [0x82002A10] times it for the car
+// at the camera) and +224 (+200, the reverb level, times it), their
+// descriptors +320 to +356; +1260 passed close; +1256 = +204. `sp` is the
+// caller's stack pointer: the original's 288-byte frame (its prologue's
+// saves, the back chain, its locals) and Calculate's below it written as
+// the originals leave them. `saves` holds the caller's registers the
+// prologues save. Returns the r3 the original leaves (Calculate's).
+struct Update3DSaves {
+  uint32_t lr;
+  uint64_t r22, r23, r24, r25, r26, r27, r28, r29, r30, r31;
+  uint64_t f23, f24, f25, f26, f27, f28, f29, f30, f31;  // the bits
+  uint8_t v126[16], v127[16];                            // as the SDK's context held them
+};
+uint64_t Update3D(uint64_t sound, uint64_t r4, uint64_t vehicle, uint32_t sp,
+                  const Update3DSaves& saves, const x3daudio::TanCall& tan);
+
+// --- The voice holders (car_sound_voices.cpp) ---
+//
+// A voice holder (the 44-byte base of every sound part): four XAudio source
+// voices at +4 to +16, their count at +20, which were playing at +24 to +36.
+// `frame` is the function's own frame (the original's size, given with each)
+// and `call` the guest call for XAudio's calls into the recompiled objects
+// and the kernel; each returns the r3 the original leaves.
+using xaudio::GuestCall;
+using xaudio::Thread;
+
+// sub_8210D158 CarSound::SetPitch (a tail call, no frame: `sp` the caller's
+// stack pointer): (f1 - [0x8200801C]) x [0x82008020], at least [0x82002A24]
+// (r7 set) or [0x82001BE0], or that floor straight when f1 is
+// [0x82000A34]; the voice in `slot`'s frequency ratio (XAudio's
+// SetFrequencyRatio) with it.
+uint32_t SetPitch(uint32_t holder, uint32_t slot, double f1, uint32_t r7,
+                  uint32_t sp, const GuestCall& call);
+// sub_8210D080 CarSound::SetPitchScaled (96 bytes): as SetPitch with the
+// difference also times r9 (as a float) x [0x82008024], the floor for r7 0
+// that times [0x82001BE0]; then + f3 - [0x82007FC8].
+uint32_t SetPitchScaled(uint32_t holder, uint32_t slot, double f1, double f3,
+                        uint32_t r7, uint32_t r9, uint32_t frame, const GuestCall& call);
+// sub_8210D1D8 CarSound::IsPlaying (112 bytes): 1 when the voice in `slot`
+// exists and its state's (GetState, at the frame's +80) first byte has bit
+// 0; 0 for the slot -1.
+uint32_t IsPlaying(uint32_t holder, uint32_t slot, uint32_t frame,
+                   const GuestCall& call);
+// sub_8210D378 CarSound::UpdateVoices (112 bytes): `output` (r4, the whole
+// register) stored at the caller's frame's +24 (the frame's +136); each
+// voice whose state has bit 2 stopped, released and cleared, each playing
+// one (bit 0) given the output matrix at the frame's +136.
+uint32_t UpdateVoices(uint32_t holder, uint64_t output, uint32_t frame,
+                      const GuestCall& call);
+// sub_8210D320 CarSound::Clear (128 bytes): each voice stopped, released and
+// cleared; +20 = 0.
+uint32_t Clear(uint32_t holder, uint32_t frame, const GuestCall& call);
+// sub_8210D240 CarSound::Pause (112 bytes): each playing voice stopped and
+// noted (+24 + 4i = 1, else 0).
+uint32_t Pause(uint32_t holder, uint32_t frame, const GuestCall& call);
+// sub_8210D2C0 CarSound::Resume (112 bytes): each voice noted started again.
+uint32_t Resume(uint32_t holder, const Thread& thread, uint32_t frame,
+                const GuestCall& call);
+// sub_8210E2B8 CarSound::PauseAll and sub_8210E350 ResumeAll (112 bytes
+// each): Pause or Resume on the car sound's 12 holders.
+uint32_t PauseAll(uint32_t sound, uint32_t frame, const GuestCall& call);
+uint32_t ResumeAll(uint32_t sound, const Thread& thread, uint32_t frame,
+                   const GuestCall& call);
+
+// --- Making and starting the voices (car_sound_voices.cpp) ---
+
+// What making a voice needs beside the guest call: the thread's words and
+// whether XAudio's default allocator may run natively (the native heap).
+struct Voices {
+  Thread thread;
+  bool native_heap;
+};
+
+// The submix voice every car's voices play into.
+constexpr uint32_t kSubmix = 0x826C5C44;
+// The car sounds' array (the count 7 at [-16]).
+constexpr uint32_t kSounds = 0x826C5C3C;
+
+// sub_8210CE38 CarSound::AddVoice (496 bytes): in the holder's first free
+// slot (none: -1), a source voice of wave 0's format (WaveBankView::Format
+// into the description at the frame's +304, its outputs at +144: the null
+// voice and the submix, each with the six-channel map at +80) made by
+// XAudioCreateSourceVoice, then wave `wave`'s buffer submitted (the packet
+// at +208: the data, the length, with `loop` (r6) the loop region from the
+// entry copied to +176, in bytes for 8- or 16-bit samples); +20 up by one.
+// Returns the slot.
+uint32_t AddVoice(uint32_t holder, uint32_t view, uint32_t wave, uint32_t loop,
+                  const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210E3E8 CarSound::PlayOnce (128 bytes): AddVoice (`loop` r8), then
+// the voice started, its volume `volume` (f1) and pitch `pitch` (f2,
+// SetPitch with r7 0). Returns the slot or -1.
+uint32_t PlayOnce(uint32_t holder, uint32_t view, uint32_t wave, uint32_t loop,
+                  double volume, double pitch, const Voices& voices, uint32_t frame,
+                  const GuestCall& call);
+// sub_8210D410 EngineLayer::Start (112 bytes): +4 to +16 and the 24 bytes
+// at +20 cleared, four looping voices of waves 0-3 from `view` into the
+// holder at +44.
+uint32_t EngineLayerStart(uint32_t layer, uint32_t view, const Voices& voices,
+                          uint32_t frame, const GuestCall& call);
+// sub_8210D6C0 EngineSound::Start (112 bytes): layer +84 from [views],
+// layer +0 from [views + 4] (r4 `index` as the original passes it); +168
+// = [0x82000A34], +172 = [0x82003384].
+uint32_t EngineSoundStart(uint32_t engine, uint64_t index, uint32_t views,
+                          const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210D7F8 TireSound::Start (128 bytes): +68 the index's low byte, +64
+// the view, +72 and +80 [0x82000A34], +70 and +76 0, two looping voices of
+// wave 0 into the holder at +24, then its state words.
+uint32_t TireSoundStart(uint32_t part, uint32_t index, uint32_t view,
+                        const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210E030 CarSound::Start (128 bytes): the engine (two views at
+// `views`), the tires and each part's bank `view` and index (+404), their
+// state words; the roll noise's looping voice of wave 1 (+792).
+uint32_t CarSoundStart(uint32_t sound, uint32_t views, uint32_t view,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+
+// sub_8210E218 CarSound::Stop (112 bytes): Clear on the 12 holders, +1248
+// = 0.
+uint32_t Stop(uint32_t sound, uint32_t frame, const GuestCall& call);
+// sub_8210F7C8 CarSounds::StopAll (112 bytes): Stop on each of the seven at
+// [0x826C5C3C] (on 0 each time when the array is 0, as the original).
+uint32_t StopAll(uint32_t frame, const GuestCall& call);
+// sub_8210E170 CarSound::Release (112 bytes): Clear on the 12 holders, the
+// matrix (+176) freed (operator delete[]'s plain C++, its original through
+// `call` where that refuses), +1248 = 0.
+uint32_t Release(uint32_t sound, uint32_t frame, const GuestCall& call);
+// sub_8210F750 CarSounds::Release (112 bytes): Release on each of the
+// seven, the array destroyed (CarSounds::Destroy with 3, its frees through
+// operator delete[]'s plain C++) and the submix voice released.
+uint32_t CarSoundsRelease(uint32_t frame, const GuestCall& call);
+
+// sub_8210FE00 CarSounds::Init (368 bytes): the seven car sounds (operator
+// new[] of 8,864 bytes, the count 7 at +0, each made by CarSound::CarSound)
+// into [0x826C5C3C], cleared (8,848 bytes) and each made again and set up
+// (+1252 [0x82007FC8], +404 its index, +400, +0 and +1248 0, SetUp with its
+// matrix from operator new[]); [0x826C5C40] = 0; the six-channel 48 kHz
+// submix voice (XAudioCreateSubmixVoice: the description at the frame's
+// +224, its map at +208 and +96, its outputs at +144 and +256) into
+// [0x826C5C44] and its effect parameters (SetEffectParameters r4 0, r5 1,
+// r6 3, the block 0x82616638 at the frame's +80). Operator new[] through
+// its plain C++, the guest's through `call` where that refuses. Returns
+// SetEffectParameters' r3.
+uint32_t CarSoundsInit(const Voices& voices, uint32_t frame,
+                       const GuestCall& call);
+
+// --- The parts' updates (car_sound_parts.cpp), from CarSound::Update ---
+//
+// `part` is the part's holder (r3), `vehicle` the vehicle (r4), `output` the
+// DSP output word (r5, the whole register) UpdateVoices is given; each
+// returns the r3 the original leaves. One-shot waves through PlayOnce with
+// the holder's view (+40).
+
+// sub_8210E778 (144 bytes; probably the impact): with the vehicle's +6152
+// bit 0, the strength of the collision object's (+340) first contact of
+// mask 0xFFFFFF; wave 7 + its level (strength x [0x82008054], at most
+// [0x820021E8], fctidz into the frame's +80) when it passes [0x82002A0C]
+// with +64 -1, or [0x82001FC0] with +64 at least 0; then +48 the ticks,
+// +60 the strength (fctiwz), +64 0.
+uint32_t HitImpact(uint32_t part, uint32_t vehicle, const Voices& voices,
+                   uint32_t frame, const GuestCall& call);
+// sub_8210E938 (192 bytes; probably the scrape): in contact (+6152 bit 1
+// without bit 0), the first contact of mask 0xFF000000's strength times the
+// speed; the looping wave 10 (+56 its slot) played or its volume set, and
+// wave 7 + the level above [0x82001FC0]; out of contact, the looping voice
+// stopped after two ticks (+52).
+uint32_t HitScrape(uint32_t part, uint32_t vehicle, const Voices& voices,
+                   uint32_t frame, const GuestCall& call);
+// sub_8210EB90 (96 bytes): wave 9 on the vehicle's +6152 bit 2, +48 = 32.
+uint32_t HitWave9(uint32_t part, uint32_t vehicle, const Voices& voices,
+                  uint32_t frame, const GuestCall& call);
+// sub_8210FD78 HitSounds::Update (112 bytes): the three above while +48 is 0
+// (else +48 down by one), +64 counted up to 32 (then -1), UpdateVoices.
+uint32_t HitSoundsUpdate(uint32_t part, uint64_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EBF0 (112 bytes; the part at +736): nothing while the vehicle's
+// +2252 is 0; wave 4 when its byte +2948 sets and +48 is 0 (+52 the slot,
+// +48 32 ticks), its volume +2952 by the car's specs (+5712: byte +2019,
+// word +1656); +48 counted down while the byte is clear; UpdateVoices.
+uint32_t Part736Update(uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210ECF0 (128 bytes; the part at +840): wave 6 on the vehicle's byte
+// +2504, wave 18 on +2960 when the byte +45 is 0 (+45 = 2, down to 0 a
+// tick); UpdateVoices.
+uint32_t Part840Update(uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EEE0 (144 bytes; the part at +888): the looping wave 17 started on
+// the vehicle's byte +2424 (+48 1, +52 the slot), its volume faded in (+60)
+// and out (+56) by [0x82007FC8] a tick, stopped at 0.0; UpdateVoices.
+uint32_t Part888Update(uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EDB0 WindSound::Update (128 bytes): wave 5 once (+48 1) while a
+// halfword at the vehicle's +5410 + 96i (i 0-3) has bit 0 and the speed
+// passes [0x8200257C], its volume by the speed and the view mode
+// ([[0x826C2CE8]]+1860); +48 back to 0 when none has; UpdateVoices.
+uint32_t WindSoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210F088 PassBySound::Update (112 bytes): nothing without a vehicle;
+// wave 15 when `passed` (r6) and the vehicle's +6148 & 0x81 is clear;
+// UpdateVoices.
+uint32_t PassBySoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                           uint32_t passed, const Voices& voices, uint32_t frame,
+                           const GuestCall& call);
+
+// --- The engine (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210D478 EngineLayer::Update (272 bytes): r3 = an engine layer, f1 the
+// engine's speed (capped at [0x82007FC4]), f2 `volume`, f4 `pitch`, f5
+// `gain`, r7 `output` (the whole register, stored at the frame's +96 for
+// SetOutputMatrix). For each entry of the layer's table (+4; 136 bytes from
+// its +4, while the entry's word is above -1; one voice each, the holder at
+// +44): the amount from the entry's first curve (+8, x and y pairs, ended by
+// an x at most [0x82001BE0]) stored at the layer's next float from +20, the
+// pitch from its second (+72); GetState (the frame's +80) and Start when
+// the amount is above 0.0 and it isn't playing; the volume: the table's
+// first word (fcfid through the frame's +88) times [0x82008028], the amount,
+// `volume`, `gain` and [0x82007FD4]; SetPitchScaled (r7 0, r9 the entry's
+// +4, f3 `pitch`); SetOutputMatrix. Returns 0.
+uint32_t EngineLayerUpdate(uint32_t layer, double speed, double volume,
+                           double pitch, double gain, uint64_t output, const Voices& voices,
+                           uint32_t frame, const GuestCall& call);
+// sub_8210D718 EngineLayer::UpdatePitched (144 bytes): r3 = the engine part,
+// f1 the speed, f2-f4, r6 `output`: above [0x82007FE0] the speed (capped)
+// through pow (sub_825A8ED0's plain C++) into a curve, then EngineLayer::
+// Update on layer +84 with the volume that times ([0x82002A3C] f2 +
+// [0x82007FD8]) x [0x8200802C], f4 f3 and f5 f4. Returns its r3.
+uint32_t EngineLayerUpdatePitched(uint32_t engine, double speed, double f2,
+                                  double f3, double f4, uint64_t output, const Voices& voices,
+                                  uint32_t frame, const GuestCall& call);
+// sub_8210E470 EngineSound::Update (160 bytes): r3 = the engine part, r4 the
+// vehicle, r5 `output`, f1 and f2: the speed the vehicle's +2224 (sub_820C0140's
+// plain C++) over its specs' (+272) +1280, times [0x82007FC4] (no vehicle:
+// +172 up by [0x82001FD8], back to [0x82003384] past [0x82008048]); the load
+// (+168 eased toward 0.0, +288 or +284 by the gear and clutch words +2248,
+// +2252, +2256 and +2268, by [0x82002968]; 1.0 without a vehicle); layer +0
+// (f2 = load x 0.0 + 1.0, f4 f1, f5 f2) and UpdatePitched; +168 = the load.
+// Returns UpdatePitched's r3.
+uint32_t EngineSoundUpdate(uint32_t engine, uint32_t vehicle, uint64_t output,
+                           double f1, double f2, const Voices& voices, uint32_t frame,
+                           const GuestCall& call);
+
+// --- The tires and the roll (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210D890 TireLayer::Update (160 bytes): r3 = the tires' part (its
+// holder at +24), r4 `layer` (the part itself in play: +0 the slot, +4 the
+// last tick's `active`, the bytes +8 the ticks slipped, +9 the ramp's step,
+// +10 its length), r5 `active`, r7 `output` (the whole register, at the
+// frame's +80 for SetOutputMatrix), f1 `scale`. Active: the voice started
+// unless playing (IsPlaying), its volume +80 x `scale` x [0x82007FEC], its
+// pitch the half-word +76 (through the frame's +80) + [0x82008038]
+// (SetPitch, r7 0), the output; +9 = 0, +8 up by one. Else, while it plays:
+// just stopped (+4 set), the ramp's length +10 from +8 x 10 x
+// [0x820029EC] (fctidz's low byte; under 10 [0x82001FD8], else at most
+// [0x82008034]); while +9 is below +10 the volume +80 x [0x82007FEC] and
+// the pitch half-way from +76 toward +9 x 128 (at most 16383), else the
+// voice stopped and +8, +9 cleared; +9 up by one. +4 = `active`. Returns
+// the last call's r3.
+uint32_t TireLayerUpdate(uint32_t part, uint32_t layer, uint32_t active,
+                         uint64_t output, double scale, const Voices& voices, uint32_t frame,
+                         const GuestCall& call);
+// sub_8210E5C0 TireSound::Update (160 bytes): r3 = the tires' part (+652),
+// r4 the vehicle, r5 `output`: the slip (Vehicle::SlipWheelValue with
+// [0x82002BCC], in a 240-byte frame below); with any wheel's +433 set and
+// Vehicle::MaxWheelSlip ([0x82007FF0]) not 0.0, TireSound::Amount with the
+// slip, +70 up by one and +72 by 1.0, active; with none, the voices at +28
+// and +32 stopped when playing (GetState at the frame's +80 and +81); not
+// active and neither slot (+0, +12) playing, +80, +72 = 0.0 and +70, +76
+// = 0. Then TireLayer::Update (r4 the part, f1 [0x82007FC8]). Returns its
+// r3.
+uint32_t TireSoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210DB60 RollSound::Update (144 bytes): r3 = the part at +792, r4 the
+// vehicle, r5 `output`: the volume (Vehicle::GetSpeedKmh)^2 x [0x82008044]
+// (at most [0x82007FC8]) x [0x82007FEC], and its fctiwz x [0x82008040] at
+// the frame's +88; its voice (+4) stopped when playing and the volume 0.0,
+// started when not and it isn't; then the pitch (the word at +88 as a
+// float + [0x8200803C], SetPitch slot 0, r7 0), the volume x [0x82007FEC]
+// and the output (at the frame's +88). Returns the last call's r3.
+uint32_t RollSoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+
+// --- The horn and the turbo (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210F118 HornSound::Update (probably; 192 bytes): r3 = the part at
+// +1072, r4 the vehicle, r5 `output`, f1 the car sound's +204 (f3 of the
+// pitch). Nothing without a vehicle. The horn's wave 11 + the low byte of
+// the car's (+5712) word +1796. In race mode 8 (the race data's +0xA3AF4):
+// input record [0x826C5B30 + 4 x side] (side 1 when [0x826C7824] is 0) for
+// the vehicle's +6148 bit 0x1 (side 0) or 0x80 (side 1), +56 the flag and
+// +48 the slot; the record at 0x826C62CC for the other bit, +60 and +52.
+// Else record [0x826C5B30], +56 and +48. Each record's 20 bytes copied to
+// the frame's +80; with its first word's bit 0x20000 the looping wave played
+// once (PlayOnce, [0x82007FD8], [0x8200803C]; the flag 1) and pitched each
+// tick (SetPitchScaled: f1 [0x8200803C], r7 0, r9 1600); without it, with
+// the flag 1, stopped when playing (the flag 0). UpdateVoices.
+uint32_t HornSoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                         double f1, const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210F4E8 TurboSound::Update (probably; 144 bytes): r3 = the part at
+// +952, r4 the vehicle, r5 `output`, by the boost (the vehicle's +2944):
+// the volume +60 up by the byte +59 x [0x82008068], at most [0x82008064];
+// while the byte +58 counts down, nothing else; at 0, the looping wave 3
+// played (+48 its slot, +60 0.0, +59 0, +58 16) when not playing and the
+// boost is above 1.0 and the last one (+52), or stopped below [0x82002A2C]
+// (+60 0.0, +59 0). Playing: the pitch word +56 (below 3072) up by the rise
+// x [0x820021EC] + [0x820029CC] (fctiwz, at most 3072), SetPitch with it +
+// 8192 (r7 0), the volume +60, +59 up by one; not playing, +56 down by 255
+// (to 0). +52 = the boost; UpdateVoices. Conversions through the frame's +80.
+uint32_t TurboSoundUpdate(uint32_t part, uint32_t vehicle, uint64_t output,
+                          const Voices& voices, uint32_t frame, const GuestCall& call);
+
+// --- The car sound's update (car_sound_parts.cpp), every tick ---
+
+// sub_82110048 CarSound::Update (128 bytes): r3 = `sound` (the whole
+// register); nothing (r3 left) without a vehicle (+400). `players` (r29):
+// the vehicle's +6148 & 0x81 set (the players' cars, probably). Update3D
+// (r4 `players`, r5 the vehicle; `saves` the caller's registers, which its
+// prologue saves with lr, r29 and r31 as the original has them then); +204
+// clamped to [0x82001070]-[0x820029D4]; for the players' cars, the submix's
+// SetEffectParameters (r4 0, r5 1, r6 3) with the block 0x826166F8 (at the
+// frame's +80) when +0 is 0 and the vehicle's half-word +5314 has bit 1 (+0
+// = 1), or 0x82616638 (at +88) when +0 is 1 and it hasn't (+0 = 0). With
+// +1248: the engine (+408, f1 +204, f2 +1252), the tires (+652), the hits
+// (+584), the pass by (+1136, r6 +1260), the turbo (+952); for the players'
+// cars also +736, +840, +888, the roll (+792), the wind (+1016) and the horn
+// (+1072, f1 +204); each with r4 +400 and r5 the 8 bytes at +352. `frame`
+// is its own frame (the prologue's saves of r29 to r31 and lr from `saves`
+// written above it); returns the r3 the original leaves.
+uint64_t CarSoundUpdate(uint64_t sound, const Update3DSaves& saves,
+                        const Voices& voices, uint32_t frame, const GuestCall& call,
+                        const x3daudio::TanCall& tan);
+
+}  // namespace car_sounds

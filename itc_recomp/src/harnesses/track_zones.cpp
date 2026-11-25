@@ -161,13 +161,13 @@ void Lists(Context& h, Random& r) {
     uint32_t n;
     bool insert;
   } kFunctions[] = {
-      {"List16::Link (sub_821531C0)", Original<__imp__sub_821531C0>, NativeList16Link, 16, false},
-      {"List64::Link (sub_820FE2C8)", Original<__imp__sub_820FE2C8>, NativeList64Link, 64, false},
-      {"List128::Link (sub_8228B5A0)", Original<__imp__sub_8228B5A0>, NativeList128Link, 128,
+      {"List16::Link (sub_821531C0)", Original<__imp__sub_821531C0>, ITC_CONTEXT_FN(NativeList16Link), 16, false},
+      {"List64::Link (sub_820FE2C8)", Original<__imp__sub_820FE2C8>, ITC_CONTEXT_FN(NativeList64Link), 64, false},
+      {"List128::Link (sub_8228B5A0)", Original<__imp__sub_8228B5A0>, ITC_CONTEXT_FN(NativeList128Link), 128,
        false},
-      {"List64::Insert (sub_820FE330)", Original<__imp__sub_820FE330>, NativeList64Insert, 64,
+      {"List64::Insert (sub_820FE330)", Original<__imp__sub_820FE330>, ITC_CONTEXT_FN(NativeList64Insert), 64,
        true},
-      {"List128::Insert (sub_8228BC18)", Original<__imp__sub_8228BC18>, NativeList128Insert, 128,
+      {"List128::Insert (sub_8228BC18)", Original<__imp__sub_8228BC18>, ITC_CONTEXT_FN(NativeList128Insert), 128,
        true},
   };
   const uint32_t block = memory::Alloc(0x1000, 0);
@@ -228,7 +228,7 @@ void Ranges(Context& h, Random& r) {
         t.r3.u64 = range;
         t.r4.u64 = ends;
         t.r5.u64 = r5;
-        (v == 0 ? Original<__imp__sub_820FE058> : NativeRangeInit)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820FE058> : ITC_CONTEXT_FN(NativeRangeInit))(t, h.base);
         out[v].Bytes(Read(h.base, block, 0x800));
         out[v].Word(t.r3.u32);
       }
@@ -250,7 +250,7 @@ void Ranges(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = range;
         t.r4.u64 = section;
-        (v == 0 ? Original<__imp__sub_820FE8C8> : NativeRangeAddBranch)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820FE8C8> : ITC_CONTEXT_FN(NativeRangeAddBranch))(t, h.base);
         out[v].Bytes(Read(h.base, block, 0x800));
         out[v].Word(t.r3.u32);
       }
@@ -285,7 +285,7 @@ void Zones(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = zone;
         t.r4.u64 = args;
-        (v == 0 ? Original<__imp__sub_8228B540> : NativeZoneReset)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8228B540> : ITC_CONTEXT_FN(NativeZoneReset))(t, h.base);
         out[v].Bytes(Read(h.base, block, kBytes));
         out[v].Word(t.r3.u32);
       }
@@ -302,7 +302,7 @@ void Zones(Context& h, Random& r) {
         guest::StoreU32(h.base, zone + tz::kZoneInside, flag);
         PPCContext t = CallContext(h);
         t.r3.u64 = zone;
-        (v == 0 ? Original<__imp__sub_8228B4F8> : NativeZoneIsInside)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8228B4F8> : ITC_CONTEXT_FN(NativeZoneIsInside))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], fmt::format("case {}", c));
@@ -326,7 +326,7 @@ void Zones(Context& h, Random& r) {
         t.r3.u64 = zone + tz::kZoneRanges;
         t.r4.u64 = source;
         t.r5.u64 = high | position;
-        (v == 0 ? Original<__imp__sub_8228BBA8> : NativeZoneRangesInsert)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8228BBA8> : ITC_CONTEXT_FN(NativeZoneRangesInsert))(t, h.base);
         out[v].Bytes(Read(h.base, block, kBytes));
         out[v].Word(t.r3.u32);
       }
@@ -516,13 +516,13 @@ void RangeTests(Context& h, Random& r) {
     GuestFunction recompiled, native;
     Kind kind;
   } kFunctions[] = {
-      {"RouteRange::ToNeighbor (sub_820FDF98)", Original<__imp__sub_820FDF98>, NativeToNeighbor,
+      {"RouteRange::ToNeighbor (sub_820FDF98)", Original<__imp__sub_820FDF98>, ITC_CONTEXT_FN(NativeToNeighbor),
        kToNeighbor},
-      {"RouteRange::WithinEnds (sub_820FE120)", Original<__imp__sub_820FE120>, NativeWithinEnds,
+      {"RouteRange::WithinEnds (sub_820FE120)", Original<__imp__sub_820FE120>, ITC_CONTEXT_FN(NativeWithinEnds),
        kWithinEnds},
-      {"RouteRange::OnPath (sub_820FE398)", Original<__imp__sub_820FE398>, NativeOnPath, kOnPath},
-      {"RouteRange::Test (sub_820FE6F8)", Original<__imp__sub_820FE6F8>, NativeTest, kTest},
-      {"RouteRange::Update (sub_820FE878)", Original<__imp__sub_820FE878>, NativeUpdate,
+      {"RouteRange::OnPath (sub_820FE398)", Original<__imp__sub_820FE398>, ITC_CONTEXT_FN(NativeOnPath), kOnPath},
+      {"RouteRange::Test (sub_820FE6F8)", Original<__imp__sub_820FE6F8>, ITC_CONTEXT_FN(NativeTest), kTest},
+      {"RouteRange::Update (sub_820FE878)", Original<__imp__sub_820FE878>, ITC_CONTEXT_FN(NativeUpdate),
        kUpdate},
   };
   constexpr uint32_t kAreaBytes = 0x3000;
@@ -670,7 +670,7 @@ void ZoneUpdates(Context& h, Random& r) {
       guest::StoreU32(h.base, tz::kSliceCount, slices);
       PPCContext t = CallContext(h);
       t.r3.u64 = zone;
-      (v == 0 ? Original<__imp__sub_8228BC80> : NativeZoneUpdate)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8228BC80> : ITC_CONTEXT_FN(NativeZoneUpdate))(t, h.base);
       if (v == 1 && guest::LoadU32(h.base, zone + tz::kZoneInside) != 0) {
         inside++;
       }
@@ -901,7 +901,7 @@ void RacersVehicles(Context& h, Random& r) {
       guest::StoreU32(h.base, kVehicles, vehicles);
       PPCContext t = CallContext(h);
       t.r3.u64 = index;
-      (v == 0 ? Original<__imp__sub_820C9718> : NativeRacersVehicle)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C9718> : ITC_CONTEXT_FN(NativeRacersVehicle))(t, h.base);
       saved.Restore();
       out[v].Word(t.r3.u32);
     }
@@ -930,7 +930,7 @@ void Owner(Context& h, Random& r) {
         Write(h.base, owner, inputs.data(), tz::kOwnerBytes);
         PPCContext t = CallContext(h);
         t.r3.u64 = owner;
-        (v == 0 ? Original<__imp__sub_8228B608> : NativeConstruct)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8228B608> : ITC_CONTEXT_FN(NativeConstruct))(t, h.base);
         out[v].Bytes(Read(h.base, owner, tz::kOwnerBytes));
         out[v].Word(t.r3.u32);
       }
@@ -952,7 +952,7 @@ void Owner(Context& h, Random& r) {
         }
         guest::StoreU32(h.base, tz::kOwner, block);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_8228B500> : NativeDestroy)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8228B500> : ITC_CONTEXT_FN(NativeDestroy))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, tz::kOwner));
         out[v].Word(t.r3.u32 == block ? 1 : 0);
         out[v].Word(block != 0 && memory::IsHeapBlock(block) ? 1 : 0);
@@ -1035,9 +1035,9 @@ void Owner(Context& h, Random& r) {
         t.r3.u64 = owner;
         t.r4.u64 = i;
         if (which == 0) {
-          (v == 0 ? Original<__imp__sub_8228BD30> : NativeOwnerUpdate)(t, h.base);
+          (v == 0 ? Original<__imp__sub_8228BD30> : ITC_CONTEXT_FN(NativeOwnerUpdate))(t, h.base);
         } else {
-          (v == 0 ? Original<__imp__sub_8228BDD0> : NativeOwnerIsInside)(t, h.base);
+          (v == 0 ? Original<__imp__sub_8228BDD0> : ITC_CONTEXT_FN(NativeOwnerIsInside))(t, h.base);
         }
         out[v].Bytes(Read(h.base, block, block_bytes + 0x40));
         out[v].Word(guest::LoadU32(h.base, tz::kSliceCount));
@@ -1143,7 +1143,7 @@ void Create(Context& h, Random& r) {
         memory::crt::OperatorDelete(*block);
       }
       PPCContext t = CallContext(h);
-      (v == 0 ? Original<__imp__sub_8228E788> : NativeCreate)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8228E788> : ITC_CONTEXT_FN(NativeCreate))(t, h.base);
       const uint32_t owner = guest::LoadU32(h.base, tz::kOwner);
       owners[v] = owner;
       out[v].Word(owner == owners[0] ? 0 : 1);

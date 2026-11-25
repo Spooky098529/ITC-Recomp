@@ -1,0 +1,516 @@
+// The car list the type 6 and 7 panel screens show natively (B7 in
+// docs/rexglue-removal.md; the functions are in docs/functions/car-list.md,
+// the fields in docs/known-data.md, "car list"): PanelSet's panels (the
+// tabs F, the car rows E, the colors D, the car's info C) and their panel
+// groups. Plain C++ over guest memory (the panels are shared with the
+// recompiled code), with the originals' loads and stores in their order.
+// Each function takes the stack pointer the original is entered with
+// (`sp`): the back chain of an original's frame and the words it builds
+// there are written as it leaves them, its register saves aren't. The UI
+// movie calls go through their overrides as guest calls (`Calls`) from the
+// original's frame with its return address; UiMovie::FindNode and Child
+// are their plain C++. Varargs SetText and SetNodeText calls pass 0 for the
+// r7 to r10 (or r6 to r10) the originals leave unset (the user's call,
+// 2026-10-30). Each returns r3 as the original leaves it. Adapters:
+// src/hooks/car_list.cpp (behind --native_car_list), register steps shared
+// with the harness in src/hooks/car_list.h.
+
+#pragma once
+
+#include "race_hud_object/race_hud_object.h"
+
+#include <cstdint>
+
+namespace car_list {
+
+using Calls = race_hud_object::Calls;
+
+// The guest functions called through `Calls`: the UI movie calls (their
+// overrides).
+constexpr uint32_t kSetText = 0x8211C1F8;      // UiMovie::SetText (varargs)
+constexpr uint32_t kSetNodeText = 0x8211C7E8;  // UiMovie::SetNodeText (varargs)
+constexpr uint32_t kScrollText = 0x8211C570;   // UiMovie::ScrollText
+constexpr uint32_t kResetTextScroll = 0x8211C5F8;
+constexpr uint32_t kFinishAll = 0x8211DFF8;
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kUnloopNamed = 0x8211DE30;
+constexpr uint32_t kShowNode = 0x8211AC00;
+constexpr uint32_t kHideNode = 0x8211AC48;
+constexpr uint32_t kSetNodeTexture = 0x8211A708;
+// The C panels' vtable slots called: 1 SetStats, 2 SetCarName (ours where
+// the slot holds CarPanel::SetStats or CarPanel::SetCarName, else a guest
+// call), and CarPanel::SetPrice (never seen in play: the original).
+constexpr uint32_t kSetStats = 0x8224E288;
+constexpr uint32_t kSetCarName = 0x822417E8;
+constexpr uint32_t kSetPrice = 0x8224E7E8;
+// Slot 3 of the C panels: Panel7C::ShowArrows (ours), else a guest call.
+constexpr uint32_t kPanel7CShowArrows = 0x82241868;
+// The doubles the stats scale by (lfd): CarListGlobals' stats_scale_a and
+// stats_scale_b (schema/car_list.h).
+
+// --- The panel groups (panels.cpp) ---
+
+// sub_8224EF18 PanelGroup::SetCaption: when the group's +32 isn't
+// negative, UiMovie::SetText(m, +12, +32, id), ScrollText(m, +12, +32, 1)
+// and the scroll's reset (sub_8211C5F8) on the group's movie.
+uint64_t SetCaption(uint32_t group, uint64_t id, uint32_t sp, const Calls& calls);
+// sub_82249CF0 PanelPart::FinishAll: UiMovie::FinishAll on the movie of
+// the panel's group (+4).
+uint64_t PartFinishAll(uint32_t panel, uint32_t sp, const Calls& calls);
+
+// --- The tabs F (+4 the group) ---
+
+// sub_8224FD20 TabPanel::SetCursorY: node (+24, +28)'s child +40, its +16
+// = (float) y, when it isn't 0.
+uint64_t TabSetCursorY(uint32_t panel, uint64_t y, uint32_t sp);
+// sub_8224FD90 TabPanel::SetButtons: the button prompts (node +36, +84 to
+// +87 textures 0, 0, 1, 1; +88, +89 hidden).
+uint64_t TabSetButtons(uint32_t panel, uint32_t sp, const Calls& calls);
+
+// sub_822501C8 TabPanel::SetTab (r4 the tab): +8 = it, the cursor at 40 x
+// the tab, the tabs' texts, nodes +88 and +92's +108 by the tab, caption
+// 929 with +140 (two players), else 930 + the tab.
+uint64_t TabSetTab(uint32_t panel, uint64_t tab, uint32_t sp, const Calls& calls);
+// sub_8224FF88 TabPanel::Move (r4 the tab, r5 the tab before, r6 the
+// moves).
+uint64_t TabMove(uint32_t panel, uint64_t tab, uint64_t before, uint64_t moves,
+                 uint32_t sp, const Calls& calls);
+
+// --- The car rows E (+0 the group) ---
+
+// sub_8224F758 RowPanel::Fill (r4 the list, r5 the scroll, r6 the item).
+uint64_t RowFill(uint64_t panel, uint32_t list, uint64_t scroll, uint64_t item,
+                 uint32_t sp, const Calls& calls);
+// sub_8224F888 RowPanel::Refresh (r4 the list, r5 the scroll).
+uint64_t RowRefresh(uint64_t panel, uint32_t list, uint64_t scroll, uint32_t sp,
+                    const Calls& calls);
+// sub_8224F8F8 RowPanel::Move (r4 the row, r5 the row before, r6 the
+// moves, r7 the scroll, r9 the list; r8 unread).
+uint64_t RowMove(uint64_t panel, uint64_t row, uint64_t before, uint64_t moves,
+                 uint64_t scroll, uint32_t list, uint32_t sp, const Calls& calls);
+
+// sub_8224F018 RowPanel::SetRow: row `row` (-1: +60) from `entry`: the
+// logo's frame and the three texts.
+uint64_t RowSetRow(uint32_t panel, uint64_t row, uint32_t entry, uint32_t sp,
+                   const Calls& calls);
+// sub_8224F680 RowPanel::SetArrows: the up and down arrows by the scroll
+// and the count.
+uint64_t RowSetArrows(uint64_t panel, uint64_t scroll, uint64_t count,
+                      uint32_t sp);
+// sub_8224F558 RowPanel::Unhighlight (two players only, +156).
+uint64_t RowUnhighlight(uint64_t panel, uint32_t sp, const Calls& calls);
+// sub_8224F4C8 RowPanel::Hide.
+uint64_t RowHide(uint32_t panel, uint32_t sp, const Calls& calls);
+
+// --- The colors D (+4 the group) ---
+
+// sub_8224D010 ColorPanel::Show.
+uint64_t ColorShow(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224D118 ColorPanel::Select (r4 the item).
+uint64_t ColorSelect(uint32_t panel, uint64_t item, uint32_t sp,
+                     const Calls& calls);
+// sub_8224D2D0 ColorPanel::SetArrows (r4 up, r5 down).
+uint64_t ColorSetArrows(uint32_t panel, uint64_t up, uint64_t down, uint32_t sp);
+// sub_8224D358 ColorPanel::ShowSwatches (r4 the count).
+uint64_t ColorShowSwatches(uint32_t panel, uint64_t count, uint32_t sp);
+// sub_8224D3E0 ColorPanel::PlaceCursor (r4 the item).
+uint64_t ColorPlaceCursor(uint32_t panel, uint64_t item, uint32_t sp);
+// sub_8224D580 ColorPanel::Move (r4 the item, r5 the one before, r6 the
+// moves, r7 the scroll, r8 the menu's +84, r9 its +92, r10 the colors).
+uint64_t ColorMove(uint64_t panel, uint64_t item, uint64_t before, uint64_t moves,
+                   uint64_t scroll, uint64_t step, uint64_t placed, uint32_t list, uint32_t sp,
+                   const Calls& calls);
+// sub_8224D458 ColorPanel::SetCount: ShowSwatches, then caption 552 unless
+// +88 (two players).
+uint64_t ColorSetCount(uint32_t panel, uint64_t count, uint32_t sp,
+                       const Calls& calls);
+// sub_8224D4A0 ColorPanel::SetSwatch (r4 the swatch, r5 a color record).
+uint64_t ColorSetSwatch(uint32_t panel, uint64_t swatch, uint32_t color,
+                        uint32_t sp);
+// sub_8224D518 ColorPanel::SetSwatches (r4 the colors' list, r5 the
+// scroll).
+uint64_t ColorSetSwatches(uint64_t panel, uint32_t list, uint64_t scroll,
+                          uint32_t sp);
+
+// --- The car's info C (+12 the group) ---
+
+// sub_8224D7F0 CarPanel::SetTexts.
+uint64_t CarSetTexts(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224D860 CarPanel::SetButtons (r4 to r7 four icons, -1 hidden).
+uint64_t CarSetButtons(uint32_t panel, uint64_t a, uint64_t b, uint64_t c,
+                       uint64_t d, uint32_t sp, const Calls& calls);
+// sub_8224D9A0 CarPanel::PlaceCursor (r4 the action).
+uint64_t CarPlaceCursor(uint64_t panel, uint64_t action, uint32_t sp);
+// sub_8224DCF0 CarPanel::Select (r4 the arrows on).
+uint64_t CarSelect(uint32_t panel, uint64_t arrows, uint32_t sp,
+                   const Calls& calls);
+// sub_8224DF30 CarPanel::StopArrows.
+uint64_t CarStopArrows(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224DED8 CarPanel::SetName (r4 an entry): caption 1862 + the car's
+// id unless +316 (two players).
+uint64_t CarSetName(uint32_t panel, uint32_t entry, uint32_t sp,
+                    const Calls& calls);
+// sub_8224E288 CarPanel::SetStats (slot 1; r4 the stats record).
+uint64_t CarSetStats(uint32_t panel, uint32_t record, uint32_t sp,
+                     const Calls& calls);
+// sub_822417E8 CarPanel::SetCarName (slot 2; r4 the car's id, r5 the
+// spec's +769).
+uint64_t CarSetCarName(uint32_t panel, uint64_t id, uint64_t kind, uint32_t sp,
+                       const Calls& calls);
+// sub_8224E878 CarPanelBase::SetCarName (slot 2 of the C panels' base
+// vtable 0x820111C0, and of Panel8C's; r4 the car's id, r5 the spec's +769):
+// node +36's children +132, +136, +140 given texts kind + 1934, id + 1646,
+// id + 1718 (SetNodeText, r6 to r10 unset: 0) when their indices aren't
+// negative. Returns r3 as the original leaves it.
+constexpr uint32_t kBaseSetCarName = 0x8224E878;
+uint64_t BaseSetCarName(uint32_t panel, uint64_t id, uint64_t kind, uint32_t sp,
+                        const Calls& calls);
+// sub_8224E490 Panel6C::SetStats (probably; r4 the stats record): node +24's
+// 18 texts by the child indices at +160 to +244 (SetNodeText; the record's
+// +0, +8 to +28, +8 and +24 scaled as CarPanel::SetStats does). Returns r3
+// as the original leaves it.
+uint64_t Panel6CSetStats(uint32_t panel, uint32_t record, uint32_t sp,
+                         const Calls& calls);
+// sub_8224D7E0 CarPanelBase::~CarPanelBase: +0 = 0x820111C0. r3 left.
+constexpr uint32_t kCarPanelBaseVtable = 0x820111C0;
+uint64_t CarPanelBaseDestruct(uint64_t panel);
+// sub_8224EBB0 ConfirmPanel::ConfirmPanel: +0 = 0x82010B5C
+// (schema::ConfirmPanel::kVtable), +4 = 0, +8 = 2, +12 to +36 = -1. r3 left.
+uint64_t ConfirmPanelConstruct(uint64_t panel);
+// sub_82241868 Panel7C::ShowArrows (slot 3; r4 shown).
+uint64_t Panel7CShowArrows(uint32_t panel, uint64_t shown, uint32_t sp,
+                           const Calls& calls);
+// sub_8224E920 CarPanel::ShowStats (r4 an entry): the stats record on the
+// frame (+80) to slot 1, then slot 2 (the plain C++ where they hold
+// SetStats and SetCarName, else guest calls), SetPrice (the original) with
+// +4 set.
+uint64_t CarShowStats(uint64_t panel_r3, uint32_t entry, uint32_t sp,
+                      const Calls& calls);
+
+// --- PanelSet's leaves (set.cpp; r3 the set, b = the set + 4 its base) ---
+
+// The two-player word (0 in PanelSet, 1 in PanelSetPair) and the players'
+// save data pointer sub_82105678 answers (two players): CarListGlobals'
+// two_players and pair_save_data (schema/car_list.h).
+
+// sub_822496C8 PanelSet::Reset (slot 2): the base's words reset. r3 left.
+uint64_t SetReset(uint64_t set);
+// sub_82249848 PanelSet::Picked, sub_82249870 WentBack, sub_82249898
+// WantsPowerGraph (slots 8 to 10).
+uint64_t SetPicked(uint32_t set);
+uint64_t SetWentBack(uint32_t set);
+uint64_t SetWantsPowerGraph(uint32_t set);
+// sub_8224B6D8 SetOpenKind (+1932), sub_8224B6E8 SetPreviousTab (+1884),
+// sub_8224B6F0 SetPreviousEntry (+1888), sub_8224B6F8 SetPreviousColor
+// (+1892): the set's word at `offset` = r4. r3 left.
+uint64_t SetWord(uint64_t set, uint32_t offset, uint64_t value);
+// sub_82248EF0 PanelSetBase::PickedPage (page 5; r3 = b): +12 = 1. r3 left.
+uint64_t PickedPage(uint64_t b);
+// sub_82249668 PanelSetBase::SaveData (r3 = b): with two players, the
+// players' save data ([0x826C5B5C], sub_82105678's, never seen in play:
+// ported) + 120,108 x +1952, else SaveData::Of(0).
+uint64_t SaveData(uint32_t b, uint32_t sp);
+
+// --- The destructors (set.cpp) ---
+
+// The vtables they store (PanelGroupBase's, PanelSetBase's, PanelSet's and
+// the interface's PanelSet leaves) are their schema types' kVtable.
+// operator delete (its override).
+constexpr uint32_t kOperatorDelete = 0x825A70E8;
+
+// sub_8224EF08 PanelGroupBase::~PanelGroupBase: +0 = its vtable, then
+// ListNode::~ListNode (a tail call). r3 left.
+uint64_t GroupBaseDestruct(uint64_t group);
+// sub_8224AE60 PanelSetBase::~PanelSetBase (r3 = b): +0 = its vtable,
+// MenuList::Release on +132 and +60 (guest calls, from its 96-byte frame).
+// The last Release's r3.
+uint64_t SetBaseDestruct(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224B708 PanelSet::~PanelSet: +0 = its vtable, ~PanelSetBase on +4,
+// then +0 = the interface's vtable. r3 as ~PanelSetBase leaves it.
+uint64_t SetDestruct(uint64_t set, uint32_t sp, const Calls& calls);
+// sub_8224AC98 PanelSetInterface::DeletingDestructor: +0 = the interface's
+// vtable, operator delete (a guest call) when bit 0 of `flags` is set. r3
+// left.
+uint64_t SetInterfaceDeletingDestruct(uint64_t set, uint64_t flags, uint32_t sp,
+                                      const Calls& calls);
+
+// --- PanelSetPair, the two-player variant (set.cpp): vtable 0x82011118,
+// two bases at +4 and +1976 (b2), [0x82815EAC] = 1. Its slots: 0
+// DeletingDestructor, 1 Build, 2 Reset, 3 Open, 5 HandleInput, 6 Update, 8
+// Picked; 4, 7 (no Free), 11 to 13 and 15 to 17 the empty sub_82106540, 9,
+// 10 and 18 sub_825C8388 (0), 14 sub_825C8390 (1). ---
+
+// Its vtable is schema::PanelSetPair::kVtable; the second base's offset:
+constexpr uint32_t kPairSecondBase = 1976;
+// sub_8224B750 PanelSetPair::PanelSetPair: r4 to r10 the first base's F,
+// the second's F, the first's E, the second's E, the first's D, the
+// second's D, the first's C; the caller's stack words at sp + 84 (the
+// second's C), + 92 and + 100 (the bases' confirm panels, b +1912) and +
+// 108 (group B, both bases' +1956). PanelSetBase::PanelSetBase's plain C++
+// on both bases from the 144-byte frame (its words below it), the panels
+// given the two-player word as it reads after each store. Returns the pair.
+uint64_t PairConstruct(uint64_t pair, uint32_t f0, uint32_t f1, uint32_t e0,
+                       uint32_t e1, uint32_t d0, uint32_t d1, uint32_t c0, uint32_t sp);
+// sub_8224B830 PanelSetPair::~PanelSetPair: +0 = its vtable,
+// ~PanelSetBase on the second base, then the first, +0 = the interface's
+// vtable. r3 as the last ~PanelSetBase leaves it.
+uint64_t PairDestruct(uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CA30 PanelSetPair::DeletingDestructor (slot 0; r4 the flags):
+// ~PanelSetPair, operator delete (a guest call) with bit 0. Returns the pair.
+uint64_t PairDeletingDestruct(uint64_t pair, uint64_t flags, uint32_t sp,
+                              const Calls& calls);
+// sub_822498C0 PanelSetPair::Reset (slot 2, a leaf): PanelSet::Reset's
+// stores on both bases, through the fourteen words it leaves below its r1.
+// r3 left.
+uint64_t PairReset(uint64_t pair, uint32_t sp);
+// sub_822499F0 PanelSetPair::Open (slot 3): both bases reset (through the
+// words on its 176-byte frame), ToTabs on each, then the players (b +1952)
+// 0 and 1 and both bases' +1940, +1944 and +1948 0. ToTabs' r3.
+uint64_t PairOpen(uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CA80 PanelSetPair::HandleInput (slot 5): [0x826379B8] = 1,
+// PanelSetBase::HandleInput on both bases. The second's r3.
+uint64_t PairHandleInput(uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_8224CF20 PanelSetPair::Update (slot 6) and sub_8224CAE0
+// PanelSetPair::Build (slot 1): PanelSetBase::Update or Build on both bases
+// from a 96-byte frame. The second's r3.
+uint64_t PairUpdate(uint64_t pair, uint32_t sp, const Calls& calls);
+uint64_t PairBuild(uint64_t pair, uint32_t sp, const Calls& calls);
+// sub_82249B60 PanelSetPair::Picked (slot 8): 1 when both bases are done
+// (+16, +1988) and both picked (+12, +1984), else 0.
+uint64_t PairPicked(uint32_t pair);
+
+// --- PanelSet's pages and steps (pages.cpp; r3 = b, a step's r4 its
+// first-pass word b + 56) ---
+
+// The guest calls: MenuList::Init (r3 to r10 and two words at the
+// caller's frame + 84 and + 92), SetSelection, Selection, the previous
+// selection (sub_8220BC28), Release; VirtualFree (where the block isn't the
+// allocation layer's pages); ScreenFades::FadeIn and FadeOut; sub_825C8390
+// (TabPanel's "finished", 1).
+constexpr uint32_t kMenuListInit = 0x8220BAC0;
+constexpr uint32_t kMenuListSetSelection = 0x8220BC30;
+constexpr uint32_t kMenuListSelection = 0x8220BC20;
+constexpr uint32_t kMenuListPrevious = 0x8220BC28;
+constexpr uint32_t kMenuListRelease = 0x8220BBB0;
+constexpr uint32_t kVirtualFree = 0x82295330;
+constexpr uint32_t kFadeIn = 0x8209D038;
+constexpr uint32_t kFadeOut = 0x8209D0C8;
+constexpr uint32_t kTabFinished = 0x825C8390;
+// The fades' pass counts (FadeIn's, FadeOut's) and the steps' wait word:
+// CarListGlobals' fade_in_passes, fade_out_passes and fade_wait.
+
+// sub_82249558 PanelSetBase::ToTabs.
+uint64_t ToTabs(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_82249730 PanelSet::Open (slot 3; r3 the set).
+uint64_t Open(uint64_t set, uint32_t sp, const Calls& calls);
+// sub_8224B538 PanelSetBase::Free (the lists' entries and the colors freed,
+// VirtualFree; the menus released) and sub_8224B880 PanelSet::Free (slot
+// 7, on the set + 4).
+uint64_t Free(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224BF30 PanelSetBase::HandleInput and sub_8224CA28
+// PanelSet::HandleInput (slot 5, on the set + 4): the page's handler from
+// the table of 9 on the frame (the plain C++ where it's ours, else a guest
+// call).
+uint64_t HandleInput(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224A3F8 PanelSetBase::BackPage8 (page 8).
+uint64_t BackPage8(uint64_t b, uint32_t sp, const Calls& calls);
+// The steps (each returns its answer): sub_82248F00 Step2 (F's Move),
+// sub_8224A718 Step3 (the fade out, F finished), sub_82249098 Step7 (E's
+// Move), sub_8224A7E0 Step11 (C's Select), sub_82249258 Step18 (D's
+// Select), sub_8224A8E0 Step26 (the fade out, D and F finished).
+uint64_t Step2(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step3(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step7(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step11(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step18(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step26(uint32_t b, uint32_t word, uint32_t sp, const Calls& calls);
+
+// The steps over the panels' shows and answers (pages.cpp; r3 = b, r4 its
+// first-pass word b + 56; each returns its answer): sub_8224A570 Step0 (the
+// tabs shown: F's list words, the tabs' menu, F's SetTab, Show and
+// SetButtons, the fade in with +1948; F's IsShown), sub_8224A6A0 Step1
+// (F's Select), sub_8224B078 Step4 (the rows shown: SetUpRows, F's
+// SetButtons, E's Show, the fade in with open kind 0; E's IsShown),
+// sub_82248F70 Step6 (E's Select), sub_82248FE0 Step8 (E hidden, then the
+// tabs' menu and F's SetTab once E's IsHidden), sub_8224CB28 Step9 (the car
+// shown: C's Show, SetUpCarPage, C's buttons and slot 3; once C's IsShown,
+// +20 = 1, +24 = 0 and, one player, GarageStage::SetDrawWord(stage 0, 1)),
+// sub_82249128 Step12 (C's Move), sub_822492C8 Step19 (D's Move, its
+// arrows, then its swatches once D's IsIdle).
+uint64_t Step0(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step1(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step4(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step6(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step8(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step9(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step12(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+uint64_t Step19(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+// MenuList::Fit (sub_8220BC40) and CarPanel::ShowCarStats (sub_8224EA10,
+// never seen in play: the original) through `Calls`.
+constexpr uint32_t kMenuListFit = 0x8220BC40;
+constexpr uint32_t kShowCarStats = 0x8224EA10;
+// sub_8224A978 PanelSetBase::SetUpRows: the two menus set up for the list's
+// (or, tab 2, the garage's) count, the selection and scroll put back, E
+// filled and refreshed.
+uint64_t SetUpRows(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224C560 PanelSetBase::SetUpCarPage: the actions' menu set up, the
+// rows' selection put back, C's cursor, texts, stats (the garage tab's
+// through ShowCarStats, the original) and name.
+uint64_t SetUpCarPage(uint64_t b, uint32_t sp, const Calls& calls);
+
+// memcpy (sub_825A7410) where c_runtime::Memcpy refuses.
+constexpr uint32_t kMemcpy = 0x825A7410;
+// sub_8224C698 PanelSetBase::Build and sub_8224CAD8 PanelSet::Build (slot
+// 1, on the set + 4): nothing when +4 (built) and the two-player word share
+// a bit; else the lists' entries freed when built, then the unlocked cars
+// (the save data's bits at +104740) to lists 0 and 1 by their spec's byte
+// +771 (else freed) and the garage's cars to list 2, each an 8,448-byte
+// entry from the allocation layer's pages (VirtualAlloc, the 2026-10-22
+// call) with the spec copied in (Params::GetCarSpec's and memcpy's plain
+// C++, the original where c_runtime::Memcpy refuses).
+uint64_t Build(uint64_t b, uint32_t sp, const Calls& calls);
+
+// The stand's holders ([0x826D83E0], CarListGlobals' stand_holders: three
+// slots, by the player) and the guest calls ShowStandCar makes:
+// Car::Refresh's original where its plain C++ declines,
+// GarageStage::SetCarClass through its override.
+constexpr uint32_t kCarRefresh = 0x820C4998;
+constexpr uint32_t kSetCarClass = 0x8217FDC8;
+// sub_8224A490 PanelSetBase::ShowStandCar (r4 a color; below 0 the rows'
+// selection + scroll): the stage by the player (slot 0 one player, else 1
+// or 2 by +1952), a car on its 4,032-byte frame (+80: Car::Init,
+// Car::SetModel with the entry's car, +3888 |= 1 or 128 for player 2,
+// Car::Refresh: their plain C++), GarageStage::SetPlates(stage, 0) and
+// GarageStage::SetCarClass(stage, car, color). Returns SetCarClass' r3.
+uint64_t ShowStandCar(uint64_t b, uint64_t color, uint32_t sp,
+                      const Calls& calls);
+
+// The pages' guest calls: MenuList::Update, Accepted, Cancelled, SetEnabled
+// and IsEnabled through their overrides, MenuSound::Play through its
+// override, the power graphs' set-ups (sub_82250670 and sub_82250700, the
+// garage tab's, through their overrides).
+constexpr uint32_t kMenuListUpdate = 0x8220C1E0;
+constexpr uint32_t kMenuListAccepted = 0x8220BD50;
+constexpr uint32_t kMenuListCancelled = 0x8220BDE0;
+constexpr uint32_t kMenuListSetEnabled = 0x8220BC00;
+constexpr uint32_t kMenuListIsEnabled = 0x8220BC10;
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
+constexpr uint32_t kEntryPowerGraph = 0x82250670;
+constexpr uint32_t kGaragePowerGraph = 0x82250700;
+// The pages (r3 = b; each returns r3 as the original leaves it):
+// sub_82249EB8 TabsPage (page 0), sub_8224A178 RowsPage (1), sub_8224AEA8
+// ColorsPage (3; ShowStandCar's plain C++ when the car is loaded) and
+// sub_8224BDC0 PowerGraphPage (6; CarPanel::SetButtons' plain C++).
+uint64_t TabsPage(uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t RowsPage(uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t ColorsPage(uint64_t b, uint32_t sp, const Calls& calls);
+uint64_t PowerGraphPage(uint64_t b, uint32_t sp, const Calls& calls);
+
+// sub_8224B248 PanelSetBase::SetUpColors: the colors' menu for the entry's
+// count (+8376; MenuList::Init, SetSelection, Fit guest calls), D's cursor
+// and arrows, the colors' list freed and made again (a 32-byte record from
+// the allocation layer's pages a color: the HSV from the entry's 20-byte
+// records at +8116 at +16 to +24, Color::HsvToRgb's plain C++, the RGB x
+// 255 at +0 to +8, as the original's single-precision steps and fctiwz), D's
+// SetCount and SetSwatches, then ShowStandCar(b, -1). Its 224-byte frame.
+// Returns ShowStandCar's r3.
+uint64_t SetUpColors(uint64_t b, uint32_t sp, const Calls& calls);
+
+// sub_8224C450 PanelSetBase::Step17 (r4 the first-pass word): first pass:
+// C's StopArrows, D's Show (each when there), SetUpColors, the word = 1.
+// Answers D's IsShown (1 without D).
+uint64_t Step17(uint64_t b, uint32_t word, uint32_t sp, const Calls& calls);
+// sub_8224B8D8 PanelSetBase::CarPage (page 2, the car's actions; menu +60,
+// the rows' menu +132): moved, accepted (C's Pick; action 1 the power graph:
+// C's stats with two players, else the power graph's record and C's
+// buttons; action 0 the pick: steps 17, 21 or 3, the stand's car through
+// ShowStandCar's plain C++ for tab 0 without the confirm panel), cancelled
+// (E's Unhighlight), else the rows' menu (moved: C's stats, +244 the
+// entry's color). The menu lists, MenuSound::Play, CarPanel::ShowCarStats
+// (never seen in play: the original) guest calls; C's Pick, ShowStats and
+// SetButtons, E's Unhighlight, PowerGraph::SetEntry, the garage tab's power
+// graph record (PowerGraph::SetFromCar, power_graph) and SaveData their
+// plain C++. Its
+// 112-byte frame.
+uint64_t CarPage(uint64_t b, uint32_t sp, const Calls& calls);
+
+// --- PanelSet's update (update.cpp; r3 = b) ---
+
+// The guest calls the update makes: GarageStage::ReloadModel, SetCar,
+// Command, IsBusy and Draw through their overrides (the garage tab's car,
+// GarageScreen::CopyGarageCar, its plain C++); the two-player stand's wait
+// word (CarListGlobals' stand_wait).
+constexpr uint32_t kReloadModel = 0x8217F880;
+constexpr uint32_t kSetCar = 0x8217FD58;
+constexpr uint32_t kGarageStageCommand = 0x82180108;
+constexpr uint32_t kGarageStageIsBusy = 0x82179BE0;
+constexpr uint32_t kGarageStageDraw = 0x8217FE60;
+
+// sub_821807D8 GarageStages::DrawAll: the three stages of [0x826D83E0]
+// (GarageStage::SetDrawWord's plain C++): each holding a model has its draw
+// word kept and set to 0, each kept word nonzero drawn alone (draw word 1,
+// GarageStage::Draw(holder, 1, 1) through its override, draw word 0), the
+// words put back. Its 160-byte frame. Returns r3 as the original leaves it.
+uint64_t DrawAll(uint32_t sp, const Calls& calls);
+// sub_8224C008 PanelSetBase::UpdateStand: the stand's car (the stage by the
+// player; its model reloaded for the entry's car, then a car on its
+// 9,952-byte frame: Car::Init, SetModel or the garage's car copied, SetPlates,
+// Car::Refresh, their plain C++; GarageStage::SetCar), DrawAll, and group
+// B's busy animations (+1960, +1964 looped; +1968 once not busy). Returns r3
+// as the original leaves it.
+uint64_t UpdateStand(uint64_t b, uint32_t sp, const Calls& calls);
+// sub_8224CD00 PanelSetBase::Update (and sub_8224CF18 PanelSet::Update on
+// the set + 4): the step at +44 from the table of 27 on its 368-byte frame
+// (the steps' plain C++ where ours, else guest calls), the next step or page
+// when it answers nonzero and [0x82815EB0] is 0, then UpdateStand. Returns 1.
+uint64_t Update(uint64_t b, uint32_t sp, const Calls& calls);
+
+// --- The panels' answers (panels.cpp; UiMovie::IsNamedActive's plain C++,
+// a leaf, so no guest call): 1 when the named animations they name aren't
+// playing or looping, else 0 ---
+
+// sub_8224FCE0 TabPanel::IsShown (+116), sub_8224F5E8 RowPanel::IsShown
+// (+76, or +80 with +152 set), sub_8224F640 RowPanel::IsHidden (+88),
+// sub_8224E108 CarPanel::IsShown (+40 and +44), sub_8224D1F0
+// ColorPanel::IsShown (+16), sub_8224D288 ColorPanel::IsIdle (+40 and +36).
+uint64_t TabIsShown(uint32_t panel, uint32_t sp);
+uint64_t RowIsShown(uint32_t panel, uint32_t sp);
+uint64_t RowIsHidden(uint32_t panel, uint32_t sp);
+uint64_t CarIsShown(uint32_t panel, uint32_t sp);
+uint64_t ColorIsShown(uint32_t panel, uint32_t sp);
+uint64_t ColorIsIdle(uint32_t panel, uint32_t sp);
+
+// --- The panels' shows, selections and moves (panels.cpp; the loops they
+// start when not running tested with IsNamedActive's plain C++) ---
+
+// sub_8224FE50 TabPanel::Show: FinishAll, +116 played, the loops +124,
+// +132, +136.
+uint64_t TabShow(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224FB20 TabPanel::Select: the tab's animation (+96 + +8) replayed
+// when its word is set, the loops +128 and +132, the tabs' nodes dimmed by
+// their words (UiMovie's SetColor plain C++). Returns the movie.
+uint64_t TabSelect(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224F1D8 RowPanel::Show and sub_8224F340 RowPanel::Select.
+uint64_t RowShow(uint32_t panel, uint32_t sp, const Calls& calls);
+uint64_t RowSelect(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224DA20 CarPanel::Show.
+uint64_t CarShow(uint32_t panel, uint32_t sp, const Calls& calls);
+// sub_8224DDF8 CarPanel::Move (r4 the action, r5 the one before, r6 the
+// direction) and sub_8224E050 CarPanel::Pick (r4, r5; then PlaceCursor's
+// plain C++), UiMovie::UnloopNamed through its override.
+uint64_t CarMove(uint32_t panel, uint64_t action, uint64_t before,
+                 uint64_t direction, uint32_t sp, const Calls& calls);
+uint64_t CarPick(uint64_t panel_r3, uint64_t action, uint64_t before, uint32_t sp,
+                 const Calls& calls);
+
+// --- The power graph's record (panels.cpp) ---
+
+// The power graph screen's record's holder is CarListGlobals' power_graph
+// ([0x82815EBC]; the record at its +8).
+// sub_82250368 PowerGraph::SetEntry (r3 an entry, r4 the tab; a leaf, its
+// switch's case 0 and 4 the split piece sub_822503F0, merged). r3 left.
+uint64_t PowerGraphSetEntry(uint64_t entry, uint64_t tab);
+
+}  // namespace car_list

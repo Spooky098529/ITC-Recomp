@@ -15,7 +15,7 @@ in `../native-renderer.md`. Mapped by the B7 loop
 The list the game records into is made once at boot by the scene's
 constructor `sub_82098A98` (scene + 8, its pointer kept at `0x8296B918`
 and `0x82970BD8`), and flipped each tick by `Scene::Update`
-(`sub_820988C8`), both in [`functions.md`](functions.md). The ~40
+(`sub_820988C8`), both in [`frame-driver.md`](frame-driver.md). The ~40
 recorders that call it (seen in play: `sub_82096030`, `sub_82096360`,
 `sub_82096418`, `sub_8209AE48`, `sub_8209AF40`, `sub_8209B3D0`,
 `sub_8209FA38`, `sub_820A0978`, `sub_820A0CC0`, `sub_820A0D38`,
@@ -40,8 +40,8 @@ delete, when bit 0 of r4 is set; no direct callers); the debug print
 Shared callees in no file yet: `sub_825A6940` (probably `malloc` or
 operator new) and `sub_825A71C0` (probably `free`), the C runtime heap
 (rows in `heap.md`; over the native allocation layer since 2026-10-22). Nearby but not the command list:
-`sub_8258C938` (vtable `0x8206C05C`, +4 = -1, +8 = +12 = 0: probably the
-file class's constructor, `files-and-saves.md`'s area; from
+`sub_8258C938` (vtable `0x8206C05C`, +4 = -1, +8 = +12 = 0: the
+file class's constructor, `File::File` in `file-layer.md`; from
 `sub_82593AC0`) and `sub_8258CE60` (an input processor's constructor,
 vtable `0x8206C0C4`). The rest of the game's functions are in
 [`functions.md`](functions.md).
@@ -81,6 +81,17 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -93,7 +104,7 @@ run it after changing either, on any branch.
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_8258C960` | `CommandList::CommandList` | Overridden | r3 = list: vtable `0x8206C080` at +0, zeroes +4 (the buffer being recorded), +8, +12, +20, +24, +28, +32 and the open flag (byte +52). Once at boot, from the scene's constructor `sub_82098A98` (on scene + 8). Ours (B7 loop): `command_list::Construct` (`src/command_list/command_list.cpp`) behind the adapter in `src/hooks/command_list.cpp` (`--native_command_list`, falling back to the original); harness `command_list`, 0 differ; seen in an attract race (temporary counter). |
-| `sub_8258CD28` | `CommandList::Init` | | r3 = list, r4 = slots in all (the scene asks for 512,000: 8 MB): frees the old memory at +20 (`sub_825A71C0`), rounds r4 up to even, allocates r4 × 16 bytes (`sub_825A6940`; -1 asked for above `0x0FFFFFFF` slots) into +20, +8 = half of r4 (each buffer's capacity in slots), buffer 0 at +24 (the allocation) and buffer 1 at +28 (its second half); flips +4 twice (left as it was), +32 = the buffer +4 selects, +12 = +16 = 0. Returns 1. Once at boot, from `sub_82098A98`. Blocked by the C runtime heap (`malloc` and `free`): made native, it would allocate guest memory without `ctx`, a decision for the user (see the heap's lead). |
+| `sub_8258CD28` | `CommandList::Init` | Native | r3 = list, r4 = slots in all (the scene asks for 512,000: 8 MB): frees the old memory at +20 (`sub_825A71C0`), rounds r4 up to even, allocates r4 × 16 bytes (`sub_825A6940`; -1 asked for above `0x0FFFFFFF` slots) into +20, +8 = half of r4 (each buffer's capacity in slots), buffer 0 at +24 (the allocation) and buffer 1 at +28 (its second half); flips +4 twice (left as it was), +32 = the buffer +4 selects, +12 = +16 = 0. Returns 1. Once at boot, from `sub_82098A98`. Blocked by the C runtime heap (`malloc` and `free`): made native, it would allocate guest memory without `ctx`, a decision for the user (see the heap's lead). Native (B7 loop, 2026-11-13): `frame_driver::CommandListInit` (`src/frame_driver/scene_set_up.cpp`), called by `Scene::Scene`'s plain C++ (`frame-driver.md`); no adapter (its only caller is ours): operator delete and new guest calls through their adapters from a 112-byte frame, both buffers begun as the original leaves them (+4 flipped twice). Harness `frame_driver`: 40 cases (0 to 300 slots, old memory or none), the same. |
 | `sub_8258C9C0` | `CommandList::Flip` | Overridden | r3 = list: +4 ^= 1, so the other buffer is recorded while the render thread replays the one just recorded. Once a tick, from `Scene::Update` (`sub_820988C8`), before `sub_8258C998`. Ours (B7 loop): `command_list::Flip` (`src/command_list/command_list.cpp`) behind the adapter in `src/hooks/command_list.cpp` (`--native_command_list`, falling back to the original); harness `command_list`, 0 differ; seen in an attract race (temporary counter). |
 | `sub_8258C998` | `CommandList::BeginTick` | Overridden | r3 = list: +32 = the buffer +4 selects (+24 or +28), +16 = +12 (the slots the last recording used), +12 = 0. Doesn't move the write pointer (+44): opening a chunk does. Once a tick, from `Scene::Update` (`sub_820988C8`). Ours (B7 loop): `command_list::BeginTick` (`src/command_list/command_list.cpp`) behind the adapter in `src/hooks/command_list.cpp` (`--native_command_list`, falling back to the original); harness `command_list`, 0 differ; seen in an attract race (temporary counter). |
 | `sub_8258C9D0` | `CommandList::OpenChunk` | Overridden | r3 = list. Nothing when a chunk is open (byte +52); otherwise +36 (the chunk's start), +44 (the write pointer), +48 and +40 = +32 (where the last chunk ended), +52 = 1, and the count of open chunks at `0x8296BD28` goes up by 1, with a debug message (`sub_825A1318`, the string at `0x8206C084`; never ran) when one was already open (probably a nesting warning). From every recorder (40 seen in play; see above), once per chunk. Ours (B7 loop): `command_list::OpenChunk` (`src/command_list/command_list.cpp`) behind the adapter in `src/hooks/command_list.cpp` (`--native_command_list`, falling back to the original); a chunk opened while the count at `0x8296BD28` isn't 0 (the debug message's branch, never seen) runs the original; harness `command_list`, 0 differ; seen in an attract race (temporary counter). |

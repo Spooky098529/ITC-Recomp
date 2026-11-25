@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "schema/c_runtime.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -32,13 +34,18 @@ LongDouble12 DoubleToLd12(uint64_t bits);
 // left as it is), as the original.
 uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status);
 
+// _ld12tof (sub_825B70D0): the same with the float's format descriptor
+// (0x8266C52C: max_exp 128, min_exp -127, precision 24, exponent width 8,
+// bias 127): the float's bits.
+uint32_t Ld12ToFloat(const LongDouble12& value, uint16_t extra, int32_t* status);
+
 // write_char (sub_825AF000): printf's output of one character to a string
 // stream (+0 the pointer, +4 room left, +8 the buffer, +12 flags) with the
 // count at `count`: a string stream with no buffer (flag 0x40, +8 = 0)
 // only counts; else stores the byte while room is left. Returns 0 when it
 // only counted, 1 when it stored, -1 with nothing written where the
 // original calls _flsbuf (no room left; never seen in play).
-int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t count);
+int32_t WriteChar(uint32_t character, uint32_t stream, uint32_t count);
 
 // write_multi_char (sub_825AF098): `length` characters of `string` through
 // write_char, or only counted for a string stream with no buffer. False,
@@ -48,19 +55,19 @@ int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t c
 // the stream (its checks then can't be made first): the original runs.
 // `*last` is the last character written (what the original leaves in r3),
 // or -1 when none was.
-bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t stream,
+bool WriteMultiChar(uint32_t string, int32_t length, uint32_t stream,
                     uint32_t count, int32_t* last);
 
 // _putwc_nolock (sub_825B7A80) for a string stream (flag 0x40): stores the
 // UTF-16 unit and moves the pointer on by 2. False, with nothing written,
 // for stdout and stderr (the console), a file stream, or no room for two
 // bytes (_flswbuf): the original runs.
-bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream);
+bool PutwcString(uint16_t unit, uint32_t stream);
 
 // The wide write_char (sub_825B1368): a string stream with no buffer only
 // counts; else _putwc_nolock, the count set to -1 when the unit is 0xFFFF
 // (its failure value) or moved on by one. False where PutwcString is.
-bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count);
+bool WriteWideChar(uint16_t unit, uint32_t stream, uint32_t count);
 
 // A guest buffer worked on in host memory, for the %f text's steps
 // (_fptostr, _cftof2_l): bytes are read from the guest the first time
@@ -70,7 +77,7 @@ bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count
 // text is no longer ok and nothing is committed.
 class GuestText {
  public:
-  GuestText(uint8_t* base, uint32_t address) : base_(base), address_(address) {}
+  GuestText(uint32_t address) : address_(address) {}
   bool ok() const { return ok_; }
   uint8_t Get(uint64_t at);
   void Set(uint64_t at, uint8_t value);
@@ -92,7 +99,6 @@ class GuestText {
  private:
   bool Reach(uint64_t at);
 
-  uint8_t* base_;
   uint32_t address_;
   bool ok_ = true;
   uint64_t end_ = 0;
@@ -126,7 +132,7 @@ bool Cftof2(GuestText& text, int32_t precision, int32_t sign, int32_t exponent, 
 // The locale's decimal point: the byte at **0x8266C024, read from guest
 // memory on every call (the locale is the game's to change). `words`, when
 // given, gets the two pointers' addresses and the byte's.
-uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words = nullptr);
+uint32_t DecimalPointAddress(uint32_t* words = nullptr);
 
 // _cftof_l (sub_825AE8E0, %f): the double's digits by _fltout2 (___dtold,
 // $I10_OUTPUT with 17 digits), then _fptostr (as many digits as the
@@ -135,7 +141,7 @@ uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words = nullptr);
 // through _errno (a null buffer, a size of 0, no room), where $I10_OUTPUT
 // or the commit isn't native, or where the decimal point lies in what's
 // written: the original runs there.
-bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision);
+bool Cftof(uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision);
 
 // _vswprintf_l (sub_825A9980, from vswprintf sub_825A9A80) with _woutput_l
 // (sub_825B13D0, wide_format.cpp): `format` (UTF-16) with the arguments at
@@ -148,11 +154,35 @@ bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t
 // (%Z), a float conversion other than %f or one needing the heap (a
 // precision above 163) or a forced point, %f's _cftof_l not native for the
 // value, or the unit 0xFFFF written (the original's error paths read errno).
-bool Vswprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+bool Vswprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
                int32_t* count);
+
+// sprintf (sub_825A93D0) after its spills, with _output_l (sub_825AF130,
+// narrow_format.cpp): `format` with the arguments at `args` (a va_list:
+// 8-byte slots) into `buffer` through a string stream of INT_MAX bytes, then
+// the terminator; `*count` the characters written. The work in `frame` (the
+// original _output_l's r1, all below the caller's stack pointer): its text
+// buffer at +144, as the original. A dry run first: false, with nothing
+// written to `buffer`, where the original must run: a null buffer or
+// format, %n, a wide character or a wide string's text (wctomb_s), a float
+// conversion other than %f or one needing the heap (a precision above 163)
+// or a forced point, %f's _cftof_l not native for the value, a lead byte
+// ending the format, or output landing on the format, the arguments, a
+// string read, or the frame (the original would read its own writes).
+bool Sprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+             int32_t* count);
+
+// _vsnprintf_l (sub_825AAF18, from _vsnprintf sub_825AB010) with _output_l:
+// as Sprintf, through a string stream of `size` bytes (INT_MAX at most);
+// with no buffer and a size of 0 only counted, with no terminator. False
+// also where the original goes through _flsbuf (the output, or the
+// terminator, doesn't fit) or EINVAL (a null format, or a null buffer with a
+// size).
+bool Vsnprintf(uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
+               uint32_t frame, int32_t* count);
 
 // __iob_func (sub_825AD4C0): the C runtime's stream table (_iob: 32 bytes
 // a stream, stdin, stdout and stderr first).
-constexpr uint32_t kStreams = 0x8266B7D0;
+constexpr uint32_t kStreams = schema::CRuntimeGlobals::streams_address();
 
 }  // namespace c_runtime

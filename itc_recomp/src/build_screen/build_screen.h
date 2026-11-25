@@ -1,0 +1,264 @@
+// The build screen natively (B7 in docs/rexglue-removal.md; the functions
+// are in docs/functions/build-screen.md): the front-end screen over the
+// screen data [0x826D8448] and UI movie 6 whose levels are the states of
+// the transition machine [0x826D843C], its menu lists [0x826D8440] and
+// [0x826D8444], the groups' and builds' lists and rows, and the garage
+// stage's lights mode under it. Plain C++ over guest memory (the screen,
+// its lists and the movie are shared with the recompiled code), with the
+// originals' loads and stores in their order. `sp` is the caller's stack
+// pointer: the back chain of the original's frame and the words it stores
+// in that frame (the movie id for UiMovies::Find, MenuList::Init's stack
+// arguments) are written there as the original leaves them; its register
+// saves aren't. Adapters: src/hooks/build_screen.cpp (behind
+// --native_build_screen), register steps shared with the harness in
+// src/hooks/build_screen.h.
+
+#pragma once
+
+#include "race_hud_object/race_hud_object.h"
+
+#include <cstdint>
+#include <functional>
+
+namespace build_screen {
+
+// Guest calls (r3 to r10 from the frame `r1` with the original's return
+// address): MenuList::Init and the UI movie animation calls, through their
+// overrides.
+using Calls = race_hud_object::Calls;
+
+// The globals (the transition machine [0x826D843C], the menu lists
+// [0x826D8440] and [0x826D8444], the screen data [0x826D8448]):
+// schema::BuildScreenGlobals (schema/build_screen.h).
+
+// The screen data, its groups, build lists and builds:
+// schema::BuildScreenData, BuildGroup, BuildSlotList and BuildRecord
+// (schema/type2_screens.h); the menu lists schema::MenuList
+// (schema/race_screens.h). The groups: 56 of 3,252 bytes from the data's
+// `groups`.
+constexpr uint32_t kGroupBytes = 3252;
+constexpr uint32_t kGroupCount = 56;
+
+// Movie 6: its id at `frame` + 80, then UiMovies::Find (rows.cpp).
+constexpr uint32_t kMovieId = 6;
+uint32_t Movie(uint32_t frame);
+
+// --- The menu lists (lists.cpp) ---
+
+// sub_8219BA50 BuildScreen::KeepGroupList, sub_8219BB20 KeepBuildList,
+// sub_8219BBF0 KeepStandList: the screen's kept selection and scroll =
+// [0x826D8440]'s selection and scroll (+4). Their r3: the selection.
+uint32_t KeepGroupList(uint32_t sp);
+uint32_t KeepBuildList(uint32_t sp);
+uint32_t KeepStandList(uint32_t sp);
+// sub_8219BAB0 RestoreGroupList, sub_8219BB80 RestoreBuildList,
+// sub_8219BC50 RestoreStandList: MenuList::SetSelection([0x826D8440], the
+// kept selection), its scroll = the kept scroll, MenuList::Fit(list, 1).
+// Their r3: the list.
+uint32_t RestoreGroupList(uint32_t sp);
+uint32_t RestoreBuildList(uint32_t sp);
+uint32_t RestoreStandList(uint32_t sp);
+// sub_8219BF08 BuildScreen::InitGroupLists: both lists over the shown
+// groups (MenuList::Init through `calls`), then RestoreGroupList. r3 the
+// list.
+uint64_t InitGroupLists(uint32_t sp, const Calls& calls);
+// sub_8219C078 BuildScreen::InitStandList: [0x826D8440] over the build
+// count, one row. Init's r3.
+uint64_t InitStandList(uint32_t sp, const Calls& calls);
+// sub_8219BCC0 BuildScreen::ValueText: the string id of a value, from the
+// ten-word table it stores below `sp`, 533 below 0 (no upper check: past 9
+// it reads the stack above the table, as the original).
+uint32_t ValueText(uint32_t sp, uint32_t value);
+
+// --- The build lists and the groups (lists.cpp) ---
+
+// sub_8219C1C8 BuildList::InsertNode: the free head's node linked after the
+// node at `position` - 1 (the head for 0); the count + 1.
+void InsertNode(uint32_t list, uint32_t position);
+// sub_8219C230 BuildList::Insert: InsertNode(list, position as a
+// halfword), then the slot of the node at `position` = the word at
+// `pointer`. r3 the list.
+void Insert(uint32_t sp, uint32_t list, uint32_t pointer, uint32_t position);
+// sub_8219EC50 BuildScreen::MarkGroups: each group's +32 = whether any of
+// its builds has +32 not equal to +36. Its r3 (the loop's end, 0x2C760).
+uint32_t MarkGroups();
+// sub_8219CC70 BuildScreen::FilterGroups: the groups of the category with
+// builds listed as shown; 0 when none, else the 11 rows' nodes shown or
+// hidden and 1.
+uint32_t FilterGroups(uint32_t sp);
+
+// --- The garage stage's lights (lists.cpp) ---
+
+// sub_8217B7C8 GarageLights::SetMode: `mode` 0 the 11 records from the
+// table at 0x82635950 and +1072 (x, x, x, 1.0); 1 every record (0, 0, 0,
+// 1.0) and +1072 the same; the vectors built below `sp` first, as the
+// original's leaf does.
+void LightsSetMode(uint32_t sp, uint32_t lights, uint32_t mode);
+// sub_8217D0C8 GarageStage::SetDark: SetMode(stage + 4512, dark), stage
+// +6060 = dark is 1. r3 stage + 4512.
+uint32_t SetDark(uint32_t sp, uint32_t holder, uint32_t dark);
+
+// --- The rows, arrows, marks, prompts and help (rows.cpp) ---
+
+// sub_8219D1B0 BuildScreen::GroupArrows and sub_8219D4B8 BuildArrows: the
+// up arrow (7, 10) or (8, 2) hidden at scroll 0, the down one (7, 11) or
+// (8, 3) hidden when scroll + the rows (11 or 6) is `count`. r3 the down
+// arrow.
+uint32_t GroupArrows(uint32_t sp, uint32_t scroll, uint32_t count);
+uint32_t BuildArrows(uint32_t sp, uint32_t scroll, uint32_t count);
+// sub_8219D7B0 BuildScreen::StandArrows: node (-1, 23) hidden when the
+// build count is 1. r3 the node.
+uint32_t StandArrows(uint32_t sp);
+// sub_8219D440 BuildScreen::ShowBuildMark: node (17, 0) hidden when the
+// build's +16 is 0, else shown with +108 = the build's +0 - 310. r3 the
+// node.
+uint32_t ShowBuildMark(uint32_t sp, uint32_t build);
+// sub_8219DA58 BuildScreen::SetPrompts: `pairs` r3 to r8 (three icon and
+// label pairs, -1 for none). r3 the last label node.
+uint32_t SetPrompts(uint32_t sp, const uint32_t pairs[6]);
+// sub_8219DB50 BuildScreen::SetHelp: node (1, 0)'s text reset, set to
+// string `id` and scrolled. ScrollNodeText's r3.
+uint64_t SetHelp(uint32_t sp, uint32_t id, const Calls& calls);
+// sub_8219BD30 BuildScreen::PowI: `x` to the `n` (signed) by squaring with
+// single-precision products, its reciprocal for n below 0. f1.
+double PowI(double x, uint32_t n);
+// sub_8219D090 BuildScreen::ShowNumber: `number`'s digits on node (12, 3)'s
+// children, the leading zeros hidden; node (12, 0) shown at 100. r3 the
+// last node found.
+uint32_t ShowNumber(uint32_t sp, uint32_t number);
+// sub_8219CE08 BuildScreen::DrawGroupRow: row `row`'s nodes for the shown
+// group `index` (its name, mark and new mark), nothing written past the
+// count. r3 SetNodeText's, else the text node.
+uint64_t DrawGroupRow(uint32_t sp, uint32_t row, uint32_t index,
+                      const Calls& calls);
+// sub_8219FA28 BuildScreen::DrawGroupRows: the 11 rows from the scroll.
+uint64_t DrawGroupRows(uint32_t sp, const Calls& calls);
+
+// --- The builds level (builds.cpp) ---
+
+// sub_8219BFE8 BuildScreen::InitBuildList: [0x826D8440] over the build
+// count (MenuList::Init, up to 6 rows), then RestoreBuildList. r3 the list.
+uint64_t InitBuildList(uint32_t sp, const Calls& calls);
+// sub_821A0128 BuildScreen::CopyBuilds: the screen's build list reset and
+// group `group`'s builds appended (BuildList::Insert). r3 the screen's list,
+// or `group` when it has none.
+uint64_t CopyBuilds(uint32_t sp, uint64_t group);
+// sub_821A0D38 BuildScreen::ListBuilds: CopyBuilds, then the 6 rows' nodes
+// shown or hidden and (8, 0) by the count. r3 node (8, 0).
+uint32_t ListBuilds(uint32_t sp, uint64_t group, const Calls& calls);
+// sub_8219D248 BuildScreen::DrawBuildRow and sub_8219D550 DrawStandRow: row
+// `row`'s texts and nodes for the build at `position` (nothing past the
+// count). r3 the last SetNodeText's, else the third text node.
+uint64_t DrawBuildRow(uint32_t sp, uint32_t row, uint32_t position,
+                      const Calls& calls);
+uint64_t DrawStandRow(uint32_t sp, uint32_t row, uint32_t position,
+                      const Calls& calls);
+// sub_8219D3E8 BuildScreen::DrawBuildRows: the 6 rows from the scroll.
+uint64_t DrawBuildRows(uint32_t sp, const Calls& calls);
+// sub_8219CF08 BuildScreen::ShowGroup: group `group`'s texts and picture.
+// r3 the last SetText's or node (18, 0).
+uint64_t ShowGroup(uint32_t sp, uint32_t group, const Calls& calls);
+// sub_821A1008 BuildScreen::SetUpBuilds: level 1's set-up. r3
+// BuildArrows'.
+uint64_t SetUpBuilds(uint32_t sp, const Calls& calls);
+
+// sub_821A0060 BuildScreen::SetUpGroups: level 0's set-up (the groups
+// marked, filtered, listed and drawn, the one shown, the number, the
+// prompts, the help line 564, the arrows). r3 GroupArrows'.
+uint64_t SetUpGroups(uint32_t sp, const Calls& calls);
+
+// sub_8219F868 BuildScreen::RestoreStand: level 2's set-up back from the
+// details (InitStandList, RestoreStandList, DrawStandRow(0, the scroll),
+// the prompts (0, 5, 1, 1), SetHelp 566, StandArrows, +0x3265C 1; the car
+// not put on the stand again). r3 StandArrows'.
+uint64_t RestoreStand(uint32_t sp, const Calls& calls);
+
+// sub_8219D820 BuildScreen::ShowDetails: build `build`'s texts on
+// sub-scene 9 (its names, or 535, by its +8; its car model's three lines,
+// or 535 and two cleared), then the scroll arrows (9, 27) and (9, 28) by
+// the text's line count and first line. r3 node (9, 28).
+uint32_t ShowDetails(uint32_t sp, uint32_t build, const Calls& calls);
+// sub_8219F8E0 BuildScreen::SetUpDetails: level 3's set-up (the text from
+// its first line, ShowDetails of the stand's build, [0x826D8440] one item
+// a line past the first 3, the prompts (1, 4), SetHelp 567, +0x3265C 0).
+// r3 SetHelp's.
+uint64_t SetUpDetails(uint32_t sp, const Calls& calls);
+
+// --- The transitions (transitions.cpp) ---
+//
+// Each takes `step`, its word at the machine's +24 (r3): the set-up on the
+// first call (the word 0, then 1), then UiMovie::Run(movie 6, 0). r3 1 but
+// for FadeOut.
+//
+// sub_8219C528 BuildScreen::HighlightGroups: PlayNamed and LoopNamed 44, 42,
+// 43, 80, 84 and 29 + the selection, FinishNamed 76 to 79, PlayNamed(76 +
+// the category, chained). sub_8219C6D0 HighlightGroups2: the same without
+// 84.
+uint64_t HighlightGroupsA(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightGroupsB(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219C850 BuildScreen::FadeOut: ScreenFades::FadeOut([0x82001BF0], 0,
+// 0, 0, layer 0) first; 1 once both fade counts words are 0, else 0.
+uint64_t FadeOut(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219C8F8 BuildScreen::HighlightBuilds (71, 70, 69, 61 + the
+// selection), sub_8219CA08 HighlightStand (96, 97, 108, 93), sub_8219CB18
+// HighlightStand2 (108, 93), sub_8219CBD8 HighlightDetails (74): PlayNamed
+// then LoopNamed of each.
+uint64_t HighlightBuilds(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightStand(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightStand2(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t HighlightDetails(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A08D8 BuildScreen::Open: PlayNamed 101 (chained), PlayNamed and
+// LoopNamed 100, 1, 83, PlayNamed 81 (chained) when the screen's +0x32658 is
+// 0, the category and the groups' kept selection and scroll 0,
+// SetUpGroups. r3 1 when Run answers 0.
+uint64_t Open(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A0A38 BuildScreen::BackToGroups: FinishNamed 71, 70, 69, 61 + the
+// selection, PlayNamed 103, SetUpGroups; once Run answers 0, the machine
+// back to level 0 with HighlightGroups2 (2) queued. r3 0.
+uint64_t BackToGroups(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FC60 BuildScreen::ChangeCategory: the category stepped by the
+// list's +28 (wrapping 0 to 4) until FilterGroups finds groups, the tabs,
+// the lists and rows again from the first group. r3 1.
+uint64_t ChangeCategory(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_821A1138 BuildScreen::OpenBuilds: FinishNamed 44, 42, 43, 80, 29 + the
+// selection, PlayNamed then FinishNamed 28, PlayNamed 102, KeepGroupList,
+// the builds' kept selection and scroll 0, SetUpBuilds. r3 1 when Run
+// answers 0.
+uint64_t OpenBuilds(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FF78 BuildScreen::BackToStand: FinishNamed 74, PlayNamed 107,
+// RestoreStand; once Run answers 0, the machine back to level 2 with
+// HighlightStand2 (13) queued. r3 0.
+uint64_t BackToStand(uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8219FEC8 BuildScreen::OpenDetails: FinishNamed 108 and 93, PlayNamed
+// 106, KeepStandList, SetUpDetails. r3 1 when Run answers 0.
+uint64_t OpenDetails(uint32_t step, uint32_t sp, const Calls& calls);
+
+
+// --- The stand (builds.cpp, transitions.cpp) ---
+
+// GarageStage::ReloadModel (sub_8217F880, car-makers.md) as the stand's
+// callers call it: `reload(holder, block, frame, lr)`, its plain C++ where
+// its adapter would run it, else a guest call. Its r3.
+using ReloadCall =
+    std::function<uint64_t(uint32_t holder, uint32_t block, uint32_t frame, uint32_t lr)>;
+// [[it]] the stand's holder (schema::BuildScreenGlobals::stand_holder;
+// kept for type2_screens/'s code).
+constexpr uint32_t kStandHolder = 0x826D83E0;
+// sub_8219D6F0 BuildScreen::PutOnStand: the screen's +0x32664 = `index`,
+// +0x32660 = 0, GarageStage::ReloadModel(holder, CarModels::BlockOf(the
+// car build's +2788)), GarageStage::SetDark(holder, `flag` 0), node (-1,
+// 11)'s +80 = `flag` 0. Its 128-byte frame below `sp`. r3 the node.
+uint32_t PutOnStand(uint32_t sp, uint32_t index, uint32_t flag,
+                    const ReloadCall& reload);
+// sub_8219F780 BuildScreen::SetUpStand: level 2's set-up (KeepBuildList,
+// InitStandList, RestoreBuildList, DrawStandRow(0, the scroll), the prompts
+// (0, 5, 1, 1), SetHelp 566, StandArrows, +0x3265C 1), then PutOnStand(the
+// build at the scroll + the selection: its +0, its +32 & 2). r3
+// PutOnStand's.
+uint64_t SetUpStand(uint32_t sp, const Calls& calls, const ReloadCall& reload);
+// sub_8219FE10 BuildScreen::OpenStand (transition 11): FinishNamed 71, 70,
+// 69, 61 + the selection, PlayNamed 104, SetUpStand. r3 1.
+uint64_t OpenStand(uint32_t step, uint32_t sp, const Calls& calls,
+                   const ReloadCall& reload);
+
+}  // namespace build_screen

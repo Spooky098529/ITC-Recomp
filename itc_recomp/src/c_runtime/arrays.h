@@ -17,13 +17,17 @@ using ElementCall = void (*)(void* user, uint64_t function, uint64_t element);
 // sub_820911A8: calls `constructor` on each of `count` elements (the low 32
 // bits, signed: 0 or less calls nothing) of `size` bytes from `array`, first
 // to last.
-void VectorConstruct(uint8_t* base, uint64_t array, uint64_t size, uint64_t count,
+void VectorConstruct(uint64_t array, uint64_t size, uint64_t count,
                      uint64_t constructor, ElementCall call, void* user);
 
 // sub_820900C0: calls `destructor` on each of `count` elements of `size`
 // bytes from `array`, last to first (the end is array + size x count, a
 // 32-bit signed multiply).
-void VectorDestruct(uint8_t* base, uint64_t array, uint64_t size, uint64_t count,
+void VectorDestruct(uint64_t array, uint64_t size, uint64_t count,
                     uint64_t destructor, ElementCall call, void* user);
+
+// sub_82106540: an empty function (`blr`), the do-nothing destructor many
+// objects share (and their vtables' empty slots). Nothing to do.
+void EmptyDestructor();
 
 }  // namespace c_runtime

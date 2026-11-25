@@ -1,0 +1,79 @@
+# The schema of docs/functions/std-string.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The C++ library's narrow string (Dinkumware's std::basic_string<char>, as
+# linked into the game; src/std_string/), and the C strings its wildcard
+# search and constructors take. Other areas embed the string as a 28-byte
+# bytes field (menu-sounds.toml, car-models.toml, file-layer.toml's two
+# global strings at 0x8265EE7C and 0x8265EE98).
+
+# The string (28 bytes): +0 the allocator (empty: nothing reads or writes
+# it), +4 the text in place while the capacity is under 16, else a pointer
+# to a heap block of capacity + 1 bytes (operator new); +20 the length; +24
+# the capacity (15 in place). The text always ends with a 0 byte. The
+# measure meets it through each member function's `this` and source.
+[StdString]
+measures = [
+  "String",
+  "std::string",
+  "sub_82091398.r3",
+  "sub_82091720.r3",
+  "sub_82091720.r4",
+  "sub_82091808.r3",
+  "sub_820A6E60.r3",
+  "sub_820A6F60.r3",
+]
+size = 28
+origin = "embedded"
+fields = [
+  { name = "text", offset = 4, type = "bytes", count = 16, note = "the text in place while the capacity is under 16" },
+  { name = "block", offset = 4, type = "u32", note = "the text's heap block (capacity + 1 bytes) while the capacity is 16 or more" },
+  { name = "length", offset = 20, type = "u32" },
+  { name = "capacity", offset = 24, type = "u32", note = "15 while the text is in place" },
+]
+
+# The library's exception made by _Xlen and _Xran (sub_82091968, never in
+# play; probably std::logic_error's constructor): +0 its vtable, +4 an image
+# word (probably its default text), the message string from +8 (copied by
+# sub_82091910). Not read in detail.
+[StdStringLogicError]
+measure = "sub_82091968.r3"
+size = 36
+origin = "embedded"
+vtable = 0x82000CD8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82000CD8" },
+  { name = "what", offset = 4, type = "u32", note = "0x82000CF4, an image word (probably the exception's default text)" },
+  { name = "message", offset = 8, type = "bytes", count = 28, note = "a StdString" },
+]
+
+# A C string (0-ended): the wildcard search's text and pattern, the wildcard
+# replace's pattern, string(const char*)'s text. Read byte by byte.
+[StdStringCString]
+measures = [
+  "WildcardSearch.r3",
+  "WildcardSearch.r4",
+  "String::ReplaceAll.r5",
+  "sub_825931D0.r4",
+]
+size = 1
+origin = "embedded"
+fields = [
+  { name = "chars", offset = 0, type = "bytes", count = 3, note = "any length, to its 0 byte (the search reads up to 3 bytes from a position)" },
+]
+
+# The wildcard search's out words (each may be null): the match's offset
+# (r5) and its length (r6).
+[StdStringMatchWord]
+measures = [
+  "WildcardSearch.r5",
+  "WildcardSearch.r6",
+]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "the match's offset (from the text searched) or its length" },
+]

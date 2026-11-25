@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "collision/collision.h"
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace track_collision {
@@ -18,136 +20,142 @@ namespace va = vehicle_accessors;
 
 namespace {
 
-constexpr uint32_t kQuarter = 0x82002968;
-constexpr uint32_t kDepthScale = 0x820029DC;
+using G = schema::CollisionWorldGlobals;
+using Query = schema::WallQuery;
+using Point = schema::TrackQueryPoint;
 
-uint32_t S16(uint8_t* base, uint32_t address) {
-  return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
+uint32_t S16(uint32_t address) {
+  return uint32_t(int32_t(int16_t(guest::LoadU16(address))));
 }
 
 }  // namespace
 
-uint32_t WallQueryAddCell(uint8_t* base, uint32_t query, uint32_t cell, uint32_t frame) {
+uint32_t WallQueryAddCell(uint32_t query, uint32_t cell, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820FC110 WallQuery::AddCell");
-  guest::StoreU32(base, frame + 28, cell);
-  const int32_t count = int32_t(guest::LoadU32(base, query + 108));
+  const Query q(query);
+  guest::StoreU32(frame + 28, cell);
+  const int32_t count = int32_t(q.cell_count());
   if (count > 0) {
-    const int32_t section = int32_t(S16(base, frame + 28));
-    uint32_t at = query + 112;
-    for (int32_t i = 0; i < int32_t(guest::LoadU32(base, query + 108)); i++, at += 4) {
-      if (int32_t(S16(base, at + 0)) == section &&
-          int32_t(S16(base, at + 2)) == int32_t(S16(base, frame + 30))) {
+    const int32_t section = int32_t(S16(frame + 28));
+    uint32_t at = q.cells_address();
+    for (int32_t i = 0; i < int32_t(q.cell_count()); i++, at += 4) {
+      if (int32_t(S16(at + 0)) == section &&
+          int32_t(S16(at + 2)) == int32_t(S16(frame + 30))) {
         return 0;
       }
     }
   }
-  guest::StoreU32(base, (uint32_t(count) + 28) * 4 + query, cell);
-  guest::StoreU32(base, query + 108, guest::LoadU32(base, query + 108) + 1);
+  guest::StoreU32(q.cells_address() + uint32_t(count) * 4, cell);
+  q.set_cell_count(q.cell_count() + 1);
   return 1;
 }
 
-bool WallQueryGatherCells(uint8_t* base, uint32_t query, uint32_t mesh, uint32_t frame,
+bool WallQueryGatherCells(uint32_t query, uint32_t mesh, uint32_t frame,
                           uint32_t* count) {
   ITC_NATIVE_RUNNING("sub_820FC188 WallQuery::GatherCells");
+  const Query q(query);
   uint32_t box = 0;
-  if (!co::CollisionShapeCurrent(base, guest::LoadU32(base, query + 12), &box) ||
-      !co::IsBox(base, box)) {
+  if (!co::CollisionShapeCurrent(q.record().address, &box) ||
+      !co::IsBox(box)) {
     return false;
   }
   const uint32_t f = frame;
   // Half the corner count (srawi, addze): the lower corners.
   const uint32_t corners = uint32_t(int32_t(co::BoxCornerCount()) / 2);
-  guest::StoreU32(base, query + 108, 0);
+  q.set_cell_count(0);
   for (uint32_t i = 0; i < corners; i++) {
-    const uint32_t position = co::BoxCacheWord(base, box, i);
-    if (WallQueryAddCell(base, query, guest::LoadU32(base, position + 0), f) == 0) {
+    const schema::TrackPosition position(co::BoxCacheWord(box, i));
+    if (WallQueryAddCell(query, position.cell(), f) == 0) {
       continue;
     }
     // The slices before and after it, and the cells the section's links
     // lead to from it or them.
-    guest::StoreU32(base, f + 80, guest::LoadU32(base, position + 0));
-    guest::StoreU32(base, f + 84, guest::LoadU32(base, position + 0));
-    const uint32_t table = guest::LoadU32(base, guest::LoadU32(base, mesh + 4) + 4);
-    const uint32_t section = guest::LoadU32(base, S16(base, position + 0) * 4 + table);
-    const int32_t after = int16_t(guest::LoadU16(base, f + 82) + 1);
-    guest::StoreU16(base, f + 82, uint16_t(after));
-    const int32_t before = int16_t(guest::LoadU16(base, f + 86) - 1);
-    guest::StoreU16(base, f + 86, uint16_t(before));
-    if (after < int32_t(S16(base, section + 0))) {
-      WallQueryAddCell(base, query, guest::LoadU32(base, f + 80), f);
+    guest::StoreU32(f + 80, position.cell());
+    guest::StoreU32(f + 84, position.cell());
+    const uint32_t table = schema::TrackMesh(mesh).file().sections();
+    const schema::TrackMeshSection section(guest::LoadU32(uint32_t(int32_t(int16_t(position.section()))) * 4 + table));
+    const int32_t after = int16_t(guest::LoadU16(f + 82) + 1);
+    guest::StoreU16(f + 82, uint16_t(after));
+    const int32_t before = int16_t(guest::LoadU16(f + 86) - 1);
+    guest::StoreU16(f + 86, uint16_t(before));
+    if (after < int32_t(int16_t(section.slice_count()))) {
+      WallQueryAddCell(query, guest::LoadU32(f + 80), f);
     }
     if (before >= 0) {
-      WallQueryAddCell(base, query, guest::LoadU32(base, f + 84), f);
+      WallQueryAddCell(query, guest::LoadU32(f + 84), f);
     }
     for (uint32_t k = 0; k < 6; k++) {
-      const uint32_t link = section + 6 + 6 * k;
-      const int32_t from = int32_t(S16(base, link - 2));
+      const schema::TrackMeshLink link(section.links_address() + 6 * k);
+      const int32_t from = int32_t(int16_t(link.from_slice()));
       if (from == -1) {
         continue;
       }
-      if (from == int32_t(S16(base, position + 2)) || from == after || from == before) {
-        guest::StoreU16(base, f + 88, guest::LoadU16(base, link + 0));
-        guest::StoreU16(base, f + 90, guest::LoadU16(base, link + 2));
-        WallQueryAddCell(base, query, guest::LoadU32(base, f + 88), f);
+      if (from == int32_t(int16_t(position.slice())) || from == after || from == before) {
+        guest::StoreU16(f + 88, link.section());
+        guest::StoreU16(f + 90, link.slice());
+        WallQueryAddCell(query, guest::LoadU32(f + 88), f);
       }
     }
   }
-  *count = guest::LoadU32(base, query + 108);
+  *count = q.cell_count();
   return true;
 }
 
-uint32_t WallQueryAddHit(uint8_t* base, uint32_t query, uint32_t surface) {
+uint32_t WallQueryAddHit(uint32_t query, uint32_t surface) {
   ITC_NATIVE_RUNNING("sub_820FC2E0 WallQuery::AddHit");
-  const uint32_t room = va::CollisionWorldWord60(base);
-  const uint32_t count = guest::LoadU32(base, query + 0);
+  const Query q(query);
+  const uint32_t room = va::CollisionWorldWord60();
+  const uint32_t count = q.hit_count();
   const uint32_t index = int32_t(room) > int32_t(count) ? count : room - 1;
-  const uint32_t record = index * 80 + guest::LoadU32(base, query + 8);
+  const schema::CollisionHit record(index * 80 + q.hits().address);
   if (int32_t(room) > int32_t(count)) {
-    guest::StoreU32(base, query + 0, count + 1);
+    q.set_hit_count(count + 1);
   }
-  guest::StoreU32(base, record + 60, guest::LoadU32(base, query + 104));
-  CopyWord(base, query + 4, record + 64);
-  const double scale = Lfs(base, kDepthScale);
-  Stfs(base, record + 48, Fmuls(Lfs(base, query + 96), scale));
-  const double depth2 = Lfs(base, query + 100);
-  guest::StoreU32(base, record + 56, surface);
-  Stfs(base, record + 52, Fmuls(depth2, scale));
+  record.set_key(q.hit_wall());
+  CopyWord(q.time_address(), record.time_address());
+  const double scale = double(G::hit_depth_scale());
+  Stfs(record.depth_address(), Fmuls(double(q.hit_depth()), scale));
+  const double depth2 = double(q.hit_depth_again());
+  record.set_surface_bits(surface);
+  Stfs(record.depth_2_address(), Fmuls(depth2, scale));
   for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, query + 48 + i, record + 0 + i);
-  }
-  for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, query + 64 + i, record + 16 + i);
+    CopyWord(q.hit_point_x_address() + i, record.point_address() + i);
   }
   for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, query + 80 + i, record + 32 + i);
+    CopyWord(q.hit_normal_x_address() + i, record.normal_address() + i);
+  }
+  for (uint32_t i = 0; i < 12; i += 4) {
+    CopyWord(q.hit_push_x_address() + i, record.push_address() + i);
   }
   return room;
 }
 
-uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out) {
+uint32_t SegmentsIntersect2D(uint32_t points, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_820FC658 Segments::Intersect2D");
-  const uint32_t a = guest::LoadU32(base, points + 0), b = guest::LoadU32(base, points + 4);
-  const uint32_t c = guest::LoadU32(base, points + 8), d = guest::LoadU32(base, points + 12);
+  const schema::TrackSegments segments(points);
+  const Point a = segments.a(), b = segments.b();
+  const Point c = segments.c(), d = segments.d();
   // The bounds in x, then in z: a-b wholly on one side of c-d.
-  auto apart = [&](uint32_t axis) {
-    const double pa = Lfs(base, a + axis), pb = Lfs(base, b + axis), pc = Lfs(base, c + axis);
+  auto apart = [&](bool z) {
+    auto at = [&](const Point& p) { return double(z ? p.z() : p.x()); };
+    const double pa = at(a), pb = at(b), pc = at(c);
     if (pa < pb) {
-      if (pa > pc && pa > Lfs(base, d + axis)) {
+      if (pa > pc && pa > at(d)) {
         return true;
       }
-      return pb < pc && pb < Lfs(base, d + axis);
+      return pb < pc && pb < at(d);
     }
-    if (pa < pc && pa < Lfs(base, d + axis)) {
+    if (pa < pc && pa < at(d)) {
       return true;
     }
-    return pb > pc && pb > Lfs(base, d + axis);
+    return pb > pc && pb > at(d);
   };
-  if (apart(0) || apart(8)) {
+  if (apart(false) || apart(true)) {
     return 0;
   }
-  double ax = Lfs(base, a + 0), bx = Lfs(base, b + 0), cx = Lfs(base, c + 0);
-  double az = Lfs(base, a + 8), bz = Lfs(base, b + 8), cz = Lfs(base, c + 8);
-  double dx = Lfs(base, d + 0), dz = Lfs(base, d + 8);
+  double ax = double(a.x()), bx = double(b.x()), cx = double(c.x());
+  double az = double(a.z()), bz = double(b.z()), cz = double(c.z());
+  double dx = double(d.x()), dz = double(d.z());
   // The sides: c and d on one side of a-b, a and b on one side of c-d.
   {
     const double abz = Fsubs(az, bz);
@@ -160,11 +168,11 @@ uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out) {
     const double u = Fmuls(adx, abz);
     const double side_c = Fmadds(caz, abx, t);
     const double side_d = Fmadds(daz, abx, u);
-    if (Fmuls(side_d, side_c) > Lfs(base, kZero)) {
+    if (Fmuls(side_d, side_c) > Lfs(kZero)) {
       return 0;
     }
   }
-  const double zero = Lfs(base, kZero);
+  const double zero = Lfs(kZero);
   {
     const double cdz = Fsubs(cz, dz);
     const double cdx = Fsubs(cx, dx);
@@ -177,7 +185,7 @@ uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out) {
     }
   }
   // Worked out around the four points' mean.
-  const double quarter = Lfs(base, kQuarter);
+  const double quarter = double(G::quarter());
   const double mx = Fmuls(Fadds(Fadds(Fadds(dx, cx), bx), ax), quarter);
   const double mz = Fmuls(Fadds(Fadds(Fadds(dz, cz), bz), az), quarter);
   ax = Fsubs(ax, mx);
@@ -201,12 +209,13 @@ uint32_t SegmentsIntersect2D(uint8_t* base, uint32_t points, uint32_t out) {
     return 0;
   }
   const double v = Fmuls(cdx, cross_ab);
-  const double inverse = Fdivs(Lfs(base, kOne), denominator);
+  const double inverse = Fdivs(Lfs(kOne), denominator);
   const double w = Fmuls(cross_cd, baz);
   const double nx = Fmsubs(cross_cd, abx, v);
   const double nz = Fmsubs(dcz, cross_ab, w);
-  Stfs(base, out + 0, Fmadds(nx, inverse, mx));
-  Stfs(base, out + 8, Fmadds(nz, inverse, mz));
+  const Point o(out);
+  o.set_x(float(Fmadds(nx, inverse, mx)));
+  o.set_z(float(Fmadds(nz, inverse, mz)));
   return 1;
 }
 

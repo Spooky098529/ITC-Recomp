@@ -1,0 +1,987 @@
+// The UI movies' vectors and objects as plain C++ (game.h: "The movies'
+// vectors and objects"; docs/functions/ui-movies-game.md).
+
+#include "ui_movies/game.h"
+
+#include "base/log.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+#include "schema/graphics_resources.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_pages.h"
+#include "schema/tuning_screen.h"
+#include "schema/ui_movies.h"
+#include "schema/ui_movies_game.h"
+#include "std_string/std_string.h"
+#include "strings_and_font/strings_and_font.h"
+#include "ui_movies/ui_movies.h"
+
+#include <cstdlib>
+#include <cstring>
+#include <unordered_set>
+
+namespace ui_movies {
+
+namespace {
+
+using schema::UiMovieNode;
+using StringsGlobals = schema::StringsAndFontGlobals;
+
+uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
+}
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
+}
+
+// operator new[] and delete[] once their checks said yes: a logged abort
+// when they refuse anyway.
+uint32_t NewArray(uint32_t size) {
+  const auto block = memory::crt::OperatorNewArray(size);
+  if (!block) {
+    ITC_LOG_ERROR("UI movies: operator new[]({}) failed after its checks", size);
+    std::abort();
+  }
+  return *block;
+}
+void DeleteArray(uint32_t block) {
+  if (!memory::crt::OperatorDeleteArray(block)) {
+    ITC_LOG_ERROR("UI movies: operator delete[]({:08X}) failed after its checks", block);
+    std::abort();
+  }
+}
+
+using schema::UiMovie;
+using schema::UiMoviePair;
+using schema::UiMoviePairVector;
+using schema::UiMovieText;
+using schema::UiMovieWordVector;
+using Globals = schema::UiMoviesGameGlobals;
+
+// The pair and word vectors share their layout (+0 the array, +4 the
+// capacity, +8 the count): the shared steps view them as word vectors.
+// The size sub_8211B160 (8-byte items) and sub_8211A788 (words) ask for a
+// capacity: -1 past what 32 bits hold, as the originals.
+uint32_t ArrayBytes(uint32_t capacity, uint32_t item) {
+  return capacity > 0xFFFFFFFFu / item ? 0xFFFFFFFFu : capacity * item;
+}
+
+// The append's capacity change (the doubled capacity, when the count has
+// reached the capacity and doubling changes it), or none.
+std::optional<uint32_t> Regrow(uint32_t vector) {
+  const UiMovieWordVector v(vector);
+  const uint32_t capacity = v.capacity();
+  if (v.count() < capacity || capacity * 2 == capacity) {
+    return std::nullopt;
+  }
+  return capacity * 2;
+}
+
+// sub_8211B160 and sub_8211A788 for a new capacity: a new array (cleared
+// for pairs), the items that fit copied (the old capacity or the new, the
+// smaller), the old array freed. Returns the old array (r3 as operator
+// delete[] leaves it).
+uint32_t Reserve(uint32_t vector, uint32_t capacity, uint32_t item, bool clear) {
+  const UiMovieWordVector v(vector);
+  // The pairs' arrays in host memory (E5 step 5); the words' stay guest.
+  const uint32_t block = item == 8 ? UiMoviePair::NewArray(capacity).address
+                                   : NewArray(ArrayBytes(capacity, item));
+  if (clear) {
+    for (uint32_t i = 0; int32_t(i) < int32_t(capacity); i++) {
+      const UiMoviePair pair(block + 8 * i);
+      pair.set_key(0);
+      pair.set_value(0);
+    }
+  }
+  for (uint32_t i = 0;; i++) {
+    const uint32_t old_capacity = v.capacity();
+    if (i >= (old_capacity > capacity ? capacity : old_capacity)) {
+      break;
+    }
+    const uint32_t from = v.words() + item * i;
+    for (uint32_t k = 0; k < item; k += 4) {
+      if (item == 8) {  // host pairs (E5 step 5), through their views
+        UiMoviePair(block + item * i).store_at(k, 4, UiMoviePair(from).load_at(k, 4));
+      } else {
+        Store(block + item * i + k, Load(from + k));
+      }
+    }
+  }
+  const uint32_t old = v.words();
+  DeleteArray(old);
+  v.set_words(block);
+  v.set_capacity(capacity);
+  return old;
+}
+
+// Whether the append's capacity change (if any) runs natively.
+bool RegrowFits(uint32_t vector, uint32_t item) {
+  const auto capacity = Regrow(vector);
+  return !capacity || (CanAllocate(ArrayBytes(*capacity, item)) &&
+                       CanDelete(UiMovieWordVector(vector).words()));
+}
+
+}  // namespace
+
+bool CanAllocate(uint32_t size) {
+  return size <= 0xFFFFF000u && memory::crt::GetProcessHeap() != 0;
+}
+
+bool CanDelete(uint32_t block) {
+  return block == 0 || memory::IsHeapBlock(block);
+}
+
+std::optional<uint32_t> MakePairs(uint32_t vector) {
+  if (!CanAllocate(512)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211B0E8 (the movie table's vector made)");
+  const UiMoviePairVector v(vector);
+  v.set_capacity(64);
+  const uint32_t block = UiMoviePair::NewArray(64).address;  // host (E5 step 5)
+  for (uint32_t i = 0; i < 64; i++) {
+    const UiMoviePair pair(block + 8 * i);
+    pair.set_key(0);
+    pair.set_value(0);
+  }
+  v.set_pairs(block);
+  return vector;
+}
+
+std::optional<uint32_t> PairsAppend(uint32_t vector, uint32_t key,
+                                    uint32_t value) {
+  if (!RegrowFits(vector, 8)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211B458 (a pair appended)");
+  uint32_t r3 = vector;
+  if (const auto capacity = Regrow(vector)) {
+    ITC_NATIVE_RUNNING("sub_8211B160 (the pairs' capacity changed)");
+    r3 = Reserve(vector, *capacity, 8, true);
+  }
+  const UiMoviePairVector v(vector);
+  const uint32_t count = v.count();
+  const UiMoviePair at(v.pairs().address + 8 * count);
+  v.set_count(count + 1);
+  at.set_key(key);
+  at.set_value(value);
+  return r3;
+}
+
+std::optional<uint32_t> PairsSet(uint32_t vector, uint32_t key, uint32_t value) {
+  const UiMoviePairVector v(vector);
+  const uint32_t count = v.count();
+  const uint32_t array = v.pairs().address;
+  for (uint32_t i = 0; i < count; i++) {
+    if (UiMoviePair(array + 8 * i).key() == key) {
+      ITC_NATIVE_RUNNING("sub_8211C168 (a pair set)");
+      UiMoviePair(v.pairs().address + 8 * i).set_value(value);
+      return vector;
+    }
+  }
+  if (!RegrowFits(vector, 8)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C168 (a pair set)");
+  return PairsAppend(vector, key, value);
+}
+
+std::optional<uint32_t> MakeWords(uint32_t vector) {
+  if (!CanAllocate(2048)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211AE18 (a words vector made)");
+  const UiMovieWordVector v(vector);
+  v.set_capacity(512);
+  v.set_words(NewArray(2048));
+  v.set_count(0);
+  return vector;
+}
+
+std::optional<uint32_t> WordsAppend(uint32_t vector, uint32_t word) {
+  if (!RegrowFits(vector, 4)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211AE68 (a word appended)");
+  uint32_t r3 = vector;
+  if (const auto capacity = Regrow(vector)) {
+    ITC_NATIVE_RUNNING("sub_8211A788 (the words' capacity changed)");
+    r3 = Reserve(vector, *capacity, 4, false);
+  }
+  const UiMovieWordVector v(vector);
+  const uint32_t count = v.count();
+  const uint32_t array = v.words();
+  v.set_count(count + 1);
+  Store(array + 4 * count, word);
+  return r3;
+}
+
+namespace {
+
+// A free the checks said would run natively: a logged abort when it
+// doesn't.
+void Require(bool done, const char* what, uint32_t block) {
+  if (!done) {
+    ITC_LOG_ERROR("UI movies: {}({:08X}) failed after its checks", what, block);
+    std::abort();
+  }
+}
+
+schema::UiMovieNamedAnimation NamedEntry(uint32_t movie, uint32_t i) {
+  return schema::UiMovieNamedAnimation(UiMovie(movie).named_animations_address() + kNamedBytes * i);
+}
+
+// The block a named animation's string frees (_Tidy with `built`): its
+// pointer while the capacity is 16 or more, else none.
+std::optional<uint32_t> StringBlock(uint32_t string) {
+  if (Load(string + std_string::kCapacity) < std_string::kInPlace) {
+    return std::nullopt;
+  }
+  return Load(string + std_string::kText);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ConstructMovie(uint32_t movie) {
+  if (!CanAllocate(2048) || !CanAllocate(65552)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211E1C0 UiMovie::UiMovie");
+  const UiMovie m(movie);
+  MakeWords(m.textures_address());
+  {
+    ITC_NATIVE_RUNNING("sub_8211B018 (the text list made)");
+    const schema::UiMovieDrawTextList list(m.text_items_address());
+    list.set_capacity(512);
+    // A blob (E5 step 5): the items are reached by address.
+    const uint32_t block = schema::UiMovieTextItemArray::New(65552).address;
+    schema::UiMovieTextItemArray(block).set_count(512);
+    const uint32_t items = block + 16;
+    for (uint32_t i = 0; i < 512; i++) {
+      MakeTextItem(items + 128 * i);
+    }
+    list.set_items(items);
+    list.set_count(0);
+  }
+  ResetDrawContext(m.draw_context_address());
+  for (uint32_t i = 0; i < kNamedCount; i++) {
+    ITC_NATIVE_RUNNING("sub_8211D210 (a named animation made)");
+    const schema::UiMovieNamedAnimation entry = NamedEntry(movie, i);
+    std_string::Construct(entry.name_address());
+    entry.set_scene(0);
+    entry.set_animation(0);
+  }
+  m.set_named_count(0);
+  for (uint32_t i = 0; i < 128; i++) {
+    const UiMoviePair pair(m.texts_address() + 8 * i);
+    pair.set_key(0);
+    pair.set_value(0);
+  }
+  m.set_text_count(0);
+  return movie;
+}
+
+std::optional<uint32_t> DestroyMovie(uint32_t movie) {
+  std::unordered_set<uint32_t> blocks;
+  auto deletable = [&](uint32_t block) {
+    return CanDelete(block) && (block == 0 || blocks.insert(block).second);
+  };
+  const UiMovie m(movie);
+  for (uint32_t i = 0; i < kNamedCount; i++) {
+    const auto block = StringBlock(NamedEntry(movie, i).name_address());
+    if (block && !deletable(*block)) {
+      return std::nullopt;
+    }
+  }
+  const uint32_t items = m.text_items().address;
+  if ((items != 0 && !deletable(items - 16)) || !deletable(m.textures())) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211E160 UiMovie::~UiMovie");
+  {
+    ITC_NATIVE_RUNNING("sub_8211D1B8 (the named animations destroyed)");
+    for (uint32_t i = kNamedCount; i-- > 0;) {
+      const uint32_t entry = NamedEntry(movie, i).name_address();
+      Require(std_string::Tidy(entry, true, 0), "a named animation's _Tidy", entry);
+    }
+  }
+  // The draw context's destructor (sub_82106540) is empty.
+  if (items != 0) {
+    ITC_NATIVE_RUNNING("sub_8211AF90 (the text items' deleting destructor)");
+    const uint32_t block = items - 16;
+    const uint32_t count = schema::UiMovieTextItemArray(block).count();
+    uint32_t item = items + (count << 7);
+    for (int32_t k = int32_t(count - 1); k >= 0; k--) {
+      item -= 128;
+      ClearTextItem(item);
+    }
+    DeleteArray(block);
+  }
+  const uint32_t textures = m.textures();
+  DeleteArray(textures);
+  return textures;
+}
+
+std::optional<uint32_t> FreeTexts(uint32_t movie) {
+  const UiMovie m(movie);
+  const uint32_t count = m.text_count();
+  std::unordered_set<uint32_t> records;
+  for (uint32_t k = 0; k < count; k++) {
+    const uint32_t record = UiMoviePair(m.texts_address() + 8 * k).value();
+    if (!memory::InRange(UiMovieText(record).buffer().address) || !CanDelete(record) ||
+        (record != 0 && !records.insert(record).second)) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_8211AC90 (a movie's texts freed)");
+  uint32_t r3 = movie;
+  for (uint32_t k = 0; k < m.text_count(); k++) {
+    const uint32_t record = UiMoviePair(m.texts_address() + 8 * k).value();
+    // VirtualFree(buffer, 0, MEM_RELEASE), as its adapter frees the layer's
+    // pages.
+    memory::FreePages(UiMovieText(record).buffer().address);
+    Require(memory::crt::OperatorDelete(record), "operator delete", record);
+    r3 = record;
+  }
+  m.set_text_count(0);
+  return r3;
+}
+
+std::optional<uint32_t> GetText(uint32_t movie, uint32_t id_address) {
+  const UiMovie m(movie);
+  const schema::UiMovieWord id_word(id_address);
+  uint32_t id = id_word.value();
+  const bool new_id = id == 0;
+  if (new_id) {
+    id = m.text_count() + 1;
+  }
+  const uint32_t map = m.texts_address();
+  uint32_t record = schema::UiMovieWord(TextMapFindKey(map, id)).value();
+  if (record == 0 && !CanAllocate(28)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211B660 UiMovie::GetText");
+  if (new_id) {
+    id_word.set_value(id);
+  }
+  if (record != 0) {
+    return record;
+  }
+  // Both in PC memory (E5 step 5): the record a host object, its buffer a
+  // blob.
+  record = UiMovieText::New().address;
+  const UiMovieText text(record);
+  const uint32_t buffer = schema::UiMovieTextBuffer::New(4096).address;
+  text.set_buffer(buffer);
+  guest::ForEachHostPart(buffer, 4096,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+  text.set_scroll_speed_word(Globals::zero());
+  text.set_scrolling(0);
+  text.set_scroll_counter(0);
+  text.set_scroll_delay(0);
+  text.set_page(0);
+  text.set_first_line(0);
+  return record;
+}
+
+uint32_t AddNamedAnimations(uint32_t stack, uint32_t movie, uint32_t scene) {
+  ITC_NATIVE_RUNNING("sub_8211E378 (a scene's named animations added)");
+  constexpr uint32_t kFrame = 240;
+  const uint32_t frame = stack - kFrame;
+  const uint32_t name = frame + 96, copy = frame + 128;
+  uint32_t r3 = movie;
+  for (uint32_t i = 0; i < UiMovieNode(scene).unknown_112(); i++) {  // the children
+    const uint32_t child = Child(scene, i);
+    r3 = child;
+    if (UiMovieNode(child).tag() == kTagSce) {
+      r3 = AddNamedAnimations(frame, movie, child);
+    }
+  }
+  auto length = [&](uint32_t text) {
+    uint32_t end = text;
+    while (guest::LoadU8(end) != 0) {
+      end++;
+    }
+    return end - text;
+  };
+  auto require = [&](bool done, const char* what) { Require(done, what, name); };
+  // The animation count: the scene's +120 (UiMovieNode's texture_top word).
+  for (uint32_t i = 0; i < Load(UiMovieNode(scene).texture_top_address()); i++) {
+    const uint32_t animation = SceneAnimation(scene, i);
+    std_string::Construct(name);
+    require(std_string::Append(name, scene + 84, length(scene + 84)), "append");
+    require(std_string::Append(name, Globals::name_separator_address(), 1), "append");
+    const uint32_t animation_name = schema::UiMovieFileAnimation(animation).name_address();
+    require(std_string::Append(name, animation_name, length(animation_name)), "append");
+    require(std_string::ConstructFrom(copy, name, 0, 0xFFFFFFFFu), "string(const string&)");
+    const UiMovie m(movie);
+    const uint32_t used = m.named_count();
+    const schema::UiMovieNamedAnimation copied(copy);
+    copied.set_scene(scene);
+    copied.set_animation(animation);
+    m.set_named_count(used + 1);
+    const schema::UiMovieNamedAnimation entry = NamedEntry(movie, used);
+    {
+      ITC_NATIVE_RUNNING("sub_8211E318 (a named animation copied)");
+      require(std_string::AssignFrom(entry.name_address(), copy, 0, 0xFFFFFFFFu), "assign");
+      entry.set_scene(copied.scene());
+      entry.set_animation(copied.animation());
+    }
+    require(std_string::Tidy(copy, true, 0), "_Tidy");
+    const auto block = StringBlock(name);
+    require(std_string::Tidy(name, true, 0), "_Tidy");
+    r3 = block ? *block : name;
+  }
+  return r3;
+}
+
+namespace {
+
+void Zero(uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+}
+
+// The setters' steps: the node's record, `change(record)`, then the record
+// stored for the node's id.
+template <typename Change>
+std::optional<uint32_t> ChangeText(uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, Change change) {
+  const uint32_t id_address = UiMovieNode(FindNode(movie, sub_scene, child)).texture_entry_address();
+  const auto record = GetText(movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  change(*record);
+  TextMapSetKey(UiMovie(movie).texts_address(), Load(id_address), *record);
+  return UiMovie(movie).texts_address();
+}
+
+// The same with the node given.
+template <typename Change>
+std::optional<uint32_t> ChangeNodeText(uint32_t movie, uint32_t node,
+                                       Change change) {
+  const uint32_t id_address = UiMovieNode(node).texture_entry_address();
+  const auto record = GetText(movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  change(*record);
+  TextMapSetKey(UiMovie(movie).texts_address(), Load(id_address), *record);
+  return UiMovie(movie).texts_address();
+}
+
+constexpr uint32_t kTxtTag = 0x54585400;  // "TXT\0"
+
+// Whether the record's next page is there: its page (+20) + 1 against its
+// buffer's page count, signed.
+bool HasNextPage(uint32_t record) {
+  const uint32_t pages =
+      strings_and_font::StringsPageCount(UiMovieText(record).buffer().address);
+  return int32_t(UiMovieText(record).page() + 1) <= int32_t(pages);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ClearText(uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child) {
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C470 UiMovie::ClearText");
+    Zero(UiMovieText(record).buffer().address, 4096);
+    UiMovieText(record).set_scroll_counter(0);
+  });
+}
+
+std::optional<uint32_t> SetText(const strings_and_font::FormatCalls& calls,
+                                uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                uint32_t child, uint32_t id, const uint64_t varargs[4]) {
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  const uint32_t node = FindNode(movie, sub_scene, child);
+  if (UiMovieNode(node).tag() != kTagTxt) {
+    return std::nullopt;
+  }
+  const uint32_t args = stack + 48;
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(args + 8 * i, uint32_t(varargs[i] >> 32));
+    Store(args + 8 * i + 4, uint32_t(varargs[i]));
+  }
+  const uint32_t id_address = UiMovieNode(node).texture_entry_address();
+  const auto record = GetText(movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C1F8 UiMovie::SetText");
+  Zero(UiMovieText(*record).buffer().address, 4096);
+  UiMovieText(*record).set_page(0);
+  strings_and_font::StringsFormatV(calls, stack - 128, Load(StringsGlobals::strings_address()),
+                                   UiMovieText(*record).buffer().address, id & 0xFFFF, args);
+  TextMapSetKey(UiMovie(movie).texts_address(), Load(id_address), *record);
+  return UiMovie(movie).texts_address();
+}
+
+std::optional<uint32_t> SetNodeText(const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                    const uint64_t varargs[5]) {
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  if (UiMovieNode(node).tag() != kTagTxt) {
+    return std::nullopt;
+  }
+  const uint32_t args = stack + 40;
+  for (uint32_t i = 0; i < 5; i++) {
+    Store(args + 8 * i, uint32_t(varargs[i] >> 32));
+    Store(args + 8 * i + 4, uint32_t(varargs[i]));
+  }
+  const uint32_t id_address = UiMovieNode(node).texture_entry_address();
+  const auto record = GetText(movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C7E8 UiMovie::SetNodeText");
+  Zero(UiMovieText(*record).buffer().address, 4096);
+  UiMovieText(*record).set_page(0);
+  strings_and_font::StringsFormatV(calls, stack - 128, Load(StringsGlobals::strings_address()),
+                                   UiMovieText(*record).buffer().address, id & 0xFFFF, args);
+  TextMapSetKey(UiMovie(movie).texts_address(), Load(id_address), *record);
+  return UiMovie(movie).texts_address();
+}
+
+namespace {
+// SetNumberText's and SetNodeNumberText's change: the buffer cleared, then
+// string 8 with r6 = 0 when the value's low word is 0, else 9 with the
+// value (all 64 bits, as the originals' mr r6); r7 to r10, the memset's
+// leftovers in the originals, passed 0 (dead frame words).
+void FormatNumber(const strings_and_font::FormatCalls& calls, uint32_t stack,
+                  uint32_t record, uint64_t value) {
+  Zero(UiMovieText(record).buffer().address, 4096);
+  const bool zero = uint32_t(value) == 0;
+  const uint64_t varargs[5] = {zero ? 0 : value, 0, 0, 0, 0};
+  strings_and_font::StringsFormat(calls, stack - 128, Load(StringsGlobals::strings_address()),
+                                  UiMovieText(record).buffer().address, zero ? 8 : 9,
+                                  varargs);
+}
+}  // namespace
+
+std::optional<uint32_t> SetNumberText(const strings_and_font::FormatCalls& calls,
+                                      uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                      uint32_t child, uint64_t value) {
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C740 UiMovie::SetNumberText");
+    FormatNumber(calls, stack, record, value);
+  });
+}
+
+std::optional<uint32_t> SetNodeNumberText(const strings_and_font::FormatCalls& calls,
+                                          uint32_t stack, uint32_t movie, uint32_t node,
+                                          uint64_t value) {
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CA18 UiMovie::SetNodeNumberText");
+    FormatNumber(calls, stack, record, value);
+  });
+}
+
+std::optional<uint32_t> SetNodeTextV(const strings_and_font::FormatCalls& calls,
+                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                     uint32_t args) {
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CBD8 UiMovie::SetNodeTextV");
+    Zero(UiMovieText(record).buffer().address, 4096);
+    strings_and_font::StringsFormatV(calls, stack - 144, Load(StringsGlobals::strings_address()),
+                                     UiMovieText(record).buffer().address, id & 0xFFFF, args);
+  });
+}
+
+std::optional<uint32_t> SetNodeCharText(const strings_and_font::FormatCalls& calls,
+                                        uint32_t stack, uint32_t movie, uint32_t node,
+                                        uint32_t text) {
+  constexpr uint32_t kCharsToText = 0x82108A70;  // the 8-bit string's conversion
+  if (UiMovieNode(node).tag() != kTxtTag) {
+    return std::nullopt;
+  }
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C8A0 UiMovie::SetNodeCharText");
+    Zero(UiMovieText(record).buffer().address, 4096);
+    calls.call(calls.user, kCharsToText, Load(StringsGlobals::font_address()),
+               UiMovieText(record).buffer().address, text, stack - 128, 0x8211C908);
+  });
+}
+
+NameRecord NameRecordAt(uint32_t address) {
+  const schema::UiMovieNameRecord record(address);
+  return {record.kind(),        record.index(),        record.flag(),
+          record.second_kind(), record.second_index(), record.second_flag()};
+}
+
+NameRecord NameRecordFromBytes(const uint8_t* bytes) {
+  const auto u32 = [&](int at) {
+    return uint32_t(bytes[at]) << 24 | uint32_t(bytes[at + 1]) << 16 |
+           uint32_t(bytes[at + 2]) << 8 | uint32_t(bytes[at + 3]);
+  };
+  const auto u16 = [&](int at) { return uint16_t(bytes[at] << 8 | bytes[at + 1]); };
+  return {u32(4), u16(8), bytes[10], u32(12), u16(16), bytes[18]};
+}
+
+std::optional<NameText> NameTextOf(const NameRecord& record) {
+  const auto index = [](uint16_t halfword) { return int32_t(int16_t(halfword)); };
+  // The original's checks: below `bound` signed, then the halfword's
+  // unsigned value below 32768 (or at least 0, signed), as its branches.
+  const auto in_range = [](int32_t i, int32_t bound) { return i < bound && i >= 0; };
+  const uint32_t kind = record.kind;
+  if (kind == 5) {
+    const int32_t i = index(record.index);
+    if (!in_range(i, 71)) {
+      return std::nullopt;
+    }
+    // r6 to r10 the lookup's leftovers in the original: passed 0.
+    return NameText{uint32_t(i + 5837), {}};
+  }
+  int32_t first = -1, second = -1;
+  if (kind == 0) {
+    const int32_t i = index(record.index);
+    first = record.flag != 0 ? i + 5477 : i + 5657;
+    if (!in_range(i, 90)) {
+      first = -1;
+    }
+  } else if (kind == 1 || kind == 4) {
+    const int32_t i = index(record.index);
+    first = i + (kind == 1 ? 5908 : 5463);
+    if (!in_range(i, kind == 1 ? 4 : 105)) {
+      first = -1;
+    }
+  }
+  const int32_t second_kind = int32_t(record.second_kind);
+  if (second_kind == 2) {
+    const int32_t i = index(record.second_index);
+    second = record.second_flag != 0 ? i + 5567 : i + 5747;
+    if (!in_range(i, 90)) {
+      second = -1;
+    }
+  } else if (second_kind == 3) {
+    const int32_t i = index(record.second_index);
+    second = i + 5912;
+    if (!in_range(i, 6)) {
+      second = -1;
+    }
+  }
+  if (first == -1 || second == -1) {
+    return std::nullopt;
+  }
+  // String 532 with the two ids; r8 to r10, unset, passed 0.
+  return NameText{532, {uint64_t(int64_t(first)), uint64_t(int64_t(second)), 0, 0, 0}};
+}
+
+std::optional<uint32_t> SetNameText(const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t name) {
+  ITC_NATIVE_RUNNING("sub_8211CAA0 UiMovie::SetNameText");
+  const auto text = NameTextOf(NameRecordAt(name));
+  if (!text) {
+    return movie;
+  }
+  return SetNodeText(calls, stack - 128, movie, node, text->id, text->varargs);
+}
+
+bool ChildNameTextArgs(uint32_t movie, uint32_t sub_scene, uint32_t child,
+                       const NameRecord& record, uint64_t (&args)[8]) {
+  const uint32_t node = FindNode(movie, sub_scene, child);
+  const auto text = NameTextOf(record);
+  if (!text) {
+    return false;
+  }
+  const uint64_t out[8] = {movie,           node,           text->id,        text->varargs[0],
+                           text->varargs[1], text->varargs[2], text->varargs[3], text->varargs[4]};
+  std::memcpy(args, out, sizeof out);
+  return true;
+}
+
+std::optional<uint32_t> SetChildNameText(const strings_and_font::FormatCalls& calls,
+                                         uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                         uint32_t child, uint32_t name) {
+  ITC_NATIVE_RUNNING("sub_8211D930 UiMovie::SetChildNameText");
+  const uint32_t node = FindNode(movie, sub_scene, child);
+  return SetNameText(calls, stack - 112, movie, node, name);
+}
+
+std::optional<uint32_t> SetTextScrollSpeed(uint32_t movie, uint32_t sub_scene,
+                                           uint32_t child, uint32_t delay, double speed) {
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C4F0 (a text's scroll delay and speed)");
+    UiMovieText(record).set_scroll_delay(delay);
+    UiMovieText(record).set_scroll_speed(float(speed));
+  });
+}
+
+std::optional<uint32_t> ScrollText(uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, uint32_t scrolling) {
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C570 UiMovie::ScrollText");
+    const uint32_t speed = Globals::scroll_speed();
+    UiMovieText(record).set_scrolling(scrolling);
+    UiMovieText(record).set_scroll_delay(45);
+    UiMovieText(record).set_scroll_speed_word(speed);
+  });
+}
+
+std::optional<uint32_t> ResetTextScroll(uint32_t movie, uint32_t sub_scene,
+                                        uint32_t child) {
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C5F8 (a text's scroll counter reset)");
+    UiMovieText(record).set_scroll_counter(0);
+  });
+}
+
+std::optional<uint32_t> SetFirstLine(uint32_t movie, uint32_t sub_scene,
+                                     uint32_t child, uint32_t line) {
+  if (UiMovieNode(FindNode(movie, sub_scene, child)).tag() != kTxtTag) {
+    return std::nullopt;
+  }
+  return ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C370 UiMovie::SetFirstLine");
+    UiMovieText(record).set_first_line(line);
+  });
+}
+
+std::optional<uint32_t> FirstLine(uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child) {
+  const uint32_t node = FindNode(movie, sub_scene, child);
+  if (UiMovieNode(node).tag() != kTxtTag) {
+    return std::nullopt;
+  }
+  const auto record = GetText(movie, UiMovieNode(node).texture_entry_address());
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C3F8 UiMovie::FirstLine");
+  return UiMovieText(*record).first_line();
+}
+
+uint32_t CountLines(uint32_t text) {
+  ITC_NATIVE_RUNNING("sub_821087D8 Strings::CountLines");
+  uint32_t lines = 1;
+  for (;; text += 2) {
+    const uint16_t c = guest::LoadU16(text);
+    if (c == 0 || c == 0xFFD1) {
+      return lines;
+    }
+    if (c == 10) {
+      lines = (lines + 1) & 0xFFFF;
+    }
+  }
+}
+
+std::optional<uint32_t> LineCount(uint32_t stack, uint32_t movie,
+                                  uint32_t sub_scene, uint32_t child) {
+  const uint32_t id_address = UiMovieNode(FindNode(movie, sub_scene, child)).texture_entry_address();
+  if (Load(id_address) == 0) {
+    ITC_NATIVE_RUNNING("sub_8211C680 UiMovie::LineCount");
+    return 0;
+  }
+  const uint32_t buffer = stack - 4208 + 80;
+  Zero(buffer, 4096);
+  if (!GetText(movie, id_address)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C680 UiMovie::LineCount");
+  const uint32_t id = Load(id_address);
+  const uint32_t page = TextField(movie, id, 20);
+  const uint32_t text = TextString(movie, id);
+  strings_and_font::StringsCopyPage(buffer, text, int32_t(page), 0);
+  return CountLines(buffer) & 0xFFFF;
+}
+
+std::optional<uint32_t> ScrollNodeText(uint32_t movie, uint32_t node,
+                                       uint32_t scrolling) {
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CCC0 UiMovie::ScrollNodeText");
+    const uint32_t speed = Globals::scroll_speed();
+    UiMovieText(record).set_scrolling(scrolling);
+    UiMovieText(record).set_scroll_delay(45);
+    UiMovieText(record).set_scroll_speed_word(speed);
+  });
+}
+
+std::optional<uint32_t> ResetNodeTextScroll(uint32_t movie, uint32_t node) {
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CD28 UiMovie::ResetNodeTextScroll");
+    UiMovieText(record).set_scroll_counter(0);
+  });
+}
+
+std::optional<uint32_t> ClearNodeText(uint32_t movie, uint32_t node) {
+  return ChangeNodeText(movie, node, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211CC50 UiMovie::ClearNodeText");
+    Zero(UiMovieText(record).buffer().address, 4096);
+  });
+}
+
+std::optional<uint32_t> RevealText(uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child) {
+  bool stepped = false;
+  const auto r3 = ChangeText(movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211D880 UiMovie::RevealText");
+    ITC_NATIVE_RUNNING("sub_8211C930 (a text's next page)");
+    stepped = HasNextPage(record);
+    if (stepped) {
+      UiMovieText(record).set_page(UiMovieText(record).page() + 1);
+    }
+  });
+  if (!r3) {
+    return std::nullopt;
+  }
+  return stepped ? 1u : 0u;
+}
+
+std::optional<uint32_t> HasMoreText(uint32_t movie, uint32_t sub_scene,
+                                    uint32_t child) {
+  const uint32_t id_address = UiMovieNode(FindNode(movie, sub_scene, child)).texture_entry_address();
+  const auto record = GetText(movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211D8D8 (whether a text has another page; sub_8211C9C0)");
+  return HasNextPage(*record) ? 1u : 0u;
+}
+
+// --- The movie table's open and delete ---
+
+uint32_t OpenMovie(uint32_t id, uint32_t asset, uint32_t frame,
+                   const archive::LoadCall& load, const OpenCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E808 UiMovies::Open");
+  Store(frame + 80, id);
+  if (schema::UiMovieWord(PairsFindKey(kMovieTable, id)).value() != 0) {
+    return 0;
+  }
+  const uint32_t movie = calls.make();
+  Store(frame + 80, movie);
+  InitAnimationLists(movie);
+  UiMovie(movie).set_id(id);
+  MovieLoad(movie, asset, load);
+  Store(frame + 84, id);
+  calls.set(frame + 84, frame + 80);
+  return 1;
+}
+
+uint32_t UnloadMovie(uint32_t movie, uint32_t frame, const UnloadCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211B540 UiMovie::Unload");
+  const UiMovie m(movie);
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.virtual_free(i, Load(m.file_0_address() + 4 * i));
+  }
+  m.set_live_scene(0);
+  m.set_saved_scene(0);
+  m.set_file_scene(0);
+  const UiMovieWordVector textures(m.textures_address());
+  while (m.texture_count() != 0) {
+    const uint32_t count = textures.count() - 1;
+    textures.set_count(count);
+    const uint32_t entry = schema::UiMovieWord(textures.words() + (count << 2)).value();
+    if (entry != 0) {
+      schema::UiMovieTexture(entry).set_texture(0);
+      Store(entry + 4, 0);  // the width
+      Store(entry + 8, 0);  // the height
+      calls.free(entry);
+    }
+  }
+  const schema::UiMovieDrawTextList items(m.text_items_address());
+  while (m.text_item_count() != 0) {
+    const uint32_t count = items.count() - 1;
+    const uint32_t item = (count << 7) + items.items().address;
+    items.set_count(count);
+    calls.copy_item(frame + 80, item);
+    ClearTextItem(frame + 80);
+  }
+  if (m.texture_set() != 0) {
+    calls.release_xpr(m.texture_set_address());
+  }
+  m.set_texture_set(0);
+  m.set_loaded(0);
+  return calls.free_texts(movie);
+}
+
+uint32_t DeleteMovie(uint32_t id, uint32_t frame, const DeleteCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E258 UiMovies::Delete");
+  Store(frame + 80, id);
+  const uint32_t entry = PairsFindKey(kMovieTable, id);
+  const uint32_t movie = schema::UiMovieWord(entry).value();
+  if (movie == 0) {
+    return entry;
+  }
+  UnloadMovie(movie, frame - 240, calls.unload);
+  calls.destroy(movie);
+  calls.free(movie);
+  Store(frame + 84, id);
+  Store(frame + 80, 0);
+  return calls.set(frame + 84, frame + 80);
+}
+
+uint32_t OnLoaded(uint32_t archive, uint32_t movie, uint32_t frame,
+                  const OnLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E500 UiMovie::OnLoaded");
+  CheckXmd(archive);
+  const uint32_t file = XmdEntry(archive, 0);
+  const uint32_t end = FindChunk(file, kTagTrm);
+  const uint32_t size = schema::UiMovieChunk(end).next() - file + end;
+  // The three file copies (+0, +4, +8) and their scenes (+16, +20, +24), by
+  // index.
+  const UiMovie m(movie);
+  const uint32_t files = m.file_0_address(), scenes = m.live_scene_address();
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(files + 4 * i, memory::AllocPages(size, 4096));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.copy(i, Load(files + 4 * i), file, size);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    FixUpFile(Load(files + 4 * i));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(scenes + 4 * i, FileScene(Load(files + 4 * i)));
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.layers(i, movie, Load(scenes + 4 * i));
+  }
+  ClearTextIds(movie);
+  calls.free_texts(movie);
+  m.set_named_count(0);
+  calls.add_named(movie, m.live_scene());
+  if (calls.get_size(archive) != 1) {
+    const uint32_t textures =
+        schema::UiMovieXmdEntry(XmdEntry(archive, 1)).texture_count();
+    const uint32_t xpr = calls.make(0, 24);
+    if (xpr != 0) {
+      calls.xpr_construct(xpr);
+    }
+    m.set_texture_set(xpr);
+    calls.xpr_create(m.texture_set(), XmdEntry(archive, 1));
+    for (uint32_t i = 0; i < textures; i++) {
+      const uint32_t entry = calls.make(1, 12);
+      const schema::UiMovieTexture record(entry);
+      if (entry != 0) {
+        record.set_texture(0);
+        Store(entry + 4, 0);  // the width
+        Store(entry + 8, 0);  // the height
+      }
+      Store(frame + 80, entry);
+      const uint32_t texture = uint32_t(calls.get_texture(m.texture_set(), i));
+      record.set_texture(texture);
+      const schema::LevelDesc desc(frame + 96);
+      calls.level_desc(texture, desc.address);
+      Store(entry + 4, desc.width());
+      Store(entry + 8, desc.height());
+      calls.append(m.textures_address(), frame + 80);
+    }
+  }
+  const uint32_t r3 = calls.virtual_free(archive);
+  m.set_loaded(1);
+  return r3;
+}
+
+uint32_t DeleteAll(uint32_t frame, const DeleteCalls& calls, uint32_t r3) {
+  ITC_NATIVE_RUNNING("sub_8211E2C8 UiMovies::DeleteAll");
+  for (uint32_t i = 0; i < Globals::movie_table_count(); i++) {
+    r3 =
+        DeleteMovie(UiMoviePair(Globals::movie_table_pairs().address + 8 * i).key(),
+                    frame - 128, calls);
+  }
+  return r3;
+}
+
+}  // namespace ui_movies

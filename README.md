@@ -40,7 +40,7 @@ The above branch contains the most up to date functions reference, and is where 
 2. Download the latest zip for your system from
    [Releases](https://github.com/Spooky098529/ITC-Recomp/releases)
    (`linux-amd64` or `win-amd64`) and extract its files into that folder,
-   next to `default.xex`.
+   next to its `DATA` folder.
 3. Run `./itc` on Linux, or `itc.exe` on Windows.
 
 ## Settings

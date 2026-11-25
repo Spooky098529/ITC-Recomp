@@ -1,10 +1,23 @@
+#include <format>
 #include "frame_state_diff.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "cameras/cameras.h"
+#include "hooks/billboards.h"
 #include "hooks/cameras.h"
+#include "hooks/car_draw.h"
+#include "hooks/car_scene_draw.h"
+#include "hooks/course_scenery.h"
+#include "hooks/framework.h"
+#include "hooks/load_poll.h"
+#include "hooks/second_set.h"
 #include "matrix_math/matrix_math.h"
+#include "models/xpr.h"
+#include "screen_objects/screen_objects.h"
+#include "lifted/sdk.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -24,6 +37,12 @@
 
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_cameras);
+ITC_FLAG_DECLARE(bool, native_screen_objects);
+ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_second_set);
+ITC_FLAG_DECLARE(bool, native_load_poll);
+ITC_FLAG_DECLARE(bool, native_car_draw);
+ITC_FLAG_DECLARE(bool, native_car_scene_draw);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -55,43 +74,18 @@ struct Range {
   uint32_t start;
   uint32_t size;
 };
-std::vector<Range> ReadableGuestRanges(uint8_t* base);
+std::vector<Range> ReadableGuestRanges();
 
 namespace {
 
-// Guest addresses that can hold game state: below the physical memory views.
-constexpr uint64_t kGuestScanEnd = 0xA0000000;
 constexpr size_t kMaxWatched = 200;
 
 }  // namespace
 
-std::vector<Range> ReadableGuestRanges(uint8_t* base) {
-  std::vector<Range> ranges;
-#ifdef _WIN32
-  // Reads the Linux memory map; the scans aren't supported on Windows.
-  (void)base;
-  return ranges;
-#endif
-  std::ifstream maps("/proc/self/maps");
-  std::string line;
-  uint64_t guest_start = reinterpret_cast<uint64_t>(base);
-  while (std::getline(maps, line)) {
-    std::istringstream fields(line);
-    std::string span, perms;
-    fields >> span >> perms;
-    if (perms.size() < 2 || perms[0] != 'r' || perms[1] != 'w') {
-      continue;
-    }
-    uint64_t start = std::stoull(span.substr(0, span.find('-')), nullptr, 16);
-    uint64_t end = std::stoull(span.substr(span.find('-') + 1), nullptr, 16);
-    if (end <= guest_start || start >= guest_start + kGuestScanEnd) {
-      continue;
-    }
-    start = std::max(start, guest_start);
-    end = std::min(end, guest_start + kGuestScanEnd);
-    ranges.push_back({uint32_t(start - guest_start), uint32_t(end - start)});
-  }
-  return ranges;
+// The memory game state can be in (E5 step 9: the heap's and the image's
+// blocks, memory/mapping.cpp), as guest ranges.
+std::vector<Range> ReadableGuestRanges() {
+  return {{memory::kHeapStart, memory::kHeapBytes}, {memory::kImageStart, memory::kImageBytes}};
 }
 
 namespace {
@@ -157,12 +151,12 @@ const char* TimerStep(uint32_t before, uint32_t after) {
 
 class FrameStateDiff {
  public:
-  void OnPassStart(uint8_t* base, bool render_only) {
+  void OnPassStart(bool render_only) {
     if (!ITC_FLAG(find_per_frame_state)) {
       return;
     }
     if (snapshot_taken_) {
-      Compare(base);
+      Compare();
       snapshot_taken_ = false;
     }
     render_only_ = render_only;
@@ -171,17 +165,18 @@ class FrameStateDiff {
     if (render_only && now - last_snapshot_ >= std::chrono::milliseconds(
                            ITC_FLAG(find_per_frame_state_interval_ms))) {
       last_snapshot_ = now;
-      ranges_ = ReadableGuestRanges(base);
+      ranges_ = ReadableGuestRanges();
       snapshot_.clear();
       for (const Range& r : ranges_) {
-        snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+        snapshot_.insert(snapshot_.end(), guest::Pointer(r.start),
+                       guest::Pointer(r.start) + r.size);
       }
       snapshot_taken_ = true;
     }
     LogChanges(now);
   }
 
-  void Before(uint8_t* base) {
+  void Before() {
     if (!ITC_FLAG(find_per_frame_state) || !render_only_) {
       return;
     }
@@ -191,19 +186,19 @@ class FrameStateDiff {
     }
     std::vector<uint32_t> values(watched_.size());
     for (size_t i = 0; i < watched_.size(); i++) {
-      values[i] = guest::LoadU32(base, watched_[i]);
+      values[i] = guest::LoadU32(watched_[i]);
     }
     before_.push_back(std::move(values));
   }
 
-  void After(uint8_t* base, const char* kind, uint32_t id) {
+  void After(const char* kind, uint32_t id) {
     if (!ITC_FLAG(find_per_frame_state) || !render_only_ || before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
     before_.pop_back();
     for (size_t i = 0; i < values.size(); i++) {
-      uint32_t now = guest::LoadU32(base, watched_[i]);
+      uint32_t now = guest::LoadU32(watched_[i]);
       if (now != values[i]) {
         changes_[{std::string(kind), id, watched_[i]}]++;
         if (forced_.count(watched_[i]) && logged_values_ < kMaxLoggedValues) {
@@ -217,7 +212,7 @@ class FrameStateDiff {
   }
 
  private:
-  void Compare(uint8_t* base) {
+  void Compare() {
     // Words are compared as stored (big endian), converted to values for the
     // timer test.
     size_t offset = 0;
@@ -225,7 +220,7 @@ class FrameStateDiff {
     std::string sample;
     std::vector<uint32_t> stepped_now;
     for (const Range& r : ranges_) {
-      const uint8_t* now = base + r.start;
+      const uint8_t* now = guest::Pointer(r.start);
       const uint8_t* then = snapshot_.data() + offset;
       for (uint32_t i = 0; i + 4 <= r.size; i += 4) {
         if (std::memcmp(now + i, then + i, 4) == 0) {
@@ -233,7 +228,7 @@ class FrameStateDiff {
         }
         uint32_t address = r.start + i;
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
-        uint32_t after = guest::LoadU32(base, address);
+        uint32_t after = guest::LoadU32(address);
         const char* step;
         if (ITC_FLAG(find_any_steps)) {
           // Only steps equal to the word's step in an earlier sample: a
@@ -259,8 +254,8 @@ class FrameStateDiff {
         found++;
         if (sample.size() < 3000) {
           sample += std::string(step) == "float"
-                        ? fmt::format(" {:08X}:{}->{}", address, AsFloat(before), AsFloat(after))
-                        : fmt::format(" {:08X}:{}->{}", address, before, after);
+                        ? std::format(" {:08X}:{}->{}", address, AsFloat(before), AsFloat(after))
+                        : std::format(" {:08X}:{}->{}", address, before, after);
         }
         stepped_now.push_back(address);
       }
@@ -366,12 +361,12 @@ FrameStateDiff& Get() {
 
 }  // namespace
 
-void FrameStateDiff_OnPassStart(uint8_t* base, bool render_only) {
-  Get().OnPassStart(base, render_only);
+void FrameStateDiff_OnPassStart(bool render_only) {
+  Get().OnPassStart(render_only);
 }
 
-void FrameStateDiff_Before(uint8_t* base) {
-  Get().Before(base);
+void FrameStateDiff_Before() {
+  Get().Before();
 }
 
 bool IsHidden(uint32_t function) {
@@ -391,21 +386,21 @@ bool IsHidden(uint32_t function) {
   return false;
 }
 
-void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id) {
-  Get().After(base, kind, id);
+void FrameStateDiff_After(const char* kind, uint32_t id) {
+  Get().After(kind, id);
 }
 
 void FrameStateDiff_Watch(uint32_t address) {
   Get().Watch(address);
 }
 
-void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+void Vec4Transform(uint32_t out, uint32_t m, uint32_t v) {
   if (IsHidden(0x820AB560)) {
     return;
   }
-  FrameStateDiff_Before(base);
-  matrix_math::Vec4Transform(base, out, m, v);
-  FrameStateDiff_After(base, "draw step part", 0x820AB560);
+  FrameStateDiff_Before();
+  matrix_math::Vec4Transform(out, m, v);
+  FrameStateDiff_After("draw step part", 0x820AB560);
 }
 
 }  // namespace debug
@@ -413,208 +408,447 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
 // name which one advances per-frame state (logged as "draw step part").
 #define ITC_FRAME_STATE_WRAP(address)                       \
-  extern "C" REX_FUNC(sub_##address) {                      \
-    REX_FUNC_PROLOGUE();                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                      \
+    \
     if (debug::IsHidden(0x##address)) {                     \
       return;                                               \
     }                                                       \
-    debug::FrameStateDiff_Before(base);                     \
-    __imp__sub_##address(ctx, base);                        \
-    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+    debug::FrameStateDiff_Before();                     \
+    lifted::original::c##address(ctx);           \
+    debug::FrameStateDiff_After("draw step part", 0x##address); \
   }
 // CameraPasses::RecordBegins and RecordEnds: the passes' recording natively
 // (src/cameras/cameras.cpp, --native_cameras) or translated, inside the
 // same wrap.
 #define ITC_FRAME_STATE_WRAP_RECORDS(address, native)                 \
-  extern "C" REX_FUNC(sub_##address) {                                \
-    REX_FUNC_PROLOGUE();                                              \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
+    \
     if (debug::IsHidden(0x##address)) {                               \
       return;                                                         \
     }                                                                 \
-    debug::FrameStateDiff_Before(base);                               \
+    debug::FrameStateDiff_Before();                               \
     if (ITC_FLAG(native_cameras)) {                                   \
-      native(ctx, base);                                              \
+      native(ctx);                                              \
     } else {                                                          \
-      __imp__sub_##address(ctx, base);                                \
+      lifted::original::c##address(ctx);                   \
     }                                                                 \
-    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+    debug::FrameStateDiff_After("draw step part", 0x##address); \
   }
 ITC_FRAME_STATE_WRAP_RECORDS(8209F8A0, hooks::CameraPassesRecordBegins)
 ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
-ITC_FRAME_STATE_WRAP(820C5DE8)
-ITC_FRAME_STATE_WRAP(820F6068)
-ITC_FRAME_STATE_WRAP(82130978)
+// Scenery::Draw natively under --native_course_scenery
+// (src/course_scenery/draw.cpp, hooks::CourseSceneryDraw), inside the same
+// wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820F6068) {
+  if (debug::IsHidden(0x820F6068)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (hooks::CourseSceneryDrawNative()) {
+    hooks::CourseSceneryDraw(ctx);
+  } else {
+    lifted::original::c820F6068(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820F6068);
+}
+// ScreenObject::Record natively under --native_screen_objects
+// (src/screen_objects/record.cpp, lift.py's translation), inside the same
+// wrap.
+ITC_NATIVE_ENTRY_ALWAYS(82130978) {
+  
+  if (debug::IsHidden(0x82130978)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_screen_objects)) {
+    lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+      return screen_objects::Record(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4],
+                                    a.r[5], a.r[6], a.r[7], a.f[0]);
+    });
+  } else {
+    lifted::original::c82130978(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x82130978);
+}
 // The render orchestrator's (sub_820C5DE8) callees. The camera passes'
 // work natively (src/cameras/cameras.cpp, --native_cameras) or translated,
 // inside the same wrap. CameraPasses::RenderTarget: r3 = the id; r3 = its
 // texture (zero-extended, as lwz leaves it).
-extern "C" REX_FUNC(sub_8209F7A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209F7A8) {
+  
   if (debug::IsHidden(0x8209F7A8)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (ITC_FLAG(native_cameras)) {
-    ctx.r3.u64 = cameras::RenderTarget(base, ctx.r3.u32);
+    ctx.r3.u64 = cameras::RenderTarget(ctx.r3.u32);
   } else {
-    __imp__sub_8209F7A8(ctx, base);
+    lifted::original::c8209F7A8(ctx);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x8209F7A8);
+  debug::FrameStateDiff_After("draw step part", 0x8209F7A8);
 }
 // CameraPass::Disable: r3 = the pass.
-extern "C" REX_FUNC(sub_820A0958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A0958) {
+  
   if (debug::IsHidden(0x820A0958)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (ITC_FLAG(native_cameras)) {
-    cameras::Disable(base, ctx.r3.u32);
+    cameras::Disable(ctx.r3.u32);
   } else {
-    __imp__sub_820A0958(ctx, base);
+    lifted::original::c820A0958(ctx);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x820A0958);
+  debug::FrameStateDiff_After("draw step part", 0x820A0958);
 }
 // CameraPasses::EnableForView: r3 = the last pass enabled, as the original
 // leaves it.
-extern "C" REX_FUNC(sub_820AA1A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AA1A8) {
+  
   if (debug::IsHidden(0x820AA1A8)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (ITC_FLAG(native_cameras)) {
-    ctx.r3.u64 = cameras::EnableForView(base);
+    ctx.r3.u64 = cameras::EnableForView();
   } else {
-    __imp__sub_820AA1A8(ctx, base);
+    lifted::original::c820AA1A8(ctx);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x820AA1A8);
+  debug::FrameStateDiff_After("draw step part", 0x820AA1A8);
 }
 // Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
 // (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
 // code leaves flush-to-zero on) or translated, inside the same wrap.
-extern "C" REX_FUNC(sub_820AB560) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AB560) {
+  
   if (debug::IsHidden(0x820AB560)) {
     return;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   if (ITC_FLAG(native_matrix_math)) {
-    matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    matrix_math::Vec4Transform(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
     ctx.fpscr.enableFlushMode();
   } else {
-    __imp__sub_820AB560(ctx, base);
+    lifted::original::c820AB560(ctx);
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
+  debug::FrameStateDiff_After("draw step part", 0x820AB560);
 }
-ITC_FRAME_STATE_WRAP(820C4EB8)
-ITC_FRAME_STATE_WRAP(820C4FB8)
-ITC_FRAME_STATE_WRAP(820DAA38)
-ITC_FRAME_STATE_WRAP(820DAAC8)
-ITC_FRAME_STATE_WRAP(820DAB10)
-ITC_FRAME_STATE_WRAP(82597118)
-ITC_FRAME_STATE_WRAP(82597518)
-ITC_FRAME_STATE_WRAP(82597610)
-ITC_FRAME_STATE_WRAP(82598768)
+// The car scene's draw's leaves natively under --native_car_scene_draw
+// (src/car_scene_draw/; native callers call the plain C++, not these wraps),
+// inside the same wrap.
+#define ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(address, step)            \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
+    \
+    if (debug::IsHidden(0x##address)) {                               \
+      return;                                                         \
+    }                                                                 \
+    debug::FrameStateDiff_Before();                               \
+    if (ITC_FLAG(native_car_scene_draw)) {                            \
+      hooks::step(ctx);                                         \
+    } else {                                                          \
+      lifted::original::c##address(ctx);                   \
+    }                                                                 \
+    debug::FrameStateDiff_After("draw step part", 0x##address); \
+  }
+// CarScene::Draw, the root (it calls its callees' plain C++ inside the same
+// checks as their wraps).
+ITC_NATIVE_ENTRY_ALWAYS(820C5DE8) {
+  if (debug::IsHidden(0x820C5DE8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_scene_draw)) {
+    hooks::CarSceneDrawRoot(ctx);
+  } else {
+    lifted::original::c820C5DE8(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820C5DE8);
+}
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4EB8, CarSceneDrawSetLight)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4FB8, CarSceneDrawPlayerModel)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAA38, CarSceneDrawBeamColor)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAAC8, CarSceneDrawBeam)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAB10, CarSceneDrawBeamShape)
+// XPR::GetTexture: r3 = the XPR, r4 = the index; r3 the record's header.
+// Natively under --native_models (src/models/xpr.cpp), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(82597118) {
+  
+  if (debug::IsHidden(0x82597118)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_models)) {
+    ctx.r3.u64 = models::XprGetTexture(ctx.r3.u32, ctx.r4.u32);
+  } else {
+    lifted::original::c82597118(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x82597118);
+}
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(82597518, CarSceneDrawProjectorBuildOrtho)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(82597610, CarSceneDrawProjectorBuild)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(82598768, CarSceneDrawTextureProjectionFit)
 // Stages::Copy (sub_820FFD88) and List::At (sub_82593FC0) were wrapped here
 // too; their native adapters (src/hooks/vehicle_accessors.cpp) do the same.
 // The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
 // the light list: count at +32, 48-byte lights at +36 (position at +0, size
 // at +32 and +36; a light with neither size above 0 is skipped).
 // --watch_lights watches every word of its first lights.
-extern "C" REX_FUNC(sub_8209CC38) {
-  REX_FUNC_PROLOGUE();
-  if (debug::IsHidden(0x8209CC38)) {
-    return;
-  }
+void debug::WatchLights(uint32_t list) {
   if (ITC_FLAG(watch_lights) && ITC_FLAG(find_per_frame_state)) {
     static std::set<uint32_t> seen;
-    uint32_t list = ctx.r4.u32;
-    uint32_t lights = guest::LoadU32(base, list + 36);
-    uint32_t count = guest::LoadU32(base, list + 32);
+    uint32_t lights = guest::LoadU32(list + 36);
+    uint32_t count = guest::LoadU32(list + 32);
     if (seen.insert(lights).second && seen.size() <= 64) {
       ITC_LOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
-                   list, count, lights, guest::LoadU32(base, list));
+                   list, count, lights, guest::LoadU32(list));
       for (uint32_t i = 0; i < std::min<uint32_t>(count, 2) * 48; i += 4) {
         debug::FrameStateDiff_Watch(lights + i);
       }
     }
   }
-  debug::FrameStateDiff_Before(base);
-  __imp__sub_8209CC38(ctx, base);
-  debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
+}
+// Billboards::Record natively under --native_billboards
+// (src/sprites/billboard_record.cpp, hooks::BillboardsRecord), inside the
+// same wrap; its native caller Billboards::Draw makes the same checks.
+ITC_NATIVE_ENTRY_ALWAYS(8209CC38) {
+  
+  if (debug::IsHidden(0x8209CC38)) {
+    return;
+  }
+  debug::WatchLights(ctx.r4.u32);
+  debug::FrameStateDiff_Before();
+  if (hooks::BillboardsNative()) {
+    hooks::BillboardsRecord(ctx);
+  } else {
+    lifted::original::c8209CC38(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x8209CC38);
 }
 // The per-car update called from Draw (sub_820DAC68), and its callees.
-ITC_FRAME_STATE_WRAP(820DAC68)
-ITC_FRAME_STATE_WRAP(820C5C88)
-ITC_FRAME_STATE_WRAP(820D4048)
-ITC_FRAME_STATE_WRAP(820D72D8)
-ITC_FRAME_STATE_WRAP(820D92A0)
-ITC_FRAME_STATE_WRAP(820D9B68)
-ITC_FRAME_STATE_WRAP(820D9C50)
-ITC_FRAME_STATE_WRAP(820D9EA0)
-ITC_FRAME_STATE_WRAP(820DAB58)
-ITC_FRAME_STATE_WRAP(820DBFF8)
-ITC_FRAME_STATE_WRAP(820DC498)
-ITC_FRAME_STATE_WRAP(820DCBC0)
-ITC_FRAME_STATE_WRAP(820DDA60)
-ITC_FRAME_STATE_WRAP(820DDE58)
-ITC_FRAME_STATE_WRAP(820E2E68)
-ITC_FRAME_STATE_WRAP(820E2EE8)
-ITC_FRAME_STATE_WRAP(820E4140)
-ITC_FRAME_STATE_WRAP(820E53F0)
-ITC_FRAME_STATE_WRAP(820E5A68)
-ITC_FRAME_STATE_WRAP(820E6A40)
-ITC_FRAME_STATE_WRAP(820E7328)
-ITC_FRAME_STATE_WRAP(820E8908)
-ITC_FRAME_STATE_WRAP(820ECE28)
+// Car::DrawUpdate natively under --native_car_draw (src/car_draw/update.cpp;
+// it calls its callees' plain C++ inside the same checks as their wraps
+// below), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820DAC68) {
+  if (debug::IsHidden(0x820DAC68)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawUpdate(ctx);
+  } else {
+    lifted::original::c820DAC68(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820DAC68);
+}
+// ScenePools::ReleaseB: r3 = the second set, r4 = the pool, r5 = the index.
+// Natively under --native_second_set (src/second_set/objects.cpp; the
+// releases it reaches call its plain C++, not this wrap), inside the same
+// wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820C5C88) {
+  
+  if (debug::IsHidden(0x820C5C88)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_second_set)) {
+    hooks::SecondSetReleaseB(ctx);
+  } else {
+    lifted::original::c820C5C88(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820C5C88);
+}
+// The scene models' finishers and apply steps natively under
+// --native_load_poll (src/load_poll/; their native callers call the plain
+// C++, not these wraps), inside the same wrap.
+#define ITC_FRAME_STATE_WRAP_LOAD_POLL(address, step)               \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
+    \
+    if (debug::IsHidden(0x##address)) {                             \
+      return;                                                       \
+    }                                                               \
+    debug::FrameStateDiff_Before();                             \
+    if (ITC_FLAG(native_load_poll)) {                               \
+      hooks::step(ctx);                                       \
+    } else {                                                        \
+      lifted::original::c##address(ctx);                 \
+    }                                                               \
+    debug::FrameStateDiff_After("draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D4048, LoadPollCarModelIsReady)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D72D8, LoadPollCarPartsSetVinylTextures)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D92A0, LoadPollWheelsApplyPalette)
+// (SceneModel::ApplyPaint sub_820D9B68's and ApplyWheelPaint sub_820D9C50's
+// wraps are removed, B7 loop, 2026-11-06: their callers in play,
+// SceneModel::PollLoad, Car::DrawUpdate and the garage stage's re-applies,
+// and for ApplyWheelPaint GarageStage::ApplyWheelPaint, are native and call
+// their plain C++, all but PollLoad inside the same wrap.)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9EA0, LoadPollSceneModelApplyPalettes)
+// SceneModel::IsNearPlayerHeight natively under --native_car_draw
+// (src/car_draw/; its native callers call the plain C++, not this wrap),
+// inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820DAB58) {
+  
+  if (debug::IsHidden(0x820DAB58)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawIsNearPlayerHeight(ctx);
+  } else {
+    lifted::original::c820DAB58(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820DAB58);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820DBFF8, LoadPollSceneCockpitFinish)
+// SceneCockpit::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820DC498) {
+  if (debug::IsHidden(0x820DC498)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneCockpit(ctx);
+  } else {
+    lifted::original::c820DC498(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820DC498);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820DCBC0, LoadPollSceneLightsApplyRecord)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820DDA60, LoadPollSceneLightsFinish)
+// SceneLights::Draw natively under --native_car_draw (src/car_draw/; it
+// skips BlinkTimers::Advance on render-only passes as that one's adapter
+// does), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820DDE58) {
+  if (debug::IsHidden(0x820DDE58)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneLightsDraw(ctx);
+  } else {
+    lifted::original::c820DDE58(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820DDE58);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E2E68, LoadPollScenePartsFinish)
+// SceneParts::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820E2EE8) {
+  if (debug::IsHidden(0x820E2EE8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneParts(ctx);
+  } else {
+    lifted::original::c820E2EE8(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820E2EE8);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E4140, LoadPollSceneInteriorFinish)
+// SceneInterior::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820E53F0) {
+  if (debug::IsHidden(0x820E53F0)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneInterior(ctx);
+  } else {
+    lifted::original::c820E53F0(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820E53F0);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E5A68, LoadPollSceneTrafficFinish)
+// SceneTraffic::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820E6A40) {
+  if (debug::IsHidden(0x820E6A40)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneTraffic(ctx);
+  } else {
+    lifted::original::c820E6A40(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820E6A40);
+}
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E7328, LoadPollSceneWheelsFinish)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E8908, LoadPollSceneWheelsSetUpPoints)
+// SceneWheels::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
+// same checks; this wrap stays for the recompiled one), inside the same wrap.
+ITC_NATIVE_ENTRY_ALWAYS(820ECE28) {
+  if (debug::IsHidden(0x820ECE28)) {
+    return;
+  }
+  debug::FrameStateDiff_Before();
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneWheels(ctx);
+  } else {
+    lifted::original::c820ECE28(ctx);
+  }
+  debug::FrameStateDiff_After("draw step part", 0x820ECE28);
+}
+#undef ITC_FRAME_STATE_WRAP_LOAD_POLL
 #undef ITC_FRAME_STATE_WRAP
 
 // Draw step part 0x82133960, rewritten to also name each view's draw: for
 // the 15 per-view objects at 0x826C5D80 whose camera pass (index at
 // 0x826174C8 + 36 * i) is active and whose +52 is clear, calls vtable slot 0,
 // then clears +8056 and +48 and flips +8060 (logged as "view draw").
-extern "C" REX_FUNC(sub_82133960) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82133960) {
+  
   if (debug::IsHidden(0x82133960)) {
     return;
   }
   constexpr uint32_t kViews = 0x826C5D80;
   constexpr uint32_t kViewPassIndices = 0x826174C8;
   constexpr uint32_t kCameraPasses = 0x826BAC00;
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   {
     guest::StackFrame frame(ctx, 128);  // the original's stwu r1,-128(r1)
     for (uint32_t i = 0; i < 15; i++) {
-      uint32_t view = guest::LoadU32(base, kViews + 4 * i);
+      uint32_t view = guest::LoadU32(kViews + 4 * i);
       if (view == 0) {
         continue;
       }
-      uint32_t pass = kCameraPasses + 592 * guest::LoadU32(base, kViewPassIndices + 36 * i);
-      if (guest::LoadU32(base, pass + 588) == 0 || guest::LoadU32(base, view + 52) != 0) {
+      uint32_t pass = kCameraPasses + 592 * guest::LoadU32(kViewPassIndices + 36 * i);
+      if (guest::LoadU32(pass + 588) == 0 || guest::LoadU32(view + 52) != 0) {
         continue;
       }
-      uint32_t draw = guest::LoadU32(base, guest::LoadU32(base, view));
-      debug::FrameStateDiff_Before(base);
+      uint32_t draw = guest::LoadU32(guest::LoadU32(view));
+      debug::FrameStateDiff_Before();
       ctx.r3.u64 = view;
-      REX_CALL_INDIRECT_FUNC(draw);
-      debug::FrameStateDiff_After(base, "view draw", draw);
-      view = guest::LoadU32(base, kViews + 4 * i);
-      uint32_t flip = guest::LoadU32(base, view + 8060);
-      guest::StoreU32(base, view + 8056, 0);
-      guest::StoreU32(base, view + 48, 0);
-      guest::StoreU32(base, view + 8060, flip ^ 1);
+      lifted::CallFromContext(ctx, draw);
+      debug::FrameStateDiff_After("view draw", draw);
+      view = guest::LoadU32(kViews + 4 * i);
+      uint32_t flip = guest::LoadU32(view + 8060);
+      guest::StoreU32(view + 8056, 0);
+      guest::StoreU32(view + 48, 0);
+      guest::StoreU32(view + 8060, flip ^ 1);
     }
   }
-  debug::FrameStateDiff_After(base, "draw step part", 0x82133960);
+  debug::FrameStateDiff_After("draw step part", 0x82133960);
 }
 
 // Tick handler 0x82096340 is a thunk calling vtable slot 1 of the object in
 // r3; name the function it reaches (logged as "thunk target").
-extern "C" REX_FUNC(sub_82096340) {
-  REX_FUNC_PROLOGUE();
-  uint32_t target = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4);
-  debug::FrameStateDiff_Before(base);
-  __imp__sub_82096340(ctx, base);
-  debug::FrameStateDiff_After(base, "thunk target", target);
+ITC_NATIVE_ENTRY_ALWAYS(82096340) {
+  
+  uint32_t target = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 4);
+  debug::FrameStateDiff_Before();
+  if (hooks::NativeFramework()) {
+    hooks::DelegateSlot1Thunk(ctx);
+  } else {
+    lifted::original::c82096340(ctx);
+  }
+  debug::FrameStateDiff_After("thunk target", target);
 }

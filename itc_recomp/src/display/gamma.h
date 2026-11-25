@@ -29,7 +29,7 @@ GammaCurve MakeGammaCurve(const Gamma& gamma, bool inverse);
 using GammaRamp = std::array<std::array<uint16_t, 256>, 3>;
 GammaRamp ApplyGammaCurve(const GammaCurve& curve, const GammaRamp& ramp);
 
-// A 128-entry piecewise-linear ramp, three channels of (base, delta) pairs
+// A 128-entry piecewise-linear ramp, three channels of (delta) pairs
 // (sub_822B0AB0).
 struct PwlEntry {
   uint16_t base;

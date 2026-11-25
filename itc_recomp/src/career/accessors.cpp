@@ -1,0 +1,240 @@
+// The career's small accessors, running means and unlock tests
+// (docs/functions/career.md).
+
+#include "career/career.h"
+
+#include "base/log.h"
+#include "car_specs/car_specs.h"
+#include "data_tables/data_tables.h"
+#include "guest.h"
+#include "race_world/race_world.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/race_event.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+#include <bit>
+#include <cmath>
+
+namespace career {
+
+using schema::CareerCounter;
+using schema::CareerSave;
+using schema::CareerStats;
+
+void PlayTimeMark(uint32_t save) {
+  ITC_NATIVE_RUNNING("sub_82111628 PlayTime::Mark");
+  CareerSave(save).set_play_time_mark(schema::CareerGlobals::play_time_frames());
+}
+
+uint32_t DayBlockWinStreak(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_82110580 DayBlock::WinStreak");
+  return CareerCounter(block).day_win_streak();
+}
+
+uint32_t DayBlockBestStreak(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_82110588 DayBlock::BestStreak");
+  return CareerCounter(block).day_best_streak();
+}
+
+void DayBlockAddWord4832(uint32_t block, uint64_t amount) {
+  ITC_NATIVE_RUNNING("sub_82110590 DayBlock::AddWord4832");
+  const CareerCounter day(block);
+  day.set_day_points(uint32_t(amount) + day.day_points());
+}
+
+uint32_t DayBlockWord4832(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_821105A0 DayBlock::Word4832");
+  return CareerCounter(block).day_points();
+}
+
+uint32_t StatsWinStreak(uint32_t stats) {
+  ITC_NATIVE_RUNNING("sub_82110B10 Stats::WinStreak");
+  return CareerStats(stats).win_streak();
+}
+
+void StatsAddPoints(uint32_t stats, uint64_t amount) {
+  ITC_NATIVE_RUNNING("sub_82110B18 Stats::AddPoints");
+  const CareerStats s(stats);
+  int32_t sum = int32_t(uint32_t(amount) + s.points());
+  if (sum > 9999999) {
+    sum = 9999999;
+  }
+  s.set_points(uint32_t(sum));
+}
+
+void ItemFlagsSet(uint32_t save, uint32_t zero, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_82112860 ItemFlags::Set");
+  if (zero != 0 || int32_t(id) < 0) {
+    return;
+  }
+  const uint32_t word =
+      CareerSave(save).item_flags_address() + ((uint32_t(int32_t(id) >> 5) << 2));
+  guest::StoreU32(word, guest::LoadU32(word) | (1u << (id & 31)));
+}
+
+uint32_t CarSpecWord744(uint32_t car) {
+  ITC_NATIVE_RUNNING("sub_821104B0 Car::SpecWord744");
+  return schema::CarSpec(car_specs::GetCarSpec(schema::CarMakersCar(car).car_id()))
+      .price();
+}
+
+namespace {
+
+// The garage list's node `n` steps from its head (+204), as the original
+// walks it: 4-byte nodes from the list, +0 the next index (signed).
+uint32_t GarageNode(uint32_t garage, uint32_t n) {
+  uint32_t index = uint32_t(int32_t(int16_t(schema::CareerGarageList(garage).head())));
+  uint32_t node = garage + (index << 2);
+  for (; n != 0; n--) {
+    index = uint32_t(int32_t(int16_t(guest::LoadU16(node))));
+    node = garage + (index << 2);
+  }
+  return node;
+}
+
+// The car in a node's slot (+2, signed; 1,968 bytes each from +212).
+uint32_t GarageCar(uint32_t garage, uint32_t node) {
+  return garage + uint32_t(int32_t(int16_t(guest::LoadU16(node + 2))) * 1968);
+}
+
+}  // namespace
+
+void PickFromCar(uint32_t save) {
+  ITC_NATIVE_RUNNING("sub_82115CC0 Career::PickFromCar");
+  const CareerSave s(save);
+  const schema::CareerPick pick(s.pick_address());
+  const uint32_t garage = s.garage_address();
+  const uint32_t selected = s.selected_car();
+  pick.set_first_kind(4);
+  const uint32_t first = GarageCar(garage, GarageNode(garage, selected));
+  const int8_t kind = int8_t(guest::LoadU8(first + 1781));
+  pick.set_first_set(1);
+  pick.set_second_kind(3);
+  pick.set_first_value(uint16_t(int16_t(kind)));
+  const uint32_t car = GarageCar(garage, GarageNode(garage, selected));
+  const int32_t id = int32_t(guest::LoadU32(car + 224));
+  pick.set_second_set(1);
+  pick.set_level(0);
+  pick.set_second_value(uint16_t(id % 4));
+  for (uint32_t i = 0; i < 20; i += 4) {
+    guest::StoreU32(s.pick_kept_address() + i, guest::LoadU32(s.pick_address() + i));
+  }
+}
+
+void RunningMeanMerge(uint32_t mean, uint64_t packed, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82111CB0 RunningMean::Merge");
+  guest::StoreU32(sp + 24, uint32_t(packed >> 32));
+  guest::StoreU32(sp + 28, uint32_t(packed));
+  RunningMeanMergeInto(mean, packed);
+}
+
+void RunningMeanMergeInto(uint32_t mean, uint64_t packed) {
+  const uint32_t old_count = guest::LoadU32(mean + 4);
+  const uint32_t count = uint32_t(packed);
+  const uint32_t sum = old_count + count;
+  if (sum == 0) {
+    return;
+  }
+  const double old_mean = double(guest::LoadFloat(mean + 0));
+  guest::StoreU32(mean + 4, sum);
+  // (The three conversions go through the red zone: not written.)
+  const double in_mean = double(std::bit_cast<float>(uint32_t(packed >> 32)));
+  const double f13 = double(float(double(int64_t(int32_t(count)))));
+  const double f12 = double(float(double(int64_t(int32_t(old_count)))));
+  const double f11 = double(float(double(int64_t(int32_t(sum)))));
+  const double product = double(float(f13 * in_mean));
+  const double total = double(float(std::fma(f12, old_mean, product)));
+  guest::StoreFloat(mean + 0, float(double(float(total / f11))));
+}
+
+uint32_t StageOf(uint32_t save) {
+  ITC_NATIVE_RUNNING("sub_821121F8 Stage::Of");
+  const uint32_t flag = race_world::FirstUnsetFlag(save);
+  if (flag < 2) {
+    return 0;
+  }
+  if (flag < 4) {
+    return 1;
+  }
+  if (flag == 4) {
+    return 2;
+  }
+  if (flag < 6) {
+    return 3;
+  }
+  return flag == 6 ? 4 : flag;
+}
+
+uint32_t Entry56Allows(uint32_t entry, uint32_t mode, uint32_t location,
+                       uint32_t stage, uint32_t test_location) {
+  ITC_NATIVE_RUNNING("sub_82111BA8 Entry56::Allows");
+  const schema::CareerEntry56 e(entry);
+  uint32_t result = 0;
+  if (int32_t(e.kind()) == 4) {
+    return 0;
+  }
+  if (test_location != 0) {
+    uint32_t bit = 0;
+    if (location == 48) {
+      bit = 64;
+    } else if (location - 14 <= 5) {
+      bit = 1u << (location - 14);
+    }
+    if (bit != 0) {
+      if ((e.mask() & bit) == 0) {
+        return 0;
+      }
+      result = 1;
+    }
+  }
+  const uint32_t mask = e.mask();
+  if ((mask & 0x380) != 0 && int32_t(mode) != 3) {
+    const uint32_t bit = mode < 1 ? 7 : mode == 1 ? 8 : 9;
+    if ((mask & (1u << bit)) == 0) {
+      return 0;
+    }
+    result = 1;
+  }
+  if ((mask & 0x7C00) == 0) {
+    return result;
+  }
+  if (int32_t(stage) == 4) {
+    return (mask & 0x2000) != 0 ? 1 : 0;
+  }
+  const uint32_t shift = (stage + 10) & 0xFF;
+  const uint32_t bit = (shift & 0x20) != 0 ? 0 : (1u << (shift & 0x1F));
+  return (mask & bit) != 0 ? 1 : 0;
+}
+
+uint32_t AnyWonKind3Stage1() {
+  ITC_NATIVE_RUNNING("sub_82111780 Items::AnyWonKind3Stage1");
+  const uint32_t records =
+      CareerSave(vehicle_accessors::SaveDataOf(0)).item_records_address();
+  for (uint32_t id = 0; id < 400; id++) {
+    const schema::OpponentItem item(data_tables::Item(id));
+    if (item.level() == 1 && item.location() == 0 && item.kind() == 3 &&
+        schema::CareerItemRecord(records + 12 * id).wins() != 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+uint64_t EventQuery(uint32_t flag, const race_event::Guest& guest) {
+  ITC_NATIVE_RUNNING("sub_82111638 Career::EventQuery");
+  if (flag != 0) {
+    return ~0ull;
+  }
+  return race_event::RefreshCurrent(guest);
+}
+
+void EventLocation(uint32_t save, const race_event::Guest& guest) {
+  ITC_NATIVE_RUNNING("sub_82111650 Career::EventLocation");
+  const int32_t location = int32_t(CareerSave(save).location());
+  const int32_t group = location >= 14 && location <= 19 ? location - 10 : 4;
+  race_event::UpdateLocation(uint32_t(group), guest.Down(96));
+}
+
+}  // namespace career

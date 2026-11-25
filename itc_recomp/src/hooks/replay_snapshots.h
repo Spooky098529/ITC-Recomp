@@ -1,0 +1,26 @@
+// The replay snapshots' register steps (src/replay_snapshots/,
+// docs/functions/replay-snapshots.md), shared by the adapters
+// (src/hooks/replay_snapshots.cpp, behind --native_replay_snapshots) and the
+// harness (without the flag).
+
+#pragma once
+
+#include "guest.h"
+#include "hooks/native_entry.h"
+
+namespace hooks {
+
+// Replay::Keep sub_82104F68: r3 = the kept replay, r4 = the race data, r5 =
+// the recordings, r6 = the save data or 0, r7 = the stage flag; r3 as the
+// original leaves it.
+void ReplayKeep(lifted::Regs& ctx);
+// RaceReplay::SaveStart sub_82104D40, SaveEnd sub_82104E68, RestoreStart
+// sub_821046F8, RestoreEnd sub_82104898: no arguments; r3 as the original
+// leaves it. The three with the world's reset run the original unless
+// --native_heap routes the game's heap to the allocation layer.
+void RaceReplaySaveStart(lifted::Regs& ctx);
+void RaceReplaySaveEnd(lifted::Regs& ctx);
+void RaceReplayRestoreStart(lifted::Regs& ctx);
+void RaceReplayRestoreEnd(lifted::Regs& ctx);
+
+}  // namespace hooks

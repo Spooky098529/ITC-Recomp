@@ -1,0 +1,324 @@
+# The schema of docs/functions/race-world.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race world (the race mode's state machine at +116812, RaceWorld::) and
+# the racers' manager ([0x826D82F4], RaceManager::), with its sorted lists and
+# the small records the start placements pass around (src/race_world/).
+#
+# Not here (other areas' types the measure filed under this one; the seed's
+# copies were dropped, to be added to those types' measures):
+# - "Vehicle::Get.ret" is a vehicle (car-physics.toml's Vehicle);
+# - "SaveData" (SaveData::AddDistance's) is a player's save data
+#   (race-event.toml's SaveData);
+# - "AiDriver::DriveCar.ret" is a car input record (ai-drivers.toml's
+#   CarInput);
+# - "RaceEvent::Entry.ret" is the race event's list entry (race-event.toml's
+#   RaceEventEntry: +4 and +6 its start's section and slice);
+# - "RaceManager::GiveVehicle.r4" is one of the manager's 28-byte entries
+#   (minimap.toml's MinimapRacerEntry), as are "RaceManager::EntryOfRecord.ret"
+#   and "Race.+2308".
+
+# The racers' manager ([0x826D82F4], 363,592 bytes, RaceManager::Create;
+# known-data.md 0x826D82F4). The measure joins it with its entries: the
+# functions passed an entry (RaceManager::JumpSections' and Neighbours' r3,
+# the minimap's and the race set-up's) read it at +0 to +27, which fall in
+# `entries` (the "RaceManager" measure's +0, +8 to +12 and +20); and with
+# the neighbor records' base (+2392: BuildNeighbors' r3, its counts at
+# +360000) and other areas' objects (Race's +3888 to +104928, inside
+# `neighbors`).
+[RaceManager]
+measure = "Race"
+measures = ["RaceManager", "RaceManager::MoveUnseen.r4"]
+size = 363592
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "0 when made; also an entry's flags where the measure joins an entry (see above)" },
+  { name = "entries", offset = 4, type = "bytes", count = 2240, note = "80 entries of 28 bytes (MinimapRacerEntry), one for each opponent and traffic car the race data lists; entry i goes with racer record i" },
+  { name = "traffic_entries", offset = 2160, type = "bytes", count = 84, note = "the last three entries (77 to 79), the traffic cars" },
+  { name = "traffic_models", offset = 2244, type = "bytes", count = 64, note = "16 words: the traffic records' numbers by model (55 to 70; -1 none)" },
+  { name = "racers", offset = 2308, type = "bytes", count = 28, note = "7 pointers to the entries that have a vehicle (the racers)" },
+  { name = "racer0", offset = 2308, type = "ptr", to = "MinimapRacerEntry", note = "the first racer's entry (the player's)" },
+  { name = "vehicle_slots", offset = 2336, type = "bytes", count = 28, note = "7 words, one a vehicle: 0 free, -1 freed before, else its ticks in use (from 1, back to 60 after 216,000)" },
+  { name = "racer_count", offset = 2364, type = "u32", note = "the racers listed at +2308 (Race::RacerCount)" },
+  { name = "entry_count", offset = 2368, type = "u32", note = "the entries in use from +4" },
+  { name = "opponents_with_vehicle", offset = 2372, type = "u32", note = "up to 4" },
+  { name = "traffic_with_vehicle", offset = 2376, type = "u32" },
+  { name = "traffic_allowed", offset = 2380, type = "u32", note = "the race data's +0x59618, at most 3" },
+  { name = "traffic_model_count", offset = 2384, type = "u32", note = "the words in use at +2244" },
+  { name = "traffic_ticks", offset = 2388, type = "u32", note = "ticks since the last traffic car (to 90)" },
+  { name = "neighbors", offset = 2392, type = "bytes", count = 360000, note = "300 records of 1,200 bytes, one a route section: +0 the section, then the sections beside it (RaceManager::BuildNeighbors); not touched by Create" },
+  { name = "neighbor_counts", offset = 362392, type = "bytes", count = 1200, note = "300 words: each record's count (1 plus the sections added)" },
+]
+
+# The race world: the race mode's state machine at +116812 (a StateMachine,
+# game-modes.toml, at +0) with the words after it, up to the race HUD
+# machine at +128664 (11,852 bytes; known-data.md "race world").
+[RaceWorld]
+measure = "RaceWorld"
+size = 11852
+origin = "embedded"
+fields = [
+  { name = "machine", offset = 0, type = "bytes", count = 9616, note = "the StateMachine (game-modes.toml)" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at set-up; 2 loading, 3 the start, 7 racing, 24 paused, 37 the end (probably)" },
+  { name = "two_humans", offset = 9608, type = "u32", note = "1 when the race data's +0xA3AF0 is 6 and the current stage's +76 is 2 or more (probably two human cars: the Xbox Live mode's network battle)" },
+  { name = "unknown_9628", offset = 9628, type = "u32", note = "sub_821743A8's (reached only with two_humans; not read)" },
+  { name = "unknown_9632", offset = 9632, type = "u32", note = "sub_821743A8's (not read)" },
+  { name = "unknown_9700", offset = 9700, type = "u32", note = "sub_821743A8's (not read)" },
+  { name = "unknown_11844", offset = 11844, type = "u32", note = "a pointer sub_821743A8 reads (not read)" },
+  { name = "unknown_11848", offset = 11848, type = "u32", note = "a pointer sub_821743A8 reads (not read)" },
+]
+
+# A sorted list (SortedList::Insert, Clear): 100 nodes of 16 bytes, then the
+# first, the last inserted and the count. Met in the callers' frames (at
+# +144, +176 and such), so the measure's accesses are the first node's.
+[RaceSortedList]
+measure = "SortedList"
+measures = ["SortedList.+1604.+8", "SortedList.+1604.+8.+12", "SortedList.+1604", "SortedList.+1604.+8.+12.+8"]
+size = 1612
+origin = "embedded"
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 1600, note = "100 RaceSortedNode's, filled in order" },
+  { name = "node0_key", offset = 4, type = "f32", note = "node 0's key" },
+  { name = "node0_previous", offset = 8, type = "ptr", to = "RaceSortedNode" },
+  { name = "node0_next", offset = 12, type = "ptr", to = "RaceSortedNode" },
+  { name = "first", offset = 1600, type = "ptr", to = "RaceSortedNode", note = "the node with the lowest key" },
+  { name = "last_inserted", offset = 1604, type = "ptr", to = "RaceSortedNode", note = "where Insert's search starts" },
+  { name = "count", offset = 1608, type = "u32" },
+]
+
+# One node of a sorted list (16 bytes).
+[RaceSortedNode]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "item", offset = 0, type = "u32", note = "the item (a racers' manager entry)" },
+  { name = "key", offset = 4, type = "f32", note = "ascending" },
+  { name = "previous", offset = 8, type = "ptr", to = "RaceSortedNode" },
+  { name = "next", offset = 12, type = "ptr", to = "RaceSortedNode" },
+]
+
+# What sub_820B6880 (RigidBody::Field80) returns: the rigid body's +80
+# orientation (a quaternion), copied as two doublewords.
+[BodyOrientation]
+measure = "sub_820B6880.ret"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "x and y (copied as a doubleword)" },
+  { name = "zw", offset = 8, type = "u64", note = "z and w (copied as a doubleword)" },
+]
+
+# The start placements' arguments passed by address (most in the callers'
+# frames; PlaceStarts' from the save data and the player's racer record).
+
+# A route position (section, slice halfwords) passed by address.
+[RaceStartPosition]
+measures = ["RaceEvent::PlaceEntry.r6", "RaceEvent::PlaceGroup.r4", "RaceEvent::PlaceStarts.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "position", offset = 0, type = "u32", note = "section and slice as one word" },
+  { name = "section", offset = 0, type = "u16" },
+  { name = "slice", offset = 2, type = "u16" },
+]
+
+# RaceEvent::PlaceEntry's index: a halfword (sign-extended), the entry's
+# index in the event's list (a group list entry's +2).
+[RaceStartEntryIndex]
+measure = "RaceEvent::PlaceEntry.r5"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u16" },
+]
+
+# The slices between placed entries (a halfword).
+[RaceStartStep]
+measures = ["RaceEvent::PlaceEntry.r7", "RaceEvent::PlaceGroupFixed.r4"]
+size = 2
+origin = "embedded"
+fields = [
+  { name = "step", offset = 0, type = "u16", note = "signed" },
+]
+
+# A start group's number (0 to 3; its list at the event + 12 x (group + 3)).
+[RaceStartGroup]
+measures = ["RaceEvent::PlaceGroup.r6", "RaceEvent::PlaceGroupSplit.r6", "RaceEvent::PlaceGroupTwoRows.r7", "RaceEvent::PlaceGroupFixed.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "group", offset = 0, type = "u32" },
+]
+
+# RaceEvent::PlaceGroup's flag: set, half the group steps forward and the
+# rest back.
+[RaceStartBothWays]
+measure = "RaceEvent::PlaceGroup.r7"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "both_ways", offset = 0, type = "u32" },
+]
+
+# RaceEvent::PlaceGroupSplit's row (0 to 5: the halfword at 0x82008E14 + 2 x
+# row indexes the sections at 0x82008DE8).
+[RaceStartRow]
+measure = "RaceEvent::PlaceGroupSplit.r7"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "row", offset = 0, type = "u32" },
+]
+
+# RaceEvent::PlaceStarts' kind (0 to 19 pick a row and a group; player 0's
+# save +6108 from RaceManager::AddRacers).
+[RaceStartKind]
+measure = "RaceEvent::PlaceStarts.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32" },
+]
+
+# RaceManager::JumpSections' player position (the rigid body's position,
+# 16 bytes in MoveUnseen's frame at +96; x and z read).
+[RaceJumpPlayerPoint]
+measure = "RaceManager::JumpSections.r4"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# RaceManager::JumpSections' player's branch (a word in MoveUnseen's frame).
+[RaceJumpBranch]
+measure = "RaceManager::JumpSections.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "branch", offset = 0, type = "u32" },
+]
+
+# RaceManager::JumpSections' two flags (the race data's flags 0x20 and 0x10
+# as words in MoveUnseen's frame, cleared once used).
+[RaceJumpFlag]
+measures = ["RaceManager::JumpSections.r6", "RaceManager::JumpSections.r7"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "flag", offset = 0, type = "u32" },
+]
+
+# RaceManager::Neighbours' r4: an entry's number (a word in MoveUnseen's
+# frame).
+[RaceNeighboursEntry]
+measure = "RaceManager::Neighbours.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "entry", offset = 0, type = "u32" },
+]
+
+[globals]
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (0 when none)" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer; race-states.toml's RaceData)" }
+race_event = { address = 0x826C6078, type = "u32", note = "the race event (a pointer; race-event.toml's RaceEvent)" }
+route = { address = 0x826C5B10, type = "u32", note = "the course's route (a pointer)" }
+vehicles = { address = 0x826C2E34, type = "u32", note = "the seven vehicles (a pointer)" }
+input_records = { address = 0x826C5B30, type = "bytes", count = 28, note = "the racers' car input records (a pointer a racer, 20 bytes each; indexed by the racer's low byte)" }
+race_progress = { address = 0x826D82E8, type = "u32", note = "the race's progress (a pointer; its 972-byte results entries from +2972)" }
+unload_object = { address = 0x826C5B28, type = "u32", note = "TrackCollision::Unload's r3 (RaceWorld::Unload)" }
+reset_float = { address = 0x826C2D80, type = "f32", note = "set to the float at 0x82000A34 by RaceManager::ResetWorld" }
+start_byte = { address = 0x826C6B0C, type = "u8", note = "which racers' results words RaceWorld::Tick clears (255 none); its +2 and +4 halfwords the start's section and slice (RaceStart::Place)" }
+start_object = { address = 0x826C7820, type = "u32", note = "its +4 (0x826C7824): set, the start from an object (RaceStart::Place); picks flags 0x1 or 0x80 in RaceWorld::Tick" }
+human_flag = { address = 0x826C7824, type = "u32", note = "picks which human car's flags (0x1 or 0x80) RaceWorld::Tick matches" }
+marked_racer = { address = 0x826C61A4, type = "bytes", count = 12, note = "three floats: a racer's point (RaceManager::NoteMarkedRacer)" }
+traffic_step = { address = 0x826193C8, type = "f32", note = "the physics step's time given a new traffic car" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (image)" }
+far_key = { address = 0x8200222C, type = "f32", note = "the sort key of entries flagged 0x10 or 0x400 (image)" }
+near_distance = { address = 0x82002568, type = "f32", note = "20.0: the neighbor sections' and the traffic's nearness (image)" }
+segment_end = { address = 0x820021E8, type = "f32", note = "the traffic's radii scale; Neighbours 1's ticks factor (image)" }
+opponent_scale = { address = 0x820021F4, type = "f32", note = "the opponents' radii: the speed x this (image)" }
+near_base = { address = 0x82002A28, type = "f32", note = "the near radii's base (image)" }
+far_base = { address = 0x82008914, type = "f32", note = "the far radii's base (image)" }
+far_cap = { address = 0x82003384, type = "f32", note = "the far radii's cap (image)" }
+opponent_near_cap = { address = 0x820099CC, type = "f32", note = "the opponents' near radius when capped (image)" }
+traffic_near_cap = { address = 0x820099C8, type = "f32", note = "the traffic's near radius when capped (image)" }
+traffic_gap = { address = 0x82009968, type = "f32", note = "the traffic's spacing (image)" }
+nearest_limit = { address = 0x8200996C, type = "f32", note = "the four nearest racers' limit; Refresh's spawn radius (image)" }
+refresh_despawn = { address = 0x82009970, type = "f32", note = "Refresh: beyond this a racer loses its vehicle (image)" }
+traffic_speed = { address = 0x82009974, type = "f32", note = "the traffic's speed placed (and its limit) (image)" }
+traffic_back = { address = 0x820029D0, type = "f32", note = "the traffic's offset behind (image)" }
+ticks_scale = { address = 0x820099D4, type = "f32", note = "a slice's ticks, by default (image)" }
+behind_factor = { address = 0x82001070, type = "f32", note = "Neighbours 2 (one behind): the ticks factor (image)" }
+both_factor = { address = 0x820029F0, type = "f32", note = "Neighbours 3 (both): the ticks factor (image)" }
+ahead_limit = { address = 0x82001FC0, type = "f32", note = "Neighbours: the farthest one ahead (image)" }
+behind_limit = { address = 0x82009798, type = "f32", note = "Neighbours: the farthest one behind (image)" }
+jump_distance = { address = 0x820099D0, type = "f32", note = "JumpSections: the distance from the player, squared and flat (image)" }
+rolling_speed = { address = 0x820097FC, type = "f32", note = "the rolling start's speed (image)" }
+slow_factor = { address = 0x820027A8, type = "f32", note = "1.5: the km/h scaled against the traffic's speed (image)" }
+start_back_step = { address = 0x82008E3C, type = "f32", note = "the start's step back (image)" }
+start_group_step = { address = 0x82008E34, type = "f32", note = "the step between start entries (image)" }
+start_rows = { address = 0x82008E14, type = "bytes", count = 12, note = "a halfword a row (0 to 5): an index into start_split_sections, 0x8000 or more for none (image)" }
+start_split_sections = { address = 0x82008DE8, type = "u16", note = "the split groups' sections, halfwords (image)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceManager.
+[RaceManagerAt48]
+measure = "Race@+48"
+size = 6014
+origin = "embedded"
+fields = [
+  { name = "unknown_6008", offset = 6008, type = "u32" },
+  { name = "unknown_6012", offset = 6012, type = "u16" },
+]
+
+# Split from RaceManager.
+[RaceManagerAt32]
+measure = "RaceManager@+32"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Split from RaceManager.
+[RaceManagerAt4]
+measure = "RaceManager@+4"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceManager.
+[RaceManagerAt2392]
+measure = "RaceManager@+2392"
+size = 360004
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_360000", offset = 360000, type = "u32" },
+]
+
+# Split from RaceWorld.
+[RaceWorldAt116812]
+measure = "RaceMode@+116812"
+size = 9612
+origin = "embedded"
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9608", offset = 9608, type = "u32" },
+]

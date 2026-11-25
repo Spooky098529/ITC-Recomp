@@ -577,7 +577,7 @@ void VectorCases(Context& h, uint32_t block) {
     bool compare_f1;
   } functions[] = {
       {"sqrtf (sub_82293590)", __imp__sub_82293590, NativeSqrtf, kF1, true},
-      {"Matrix::SetTranslation (sub_82293818)", __imp__sub_82293818, NativeMatrixSetTranslation,
+      {"Matrix::SetTranslation (sub_82293818)", __imp__sub_82293818, ITC_CONTEXT_FN(NativeMatrixSetTranslation),
        kR3R4Mat, true},
       {"Matrix::Rotate (sub_82293880)", __imp__sub_82293880, NativeMatrixRotate, kR3MatR5, true},
       // f1 is a scratch register there (left the matrix's +48); callers
@@ -847,27 +847,27 @@ void RigidBodyCases(Context& h, uint32_t block) {
       {"RigidBody::IsFixed (sub_820B6638)", __imp__sub_820B6638, NativeRigidBodyIsFixed,
        kBodyOnly, true, false},
       // f1 is left the mass there (a scratch register callers don't read).
-      {"RigidBody::SetGravity (sub_820B6640)", __imp__sub_820B6640, NativeRigidBodySetGravity,
+      {"RigidBody::SetGravity (sub_820B6640)", __imp__sub_820B6640, ITC_CONTEXT_FN(NativeRigidBodySetGravity),
        kBodyVector, false},
-      {"RigidBody::SetMass (sub_820B6698)", __imp__sub_820B6698, NativeRigidBodySetMass, kBodyF1,
+      {"RigidBody::SetMass (sub_820B6698)", __imp__sub_820B6698, ITC_CONTEXT_FN(NativeRigidBodySetMass), kBodyF1,
        true},
       {"RigidBody::Mass (sub_820B6708)", __imp__sub_820B6708, NativeRigidBodyMass, kBodyOnly,
        true, false},
       {"RigidBody::SetCenterOfMass (sub_820B67E0)", __imp__sub_820B67E0,
-       NativeRigidBodySetCenterOfMass, kBodyVector, true},
+       ITC_CONTEXT_FN(NativeRigidBodySetCenterOfMass), kBodyVector, true},
       {"RigidBody::Float48 (sub_820B68A0)", __imp__sub_820B68A0, NativeRigidBodyFloat48,
        kBodyOnly, true, false},
       {"RigidBody::PointVelocity (sub_820B68C0)", __imp__sub_820B68C0,
-       NativeRigidBodyPointVelocity, kOutBodyPoint, true},
-      {"RigidBody::SetFloat112 (sub_820B6950)", __imp__sub_820B6950, NativeRigidBodySetFloat112,
+       ITC_CONTEXT_FN(NativeRigidBodyPointVelocity), kOutBodyPoint, true},
+      {"RigidBody::SetFloat112 (sub_820B6950)", __imp__sub_820B6950, ITC_CONTEXT_FN(NativeRigidBodySetFloat112),
        kBodyF1, true, false},
-      {"RigidBody::AddForce (sub_820B6958)", __imp__sub_820B6958, NativeRigidBodyAddForce,
+      {"RigidBody::AddForce (sub_820B6958)", __imp__sub_820B6958, ITC_CONTEXT_FN(NativeRigidBodyAddForce),
        kBodyVector, true},
-      {"RigidBody::AddTorque (sub_820B6960)", __imp__sub_820B6960, NativeRigidBodyAddTorque,
+      {"RigidBody::AddTorque (sub_820B6960)", __imp__sub_820B6960, ITC_CONTEXT_FN(NativeRigidBodyAddTorque),
        kBodyVector, true},
-      {"RigidBody::AddForceAt (sub_820B6968)", __imp__sub_820B6968, NativeRigidBodyAddForceAt,
+      {"RigidBody::AddForceAt (sub_820B6968)", __imp__sub_820B6968, ITC_CONTEXT_FN(NativeRigidBodyAddForceAt),
        kBodyVectorPoint, true},
-      {"RigidBody::AddTorqueAt (sub_820B69D8)", __imp__sub_820B69D8, NativeRigidBodyAddTorqueAt,
+      {"RigidBody::AddTorqueAt (sub_820B69D8)", __imp__sub_820B69D8, ITC_CONTEXT_FN(NativeRigidBodyAddTorqueAt),
        kBodyVectorPoint, true},
   };
   // Where the vector, the point and the output go: apart, or inside the
@@ -1158,7 +1158,7 @@ void OtherObjectCases(Context& h, uint32_t block) {
       {"CollisionObject::ClearBits260 (sub_820B7D58)", __imp__sub_820B7D58,
        NativeCollisionObjectClearBits260},
       {"CollisionObject::SetSize (sub_820B7D68)", __imp__sub_820B7D68,
-       NativeCollisionObjectSetSize, nullptr, source},
+       ITC_CONTEXT_FN(NativeCollisionObjectSetSize), nullptr, source},
       {"CollisionObject::SetFloat224 (sub_820B7D70)", __imp__sub_820B7D70,
        NativeCollisionObjectSetFloat224},
       {"CollisionRecord::Copy (sub_820B7D78)", __imp__sub_820B7D78, NativeCollisionRecordCopy,
@@ -1267,7 +1267,7 @@ void RaceDataMoreCases(Context& h, uint32_t block, uint32_t records_block) {
       {"Stages::Racer (sub_820FFC98)", __imp__sub_820FFC98, NativeStagesRacer, true},
       {"Stages::Word48 (sub_820FFCC8)", __imp__sub_820FFCC8, NativeStagesWord48, true},
       {"Stages::Copy24 (sub_820FFD48)", __imp__sub_820FFD48, NativeStagesCopy24, false, true},
-      {"Stages::Copy (sub_820FFD88)", __imp__sub_820FFD88, NativeStagesCopy, false, true},
+      {"Stages::Copy (sub_820FFD88)", __imp__sub_820FFD88, ITC_CONTEXT_FN(NativeStagesCopy), false, true},
   };
   for (const auto& f : stage_functions) {
     Results results(f.name);
@@ -1345,7 +1345,7 @@ void RaceDataMoreCases(Context& h, uint32_t block, uint32_t records_block) {
                   t.r3.u64 = records_block;
                   t.r4.u64 = block + kStages;
                 },
-                __imp__sub_820FFE08, NativeRacerRecordsAdd, fmt::format("seed {}", seed));
+                __imp__sub_820FFE08, ITC_CONTEXT_FN(NativeRacerRecordsAdd), fmt::format("seed {}", seed));
       }
       for (uint32_t n : {0xFFFFFFFFu, 0u, 1u, 76u, 0x80000000u}) {
         Compare(h, at, {}, records(seed),

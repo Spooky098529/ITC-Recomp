@@ -1,0 +1,244 @@
+// Scenery::DrawArea (sub_820F3B70, course_scenery.h;
+// docs/functions/course-scenery.md): a visible area's models and light
+// groups for one pass, step for step as the translated code (built with
+// strict floats, CMakeLists.txt). Its 400-byte frame keeps the original's
+// temporaries at their offsets (the identity at +80 and +208, the camera
+// pass's view-projection at +144: its callees read them by guest address
+// and frame interpolation follows the copy); its callees' plain C++ runs
+// with the registers their adapters would hand the interpolation's hooks.
+
+#include "course_scenery/course_scenery.h"
+
+#include "car_scene_draw/car_scene_draw.h"
+#include "car_scene_draw/ops.h"
+#include "guest.h"
+
+#include "base/log.h"
+#include "game_data/data_file.h"
+#include "interpolation/blend_state.h"
+#include "matrix_math/matrix_math.h"
+#include "post_effects/post_effects.h"
+#include "scenery_lists/scenery_lists.h"
+#include "schema/cameras.h"
+#include "schema/course_scenery.h"
+#include "schema/models.h"
+#include "schema/post_effects.h"
+#include "schema/scenery_lists.h"
+#include "sprites/billboards.h"
+
+#include <array>
+#include <initializer_list>
+
+namespace course_scenery {
+
+namespace {
+
+using namespace car_scene_draw::ops;
+
+constexpr uint32_t kFrame = 400;
+constexpr uint32_t kTextureProviderSet = 0x82594718;
+constexpr uint32_t kDrawShape = 0x82147D88;
+constexpr uint32_t kDrawShapeDepth = 0x82596D48;
+constexpr uint32_t kDepthFrame = 160;  // Model::DrawShapeDepth's
+constexpr uint32_t kDepthContextReturn = 0x82596D9C;
+constexpr uint32_t kDepthSubmitReturn = 0x82596E60;
+
+void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); }
+
+bool ShadowPass(int32_t type) { return type == 10 || type == 13 || type == 16; }
+
+using G = schema::CourseSceneryGlobals;
+using VisibleArea = schema::SceneryVisibleArea;
+using Pass = schema::CameraPass;
+
+// The camera pass `index` (592 bytes each from 0x826BAC00).
+Pass PassAt(uint32_t index) {
+  return Pass(index * Pass::kSize + schema::CamerasGlobals::passes_address());
+}
+
+constexpr uint32_t kViewCopy = schema::SceneryListsGlobals::view_address();
+
+}  // namespace
+
+void DrawArea(const scenery_lists::DrawCalls& draws,
+              const car_scene_draw::SceneDrawCalls& calls, uint32_t stack, uint32_t manager,
+              uint32_t description, uint32_t area, uint32_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820F3B70 Scenery::DrawArea");
+  const uint32_t f = stack - kFrame;
+  Store(f, stack);  // the back chain, as stwu
+  const schema::Scenery m(manager);
+  const schema::SceneryPassDesc desc(description);
+  const VisibleArea va(area);
+  const schema::CourseSet s = m.course_set();  // r18
+  if ((desc.mask() & m.mask() & va.mask()) == 0) {
+    return;
+  }
+  RecordHeadlightProjectors(calls, f, description);
+  FlushOff();
+
+  // The identity at +80 (1.0 stored in +144's w column first) and its copy
+  // at +208, the camera pass's view-projection at +144 and its view at
+  // 0x8265ECA0 (both copies noted for interpolation), the keys.
+  const Pass pass = PassAt(desc.camera_pass());  // r24
+  const double one = double(G::one());
+  for (uint32_t at : {156u, 172u, 188u, 204u}) {
+    Stfs(f + at, one);
+  }
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t col = 0; col < 4; col++) {
+      Store(f + 80 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
+    }
+  }
+  for (uint32_t at = 0; at < 64; at += 4) {
+    Store(f + 208 + at, Load(f + 80 + at));
+  }
+  const uint32_t view_projection = f + 144, world = f + 208;
+  matrix_math::Copy(view_projection, pass.view_projection_address());
+  interpolation::BlendState_OnCopy(view_projection, pass.view_projection_address(),
+                                   0x820F3C3C);
+  FlushOff();
+  // The depth buckets' key 163 here; the draws' keys the description's.
+  G::set_key_depth(163);
+  const uint32_t key_a = desc.key_a();
+  const uint32_t key_b = desc.key_b();
+  G::set_key_a(key_a);
+  G::set_key_b(key_b);
+  matrix_math::Copy(kViewCopy, pass.view_address());
+  interpolation::BlendState_OnCopy(kViewCopy, pass.view_address(), 0x820F3C70);
+  FlushOff();
+
+  // Model::DrawShapeDepth: natively (its queue entry handed over from its
+  // frame), else its adapter; the context its wrapper keeps has the
+  // caller's r28 (`depth_r28`).
+  auto draw_depth = [&](uint32_t model, uint32_t shape, uint32_t mask, uint32_t depth_r28,
+                        uint32_t lr) {
+    const uint32_t frame = f - kDepthFrame;
+    const std::array<uint32_t, 9> context = {kDepthContextReturn, 1, mask, 0, shape,
+                                             depth_r28, model, world, view_projection};
+    const auto draw = scenery_lists::DrawShapeDepth(model, view_projection, world, shape,
+                                                    0, mask, 1, frame, context);
+    FlushOff();
+    if (!draw) {
+      // Its original (never seen in play: a chunk open on another list, or
+      // no room), its recorder's context then with ctx's r28.
+      const uint32_t args[7] = {model, view_projection, world, shape, 0, mask, 1};
+      draws.call(draws.user, kDrawShapeDepth, args, 7, f, lr);
+      FlushOff();
+      return;
+    }
+    Store(frame, f);  // its back chain, as its stwu
+    if (draw->submit) {
+      draws.submit(draws.user, draw->entry, draw->key, draw->depth, frame, kDepthSubmitReturn);
+      FlushOff();
+    }
+  };
+  // The texture provider's slot 4 (TextureProvider::Set natively where it
+  // is the game's, else a guest call).
+  const uint32_t provider = m.texture_provider_address();
+  auto provider_set = [&](uint32_t slot, uint32_t value, uint32_t lr) {
+    const uint32_t function = m.texture_provider().set();
+    if (function != kTextureProviderSet ||
+        !scenery_lists::TextureProviderSet(provider, slot, value)) {
+      const uint32_t args[3] = {provider, slot, value};
+      draws.call(draws.user, function, args, 3, f, lr);
+    }
+    FlushOff();
+  };
+
+  // The area's models' entries (+16, a word each).
+  auto model_at = [&](uint32_t n) {
+    return schema::AreaModel(Load(va.models_address() + 4 * n));
+  };
+  const uint32_t count = va.model_count();
+  for (uint32_t n = 0; n < count; n++) {
+    const schema::AreaModel entry = model_at(n);
+    const int32_t type = int32_t(pass.type());
+    if (ShadowPass(type)) {
+      // The shadow passes' keys: the description's +28 and +24.
+      G::set_other_key(desc.key_b());
+      G::set_depth_key(desc.key_a());
+      const uint32_t model = model_at(n).model().address;
+      if (model == 0) {
+        continue;
+      }
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
+        draw_depth(model, i, 1, caller_r28, 0x820F3F44);
+      }
+      continue;
+    }
+    uint32_t slot = 1;
+    const uint32_t textures = s.texture_animations().address;
+    const uint32_t model = entry.model().address;
+    scenery_lists::ResetDrawState(model);
+    if (textures != 0) {
+      provider_set(1, s.xpr_address(), 0x820F3CE4);
+      slot = 2;
+    }
+    schema::SceneryModel(model).set_animations(textures);
+    const uint32_t own = model_at(n).xpr().address;
+    if (own != 0) {
+      provider_set(slot, own, 0x820F3D14);
+    }
+    schema::SceneryModel(model).set_texture_provider(provider);
+    const int32_t kind = int32_t(pass.type());
+    const uint32_t depth_too = kind == 0 ? 1 : 0;  // r28
+    const uint32_t pair_offset = (kind == 0 || kind == 1 || kind == 2) ? 0 : 28;
+    for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
+      const uint32_t frame = f - scenery_lists::kSceneryDrawShapeFrame;
+      const uint32_t chain = Load(frame);
+      Store(frame, f);
+      const auto drawn = scenery_lists::SceneryDrawShape(draws, frame, model,
+                                                         view_projection, world, i, depth_too, 0,
+                                                         0, pair_offset, pass.address);
+      FlushOff();
+      if (!drawn) {
+        Store(frame, chain);
+        const uint32_t args[8] = {model, view_projection, world, i, depth_too, 0, 0, pair_offset};
+        draws.call(draws.user, kDrawShape, args, 8, f, 0x820F3D84);
+        FlushOff();
+      }
+    }
+    // The bloom targets' depth (types 0, 1 and 2, with post effects 3, 7
+    // and 11 set and their +52 0).
+    static constexpr struct {
+      int32_t type;
+      uint32_t effect, key, lr;
+    } kDepths[3] = {{0, 3, 116, 0x820F3DF8}, {1, 7, 116, 0x820F3E6C}, {2, 11, 119, 0x820F3EE0}};
+    for (const auto& d : kDepths) {
+      if (int32_t(pass.type()) != d.type) {
+        continue;
+      }
+      const uint32_t effect = post_effects::Get(d.effect);
+      if (effect == 0 || schema::PostEffect(effect).skipped() != 0) {
+        continue;
+      }
+      G::set_depth_key(d.key);
+      G::set_other_key(d.key);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
+        draw_depth(model, i, 0, depth_too, d.lr);
+      }
+    }
+  }
+
+  // The area's light groups, with +196 & 0x400, outside the shadow passes.
+  if ((m.mask() & 0x400) == 0) {
+    return;
+  }
+  const Pass pass_again = PassAt(desc.camera_pass());
+  if (ShadowPass(int32_t(pass_again.type()))) {
+    return;
+  }
+  const uint32_t lights = va.lights().light_file().address;
+  if (lights == 0) {
+    return;
+  }
+  scenery_lists::SetBillboardPass(description, desc.camera_pass_object(), desc.key_b());
+  for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(lights).count()); i++) {
+    const uint32_t animations = s.texture_animations().address;
+    const uint32_t groups = game_data::GetEntry(lights, i, false);
+    sprites::DrawLightGroups(calls, f, description, groups, s.xpr_address(), animations);
+    FlushOff();
+  }
+}
+
+}  // namespace course_scenery

@@ -1,0 +1,635 @@
+# The schema of docs/functions/accessories.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The interior accessories (probably a hanging ornament): the set at
+# [0x826C5510] with three 1,104-byte entries, each an AccessoryFile and an
+# Accessory (a car part model with a swinging skeleton). Hand port in
+# src/accessories/. Fields read 4 and 8 bytes wide (float4s copied as two
+# doublewords) get a field of each width at that offset.
+
+# The set (32 bytes, VirtualAlloc'd by Accessories::New): AccessoriesBase's
+# constructor and destructor see it too.
+[Accessories]
+measures = ["Accessories", "AccessoriesBase"]
+size = 32
+origin = "allocated"
+# In host memory (E5 step 5): made by Accessories::New (the hand port,
+# src/accessories/accessories.cpp; the lifted original's VirtualAlloc
+# returning to 0x820F0F6C), freed by Accessories::Free's VirtualFree (a
+# handle; AccessoryFile::FreeData's plain C++). Its entries' slots (+4 to
+# +12) are read by index through raw accesses.
+storage = "host"
+host_alloc = [0x820F0F6C]
+vtable = 0x82006740
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AccessoriesVtable", note = "0x82006740 (the base's 0x8200672C while it's built or torn down, the list node's 0x82010B5C after)" },
+  { name = "entry_0", offset = 4, type = "ptr", to = "AccessoryEntry", note = "the three entries, by the interior record's +112 (3 is none); 0 when not acquired" },
+  { name = "entry_1", offset = 8, type = "ptr", to = "AccessoryEntry" },
+  { name = "entry_2", offset = 12, type = "ptr", to = "AccessoryEntry" },
+  { name = "scale_xy", offset = 16, type = "u64", note = "the scale copied as two doublewords" },
+  { name = "scale_x", offset = 16, type = "f32", note = "the scale, (1, 1, 1, 1) by default; copied into each accessory's +1024" },
+  { name = "scale_y", offset = 20, type = "f32" },
+  { name = "scale_zw", offset = 24, type = "u64" },
+  { name = "scale_z", offset = 24, type = "f32" },
+  { name = "scale_w", offset = 28, type = "f32" },
+]
+
+# The set's vtable (0x82006740) as Accessories::Free reads it.
+[AccessoriesVtable]
+measure = "Accessories.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0: the deleting destructor sub_820F0FE0" },
+  { name = "acquire", offset = 4, type = "fn", note = "slot 1: Accessories::Acquire sub_820F0EB8" },
+]
+
+# An entry (1,104 bytes, VirtualAlloc'd by AccessoryEntry::New): a count, its
+# file at +4 (an AccessoryFile) and the accessory at +48 (an Accessory). Its
+# file's and accessory's words the measure meets through the entry are named
+# here at the entry's offsets.
+[AccessoryEntry]
+measure = "Accessories.+4"
+measures = ["new<1104>@AccessoryEntry::New", "AccessoryEntry::OnLoaded.r6", "Accessories@+4"]
+size = 1104
+origin = "allocated"
+# In host memory (E5 step 5): made by AccessoryEntry::New (the hand port,
+# src/accessories/accessories.cpp; sub_820F0920 has no lifted body), freed
+# by AccessoryEntry::Destroy's VirtualFree (a handle; AccessoryFile::
+# FreeData's plain C++). Its scalar fields are the layout; the file, the
+# accessory (a part model, its two files and its skeleton) stay guest-shaped
+# views reaching it through raw accesses, as the scene pools' part models.
+# The file's data (the archive's asset 23008 + the index: the part model,
+# an XPR2 texture pack and the node file, used in place) stays in guest
+# memory: the renderer reads the XPR's textures.
+storage = "host"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "the reference count: 1 when made, +1 an acquire, -1 a release (destroyed at 0)" },
+  { name = "file", offset = 4, type = "bytes", count = 36, note = "an AccessoryFile: archive asset 23008 + the index" },
+  { name = "file_data", offset = 20, type = "u32", note = "the file's +16: its data (a data file of three parts)" },
+  { name = "accessory", offset = 48, type = "bytes", count = 1056, note = "an Accessory" },
+  { name = "accessory_scale_xy", offset = 1072, type = "u64", note = "the accessory's +1024: its scale" },
+  { name = "accessory_scale_zw", offset = 1080, type = "u64" },
+  { name = "accessory_texture_index", offset = 1088, type = "u32", note = "the accessory's +1040" },
+  { name = "accessory_loaded", offset = 1096, type = "u32", note = "the accessory's +1048" },
+]
+
+# The file class (36 bytes, vtable 0x82006738 over the list node's
+# 0x82010B5C): in an entry (+4), an accessory (+464, +500) and a skeleton
+# (+180). OnArchiveDone's r6 is one.
+[AccessoryFile]
+measure = "AccessoryFile"
+measures = ["AccessoryFile::OnArchiveDone.r6", "AccessoryFile::AccessoryFile.r3", "AccessoryFile::SetData.r3"]
+size = 36
+origin = "embedded"
+vtable = 0x82006738
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006738; the list node's 0x82010B5C after the destructor" },
+  { name = "asset_id", offset = 4, type = "u32", note = "-1 when none" },
+  { name = "serial", offset = 8, type = "u32", note = "the archive load's serial, -1 when none" },
+  { name = "state", offset = 12, type = "u32", note = "0 none, 1 loading, 2 loaded" },
+  { name = "data", offset = 16, type = "u32" },
+  { name = "size", offset = 20, type = "u32", note = "Archive::AssetSize's answer (0 when set from data)" },
+  { name = "owned", offset = 24, type = "u32", note = "the data is freed with VirtualFree on reset" },
+  { name = "callback", offset = 28, type = "fn", note = "called when the archive's load completes (r6 = the context)" },
+  { name = "callback_context", offset = 32, type = "u32" },
+]
+
+# The accessory (1,056 bytes, at entry + 48): a car part model (464 bytes,
+# models.md) with vtable 0x820066C8, the model's and XPR's files (+464,
+# +500), the skeleton (+544, an AccessorySkeleton) and its pose. Its files'
+# and skeleton's words met through the accessory are named here at the
+# accessory's offsets.
+[Accessory]
+measure = "Accessory"
+measures = ["Accessories::AcquireEntry.ret", "Accessory::SetTexture.r3"]
+size = 1056
+origin = "embedded"
+vtable = 0x820066C8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820066C8 (the part model's while it's built)" },
+  { name = "unknown_4", offset = 4, type = "f32", note = "only Matrix::FromScaleRotationTranslation's out reaches it: a measure fault (its r3 is a matrix)" },
+  { name = "unknown_8", offset = 8, type = "f32", note = "as unknown_4" },
+  { name = "shapes", offset = 40, type = "ptr", to = "AccessoryShape", note = "the model's shapes" },
+  { name = "textures_vtable", offset = 80, type = "ptr", to = "AccessoryTexturesVtable", note = "the model's texture provider (embedded at +80): its vtable" },
+  { name = "shape_count", offset = 412, type = "u32" },
+  { name = "model_file", offset = 464, type = "bytes", count = 36, note = "an AccessoryFile: the part model" },
+  { name = "model_file_state", offset = 476, type = "u32", note = "+464's state" },
+  { name = "model_file_data", offset = 480, type = "u32", note = "+464's data" },
+  { name = "xpr_file", offset = 500, type = "bytes", count = 36, note = "an AccessoryFile: the XPR" },
+  { name = "xpr_file_data", offset = 516, type = "u32", note = "+500's data" },
+  { name = "skeleton", offset = 544, type = "bytes", count = 448, note = "an AccessorySkeleton" },
+  { name = "skeleton_node_file", offset = 624, type = "ptr", to = "AccessoryNodeFile", note = "the skeleton's +80" },
+  { name = "skeleton_rows_0", offset = 632, type = "ptr", to = "AccessoryNodeRow", note = "the skeleton's +88: the anchor is its row at the swing node" },
+  { name = "skeleton_unknown_108", offset = 652, type = "u32", note = "the skeleton's +108, handed to Accessory::BindSkin" },
+  { name = "skeleton_node_matrices", offset = 692, type = "ptr", to = "AccessoryMatrix", note = "the skeleton's +148" },
+  { name = "skeleton_swing_node", offset = 800, type = "u32", note = "the skeleton's +256" },
+  { name = "anchor_xy", offset = 992, type = "u64", note = "the anchor copied as two doublewords" },
+  { name = "anchor_x", offset = 992, type = "f32", note = "the anchor position (w = 1)" },
+  { name = "anchor_y", offset = 996, type = "f32" },
+  { name = "anchor_zw", offset = 1000, type = "u64" },
+  { name = "anchor_z", offset = 1000, type = "f32" },
+  { name = "anchor_w", offset = 1004, type = "f32" },
+  { name = "angle_x", offset = 1008, type = "f32", note = "the three angles" },
+  { name = "angle_y", offset = 1012, type = "f32" },
+  { name = "angle_z", offset = 1016, type = "f32" },
+  { name = "angle_w", offset = 1020, type = "f32", note = "1.0" },
+  { name = "scale_xy", offset = 1024, type = "u64", note = "the set's scale, copied as two doublewords" },
+  { name = "scale_x", offset = 1024, type = "f32" },
+  { name = "scale_y", offset = 1028, type = "f32" },
+  { name = "scale_zw", offset = 1032, type = "u64" },
+  { name = "scale_z", offset = 1032, type = "f32" },
+  { name = "scale_w", offset = 1036, type = "f32" },
+  { name = "texture_index", offset = 1040, type = "u32" },
+  { name = "visible", offset = 1044, type = "u32", note = "bit 0; 1 by default" },
+  { name = "loaded", offset = 1048, type = "u32" },
+]
+
+# The accessory's shapes (+40, 544 bytes each) as Accessory::BindSkin and
+# DrawShape read them.
+[AccessoryShape]
+measure = "Accessory.+40"
+size = 544
+origin = "embedded"
+fields = [
+  { name = "skinned", offset = 428, type = "u32", note = "1: BindSkin skins the shape (probably)" },
+]
+
+# The accessory's texture provider's vtable (the provider embedded at +80).
+[AccessoryTexturesVtable]
+measure = "Accessory::SetTexture.r3.+80"
+size = 16
+origin = "image"
+fields = [
+  { name = "texture_set", offset = 12, type = "fn", note = "slot 3: answers the texture set (its +20 the texture count)" },
+]
+
+# The skeleton (448 bytes, at accessory + 544): a SkeletonBase
+# (model-animation.md, 176 bytes) with vtables 0x82006700 at +0 and
+# 0x820066FC at +176 (a second base), the node file at +180 (an
+# AccessoryFile), a 40-byte worker job at +216, then the swing's state. The
+# SkeletonBase methods sub_8259A2B0, sub_8259A400, sub_8259B660 and
+# sub_8259BB98 (the skeletons' vtable slot 1; not read) are merged here:
+# their r3 is a skeleton, the accessory's when AccessorySkeleton::Swing
+# calls them (the base's fields at the same offsets).
+[AccessorySkeleton]
+measures = ["AccessorySkeleton", "sub_8259A2B0.r3", "sub_8259A400.r3", "sub_8259B660.r3", "sub_8259BB98.r3"]
+size = 448
+origin = "embedded"
+vtable = 0x82006700
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AccessorySkeletonVtable", note = "0x82006700" },
+  { name = "node_file", offset = 80, type = "ptr", to = "AccessoryNodeFile", note = "the node file (SkeletonBase's view of it starts here)" },
+  { name = "nodes", offset = 84, type = "ptr", to = "AccessoryNodeRecord", note = "the node records, 160 bytes each" },
+  { name = "rows_0", offset = 88, type = "ptr", to = "AccessoryNodeRow", note = "three arrays of 16-byte rows, one a node, copied into the local entries' +0, +16, +32 by Reset" },
+  { name = "rows_1", offset = 92, type = "ptr", to = "AccessoryNodeRow" },
+  { name = "rows_2", offset = 96, type = "ptr", to = "AccessoryNodeRow" },
+  { name = "unknown_104", offset = 104, type = "u32", note = "read by sub_8259ACE0 and sub_8259AF20 (not read)" },
+  { name = "unknown_120", offset = 120, type = "ptr", to = "AccessorySkeletonTable", note = "read by sub_8259A400 (not read)" },
+  { name = "locals", offset = 136, type = "ptr", to = "AccessoryNodeLocal", note = "the nodes' 144-byte local entries" },
+  { name = "swing_locals", offset = 140, type = "ptr", to = "AccessoryNodeLocal", note = "+136 + 144 x the node file's +12 (the swinging nodes' entries)" },
+  { name = "swing_entries", offset = 144, type = "ptr", to = "AccessorySwingEntry", note = "a 64-byte entry for each of the node file's +8" },
+  { name = "node_matrices", offset = 148, type = "ptr", to = "AccessoryMatrix", note = "the nodes' 64-byte matrices" },
+  { name = "stepped", offset = 152, type = "u32", note = "0 until the first step (Reset clears it, Swing sets it)" },
+  { name = "vtable_2", offset = 176, type = "u32", note = "the second base's: 0x820066FC (the list node's 0x82010B5C while built or torn down)" },
+  { name = "file", offset = 180, type = "bytes", count = 36, note = "an AccessoryFile: the node file" },
+  { name = "file_state", offset = 192, type = "u32", note = "+180's state" },
+  { name = "file_data", offset = 196, type = "u32", note = "+180's data" },
+  { name = "job_vtable", offset = 216, type = "u32", note = "the job (40 bytes, as DebugText's in framework.md): 0x820066DC (0x82000EB8 after its destructor)" },
+  { name = "job_functor_vtable", offset = 220, type = "u32", note = "0x82000AB4 first, then 0x82002908" },
+  { name = "unknown_224", offset = 224, type = "u32", note = "the job's +8: 0" },
+  { name = "unknown_228", offset = 228, type = "u32", note = "the job's +12: 0" },
+  { name = "unknown_232", offset = 232, type = "u8", note = "the job's +16: 0" },
+  { name = "unknown_233", offset = 233, type = "u8", note = "the job's +17: 1" },
+  { name = "unknown_234", offset = 234, type = "u8", note = "the job's +18: 0" },
+  { name = "unknown_236", offset = 236, type = "u32", note = "the job's +20: Step stores a frame word it never sets" },
+  { name = "job_delegate_vtable", offset = 240, type = "u32", note = "0x8200833C (0x82000ABC, the functors' base, after)" },
+  { name = "job_target", offset = 244, type = "ptr", to = "AccessorySkeleton", note = "the skeleton, set by Step (0 when made)" },
+  { name = "job_method_pair", offset = 248, type = "u64", note = "the delegate's method, written as a doubleword" },
+  { name = "job_method", offset = 248, type = "u32", note = "AccessorySkeleton::Update sub_820F0628 once stepped (0 when made)" },
+  { name = "job_method_extra", offset = 252, type = "u32", note = "0" },
+  { name = "swing_node", offset = 256, type = "u32", note = "the node whose name holds the string at 0x82006710" },
+  { name = "set_up", offset = 260, type = "u32" },
+  { name = "swinging", offset = 264, type = "u32", note = "1 when made" },
+  { name = "angle", offset = 268, type = "f32", note = "probably" },
+  { name = "angle_speed", offset = 272, type = "f32", note = "probably" },
+  { name = "matrix", offset = 288, type = "bytes", count = 64, note = "this step's matrix" },
+  { name = "matrix_row0_w", offset = 300, type = "f32", note = "this step's matrix (+288, 64 bytes)" },
+  { name = "matrix_row1_w", offset = 316, type = "f32" },
+  { name = "matrix_row2_x", offset = 320, type = "f32" },
+  { name = "matrix_row2_z", offset = 328, type = "f32" },
+  { name = "matrix_row2_w", offset = 332, type = "f32" },
+  { name = "matrix_row3_x", offset = 336, type = "f32", note = "the translation" },
+  { name = "matrix_row3_y", offset = 340, type = "f32" },
+  { name = "matrix_row3_z", offset = 344, type = "f32" },
+  { name = "matrix_row3_w", offset = 348, type = "f32" },
+  { name = "last_matrix", offset = 352, type = "bytes", count = 64, note = "the last step's matrix" },
+  { name = "last_row0_w", offset = 364, type = "f32", note = "the last step's matrix (+352, 64 bytes)" },
+  { name = "last_row1_w", offset = 380, type = "f32" },
+  { name = "last_row2_w", offset = 396, type = "f32" },
+  { name = "last_row3_x", offset = 400, type = "f32", note = "the translation" },
+  { name = "last_row3_y", offset = 404, type = "f32" },
+  { name = "last_row3_z", offset = 408, type = "f32" },
+  { name = "last_row3_w", offset = 412, type = "f32" },
+  { name = "movement_xy", offset = 416, type = "u64", note = "the last step's movement (probably), copied as two doublewords" },
+  { name = "movement_x", offset = 416, type = "f32" },
+  { name = "movement_y", offset = 420, type = "f32" },
+  { name = "movement_zw", offset = 424, type = "u64" },
+  { name = "movement_z", offset = 424, type = "f32" },
+  { name = "movement_w", offset = 428, type = "f32", note = "1.0" },
+  { name = "swing_xy", offset = 432, type = "u64", note = "the swing vector (probably), copied as two doublewords" },
+  { name = "swing_x", offset = 432, type = "f32" },
+  { name = "swing_y", offset = 436, type = "f32" },
+  { name = "swing_zw", offset = 440, type = "u64" },
+  { name = "swing_z", offset = 440, type = "f32" },
+  { name = "swing_w", offset = 444, type = "f32", note = "1.0" },
+]
+
+# The skeletons' vtable as sub_8259BB98 (slot 1) reads it.
+[AccessorySkeletonVtable]
+measure = "sub_8259BB98.r3.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "slot_2", offset = 8, type = "fn", note = "0x82106540 in the skeletons' vtables" },
+  { name = "slot_3", offset = 12, type = "fn", note = "0x82106540 too" },
+]
+
+# The node file (the skeleton's +80; the data file's third part).
+[AccessoryNodeFile]
+measures = ["AccessorySkeleton.+80", "Accessory.+624", "sub_8259A2B0.r3.+80", "sub_8259A400.r3.+80", "sub_8259B660.r3.+80", "sub_8259BB98.r3.+80"]
+size = 16
+origin = "file"
+fields = [
+  { name = "node_count", offset = 4, type = "u32" },
+  { name = "swing_count", offset = 8, type = "u32", note = "the swinging nodes" },
+  { name = "swing_first", offset = 12, type = "u32", note = "the first swinging node's index" },
+]
+
+# A node record (160 bytes, the skeleton's +84).
+[AccessoryNodeRecord]
+measure = "AccessorySkeleton.+84"
+measures = ["strstr.ret"]
+size = 160
+origin = "file"
+fields = [
+  { name = "name", offset = 0, type = "bytes", count = 64, note = "a string (strstr'd for the swing node); its length probably" },
+  { name = "rest_xy", offset = 64, type = "u64", note = "16 bytes copied into the local entry's +48 when flags has 0x40" },
+  { name = "rest_zw", offset = 72, type = "u64" },
+  { name = "flags", offset = 132, type = "u32", note = "0x40 its +64 is the local position; 0x80 a swinging node turned by Update" },
+  { name = "length", offset = 140, type = "f32", note = "its length from its parent (SwingNode)" },
+]
+
+# A 16-byte row (the skeleton's +88, +92, +96 arrays, one a node).
+[AccessoryNodeRow]
+measure = "Accessory.+632"
+measures = ["AccessoryEntry::OnLoaded.r6@+48@+544.+88", "AccessoryEntry::OnLoaded.r6@+48@+544.+92", "AccessoryEntry::OnLoaded.r6@+48@+544.+96"]
+size = 16
+origin = "file"
+fields = [
+  { name = "xy", offset = 0, type = "u64" },
+  { name = "zw", offset = 8, type = "u64" },
+]
+
+# A node's local entry (144 bytes, the skeleton's +136 and +140): four rows.
+[AccessoryNodeLocal]
+measures = ["AccessorySkeleton.+136", "AccessorySkeleton.+140"]
+size = 144
+origin = "allocated"
+fields = [
+  { name = "row0_xy", offset = 0, type = "u64" },
+  { name = "row0_x", offset = 0, type = "f32" },
+  { name = "row0_y", offset = 4, type = "f32" },
+  { name = "row0_zw", offset = 8, type = "u64" },
+  { name = "row0_z", offset = 8, type = "f32" },
+  { name = "row1_xy", offset = 16, type = "u64" },
+  { name = "row1_x", offset = 16, type = "f32" },
+  { name = "row1_y", offset = 20, type = "f32", note = "a swinging node's angle (Update: a constant + atan2)" },
+  { name = "row1_zw", offset = 24, type = "u64" },
+  { name = "row1_z", offset = 24, type = "f32" },
+  { name = "row2_xy", offset = 32, type = "u64" },
+  { name = "row2_zw", offset = 40, type = "u64" },
+  { name = "row3_xy", offset = 48, type = "u64", note = "the position (the node record's +64 when its flags have 0x40)" },
+  { name = "row3_zw", offset = 56, type = "u64" },
+]
+
+# A swinging node's entry (64 bytes, the skeleton's +144).
+[AccessorySwingEntry]
+measures = ["AccessorySkeleton.+144", "sub_8259A2B0.r3.+144", "sub_8259A400.r3.+144", "sub_8259B660.r3.+144", "sub_8259BB98.r3.+144"]
+size = 64
+origin = "allocated"
+fields = [
+  { name = "row0_x", offset = 0, type = "f32" },
+  { name = "row0_y", offset = 4, type = "f32" },
+  { name = "row0_z", offset = 8, type = "f32" },
+  { name = "row0_w", offset = 12, type = "f32", note = "1.0 when made" },
+  { name = "row1_x", offset = 16, type = "f32" },
+  { name = "row1_y", offset = 20, type = "f32" },
+  { name = "row1_z", offset = 24, type = "f32" },
+  { name = "row1_w", offset = 28, type = "f32", note = "1.0 when made" },
+  { name = "row2_x", offset = 32, type = "f32" },
+  { name = "row2_y", offset = 36, type = "f32" },
+  { name = "row2_z", offset = 40, type = "f32" },
+  { name = "row2_w", offset = 44, type = "f32", note = "1.0 when made" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "1 when made" },
+]
+
+# A 64-byte matrix: the skeleton's node matrices (+148), the matrix
+# Accessory::SetAnchor takes and Matrix::FromScaleRotationTranslation's out
+# (the measure joins that one with the Accessory: a fault).
+[AccessoryMatrix]
+measures = ["AccessorySkeleton.+148", "sub_8259A2B0.r3.+148", "Accessory::SetAnchor.r4"]
+size = 64
+origin = "allocated"
+fields = [
+  { name = "row0_xy", offset = 0, type = "u64" },
+  { name = "row0_x", offset = 0, type = "f32", note = "the scale's x in FromScaleRotationTranslation" },
+  { name = "row1_y", offset = 20, type = "f32", note = "the scale's y" },
+  { name = "row2_z", offset = 40, type = "f32", note = "the scale's z" },
+  { name = "translation_xy", offset = 48, type = "u64" },
+  { name = "translation_x", offset = 48, type = "f32" },
+  { name = "translation_y", offset = 52, type = "f32" },
+  { name = "translation_zw", offset = 56, type = "u64" },
+  { name = "translation_z", offset = 56, type = "f32" },
+]
+
+# What sub_8259A400 (not read) reads at the skeleton's +120.
+[AccessorySkeletonTable]
+measure = "sub_8259A400.r3.+120"
+size = 32
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+]
+
+# A float4 handed by pointer: Accessories::SetScale's scale, sub_8259BB98's
+# and sub_8259B188's r4 (not read), copied as doublewords.
+[AccessoryFloat4]
+measures = ["Accessories::SetScale.r4", "sub_8259BB98.r4", "sub_8259B188.r4"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64" },
+  { name = "zw", offset = 8, type = "u64" },
+]
+
+# A float3 handed by pointer: AccessorySkeleton::SwingNode's swing vector,
+# sub_8259B188's r5 (not read), Matrix::FromScaleRotationTranslation's
+# angles, position and scale.
+[AccessoryFloat3]
+measure = "AccessorySkeleton::SwingNode.r5"
+measures = ["sub_8259B660.r3.+144@+16"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# AccessorySkeleton::Step's r4: a worker pool (0 from its only caller).
+[AccessoryWorkerPool]
+measure = "AccessorySkeleton::Step.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AccessoryWorkerPoolVtable" },
+]
+
+[AccessoryWorkerPoolVtable]
+measure = "AccessorySkeleton::Step.r4.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "submit", offset = 4, type = "fn", note = "slot 1: r4 = the job, r5 = 1" },
+]
+
+[globals]
+set = { address = 0x826C5510, type = "ptr", to = "Accessories", note = "made by Accessories::Create, freed by Accessories::Destroy" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+material_group_0 = { address = 0x820066D0, type = "u32", note = "the material groups Accessory::SetTexture walks: 0" }
+material_group_1 = { address = 0x820066D4, type = "u32", note = "1" }
+swing_node_name = { address = 0x82006710, type = "bytes", count = 4, note = "the string a swinging node's name holds (not read)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from Accessory.
+[AccessoryAt1008]
+measure = "Accessory@+1008"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt1024]
+measure = "Accessory@+1024"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt992]
+measure = "Accessory@+992"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544]
+measure = "Accessory::Step.r3@+544"
+size = 256
+origin = "embedded"
+fields = [
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u8" },
+  { name = "unknown_233", offset = 233, type = "u8" },
+  { name = "unknown_234", offset = 234, type = "u8" },
+  { name = "unknown_236", offset = 236, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_248", offset = 248, type = "u64" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_2]
+measure = "Accessory@+544"
+size = 432
+origin = "embedded"
+fields = [
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+]
+
+# Split from Accessory.
+[AccessoryAt48]
+measure = "AccessoryEntry::OnLoaded.r6@+48"
+size = 1052
+origin = "embedded"
+fields = [
+  { name = "unknown_476", offset = 476, type = "u32" },
+  { name = "unknown_480", offset = 480, type = "u32" },
+  { name = "unknown_516", offset = 516, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+  { name = "unknown_800", offset = 800, type = "u32" },
+  { name = "unknown_992", offset = 992, type = "u64" },
+  { name = "unknown_1000", offset = 1000, type = "u64" },
+  { name = "unknown_1048", offset = 1048, type = "u32" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_3]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544"
+size = 448
+origin = "embedded"
+fields = [
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+  { name = "unknown_88", offset = 88, type = "u32" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_136", offset = 136, type = "u32" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_192", offset = 192, type = "u32" },
+  { name = "unknown_196", offset = 196, type = "u32" },
+  { name = "unknown_256", offset = 256, type = "u32" },
+  { name = "unknown_260", offset = 260, type = "u32" },
+  { name = "unknown_268", offset = 268, type = "f32" },
+  { name = "unknown_272", offset = 272, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+  { name = "unknown_432", offset = 432, type = "f32" },
+  { name = "unknown_436", offset = 436, type = "f32" },
+  { name = "unknown_440", offset = 440, type = "f32" },
+  { name = "unknown_444", offset = 444, type = "f32" },
+]
+
+# Split from AccessoryNodeLocal.
+[AccessoryNodeLocalPart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+136"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+  { name = "unknown_16", offset = 16, type = "u64" },
+  { name = "unknown_24", offset = 24, type = "u64" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_48", offset = 48, type = "u64" },
+  { name = "unknown_56", offset = 56, type = "u64" },
+]
+
+# Split from AccessoryNodeFile.
+[AccessoryNodeFilePart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+80"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from AccessoryNodeRecord.
+[AccessoryNodeRecordPart]
+measure = "AccessoryEntry::OnLoaded.r6@+48@+544.+84"
+size = 136
+origin = "embedded"
+fields = [
+  { name = "unknown_64", offset = 64, type = "u64" },
+  { name = "unknown_72", offset = 72, type = "u64" },
+  { name = "unknown_132", offset = 132, type = "u32" },
+]
+
+# Split from Accessory.
+[AccessoryAt48_2]
+measure = "new<1104>@AccessoryEntry::New@+48"
+size = 1052
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_992", offset = 992, type = "f32" },
+  { name = "unknown_996", offset = 996, type = "f32" },
+  { name = "unknown_1000", offset = 1000, type = "f32" },
+  { name = "unknown_1004", offset = 1004, type = "f32" },
+  { name = "unknown_1008", offset = 1008, type = "f32" },
+  { name = "unknown_1012", offset = 1012, type = "f32" },
+  { name = "unknown_1016", offset = 1016, type = "f32" },
+  { name = "unknown_1020", offset = 1020, type = "f32" },
+  { name = "unknown_1024", offset = 1024, type = "f32" },
+  { name = "unknown_1028", offset = 1028, type = "f32" },
+  { name = "unknown_1032", offset = 1032, type = "f32" },
+  { name = "unknown_1036", offset = 1036, type = "f32" },
+  { name = "unknown_1040", offset = 1040, type = "u32" },
+  { name = "unknown_1044", offset = 1044, type = "u32" },
+  { name = "unknown_1048", offset = 1048, type = "u32" },
+]
+
+# Split from AccessorySkeleton.
+[AccessorySkeletonAt544_4]
+measure = "new<1104>@AccessoryEntry::New@+48@+544"
+size = 448
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+  { name = "unknown_216", offset = 216, type = "u32" },
+  { name = "unknown_220", offset = 220, type = "u32" },
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u8" },
+  { name = "unknown_233", offset = 233, type = "u8" },
+  { name = "unknown_234", offset = 234, type = "u8" },
+  { name = "unknown_240", offset = 240, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_248", offset = 248, type = "u64" },
+  { name = "unknown_256", offset = 256, type = "u32" },
+  { name = "unknown_260", offset = 260, type = "u32" },
+  { name = "unknown_264", offset = 264, type = "u32" },
+  { name = "unknown_268", offset = 268, type = "f32" },
+  { name = "unknown_272", offset = 272, type = "f32" },
+  { name = "unknown_300", offset = 300, type = "f32" },
+  { name = "unknown_316", offset = 316, type = "f32" },
+  { name = "unknown_332", offset = 332, type = "f32" },
+  { name = "unknown_348", offset = 348, type = "f32" },
+  { name = "unknown_364", offset = 364, type = "f32" },
+  { name = "unknown_380", offset = 380, type = "f32" },
+  { name = "unknown_396", offset = 396, type = "f32" },
+  { name = "unknown_412", offset = 412, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_420", offset = 420, type = "f32" },
+  { name = "unknown_424", offset = 424, type = "f32" },
+  { name = "unknown_428", offset = 428, type = "f32" },
+  { name = "unknown_432", offset = 432, type = "f32" },
+  { name = "unknown_436", offset = 436, type = "f32" },
+  { name = "unknown_440", offset = 440, type = "f32" },
+  { name = "unknown_444", offset = 444, type = "f32" },
+]

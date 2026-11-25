@@ -7,10 +7,12 @@ Reports only; changes nothing.
 usage: check_function_statuses.py [repo root]   (default: this repo)
 
 For each table row, every sub_XXXXXXXX in its first column is checked:
-  error    Native or Merged, but an override (extern "C" REX_FUNC(sub_X),
+  error    Native, Merged or Host, but an override (extern "C" REX_FUNC(sub_X),
            or a macro defining one) exists:
            it should be Overridden or Wrapped
   error    Overridden or Wrapped, but no override exists
+  error    Lifted, but an override exists outside src/lifted/ (its own entry
+           for the SDK, while it has one, is in src/lifted/)
   error    no status, but an override exists
   check    Wrapped, but nothing calls __imp__sub_X
   check    Dropped, but src/ calls __imp__sub_X (a fallback flag
@@ -71,20 +73,44 @@ def overrides():
     calls to the originals are checks, not fallbacks, and don't count.
     """
     found = {}
-    macros = {}  # name -> whether its body defines an override
+    macros = {}  # name -> index of the parameter its override's address is
     imp_macros = {}  # name -> index of the parameter it builds __imp__sub_## from
     files = list(sources())
+    definitions = []  # (name, params, body)
     for path, text in files:
         for m in OVERRIDE.finditer(text):
             found[m.group(1)] = path
         for m in DEFINE.finditer(text):
             body = m.group(3)
-            if re.search(r"REX_FUNC\(\s*sub_\s*##", body):
-                macros[m.group(1)] = True
             params = [p.strip() for p in m.group(2).split(",")]
+            definitions.append((m.group(1), params, body))
+            made = (re.search(r"REX_FUNC\(\s*sub_\s*##\s*(\w+)", body) or
+                    re.search(r"RegisterEntry\(\s*0x\s*##\s*(\w+)", body))
+            if made and made.group(1) in params:
+                macros[m.group(1)] = params.index(made.group(1))
             built = re.search(r"__imp__sub_\s*##\s*(\w+)", body)
             if built and built.group(1) in params:
                 imp_macros[m.group(1)] = params.index(built.group(1))
+    # (A dispatch table entry, hooks/native_entry.h's RegisterEntry since the
+    # rewiring's stage 4, counts as the override it replaced.)
+    # A macro handing one of its parameters to an override-making macro as
+    # the address (ITC_ACCESSOR_WORD(address, ...) -> ITC_NATIVE_ENTRY(address,
+    # ...), hooks/native_entry.h, since the rewiring's stage 3) makes them too.
+    changed = True
+    while changed:
+        changed = False
+        for name, params, body in definitions:
+            if name in macros:
+                continue
+            for inner, index in list(macros.items()):
+                for use in re.finditer(r"\b" + inner + r"\(([^()]*)", body):
+                    args = [a.strip() for a in use.group(1).split(",")]
+                    if index < len(args) and args[index] in params:
+                        macros[name] = params.index(args[index])
+                        changed = True
+                        break
+                if name in macros:
+                    break
 
     def arguments(name, text):
         """Macro `name`'s uses in `text`, its arguments in group 1."""
@@ -101,9 +127,10 @@ def overrides():
                 if index < len(args) and re.fullmatch(r"(?:0x)?[0-9A-Fa-f]{8}", args[index]):
                     calls.add("sub_" + args[index][-8:].upper())
     for path, text in files:
-        for name in macros:
+        for name, index in macros.items():
             for m in arguments(name, text):
-                arg = m.group(1).split(",")[0].strip()
+                args = [a.strip() for a in m.group(1).split(",")]
+                arg = args[index] if index < len(args) else ""
                 if re.fullmatch(r"(?:0x)?[0-9A-Fa-f]{8}", arg):
                     found["sub_" + arg[-8:].upper()] = path
     return {sub: (path, sub in calls) for sub, path in found.items()}
@@ -142,7 +169,13 @@ def main():
                 continue
             override = found.get(sub)
             where = f"{place} {sub} ({status or 'no status'})"
-            if status in ("Native", "Merged") and override:
+            if status == "Lifted":
+                # Its entry for the SDK, while it has one, is in src/lifted/.
+                if override and "/lifted/" not in override[0].replace(os.sep, "/"):
+                    print(f"error  {where}: an override outside src/lifted/ exists in {override[0]}")
+                    errors += 1
+                continue
+            if status in ("Native", "Merged", "Host") and override:
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1
             elif status in ("Overridden", "Wrapped") and not override:

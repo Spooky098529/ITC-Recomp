@@ -1265,7 +1265,7 @@ void ReleaseCases(Context& h) {
         h, results, [&](Nodes&, std::vector<Seed>&) { StandIns(h, object, counts); },
         [&](int v, PPCContext& t, Nodes&) {
           t.r3.u64 = object;
-          Run(v, __imp__sub_8212F0B8, NativeRelease, t, h.base);
+          Run(v, __imp__sub_8212F0B8, ITC_CONTEXT_FN(NativeRelease), t, h.base);
         },
         [&](Outputs& out, const PPCContext& t, Nodes&) {
           StandInsOut(h, object, out);
@@ -1291,7 +1291,7 @@ void DestroyCases(Context& h, uint32_t object) {
         },
         [&](int v, PPCContext& t, Nodes&) {
           t.r3.u64 = object;
-          Run(v, __imp__sub_82132FC8, NativeDestroy, t, h.base);
+          Run(v, __imp__sub_82132FC8, ITC_CONTEXT_FN(NativeDestroy), t, h.base);
         },
         [&](Outputs& out, const PPCContext& t, Nodes& ids) {
           StandInsOut(h, object, out);

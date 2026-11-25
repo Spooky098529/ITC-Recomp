@@ -1,0 +1,461 @@
+# The schema of docs/functions/collision-world.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The track's collision mesh (0x826C5B1C) and its file, sections, slices,
+# triangles and walls; the track positions; the ground result; the wall
+# query on TrackCollision::WallHits' frame; the points the queries read
+# (src/track_collision/, docs/known-data.md "0x826C5B1C", "track
+# position", "ground result", "wall query"). The course's route
+# (0x826C5B10) is track-route.toml's; the collision world, its hit records
+# and the box shapes are car-physics' and collision's.
+#
+# Measure faults (tools/type_map.py), each kept as a field with a name of its
+# own (`fault_...`) and a note: the measure files a function's r3 under the
+# class its name starts with, so TrackMesh:: functions taking a section, a
+# slice or an out vector (FindSlice, SliceContains, TriangleInSlice,
+# ColorAt, QuadHeight, TriangleNormal) join those with the mesh;
+# TrackCollision:: functions taking hit records or the wall query
+# (GroundHits, WallHits, QueryWalls) join them with the ground result;
+# TrackPosition's measure also holds the points and the mesh some track
+# position functions and TrackRoute:: functions take as r3 or r4;
+# WallQuery's holds IgnoresWall's and ModeSkips' r3 (a halfword's and a
+# word's address). Where a fault's access has the width of a real field at
+# the same offset, it fits that field and has no field of its own.
+#
+# The section, slice, triangle and wall types the hand ports read through
+# (TrackMeshLink, TrackOutlinePoint, TrackMeshSlice, TrackMeshWall, TrackMeshScratch,
+# TrackTestedWall) the measure never sees
+# as their own: it files their accesses under the faults above.
+
+# The track's collision mesh (12 bytes, the image's 0x826C5B1C).
+[TrackMesh]
+measures = ["TrackMesh", "WallQuery::GatherCells.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "scratch", offset = 0, type = "ptr", to = "TrackMeshScratch", note = "an 8-byte block (TrackMesh::Prepare); also the out vectors' x (ColorAt, QuadHeight, TriangleNormal: a measure fault)" },
+  { name = "fault_section_slice_count", offset = 0, type = "u16", note = "measure fault: TrackMesh::FindSlice's r3 is a section (its slice count)" },
+  { name = "fault_section_outline", offset = 2, type = "u16", note = "measure fault: TrackMesh::FindSlice's r3 is a section (its outline's offset)" },
+  { name = "file", offset = 4, type = "ptr", to = "TrackMeshFile", note = "the course's mesh file (VirtualAlloc'd, Archive::Load); also the out vectors' y (a measure fault)" },
+  { name = "state", offset = 8, type = "u32", note = "1 loading, 2 loaded, 0 freed (TrackRoute's the same); also the out vectors' z (a measure fault)" },
+  { name = "fault_out_w", offset = 12, type = "f32", note = "measure fault: TrackMesh::TriangleNormal's r3 is the out vector (its w)" },
+  { name = "fault_slice_corner_0", offset = 12, type = "u16", note = "measure fault: TrackMesh::SliceContains' r3 is a slice (TrackMeshSlice.corner_0)" },
+  { name = "fault_slice_corner_3", offset = 18, type = "u16", note = "measure fault: a slice's TrackMeshSlice.corner_3" },
+  { name = "fault_slice_height", offset = 20, type = "f32", note = "measure fault: a slice's TrackMeshSlice.height" },
+  { name = "fault_section_vertices", offset = 64, type = "u32", note = "measure fault: TrackMesh::TriangleInSlice's r3 is a section (TrackMeshSection.vertices)" },
+  { name = "fault_section_slices", offset = 72, type = "u32", note = "measure fault: a section's TrackMeshSection.slices" },
+  { name = "fault_section_triangles", offset = 76, type = "u32", note = "measure fault: a section's TrackMeshSection.triangles" },
+]
+
+# The mesh's +0 block (TrackMesh::InitScratch); what it's for isn't known.
+[TrackMeshScratch]
+size = 8
+origin = "allocated"
+fields = [
+  { name = "zero", offset = 0, type = "u32", note = "0" },
+  { name = "block", offset = 4, type = "u32", note = "an 8 KB block (VirtualAlloc); nothing read here uses it" },
+]
+
+# The mesh file (loaded per course; offsets made pointers by
+# TrackMesh::OnLoaded).
+[TrackMeshFile]
+measures = ["TrackMesh.+4", "WallQuery::GatherCells.r4.+4", "TrackPosition.+4"]
+size = 8
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# its loader's VirtualAlloc (lifted; returning at 0x820F77DC), in PC memory
+# with the file's bytes; freed by the game's VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x820F77DC, reg = "r4" }]
+fields = [
+  { name = "section_count", offset = 0, type = "u32" },
+  { name = "sections", offset = 4, type = "u32", note = "the section table: a pointer to a section a word" },
+]
+
+# A section of the mesh file: the road split along its length.
+[TrackMeshSection]
+measures = ["TrackMesh::FindTriangle.r4.+0", "sub_820F6C88.r3", "TrackMesh::QuadHeight.r4", "TrackMesh::TriangleNormal.r4"]
+size = 84
+origin = "embedded"
+fields = [
+  { name = "slice_count", offset = 0, type = "u16" },
+  { name = "outline", offset = 2, type = "u16", note = "the offset of its outline (8-byte x, z points)" },
+  { name = "links", offset = 4, type = "bytes", count = 36, note = "six 6-byte links: +0 the slice they leave from (0xFFFF none), +2 the section and +4 the slice they lead to" },
+  { name = "link_0_from_slice", offset = 4, type = "u16", note = "the first link's slice it leaves from" },
+  { name = "link_0_section", offset = 6, type = "u16", note = "the first link's section" },
+  { name = "link_0_slice", offset = 8, type = "u16", note = "the first link's slice there" },
+  { name = "half_height", offset = 40, type = "f32", note = "the bounds' half height (y from center_y - this to center_y + this)" },
+  { name = "center_y", offset = 44, type = "f32", note = "the bounds' center height" },
+  { name = "min_x", offset = 48, type = "f32" },
+  { name = "min_z", offset = 52, type = "f32" },
+  { name = "max_x", offset = 56, type = "f32" },
+  { name = "max_z", offset = 60, type = "f32" },
+  { name = "vertices", offset = 64, type = "u32", note = "the offset of its vertices (12 bytes: x, y, z)" },
+  { name = "colors", offset = 68, type = "u32", note = "the offset of a halfword per vertex (probably RGB555 colors)" },
+  { name = "slices", offset = 72, type = "u32", note = "the offset of its 28-byte slices (TrackMeshSlice)" },
+  { name = "triangles", offset = 76, type = "u32", note = "the offset of its 12-byte triangles (TrackMeshTriangle)" },
+  { name = "walls", offset = 80, type = "u32", note = "the offset of its 8-byte walls (TrackMeshWall)" },
+]
+
+# A link of a section (6 bytes, six at the section's +4).
+[TrackMeshLink]
+size = 6
+origin = "embedded"
+fields = [
+  { name = "from_slice", offset = 0, type = "u16", note = "the slice of this section it leaves from (0xFFFF unused)" },
+  { name = "section", offset = 2, type = "u16", note = "the section it leads to" },
+  { name = "slice", offset = 4, type = "u16", note = "the slice there" },
+]
+
+# A point of a section's outline (8 bytes: x, z).
+[TrackOutlinePoint]
+measure = "TrackMesh::SliceContains.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "z", offset = 4, type = "f32" },
+]
+
+# A slice of a section (a cell along the road).
+[TrackMeshSlice]
+size = 28
+origin = "embedded"
+fields = [
+  { name = "triangle_count", offset = 0, type = "u16" },
+  { name = "first_triangle", offset = 2, type = "u16" },
+  { name = "wall_count", offset = 4, type = "u16" },
+  { name = "first_wall", offset = 6, type = "u16" },
+  { name = "corners", offset = 12, type = "bytes", count = 8, note = "the outline's 3 or 4 corners (halfwords, points of the section's outline)" },
+  { name = "corner_0", offset = 12, type = "u16" },
+  { name = "corner_3", offset = 18, type = "u16", note = "0xFFFF for three corners" },
+  { name = "height", offset = 20, type = "f32" },
+  { name = "kind", offset = 24, type = "u16", note = "30, 31, 32 give a track position's flags 2, 4, 8" },
+]
+
+# A triangle (or quad) of a section (12 bytes).
+[TrackMeshTriangle]
+measures = ["TrackMesh::ColorAt.r5", "TrackMesh::QuadHeight.r5"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vertex_0", offset = 0, type = "u16" },
+  { name = "vertex_1", offset = 2, type = "u16" },
+  { name = "vertex_2", offset = 4, type = "u16" },
+  { name = "vertex_3", offset = 6, type = "u16", note = "a quad's fourth, or 0xFFFF for a triangle" },
+  { name = "surface_kind", offset = 9, type = "u8" },
+  { name = "flags", offset = 10, type = "u16", note = "bit 0: a quad with its own height (smooth)" },
+]
+
+# A wall of a section (8 bytes): a vertical segment between two vertices.
+[TrackMeshWall]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "vertex_0", offset = 0, type = "u16" },
+  { name = "vertex_1", offset = 2, type = "u16" },
+  { name = "kind", offset = 4, type = "u16", note = "for WallQuery::IgnoresWall (2 to 61)" },
+]
+
+# A track position (96 bytes): the vehicle's +5232 and its wheels' +5328 +
+# 96i; a section and slice kept from tick to tick with the last point,
+# normal and surface kind.
+[TrackPosition]
+measure = "TrackPosition"
+measures = ["TrackMesh::FindTriangle.r7", "TrackPosition::Copy.r3"]
+size = 96
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16", note = "the mesh section (-1 none)" },
+  { name = "cell", offset = 0, type = "u32", note = "the section and slice as one word (the wall query's cells); also a point's x: TrackMesh::ColorAt's, GroundHeight's, QuadHeight's and TrackRoute::Follow's, NoteShoulder's, Point's r3 or r4 here is a point (a measure fault)" },
+  { name = "slice", offset = 2, type = "u16", note = "the slice in it (kept by TrackPosition::FindCell)" },
+  { name = "route_section", offset = 4, type = "u16", note = "the route position: a section of the course's route (TrackRoute::Follow)" },
+  { name = "route_position", offset = 4, type = "u32", note = "the route position (section and slice) as one word; also the mesh's file (TrackPosition::CrossSection's, FindCell's and the searches' r3 or r4 is the mesh) and a point's y (GroundHeight, TrackRoute::): measure faults" },
+  { name = "route_slice", offset = 6, type = "u16", note = "the route position's slice" },
+  { name = "point_xy", offset = 16, type = "u64", note = "the point's x and y copied as one (TrackPosition::Copy)" },
+  { name = "point_x", offset = 16, type = "f32" },
+  { name = "point_y", offset = 20, type = "f32", note = "the last ground height under it" },
+  { name = "point_z", offset = 24, type = "f32" },
+  { name = "point_zw", offset = 24, type = "u64" },
+  { name = "color_xy", offset = 32, type = "u64", note = "the ground's color there (x, y, z, w)" },
+  { name = "color_x", offset = 32, type = "f32" },
+  { name = "color_zw", offset = 40, type = "u64" },
+  { name = "normal_xy", offset = 48, type = "u64", note = "the ground's normal there (x, y, z, w)" },
+  { name = "normal_x", offset = 48, type = "f32" },
+  { name = "normal_y", offset = 52, type = "f32" },
+  { name = "normal_z", offset = 56, type = "f32" },
+  { name = "normal_zw", offset = 56, type = "u64" },
+  { name = "unknown_64", offset = 64, type = "u64", note = "copied by TrackPosition::Copy" },
+  { name = "unknown_72", offset = 72, type = "u64", note = "copied by TrackPosition::Copy" },
+  { name = "surface_kind", offset = 80, type = "u16" },
+  { name = "flags", offset = 82, type = "u16", note = "1 surface kinds 4 and 20; 2, 4, 8 the slice's kind 30, 31, 32" },
+]
+
+# The ground result: TrackCollision::Ground's out (on Vehicle::ProbeGround's
+# and GroundHits' stacks).
+[TrackGroundResult]
+measure = "TrackCollision"
+size = 628
+origin = "embedded"
+fields = [
+  { name = "depth", offset = 0, type = "f32", note = "the height above the ground" },
+  { name = "fault_hits_8", offset = 8, type = "f32", note = "measure fault: TrackCollision::GroundHits' r3 is the hit records (the first record's point's z)" },
+  { name = "normal_x", offset = 16, type = "f32", note = "the ground's normal" },
+  { name = "normal_y", offset = 20, type = "f32" },
+  { name = "normal_z", offset = 24, type = "f32" },
+  { name = "normal_copy_x", offset = 32, type = "f32", note = "the normal again" },
+  { name = "surface", offset = 48, type = "u32", note = "the surface kind's bits (0x04000000 for none; the ground callback clears 0x7F000000); GroundHits' hit record's depth (a measure fault)" },
+  { name = "position", offset = 52, type = "ptr", to = "TrackPosition", note = "the track position used" },
+  { name = "fault_hit_surface", offset = 56, type = "u32", note = "measure fault: GroundHits' hit record's surface bits" },
+  { name = "fault_hit_key", offset = 60, type = "u32", note = "measure fault: GroundHits' hit record's key" },
+  { name = "fault_hit_time", offset = 64, type = "f32", note = "measure fault: WallHits' first hit record's time (2.0)" },
+  { name = "fault_query_cell_count", offset = 108, type = "u32", note = "measure fault: TrackCollision::QueryWalls' r3 is the wall query (WallQuery.cell_count)" },
+  { name = "fault_query_cells", offset = 112, type = "u32", note = "measure fault: the wall query's cells" },
+  { name = "fault_query_walls_tested", offset = 624, type = "u32", note = "measure fault: the wall query's walls_tested" },
+]
+
+# The wall query: TrackCollision::WallHits' stack record (its 1,584-byte
+# frame, at +80).
+[WallQuery]
+measure = "WallQuery"
+size = 1468
+origin = "embedded"
+fields = [
+  { name = "hit_count", offset = 0, type = "u32" },
+  { name = "fault_wall_kind", offset = 0, type = "u16", note = "measure fault: WallQuery::IgnoresWall's r3 is the wall's kind's address; ModeSkips' r3 a word's (it fits hit_count)" },
+  { name = "time", offset = 4, type = "f32", note = "2.0" },
+  { name = "hits", offset = 8, type = "ptr", to = "CollisionHit", note = "the collision world's hit records (80 bytes each, car-physics.toml's CollisionHit; the measure's WallQuery.+8)" },
+  { name = "record", offset = 12, type = "ptr", to = "WallQueryShapeRecord", note = "the collision object's shape record" },
+  { name = "wall_a_x", offset = 16, type = "f32", note = "the wall's first end" },
+  { name = "wall_a_y", offset = 20, type = "f32" },
+  { name = "wall_a_z", offset = 24, type = "f32" },
+  { name = "wall_b_x", offset = 32, type = "f32", note = "the wall's second end" },
+  { name = "wall_b_y", offset = 36, type = "f32" },
+  { name = "wall_b_z", offset = 40, type = "f32" },
+  { name = "hit_point_xy", offset = 48, type = "u64", note = "the hit being made: its point" },
+  { name = "hit_point_x", offset = 48, type = "f32" },
+  { name = "hit_point_y", offset = 52, type = "f32" },
+  { name = "hit_point_z", offset = 56, type = "f32" },
+  { name = "hit_point_zw", offset = 56, type = "u64" },
+  { name = "hit_normal_xy", offset = 64, type = "u64", note = "the hit's normal" },
+  { name = "hit_normal_x", offset = 64, type = "f32" },
+  { name = "hit_normal_y", offset = 68, type = "f32" },
+  { name = "hit_normal_z", offset = 72, type = "f32" },
+  { name = "hit_normal_zw", offset = 72, type = "u64" },
+  { name = "hit_push_xy", offset = 80, type = "u64", note = "the hit's push direction" },
+  { name = "hit_push_x", offset = 80, type = "f32" },
+  { name = "hit_push_y", offset = 84, type = "f32" },
+  { name = "hit_push_z", offset = 88, type = "f32" },
+  { name = "hit_push_zw", offset = 88, type = "u64" },
+  { name = "hit_depth", offset = 96, type = "f32" },
+  { name = "hit_depth_again", offset = 100, type = "f32" },
+  { name = "hit_wall", offset = 104, type = "u32", note = "the wall's number in the query (the hit record's key)" },
+  { name = "cell_count", offset = 108, type = "u32" },
+  { name = "cells", offset = 112, type = "bytes", count = 512, note = "the cells near the box: two halfwords each (section, slice); room for 128" },
+  { name = "walls_tested", offset = 624, type = "u32" },
+  { name = "walls", offset = 628, type = "bytes", count = 768, note = "the walls tested: 6 bytes each (section, two vertices), at most 128" },
+  { name = "direction_x", offset = 1408, type = "f32", note = "the wall's direction" },
+  { name = "direction_y", offset = 1412, type = "f32" },
+  { name = "direction_z", offset = 1416, type = "f32" },
+  { name = "direction_w", offset = 1420, type = "f32" },
+  { name = "negated_x", offset = 1424, type = "f32", note = "the direction negated" },
+  { name = "negated_y", offset = 1428, type = "f32" },
+  { name = "negated_z", offset = 1432, type = "f32" },
+  { name = "normal_xy", offset = 1440, type = "u64", note = "the wall's horizontal normal" },
+  { name = "normal_x", offset = 1440, type = "f32" },
+  { name = "normal_y", offset = 1444, type = "f32" },
+  { name = "normal_z", offset = 1448, type = "f32" },
+  { name = "normal_zw", offset = 1448, type = "u64" },
+  { name = "normal_w", offset = 1452, type = "f32" },
+  { name = "span_a", offset = 1456, type = "f32", note = "the wall's first end along its direction" },
+  { name = "span_b", offset = 1460, type = "f32", note = "its second end along the direction" },
+  { name = "normal_distance", offset = 1464, type = "f32", note = "the normal's distance" },
+]
+
+# A wall the query tested (6 bytes, up to 128 at the wall query's +628).
+[TrackTestedWall]
+size = 6
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16" },
+  { name = "vertex_0", offset = 2, type = "u16" },
+  { name = "vertex_1", offset = 4, type = "u16" },
+]
+
+# The collision object's shape record as the wall query reads it (its
+# template, previous and current copies are collision.md's).
+[WallQueryShapeRecord]
+measure = "WallQuery.+12"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "template_shape", offset = 0, type = "u32", note = "the template shape (a box)" },
+]
+
+# A point (x, y, z, w) the queries read; also the out vectors and the
+# mesh's vertices (12 bytes, x, y, z), which the measure files elsewhere.
+[TrackQueryPoint]
+measures = ["TrackMesh::ColorAt.r6", "Segments.+0", "Segments.+4", "Segments.+8", "Segments.+12", "Segments::Intersect2D.r4", "TrackMesh::SliceContains.r5", "TrackMesh::TriangleInSlice.r5", "sub_820F6C88.r4", "sub_820F7D70.r4", "TrackCollision::Ground.r4", "BoxShape::LowerCorner.ret", "sub_820B97C0.ret"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "zw", offset = 8, type = "u64" },
+  { name = "w", offset = 12, type = "f32" },
+]
+
+# Segments::Intersect2D's four point pointers (a, b, c, d).
+[TrackSegments]
+measure = "Segments"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "a", offset = 0, type = "ptr", to = "TrackQueryPoint" },
+  { name = "b", offset = 4, type = "ptr", to = "TrackQueryPoint" },
+  { name = "c", offset = 8, type = "ptr", to = "TrackQueryPoint" },
+  { name = "d", offset = 12, type = "ptr", to = "TrackQueryPoint" },
+]
+
+# TrackCollision::GroundHits' r4: the shape record's current copy (a box,
+# collision.md's BoxShape), read only through its vtable.
+[TrackGroundHitsShape]
+measure = "TrackCollision::GroundHits.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "TrackGroundHitsShapeVtable" },
+]
+
+[TrackGroundHitsShapeVtable]
+measure = "TrackCollision::GroundHits.r4.+0"
+size = 88
+origin = "embedded"
+fields = [
+  { name = "type", offset = 16, type = "fn", note = "slot 4: the shape's type (2 a box)" },
+  { name = "corner_count", offset = 44, type = "fn", note = "slot 11" },
+  { name = "corner", offset = 48, type = "fn", note = "slot 12" },
+  { name = "slot_20", offset = 80, type = "fn", note = "slot 20 (BoxShape::LowerCorner, probably)" },
+  { name = "cache_word", offset = 84, type = "fn", note = "slot 21: BoxShape::CacheWord" },
+]
+
+# TrackMesh::FindTriangle's outs: the section and the triangle.
+[TrackFoundSection]
+measure = "TrackMesh::FindTriangle.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "ptr", to = "TrackMeshSection" },
+]
+
+[TrackFoundTriangle]
+measure = "TrackMesh::FindTriangle.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "triangle", offset = 0, type = "u32", note = "the triangle's index in the section" },
+]
+
+# TrackMesh::NearestSlice's best squared distance (in and out).
+[TrackNearestDistance]
+measure = "sub_820F6C88.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "distance", offset = 0, type = "f32" },
+]
+
+# The 4-byte object TrackCollision::Load makes at 0x826C5B28. In host memory
+# (E5 step 4): host_alloc for Load's operator new (lifted); freed by
+# TrackCollision::Unload's operator delete over the handle.
+[TrackCollisionObject]
+measure = "new<4>@TrackCollision::Load"
+size = 4
+origin = "allocated"
+storage = "host"
+host_alloc = [0x820FF37C]
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "0, then 4; what it is isn't known" },
+]
+
+[globals]
+mesh = { address = 0x826C5B1C, type = "bytes", count = 12, note = "the track's collision mesh (TrackMesh)" }
+collision_object = { address = 0x826C5B28, type = "ptr", to = "TrackCollisionObject", note = "made by TrackCollision::Load, deleted by Unload (the pointer kept)" }
+linked_tried = { address = 0x826C5B04, type = "bytes", count = 14, note = "TrackPosition::SearchLinked's linked sections tried (halfwords, -1 after the last)" }
+tick_step = { address = 0x8260327C, type = "f32", note = "the collision world's step (probably 1/30)" }
+up = { address = 0x82638280, type = "bytes", count = 16, note = "a vector, probably the up axis (TrackCollision::Ground without a track position)" }
+up_too = { address = 0x826382B0, type = "bytes", count = 16, note = "a vector, probably the up axis (the wall query)" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5 (the ground's raise)" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "probably -1.0" }
+height_tolerance = { address = 0x82001BDC, type = "f32", note = "a point's y within this of a slice's height" }
+bounds_margin = { address = 0x82001FD8, type = "f32", note = "the margin around a section's bounds" }
+center_reach = { address = 0x82002A28, type = "f32", note = "each axis from a slice outline's center" }
+center_reach_squared = { address = 0x8200681C, type = "f32" }
+farthest = { address = 0x82006824, type = "f32", note = "TrackPosition::SearchAll's first best distance" }
+inside_epsilon = { address = 0x820029D8, type = "f32", note = "an edge's cross product at most this is inside" }
+height_offset = { address = 0x82002A08, type = "f32", note = "0.005, added to every ground height and again for kinds 4 and 20" }
+catch_distance = { address = 0x82002A0C, type = "f32", note = "100.0, the ground's catch distance" }
+slice_offsets = { address = 0x8200680C, type = "bytes", count = 16, note = "four words: the slice offsets 1, -1, 2, -2" }
+quarter = { address = 0x82002968, type = "f32", note = "probably 0.25" }
+two = { address = 0x820021E8, type = "f32", note = "2.0" }
+small_epsilon = { address = 0x8200222C, type = "f32", note = "the small epsilon collision.md names" }
+hit_depth_scale = { address = 0x820029DC, type = "f32", note = "WallQuery::AddHit's depth factor" }
+color_scale = { address = 0x82006820, type = "f32", note = "TrackMesh::ColorAt's scale of the channels" }
+no_other_lowering = { address = 0x82002FB0, type = "f32", note = "taken off the height for kinds 4 and 20 with no other triangle" }
+slope_floor = { address = 0x82006908, type = "f32", note = "the wall query: the ends' moves toward the wall at least this" }
+outward = { address = 0x8200690C, type = "f32", note = "the wall query: the faces' normals scaled by this" }
+corner_reach = { address = 0x82002CB0, type = "f32", note = "the wall query's corner reach" }
+corner_margin = { address = 0x82001FBC, type = "f32", note = "the wall query's corner margin" }
+corner_order = { address = 0x82006900, type = "bytes", count = 8, note = "the order of a box's first 8 corners (bytes)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +4 the course route's index, +20 the branch flags, +24 the route bits, +48 the racer records, +0x59AE4 the stage flags, +0xA3AF4 the race mode" }
+race_progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): +6100 read by WallQuery::ModeSkips for mode 5" }
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (race-world.toml): +2308 the racers, +2364 their count" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from TrackPosition.
+[TrackPositionAt16]
+measure = "TrackPosition@+16"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+
+# Split from TrackPosition.
+[TrackPositionAt48]
+measure = "TrackPosition@+48"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from TrackMesh.
+[TrackMeshAt32]
+measure = "TrackPosition@+32"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "out_w", offset = 12, type = "f32", note = "the owner's fault_ field before the measure's fixes (2026-11-22): TrackMesh::TriangleNormal's r3 is the out vector (its w)" },
+]

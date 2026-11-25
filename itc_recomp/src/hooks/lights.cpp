@@ -11,9 +11,12 @@
 // 1/sqrt and one Newton step), so the same lights pass. The lights that do are
 // then merged and sorted one by one as the original does.
 
+#include "hooks/lights.h"
+
 #include "guest.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 
 #include <smmintrin.h>
 
@@ -22,7 +25,7 @@
 #include <utility>
 
 ITC_FLAG_BOOL(native_nearest_lights, true, "ITC",
-              "Find the lights nearest a point (sub_820F4128) natively, four lights "
+              "Find the lights nearest a point (sub_820F4128, no adapter: for its native caller) natively, four lights "
               "tested at once, instead of through the translated code (same results)");
 
 namespace {
@@ -71,23 +74,23 @@ struct Passed {
   bool overflowed = false;
 };
 
-uint32_t LoadLittleEndianU32(uint8_t* base, uint32_t address) {
-  return __builtin_bswap32(guest::LoadU32(base, address));
+uint32_t LoadLittleEndianU32(uint32_t address) {
+  return __builtin_bswap32(guest::LoadU32(address));
 }
 
-__m128 LoadSwapped(uint8_t* base, uint32_t address) {
+__m128 LoadSwapped(uint32_t address) {
   return _mm_castsi128_ps(
-      guest::SwapVector(_mm_loadu_si128(reinterpret_cast<const __m128i*>(REX_RAW_ADDR(address)))));
+      guest::SwapVector(_mm_loadu_si128(reinterpret_cast<const __m128i*>(guest::Pointer(address)))));
 }
 
 // One light that passed both tests, as the original's loop at 0x820F42A8
 // takes it: dropped or merged into a kept light within the merge distance
 // (the nearest such, searching from the last kept), otherwise sorted in by
 // distance; once full, the farthest drops off the end.
-void Keep(uint8_t* base, const Query& query, Search& search, uint32_t light, float x, float y,
+void Keep(const Query& query, Search& search, uint32_t light, float x, float y,
           float z, float distance) {
   Kept& added = search.kept[search.count];
-  std::memcpy(added.bytes, REX_RAW_ADDR(light), sizeof(added.bytes));
+  std::memcpy(added.bytes, guest::Pointer(light), sizeof(added.bytes));
   added.x = x;
   added.y = y;
   added.z = z;
@@ -115,7 +118,7 @@ void Keep(uint8_t* base, const Query& query, Search& search, uint32_t light, flo
 }
 
 // Tests count lights from lights, four at a time.
-void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t lights,
+void ScanGroup(const Query& query, Search& search, uint32_t lights,
                uint32_t count, Passed* passed_lights) {
   const __m128 px = _mm_set1_ps(query.px), py = _mm_set1_ps(query.py),
                pz = _mm_set1_ps(query.pz);
@@ -124,10 +127,10 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
   for (uint32_t first = 0; first < count; first += 4) {
     uint32_t in_group = count - first < 4 ? count - first : 4;
     // Lanes past the group's end repeat its last light, and are ignored.
-    __m128 l0 = LoadSwapped(base, lights + kLightStride * first);
-    __m128 l1 = LoadSwapped(base, lights + kLightStride * (first + (in_group > 1 ? 1 : 0)));
-    __m128 l2 = LoadSwapped(base, lights + kLightStride * (first + (in_group > 2 ? 2 : 0)));
-    __m128 l3 = LoadSwapped(base, lights + kLightStride * (first + (in_group > 3 ? 3 : 0)));
+    __m128 l0 = LoadSwapped(lights + kLightStride * first);
+    __m128 l1 = LoadSwapped(lights + kLightStride * (first + (in_group > 1 ? 1 : 0)));
+    __m128 l2 = LoadSwapped(lights + kLightStride * (first + (in_group > 2 ? 2 : 0)));
+    __m128 l3 = LoadSwapped(lights + kLightStride * (first + (in_group > 3 ? 3 : 0)));
     _MM_TRANSPOSE4_PS(l0, l1, l2, l3);  // now x, y, z, w of each light
     __m128 dx = _mm_sub_ps(l0, px), dy = _mm_sub_ps(l1, py), dz = _mm_sub_ps(l2, pz);
     __m128 distance =
@@ -161,7 +164,7 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
     for (; passed; passed &= passed - 1) {
       int lane = __builtin_ctz(passed);
       uint32_t light = lights + kLightStride * (first + lane);
-      Keep(base, query, search, light, xs[lane], ys[lane], zs[lane], distances[lane]);
+      Keep(query, search, light, xs[lane], ys[lane], zs[lane], distances[lane]);
       if (passed_lights) {
         if (passed_lights->count < std::size(passed_lights->lights)) {
           passed_lights->lights[passed_lights->count++] = {light, xs[lane], ys[lane], zs[lane],
@@ -179,35 +182,35 @@ void ScanGroup(uint8_t* base, const Query& query, Search& search, uint32_t light
 // table), and the entry's group of lights as many times as its count says
 // (the scans after the first take the lights the first passed, unless there
 // were too many to keep).
-void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& search) {
+void FindNearest(uint32_t owner, const Query& query, Search& search) {
   uint32_t list = owner + kSetListOffset;
-  for (uint32_t i = 0; i < guest::LoadU32(base, list); i++) {
-    uint32_t entry = guest::LoadU32(base, list + 8) + kSetEntryStride * i;
-    uint32_t set = guest::LoadU32(base, guest::LoadU32(base, entry + 12) + 80);
+  for (uint32_t i = 0; i < guest::LoadU32(list); i++) {
+    uint32_t entry = guest::LoadU32(list + 8) + kSetEntryStride * i;
+    uint32_t set = guest::LoadU32(guest::LoadU32(entry + 12) + 80);
     if (set == 0) {
       continue;
     }
-    for (uint32_t j = 0; j < LoadLittleEndianU32(base, set); j++) {
-      uint32_t block = set + LoadLittleEndianU32(base, set + 4 + 4 * j);
-      uint32_t scans = guest::LoadU32(base, block);
-      uint32_t lights = guest::LoadU32(base, block + kGroupCountOffset);
+    for (uint32_t j = 0; j < LoadLittleEndianU32(set); j++) {
+      uint32_t block = set + LoadLittleEndianU32(set + 4 + 4 * j);
+      uint32_t scans = guest::LoadU32(block);
+      uint32_t lights = guest::LoadU32(block + kGroupCountOffset);
       if (lights == 0) {
         continue;
       }
       if (scans == 1) {
-        ScanGroup(base, query, search, block + kGroupLightsOffset, lights, nullptr);
+        ScanGroup(query, search, block + kGroupLightsOffset, lights, nullptr);
         continue;
       }
       Passed passed;
       for (uint32_t scan = 0; scan < scans; scan++) {
         if (scan == 0 || passed.overflowed) {
-          ScanGroup(base, query, search, block + kGroupLightsOffset, lights,
+          ScanGroup(query, search, block + kGroupLightsOffset, lights,
                     scan == 0 ? &passed : nullptr);
           continue;
         }
         for (uint32_t k = 0; k < passed.count; k++) {
           const Passed::Light& light = passed.lights[k];
-          Keep(base, query, search, light.address, light.x, light.y, light.z, light.distance);
+          Keep(query, search, light.address, light.x, light.y, light.z, light.distance);
         }
       }
     }
@@ -216,11 +219,11 @@ void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& sear
 
 // Writes the kept lights as the original does: position, the w at
 // kOutputW, then the light's bytes 16-31.
-void Write(uint8_t* base, const Search& search, uint32_t output) {
+void Write(const Search& search, uint32_t output) {
   uint8_t w[4];
-  std::memcpy(w, REX_RAW_ADDR(kOutputW), 4);
+  std::memcpy(w, guest::Pointer(kOutputW), 4);
   for (int32_t i = 0; i < search.count; i++) {
-    uint8_t* out = REX_RAW_ADDR(output + kOutputStride * i);
+    uint8_t* out = guest::Pointer(output + kOutputStride * i);
     std::memcpy(out, search.kept[i].bytes, 12);
     std::memcpy(out + 12, w, 4);
     std::memcpy(out + 16, search.kept[i].bytes + 16, 16);
@@ -233,41 +236,41 @@ bool IsFloat(double value) {
 
 }  // namespace
 
-// Lights_FindNearest: r3 = the light sets' owner, r4 = output (32 bytes a
-// light), r5 = the point, r6 = most lights (at most 32), r9 = the direction,
-// f1 = merge distance, f2 = farthest squared distance, f3 = least dot product
-// with the direction; returns r3 = lights written. The caller reads only r3
-// after the call (checked at 0x820C92F8), so no other register is set.
-extern "C" REX_FUNC(sub_820F4128) {
-  REX_FUNC_PROLOGUE();
-  ctx.fpscr.disableFlushMode();
+namespace lights {
+
+std::optional<uint32_t> FindNearest(uint32_t owner, uint32_t output,
+                                    uint32_t point, int32_t most, uint32_t direction, double f1,
+                                    double f2, double f3) {
+  ITC_NATIVE_RUNNING("sub_820F4128 Lights::FindNearest");
   // Comparisons the original makes in double are made here in float: the
   // caller passes floats (lfs, frsp), but anything else goes to the original.
-  if (!ITC_FLAG(native_nearest_lights) || !IsFloat(ctx.f2.f64) || !IsFloat(ctx.f3.f64))
-      [[unlikely]] {
-    __imp__sub_820F4128(ctx, base);
-    return;
+  if (!ITC_FLAG(native_nearest_lights) || !IsFloat(f2) || !IsFloat(f3)) [[unlikely]] {
+    return std::nullopt;
   }
-  uint32_t owner = ctx.r3.u32;
-  int32_t most = ctx.r6.s32;
-  if (guest::LoadU32(base, owner + kSetListOffset) == 0 || most > kMostLights) {
-    ctx.r3.s64 = 0;
-    return;
+  if (guest::LoadU32(owner + kSetListOffset) == 0 || most > kMostLights) {
+    return 0;
   }
   Query query;
-  query.px = guest::LoadFloat(base, ctx.r5.u32);
-  query.py = guest::LoadFloat(base, ctx.r5.u32 + 4);
-  query.pz = guest::LoadFloat(base, ctx.r5.u32 + 8);
-  uint32_t direction = ctx.r9.u32 & ~0xFu;
-  query.dx = _mm_set1_ps(guest::LoadFloat(base, direction));
-  query.dy = _mm_set1_ps(guest::LoadFloat(base, direction + 4));
-  query.dz = _mm_set1_ps(guest::LoadFloat(base, direction + 8));
-  query.merge_squared = float(ctx.f1.f64 * ctx.f1.f64);
-  query.farthest = _mm_set1_ps(float(ctx.f2.f64));
-  query.least_dot = _mm_set1_ps(float(ctx.f3.f64));
+  query.px = guest::LoadFloat(point);
+  query.py = guest::LoadFloat(point + 4);
+  query.pz = guest::LoadFloat(point + 8);
+  direction &= ~0xFu;
+  query.dx = _mm_set1_ps(guest::LoadFloat(direction));
+  query.dy = _mm_set1_ps(guest::LoadFloat(direction + 4));
+  query.dz = _mm_set1_ps(guest::LoadFloat(direction + 8));
+  query.merge_squared = float(f1 * f1);
+  query.farthest = _mm_set1_ps(float(f2));
+  query.least_dot = _mm_set1_ps(float(f3));
   query.most = most;
   Search search;
-  FindNearest(base, owner, query, search);
-  Write(base, search, ctx.r4.u32);
-  ctx.r3.s64 = search.count;
+  FindNearest(owner, query, search);
+  Write(search, output);
+  return uint32_t(search.count);
 }
+
+}  // namespace lights
+
+// Lights::FindNearest (sub_820F4128) has no adapter (removed 2026-11-13, B7
+// loop): its only caller in play, the car draw's lighting (sub_820C9170,
+// src/car_draw/lighting.cpp), calls lights::FindNearest above (its original
+// where that declines).

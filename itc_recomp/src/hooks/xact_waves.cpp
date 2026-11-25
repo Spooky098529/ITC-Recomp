@@ -1,0 +1,385 @@
+// XACT's voice class and waves natively: adapters in front of
+// src/xact/waves.h (docs/functions/xact-waves.md), with the register steps
+// the harness shares (hooks/xact_waves.h).
+
+#include "lifted/originals.h"
+#include "hooks/xact_waves.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "hooks/heap.h"
+#include "hooks/xaudio.h"
+#include "xact/waves.h"
+
+ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
+              "Run XACT's voice class and waves (docs/functions/xact-waves.md: "
+              "XACTVoice::Create sub_825C9C40 with Init sub_825C9B60, GetState sub_825C9DB8, "
+              "SetVolume sub_825C9BE8, SetPitch sub_825C9BF0, SubmitPacket sub_825C9E08, Start "
+              "sub_825C9BF8, Stop sub_825C9C10, FlushPackets sub_825C9C28 and the deleting "
+              "destructor sub_825CA448, over XAudio's entry points' plain C++; XACTWave::XACTWave "
+              "sub_825D23F0 and XACTInMemoryWave::XACTInMemoryWave sub_825D37A8 (the wave bank's "
+              "AddListener's plain C++ while its slot holds it); XACTTrack::GetVolume sub_825D0268 "
+              "and GetPitch sub_825D02B0; XACTWave::GetStartPosition sub_825D2170; "
+              "XACTWave::RequestNext sub_825D1C30; XACTEngine::RequestCommit sub_825D1C78, the "
+              "engine's critical section entered as the original does; XACTWave::SetVoice "
+              "sub_825D1DF8, XACTInMemoryWave::Play sub_825D3938, XACTWave::Pause sub_825D1ED8 "
+              "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, XACTWave::Notify sub_825D2030 and SetState "
+              "sub_825D24D8, XACTWave::Release sub_825D28D0, ~XACTWave sub_825D29E8, "
+              "XACTInMemoryWave's deleting destructor sub_825D3820 (freeing under --native_heap) "
+              "and Stop sub_825D3A28, XACTInMemoryWave::Prepare sub_825D3B10 and "
+              "XACTWave::AudioUpdate sub_825D2560 with Finish sub_825D1FD8, the voice's methods "
+              "through their plain "
+              "C++ while its slots hold them, the owner's and renderer's slots through the "
+              "guest call) natively instead "
+              "of through the translated code (the same reads and writes; XAudio's locks stay "
+              "the game's, taken as the original does; checked by "
+              "--run_harnesses=xact_waves)");
+
+ITC_FLAG_DECLARE(bool, native_xact);
+
+namespace hooks {
+
+ITC_REGS_STEP(XactEngineSendNotification) {
+  const uint64_t engine = ctx.r3.u64;
+  const uint64_t words[4] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::EngineSendNotification(engine, words, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
+}
+
+ITC_REGS_STEP(XactWaveRelease) {
+  const uint32_t wave = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveRelease(wave, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactWaveDestruct) {
+  const uint32_t wave = ctx.r3.u32;
+  XAudioFramed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveDestruct(wave, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWaveDeletingDestruct) {
+  const uint32_t wave = ctx.r3.u32, flags = ctx.r4.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveDeletingDestruct(wave, flags, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWaveStop) {
+  const uint32_t wave = ctx.r3.u32, mode = ctx.r4.u32, exit_loop = ctx.r5.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveStop(wave, mode, exit_loop, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactWaveNotify) {
+  const uint32_t wave = ctx.r3.u32, type = ctx.r4.u32;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::WaveNotify(wave, type, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
+}
+
+ITC_REGS_STEP(XactWaveSetState) {
+  const uint64_t wave = ctx.r3.u64;
+  const uint32_t state = ctx.r4.u32;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::WaveSetState(wave, state, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
+}
+
+ITC_REGS_STEP(XactVoiceCreate) {
+  const uint32_t description = ctx.r3.u32, holder = ctx.r4.u32, level = ctx.r5.u32,
+                 reverb = ctx.r6.u32, out = ctx.r7.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 144, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::VoiceCreate(description, holder, level, reverb, out, thread, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceGetState) {
+  const uint32_t voice = ctx.r3.u32, out = ctx.r4.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::VoiceGetState(voice, out, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceSetVolume) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t voice = ctx.r3.u32;
+  const double f1 = ctx.f1.f64;
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::VoiceSetVolume(voice, f1, sp, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceSetPitch) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t voice = ctx.r3.u32;
+  const double f1 = ctx.f1.f64;
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::VoiceSetPitch(voice, f1, sp, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceSubmitPacket) {
+  const uint32_t voice = ctx.r3.u32, packet = ctx.r4.u32, flag = ctx.r5.u32;
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::VoiceSubmitPacket(voice, packet, flag, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceStart) {
+  const uint32_t voice = ctx.r3.u32, deferred = ctx.r4.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::VoiceStart(voice, deferred, thread, sp, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceStop) {
+  const uint32_t voice = ctx.r3.u32, now = ctx.r4.u32;
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::VoiceStop(voice, now, sp, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceFlushPackets) {
+  const uint32_t voice = ctx.r3.u32;
+  XAudioFramed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::VoiceFlushPackets(voice, sp, call);
+  });
+}
+
+ITC_REGS_STEP(XactVoiceDeletingDestruct) {
+  const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::VoiceDeletingDestruct(voice, flags, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactWaveConstruct) {
+  const uint32_t wave = ctx.r3.u32, engine = ctx.r4.u32, bank = ctx.r5.u32, index = ctx.r6.u32,
+                 owner = ctx.r7.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveConstruct(wave, engine, bank, index, owner, native_heap, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWaveConstruct) {
+  const uint32_t wave = ctx.r3.u32, engine = ctx.r4.u32, bank = ctx.r5.u32, index = ctx.r6.u32,
+                 owner = ctx.r7.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveConstruct(wave, engine, bank, index, owner, native_heap,
+                                       frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactTrackGetVolume) {
+  ctx.fpscr.disableFlushMode();
+  if (const auto done = xact::TrackGetVolume(ctx.r3.u32)) {
+    ctx.f1.f64 = done->f1;
+    ctx.r3.u64 = done->r3;
+    return;
+  }
+  lifted::original::c825D0268(ctx);
+}
+
+ITC_REGS_STEP(XactTrackGetPitch) {
+  ctx.fpscr.disableFlushMode();
+  const xact::CategoryVolume done = xact::TrackGetPitch(ctx.r3.u32);
+  ctx.f1.f64 = done.f1;
+  ctx.r3.u64 = done.r3;
+}
+
+ITC_REGS_STEP(XactWaveGetStartPosition) {
+  if (const auto done = xact::WaveGetStartPosition(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r7.u32)) {
+    ctx.r3.s64 = int32_t(*done);  // li or lis, as the original's
+    return;
+  }
+  lifted::original::c825D2170(ctx);
+}
+
+ITC_REGS_STEP(XactWaveRequestNext) {
+  xact::WaveRequestNext(ctx.r3.u32, ctx.r5.u32);
+}
+
+ITC_REGS_STEP(XactEngineRequestCommit) {
+  const uint32_t engine = ctx.r3.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t) {
+    return xact::EngineRequestCommit(engine, call);
+  });
+}
+
+ITC_REGS_STEP(XactWaveSetVoice) {
+  const uint32_t wave = ctx.r3.u32, voice = ctx.r4.u32;
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveSetVoice(wave, voice, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWavePlay) {
+  const uint32_t wave = ctx.r3.u32, deferred = ctx.r4.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWavePlay(wave, deferred, thread, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactWavePause) {
+  const uint32_t wave = ctx.r3.u32, pause = ctx.r4.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx);
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WavePause(wave, pause, thread, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactWavePrepareNext) {
+  const uint32_t wave = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WavePrepareNext(wave, native_heap, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWaveUpdate) {
+  const uint32_t wave = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveUpdate(wave, native_heap, frame, call);
+  });
+}
+
+ITC_REGS_STEP(XactInMemoryWavePrepare) {
+  const uint32_t wave = ctx.r3.u32, count = ctx.r4.u32, loops = ctx.r5.u32, ms = ctx.r6.u32;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 320, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::InMemoryWavePrepare(wave, count, loops, ms, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
+}
+
+ITC_REGS_STEP(XactWaveAudioUpdate) {
+  const uint32_t wave = ctx.r3.u32;
+  const uint64_t r3_in = ctx.r3.u64;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::WaveAudioUpdate(wave, r3_in, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+}
+
+namespace {
+
+thread_local std::optional<CreateVoiceStandIn> create_voice_stand_in;
+
+}  // namespace
+
+void SetCreateVoiceForHarness(std::optional<CreateVoiceStandIn> stand_in) {
+  create_voice_stand_in = stand_in;
+}
+
+}  // namespace hooks
+
+// XACTRenderer::CreateVoice (sub_825C31D8, xact.md's row): the original,
+// or, while the xact_waves harness asks on its thread, a stand-in that
+// records r3 to r10 and answers with the harness's voice and r3 (a voice
+// needs the live engine; the waves' Prepare only reads what it hands back).
+ITC_NATIVE_ENTRY_ALWAYS(825C31D8) {
+  
+  if (!hooks::create_voice_stand_in) {
+    lifted::original::c825C31D8(ctx);
+    return;
+  }
+  const hooks::CreateVoiceStandIn& s = *hooks::create_voice_stand_in;
+  const lifted::Temp* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                                   &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU32(s.record + 4 * i, r[i]->u32);
+  }
+  if (int32_t(s.r3) >= 0) {
+    guest::StoreU32(ctx.r10.u32, s.voice);
+  }
+  ctx.r3.s64 = int32_t(s.r3);
+}
+
+// The flag's fallback, then the register step.
+#define ITC_XACT_WAVES_ADAPTER(address, step) \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_xact_waves)) { \
+    hooks::step(ctx);                   \
+  }
+
+// The same for a function allocating or freeing through the native layer:
+// the original unless --native_heap routes the game's heap there.
+#define ITC_XACT_WAVES_HEAP_ADAPTER(address, step)                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
+    \
+    if (!ITC_FLAG(native_xact_waves) || !hooks::NativeHeapActive()) { \
+      lifted::original::c##address(ctx);                   \
+      return;                                                         \
+    }                                                                 \
+    hooks::step(ctx);                                           \
+  }
+
+ITC_XACT_WAVES_HEAP_ADAPTER(825C9C40, XactVoiceCreate)
+// No adapter (removed 2026-10-29: only XACTVoice::Create's plain C++ calls it in play) for
+// XACTVoice::Init sub_825C9B60.
+ITC_XACT_WAVES_ADAPTER(825C9DB8, XactVoiceGetState)
+ITC_XACT_WAVES_ADAPTER(825C9BE8, XactVoiceSetVolume)
+ITC_XACT_WAVES_ADAPTER(825C9BF0, XactVoiceSetPitch)
+ITC_XACT_WAVES_ADAPTER(825C9E08, XactVoiceSubmitPacket)
+ITC_XACT_WAVES_ADAPTER(825C9BF8, XactVoiceStart)
+ITC_XACT_WAVES_ADAPTER(825C9C10, XactVoiceStop)
+ITC_XACT_WAVES_ADAPTER(825C9C28, XactVoiceFlushPackets)
+ITC_XACT_WAVES_HEAP_ADAPTER(825CA448, XactVoiceDeletingDestruct)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::XACTInMemoryWave's plain C++ calls it
+// in play) for XACTWave::XACTWave sub_825D23F0.
+ITC_XACT_WAVES_ADAPTER(825D37A8, XactInMemoryWaveConstruct)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTTrack::GetVolume sub_825D0268.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTTrack::GetPitch sub_825D02B0.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWave::GetStartPosition sub_825D2170.
+ITC_XACT_WAVES_ADAPTER(825D1C30, XactWaveRequestNext)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Play's and XACTWave::Pause's plain C++
+// calls it in play) for XACTEngine::RequestCommit sub_825D1C78.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's and Update's plain C++ call it in
+// play) for XACTWave::SetVoice sub_825D1DF8.
+ITC_XACT_WAVES_ADAPTER(825D3938, XactInMemoryWavePlay)
+ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Update's plain C++ calls it in play) for
+// XACTWave::PrepareNext sub_825D2778.
+ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
+// No adapter (removed 2026-10-29: only XACTWave::SetState's, AudioUpdate's and Release's plain C++
+// call it in play) for XACTWave::Notify sub_825D2030.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's and Stop's plain C++ call it in
+// play) for XACTWave::SetState sub_825D24D8.
+// No adapter (removed 2026-10-29: only ~XACTWave's plain C++ calls it in play) for
+// XACTWave::Release sub_825D28D0.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave's deleting destructor's plain C++ calls
+// it in play) for XACTWave::~XACTWave sub_825D29E8.
+ITC_XACT_WAVES_HEAP_ADAPTER(825D3820, XactInMemoryWaveDeletingDestruct)
+ITC_XACT_WAVES_ADAPTER(825D3A28, XactInMemoryWaveStop)
+ITC_XACT_WAVES_ADAPTER(825D3B10, XactInMemoryWavePrepare)
+ITC_XACT_WAVES_ADAPTER(825D2560, XactWaveAudioUpdate)
+// XACTWave::Finish sub_825D1FD8 (never seen in play) has no adapter: its
+// only caller, AudioUpdate, is native.
+
+// XACTEngine::SendNotification is xact.md's: under --native_xact.
+ITC_NATIVE_ENTRY(825C1388, ITC_FLAG(native_xact)) {
+  hooks::XactEngineSendNotification(ctx);
+}

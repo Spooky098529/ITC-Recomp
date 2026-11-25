@@ -1,0 +1,111 @@
+# The schema of docs/functions/sprites.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The light glows' billboards (the light groups): the pass they're drawn
+# for, the material on LightGroups::Draw's frame, its lights in the level
+# data (src/sprites/billboards.cpp, billboard_record.cpp). The sprite lists,
+# single sprites and screen rectangles the race overlays record are
+# race-overlays.toml's (OverlaySprite), and the lists live on the overlays'
+# stacks. The measure's "Billboards.+0" is the camera pass (cameras.toml's
+# CameraPass), described there.
+
+# The pass the billboards are drawn for (Billboards::BuildVertices',
+# RecordState's and Record's `set`): a pass description the course scenery
+# fills (PassDescription::SetBillboardPass in scenery-lists.md).
+[BillboardPass]
+measure = "Billboards"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "camera_pass", offset = 0, type = "ptr", to = "CameraPass" },
+  { name = "layer", offset = 4, type = "u32", note = "the render queue layer Record hands the chunk to (SetBillboardPass' word28)" },
+]
+
+# The material (BillboardMaterial::Init and SetLights; on LightGroups::Draw's
+# frame at +80).
+[BillboardMaterial]
+measures = ["Billboards::RecordState.r5", "Billboards::Draw.r4"]
+size = 40
+origin = "stack"
+fields = [
+  { name = "alpha_mode", offset = 0, type = "u32", note = "1 at Init; LightGroups::Draw: 1024 (flag 0x200), else 64 (0x10) or 32; signed in the compares" },
+  { name = "blend_mode", offset = 4, type = "u32", note = "1 at Init; LightGroups::Draw: 2 (flag 0x40) or 4" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0 at Init" },
+  { name = "texture", offset = 12, type = "u32", note = "0 at Init; LightGroups::Draw: XPR::GetTexture's; none in stages 0 to 3 when 0" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "0 at Init" },
+  { name = "light_count", offset = 32, type = "u32", note = "0 at Init; SetLights" },
+  { name = "lights", offset = 36, type = "ptr", to = "BillboardLight", note = "0 at Init; SetLights; light_count of them, 48 bytes each" },
+]
+
+# A light (48 bytes, in a light group of the level data).
+[BillboardLight]
+measure = "Billboards::RecordState.r5.+36"
+size = 48
+origin = "file"
+fields = [
+  { name = "x", offset = 0, type = "f32", note = "the position" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "red", offset = 16, type = "f32", note = "0 to 255" },
+  { name = "green", offset = 20, type = "f32" },
+  { name = "blue", offset = 24, type = "f32" },
+  { name = "alpha", offset = 28, type = "f32" },
+  { name = "width", offset = 32, type = "f32", note = "drawn when it or the height is above 0.0" },
+  { name = "height", offset = 36, type = "f32" },
+]
+
+# A light group file's entry (LightGroups::Draw's r4: game_data::GetEntry of
+# the course set's or area's light file). The measure files it as
+# "CourseSet.+1060", which is the course set's texture animations
+# (course-scenery.toml): a measure fault, the r4 joined with the r6 beside it.
+[LightGroups]
+measure = "CourseSet.+1060"
+size = 76
+origin = "file"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "the groups" },
+  { name = "first_group", offset = 16, type = "bytes", count = 60, note = "the first LightGroup; each is followed by its lights (48 bytes each), then the next" },
+]
+
+# A light group (in LightGroups, from +16): 60 bytes, then its lights.
+[LightGroup]
+size = 60
+origin = "file"
+fields = [
+  { name = "flags", offset = 0, type = "u32", note = "0x200 alpha mode 1024, 0x10 64 (else 32); 0x40 blend mode 2 (else 4)" },
+  { name = "texture_id", offset = 4, type = "u32", note = "the XPR's texture id, or a texture animation's" },
+  { name = "light_count", offset = 44, type = "u32", note = "the BillboardLights from +60" },
+]
+
+# AnimationSet::CurrentFrame's answer (scenery-lists.md): the current frame's
+# 8-byte entry of a texture animation (course-scenery.toml's Animation).
+[AnimationFrameEntry]
+measure = "AnimationSet::CurrentFrame.ret"
+size = 8
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "handed to the texture provider's slot 5 with +4 (SceneryModel::RecordShape)" },
+  { name = "texture_id", offset = 4, type = "u32" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+one_word = { address = 0x82000A30, type = "u32", note = "1.0, copied as bits" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+farthest = { address = 0x82001BDC, type = "f32", note = "the billboards' draw distance's cap" }
+offset_w = { address = 0x82001BE0, type = "f32", note = "w of the billboard light's offset (read, not used)" }
+size_scale = { address = 0x82001BE4, type = "f32", note = "the billboard light's width and height scale; the sprite list's texture coordinate end" }
+forward_scale = { address = 0x82001BE8, type = "f32", note = "the billboard quad's forward axis' scale" }
+alpha_ref = { address = 0x8266D090, type = "f32", note = "the billboards' 1024 alpha mode's reference" }
+ring_vertices = { address = 0x8266D098, type = "bytes", count = 229376, note = "the billboards' vertex ring: two halves of 4,096 28-byte vertices" }
+ring_half = { address = 0x826A5098, type = "u32", note = "the ring's half written this pass, 0 or 1" }
+ring_count = { address = 0x826A509C, type = "u32", note = "the vertices written into the ring's half" }
+vertex_shader = { address = 0x826A50A0, type = "u32", note = "the billboards' (app-start-up.toml)" }
+pixel_shader = { address = 0x826A50A4, type = "u32" }
+ring_declaration = { address = 0x826A50A8, type = "u32", note = "the billboards' vertex declaration, recorded with command 10" }
+render_manager = { address = 0x826BABA0, type = "u32", note = "the render manager (its slot 8, the scene)" }
+render_queue = { address = 0x826C5D5C, type = "u32", note = "the sprite recorders' render queue (race-overlays.toml)" }
+command_list = { address = 0x826C5D60, type = "u32", note = "the sprite recorders' command list" }

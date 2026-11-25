@@ -2,7 +2,17 @@
 
 #pragma once
 
+#include <cstdint>
+#include <optional>
+
 namespace hooks {
+
+// VirtualFree (sub_82295330) as its adapter does it, for native callers:
+// its r3, or nullopt where the adapter runs the original (the native heap
+// off on this thread, an address the layer didn't give). `caller` is only
+// logged.
+std::optional<uint32_t> VirtualFree(uint32_t address, uint32_t size, uint32_t type,
+                                    uint32_t caller);
 
 // Whether the adapters on this thread route to the native allocation layer
 // (--native_heap, outside a RecompiledHeapScope): native code over the layer

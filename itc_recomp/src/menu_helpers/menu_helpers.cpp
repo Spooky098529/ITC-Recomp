@@ -1,0 +1,211 @@
+// The front end's menu helpers (docs/functions/menu-helpers.md): see
+// menu_helpers.h.
+
+#include "menu_helpers/menu_helpers.h"
+
+#include "action_mappers/action_mappers.h"
+#include "base/log.h"
+#include "debug/pause_menu_log.h"
+#include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/racer_controllers.h"
+
+namespace menu_helpers {
+
+namespace {
+
+int32_t S(uint32_t value) { return int32_t(value); }
+
+using Menu = schema::FrontEndMenu;
+using Entry = schema::PlayerMapperEntry;
+
+// The player's mapper entry: [kControllerEntries + 4 * player]'s index into
+// the 8-byte entries at kMapperEntries.
+uint32_t EntryOf(uint32_t player) {
+  const uint32_t index = guest::LoadU32(player * 4 + kControllerEntries);
+  return index * Entry::kSize + kMapperEntries;
+}
+
+// The original's frame below `sp` (`frame`), made only when a guest call
+// needs it as its r1 (E5 step 6): its back chain written then.
+struct GuestFrame {
+  uint32_t sp;
+  uint32_t frame;
+};
+
+// The mapper's read slot at `offset` in its vtable on `action`, as the
+// original's bctrl from `f.frame` returning to `lr`: ActionMapper::Pressed's
+// or Fired's plain C++ when the vtable holds it and `native_slots`, logged
+// for --log_pause_menu as its adapter does, else the slot through `calls`
+// (the frame's back chain written first).
+uint64_t ReadSlot(uint32_t mapper, uint32_t offset, uint64_t action,
+                  const GuestFrame& f, uint32_t lr, bool native_slots, const Calls& calls) {
+  const uint32_t function = guest::LoadU32(guest::LoadU32(mapper) + offset);
+  if (native_slots && (function == kPressedSlot || function == kFiredSlot)) {
+    const bool pressed = function == kPressedSlot;
+    const uint32_t id = uint32_t(action);
+    const uint32_t r3 = pressed ? action_mappers::Pressed(mapper, id)
+                                : action_mappers::Fired(mapper, id);
+    debug::PauseMenuLog_NoteSlotRead(pressed ? 10 : 12, mapper, id, lr, double(r3));
+    return r3;
+  }
+  guest::StoreU32(f.frame, f.sp);
+  return calls.Call(function, f.frame, lr, mapper, action);
+}
+
+// One try on the player's entry: false when its +4 is 1 (the mappers
+// blocked), else whether the slot's answer's low byte is nonzero. The entry's
+// +4 and +0 are read again on every try, as the original does.
+bool Try(uint32_t entry, uint32_t offset, uint64_t action,
+         const GuestFrame& frame, uint32_t lr, bool native_slots, const Calls& calls) {
+  const Entry e(entry);
+  if (S(e.unread()) == 1) {
+    return false;
+  }
+  const uint32_t mapper = e.mapper<schema::View>().address;
+  return (ReadSlot(mapper, offset, action, frame, lr, native_slots, calls) & 0xFF) != 0;
+}
+
+// The cursor moved by `delta` (read again, as the original's lwz, addi, stw).
+void MoveCursor(uint32_t menu, int32_t delta) {
+  const Menu m(menu);
+  m.set_cursor(m.cursor() + uint32_t(delta));
+}
+
+struct Read {
+  uint32_t offset;  // the slot
+  uint32_t action;
+  uint32_t lr;  // the original's return address
+};
+
+}  // namespace
+
+uint32_t Step(uint32_t menu, uint32_t sp, bool native_slots, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82186568 Menu::Step");
+  const Menu m(menu);
+  const GuestFrame frame{sp, sp - 128};
+  // The original's order: the player, the cursor and +24 loaded, the
+  // player's entry index, then +4 and +36 stored.
+  const uint32_t player = m.player();
+  const uint32_t cursor = m.cursor();
+  const uint32_t locked = m.up_down_locked();
+  const uint32_t entry = EntryOf(player);
+  m.set_previous(cursor);
+  m.set_side(0);
+
+  // (1) Up and down (and the side asked), the first fired wins.
+  if (locked == 0) {
+    struct Move {
+      Read read;
+      int kind;  // -1 / 1 the cursor, 2 the side -1, 3 the side 1
+    };
+    static constexpr Move kMoves[] = {
+        {{kFiredOffset, 153, 0x821865E4}, -1}, {{kFiredOffset, 167, 0x82186610}, -1},
+        {{kFiredOffset, 154, 0x8218663C}, 1},  {{kFiredOffset, 168, 0x82186668}, 1},
+        {{kFiredOffset, 155, 0x82186694}, 2},  {{kFiredOffset, 169, 0x821866C0}, 2},
+        {{kFiredOffset, 156, 0x821866EC}, 3},  {{kFiredOffset, 170, 0x82186718}, 3},
+    };
+    for (const Move& move : kMoves) {
+      if (Try(entry, move.read.offset, move.read.action, frame, move.read.lr, native_slots,
+              calls)) {
+        if (move.kind == 2) {
+          m.set_side(-1);
+        } else if (move.kind == 3) {
+          m.set_side(1);
+        } else {
+          MoveCursor(menu, move.kind);
+        }
+        break;
+      }
+    }
+  }
+
+  // (2) Left and right step the cursor; (3) the shoulder buttons, pressed
+  // or fired.
+  struct Steps {
+    uint32_t (Menu::*field)() const;  // the word that turns the steps on
+    Read reads[4];
+    int deltas[4];
+  };
+  static constexpr Steps kSteps[] = {
+      {&Menu::left_right_steps,
+       {{kFiredOffset, 155, 0x82186778},
+        {kFiredOffset, 169, 0x821867A4},
+        {kFiredOffset, 156, 0x821867D0},
+        {kFiredOffset, 170, 0x821867FC}},
+       {-1, -1, 1, 1}},
+      {&Menu::shoulders_step,
+       {{kPressedOffset, 161, 0x8218684C},
+        {kFiredOffset, 161, 0x82186878},
+        {kPressedOffset, 162, 0x821868A4},
+        {kFiredOffset, 162, 0x821868D0}},
+       {-1, -1, 1, 1}},
+  };
+  for (const Steps& steps : kSteps) {
+    if ((m.*steps.field)() == 0) {
+      continue;
+    }
+    for (int k = 0; k < 4; k++) {
+      const Read& read = steps.reads[k];
+      if (Try(entry, read.offset, read.action, frame, read.lr, native_slots, calls)) {
+        MoveCursor(menu, steps.deltas[k]);
+        break;
+      }
+    }
+  }
+
+  // Wrapped or clamped between the first and the last item.
+  if (m.wraps() != 0) {
+    const int32_t now = S(m.cursor());
+    const int32_t first = S(m.first_item());
+    uint32_t wrapped;
+    if (now < first) {
+      wrapped = 1;
+    } else {
+      wrapped = now > S(m.last_item()) ? 1 : 0;
+    }
+    m.set_wrapped(wrapped);
+    int32_t result = now;
+    if (now < first) {
+      result = S(m.last_item());
+    } else if (now > S(m.last_item())) {
+      result = first;
+    }
+    m.set_cursor(uint32_t(result));
+  } else {
+    const int32_t now = S(m.cursor());
+    const int32_t first = S(m.first_item());
+    m.set_wrapped(0);
+    int32_t result = now;
+    if (now < first) {
+      result = first;
+    } else {
+      const int32_t last = S(m.last_item());
+      if (now > last) {
+        result = last;
+      }
+    }
+    m.set_cursor(uint32_t(result));
+  }
+
+  // Which way it moved since the start.
+  const int32_t now = S(m.cursor());
+  const int32_t before = S(m.previous());
+  m.set_moved(now > before ? 1u : now < before ? uint32_t(-1) : 0u);
+  return m.moved();
+}
+
+uint32_t Pressed(uint32_t menu, uint64_t action, uint32_t sp, bool native_slots,
+                 const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821864C8 Menu::Pressed");
+  const Menu m(menu);
+  const GuestFrame frame{sp, sp - 96};
+  if (m.moved() != 0 || m.side() != 0) {
+    return 0;
+  }
+  const uint32_t player = m.player();
+  const uint32_t entry = EntryOf(player);
+  return Try(entry, kPressedOffset, action, frame, 0x82186540, native_slots, calls) ? 1 : 0;
+}
+
+}  // namespace menu_helpers

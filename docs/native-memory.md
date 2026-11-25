@@ -105,7 +105,14 @@ Read in `generated/` (2026-10-22).
 - Pages: `AllocPages(size)` and `FreePages(address)`. VirtualAlloc's
   memory is page-aligned and zeroed.
 - Physical memory: `AllocPhysical(size, low, high, alignment,
-  protection)` and `FreePhysical(address)`.
+  protection)` and `FreePhysical(address)`, and `PhysicalSize(address)`
+  (XPhysicalSize `sub_822965C0`, MmQueryAllocationSize's wrapper; the
+  user's call, 2026-11-06): the size `AllocPhysical` recorded for the
+  block, rounded up to its page size (one page for 0) as the SDK's import
+  answers it, one
+  answer for every caller (both, `Scenery::AllocPhysical` and
+  `FreePhysical`, are native and call it; no adapter); 0, logged once,
+  for a block the layer didn't give.
 
 How it's reached:
 

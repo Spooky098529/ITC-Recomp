@@ -9,6 +9,7 @@
 #include "harness.h"
 
 #include "hooks/heap.h"
+#include "memory/heap.h"
 
 #include <algorithm>
 #include <initializer_list>
@@ -86,19 +87,19 @@ void HeapCases(Context& h) {
   for (uint32_t size : {0u, 1u, 7u, 8u, 13u, 24u, 100u, 1000u, 4096u, 70000u}) {
     for (uint32_t flags : {0u, 8u}) {
       Case(results, fmt::format("size {} flags {:#x}", size, flags), [&](std::vector<uint8_t>& out) {
-        const uint32_t p = Call(h, sub_82299D60, {heap, flags, size});
+        const uint32_t p = Call(h, harness::Ours<0x82299D60>, {heap, flags, size});
         Append(out, p != 0);
         if (p == 0) {
           return;
         }
         Append(out, p % 16);
-        Append(out, Call(h, sub_82298FF8, {heap, 0, p}));
+        Append(out, Call(h, harness::Ours<0x82298FF8>, {heap, 0, p}));
         if (flags & 8) {
           Append(out, AllZero(h.base, p, size));
         }
         WritePattern(h.base, p, size);
         Append(out, HasPattern(h.base, p, size));
-        Append(out, Call(h, sub_8229A648, {heap, 0, p}) != 0);
+        Append(out, Call(h, harness::Ours<0x8229A648>, {heap, 0, p}) != 0);
       });
     }
   }
@@ -116,29 +117,29 @@ void ReallocCases(Context& h) {
     for (uint32_t flags : {0u, 8u}) {
       Case(results, fmt::format("{} to {} flags {:#x}", from, to, flags),
            [&](std::vector<uint8_t>& out) {
-             const uint32_t p = Call(h, sub_82299D60, {heap, 0, from});
+             const uint32_t p = Call(h, harness::Ours<0x82299D60>, {heap, 0, from});
              WritePattern(h.base, p, from);
              // Something after the block, so growing may have to move it.
-             const uint32_t after = Call(h, sub_82299D60, {heap, 0, 8});
-             const uint32_t q = Call(h, sub_8229A930, {heap, flags, p, to});
+             const uint32_t after = Call(h, harness::Ours<0x82299D60>, {heap, 0, 8});
+             const uint32_t q = Call(h, harness::Ours<0x8229A930>, {heap, flags, p, to});
              Append(out, q != 0);
              if (q != 0) {
-               const uint32_t size = Call(h, sub_82298FF8, {heap, 0, q});
+               const uint32_t size = Call(h, harness::Ours<0x82298FF8>, {heap, 0, q});
                Append(out, size);
                Append(out, q % 16);
                Append(out, HasPattern(h.base, q, std::min(from, size)));
                if ((flags & 8) && size > from) {
                  Append(out, AllZero(h.base, q + from, size - from));
                }
-               Append(out, Call(h, sub_8229A648, {heap, 0, q}) != 0);
+               Append(out, Call(h, harness::Ours<0x8229A648>, {heap, 0, q}) != 0);
              }
-             Append(out, Call(h, sub_8229A648, {heap, 0, after}) != 0);
+             Append(out, Call(h, harness::Ours<0x8229A648>, {heap, 0, after}) != 0);
            });
     }
   }
   // A null block.
   Case(results, "a null block", [&](std::vector<uint8_t>& out) {
-    Append(out, Call(h, sub_8229A930, {heap, 0, 0, 16}));
+    Append(out, Call(h, harness::Ours<0x8229A930>, {heap, 0, 0, 16}));
   });
   results.Report();
 }
@@ -148,7 +149,7 @@ void PageCases(Context& h) {
   for (uint32_t size : {1u, 4096u, 5000u, 70000u, 1u << 20}) {
     for (uint32_t type : {0x1000u, 0x801000u, 0x20801000u}) {
       Case(results, fmt::format("size {} type {:#x}", size, type), [&](std::vector<uint8_t>& out) {
-        const uint32_t p = Call(h, sub_82295398, {0, size, type, 4});
+        const uint32_t p = Call(h, harness::Ours<0x82295398>, {0, size, type, 4});
         Append(out, p != 0);
         if (p == 0) {
           return;
@@ -160,7 +161,7 @@ void PageCases(Context& h) {
         }
         WritePattern(h.base, p, size);
         Append(out, HasPattern(h.base, p, size));
-        Append(out, Call(h, sub_82295330, {p, 0, 0x8000}) != 0);
+        Append(out, Call(h, harness::Ours<0x82295330>, {p, 0, 0x8000}) != 0);
       });
     }
   }
@@ -178,8 +179,8 @@ void PhysicalCases(Context& h) {
                            ex ? "XPhysicalAllocEx" : "XPhysicalAlloc", size, alignment, protection),
                [&](std::vector<uint8_t>& out) {
                  const uint32_t p =
-                     ex ? Call(h, sub_82296550, {size, 0, 0x1FFFFFFF, alignment, protection})
-                        : Call(h, sub_822964C8, {size, 0xFFFFFFFF, alignment, protection});
+                     ex ? Call(h, harness::Ours<0x82296550>, {size, 0, 0x1FFFFFFF, alignment, protection})
+                        : Call(h, harness::Ours<0x822964C8>, {size, 0xFFFFFFFF, alignment, protection});
                  Append(out, p != 0);
                  if (p == 0) {
                    return;
@@ -189,9 +190,40 @@ void PhysicalCases(Context& h) {
                  Append(out, p % std::max(alignment, 4096u));
                  WritePattern(h.base, p, size);
                  Append(out, HasPattern(h.base, p, size));
-                 Call(h, sub_822965C8, {p});
+                 Call(h, harness::Ours<0x822965C8>, {p});
                });
         }
+      }
+    }
+  }
+  results.Report();
+}
+
+// XPhysicalSize (sub_822965C0): blocks from the layer (XPhysicalAlloc's
+// adapter), their size asked of the SDK's import through the original and of
+// the layer (memory::PhysicalSize).
+void PhysicalSizeCases(Context& h) {
+  Results results("heap: XPhysicalSize");
+  Random random(0x5851A3E7u);
+  std::vector<uint32_t> sizes = {0, 1, 4095, 4096, 4097, 0x10000, 0x10001, 100000, 248, 272 * 7,
+                                 0x1D8000};
+  for (int i = 0; i < 30; i++) {
+    sizes.push_back(1 + random.Below(i < 20 ? 0x40000 : 0x400000));
+  }
+  for (uint32_t size : sizes) {
+    for (uint32_t protection : {0x4u, 0x20000004u, 0x404u}) {
+      for (uint32_t alignment : {0u, 64u, 0x10000u}) {
+        const uint32_t p = Call(h, harness::Ours<0x822964C8>, {size, 0xFFFFFFFF, alignment, protection});
+        if (p == 0) {
+          continue;
+        }
+        Outputs out[2];
+        out[0].Word(Call(h, __imp__sub_822965C0, {p}));
+        out[1].Word(memory::PhysicalSize(p));
+        results.Check(out[0], out[1],
+                      fmt::format("XPhysicalSize size {} alignment {:#x} protection {:#x}", size,
+                                  alignment, protection));
+        Call(h, harness::Ours<0x822965C8>, {p});
       }
     }
   }
@@ -205,6 +237,7 @@ void Heap(Context& h) {
   ReallocCases(h);
   PageCases(h);
   PhysicalCases(h);
+  PhysicalSizeCases(h);
 }
 
 }  // namespace harness

@@ -37,101 +37,101 @@ constexpr uint32_t kRoute = 0x826C5B10;
 // TrackRoute::LanePoint (sub_820F8668): out (x, y, z, 1.0) = the slice's
 // center moved across the road by (lane - (n - 1) / 2) / n of its width (n
 // the slice's lanes; a lane at n or above taken as n - 1).
-void LanePoint(uint8_t* base, uint32_t route, uint32_t out, uint32_t position, int32_t lane);
+void LanePoint(uint32_t route, uint32_t out, uint32_t position, int32_t lane);
 // TrackRoute::LaneAt (sub_820F8920): the lane the point is in (0 to n - 1;
 // 0 for slices with one lane).
-uint32_t LaneAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t position);
+uint32_t LaneAt(uint32_t route, uint32_t point, uint32_t position);
 // TrackRoute::Link (sub_820F89F0): the link's section; when it's -1, link 0
 // (for links 0 to 2) or 3 (the others); when that's -1 too, the section.
 // Sign-extended from 16 bits (the original's r3).
-int32_t Link(uint8_t* base, uint32_t route, uint32_t section, uint32_t link);
+int32_t Link(uint32_t route, uint32_t section, uint32_t link);
 // TrackRoute::LinkLane (sub_820F8CE8): the signed byte at the position's
 // section's +76 + 8 x link + lane; -1 when the link is -1.
-int32_t LinkLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t link_address,
+int32_t LinkLane(uint32_t route, uint32_t position, uint32_t link_address,
                  uint32_t lane_address);
 // TrackRoute::SpecialSection (sub_820F8D38): 0 to 5 for the sections 293,
 // 230, 156, 20, 39 and 77 of kind 4 whose slice's byte +57 is 4; else -1.
-int32_t SpecialSection(uint8_t* base, uint32_t route, uint32_t position);
+int32_t SpecialSection(uint32_t route, uint32_t position);
 // TrackRoute::SliceTest (sub_820F8DE8): by the section's kind (its row).
-uint32_t SliceTest(uint8_t* base, uint32_t route, uint32_t position);
+uint32_t SliceTest(uint32_t route, uint32_t position);
 // TrackRoute::IsMainRoad (sub_820F8E98): 1 for a section not of kinds 1 to
 // 4 whose branch number isn't 7, 8 or 29.
-uint32_t IsMainRoad(uint8_t* base, uint32_t route, uint32_t position);
+uint32_t IsMainRoad(uint32_t route, uint32_t position);
 // TrackRoute::SectionOutcode (sub_820F8EF0): the point against the
 // section's bounds widened by [0x82002568]: bits 1, 2 x below or above, 4,
 // 8 y, 16, 32 z.
-uint32_t SectionOutcode(uint8_t* base, uint32_t route, uint32_t point, uint32_t section);
+uint32_t SectionOutcode(uint32_t route, uint32_t point, uint32_t section);
 
 // --- Steps between sections (src/track_route/track_route.cpp) ---
 
 // TrackRoute::StepForward (sub_820F8B48): the next section by the forward
 // links 2, 1, 0 (2 and 1 not to kinds 2 or 4), the slice less the word at
 // `count`. 1 when one was taken.
-uint32_t StepForward(uint8_t* base, uint32_t route, uint32_t position, uint32_t count);
+uint32_t StepForward(uint32_t route, uint32_t position, uint32_t count);
 // TrackRoute::BranchesMatching (sub_820F8BD0): the forward links of the
 // section (a pointer) not to kinds 2 or 4 whose branch number's bit is in
 // the word at `mask`, written to `out` (section, link index); their count.
-uint32_t BranchesMatching(uint8_t* base, uint32_t route, uint32_t out, uint32_t section,
+uint32_t BranchesMatching(uint32_t route, uint32_t out, uint32_t section,
                           uint32_t mask);
 // TrackRoute::StepAlongPath (sub_820F8C58): the first section of the path
 // (halfwords, ending with a negative one) a forward link leads to, the slice
 // less the word at `count`. 1 when found.
-uint32_t StepAlongPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
+uint32_t StepAlongPath(uint32_t route, uint32_t position, uint32_t count,
                        uint32_t path);
 // TrackRoute::StepForwardMasked (sub_820F93A0): the first mask (a list of
 // words ending with 0) with a matching branch (BranchesMatching) gives the
 // next section; none, StepForward. 1 when one was taken.
-uint32_t StepForwardMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t count,
+uint32_t StepForwardMasked(uint32_t route, uint32_t position, uint32_t count,
                            uint32_t masks);
 // TrackRoute::NormalizeForward (sub_820F9EA8): while the slice is past the
 // section's last, the next section (StepForwardMasked with masks, else
 // StepForward); when none, the last slice (or the position (0, 0) with a
 // section above 0x7FFF) and 0. 1 once it's in the section.
-uint32_t NormalizeForward(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks);
+uint32_t NormalizeForward(uint32_t route, uint32_t position, uint32_t masks);
 // TrackRoute::StepForwardLane (sub_820F9448): the forward link whose lanes
 // hold the halfword lane at `lane` (changed: the lane over the link), else
 // links 2, 1, 0 onto the last lane; the slice less the word at `count`. 1
 // when a section was taken.
-uint32_t StepForwardLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+uint32_t StepForwardLane(uint32_t route, uint32_t position, uint32_t lane,
                          uint32_t count);
 // TrackRoute::StepForwardLaneMasked (sub_820F9600): StepForwardLane by the
 // branch masks' first matches. 1 when a section was taken.
-uint32_t StepForwardLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+uint32_t StepForwardLaneMasked(uint32_t route, uint32_t position, uint32_t lane,
                                uint32_t count, uint32_t masks);
 // TrackRoute::StepBack (sub_820F8A58): the previous section by the back
 // links 5, 4, 3 (its row), the slice plus its slices' count. 1 when one was
 // taken.
-uint32_t StepBack(uint8_t* base, uint32_t route, uint32_t position);
+uint32_t StepBack(uint32_t route, uint32_t position);
 // TrackRoute::NormalizeBack (sub_820F9320): StepBack while the slice is
 // negative; when none, slice 0 (or the position (0, 0) with a negative
 // section) and 0. 1 once the slice isn't negative.
-uint32_t NormalizeBack(uint8_t* base, uint32_t route, uint32_t position);
+uint32_t NormalizeBack(uint32_t route, uint32_t position);
 
 // TrackRoute::Normalize (sub_820F9FE8): 1 when the position is on the
 // route (its section and slice within the counts); else, with a section on
 // the route, NormalizeBack then NormalizeForward (with the masks or 0), 1
 // when both did; else 0, the position set to (0, 0) unless it's on the
 // route then.
-uint32_t Normalize(uint8_t* base, uint32_t route, uint32_t position, uint32_t masks);
+uint32_t Normalize(uint32_t route, uint32_t position, uint32_t masks);
 // TrackRoute::NormalizeForwardPath (sub_820F9F58): with a path, while past
 // the section's end, StepAlongPath, else StepForward; when neither (or with
 // no path), NormalizeForward with the masks. 1 once in the section.
-uint32_t NormalizeForwardPath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+uint32_t NormalizeForwardPath(uint32_t route, uint32_t position, uint32_t path,
                               uint32_t masks);
 // TrackRoute::NormalizePath (sub_820FA0F8): Normalize, forward by
 // NormalizeForwardPath.
-uint32_t NormalizePath(uint8_t* base, uint32_t route, uint32_t position, uint32_t path,
+uint32_t NormalizePath(uint32_t route, uint32_t position, uint32_t path,
                        uint32_t masks);
 
 // TrackRoute::NormalizeLane (sub_820FA210): 1 when on the route; past the
 // end, StepForwardLane while past it (the lane at `lane` carried), else
 // Normalize; before the start, NormalizeBack, else 0 and the position (0,
 // 0) unless it's on the route.
-uint32_t NormalizeLane(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane);
+uint32_t NormalizeLane(uint32_t route, uint32_t position, uint32_t lane);
 // TrackRoute::NormalizeLaneMasked (sub_820FA350): as NormalizeLane, a
 // section off the route (0, 0) and 0 first, forward by
 // StepForwardLaneMasked, else NormalizeLane.
-uint32_t NormalizeLaneMasked(uint8_t* base, uint32_t route, uint32_t position, uint32_t lane,
+uint32_t NormalizeLaneMasked(uint32_t route, uint32_t position, uint32_t lane,
                              uint32_t masks);
 
 // --- Points and slices ---
@@ -139,25 +139,25 @@ uint32_t NormalizeLaneMasked(uint8_t* base, uint32_t route, uint32_t position, u
 // TrackRoute::Point (sub_820FA860): a copy of the position (at `frame` +
 // 80, the original's frame) normalized; when on the route, out (x, y, z,
 // 1.0) = its slice's center. Returns the copy's section.
-uint32_t Point(uint8_t* base, uint32_t route, uint32_t out, uint32_t position, uint32_t frame);
+uint32_t Point(uint32_t route, uint32_t out, uint32_t position, uint32_t frame);
 // TrackRoute::AlongSlice (sub_820FAE78): the point's offset along the road
 // from the slice's center (`record`): 0 within a slice's length, 2 before,
 // 1 past. The next slice's position (at `frame` + 80) normalized when past.
-uint32_t AlongSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+uint32_t AlongSlice(uint32_t route, uint32_t point, uint32_t position,
                     uint32_t record, uint32_t frame);
 
 // TrackRoute::Locate (sub_820FAF88): AlongSlice's answer (1 past, 2
 // before); within it, 5 beyond the left margin (+16), 6 beyond the right
 // (+20), else 0. `frame`: the original's (AlongSlice's below it).
-uint32_t Locate(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+uint32_t Locate(uint32_t route, uint32_t point, uint32_t position,
                 uint32_t record, uint32_t frame);
 // TrackRoute::LocateShoulder (sub_820FB030): as Locate, and within the
 // margins 3 or 4 beyond half the width plus 0.5 on the left or right.
-uint32_t LocateShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+uint32_t LocateShoulder(uint32_t route, uint32_t point, uint32_t position,
                         uint32_t record, uint32_t frame);
 // TrackRoute::LocateAt (sub_820FB888): LocateShoulder on the position's
 // slice. `frame`: LocateShoulder's (the original tail-calls it).
-uint32_t LocateAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+uint32_t LocateAt(uint32_t route, uint32_t point, uint32_t position,
                   uint32_t frame);
 // TrackRoute::ToMainRoad (sub_820FA728): in a copy (at `frame` + 80, the
 // original's frame), up to 10 sections forward (the default branch mask,
@@ -165,19 +165,19 @@ uint32_t LocateAt(uint8_t* base, uint32_t route, uint32_t point, uint32_t positi
 // (IsMainRoad); found, the slice less the slices moved when `flag` is set,
 // normalized, and the position = the copy. Returns the original's r3 (the
 // last Normalize's answer, or 0 when none was found).
-uint32_t ToMainRoad(uint8_t* base, uint32_t route, uint32_t position, uint32_t flag,
+uint32_t ToMainRoad(uint32_t route, uint32_t position, uint32_t flag,
                     uint32_t frame);
 // TrackRoute::NoteShoulder (sub_820FB100): LocateShoulder on the position's
 // slice; on a shoulder (3 or 4) nearer the slice's center (squared, in 3D)
 // than the float at `distance`, the position into `best` and the distance
 // into `distance`. Returns LocateShoulder's answer. `frame`: the original's.
-uint32_t NoteShoulder(uint8_t* base, uint32_t route, uint32_t point, uint32_t position,
+uint32_t NoteShoulder(uint32_t route, uint32_t point, uint32_t position,
                       uint32_t best, uint32_t distance, uint32_t frame);
 // TrackRoute::TakeBranch (sub_820FA4A8): 1 when on the route; past the end,
 // the n-th (the word at `which`, from 0) forward link (its row), before the
 // start the n-th back link, the slice moved by a section's count, then
 // Normalize; 0 when there's no n-th.
-uint32_t TakeBranch(uint8_t* base, uint32_t route, uint32_t position, uint32_t which);
+uint32_t TakeBranch(uint32_t route, uint32_t position, uint32_t which);
 // TrackRoute::Follow's full search (sub_820FB2B0, never seen in play, so
 // without a row): the nearest slice holding the point (OnSlice's score)
 // among the sections the section's links lead to, then the section before
@@ -186,7 +186,7 @@ uint32_t TakeBranch(uint8_t* base, uint32_t route, uint32_t position, uint32_t w
 // None: out as it was when whole, else the section before with out's slice,
 // else (0, 0). Out = the result. `frame`: the original's (its +80, +84 and
 // +88 its position, best and score, as the original keeps them).
-void FullSearch(uint8_t* base, uint32_t route, uint32_t out, uint32_t point, uint32_t section,
+void FullSearch(uint32_t route, uint32_t out, uint32_t point, uint32_t section,
                 uint32_t before, uint32_t frame);
 // TrackRoute::Follow (sub_820FB680): the route position moved to the slice
 // holding the point, up to six steps (its row); else the nearest shoulder
@@ -194,24 +194,24 @@ void FullSearch(uint8_t* base, uint32_t route, uint32_t out, uint32_t point, uin
 // route position before (its section for FullSearch). `frame`: the
 // original's (its +80 to +95 its copy, best, distance and branch count).
 // The original's r3 isn't kept (no caller reads it).
-void Follow(uint8_t* base, uint32_t route, uint32_t position, uint32_t point, uint32_t before,
+void Follow(uint32_t route, uint32_t position, uint32_t point, uint32_t before,
             uint32_t frame);
 // TrackRoute::OnSlice (sub_820FB1B8): 1 when the point is within the
 // position's section's bounds (SectionOutcode) and on its slice (Locate);
 // the score at `score` (when not 0). `frame`: the original's.
-uint32_t OnSlice(uint8_t* base, uint32_t route, uint32_t point, uint32_t position, uint32_t score,
+uint32_t OnSlice(uint32_t route, uint32_t point, uint32_t position, uint32_t score,
                  uint32_t frame);
 
 // --- The linear index (the global route's file) ---
 
 // TrackRoute::ToIndex (sub_820AB408): the slices before the packed position
 // (section in the high halfword) plus its slice.
-uint32_t ToIndex(uint8_t* base, uint32_t packed);
+uint32_t ToIndex(uint32_t packed);
 // TrackRoute::FromIndex (sub_820AB498): the packed position holding the
 // index, kept on the route.
-uint32_t FromIndex(uint8_t* base, uint32_t index);
+uint32_t FromIndex(uint32_t index);
 // TrackRoute::ClampPosition (sub_820F8420): out = FromIndex(ToIndex(packed)).
-void ClampPosition(uint8_t* base, uint32_t out, uint32_t packed);
+void ClampPosition(uint32_t out, uint32_t packed);
 
 // --- Distances ---
 
@@ -219,13 +219,13 @@ void ClampPosition(uint8_t* base, uint32_t out, uint32_t packed);
 // to a's, `depth` more levels deep; `distance` advanced as the original
 // advances its float. True when found (the original writes its float only
 // then).
-bool LinkDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, float& distance,
+bool LinkDistance(uint32_t route, uint32_t a, uint32_t b, float& distance,
                   int32_t depth);
 // TrackRoute::Distance (sub_820F9278): the distance from a to b in meters
 // (f1); 10000.0 ([0x82002814]) when they aren't linked. `linked` (when not
 // null; set only for positions in different sections) whether
 // LinkDistance found them (the original's r3 then).
-double Distance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, bool* linked = nullptr);
+double Distance(uint32_t route, uint32_t a, uint32_t b, bool* linked = nullptr);
 
 // TrackRoute::PathDistance (sub_820FA9D0): f1 = the distance from a to b
 // (packed positions) along the path (`length` sections, halfwords): from
@@ -237,7 +237,7 @@ double Distance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, bool* lin
 // `frame`: the original's (its +80 to +191 its positions and vectors, as the
 // original keeps them; the stores into its caller's frame aren't made).
 // The original's r3 isn't kept (no caller reads it).
-double PathDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, uint32_t path,
+double PathDistance(uint32_t route, uint32_t a, uint32_t b, uint32_t path,
                     int32_t length, uint32_t frame);
 
 // --- Points of a slice (the global route's file) ---
@@ -247,6 +247,6 @@ double PathDistance(uint8_t* base, uint32_t route, uint32_t a, uint32_t b, uint3
 // 1 and 2 the two point tables', 4 the center's half-sum with itself;
 // above 16, nothing. False, with nothing done, for 5 to 16 (sub_820F8FA0's
 // cases, never seen in play: the original's).
-bool SlicePoint(uint8_t* base, uint32_t out, uint32_t which, uint32_t section, uint32_t slice);
+bool SlicePoint(uint32_t out, uint32_t which, uint32_t section, uint32_t slice);
 
 }  // namespace track_route

@@ -1,10 +1,10 @@
 #include "memory/heap.h"
+#include "guest.h"
+
+#include "memory/handles.h"
+#include "memory/mapping.h"
 
 #include "base/log.h"
-
-#include <rex/system/kernel_state.h>
-#include <rex/system/xmemory.h>
-#include <rex/system/xtypes.h>
 
 #include <algorithm>
 #include <atomic>
@@ -23,7 +23,7 @@ namespace {
 // The range's size: the most the game had in use was 172.6 MiB (heap and
 // pages, a drive through the front end and a race); see "What the counter
 // saw" in docs/native-memory.md.
-constexpr uint32_t kRangeBytes = 384u << 20;
+constexpr uint32_t kRangeBytes = kHeapBytes;  // guest.h: the heap's block
 constexpr uint32_t kPageBytes = 4096;
 
 struct Block {
@@ -33,11 +33,13 @@ struct Block {
 };
 
 std::mutex mutex;
-uint8_t* membase = nullptr;
 std::atomic<uint32_t> range_start{0};
 uint32_t range_end = 0;
 std::map<uint32_t, uint32_t> free_ranges;  // start -> bytes, sorted by address
 std::unordered_map<uint32_t, Block> blocks;
+// Physical blocks' allocated sizes (the size rounded to their page size), by
+// address: what MmQueryAllocationSize answers for them.
+std::unordered_map<uint32_t, uint32_t> physical_sizes;
 std::set<uint64_t> seen;  // what's been logged once: kind << 32 | value
 
 enum Seen : uint64_t {
@@ -48,6 +50,8 @@ enum Seen : uint64_t {
   kUnknownSize,
   kUnknownFreePages,
   kPhysicalProtection,
+  kUnknownPhysicalSize,
+  kUnknownFreePhysical,
 };
 
 // Under the mutex.
@@ -60,21 +64,20 @@ bool FirstTime(Seen kind, uint32_t value) {
   std::abort();
 }
 
-// Reserves the range, on the first allocation (under the mutex).
+// The range's start: the first 64 KB past page 0, where the SDK's 4 KB
+// heap gave it.
+constexpr uint32_t kRangeStart = kHeapStart;
+
+// Takes the range, on the first allocation (under the mutex): guest memory
+// mapped by us (memory/mapping.h).
 void ReserveRange() {
   if (range_start.load(std::memory_order_relaxed) != 0) {
     return;
   }
-  rex::memory::Memory* memory = REX_KERNEL_MEMORY();
-  uint32_t address = 0;
-  if (!memory->LookupHeapByType(false, kPageBytes)
-           ->Alloc(kRangeBytes, 64 * 1024,
-                   rex::memory::kMemoryAllocationReserve | rex::memory::kMemoryAllocationCommit,
-                   rex::memory::kMemoryProtectRead | rex::memory::kMemoryProtectWrite, false,
-                   &address)) {
-    OutOfMemory("reserving the range", kRangeBytes);
+  if (!MapGuest()) {
+    OutOfMemory("mapping guest memory", kRangeBytes);
   }
-  membase = memory->virtual_membase();
+  const uint32_t address = kRangeStart;
   range_end = address + kRangeBytes;
   free_ranges.emplace(address, kRangeBytes);
   range_start.store(address, std::memory_order_relaxed);
@@ -103,8 +106,8 @@ uint32_t Take(uint32_t span, uint32_t alignment) {
   return 0;
 }
 
-// Returns bytes to the free ranges, joined with their neighbors.
-void Give(uint32_t start, uint32_t bytes) {
+// Returns bytes to free ranges, joined with their neighbors.
+void Give(std::map<uint32_t, uint32_t>& free_ranges, uint32_t start, uint32_t bytes) {
   auto next = free_ranges.lower_bound(start);
   if (next != free_ranges.end() && start + bytes == next->first) {
     bytes += next->second;
@@ -120,6 +123,10 @@ void Give(uint32_t start, uint32_t bytes) {
   free_ranges.emplace_hint(next, start, bytes);
 }
 
+void Give(uint32_t start, uint32_t bytes) {
+  Give(free_ranges, start, bytes);
+}
+
 // Heap blocks are 16-aligned and take multiples of 16 bytes, as the game's
 // heap's: AltiVec loads and stores (lvx, stvx) on them drop the address's
 // low four bits.
@@ -130,24 +137,83 @@ uint32_t HeapSpan(uint32_t size) {
 }
 
 void Clear(uint32_t address, uint32_t bytes) {
-  std::memset(membase + address, 0, bytes);
+  guest::ForEachHostPart(address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
-// The SDK's FromXdkProtectFlags (not in a header).
-uint32_t HostProtection(uint32_t protection) {
-  uint32_t result = 0;
-  if (protection & (rex::X_PAGE_READONLY | rex::X_PAGE_EXECUTE_READ)) {
-    result = rex::memory::kMemoryProtectRead;
-  } else if (protection & (rex::X_PAGE_READWRITE | rex::X_PAGE_EXECUTE_READWRITE)) {
-    result = rex::memory::kMemoryProtectRead | rex::memory::kMemoryProtectWrite;
+// Xbox protection bits (X_PAGE_*, X_MEM_*) AllocPhysical reads.
+constexpr uint32_t kPageReadOnly = 0x02;
+constexpr uint32_t kPageReadWrite = 0x04;
+constexpr uint32_t kMem16MbPages = 0x02000000;
+constexpr uint32_t kMemLargePages = 0x20000000;
+
+// Physical memory: [0, 512 MB), handed out top down (the SDK's physical
+// heaps allocate top down) in whole 4 KB pages, by physical address; free
+// ranges kept here (start -> bytes), as the virtual range's.
+constexpr uint32_t kPhysicalBytes = 0x20000000;
+std::map<uint32_t, uint32_t> physical_free;
+
+// The views physical memory is seen through (memory/mapping.h), by page
+// size: the guest address of physical 0 in each (the 4 KB view is a page
+// off: guest 0xE0000000 + x is physical x + 0x1000) and the physical range
+// it reaches, as the SDK's PhysicalHeaps.
+struct PhysicalView {
+  uint32_t base;     // guest address of the view
+  uint32_t offset;   // physical address at the view's base
+  uint32_t size;     // the view's size in guest addresses
+};
+constexpr PhysicalView kView64Kb = {0xA0000000, 0, 0x20000000};
+constexpr PhysicalView kView16Mb = {0xC0000000, 0, 0x20000000};
+constexpr PhysicalView kView4Kb = {0xE0000000, 0x1000, 0x1FD00000};
+
+const PhysicalView& ViewOf(uint32_t address) {
+  return address >= kView4Kb.base ? kView4Kb : address >= kView16Mb.base ? kView16Mb : kView64Kb;
+}
+
+// Takes [start, start + bytes) out of the physical free ranges (it must be
+// inside one).
+void TakePhysical(uint32_t start, uint32_t bytes) {
+  auto it = std::prev(physical_free.upper_bound(start));
+  const uint32_t range = it->first;
+  const uint32_t end = range + it->second;
+  physical_free.erase(it);
+  if (start > range) {
+    physical_free.emplace(range, start - range);
   }
-  if (protection & rex::X_PAGE_NOCACHE) {
-    result |= rex::memory::kMemoryProtectNoCache;
+  if (start + bytes < end) {
+    physical_free.emplace(start + bytes, end - start - bytes);
   }
-  if (protection & rex::X_PAGE_WRITECOMBINE) {
-    result |= rex::memory::kMemoryProtectWriteCombine;
+}
+
+// The physical ranges the SDK's memory kept for itself at start-up, kept out
+// the same way (under the mutex, once): 0-16 MB (the GPU writeback at
+// 0xC0000000, also what 0x7F000000 shows), the 3.25 MB its 64 KB view
+// reserved below the top 64 KB, and the top 64 KB.
+void SetUpPhysical() {
+  if (!physical_free.empty()) {
+    return;
   }
-  return result;
+  physical_free.emplace(0, kPhysicalBytes);
+  TakePhysical(0, 0x01000000);
+  TakePhysical(0x1FCB0000, 0x340000);
+  TakePhysical(0x1FFF0000, 0x10000);
+}
+
+// Top down: the highest physical address at `alignment` (a multiple of
+// 4 KB) where `bytes` fit free inside [low, high_end); ~0u when none does.
+uint32_t FindPhysical(uint32_t bytes, uint32_t alignment, uint32_t low, uint64_t high_end) {
+  for (auto it = physical_free.rbegin(); it != physical_free.rend(); ++it) {
+    const uint64_t start = std::max<uint64_t>(it->first, low);
+    const uint64_t end = std::min<uint64_t>(uint64_t(it->first) + it->second, high_end);
+    if (end < start + bytes) {
+      continue;
+    }
+    const uint64_t candidate = (end - bytes) & ~uint64_t(alignment - 1);
+    if (candidate >= start) {
+      return uint32_t(candidate);
+    }
+  }
+  return ~0u;
 }
 
 }  // namespace
@@ -178,6 +244,9 @@ bool Free(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_8229A648 HeapFree");
   if (address == 0) {
     return true;
+  }
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
   }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
@@ -236,7 +305,8 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
       if (result == 0) {
         OutOfMemory("HeapReAlloc", size);
       }
-      std::memmove(membase + result, membase + address, std::min(old_size, size));
+      std::memmove(guest::Pointer(result), guest::Pointer(address),
+                   std::min(old_size, size));
       Give(address, block.span);
       blocks.erase(it);
       blocks[result] = {size, span, false};
@@ -250,6 +320,9 @@ uint32_t Realloc(uint32_t address, uint32_t size, uint32_t flags) {
 
 uint32_t Size(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82298FF8 HeapSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.size;  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || it->second.pages) {
@@ -262,12 +335,18 @@ uint32_t Size(uint32_t address) {
 }
 
 bool IsHeapBlock(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && !it->second.pages;
 }
 
 bool IsPages(uint32_t address) {
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    return info.offset == 0;  // a host object's handle (E5): freed by any of the frees
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   return it != blocks.end() && it->second.pages;
@@ -292,6 +371,9 @@ uint32_t AllocPages(uint32_t size, uint32_t alignment) {
 
 bool FreePages(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_82295330 VirtualFree");
+  if (IsHandle(address)) {
+    return FreeHandle(address);  // a host object (E5)
+  }
   std::lock_guard lock(mutex);
   auto it = blocks.find(address);
   if (it == blocks.end() || !it->second.pages) {
@@ -306,6 +388,9 @@ bool FreePages(uint32_t address) {
 }
 
 bool InRange(uint32_t address) {
+  if (IsHandle(address)) {
+    return true;  // a host object (E5): ours, freed through its handle
+  }
   const uint32_t start = range_start.load(std::memory_order_relaxed);
   return start != 0 && address >= start && address - start < kRangeBytes;
 }
@@ -313,7 +398,7 @@ bool InRange(uint32_t address) {
 uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alignment,
                        uint32_t protection) {
   ITC_NATIVE_RUNNING("sub_82296550 XPhysicalAllocEx");
-  if (!(protection & (rex::X_PAGE_READONLY | rex::X_PAGE_READWRITE))) {
+  if (!(protection & (kPageReadOnly | kPageReadWrite))) {
     std::lock_guard lock(mutex);
     if (FirstTime(kPhysicalProtection, protection)) {
       ITC_LOG_ERROR("native heap: physical memory with protection {:#x}", protection);
@@ -321,35 +406,90 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
     return 0;
   }
   // As the SDK's MmAllocatePhysicalMemoryEx: the page size from the
-  // protection, the physical range moved into the heap's addresses, top down.
+  // protection (it picks the view), the size and alignment rounded to it,
+  // [low, high] clamped to the view's physical range and rounded up to the
+  // alignment (BaseHeap::AllocRange), top down.
   uint32_t page_size = kPageBytes;
-  if (protection & rex::X_MEM_LARGE_PAGES) {
+  const PhysicalView* view = &kView4Kb;
+  if (protection & kMemLargePages) {
     page_size = 64 * 1024;
-  } else if (protection & rex::X_MEM_16MB_PAGES) {
+    view = &kView64Kb;
+  } else if (protection & kMem16MbPages) {
     page_size = 16 * 1024 * 1024;
+    view = &kView16Mb;
   }
-  const uint32_t rounded_size = (size + page_size - 1) & ~(page_size - 1);
-  const uint32_t rounded_alignment = (alignment + page_size - 1) & ~(page_size - 1);
-  auto* heap = static_cast<rex::memory::PhysicalHeap*>(
-      REX_KERNEL_MEMORY()->LookupHeapByType(true, page_size));
-  const uint32_t heap_base = heap->heap_base();
-  const uint32_t offset = heap->GetPhysicalAddress(heap_base);
-  const uint32_t heap_size = heap->heap_size();
-  const uint32_t heap_low = heap_base + std::min(low > offset ? low - offset : 0, heap_size - 1);
-  const uint32_t heap_high = heap_base + std::min(high > offset ? high - offset : 0, heap_size - 1);
-  uint32_t address = 0;
-  if (!heap->AllocRange(heap_low, heap_high, rounded_size, rounded_alignment,
-                        rex::memory::kMemoryAllocationReserve |
-                            rex::memory::kMemoryAllocationCommit,
-                        HostProtection(protection), true, &address)) {
-    OutOfMemory("physical memory", size);
+  // A size of 0 takes a page, as the SDK's heaps (rex::round_up).
+  const uint32_t rounded_size =
+      std::max(uint32_t((uint64_t(size) + page_size - 1) & ~uint64_t(page_size - 1)), page_size);
+  const uint32_t rounded_alignment =
+      std::max((alignment + page_size - 1) & ~(page_size - 1), page_size);
+  const uint32_t view_low = view->offset;
+  const uint32_t view_high = view->offset + view->size - 1;
+  const uint32_t clamped_low = std::clamp(low, view_low, view_high);
+  const uint32_t clamped_high = std::clamp(high, view_low, view_high);
+  const uint64_t aligned_low =
+      (uint64_t(clamped_low) + rounded_alignment - 1) & ~uint64_t(rounded_alignment - 1);
+  const uint64_t aligned_high = std::min<uint64_t>(
+      (uint64_t(clamped_high) + rounded_alignment - 1) & ~uint64_t(rounded_alignment - 1),
+      kPhysicalBytes - 1);
+  // Through the end of the page aligned_high is in.
+  const uint64_t high_end = (aligned_high & ~uint64_t(kPageBytes - 1)) + kPageBytes;
+  uint32_t address;
+  {
+    std::lock_guard lock(mutex);
+    SetUpPhysical();
+    const uint32_t physical =
+        aligned_low > 0xFFFFFFFFu
+            ? ~0u
+            : FindPhysical(rounded_size, rounded_alignment, uint32_t(aligned_low), high_end);
+    if (physical == ~0u) {
+      OutOfMemory("physical memory", size);
+    }
+    TakePhysical(physical, rounded_size);
+    address = view->base + (physical - view->offset);
+    // What MmQueryAllocationSize answers.
+    physical_sizes[address] = rounded_size;
   }
   return address;
 }
 
 void FreePhysical(uint32_t address) {
   ITC_NATIVE_RUNNING("sub_822965C8 XPhysicalFree");
-  REX_KERNEL_MEMORY()->LookupHeap(address)->Release(address);
+  if (IsHandle(address)) {
+    FreeHandle(address);  // a host object (E5)
+    return;
+  }
+  std::lock_guard lock(mutex);
+  const auto it = physical_sizes.find(address);
+  if (it == physical_sizes.end()) {
+    if (FirstTime(kUnknownFreePhysical, address)) {
+      ITC_LOG_ERROR("native heap: XPhysicalFree of {:#x}, not a physical block the layer gave",
+                    address);
+    }
+    return;
+  }
+  const PhysicalView& view = ViewOf(address);
+  Give(physical_free, address - view.base + view.offset, it->second);
+  physical_sizes.erase(it);
+}
+
+uint32_t PhysicalSize(uint32_t address) {
+  ITC_NATIVE_RUNNING("sub_822965C0 XPhysicalSize");
+  if (HandleInfo info; IsHandle(address) && DescribeHandle(address, &info)) {
+    // A blob made where the game asked for physical memory (E5 step 7):
+    // whole 4 KB pages, as a 4 KB-page physical block's size.
+    return info.size;
+  }
+  std::lock_guard lock(mutex);
+  const auto it = physical_sizes.find(address);
+  if (it == physical_sizes.end()) {
+    if (FirstTime(kUnknownPhysicalSize, 0)) {
+      ITC_LOG_ERROR("native heap: XPhysicalSize of {:#x}, not a physical block the layer gave",
+                    address);
+    }
+    return 0;
+  }
+  return it->second;
 }
 
 }  // namespace memory

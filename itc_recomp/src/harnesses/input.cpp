@@ -191,7 +191,7 @@ void AllocateNodesCases(Context& h) {
     const uint32_t count = i < 16 ? 1 : i < 20 ? 0 : h.random.Below(200);
     Case(
         h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = count; }, __imp__sub_82099C08,
-        NativeAllocateNodes,
+        ITC_CONTEXT_FN(NativeAllocateNodes),
         [&](Outputs& out, const PPCContext& t) {
           const uint32_t node = t.r3.u32;
           AreaWords(h, out, node);
@@ -226,7 +226,7 @@ void IncSizeCases(Context& h) {
           t.r3.u64 = list;
           t.r4.u64 = count;
         },
-        __imp__sub_820958B8, NativeIncSize,
+        __imp__sub_820958B8, ITC_CONTEXT_FN(NativeIncSize),
         [&](Outputs& out, const PPCContext& t) {
           AreaWords(h, out, 0);
           out.Word(t.r3.u32);
@@ -242,7 +242,7 @@ void ConstructCases(Context& h) {
     const uint32_t list = h.data + 64 + 4 * uint32_t(i);
     Case(
         h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = list; }, __imp__sub_820AD058,
-        NativeConstruct,
+        ITC_CONTEXT_FN(NativeConstruct),
         [&](Outputs& out, const PPCContext& t) {
           const uint32_t node = guest::LoadU32(h.base, list + sl::kHead);
           AreaWords(h, out, node);
@@ -289,7 +289,7 @@ void InsertCases(Context& h) {
           t.r4.u64 = (uint64_t(list) << 32) | where;
           t.r5.u64 = value;
         },
-        __imp__sub_82095958, NativeInsert,
+        __imp__sub_82095958, ITC_CONTEXT_FN(NativeInsert),
         [&](Outputs& out, const PPCContext& t) {
           const uint32_t node = guest::LoadU32(h.base, where + sl::kPrevious);
           AreaWords(h, out, node);
@@ -390,7 +390,7 @@ void PadCases(Context& h) {
             t.r4.u64 = index;
             t.r5.u64 = device;
           },
-          __imp__sub_825918F0, NativeBind,
+          __imp__sub_825918F0, ITC_CONTEXT_FN(NativeBind),
           [&](Outputs& out, const PPCContext& t) {
             AreaWords(h, out, 0);
             out.Word(t.r3.u32);
@@ -639,7 +639,7 @@ void ManagerCases(Context& h) {
         t.r3.u64 = manager;
         t.r4.u64 = d.arguments;
         ITC_FLAG(native_input) = v == 1;
-        (v == 0 ? __imp__sub_820991E0 : sub_820991E0)(t, h.base);
+        (v == 0 ? __imp__sub_820991E0 : harness::Ours<0x820991E0>)(t, h.base);
         ITC_FLAG(native_input) = true;
         std::vector<uint32_t> blocks = {0};
         for (uint32_t node : HeadNodes(h, manager)) {
@@ -664,7 +664,7 @@ void ManagerCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = d.arguments;
         ITC_FLAG(native_input) = v == 1;
-        (v == 0 ? __imp__sub_820993E8 : sub_820993E8)(t, h.base);
+        (v == 0 ? __imp__sub_820993E8 : harness::Ours<0x820993E8>)(t, h.base);
         ITC_FLAG(native_input) = true;
         const uint32_t manager = t.r3.u32;
         std::vector<uint32_t> blocks = {manager};
@@ -720,7 +720,7 @@ void ManagerCases(Context& h) {
         t.r4.u64 = index;
         t.r5.u64 = listener;
         ITC_FLAG(native_input) = v == 1;
-        (v == 0 ? __imp__sub_82099430 : NativeAddListener)(t, h.base);
+        (v == 0 ? __imp__sub_82099430 : ITC_CONTEXT_FN(NativeAddListener))(t, h.base);
         ITC_FLAG(native_input) = true;
         node = guest::LoadU32(h.base, heads + 16 * pad + sl::kPrevious);
         FloatWords floats;

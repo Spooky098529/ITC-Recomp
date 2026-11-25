@@ -16,6 +16,8 @@
 
 #include <cstdint>
 
+#include "graphics/replay_commands.h"
+
 namespace graphics::video_output {
 
 constexpr uint32_t kVtable = 0x8206CAF8;
@@ -32,22 +34,32 @@ uint32_t CurrentThreadId();
 
 // sub_8229D9D0 Device::AcquireThreadOwnership: device +10760 = the current
 // thread's id. Returns it (the original leaves it in r3).
-uint32_t AcquireThreadOwnership(uint8_t* base, uint32_t device);
+uint32_t AcquireThreadOwnership(uint32_t device);
 
 // sub_8229DA10 Device::ReleaseThreadOwnership: device +10760 = 0.
-void ReleaseThreadOwnership(uint8_t* base, uint32_t device);
+void ReleaseThreadOwnership(uint32_t device);
 
 // sub_8258DB18 VideoOutput::VideoOutput: the fields set and its device lock
 // made (count 1; a lock made before at the same address is put back to 1).
 // Returns the video output.
-uint32_t Construct(uint8_t* base, uint32_t video_output);
+uint32_t Construct(uint32_t video_output);
 
 // sub_8258D8C8 VideoOutput::LockDevice: waits for the device lock, marks the
 // device as the calling thread's and returns the device (+140).
-uint32_t LockDevice(uint8_t* base, uint32_t video_output);
+uint32_t LockDevice(uint32_t video_output);
 
 // sub_8258D908 VideoOutput::UnlockDevice: the device in the word at `local`
 // let go (its thread word cleared), the word = 0, the lock given back.
-void UnlockDevice(uint8_t* base, uint32_t video_output, uint32_t local);
+void UnlockDevice(uint32_t video_output, uint32_t local);
+
+// sub_8258D998 VideoOutput::ResolveFrontBuffer, in its 112-byte frame below
+// `sp`: the frame's end. Device::Resolve (sub_822AFA58, a guest call through
+// its wrap) of render target 0 into the front buffer texture at video
+// output + 4 x (68 + its +268), with no rectangles, point or clear color,
+// level and slice 0, f1 = the float at 0x82000A34 and the frame's +92 and
+// +100 = 0. Returns Resolve's r3. Adapter: src/native/replay_hooks.cpp,
+// inside its wrap (--native_replay_commands).
+uint32_t ResolveFrontBuffer(uint32_t video_output, uint32_t sp,
+                            const replay_commands::GuestCall& call);
 
 }  // namespace graphics::video_output

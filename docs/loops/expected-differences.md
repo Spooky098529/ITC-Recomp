@@ -63,12 +63,70 @@ NaN groups below stay as recorded.
   position); ours leaves them. Only cases taking the packet path (flags
   without 0x2 or 0x10) differ; the header, ranges, lock count and r3
   match. The renderer skips coherency packets.
+- **Uninitialized stack byte:** the original fills a pad byte from an
+  uninitialized stack byte, the native code writes 0; how many cases
+  differ depends on what the callers left on the stack (0 while the run
+  loop was recompiled, every case since `main` and `App::Run` are native,
+  2026-10-25: the byte is now 0x33).
+- **Unwritten stack bytes copied:** a function builds a record on its
+  stack, its callees leave some of its bytes unwritten, and it copies
+  the whole record into a guest object; in the original those bytes are
+  what earlier calls left there (their register saves), which native
+  callees don't write on the guest stack. Here: `Racers::SetStart`'s 16
+  traffic records, 42 bytes each (the car object's +34, the record's
+  +3928 to +3935 and others) copied into the race data. The harness
+  finds the bytes by running the callees natively over two fills and
+  compares them in their own group; every other output matches.
+  Whether the game reads those bytes isn't known.
+- **Unwritten header bytes in the frame:** a function reads a record
+  into its own stack frame and its callee leaves some of its bytes
+  unwritten; in the original they hold what earlier calls left there
+  (their register saves), which native callees don't write on the guest
+  stack. Nothing reads them, and nothing copies them out. Here:
+  `CarModel::OnDecalLoaded`'s TGA headers (the reader never writes +3
+  and +9; in `Vinyl::DrawDecals`' frame at +192 and +224), `DrawDecal`
+  reading only the width and height.
 - **Constant order:** the HLSL compiler (`sub_822B8F10`) places the HSV
   gradient's literal constants (1 to 6, source `82071528`) in another
   order when it compiles during a race than at boot, where every compile
   gave the order stored (`--use_hardcoded_shaders`, the boot's bytes);
   probably state of its own, such as heap addresses. The same program
   either way: only the constants' registers differ.
+
+## The rewiring's stage 3 (2026-11-16)
+
+169 groups named "... (expected to differ: the rewiring)", listed by name
+in `itc_recomp/src/harnesses/rewiring_expected.cpp` (the user's call,
+2026-11-16; the run itc_5635 has no other group differing). Since stage 3
+("Before E1: the rewiring" in `docs/rexglue-removal.md`) our native
+functions run on a register view that carries only a call's registers.
+Each group was checked to differ only in what the user's calls loosened,
+never in memory the game reads, r3 or f1:
+
+- **Leftover registers:** r11 or ctr a native function no longer leaves
+  for its caller (GetLastError, App::IsRunning, the `Defaults::Table*`
+  getters, CourseRecords::Of, SaveData::TwoPlayerBlock,
+  RaceWorld::OnPausedTick, Players::ResetControllers (intermittent: the
+  original leaves r11 at 1 only in some cases), the morph jobs and work
+  items, the app's
+  interface slots, RenderManagerSlotDirect's stand-in cases).
+- **Registers after a call through an entry:** only r3 and f1 come back
+  (r4 after tan and ldexp, the framework's tick, DebugText::Create and the
+  frame passes; f2 and f3 after ActionMappers::Init; the r4 and r5 pair the
+  draws' harnesses read after the last render queue call, in Model::Draw*,
+  CarPart::Draw and every car part, light, interior, cockpit, traffic and
+  wheel group; the leftovers the XAudio voices' and race sounds' fake
+  objects record).
+- **Stack saves of a caller's register:** 0 where the original saves a
+  register the view doesn't hold (the save slots and devices, X3DAudio and
+  the car sound, the app's start-up, constructor and creation with the
+  constructors under them, the power graph's three groups, including a few
+  render-block slot words its sprites read from such stack words).
+- **Harness artifacts:** Quaternion::FromAngles' inputs (the recompiled
+  run now switches the host's float mode for real, so its angles keep
+  denormals the native run's are flushed of; the output matches) and
+  Device::SetDefaultState's FVF pad byte (uninitialized stack, as the
+  pad byte groups above), intermittent.
 
 ## By function file
 
@@ -228,9 +286,74 @@ were at 0.
 | `sub_822A8A60` Device::SetShaderGprAllocation | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
 | `sub_822A3A20` Device::SetGammaRamp | the command buffer | 40 of 60 | Packets nothing reads | for review (03:25 run) |
 | `sub_822ACB90` Device::SetDefaultState | the command buffer | 40 of 40 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A6A88` VertexDeclaration::FromFvf | the end marker's pad byte | 400 of 400 | Uninitialized stack byte | for review (01:17 run) |
+| `sub_822AA0E8` Device::SetFVF | the end marker's pad byte | 100 of 100 | Uninitialized stack byte | for review (01:17 run) |
 
 ### `functions.md`
 
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_822B8F10` D3DXCompileShader | the HSV gradient's constant order | 1 of 1 | Constant order | for review (2026-10-24) |
+
+### `race-setup.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82115D98` Race::SetUp | the traffic records' unwritten bytes | 46 of 48 (45 or 46 from run to run) | Unwritten stack bytes copied | for review (23:42 run) |
+
+### `car-models.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_820D5750` CarModel::OnDecalLoaded | the TGA headers' unwritten bytes | 16 of 16 | Unwritten header bytes in the frame | for review (08:36 run) |
+
+### `race-world.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82173050` RaceManager::AddRacers | random traffic numbers | 5 of 200 | Stack leftovers (a negative car number from random +16 words makes `Traffic::PickModel` read below its tables, into earlier calls' register saves; +16 is 0 from `RaceManager::Create` in play) | for review (08:36 run) |
+
+### `command-buffer.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822AF978` Device::WriteDefaultDrawRegisters | its packets and r3 | 100 of 100 | Packets nothing reads (its 15 packet words left out, so the command words and r3, the position after them, differ; the dirty marks match in the main group) | for review (2026-11-06 01:02 run) |
+| `sub_8229F0E0` | against the original with its packets | 300 of 300 | Packets nothing reads (its WAIT_UNTIL and register 0xD04 packets left out: the write position, the kicked tail and the progress block's read position 16 bytes short; its group without the packets matches) | for review (2026-11-06 01:02 run) |
+| `sub_8229F1B0` Device::WaitForIdle | against the original with its packets | 300 of 300 | Packets nothing reads (its WAIT_UNTIL packet left out: 8 bytes short, the same knock-on; its group without the packets matches) | for review (2026-11-06 01:02 run) |
+
+### `predicated-tiling.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_825BEB80` Device::SetPredication | against the original as it is | 600 of 600 | Packets nothing reads (the SET_BIN_MASK packet's two words left out: the write position and r3 8 bytes earlier; its group without the packet matches) | for review (2026-11-06 01:02 run) |
+| `sub_822B6AD8` Device::BeginTiledSegments | against the original as it is | 600 of 600 | Packets nothing reads (the segment chain's 256-byte header not written, its space still reserved; only the worker's job reads it, which never runs; its group without the header matches) | for review (2026-11-06 01:02 run) |
+
+### `type6-type7-modes.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82236880` Type6Mode::Init | the transitions' stack leftovers | 6 of 6 | Unwritten stack bytes copied (the members' state machine Inits copy three frame words they never write into each 48-byte transition's functor, +32 to +40; the screen block's constructor, recompiled under the original, leaves other words there than the plain C++'s back chains; dead words; type 7's same group matches) | for review (2026-11-07 22:22 run) |
+
+### `type67-screens.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822334C8` Type6ListScreen::SetUpRace | the traffic records' unwritten bytes | 11 of 16 | Unwritten stack bytes copied (the recompiled race set-up's register saves, `Racers::SetStart`'s 16 records on its stack; seen 0x826C0000 at a record's +3932; as `Race::SetUp`'s group) | for review (2026-11-13 12:31 run) |
+| `sub_82243018` Type7ListScreen::SetUpRace | the traffic records' unwritten bytes | 7 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s and `Race::SetUp`'s: `Racers::SetStart`'s records built on its stack over the recompiled callees' register saves) | for review (2026-11-13 b7-loop-13-11-26 run, part 2c) |
+| `sub_8223F778` Type8ListScreen::SetUpRace | the traffic records' unwritten bytes | 2 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s; the same words) | for review (2026-11-13 12:31 run) |
+| `sub_8223E760` Type8ColorListScreen::SetUpRace | the traffic records' unwritten bytes | 5 of 12 | Unwritten stack bytes copied (as `Type6ListScreen::SetUpRace`'s) | for review (2026-11-13 12:31 run) |
+
+### `title-screen.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82222700` TitleScreen::MainMenu | multiplayer items bypassed (expected to differ) | 4 of 400 | The multiplayer bypass on purpose (the user's call, 2026-11-14): items 3 and 4 are silent, answered as an input the menu ignores (no `MenuSound::Play`, r3 0; the user's call, 2026-11-14, replacing the refusal cue played at first); the original's page-object writes, stored item word, message and sound are left out | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
+| `sub_82222700` TitleScreen::MainMenu | item 3 or 4 accepted, bypassed (expected to differ) | 100 of 100 | The same bypass, with every case accepting item 3 or 4 | for review (2026-11-14 05:01 run; silent since the 15:19 run, the same counts) |
+
+### `network-mode.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82278058` ModeType12::Init | the transitions' stack leftovers | 16 of 16 | Unwritten stack bytes copied (the recompiled InitStates, under the recompiled Init, copy three frame words they never write into each transition, +32 to +40, holding `NetScreen::InitBase`'s return address 0x8228861C and back chains; dead words; as `Type6Mode::Init`'s group) | for review (2026-11-12 08:26 run) |
+| `sub_8227B930` ModeType12::NextMode | the time attack's traffic records' unwritten bytes | 16 of 32 (17 in another run) | Unwritten stack bytes copied (the recompiled race set-up's register saves; as `Race::SetUp`'s group) | for review (2026-11-12 08:26 run) |
+| `sub_82292CC0` Leaderboard::Read | (expected to differ) | 20 of 20 | No Live on purpose (the user's call, 2026-11-14): the SDK's `XamUserCreateStatsEnumerator` stub reports success without the size or handle, so the original allocates a garbage-size buffer into `[0x826C6AD4]` and clears the overlapped at `0x826C6080`, then `XEnumerate` fails; ours fails the read (+180 = 4, no buffer). r3 differs too (unread) | for review (2026-11-14 05:01 run) |

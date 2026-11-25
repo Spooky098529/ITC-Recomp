@@ -1,0 +1,485 @@
+// The car scene natively: adapters in front of src/scene/
+// (docs/functions/scene.md), with the register steps the harness shares
+// (hooks/scene.h).
+
+#include "hooks/scene.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
+
+#include "accessories/accessories.h"
+#include "base/flags.h"
+#include "car_models/vinyl.h"
+#include "hooks/accessories.h"
+#include "hooks/archive.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
+#include "hooks/scene_models.h"
+#include "scene/scene.h"
+#include "schema/accessories.h"
+#include "schema/car_draw.h"
+#include "schema/models.h"
+#include "schema/scene.h"
+
+#include <optional>
+#include "lifted/sdk.h"
+
+ITC_FLAG_DECLARE(bool, native_accessories);
+ITC_FLAG_DECLARE(bool, native_car_models);
+ITC_FLAG_DECLARE(bool, native_scene_models);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+
+ITC_FLAG_BOOL(native_scene, true, "ITC",
+              "Run the car scene (docs/functions/scene.md: SceneSetUp::SceneSetUp sub_820D0D50, "
+              "with --native_heap FreePagesIn sub_820D09A0, ScenePools::StartTeardownA "
+              "sub_820C3C80, CarScene::StartTeardown sub_820C4D88 (Accessories::ReleaseAll's "
+              "plain C++ where its adapter would run it), CarScene::SetInteriorWord sub_820C8950, "
+              "with --native_heap ScenePools::DestroyA sub_820C3CF8 (the pool objects' "
+              "destructors guest calls through their vtables) and UpdateA sub_820C3DA0 "
+              "(Texture::Free's plain C++ where its adapter would run it), with --native_heap "
+              "and the models' lifetime SceneAssets::SceneAssets sub_820C5008, Reset "
+              "sub_820C4A70 and ~SceneAssets sub_820C5168, CarScene::CarScene sub_820C89A8 and "
+              "~CarScene sub_820C9110, List::DeleteAll sub_82593FF8 and ~List sub_82594188 (the "
+              "nodes' destructors guest calls), CarScene::InitLighting sub_820C8528, with --native_heap "
+              "and the models' lifetime SceneAssets::Release sub_820C4C80 (the original "
+              "VirtualFree for a TGA pixels' word that isn't the layer's) and CarScene::Create "
+              "sub_820C8A50 (over ScenePools::MakeA's, PaintPalette::Init's and the accessories' "
+              "plain C++), with --native_heap and the archive's queue CarScene::LoadAssets sub_820C8B40, with the models' lifetime CarScene::OnFileLoaded "
+              "sub_820C52A0 (Model::Load's, XPR::Create's and TGA::CreateImage's originals "
+              "where their plain C++ declines, the providers' slot +16 through their vtables "
+              "unless it's TextureProvider::Set), CarScene::LoadsDone sub_820C5798 (the second set's "
+              "finishers through their overrides), CarScene::Update sub_820C9608 with "
+              "ScenePools::DestroyB sub_820C59B0 (its callees' register steps, their originals "
+              "with their flags off; the pool objects' destructors guest calls) and, under "
+              "--native_vehicle_accessors, sub_820C5A60 (SceneModel::Update sub_820DA180's "
+              "step with --native_scene_models)) natively instead of through the "
+              "translated code (the same writes; checked by --run_harnesses=scene)");
+
+namespace hooks {
+
+namespace {
+
+// A guest function through the function table (its override when it has
+// one), from `r1` with `lr`, r3 and r4 set; r1 and lr put back.
+void GuestCall(lifted::Regs& ctx, uint32_t function, uint32_t r1, uint32_t lr,
+               uint64_t r3, uint64_t r4) {
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.lr = lr;
+  lifted::CallFromContext(ctx, function);
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+}
+
+// The pool objects' deleting destructors: slot 0 of the object's vtable,
+// r4 = the flags, from `frame` with `lr`.
+scene::DestroyCall Destroyer(lifted::Regs& ctx, uint32_t lr) {
+  return [&ctx, lr](uint32_t object, uint32_t flags, uint32_t frame) {
+    const uint32_t function = guest::LoadU32(guest::LoadU32(object));
+    GuestCall(ctx, function, frame, lr, object, flags);
+  };
+}
+
+}  // namespace
+
+ITC_REGS_STEP(SceneSetUpConstruct) {
+  scene::SetUpConstruct(ctx.r3.u32);
+  // (r11 = 0, a leftover for recompiled callers: none now)
+}
+
+ITC_REGS_STEP(SceneFreePagesIn) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = scene::FreePagesIn(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820D09A0(ctx);
+}
+
+ITC_REGS_STEP(SceneStartTeardownA) {
+  scene::StartTeardownA();
+}
+
+ITC_REGS_STEP(SceneStartTeardown) {
+  // ReleaseAll runs only when the scene exists.
+  const uint32_t set = schema::AccessoriesGlobals::set().address;
+  if (schema::SceneGlobals::scene().address != 0 &&
+      (set == 0 || !ITC_FLAG(native_accessories) || !AccessoriesNativeLoads() ||
+       !ModelsNativeLifetime() || !accessories::SetReleasable(set))) {
+    lifted::original::c820C4D88(ctx);
+    return;
+  }
+  const auto r3 = scene::StartTeardown([&](uint32_t set) -> uint64_t {
+    return accessories::SetReleaseAll(set).value_or(set);
+  });
+  if (r3) {
+    ctx.fpscr.disableFlushMode();
+    ctx.r3.u64 = *r3;
+  }
+}
+
+ITC_REGS_STEP(SceneSetInteriorWord) {
+  if (const auto r3 = scene::SetInteriorWord(ctx.r3.u32, ctx.r4.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+ITC_REGS_STEP(SceneLoadsDone) {
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = scene::LoadsDone(ctx.r3.u32, ctx.r1.u32,
+      [&](uint32_t function, uint32_t frame, uint32_t return_address, uint32_t r3, uint32_t r4) {
+        GuestCall(ctx, function, frame, return_address, r3, r4);
+        return ctx.r3.u64;
+      });
+  ctx.lr = lr;
+}
+
+ITC_REGS_STEP(SceneDestroyA) {
+  if (!hooks::NativeHeapActive() || !scene::DestroyAFreeable(ctx.r3.u32)) {
+    lifted::original::c820C3CF8(ctx);
+    return;
+  }
+  scene::DestroyA(ctx.r3.u32, ctx.r1.u32, [&](uint32_t object, uint32_t frame) {
+    const uint32_t function = guest::LoadU32(guest::LoadU32(object));
+    GuestCall(ctx, function, frame, 0x820C3D60, object, 0);
+  });
+  ctx.r3.u64 = 0;
+}
+
+ITC_REGS_STEP(SceneAssetsConstruct) {
+  if (!ModelsNativeLifetime() || !scene::AssetsConstruct(ctx.r3.u32)) {
+    lifted::original::c820C5008(ctx);
+  }
+}
+
+ITC_REGS_STEP(SceneCarSceneConstruct) {
+  if (!ModelsNativeLifetime() || !scene::CarSceneConstruct(ctx.r3.u32)) {
+    lifted::original::c820C89A8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+ITC_REGS_STEP(SceneAssetsReset) {
+  if (ModelsNativeLifetime()) {
+    if (const auto r3 = scene::AssetsReset(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820C4A70(ctx);
+}
+
+ITC_REGS_STEP(SceneAssetsDestruct) {
+  if (ModelsNativeLifetime()) {
+    if (const auto r3 = scene::AssetsDestruct(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820C5168(ctx);
+}
+
+ITC_REGS_STEP(SceneListDeleteAll) {
+  scene::ListDeleteAll(ctx.r3.u32, ctx.r1.u32, Destroyer(ctx, 0x8259402C));
+  ctx.r3.u64 = 0;
+}
+
+ITC_REGS_STEP(SceneListDestruct) {
+  scene::ListDestruct(ctx.r3.u32, ctx.r1.u32, Destroyer(ctx, 0x8259402C));
+  ctx.r3.u64 = 0;
+}
+
+ITC_REGS_STEP(SceneCarSceneDestruct) {
+  if (!ModelsNativeLifetime() ||
+      !scene::CarSceneDestructible(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820C9110(ctx);
+    return;
+  }
+  const auto r3 = scene::CarSceneDestruct(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                          Destroyer(ctx, 0x8259402C));
+  ctx.r3.u64 = *r3;
+}
+
+ITC_REGS_STEP(SceneUpdateA) {
+  if (!hooks::NativeHeapActive() || !scene::UpdateANative()) {
+    lifted::original::c820C3DA0(ctx);
+    return;
+  }
+  const auto texture_free = [&](uint32_t header_in, uint32_t data_in,
+                                uint32_t frame) -> uint32_t {
+    if (ITC_FLAG(native_car_models) && car_models::TextureFreeable(header_in)) {
+      return car_models::TextureFree(header_in, data_in);
+    }
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = header_in;
+    ctx.r4.u64 = data_in;
+    ctx.lr = 0x820C3E1C;
+    lifted::Enter(ctx, game::Texture::Free);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u32;
+  };
+  const uint64_t r3_in = ctx.r3.u64;
+  const auto r3 = scene::UpdateA(ctx.r1.u32, Destroyer(ctx, 0x820C3D60), texture_free);
+  ctx.r3.u64 = r3 ? *r3 : r3_in;
+}
+
+ITC_REGS_STEP(SceneInitLighting) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = scene::InitLighting(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(SceneAssetsRelease) {
+  if (ModelsNativeLifetime()) {
+    const auto r3 = scene::AssetsRelease(ctx.r3.u32, [&](uint32_t at) {
+      // FreePagesIn's original, from Release's r1 (its 128-byte frame,
+      // only its back chain, left out: E5 step 6).
+      const uint64_t link = ctx.lr;
+      ctx.r3.u64 = at;
+      ctx.lr = 0x820C4CDC;
+      lifted::original::c820D09A0(ctx);
+      ctx.lr = link;
+    });
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820C4C80(ctx);
+}
+
+ITC_REGS_STEP(SceneCreate) {
+  if (!hooks::NativeHeapActive() || !ModelsNativeLifetime() || !scene::CreateNative()) {
+    lifted::original::c820C8A50(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = scene::Create(ctx.r1.u32);
+}
+
+ITC_REGS_STEP(SceneLoadAssets) {
+  if (!hooks::NativeHeapActive() || !NativeArchiveQueue()) {
+    lifted::original::c820C8B40(ctx);
+    return;
+  }
+  ctx.r3.u64 = scene::LoadAssets(ctx.r3.u32, ctx.r13.u32, NativeArchiveLoad());
+}
+
+ITC_REGS_STEP(SceneOnFileLoaded) {
+  const uint32_t request = ctx.r3.u32, data = ctx.r4.u32, scene_at = ctx.r6.u32;
+  if (!ModelsNativeLifetime() || !scene::FileLoadedNative(request, scene_at)) {
+    lifted::original::c820C52A0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr, r3_in = ctx.r3.u64;
+  std::optional<uint64_t> r3;
+  // The guest calls from the original's frame (128 bytes).
+  guest_call::InFrame(ctx, 128, 0x820C52D0, [&](uint32_t) {
+    hooks::ModelLoadGuest model_guest{ctx};
+    scene::FileLoadedCalls calls;
+    calls.model_load = model_guest.Calls();
+    calls.model_load_original = [&](uint32_t model, uint32_t file, uint32_t xpr) {
+      ctx.r3.u64 = model;
+      ctx.r4.u64 = file;
+      ctx.r5.u64 = xpr;
+      ctx.lr = 0x820C5480;
+      lifted::original::c82596920(ctx);
+    };
+    calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
+      ctx.r3.u64 = xpr;
+      ctx.r4.u64 = file;
+      ctx.lr = 0x820C52D0;
+      lifted::original::c82596F68(ctx);
+    };
+    calls.provider_set = [&](uint32_t provider, uint32_t xpr) -> uint64_t {
+      ctx.r3.u64 = provider;
+      ctx.r4.u64 = 0;
+      ctx.r5.u64 = xpr;
+      ctx.lr = 0x820C5340;
+      lifted::CallFromContext(ctx, schema::TextureProvider(provider).vtable().set());
+      return ctx.r3.u64;
+    };
+    calls.tga_create = [&](uint32_t header, uint32_t size, uint32_t buffer_at, uint32_t pixels) {
+      ctx.r3.u64 = header;
+      ctx.r4.u64 = size;
+      ctx.r5.u64 = buffer_at;
+      ctx.r6.u64 = pixels;
+      ctx.lr = 0x820C54F0;
+      lifted::original::c820ED020(ctx);
+    };
+    r3 = scene::FileLoaded(request, data, scene_at, stack, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3 ? *r3 : r3_in;
+  ctx.fpscr.disableFlushMode();
+}
+
+
+namespace {
+
+// A register step (or an original) from `frame` with `lr`, r3 and r4 set;
+// r1 and lr put back. Returns the r3 it leaves.
+using Step = void (*)(lifted::Regs&);
+
+uint64_t StepCall(lifted::Regs& ctx, Step step, uint32_t frame, uint32_t lr,
+                  uint64_t r3, uint64_t r4) {
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = frame;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.lr = lr;
+  step(ctx);
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+  return ctx.r3.u64;
+}
+
+// VirtualFree(pages, 0, MEM_RELEASE) as its adapter does it, else the
+// original from `frame`.
+uint64_t FreePages(lifted::Regs& ctx, uint32_t pages, uint32_t frame, uint32_t lr) {
+  if (const auto r3 = hooks::VirtualFree(pages, 0, 0x8000, lr)) {
+    return *r3;
+  }
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = frame;
+  ctx.r3.u64 = pages;
+  ctx.r4.u64 = 0;
+  ctx.r5.u64 = 0x8000;
+  ctx.lr = lr;
+  lifted::original::c82295330(ctx);
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+  return ctx.r3.u64;
+}
+
+}  // namespace
+
+ITC_REGS_STEP(SceneDestroyB) {
+  const uint64_t lr = ctx.lr;
+  scene::DestroyB(ctx.r3.u32, ctx.r1.u32,
+      [&](uint32_t function, uint32_t frame, uint32_t return_address, uint32_t r3, uint32_t r4) {
+        GuestCall(ctx, function, frame, return_address, r3, r4);
+        return ctx.r3.u64;
+      },
+      [&](uint32_t object, uint32_t frame) {
+        const uint32_t function = guest::LoadU32(guest::LoadU32(object));
+        GuestCall(ctx, function, frame, 0x820C5A20, object, 0);
+      },
+      [&](uint32_t object, uint32_t frame) {
+        return FreePages(ctx, object, frame, 0x820C5A34);
+      });
+  ctx.lr = lr;
+  ctx.r3.u64 = 0;
+}
+
+ITC_REGS_STEP(SceneUpdateModels) {
+  const uint64_t lr = ctx.lr, r3_in = ctx.r3.u64;
+  const auto r3 = scene::UpdateModels(ctx.r3.u32, ctx.r1.u32,
+                                      [&](uint32_t model, uint32_t frame) {
+                                        return StepCall(ctx,
+                                                        [](lifted::Regs& c) {
+                                                          if (ITC_FLAG(native_scene_models)) {
+                                                            hooks::SceneModelUpdate(c);
+                                                          } else {
+                                                            lifted::Sdk(c, lifted::original::c820DA180);
+                                                          }
+                                                        },
+                                                        frame, 0x820C5A9C, model, ctx.r4.u64);
+                                      });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3.value_or(r3_in);
+}
+
+ITC_REGS_STEP(SceneUpdate) {
+  const uint64_t lr = ctx.lr;
+  scene::UpdateCalls calls;
+  calls.finish = [&](uint32_t function, uint32_t frame, uint32_t return_address, uint32_t r3,
+                     uint32_t r4) {
+    GuestCall(ctx, function, frame, return_address, r3, r4);
+    return ctx.r3.u64;
+  };
+  calls.destroy = [&](uint32_t object, uint32_t frame) {
+    const uint32_t function = guest::LoadU32(guest::LoadU32(object));
+    GuestCall(ctx, function, frame, 0x820C5A20, object, 0);
+  };
+  calls.free_object = [&](uint32_t object, uint32_t frame) {
+    return FreePages(ctx, object, frame, 0x820C5A34);
+  };
+  calls.free_scene = [&](uint32_t scene, uint32_t frame) {
+    return FreePages(ctx, scene, frame, 0x820C9684);
+  };
+  calls.release = [&](uint32_t assets, uint32_t frame) {
+    return StepCall(ctx, ITC_REGS_FN(SceneAssetsRelease), frame, 0x820C9664, assets, ctx.r4.u64);
+  };
+  calls.destruct = [&](uint32_t scene, uint32_t frame) {
+    return StepCall(ctx, ITC_REGS_FN(SceneCarSceneDestruct), frame, 0x820C9670, scene, 0);
+  };
+  calls.update_models = [&](uint32_t scene, uint32_t frame) {
+    return StepCall(ctx,
+                    [](lifted::Regs& c) {
+                      if (ITC_FLAG(native_vehicle_accessors)) {
+                        SceneUpdateModels(c);
+                      } else {
+                        lifted::Sdk(c, lifted::original::c820C5A60);
+                      }
+                    },
+                    frame, 0x820C96A4, scene, ctx.r4.u64);
+  };
+  calls.update_a = [&](uint64_t r3, uint32_t frame) {
+    return StepCall(ctx, ITC_REGS_FN(SceneUpdateA), frame, 0x820C96B4, r3, ctx.r4.u64);
+  };
+  calls.accessories_destroy = [&](uint32_t frame) {
+    return StepCall(ctx,
+                    [](lifted::Regs& c) {
+                      if (ITC_FLAG(native_accessories)) {
+                        AccessoriesDestroy(c);
+                      } else {
+                        lifted::Sdk(c, lifted::original::c820F1078);
+                      }
+                    },
+                    frame, 0x820C96D0, ctx.r3.u64, ctx.r4.u64);
+  };
+  const uint64_t r3 = scene::Update(ctx.r1.u32, ctx.r3.u64, calls);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace hooks
+
+// The adapters: the register steps above, or the originals with the flag
+// off.
+
+#define ITC_SCENE(address, step)       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_scene)) { \
+    hooks::step(ctx);            \
+  }
+
+ITC_SCENE(820D0D50, SceneSetUpConstruct)
+ITC_SCENE(820D09A0, SceneFreePagesIn)
+ITC_SCENE(820C4D88, SceneStartTeardown)
+ITC_SCENE(820C8950, SceneSetInteriorWord)
+ITC_SCENE(820C8A50, SceneCreate)
+ITC_SCENE(820C8B40, SceneLoadAssets)
+ITC_SCENE(820C52A0, SceneOnFileLoaded)
+ITC_SCENE(820C5798, SceneLoadsDone)
+ITC_SCENE(820C9608, SceneUpdate)
+// No adapters (their callers in play are native; the register steps above
+// are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
+// sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets
+// sub_820C5168, List::DeleteAll sub_82593FF8 and ~List sub_82594188,
+// CarScene::InitLighting sub_820C8528, CarScene::CarScene sub_820C89A8 and
+// SceneAssets::Reset sub_820C4A70; ScenePools::DestroyB sub_820C59B0 (only
+// CarScene::Update calls it), sub_820C5A60 (CarScene::UpdateModels,
+// --native_vehicle_accessors; only CarScene::Update calls it); removed (B7
+// loop, 2026-11-06), their callers in play native: ScenePools::UpdateA
+// sub_820C3DA0, CarScene::~CarScene sub_820C9110 and SceneAssets::Release
+// sub_820C4C80 (CarScene::Update's plain C++ calls their steps).

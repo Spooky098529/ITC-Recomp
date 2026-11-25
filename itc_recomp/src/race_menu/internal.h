@@ -1,0 +1,98 @@
+// The race menu's shared helpers (src/race_menu/ only).
+
+#pragma once
+
+#include <cstdint>
+
+#include "game_modes/game_modes.h"
+#include "guest.h"
+#include "race_menu/race_menu.h"
+#include "schema/boot_mode.h"
+#include "schema/career.h"
+#include "schema/game_modes.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/racer_controllers.h"
+#include "schema/race_menu.h"
+#include "schema/tuning_screen.h"
+#include "ui_movies/game.h"
+
+namespace race_menu {
+
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
+}
+
+constexpr uint32_t kNone = 0xFFFFFFFFu;
+
+// The views (schema/race-menu.toml, menu-helpers.toml).
+using Machine = schema::RaceMenu;
+using G = schema::RaceMenuGlobals;
+using Pages = schema::PageObject;
+using Menu = schema::FrontEndMenu;
+using Event = schema::RaceMenuEvent;
+using EventKind = schema::RaceMenuEventKind;
+// Other areas' views: player 0's save data (race-event.toml; its +0x199E0
+// through career.toml's CareerSave), a UI movie node (tuning-screen.toml),
+// a mode message (game-modes.toml).
+using Save = schema::SaveData;
+using CareerSave = schema::CareerSave;
+using Node = schema::UiMovieNode;
+using Message = game_modes::RingSlot;  // a slot in a mode's ring (its bytes, E5 step 4)
+// A player's mapper entry (racer-controllers.toml).
+using Entry = schema::PlayerMapperEntry;
+
+// The machine's event pairs (+9852) and kind pairs (+9980) by index.
+inline Event EventAt(uint32_t machine, uint32_t i) {
+  return Event(Machine(machine).events_address() + 8 * i);
+}
+inline EventKind EventKindAt(uint32_t machine, uint32_t i) {
+  return EventKind(Machine(machine).event_kinds_address() + 8 * i);
+}
+
+// The original's frame below `sp`, its back chain written.
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  const uint32_t frame = sp - bytes;
+  Store(frame, sp);
+  return frame;
+}
+
+// UiMovies::Find(id): the pair's value's address, and the movie in it. The
+// original stored the id at `key` (a frame word only it read) and passed its
+// address; the id is passed as a value (E5 step 6), `key` left unwritten.
+inline uint32_t FindPair(uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(ui_movies::kMovieTable, id);
+}
+inline uint32_t FindMovie(uint32_t id, uint32_t key) {
+  return Load(FindPair(id, key));
+}
+
+
+constexpr uint32_t kSoundPlay = 0x82175850;  // Sound::Play, through its override
+
+// The sound manager's vtable's slots (bytes into it).
+constexpr uint32_t kStopCueSlot = 52;       // 13
+constexpr uint32_t kIsCuePlayingSlot = 56;  // 14
+
+// The sound manager's slot with r4 = the bank's word, r5 = the cue's.
+inline uint64_t CallSlot(const Calls& calls, uint32_t slot, uint32_t frame,
+                         uint32_t lr, uint32_t bank, uint32_t cue) {
+  const uint32_t manager = G::sound_manager();
+  return calls.Call(Load(Load(manager) + slot), frame, lr, manager, bank, cue);
+}
+
+// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
+// start +604, 50 slots of 12 bytes), as the handlers do inline.
+inline void Post(uint32_t mode, uint32_t id) {
+  const schema::RaceMenuMode m(mode);
+  const uint32_t count = m.message_count() + 1;
+  const uint32_t start = m.message_start();
+  m.set_message_count(count);
+  const Message slot{m.messages() + 12 * ((start + count - 1) % 50)};
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
+}
+
+}  // namespace race_menu

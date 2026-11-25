@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 
 namespace collision {
@@ -14,22 +15,14 @@ namespace collision {
 using namespace car_physics::ops;
 namespace vl = vector_library;
 
-namespace {
+using G = schema::CollisionGlobals;
+using Box = schema::BoxShape;
+using Record = schema::CollisionShape;
+using Query = schema::CollisionQuery;
+using Contact = schema::QueryContact;
 
-// The edges' corner indices (12 words each) and BoxShape::LowerCorner's
-// corners (4 words).
-constexpr uint32_t kEdgeStarts = 0x82600D54;
-constexpr uint32_t kEdgeEnds = 0x82600D84;
-constexpr uint32_t kLowerCorners = 0x82002B0C;
-// BoxShape::FaceDirection's factors (16 bytes an entry) and its result.
-constexpr uint32_t kFaceDirectionFactors = 0x82600DC0;
-constexpr uint32_t kFaceDirection = 0x826C2DE0;
-constexpr uint32_t kMinusOne = 0x82001BE0;  // the game's float -1.0
-
-}  // namespace
-
-bool IsBox(uint8_t* base, uint32_t shape) {
-  return guest::LoadU32(base, shape) == kBoxVtable;
+bool IsBox(uint32_t shape) {
+  return Box(shape).vtable() == kBoxVtable;
 }
 
 uint32_t BoxCornerCount() {
@@ -46,174 +39,188 @@ uint32_t BoxEdgeCount() {
 }
 uint32_t BoxCorner(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820B9ED0 BoxShape::Corner");
-  return box + ((i + 11) << 4);
+  return Box(box).corner_x_address() + (i << 4);
 }
 uint32_t BoxFace(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820B9EE8 BoxShape::Face");
-  return box + (i << 5) + 304;
+  return Box(box).face_px_distance_address() + (i << 5);
 }
-uint32_t BoxEdgeStart(uint8_t* base, uint32_t edge) {
+uint32_t BoxEdgeStart(uint32_t edge) {
   ITC_NATIVE_RUNNING("sub_820B9F98 BoxShape::EdgeStart");
-  return guest::LoadU32(base, kEdgeStarts + (edge << 2));
+  return guest::LoadU32(G::edge_starts_address() + (edge << 2));
 }
-uint32_t BoxEdgeEnd(uint8_t* base, uint32_t edge) {
+uint32_t BoxEdgeEnd(uint32_t edge) {
   ITC_NATIVE_RUNNING("sub_820B9FB0 BoxShape::EdgeEnd");
-  return guest::LoadU32(base, kEdgeEnds + (edge << 2));
+  return guest::LoadU32(G::edge_ends_address() + (edge << 2));
 }
-uint32_t BoxEdgesStart(uint8_t* base, uint32_t edge) {
+uint32_t BoxEdgesStart(uint32_t edge) {
   ITC_NATIVE_RUNNING("sub_820B9FC8 BoxEdges::Start");
-  return guest::LoadU32(base, kEdgeStarts + (edge << 2));
+  return guest::LoadU32(G::edge_starts_address() + (edge << 2));
 }
-uint32_t BoxEdgesEnd(uint8_t* base, uint32_t edge) {
+uint32_t BoxEdgesEnd(uint32_t edge) {
   ITC_NATIVE_RUNNING("sub_820B9FE0 BoxEdges::End");
-  return guest::LoadU32(base, kEdgeEnds + (edge << 2));
+  return guest::LoadU32(G::edge_ends_address() + (edge << 2));
 }
 
-void BoxSetCacheWord(uint8_t* base, uint32_t box, uint32_t i, uint32_t value) {
+void BoxSetCacheWord(uint32_t box, uint32_t i, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820BA668 BoxShape::SetCacheWord");
-  guest::StoreU32(base, box + ((i + 40) << 2), value);
+  guest::StoreU32(Box(box).lower_corner_position_0_address() + (i << 2), value);
 }
-uint32_t BoxCacheWord(uint8_t* base, uint32_t box, uint32_t i) {
+uint32_t BoxCacheWord(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820BA678 BoxShape::CacheWord");
-  return guest::LoadU32(base, box + ((i + 40) << 2));
+  return guest::LoadU32(Box(box).lower_corner_position_0_address() + (i << 2));
 }
-void BoxCopyCache(uint8_t* base, uint32_t box, uint32_t from) {
+void BoxCopyCache(uint32_t box, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_820BAA50 BoxShape::CopyCache");
-  for (uint32_t at = 160; at < 176; at += 4) {
-    guest::StoreU32(base, box + at, guest::LoadU32(base, from + at));
-  }
+  const Box to(box), source(from);
+  to.set_lower_corner_position_0(source.lower_corner_position_0());
+  to.set_lower_corner_position_1(source.lower_corner_position_1());
+  to.set_lower_corner_position_2(source.lower_corner_position_2());
+  to.set_lower_corner_position_3(source.lower_corner_position_3());
 }
 
-double ShapeRadius(uint8_t* base, uint32_t shape) {
+double ShapeRadius(uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_820BAB40 Shape::Radius");
-  return Lfs(base, shape + 32);
+  return double(Box(shape).radius());
 }
 
-uint32_t BoxLowerCorner(uint8_t* base, uint32_t box, uint32_t i) {
+uint32_t BoxLowerCorner(uint32_t box, uint32_t i) {
   ITC_NATIVE_RUNNING("sub_820BA368 BoxShape::LowerCorner");
-  const uint32_t k = guest::LoadU32(base, kLowerCorners + (i << 2));
+  const Box b(box);
+  const uint32_t k = guest::LoadU32(G::lower_corners_address() + (i << 2));
   const uint32_t partner = k ^ 2;
-  const double y = Lfs(base, (k << 4) + box + 180);
-  const double partner_y = Lfs(base, (partner << 4) + box + 180);
+  const double y = Lfs(b.corner_y_address() + (k << 4));
+  const double partner_y = Lfs(b.corner_y_address() + (partner << 4));
   // blt: k only when its y is less (equal or NaN takes the partner).
   const uint32_t pick = y < partner_y ? k : partner;
-  return ((pick + 11) << 4) + box;
+  return b.corner_x_address() + (pick << 4);
 }
 
-double BoxFaceDistance(uint8_t* base, uint32_t box, uint32_t i, uint32_t point, uint32_t* r3) {
+double BoxFaceDistance(uint32_t box, uint32_t i, uint32_t point, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820BA3B0 BoxShape::FaceDistance");
-  const uint32_t normal = ((i + 10) << 5) + box;
-  const double dot = double(vl::Vec3DotOf(base, normal, point));
+  const Box b(box);
+  const uint32_t normal = b.face_px_normal_x_address() + (i << 5);
+  const double dot = double(vl::Vec3DotOf(normal, point));
   *r3 = normal;
-  return Fsubs(dot, Lfs(base, (i << 5) + box + 304));
+  return Fsubs(dot, Lfs(b.face_px_distance_address() + (i << 5)));
 }
 
-uint32_t BoxFaceDirection(uint8_t* base, uint32_t box, uint32_t i, uint32_t frame) {
+uint32_t BoxFaceDirection(uint32_t box, uint32_t i, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820B9F00 BoxShape::FaceDirection");
-  const uint32_t factors = (i << 4) + kFaceDirectionFactors;
-  vl::Vec4Scaled(base, frame + 80, box + 384, Lfs(base, factors + 8));
-  vl::Vec4Scaled(base, frame + 96, box + 352, Lfs(base, factors + 4));
-  vl::Vec4Scaled(base, frame + 112, box + 320, Lfs(base, factors + 0));
-  vl::Vec3Sum(base, frame + 128, frame + 112, frame + 96);
-  vl::Vec3Sum(base, frame + 144, frame + 128, frame + 80);
-  vl::Vec4Copy(base, kFaceDirection, frame + 144);
-  return kFaceDirection;
+  const Box b(box);
+  const uint32_t factors = (i << 4) + G::face_direction_factors_address();
+  vl::Vec4Scaled(frame + 80, b.face_pz_normal_x_address(), Lfs(factors + 8));
+  vl::Vec4Scaled(frame + 96, b.face_py_normal_x_address(), Lfs(factors + 4));
+  vl::Vec4Scaled(frame + 112, b.face_px_normal_x_address(), Lfs(factors + 0));
+  vl::Vec3Sum(frame + 128, frame + 112, frame + 96);
+  vl::Vec3Sum(frame + 144, frame + 128, frame + 80);
+  vl::Vec4Copy(G::face_direction_address(), frame + 144);
+  return G::face_direction_address();
 }
 
-double BoxTranslate(uint8_t* base, uint32_t box, uint32_t offset) {
+double BoxTranslate(uint32_t box, uint32_t offset) {
   ITC_NATIVE_RUNNING("sub_820BA2F0 BoxShape::Translate");
+  const Box b(box);
   for (uint32_t k = 0; k < 8; k++) {
-    vl::Vec3AddTo(base, box + 176 + 16 * k, offset);
+    vl::Vec3AddTo(b.corner_x_address() + 16 * k, offset);
   }
   double dot = 0.0;
   for (uint32_t k = 0; k < 6; k++) {
-    const uint32_t face = box + 304 + 32 * k;
-    dot = double(vl::Vec3DotOf(base, face + 16, offset));
-    Stfs(base, face, Fadds(dot, Lfs(base, face)));
+    const schema::BoxShapeFace face(b.face_px_distance_address() + 32 * k);
+    dot = double(vl::Vec3DotOf(face.normal_x_address(), offset));
+    face.set_distance(float(Fadds(dot, double(face.distance()))));
   }
-  vl::Vec3AddTo(base, box + 48, offset);
+  vl::Vec3AddTo(b.center_x_address(), offset);
   return dot;
 }
 
-uint32_t WordAt8(uint8_t* base, uint32_t object) {
+uint32_t WordAt8(uint32_t object) {
   ITC_NATIVE_RUNNING("sub_822BE2C8 WordAt8");
-  return guest::LoadU32(base, object + 8);
+  return schema::WordAt8Object(object).word_8();
 }
 
-uint32_t CollisionShapeCurrentCenter(uint8_t* base, uint32_t record) {
+uint32_t CollisionShapeCurrentCenter(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820BAB20 CollisionShape::CurrentCenter");
-  return guest::LoadU32(base, record + 8) + 48;
+  return Record(record).current().center_x_address();
 }
-uint32_t CollisionShapePreviousCenter(uint8_t* base, uint32_t record) {
+uint32_t CollisionShapePreviousCenter(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820BAB30 CollisionShape::PreviousCenter");
-  return guest::LoadU32(base, record + 4) + 48;
+  return Record(record).previous().center_x_address();
 }
 
 // The box's slot 4 (its type) is a leaf answering 2.
-bool CollisionShapeType(uint8_t* base, uint32_t record, uint32_t* type) {
+bool CollisionShapeType(uint32_t record, uint32_t* type) {
   ITC_NATIVE_RUNNING("sub_820BACB8 CollisionShape::Type");
-  if (!IsBox(base, guest::LoadU32(base, record))) {
+  if (!IsBox(Record(record).template_shape().address)) {
     return false;
   }
   *type = 2;
   return true;
 }
-bool CollisionShapePrevious(uint8_t* base, uint32_t record, uint32_t* copy) {
+bool CollisionShapePrevious(uint32_t record, uint32_t* copy) {
   ITC_NATIVE_RUNNING("sub_820BADF8 CollisionShape::Previous");
-  if (!IsBox(base, guest::LoadU32(base, record))) {
+  const Record r(record);
+  if (!IsBox(r.template_shape().address)) {
     return false;
   }
-  *copy = guest::LoadU32(base, record + 4);
+  *copy = r.previous().address;
   return true;
 }
-bool CollisionShapeCurrent(uint8_t* base, uint32_t record, uint32_t* copy) {
+bool CollisionShapeCurrent(uint32_t record, uint32_t* copy) {
   ITC_NATIVE_RUNNING("sub_820BAE38 CollisionShape::Current");
-  if (!IsBox(base, guest::LoadU32(base, record))) {
+  const Record r(record);
+  if (!IsBox(r.template_shape().address)) {
     return false;
   }
-  *copy = guest::LoadU32(base, record + 8);
+  *copy = r.current().address;
   return true;
 }
 
-void QueryConstruct(uint8_t* base, uint32_t query) {
+void QueryConstruct(uint32_t query) {
   ITC_NATIVE_RUNNING("sub_820BD1C8 Query::Query");
-  for (uint32_t at : {44u, 60u, 76u, 108u}) {
-    CopyWord(base, kZero, query + at);
+  const Query q(query);
+  for (uint32_t at : {q.contact_point_w_address(), q.contact_normal_w_address(),
+                      q.contact_push_w_address(), q.direction_w_address()}) {
+    CopyWord(kZero, at);
   }
-  for (uint32_t block : {112u, 448u, 784u, 1120u}) {
+  for (uint32_t block : {q.b_in_a_previous_block_address(), q.b_in_a_current_block_address(),
+                         q.a_in_b_previous_block_address(), q.a_in_b_current_block_address()}) {
     for (uint32_t k = 0; k < 8; k++) {
-      CopyWord(base, kZero, query + block + 80 + 12 + 32 * k);
+      CopyWord(kZero, schema::CollisionBlock(block).corner_w_address() + 32 * k);
     }
   }
-  guest::StoreU32(base, query + 0, 0);
-  guest::StoreU32(base, query + 4, 0);
-  guest::StoreU32(base, query + 8, query + 112);
-  guest::StoreU32(base, query + 12, query + 448);
-  guest::StoreU32(base, query + 16, query + 784);
-  guest::StoreU32(base, query + 20, query + 1120);
+  q.set_shape_a(0);
+  q.set_shape_b(0);
+  q.set_b_in_a_previous(q.b_in_a_previous_block_address());
+  q.set_b_in_a_current(q.b_in_a_current_block_address());
+  q.set_a_in_b_previous(q.a_in_b_previous_block_address());
+  q.set_a_in_b_current(q.a_in_b_current_block_address());
 }
 
-void QuerySetShapes(uint8_t* base, uint32_t query, uint32_t a, uint32_t b) {
+void QuerySetShapes(uint32_t query, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820BC848 Query::SetShapes");
-  guest::StoreU32(base, query + 0, a);
-  guest::StoreU32(base, query + 4, b);
+  const Query q(query);
+  q.set_shape_a(a);
+  q.set_shape_b(b);
 }
 
-void ContactSet(uint8_t* base, uint32_t contact, uint32_t point, uint32_t normal, double depth,
+void ContactSet(uint32_t contact, uint32_t point, uint32_t normal, double depth,
                 double time) {
   ITC_NATIVE_RUNNING("sub_820BC908 Contact::Set");
-  vl::Vec4Copy(base, contact, point);
-  vl::Vec4Copy(base, contact + 16, normal);
-  vl::Vec4Copy(base, contact + 32, normal);
-  Stfs(base, contact + 48, depth);
-  Stfs(base, contact + 52, time);
+  const Contact c(contact);
+  vl::Vec4Copy(c.point_x_address(), point);
+  vl::Vec4Copy(c.normal_x_address(), normal);
+  vl::Vec4Copy(c.push_x_address(), normal);
+  c.set_depth(float(depth));
+  c.set_time(float(time));
 }
 
-double ContactFlip(uint8_t* base, uint32_t contact) {
+double ContactFlip(uint32_t contact) {
   ITC_NATIVE_RUNNING("sub_820BC858 Contact::Flip");
-  const double minus_one = Lfs(base, kMinusOne);
-  vl::Vec4ScaleBy(base, contact + 16, minus_one);
-  vl::Vec4ScaleBy(base, contact + 32, minus_one);
+  const Contact c(contact);
+  const double minus_one = double(G::minus_one());
+  vl::Vec4ScaleBy(c.normal_x_address(), minus_one);
+  vl::Vec4ScaleBy(c.push_x_address(), minus_one);
   return minus_one;
 }
 

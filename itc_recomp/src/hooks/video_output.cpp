@@ -8,6 +8,7 @@
 // it), so it's meant to be set at launch, not changed while the game runs.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "graphics/video_output.h"
@@ -26,18 +27,13 @@ ITC_FLAG_BOOL(native_video_output, true, "ITC",
 namespace vo = graphics::video_output;
 
 #define ITC_VIDEO_OUTPUT(address, ...)       \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_video_output)) {    \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_video_output)) { \
     __VA_ARGS__;                             \
   }
 
 ITC_VIDEO_OUTPUT(825B9A60, ctx.r3.u64 = vo::CurrentThreadId())
-ITC_VIDEO_OUTPUT(8229D9D0, ctx.r3.u64 = vo::AcquireThreadOwnership(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8229DA10, vo::ReleaseThreadOwnership(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258DB18, ctx.r3.u64 = vo::Construct(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258D8C8, ctx.r3.u64 = vo::LockDevice(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258D908, vo::UnlockDevice(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VIDEO_OUTPUT(8229D9D0, ctx.r3.u64 = vo::AcquireThreadOwnership(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8229DA10, vo::ReleaseThreadOwnership(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258DB18, ctx.r3.u64 = vo::Construct(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258D8C8, ctx.r3.u64 = vo::LockDevice(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258D908, vo::UnlockDevice(ctx.r3.u32, ctx.r4.u32))

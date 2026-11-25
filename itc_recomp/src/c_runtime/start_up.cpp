@@ -6,70 +6,89 @@
 #include "base/log.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
+#include "schema/heap.h"
 
 namespace c_runtime {
 
-void InitFloatConversions(uint8_t* base) {
+void InitFloatConversions() {
   ITC_NATIVE_RUNNING("sub_825A6DB0 _cfltcvt_init");
-  static constexpr uint32_t kTable = 0x8266BA5C;
   static constexpr uint32_t kFunctions[10] = {
       0x825AEB70, 0x825ADF20, 0x825ADF10, 0x825ADF18, 0x825ADE90,
       0x825AEB70, 0x825AEB20, 0x825ADEB0, 0x825ADDD8, 0x825ADD38,
   };
   for (uint32_t i = 0; i < 10; i++) {
-    guest::StoreU32(base, kTable + 4 * i, kFunctions[i]);
+    guest::StoreU32(schema::CRuntimeGlobals::float_conversions_address() + 4 * i,
+                    kFunctions[i]);
   }
 }
 
-void SetHandler82971170(uint8_t* base, uint32_t value) {
-  guest::StoreU32(base, 0x82971170, value);
+void SetHandler82971170(uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AD140 (sets 0x82971170)");
+  schema::HeapGlobals::set_new_handler(value);
 }
 
-void SetHandler82971178(uint8_t* base, uint32_t value) {
-  guest::StoreU32(base, 0x82971178, value);
+void SetHandler82971178(uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AEE18 (sets 0x82971178)");
+  schema::CRuntimeGlobals::set_unknown_82971178(value);
 }
 
-void SetInvalidParameterHandler(uint8_t* base, uint32_t value) {
-  guest::StoreU32(base, 0x82978320, value);
+void SetInvalidParameterHandler(uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AFCB8 (sets 0x82978320)");
+  schema::CRuntimeGlobals::set_invalid_parameter_handler(value);
 }
 
-void SetCriticalSectionInitializer(uint8_t* base, uint32_t value) {
-  guest::StoreU32(base, 0x8297132C, value);
+void SetCriticalSectionInitializer(uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825B3560 (sets 0x8297132C)");
+  schema::CRuntimeGlobals::set_critical_section_initializer(value);
 }
 
-void SetDefaultCriticalSectionInitializer(uint8_t* base) {
-  guest::StoreU32(base, 0x82971328, 0x825B3498);
+void SetDefaultCriticalSectionInitializer() {
+  ITC_NATIVE_RUNNING("sub_825B3548 (sets 0x82971328)");
+  schema::CRuntimeGlobals::set_default_critical_section_initializer(0x825B3498);
 }
 
-int32_t InitMbcTable(uint8_t* base) {
-  static constexpr uint32_t kDone = 0x82978338;
-  if (guest::LoadU32(base, kDone) == 0) {
-    const uint32_t info = guest::LoadU32(base, 0x8266C450);
-    guest::StoreU32(base, 0x8297136C, uint32_t(-3));
-    guest::StoreU32(base, 0x8297135C, 0);
-    SetSbcs(base, info);
-    guest::StoreU32(base, kDone, 1);
+void InitPointers() {
+  ITC_NATIVE_RUNNING("sub_825AA398 _init_pointers");
+  SetHandler82971170(0);
+  SetCriticalSectionInitializer(0);
+  SetInvalidParameterHandler(0);
+  SetHandler82971178(0);
+  SetDefaultCriticalSectionInitializer();
+  schema::CRuntimeGlobals::set_aexit_rtn(0x825AA378);
+}
+
+int32_t InitMbcTable() {
+  using schema::CRuntimeGlobals;
+  if (CRuntimeGlobals::mbctable_done() == 0) {
+    const uint32_t info = CRuntimeGlobals::mbc_info().address;
+    CRuntimeGlobals::set_mbc_code_page(-3);
+    CRuntimeGlobals::set_mbc_is_set(0);
+    SetSbcs(info);
+    CRuntimeGlobals::set_mbctable_done(1);
   }
   return 0;
 }
 
-void SetSbcs(uint8_t* base, uint32_t info) {
+void SetSbcs(uint32_t info) {
   ITC_NATIVE_RUNNING("sub_825B68C8 setSBCS");
-  static constexpr uint32_t kCLocale = 0x8266C028;
+  const schema::MbcInfo to(info);
+  const schema::MbcInfo from(schema::CRuntimeGlobals::c_mbc_info_address());
   for (uint32_t i = 0; i < 257; i++) {
-    guest::StoreU8(base, info + 28 + i, 0);
+    guest::StoreU8(to.mbctype_address() + i, 0);
   }
-  guest::StoreU32(base, info + 4, 0);
-  guest::StoreU32(base, info + 8, 0);
-  guest::StoreU32(base, info + 12, 0);
+  to.set_code_page(0);
+  to.set_is_mb_code_page(0);
+  to.set_lcid(0);
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU16(base, info + 16 + 2 * i, 0);
+    guest::StoreU16(to.lead_byte_ranges_address() + 2 * i, 0);
   }
   for (uint32_t i = 0; i < 257; i++) {
-    guest::StoreU8(base, info + 28 + i, guest::LoadU8(base, kCLocale + 28 + i));
+    guest::StoreU8(to.mbctype_address() + i, guest::LoadU8(from.mbctype_address() + i));
   }
   for (uint32_t i = 0; i < 256; i++) {
-    guest::StoreU8(base, info + 285 + i, guest::LoadU8(base, kCLocale + 285 + i));
+    guest::StoreU8(to.mbcasemap_address() + i,
+                   guest::LoadU8(from.mbcasemap_address() + i));
   }
 }
 

@@ -17,7 +17,7 @@ namespace race_overlays {
 
 // CarOverlays::View (sub_82126550): the view in `slot` (+4 + 4 x slot), 0
 // for slot 25.
-uint32_t View(uint8_t* base, uint32_t overlays, uint32_t slot);
+uint32_t View(uint32_t overlays, uint32_t slot);
 
 // CarOverlays::ViewportEntry (sub_821264A8): the address of the 12-byte
 // entry `index` of the table at 0x82008558.
@@ -25,48 +25,48 @@ uint32_t ViewportEntry(uint32_t index);
 
 // OverlayView::SpeedKmh (sub_821268C0): the view's vehicle's speed in km/h
 // (Vehicle::GetSpeedKmh, sub_820C0128, which the original tail-calls).
-float SpeedKmh(uint8_t* base, uint32_t view);
+float SpeedKmh(uint32_t view);
 
 // OverlayView::WheelSpin (sub_821268F0): the float at vehicle + 664 + 368 x
 // wheel.
-float WheelSpin(uint8_t* base, uint32_t view, uint32_t wheel);
+float WheelSpin(uint32_t view, uint32_t wheel);
 
 // sub_82126908: the float at vehicle + 512 + 368 x wheel.
-float WheelValue512(uint8_t* base, uint32_t view, uint32_t wheel);
+float WheelValue512(uint32_t view, uint32_t wheel);
 
 // sub_82126920: the vehicle's float +3764 for wheels 0-1, +4036 for 2-3,
 // else the game's 0.0 (0x82000A34).
-float AxleValue3764(uint8_t* base, uint32_t view, uint32_t wheel);
+float AxleValue3764(uint32_t view, uint32_t wheel);
 
 // sub_82126958: the vehicle's float +3384 for wheels 0-1, +3388 for 2-3,
 // else the game's 0.0, times the float at 0x82001FBC (rounded to single).
-float AxleValue3384(uint8_t* base, uint32_t view, uint32_t wheel);
+float AxleValue3384(uint32_t view, uint32_t wheel);
 
 // OverlayView::WheelOnGround (sub_82126998): the byte at vehicle + 433 + 368
 // x wheel.
-uint32_t WheelOnGround(uint8_t* base, uint32_t view, uint32_t wheel);
+uint32_t WheelOnGround(uint32_t view, uint32_t wheel);
 
 // sub_82126A80: the vehicle's byte +2504.
-uint32_t VehicleByte2504(uint8_t* base, uint32_t view);
+uint32_t VehicleByte2504(uint32_t view);
 // sub_82126AA0: the vehicle's word +2252.
-uint32_t VehicleWord2252(uint8_t* base, uint32_t view);
+uint32_t VehicleWord2252(uint32_t view);
 // sub_82126AB0: the vehicle's word +340 (an object pointer).
-uint32_t VehicleWord340(uint8_t* base, uint32_t view);
+uint32_t VehicleWord340(uint32_t view);
 // sub_82126AC0: the vehicle's float +6256.
-float VehicleFloat6256(uint8_t* base, uint32_t view);
+float VehicleFloat6256(uint32_t view);
 // sub_82126AD0: the vehicle's float +6252.
-float VehicleFloat6252(uint8_t* base, uint32_t view);
+float VehicleFloat6252(uint32_t view);
 
 // sub_82126D18: the word at [0x826C5B2C] + 0xA3AF4 (probably the race mode).
-uint32_t RaceMode(uint8_t* base);
+uint32_t RaceMode();
 
 // OverlayView::RacerFlags (sub_82127178): [[vehicle + 5712] + 3888].
-uint32_t RacerFlags(uint8_t* base, uint32_t view);
+uint32_t RacerFlags(uint32_t view);
 
 // OverlayView::RacerId (sub_82126AE0): which of the 93 racer records (3,936
 // bytes from [0x826C5B2C] + 48) is the vehicle's +5712, and that record's
 // word +3912; -1 when none is.
-int32_t RacerId(uint8_t* base, uint32_t view);
+int32_t RacerId(uint32_t view);
 
 }  // namespace race_overlays
 
@@ -78,39 +78,39 @@ namespace race_overlays {
 // the translated code keeps the bits, signaling NaNs included).
 
 // Smoke::SetVelocity (sub_8212A840): `vector` to the smoke's +32,544.
-void SmokeSetVelocity(uint8_t* base, uint32_t smoke, uint32_t vector);
+void SmokeSetVelocity(uint32_t smoke, uint32_t vector);
 // Smoke::SetRegion (sub_8212A998): `a` to +32,608, `b` to +32,592, the view
 // mode to +32,624.
-void SmokeSetRegion(uint8_t* base, uint32_t smoke, uint32_t a, uint32_t b, uint32_t mode);
+void SmokeSetRegion(uint32_t smoke, uint32_t a, uint32_t b, uint32_t mode);
 // ParticlesB::SetPosition (sub_8212BA70): `position` to +2,784.
-void ParticlesBSetPosition(uint8_t* base, uint32_t effect, uint32_t position);
+void ParticlesBSetPosition(uint32_t effect, uint32_t position);
 // ParticlesC::SetPosition (sub_8212C6A8): `position` to +2,672 and `speed`
 // (rounded to single) to +2,704.
-void ParticlesCSetPosition(uint8_t* base, uint32_t effect, uint32_t position, double speed);
+void ParticlesCSetPosition(uint32_t effect, uint32_t position, double speed);
 // Sparks::SetPosition (sub_8212DF90): `position` to +28,960.
-void SparksSetPosition(uint8_t* base, uint32_t sparks, uint32_t position);
+void SparksSetPosition(uint32_t sparks, uint32_t position);
 // Trail::SetLastPosition (sub_821299D8): `position` to +64,144.
-void TrailSetLastPosition(uint8_t* base, uint32_t trail, uint32_t position);
+void TrailSetLastPosition(uint32_t trail, uint32_t position);
 // Marker::SetCameraPosition (sub_8212CE18): `position` to +272.
-void MarkerSetCameraPosition(uint8_t* base, uint32_t marker, uint32_t position);
+void MarkerSetCameraPosition(uint32_t marker, uint32_t position);
 // LightSprite::SetPosition (sub_8211EBE0): when shown (+240), `position` to
 // the sprite's position (+192).
-void LightSpriteSetPosition(uint8_t* base, uint32_t sprite, uint32_t position);
+void LightSpriteSetPosition(uint32_t sprite, uint32_t position);
 // ModelSprite::PlaceHidden (sub_82121560): `position` to +272, +336 = 0.
-void ModelSpritePlaceHidden(uint8_t* base, uint32_t sprite, uint32_t position);
+void ModelSpritePlaceHidden(uint32_t sprite, uint32_t position);
 
 // Overlay::SetTextures104 (sub_8212C0E0) and SetTextures108 (sub_8212D6D8):
 // `value` to the overlay's +104 or +108.
-void SetTextures104(uint8_t* base, uint32_t overlay, uint32_t value);
-void SetTextures108(uint8_t* base, uint32_t overlay, uint32_t value);
+void SetTextures104(uint32_t overlay, uint32_t value);
+void SetTextures108(uint32_t overlay, uint32_t value);
 
 // Marker::SetTextures (sub_8212CC10, 4 at +104), LightSprite::SetTextures
 // (sub_8211E9C8, 9 at +104), ModelSprite::SetTextures (sub_8211F408, 25 at
 // +108): the addresses of consecutive words from `table` (the texture
 // table's entries, not their contents).
-void MarkerSetTextures(uint8_t* base, uint32_t marker, uint32_t table);
-void LightSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
-void ModelSpriteSetTextures(uint8_t* base, uint32_t sprite, uint32_t table);
+void MarkerSetTextures(uint32_t marker, uint32_t table);
+void LightSpriteSetTextures(uint32_t sprite, uint32_t table);
+void ModelSpriteSetTextures(uint32_t sprite, uint32_t table);
 
 }  // namespace race_overlays
 
@@ -121,13 +121,13 @@ namespace race_overlays {
 // rand (sub_82293568), the game's own (not the C runtime's per-thread one):
 // the seed at 0x82638188 = seed x 1,103,515,245 + 12,345; returns the new
 // seed's upper halfword's low 15 bits.
-uint32_t Rand(uint8_t* base);
+uint32_t Rand();
 
 // RandomRange (sub_8211F118): low + (high - low) x rand() x the float at
 // 0x82002BD4, with the original's roundings (the difference and the product
 // to single, then a fused multiply-add rounded to single). `drawn` gets
 // rand()'s result (the original leaves it in r3).
-float RandomRange(uint8_t* base, double low, double high, uint32_t* drawn = nullptr);
+float RandomRange(double low, double high, uint32_t* drawn = nullptr);
 
 }  // namespace race_overlays
 
@@ -146,12 +146,12 @@ namespace race_overlays {
 // screen rectangle sized by the distance (clamped); `kind` 0-3 picks the
 // texture (others 0); when not shown yet, shows it with the table's alpha
 // (+8) and life (+0), colors 255. Returns 1.
-uint32_t MarkerSet(uint8_t* base, uint32_t marker, uint32_t position, double distance,
+uint32_t MarkerSet(uint32_t marker, uint32_t position, double distance,
                    uint32_t mode, uint32_t kind);
 
 // Marker::Update (sub_8212CBE0, its slot 4): when shown, the age counts up
 // (back to 0 when it would turn negative).
-void MarkerUpdate(uint8_t* base, uint32_t marker);
+void MarkerUpdate(uint32_t marker);
 
 }  // namespace race_overlays
 
@@ -171,7 +171,7 @@ namespace race_overlays {
 // ticks (age / the table's +12 x +124), clamped to 0 and +124; +44 the
 // width as an integer. False, with nothing done, for a capacity of 0 or -1
 // (where the original's division would trap); the original runs there.
-bool TrailUpdate(uint8_t* base, uint32_t trail);
+bool TrailUpdate(uint32_t trail);
 
 }  // namespace race_overlays
 
@@ -190,7 +190,7 @@ uint32_t ModelSpriteKind(int32_t racer);
 // 0x82616D30, 7 0x82616D54, 8 0x82616D78, others 0x826C5CF0. Covers its
 // jump table's first case, sub_8211F3B4 (word 0), and kind 1's
 // sub_8211F334 (never run in play).
-uint32_t ModelSpriteEntry(uint8_t* base, uint32_t kind, uint32_t index);
+uint32_t ModelSpriteEntry(uint32_t kind, uint32_t index);
 
 }  // namespace race_overlays
 
@@ -206,7 +206,7 @@ namespace race_overlays {
 // +96 = 1, +112 = 0, colors 255, 0, 0 at +80; the head moves on (modulo the
 // capacity) and the count goes up. Returns 1, or 0 when full. (The
 // original's f1 isn't read.)
-uint32_t ParticlesCEmit(uint8_t* base, uint32_t effect, uint32_t position);
+uint32_t ParticlesCEmit(uint32_t effect, uint32_t position);
 
 // Trail::AddPoint (sub_82129598): when the count (+64,136) is below the
 // capacity (+104, signed), `state` isn't 0 and `position` is away from the
@@ -225,7 +225,7 @@ uint32_t ParticlesCEmit(uint8_t* base, uint32_t effect, uint32_t position);
 // reads). `*result` gets 1 for a point added, else 0. False, with nothing
 // done, for a capacity of 0 or -1 (where the original's division can trap);
 // the original runs there.
-bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double speed, double width,
+bool TrailAddPoint(uint32_t trail, uint32_t position, double speed, double width,
                    const uint32_t direction[4], uint32_t state, uint32_t value,
                    uint32_t* result);
 
@@ -251,7 +251,7 @@ namespace race_overlays {
 // and f3 aren't read.) False, with nothing done,
 // for a capacity of 0 or -1 (where the original's division can trap); the
 // original runs there.
-bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
+bool ParticlesBEmit(uint32_t effect, uint32_t position, double a,
                     uint32_t* result, double* sine);
 
 }  // namespace race_overlays
@@ -269,15 +269,15 @@ namespace race_overlays {
 // ModelParts::HasPoint (sub_820DF2A0): for points 4-21, 1 when the point's
 // word is set, else 0; others return `parts` itself (the original leaves
 // r3 alone).
-uint32_t ModelPartsHasPoint(uint8_t* base, uint32_t parts, int32_t index);
+uint32_t ModelPartsHasPoint(uint32_t parts, int32_t index);
 
 // Model::HasPoint (sub_820D9DB0): 0 unless the model's +5048, +5052, +5060
 // and +5064 are all set; then 1 for points below 4, else
 // ModelPartsHasPoint on +5060.
-uint32_t ModelHasPoint(uint8_t* base, uint32_t model, int32_t index);
+uint32_t ModelHasPoint(uint32_t model, int32_t index);
 
 // OverlayView::HasPoint (sub_82126A78): ModelHasPoint on the view's model.
-uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index);
+uint32_t OverlayViewHasPoint(uint32_t view, int32_t index);
 
 }  // namespace race_overlays
 
@@ -286,18 +286,18 @@ namespace race_overlays {
 // ModelParts::PointPosition (sub_820E0910): for points 4-21, the point's 16
 // bytes to `out` (two doublewords, as the original's ld and std); nothing
 // for others. Returns `out` (the original leaves r3 alone).
-uint32_t ModelPartsPointPosition(uint8_t* base, uint32_t out, uint32_t parts, int32_t index);
+uint32_t ModelPartsPointPosition(uint32_t out, uint32_t parts, int32_t index);
 
 // Model::PointPosition (sub_820DA988): when the model's four words are set
 // (as ModelHasPoint), points below 4 from the table at the +5048 object's
 // +24 plus 6,976 (16 bytes each), others ModelPartsPointPosition on +5060;
 // else the game's 0.0 (0x82000A34) to the four words of `out`. Returns
 // `out`.
-uint32_t ModelPointPosition(uint8_t* base, uint32_t out, uint32_t model, int32_t index);
+uint32_t ModelPointPosition(uint32_t out, uint32_t model, int32_t index);
 
 // OverlayView::PointPosition (sub_82127140): ModelPointPosition on the
 // view's model. Returns `out`.
-uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, int32_t index);
+uint32_t OverlayViewPointPosition(uint32_t out, uint32_t view, int32_t index);
 
 }  // namespace race_overlays
 
@@ -328,7 +328,7 @@ namespace race_overlays {
 // doesn't read. `*drawn` gets the last rand() result and `*value` the last
 // RandomRange value (the original leaves them in r3 and f1; untouched when
 // none is drawn).
-void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
+void SparksUpdateStreak(uint32_t sparks, double speed,
                         const uint32_t position[4], uint32_t streaking, uint32_t mode,
                         uint32_t* drawn, double* value);
 
@@ -353,7 +353,7 @@ namespace race_overlays {
 // original leaves in f1 (a RandomRange value or a sine; untouched when
 // full). False, with nothing done, for a capacity of 0 or -1 (where the
 // original's division can trap); the original runs there.
-bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double strength,
+bool SparksEmit(uint32_t sparks, uint32_t position, double strength,
                 const uint32_t vector[4], uint32_t* result, double* last);
 
 }  // namespace race_overlays
@@ -384,7 +384,7 @@ namespace race_overlays {
 // `*last` the last sine (the original leaves it in f1; untouched when
 // full). False, with nothing done, for a capacity of 0 or -1 (where the
 // original's division can trap); the original runs there.
-bool SmokeEmit(uint8_t* base, uint32_t smoke, double size, double speed, uint32_t frame,
+bool SmokeEmit(uint32_t smoke, double size, double speed, uint32_t frame,
                uint32_t region, uint32_t value, uint32_t* result, double* last);
 
 // CarOverlays::EmitSmoke (sub_82123240): adds `rate` (unless it's 0.0) to
@@ -396,7 +396,7 @@ bool SmokeEmit(uint8_t* base, uint32_t smoke, double size, double speed, uint32_
 // smoke's capacity is 0 or -1 or the accumulator is the smoke's capacity
 // word (where Smoke::Emit would decline after the accumulator changed);
 // the original runs there.
-bool EmitSmoke(uint8_t* base, uint32_t overlays, double rate, double speed, uint32_t frame,
+bool EmitSmoke(uint32_t overlays, double rate, double speed, uint32_t frame,
                uint32_t wheel, uint32_t value, double* last);
 
 }  // namespace race_overlays
@@ -410,44 +410,44 @@ namespace race_overlays {
 
 // Overlay::Overlay (sub_82126498): the base class's vtable (0x820085D8) to
 // +0.
-void OverlayConstruct(uint8_t* base, uint32_t overlay);
+void OverlayConstruct(uint32_t overlay);
 
 // CarOverlays::ClearViews (sub_82126530): the 25 view slots (+4 to +100)
 // to 0.
-void ClearViews(uint8_t* base, uint32_t overlays);
+void ClearViews(uint32_t overlays);
 
 // ViewDesc::Clear (sub_82126860): +0 and +4 to 0.
-void ViewDescClear(uint8_t* base, uint32_t desc);
+void ViewDescClear(uint32_t desc);
 
 // OverlayView::OverlayView (sub_82126870): the vtable (0x82010B5C) to +0,
 // +4 and +8 to 0.
-void OverlayViewConstruct(uint8_t* base, uint32_t view);
+void OverlayViewConstruct(uint32_t view);
 
 // OverlayView::Set (sub_82126890): the description's three words (the
 // vehicle, its scene model, the viewport) to +4, +8 and +12.
-void OverlayViewSet(uint8_t* base, uint32_t view, uint32_t desc);
+void OverlayViewSet(uint32_t view, uint32_t desc);
 
 // CarOverlays::BindViewport (sub_821264C0): `out` +0 = [[0x826C2CE8] + 4 x
 // entry.0] + 80 x entry.1, +4 = the camera pass 0x826BAC00 + 592 x
 // entry.2, +8 and +12 the two words at 0x820085A0 + 8 x `second` (`entry`
 // the 12-byte entry `index` at 0x82008558).
-void BindViewport(uint8_t* base, uint32_t out, uint32_t index, uint32_t second);
+void BindViewport(uint32_t out, uint32_t index, uint32_t second);
 
 // Overlays::SetRenderTargets (sub_82128190): the render queue and the
 // command list to 0x826C5D5C and 0x826C5D60.
-void SetRenderTargets(uint8_t* base, uint32_t queue, uint32_t list);
+void SetRenderTargets(uint32_t queue, uint32_t list);
 
 // Particle::Particle (sub_8212B3D0): the game's 1.0 (0x82000A30, its bits)
 // to +12 and +28.
-void ParticleConstruct(uint8_t* base, uint32_t particle);
+void ParticleConstruct(uint32_t particle);
 
 // RaceOverlays::Clear (sub_8215DE80): the list's 25 pointers to 0.
-void RaceOverlaysClear(uint8_t* base, uint32_t list);
+void RaceOverlaysClear(uint32_t list);
 
 // RaceOverlays::ShareTextures (sub_8215E000): entries 1-24 that are set get
 // overlay 0's texture table (SetTextures104 with [list[0] + 104]). Returns
 // what the original leaves in r3 (entry 24).
-uint32_t ShareTextures(uint8_t* base, uint32_t list);
+uint32_t ShareTextures(uint32_t list);
 // RaceOverlays::SlotOf (sub_8215E048): an overlay's index (0-24) to its
 // view slot: the index itself (the jump table's cases, sub_8215E078 the
 // first), 0 for anything above 24.
@@ -468,39 +468,39 @@ namespace race_overlays {
 
 // LightSprite::Reset (sub_8211E9F0): +272 a unit vector, the sprite at +144
 // cleared.
-void LightSpriteReset(uint8_t* base, uint32_t sprite);
+void LightSpriteReset(uint32_t sprite);
 // ModelSprite::Reset (sub_8211F430): the sprite at +224 cleared, +368 and
 // +384 unit vectors, +404 and +408 -1, ten unit vectors from +416.
-void ModelSpriteReset(uint8_t* base, uint32_t sprite);
+void ModelSpriteReset(uint32_t sprite);
 // Sprite::ResetStyle2 (sub_82123A00): the identity matrix at +0 (stvx),
 // +64 and +68 0, +72 2, 1.0 at +92 and +108.
-void SpriteResetStyle2(uint8_t* base, uint32_t sprite);
+void SpriteResetStyle2(uint32_t sprite);
 // Trail::Reset (sub_82129498): head, tail and count (+64,128 to +64,136) 0,
 // the last position (+64,144) a unit vector, then each of the +104 points
 // (128 bytes from +128) cleared, the count read again each time.
-void TrailReset(uint8_t* base, uint32_t trail);
+void TrailReset(uint32_t trail);
 // SmokeEmitter::Reset (sub_8212A218): the emitter's vectors cleared, the
 // identity matrix at +144 (stvx), +92 1, +128 10, +112 and +224 the float
 // at 0x82002A90, its ten 48-byte particles from +240 cleared.
-void SmokeEmitterReset(uint8_t* base, uint32_t emitter);
+void SmokeEmitterReset(uint32_t emitter);
 // SmokeEmitter::SmokeEmitter (sub_8212B230): 1.0 in the w of its vectors
 // and of its ten particles from +240.
-void SmokeEmitterConstruct(uint8_t* base, uint32_t emitter);
+void SmokeEmitterConstruct(uint32_t emitter);
 // ParticlesB::ResetEntry (sub_8212B3E8): a 176-byte entry's vectors unit
 // vectors, +92 and +116 1, the rest 0.
-void ParticlesBResetEntry(uint8_t* base, uint32_t entry);
+void ParticlesBResetEntry(uint32_t entry);
 // ParticlesC::Reset (sub_8212C0E8): +2,704 0.0, +2,688 to +2,696 0, the
 // position (+2,672) a unit vector, then each of the +2,700 entries (128
 // bytes from +112) cleared, the count read again each time.
-void ParticlesCReset(uint8_t* base, uint32_t particles);
+void ParticlesCReset(uint32_t particles);
 // Marker::Reset (sub_8212CC38): the camera position (+272) a unit vector,
 // +288 1, the sprite at +128 cleared.
-void MarkerReset(uint8_t* base, uint32_t marker);
+void MarkerReset(uint32_t marker);
 // Sparks::Reset (sub_8212D6E0): the counters (+28,928 to +28,940, +28,976)
 // 0, its vectors unit vectors, the 50 vectors at +29,024, then each of the
 // +104 entries (144 bytes from +128) cleared, the count read again each
 // time.
-void SparksReset(uint8_t* base, uint32_t sparks);
+void SparksReset(uint32_t sparks);
 
 }  // namespace race_overlays
 
@@ -513,7 +513,7 @@ namespace race_overlays {
 // +32,608; differences by fsubs, dot products of x, y and z by vmsum3fp128
 // with flush-to-zero on), else 0. Writes nothing to guest memory (the
 // original's temporaries are below the stack pointer).
-uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point);
+uint32_t SmokeInRegion(uint32_t smoke, uint32_t point);
 
 // Sparks::Update (sub_8212DDC8): for each of the count (+28,940) entries
 // from the head (+28,932; 144 bytes from +128, the index moving on modulo
@@ -525,7 +525,7 @@ uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point);
 // +32. False, with nothing done, when the original could trap or reach
 // outside its entries (a capacity of 0 or -1, a head below 0 or INT_MAX,
 // entries past the end of guest memory); the original runs there.
-bool SparksUpdate(uint8_t* base, uint32_t sparks);
+bool SparksUpdate(uint32_t sparks);
 
 // Smoke::Update (sub_8212AA78): the oldest emitter (the head, +32,528; 720
 // bytes from +128), when its life (+108) is out, reset (SmokeEmitterReset)
@@ -541,7 +541,7 @@ bool SparksUpdate(uint8_t* base, uint32_t sparks);
 // original leaves it (the last InRegion result, when it ran). False, with
 // nothing done, when the original could trap or reach outside its emitters
 // (EntriesInRange's cases); the original runs there.
-bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3);
+bool SmokeUpdate(uint32_t smoke, uint32_t* r3);
 
 // ParticlesB::Update (sub_8212B748): the oldest entry (+2,768; 176 bytes
 // from +128), when its life (+108) is out, reset (ParticlesBResetEntry) and
@@ -556,7 +556,7 @@ bool SmokeUpdate(uint8_t* base, uint32_t smoke, uint32_t* r3);
 // and moves by it. False, with nothing done, when the original could trap
 // or reach outside its entries (EntriesInRange's cases); the original runs
 // there.
-bool ParticlesBUpdate(uint8_t* base, uint32_t effect);
+bool ParticlesBUpdate(uint32_t effect);
 
 // ParticlesC::Update (sub_8212C2F0): for each of the count (+2,696)
 // entries from the oldest (+2,688; 128 bytes from +112, the index moving on
@@ -574,7 +574,7 @@ bool ParticlesBUpdate(uint8_t* base, uint32_t effect);
 // original leaves it (the last rand() result, when it ran). False, with
 // nothing done, for a capacity of 0 (the original's divisions trap); the
 // original runs there.
-bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3);
+bool ParticlesCUpdate(uint32_t effect, uint32_t* r3);
 
 }  // namespace race_overlays
 
@@ -587,33 +587,33 @@ namespace race_overlays {
 
 // LightSprite::LightSprite (sub_8211F060): vtable 0x82008444; 1.0 at +156
 // to +220 (every 16 bytes) and +284.
-void LightSpriteConstruct(uint8_t* base, uint32_t sprite);
+void LightSpriteConstruct(uint32_t sprite);
 // ModelSprite::ModelSprite (sub_82122880): vtable 0x820084E8; 1.0 at +236
 // to +300, +380, +396 and +428 to +572.
-void ModelSpriteConstruct(uint8_t* base, uint32_t sprite);
+void ModelSpriteConstruct(uint32_t sprite);
 // Trail::Trail (sub_8212A140): vtable 0x820086C0; 1.0 at +12, +28, +76, +92
 // and +108 of each of the 500 points (128 bytes from +128) and at +64,156.
-void TrailConstruct(uint8_t* base, uint32_t trail);
+void TrailConstruct(uint32_t trail);
 // Smoke::Smoke (sub_8212B2E8): +116 0, vtable 0x820086F4, the 45 emitters
 // from +128 constructed (SmokeEmitterConstruct), 1.0 at +32,556 to +32,620.
-void SmokeConstruct(uint8_t* base, uint32_t smoke);
+void SmokeConstruct(uint32_t smoke);
 // ParticlesC::ParticlesC (sub_8212CAF8): vtable 0x82008750; 1.0 at +12 to
 // +76 (every 16 bytes) of each of the 20 entries (128 bytes from +112) and
 // at +2,684.
-void ParticlesCConstruct(uint8_t* base, uint32_t particles);
+void ParticlesCConstruct(uint32_t particles);
 // Marker::Marker (sub_8212D620): vtable 0x82008784; 1.0 at +140 to +204 and
 // +284.
-void MarkerConstruct(uint8_t* base, uint32_t marker);
+void MarkerConstruct(uint32_t marker);
 // Sparks::Sparks (sub_8212E9A0): vtable 0x820087BC; 1.0 at +12 to +76 and
 // +124 of each of the 200 entries (144 bytes from +128), at +28,972,
 // +29,004, +29,020 and +29,036 to +29,820.
-void SparksConstruct(uint8_t* base, uint32_t sparks);
+void SparksConstruct(uint32_t sparks);
 // ParticlesB::ParticlesB (sub_8212BFE8): Overlay::Overlay, vtable
 // 0x82008720; 1.0 at +12 to +76 (every 16 bytes) of each of the 15 entries
 // (176 bytes from +128) and each entry's 48-byte particle (+128) constructed
 // (Particle::Particle through the array helper, c_runtime::VectorConstruct),
 // then 1.0 at +2,796 and +2,812.
-void ParticlesBConstruct(uint8_t* base, uint32_t particles);
+void ParticlesBConstruct(uint32_t particles);
 
 // --- The two children's destructors with particle arrays ---
 //
@@ -629,23 +629,23 @@ void ParticlesBConstruct(uint8_t* base, uint32_t particles);
 // Smoke::~Smoke (sub_8212B288): vtable 0x820086F4, the ten 48-byte
 // particles at +240 of each of the 45 emitters (720 bytes from +128),
 // last emitter first.
-void SmokeDestruct(uint8_t* base, uint32_t smoke);
+void SmokeDestruct(uint32_t smoke);
 // Smoke's deleting destructor (sub_8212B358).
-bool SmokeDeletingDestructor(uint8_t* base, uint32_t smoke, uint32_t flags);
+bool SmokeDeletingDestructor(uint32_t smoke, uint32_t flags);
 // ParticlesB::~ParticlesB (sub_8212BF88): vtable 0x82008720, the particle
 // at +128 of each of the 15 entries, last first.
-void ParticlesBDestruct(uint8_t* base, uint32_t particles);
+void ParticlesBDestruct(uint32_t particles);
 // ParticlesB's deleting destructor (sub_8212C070).
-bool ParticlesBDeletingDestructor(uint8_t* base, uint32_t particles, uint32_t flags);
+bool ParticlesBDeletingDestructor(uint32_t particles, uint32_t flags);
 
 // Smoke::Reset (sub_8212A9E0): +32,528 to +32,536 0, +32,544, +32,560 and
 // +32,576 unit vectors, then each of the +104 emitters (720 bytes from
 // +128) reset (SmokeEmitterReset), the count read again each time.
-void SmokeReset(uint8_t* base, uint32_t smoke);
+void SmokeReset(uint32_t smoke);
 // ParticlesB::Reset (sub_8212BA98): +2,768 to +2,776 0, +2,784 and +2,800
 // unit vectors, then each of the +104 entries (176 bytes from +128) reset
 // (ParticlesBResetEntry), the count read again each time.
-void ParticlesBReset(uint8_t* base, uint32_t particles);
+void ParticlesBReset(uint32_t particles);
 
 // --- The view's body and wheels, through the vehicle accessors ---
 //
@@ -654,31 +654,31 @@ void ParticlesBReset(uint8_t* base, uint32_t particles);
 
 // OverlayView::BodyMatrix (sub_821268B0): RigidBody::Matrix of the
 // vehicle's +336, the body's 64-byte matrix.
-uint32_t BodyMatrix(uint8_t* base, uint32_t view);
+uint32_t BodyMatrix(uint32_t view);
 // OverlayView::WheelContact (sub_821268C8): Vehicle::WheelContact + 16 (the
 // contact point, probably).
-uint32_t WheelContact(uint8_t* base, uint32_t view, uint32_t wheel);
+uint32_t WheelContact(uint32_t view, uint32_t wheel);
 // OverlayView::WheelSurfaceMarks (sub_821269B0): the contact record's
 // halfword +80, sign-extended and compared unsigned: 0 for 1, 2 and 8, else
 // 1.
-uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel);
+uint32_t WheelSurfaceMarks(uint32_t view, uint32_t wheel);
 // OverlayView::WheelSlip (sub_82126A70): Vehicle::WheelSlip of the view's
 // vehicle (which the original tail-calls).
-float WheelSlip(uint8_t* base, uint32_t view, uint32_t wheel, double threshold);
+float WheelSlip(uint32_t view, uint32_t wheel, double threshold);
 // OverlayView::BodyPosition (sub_82126F80): out = the 16 bytes at
 // RigidBody::Position (bits as they are); returns out.
-uint32_t BodyPosition(uint8_t* base, uint32_t out, uint32_t view);
+uint32_t BodyPosition(uint32_t out, uint32_t view);
 // OverlayView::BodyMatrixCopy (sub_82126FF0): 1.0 stored in out's rows' w,
 // then out = the body's 64-byte matrix (which covers them again: the copy
 // is the matrix as it is, bits too); returns out.
-uint32_t BodyMatrixCopy(uint8_t* base, uint32_t out, uint32_t view);
+uint32_t BodyMatrixCopy(uint32_t out, uint32_t view);
 
 // CarOverlays::IsBehindCamera (sub_82124630): with the camera pass at
 // overlays +800 (its eye at +400) and the body matrix of the view in slot
 // +128: 0 when the dot product (vmsum3fp128, flush-to-zero on) of point -
 // eye and point - the matrix's fourth row (the car's position) is below the
 // game's 0.0, else 1 (NaNs too).
-uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point);
+uint32_t IsBehindCamera(uint32_t overlays, uint32_t point);
 
 // --- The racers' save flags and stages (the marker's and car-model sprites'
 // inputs) ---
@@ -687,16 +687,16 @@ uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point);
 // 12 bytes a racer id: 1 when nonzero, 0 for ids above 399 (unsigned).
 
 // sub_82126BB0: the halfword at +0x199FA.
-uint32_t SaveFlag199FA(uint8_t* base, uint32_t id);
+uint32_t SaveFlag199FA(uint32_t id);
 // sub_82126C08: the halfword at +0x199F8.
-uint32_t SaveFlag199F8(uint8_t* base, uint32_t id);
+uint32_t SaveFlag199F8(uint32_t id);
 // sub_82126C58: the halfword at +0x199FC.
-uint32_t SaveFlag199FC(uint8_t* base, uint32_t id);
+uint32_t SaveFlag199FC(uint32_t id);
 // sub_82126CB0: SaveFlag199F8 or SaveFlag199FC.
-uint32_t SaveFlag199F8Or199FC(uint8_t* base, uint32_t id);
+uint32_t SaveFlag199F8Or199FC(uint32_t id);
 // sub_82126B50: 0 for ids above 399; else Stages::HasRacer(race data +
 // 0x59620, Racers::IndexOf(race data + 48, id), the current stage).
-uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
+uint32_t RacerInCurrentStage(uint32_t id);
 
 // CarOverlays::UpdateTrails (sub_82124EE0): nothing when DebugSwitchOff
 // isn't 0; else for each wheel 0-3 and its trail (+148 + 4i), with the
@@ -715,24 +715,24 @@ uint32_t RacerInCurrentStage(uint8_t* base, uint32_t id);
 // +440 + 12i = whether one was added; then Trail::SetLastPosition (the
 // point). False, with nothing done, when a trail's capacity is 0 or -1
 // (Trail::AddPoint would decline); the original runs there.
-bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch);
+bool UpdateTrails(uint32_t overlays, uint32_t scratch);
 
 // OverlayView::NoSaveFlags (sub_82127198): 1 when the id is 399 or below
 // (unsigned) and neither SaveFlag199FA nor SaveFlag199F8Or199FC is set,
 // else 0 (r3, a view, isn't read). Only MarkerKind and FlagsKind call it.
-uint32_t NoSaveFlags(uint8_t* base, uint32_t id);
+uint32_t NoSaveFlags(uint32_t id);
 // CarOverlays::FlagsKind (sub_82122DB8): with the view in slot +128 (not
 // read further): 0 when NoSaveFlags(id); else 1 unless SaveFlag199FA is
 // set for `a`, `b` (and `c`, `d` up to the first that's -1), 2 when all
 // are. Only MarkerKind calls it (with c and d -1).
-uint32_t FlagsKind(uint8_t* base, uint32_t overlays, uint32_t id, int32_t a, int32_t b,
+uint32_t FlagsKind(uint32_t overlays, uint32_t id, int32_t a, int32_t b,
                    int32_t c, int32_t d);
 // CarOverlays::MarkerKind (sub_82122EA8): `fallback` for ids (signed)
 // outside 67-68, 107-109, 111-114, 248-250, 304-306, 374-375, 383-385 and
 // 393-395; for 67-68 and 374-375, FlagsKind with the range; for the others
 // 0 when NoSaveFlags(id), else 2 when SaveFlag199FA is set for each id of
 // the range, else 1.
-uint32_t MarkerKind(uint8_t* base, uint32_t overlays, int32_t id, uint32_t fallback);
+uint32_t MarkerKind(uint32_t overlays, int32_t id, uint32_t fallback);
 
 }  // namespace race_overlays
 
@@ -750,20 +750,20 @@ namespace race_overlays {
 
 // sub_82126A90: the vehicle's float +2508. Only UpdateLightSprites calls it
 // (into f1, which LightSprite::Show doesn't read); never ran in play.
-float VehicleFloat2508(uint8_t* base, uint32_t view);
+float VehicleFloat2508(uint32_t view);
 // LightSprite::Show (sub_8211EAA0): the sprite at +144 shown at `position`
 // (its +48), +96 = 1, +100 and +104 = the table's (+140) +4 and +8 (bits as
 // they are), +108 = its +0, +112 = 0, +116 = rand() % 4, colors 255 at +80
 // to +88, +92 = +104 as an integer (fctiwz). Never ran in play (the
 // vehicle's +2504 stayed 0).
-void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position);
+void LightSpriteShow(uint32_t sprite, uint32_t position);
 // CarOverlays::UpdateLightSprites (sub_821251C0): nothing more when
 // DebugSwitchOff isn't 0; else for model points 4-7 that exist and the
 // light sprites (+200 + 4i): the point with x less the float at 0x82001FBC,
 // in world space; LightSprite::Show there when the vehicle's byte +2504 is
 // set; LightSprite::SetPosition. Then +720 = the vehicle's word +2252 (read
 // first).
-void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame);
+void UpdateLightSprites(uint32_t overlays, uint32_t frame);
 // CarOverlays::UpdateParticlesB (sub_821252D0): as UpdateLightSprites
 // (DebugSwitchOff, points 4-7, x less the float at 0x82001FBC) for particle
 // effect B's emitters (+360 + 4i): ParticlesB::Emit with the vehicle's
@@ -771,12 +771,12 @@ void UpdateLightSprites(uint8_t* base, uint32_t overlays, uint32_t frame);
 // doesn't read), then ParticlesB::SetPosition. False, with nothing done,
 // when an emitter's capacity is 0 or -1 (ParticlesB::Emit would decline);
 // the original runs there.
-bool UpdateParticlesB(uint8_t* base, uint32_t overlays, uint32_t frame);
+bool UpdateParticlesB(uint32_t overlays, uint32_t frame);
 // CarOverlays::UpdateParticlesC (sub_82125798): for model points 14-17 that
 // exist and particle effect C's emitters (+380 + 4i): the point in world
 // space (x as it is), ParticlesC::Emit there when
 // CarOverlays::IsBehindCamera returns 0, then ParticlesC::SetPosition with the speed in km/h. No DebugSwitchOff check.
-void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame);
+void UpdateParticlesC(uint32_t overlays, uint32_t frame);
 
 
 // Smoke::SetFrame (sub_8212B1B0): for each of the smoke's +104 emitters (720
@@ -786,12 +786,12 @@ void UpdateParticlesC(uint8_t* base, uint32_t overlays, uint32_t frame);
 // wouldn't be the library's plain one (into the physical views, or sharing
 // memory with the frame) or there are more than 65,536 emitters; the
 // original runs there. Only UpdateSmoke calls it.
-bool SmokeSetFrame(uint8_t* base, uint32_t smoke, uint32_t frame);
+bool SmokeSetFrame(uint32_t smoke, uint32_t frame);
 // sub_82126A00: 1 when the wheel's contact surface (Vehicle::WheelContact's
 // halfword +80, sign-extended) is 8, else 0.
-uint32_t WheelOnSurface8(uint8_t* base, uint32_t view, uint32_t wheel);
+uint32_t WheelOnSurface8(uint32_t view, uint32_t wheel);
 // sub_82126A38: 1 when the surface is 1 or 2, else 0.
-uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel);
+uint32_t WheelOnSurface1Or2(uint32_t view, uint32_t wheel);
 // CarOverlays::UpdateSmoke (sub_82125B60): the car's axes (half the
 // difference of wheels 2 and 3's contacts, plus wheel 3's, at `frame` + 80;
 // of 0 and 1, plus 1's, at +96; the additions vaddfp with flush-to-zero on),
@@ -810,13 +810,13 @@ uint32_t WheelOnSurface1Or2(uint8_t* base, uint32_t view, uint32_t wheel);
 // the original's stack frame (its r1 after the stwu, 400 bytes below). False,
 // with nothing done, where EmitSmoke or Smoke::SetFrame would decline for a
 // wheel; the original runs there.
-bool UpdateSmoke(uint8_t* base, uint32_t overlays, uint32_t frame);
+bool UpdateSmoke(uint32_t overlays, uint32_t frame);
 
 // OverlayView::ModelMatrix (sub_821270E8): 1.0 stored in out's rows' w,
 // then out = the 64 bytes at the view's model + 4,304 (memcpy, through
 // c_runtime::Memcpy; it covers them again). False, with nothing done, where
 // the copy wouldn't be the library's plain one (into the physical views, or
 // sharing memory with the model's matrix); the original runs there.
-bool ModelMatrix(uint8_t* base, uint32_t out, uint32_t view);
+bool ModelMatrix(uint32_t out, uint32_t view);
 
 }  // namespace race_overlays

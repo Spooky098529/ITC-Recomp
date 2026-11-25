@@ -1,0 +1,557 @@
+# The schema of docs/functions/ui-movies-game.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The game's side of the UI movies (UiMovie::, src/ui_movies/game.cpp,
+# objects.cpp, texts.cpp, effect.cpp; src/hooks/ui_movies_game.cpp): the
+# movie object (about 41 KB, docs/known-data.md "UI movie" and the rows
+# after it), its two animation lists and their slots, its texts, its text
+# list's items, the {key, value} pair vectors (the movie table 0x826C5CCC)
+# and the word vector of its textures.
+#
+# Left to other areas' files (the measure gave them to this area by a tie
+# or because their code calls the movies; see the area's report):
+# - UI movie nodes: "sub_8211A660.r4", "sub_8211BD10.r5",
+#   "UiMovie::SetNodeText.r4" and "sub_8211E378.r4" (a scene) are
+#   tuning-screen.toml's UiMovieNode.
+# - "new<12>@UiMovie::OnLoaded" (a texture entry: +0 the texture, +4 width,
+#   +8 height) is tuning-pages.toml's UiMovieTexture; tuning-pages.toml's
+#   UiMovieObject ("UiMovies::Find.ret.+0") is this file's UiMovie.
+# - The type 12 (Xbox Live) mode's screens, unreachable (network-mode.md):
+#   the machines "sub_8226E8B8.r3", "sub_82262678.r3", "sub_82263508.r3",
+#   "sub_822617C0.r3", "sub_82261E38.r3", "sub_82263840.r3",
+#   "sub_82267A48.r3", "sub_8226C230.r3", "sub_8226C500.r3",
+#   "sub_8226C6E0.r3", "sub_8226D7B0.r3", "sub_82270DC0.r3",
+#   "sub_82270F40.r3" (network-mode.toml's NetMachine); their menus and page
+#   objects "new<68>@Type12Screen6/7/9::Create", "new<68>@Type12Dialog11::
+#   Create" and the like (menu-helpers.toml's FrontEndMenu); their steps'
+#   started words ("sub_8226....r4", 4 bytes); "sub_8225FB88.r3",
+#   "sub_822606B8.ret" and "new<68>@Type12Screen7::Create.+8..." (lifted,
+#   not read).
+# - "new<?>@sub_82148D00" and its +4: lifted, not read, not a UI movie.
+# - "sub_8211AE68.r3.+16" (a chunk of the live scene: the measure joins the
+#   movie with the texture vector, see UiMovieWordVector's fault) and
+#   "UiMovie::ScrollOffset.r4.+0" (a measure fault: the parameters' +0 is the
+#   integer x, not a pointer) aren't described.
+
+# A text's 4 KB UTF-16 buffer.
+[UiMovieTextBuffer]
+measure = "new<4096>@UiMovie::GetText"
+size = 4096
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): raw UTF-16 bytes, in PC memory; made by
+# UiMovie::GetText's hand port (ui_movies::GetText, New where the original's
+# VirtualAlloc returned at 0x8211B6D4), written by the formatting and the
+# conversions, read by the font; freed by the texts' free (FreeTexts,
+# VirtualFree; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8211B6D4, reg = "r4" }]
+fields = [
+  { name = "char_0", offset = 0, type = "u16", note = "the first character" },
+  { name = "char_1", offset = 2, type = "u16" },
+]
+
+# A movie's file as the archive reads it (an XMD archive: entry 0 the X2D
+# movie file, entry 1, when there, the XPR2 texture set): a blob (E5 step 5,
+# 2026-11-24) in PC memory with the file's bytes, made by UiMovie::Load's
+# hand port (ui_movies::MovieLoad, New where the original's VirtualAlloc
+# returned at 0x8211E7D0), read whole by Archive::Load, then read by
+# UiMovie::OnLoaded (its checks and chunks by address, the X2D file copied
+# out three times and the XPR's header and data copied out by XPR::Create,
+# both through the memcpy's blob path), which frees it (VirtualFree).
+[UiMovieArchiveFile]
+size = 0
+origin = "allocated"
+storage = "blob"
+blob_alloc = [{ call = 0x8211E7D0, reg = "r4" }]
+fields = []
+
+# A movie's text (28 bytes, UiMovie::GetText sub_8211B660; by the TXT node's
+# +108 id, in the movie's texts at +0x9BCC).
+[UiMovieText]
+measures = ["new<28>@UiMovie::GetText", "TextMap::Find.ret.+0", "sub_8211AC90.r3.+39888"]
+size = 28
+origin = "allocated"
+# Host (E5 step 5, 2026-11-24): made by UiMovie::GetText's hand port
+# (ui_movies::GetText, New where the original's operator new returned at
+# 0x8211B6BC); freed by the texts' free (FreeTexts, operator delete).
+storage = "host"
+host_alloc = [0x8211B6BC]
+fields = [
+  { name = "buffer", offset = 0, type = "ptr", to = "UiMovieTextBuffer", note = "a 4 KB UTF-16 buffer (pages from sub_82295398)" },
+  { name = "scrolling", offset = 4, type = "u32" },
+  { name = "scroll_counter", offset = 8, type = "u32", note = "ticks" },
+  { name = "scroll_delay", offset = 12, type = "u32", note = "signed" },
+  { name = "scroll_speed", offset = 16, type = "f32" },
+  { name = "scroll_speed_word", offset = 16, type = "u32", note = "scroll_speed as a word (ScrollText stores the default's word)" },
+  { name = "page", offset = 20, type = "u32", note = "the page shown (probably: the characters shown)" },
+  { name = "first_line", offset = 24, type = "u32", note = "passed to the formatting (UiMovie::SetFirstLine, FirstLine)" },
+]
+
+# One of the text list's items (128 bytes: TextItem::TextItem sub_8211A818);
+# copied by sub_8211AED0 (+0 to +112).
+[UiMovieTextItem]
+measure = "TextItem"
+measures = ["sub_8211AED0.r3", "sub_8211AED0.r4", "sub_8259E620.r4", "UiMovie.+40", "sub_8259E620.r3"]
+# measures from UiMovieQueuedText (ui-movies), merged at the integration
+size = 128
+origin = "embedded"
+fields = [
+  { name = "array_count", offset = -16, type = "u32", note = "the first item's: operator new[]'s count (512) in the array's 16-byte header" },
+  { name = "node", offset = 0, type = "u32", note = "the TXT node drawn" },
+  { name = "matrix", offset = 16, type = "bytes", count = 64, note = "a 4x4 matrix (the identity when made)" },
+  { name = "matrix_3", offset = 28, type = "f32" },
+  { name = "matrix_7", offset = 44, type = "f32" },
+  { name = "matrix_11", offset = 60, type = "f32" },
+  { name = "matrix_15", offset = 76, type = "f32" },
+  { name = "depth", offset = 80, type = "u32", note = "a float, 0.0 when made (copied as words)" },
+  { name = "red", offset = 84, type = "u32", note = "the color's scales (+84 to +96), floats copied as words; 0.0 when made" },
+  { name = "green", offset = 88, type = "u32" },
+  { name = "blue", offset = 92, type = "u32" },
+  { name = "alpha", offset = 96, type = "u32" },
+  { name = "clip_0", offset = 100, type = "u32", note = "the clip rectangle (+100 to +112)" },
+  { name = "clip_1", offset = 104, type = "u32" },
+  { name = "clip_2", offset = 108, type = "u32" },
+  { name = "clip_3", offset = 112, type = "u32" },
+]
+
+# The text items' array as allocated (65,552 bytes, sub_8211B018): the
+# count in its 16-byte header, then 512 items.
+[UiMovieTextItemArray]
+measure = "new<65552>@sub_8211B018"
+size = 65552
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): an array of 512 embedded text items
+# reached by address (views, copies, matrices), in PC memory with the guest's
+# bytes; made by UiMovie::UiMovie's hand port (ui_movies::ConstructMovie,
+# New where sub_8211B018's operator new[] returned at 0x8211B03C), freed by
+# ~UiMovie (DestroyMovie, operator delete[]; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8211B03C, reg = "r3" }]
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "512" },
+]
+
+# A UI movie (made by UiMovie::UiMovie sub_8211E1C0 and sub_8211A9E8; 40,976
+# bytes from operator new). The measure joins UI movie nodes with it (their
+# r3 met as "UiMovie"): the fault_ fields.
+[UiMovie]
+measure = "UiMovie"
+measures = ["sub_8211A9E8.r3", "sub_8211AC90.r3", "sub_8211E378.r3", "sub_8211C4F0.r3", "sub_8211C5F8.r3", "UiMovie::OnLoaded.r6", "UiMovies::Find.ret.+0", "AnimationList::Get.r4", "RaceHud.+604"]
+# measures from UiMovieObject (tuning-pages), merged at the integration
+size = 40976
+origin = "allocated"
+# Dual (E5 step 5, 2026-11-24): every movie in host memory (the measure's
+# joins and fault_ fields view guest addresses as movies too). Made by
+# UiMovies::Open's adapter (OpenCalls' make) and the data load's movie lists
+# (data_load::MovieListAdd), New where the originals' operator new returned
+# at 0x8211E854, 0x82247AC4 and 0x822912C4; freed by UiMovies::Delete
+# (operator delete; the game's frees take handles). Its parts (the named
+# animations' strings, the draw context, the animation lists, the texts'
+# pairs) stay bytes in the guest's order, reached by address.
+storage = "dual"
+host_alloc = [0x8211E854, 0x82247AC4, 0x822912C4]
+fields = [
+  { name = "file_0", offset = 0, type = "u32", note = "the first of three copies of its movie file (pages from sub_82295398); the live scene's" },
+  { name = "file_1", offset = 4, type = "u32", note = "the second copy (the saved scene's)" },
+  { name = "file_2", offset = 8, type = "u32", note = "the third copy (the file's own scene, for resets)" },
+  { name = "texture_set", offset = 12, type = "u32", note = "its texture set (24 bytes, the XPR, sub_82596E68)" },
+  { name = "live_scene", offset = 16, type = "u32", note = "the live scene (animated and drawn)" },
+  { name = "saved_scene", offset = 20, type = "u32", note = "the live pose saved at each update's start" },
+  { name = "file_scene", offset = 24, type = "u32", note = "the file's scene (for resets)" },
+  { name = "textures", offset = 28, type = "u32", note = "the textures' word vector (UiMovieWordVector): its data, 12-byte entries' addresses" },
+  { name = "texture_capacity", offset = 32, type = "u32", note = "512" },
+  { name = "texture_count", offset = 36, type = "u32" },
+  { name = "text_items", offset = 40, type = "ptr", to = "UiMovieTextItem", note = "the text list (ui-movies.toml's UiMovieDrawTextList): its items, 128 bytes each, 512 made" },
+  { name = "text_item_capacity", offset = 44, type = "u32" },
+  { name = "text_item_count", offset = 48, type = "u32" },
+  { name = "fault_file_tags", offset = 8, type = "bytes", count = 8, note = "measure fault: sub_825A0E40 reads a movie file's X2D and 005 tags (+8 to +15) through a file it takes for a movie" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "draw_context", offset = 64, type = "bytes", count = 112, note = "the draw context (known-data.md: UI movie draw context)" },
+  { name = "named_animations", offset = 176, type = "bytes", count = 36864, note = "1,024 UiMovieNamedAnimation entries of 36 bytes" },
+  { name = "named_count", offset = 37040, type = "u32", note = "the named animations in use" },
+  { name = "queue", offset = 37044, type = "bytes", count = 1420, note = "the animation queue (a UiMovieAnimationList), played in chained groups" },
+  { name = "queue_free", offset = 37172, type = "u16", note = "the queue's free chain's first link" },
+  { name = "queue_first", offset = 37176, type = "u16", note = "the queue's first link in use (-1 none)" },
+  { name = "queue_count", offset = 37180, type = "u16" },
+  { name = "looping", offset = 38464, type = "bytes", count = 1420, note = "the looping animations (a UiMovieAnimationList)" },
+  { name = "looping_free", offset = 38592, type = "u16" },
+  { name = "looping_first", offset = 38596, type = "u16" },
+  { name = "looping_count", offset = 38600, type = "u16" },
+  { name = "texts", offset = 39884, type = "bytes", count = 1024, note = "128 {id, text} pairs (UiMoviePair; the texts are UiMovieText records)" },
+  { name = "text_0_id", offset = 39884, type = "u32", note = "the first pair's id" },
+  { name = "text_0", offset = 39888, type = "ptr", to = "UiMovieText", note = "the first pair's text" },
+  { name = "text_count", offset = 40908, type = "u32", note = "the pairs in use; also numbers new texts" },
+  { name = "loaded", offset = 40912, type = "u32", note = "set at the end of UiMovie::OnLoaded" },
+  { name = "id", offset = 40916, type = "u32", note = "its id in the movie table (UiMovies::Open)" },
+  { name = "last_started", offset = 40920, type = "bytes", count = 40, note = "a copy of the last started animation's slot (UiMovieAnimationSlot)" },
+  { name = "fault_location_menu", offset = 20044, type = "u32", note = "measure fault: LocationScreen::Page0's r31 is an image base, r31 + 20044 the global 0x82814E4C (the location's menu), not a field (from UiMovieObject, tuning-pages)" },
+]
+
+# A movie's animation queue (+0x90B4) or looping animations (+0x9640),
+# 1,420 bytes each: 32 links of 4 bytes (16-bit: +0 the next link, +2 its
+# slot; -1 ends a chain) and 32 slots of 40 bytes.
+[UiMovieAnimationList]
+measure = "UiMovie@+37044"
+measures = ["AnimationList::RemoveAt.r3"]
+size = 1420
+origin = "embedded"
+fields = [
+  { name = "links", offset = 0, type = "bytes", count = 128, note = "32 links: +0 the next (16-bit), +2 its slot" },
+  { name = "free", offset = 128, type = "u16", note = "the free chain's first link" },
+  { name = "unknown_130", offset = 130, type = "u16", note = "set to -1, not read" },
+  { name = "first", offset = 132, type = "u16", note = "the first link in use (-1 none)" },
+  { name = "unknown_134", offset = 134, type = "u16", note = "set to -1, not read" },
+  { name = "count", offset = 136, type = "u16" },
+  { name = "slots", offset = 140, type = "bytes", count = 1280, note = "32 UiMovieAnimationSlot of 40 bytes" },
+]
+
+# One of an animation list's 32 links (4 bytes at the list's +4 i; the
+# list's first and free fields hold link indices too).
+[UiMovieAnimationLink]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "next", offset = 0, type = "u16", note = "the next link's index (signed; -1 ends a chain)" },
+  { name = "slot", offset = 2, type = "u16", note = "its slot's index (signed)" },
+]
+
+# One playing animation (40 bytes; an animation list's slot, a movie's last
+# started +0x9FD8).
+[UiMovieAnimationSlot]
+size = 40
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the animation's index in its scene (-1 for a named one)" },
+  { name = "sub_scene", offset = 4, type = "u32", note = "the sub-scene's index (-1 the live scene; -1 for a named one)" },
+  { name = "named", offset = 8, type = "u32", note = "the named animation's index (-1 otherwise)" },
+  { name = "scene", offset = 12, type = "u32", note = "the scene node" },
+  { name = "animation", offset = 16, type = "u32", note = "the animation (its +12 the length)" },
+  { name = "time", offset = 20, type = "u32", note = "a float, copied as its word" },
+  { name = "chained", offset = 24, type = "u32", note = "chained with the next slot" },
+  { name = "reversed", offset = 28, type = "u32", note = "the time steps down from the length" },
+  { name = "keep_end", offset = 32, type = "u32", note = "probably keep its end pose once it ends" },
+  { name = "paused", offset = 36, type = "u32", note = "the time isn't stepped" },
+]
+
+# A {key, value} pair (the movie table's: {id, movie}; a movie's texts:
+# {id, text}).
+[UiMoviePair]
+measures = [
+  "UiMovies.+0", "sub_8211C168.r3.+0", "sub_8211B458.r3.+0", "sub_8211B458.r4",
+  "new<4294967295>@sub_8211B160",
+]
+size = 8
+origin = "embedded"
+# Dual (E5 step 5, 2026-11-24): the movie table's arrays in host memory
+# (NewArray in ui_movies::MakePairs and the pairs' Reserve, where
+# sub_8211B0E8's operator new[] returned at 0x8211B10C); embedded in each
+# movie's texts (+0x9BCC). Freed by the Reserve's operator delete[].
+storage = "dual"
+host_alloc_array = [{ call = 0x8211B10C, reg = "r3" }]
+fields = [
+  { name = "key", offset = 0, type = "u32" },
+  { name = "value", offset = 4, type = "u32" },
+]
+
+# A movie's texts (+0x9BCC): 128 {id, text} pairs in place, then their
+# count (TextMap::Find sub_8211B310, TextMap::Set sub_8211B370).
+[UiMovieTextMap]
+measure = "TextMap::Set.r3"
+measures = ["TextMap::Find.r3"]
+size = 1028
+origin = "embedded"
+fields = [
+  { name = "pairs", offset = 0, type = "bytes", count = 1024, note = "128 UiMoviePair {id, text}" },
+  { name = "pair_0_key", offset = 0, type = "u32" },
+  { name = "count", offset = 1024, type = "u32", note = "the pairs in use (the movie's text_count)" },
+]
+
+# A vector of {key, value} word pairs (the movie table 0x826C5CCC).
+[UiMoviePairVector]
+measures = ["UiMovies", "sub_8211C168.r3", "sub_8211B458.r3"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "pairs", offset = 0, type = "ptr", to = "UiMoviePair" },
+  { name = "capacity", offset = 4, type = "u32" },
+  { name = "count", offset = 8, type = "u32" },
+]
+
+# A word passed by its address: the lookups' keys and values (stored in
+# their callers' frames), the value cell the text lookup answers.
+[UiMovieWord]
+measures = [
+  "TextMap::Find.ret", "TextMap::Find.r4", "TextMap::Set.r4", "TextMap::Set.r5",
+  "UiMovie::GetText.r4", "UiMovies::Find.r4", "sub_8211C168.r4", "sub_8211C168.r5",
+  "sub_8211AE68.r4",
+]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# A vector of words (a movie's textures at +28: +0 the data, +4 the
+# capacity, +8 the count).
+[UiMovieWordVector]
+measure = "UiMovie::OnLoaded.r6@+28"
+measures = ["sub_8211A6C0.ret@+28", "sub_8211A6C0.r3"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "words", offset = 0, type = "u32" },
+  { name = "capacity", offset = 4, type = "u32" },
+  { name = "count", offset = 8, type = "u32" },
+  { name = "fault_live_scene", offset = 16, type = "u32", note = "measure fault: sub_8211A6C0's r3 is the movie (its +16 the live scene), not this vector (the movie's +28)" },
+]
+
+# A named animation (36 bytes, a movie's +176 + 36 i).
+[UiMovieNamedAnimation]
+measures = ["sub_8211E318.r3", "sub_8211E318.r4"]
+size = 36
+origin = "embedded"
+fields = [
+  { name = "name", offset = 0, type = "bytes", count = 28, note = "a std::string, \"scene.animation\"" },
+  { name = "scene", offset = 28, type = "u32" },
+  { name = "animation", offset = 32, type = "u32" },
+]
+
+# A quad or primitive for the library's recorders (sub_8259DAD0's r3, in
+# ui-movies.md), built on the caller's stack (Quad::Quad sub_8211A948).
+[UiMovieQuad]
+# measures from UiMovieDrawQuad (ui-movies), merged at the integration
+measures = ["sub_8259DAD0.r3", "sub_8259E098.r3", "sub_8259EBE8.r3"]
+measure = "Quad"
+size = 116
+origin = "embedded"
+fields = [
+  { name = "matrix", offset = 0, type = "bytes", count = 64, note = "the identity when made" },
+  { name = "matrix_3", offset = 12, type = "f32" },
+  { name = "matrix_7", offset = 28, type = "f32" },
+  { name = "matrix_11", offset = 44, type = "f32" },
+  { name = "matrix_15", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "u32", note = "0 when made" },
+  { name = "blend_mode", offset = 68, type = "u32", note = "0 to 4, 5 and up none; 0 when made" },
+  { name = "unknown_72", offset = 72, type = "u32", note = "2 when made" },
+  { name = "vertex_count", offset = 80, type = "u32" },
+  { name = "texture", offset = 84, type = "u32" },
+  { name = "positions", offset = 88, type = "u32", note = "16 bytes a vertex" },
+  { name = "colors", offset = 92, type = "u32", note = "16 bytes a vertex" },
+  { name = "coords", offset = 96, type = "u32", note = "the texture coordinates, 16 bytes a vertex" },
+  { name = "clipped", offset = 100, type = "u32" },
+  { name = "clip_0", offset = 104, type = "u16", note = "the clip rectangle (+104 to +110)" },
+  { name = "clip_1", offset = 106, type = "u16" },
+  { name = "clip_2", offset = 108, type = "u16" },
+  { name = "clip_3", offset = 110, type = "u16" },
+  { name = "texture_stage", offset = 112, type = "u32", note = "the texture stage flag" },
+]
+
+# A text's draw parameters (124 bytes, built in UiMovie::DrawTexts' frame
+# at +112; Font::SetParams' and Text::Draw's).
+[UiMovieTextParams]
+measure = "UiMovie::ScrollOffset.r4"
+size = 124
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "u32", note = "integer" },
+  { name = "y", offset = 4, type = "u32" },
+  { name = "origin_x", offset = 8, type = "u32", note = "the node's pivot" },
+  { name = "origin_y", offset = 12, type = "u32" },
+  { name = "angle", offset = 16, type = "f32" },
+  { name = "red", offset = 20, type = "u8" },
+  { name = "green", offset = 21, type = "u8" },
+  { name = "blue", offset = 22, type = "u8" },
+  { name = "alpha", offset = 24, type = "f32" },
+  { name = "scale_x", offset = 28, type = "f32" },
+  { name = "scale_y", offset = 32, type = "f32" },
+  { name = "glyph_scale_x", offset = 36, type = "f32" },
+  { name = "glyph_scale_y", offset = 40, type = "f32" },
+  { name = "clip_0", offset = 44, type = "u32", note = "the node's clip rectangle (+44 to +56)" },
+  { name = "clip_1", offset = 48, type = "u32" },
+  { name = "clip_2", offset = 52, type = "u32" },
+  { name = "clip_3", offset = 56, type = "u32" },
+  { name = "alignment", offset = 60, type = "u32", note = "0 left, 1, 2, 3 (the node's flags)" },
+  { name = "unknown_64", offset = 64, type = "u32", note = "24" },
+  { name = "gap", offset = 68, type = "u32", note = "the node's +100 (integer): the scrolling text's gap" },
+  { name = "unknown_72", offset = 72, type = "u32", note = "the node's +104 (integer)" },
+  { name = "unknown_76", offset = 76, type = "u32", note = "the node's +124" },
+  { name = "unknown_80", offset = 80, type = "u32", note = "the node's +128" },
+  { name = "unknown_84", offset = 84, type = "u32", note = "the node's +116 (integer)" },
+  { name = "unknown_88", offset = 88, type = "u32", note = "the node's +120 (integer)" },
+  { name = "unknown_92", offset = 92, type = "u8", note = "128" },
+  { name = "unknown_93", offset = 93, type = "u8", note = "128" },
+  { name = "unknown_94", offset = 94, type = "u8", note = "128" },
+  { name = "unknown_96", offset = 96, type = "f32" },
+  { name = "unknown_100", offset = 100, type = "f32" },
+  { name = "unknown_104", offset = 104, type = "f32" },
+  { name = "unknown_112", offset = 112, type = "u32", note = "0" },
+  { name = "layer", offset = 116, type = "u32", note = "the node's layer (+72)" },
+  { name = "text_id", offset = 120, type = "u32", note = "the node's text id (+108)" },
+]
+
+# A name record (UiMovie::SetNameText's r5, probably a name of two string
+# parts).
+[UiMovieNameRecord]
+measure = "UiMovie::SetNameText.r5"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 4, type = "u32", note = "0, 1, 4 or 5" },
+  { name = "index", offset = 8, type = "u16", note = "signed" },
+  { name = "flag", offset = 10, type = "u8" },
+  { name = "second_kind", offset = 12, type = "u32", note = "2 or 3" },
+  { name = "second_index", offset = 16, type = "u16", note = "signed" },
+  { name = "second_flag", offset = 18, type = "u8" },
+]
+
+# A movie file's animation (sub_8259D670's answer; known-data.md "UI movie
+# file").
+[UiMovieFileAnimation]
+measure = "sub_8259D670.ret"
+size = 20
+origin = "file"
+fields = [
+  { name = "length", offset = 12, type = "f32" },
+  { name = "name", offset = 16, type = "u8", note = "its name's first byte (a string in place)" },
+]
+
+# A picture's texture entry (16 bytes from its +144, sub_8259D648's answer).
+[UiMoviePictureTexture]
+measure = "sub_8259D648.ret"
+size = 16
+origin = "file"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "the index in the movie's textures" },
+]
+
+# An XMD file's entry (sub_825A0CD0's answer): entry 1 is the movie's XPR.
+[UiMovieXmdEntry]
+measure = "sub_825A0CD0.ret"
+size = 16
+origin = "file"
+fields = [
+  { name = "texture_count", offset = 12, type = "u32", note = "entry 1's: the XPR's texture count" },
+]
+
+# An 8-bit string sub_82108A70 (the conversion to UTF-16 UiMovie::
+# SetNodeCharText calls) reads (its r5).
+[UiMovieCharText]
+measure = "sub_82108A70.r5"
+size = 3
+origin = "file"
+fields = [
+  { name = "char_0", offset = 0, type = "u8" },
+  { name = "char_1", offset = 1, type = "u8" },
+  { name = "char_2", offset = 2, type = "u8" },
+]
+
+[globals]
+colors = { address = 0x82008410, type = "bytes", count = 12, note = "the UI movie color table: 12-byte entries (r, g, b integers)" }
+empty_string = { address = 0x82008434, type = "u16", note = "the empty string a text without a buffer gives" }
+zero = { address = 0x82000A34, type = "u32", note = "the float 0.0 (copied as its word)" }
+no_time = { address = 0x82001BE0, type = "u32", note = "the time AnimationTime answers for none" }
+name_separator = { address = 0x82001DE8, type = "u8", note = "the named animations' \".\"" }
+scroll_speed = { address = 0x820021F8, type = "u32", note = "the scroll speed ScrollText sets (a float, copied as its word)" }
+screen_flag = { address = 0x826C5CB0, type = "u32", note = "cleared by sub_8211AD00's work" }
+movie_table_pairs = { address = 0x826C5CCC, type = "ptr", to = "UiMoviePair", note = "the UI movie table: a UiMoviePairVector of {id, movie} pairs" }
+movie_table_capacity = { address = 0x826C5CD0, type = "u32", note = "64" }
+movie_table_count = { address = 0x826C5CD4, type = "u32" }
+text_none = { address = 0x826C5CD8, type = "u32", note = "what the texts' lookup answers the address of for a missing key" }
+movie_none = { address = 0x826C5CDC, type = "u32", note = "what the movie table's lookup answers the address of for a missing key" }
+unknown_826C5CA4 = { address = 0x826C5CA4, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CA8 = { address = 0x826C5CA8, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CAC = { address = 0x826C5CAC, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CB4 = { address = 0x826C5CB4, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CB8 = { address = 0x826C5CB8, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CBC = { address = 0x826C5CBC, type = "u32", note = "cleared by sub_8211AD00" }
+unknown_826C5CC0 = { address = 0x826C5CC0, type = "u32", note = "cleared by sub_8211AD00" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from UiMovie.
+[UiMovieAt176]
+measure = "UiMovie@+176"
+size = 36
+origin = "embedded"
+fields = [
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+]
+
+# Split from UiMovie.
+[UiMovieAt28]
+measure = "UiMovie@+28"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from UiMovie.
+[UiMovieAt40]
+measure = "UiMovie@+40"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from UiMovie.
+[UiMovieAt64]
+measure = "UiMovie@+64"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_12_4i", offset = 12, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+  { name = "unknown_84", offset = 84, type = "f32" },
+  { name = "unknown_88", offset = 88, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u32" },
+]
+
+# Split from UiMovieTextItem.
+[UiMovieTextItemAt16]
+measure = "new<65552>@sub_8211B018@+16"
+size = 100
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_60", offset = 60, type = "f32" },
+  { name = "unknown_76", offset = 76, type = "f32" },
+  { name = "unknown_80", offset = 80, type = "f32" },
+  { name = "unknown_84", offset = 84, type = "f32" },
+  { name = "unknown_88", offset = 88, type = "f32" },
+  { name = "unknown_92", offset = 92, type = "f32" },
+  { name = "unknown_96", offset = 96, type = "f32" },
+]

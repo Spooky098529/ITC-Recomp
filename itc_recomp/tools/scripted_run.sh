@@ -9,8 +9,8 @@
 #   itc_recomp/tools/scripted_run.sh <recording> [extra flags]
 #
 # Run from the repo root, after building. The replay starts PAD_DELAY
-# seconds (3 by default) after the boot's first draw ("called from
-# 8248466C"), with --skip_intro, so at the title screen, and the game is
+# seconds (3 by default) after the boot's first draw (BOOT_MARK, its first
+# resolve), with --skip_intro, so at the title screen, and the game is
 # closed 5 s after the last input (or, if it hangs, 2 minutes after the
 # recording's length from launch). If the boot stalls
 # (no such line in 30 s), the game is restarted once. The user's own pad
@@ -20,6 +20,11 @@
 set -u
 RECORDING=${1:?usage: scripted_run.sh <recording> [extra flags]}; shift
 PAD_DELAY=${PAD_DELAY:-3}
+# The boot's first draw. Until 2026-10-25 this was the movie library's draw
+# ("called from 8248466C"), which no longer runs since the movies play
+# through our FFmpeg (--play_movies_with_ffmpeg), so every replay since then
+# "stalled". The first resolve comes ~20 ms before where that line did.
+BOOT_MARK='Resolve (822AFA58) called from 8258D9E8'
 REAL_PAD=${REAL_PAD:-0x2E24/0x072F}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 TOOLS=$(dirname "$0")
@@ -35,7 +40,7 @@ newest_log() { ls -t $B/logs/itc_*.log 2>/dev/null | head -1; }
 start_game() {
   local before; before=$(newest_log)
   SDL_GAMECONTROLLER_IGNORE_DEVICES=$REAL_PAD SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 \
-  XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
+  XDG_DATA_DIRS=/usr/local/share:/usr/share \
     timeout "$SECONDS_TO_RUN" "$B/itc" \
     --native_audio=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
     --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \
@@ -46,14 +51,14 @@ start_game() {
   for _ in $(seq 300); do
     sleep 0.1
     if [ -z "$L" ] && [ "$(newest_log)" != "$before" ]; then L=$(newest_log); fi
-    if [ -n "$L" ] && grep -q 'called from 8248466C' "$L"; then return 0; fi
+    if [ -n "$L" ] && grep -qF "$BOOT_MARK" "$L"; then return 0; fi
     kill -0 $GAME 2>/dev/null || return 1
   done
   return 1
 }
 
 if ! start_game "$@"; then
-  echo "boot stalled (no \"called from 8248466C\" in 30 s); restarting once"
+  echo "boot stalled (no \"$BOOT_MARK\" in 30 s); restarting once"
   kill $GAME 2>/dev/null; wait $GAME 2>/dev/null
   find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   if ! start_game "$@"; then

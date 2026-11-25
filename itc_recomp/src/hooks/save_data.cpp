@@ -1,0 +1,242 @@
+// The players' save data natively: adapters in front of src/save_data/
+// (docs/functions/save-data.md), with the register steps the harness shares
+// (hooks/save_data.h).
+
+#include "hooks/save_data.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "hooks/app_start_up.h"
+#include "hooks/heap.h"
+#include "save_data/save_data.h"
+#include "schema/save_data.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_save_data, true, "ITC",
+              "Run the players' save data's set-ups (docs/functions/save-data.md: Stats::Stats "
+              "sub_821056C0, Stats::ResetRecords sub_821136D8, Stats::Reset sub_82113730, "
+              "Progress::Clear sub_82113BD8, BitSet400::SetAll sub_821133A8, the default "
+              "tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0, sub_820CCCF0 and "
+              "sub_820CCD00, Progress::SetDefaults sub_82113E60 (its copies through memcpy's "
+              "plain C++), ControlMap::SetDefault sub_821058A8, Options::SetDefaults "
+              "sub_82105940, CourseRecords::Reset sub_82105D08, CourseRecords::Of sub_82105BF8, SaveData::TwoPlayerBlock sub_82105678, Players::ResetControllers "
+              "sub_8209F5E0 and, with --native_heap, SaveData::Delete sub_821055D8, "
+              "SaveData::Create sub_821057C8, MenuList::Init sub_8220BAC0 and "
+              "TitleScreen::ResetPlayer sub_82221D00, and SaveData::CreateTwoPlayerBlock "
+              "sub_82105740 (no adapter: ModeType8::Init's plain C++ calls it); no adapters for the Stats functions, "
+              "BitSet400::SetAll, the getters but Table3044's, ControlMap::SetDefault, "
+              "Options::SetDefaults and CourseRecords::Reset: only their callers' plain C++ "
+              "calls them in play) natively instead of through the translated code (the same writes; "
+              "checked by --run_harnesses=save_data)");
+
+namespace hooks {
+
+namespace sd = save_data;
+
+ITC_REGS_STEP(SaveDataStatsConstruct) {
+  ctx.fpscr.disableFlushMode();
+  sd::StatsConstruct(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataStatsResetRecords) {
+  ctx.fpscr.disableFlushMode();
+  sd::StatsResetRecords(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataStatsReset) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sd::StatsReset(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataProgressClear) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sd::ProgressClear(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataBitSetAll) {
+  sd::BitSet400SetAll(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataProgressSetDefaults) {
+  if (!sd::SetDefaultsNative(ctx.r3.u32)) {
+    lifted::original::c82113E60(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sd::ProgressSetDefaults(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataControlMapSetDefault) {
+  sd::ControlMapSetDefault(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataOptionsSetDefaults) {
+  ctx.r7.u64 = ctx.r3.u64;
+  ctx.r3.u64 = sd::OptionsSetDefaults(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataCourseRecordsReset) {
+  ctx.r3.u64 = sd::CourseRecordsReset(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(SaveDataCourseRecordsOf) {
+  const uint64_t records = ctx.r3.u64;
+  ctx.r10.u64 = schema::CourseRecordKey(ctx.r4.u32).traffic();
+  ctx.r3.u64 = sd::CourseRecordsOf(records, ctx.r4.u32);
+  // (r11 = r3 - 20, a leftover for recompiled callers: none now)
+}
+
+ITC_REGS_STEP(SaveDataDelete) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto block = sd::SaveDataDelete(ctx.r3.u32)) {
+      ctx.r3.u64 = *block;
+      return;
+    }
+  }
+  lifted::original::c821055D8(ctx);
+}
+
+ITC_REGS_STEP(SaveDataCreate) {
+  if (hooks::StartUpRecorded(ctx, 0x821057C8)) {  // the data load's harness
+    return;
+  }
+  if (hooks::NativeHeapActive() && sd::CreateNative()) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto holder = sd::SaveDataCreate(ctx.r3.u32)) {
+      ctx.r3.u64 = *holder;
+      return;
+    }
+  }
+  lifted::original::c821057C8(ctx);
+}
+
+ITC_REGS_STEP(SaveDataCreateTwoPlayerBlock) {
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto r3 = sd::CreateTwoPlayerBlock()) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c82105740(ctx);
+}
+
+ITC_REGS_STEP(SaveDataResetControllers) {
+  sd::PlayersResetControllers();
+  ctx.r9.u64 = 3;
+  ctx.r10.u64 = 0xFFFFFFFF826C0000ull;
+  // (r11 = 1, a leftover for recompiled callers: none now)
+}
+
+ITC_REGS_STEP(SaveDataMenuListInit) {
+  if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(ctx.r3.u32)) {
+    lifted::original::c8220BAC0(ctx);
+    return;
+  }
+  const sd::MenuListArgs args{ctx.r4.u32,
+                              ctx.r5.u32,
+                              ctx.r6.u32,
+                              ctx.r7.u32,
+                              ctx.r8.u32,
+                              ctx.r9.u32,
+                              ctx.r10.u32,
+                              guest::LoadU32(ctx.r1.u32 + 84),
+                              guest::LoadU32(ctx.r1.u32 + 92)};
+  ctx.r3.u64 = sd::MenuListInit(ctx.r3.u32, args);
+}
+
+ITC_REGS_STEP(SaveDataResetPlayer) {
+  if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative()) {
+    lifted::original::c82221D00(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (const auto r3 = sd::TitleScreenResetPlayer()) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  // SaveData::Create's plain C++ refused after the delete (operator new's
+  // error paths, never seen): the rest as the original does it.
+  ctx.r3.u64 = 0;
+  lifted::Enter(ctx, game::SaveData::Create);
+  lifted::Enter(ctx, game::Players::ResetControllers);
+}
+
+#define ITC_SAVE_DATA_TABLE(name)                        \
+  ITC_REGS_STEP(SaveData##name) {                        \
+    /* (r11, a leftover for recompiled callers: none now) */ \
+    ctx.r3.s64 = int32_t(sd::Defaults##name());          \
+  }
+
+ITC_SAVE_DATA_TABLE(Table50A8)
+ITC_SAVE_DATA_TABLE(Table3044)
+ITC_SAVE_DATA_TABLE(Table3E34)
+ITC_SAVE_DATA_TABLE(Table3C24)
+ITC_SAVE_DATA_TABLE(Table50E4)
+
+#undef ITC_SAVE_DATA_TABLE
+
+ITC_REGS_STEP(SaveDataTwoPlayerBlock) {
+  // (r11 = 0x826C0000, a leftover for recompiled callers: none now)
+  ctx.r3.u64 = sd::TwoPlayerBlock();
+}
+
+}  // namespace hooks
+
+// No adapters (removed 2026-10-28: in play only the plain C++ of their
+// callers calls them; the flag switches those callers, and the register steps
+// above stay for the harness) for Stats::Stats sub_821056C0, Stats::Reset
+// sub_82113730, Stats::ResetRecords sub_821136D8, BitSet400::SetAll
+// sub_821133A8, the default tables' getters sub_820CCCC0, sub_820CCCE0,
+// sub_820CCCF0 and sub_820CCD00 (Table3044's, sub_820CCCD0, stays: the car
+// object's maker sub_82110448 calls it), ControlMap::SetDefault
+// sub_821058A8, Options::SetDefaults sub_82105940 and CourseRecords::Reset
+// sub_82105D08.
+
+#define ITC_SAVE_DATA_ADAPTER(address, step) \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_data)) { \
+    hooks::step(ctx);                  \
+  }
+
+ITC_SAVE_DATA_ADAPTER(82113BD8, SaveDataProgressClear)
+ITC_SAVE_DATA_ADAPTER(820CCCD0, SaveDataTable3044)
+ITC_SAVE_DATA_ADAPTER(82113E60, SaveDataProgressSetDefaults)
+ITC_SAVE_DATA_ADAPTER(821055D8, SaveDataDelete)
+ITC_SAVE_DATA_ADAPTER(821057C8, SaveDataCreate)
+// CourseRecords::Of: from Race::PlaceRacers' recompiled branch (its plain
+// C++ declines there) and NodeScreen::ShowRecords' plain C++ (directly).
+ITC_SAVE_DATA_ADAPTER(82105BF8, SaveDataCourseRecordsOf)
+// SaveData::TwoPlayerBlock: from the type 8 mode's Init and slot 6, its
+// panel screen's PickCar and the save screen's kind 6 pages (recompiled,
+// never seen in play); the car list's plain C++ reads the word inline.
+ITC_SAVE_DATA_ADAPTER(82105678, SaveDataTwoPlayerBlock)
+// Players::ResetControllers' adapter written out: the app_start_up
+// harness's recorder first.
+ITC_NATIVE_ENTRY_ALWAYS(8209F5E0) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x8209F5E0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_save_data)) {
+    lifted::original::c8209F5E0(ctx);
+    return;
+  }
+  hooks::SaveDataResetControllers(ctx);
+}
+// MenuList::Init hands its call to the harnesses' recorder first (the race
+// HUD object's).
+ITC_NATIVE_ENTRY_ALWAYS(8220BAC0) {
+  
+  if (hooks::StartUpRecorded(ctx, 0x8220BAC0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_save_data)) {
+    lifted::original::c8220BAC0(ctx);
+    return;
+  }
+  hooks::SaveDataMenuListInit(ctx);
+}
+ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)

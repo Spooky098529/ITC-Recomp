@@ -16,7 +16,8 @@ or let go. Which of these each racer gets depends on the race flow's
 state: the functions at `8215F5E8`-`82160AE0` are handlers registered,
 one per state, by the race flow's set-up (`sub_82160AE0`, 1,661 lines,
 from `sub_82151D20`; a table of (state, event) entries through
-`sub_82106158`, both in `../loops/leads.md`), on an object whose +9604
+`sub_82106158`; `RaceFlow::Init` in `race-flow.md` since 2026-11-04,
+with the table, and `StateMachine::Add` in `game-modes.md`), on an object whose +9604
 is the state, +9608 flags and +9612, +9616 the player indexes of the
 two human cars (0 and 1; both 0 when the race data's +0xA3AF0 is 6). Which state is which
 isn't known (the states named in the rows are the table's numbers); the
@@ -45,6 +46,8 @@ Shared with other files, without rows here: `AiDriver::DriveCar`
 mappers' read slots (`action-mappers.md`, through the vtable); operator
 new and delete (`sub_825A6880`, `sub_825A70E8`, `heap.md`).
 
+Rows in `race-flow.md` since 2026-11-04 (not seen in play):
+`sub_8215F7B0`, `sub_821022B0`, `sub_8215FB08` and `sub_8215FC30`.
 Not seen in play, so without rows: `sub_8215F5F0` (every racer's input
 record cleared: one cleared record copied to all; from
 `sub_8215FB90`), `sub_8215F7B0` (every input record cleared,
@@ -97,6 +100,17 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

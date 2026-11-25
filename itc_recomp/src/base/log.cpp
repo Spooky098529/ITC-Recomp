@@ -1,5 +1,6 @@
 #include "base/log.h"
 
+#include <charconv>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -105,6 +106,30 @@ void StartLogFile(const std::string& path, std::string_view level_name) {
   std::fflush(file);
   early.clear();
   early.shrink_to_fit();
+}
+
+std::filesystem::path NextLogPath(const std::filesystem::path& dir, std::string_view name) {
+  std::error_code error;
+  std::filesystem::create_directories(dir, error);
+  int highest = 0;
+  const std::string prefix = std::string(name) + "_";
+  for (const auto& entry : std::filesystem::directory_iterator(dir, error)) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    const std::string stem = entry.path().stem().string();
+    if (!stem.starts_with(prefix)) {
+      continue;
+    }
+    const std::string_view digits = std::string_view(stem).substr(prefix.size());
+    int number = 0;
+    const auto [end, parse_error] =
+        std::from_chars(digits.data(), digits.data() + digits.size(), number);
+    if (parse_error == std::errc() && end == digits.data() + digits.size()) {
+      highest = std::max(highest, number);
+    }
+  }
+  return dir / std::format("{}_{:03}.log", name, highest + 1);
 }
 
 }  // namespace base

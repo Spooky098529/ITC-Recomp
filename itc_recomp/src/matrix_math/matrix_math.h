@@ -21,19 +21,21 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 
 namespace matrix_math {
 
 // Matrix::Multiply (sub_8209BD50): out = a * b, both read first (any
 // alignment), out stored aligned (to its 16-byte boundary, as stvx).
-void Multiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b);
+void Multiply(uint32_t out, uint32_t a, uint32_t b);
 // Matrix::Copy (sub_820A0AC0): the 16 words, copied five times over as the
 // original does (it only matters when the two overlap).
-void Copy(uint8_t* base, uint32_t dst, uint32_t src);
+void Copy(uint32_t dst, uint32_t src);
 // Matrix::Inverse (sub_820A9988): out = the inverse of in (read first, any
 // alignment), out stored aligned.
-void Inverse(uint8_t* base, uint32_t out, uint32_t in);
+void Inverse(uint32_t out, uint32_t in);
 // Matrix::RotateX, RotateY and RotateZ (sub_820A65F0, sub_820A67F8,
 // sub_820A2D30): out = in * the turn about that axis by the float at
 // `angle`, its sine and cosine from the game's polynomials (not std::sin).
@@ -41,65 +43,83 @@ void Inverse(uint8_t* base, uint32_t out, uint32_t in);
 // the original's stack, r1 - 80), then multiplied with Multiply and noted
 // for interpolation (interpolation::BlendState_OnMultiply) with the return
 // address of the original's call.
-void RotateX(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
-void RotateY(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
-void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+void RotateX(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+void RotateY(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
+void RotateZ(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn);
 // sub_820A9BC8: an object's +560 = Inverse of its +208 (the name ours;
 // whose object isn't known).
-void ObjectInverse(uint8_t* base, uint32_t object);
+void ObjectInverse(uint32_t object);
 // Vec4::Transform (sub_820AB560): out = v * m, all four components; m read
 // first (any alignment), v and out aligned.
-void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
+void Vec4Transform(uint32_t out, uint32_t m, uint32_t v);
 // Vec3::SwapXZ (sub_820AB688): swaps the words at +0 and +8.
-void Vec3SwapXZ(uint8_t* base, uint32_t v);
+void Vec3SwapXZ(uint32_t v);
 // sub_8209B038: the words at +12, +28, +44 and +60 = 1.0 (0x82000A30's).
-void SetWsToOne(uint8_t* base, uint32_t m);
+void SetWsToOne(uint32_t m);
 
 // Matrix::MultiplyUnaligned (sub_822B8F78): out = a * b, any word-aligned
 // addresses, all read before out is written.
-void MultiplyUnaligned(uint8_t* base, uint32_t out, uint32_t a, uint32_t b);
+void MultiplyUnaligned(uint32_t out, uint32_t a, uint32_t b);
 // Matrix::MultiplyReversed (sub_82293988): out = b * a (through
 // Matrix::MultiplyTo, sub_82293598, merged: a tail call).
-void MultiplyReversed(uint8_t* base, uint32_t out, uint32_t a, uint32_t b);
+void MultiplyReversed(uint32_t out, uint32_t a, uint32_t b);
 // Matrix::InverseRotate (sub_82293998): out = (v.x, v.y, v.z) times the
 // transposed upper 3x3 of m, w 0.0 (Matrix::Transpose, sub_822936D8, and
 // Matrix::TransposeUnaligned, sub_822B9158, merged: the transposed words
 // held here instead of on the original's stack).
-void InverseRotate(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
+void InverseRotate(uint32_t out, uint32_t m, uint32_t v);
 // Matrix::Set (sub_822935A0): the four rows copied with Vec4::Copy.
-void Set(uint8_t* base, uint32_t out, uint32_t in);
+void Set(uint32_t out, uint32_t in);
 // Matrix::SetIdentity (sub_822936E0): Set(out, 0x82953740).
-void SetIdentity(uint8_t* base, uint32_t out);
+void SetIdentity(uint32_t out);
 // Matrix::FromQuaternion (sub_822936F0): the upper 3x3 of the quaternion's
 // turn; the fourth row and column left as they were.
-void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q);
+void FromQuaternion(uint32_t out, uint32_t q);
 // Matrix::FromQuaternionAndRow (sub_822937D8): FromQuaternion, then the
 // fourth row copied from 0x826382D0 (Vec4::Copy); the fourth column left.
-void FromQuaternionAndRow(uint8_t* base, uint32_t out, uint32_t q);
+void FromQuaternionAndRow(uint32_t out, uint32_t q);
 // Quaternion::XAxis (sub_82293DF0): out = (1, 0, 0, 1) projected by the
 // quaternion's turn (a matrix built at `scratch`, 64 bytes of guest memory:
 // the original's stack, r1 - 96): the x axis turned.
-void QuaternionXAxis(uint8_t* base, uint32_t out, uint32_t q, uint32_t scratch);
+void QuaternionXAxis(uint32_t out, uint32_t q, uint32_t scratch);
 // Quaternion::LengthSquared (sub_82293CB0): x² + y² + z² + w².
-float QuaternionLengthSquared(uint8_t* base, uint32_t q);
+float QuaternionLengthSquared(uint32_t q);
 // Matrix::ProjectPoint (sub_82293600): (p, 1) * m divided by its w, out w
 // 1.0; all read before out is written.
-void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p);
+void ProjectPoint(uint32_t out, uint32_t m, uint32_t p);
 // Quaternion::FromMatrix (sub_82293AD8): the quaternion of m's upper 3x3.
-void QuaternionFromMatrix(uint8_t* base, uint32_t out, uint32_t m);
+void QuaternionFromMatrix(uint32_t out, uint32_t m);
 // Quaternion::Multiply (sub_82293D78): out = a b (Hamilton product).
-void QuaternionMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b);
+void QuaternionMultiply(uint32_t out, uint32_t a, uint32_t b);
 // Quaternion::FromAxisAngle (sub_82293E68): (0, 0, 0, 1) when the angle is
 // 0.0; otherwise SinCos(angle × 0.5) (the sine and cosine stored at
 // `scratch` and +4, the original's stack, r1 - 32) and out = (axis × s, c).
 // Returns what the original leaves in f1: the angle, or the cosine's double.
-double QuaternionFromAxisAngle(uint8_t* base, uint32_t out, uint32_t axis, double angle,
+double QuaternionFromAxisAngle(uint32_t out, uint32_t axis, double angle,
                                uint32_t scratch);
 // Quaternion::NormalizeSelf (sub_82293F10): q / |q|.
-void QuaternionNormalizeSelf(uint8_t* base, uint32_t q);
+void QuaternionNormalizeSelf(uint32_t q);
 // SinCos (sub_820B0E10): sin and cos of the angle stored as floats at
 // `sine` and `cosine` (the C runtime's, src/c_runtime/math.h); returns the
 // cosine's double (the original leaves it in f1).
-double SinCos(uint8_t* base, double angle, uint32_t sine, uint32_t cosine);
+double SinCos(double angle, uint32_t sine, uint32_t cosine);
+
+// The two static matrices (C runtime static set-ups, no direct callers:
+// _cinit's initializer table, once at boot). sub_825D8F88
+// ZeroMatrix::StaticInit: the float 0.0 (0x82000A34) at the 16 words of its
+// frame's +160 to +220 (sp - 304 + ...), their addresses from +220 down to
+// +160, the last nine at the frame's +84 to +148 as the original passes them,
+// Matrix::FromFloats (camera_modes::MatrixFromFloats) into 0x8266D000, and
+// its clean-up 0x825DACA0 registered with atexit (through `call` when the
+// native one can't); returns atexit's r3. `sp` is the caller's r1.
+// sub_825D9060 IdentityMatrix::StaticInit: the same with 1.0 (0x82000A30) at
+// +160, +180, +200 and +220, into 0x8266D040, clean-up 0x825DAC98 (the
+// two matrices: schema::MatrixMathGlobals' zero_matrix and identity_matrix).
+int32_t ZeroMatrixStaticInit(uint32_t sp, const c_runtime::AtexitCall& call);
+int32_t IdentityMatrixStaticInit(uint32_t sp, const c_runtime::AtexitCall& call);
+// sub_825DACA0 and sub_825DAC98: their clean-ups, empty (a lone blr; never
+// seen in play: the exit's).
+void ZeroMatrixExit();
+void IdentityMatrixExit();
 
 }  // namespace matrix_math

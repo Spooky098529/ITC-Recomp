@@ -9,6 +9,7 @@
 #include "c_runtime/strings.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 #include <algorithm>
 #include <climits>
@@ -113,8 +114,20 @@ void ShrMan(uint32_t man[3], int32_t count) {
 
 }  // namespace
 
-uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status) {
-  ITC_NATIVE_RUNNING("sub_825B69B8 _ld12tod");
+namespace {
+
+// _ld12cvt's format descriptor: the double's above, the float's at
+// 0x8266C52C (128, -127, 24, 8, 32 bits, 127).
+struct Ld12Format {
+  int32_t max_exp, min_exp, precision, exponent_width, bias;
+};
+constexpr Ld12Format kDoubleFormat{kMaxExp, kMinExp, kPrecision, kExponentWidth, kBias};
+constexpr Ld12Format kFloatFormat{128, -127, 24, 8, 127};
+
+// _ld12cvt: the 12-byte form rounded to `format`; the result's top word
+// (sign, exponent, mantissa) and the next.
+void Ld12Convert(const LongDouble12& value, uint16_t extra, const Ld12Format& format,
+                 int32_t* status, uint32_t* high_out, uint32_t* low_out) {
   uint32_t man[3] = {value.mantissa_high, value.mantissa_low, uint32_t(extra) << 16};
   const bool negative = (value.sign_exponent & 0x8000) != 0;
   int32_t exponent = int32_t(value.sign_exponent & 0x7FFF) - 16383;
@@ -129,53 +142,70 @@ uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status
   } else {
     const uint32_t saved[3] = {man[0], man[1], man[2]};
     const int32_t unrounded = exponent;
-    if (RoundMan(man, kPrecision)) {
+    if (RoundMan(man, format.precision)) {
       exponent++;
     }
-    if (exponent < kMinExp - kPrecision) {
+    if (exponent < format.min_exp - format.precision) {
       man[0] = man[1] = man[2] = 0;  // underflow to zero
       *status = 2;
-    } else if (exponent <= kMinExp) {
+    } else if (exponent <= format.min_exp) {
       // A denormal: the unrounded mantissa shifted by the unrounded
       // exponent's distance, rounded again, and room made for the exponent.
       man[0] = saved[0];
       man[1] = saved[1];
       man[2] = saved[2];
-      ShrMan(man, kMinExp - unrounded);
-      RoundMan(man, kPrecision);
-      ShrMan(man, kExponentWidth + 1);
+      ShrMan(man, format.min_exp - unrounded);
+      RoundMan(man, format.precision);
+      ShrMan(man, format.exponent_width + 1);
       *status = 2;
-    } else if (exponent >= kMaxExp) {
+    } else if (exponent >= format.max_exp) {
       man[0] = 0x80000000u;  // overflow: infinity
       man[1] = man[2] = 0;
-      ShrMan(man, kExponentWidth);
-      biased = kBias + kMaxExp;
+      ShrMan(man, format.exponent_width);
+      biased = format.bias + format.max_exp;
       *status = 1;
     } else {
       man[0] &= 0x7FFFFFFFu;  // the leading bit left out
-      ShrMan(man, kExponentWidth);
-      biased = kBias + exponent;
+      ShrMan(man, format.exponent_width);
+      biased = format.bias + exponent;
       *status = 0;
     }
   }
-  const uint32_t high = Slw(uint32_t(biased), 31 - kExponentWidth) |
-                        (negative ? 0x80000000u : 0) | man[0];
-  return (uint64_t(high) << 32) | man[1];
+  *high_out = Slw(uint32_t(biased), 31 - format.exponent_width) | (negative ? 0x80000000u : 0) |
+              man[0];
+  *low_out = man[1];
 }
 
-int32_t WriteChar(uint8_t* base, uint32_t character, uint32_t stream, uint32_t count) {
-  if ((guest::LoadU32(base, stream + 12) & 0x40) != 0 && guest::LoadU32(base, stream + 8) == 0) {
-    guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+}  // namespace
+
+uint64_t Ld12ToDouble(const LongDouble12& value, uint16_t extra, int32_t* status) {
+  ITC_NATIVE_RUNNING("sub_825B69B8 _ld12tod");
+  uint32_t high = 0, low = 0;
+  Ld12Convert(value, extra, kDoubleFormat, status, &high, &low);
+  return (uint64_t(high) << 32) | low;
+}
+
+uint32_t Ld12ToFloat(const LongDouble12& value, uint16_t extra, int32_t* status) {
+  ITC_NATIVE_RUNNING("sub_825B70D0 _ld12tof");
+  uint32_t high = 0, low = 0;
+  Ld12Convert(value, extra, kFloatFormat, status, &high, &low);
+  return high;
+}
+
+int32_t WriteChar(uint32_t character, uint32_t stream, uint32_t count) {
+  const schema::Stream s(stream);
+  if ((s.flags() & 0x40) != 0 && s.buffer() == 0) {
+    guest::StoreU32(count, guest::LoadU32(count) + 1);
     return 0;
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4) - 1;
+  const uint32_t room = s.room() - 1;
   if (int32_t(room) < 0) {
     return -1;  // _flsbuf
   }
-  guest::StoreU32(base, stream + 4, room);
-  guest::StoreU8(base, guest::LoadU32(base, stream), uint8_t(character));
-  guest::StoreU32(base, stream, guest::LoadU32(base, stream) + 1);
-  guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+  s.set_room(room);
+  guest::StoreU8(s.pointer(), uint8_t(character));
+  s.set_pointer(s.pointer() + 1);
+  guest::StoreU32(count, guest::LoadU32(count) + 1);
   return 1;
 }
 
@@ -187,25 +217,27 @@ bool Overlap(uint32_t a, uint32_t a_bytes, uint32_t b, uint32_t b_bytes) {
 }
 
 // A string stream with no buffer: write_char and its wide one only count.
-bool CountsOnly(uint8_t* base, uint32_t stream) {
-  return (guest::LoadU32(base, stream + 12) & 0x40) != 0 && guest::LoadU32(base, stream + 8) == 0;
+bool CountsOnly(uint32_t stream) {
+  const schema::Stream s(stream);
+  return (s.flags() & 0x40) != 0 && s.buffer() == 0;
 }
 
 }  // namespace
 
-bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t stream,
+bool WriteMultiChar(uint32_t string, int32_t length, uint32_t stream,
                     uint32_t count, int32_t* last) {
   *last = -1;
-  if (CountsOnly(base, stream)) {
-    guest::StoreU32(base, count, guest::LoadU32(base, count) + uint32_t(length));
+  if (CountsOnly(stream)) {
+    guest::StoreU32(count, guest::LoadU32(count) + uint32_t(length));
     return true;
   }
   if (length <= 0) {
     return true;
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4);
-  const uint32_t pointer = guest::LoadU32(base, stream);
-  const uint32_t counted = guest::LoadU32(base, count);
+  const schema::Stream s(stream);
+  const uint32_t room = s.room();
+  const uint32_t pointer = s.pointer();
+  const uint32_t counted = guest::LoadU32(count);
   if (Overlap(pointer, uint32_t(length), stream, 16) ||
       Overlap(pointer, uint32_t(length), count, 4) || Overlap(count, 4, stream, 16)) {
     return false;
@@ -216,40 +248,41 @@ bool WriteMultiChar(uint8_t* base, uint32_t string, int32_t length, uint32_t str
     }
   }
   for (uint32_t k = 0; k < uint32_t(length); k++) {
-    *last = guest::LoadU8(base, string + k);
-    WriteChar(base, uint32_t(*last), stream, count);
+    *last = guest::LoadU8(string + k);
+    WriteChar(uint32_t(*last), stream, count);
   }
   return true;
 }
 
-bool PutwcString(uint8_t* base, uint16_t unit, uint32_t stream) {
+bool PutwcString(uint16_t unit, uint32_t stream) {
   ITC_NATIVE_RUNNING("sub_825B7A80 _putwc_nolock");
   if (stream == kStreams + 32 || stream == kStreams + 64) {
     return false;  // stdout and stderr: the console
   }
-  if ((guest::LoadU32(base, stream + 12) & 0x40) == 0) {
+  const schema::Stream s(stream);
+  if ((s.flags() & 0x40) == 0) {
     return false;  // a file stream
   }
-  const uint32_t room = guest::LoadU32(base, stream + 4) - 2;
+  const uint32_t room = s.room() - 2;
   if (int32_t(room) < 0) {
     return false;  // _flswbuf
   }
-  guest::StoreU32(base, stream + 4, room);
-  guest::StoreU16(base, guest::LoadU32(base, stream), unit);
-  guest::StoreU32(base, stream, guest::LoadU32(base, stream) + 2);
+  s.set_room(room);
+  guest::StoreU16(s.pointer(), unit);
+  s.set_pointer(s.pointer() + 2);
   return true;
 }
 
-bool WriteWideChar(uint8_t* base, uint16_t unit, uint32_t stream, uint32_t count) {
+bool WriteWideChar(uint16_t unit, uint32_t stream, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825B1368 wide write_char");
-  if (CountsOnly(base, stream)) {
-    guest::StoreU32(base, count, guest::LoadU32(base, count) + 1);
+  if (CountsOnly(stream)) {
+    guest::StoreU32(count, guest::LoadU32(count) + 1);
     return true;
   }
-  if (!PutwcString(base, unit, stream)) {
+  if (!PutwcString(unit, stream)) {
     return false;
   }
-  guest::StoreU32(base, count, unit == 0xFFFF ? 0xFFFFFFFFu : guest::LoadU32(base, count) + 1);
+  guest::StoreU32(count, unit == 0xFFFF ? 0xFFFFFFFFu : guest::LoadU32(count) + 1);
   return true;
 }
 
@@ -273,7 +306,7 @@ uint8_t GuestText::Get(uint64_t at) {
     return 0;
   }
   if (!known_[at]) {
-    bytes_[at] = guest::LoadU8(base_, uint32_t(address_ + at));
+    bytes_[at] = guest::LoadU8(uint32_t(address_ + at));
     known_[at] = 1;
   }
   return bytes_[at];
@@ -333,7 +366,7 @@ bool GuestText::Commit() {
   }
   for (uint64_t i = 0; i < end_; i++) {
     if (written_[i]) {
-      guest::StoreU8(base_, uint32_t(address_ + i), bytes_[i]);
+      guest::StoreU8(uint32_t(address_ + i), bytes_[i]);
     }
   }
   return true;
@@ -423,23 +456,23 @@ bool Cftof2(GuestText& text, int32_t precision, int32_t sign, int32_t exponent, 
   return text.ok();
 }
 
-uint32_t DecimalPointAddress(uint8_t* base, uint32_t* words) {
-  constexpr uint32_t kLocaleData = 0x8266C024;
-  const uint32_t first = guest::LoadU32(base, kLocaleData);
-  const uint32_t point = guest::LoadU32(base, first);
+uint32_t DecimalPointAddress(uint32_t* words) {
+  const schema::Lconv lconv = schema::CRuntimeGlobals::lconv();
+  const uint32_t first = lconv.address;
+  const uint32_t point = lconv.decimal_point().address;
   if (words) {
-    words[0] = kLocaleData;
+    words[0] = schema::CRuntimeGlobals::lconv_address();
     words[1] = first;
     words[2] = point;
   }
   return point;
 }
 
-bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision) {
+bool Cftof(uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision) {
   ITC_NATIVE_RUNNING("sub_825AE8E0 _cftof_l");
   // _fltout2: $I10_OUTPUT's digits copied by strcpy_s into 22 bytes.
   FloatOut out;
-  if (!I10Output(base, DoubleToLd12(bits), 17, 0, &out)) {
+  if (!I10Output(DoubleToLd12(bits), 17, 0, &out)) {
     return false;
   }
   uint32_t length = 0;
@@ -457,14 +490,14 @@ bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t
   }
   const uint32_t minus = sign == kMinus ? 1 : 0;
   const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus;
-  GuestText text(base, buffer);
+  GuestText text(buffer);
   if (FpToStr(text, minus, room, int32_t(uint32_t(exponent) + uint32_t(precision)), &exponent,
               mantissa) != 0) {
     return false;
   }
   uint32_t words[3];
-  const uint32_t point = DecimalPointAddress(base, words);
-  if (!Cftof2(text, precision, sign, exponent, false, guest::LoadU8(base, point))) {
+  const uint32_t point = DecimalPointAddress(words);
+  if (!Cftof2(text, precision, sign, exponent, false, guest::LoadU8(point))) {
     return false;
   }
   const uint32_t end = uint32_t(text.WrittenEnd());

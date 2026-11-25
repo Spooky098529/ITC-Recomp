@@ -1,0 +1,225 @@
+# The schema of docs/functions/track-zones.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The fixed-size lists (List16 is camera-modes.toml's, List64 and List128
+# here) share one layout for N slots: N nodes of two halfwords (the next
+# node, -1 for none, and a data slot), then halfwords the free list's head
+# (+4N), one not read (+4N + 2, -1 at reset), the head (+4N + 4), one not
+# read (+4N + 6, -1 at reset; probably the tail) and the count (+4N + 8),
+# then the data (+4N + 12). Fields not named here (the route's section
+# records, the racers' records, the vehicle's track position) are other
+# areas' (track-route, race-world, collision-world).
+#
+# Measure faults (for the lead): RouteRange::ToNeighbor's out (r3) and
+# RouteRange::Advance's out (r3, camera-modes.md) are positions on the
+# stack (section, slice halfwords), which the measure joins with
+# RouteRange: their halfword stores at +0 and +2 fit no field of it.
+
+# A route range (1,064 bytes, RouteRange::): a start and an end on the
+# course's route, the sections to take at forks and the sections to leave
+# out. In the track zones (TrackZone's ranges) and on the stack (the zones'
+# set-ups, the camera modes' sub_82155288).
+[RouteRange]
+measure = "RouteRange"
+measures = ["RouteRange::Advance.r4", "RouteRange::AddBranch.r3"]
+size = 1064
+origin = "embedded"
+# Dual (E5 step 4): in the track zones (host) and on the stack and in the
+# camera modes' objects (guest). Its two List64s (+12, +536) are covered by
+# its own fields, so they aren't embed fields (a second copy of the same
+# scalars in the layout would swap them twice in a copy).
+storage = "dual"
+# 9 functions; areas: camera-modes.md, track-zones.md
+fields = [
+  { name = "state", offset = 0, type = "u32", note = "0 off, 1 set up or outside, 2 on the range (RouteRange::Update)" },
+  { name = "start_section", offset = 4, type = "u16", note = "the start: a section of the course's route (0x826C5B10)" },
+  { name = "start_slice", offset = 6, type = "u16", note = "the start's slice in it" },
+  { name = "end_section", offset = 8, type = "u16" },
+  { name = "end_slice", offset = 10, type = "u16" },
+  { name = "take_nodes", offset = 12, type = "bytes", count = 256, note = "the sections to take at forks: a List64 from +12, its 64 nodes" },
+  { name = "take_free", offset = 268, type = "u16", note = "the take list's free head (its +256)" },
+  { name = "take_258", offset = 270, type = "u16", note = "the take list's +258: -1 at reset, not read" },
+  { name = "take_head", offset = 272, type = "u16", note = "the take list's head (its +260)" },
+  { name = "take_262", offset = 274, type = "u16", note = "the take list's +262: -1 at reset, not read (probably the tail)" },
+  { name = "take_count", offset = 276, type = "u16", note = "the take list's count (its +264)" },
+  { name = "take_sections", offset = 280, type = "bytes", count = 256, note = "the take list's 64 words: sections" },
+  { name = "leave_nodes", offset = 536, type = "bytes", count = 256, note = "the sections to leave out: a List64 from +536 (empty in play), its nodes" },
+  { name = "leave_free", offset = 792, type = "u16" },
+  { name = "leave_258", offset = 794, type = "u16", note = "-1 at reset, not read" },
+  { name = "leave_head", offset = 796, type = "u16" },
+  { name = "leave_262", offset = 798, type = "u16", note = "-1 at reset, not read" },
+  { name = "leave_count", offset = 800, type = "u16" },
+  { name = "leave_sections", offset = 804, type = "bytes", count = 256, note = "the leave list's 64 words: sections" },
+  { name = "check_beside", offset = 1060, type = "u32", note = "1 to check the sections beside the ends (links 6 to 9)" },
+  { name = "fault_out_section", offset = 0, type = "u16", note = "measure fault: RouteRange::Advance's and ToNeighbor's r3 is an out position on the stack (section at +0), joined with the range; tools/type_map.py should split it" },
+  { name = "fault_out_slice", offset = 2, type = "u16", note = "measure fault: the out position's slice at +2 (Advance, ToNeighbor)" },
+]
+
+# The track zones' owner ([0x828161EC], 1,199,156 bytes, TrackZones::):
+# a 128-slot list of the zones, then the 70 zones.
+[TrackZones]
+measure = "TrackZones"
+size = 1199156
+origin = "allocated"
+# Host (E5 step 4): made by TrackZones::Create (the hand port's New; the
+# lifted original's operator new at 0x8228E7B4), freed by
+# TrackZones::Destroy. Its List128 at +0 is covered by its own fields.
+storage = "host"
+host_alloc = [0x8228E7B4]
+# 3 functions; areas: track-zones.md
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 512, note = "the zone list (a List128 from +0): its 128 nodes" },
+  { name = "free", offset = 512, type = "u16", note = "the zone list's free head" },
+  { name = "list_514", offset = 514, type = "u16", note = "-1 at reset, not read" },
+  { name = "head", offset = 516, type = "u16", note = "the zone list's head" },
+  { name = "list_518", offset = 518, type = "u16", note = "-1 at reset, not read" },
+  { name = "count", offset = 520, type = "u16", note = "the zone list's count (70 once made)" },
+  { name = "listed_zones", offset = 524, type = "bytes", count = 512, note = "the zone list's 128 words: the zones' addresses" },
+  { name = "zones", offset = 1036, type = "bytes", count = 1198120, note = "the 70 zones (TrackZone), 17,116 bytes apart; zone i's vtable 0x82011AF0 + 12 x i" },
+  { name = "zone", offset = 1036, type = "embed", to = "TrackZone", count = 70, note = "the 70 zones" },
+]
+
+# A track zone (17,116 bytes, Zone::): up to 16 route ranges; inside while
+# the vehicle's track position is in one of them. Its set-ups (ZoneN::Setup)
+# are met by the measure as Zone0 to Zone69.
+[TrackZone]
+measure = "Zone"
+measures = ["Zone0", "Zone1", "Zone2", "Zone3", "Zone4", "Zone5", "Zone6", "Zone7", "Zone8", "Zone9", "Zone10", "Zone11", "Zone12", "Zone13", "Zone14", "Zone15", "Zone16", "Zone17", "Zone18", "Zone19", "Zone20", "Zone21", "Zone22", "Zone23", "Zone24", "Zone25", "Zone26", "Zone27", "Zone28", "Zone29", "Zone30", "Zone31", "Zone32", "Zone33", "Zone34", "Zone35", "Zone36", "Zone37", "Zone38", "Zone39", "Zone40", "Zone41", "Zone42", "Zone43", "Zone44", "Zone45", "Zone46", "Zone47", "Zone48", "Zone49", "Zone50", "Zone51", "Zone52", "Zone53", "Zone54", "Zone55", "Zone56", "Zone57", "Zone58", "Zone59", "Zone60", "Zone61", "Zone62", "Zone63", "Zone64", "Zone65", "Zone66", "Zone67", "Zone68", "Zone69"]
+size = 17116
+origin = "embedded"
+# Host (E5 step 4): only inside TrackZones. Its range list at +4 is
+# covered by its own fields.
+storage = "host"
+# 3 functions; areas: track-zones.md
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82011AF0 + 12 x the zone: its set-up, Zone::Update, Zone::IsInside" },
+  { name = "range_nodes", offset = 4, type = "bytes", count = 64, note = "the range list (a 16-slot list from +4, TrackZoneRangeList): its nodes" },
+  { name = "range_free", offset = 68, type = "u16", note = "the range list's free head" },
+  { name = "range_list_66", offset = 70, type = "u16", note = "the range list's +66: -1 at reset, not read" },
+  { name = "range_head", offset = 72, type = "u16", note = "the range list's head" },
+  { name = "range_list_70", offset = 74, type = "u16", note = "the range list's +70: -1 at reset, not read" },
+  { name = "range_count", offset = 76, type = "u16", note = "the range list's count" },
+  { name = "ranges", offset = 80, type = "bytes", count = 17024, note = "the range list's 16 RouteRanges, 1,064 bytes apart" },
+  { name = "range", offset = 80, type = "embed", to = "RouteRange", count = 16, note = "the range list's 16 RouteRanges" },
+  { name = "index", offset = 17104, type = "u32", note = "its position in the owner's list" },
+  { name = "vehicle", offset = 17108, type = "u32", note = "the vehicle checked (Racers::Vehicle)" },
+  { name = "inside", offset = 17112, type = "u32", note = "1 while the vehicle's track position is in one of its ranges" },
+]
+
+# A zone's range list (the zone's +4; ZoneRanges::Insert's r3): a 16-slot
+# list whose data slots are 1,064-byte RouteRanges.
+[TrackZoneRangeList]
+measure = "ZoneRanges::Insert.r3"
+size = 17100
+origin = "embedded"
+# Host (E5 step 4): only inside a TrackZone (its +4).
+storage = "host"
+# 1 functions; areas: track-zones.md
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 64, note = "16 nodes: (next, slot) halfwords" },
+  { name = "free", offset = 64, type = "u16", note = "the free list's head" },
+  { name = "list_66", offset = 66, type = "u16", note = "-1 at reset, not read" },
+  { name = "head", offset = 68, type = "u16" },
+  { name = "list_70", offset = 70, type = "u16", note = "-1 at reset, not read" },
+  { name = "count", offset = 72, type = "u16" },
+  { name = "ranges", offset = 76, type = "bytes", count = 17024, note = "16 RouteRanges, 1,064 bytes apart" },
+]
+
+# A 128-slot list of words (List128::Link, Insert): the track zones' owner's.
+[List128]
+measure = "List128"
+size = 1036
+origin = "embedded"
+# Host (E5 step 4): only inside TrackZones (its +0).
+storage = "host"
+# 2 functions; areas: track-zones.md
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 512, note = "128 nodes: (next, slot) halfwords" },
+  { name = "free", offset = 512, type = "u16", note = "the free list's head" },
+  { name = "list_514", offset = 514, type = "u16", note = "-1 at reset, not read" },
+  { name = "head", offset = 516, type = "u16" },
+  { name = "list_518", offset = 518, type = "u16", note = "-1 at reset, not read" },
+  { name = "count", offset = 520, type = "u16" },
+  { name = "words", offset = 524, type = "bytes", count = 512, note = "the 128 data words" },
+]
+
+# A 64-slot list of words (List64::Link, Insert): a route range's lists of
+# sections (also the scenery's list of models, scenery-lists.md).
+[List64]
+measure = "List64"
+measures = ["List64::Insert.r3"]
+size = 524
+origin = "embedded"
+# Dual (E5 step 4): in the route ranges (dual) and the scenery's lists
+# (guest).
+storage = "dual"
+# 2 functions; areas: track-zones.md
+fields = [
+  { name = "nodes", offset = 0, type = "bytes", count = 256, note = "64 nodes: (next, slot) halfwords" },
+  { name = "free", offset = 256, type = "u16", note = "the free list's head" },
+  { name = "list_258", offset = 258, type = "u16", note = "-1 at reset, not read" },
+  { name = "head", offset = 260, type = "u16" },
+  { name = "list_262", offset = 262, type = "u16", note = "-1 at reset, not read" },
+  { name = "count", offset = 264, type = "u16" },
+  { name = "words", offset = 268, type = "bytes", count = 256, note = "the 64 data words" },
+]
+
+# A position on the course's route (two halfwords), as the route ranges'
+# functions take it (r4, or ToNeighbor's r5). race-states.toml's
+# RoutePosition is the same shape.
+[TrackZonePosition]
+measures = ["RouteRange::OnPath.r4", "RouteRange::Test.r4", "RouteRange::ToNeighbor.r5", "RouteRange::Update.r4"]
+size = 4
+origin = "embedded"
+# 5 functions; areas: track-zones.md
+fields = [
+  { name = "section", offset = 0, type = "u16", note = "a section of the course's route" },
+  { name = "slice", offset = 2, type = "u16", note = "the slice in it" },
+]
+
+# RouteRange::Init's ends (r4: the set-up's stack +80): the start and end.
+[RouteRangeEnds]
+measure = "RouteRange::Init.r4"
+size = 8
+origin = "embedded"
+# 1 functions; areas: track-zones.md
+fields = [
+  { name = "start_section", offset = 0, type = "u16" },
+  { name = "start_slice", offset = 2, type = "u16" },
+  { name = "end_section", offset = 4, type = "u16" },
+  { name = "end_slice", offset = 6, type = "u16" },
+]
+
+# The word List64::Insert and List128::Insert add (their r4 points at it).
+[TrackZonesListWord]
+measures = ["List64::Insert.r4", "List128::Insert.r4"]
+size = 4
+origin = "embedded"
+# 2 functions; areas: track-zones.md
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# A zone's set-up's arguments (Zone::Reset's r4: TrackZones::Create's
+# frame +96): the zone's index and vehicle.
+[TrackZoneSetupArgs]
+measure = "Zone::Reset.r4"
+size = 8
+origin = "embedded"
+# 1 functions; areas: track-zones.md
+fields = [
+  { name = "index", offset = 0, type = "u32" },
+  { name = "vehicle", offset = 4, type = "u32" },
+]
+
+[globals]
+track_zones = { address = 0x828161EC, type = "ptr", to = "TrackZones", note = "the track zones' owner (0 when none)" }
+slice_count = { address = 0x82603274, type = "u32", note = "the slices counted along a route range's path (RouteRange::OnPath)" }
+zone_vtables = { address = 0x82011AF0, type = "bytes", count = 840, note = "the 70 zones' vtables (.rdata, 12 bytes each)" }
+route = { address = 0x826C5B10, type = "ptr", to = "TrackRouteFile", note = "the course's route (track-route.toml's TrackRoute, embedded): its file, +12 the sections table" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +0x59614 the racers added, +0x59620 the stages, +0xA3AF0 the kind" }
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (race-world.toml): +2308 the racers' entries" }
+human_flag = { address = 0x826C7824, type = "u32", note = "0 for player 2's vehicle in mode 6 (TrackZones::Create)" }

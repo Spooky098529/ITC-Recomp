@@ -1,0 +1,180 @@
+# The schema of docs/functions/graphics-resources.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's resources (the 360's Direct3D, linked into the
+# game): the headers of textures, surfaces and buffers (docs/known-data.md:
+# "texture header", "surface header", "buffer header"), the level
+# description, the EDRAM allocator, and the words the header math returns
+# through its callers' pointers. Every header starts with the same 24 bytes
+# (the common word, the reference count, the fences, the base's locked
+# range); what follows depends on the type (+0's low 4 bits: 1 a vertex
+# buffer, 2 an index buffer, 3 a texture, 4 a surface). Names from the
+# docs and src/graphics/resources.h, edram.h.
+
+# A resource met by its type only (Resource::GetType, AddRef, Release,
+# Lock, Unlock, Destroy): the common header with the words the generic
+# functions read past it. The texture's, surface's and buffer's own fields
+# are their types'; +152 to +176 are type 9's (sub_822AD978,
+# sub_822AD9D8 and sub_822AD740 through Destroy, not seen in play).
+[ResourceHeader]
+measures = ["Resource", "sub_822AD740.r3"]
+size = 180
+origin = "gpu"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "the low 4 bits the type; bits 8-11 the lock count (256 a lock); 0x200000 write-combined or the other view's lock, 0x40000000 a texture's level, 0x00100000 a render target or depth surface, 0x80000000 holding EDRAM" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "fence", offset = 8, type = "u32", note = "the fence the destroy waits for (Dropped)" },
+  { name = "read_fence", offset = 12, type = "u32", note = "probably" },
+  { name = "locked_base", offset = 20, type = "u32", note = "the base data's locked range, 128-byte units, start << 16 | end, 0xFFFF0000 none" },
+  { name = "locked_mips", offset = 24, type = "u32", note = "a texture's: the mip data's locked range" },
+  { name = "data", offset = 24, type = "u32", note = "a buffer's: its data (a vertex buffer's low 2 bits 3)" },
+  { name = "parent", offset = 24, type = "ptr", to = "TextureHeader", note = "a texture's level (a surface): its texture" },
+  { name = "fetch_format", offset = 32, type = "u32", note = "a texture's: the low 6 bits the GPU format, bit 10 an array, the top 20 bits the base data" },
+  { name = "fetch_mips", offset = 48, type = "u32", note = "a texture's: bits 9-10 the dimension, the top 20 bits the mip data; type 6's +48 its data" },
+  { name = "type9_data", offset = 152, type = "u32", note = "type 9's (not seen in play): physical memory XMemFree'd by sub_822AD9D8 when not 0" },
+  { name = "unknown_156", offset = 156, type = "u32", note = "type 9's, read by sub_822AD740 (not read)" },
+  { name = "unknown_164", offset = 164, type = "u32", note = "type 9's, read by sub_822AD978 (not read)" },
+  { name = "unknown_176", offset = 176, type = "u32", note = "type 9's, read by sub_822AD978 (not read)" },
+]
+
+# A texture's header (52 bytes; docs/known-data.md, "texture header"): made
+# by Device::CreateTexture or in an XPR2, or met as a surface's parent
+# (Resource::Lock reads its fences, Resource::GetType its dimension).
+[TextureHeader]
+measures = ["Texture", "Resource.+24", "new<52>@Device::CreateTexture"]
+size = 52
+origin = "file"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "the low 4 bits the type (3); bits 8-11 the lock count; 0x200000 write-combined" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "fence", offset = 8, type = "u32" },
+  { name = "read_fence", offset = 12, type = "u32", note = "probably" },
+  { name = "locked_base", offset = 20, type = "u32", note = "the base data's locked range (128-byte units, 0xFFFF0000 none)" },
+  { name = "locked_mips", offset = 24, type = "u32", note = "the mip data's locked range" },
+  { name = "fetch_tiling", offset = 28, type = "u32", note = "the fetch constant's first word: the top bit tiled, bits 22-30 the pitch (32-texel units)" },
+  { name = "fetch_format", offset = 32, type = "u32", note = "the low 6 bits the GPU format, bit 10 an array, the top 20 bits the base data's address" },
+  { name = "fetch_size", offset = 36, type = "u32", note = "2D: width - 1 in bits 0-12, height - 1 in 13-25; 3D 11, 11, 10 bits; 1D 24 bits; an array's depth - 1 from bit 26" },
+  { name = "fetch_swizzle", offset = 40, type = "u32", note = "the swizzle; the top bit probably a border, bit 30 adds 2 to the base size" },
+  { name = "fetch_mip_range", offset = 44, type = "u32", note = "bits 6-9 the last mip level (levels = that + 1)" },
+  { name = "fetch_mips", offset = 48, type = "u32", note = "bits 9-10 the dimension (0 1D, 1 2D, 2 3D, 3 cube), bit 11 packed mips, the top 20 bits the mip data's address" },
+]
+
+# A render target, depth surface or texture level (48 bytes; docs/known-data.md,
+# "surface header"): Device::CreateSurface's (SurfaceHeader::Set) or
+# Texture::GetSurfaceLevel's.
+[SurfaceHeader]
+measures = ["Surface", "Font::OnPageLoaded.ret", "new<48>@Device::CreateSurface", "new<48>@Texture::GetSurfaceLevel"]
+size = 48
+origin = "allocated"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "4; 0x40000000 a texture's level, 0x00100000 a render target or depth surface, 0x80000000 holding EDRAM" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "locked_base", offset = 20, type = "u32", note = "0xFFFF0000" },
+  { name = "parent", offset = 24, type = "ptr", to = "TextureHeader", note = "a texture's level: its texture" },
+  { name = "pitch", offset = 24, type = "u32", note = "a render target: the pitch in 80-pixel tiles (low 14 bits) and the samples (above)" },
+  { name = "multisample", offset = 24, type = "u16", note = "a render target: the multisample type in its low 2 bits" },
+  { name = "level_face", offset = 28, type = "u32", note = "a texture's level: the level in bits 28-31, the face in 22-27" },
+  { name = "edram", offset = 28, type = "u32", note = "a render target: the EDRAM base (low 12 bits) and format bits" },
+  { name = "hi_z", offset = 32, type = "u32", note = "bit 0 holding the hi-z" },
+  { name = "size", offset = 36, type = "u32", note = "width - 1 at bit 18, height - 1 at bit 3" },
+  { name = "format", offset = 40, type = "u32" },
+  { name = "edram_bytes", offset = 44, type = "u32", note = "the EDRAM tiles x 5,120" },
+]
+
+# A vertex or index buffer (32 bytes; docs/known-data.md, "buffer header").
+[BufferHeader]
+measures = ["VertexBuffer", "IndexBuffer", "new<32>@Device::CreateVertexBuffer", "new<32>@Device::CreateIndexBuffer",
+            "Device.+12180"]
+size = 32
+origin = "allocated"
+fields = [
+  { name = "common", offset = 0, type = "u32", note = "1 vertex, 2 index; an index buffer's format in the top 3 bits" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "locked_base", offset = 20, type = "u32", note = "the data's locked range (0xFFFF0000 none)" },
+  { name = "data", offset = 24, type = "u32", note = "the data's address (a vertex buffer's low 2 bits 3)" },
+  { name = "size", offset = 28, type = "u32", note = "the bytes (a vertex buffer's in bits 2-25, with bits 28 and 1 set)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "stored by Device::SetIndices on the bound index buffer (Device.+12180; single-commands' report); not read in detail" },
+]
+
+# A level description (32 bytes, D3DSURFACE_DESC probably), filled by
+# Texture::LevelDesc and Surface::GetDesc.
+[LevelDesc]
+measures = ["Texture::LevelDesc.r5", "Surface::GetDesc.r4"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "format", offset = 0, type = "u32" },
+  { name = "type", offset = 4, type = "u32", note = "Resource::GetType's; 4 a surface" },
+  { name = "usage", offset = 8, type = "u32", note = "probably; 0" },
+  { name = "pool", offset = 12, type = "u32", note = "probably; 0" },
+  { name = "multisample", offset = 16, type = "u32", note = "the multisample type" },
+  { name = "multisample_quality", offset = 20, type = "u32", note = "probably; 0" },
+  { name = "width", offset = 24, type = "u32" },
+  { name = "height", offset = 28, type = "u32" },
+]
+
+# The EDRAM allocator at [0x82953E20] (804 bytes, made on first use by
+# Edram::Alloc; docs/known-data.md).
+[EdramAllocator]
+measures = ["[82953E20]", "new<804>@Edram::Alloc"]
+size = 804
+origin = "allocated"
+fields = [
+  { name = "lock", offset = 0, type = "bytes", count = 28, note = "the kernel's critical section in the game's (a host std::mutex in ours)" },
+  { name = "free_tiles", offset = 28, type = "u32", note = "6,144 at the start" },
+  { name = "bitmap", offset = 32, type = "bytes", count = 768, note = "6,144 tiles, a set bit used, the most significant bit first" },
+  { name = "sentinel", offset = 800, type = "u32", note = "0x55555555: ends the bitmap's scans" },
+]
+
+# SurfaceHeader::Set's parameters (its r7, Device::CreateSurface's caller's;
+# 0 when none).
+[SurfaceParameters]
+measure = "SurfaceHeader::Set.r7"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "edram_base", offset = 0, type = "u32" },
+  { name = "hi_z_base", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "read, its use not worked out" },
+]
+
+# A locked rect (D3DLOCKED_RECT, probably): Texture::LockRect's r6.
+[LockedRect]
+measure = "Texture::LockRect.r6"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "pitch", offset = 0, type = "u32" },
+  { name = "bits", offset = 4, type = "u32", note = "the address" },
+]
+
+# The rect Texture::LockRect locks from (its r7, RECT probably): only its
+# left and top are read.
+[GpuLockRect]
+measure = "Texture::LockRect.r7"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "left", offset = 0, type = "u32" },
+  { name = "top", offset = 4, type = "u32" },
+]
+
+# A word the header math writes through a caller's pointer (an out
+# argument) or updates in place: the sizes, pitches, offsets, the EDRAM
+# base, a run's position.
+[GpuOutWord]
+measures = ["Device::GetStreamSource.r5", "Device::GetStreamSource.r6", "Edram::Alloc.r4", "Edram::NextRun.r4", "GpuFormat::BlockSize.r4", "GpuFormat::BlockSize.r5", "SurfaceHeader::Set.r9", "SurfaceHeader::Set.r10", "Texture::BaseSize.r4", "Texture::BaseSize.r5", "Texture::BaseSize.r6", "Texture::LevelLayout.r5", "Texture::LevelLayout.r6", "Texture::LevelLayout.r7", "Texture::LevelLayout.r8", "Texture::LevelLayout.r9", "Texture::LockLevel.r7", "Texture::LockLevel.r8", "Texture::LockLevel.r10", "TextureLayout", "TextureLayout::LevelSize.r4", "TextureLayout::LevelSize.r5", "TextureLayout::MipTailOffset.r10"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+[globals]
+device = { address = 0x820007B0, type = "ptr", to = "Device", note = "the graphics device" }
+hi_z_taken = { address = 0x829537C4, type = "u32", note = "1 while a depth surface holds the hi-z" }
+edram_allocator = { address = 0x82953E20, type = "ptr", to = "EdramAllocator", note = "made on first use by Edram::Alloc" }
+format_table = { address = 0x82013468, type = "u16", note = "the first of the GPU formats' halfwords (by format): bits 8-11 the format bits, the low byte the bits a pixel" }

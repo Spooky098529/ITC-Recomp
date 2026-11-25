@@ -1,0 +1,554 @@
+// The career's location screen natively: adapters in front of
+// src/location_screen/ (docs/functions/location-screen.md), with the
+// register steps the harness shares (hooks/location_screen.h).
+
+#include "hooks/location_screen.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "hooks/archive.h"
+#include "hooks/career.h"
+#include "hooks/heap.h"
+#include "hooks/guest_call.h"
+#include "hooks/race_event.h"
+#include "hooks/race_setup.h"
+#include "hooks/strings_and_font.h"
+#include "location_screen/location_screen.h"
+#include "memory/c_runtime_heap.h"
+#include "schema/location_screen.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
+ITC_FLAG_DECLARE(bool, native_course_scenery);
+
+ITC_FLAG_BOOL(native_location_screen, true, "ITC",
+              "Run the career's location screen (docs/functions/location-screen.md: "
+              "LocationScreen::SceneryConfig sub_8228F0A0, KindText sub_82227690, "
+              "IsPictureQueued sub_822291E8, PictureA sub_82229108, PictureB sub_82229158, "
+              "OnMessage14 sub_82227158, HasMoreUnlocks sub_822281D8, NextUnlockEntry "
+              "sub_82227618, OpponentHasCard sub_82227708, NextResultText sub_822271F8, "
+              "ShowPictures sub_8222A060, HidePictures sub_8222A150, SetCarColor sub_8222AC18, "
+              "SetCursor sub_8222BFE8, ListNode sub_8222C058, ShowArrows sub_8222C0C8, "
+              "RunCardMovie sub_822291A8, Transition1 sub_8222AD50, Transition18 sub_8222BE60; "
+              "UiMovie::Run through its override; ScreenMachine::Reenter sub_822895E0, Reset "
+              "sub_822279A8 with ResetView sub_82227818 (no adapter: only Reset's plain C++ calls it), "
+              "ApplyQueuedPage sub_8222C9B0, "
+              "UpdatePage sub_8222EC08, its page's handler through the guest context; InitStates "
+              "sub_8222F258 over StateMachine::Add's plain C++; Page9 sub_822280D8 and Page11 "
+              "sub_82228138 over the career's and the race set-up's register steps, "
+              "NextOpponentText sub_82227430, LoadPicture sub_8222C270, Picture::Free "
+              "sub_82228438 and FreePictures sub_82228498, OnPictureLoadedA sub_82228E88 and "
+              "OnPictureLoadedB sub_82228FC8, their heap, XPR, texture and archive calls "
+              "through those adapters; with the UI movies' heap native (their text setters' "
+              "plain C++), ResetMovie sub_8222CD60, Transition29 sub_8222CFF0, ShowUnlockEntry "
+              "sub_8222A978, Transition25 sub_8222D1A8, ShowListEntry sub_8222B048, "
+              "Transition2 sub_8222D610, Transition14 sub_8222E6E0 and Transition16 "
+              "sub_8222E8D8, Transition23 sub_8222A470, Transition33 sub_8222A718 and "
+              "Transition7 sub_8222AE00, UiMovie::Finish, FinishNamed, FinishAll and Run through "
+              "their overrides; ShowOpponentPictures sub_8222B200 and UpdateView sub_82227E20; "
+              "with the texts' check ShowOpponentInfo sub_8222B438, Transition12 sub_8222B8A8, "
+              "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0; Transition4 sub_8222D828 and "
+              "Transition5 sub_8222DA10 over CameraAnims::Evaluate's plain C++, Transition8 "
+              "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
+              "sub_8222F0B0; PoseCar sub_82228588 (no adapter) over the cars' and the matrix math's plain "
+              "C++; ShowOpponentSpecs sub_8222C188 over UiMovie::SetNodeText's plain C++ and "
+              "Transition9 sub_8222DEE0; PollLoad sub_82229238 over the camera animations', "
+              "PoseCar's, the UI movies' and Scenery::IsLoaded's plain C++, CarScene::Update, "
+              "Draw and SceneModel::PollLoad through their adapters) "
+              "natively instead of through the translated code (the same writes; checked by "
+              "--run_harnesses=location_screen). Picture::Free, KindText, "
+              "SetCursor, ShowUnlockEntry, ShowCard, ListNode, ShowListEntry, HidePictures, "
+              "SetCarColor, ShowArrows, ShowOpponentSpecs, ResetMovie, ShowOpponentPictures and "
+              "ShowOpponentInfo have no adapters: only native callers reach them, and the flag "
+              "switches those");
+
+namespace hooks {
+
+namespace ls = location_screen;
+
+void LocationScreenSceneryConfig(lifted::Regs& ctx) {
+  ctx.r3.u64 = ls::SceneryConfig(ctx.r3.u64, ctx.r4.u64);
+}
+
+void LocationScreenKindText(lifted::Regs& ctx) {
+  ctx.r3.u64 = ls::KindText(ctx.r3.u32, ctx.r4.u64);
+}
+
+ITC_REGS_STEP(LocationScreenIsPictureQueued) {
+  ctx.r3.u64 = ls::IsPictureQueued(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(LocationScreenPictureA) {
+  ctx.r3.u64 = ls::PictureA(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(LocationScreenPictureB) {
+  ctx.r3.u64 = ls::PictureB(ctx.r3.u32);
+}
+
+void LocationScreenOnMessage14(lifted::Regs&) { ls::OnMessage14(); }
+
+ITC_REGS_STEP(LocationScreenHasMoreUnlocks) {
+  ctx.r3.u64 = ls::HasMoreUnlocks();
+}
+
+ITC_REGS_STEP(LocationScreenNextUnlockEntry) {
+  ctx.r3.u64 = ls::NextUnlockEntry();
+}
+
+ITC_REGS_STEP(LocationScreenOpponentHasCard) {
+  if (const auto r3 = ls::OpponentHasCard(ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  lifted::original::c82227708(ctx);
+}
+
+ITC_REGS_STEP(LocationScreenNextResultText) {
+  if (const auto r3 = ls::NextResultText(ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  lifted::original::c822271F8(ctx);
+}
+
+ITC_REGS_STEP(LocationScreenShowPictures) {
+  ctx.r3.u64 = ls::ShowPictures(ctx.r1.u32);
+}
+
+ITC_REGS_STEP(LocationScreenHidePictures) {
+  ctx.r3.u64 = ls::HidePictures(ctx.r1.u32);
+}
+
+ITC_REGS_STEP(LocationScreenSetCarColor) {
+  ctx.r3.u64 = ls::SetCarColor(ctx.r1.u32);
+}
+
+ITC_REGS_STEP(LocationScreenSetCursor) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ls::SetCursor(ctx.r1.u32, ctx.r3.u32);
+}
+
+ITC_REGS_STEP(LocationScreenListNode) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ls::ListNode(ctx.r1.u32, ctx.r3.u32);
+}
+
+ITC_REGS_STEP(LocationScreenShowArrows) {
+  ctx.r3.u64 = ls::ShowArrows(ctx.r1.u32);
+}
+
+namespace {
+
+struct GuestRun {
+  lifted::Regs& ctx;
+};
+
+uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t frame_bytes,
+                    uint32_t lr) {
+  auto& guest = *static_cast<GuestRun*>(user);
+  lifted::Regs& ctx = guest.ctx;
+  guest_call::InFrame(ctx, frame_bytes, lr, [&](uint32_t) {
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = draw_only;
+    lifted::Enter(ctx, game::UiMovie::Run);
+  });
+  return ctx.r3.u64;
+}
+
+// Runs `step(run)` with UiMovie::Run through this context; lr put back.
+template <typename Step>
+uint64_t WithRun(lifted::Regs& ctx, Step step) {
+  const uint64_t lr = ctx.lr;
+  GuestRun guest{ctx};
+  const ls::RunCall run{&guest, RunThrough};
+  const uint64_t r3 = step(run);
+  ctx.lr = lr;
+  return r3;
+}
+
+}  // namespace
+
+ITC_REGS_STEP(LocationScreenRunCardMovie) {
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = WithRun(ctx, [&](const ls::RunCall& run) {
+    return ls::RunCardMovie(sp, run);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenTransition1) {
+  const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
+  ctx.r3.u64 = WithRun(ctx, [&](const ls::RunCall& run) -> uint64_t {
+    return ls::Transition1(sp, step, run);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenTransition18) {
+  const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
+  ctx.r3.u64 = WithRun(ctx, [&](const ls::RunCall& run) -> uint64_t {
+    return ls::Transition18(sp, step, run);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenReenter) { ls::Reenter(ctx.r3.u32); }
+
+ITC_REGS_STEP(LocationScreenReset) {
+  const uint32_t screen = ctx.r3.u32;
+  if (!ls::ResetNative(screen)) {
+    lifted::original::c822279A8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ls::Reset(screen);
+  // r3 the view's second matrix (memcpy's).
+  ctx.r3.u64 = schema::LocationScreenView(schema::LocationScreen(screen).view_address())
+                   .matrix1_address();
+}
+
+ITC_REGS_STEP(LocationScreenResetView) {
+  const uint32_t view = ctx.r3.u32;
+  if (!ls::ResetNative(view - 560)) {
+    lifted::original::c82227818(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ls::ResetView(view);
+  ctx.r3.u64 = schema::LocationScreenView(view).matrix1_address();
+}
+
+ITC_REGS_STEP(LocationScreenApplyQueuedPage) {
+  if (const auto r3 = ls::ApplyQueuedPage(ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+namespace {
+
+void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t machine,
+                 uint32_t frame_bytes, uint32_t lr) {
+  auto& guest = *static_cast<GuestRun*>(user);
+  lifted::Regs& ctx = guest.ctx;
+  guest_call::InFrame(ctx, frame_bytes, lr, [&](uint32_t) {
+    ctx.r3.u64 = dispatcher;
+    ctx.r4.u64 = machine;
+    lifted::CallFromContext(ctx, handler);
+  });
+}
+
+}  // namespace
+
+ITC_REGS_STEP(LocationScreenUpdatePage) {
+  const uint64_t lr = ctx.lr;
+  GuestRun guest{ctx};
+  const ls::PageCall call{&guest, PageThrough};
+  ls::UpdatePage(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, call);
+  ctx.lr = lr;
+}
+
+ITC_REGS_STEP(LocationScreenInitStates) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 =
+      ls::InitStates(machine, ctx.r1.u32 - ls::kInitStatesFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+
+// --- The second migration's guest calls ---
+
+LocationScreenCalls::LocationScreenCalls(lifted::Regs& ctx)
+    : ctx_(ctx),
+      lr_(ctx.lr),
+      event_(std::make_unique<RaceEventGuest>(ctx)),
+      format_(std::make_unique<FormatGuestCalls>(ctx)),
+      calls_{this, &LocationScreenCalls::Call, ctx.r1.u32, &event_->get(), &format_->get()} {}
+
+LocationScreenCalls::~LocationScreenCalls() { ctx_.lr = lr_; }
+
+uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t args[4],
+                                   uint32_t r1, uint32_t lr) {
+  auto& self = *static_cast<LocationScreenCalls*>(user);
+  lifted::Regs& ctx = self.ctx_;
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = args[0];
+  ctx.r4.u64 = args[1];
+  ctx.r5.u64 = args[2];
+  ctx.r6.u64 = args[3];
+  ctx.lr = lr;
+  switch (function) {
+    case ls::kEventQuery:
+      CareerEventQuery(ctx);
+      break;
+    case ls::kRaceSetUp:
+      RaceSetupSetUp(ctx);
+      break;
+    case ls::kArchiveLoad:
+      ctx.r7.u64 = 0;
+      ctx.r8.u64 = 0;
+      [[fallthrough]];
+    default:
+      lifted::CallFromContext(ctx, function);
+      break;
+  }
+  ctx.r1.u64 = stack;
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+
+ITC_REGS_STEP(LocationScreenPage9) {
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::Page9(sp, machine, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenPage11) {
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::Page11(sp, machine, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenNextOpponentText) {
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::NextOpponentText(sp, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenLoadPicture) {
+  const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32, id = ctx.r4.u32, list = ctx.r5.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::LoadPicture(sp, screen, id, list, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenPictureFree) {
+  const uint32_t sp = ctx.r1.u32, picture = ctx.r3.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::PictureFree(sp, picture, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenFreePictures) {
+  const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::FreePictures(sp, screen, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenOnPictureLoadedA) {
+  const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::OnPictureLoaded(sp, screen, buffer, 0, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenOnPictureLoadedB) {
+  const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::OnPictureLoaded(sp, screen, buffer, 1, calls.get());
+}
+
+bool LocationScreenTextsNative() {
+  return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
+         NativeHeapActive() && memory::crt::GetProcessHeap() != 0;
+}
+
+namespace {
+
+// The texts' functions: natively while the UI movies' text setters are, else
+// the original; r3 the plain C++'s.
+template <typename Step>
+void Texts(lifted::Regs& ctx, lifted::RegsFunction* original, Step step) {
+  if (!LocationScreenTextsNative()) {
+    lifted::Sdk(ctx, original);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, r3 = ctx.r3.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = step(sp, r3, calls.get());
+}
+
+}  // namespace
+
+ITC_REGS_STEP(LocationScreenResetMovie) {
+  Texts(ctx, lifted::original::c8222CD60, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ResetMovie(sp, calls);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenShowUnlockEntry) {
+  Texts(ctx, lifted::original::c8222A978, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowUnlockEntry(sp, calls);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenShowListEntry) {
+  Texts(ctx, lifted::original::c8222B048, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowListEntry(sp, calls);
+  });
+}
+
+#define LOCATION_SCREEN_TRANSITION(address, name)                                     \
+  void LocationScreen##name(lifted::Regs& ctx) {                         \
+    Texts(ctx, lifted::original::c##address,                                            \
+          [&](uint32_t sp, uint32_t step, const ls::Calls& calls) {                   \
+            return ls::name(sp, step, calls);                                   \
+          });                                                                         \
+  }
+LOCATION_SCREEN_TRANSITION(8222CFF0, Transition29)
+LOCATION_SCREEN_TRANSITION(8222D1A8, Transition25)
+LOCATION_SCREEN_TRANSITION(8222D610, Transition2)
+LOCATION_SCREEN_TRANSITION(8222E6E0, Transition14)
+LOCATION_SCREEN_TRANSITION(8222E8D8, Transition16)
+LOCATION_SCREEN_TRANSITION(8222A470, Transition23)
+LOCATION_SCREEN_TRANSITION(8222A718, Transition33)
+LOCATION_SCREEN_TRANSITION(8222AE00, Transition7)
+LOCATION_SCREEN_TRANSITION(8222B8A8, Transition12)
+LOCATION_SCREEN_TRANSITION(8222EAD0, Transition17)
+LOCATION_SCREEN_TRANSITION(8222D828, Transition4)
+LOCATION_SCREEN_TRANSITION(8222DA10, Transition5)
+LOCATION_SCREEN_TRANSITION(8222DC08, Transition8)
+LOCATION_SCREEN_TRANSITION(8222D2E8, Transition24)
+LOCATION_SCREEN_TRANSITION(8222D108, Transition34)
+LOCATION_SCREEN_TRANSITION(8222DEE0, Transition9)
+#undef LOCATION_SCREEN_TRANSITION
+
+ITC_REGS_STEP(LocationScreenShowOpponentInfo) {
+  Texts(ctx, lifted::original::c8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowOpponentInfo(sp, calls);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenStart) {
+  Texts(ctx, lifted::original::c8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::Start(sp, calls);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenShowOpponentSpecs) {
+  Texts(ctx, lifted::original::c8222C188, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowOpponentSpecs(sp, calls);
+  });
+}
+
+ITC_REGS_STEP(LocationScreenPoseCar) {
+  const uint32_t sp = ctx.r1.u32, model = ctx.r3.u32, index = ctx.r4.u32;
+  const uint64_t r3 = ctx.r3.u64;
+  if (((sp - ls::kPoseCarFrame) & 0xF) != 0) {
+    lifted::original::c82228588(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  {
+    LocationScreenCalls calls(ctx);
+    ls::PoseCar(sp, model, index, calls.get());
+  }
+  ctx.r3.u64 = r3 + 272;
+  ctx.fpscr.enableFlushMode();
+}
+
+ITC_REGS_STEP(LocationScreenShowCard) {
+  if (!LocationScreenTextsNative()) {
+    lifted::original::c8222BBD0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::ShowCard(sp, calls.get());
+}
+
+ITC_REGS_STEP(LocationScreenShowOpponentPictures) {
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::ShowOpponentPictures(sp, calls.get());
+}
+
+// PollLoad: r3 = the machine; as the texts' functions (it reads the UI
+// movies' nodes through their plain C++).
+ITC_REGS_STEP(LocationScreenPollLoad) {
+  if (!LocationScreenTextsNative()) {
+    lifted::original::c82229238(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r3.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::PollLoad(sp, machine, calls.get(), ITC_FLAG(native_course_scenery),
+                            NativeArchiveQueue());
+}
+
+ITC_REGS_STEP(LocationScreenUpdateView) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx);
+  ctx.r3.u64 = ls::UpdateView(sp, calls.get());
+}
+
+}  // namespace hooks
+
+#define LOCATION_SCREEN_ADAPTER(address, step)  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_location_screen)) { \
+    hooks::step(ctx);                     \
+  }
+
+LOCATION_SCREEN_ADAPTER(8228F0A0, LocationScreenSceneryConfig)
+LOCATION_SCREEN_ADAPTER(822291E8, LocationScreenIsPictureQueued)
+LOCATION_SCREEN_ADAPTER(82227158, LocationScreenOnMessage14)
+LOCATION_SCREEN_ADAPTER(822281D8, LocationScreenHasMoreUnlocks)
+LOCATION_SCREEN_ADAPTER(82227618, LocationScreenNextUnlockEntry)
+LOCATION_SCREEN_ADAPTER(82227708, LocationScreenOpponentHasCard)
+LOCATION_SCREEN_ADAPTER(822271F8, LocationScreenNextResultText)
+LOCATION_SCREEN_ADAPTER(8222A060, LocationScreenShowPictures)
+LOCATION_SCREEN_ADAPTER(822291A8, LocationScreenRunCardMovie)
+LOCATION_SCREEN_ADAPTER(8222AD50, LocationScreenTransition1)
+LOCATION_SCREEN_ADAPTER(8222BE60, LocationScreenTransition18)
+LOCATION_SCREEN_ADAPTER(822895E0, LocationScreenReenter)
+LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
+LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
+LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
+LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
+// PictureA and PictureB: their adapters back since E5 step 3 (the screen's
+// pictures are host objects, which their originals would read raw), for
+// the lifted Transition6, Transition30 and Transition32 calling them through
+// the dispatch table.
+LOCATION_SCREEN_ADAPTER(82229108, LocationScreenPictureA)
+LOCATION_SCREEN_ADAPTER(82229158, LocationScreenPictureB)
+// No adapters (only native callers reach them in play, and the flag switches
+// those; their steps above are the harness's): Picture::Free sub_82228438, KindText sub_82227690,
+// SetCursor sub_8222BFE8, ShowUnlockEntry sub_8222A978, ShowCard
+// sub_8222BBD0, ListNode sub_8222C058, ShowListEntry sub_8222B048,
+// HidePictures sub_8222A150, SetCarColor sub_8222AC18, ShowArrows
+// sub_8222C0C8, ShowOpponentSpecs sub_8222C188, ResetMovie sub_8222CD60,
+// ShowOpponentPictures sub_8222B200, ShowOpponentInfo sub_8222B438; and,
+// since PollLoad is native (2026-11-12), PoseCar sub_82228588.
+LOCATION_SCREEN_ADAPTER(822280D8, LocationScreenPage9)
+LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
+LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
+LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
+LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)
+// The archive's load callbacks (no direct callers: their adapters stay).
+LOCATION_SCREEN_ADAPTER(82228E88, LocationScreenOnPictureLoadedA)
+LOCATION_SCREEN_ADAPTER(82228FC8, LocationScreenOnPictureLoadedB)
+LOCATION_SCREEN_ADAPTER(8222CFF0, LocationScreenTransition29)
+LOCATION_SCREEN_ADAPTER(8222D1A8, LocationScreenTransition25)
+LOCATION_SCREEN_ADAPTER(8222D610, LocationScreenTransition2)
+LOCATION_SCREEN_ADAPTER(8222E6E0, LocationScreenTransition14)
+LOCATION_SCREEN_ADAPTER(8222E8D8, LocationScreenTransition16)
+LOCATION_SCREEN_ADAPTER(8222A470, LocationScreenTransition23)
+LOCATION_SCREEN_ADAPTER(8222A718, LocationScreenTransition33)
+LOCATION_SCREEN_ADAPTER(8222AE00, LocationScreenTransition7)
+LOCATION_SCREEN_ADAPTER(82227E20, LocationScreenUpdateView)
+LOCATION_SCREEN_ADAPTER(8222B8A8, LocationScreenTransition12)
+LOCATION_SCREEN_ADAPTER(8222EAD0, LocationScreenTransition17)
+LOCATION_SCREEN_ADAPTER(8222D828, LocationScreenTransition4)
+LOCATION_SCREEN_ADAPTER(8222DA10, LocationScreenTransition5)
+LOCATION_SCREEN_ADAPTER(8222DC08, LocationScreenTransition8)
+LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
+LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
+LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
+LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)
+// State 2's handler (through the machine's table: its adapter stays).
+LOCATION_SCREEN_ADAPTER(82229238, LocationScreenPollLoad)

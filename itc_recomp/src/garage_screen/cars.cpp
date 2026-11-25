@@ -1,0 +1,242 @@
+// The garage screen's car objects never seen in play (the stand's car, the
+// spec texts, the questions, the plate editor's and the spec sheet's
+// set-ups, the view's camera buttons; docs/functions/garage-screen.md): see
+// garage_screen.h.
+
+#include "garage_screen/garage_screen.h"
+
+#include "base/log.h"
+#include "garage_screen/internal.h"
+#include "schema/vehicle.h"
+#include "type67_modes/type67_modes.h"
+#include "ui_movies/game.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+namespace garage_screen {
+
+namespace {
+
+using Car = schema::CarMakersCar;
+using Spec = schema::CarSpecCopies;
+using Curve = schema::PowerCurve;
+
+constexpr uint32_t kCarInit = 0x820CD5D8;         // Car::Init
+constexpr uint32_t kCarRefresh = 0x820C4998;      // Car::Refresh
+constexpr uint32_t kCarDataConstruct = 0x820AEF80;  // CarData::CarData
+constexpr uint32_t kSetupFromCar = 0x820C27E8;    // Vehicle::SetupFromCar
+constexpr uint32_t kCurveFromEngine = 0x820CE7D8; // PowerCurve::FromEngine
+constexpr uint32_t kShiftPeak = 0x820CE1D8;       // PowerCurve::ShiftPeak
+constexpr uint32_t kSetCar = 0x8217FD58;          // GarageStage::SetCar
+constexpr uint32_t kSetNodeNumberText = 0x8211CA18;
+constexpr uint32_t kGarageBytes = 98612;          // the save's garage list (+6120)
+constexpr uint32_t kCarBytes = 1884;              // a garage car's words a car object takes
+constexpr uint32_t kCursor = 40960;               // the dialog movies' cursor word
+
+// A car object at `car` from the garage car `from`: Car::Init, its first
+// 1,884 bytes copied over, Car::Refresh (with the flags' bit 0 set between
+// when `flag`), through the guest from `frame` with the three return
+// addresses. Refresh's r3.
+uint64_t MakeCar(uint32_t car, uint32_t from, uint32_t frame, const uint32_t lrs[3],
+                 bool flag, const Calls& calls) {
+  calls.Call(kCarInit, frame, lrs[0], car);
+  Memcpy(calls, car, from, kCarBytes, frame, lrs[1]);
+  if (flag) {
+    const Car object(car);
+    object.set_flags(object.flags() | 1);
+  }
+  return calls.Call(kCarRefresh, frame, lrs[2], car);
+}
+
+// The engine's figures at `out` (+0, +4, +8 to +16 ...) the spec sheet and
+// the spec texts share: the power (`data` +400 + +672, by the constant, plus
+// +0) truncated.
+uint32_t Power(uint32_t data) {
+  const double sum = double(float(Lfs(data + 672) + Lfs(data + 400)));
+  return Fctiwz(double(float(std::fma(sum, double(G::power_scale()), Lfs(data + 0)))));
+}
+
+}  // namespace
+
+uint64_t ReloadStandCar(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82193B10 GarageScreen::ReloadStandCar");
+  // __chkstk's probe dropped (sub_825A9934 is Dropped).
+  const uint32_t frame = Frame(sp, 100688);
+  const ScreenData data = Data();
+  Memcpy(calls, frame + 2048, data.save().garage_address(), kGarageBytes, frame,
+         0x82193B50);
+  CopyGarageCar(frame + 80, frame + 2048, data.scroll() + data.selection(),
+                frame, calls);
+  const uint64_t block = calls.Call(kBlockOf, frame, 0x82193B70, Load(frame + 92));
+  const uint64_t r3 = calls.Call(kReloadModel, frame, 0x82193B84, Holder(), block);
+  Data().set_stand_model(uint32_t(r3));
+  return r3;
+}
+
+uint64_t PutCarOnStand(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82193BA8 GarageScreen::PutCarOnStand");
+  const uint32_t frame = Frame(sp, 104592);
+  const ScreenData data = Data();
+  Memcpy(calls, frame + 5952, data.save().garage_address(), kGarageBytes, frame,
+         0x82193BE4);
+  CopyGarageCar(frame + 3984, frame + 5952, data.scroll() + data.selection(),
+                frame, calls);
+  static constexpr uint32_t kLrs[3] = {0x82193C04, 0x82193C14, 0x82193C28};
+  MakeCar(frame + 80, frame + 3984, frame, kLrs, true, calls);
+  return calls.Call(kSetCar, frame, 0x82193C40, Holder(), frame + 80, ~0ull);
+}
+
+uint64_t ShowCarSpecs(uint32_t car, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82194D90 GarageScreen::ShowCarSpecs");
+  const uint32_t frame = Frame(sp, 6976);
+  const uint32_t object = frame + 3040, vehicle = frame + 1184, curve = frame + 112;
+  static constexpr uint32_t kLrs[3] = {0x82194DB4, 0x82194DC4, 0x82194DCC};
+  MakeCar(object, car, frame, kLrs, false, calls);
+  const Spec p(vehicle_accessors::ObjectRecord1888(object));
+  const Curve c(curve);
+  calls.Call(kCarDataConstruct, frame, 0x82194DE0, vehicle);
+  calls.Call(kSetupFromCar, frame, 0x82194DEC, vehicle, object);
+  calls.Call(kCurveFromEngine, frame, 0x82194DF8, curve, frame + 2452);
+  calls.Call(kShiftPeak, frame, 0x82194E04, curve, 0);
+  // The figures' record at the frame's +80 (ShowSpecTexts').
+  Store(frame + 80, p.unknown_130());
+  Store(frame + 84, p.turbo() != 0 ? 1 : 0);
+  Store(frame + 88, Power(vehicle));
+  Store(frame + 92, p.displacement());
+  Store(frame + 96, Fctiwz(double(c.most_power())));
+  Stfs(frame + 100, double(float(double(c.torque_scale()) * double(G::curve_scale()))));
+  ShowSpecTexts(frame + 80, frame, calls);
+  return ShowCarNames(Car(car).car_id(), p.spec_byte_129(), frame, calls);
+}
+
+uint64_t SetUseQuestion(uint32_t car, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821933D0 GarageScreen::SetUseQuestion");
+  const uint32_t frame = Frame(sp, 4064);
+  const uint32_t movie = FindMovie(16, frame + 80);
+  const uint32_t id = Car(car).car_id();
+  static constexpr uint32_t kLrs[3] = {0x8219340C, 0x8219341C, 0x82193424};
+  MakeCar(frame + 96, car, frame, kLrs, false, calls);
+  const Spec p(vehicle_accessors::ObjectRecord1888(frame + 96));
+  Store(movie + kCursor, 0);
+  const uint64_t maker = uint64_t(p.spec_byte_129()) + 1934;
+  const uint32_t question = ui_movies::FindNode(movie, 0xFFFFFFFFu, 0);
+  const uint32_t yes = ui_movies::FindNode(movie, 1, 3);
+  const uint32_t no = ui_movies::FindNode(movie, 1, 4);
+  // String 97 with the maker's and the car's names (r6 to r9 set; r10 left
+  // unset: 0).
+  calls.CallArgs(kSetNodeText, frame, 0x821934A4,
+                 {movie, question, 97, 24, maker, uint64_t(id) + 1646, uint64_t(id) + 1718, 0});
+  calls.Call(kSetNodeText, frame, 0x821934B4, movie, yes, 2);
+  return calls.Call(kSetNodeText, frame, 0x821934C4, movie, no, 3);
+}
+
+uint64_t SetSaleQuestion(uint32_t car, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_821934D0 GarageScreen::SetSaleQuestion");
+  const uint32_t frame = Frame(sp, 4112);
+  const uint32_t movie = FindMovie(18, frame + 80);
+  const uint32_t id = Car(car).car_id();
+  Data().set_sale_price(uint32_t(SalePrice(car, frame)));
+  static constexpr uint32_t kLrs[3] = {0x82193528, 0x82193538, 0x82193540};
+  MakeCar(frame + 96, car, frame, kLrs, false, calls);
+  const Spec p(vehicle_accessors::ObjectRecord1888(frame + 96));
+  Store(movie + kCursor, 1);
+  auto node = [&](uint32_t sub_scene, uint32_t child) {
+    return ui_movies::FindNode(movie, sub_scene, child);
+  };
+  const uint32_t title = node(0xFFFFFFFFu, 4), maker = node(0xFFFFFFFFu, 5);
+  const uint32_t name1 = node(0xFFFFFFFFu, 6), name2 = node(0xFFFFFFFFu, 7);
+  const uint32_t line = node(1, 4), price = node(1, 2), label = node(1, 3);
+  const uint32_t yes = node(2, 3), no = node(2, 4);
+  calls.Call(kSetNodeText, frame, 0x82193620, movie, title, 25);
+  calls.Call(kSetNodeText, frame, 0x82193634, movie, maker,
+             uint64_t(p.spec_byte_129()) + 1934);
+  calls.Call(kSetNodeText, frame, 0x82193644, movie, name1, uint64_t(id) + 1646);
+  calls.Call(kSetNodeText, frame, 0x82193654, movie, name2, uint64_t(id) + 1718);
+  calls.Call(kSetNodeNumberText, frame, 0x82193668, movie, price,
+             Data().sale_price());
+  calls.Call(kSetNodeText, frame, 0x82193678, movie, line, 527);
+  calls.Call(kSetNodeText, frame, 0x82193688, movie, label, 435);
+  calls.Call(kSetNodeText, frame, 0x82193698, movie, yes, 2);
+  return calls.Call(kSetNodeText, frame, 0x821936A8, movie, no, 3);
+}
+
+uint64_t SetUpPlateEditor(uint32_t car, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82191810 GarageScreen::SetUpPlateEditor");
+  const uint32_t frame = Frame(sp, 4000);
+  static constexpr uint32_t kLrs[3] = {0x8219182C, 0x8219183C, 0x82191844};
+  MakeCar(frame + 80, car, frame, kLrs, false, calls);
+  const Spec p(vehicle_accessors::ObjectRecord1888(frame + 80));
+  const schema::PlateEditorData plate = G::plate_editor();
+  plate.set_make_random(0);
+  // The plate's kind by the car's sizes (each compared unsigned).
+  const bool small = p.displacement() <= 2000 && p.unknown_76() <= 4700 &&
+                     p.unknown_80() <= 2000 && p.unknown_84() <= 1700;
+  plate.set_car_class(small ? 1 : 0);
+  for (uint32_t i = 0; i < 5; i++) {
+    // Into the editor's host data (E5 step 4) as the guest's bytes give it.
+    plate.store_at(plate.start_plate_address() - plate.address + 4 * i, 4,
+                   Load(Car(car).setting_bytes_address() + 4 * i));
+  }
+  return p.address;
+}
+
+uint64_t SetUpSpecSheet(uint32_t car, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82191628 GarageScreen::SetUpSpecSheet");
+  const uint32_t frame = Frame(sp, 5104);
+  const schema::SpecSheetData sheet = G::spec_sheet();
+  const uint32_t object = frame + 1152, curve = frame + 80;
+  const Curve c(curve);
+  static constexpr uint32_t kLrs[3] = {0x82191650, 0x82191660, 0x82191668};
+  MakeCar(object, car, frame, kLrs, false, calls);
+  const Spec p(vehicle_accessors::ObjectRecord1888(object));
+  const uint32_t vehicle = sheet.car_data_address();
+  calls.Call(kSetupFromCar, frame, 0x82191684, vehicle, object);
+  calls.Call(kCurveFromEngine, frame, 0x82191690, curve, vehicle + 1268);
+  const uint64_t r3 = calls.Call(kShiftPeak, frame, 0x8219169C, curve, 0);
+  sheet.set_tab(2);
+  for (uint32_t i = 0; i < 5; i++) {
+    // Into the sheet's host data (E5 step 4) as the guest's bytes give it.
+    sheet.store_at(sheet.parts_address() - sheet.address + 4 * i, 4,
+                   Load(Car(car).setting_bytes_address() + 4 * i));
+  }
+  const schema::GarageCar garage_car(car);
+  sheet.set_car_value(Fctiwz(double(garage_car.racer_float())));
+  sheet.set_rating(Power(vehicle));
+  sheet.set_spec_word_0(p.unknown_76());
+  sheet.set_spec_word_1(p.unknown_84());
+  sheet.set_spec_word_2(p.unknown_80());
+  sheet.set_car_id(Car(car).car_id());
+  sheet.set_spec_byte_0(p.spec_byte_129());
+  sheet.set_spec_byte_1(p.unknown_130());
+  // The drive by the spec's byte +68 (a jump table; above 7 +32 unwritten).
+  // Its cases 0 and 4 are the recompiler's piece sub_82191768, merged here.
+  static constexpr uint32_t kDrives[8] = {6, 2, 3, 4, 6, 0, 1, 5};
+  const uint32_t kind = p.engine_type();
+  if (kind <= 7) {
+    sheet.set_engine_class(kDrives[kind]);
+  }
+  sheet.set_spec_flag(p.turbo() != 0 ? 1 : 0);
+  sheet.set_spec_word_3(p.displacement());
+  sheet.set_curve_value_0(Fctiwz(double(c.most_power())));
+  sheet.set_curve_value_1(Fctiwz(double(c.most_power_rpm())));
+  sheet.set_peak_torque(float(double(c.torque_scale()) * double(G::curve_scale())));
+  sheet.set_peak_index(Fctiwz(double(c.peak_rpm())));
+  return r3;
+}
+
+uint64_t CameraA(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82191A70 GarageScreen::CameraA");
+  const uint32_t frame = Frame(sp, 96);
+  Data().set_turning(0);
+  StageCommand(1, frame, 0x82191AA4, calls);
+  return type67_modes::GarageStageCameraCommand(Holder(), 0, frame);
+}
+
+uint64_t CameraB(uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82191AC8 GarageScreen::CameraB");
+  const uint32_t frame = Frame(sp, 96);
+  Data().set_turning(0);
+  StageCommand(1, frame, 0x82191AFC, calls);
+  return type67_modes::GarageStageCameraCommand(Holder(), 1, frame);
+}
+
+}  // namespace garage_screen

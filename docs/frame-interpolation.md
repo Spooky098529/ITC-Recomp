@@ -81,7 +81,11 @@ recorded commands are replayed.
 - `sub_825953D0` is the bulk per-object recorder (vertex constants 0, 9
   registers); it allocates the payload with the call returning to
   `0x82595428` and fills it with the multiply returning to `0x82595438`.
-  It runs on every pass, including render-only ones.
+  It runs on every pass, including render-only ones. Since the B7 loop
+  (2026-10-25) its recording is native (`src/scenery_lists/model_draws.cpp`,
+  `--native_scenery_lists`) inside the same wrapper: the multiply and copy
+  are noted with those return addresses, and the command list's
+  diagnostics (`--log_slot_callers` and the others) run the original.
 - `sub_82595550`, `sub_82146BD0` and `sub_820CECA0` record draws with a
   command 7 (vertex constants 9, 5 registers). `sub_82595490` records pixel
   constants 0, 63 registers.
@@ -182,7 +186,7 @@ render-only passes it ran ~5x fast. Each case found is fixed in
 | The player's triangle on the minimap flashing where it overlaps other cars' (a frame divider: `0x826C5AA4` counts calls and wraps after 4, then steps the phase `0x826C5AA8`, which wraps after 5) | `sub_820F5740` | Both put back after the call on render-only passes (`--per_tick_minimap_blink`) |
 | Play time (a frame counter at `0x826C5B90`, which `sub_821109B8` turns into hours, minutes and seconds at 30 a second) | `sub_82107910` | One taken back before the call on render-only passes (`--per_tick_play_time`) |
 | UI movies: the HUD, including the race start countdown (a 240-frame movie, a beep at frames 60, 120, 180, 240) | `sub_8211D2F8`, with r4 = 0 (advance a frame and draw); r4 = 1 only draws | Replayed (below) (`--per_tick_ui_movies`) |
-| UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow") |
+| UI movies' adding animation tracks (the pause sub-menus' arrow slid ~5x as far): they write into the movie's nodes, outside the replayed bytes | `sub_825A0548`, inside `sub_8211D2F8` | A workaround for frame rates above 30: on render-only passes, adds whose target the update doesn't put back to the rest pose (`sub_82119B80`) are skipped (`--per_tick_ui_movie_tracks`; `docs/pause-menu-fix.md`, "The sub-menus' arrow"; the track native since 2026-10-25, the override kept around it) |
 | The cockpit dials: the turbo gauge reads car + 704, which Draw's per-car update (`sub_820DAC68`) lowers by 1.0 every pass (set again only on ticks), so it fell to its rest angle; and blending the needles' matrices cut across the dials on fast swings | `sub_820E42E8`, `sub_820E45A8` (native, `src/hooks/cockpit_dials.cpp`) | Posed every pass from the tick's gauge values, on the car blended to the frame; replayed as live poses (`--native_cockpit_dials`; "The cockpit dials" under "What gets blended") |
 | The rival's logo in the rival intro cutscene (drawn during Update by handler `82159948`) | `sub_821594B8` (native override), `sub_82211A28` | On render-only passes the handler gets Update but only redraws the logo the logic pass drew (`--redraw_rival_logo`; "The rival logo at the race start" below) |
 
@@ -231,7 +235,9 @@ passes before Draw (since removed), and hiding
 `rival-logo-flicker`, `--redraw_rival_logo`). Entering a race against a rival plays the rival
 intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
 over them. The logo flickers with frames above 30; the attract race's
-logo (drawn from Draw) doesn't. Found
+logo (drawn from Draw) doesn't. (The logo's draw, `sub_82211A28`, is
+native since 2026-10-25, `--native_race_hud`, `functions/race-hud.md`; its
+override's noting and the redraw are unchanged.) Found
 with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
 
 - `--log_recording_handlers`: Update handler `0x82159948` (a jump to
@@ -277,7 +283,9 @@ with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
 - Fix (the user's design, `--redraw_rival_logo`, on by default): a native
   override of `sub_821594B8` (`per_frame_logic.cpp`). Render-only passes
   deliver Update to `82159948` too (`game_messages.cpp`, as for the race
-  overlays). On logic passes the override runs the original, and a
+  overlays). On logic passes the override runs the director's update (since
+  2026-10-30 natively with `--native_camera_modes`,
+  `hooks::CameraModesUpdate`, else the original), and a
   pass-through hook on `sub_82211A28` notes the entry it's called with
   during it; on render-only passes it runs nothing of the cutscene, only
   `sub_82211A28` (the game's) on that entry, if the logic pass drew. The
@@ -556,8 +564,9 @@ and target, and recorder world matrices), mostly for comparison.
 |---|---|
 | `--max_fps` | Frame rate cap in races; 0 = unlimited. |
 | `--interpolate_draw_state` | Blending on (default) or off. |
+| `--game_rand_by_tick` | (2026-11-22, E5 step 4.) Render-only passes don't advance the game's own random generator (`sub_82293568`, its seed at `0x82638188`), on by default: its seed is saved when a render-only pass starts and put back when the next pass starts (`GameMessages_SetRenderOnlyPass`). The camera shake (`camera_modes::ShakeRandom`) draws from it on every pass, so before, the number of frames drawn between ticks moved the draws after it: the race's traffic cars' random parts (`Car::SetModel`) changed with the frame rate. Found by `tick_replay.sh` (E5 step 4's batch 1: a build a little slower drew more frames). |
 | `--motion_blur` | The game's velocity-based motion blur (pixel shader `7EB16456AAD56CBA`), on by default; false leaves its one draw out, and the frame is as drawn, unblurred. Defined in `src/native/renderer.cpp` (2026-10-19, `beam-stepping`); it used to be SDK patch `0002`, for the emulated GPU only (removed: the plugin isn't shipped, and now always draws it). Its velocities come from the tick, so it smears a whole tick of motion at high frame rates; see `--motion_blur_by_tick`. |
-| `--glow` | Emulated GPU only (the native renderer always draws the glow and ignores this flag): the game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine), off by default there, as it leaves smears after camera switches. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
+| `--glow` | (Gone with SDK patch 0001 in E4's step 7, 2026-11-16.) Emulated GPU only (the native renderer always draws the glow and ignores this flag): the game's light bloom (glow intensity c33.y of pixel shader `9750599DF5ED3B39`, the bloom combine), off by default there, as it leaves smears after camera switches. Patch `patches/rexglue-sdk/0001`. Turned on (with `--motion_blur=true`) when comparing the native renderer with the emulated GPU. |
 | `--blend_pixel_constants` | Blend per-object lighting constants (default on). |
 | `--blend_glow`, `--glow_history_every_frame` | The glow between ticks (default on; `src/interpolation/glow.cpp`): its strength and history weight blended between ticks, and its history written every frame with the weight raised to the frame's share of a tick. See the bloom under Known issues in `native-renderer.md`. |
 | `--log_glow_recorder` | Every 2 s: the glow recorder's passes, history writes (the game's and added), the tick's history weight and the weights used. |

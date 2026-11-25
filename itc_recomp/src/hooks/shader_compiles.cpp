@@ -10,6 +10,9 @@
 // compiles instead, dumping what's made (src/debug/shader_compile_dump.h).
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include <string>
 
@@ -17,6 +20,8 @@
 #include "base/log.h"
 #include "debug/shader_compile_dump.h"
 #include "graphics/hardcoded_shaders.h"
+#include "lifted/sdk.h"
+#include "schema/heap.h"
 
 ITC_FLAG_BOOL(use_hardcoded_shaders, true, "ITC",
               "Use the shaders the game's HLSL compiler made from the HLSL in the image "
@@ -26,9 +31,9 @@ ITC_FLAG_BOOL(use_hardcoded_shaders, true, "ITC",
 
 namespace {
 
-std::string LoadProfile(uint8_t* base, uint32_t address) {
+std::string LoadProfile(uint32_t address) {
   std::string s;
-  for (uint8_t c; s.size() < 16 && (c = guest::LoadU8(base, address + s.size())) != 0;) {
+  for (uint8_t c; s.size() < 16 && (c = guest::LoadU8(address + s.size())) != 0;) {
     s.push_back(static_cast<char>(c));
   }
   return s;
@@ -40,43 +45,43 @@ std::string LoadProfile(uint8_t* base, uint32_t address) {
 // the entry point, r8 the profile, r9 the flags, r10 where the shader buffer
 // goes; the caller's stack words +84 and +92 where the errors and the
 // constant table go. Returns 0, or D3DXCreateBuffer's failure.
-extern "C" REX_FUNC(sub_822B8F10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B8F10) {
+  
   if (debug::ShaderCompileDump_Active()) {
-    debug::ShaderCompileDump_Compile(ctx, base);
+    debug::ShaderCompileDump_Compile(ctx);
     return;
   }
   if (!ITC_FLAG(use_hardcoded_shaders)) {
-    __imp__sub_822B8F10(ctx, base);
+    lifted::original::c822B8F10(ctx);
     return;
   }
   namespace hs = graphics::hardcoded_shaders;
-  const hs::Shader* shader = hs::Find(ctx.r3.u32, ctx.r4.u32, LoadProfile(base, ctx.r8.u32));
+  const hs::Shader* shader = hs::Find(ctx.r3.u32, ctx.r4.u32, LoadProfile(ctx.r8.u32));
   if (!shader || ctx.r5.u32 != 0 || ctx.r6.u32 != 0 || ctx.r9.u32 != 0) {
     ITC_LOG_ERROR("hardcoded shaders: no stored shader for source {:08X} length {}, compiled",
                   ctx.r3.u32, ctx.r4.u32);
-    __imp__sub_822B8F10(ctx, base);
+    lifted::original::c822B8F10(ctx);
     return;
   }
   ITC_NATIVE_RUNNING("sub_822B8F10 D3DXCompileShader");
   const uint32_t shader_out = ctx.r10.u32;
-  const uint32_t errors_out = guest::LoadU32(base, ctx.r1.u32 + 84);
-  const uint32_t table_out = guest::LoadU32(base, ctx.r1.u32 + 92);
+  const uint32_t errors_out = guest::LoadU32(ctx.r1.u32 + 84);
+  const uint32_t table_out = guest::LoadU32(ctx.r1.u32 + 92);
   ctx.r3.u64 = shader->size;
   ctx.r4.u64 = shader_out;
-  sub_822BE450(ctx, base);
+  lifted::Enter(ctx, lifted::e822BE450);
   if (ctx.r3.s32 < 0) {
     return;
   }
-  const uint32_t data = guest::LoadU32(base, guest::LoadU32(base, shader_out) + 12);
+  const uint32_t data = schema::D3DXBufferOut(shader_out).buffer().contents();
   for (uint32_t i = 0; i < shader->size; i++) {
-    guest::StoreU8(base, data + i, shader->data[i]);
+    guest::StoreU8(data + i, shader->data[i]);
   }
   if (errors_out) {
-    guest::StoreU32(base, errors_out, 0);
+    schema::D3DXBufferOut(errors_out).set_buffer(0u);
   }
   if (table_out) {
-    guest::StoreU32(base, table_out, 0);
+    guest::StoreU32(table_out, 0);
   }
   ctx.r3.u64 = 0;
 }

@@ -1,0 +1,866 @@
+# The schema of docs/functions/race-event.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race event (RaceEvent::, 160 bytes at [0x826C6078]): the opponents a
+# career race offers, from the data tables' 400 items sorted by their unlock
+# state into pools by location (RaceEvent::Init's 6,080-byte block), trimmed
+# and copied into ten groups; locations 0 to 3 also get the event's list
+# (+156). The items' unlock conditions are tests over the save data and the
+# garage's selected car (EventCondition::). Names are ours and mostly guesses
+# (docs/known-data.md's race event rows). Also here, as the measure files
+# them under this area (the area touching them most): the save data
+# (SaveData::Of's), the data tables' item, a car object's copies of its spec
+# (+1888, sub_820C4550's) and the power curve EventCondition::Power builds.
+#
+# Measure faults (tools/type_map.py), kept as fields with their own names:
+# - "Unlock" joins the item with Car::FromBuild's and CarDecal::FromBuild's
+#   car build (an item's +160; the build_ fields hold the build's offsets)
+#   and Unlock::HasSectionCondition's unlock block (an item's +40).
+# - RaceEvent joins the event with EventPools::ToGroup's and ToGroupNoList's
+#   group (their +4 and +8, which fit the section flags' words), and with
+#   RaceEvent::FindRacer's and RaceEvent::Entry's list entry (+0).
+# - EventGroup.+8's offsets from EventGroup::PromoteUnlocked's moves wrap at
+#   2^32 (the entry before, -4 and -2, and the one after: offsets 2^32 - 4
+#   to 2^32 + 2).
+# - SceneModelRecord::SetWheels.ret joins block 2's copy with
+#   sub_820CE600's and sub_820CE7F0's engine stage (its +20 to +28).
+# - EventCondition's +0 read as a word by EventCondition::CategoryMask: its
+#   r4 and r5 (&a location, &a mode mask) are a condition's arguments.
+# The same objects as other areas' types (for the lead to merge): SaveData
+# is career.toml's CareerSave; OpponentItem career.toml's CareerOpponentItem;
+# StagePowerCurve the measure's PowerCurve; RaceEventRoutePosition the
+# measure's RoutePosition.
+
+# The race event (160 bytes, RaceEvent::Make; [0x826C6078]). In host memory
+# (E5 step 4): made by RaceEvent::Make (New; host_alloc for the lifted
+# original's operator new), deleted by RaceEvent::Destroy (Delete).
+[RaceEvent]
+measure = "RaceEvent"
+size = 160
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82144E94]
+host_free = [{ call = 0x82144E34, reg = "r3" }]
+fields = [
+  { name = "group", offset = 36, type = "embed", to = "EventGroup", count = 10, note = "the ten groups, one a location 0 to 9" },
+  { name = "section_rival_waiting", offset = 0, type = "u32", note = "1 when a list entry's item has a kind 65 condition (RaceEvent::Init); also the list entry's item id through the measure's join" },
+  { name = "on_section_13", offset = 4, type = "u32", note = "1 while the player's car is on section 13's slices 0 to 9 (AiPath::NoteFixedSections; +4 and +8, or +12 and +16, let the section rival in); also a group's entries through the measure's join" },
+  { name = "on_section_14", offset = 8, type = "u32", note = "section 14's slices 0 to 4; also a group's locked entries through the measure's join" },
+  { name = "on_section_4", offset = 12, type = "u32", note = "section 4's slices 0 to 9" },
+  { name = "on_section_5", offset = 16, type = "u32", note = "section 5's slices 0 to 4" },
+  { name = "count", offset = 20, type = "u16", note = "the list's count (+22 + +24)" },
+  { name = "open_0_to_3", offset = 22, type = "u16", note = "groups 0 to 3's open counts summed" },
+  { name = "locked_0_to_3", offset = 24, type = "u16", note = "groups 0 to 3's locked counts summed" },
+  { name = "open_4_to_9", offset = 26, type = "u16", note = "groups 4 to 9's open counts summed" },
+  { name = "locked_4_to_9", offset = 28, type = "u16", note = "groups 4 to 9's locked counts summed" },
+  { name = "mode", offset = 30, type = "u16", note = "RaceEvent::SetMode" },
+  { name = "mode_streak", offset = 32, type = "u16", note = "the save data's +6060 + 1 with the same mode as last, else 1" },
+  { name = "location", offset = 34, type = "u16" },
+  { name = "groups", offset = 36, type = "bytes", count = 120, note = "ten EventGroups, one a location 0 to 9" },
+  { name = "group0_open", offset = 36, type = "u16", note = "group 0's (EventGroup.open)" },
+  { name = "group0_locked", offset = 38, type = "u16" },
+  { name = "group0_entries", offset = 40, type = "ptr", to = "EventGroupEntry" },
+  { name = "group0_locked_entries", offset = 44, type = "ptr", to = "EventGroupEntry" },
+  { name = "group4_open", offset = 84, type = "u16", note = "group 4's (EventGroup.open)" },
+  { name = "group4_locked", offset = 86, type = "u16" },
+  { name = "group4_entries", offset = 88, type = "ptr", to = "EventGroupEntry" },
+  { name = "group4_locked_entries", offset = 92, type = "ptr", to = "EventGroupEntry" },
+  { name = "list", offset = 156, type = "ptr", to = "RaceEventEntry", note = "VirtualAlloc'ed, count +20" },
+]
+
+# A list entry (12 bytes, the event's +156; RaceEvent::Alloc's). In host
+# memory (E5 step 4): the list one array (NewArray, host_alloc_array for the
+# lifted original's VirtualAlloc), deleted by RaceEvent::Free.
+[RaceEventEntry]
+measure = "new<?>@RaceEvent::Alloc"
+measures = ["RaceEvent::Entry.ret"]
+size = 12
+origin = "allocated"
+storage = "host"
+host_alloc_array = [{ call = 0x82143654, reg = "r4" }]
+fields = [
+  { name = "item_id", offset = 0, type = "u32", note = "the opponent's item (its car build at the item's +160)" },
+  { name = "start", offset = 4, type = "u32", note = "a start position (two halfwords, -1 -1 until placed: RaceEvent::PlaceEntry)" },
+  { name = "flag", offset = 8, type = "u32", note = "1 open or found among the racers; 0 gives the racer flags 0x300" },
+  { name = "start_section", offset = 4, type = "u16", note = "start's high halfword: the start's route section (RaceManager::AddRacers)" },
+  { name = "start_slice", offset = 6, type = "u16", note = "start's low halfword: its slice" },
+]
+
+# A race event group (12 bytes, the event's +36 + 12 x location).
+[EventGroup]
+measure = "EventGroup"
+measures = ["EventGroup::Alloc.r3", "EventGroup::Free.r3"]
+size = 12
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "open", offset = 0, type = "u16", note = "the open count" },
+  { name = "locked", offset = 2, type = "u16", note = "the locked count" },
+  { name = "entries", offset = 4, type = "ptr", to = "EventGroupEntry", note = "VirtualAlloc'ed, open + locked entries" },
+  { name = "locked_entries", offset = 8, type = "ptr", to = "EventGroupEntry", note = "the locked part: +4 + 4 x the open count" },
+]
+
+# A group's entry (4 bytes). In host memory (E5 step 4): a group's entries
+# one array (EventGroup::Alloc's NewArray), deleted by EventGroup::Free. The
+# measure's accesses past its 4 bytes (EventGroup::PromoteUnlocked's moves:
+# the next entry's +4 to +7, and the entry before at offsets 2^32 - 4 and
+# 2^32 - 2 not wrapped) are the neighbors' fields, no longer fields here (a
+# host struct is its 4 bytes; the moves go through the neighbor's view).
+[EventGroupEntry]
+measure = "EventGroup.+4"
+measures = ["EventGroup.+8", "EventPools::CopyIds.r4", "RaceEvent@+84.+4", "RaceEvent@+84.+8"]
+size = 4
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "item_id", offset = 0, type = "u16" },
+  { name = "list_index", offset = 2, type = "u16", note = "its index in the event's list (locations 0 to 3; -1 once promoted past the open ones)" },
+  { name = "word", offset = 0, type = "u32", note = "the entry as one word (the swaps)" },
+]
+
+# A location's pools (608 bytes; RaceEvent::Init's block holds ten): counted
+# halfword lists of item ids, up to 100 each.
+[EventPools]
+measure = "EventPools"
+size = 608
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "open_list", offset = 0, type = "embed", to = "EventIdList", note = "the open items not beaten" },
+  { name = "won_list", offset = 202, type = "embed", to = "EventIdList", note = "the open items beaten" },
+  { name = "locked_list", offset = 404, type = "embed", to = "EventIdList", note = "the locked items and the rivals of the others" },
+  { name = "open", offset = 0, type = "u16", note = "the open items not beaten: the count" },
+  { name = "open_ids", offset = 2, type = "bytes", count = 200, note = "their ids" },
+  { name = "won", offset = 202, type = "u16", note = "the open items beaten: the count" },
+  { name = "won_ids", offset = 204, type = "bytes", count = 200 },
+  { name = "locked", offset = 404, type = "u16", note = "the locked items and the rivals of the others: the count" },
+  { name = "locked_ids", offset = 406, type = "bytes", count = 200 },
+  { name = "kept", offset = 606, type = "u16", note = "the kept count (at most the location's cap)" },
+]
+
+# A counted list of item ids in a location's pools (202 bytes: EventPools'
+# +0, +202 and +404): the count, then up to 100 ids (EventPools::Append's).
+[EventIdList]
+measure = "EventIdList"
+size = 202
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "count", offset = 0, type = "u16" },
+  { name = "ids", offset = 2, type = "bytes", count = 200, note = "the ids, halfwords (read with load_at)" },
+]
+
+# RaceEvent::Init's block: ten EventPools. In host memory (E5 step 4): made
+# by RaceEvent::Init (New; host_alloc for the lifted original's new[]),
+# deleted at its end (Delete; host_free for the original's two delete[]).
+[RaceEventPoolBlock]
+measure = "new<6080>@RaceEvent::Init"
+size = 6080
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82144AFC]
+host_free = [{ call = 0x82144CF4, reg = "r3" }, { call = 0x82144DE8, reg = "r3" }]
+fields = [
+  { name = "pool", offset = 0, type = "embed", to = "EventPools", count = 10, note = "ten EventPools, one a location" },
+  { name = "pools", offset = 0, type = "bytes", count = 6080, note = "ten EventPools, one a location" },
+  { name = "pool0_open", offset = 0, type = "u16" },
+  { name = "pool0_won", offset = 202, type = "u16" },
+  { name = "pool0_locked", offset = 404, type = "u16" },
+  { name = "pool0_kept", offset = 606, type = "u16" },
+  { name = "pool4_open", offset = 2432, type = "u16" },
+  { name = "pool4_won", offset = 2634, type = "u16" },
+  { name = "pool4_locked", offset = 2836, type = "u16" },
+  { name = "pool4_kept", offset = 3038, type = "u16" },
+]
+
+# An event condition (20 bytes): an item's +48, +68 (its unlock) and +100
+# (available).
+[EventCondition]
+measure = "EventCondition"
+measures = ["EventCondition::State.r3"]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "answer", offset = 0, type = "s16", note = "the answer wanted" },
+  { name = "kind", offset = 2, type = "s16", note = "0 to 67 (the tests in race-event.md)" },
+  { name = "arg0", offset = 4, type = "s32", note = "the arguments: -1 unused" },
+  { name = "arg1", offset = 8, type = "s32" },
+  { name = "arg2", offset = 12, type = "s32" },
+  { name = "arg3", offset = 16, type = "s32" },
+]
+
+# The data tables' item (3,008 bytes, DataTables::Item; the opponents).
+[OpponentItem]
+measure = "DataTables::Item.ret"
+measures = ["Unlock", "CarDecal::FromBuild.r4"]
+size = 3008
+origin = "file"
+fields = [
+  { name = "id", offset = 0, type = "u16" },
+  { name = "category", offset = 34, type = "u8", note = "0 to 47, bits counted by the unlock tests" },
+  { name = "kind", offset = 35, type = "u8", note = "0 to 5 (signed): kind 2 waits on its category's kind 0 items, kind 5 on every other item" },
+  { name = "location", offset = 36, type = "u8", note = "0 to 9 (signed)" },
+  { name = "sort_key", offset = 37, type = "u8", note = "after +35 (signed); the racer's +3924" },
+  { name = "unlock", offset = 40, type = "bytes", count = 48, note = "the unlock block, +40 to +87" },
+  { name = "mode_mask", offset = 40, type = "u16", note = "a mask of modes (read signed)" },
+  { name = "level", offset = 42, type = "u16", note = "1 to 4" },
+  { name = "listed", offset = 46, type = "u8", note = "1 listed while locked, 2 never" },
+  { name = "any", offset = 47, type = "u8", note = "0 both conditions, else either" },
+  { name = "condition_0", offset = 48, type = "bytes", count = 20, note = "an EventCondition" },
+  { name = "condition_1", offset = 68, type = "bytes", count = 20, note = "an EventCondition" },
+  { name = "race_kind", offset = 88, type = "u16", note = "0 to 5 (Race::SetUpRival); 3 has the rivals' rivals followed" },
+  { name = "location_offset", offset = 90, type = "u8", note = "a kind 4 or 5 race's location offset" },
+  { name = "counts_owned", offset = 91, type = "u8", note = "1 counts for RaceEvent::FirstOwned" },
+  { name = "rival_0", offset = 92, type = "u16", note = "three rival item ids (-1 ends), +92 to +96" },
+  { name = "rival_1", offset = 94, type = "u16" },
+  { name = "rival_2", offset = 96, type = "u16" },
+  { name = "available", offset = 100, type = "bytes", count = 20, note = "the availability condition (an EventCondition, Items::Available)" },
+  { name = "build", offset = 160, type = "bytes", count = 2812, note = "a car build (Car::FromBuild)" },
+  { name = "unknown_180", offset = 180, type = "u16", note = "Race::SetUpRival" },
+  { name = "unknown_182", offset = 182, type = "u8", note = "Race::SetUpRival" },
+  { name = "build_gear_factor_0", offset = 0, type = "f32", note = "measure fault: the build +0 (CarDecal::FromBuild: a decal entry's word +0)" },
+  { name = "build_gear_factor_1", offset = 4, type = "f32", note = "measure fault: the build +4 (CarDecal::FromBuild: a decal entry's word +4)" },
+  { name = "build_gear_factor_2", offset = 8, type = "f32", note = "measure fault: the build +8 (CarDecal::FromBuild: a decal entry's word +8)" },
+  { name = "build_gear_factor_3", offset = 12, type = "f32", note = "measure fault: the build +12 (CarDecal::FromBuild: a decal entry's word +12)" },
+  { name = "build_gear_factor_4", offset = 16, type = "f32", note = "measure fault: the build +16 (CarDecal::FromBuild: a decal entry's word +16)" },
+  { name = "build_gear_factor_5", offset = 20, type = "f32", note = "measure fault: the build +20 (CarDecal::FromBuild: a decal entry's word +20)" },
+  { name = "build_gear_factor_6", offset = 24, type = "f32", note = "measure fault: the build +24 (CarDecal::FromBuild: a decal entry's word +24)" },
+  { name = "build_setting_0", offset = 28, type = "u32", note = "measure fault: the build +28, a setting byte as a word (CarDecal::FromBuild: a decal entry's word +28)" },
+  { name = "build_setting_1", offset = 32, type = "u32", note = "measure fault: the build +32, a setting byte as a word (CarDecal::FromBuild: a decal entry's word +32)" },
+  { name = "build_setting_2", offset = 36, type = "u32", note = "measure fault: the build +36, a setting byte as a word" },
+  { name = "build_setting_3", offset = 40, type = "u32", note = "measure fault: the build +40, a setting byte as a word" },
+  { name = "build_setting_4", offset = 44, type = "u32", note = "measure fault: the build +44, a setting byte as a word" },
+  { name = "build_setting_5", offset = 48, type = "u32", note = "measure fault: the build +48, a setting byte as a word" },
+  { name = "build_setting_6", offset = 52, type = "u32", note = "measure fault: the build +52, a setting byte as a word" },
+  { name = "build_setting_7", offset = 56, type = "u32", note = "measure fault: the build +56, a setting byte as a word" },
+  { name = "build_setting_8", offset = 60, type = "u32", note = "measure fault: the build +60, a setting byte as a word" },
+  { name = "build_setting_9", offset = 64, type = "u32", note = "measure fault: the build +64, a setting byte as a word" },
+  { name = "build_setting_10", offset = 68, type = "u32", note = "measure fault: the build +68, a setting byte as a word" },
+  { name = "build_setting_11", offset = 72, type = "u32", note = "measure fault: the build +72, a setting byte as a word" },
+  { name = "build_setting_12", offset = 76, type = "u32", note = "measure fault: the build +76, a setting byte as a word" },
+  { name = "build_setting_13", offset = 80, type = "u32", note = "measure fault: the build +80, a setting byte as a word" },
+  { name = "build_setting_14", offset = 84, type = "u32", note = "measure fault: the build +84, a setting byte as a word" },
+  { name = "build_setting_15", offset = 88, type = "u32", note = "measure fault: the build +88, a setting byte as a word" },
+  { name = "build_setting_16", offset = 92, type = "u32", note = "measure fault: the build +92, a setting byte as a word" },
+  { name = "build_setting_17", offset = 96, type = "u32", note = "measure fault: the build +96, a setting byte as a word" },
+  { name = "build_setting_18", offset = 100, type = "u32", note = "measure fault: the build +100, a setting byte as a word" },
+  { name = "build_setting_19", offset = 104, type = "u32", note = "measure fault: the build +104, a setting byte as a word" },
+  { name = "build_setting_20", offset = 108, type = "u32", note = "measure fault: the build +108, a setting byte as a word" },
+  { name = "build_setting_21", offset = 112, type = "u32", note = "measure fault: the build +112, a setting byte as a word" },
+  { name = "build_setting_22", offset = 116, type = "u32", note = "measure fault: the build +116, a setting byte as a word" },
+  { name = "build_tuning_0", offset = 120, type = "u32", note = "measure fault: the build +120, a tuning word" },
+  { name = "build_tuning_1", offset = 124, type = "u32", note = "measure fault: the build +124, a tuning word" },
+  { name = "build_tuning_2", offset = 128, type = "u32", note = "measure fault: the build +128, a tuning word" },
+  { name = "build_tuning_3", offset = 132, type = "u32", note = "measure fault: the build +132, a tuning word" },
+  { name = "build_tuning_4", offset = 136, type = "u32", note = "measure fault: the build +136, a tuning word" },
+  { name = "build_tuning_5", offset = 140, type = "u32", note = "measure fault: the build +140, a tuning word" },
+  { name = "build_tuning_6", offset = 144, type = "u32", note = "measure fault: the build +144, a tuning word" },
+  { name = "build_tuning_7", offset = 148, type = "u32", note = "measure fault: the build +148, a tuning word" },
+  { name = "build_tuning_8", offset = 152, type = "u32", note = "measure fault: the build +152, a tuning word" },
+  { name = "build_tuning_9", offset = 156, type = "u32", note = "measure fault: the build +156, a tuning word" },
+  { name = "build_tuning_10", offset = 160, type = "u32", note = "measure fault: the build +160, a tuning word" },
+  { name = "build_tuning_11", offset = 164, type = "u32", note = "measure fault: the build +164, a tuning word" },
+  { name = "build_tuning_12", offset = 168, type = "u32", note = "measure fault: the build +168, a tuning word" },
+  { name = "build_tuning_13", offset = 172, type = "u32", note = "measure fault: the build +172, a tuning word" },
+  { name = "build_tuning_14", offset = 176, type = "u32", note = "measure fault: the build +176, a tuning word" },
+  { name = "build_tuning_15", offset = 180, type = "u32", note = "measure fault: the build +180, a tuning word" },
+  { name = "build_tuning_16", offset = 184, type = "u32", note = "measure fault: the build +184, a tuning word" },
+  { name = "build_tuning_17", offset = 188, type = "u32", note = "measure fault: the build +188, a tuning word" },
+  { name = "build_tuning_18", offset = 192, type = "u32", note = "measure fault: the build +192, a tuning word" },
+  { name = "build_tuning_19", offset = 196, type = "u32", note = "measure fault: the build +196, a tuning word" },
+  { name = "build_tuning_20", offset = 200, type = "u32", note = "measure fault: the build +200, a tuning word" },
+  { name = "build_tuning_21", offset = 204, type = "u32", note = "measure fault: the build +204, a tuning word" },
+  { name = "build_tuning_22", offset = 208, type = "u32", note = "measure fault: the build +208, a tuning word" },
+  { name = "build_tuning_23", offset = 212, type = "u32", note = "measure fault: the build +212, a tuning word" },
+  { name = "build_tuning_24", offset = 216, type = "u32", note = "measure fault: the build +216, a tuning word" },
+  { name = "build_tuning_25", offset = 220, type = "u32", note = "measure fault: the build +220, a tuning word" },
+  { name = "build_tuning_26", offset = 224, type = "u32", note = "measure fault: the build +224, a tuning word" },
+  { name = "build_tuning_27", offset = 228, type = "u32", note = "measure fault: the build +228, a tuning word" },
+  { name = "build_tuning_28", offset = 232, type = "u32", note = "measure fault: the build +232, a tuning word" },
+  { name = "build_tuning_29", offset = 236, type = "u32", note = "measure fault: the build +236, a tuning word" },
+  { name = "build_tuning_30", offset = 240, type = "u32", note = "measure fault: the build +240, a tuning word" },
+  { name = "build_tuning_31", offset = 244, type = "u32", note = "measure fault: the build +244, a tuning word" },
+  { name = "build_tuning_32", offset = 248, type = "u32", note = "measure fault: the build +248, a tuning word" },
+  { name = "build_tuning_33", offset = 252, type = "u32", note = "measure fault: the build +252, a tuning word" },
+  { name = "build_tuning_34", offset = 256, type = "u32", note = "measure fault: the build +256, a tuning word" },
+  { name = "build_tuning_35", offset = 260, type = "u32", note = "measure fault: the build +260, a tuning word" },
+  { name = "build_tuning_36", offset = 264, type = "u32", note = "measure fault: the build +264, a tuning word" },
+  { name = "build_tuning_37", offset = 268, type = "u32", note = "measure fault: the build +268, a tuning word" },
+  { name = "build_entry_word_0", offset = 332, type = "u32", note = "measure fault: the build +332 (the car's +1588 entries)" },
+  { name = "build_entry_word_1", offset = 336, type = "u32", note = "measure fault: the build +336 (the car's +1588 entries)" },
+  { name = "build_entry_word_2", offset = 340, type = "u32", note = "measure fault: the build +340 (the car's +1588 entries)" },
+  { name = "build_entry_word_3", offset = 344, type = "u32", note = "measure fault: the build +344 (the car's +1588 entries)" },
+  { name = "build_entry_word_4", offset = 348, type = "u32", note = "measure fault: the build +348 (the car's +1588 entries)" },
+  { name = "build_car_1568", offset = 2768, type = "u32", note = "measure fault: the build +2768, the car's +1568 bytes' first word" },
+  { name = "build_car_id", offset = 2788, type = "u32", note = "measure fault: the build +2788, the car id" },
+  { name = "build_paint_0", offset = 2792, type = "u32", note = "measure fault: the build +2792, the paint" },
+  { name = "build_paint_1", offset = 2796, type = "u32", note = "measure fault: the build +2796, the paint" },
+  { name = "build_paint_2", offset = 2800, type = "u32", note = "measure fault: the build +2800, the paint" },
+  { name = "build_paint_3", offset = 2804, type = "u32", note = "measure fault: the build +2804, the paint" },
+  { name = "build_paint_4", offset = 2808, type = "u32", note = "measure fault: the build +2808, the paint" },
+]
+
+# A player's save data (0x1F978 bytes, SaveData::Of; career.toml's
+# CareerSave is the same object).
+[SaveData]
+measure = "SaveData::Of.ret"
+measures = ["SaveData"]
+size = 129400
+origin = "allocated"
+fields = [
+  { name = "new_game", offset = 0, type = "u32", note = "1 for a new game; also TodaysEvent::NextUnlockEntry's and Type2Hub::NextNotice's +0 (probably a list entry joined by the measure)" },
+  { name = "shown_items", offset = 4, type = "u32", note = "Settings::Read: OR'd with bit 5 of +6092 into the options' +8 (the sound page's items shown)" },
+  { name = "pick_head", offset = 8, type = "u32", note = "the pick's first word (CareerPick.head)" },
+  { name = "wins", offset = 60, type = "u16", note = "the stats record's +12" },
+  { name = "races_20", offset = 68, type = "u16", note = "the stats record's +20, a race count" },
+  { name = "races_22", offset = 70, type = "u16", note = "the stats record's +22, a race count" },
+  { name = "day_float_4836", offset = 4908, type = "f32", note = "the day block's float +4836" },
+  { name = "mode_counts", offset = 5844, type = "u16", note = "+5844 + 14 x mode: a count, up to 9999 (mode 0's)" },
+  { name = "location_count_12", offset = 5910, type = "u16", note = "+5886 + 2 x location: counts by location (location 12's)" },
+  { name = "mean_796", offset = 5952, type = "f32", note = "the stats record's +5904, a running mean" },
+  { name = "best_804", offset = 6024, type = "f32", note = "the stats record's +5976" },
+  { name = "best_828_2", offset = 6032, type = "f32", note = "the stats record's +5984" },
+  { name = "best_16", offset = 6044, type = "u32", note = "the stats record's +5996: a best time, in ticks" },
+  { name = "cars_bought", offset = 6052, type = "u16", note = "probably (CarDealer::Buy adds to it); the stats record's +6004" },
+  { name = "cars_sold", offset = 6054, type = "u16", note = "probably; the stats record's +6006" },
+  { name = "last_mode", offset = 6056, type = "u32" },
+  { name = "mode_streak", offset = 6060, type = "u16" },
+  { name = "stages", offset = 6092, type = "u32", note = "the stages reached, a bit each" },
+  { name = "day", offset = 6100, type = "u32", note = "the day (1 a fixed rival race); from 999 the day tests are met" },
+  { name = "mode", offset = 6104, type = "u32" },
+  { name = "location", offset = 6108, type = "u32", note = "14 to 19, 48" },
+  { name = "next_location", offset = 6112, type = "u32" },
+  { name = "money", offset = 6116, type = "u32", note = "3000 for a new game, at most 9,999,999" },
+  { name = "garage", offset = 6120, type = "bytes", count = 98612, note = "the garage's list (career.toml's CareerGarageList): 4-byte nodes, cars of 1,968 bytes from +6332" },
+  { name = "garage_head", offset = 6324, type = "u16", note = "the garage list's head (+204)" },
+  { name = "garage_count", offset = 6328, type = "u16", note = "the garage list's count (+208)" },
+  { name = "selected_car", offset = 104736, type = "u32", note = "0x19920: the selected garage car, a position in the list" },
+  { name = "item_records", offset = 104952, type = "bytes", count = 4800, note = "0x199F8: 400 records of 12 bytes by item id" },
+  { name = "item_record_losses", offset = 104952, type = "u16", note = "record 0's (+ 12 x id)" },
+  { name = "item_record_wins", offset = 104954, type = "u16", note = "record 0's (+ 12 x id)" },
+  { name = "item_record_outcome3", offset = 104956, type = "u16", note = "record 0's (+ 12 x id)" },
+  { name = "item_record_rival_wins", offset = 104958, type = "u16", note = "record 0's +6, probably the rival's wins (+ 12 x id)" },
+  { name = "item_record_word", offset = 104960, type = "u32", note = "record 0's +8 (+ 12 x id)" },
+  { name = "item_flags", offset = 109796, type = "bytes", count = 52, note = "0x1ACE4: a 400-bit set" },
+  { name = "item_flags_word_11", offset = 109840, type = "u32", note = "0x1AD10: the set's word 11 (kind 64 tests 0x20)" },
+  { name = "unlocks_shown", offset = 116600, type = "bytes", count = 768, note = "0x1C778: 64 12-byte entries {0, table, entry}, the unlocks to show" },
+  { name = "unlock_shown_word", offset = 116600, type = "u32", note = "entry 0's (+ 12 x i)" },
+  { name = "unlock_shown_table", offset = 116604, type = "u32", note = "entry 0's (+ 12 x i)" },
+  { name = "unlock_shown_entry", offset = 116608, type = "u32", note = "entry 0's (+ 12 x i)" },
+  { name = "unlocks_shown_count", offset = 117368, type = "u32", note = "0x1CA78" },
+  { name = "rewards_shown", offset = 117380, type = "bytes", count = 2688, note = "0x1CA84: 12-byte entries {0, 8, index}" },
+  { name = "reward_shown_word", offset = 117380, type = "u32", note = "entry 0's (+ 12 x i)" },
+  { name = "rewards_shown_count", offset = 120068, type = "u32", note = "0x1D504" },
+  { name = "movie_after_results", offset = 120100, type = "u32", note = "0x1D524: a movie to play after the day's results, -1 none" },
+  { name = "options", offset = 129116, type = "bytes", count = 104, note = "0x1F85C: the options" },
+  { name = "hud_option_0", offset = 129116, type = "u32", note = "the options' +0 to +12: the four HUD options" },
+  { name = "hud_option_1", offset = 129120, type = "u32" },
+  { name = "hud_option_2", offset = 129124, type = "u32" },
+  { name = "hud_option_3", offset = 129128, type = "u32" },
+  { name = "profile_option", offset = 129136, type = "u32", note = "the options' +20: 1 when the profile's +632 is 0 (SaveScreen::StoreSettings)" },
+  { name = "camera_view", offset = 129140, type = "u32", note = "the options' +24: the camera setting (0 view 2, 1 view 1, 2 view 0)" },
+  { name = "effects_volume", offset = 129144, type = "u8", note = "the options' +28, 0 to 15 (race-screens.md's order; options-screen.md names them the other way round)" },
+  { name = "music_volume", offset = 129145, type = "u8", note = "the options' +29, 0 to 15; kind 66 tests it above 0 (signed)" },
+  { name = "setting_0", offset = 129152, type = "u8", note = "the options' +36 to +41: settings bytes (+36 to +38 values -10 to 10)" },
+  { name = "setting_1", offset = 129153, type = "u8" },
+  { name = "setting_2", offset = 129154, type = "u8" },
+  { name = "setting_3", offset = 129155, type = "u8" },
+  { name = "setting_4", offset = 129156, type = "u8" },
+  { name = "setting_5", offset = 129157, type = "u8" },
+  { name = "distance_total_2", offset = 6040, type = "f32", note = "the second distance total, beside +4908 (SaveData::AddDistance; race-world's report)" },
+]
+
+# A car object's copies of its spec, from its +1888 (sub_820C4550's answer):
+# +0 block 2 (340 bytes, the spec sheet), +352 block 1 (640, the physics),
+# +992 the engine stage (204), +1196 and +1288 the front and rear tires (92,
+# inched up). A spec's own block 2 (Params::GetCarSpec + 640) has block 2's
+# layout too. Offsets in the notes are within each block (docs/known-data.md's
+# car spec, car-specs.toml's CarEngineStage and CarTire).
+[CarSpecCopies]
+measures = ["sub_820C4550.ret", "SceneModelRecord::SetWheels.ret"]
+size = 1380
+origin = "embedded"
+fields = [
+  { name = "block2_id", offset = 0, type = "bytes", count = 8, note = "block 2's car id" },
+  { name = "displacement", offset = 8, type = "u32", note = "cc" },
+  { name = "power", offset = 12, type = "f32", note = "probably (+12 to +24: the power and torque and their rpm, SBX-Recomp's reading)" },
+  { name = "power_rpm", offset = 16, type = "f32", note = "probably" },
+  { name = "torque", offset = 20, type = "f32", note = "probably; also the engine stage's +20 through SetWheels' join (sub_820CE7F0)" },
+  { name = "torque_rpm", offset = 24, type = "f32", note = "probably; also the engine stage's +24 (sub_820CE600)" },
+  { name = "zeroed_28", offset = 28, type = "f32", note = "+28 to +60 0.0 at load; also the engine stage's +28 (sub_820CE600)" },
+  { name = "engine_type", offset = 68, type = "u8", note = "cylinders for the tuning (7: two rotors)" },
+  { name = "turbo", offset = 69, type = "u8", note = "1 for turbo" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+  { name = "model_year", offset = 88, type = "u32", note = "probably (kind 36 tests 1990 to 1999)" },
+  { name = "spec_92", offset = 92, type = "u32", note = "kind 37 tests it is 4" },
+  { name = "spec_96", offset = 96, type = "u32", note = "kind 37 tests it is 0" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "spec_120", offset = 120, type = "u32", note = "kind 49: 0 wants the tuning's +108 set, else not negative" },
+  { name = "spec_byte_129", offset = 129, type = "u8", note = "kind 32 tests it" },
+  { name = "unknown_130", offset = 130, type = "u8" },
+  { name = "list_kind", offset = 131, type = "u8", note = "the car list (0 road cars; nonzero takes car 0's aero parts)" },
+  { name = "unknown_232", offset = 232, type = "u32" },
+  { name = "wheel_236", offset = 236, type = "u32", note = "SceneModelRecord::SetWheels: the record's +4124 when not 0" },
+  { name = "setting_300", offset = 300, type = "f32", note = "+300 to +312 read by CarData::ApplySettings (sub_820C05C8)" },
+  { name = "setting_304", offset = 304, type = "f32" },
+  { name = "setting_308", offset = 308, type = "f32" },
+  { name = "setting_312", offset = 312, type = "f32" },
+  { name = "b1_inertia_factor_x", offset = 368, type = "f32", note = "block 1 +16" },
+  { name = "b1_inertia_factor_y", offset = 372, type = "f32", note = "block 1 +20" },
+  { name = "b1_inertia_factor_z", offset = 376, type = "f32", note = "block 1 +24" },
+  { name = "b1_length", offset = 384, type = "f32", note = "block 1 +32" },
+  { name = "b1_height", offset = 388, type = "f32", note = "block 1 +36" },
+  { name = "b1_width", offset = 392, type = "f32", note = "block 1 +40" },
+  { name = "b1_center_of_mass_x", offset = 400, type = "f32", note = "block 1 +48" },
+  { name = "b1_center_of_mass_y", offset = 404, type = "f32", note = "block 1 +52" },
+  { name = "b1_center_of_mass_z", offset = 408, type = "f32", note = "block 1 +56" },
+  { name = "b1_box_min_x", offset = 416, type = "f32", note = "block 1 +64" },
+  { name = "b1_box_min_y", offset = 420, type = "f32", note = "block 1 +68" },
+  { name = "b1_box_min_z", offset = 424, type = "f32", note = "block 1 +72" },
+  { name = "b1_box_max_x", offset = 432, type = "f32", note = "block 1 +80" },
+  { name = "b1_box_max_y", offset = 436, type = "f32", note = "block 1 +84" },
+  { name = "b1_box_max_z", offset = 440, type = "f32", note = "block 1 +88" },
+  { name = "b1_matrix_96_0", offset = 448, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_1", offset = 452, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_2", offset = 456, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_3", offset = 460, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_4", offset = 464, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_5", offset = 468, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_10", offset = 488, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_11", offset = 492, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_12", offset = 496, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_13", offset = 500, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_14", offset = 504, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_96_15", offset = 508, type = "f32", note = "block 1 +96's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_0", offset = 512, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_1", offset = 516, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_2", offset = 520, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_3", offset = 524, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_4", offset = 528, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_5", offset = 532, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_10", offset = 552, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_11", offset = 556, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_12", offset = 560, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_13", offset = 564, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_14", offset = 568, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_matrix_160_15", offset = 572, type = "f32", note = "block 1 +160's 16 floats (probably a matrix)" },
+  { name = "b1_floats_224_0", offset = 576, type = "f32", note = "block 1 +224's 5 floats" },
+  { name = "b1_floats_224_1", offset = 580, type = "f32", note = "block 1 +224's 5 floats" },
+  { name = "b1_floats_224_2", offset = 584, type = "f32", note = "block 1 +224's 5 floats" },
+  { name = "b1_floats_224_3", offset = 588, type = "f32", note = "block 1 +224's 5 floats" },
+  { name = "b1_floats_224_4", offset = 592, type = "f32", note = "block 1 +224's 5 floats" },
+  { name = "b1_floats_244_0", offset = 596, type = "f32", note = "block 1 +244's 5 floats" },
+  { name = "b1_floats_244_1", offset = 600, type = "f32", note = "block 1 +244's 5 floats" },
+  { name = "b1_floats_244_2", offset = 604, type = "f32", note = "block 1 +244's 5 floats" },
+  { name = "b1_floats_244_3", offset = 608, type = "f32", note = "block 1 +244's 5 floats" },
+  { name = "b1_floats_244_4", offset = 612, type = "f32", note = "block 1 +244's 5 floats" },
+  { name = "b1_record_264_0", offset = 616, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_1", offset = 620, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_2", offset = 624, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_4", offset = 632, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_5", offset = 636, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_6", offset = 640, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_8", offset = 648, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_9", offset = 652, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_10", offset = 656, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_11", offset = 660, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_12", offset = 664, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_13", offset = 668, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_14", offset = 672, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_record_264_15", offset = 676, type = "f32", note = "block 1 +264's 92 bytes" },
+  { name = "b1_drive_type", offset = 708, type = "u32", note = "block 1 +356: 0 front, 1 rear, 2 and up all-wheel" },
+  { name = "b1_drive_record", offset = 712, type = "u32", note = "block 1 +360: an index into 0x8260181C" },
+  { name = "b1_front_torque_share", offset = 716, type = "f32", note = "block 1 +364" },
+  { name = "b1_gear_count", offset = 720, type = "u32", note = "block 1 +368" },
+  { name = "b1_final_drive", offset = 724, type = "f32", note = "block 1 +372" },
+  { name = "b1_float_376", offset = 728, type = "f32", note = "block 1 +376 (its floats +528 to +636)" },
+  { name = "b1_float_380", offset = 732, type = "f32", note = "block 1 +380 (its floats +528 to +636)" },
+  { name = "b1_gear_ratio_reverse", offset = 736, type = "f32", note = "block 1 +384: the reverse ratio, then up to 8 forward (+384, 9 floats)" },
+  { name = "b1_gear_table_420", offset = 772, type = "f32", note = "block 1 +420: a per-gear table's first (9 floats)" },
+  { name = "b1_gear_table_456", offset = 808, type = "f32", note = "block 1 +456: a per-gear table's first (9 floats)" },
+  { name = "b1_shift_time_0", offset = 844, type = "f32", note = "block 1 +492: the shift times' first (9 floats)" },
+  { name = "b1_mass", offset = 884, type = "f32", note = "block 1 +532" },
+  { name = "b1_wheelbase", offset = 888, type = "f32", note = "block 1 +536" },
+  { name = "b1_front_track", offset = 892, type = "f32", note = "block 1 +540" },
+  { name = "b1_rear_track", offset = 896, type = "f32", note = "block 1 +544" },
+  { name = "b1_float_548", offset = 900, type = "f32", note = "block 1 +548 (its floats +528 to +636)" },
+  { name = "b1_float_552", offset = 904, type = "f32", note = "block 1 +552 (its floats +528 to +636)" },
+  { name = "b1_reverse_ramp", offset = 908, type = "f32", note = "block 1 +556: a ramp rate" },
+  { name = "b1_float_560", offset = 912, type = "f32", note = "block 1 +560 (its floats +528 to +636)" },
+  { name = "b1_float_564", offset = 916, type = "f32", note = "block 1 +564 (its floats +528 to +636)" },
+  { name = "b1_float_568", offset = 920, type = "f32", note = "block 1 +568 (its floats +528 to +636)" },
+  { name = "b1_float_572", offset = 924, type = "f32", note = "block 1 +572 (its floats +528 to +636)" },
+  { name = "b1_float_576", offset = 928, type = "f32", note = "block 1 +576 (its floats +528 to +636)" },
+  { name = "b1_float_580", offset = 932, type = "f32", note = "block 1 +580 (its floats +528 to +636)" },
+  { name = "b1_float_584", offset = 936, type = "f32", note = "block 1 +584 (its floats +528 to +636)" },
+  { name = "b1_float_588", offset = 940, type = "f32", note = "block 1 +588 (its floats +528 to +636)" },
+  { name = "b1_float_592", offset = 944, type = "f32", note = "block 1 +592 (its floats +528 to +636)" },
+  { name = "b1_float_596", offset = 948, type = "f32", note = "block 1 +596 (its floats +528 to +636)" },
+  { name = "b1_idle_rpm", offset = 952, type = "f32", note = "block 1 +600" },
+  { name = "b1_float_604", offset = 956, type = "f32", note = "block 1 +604 (its floats +528 to +636)" },
+  { name = "b1_float_608", offset = 960, type = "f32", note = "block 1 +608 (its floats +528 to +636)" },
+  { name = "b1_float_612", offset = 964, type = "f32", note = "block 1 +612 (its floats +528 to +636)" },
+  { name = "b1_steering", offset = 968, type = "f32", note = "block 1 +616" },
+  { name = "b1_float_620", offset = 972, type = "f32", note = "block 1 +620 (its floats +528 to +636)" },
+  { name = "b1_float_624", offset = 976, type = "f32", note = "block 1 +624 (its floats +528 to +636)" },
+  { name = "b1_float_628", offset = 980, type = "f32", note = "block 1 +628 (its floats +528 to +636)" },
+  { name = "stage_max_rpm", offset = 1004, type = "f32", note = "the engine stage +12: probably" },
+  { name = "stage_16", offset = 1008, type = "f32", note = "the engine stage +16" },
+  { name = "stage_rev_limit", offset = 1012, type = "f32", note = "the engine stage +20" },
+  { name = "stage_torque_x10", offset = 1016, type = "f32", note = "the engine stage +24: the torque x 10" },
+  { name = "stage_torque_curve_0", offset = 1020, type = "f32", note = "the engine stage +28: the torque curve's first (32 floats)" },
+  { name = "stage_156", offset = 1148, type = "f32", note = "the engine stage +156" },
+  { name = "stage_160", offset = 1152, type = "f32", note = "the engine stage +160" },
+  { name = "stage_164", offset = 1156, type = "f32", note = "the engine stage +164" },
+  { name = "stage_168", offset = 1160, type = "f32", note = "the engine stage +168" },
+  { name = "stage_turbo", offset = 1164, type = "u32", note = "the engine stage +172: the turbo flag" },
+  { name = "stage_boost", offset = 1168, type = "f32", note = "the engine stage +176" },
+  { name = "stage_boost_2", offset = 1172, type = "f32", note = "the engine stage +180" },
+  { name = "stage_boost_3", offset = 1176, type = "f32", note = "the engine stage +184" },
+  { name = "stage_188", offset = 1180, type = "f32", note = "the engine stage +188" },
+  { name = "stage_blow_off", offset = 1184, type = "u32", note = "the engine stage +192: probably" },
+  { name = "stage_196", offset = 1188, type = "f32", note = "the engine stage +196" },
+  { name = "front_tire_8", offset = 1204, type = "f32", note = "the front tire +8" },
+  { name = "front_tire_24", offset = 1220, type = "f32", note = "the front tire +24" },
+  { name = "front_tire_radius", offset = 1240, type = "f32", note = "the front tire +44" },
+  { name = "front_tire_width", offset = 1244, type = "f32", note = "the front tire +48" },
+  { name = "front_tire_mass", offset = 1248, type = "f32", note = "the front tire +52" },
+  { name = "front_tire_56", offset = 1252, type = "f32", note = "the front tire +56" },
+  { name = "front_tire_60", offset = 1256, type = "f32", note = "the front tire +60" },
+  { name = "front_tire_grip", offset = 1260, type = "f32", note = "the front tire +64" },
+  { name = "front_tire_grip_2", offset = 1264, type = "f32", note = "the front tire +68" },
+  { name = "front_tire_72", offset = 1268, type = "f32", note = "the front tire +72" },
+  { name = "front_tire_76", offset = 1272, type = "f32", note = "the front tire +76" },
+  { name = "rear_tire_8", offset = 1296, type = "f32", note = "the rear tire +8" },
+  { name = "rear_tire_24", offset = 1312, type = "f32", note = "the rear tire +24" },
+  { name = "rear_tire_radius", offset = 1332, type = "f32", note = "the rear tire +44" },
+  { name = "rear_tire_width", offset = 1336, type = "f32", note = "the rear tire +48" },
+  { name = "rear_tire_mass", offset = 1340, type = "f32", note = "the rear tire +52" },
+  { name = "rear_tire_56", offset = 1344, type = "f32", note = "the rear tire +56" },
+  { name = "rear_tire_60", offset = 1348, type = "f32", note = "the rear tire +60" },
+  { name = "rear_tire_grip", offset = 1352, type = "f32", note = "the rear tire +64" },
+  { name = "rear_tire_grip_2", offset = 1356, type = "f32", note = "the rear tire +68" },
+  { name = "rear_tire_72", offset = 1360, type = "f32", note = "the rear tire +72" },
+  { name = "rear_tire_76", offset = 1364, type = "f32", note = "the rear tire +76" },
+]
+
+# The power curve EventCondition::Power builds from the engine stage's copy
+# (1,064 bytes; docs/known-data.md's "power curve", the measure's PowerCurve).
+[StagePowerCurve]
+measures = ["sub_820CE600.r3", "sub_820CE7F0.r3"]
+size = 1064
+origin = "embedded"
+fields = [
+  { name = "unknown_minus_28", offset = -28, type = "f32", note = "read by sub_820CE600 below the curve (not read in detail)" },
+  { name = "unknown_minus_12", offset = -12, type = "f32", note = "read by sub_820CE600 below the curve (not read in detail)" },
+  { name = "rpm", offset = 0, type = "f32", note = "32 entries of 16 bytes: entry 0's rpm" },
+  { name = "torque", offset = 4, type = "f32" },
+  { name = "power", offset = 8, type = "f32" },
+  { name = "entry_12", offset = 12, type = "f32" },
+  { name = "shifted_rpm", offset = 512, type = "f32", note = "the 32 entries after the peak's shift: entry 0's rpm" },
+  { name = "shifted_torque", offset = 516, type = "f32" },
+  { name = "shifted_power", offset = 520, type = "f32" },
+  { name = "shifted_entry_12", offset = 524, type = "f32" },
+  { name = "peak_index", offset = 1024, type = "u32", note = "the peak power's index" },
+  { name = "points", offset = 1028, type = "u32", note = "the points counted" },
+  { name = "peak_down", offset = 1032, type = "s32", note = "how far the peak may move down (100 rpm steps, -20 to 0)" },
+  { name = "peak_up", offset = 1036, type = "s32", note = "how far up (0 to 20)" },
+  { name = "lowest_rpm", offset = 1040, type = "f32", note = "800.0" },
+  { name = "highest_rpm", offset = 1044, type = "f32", note = "the engine stage's +20 (sub_820CE7F0)" },
+  { name = "torque_scale", offset = 1048, type = "f32" },
+  { name = "shifted_peak_rpm", offset = 1052, type = "f32" },
+  { name = "shifted_peak_power", offset = 1056, type = "f32" },
+  { name = "shifted_peak_power_rpm", offset = 1060, type = "f32" },
+]
+
+# Words the race event's functions take by address (their callers' stack
+# words, mostly).
+[RaceEventModeArg]
+measure = "RaceEvent::Init.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "mode", offset = 0, type = "u32" },
+]
+
+[RaceEventLocationArg]
+measure = "RaceEvent::SetMode.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "location", offset = 0, type = "u32" },
+]
+
+[RaceEventFirstOwnedOut]
+measure = "RaceEvent::Init.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first_owned", offset = 0, type = "u32", note = "RaceEvent::FirstOwned's answer" },
+]
+
+[RaceEventIndex]
+measures = ["RaceEvent::GroupItem.r5", "EventPools::CopyIds.r6", "EventPools::ToGroupNoList.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "an index into a group, or the running list index (in and out)" },
+]
+
+[RaceEventFlagArg]
+measures = ["EventPools::CopyIds.r7", "RaceEvent::PlaceUnlocked.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "flag", offset = 0, type = "u32", note = "CopyIds: the list entries' flag; PlaceUnlocked: place the opponents found" },
+]
+
+[RaceEventLevelArg]
+measure = "EventCondition::LocationCleared.r4"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "level", offset = 0, type = "u16", note = "the item's level" },
+]
+
+[RaceEventItemIdRef]
+measures = ["Items::Beaten.r4", "EventPools::AddRivalsOf.r4"]
+size = 2
+origin = "embedded"
+fields = [
+  { name = "id", offset = 0, type = "u16", note = "an item id (a group entry's or a rival's)" },
+]
+
+[RaceEventCapArg]
+measure = "EventPools::Trim.r4"
+size = 2
+origin = "embedded"
+fields = [
+  { name = "cap", offset = 0, type = "u16", note = "the location's cap" },
+]
+
+# A route position (two halfwords; the measure's RoutePosition).
+[RaceEventRoutePosition]
+measures = ["RaceEvent::PlaceUnlocked.r4", "RaceEvent::SectionRival.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16", note = "probably" },
+  { name = "slice", offset = 2, type = "u16", note = "probably; stepped back and forward by the placements" },
+  { name = "word", offset = 0, type = "u32", note = "both, copied as one word" },
+]
+
+[globals]
+event = { address = 0x826C6078, type = "ptr", to = "RaceEvent", note = "the race event (RaceEvent::Current)" }
+location_groups = { address = 0x82008D74, type = "s16", note = "halfwords by location: its group" }
+mode_words = { address = 0x82008D88, type = "u32", note = "words by mode (kinds 25 at +12 and 26)" }
+mode_masks = { address = 0x82008DF4, type = "u32", note = "words by mode: the items' mode mask" }
+location_caps = { address = 0x82008E00, type = "u16", note = "halfwords: locations 0 to 3's caps" }
+location_stages = { address = 0x82008E08, type = "s8", note = "bytes: the stage each location needs" }
+route = { address = 0x826C5B10, type = "ptr", note = "the course's route (its +8 the length)" }
+race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (+48 the racer records, 3,936 bytes each)" }
+racers_manager = { address = 0x826D82F4, type = "ptr", note = "the racers' manager (+2368 the count, 28-byte entries from +4)" }
+back_step = { address = 0x82001FB0, type = "f32", note = "the floats PlaceUnlocked and SectionRival step positions by" }
+slice_unit = { address = 0x82000A30, type = "f32" }
+forward_scale = { address = 0x82008E34, type = "f32" }
+back_scale = { address = 0x82008E38, type = "f32" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from EventCondition.
+[EventConditionAt4]
+measure = "EventCondition@+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from EventCondition.
+[EventConditionAt8]
+measure = "EventCondition@+8"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from CarSpecCopies.
+[CarSpecCopiesAt992]
+measure = "GarageScreen::SetUpPlateEditor.ret@+992"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "unknown_20", offset = 20, type = "f32" },
+]
+
+# Split from RaceEvent.
+[RaceEventAt84]
+measure = "RaceEvent@+84"
+size = 12
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from OpponentItem.
+[OpponentItemAt160]
+measure = "RaceSounds::PickRivalMusic.ret@+160"
+size = 2812
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+  { name = "unknown_88", offset = 88, type = "u32" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u32" },
+  { name = "unknown_112", offset = 112, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "u32" },
+  { name = "unknown_124", offset = 124, type = "u32" },
+  { name = "unknown_128", offset = 128, type = "u32" },
+  { name = "unknown_132", offset = 132, type = "u32" },
+  { name = "unknown_136", offset = 136, type = "u32" },
+  { name = "unknown_140", offset = 140, type = "u32" },
+  { name = "unknown_144", offset = 144, type = "u32" },
+  { name = "unknown_148", offset = 148, type = "u32" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u32" },
+  { name = "unknown_160", offset = 160, type = "u32" },
+  { name = "unknown_164", offset = 164, type = "u32" },
+  { name = "unknown_168", offset = 168, type = "u32" },
+  { name = "unknown_172", offset = 172, type = "u32" },
+  { name = "unknown_176", offset = 176, type = "u32" },
+  { name = "unknown_180", offset = 180, type = "u32" },
+  { name = "unknown_184", offset = 184, type = "u32" },
+  { name = "unknown_188", offset = 188, type = "u32" },
+  { name = "unknown_192", offset = 192, type = "u32" },
+  { name = "unknown_196", offset = 196, type = "u32" },
+  { name = "unknown_200", offset = 200, type = "u32" },
+  { name = "unknown_204", offset = 204, type = "u32" },
+  { name = "unknown_208", offset = 208, type = "u32" },
+  { name = "unknown_212", offset = 212, type = "u32" },
+  { name = "unknown_216", offset = 216, type = "u32" },
+  { name = "unknown_220", offset = 220, type = "u32" },
+  { name = "unknown_224", offset = 224, type = "u32" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u32" },
+  { name = "unknown_236", offset = 236, type = "u32" },
+  { name = "unknown_240", offset = 240, type = "u32" },
+  { name = "unknown_244", offset = 244, type = "u32" },
+  { name = "unknown_248", offset = 248, type = "u32" },
+  { name = "unknown_252", offset = 252, type = "u32" },
+  { name = "unknown_256", offset = 256, type = "u32" },
+  { name = "unknown_260", offset = 260, type = "u32" },
+  { name = "unknown_264", offset = 264, type = "u32" },
+  { name = "unknown_268", offset = 268, type = "u32" },
+  { name = "unknown_332", offset = 332, type = "u32" },
+  { name = "unknown_336", offset = 336, type = "u32" },
+  { name = "unknown_340", offset = 340, type = "u32" },
+  { name = "unknown_344", offset = 344, type = "u32" },
+  { name = "unknown_348", offset = 348, type = "u32" },
+  { name = "unknown_2768", offset = 2768, type = "u32" },
+  { name = "unknown_2788", offset = 2788, type = "u32" },
+  { name = "unknown_2792", offset = 2792, type = "u32" },
+  { name = "unknown_2796", offset = 2796, type = "u32" },
+  { name = "unknown_2800", offset = 2800, type = "u32" },
+  { name = "unknown_2804", offset = 2804, type = "u32" },
+  { name = "unknown_2808", offset = 2808, type = "u32" },
+]
+
+# Split from CarSpecCopies.
+[CarSpecCopiesAt992_2]
+measure = "sub_820C4550.ret@+992"
+size = 32
+origin = "embedded"
+fields = [
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from EventPools.
+[EventPoolsAt2432]
+measure = "EventPools@+2432"
+size = 408
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+  { name = "unknown_202", offset = 202, type = "u16" },
+  { name = "unknown_204", offset = 204, type = "u16" },
+  { name = "unknown_404", offset = 404, type = "u16" },
+  { name = "unknown_406", offset = 406, type = "u16" },
+]
+
+# Split from EventGroup.
+[EventGroupAt36]
+measure = "RaceEvent@+36"
+size = 12
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from EventGroupEntry.
+[EventGroupEntryPart]
+measure = "RaceEvent@+36.+8"
+size = 4
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_0_4i", offset = 0, type = "u32" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+# Split from OpponentItem.
+[OpponentItemAt40]
+measure = "RaceSounds::PickRivalMusic.ret@+40"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "block_condition_kind", offset = 10, type = "u16", note = "the owner's fault_ field before the measure's fixes (2026-11-22): Unlock::HasSectionCondition's unlock block (+40): its first condition's kind (the item's +50)" },
+]
+
+# Split from RaceEvent.
+[RaceEventAt3916]
+measure = "[826C5B2C]@+48@+3916"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]

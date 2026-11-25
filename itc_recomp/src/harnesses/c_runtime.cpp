@@ -3,8 +3,12 @@
 
 #include "harness.h"
 
+#include "c_runtime/core.h"
+#include "hooks/c_runtime_core.h"
+
 #include "base/log.h"
 #include "c_runtime/format.h"
+#include "hooks/c_runtime.h"
 #include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
@@ -162,6 +166,23 @@ const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 45
 // where the plain C++ refuses (the error paths the adapters left to the
 // original), the original runs, as the adapters did.
 
+// _init_pointers' setters: r3 = the value (left).
+void NativeSetHandler82971170(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971170(base, ctx.r3.u32);
+}
+void NativeSetHandler82971178(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971178(base, ctx.r3.u32);
+}
+void NativeSetInvalidParameterHandler(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
+}
+void NativeSetCriticalSectionInitializer(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
+}
+void NativeSetDefaultCriticalSectionInitializer(PPCContext&, uint8_t* base) {
+  c_runtime::SetDefaultCriticalSectionInitializer(base);
+}
+
 // strcpy_s: r3 = destination, r4 = its size, r5 = source; returns 0.
 void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
   if (!c_runtime::StrcpyS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -169,6 +190,11 @@ void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = 0;
+}
+
+// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
+void NativeWcscmp(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // __ascii_strnicmp: r3, r4 = strings, r5 = count.
@@ -302,30 +328,14 @@ void NativeI10Output(PPCContext& ctx, uint8_t* base) {
 }
 
 // _fltout2: r3 = the double's bits, r4 = the result, r5 = the digits'
-// buffer, r6 = its size; returns r4.
-void NativeFltout2(PPCContext& ctx, uint8_t* base) {
-  c_runtime::FloatOut out;
-  bool native = c_runtime::I10Output(base, c_runtime::DoubleToLd12(ctx.r3.u64), 17, 0, &out);
-  uint32_t length = 0;
-  if (native) {
-    while (length < 22 && out.bytes[4 + length] != 0) {
-      length++;
-    }
-    native = length < 22 && ctx.r5.u32 != 0 && ctx.r6.u32 != 0 && length + 1 <= ctx.r6.u32;
-  }
-  if (!native) {
-    __imp__sub_825B6458(ctx, base);
-    return;
-  }
-  const uint32_t result = ctx.r4.u32, buffer = ctx.r5.u32;
-  guest::StoreU32(base, result + 8, uint32_t(out.result));
-  guest::StoreU32(base, result, uint32_t(int32_t(int8_t(out.bytes[2]))));
-  guest::StoreU32(base, result + 4, uint32_t(int32_t(int16_t(out.bytes[0] << 8 | out.bytes[1]))));
-  for (uint32_t i = 0; i <= length; i++) {
-    guest::StoreU8(base, buffer + i, out.bytes[4 + i]);
-  }
-  guest::StoreU32(base, result + 12, buffer);
-  ctx.r3.u64 = ctx.r4.u64;
+// buffer, r6 = its size; returns r4. Its plain C++ over guest memory
+// (c_runtime::core::Fltout2, the native _cftoe_l's and _cftog_l's; the
+// native _cftof_l makes the same steps in host memory).
+void NativeFltout2(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
+  ctx.r3.u64 = c_runtime::core::Fltout2(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                        hooks::CRuntimeCoreCalls(ctx, base));
 }
 
 // _cftof_l (%f): r3 = the double's address, r4 = the buffer, r5 = its size,
@@ -441,8 +451,58 @@ void NativeSetSbcs(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
+// rand (sub_825A9BB8) on the harness's thread: the seed (+20 of its C
+// runtime data, from the recompiled _getptd) set to random words, edge
+// values and runs of calls, and the last error set before; compared: r3,
+// the seed after and the last error after (put back after the cases).
+void Rand(Context& h) {
+  Results results("rand (sub_825A9BB8)");
+  PPCContext probe = CallContext(h);
+  __imp__sub_825AA580(probe, h.base);
+  const uint32_t data = probe.r3.u32;
+  if (data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime: rand: no thread data");
+    return;
+  }
+  const uint32_t saved_seed = guest::LoadU32(h.base, data + 20);
+  PPCContext e = CallContext(h);
+  __imp__sub_82295F18(e, h.base);
+  const uint32_t saved_error = e.r3.u32;
+  for (int c = 0; c < 200; c++) {
+    const uint32_t seed = c < 4 ? std::array<uint32_t, 4>{0u, 1u, 0xFFFFFFFFu, 0x80000000u}[c]
+                                : uint32_t(h.random.Next());
+    const uint32_t error = c % 3 == 0 ? 0 : uint32_t(h.random.Next());
+    const int calls = 1 + int(h.random.Below(3));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, data + 20, seed);
+      PPCContext set = CallContext(h);
+      set.r3.u64 = error;
+      __imp__sub_82296FD0(set, h.base);
+      for (int k = 0; k < calls; k++) {
+        PPCContext t = CallContext(h);
+        (v == 0 ? __imp__sub_825A9BB8 : ITC_CONTEXT_FN(hooks::CRuntimeRand))(t, h.base);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32);
+      }
+      out[v].Word(guest::LoadU32(h.base, data + 20));
+      PPCContext get = CallContext(h);
+      __imp__sub_82295F18(get, h.base);
+      out[v].Word(get.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  guest::StoreU32(h.base, data + 20, saved_seed);
+  PPCContext put = CallContext(h);
+  put.r3.u64 = saved_error;
+  __imp__sub_82296FD0(put, h.base);
+  results.Report();
+}
+
 void CRuntime(Context& h) {
   const Places places = MakePlaces(h);
+  Rand(h);
   // The stack probe: frame sizes below, at and above whole pages (the
   // callers' are 4 KB to 64 KB). It only reads, so the scratch area and the
   // registers the callers use after it (r1, r12) and r3 must be the same.
@@ -460,7 +520,7 @@ void CRuntime(Context& h) {
         PPCContext t = CallContext(h);
         t.r12.s64 = -int64_t(size);
         t.r3.u64 = 0x12345678;
-        (v == 0 ? __imp__sub_825A9934 : sub_825A9934)(t, h.base);
+        (v == 0 ? __imp__sub_825A9934 : harness::Ours<0x825A9934>)(t, h.base);
         result[v] = Read(h.base, h.data, kScratchBytes);
         Append(result[v], t.r1.u64);
         Append(result[v], t.r12.u64);
@@ -496,7 +556,7 @@ void CRuntime(Context& h) {
                t.r4.u64 = value;
                t.r5.u64 = count;
              },
-             __imp__sub_825A71D0, sub_825A71D0, h.data, kScratchBytes,
+             __imp__sub_825A71D0, harness::Ours<0x825A71D0>, h.data, kScratchBytes,
              fmt::format("count {} offset {} value {:X}", count, offset, value));
       }
     }
@@ -572,6 +632,94 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // XMemCpy (sub_82295890, with its line copy sub_82296FE0): counts 0-300
+  // and up to 1,800, the destination at every place in a 128-byte line, the
+  // source at every alignment in 16 bytes (the line copy for unaligned
+  // ones), random bytes; the whole scratch area and r3 compared. Its byte
+  // loop's step at 0x82638308 is logged, and the short counts also run with
+  // steps 2, 3 and 8 written there for a while (restored), only where the
+  // count reaches 0 (else the original never ends). Overlapping ranges go to
+  // the original on the native side too.
+  {
+    const uint32_t step = guest::LoadU32(h.base, c_runtime::kXMemCpyStep);
+    ITC_LOG_INFO("harness: XMemCpy (sub_82295890): the step at 0x82638308 is {}", step);
+    Results results("XMemCpy (sub_82295890)");
+    const uint32_t line = (h.data + 127) & ~127u;
+    auto native = [](PPCContext& t, uint8_t* base) {
+      if (!c_runtime::XMemCpy(base, t.r3.u32, t.r4.u32, t.r5.u32)) {
+        __imp__sub_82295890(t, base);
+      }
+    };
+    auto one = [&](uint32_t destination, uint32_t source, uint32_t count, const std::string& what) {
+      const std::vector<uint8_t> bytes = RandomBytes(h, count + 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, source - 16, bytes.data(), uint32_t(bytes.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = destination;
+        t.r4.u64 = source;
+        t.r5.u64 = count;
+        (v == 0 ? __imp__sub_82295890 : native)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], what);
+    };
+    for (uint32_t count = 0; count <= 300; count++) {
+      for (uint32_t d : {0u, 1u, 7u, 8u, 16u, 17u, 100u, 127u}) {
+        for (uint32_t sa : {0u, 1u, 4u, 8u, 15u}) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (uint32_t count : {383u, 384u, 385u, 511u, 512u, 513u, 1023u, 1024u, 1025u, 1500u, 1800u}) {
+      for (uint32_t d = 0; d < 128; d += 9) {
+        for (uint32_t sa = 0; sa < 16; sa += 3) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (int i = 0; i < 300; i++) {
+      const uint32_t d = h.random.Below(128), sa = h.random.Below(16);
+      const uint32_t count = h.random.Below(1800);
+      one(line + d, line + 2064 + sa, count,
+          fmt::format("count {} destination +{} source +{}", count, d, sa));
+    }
+    // Overlapping either way (the original's on both sides).
+    for (uint32_t count : {5u, 15u, 16u, 40u, 300u}) {
+      for (int32_t shift : {-17, -1, 1, 3, 130}) {
+        one(uint32_t(int32_t(line + 1000) + shift), line + 1000, count,
+            fmt::format("count {} overlapping by {}", count, shift));
+      }
+    }
+    // Other steps, where the byte loop's count reaches 0.
+    for (uint32_t other : {2u, 3u, 8u}) {
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, other);
+      for (uint32_t count = 0; count < 16; count++) {
+        for (uint32_t sa : {0u, 1u, 2u, 4u, 8u}) {
+          uint32_t at = 0, left = count;
+          if (left >= 8 && (sa & 7) == 0) {
+            at += 8;
+            left -= 8;
+          }
+          if (((sa + at) & 3) == 0 && left >= 4) {
+            left &= 3;
+          }
+          if (left % other != 0) {
+            continue;
+          }
+          one(line + 5, line + 2064 + sa, count,
+              fmt::format("step {} count {} source +{}", other, count, sa));
+        }
+      }
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, step);
+    }
+    results.Report();
+  }
+
   // The wide string helpers: every length in kLengths at each place (odd
   // addresses and across a page end included), units with high bits; the
   // destination apart from the source, or overlapping below it.
@@ -585,7 +733,7 @@ void CRuntime(Context& h) {
         const uint32_t at = h.data + offset;
         const std::string what = fmt::format("length {} offset {}", length, offset);
         StringCase(h, lengths, [&] { WriteUnits(h, at, units); },
-                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, NativeWcslen,
+                   [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_825A9958, ITC_CONTEXT_FN(NativeWcslen),
                    what);
         // The destination elsewhere (the source near the page end goes to the
         // start, and the other way), then overlapping, one unit below.
@@ -595,13 +743,13 @@ void CRuntime(Context& h) {
                      t.r3.u64 = destination;
                      t.r4.u64 = at;
                    },
-                   __imp__sub_825A7F30, sub_825A7F30, what);
+                   __imp__sub_825A7F30, harness::Ours<0x825A7F30>, what);
         StringCase(h, copies, [&] { WriteUnits(h, at, units); },
                    [&](PPCContext& t) {
                      t.r3.u64 = at - 2;
                      t.r4.u64 = at;
                    },
-                   __imp__sub_825A7F30, sub_825A7F30, what + " overlapping");
+                   __imp__sub_825A7F30, harness::Ours<0x825A7F30>, what + " overlapping");
         for (uint32_t prefix : {0u, 1u, 9u, 120u}) {
           const std::vector<uint16_t> start = RandomUnits(h, prefix);
           StringCase(h, joins,
@@ -613,7 +761,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = destination;
                        t.r4.u64 = at;
                      },
-                     __imp__sub_825A7EF8, sub_825A7EF8, what + fmt::format(" prefix {}", prefix));
+                     __imp__sub_825A7EF8, harness::Ours<0x825A7EF8>, what + fmt::format(" prefix {}", prefix));
         }
       }
     }
@@ -654,7 +802,7 @@ void CRuntime(Context& h) {
                          t.r3.u64 = first;
                          t.r4.u64 = second;
                        },
-                       __imp__sub_825A7EB0, sub_825A7EB0,
+                       __imp__sub_825A7EB0, ITC_CONTEXT_FN(NativeWcscmp),
                        fmt::format("length {} offset {} other {} order {}", length, offset, o,
                                    order));
           }
@@ -676,7 +824,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = bytes;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825B7EC8, NativeMbtowc,
+                       __imp__sub_825B7EC8, ITC_CONTEXT_FN(NativeMbtowc),
                        fmt::format("wide {:X} bytes {:X} count {} byte {:X}", wide, bytes, count,
                                    byte));
           }
@@ -710,7 +858,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = at;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825A7F50, sub_825A7F50, what);
+                       __imp__sub_825A7F50, harness::Ours<0x825A7F50>, what);
             if (count > length) {
               StringCase(h, safe, [&] { WriteBytes(h, at, bytes); },
                          [&](PPCContext& t) {
@@ -718,7 +866,7 @@ void CRuntime(Context& h) {
                            t.r4.u64 = count;
                            t.r5.u64 = at;
                          },
-                         __imp__sub_825A9DD8, NativeStrcpyS, what);
+                         __imp__sub_825A9DD8, ITC_CONTEXT_FN(NativeStrcpyS), what);
             }
           }
         }
@@ -767,7 +915,7 @@ void CRuntime(Context& h) {
                          t.r3.u64 = first;
                          t.r4.u64 = second;
                        },
-                       __imp__sub_825AA100, sub_825AA100, what);
+                       __imp__sub_825AA100, harness::Ours<0x825AA100>, what);
             for (uint64_t count : {uint64_t(0), uint64_t(1), uint64_t(length), uint64_t(length) + 1,
                                    uint64_t(length / 2 + 1), uint64_t(0x7FFFFFFF), uint64_t(0xFFFFFFFF),
                                    uint64_t(0x100000003)}) {
@@ -777,10 +925,10 @@ void CRuntime(Context& h) {
                 t.r5.u64 = count;
               };
               const std::string with = what + fmt::format(" count {:X}", count);
-              StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, sub_825AACD0, with);
-              StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, NativeAsciiStrnicmp, with);
+              StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, harness::Ours<0x825AACD0>, with);
+              StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, ITC_CONTEXT_FN(NativeAsciiStrnicmp), with);
               if (count <= 0x7FFFFFFF) {  // above, EINVAL through _errno
-                StringCase(h, nicmp, setup, args, __imp__sub_825AC710, sub_825AC710, with);
+                StringCase(h, nicmp, setup, args, __imp__sub_825AC710, harness::Ours<0x825AC710>, with);
               }
             }
           }
@@ -827,7 +975,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = at;
                        t.r4.u64 = needle_at;
                      },
-                     __imp__sub_825A98A8, sub_825A98A8,
+                     __imp__sub_825A98A8, harness::Ours<0x825A98A8>,
                      fmt::format("length {} offset {} needle {}", length, offset, n));
           // r3 with its high word set (as a sign-extended pointer has).
           StringCase(h, finds,
@@ -839,7 +987,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = 0xFFFFFFFF00000000ull | at;
                        t.r4.u64 = needle_at;
                      },
-                     __imp__sub_825A98A8, sub_825A98A8,
+                     __imp__sub_825A98A8, harness::Ours<0x825A98A8>,
                      fmt::format("length {} offset {} needle {} high r3", length, offset, n));
         }
       }
@@ -872,7 +1020,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = source;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825A7830, sub_825A7830,
+                       __imp__sub_825A7830, harness::Ours<0x825A7830>,
                        fmt::format("count {} destination {} source {} shift {}", count, d, sa,
                                    shift));
           }
@@ -886,7 +1034,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = h.data + 65;
                    t.r5.u64 = count;
                  },
-                 __imp__sub_825A7830, sub_825A7830, fmt::format("count {} across a page end", count));
+                 __imp__sub_825A7830, harness::Ours<0x825A7830>, fmt::format("count {} across a page end", count));
     }
     copies.Report();
   }
@@ -908,12 +1056,12 @@ void CRuntime(Context& h) {
       GuestFunction recompiled, native;
     };
     const Function functions[] = {
-        {"toupper (sub_825A8600)", __imp__sub_825A8600, sub_825A8600},
-        {"tolower (sub_825A8618)", __imp__sub_825A8618, sub_825A8618},
-        {"isalpha (sub_825AB020)", __imp__sub_825AB020, sub_825AB020},
-        {"isdigit (sub_825AB040)", __imp__sub_825AB040, sub_825AB040},
-        {"isalnum (sub_825AB0A0)", __imp__sub_825AB0A0, sub_825AB0A0},
-        {"isleadbyte (sub_825B6898)", __imp__sub_825B6898, sub_825B6898},
+        {"toupper (sub_825A8600)", __imp__sub_825A8600, harness::Ours<0x825A8600>},
+        {"tolower (sub_825A8618)", __imp__sub_825A8618, harness::Ours<0x825A8618>},
+        {"isalpha (sub_825AB020)", __imp__sub_825AB020, harness::Ours<0x825AB020>},
+        {"isdigit (sub_825AB040)", __imp__sub_825AB040, harness::Ours<0x825AB040>},
+        {"isalnum (sub_825AB0A0)", __imp__sub_825AB0A0, harness::Ours<0x825AB0A0>},
+        {"isleadbyte (sub_825B6898)", __imp__sub_825B6898, harness::Ours<0x825B6898>},
     };
     for (const Function& f : functions) {
       Results results(f.name);
@@ -1004,7 +1152,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = end_out;
                          t.r5.s64 = text.radix;
                        },
-                       __imp__sub_825A85E0, sub_825A85E0, what);
+                       __imp__sub_825A85E0, harness::Ours<0x825A85E0>, what);
           }
           if (text.value <= (text.negative ? 0x80000000ull : 0x7FFFFFFFull)) {
             StringCase(h, signed_results, setup,
@@ -1015,7 +1163,7 @@ void CRuntime(Context& h) {
                          t.r6.s64 = text.radix;
                          t.r7.u64 = 0;
                        },
-                       __imp__sub_825A82C8, NativeStrToXl, what);
+                       __imp__sub_825A82C8, ITC_CONTEXT_FN(NativeStrToXl), what);
           }
         }
       }
@@ -1052,7 +1200,7 @@ void CRuntime(Context& h) {
                      t.r3.u64 = h.data + offset;
                      t.r4.u64 = h.data + 512;
                    },
-                   __imp__sub_825B6378, NativeDtold,
+                   __imp__sub_825B6378, ITC_CONTEXT_FN(NativeDtold),
                    fmt::format("{:016X} out +{}", bits, offset));
       }
     }
@@ -1133,7 +1281,7 @@ void CRuntime(Context& h) {
                    t.r3.u64 = h.data + 512;
                    t.r4.u64 = h.data + 64;
                  },
-                 __imp__sub_825B69B8, NativeLd12tod,
+                 __imp__sub_825B69B8, ITC_CONTEXT_FN(NativeLd12tod),
                  fmt::format("{:04X} {:08X} {:08X} {:04X}", v.sign_exponent, v.high, v.low,
                              v.extra));
     }
@@ -1178,7 +1326,7 @@ void CRuntime(Context& h) {
                            t.r4.u64 = stream;
                            t.r5.u64 = count;
                          },
-                         __imp__sub_825AF000, sub_825AF000,
+                         __imp__sub_825AF000, harness::Ours<0x825AF000>,
                          fmt::format("flags {:X} base {:X} room {:X} pointer {:X} count {:X}",
                                      flag, base_word, room, pointer, c));
             }
@@ -1237,7 +1385,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = stream;
                              t.r6.u64 = count;
                            },
-                           __imp__sub_825AF098, sub_825AF098,
+                           __imp__sub_825AF098, harness::Ours<0x825AF098>,
                            fmt::format("flags {:X} base {:X} room {:X} length {} pointer +{} "
                                        "count {:X}",
                                        flag, base_word, room, length, pointer - h.data, c));
@@ -1293,7 +1441,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = count;
                            },
                            wide_char ? __imp__sub_825B1368 : __imp__sub_825B7A80,
-                           wide_char ? NativeWideWriteChar : NativePutwc,
+                           wide_char ? ITC_CONTEXT_FN(NativeWideWriteChar) : ITC_CONTEXT_FN(NativePutwc),
                            fmt::format("flags {:X} base {:X} room {:X} pointer +{} count {:X} "
                                        "unit {:X}",
                                        flag, base_word, room, pointer - h.data, c, unit));
@@ -1319,7 +1467,7 @@ void CRuntime(Context& h) {
     const std::vector<std::pair<uint32_t, uint32_t>> table = {{0x8266BA5C, 40}};
     for (auto [recompiled, native, name] :
          {std::tuple{__imp__sub_825A6DB0, NativeCfltcvtInit, "_cfltcvt_init"},
-          std::tuple{__imp__sub_825A6E48, sub_825A6E48, "sub_825A6E48"}}) {
+          std::tuple{__imp__sub_825A6E48, harness::Ours<0x825A6E48>, "sub_825A6E48"}}) {
       GlobalsCase(h, results, table, [&] { Fill(h.base, 0x8266BA5C, 40); },
                   [](PPCContext&) {}, recompiled, native, name, false);
     }
@@ -1329,11 +1477,11 @@ void CRuntime(Context& h) {
       const char* name;
     };
     const Setter setters[] = {
-        {__imp__sub_825AD140, sub_825AD140, 0x82971170, "sub_825AD140"},
-        {__imp__sub_825AEE18, sub_825AEE18, 0x82971178, "sub_825AEE18"},
-        {__imp__sub_825AFCB8, sub_825AFCB8, 0x82978320, "sub_825AFCB8"},
-        {__imp__sub_825B3560, sub_825B3560, 0x8297132C, "sub_825B3560"},
-        {__imp__sub_825B3548, sub_825B3548, 0x82971328, "sub_825B3548"},
+        {__imp__sub_825AD140, ITC_CONTEXT_FN(NativeSetHandler82971170), 0x82971170, "sub_825AD140"},
+        {__imp__sub_825AEE18, ITC_CONTEXT_FN(NativeSetHandler82971178), 0x82971178, "sub_825AEE18"},
+        {__imp__sub_825AFCB8, ITC_CONTEXT_FN(NativeSetInvalidParameterHandler), 0x82978320, "sub_825AFCB8"},
+        {__imp__sub_825B3560, ITC_CONTEXT_FN(NativeSetCriticalSectionInitializer), 0x8297132C, "sub_825B3560"},
+        {__imp__sub_825B3548, NativeSetDefaultCriticalSectionInitializer, 0x82971328, "sub_825B3548"},
     };
     for (const Setter& setter : setters) {
       for (uint64_t value : {uint64_t(0), uint64_t(0x825B3498), uint64_t(0xFFFFFFFF), h.random.Next(), h.random.Next()}) {
@@ -1341,6 +1489,54 @@ void CRuntime(Context& h) {
                     [&](PPCContext& t) { t.r3.u64 = value; }, setter.recompiled, setter.native,
                     fmt::format("{} r3 {:X}", setter.name, value));
       }
+    }
+    // _init_pointers on its six globals (from random words), and the empty
+    // destructor on random registers (all left): the globals, the scratch
+    // area and the registers it could touch compared.
+    {
+      Results init("_init_pointers (sub_825AA398) and the empty destructor (sub_82106540)");
+      constexpr uint32_t kGlobals[] = {0x82971170, 0x8297132C, 0x82978320,
+                                       0x82971178, 0x82971328, 0x8266B7B0};
+      for (int i = 0; i < 20; i++) {
+        const Random start = h.random;
+        for (bool empty : {false, true}) {
+          Outputs out[2];
+          for (int v = 0; v < 2; v++) {
+            h.random = start;
+            uint32_t saved[6];
+            for (int k = 0; k < 6; k++) {
+              saved[k] = guest::LoadU32(h.base, kGlobals[k]);
+              guest::StoreU32(h.base, kGlobals[k], uint32_t(h.random.Next()));
+            }
+            Fill(h.base, h.data, kScratchBytes);
+            PPCContext t = CallContext(h);
+            t.r3.u64 = i == 0 ? 0 : h.random.Next();
+            t.r4.u64 = h.random.Next();
+            t.r10.u64 = h.random.Next();
+            t.r11.u64 = h.random.Next();
+            if (empty) {
+              (v == 0 ? __imp__sub_82106540 : harness::Ours<0x82106540>)(t, h.base);
+            } else {
+              (v == 0 ? __imp__sub_825AA398 : harness::Ours<0x825AA398>)(t, h.base);
+            }
+            for (int k = 0; k < 6; k++) {
+              out[v].Word(guest::LoadU32(h.base, kGlobals[k]));
+              guest::StoreU32(h.base, kGlobals[k], saved[k]);
+            }
+            out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+            out[v].Word(t.r3.u32);
+            out[v].Word(uint32_t(t.r3.u64 >> 32));
+            out[v].Word(t.r4.u32);
+            if (empty) {
+              out[v].Word(t.r10.u32);
+              out[v].Word(t.r11.u32);
+            }
+          }
+          init.Check(out[0], out[1],
+                     fmt::format("{} case {}", empty ? "sub_82106540" : "_init_pointers", i));
+        }
+      }
+      init.Report();
     }
     const uint32_t info = guest::LoadU32(h.base, 0x8266C450);
     const std::vector<std::pair<uint32_t, uint32_t>> mbc = {
@@ -1353,12 +1549,12 @@ void CRuntime(Context& h) {
                     guest::StoreU32(h.base, 0x8297136C, 0x12345678);
                     Fill(h.base, info, 544);
                   },
-                  [](PPCContext& t) { t.r3.u64 = 0x5555; }, __imp__sub_825B6958, sub_825B6958,
+                  [](PPCContext& t) { t.r3.u64 = 0x5555; }, __imp__sub_825B6958, harness::Ours<0x825B6958>,
                   fmt::format("__initmbctable done {}", done));
     }
     for (uint32_t offset : {64u, 67u, 1024u}) {
       GlobalsCase(h, results, {}, [] {}, [&](PPCContext& t) { t.r3.u64 = h.data + offset; },
-                  __imp__sub_825B68C8, NativeSetSbcs, fmt::format("setSBCS +{}", offset));
+                  __imp__sub_825B68C8, ITC_CONTEXT_FN(NativeSetSbcs), fmt::format("setSBCS +{}", offset));
     }
     results.Report();
   }
@@ -1379,7 +1575,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = from;
                    t.r5.u64 = size;
                  },
-                 __imp__sub_825A7410, sub_825A7410,
+                 __imp__sub_825A7410, harness::Ours<0x825A7410>,
                  fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
     };
     std::vector<uint32_t> sizes;
@@ -1427,7 +1623,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = from;
                    t.r5.u64 = size;
                  },
-                 __imp__sub_825AA840, sub_825AA840,
+                 __imp__sub_825AA840, harness::Ours<0x825AA840>,
                  fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
     };
     for (uint32_t size : {0u, 1u, 2u, 3u, 4u, 5u, 7u, 8u, 9u, 13u, 16u, 31u, 64u, 100u, 257u}) {
@@ -1456,6 +1652,72 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // memmove_s (sub_825A7348): counts of 0, below and at the size, the
+  // destination below, at and above the source, apart and overlapping, at
+  // several alignments and across a page end; a count above the size and
+  // null buffers only with a count of 0 (the error paths, _errno and
+  // _invalid_parameter, never ran in play). The plain C++ (falling back to
+  // the original where it refuses, as its adapter) against the original;
+  // the scratch area and r3 compared exactly.
+  {
+    Results results("memmove_s (sub_825A7348)");
+    const auto native = [](PPCContext& t, uint8_t* base) {
+      if (const auto r3 = c_runtime::MemmoveS(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32)) {
+        t.r3.u64 = *r3;
+      } else {
+        __imp__sub_825A7348(t, base);
+      }
+    };
+    auto move_s = [&](uint32_t to, uint32_t size, uint32_t from, uint32_t count) {
+      const auto bytes = RandomBytes(h, count + 16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        if (from != 0) {
+          Write(h.base, from - 8, bytes.data(), count + 16);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = to;
+        t.r4.u64 = size;
+        t.r5.u64 = from;
+        t.r6.u64 = count;
+        if (v == 0) {
+          __imp__sub_825A7348(t, h.base);
+        } else {
+          native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("to +{} size {} from +{} count {}", to - h.data, size,
+                                from - h.data, count));
+    };
+    for (uint32_t count : {0u, 1u, 3u, 4u, 8u, 17u, 64u, 200u, 1000u}) {
+      for (uint32_t extra : {0u, 1u, 50u}) {
+        for (uint32_t a = 0; a < 4; a++) {
+          move_s(h.data + 2048 + a, count + extra, h.data + 64 + 3 - a, count);
+          move_s(h.data + 64 + a, count + extra, h.data + 2048 + 3 - a, count);
+        }
+      }
+      move_s(h.data + 1024, count, h.data + 1024, count);
+      for (uint32_t k : {1u, 4u, 9u, 16u}) {
+        move_s(h.data + 1024 + k, count, h.data + 1024, count);
+        move_s(h.data + 1024, count, h.data + 1024 + k, count);
+      }
+    }
+    for (uint32_t count : {5u, 64u, 200u}) {
+      move_s(h.data + places.page_end - 3, count, h.data + 64 + 1, count);
+      move_s(h.data + places.page_end - 3, count, h.data + places.page_end - 9, count);
+    }
+    // A count of 0 returns 0 before anything is checked.
+    move_s(0, 0, 0, 0);
+    move_s(h.data + 64, 0, 0, 0);
+    move_s(0, 5, h.data + 64, 0);
+    results.Report();
+  }
+
   // memcpy_s (sub_825A7270): counts of 0, below, at and (for count 0 only)
   // above the size, at several alignments; the error paths (_errno) left
   // out. The scratch area and r3 compared.
@@ -1474,7 +1736,7 @@ void CRuntime(Context& h) {
                        t.r5.u64 = from;
                        t.r6.u64 = count;
                      },
-                     __imp__sub_825A7270, sub_825A7270,
+                     __imp__sub_825A7270, harness::Ours<0x825A7270>,
                      fmt::format("to +{} size {} from +{} count {}", to - h.data, size,
                                  from - h.data, count));
         }
@@ -1486,7 +1748,7 @@ void CRuntime(Context& h) {
       t.r4.u64 = 0;
       t.r5.u64 = 0;
       t.r6.u64 = 0;
-    }, __imp__sub_825A7270, sub_825A7270, "all 0");
+    }, __imp__sub_825A7270, harness::Ours<0x825A7270>, "all 0");
     results.Report();
   }
 
@@ -1516,7 +1778,7 @@ void CRuntime(Context& h) {
         t.r3.u64 = from;
         t.r4.u64 = count;
         t.r5.u64 = out;
-        (v == 0 ? __imp__sub_825B7F10 : NativeMtold12)(t, h.base);
+        (v == 0 ? __imp__sub_825B7F10 : ITC_CONTEXT_FN(NativeMtold12))(t, h.base);
         result[v] = Read(h.base, h.data, kScratchBytes);
       }
       results.Check(result[0], result[1], fmt::format("{} digits", count));
@@ -1599,7 +1861,7 @@ void CRuntime(Context& h) {
                      t.r9.u64 = kArgs[v][3];
                      t.r10.u64 = 0x8266BC28;
                    },
-                   __imp__sub_825B36B8, NativeStrgtold12, fmt::format("\"{}\" args {}", numbers[i], v));
+                   __imp__sub_825B36B8, ITC_CONTEXT_FN(NativeStrgtold12), fmt::format("\"{}\" args {}", numbers[i], v));
       }
     }
     results.Report();
@@ -1617,7 +1879,7 @@ void CRuntime(Context& h) {
                    t.r7.u64 = 0;
                    t.r8.u64 = 0x8266BC28;
                  },
-                 __imp__sub_825AFDC8, NativeFltin2, fmt::format("\"{}\"", numbers[i]));
+                 __imp__sub_825AFDC8, ITC_CONTEXT_FN(NativeFltin2), fmt::format("\"{}\"", numbers[i]));
     }
     results.Report();
   }
@@ -1636,9 +1898,9 @@ void CRuntime(Context& h) {
         t.r4.u64 = locale;
         t.f1.u64 = 0x7FF4000000000001ull;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825AB0C0 : NativeAtofL)(t, h.base);
+          (v == 0 ? __imp__sub_825AB0C0 : ITC_CONTEXT_FN(NativeAtofL))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825AB1C0 : sub_825AB1C0)(t, h.base);
+          (v == 0 ? __imp__sub_825AB1C0 : harness::Ours<0x825AB1C0>)(t, h.base);
         }
         result[v] = Read(h.base, h.data, kScratchBytes);
         Append(result[v], t.f1.u64);
@@ -1697,7 +1959,7 @@ void CRuntime(Context& h) {
                      t.r6.u64 = flags;
                      t.r7.u64 = fos;
                    },
-                   __imp__sub_825B8B48, NativeI10Output,
+                   __imp__sub_825B8B48, ITC_CONTEXT_FN(NativeI10Output),
                    fmt::format("{:04X} {:08X} {:08X} digits {} flags {}", sign_exponent, high,
                                low, digits, flags));
       }
@@ -1744,7 +2006,7 @@ void CRuntime(Context& h) {
                    t.r5.u64 = buffer;
                    t.r6.u64 = 22 + n % 40;
                  },
-                 __imp__sub_825B6458, NativeFltout2, fmt::format("{:016X}", d));
+                 __imp__sub_825B6458, ITC_CONTEXT_FN(NativeFltout2), fmt::format("{:016X}", d));
       n++;
     }
     results.Report();
@@ -1816,7 +2078,7 @@ void CRuntime(Context& h) {
                        }
                      },
                      direct ? __imp__sub_825AE8E0 : __imp__sub_825AEB20,
-                     direct ? NativeCftofL : sub_825AEB20,
+                     direct ? ITC_CONTEXT_FN(NativeCftofL) : harness::Ours<0x825AEB20>,
                      fmt::format("{:016X} %{}.{}{}", d, char(format), precision,
                                  direct ? " (_cftof_l)" : ""));
         }
@@ -1863,7 +2125,7 @@ void CRuntime(Context& h) {
                    t.r5.u64 = uint64_t(int64_t(digits));
                    t.r6.u64 = result;
                  },
-                 __imp__sub_825B61E8, NativeFpToStr,
+                 __imp__sub_825B61E8, ITC_CONTEXT_FN(NativeFpToStr),
                  fmt::format("\"{}\" digits {} size {}",
                              std::string(mantissa.begin(), mantissa.end()), digits, size));
     }
@@ -1911,7 +2173,7 @@ void CRuntime(Context& h) {
                    t.r7.u64 = g_format ? 0x100 | (1 + i % 200) : 0x100;
                    t.r8.u64 = 0;
                  },
-                 __imp__sub_825AE708, NativeCftof2,
+                 __imp__sub_825AE708, ITC_CONTEXT_FN(NativeCftof2),
                  fmt::format("\"{}\" sign {:X} exponent {} precision {} g {}",
                              std::string(text.begin(), text.end()), sign, exponent, precision,
                              g_format));
@@ -1925,13 +2187,13 @@ void CRuntime(Context& h) {
     for (int i = 0; i < 16; i++) {
       const uint64_t r3 = h.random.Next();
       StringCase(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = r3; }, __imp__sub_825AD4C0,
-                 sub_825AD4C0, fmt::format("r3 {:X}", r3));
+                 harness::Ours<0x825AD4C0>, fmt::format("r3 {:X}", r3));
     }
     results.Report();
   }
 
   // The array helpers: each kind of element function the game passes (the
-  // native SetWsToOne and Particle::Particle, the translated sub_82101D20,
+  // native SetWsToOne, Particle::Particle and sub_82101D20 (race_setup's),
   // the empty destructor) and Vec3::SwapXZ, whose swaps over overlapping
   // elements show the order; the game's sizes and small overlapping ones,
   // counts of none, below none, one and many (some with bits above the low
@@ -1988,9 +2250,9 @@ void CRuntime(Context& h) {
               t.r30.u64 = 0x3030303030303030ull;
               t.r31.u64 = 0x3131313131313131ull;
               if (which == 0) {
-                (v == 0 ? __imp__sub_820911A8 : sub_820911A8)(t, h.base);
+                (v == 0 ? __imp__sub_820911A8 : harness::Ours<0x820911A8>)(t, h.base);
               } else {
-                (v == 0 ? __imp__sub_820900C0 : sub_820900C0)(t, h.base);
+                (v == 0 ? __imp__sub_820900C0 : harness::Ours<0x820900C0>)(t, h.base);
               }
               out[v].Bytes(Read(h.base, h.data, kScratchBytes));
               out[v].Word(t.r1.u32);

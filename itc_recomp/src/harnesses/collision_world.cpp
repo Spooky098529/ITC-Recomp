@@ -358,9 +358,9 @@ void LifetimeCases(Context& h, uint32_t area) {
        kPrepare},
       {"TrackMesh::InitScratch (sub_820F6898)", Original<__imp__sub_820F6898>,
        NativeMeshInitScratch, kInitScratch},
-      {"TrackMesh::Free (sub_820F6940)", Original<__imp__sub_820F6940>, NativeMeshFree,
+      {"TrackMesh::Free (sub_820F6940)", Original<__imp__sub_820F6940>, ITC_CONTEXT_FN(NativeMeshFree),
        kMeshFree},
-      {"TrackRoute::Free (sub_820F8618)", Original<__imp__sub_820F8618>, NativeRouteFree,
+      {"TrackRoute::Free (sub_820F8618)", Original<__imp__sub_820F8618>, ITC_CONTEXT_FN(NativeRouteFree),
        kRouteFree},
   };
   constexpr uint32_t kObjectBytes = 16;
@@ -540,7 +540,7 @@ void UnloadCases(Context& h) {
       guest::StoreU32(h.base, tc::kRoute + 4, uint32_t(r.Next()));
       guest::StoreU32(h.base, tc::kRoute + 8, 2);
       guest::StoreU32(h.base, 0x826C5B28, r.Below(4) == 0 ? 0 : block(4, false));
-      (v == 0 ? Original<__imp__sub_820FEFB0> : NativeUnload)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820FEFB0> : ITC_CONTEXT_FN(NativeUnload))(t, h.base);
       auto name = [&](uint32_t w) {
         for (size_t i = 0; i < heap.size(); i++) {
           if (w == heap[i]) {
@@ -850,7 +850,7 @@ void GroundCases(Context& h, uint32_t area) {
       {"TrackCollision::GroundCallback (sub_820FEAB0)", Original<__imp__sub_820FEAB0>,
        NativeGroundCallback, kGround},
       {"TrackCollision::GroundHits (sub_820FEBD0)", Original<__imp__sub_820FEBD0>,
-       NativeGroundHits, kHits},
+       ITC_CONTEXT_FN(NativeGroundHits), kHits},
       {"TrackMesh::SliceContains (sub_820F6A38)", Original<__imp__sub_820F6A38>,
        NativeSliceContains, kContains},
       {"TrackMesh::FindSlice (sub_820F6BE8)", Original<__imp__sub_820F6BE8>, NativeFindSlice,
@@ -867,13 +867,13 @@ void GroundCases(Context& h, uint32_t area) {
        NativeSearchAll, kSearch},
       {"TrackPosition::FindCell (sub_820F8090)", Original<__imp__sub_820F8090>, NativeFindCell,
        kFindCell},
-      {"WallQuery::GatherCells (sub_820FC188)", Original<__imp__sub_820FC188>, NativeGatherCells,
+      {"WallQuery::GatherCells (sub_820FC188)", Original<__imp__sub_820FC188>, ITC_CONTEXT_FN(NativeGatherCells),
        kGather},
       {"WallQuery::AddCell (sub_820FC110)", Original<__imp__sub_820FC110>, NativeAddCell,
        kAddCell},
-      {"TrackPosition::Update (sub_820F8470)", Original<__imp__sub_820F8470>, NativeUpdate,
+      {"TrackPosition::Update (sub_820F8470)", Original<__imp__sub_820F8470>, ITC_CONTEXT_FN(NativeUpdate),
        kUpdate},
-      {"TrackPosition::Init (sub_820F8578)", Original<__imp__sub_820F8578>, NativeInit,
+      {"TrackPosition::Init (sub_820F8578)", Original<__imp__sub_820F8578>, ITC_CONTEXT_FN(NativeInit),
        kUpdate},
   };
   const uint32_t route_table = memory::Alloc(4 * 0x10000, 0);
@@ -1452,6 +1452,29 @@ void WallCases(Context& h, uint32_t area) {
 }
 
 }  // namespace
+
+// For the vehicle's harness (src/harnesses/vehicle.cpp): the ground's mesh
+// and the course's route over it (the TrackPosition::Update and Init cases'
+// course, numbers only), built in `area` and installed as the game's (the
+// mesh at 0x826C5B1C, the route at 0x826C5B10: the caller saves and puts
+// them back). Points over it: x within -10 to 10, z within 0 to 60, the
+// ground's height 0 to 1; two route sections of 6 slices (5 apart along z,
+// section 1 from z = 30). `table`: 65,536 words, filled once.
+uint32_t TestCourseBytes() {
+  return kRouteP + kRouteBytes;
+}
+void FillTestCourseTable(uint8_t* base, uint32_t area, uint32_t table) {
+  for (uint32_t i = 0; i < 0x10000; i++) {
+    guest::StoreU32(base, table + 4 * i, area + kRouteSectionP + kRouteSectionBytes * (i % 2));
+  }
+}
+void BuildTestCourse(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
+  std::vector<uint32_t> triangles, quads;
+  BuildMesh(base, area, r, triangles, quads, false);
+  std::memcpy(base + tc::kMesh, base + area + kMeshP, 12);
+  BuildRoute(base, area, table, r);
+  guest::StoreU32(base, kRoute, area + kRouteFileP);
+}
 
 // The wall query's cases (collision_world_walls.cpp).
 void CollisionWorldWalls(Context& h, uint32_t area);

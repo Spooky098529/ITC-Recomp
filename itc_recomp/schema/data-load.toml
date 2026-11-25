@@ -1,0 +1,60 @@
+# The schema of docs/functions/data-load.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The data load at boot (src/data_load/): the save defaults' bit sets
+# Defaults::Init fills, the session's objects (the race data, the input
+# recordings, the replay, the two static replays), the loading screen's and
+# the other UI movie set's lists. The 5,232-byte records (Record5232,
+# Member1136, Member4080, Part464) and the input recordings' and replay's
+# blocks are replay-snapshots.md's (the measure files them there).
+
+# A 7-word bit set (std::bitset<224>, probably): bit i is word i / 32's bit
+# i % 32. Bits224::Fill's r3 (the image's 0x826C50E4, Defaults::Table50E4;
+# 0x826C3C24 has the same shape).
+[Bits224]
+measure = "Bits224"
+size = 28
+origin = "file"
+fields = [
+  { name = "words", offset = 0, type = "bytes", count = 28, note = "7 big-endian words, indexed by the bit" },
+]
+
+# A 15-word bit set (std::bitset<480>, probably), as Bits224. Bits480::Fill's
+# r3 (the image's 0x826C4064); 0x826C3044, 0x826C50A8 and the 48 sets at
+# 0x826C3080 have the same shape.
+[Bits480]
+measure = "Bits480"
+size = 60
+origin = "file"
+fields = [
+  { name = "words", offset = 0, type = "bytes", count = 60, note = "15 big-endian words, indexed by the bit" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0 (.rdata), loaded with lfs by the records' constructors" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (.rdata)" }
+defaults_3044 = { address = 0x826C3044, type = "bytes", count = 60, note = "a Bits480: Defaults::Table3044 (save-data.md); fixed bits, then the first bit of most of the 48 sets' ranges" }
+defaults_sets = { address = 0x826C3080, type = "bytes", count = 2880, note = "48 Bits480, 60 bytes apart: a range of bits each by its index (none for 29)" }
+defaults_3c24 = { address = 0x826C3C24, type = "bytes", count = 28, note = "a Bits224: Defaults::Table3C24, bits 0-60" }
+defaults_4064 = { address = 0x826C4064, type = "bytes", count = 60, note = "a Bits480: ORed with sets 17, 35, 38, 41 and 47, Bits480::Fill, then cleared (it ends 0); Defaults::Init's r3" }
+defaults_50a8 = { address = 0x826C50A8, type = "bytes", count = 60, note = "a Bits480: Defaults::Table50A8" }
+defaults_50e4 = { address = 0x826C50E4, type = "bytes", count = 28, note = "a Bits224: Defaults::Table50E4, Bits224::Fill (bits 0-198)" }
+race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (0xA3B00 bytes, race-setup.md), made by RaceData::Create" }
+input_recordings = { address = 0x826C5B4C, type = "ptr", note = "the input recordings (0x2225C0 bytes), made by InputRecordings::Create" }
+replay = { address = 0x826C5B50, type = "ptr", note = "the replay kept after a race, probably (0x13C8F0 bytes), made by Replay::Create" }
+loaded = { address = 0x826C5B8C, type = "u32", note = "BootData::Load's once flag" }
+render_manager = { address = 0x826BABA0, type = "ptr", note = "the app's render interface: its slot 8's answer's slots 1 and 2 are the command list and the renderer" }
+loading_shown = { address = 0x82815E60, type = "u32", note = "the loading screen's shown flag" }
+loading_movies = { address = 0x82815E68, type = "bytes", count = 64, note = "the loading screen's UI movies (40,976 bytes each), up to 16" }
+loading_movie_count = { address = 0x82815EA8, type = "u32", note = "the loading screen's movie count (the list's +64)" }
+other_movies = { address = 0x82816610, type = "bytes", count = 64, note = "the other UI movie set's movies (sub_822912A0's list), up to 16" }
+other_movie_count = { address = 0x82816650, type = "u32", note = "the other set's movie count (the list's +64)" }
+other_movie_ids = { address = 0x82638134, type = "bytes", count = 12, note = "the other set's three asset ids (22560, 22595, 22559 in the image)" }
+unknown_82638130 = { address = 0x82638130, type = "u32", note = "1 in the image, 0 after sub_82291328; read by the other set's users (not read)" }
+unknown_828165D0 = { address = 0x828165D0, type = "bytes", count = 36, note = "nine words sub_82291328 clears; the other set's users' (not read)" }
+unknown_82816600 = { address = 0x82816600, type = "u32", note = "cleared by sub_82291328; the other set's users' (not read)" }
+static_replay_a = { address = 0x826D8520, type = "bytes", count = 1296624, note = "a static object with Replay::Create's layout (its seven records at +0x2BF10); Replay826D8520::StaticInit" }
+static_replay_b = { address = 0x82816E50, type = "bytes", count = 1296624, note = "the same at 0x82816E50; Replay82816E50::StaticInit" }

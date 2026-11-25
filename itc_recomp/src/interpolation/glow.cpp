@@ -18,8 +18,10 @@
 // as fast in time as at 30 Hz. Everything is put back afterwards.
 
 #include "frame_pacing/frame_pacer.h"
+#include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/post_effects.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -86,11 +88,11 @@ void LogGlow() {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_821379D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821379D8) {
+  
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
   if (!ITC_FLAG(interpolate_draw_state) || !frame_pacing::GameMessages_InRace()) {
-    __imp__sub_821379D8(ctx, base);
+    hooks::PostEffectsGlowRecord(ctx);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -102,14 +104,14 @@ extern "C" REX_FUNC(sub_821379D8) {
     glow.before = glow.now;
     glow.have_before = glow.last_record != Clock::time_point{};
     for (size_t i = 0; i < kBlended.size(); i++) {
-      glow.now[i] = guest::LoadFloat(base, object + kBlended[i]);
+      glow.now[i] = guest::LoadFloat(object + kBlended[i]);
     }
-    glow.write_history = guest::LoadU32(base, object + kWriteHistory);
+    glow.write_history = guest::LoadU32(object + kWriteHistory);
   }
   std::vector<std::pair<uint32_t, uint32_t>> saved;
   auto replace = [&](uint32_t offset, uint32_t value) {
-    saved.emplace_back(offset, guest::LoadU32(base, object + offset));
-    guest::StoreU32(base, object + offset, value);
+    saved.emplace_back(offset, guest::LoadU32(object + offset));
+    guest::StoreU32(object + offset, value);
   };
   auto replace_float = [&](uint32_t offset, float value) {
     uint32_t bits;
@@ -117,9 +119,9 @@ extern "C" REX_FUNC(sub_821379D8) {
     replace(offset, bits);
   };
 
-  bool reset = guest::LoadU32(base, object + kReset) != 0;
+  bool reset = guest::LoadU32(object + kReset) != 0;
   float amount = frame_pacing::GetFramePacer().TickProgress();
-  float weight = guest::LoadFloat(base, object + kHistoryWeight);
+  float weight = guest::LoadFloat(object + kHistoryWeight);
   if (ITC_FLAG(blend_glow) && glow.have_before && !reset) {
     for (size_t i = 0; i < kBlended.size(); i++) {
       float a = glow.before[i], b = glow.now[i];
@@ -142,7 +144,7 @@ extern "C" REX_FUNC(sub_821379D8) {
                                  frame_pacing::FramePacer::kTickPeriod).count(),
                          0.0f, 1.0f);
     }
-    if (render_only && !guest::LoadU32(base, object + kWriteHistory)) {
+    if (render_only && !guest::LoadU32(object + kWriteHistory)) {
       replace(kWriteHistory, glow.write_history);
       g_log.forced_writes += log;
     }
@@ -166,9 +168,9 @@ extern "C" REX_FUNC(sub_821379D8) {
     LogGlow();
   }
 
-  __imp__sub_821379D8(ctx, base);
+  hooks::PostEffectsGlowRecord(ctx);
 
   for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
-    guest::StoreU32(base, object + it->first, it->second);
+    guest::StoreU32(object + it->first, it->second);
   }
 }

@@ -1,0 +1,345 @@
+# The schema of docs/functions/replay-snapshots.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's snapshots for its replay (src/replay_snapshots/): a block
+# (ReplaySnapshot, 38,928 bytes) of the input recordings holds the racers'
+# manager's entries and counts, then one 5,232-byte record a vehicle
+# (ReplayRecord) with its parts: the rigid body (ReplayBodyState), the
+# physics part (ReplayVehiclePhysics) and the collision object
+# (ReplayCollisionState, with its two placed shape copies, ReplayShapeState).
+# Each part's fields are the vehicle's (car-physics.toml's Vehicle,
+# RigidBody, CollisionWorldObject, collision.toml's BoxShape) whose names
+# they take; vectors (16 bytes) and matrices (64) are bytes fields, as
+# car-physics.toml's (the code passes their addresses to the vector library
+# and the matrix math).
+
+# A race snapshot: the racers' manager's head ([0x826D82F4], race-world.md)
+# and the seven vehicles' records. Two in the input recordings: block A
+# (+0x20F590, the race's start) and block B (+0x218DA0, its end); the kept
+# replay's +0x2B610 a copy of block A.
+[ReplaySnapshot]
+measure = "RaceSnapshot::Copy.r4"
+measures = ["RaceSnapshot::Save.r3", "RaceSnapshot::Copy.r3"]
+size = 38928
+origin = "embedded"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 2156, note = "the manager's first 77 entries (28 bytes each, from its +4)" },
+  { name = "traffic_entries", offset = 2156, type = "bytes", count = 84, note = "the manager's three traffic entries (its +2160)" },
+  { name = "slot_0", offset = 2240, type = "u32", note = "the manager's 7 slot words (+2336 to +2360)" },
+  { name = "slot_1", offset = 2244, type = "u32" },
+  { name = "slot_2", offset = 2248, type = "u32" },
+  { name = "slot_3", offset = 2252, type = "u32" },
+  { name = "slot_4", offset = 2256, type = "u32" },
+  { name = "slot_5", offset = 2260, type = "u32" },
+  { name = "slot_6", offset = 2264, type = "u32" },
+  { name = "racer_count", offset = 2268, type = "u32", note = "the manager's +2364" },
+  { name = "entry_count", offset = 2272, type = "u32", note = "the manager's +2368" },
+  { name = "opponent_count", offset = 2276, type = "u32", note = "the manager's +2372 (opponents streamed in)" },
+  { name = "traffic_listed", offset = 2280, type = "u32", note = "the manager's +2376" },
+  { name = "traffic_count", offset = 2284, type = "u32", note = "the manager's +2380" },
+  { name = "unknown_2288", offset = 2288, type = "u32", note = "the manager's +2388" },
+  { name = "unknown_2292", offset = 2292, type = "u32", note = "0 at RaceSnapshot::Save, copied by RaceSnapshot::Copy" },
+  { name = "records", offset = 2304, type = "bytes", count = 36624, note = "seven ReplayRecords (5,232 bytes each), one a vehicle (Vehicle::Get(i))" },
+]
+
+# A vehicle's record (5,232 bytes, constructed by Record5232::Record5232 in
+# data-load.md).
+[ReplayRecord]
+measure = "Record5232"
+measures = ["Record5232::Record5232.r3"]
+size = 5232
+origin = "file"
+fields = [
+  { name = "car_flags", offset = 0, type = "u32", note = "the vehicle's +6148 (0: the vehicle not in use, the record skipped)" },
+  { name = "collision_flags", offset = 4, type = "u32", note = "the vehicle's +6152 (its contact bits)" },
+  { name = "status", offset = 16, type = "bytes", count = 112, note = "the vehicle's +6160 (VehicleStatus, memcpy)" },
+  { name = "track_positions", offset = 128, type = "bytes", count = 480, note = "the vehicle's five track positions (+5232, 96 bytes each; TrackPosition::Copy)" },
+  { name = "body", offset = 608, type = "bytes", count = 528, note = "a ReplayBodyState (516 bytes): the rigid body's (vehicle +336)" },
+  { name = "physics", offset = 1136, type = "bytes", count = 2944, note = "a ReplayVehiclePhysics (2,938 bytes): the vehicle's +0 to +3241, packed" },
+  { name = "collision", offset = 4080, type = "bytes", count = 1152, note = "a ReplayCollisionState: the collision object's (vehicle +340)" },
+]
+
+# The rigid body's first 516 bytes (car-physics.toml's RigidBody, at the
+# same offsets): a record's +608.
+[ReplayBodyState]
+measure = "Record5232@+608"
+size = 516
+origin = "embedded"
+fields = [
+  { name = "fixed", offset = 0, type = "u8", note = "set: no inverse mass" },
+  { name = "mass", offset = 4, type = "f32" },
+  { name = "inverse_mass", offset = 8, type = "f32" },
+  { name = "center_of_mass", offset = 16, type = "bytes", count = 16 },
+  { name = "velocity", offset = 32, type = "bytes", count = 16 },
+  { name = "speed_cap", offset = 48, type = "f32" },
+  { name = "force", offset = 64, type = "bytes", count = 16 },
+  { name = "orientation", offset = 80, type = "bytes", count = 16, note = "a quaternion, copied as two doublewords (ld, std)" },
+  { name = "angular_velocity", offset = 96, type = "bytes", count = 16 },
+  { name = "spin_cap", offset = 112, type = "f32" },
+  { name = "torque", offset = 128, type = "bytes", count = 16 },
+  { name = "velocity_direction", offset = 144, type = "bytes", count = 16 },
+  { name = "speed", offset = 160, type = "f32" },
+  { name = "linear_damping", offset = 164, type = "f32" },
+  { name = "momentum", offset = 176, type = "bytes", count = 16 },
+  { name = "center_of_mass_offset", offset = 192, type = "bytes", count = 16 },
+  { name = "origin", offset = 208, type = "bytes", count = 16 },
+  { name = "orientation_matrix", offset = 224, type = "bytes", count = 64 },
+  { name = "matrix", offset = 288, type = "bytes", count = 64 },
+  { name = "inertia", offset = 352, type = "bytes", count = 16 },
+  { name = "inverse_inertia", offset = 368, type = "bytes", count = 16 },
+  { name = "angular_damping", offset = 384, type = "f32" },
+  { name = "angular_momentum", offset = 400, type = "bytes", count = 16 },
+  { name = "world_inverse_inertia", offset = 416, type = "bytes", count = 64 },
+  { name = "gravity", offset = 480, type = "bytes", count = 16 },
+  { name = "weight", offset = 496, type = "bytes", count = 16 },
+  { name = "effective_mass", offset = 512, type = "f32" },
+]
+
+# The vehicle's physics fields (+0 to +3241) packed into 2,944 bytes: a
+# record's +1136. Each field is the vehicle's at the offset its note gives
+# (Member1136::Save and Restore), named as car-physics.toml's Vehicle names
+# it; unknown_ where the vehicle's field is.
+[ReplayVehiclePhysics]
+measure = "Record5232@+1136"
+measures = ["Record5232::Record5232.ret@+1136"]
+size = 2944
+origin = "file"
+fields = [
+  { name = "body_row0", offset = 0, type = "bytes", count = 16, note = "the vehicle's +0" },
+  { name = "body_row1", offset = 16, type = "bytes", count = 16, note = "the vehicle's +16" },
+  { name = "body_row2", offset = 32, type = "bytes", count = 16, note = "the vehicle's +32" },
+  { name = "speed", offset = 48, type = "f32", note = "the vehicle's +48" },
+  { name = "unknown_52", offset = 52, type = "f32", note = "the vehicle's +52" },
+  { name = "angular_velocity", offset = 64, type = "bytes", count = 16, note = "the vehicle's +64" },
+  { name = "unknown_80", offset = 80, type = "f32", note = "the vehicle's +80" },
+  { name = "unknown_84", offset = 84, type = "f32", note = "the vehicle's +84" },
+  { name = "roll", offset = 88, type = "f32", note = "the vehicle's +88" },
+  { name = "slip_term", offset = 92, type = "f32", note = "the vehicle's +92" },
+  { name = "ground_up", offset = 96, type = "bytes", count = 16, note = "the vehicle's +96" },
+  { name = "ground_forward", offset = 112, type = "bytes", count = 16, note = "the vehicle's +112" },
+  { name = "ground_side", offset = 128, type = "bytes", count = 16, note = "the vehicle's +128" },
+  { name = "ground_matrix", offset = 144, type = "bytes", count = 64, note = "the vehicle's +144" },
+  { name = "body_matrix", offset = 208, type = "bytes", count = 64, note = "the vehicle's +208" },
+  { name = "speed_sensitive_steering", offset = 272, type = "u8", note = "the vehicle's +276" },
+  { name = "steering_input", offset = 276, type = "f32", note = "the vehicle's +280" },
+  { name = "throttle", offset = 280, type = "f32", note = "the vehicle's +284" },
+  { name = "reverse_throttle", offset = 284, type = "f32", note = "the vehicle's +288" },
+  { name = "brake", offset = 288, type = "f32", note = "the vehicle's +292" },
+  { name = "handbrake", offset = 292, type = "f32", note = "the vehicle's +296" },
+  { name = "unknown_296", offset = 296, type = "f32", note = "the vehicle's +300" },
+  { name = "steering", offset = 300, type = "f32", note = "the vehicle's +304" },
+  { name = "front_left_angle", offset = 304, type = "f32", note = "the vehicle's +308" },
+  { name = "front_right_angle", offset = 308, type = "f32", note = "the vehicle's +312" },
+  { name = "steering_limit_left", offset = 312, type = "f32", note = "the vehicle's +316" },
+  { name = "steering_limit_right", offset = 316, type = "f32", note = "the vehicle's +320" },
+  { name = "steering_smoothed", offset = 320, type = "f32", note = "the vehicle's +324" },
+  { name = "steering_previous", offset = 324, type = "f32", note = "the vehicle's +328" },
+  { name = "unknown_328", offset = 328, type = "f32", note = "the vehicle's +332" },
+  { name = "wheels_on_ground", offset = 332, type = "u32", note = "the vehicle's +348" },
+  { name = "unknown_336", offset = 336, type = "bytes", count = 16, note = "the vehicle's +352" },
+  { name = "wheel_forces_ground", offset = 352, type = "bytes", count = 16, note = "the vehicle's +368" },
+  { name = "ground_velocity", offset = 368, type = "bytes", count = 16, note = "the vehicle's +384" },
+  { name = "unknown_384", offset = 384, type = "bytes", count = 16, note = "the vehicle's +400" },
+  { name = "wheel_0", offset = 400, type = "bytes", count = 368, note = "the vehicle's +416" },
+  { name = "wheel_1", offset = 768, type = "bytes", count = 368, note = "the vehicle's +784" },
+  { name = "wheel_2", offset = 1136, type = "bytes", count = 368, note = "the vehicle's +1152" },
+  { name = "wheel_3", offset = 1504, type = "bytes", count = 368, note = "the vehicle's +1520" },
+  { name = "front_axle", offset = 1872, type = "bytes", count = 128, note = "the vehicle's +1888" },
+  { name = "rear_axle", offset = 2000, type = "bytes", count = 128, note = "the vehicle's +2016" },
+  { name = "wheel_by_load_0", offset = 2128, type = "u32", note = "the vehicle's +2176: the wheel indices sorted by load" },
+  { name = "wheel_by_load_1", offset = 2132, type = "u32", note = "the vehicle's +2180" },
+  { name = "wheel_by_load_2", offset = 2136, type = "u32", note = "the vehicle's +2184" },
+  { name = "wheel_by_load_3", offset = 2140, type = "u32", note = "the vehicle's +2188" },
+  { name = "driven_axle_spin", offset = 2144, type = "f32", note = "the vehicle's +2192" },
+  { name = "engine_spin", offset = 2148, type = "f32", note = "the vehicle's +2196" },
+  { name = "engine_spin_previous", offset = 2152, type = "f32", note = "the vehicle's +2200" },
+  { name = "drivetrain_block", offset = 2156, type = "bytes", count = 144, note = "the vehicle's +2204 to +2347 (memcpy)" },
+  { name = "direction", offset = 2300, type = "f32", note = "the vehicle's +2348" },
+  { name = "dt", offset = 2304, type = "f32", note = "the vehicle's +2352" },
+  { name = "inverse_dt", offset = 2308, type = "f32", note = "the vehicle's +2356" },
+  { name = "unknown_2312", offset = 2312, type = "f32", note = "the vehicle's +2360" },
+  { name = "substep_dt", offset = 2316, type = "f32", note = "the vehicle's +2364" },
+  { name = "substep_count", offset = 2320, type = "u32", note = "the vehicle's +2368" },
+  { name = "flags", offset = 2324, type = "u32", note = "the vehicle's +2372" },
+  { name = "drive_type", offset = 2328, type = "u32", note = "the vehicle's +2376" },
+  { name = "unknown_2332", offset = 2332, type = "u8", note = "the vehicle's +2380" },
+  { name = "unknown_2333", offset = 2333, type = "u8", note = "the vehicle's +2381" },
+  { name = "unknown_2334", offset = 2334, type = "u8", note = "the vehicle's +2382" },
+  { name = "unknown_2335", offset = 2335, type = "u8", note = "the vehicle's +2383" },
+  { name = "forced_rest", offset = 2336, type = "u8", note = "the vehicle's +2384" },
+  { name = "value2388_set", offset = 2337, type = "u8", note = "the vehicle's +2385" },
+  { name = "abs", offset = 2338, type = "u8", note = "the vehicle's +2386" },
+  { name = "unknown_2339", offset = 2339, type = "u8", note = "the vehicle's +2387" },
+  { name = "value2388", offset = 2340, type = "f32", note = "the vehicle's +2388" },
+  { name = "traction_counter", offset = 2344, type = "u32", note = "the vehicle's +2392" },
+  { name = "traction_limit", offset = 2348, type = "f32", note = "the vehicle's +2396" },
+  { name = "traction_active", offset = 2352, type = "u8", note = "the vehicle's +2400" },
+  { name = "abs_active", offset = 2353, type = "u8", note = "the vehicle's +2401" },
+  { name = "drag_scale", offset = 2356, type = "f32", note = "the vehicle's +2404" },
+  { name = "grip_scale", offset = 2360, type = "f32", note = "the vehicle's +2408" },
+  { name = "torque_scale", offset = 2364, type = "f32", note = "the vehicle's +2412" },
+  { name = "oil_factor", offset = 2368, type = "f32", note = "the vehicle's +2428" },
+  { name = "brake_efficiency", offset = 2372, type = "f32", note = "the vehicle's +2432" },
+  { name = "unknown_2376", offset = 2376, type = "f32", note = "the vehicle's +2436" },
+  { name = "nitrous_factor", offset = 2380, type = "f32", note = "the vehicle's +2416" },
+  { name = "nitrous_value", offset = 2384, type = "f32", note = "the vehicle's +2420" },
+  { name = "nitrous_on", offset = 2388, type = "u8", note = "the vehicle's +2424" },
+  { name = "speed_squared", offset = 2392, type = "f32", note = "the vehicle's +2440" },
+  { name = "unknown_2396", offset = 2396, type = "u8", note = "the vehicle's +2444" },
+  { name = "unknown_2397", offset = 2397, type = "u8", note = "the vehicle's +2445" },
+  { name = "unknown_2400", offset = 2400, type = "f32", note = "the vehicle's +2448" },
+  { name = "unknown_2404", offset = 2404, type = "f32", note = "the vehicle's +2452" },
+  { name = "unknown_2408", offset = 2408, type = "u8", note = "the vehicle's +2456" },
+  { name = "body_force", offset = 2416, type = "bytes", count = 16, note = "the vehicle's +2464" },
+  { name = "body_torque", offset = 2432, type = "bytes", count = 16, note = "the vehicle's +2480" },
+  { name = "tire_wear_mode", offset = 2448, type = "u32", note = "the vehicle's +2496" },
+  { name = "backfire_charge", offset = 2452, type = "f32", note = "the vehicle's +2500" },
+  { name = "backfire", offset = 2456, type = "u8", note = "the vehicle's +2504" },
+  { name = "backfire_strength", offset = 2460, type = "f32", note = "the vehicle's +2508" },
+  { name = "unknown_2464", offset = 2464, type = "u8", note = "the vehicle's +2512" },
+  { name = "throttle_used", offset = 2468, type = "f32", note = "the vehicle's +2516" },
+  { name = "throttle_used_previous", offset = 2472, type = "f32", note = "the vehicle's +2520" },
+  { name = "unknown_2476", offset = 2476, type = "u32", note = "the vehicle's +2524" },
+  { name = "axis", offset = 2480, type = "bytes", count = 16, note = "the vehicle's +2528" },
+  { name = "wheel_accumulator_0", offset = 2496, type = "bytes", count = 16, note = "the vehicle's +2544" },
+  { name = "wheel_accumulator_1", offset = 2512, type = "bytes", count = 16, note = "the vehicle's +2560" },
+  { name = "wheel_accumulator_2", offset = 2528, type = "bytes", count = 16, note = "the vehicle's +2576" },
+  { name = "wheel_accumulator_3", offset = 2544, type = "bytes", count = 16, note = "the vehicle's +2592" },
+  { name = "body_accumulator", offset = 2560, type = "bytes", count = 16, note = "the vehicle's +2608" },
+  { name = "unknown_2576", offset = 2576, type = "u8", note = "the vehicle's +2624" },
+  { name = "unknown_2577", offset = 2577, type = "u8", note = "the vehicle's +2625" },
+  { name = "unknown_2580", offset = 2580, type = "f32", note = "the vehicle's +2628" },
+  { name = "shift_up_speed_0", offset = 2584, type = "f32", note = "the vehicle's +2632" },
+  { name = "shift_up_speed_1", offset = 2588, type = "f32", note = "the vehicle's +2636" },
+  { name = "shift_up_speed_2", offset = 2592, type = "f32", note = "the vehicle's +2640" },
+  { name = "shift_up_speed_3", offset = 2596, type = "f32", note = "the vehicle's +2644" },
+  { name = "shift_up_speed_4", offset = 2600, type = "f32", note = "the vehicle's +2648" },
+  { name = "shift_up_speed_5", offset = 2604, type = "f32", note = "the vehicle's +2652" },
+  { name = "shift_up_speed_6", offset = 2608, type = "f32", note = "the vehicle's +2656" },
+  { name = "shift_up_speed_7", offset = 2612, type = "f32", note = "the vehicle's +2660" },
+  { name = "surfaces_on", offset = 2616, type = "u8", note = "the vehicle's +2664" },
+  { name = "unknown_2620", offset = 2620, type = "f32", note = "the vehicle's +2924" },
+  { name = "at_rest", offset = 2624, type = "u8", note = "the vehicle's +2928" },
+  { name = "unknown_2628", offset = 2628, type = "f32", note = "the vehicle's +2932" },
+  { name = "unknown_2632", offset = 2632, type = "f32", note = "the vehicle's +2936" },
+  { name = "unknown_2636", offset = 2636, type = "f32", note = "the vehicle's +2940" },
+  { name = "boost", offset = 2640, type = "f32", note = "the vehicle's +2944" },
+  { name = "wastegate_open", offset = 2644, type = "u8", note = "the vehicle's +2948" },
+  { name = "wastegate", offset = 2648, type = "f32", note = "the vehicle's +2952" },
+  { name = "turbo_torque_factor", offset = 2652, type = "f32", note = "the vehicle's +2956" },
+  { name = "blow_off_open", offset = 2656, type = "u8", note = "the vehicle's +2960" },
+  { name = "blow_off", offset = 2660, type = "f32", note = "the vehicle's +2964" },
+  { name = "gauge_0", offset = 2664, type = "f32", note = "the vehicle's +2968" },
+  { name = "gauge_1", offset = 2668, type = "f32", note = "the vehicle's +2972" },
+  { name = "gauge_2", offset = 2672, type = "f32", note = "the vehicle's +2976" },
+  { name = "gauge_3", offset = 2676, type = "f32", note = "the vehicle's +2980" },
+  { name = "track_position", offset = 2680, type = "u32", note = "the vehicle's +2984" },
+  { name = "steer_block_a", offset = 2684, type = "bytes", count = 60, note = "the vehicle's +2988 to +3047 (memcpy; its SteerRecord first)" },
+  { name = "steer_block_b", offset = 2744, type = "bytes", count = 60, note = "the vehicle's +3048 to +3107 (memcpy)" },
+  { name = "steering_result", offset = 2804, type = "f32", note = "the vehicle's +3108" },
+  { name = "yaw_rate", offset = 2808, type = "f32", note = "the vehicle's +3112" },
+  { name = "unknown_2812", offset = 2812, type = "f32", note = "the vehicle's +3116" },
+  { name = "unknown_2816", offset = 2816, type = "f32", note = "the vehicle's +3120" },
+  { name = "unknown_2820", offset = 2820, type = "f32", note = "the vehicle's +3124" },
+  { name = "unknown_2824", offset = 2824, type = "f32", note = "the vehicle's +3128" },
+  { name = "upright", offset = 2828, type = "u8", note = "the vehicle's +3132" },
+  { name = "unknown_2832", offset = 2832, type = "f32", note = "the vehicle's +3136" },
+  { name = "unknown_2836", offset = 2836, type = "f32", note = "the vehicle's +3140" },
+  { name = "unknown_2840", offset = 2840, type = "f32", note = "the vehicle's +3144" },
+  { name = "unknown_2844", offset = 2844, type = "f32", note = "the vehicle's +3148" },
+  { name = "unknown_2848", offset = 2848, type = "f32", note = "the vehicle's +3152" },
+  { name = "step_count", offset = 2852, type = "u32", note = "the vehicle's +3156" },
+  { name = "unknown_2864", offset = 2864, type = "bytes", count = 16, note = "the vehicle's +3168" },
+  { name = "unknown_2880", offset = 2880, type = "bytes", count = 16, note = "the vehicle's +3184" },
+  { name = "unknown_2896", offset = 2896, type = "bytes", count = 16, note = "the vehicle's +3200" },
+  { name = "unknown_2912", offset = 2912, type = "bytes", count = 16, note = "the vehicle's +3216" },
+  { name = "brake_fade", offset = 2928, type = "f32", note = "the vehicle's +3232" },
+  { name = "brake_fade_copy", offset = 2932, type = "f32", note = "the vehicle's +3236" },
+  { name = "backfire_latch", offset = 2936, type = "u8", note = "the vehicle's +3240" },
+  { name = "tipped", offset = 2937, type = "u8", note = "the vehicle's +3241" },
+]
+
+# The collision object's state (car-physics.toml's CollisionWorldObject,
+# the vehicle's +340): a record's +4080.
+[ReplayCollisionState]
+measure = "Record5232@+4080"
+measures = ["Record5232::Record5232.ret@+4080", "Record5232::Copy.r3@+4080@+16"]
+size = 1152
+origin = "file"
+fields = [
+  { name = "has_object", offset = 0, type = "u32", note = "1 when saved from a collision object, 0 for none (nothing restored then)" },
+  { name = "shape_previous", offset = 16, type = "bytes", count = 464, note = "a ReplayShapeState (452 bytes): the object's +36 (the shape record's previous placed copy)" },
+  { name = "shape_current", offset = 480, type = "bytes", count = 464, note = "a ReplayShapeState: the object's +40 (the current placed copy)" },
+  { name = "box_min", offset = 944, type = "bytes", count = 16, note = "the object's +48 (its shape record's box, min)" },
+  { name = "box_max", offset = 960, type = "bytes", count = 16, note = "the object's +64 (max)" },
+  { name = "motion", offset = 976, type = "bytes", count = 64, note = "the object's +80 (the motion matrix)" },
+  { name = "lowest_travel", offset = 1040, type = "f32", note = "the object's +144" },
+  { name = "push", offset = 1056, type = "bytes", count = 16, note = "the object's +160" },
+  { name = "pair_torque", offset = 1072, type = "bytes", count = 16, note = "the object's +176" },
+  { name = "push_count", offset = 1088, type = "u32", note = "the object's +192" },
+  { name = "push_scale", offset = 1104, type = "bytes", count = 16, note = "the object's +208" },
+  { name = "torque_scale", offset = 1120, type = "f32", note = "the object's +224" },
+  { name = "moved", offset = 1124, type = "u32", note = "the object's +288" },
+  { name = "push_out", offset = 1136, type = "bytes", count = 16, note = "the object's +304" },
+]
+
+# A placed shape copy's state (collision.toml's BoxShape fields, packed):
+# ReplayCollisionState's +16 and +480.
+[ReplayShapeState]
+measure = "Part464::Restore.r3"
+measures = ["Part464::Save.r3", "Part464::Copy.r3", "Part464::Part464.r3"]
+size = 452
+origin = "file"
+fields = [
+  { name = "half_extent", offset = 0, type = "bytes", count = 16, note = "the shape's +128" },
+  { name = "inverse_half_extent", offset = 16, type = "bytes", count = 16, note = "the shape's +144" },
+  { name = "corners", offset = 32, type = "bytes", count = 128, note = "the shape's +176 to +303: its 8 corners" },
+  { name = "face_px_distance", offset = 160, type = "f32", note = "the shape's +304" },
+  { name = "face_px_normal", offset = 176, type = "bytes", count = 16, note = "the shape's +320" },
+  { name = "face_py_distance", offset = 192, type = "f32", note = "the shape's +336" },
+  { name = "face_py_normal", offset = 208, type = "bytes", count = 16, note = "the shape's +352" },
+  { name = "face_pz_distance", offset = 224, type = "f32", note = "the shape's +368" },
+  { name = "face_pz_normal", offset = 240, type = "bytes", count = 16, note = "the shape's +384" },
+  { name = "face_nx_distance", offset = 256, type = "f32", note = "the shape's +400" },
+  { name = "face_nx_normal", offset = 272, type = "bytes", count = 16, note = "the shape's +416" },
+  { name = "face_ny_distance", offset = 288, type = "f32", note = "the shape's +432" },
+  { name = "face_ny_normal", offset = 304, type = "bytes", count = 16, note = "the shape's +448" },
+  { name = "face_nz_distance", offset = 320, type = "f32", note = "the shape's +464" },
+  { name = "face_nz_normal", offset = 336, type = "bytes", count = 16, note = "the shape's +480" },
+  { name = "car_float_16", offset = 352, type = "f32", note = "the shape's +16" },
+  { name = "car_float_20", offset = 356, type = "f32", note = "the shape's +20" },
+  { name = "car_float_24", offset = 360, type = "f32", note = "the shape's +24" },
+  { name = "friction", offset = 364, type = "f32", note = "the shape's +28" },
+  { name = "radius", offset = 368, type = "f32", note = "the shape's +32" },
+  { name = "center", offset = 384, type = "bytes", count = 16, note = "the shape's +48" },
+  { name = "axis0", offset = 400, type = "bytes", count = 16, note = "the shape's +64" },
+  { name = "axis1", offset = 416, type = "bytes", count = 16, note = "the shape's +80" },
+  { name = "axis2", offset = 432, type = "bytes", count = 16, note = "the shape's +96" },
+  { name = "unknown_448", offset = 448, type = "u32", note = "the shape's halfword +112, as a word" },
+]
+
+# ReplayPlacedBox: merged into collision.toml's BoxShape at the integration (the same object).
+
+# A measure fault: the r4 of the six record copies (Record5232::CopyTrack,
+# BodyState::Copy, Member1136::Copy, Part464::Copy, Member4080::CopyShapes,
+# Member4080::Copy) joined into one type, each a different part of a record
+# (ReplayRecord, ReplayBodyState, ReplayVehiclePhysics, ReplayShapeState,
+# ReplayCollisionState). One bytes field until the measure splits them.
+[ReplayCopySource]
+measure = "Record5232::CopyTrack.r4@+1136"
+measures = ["Record5232::CopyTrack.r4@+608", "Part464::Copy.r4", "Record5232::CopyTrack.r4@+4080", "Record5232::CopyTrack.r4", "Record5232::Copy.r4@+4080@+16"]
+size = 2938
+origin = "embedded"
+fields = [
+  { name = "part", offset = 0, type = "bytes", count = 2938, note = "a record part (which one depends on the copy)" },
+]
+
+[globals]
+input_recordings = { address = 0x826C5B4C, type = "u32", note = "the input recordings (a pointer): +0x107AC0 and +0x20F584 the two recordings' counts, +0x20F590 and +0x218DA0 snapshot blocks A and B, +0x2225B0 set to 1 by the restores" }
+kept_replay = { address = 0x826C5B50, type = "u32", note = "the kept replay (a pointer): Replay::Keep's r3" }
+racers_manager = { address = 0x826D82F4, type = "u32", note = "the racers' manager (a pointer, race-world.md)" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +0x59AE8 the kept results" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (.rdata)" }

@@ -1,0 +1,286 @@
+# The schema of docs/functions/race-screens.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The other in-race screens (src/race_screens/): the pause menu, the confirm
+# dialog, the career's results, the menu after the race, each a set of small
+# VirtualAlloc blocks at global addresses (a 4-byte screen holding its UI
+# movie, a data block, a page object and a menu list), and the menu list the
+# front end shares.
+#
+# The page objects (28 bytes, ScreenPages::) are menu-helpers.toml's
+# PageObject: the measures "ScreenPages", "new<28>@PauseMenu::Create",
+# "new<28>@RaceDialog::Create" and "new<28>@AfterRaceMenu::Create" (and
+# race-screens-unseen's "new<28>@PauseMenu4::Create") are its, left for the
+# lead to add there.
+#
+# Measure faults left unclaimed (no type here takes them):
+# - "RaceDialog" (+0 in RaceDialog::Move, OpenAnim, ShowMessage): the
+#   transitions' r3, the page object's step word (PageObject +24), not an
+#   object of its own.
+# - "MenuList.+20" and "MenuList.+20.+-31528" (PauseMenu::MoveOptions): a
+#   register the measure took for the list's +20; the reads are the pause
+#   data's +144 through the image address 0x826D84D4.
+# - "new<4>@PauseMenu::Create.+0" (PauseMenu::RestoreNodes' +16 to +24): the
+#   pause menu's UI movie (UiMovie, ui-movies-game's), the screen's +0.
+
+# The menu list's block (MenuList::Init's allocation): a word an item.
+[MenuListEnabled]
+measure = "new<?>@MenuList::Init"
+size = 4
+origin = "allocated"
+# A blob since E5 step 5 (2026-11-24): a word an item, the list's count x 4
+# bytes, made by MenuList::Init (save_data::MenuListInit, New(base, size) in
+# place of VirtualAlloc; its lifted original's VirtualAlloc at 0x8220BB60,
+# the size in r4), freed by MenuList::Init's next call and MenuList::Release
+# (VirtualFree; the game's frees take handles).
+storage = "blob"
+blob_alloc = [{ call = 0x8220BB60, reg = "r4" }]
+fields = [
+  { name = "item_0", offset = 0, type = "u32", note = "item 0's word (0 disabled); item i's at +4i" },
+]
+
+# The menu list (72 bytes, MenuList::, the front end's shared list; set up by
+# MenuList::Init in save-data.md): the in-race screens' and about 50
+# front-end screens'.
+[MenuList]
+measures = ["MenuList", "new<72>@PauseMenu::Create", "new<72>@AfterRaceMenu::Create", "new<72>@RaceDialog::Create",
+            "new<72>@PauseMenu4::Create", "new<72>@SaveScreen::OnEnter", "new<72>@TitleScreen::Create", "new<72>@ReplayTheater::Create", "new<72>@PlateEditor::Create", "new<72>@BuildScreen::Create", "new<72>@BuildScreen::Create#2",
+            "new<72>@GarageScreen::Create", "new<72>@GarageScreen::Create#2", "new<72>@RaceScreens::Make1004", "new<72>@CarDealer::Create#2"]
+size = 72
+origin = "allocated"
+# Dual since E5 step 5 (2026-11-24; a generic type: the in-race screens' and
+# about 50 front-end screens' lists, reached by the shared MenuList::
+# functions): made by the screens' makers in host memory (New in place of
+# their VirtualAlloc(72) or operator new(72); the in-race makers' lifted
+# originals through host_alloc), freed by their VirtualFree or operator
+# delete (the game's frees take handles). The allocations left in
+# guest memory are read the same way through the dual view. The measure's
+# four fault fields at +228 to +1900 (PanelSet::Open's PanelSetBase, taken
+# for a list) were removed: a host struct is sized by its last field.
+storage = "dual"
+host_alloc = [0x8220D840, 0x822108C0, 0x82217D94, 0x8221B26C]
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "the item count" },
+  { name = "scroll", offset = 4, type = "u32", note = "the first item shown" },
+  { name = "scroll_before", offset = 8, type = "u32" },
+  { name = "shown", offset = 12, type = "u32", note = "the items shown" },
+  { name = "selection", offset = 16, type = "u32", note = "relative to the scroll" },
+  { name = "selection_before", offset = 20, type = "u32" },
+  { name = "move", offset = 24, type = "u32", note = "the last move: 1 down, -1 up, 0 none" },
+  { name = "side", offset = 28, type = "u32", note = "left or right asked: -1, 1, else 0" },
+  { name = "wrapped", offset = 32, type = "u32", note = "set when the move wrapped or skipped" },
+  { name = "down_action", offset = 36, type = "u32" },
+  { name = "up_action", offset = 40, type = "u32" },
+  { name = "left_action", offset = 44, type = "u32" },
+  { name = "right_action", offset = 48, type = "u32" },
+  { name = "accept_action", offset = 52, type = "u32" },
+  { name = "back_action", offset = 56, type = "u32" },
+  { name = "player", offset = 60, type = "u32", note = "an index into [0x826BABA4], then the mapper entry at 0x826BAB80" },
+  { name = "wraps", offset = 64, type = "u32" },
+  { name = "enabled", offset = 68, type = "ptr", to = "MenuListEnabled", note = "a word an item, 0 for a disabled item" },
+]
+
+# The pause menu's screen ([0x826D84D0], 4 bytes): its UI movie (4). The
+# measure's "PauseMenu" also takes the transitions' r3, the page object's
+# step word (a 4-byte word at +0 as well).
+[PauseMenuScreen]
+measure = "new<4>@PauseMenu::Create"
+size = 4
+origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by PauseMenu::Create
+# (the original's VirtualAlloc(4) at 0x8220D808), freed by PauseMenu::Destroy
+# (its VirtualFree at 0x8220C508, which returned 1); the global at
+# 0x826D84D0 and the race HUD holder's +1012 hold its handle. The measure's
+# "PauseMenu" (the transitions' started word) is PauseMenuStarted's since.
+storage = "host"
+host_alloc = [0x8220D808]
+host_free = [{ call = 0x8220C508, reg = "r3", returns = 1 }]
+fields = [
+  { name = "movie", offset = 0, type = "ptr", note = "UI movie 4 (UiMovies::Find)" },
+]
+
+# The pause menu's transitions' r3 (the measure's "PauseMenu"): the page
+# object's step word, a pointer to its +24 (0 on a step's first call, set to
+# 1 there); split from PauseMenuScreen in E5 step 3.
+[PauseMenuStarted]
+measure = "PauseMenu"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "0 on the step's first call; the transition sets 1" },
+]
+
+# The pause menu's data ([0x826D84D4], 160 bytes): the options copied from
+# player 0's save data (+0x1F85C) by PauseMenu::LoadData and written back at
+# closing, their edits, the career's numbers and the menu's state.
+[PauseMenuData]
+measure = "new<160>@PauseMenu::Create"
+size = 160
+origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by PauseMenu::Create
+# (race_screens::PauseMenuCreate; the original's VirtualAlloc at 0x8220D824,
+# listed for its lifted original), freed by PauseMenu::Destroy
+# (race_screens::PauseMenuDestroy; the original's VirtualFree at 0x8220C524,
+# which returned 1); the global at 0x826D84D4 holds its handle.
+storage = "host"
+host_alloc = [0x8220D824]
+host_free = [{ call = 0x8220C524, reg = "r3", returns = 1 }]
+fields = [
+  { name = "hud_option_0", offset = 0, type = "u32", note = "the four HUD options (the save's options words +0 to +12)" },
+  { name = "hud_option_1", offset = 4, type = "u32" },
+  { name = "hud_option_2", offset = 8, type = "u32" },
+  { name = "hud_option_3", offset = 12, type = "u32" },
+  { name = "music_volume_saved", offset = 16, type = "u32", note = "the options' byte +28, sign-extended (the music's: VolumePage sets SetMusicVolume with it)" },
+  { name = "effects_volume_saved", offset = 20, type = "u32", note = "the options' byte +29" },
+  { name = "adjust_saved_0", offset = 24, type = "u32", note = "three values -10 to 10 (the options' bytes +36 to +38)" },
+  { name = "adjust_saved_1", offset = 28, type = "u32" },
+  { name = "adjust_saved_2", offset = 32, type = "u32" },
+  { name = "hud_edit_0", offset = 36, type = "u32", note = "the HUD options' edits (page 1)" },
+  { name = "hud_edit_1", offset = 40, type = "u32" },
+  { name = "hud_edit_2", offset = 44, type = "u32" },
+  { name = "hud_edit_3", offset = 48, type = "u32" },
+  { name = "music_volume", offset = 52, type = "u32", note = "the volumes' edits (page 2), 0 to 15: SoundOptions::SetMusicVolume's (+52) and SetEffectsVolume's (+56)" },
+  { name = "effects_volume", offset = 56, type = "u32" },
+  { name = "adjust_0", offset = 60, type = "u32", note = "the three values' edits (page 3), -10 to 10" },
+  { name = "adjust_1", offset = 64, type = "u32" },
+  { name = "adjust_2", offset = 68, type = "u32" },
+  { name = "hud_default_0", offset = 72, type = "u32", note = "the HUD options' defaults (the last item's Default), 1 at LoadData" },
+  { name = "hud_default_1", offset = 76, type = "u32", note = "1 at LoadData" },
+  { name = "hud_default_2", offset = 80, type = "u32", note = "1 at LoadData" },
+  { name = "hud_default_3", offset = 84, type = "u32", note = "1 at LoadData" },
+  { name = "music_volume_default", offset = 88, type = "u32", note = "the volumes' defaults, 15 at LoadData" },
+  { name = "effects_volume_default", offset = 92, type = "u32", note = "15 at LoadData (probably)" },
+  { name = "adjust_default_0", offset = 96, type = "u32", note = "the three values' defaults, 0 at LoadData" },
+  { name = "adjust_default_1", offset = 100, type = "u32", note = "0 at LoadData" },
+  { name = "adjust_default_2", offset = 104, type = "u32", note = "0 at LoadData" },
+  { name = "money", offset = 108, type = "u32", note = "the save data's +6116 (kinds 0 to 2)" },
+  { name = "weekday", offset = 112, type = "u32", note = "the day (save +6100) mod 7" },
+  { name = "day", offset = 116, type = "u32", note = "the day, at most 999" },
+  { name = "win_streak", offset = 120, type = "u32", note = "Stats::WinStreak, 0 to 999" },
+  { name = "car_value_a", offset = 124, type = "u32", note = "the car's float +6248, clamped and truncated" },
+  { name = "car_value_b", offset = 128, type = "u32", note = "the car's float +6244, clamped and truncated" },
+  { name = "kind", offset = 132, type = "u32", note = "0 to 8: which items (the table at 0x8200CBF0)" },
+  { name = "item_count", offset = 136, type = "u32", note = "the kind's items, at most 6" },
+  { name = "answer", offset = 140, type = "u32", note = "1 the resume, 2 to 9 the items ending or restarting the race" },
+  { name = "last_item_ok", offset = 144, type = "u32", note = "the sub-pages' last item: 1 OK (the edits kept), 0 Default (the defaults); the arrow's row" },
+  { name = "main_selection", offset = 148, type = "u32", note = "the main list's selection kept while a sub-page shows" },
+  { name = "run_count", offset = 152, type = "u32", note = "PauseMenu::RunTen's count, done at 10" },
+  { name = "first_day", offset = 156, type = "u32", note = "Open's flag (RaceHudMachine::IsFirstDay): the items of id 4 disabled" },
+]
+
+# The confirm dialog's data ([0x826D84FC], 40 bytes).
+[RaceDialogData]
+measure = "new<40>@RaceDialog::Create"
+size = 40
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82217DE8]
+fields = [
+  { name = "yes", offset = 0, type = "u32", note = "1 when the question was answered yes" },
+  { name = "slot", offset = 4, type = "u32", note = "AskSlot's slot (0 a new one)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0 before Replays::Delete (Question's message 5)" },
+  { name = "message", offset = 12, type = "u32", note = "the message (ShowMessage's jump table, 0 to 11), 13 the question" },
+  { name = "open_style", offset = 16, type = "u32", note = "how OpenAnim and ShowMessage open it: 0, 1 (with the list) or 2" },
+  { name = "next_open_style", offset = 20, type = "u32", note = "open_style after OpenAnim" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "selection", offset = 28, type = "u32", note = "the list's selection at opening" },
+  { name = "showing", offset = 32, type = "u32", note = "1 while the dialog shows (RaceDialog::Answer clears it)" },
+  { name = "close_asked", offset = 36, type = "u32", note = "1: Update goes to page 5" },
+]
+
+# The career's results ([0x826D8500], 212 bytes): RaceHudMachine::AwardPrize's
+# 168-byte block copied to +0 by CareerResults::Open, then the screen's own
+# words and its page object at +184. Host since E5 step 4
+# (CareerResults::Create's VirtualAlloc(212), 0x82219158): the page object's
+# words stay flat fields here (PageObject is a guest type), its address
+# (+184) and the transitions' step word (+208) handed out as interior handles.
+[CareerResultsScreen]
+measure = "CareerResults"
+size = 212
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82219158]
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "0 to 2 by the race's result; the transitions' r3 (the step word, +208) is also measured here (a measure fault)" },
+  { name = "opponent_prize", offset = 4, type = "u32", note = "the opponents' prizes summed" },
+  { name = "win_prize", offset = 8, type = "u32", note = "the win's prize by the race's time" },
+  { name = "streak_factor", offset = 12, type = "f32", note = "by the day's win streak" },
+  { name = "prize", offset = 16, type = "u32", note = "(opponent_prize + win_prize) x streak_factor" },
+  { name = "item_bonus", offset = 20, type = "u32", note = "the opponents' item bonuses summed" },
+  { name = "entry_value", offset = 24, type = "f32", note = "the result's float +844; the entries' first" },
+  { name = "entry_points", offset = 28, type = "u32", note = "entry_value x the scale, truncated" },
+  { name = "pairs", offset = 32, type = "bytes", count = 128, note = "(float, int) pairs, 8 bytes each, pair_count of them" },
+  { name = "pair_count", offset = 160, type = "u32" },
+  { name = "money", offset = 164, type = "u32", note = "the save data's +6116 before the prize" },
+  { name = "total", offset = 168, type = "u32", note = "prize + item_bonus + entry_points + money, at least 0" },
+  { name = "entry", offset = 172, type = "u32", note = "the entry NextEntry shows" },
+  { name = "movie", offset = 180, type = "ptr", note = "UI movie 6" },
+  { name = "pages_page", offset = 184, type = "u32", note = "its page object (PageObject) at +184: the page" },
+  { name = "pages_next_page", offset = 188, type = "u32" },
+  { name = "pages_previous_page", offset = 192, type = "u32" },
+  { name = "pages_step", offset = 196, type = "u32", note = "the running transition, -1 none" },
+  { name = "pages_queued_step", offset = 200, type = "u32" },
+  { name = "pages_unknown_20", offset = 204, type = "u32" },
+  { name = "pages_step_started", offset = 208, type = "u32" },
+]
+
+# The menu after the race's screen ([0x826D8510], 4 bytes): its UI movie (9).
+# The measure's "AfterRaceMenu" also takes the transitions' r3 (the page
+# object's step word) and AfterRaceMenu::ShowReplay's and
+# Replays::ReadEntry's r3, a 36-byte replay record (the replay list's
+# records, [0x828161F0] + 12, save-interface.md): measure faults, its words
+# below as fault_replay_*. Dual since E5 step 4: the screen itself is a host
+# object (AfterRaceMenu::Create), while the lifted transitions' step words
+# and the replay records it's also measured over stay in guest memory.
+[AfterRaceMenuScreen]
+measures = ["new<4>@AfterRaceMenu::Create", "AfterRaceMenu"]
+size = 4
+origin = "allocated"
+storage = "dual"
+host_alloc = [0x8221B210]
+fields = [
+  { name = "movie", offset = 0, type = "ptr", note = "UI movie 9 (UiMovies::Find)" },
+  { name = "fault_replay_year", offset = 0, type = "u16", note = "measure fault: a replay record's halfwords +0 to +10, the date and time (probably a SYSTEMTIME's)" },
+  { name = "fault_replay_month", offset = 2, type = "u16", note = "measure fault" },
+  { name = "fault_replay_day", offset = 6, type = "u16", note = "measure fault" },
+  { name = "fault_replay_hour", offset = 8, type = "u16", note = "measure fault" },
+  { name = "fault_replay_minute", offset = 10, type = "u16", note = "measure fault" },
+  { name = "fault_replay_time", offset = 16, type = "u32", note = "measure fault: minutes, seconds and thousandths packed" },
+  { name = "fault_replay_mode", offset = 20, type = "u32", note = "measure fault" },
+  { name = "fault_replay_course", offset = 24, type = "u32", note = "measure fault" },
+  { name = "fault_replay_number", offset = 28, type = "u32", note = "measure fault: the replay's number, 0 for none" },
+  { name = "fault_replay_result", offset = 32, type = "u32", note = "measure fault" },
+]
+
+# The menu after the race's data ([0x826D8514], 24 bytes).
+[AfterRaceMenuData]
+measure = "new<24>@AfterRaceMenu::Create"
+size = 24
+origin = "allocated"
+storage = "host"
+host_alloc = [0x8221B22C]
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "0 to 6: which items (the table at 0x82010428)" },
+  { name = "item_count", offset = 4, type = "u32", note = "the kind's items, at most 4" },
+  { name = "no_replay", offset = 8, type = "u32", note = "Open's flag: items 1 and 2 (the replay's) disabled" },
+  { name = "answer", offset = 12, type = "u32" },
+  { name = "selection", offset = 16, type = "u32", note = "the main list's selection kept" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "0 at Open; 1 from sub_82211E90, 0 from sub_82211F18" },
+]
+
+[globals]
+pause_screen = { address = 0x826D84D0, type = "ptr", to = "PauseMenuScreen" }
+pause_data = { address = 0x826D84D4, type = "ptr", to = "PauseMenuData" }
+pause_pages = { address = 0x826D84D8, type = "ptr", to = "PageObject" }
+pause_list = { address = 0x826D84DC, type = "ptr", to = "MenuList" }
+dialog_list = { address = 0x826D84F4, type = "ptr", to = "MenuList" }
+dialog_pages = { address = 0x826D84F8, type = "ptr", to = "PageObject" }
+dialog_data = { address = 0x826D84FC, type = "ptr", to = "RaceDialogData" }
+career_results = { address = 0x826D8500, type = "ptr", to = "CareerResultsScreen" }
+after_screen = { address = 0x826D8510, type = "ptr", to = "AfterRaceMenuScreen" }
+after_data = { address = 0x826D8514, type = "ptr", to = "AfterRaceMenuData" }
+after_pages = { address = 0x826D8518, type = "ptr", to = "PageObject" }
+after_list = { address = 0x826D851C, type = "ptr", to = "MenuList" }

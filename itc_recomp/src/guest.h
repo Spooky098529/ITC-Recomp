@@ -1,12 +1,15 @@
 // Helpers for hand-written code that works with guest (Xbox 360) state.
 //
-// Guest memory is big-endian and addressed by 32-bit guest pointers relative
-// to `base`. Guest functions are called through their generated sub_XXXXXXXX
-// names, with arguments in ctx registers as the PowerPC ABI expects.
+// The game's memory is big-endian and addressed by 32-bit guest addresses,
+// each translated to the host block holding it (E5 steps 7 to 10: the heap,
+// the image, the physical memory, the handles' objects). Guest functions are called through the dispatch table by
+// address (lifted::Call; docs/rexglue-removal.md, "Before E1: the
+// rewiring").
 
 #pragma once
 
-#include "generated/default/itc_funcs.h"
+#include "guest_code.h"
+#include "memory/handles.h"
 
 #include <bit>
 #include <cstdint>
@@ -16,30 +19,251 @@
 #include <tmmintrin.h>
 #endif
 
+// Our register view (lifted/regs.h), declared here for the steps' and
+// helpers' declarations that take one.
+namespace lifted {
+struct Regs;
+}  // namespace lifted
+
+namespace memory {
+// A raw load or store reaching a host object through its handle
+// (memory/host_copy.cpp): the bytes as the guest's would give them; logged
+// once per type and offset (code still in guest shape, to convert).
+uint64_t RawHandleLoad(uint32_t address, uint32_t width);
+void RawHandleStore(uint32_t address, uint32_t width, uint64_t value);
+// The same without the log line (memory/host_copy.h).
+uint64_t OwnerLoad(uint32_t address, uint32_t width);
+}  // namespace memory
+
+namespace memory {
+// The calling thread's own stack (E5 step 6): a blob (memory/handles.h), so
+// its frames live in PC memory; set by our threads (threads/threads.cpp) when
+// they start. Its bytes are found here first, without the handles' lookup:
+// the stack is what the game's code touches most.
+struct StackSpan {
+  uint32_t start = 0;
+  uint32_t size = 0;
+  uint8_t* bytes = nullptr;
+};
+inline thread_local StackSpan t_stack;
+
+// The physical memory (E5 step 7): the GPU's, mapped on its own outside
+// guest memory (memory/mapping.cpp). The guest's addresses for it are
+// translated: 0x7F000000 (physical 0-16 MB), 0xA0000000 and 0xC0000000 (the
+// physical address), 0xE0000000 (the physical address + 4 KB).
+inline uint8_t* g_physical = nullptr;
+inline bool IsPhysical(uint32_t address) {
+  return address >= 0xA0000000u || address - 0x7F000000u < 0x1000000u;
+}
+inline uint8_t* PhysicalPointer(uint32_t address) {
+  if (address >= 0xE0000000u) {
+    return g_physical + (address - 0xE0000000u) + 0x1000;
+  }
+  if (address >= 0xA0000000u) {
+    return g_physical + (address & 0x1FFFFFFFu);
+  }
+  return g_physical + (address - 0x7F000000u);
+}
+
+// The heap and the image (E5 step 9): blocks of host memory of their own
+// (memory/mapping.cpp), no longer in a guest mapping. The heap is our
+// allocation layer's range (memory/heap.h), the image its data compiled in
+// (image/image.h). Any other address (a null pointer's, below 0x10000, or
+// one in no block) stops the program, named (memory::NoBlock, mapping.cpp).
+constexpr uint32_t kHeapStart = 0x10000;
+constexpr uint32_t kHeapBytes = 384u << 20;
+constexpr uint32_t kImageStart = 0x82000000;
+constexpr uint32_t kImageBytes = 0x9B0000;
+[[noreturn]] void NoBlock(uint32_t address);
+inline uint8_t* g_heap = nullptr;
+inline uint8_t* g_image = nullptr;
+inline uint8_t* BlockPointer(uint32_t address) {
+  if (address - kHeapStart < kHeapBytes) [[likely]] {
+    return g_heap + (address - kHeapStart);
+  }
+  if (address - kImageStart < kImageBytes) {
+    return g_image + (address - kImageStart);
+  }
+  NoBlock(address);
+}
+
+// The host bytes of `width` bytes at `address` in the calling thread's
+// stack, or nullptr.
+inline uint8_t* StackBytes(uint32_t address, uint32_t width) {
+  const uint32_t offset = address - t_stack.start;
+  if (offset < t_stack.size && t_stack.size - offset >= width) [[likely]] {
+    return t_stack.bytes + offset;
+  }
+  return nullptr;
+}
+}  // namespace memory
+
 namespace guest {
 
-inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U8(address);
+// Guest memory's one spelling, for lifted code and hand ports alike
+// (docs/e5-native.md, step 0): the 32-bit guest address, big-endian, through volatile accesses (as the generated code's macros
+// did: the compiler neither merges nor drops them). Each address is
+// translated to the block holding it (the physical memory, a handle's
+// object, the heap or the image: memory/mapping.cpp).
+
+// The host address of a guest address.
+// A blob's handle (memory/handles.h: a file's data in PC memory, in the
+// guest's byte order) gives the blob's bytes; a typed host object's handle
+// stops the program, named (memory::NoBlock): its members are read through
+// its view.
+inline uint8_t* Pointer(uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    return memory::PhysicalPointer(address);
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* bytes = memory::StackBytes(address, 1)) {
+      return bytes;
+    }
+    if (uint8_t* bytes = memory::BlobPointer(address)) {
+      return bytes;
+    }
+  }
+  return memory::BlockPointer(address);
 }
 
-inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
-  REX_STORE_U8(address, value);
+inline uint8_t LoadU8(uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint8_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 1);
+    return v;
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 1)) {
+      uint8_t v;
+      std::memcpy(&v, p, 1);
+      return v;
+    }
+    return uint8_t(memory::RawHandleLoad(address, 1));
+  }
+  return *reinterpret_cast<volatile uint8_t*>(memory::BlockPointer(address));
 }
 
-inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U16(address);
+inline void StoreU8(uint32_t address, uint8_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint8_t v = value;
+    std::memcpy(memory::PhysicalPointer(address), &v, 1);
+    return;
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 1)) {
+      const uint8_t v = value;
+      std::memcpy(p, &v, 1);
+      return;
+    }
+    memory::RawHandleStore(address, 1, value);
+    return;
+  }
+  *reinterpret_cast<volatile uint8_t*>(memory::BlockPointer(address)) = value;
 }
 
-inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
-  REX_STORE_U16(address, value);
+inline uint16_t LoadU16(uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint16_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 2);
+    return __builtin_bswap16(v);
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 2)) {
+      uint16_t v;
+      std::memcpy(&v, p, 2);
+      return __builtin_bswap16(v);
+    }
+    return uint16_t(memory::RawHandleLoad(address, 2));
+  }
+  return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(memory::BlockPointer(address)));
 }
 
-inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U32(address);
+inline void StoreU16(uint32_t address, uint16_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint16_t v = __builtin_bswap16(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 2);
+    return;
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 2)) {
+      const uint16_t v = __builtin_bswap16(value);
+      std::memcpy(p, &v, 2);
+      return;
+    }
+    memory::RawHandleStore(address, 2, value);
+    return;
+  }
+  *reinterpret_cast<volatile uint16_t*>(memory::BlockPointer(address)) = __builtin_bswap16(value);
 }
 
-inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
-  REX_STORE_U32(address, value);
+inline uint32_t LoadU32(uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint32_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 4);
+    return __builtin_bswap32(v);
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 4)) {
+      uint32_t v;
+      std::memcpy(&v, p, 4);
+      return __builtin_bswap32(v);
+    }
+    return uint32_t(memory::RawHandleLoad(address, 4));
+  }
+  return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(memory::BlockPointer(address)));
+}
+
+inline void StoreU32(uint32_t address, uint32_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint32_t v = __builtin_bswap32(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 4);
+    return;
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 4)) {
+      const uint32_t v = __builtin_bswap32(value);
+      std::memcpy(p, &v, 4);
+      return;
+    }
+    memory::RawHandleStore(address, 4, value);
+    return;
+  }
+  *reinterpret_cast<volatile uint32_t*>(memory::BlockPointer(address)) = __builtin_bswap32(value);
+}
+
+inline uint64_t LoadU64(uint32_t address) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    uint64_t v;
+    std::memcpy(&v, memory::PhysicalPointer(address), 8);
+    return __builtin_bswap64(v);
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (const uint8_t* p = memory::StackBytes(address, 8)) {
+      uint64_t v;
+      std::memcpy(&v, p, 8);
+      return __builtin_bswap64(v);
+    }
+    return uint64_t(memory::RawHandleLoad(address, 8));
+  }
+  return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(memory::BlockPointer(address)));
+}
+
+inline void StoreU64(uint32_t address, uint64_t value) {
+  if (memory::IsPhysical(address)) [[unlikely]] {
+    const uint64_t v = __builtin_bswap64(value);
+    std::memcpy(memory::PhysicalPointer(address), &v, 8);
+    return;
+  }
+  if (memory::IsHandle(address)) [[unlikely]] {
+    if (uint8_t* p = memory::StackBytes(address, 8)) {
+      const uint64_t v = __builtin_bswap64(value);
+      std::memcpy(p, &v, 8);
+      return;
+    }
+    memory::RawHandleStore(address, 8, value);
+    return;
+  }
+  *reinterpret_cast<volatile uint64_t*>(memory::BlockPointer(address)) = __builtin_bswap64(value);
 }
 
 #if defined(__SSSE3__)
@@ -96,16 +320,16 @@ inline bool SwapU32s(const uint8_t* in, uint32_t* out, uint32_t count) {
 // offset is taken once, so a range with words starting both below
 // 0xE0000000 and at or above it (where it changes, by each word's start as
 // in LoadU32) is copied in two parts.
-inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t count) {
+inline bool CopyU32s(uint32_t address, uint32_t* out, uint32_t count) {
   constexpr uint32_t kOffsetChange = 0xE0000000u;
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    bool differ = SwapU32s(REX_RAW_ADDR(address), out, below);
+    bool differ = SwapU32s(guest::Pointer(address), out, below);
     uint32_t rest = address + 4 * below;
-    return SwapU32s(REX_RAW_ADDR(rest), out + below, count - below) || differ;
+    return SwapU32s(guest::Pointer(rest), out + below, count - below) || differ;
   }
-  return SwapU32s(REX_RAW_ADDR(address), out, count);
+  return SwapU32s(guest::Pointer(address), out, count);
 }
 
 // CopyU32s for floats (no comparison).
@@ -117,17 +341,17 @@ inline void SwapFloats(const uint8_t* in, float* out, uint32_t count) {
   }
 }
 
-inline void CopyFloats(uint8_t* base, uint32_t address, float* out, uint32_t count) {
+inline void CopyFloats(uint32_t address, float* out, uint32_t count) {
   constexpr uint32_t kOffsetChange = 0xE0000000u;
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    SwapFloats(REX_RAW_ADDR(address), out, below);
+    SwapFloats(guest::Pointer(address), out, below);
     uint32_t rest = address + 4 * below;
-    SwapFloats(REX_RAW_ADDR(rest), out + below, count - below);
+    SwapFloats(guest::Pointer(rest), out + below, count - below);
     return;
   }
-  SwapFloats(REX_RAW_ADDR(address), out, count);
+  SwapFloats(guest::Pointer(address), out, count);
 }
 
 // Byte-swaps count words from in into guest memory at out (host memory,
@@ -146,47 +370,68 @@ inline void SwapStoreU32s(uint8_t* out, const uint8_t* in, uint32_t count) {
 // in CopyU32s): calls part(host, offset into the range, part's bytes). For
 // bulk copies such as file reads (no byte swap).
 template <typename Part>
-inline void ForEachHostPart(uint8_t* base, uint32_t address, uint32_t bytes, Part part) {
+inline void ForEachHostPart(uint32_t address, uint32_t bytes, Part part) {
   constexpr uint32_t kOffsetChange = 0xE0000000u;
   if (bytes && address < kOffsetChange && uint64_t(address) + bytes > kOffsetChange) {
     uint32_t below = kOffsetChange - address;
-    part(REX_RAW_ADDR(address), 0u, below);
-    part(REX_RAW_ADDR(kOffsetChange), below, bytes - below);
+    part(guest::Pointer(address), 0u, below);
+    part(guest::Pointer(kOffsetChange), below, bytes - below);
     return;
   }
-  part(REX_RAW_ADDR(address), 0u, bytes);
+  part(guest::Pointer(address), 0u, bytes);
 }
 
 // Stores count words (floats or integers, in host byte order) to guest
 // memory at address, as StoreU32 would one by one, in one vectorized loop.
 // Split at 0xE0000000 as CopyU32s.
-inline void StoreU32s(uint8_t* base, uint32_t address, const void* words, uint32_t count) {
+inline void StoreU32s(uint32_t address, const void* words, uint32_t count) {
   const uint8_t* in = static_cast<const uint8_t*>(words);
   constexpr uint32_t kOffsetChange = 0xE0000000u;
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    SwapStoreU32s(REX_RAW_ADDR(address), in, below);
+    SwapStoreU32s(guest::Pointer(address), in, below);
     uint32_t rest = address + 4 * below;
-    SwapStoreU32s(REX_RAW_ADDR(rest), in + 4 * below, count - below);
+    SwapStoreU32s(guest::Pointer(rest), in + 4 * below, count - below);
     return;
   }
-  SwapStoreU32s(REX_RAW_ADDR(address), in, count);
+  SwapStoreU32s(guest::Pointer(address), in, count);
 }
 
-inline float LoadFloat(uint8_t* base, uint32_t address) {
-  return std::bit_cast<float>(REX_LOAD_U32(address));
+inline float LoadFloat(uint32_t address) {
+  return std::bit_cast<float>(guest::LoadU32(address));
 }
 
-inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
-  REX_STORE_U32(address, std::bit_cast<uint32_t>(value));
+inline void StoreFloat(uint32_t address, float value) {
+  guest::StoreU32(address, std::bit_cast<uint32_t>(value));
+}
+
+// An object's vtable word (its +0) for a virtual call (docs/loops/e5-loop.md,
+// step 4): from guest memory, or from the host object a handle names (host
+// structs keep the guest offsets and hold the word, still the image table's
+// guest address, in host order). An interface's address inside an object
+// (handle + offset) reads that interface's word.
+inline uint32_t VtableWord(uint32_t object) {
+  if (memory::IsHandle(object)) {
+    // An object inside a blob (E5 step 5: the save slots in their operator
+    // new[] block) keeps the guest's byte order.
+    if (memory::BlobPointer(object)) [[unlikely]] {
+      return guest::LoadU32(object);
+    }
+    // A host object, or one inside a host owner: the word as the owner's
+    // layout orders it (memory::OwnerLoad).
+    return uint32_t(memory::OwnerLoad(object, 4));
+  }
+  return guest::LoadU32(object);
 }
 
 // Reserves space on the guest stack for the lifetime of the object, for
 // guest functions that take pointers to locals. Mirrors a guest prologue.
+// `Context` is our register view (lifted::Regs).
+template <typename Context>
 class StackFrame {
  public:
-  StackFrame(PPCContext& ctx, uint32_t size) : ctx_(ctx), size_(size) {
+  StackFrame(Context& ctx, uint32_t size) : ctx_(ctx), size_(size) {
     ctx_.r1.u32 -= size_;
   }
   ~StackFrame() { ctx_.r1.u32 += size_; }
@@ -198,7 +443,7 @@ class StackFrame {
   uint32_t Local(uint32_t offset) const { return ctx_.r1.u32 + offset; }
 
  private:
-  PPCContext& ctx_;
+  Context& ctx_;
   uint32_t size_;
 };
 

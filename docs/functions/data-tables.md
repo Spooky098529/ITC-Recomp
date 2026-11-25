@@ -38,7 +38,9 @@ at `82110B40`-`82116588`, the code at `82140340`-`82144E58` and the
 front end at `822271F8`-`8222F0B0`). The table's free (`sub_82116FB0`:
 the block +12 and the object, `sub_825A71C0`, `sub_825A70E8`) never ran
 and has no row. The rows were drafted by the B7 loop's mapping agent
-(2026-10-23) from the generated code; since then the B7 loop's migration agent has made them native as far as they're ready (`src/data_tables/`, `--native_data_tables`).
+(2026-10-23) from the generated code; since then the B7 loop's migration agent has made them native as far as they're ready (`src/data_tables/`, `--native_data_tables`). Its objects are described in `itc_recomp/schema/data-tables.toml`
+(E5 step 2: `DataTables`, the tables' entries as the walks read them, the
+swapped word, the globals `tables` and `table_ids`).
 
 Status:
 
@@ -75,6 +77,17 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -86,8 +99,8 @@ run it after changing either, on any branch.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
-| `sub_82116DB0` | `DataTables::Init` | | No arguments; once at boot (only caller `sub_82105868`, just before `DataTables::Load`). Makes the 64-byte table object (`sub_825A6880`, operator new) into `0x826C5CA0`: +12 the block, +4 the loads pending, +8 the item count, all 0. Then two passes over the twelve assets: each sets a table pointer to the block (+12) plus the sizes so far (0 while the block isn't made) and counts +4 up: +16 asset 94, +60 asset 84, +20 to +48 the eight ids at `0x82616C64`, +52 asset 95, +56 asset 96. The sizes come from the archive's TOC (`sub_8209D868(id)` + 16 × id + 24, the unpacked size, or + 20, the stored size, when 0; `sub_820A0678(id)` for the eight). After the first pass the block is allocated with the total (`sub_825A6940`, operator new[]); +4 ends at 12. Allocates guest memory. |
-| `sub_82117240` | `DataTables::Load` | | No arguments; once at boot (only caller `sub_82105868`, after `DataTables::Init`). Twelve `Archive::Load`s (`sub_8209DE48`, `files-and-saves.md`; r7, r8 = 0) into the table pointers `DataTables::Init` set: asset 94 into +16 with `sub_821170D8` and the table object as context; 84 into +60 with `sub_821170C0` (the object); the eight ids at `0x82616C64` into +20 to +48 with `sub_821170F0` (the table as context); 95 into +52 with `sub_82116FF0` and 96 into +56 with `sub_82117058` (the table). Each returned serial is stored at the object's +0 (overwritten; nothing reads it). |
+| `sub_82116DB0` | `DataTables::Init` | Overridden | No arguments; once at boot (only caller `sub_82105868`, just before `DataTables::Load`). Makes the 64-byte table object (`sub_825A6880`, operator new) into `0x826C5CA0`: +12 the block, +4 the loads pending, +8 the item count, all 0. Then two passes over the twelve assets: each sets a table pointer to the block (+12) plus the sizes so far (0 while the block isn't made) and counts +4 up: +16 asset 94, +60 asset 84, +20 to +48 the eight ids at `0x82616C64`, +52 asset 95, +56 asset 96. The sizes come from the archive's TOC (`sub_8209D868(id)` + 16 × id + 24, the unpacked size, or + 20, the stored size, when 0; `sub_820A0678(id)` for the eight). After the first pass the block is allocated with the total (`sub_825A6940`, operator new[]); +4 ends at 12. Allocates guest memory. Native (B7 loop, 2026-10-30, the data load's migration): `Init` in `src/data_tables/data_tables.cpp` (operator new's and new[]'s, `Archive::Toc`'s and `AssetSize`'s plain C++; each table pointer 0 when the one before was, as the original chains them), the adapter in `src/hooks/data_tables.cpp` behind `--native_data_tables` and `--native_heap`. Harness `data_tables` (the real TOC and fake ones). |
+| `sub_82117240` | `DataTables::Load` | Overridden | No arguments; once at boot (only caller `sub_82105868`, after `DataTables::Init`). Twelve `Archive::Load`s (`sub_8209DE48`, `files-and-saves.md`; r7, r8 = 0) into the table pointers `DataTables::Init` set: asset 94 into +16 with `sub_821170D8` and the table object as context; 84 into +60 with `sub_821170C0` (the object); the eight ids at `0x82616C64` into +20 to +48 with `sub_821170F0` (the table as context); 95 into +52 with `sub_82116FF0` and 96 into +56 with `sub_82117058` (the table). Each returned serial is stored at the object's +0 (overwritten; nothing reads it). Native (B7 loop, 2026-10-30, the data load's migration): `Load` in `src/data_tables/data_tables.cpp`, the loads through `archive::Queue` and `BuildLoad` (Archive::Load's plain C++), the adapter behind `--native_data_tables` with the archive's queue native. Harness `data_tables` (the loads recorded through `Archive::Load`'s adapter's recorder, `hooks::g_start_up_recorder`, instead of queued). |
 | `sub_821170D8` | `DataTables::OnItemsLoaded` | Overridden | `Archive::Load`'s callback for asset 94 (no direct callers; its address is passed by `DataTables::Load`): r6 = the table object: +8 = 400 (the item count), +4 (the loads pending) down by one. The entries aren't byte-swapped. Leaf. Native (2026-10-23, `OnItemsLoaded` in `src/data_tables/data_tables.cpp`, `--native_data_tables`; harness `data_tables`); runs at boot. Its adapter stays (a function pointer). |
 | `sub_821170C0` | `DataTables::OnLoaded84` | Overridden | `Archive::Load`'s callback for asset 84 (no direct callers): `[0x826C5CA0]` +4 down by one. Leaf. Native (2026-10-23, `OnLoaded84` in `src/data_tables/data_tables.cpp`, `--native_data_tables`; harness `data_tables`); runs at boot. Its adapter stays (a function pointer). |
 | `sub_821170F0` | `DataTables::On56Loaded` | Overridden | `Archive::Load`'s callback for the eight 56-byte tables (no direct callers): r6 = the table: `Entry56::Swap` (`sub_82111B30`) on each entry, up to and including the first whose +0 is -1, then `[0x826C5CA0]` +4 down by one. Native (2026-10-23, `On56Loaded` in `src/data_tables/data_tables.cpp`, `--native_data_tables`; harness `data_tables`, tables of 0 to 39 entries and up to the scratch area's end); runs at boot. Its adapter stays (reached through `Archive::Load`'s function pointer). |

@@ -1,0 +1,242 @@
+# The schema of docs/functions/c-runtime-core.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The C runtime's core (Microsoft's C runtime and XAPI, statically linked):
+# the errno slots, the lock table, the file handle table (ioinfo), the
+# thread notify blocks, the exception action table and the exception
+# records the filters read. Names from docs/known-data.md, the rows and
+# src/c_runtime/core.h, and Microsoft's CRT sources where the layout
+# matches theirs ("probably" then).
+#
+# Left to c-runtime.toml (the same objects; reported to the lead, as this
+# area's agent doesn't edit it): the thread data (_tiddata: the measure's
+# _getptd_noexit.ret and calloc.ret are c-runtime.toml's ThreadData), the
+# streams (FILE: _ftbuf.r4, _fclose_nolock.r3, fclose_825A9580.r3,
+# _flush.r3, _fflush_nolock.r3 and fputs_825AD280.r4 are its Stream), the
+# strings and buffers (strrchr.r3, strrchr.ret, fputs_825AD280.r3,
+# _ftbuf.r4.+8, _cftoe2_l.r3, _cftoe2_l.r7.+12, _cftoe_l.r4 and
+# _cftog_l.r4 are its CString), _cftoe2_l.r7 (its FloatStrings), the
+# doubles _cftoe_l.r3 and _cftog_l.r3 (its DoubleValue), and heap.toml's
+# StdException (the measure's `std`, std::_Throw's r3).
+
+# errno: the int _errno returns the address of (the thread data's +8, or
+# 0x8266B658 without thread data).
+# Measure fault (reported): _fptostr's and _cftoa_l's byte and doubleword
+# accesses here are r3 reused as their buffer after the _errno call (kept
+# as fault_ fields, as app-states.toml's).
+[ErrnoSlot]
+measure = "_errno.ret"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "s32" },
+  { name = "fault_buffer_double", offset = 0, type = "u64", note = "measure fault: _fptostr's and _cftoa_l's r3 after the _errno call is their buffer, not errno" },
+  { name = "fault_buffer_0", offset = 0, type = "u8", note = "measure fault: as fault_buffer_double" },
+  { name = "fault_buffer_1", offset = 1, type = "u8", note = "measure fault: as fault_buffer_double" },
+  { name = "fault_buffer_2", offset = 2, type = "u8", note = "measure fault: as fault_buffer_double" },
+]
+
+# _doserrno: the word __doserrno returns the address of (the thread data's
+# +12, or 0x8266B65C without thread data).
+[DosErrnoSlot]
+measure = "__doserrno.ret"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "the Windows error last mapped" },
+]
+
+# One entry of the exception action table (_XCPT_ACTION, 12 bytes).
+[ExceptionAction]
+size = 12
+origin = "image"
+fields = [
+  { name = "exception_code", offset = 0, type = "u32", note = "XcptNum" },
+  { name = "signal", offset = 4, type = "s32", note = "SigNum: 8 for the SIGFPE entries" },
+  { name = "action", offset = 8, type = "fn", note = "XcptAction: 0 (SIG_DFL), 1 (SIG_IGN) or a handler" },
+]
+
+# The exception action table a thread's data +92 points at: _XcptActTab
+# (0x8266BE60) unless copied; _XcptActTabCount (11) ExceptionActions.
+[ExceptionActionTable]
+measure = "_getptd_noexit.ret.+92"
+size = 132
+origin = "image"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 132, note = "11 ExceptionActions of 12 bytes, searched by signal by raise" },
+]
+
+# A lock table entry (0x8266BD40, 36 of them, by lock number).
+[CrtLockEntry]
+size = 8
+origin = "image"
+fields = [
+  { name = "section", offset = 0, type = "u32", note = "the critical section (28 bytes), 0 when not made" },
+  { name = "made_at_boot", offset = 4, type = "u32", note = "1: given one of 0x829711A0's sections by _mtinitlocks, never freed" },
+]
+
+# A file handle's entry (ioinfo, 44 bytes): blocks of 32 through
+# __pioinfo (0x82978220), __badioinfo (0x8266BFB8) for -1 and -2.
+[CrtIoInfo]
+size = 44
+origin = "allocated"
+fields = [
+  { name = "os_handle", offset = 0, type = "u32", note = "osfhnd: -1 none, -2 for the first three" },
+  { name = "osfile", offset = 4, type = "u8", note = "bit 0 open (FOPEN), 0x02 EOF, 0x20 append, 0x40 device, 0x80 text; 0xC1 for the first three" },
+  { name = "pipe_char", offset = 5, type = "u8", note = "pipech: 10 (none)" },
+  { name = "lock_made", offset = 8, type = "u32", note = "lockinitflag: the critical section made (counted by __lock_fhandle)" },
+  { name = "lock", offset = 12, type = "bytes", count = 28, note = "the critical section __lock_fhandle enters" },
+  { name = "text_mode", offset = 40, type = "u8", note = "the text-mode bits (textmode in the bits above bit 0, unicode bit 0, probably)" },
+  { name = "pipe_char2", offset = 41, type = "bytes", count = 2, note = "pipech2: 10 and 10" },
+]
+
+# A block of 32 handle entries: the measure meets the first (the word at
+# 0x82978220), read by _close_nolock for stdout's (+48) and stderr's (+92)
+# osfile.
+[CrtIoInfoBlock]
+measure = "[82978220]"
+size = 1408
+origin = "allocated"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 1408, note = "32 CrtIoInfos of 44 bytes (calloc(32, 44) by _ioinit)" },
+]
+
+# A thread notify block (XTHREAD_NOTIFICATION, probably): the list headed
+# at 0x8263879C (the head an 8-byte block of links only) is walked at each
+# thread's start and end; the measure meets the first through the head.
+[ThreadNotifyBlock]
+measure = "[8263879C]"
+size = 12
+origin = "image"
+fields = [
+  { name = "next", offset = 0, type = "u32", note = "the next block (the head at the end)" },
+  { name = "previous", offset = 4, type = "u32" },
+  { name = "routine", offset = 8, type = "fn", note = "called with r3 1 at a thread's start, 0 at its end" },
+]
+
+# _initterm's table: the function pointers between `begin` and `end`.
+[CrtInitTable]
+measure = "_initterm.r3"
+size = 4
+origin = "image"
+fields = [
+  { name = "function", offset = 0, type = "fn", note = "0: skipped" },
+]
+
+# The C++ throw info (_ThrowInfo) _CxxThrowException's r4 points at.
+[CxxThrowInfo]
+measure = "_CxxThrowException.r4"
+size = 16
+origin = "image"
+fields = [
+  { name = "attributes", offset = 0, type = "u32", note = "bit 3 (8): a pure (/clr:pure) throw, magic 0x01994000" },
+]
+
+# An exception record (EXCEPTION_RECORD) as the filters read it.
+[ExceptionRecord]
+measure = "__CxxUnhandledExceptionFilter.r3.+0"
+size = 80
+origin = "embedded"
+fields = [
+  { name = "code", offset = 0, type = "u32", note = "0xE06D7363 for a C++ exception" },
+  { name = "flags", offset = 4, type = "u32" },
+  { name = "record", offset = 8, type = "u32", note = "the chained record" },
+  { name = "exception_address", offset = 12, type = "fn", note = "where it was raised (ExceptionAddress; not \"address\", which would hide View::address)" },
+  { name = "parameter_count", offset = 16, type = "u32", note = "3 for a C++ exception" },
+  { name = "magic", offset = 20, type = "u32", note = "the first parameter: a C++ exception's magic (0x19930520 to 0x19930522, 0x01994000)" },
+  { name = "object", offset = 24, type = "u32", note = "the second: the thrown object" },
+  { name = "throw_info", offset = 28, type = "ptr", to = "CxxThrowInfo", note = "the third" },
+]
+
+# EXCEPTION_POINTERS, __CxxUnhandledExceptionFilter's r3.
+[ExceptionPointers]
+measure = "__CxxUnhandledExceptionFilter.r3"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "exception_record", offset = 0, type = "ptr", to = "ExceptionRecord" },
+  { name = "context", offset = 4, type = "u32" },
+]
+
+# std::exception's vtable (the measure's std.+0, through std::_Throw's r3).
+[StdExceptionVtable]
+measure = "std.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "destructor", offset = 0, type = "fn", note = "probably the scalar deleting destructor" },
+  { name = "what", offset = 4, type = "fn", note = "what(): the message" },
+]
+
+# An OVERLAPPED WriteFile takes (none from the C runtime's own callers).
+[CrtOverlapped]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "internal", offset = 0, type = "u32", note = "the status: 259 (STATUS_PENDING) while pending" },
+  { name = "internal_high", offset = 4, type = "u32", note = "the bytes moved" },
+  { name = "offset", offset = 8, type = "u32", note = "the file position's low word" },
+  { name = "offset_high", offset = 12, type = "u32", note = "and its high word" },
+  { name = "event", offset = 16, type = "u32", note = "hEvent" },
+]
+
+# The kernel's debug monitor data (KeDebugMonitorData's word: 0, no debugger).
+[DebugMonitorData]
+size = 28
+origin = "image"
+fields = [
+  { name = "notify", offset = 24, type = "fn", note = "called with a notification number and a value (10 for an unhandled exception, 39 for a fatal app exit)" },
+]
+
+[globals]
+xapi_initializers = { address = 0x82600000, type = "bytes", count = 12, note = "_initterm_e's table: three function pointers (XAPI's, probably), called until one returns nonzero" }
+pre_terminators = { address = 0x82600294, type = "bytes", count = 8, note = "doexit's pre-terminators (_initterm, 0x82600294 to 0x8260029C)" }
+terminators = { address = 0x826002A0, type = "bytes", count = 4, note = "doexit's terminators (0x826002A0 to 0x826002A4)" }
+loaded_command_line = { address = 0x820007EC, type = "u32", note = "ExLoadedCommandLine (kernel variable import 0x1AE): GetCommandLineA's answer" }
+debug_monitor_data = { address = 0x820007F0, type = "u32", note = "KeDebugMonitorData's address (kernel variable import 0x59); the word there points at a DebugMonitorData, 0 with no debugger" }
+zero_double = { address = 0x82002258, type = "f64", note = "0.0, _positive's compare" }
+exponent_text = { address = 0x82072F88, type = "bytes", count = 6, note = "\"e+000\", %e's exponent copied by _cftoe2_l" }
+thread_start_hook = { address = 0x820723A0, type = "fn", note = "called at a thread's start by the C runtime's notify routine, when set" }
+thread_end_hook = { address = 0x820723A4, type = "fn", note = "and at its end" }
+notify_lock = { address = 0x82638780, type = "bytes", count = 28, note = "the thread notify list's critical section" }
+notify_list = { address = 0x8263879C, type = "bytes", count = 8, note = "the thread notify list's head: +0 the first ThreadNotifyBlock, +4 the last (itself when empty)" }
+os_error_table = { address = 0x8266B4F0, type = "bytes", count = 360, note = "errtable: 45 pairs (Windows error, errno)" }
+errno_fallback = { address = 0x8266B658, type = "s32", note = "errno without thread data" }
+doserrno_fallback = { address = 0x8266B65C, type = "u32", note = "_doserrno without thread data" }
+fls_index = { address = 0x8266B7B4, type = "u32", note = "__flsindex: the thread data's TLS index, -1 when freed" }
+getvalue_index = { address = 0x8266B7B8, type = "u32", note = "__getvalueindex: the getter's TLS index, -1 when freed" }
+abort_behavior = { address = 0x8266B7C4, type = "u32", note = "__abort_behavior: 3 in the image (bit 0 write the message, bit 1 report the fault)" }
+run_time_errors = { address = 0x8266BA88, type = "bytes", count = 184, note = "rterrs: 23 pairs (number, text), _NMSG_WRITE's" }
+positive_infinity = { address = 0x8266BC30, type = "f64", note = "+infinity (exp's overflow)" }
+lock_table = { address = 0x8266BD40, type = "bytes", count = 288, note = "_locktable: 36 CrtLockEntries" }
+exception_actions = { address = 0x8266BE60, type = "bytes", count = 132, note = "_XcptActTab: 11 ExceptionActions, each thread's data +92 points here" }
+first_fpe_index = { address = 0x8266BED8, type = "s32", note = "_First_FPE_Indx: the first SIGFPE entry" }
+fpe_count = { address = 0x8266BEDC, type = "s32", note = "_Num_FPE" }
+exception_action_count = { address = 0x8266BEE4, type = "s32", note = "_XcptActTabCount (11)" }
+bad_io_info = { address = 0x8266BFB8, type = "bytes", count = 44, note = "__badioinfo: the CrtIoInfo of handles -1 and -2" }
+exit_flag = { address = 0x82971144, type = "u8", note = "_exitflag: doexit's \"return to caller\"" }
+c_termination_done = { address = 0x82971148, type = "s32", note = "_C_Termination_Done" }
+c_exit_done = { address = 0x8297114C, type = "s32", note = "_C_Exit_Done" }
+crt_notify_block = { address = 0x82971150, type = "bytes", count = 12, note = "the C runtime's ThreadNotifyBlock (routine 0x825B3650), registered by _mtinit" }
+fls_alloc = { address = 0x8297115C, type = "fn", note = "the FLS stand-ins _mtinit sets: __crtTlsAlloc (0x825AA3F8)" }
+fls_get_value = { address = 0x82971160, type = "fn", note = "KeTlsGetValue's thunk (0x825DBBF4)" }
+fls_set_value = { address = 0x82971164, type = "fn", note = "KeTlsSetValue's thunk (0x825DBC04)" }
+fls_free = { address = 0x82971168, type = "fn", note = "KeTlsFree's thunk (0x825DBC24)" }
+cflush = { address = 0x82971174, type = "u32", note = "_cflush: counted by _stbuf and _getbuf" }
+lock_sections = { address = 0x829711A0, type = "bytes", count = 392, note = "the lock table's static critical sections (28 bytes each, up to 14: the entries made at boot, in order; entry 8's at 0x82971248)" }
+std_buffers = { address = 0x82971330, type = "bytes", count = 8, note = "_stdbuf: the console streams' two shared buffers (malloc(4096) when first used)" }
+sigint_action = { address = 0x82971338, type = "fn", note = "the signal actions raise reads and resets under _lock(0)" }
+sigbreak_action = { address = 0x8297133C, type = "fn" }
+sigabrt_action = { address = 0x82971340, type = "fn", note = "__get_sigabrt's" }
+sigterm_action = { address = 0x82971344, type = "fn" }
+cxx_previous_filter = { address = 0x82971348, type = "fn", note = "the unhandled exception filter before __CxxUnhandledExceptionFilter (0)" }
+output_format = { address = 0x82971358, type = "u32", note = "_outputformat: bit 0 (_TWO_DIGIT_EXPONENT)" }
+unhandled_exception_filter = { address = 0x829714A0, type = "fn", note = "SetUnhandledExceptionFilter's word" }
+debugger_hook_dummy = { address = 0x8297820C, type = "u32", note = "_debugger_hook_dummy: _crt_debugger_hook stores 0" }
+handle_count = { address = 0x82978210, type = "u32", note = "_nhandle" }
+io_info_blocks = { address = 0x82978220, type = "bytes", count = 256, note = "__pioinfo: 64 pointers to CrtIoInfoBlocks (the first made by _ioinit)" }
+stream_table = { address = 0x82978324, type = "u32", note = "__piob: the stream pointers (_nstream of them, the first 20 at _iob's)" }
+stream_count = { address = 0x82978328, type = "s32", note = "_nstream (512)" }

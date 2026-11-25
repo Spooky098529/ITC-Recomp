@@ -1,0 +1,415 @@
+# The schema of docs/functions/screen-objects.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's screen objects (one 128,000-byte object a view, at the race
+# scene's +31152, or +31156 and +31160 in split screen; probably a screen
+# blur while the nitrous runs), with their two red-black trees: each ring
+# point's texture coordinates kept in a std::map<double, std::map<double,
+# {float u, v}>> (UvMap, its nodes holding UvColumns). The trees are
+# Dinkumware's std::map as the game instantiated them (src/screen_objects/
+# uv_trees.h): a tree (12 bytes) +4 its head node, +8 its size; a node +0
+# left, +4 parent, +8 right, +16 its double key, then its value, its color
+# (0 red, 1 black) and its isnil byte (1 only for the head).
+#
+# Measure faults (tools/type_map.py), their fields named fault_*: "UvMap"
+# and "UvColumn" join the tree with its nodes (UvMap::ConstructNode's r3 is
+# a node, and the methods' r3 is met as both), "VideoOutput.+276" is a map
+# node met as the video output's +276 (a register reused).
+# Also here, as the measure files them: the C++ library's exception objects
+# and a vector of words met only in its throw paths (StdThrownObject,
+# StdLogicError, StdWordVector), never seen in play.
+
+# The screen object (128,000 bytes, ScreenObject::ScreenObject sub_82133000).
+[ScreenObject]
+measure = "ScreenObject"
+size = 128000
+origin = "allocated"
+fields = [
+  { name = "vertex_declaration", offset = 0, type = "u32", note = "a float2 position, a color, a float2 texture coordinate (20 bytes a vertex)" },
+  { name = "texture", offset = 4, type = "u32", note = "1024 wide, A8R8G8B8" },
+  { name = "width", offset = 8, type = "u32" },
+  { name = "height", offset = 12, type = "u32" },
+  { name = "x", offset = 16, type = "u32" },
+  { name = "y", offset = 20, type = "u32" },
+  { name = "running", offset = 24, type = "u8", note = "set by ScreenObject::Start (never seen in play)" },
+  { name = "hidden", offset = 25, type = "u8", note = "ScreenObject::ToggleHidden" },
+  { name = "stopping", offset = 26, type = "u8" },
+  { name = "speed_set", offset = 27, type = "u8", note = "set by each SetSpeed, cleared by each Record" },
+  { name = "glow_saved_0", offset = 28, type = "f32", note = "the +88 object's slot 13, saved by Start (probably to restore it)" },
+  { name = "glow_saved_1", offset = 32, type = "f32", note = "the +88 object's slot 21, saved by Start" },
+  { name = "glow_saved_2", offset = 36, type = "f32", note = "the +88 object's slot 22, saved by Start" },
+  { name = "glow_setting_0", offset = 40, type = "f32", note = "0.25: Record sets it on the +88 object (slot 2)" },
+  { name = "glow_setting_1", offset = 44, type = "f32", note = "0.035: Record's slot 10" },
+  { name = "glow_setting_2", offset = 48, type = "f32", note = "0.6: Record's slot 11" },
+  { name = "second_saved_0", offset = 52, type = "f32", note = "the +92 object's settings Start reads (its slot 9 with +52 to +60)" },
+  { name = "second_saved_1", offset = 56, type = "f32" },
+  { name = "second_saved_2", offset = 60, type = "f32" },
+  { name = "second_setting_0", offset = 64, type = "f32", note = "0.95: Record sets +64 to +72 on the +92 object (slot 4)" },
+  { name = "second_setting_1", offset = 68, type = "f32", note = "0.95" },
+  { name = "second_setting_2", offset = 72, type = "f32", note = "1.05" },
+  { name = "strength", offset = 76, type = "f32", note = "the speed in km/h / 300, in [0, 1] (SetSpeed)" },
+  { name = "camera_pass", offset = 80, type = "u32", note = "0x826BAC00 + 592 x it" },
+  { name = "key", offset = 84, type = "u32", note = "599 or 601: probably the chunk's sort key" },
+  { name = "glow", offset = 88, type = "ptr", to = "ScreenObjectGlowEffect", note = "probably its glow; 0 from the constructor, who sets it not found" },
+  { name = "second_effect", offset = 92, type = "ptr", to = "ScreenObjectSecondEffect", note = "0 from the constructor, who sets it not found" },
+  { name = "fan_vertices", offset = 96, type = "bytes", count = 60000, note = "the fan's 20-byte vertices (720 triangles)" },
+  { name = "fan_vertex_count", offset = 60096, type = "u32" },
+  { name = "fan_offsets", offset = 60100, type = "bytes", count = 16000, note = "each step's two texture offsets, 16 bytes a step (probably for the draw)" },
+  { name = "noise_toggle", offset = 76100, type = "u32", note = "drawn again every second point" },
+  { name = "noise", offset = 76104, type = "f32" },
+  { name = "fade_flag", offset = 76108, type = "u8", note = "Init: 0 (with +76112 to +76120 probably the fade)" },
+  { name = "fade_word", offset = 76112, type = "u32", note = "Init: 0" },
+  { name = "fade_0", offset = 76116, type = "f32", note = "Init: 1.0" },
+  { name = "fade_1", offset = 76120, type = "f32", note = "Init: 1.0" },
+  { name = "uv_map", offset = 76124, type = "bytes", count = 12, note = "a ScreenObjectUvMap (std::map<double, UvColumn>)" },
+  { name = "uv_map_head", offset = 76128, type = "ptr", to = "ScreenObjectUvMapNode" },
+  { name = "uv_map_size", offset = 76132, type = "u32" },
+  { name = "ring_vertices", offset = 76136, type = "bytes", count = 51840, note = "the rings' 20-byte vertices (1,440 written)" },
+  { name = "ring_vertex_count", offset = 127976, type = "u32" },
+  { name = "end_0", offset = 127980, type = "f32", note = "Init sets +127980 to +127996 (0, 0.5); not read further" },
+  { name = "end_word", offset = 127984, type = "u32" },
+  { name = "end_flag", offset = 127988, type = "u8" },
+  { name = "end_1", offset = 127996, type = "f32" },
+]
+
+# The object at the screen object's +88 (probably its glow), met through
+# its vtable only.
+[ScreenObjectGlowEffect]
+measure = "ScreenObject.+88"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ScreenObjectGlowEffectVtable" },
+]
+
+[ScreenObjectGlowEffectVtable]
+measure = "ScreenObject.+88.+0"
+size = 92
+origin = "image"
+fields = [
+  { name = "slot2", offset = 8, type = "fn", note = "Record sets +40" },
+  { name = "slot10", offset = 40, type = "fn", note = "Record sets +44" },
+  { name = "slot11", offset = 44, type = "fn", note = "Record sets +48" },
+  { name = "slot13", offset = 52, type = "fn", note = "Start saves it into +28" },
+  { name = "slot21", offset = 84, type = "fn", note = "Start saves it into +32" },
+  { name = "slot22", offset = 88, type = "fn", note = "Start saves it into +36" },
+]
+
+# The object at the screen object's +92, met through its vtable only.
+[ScreenObjectSecondEffect]
+measure = "ScreenObject.+92"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ScreenObjectSecondEffectVtable" },
+]
+
+[ScreenObjectSecondEffectVtable]
+measure = "ScreenObject.+92.+0"
+size = 40
+origin = "image"
+fields = [
+  { name = "slot4", offset = 16, type = "fn", note = "Record sets +64 to +72" },
+  { name = "slot9", offset = 36, type = "fn", note = "Start reads +52 to +60" },
+]
+
+# The map (std::map<double, UvColumn>, 12 bytes): the screen object's
+# +76124.
+[ScreenObjectUvMap]
+measure = "UvMap"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "head", offset = 4, type = "ptr", to = "ScreenObjectUvMapNode", note = "the head node: its parent the root, its left and right the leftmost and rightmost nodes" },
+  { name = "size", offset = 8, type = "u32" },
+  { name = "fault_node_left", offset = 0, type = "u32", note = "measure fault: a node's left (UvMap::ConstructNode's r3)" },
+  { name = "fault_iterator", offset = 0, type = "u64", note = "measure fault: Erase's and InsertUnique's result out (an iterator, stored as one doubleword)" },
+  { name = "fault_node_right", offset = 8, type = "u8", note = "measure fault: a byte met at +8" },
+  { name = "fault_node_key", offset = 16, type = "f64", note = "measure fault: a node's key" },
+  { name = "fault_node_color", offset = 40, type = "u8", note = "measure fault: a node's color" },
+  { name = "fault_node_is_nil", offset = 41, type = "u8", note = "measure fault: a node's isnil" },
+]
+
+# A map node (48 bytes, UvMap::AllocateNodes). In host memory (E5 step 4,
+# 2026-11-24): made by UvMap::AllocateNodes' hand port (NewArray, one node
+# a call), freed by UvMap::EraseSubtree's and ~UvMap's (Delete); no lifted
+# function allocates or frees one (their originals' calls to the
+# allocators have no entry). The measure's "RaceScreens@+16.+592" (a
+# texture read by sub_822A5C50, a graphics function: a register reused)
+# is left out, so that function's load stays a guest one.
+[ScreenObjectUvMapNode]
+measure = "UvMap.+4"
+measures = ["UvMap.+4.+0", "UvMap.+4.+8", "UvMap.+4.+8.+0", "new<?>@UvMap::AllocateNodes.+4", "new<?>@UvMap::AllocateNodes.+4.+0", "new<?>@UvMap::AllocateNodes.+4.+0.+8", "new<?>@UvMap::AllocateNodes.+4.+8", "new<?>@UvMap::AllocateNodes.+4.+8.+0", "UvMap::EraseSubtree.r4", "UvMap::EraseSubtree.r4.+0", "UvMap.+4.+0.+8"]
+size = 48
+origin = "allocated"
+storage = "host"
+fields = [
+  { name = "left", offset = 0, type = "ptr", to = "ScreenObjectUvMapNode" },
+  { name = "parent", offset = 4, type = "ptr", to = "ScreenObjectUvMapNode" },
+  { name = "right", offset = 8, type = "ptr", to = "ScreenObjectUvMapNode" },
+  { name = "key", offset = 16, type = "f64", note = "x rounded to 0.001" },
+  { name = "key_high", offset = 16, type = "u32", note = "the key's high word" },
+  { name = "key_low", offset = 20, type = "u32", note = "the key's low word" },
+  { name = "column", offset = 24, type = "embed", to = "ScreenObjectUvColumn", note = "its head at +28, its size at +32" },
+  { name = "color", offset = 40, type = "u8", note = "0 red, 1 black" },
+  { name = "is_nil", offset = 41, type = "u8", note = "1 only for the head" },
+]
+
+# The map's value ({double x, a UvColumn}, 20 bytes): UvMap::InsertUnique's
+# r5, UvMap::ConstructNode's r7.
+[ScreenObjectUvMapValue]
+measure = "UvMap::InsertUnique.r5"
+measures = ["UvMap::ConstructNode.r7", "UvMap::ConstructNode.r7@+8.+4"]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "key", offset = 0, type = "f64" },
+  { name = "key_high", offset = 0, type = "u32" },
+  { name = "key_low", offset = 4, type = "u32" },
+  { name = "column", offset = 8, type = "bytes", count = 12, note = "a ScreenObjectUvColumn" },
+  { name = "column_head", offset = 12, type = "ptr", to = "ScreenObjectUvColumnNode" },
+  { name = "column_size", offset = 16, type = "u32" },
+]
+
+# A column (std::map<double, {float u, v}>, 12 bytes): a map node's +24.
+# Dual: embedded in the map's nodes (host) and made on AddRingPoint's
+# stack, alone and at a map value's +8 (guest).
+[ScreenObjectUvColumn]
+measures = ["UvColumn", "UvColumn::Find.r4", "UvColumn::InsertUnique.r4"]
+size = 12
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "head", offset = 4, type = "ptr", to = "ScreenObjectUvColumnNode" },
+  { name = "size", offset = 8, type = "u32" },
+  { name = "fault_node_left", offset = 0, type = "u32", note = "measure fault: a node's left met as the column" },
+  { name = "fault_iterator", offset = 0, type = "u64", note = "measure fault: Erase's and InsertUnique's result out (an iterator, stored as one doubleword)" },
+  { name = "fault_size_byte", offset = 8, type = "u8", note = "measure fault: a byte met at +8" },
+]
+
+# A column node (40 bytes, UvColumn::AllocateNodes). In host memory (E5
+# step 4, 2026-11-24): made by UvColumn::AllocateNodes' hand port
+# (NewArray, one node a call), freed by UvColumn::EraseSubtree's and
+# ~UvColumn's (Delete); no lifted function allocates or frees one.
+[ScreenObjectUvColumnNode]
+measures = ["new<?>@UvColumn::AllocateNodes", "UvColumn.+4.+8", "UvColumn.+4.+8.+4",
+            "UvColumn.+4.+8.+4.+8", "UvColumn::RotateRight.r4.+0",
+            "UvColumn::EraseSubtree.r4", "UvColumn::EraseSubtree.r4.+0",
+            "UvColumn::CopySubtree.r4", "UvColumn::Insert.r4.+4.+8",
+            "UvColumn::Insert.r4.+4.+8.+4", "UvColumn::Insert.r4.+4.+8.+4.+8",
+            "UvColumn::InsertUnique.r4.+4", "UvColumn::InsertUnique.r4.+4.+0",
+            "UvColumn::InsertUnique.r4.+4.+0.+8",
+            "sub_8212EEF8.r3.+4", "sub_8212EEF8.r3.+4.+0", "sub_8212EEF8.r3.+4.+8"]
+size = 40
+origin = "allocated"
+storage = "host"
+fields = [
+  { name = "left", offset = 0, type = "ptr", to = "ScreenObjectUvColumnNode" },
+  { name = "parent", offset = 4, type = "ptr", to = "ScreenObjectUvColumnNode" },
+  { name = "right", offset = 8, type = "ptr", to = "ScreenObjectUvColumnNode" },
+  { name = "key", offset = 16, type = "f64", note = "y rounded to 0.001" },
+  { name = "key_high", offset = 16, type = "u32", note = "the key's high word" },
+  { name = "key_low", offset = 20, type = "u32", note = "the key's low word" },
+  { name = "u", offset = 24, type = "u32", note = "the float u's bits" },
+  { name = "v", offset = 28, type = "u32", note = "the float v's bits" },
+  { name = "color", offset = 32, type = "u8", note = "0 red, 1 black" },
+  { name = "is_nil", offset = 33, type = "u8", note = "1 only for the head" },
+]
+
+# A column's value ({double y, float u, float v}, 16 bytes):
+# UvColumn::InsertUnique's r5, UvColumn::NewNode's r7. Dual: met on
+# AddRingPoint's stack (guest) and as a column node's +16 (CopySubtree
+# hands NewNode its source node's key address, an interior handle; the
+# node's own fields cover those bytes, so no embed field there: the view
+# reads the node's members at +16 to +31, laid out alike).
+[ScreenObjectUvColumnValue]
+measures = ["UvColumn::InsertUnique.r5", "UvColumn::NewNode.r7"]
+size = 16
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "key", offset = 0, type = "f64" },
+  { name = "key_high", offset = 0, type = "u32" },
+  { name = "key_low", offset = 4, type = "u32" },
+  { name = "u", offset = 8, type = "u32", note = "the float u's bits" },
+  { name = "v", offset = 12, type = "u32", note = "the float v's bits" },
+]
+
+# A key passed by its address (LowerBoundNode's r4, Find's r5).
+[ScreenObjectUvKey]
+measures = ["UvColumn::LowerBoundNode.r4", "UvMap::LowerBoundNode.r4", "UvColumn::Find.r5",
+            "UvMap::Find.r5"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f64" },
+]
+
+# A checked iterator (8 bytes): its tree, then its node. Insert's result,
+# and the column iterator's decrement's r3.
+[ScreenObjectUvIterator]
+measures = ["UvColumn::Insert.ret", "UvMap::Insert.ret", "sub_8212EEF8.r3"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "tree", offset = 0, type = "u32" },
+  { name = "node", offset = 4, type = "u32" },
+]
+
+# --- The C++ library's objects the measure files here (throw paths, never
+# seen in play) ---
+
+# The object sub_82091200 throws (r3): a std::exception-derived object
+# (probably bad_alloc), read for its vtable's slot 2.
+[StdThrownObject]
+measure = "sub_82091200.r3"
+size = 4
+origin = "file"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "StdThrownObjectVtable" },
+]
+
+[StdThrownObjectVtable]
+measure = "sub_82091200.r3.+0"
+size = 12
+origin = "image"
+fields = [
+  { name = "slot2", offset = 8, type = "fn" },
+]
+
+# StdLogicError: merged into heap.toml's StdException at the integration (the same object).
+
+# A vector of words (sub_820A9330: an element by index, with its checks).
+[StdWordVector]
+measures = ["sub_820A9330.r3", "sub_820A96D0.r3.+4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "first", offset = 4, type = "u32" },
+  { name = "last", offset = 8, type = "u32" },
+]
+
+# sub_820A9330's result: the element's address.
+[StdWordVectorElement]
+measure = "sub_820A9330.ret"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# sub_820A96D0's r3: an object holding a StdWordVector pointer at +4
+# (its last element read).
+[StdWordVectorOwner]
+measure = "sub_820A96D0.r3"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "vector", offset = 4, type = "ptr", to = "StdWordVector" },
+]
+
+[globals]
+thousand = { address = 0x82008808, type = "f64", note = "1000.0 (AddRingPoint's key rounding)" }
+half_double = { address = 0x820022B8, type = "f64", note = "0.5 (AddRingPoint's key rounding)" }
+thousandth = { address = 0x82002B98, type = "f64", note = "0.001 (AddRingPoint's key rounding)" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5 (BuildRings: the center)" }
+degree = { address = 0x82002948, type = "f32", note = "pi / 180 (BuildRings)" }
+ring_step = { address = 0x82008810, type = "f32", note = "0.035 (BuildRings: the radius step)" }
+one = { address = 0x82000A30, type = "f32", note = "1.0 (SetSpeed's clamp)" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (SetSpeed's clamp)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from ScreenObjectUvMapValue.
+[ScreenObjectUvMapValueAt8]
+measure = "UvMap::ConstructNode.r7@+8"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from ScreenObjectUvMap.
+[ScreenObjectUvMapAt76124]
+measure = "ScreenObject::~ScreenObject.r3@+76124"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
+
+# Split from ScreenObjectUvMapNode.
+[ScreenObjectUvMapNodePart]
+measure = "ScreenObject::~ScreenObject.r3@+76124.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from ScreenObjectUvMap.
+[ScreenObjectUvMapAt76124_2]
+measure = "ScreenObject@+76124"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvMapNode.
+[ScreenObjectUvMapNodePart_2]
+measure = "ScreenObject@+76124.+4.+8.+4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumn.
+[ScreenObjectUvColumnAt24]
+measure = "UvMap::EraseSubtree.r4@+24"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumnNode.
+[ScreenObjectUvColumnNodePart]
+measure = "UvMap::EraseSubtree.r4@+24.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumn.
+[ScreenObjectUvColumnAt24_2]
+measure = "UvMap@+24"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from ScreenObjectUvColumnNode.
+[ScreenObjectUvColumnNodePart_2]
+measure = "new<?>@UvColumn::AllocateNodes.+4"
+size = 34
+origin = "embedded"
+fields = [
+  { name = "unknown_33", offset = 33, type = "u8" },
+]

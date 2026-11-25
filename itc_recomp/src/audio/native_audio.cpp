@@ -10,24 +10,29 @@
 // sounds are decoded by our own code (hooks/xma.cpp), so the SDK's XMA
 // decoder isn't set up.
 //
-// --native_audio=false brings back the SDK's driver, for comparison.
+// Since E2 (step 5, docs/rexglue-removal.md) this is a class of its own,
+// started from main(), not an audio system in the SDK's runtime (which
+// isn't made any more); --native_audio=false (the SDK's driver) is gone.
 
 #include "audio/native_audio.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
 
 #include "audio/output_mix.h"
+#include "audio/render_driver.h"
+#include "threads/threads.h"
+#include "hooks/lifted_call.h"
+#include "hooks/native_entry.h"
+#include "memory/heap.h"
+#include "memory/mapping.h"
 #include "movies/player.h"
+#include "schema/audio.h"
 
 #include "guest.h"
 
-#include <rex/audio/audio_driver.h>
-#include <rex/audio/audio_system.h>
-#include <rex/audio/flags.h>
 #include "base/flags.h"
 #include "base/log.h"
-#include <rex/system/function_dispatcher.h>
-#include <rex/system/kernel_state.h>
-#include <rex/system/xthread.h>
-#include <rex/thread.h>
 
 #include <SDL3/SDL.h>
 
@@ -40,17 +45,27 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <vector>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_audio, true, "ITC",
-              "Our own audio output instead of the SDK's render driver and Audio Worker");
+              "Our own audio output (always on since E2: the SDK's render driver and Audio "
+              "Worker are gone; false is ignored, with a warning)");
+ITC_FLAG_BOOL(native_render_driver, true, "ITC",
+              "Run the game's render driver's destructor (AudioRenderDriver::Destroy "
+              "sub_824658C8, docs/functions/audio.md) natively inside its wrap instead of "
+              "through the translated code (XAudioUnregisterRenderDriverClient through its "
+              "import as the original; checked by --run_harnesses=audio_wraps)");
 
-ITC_FLAG_DECLARE(int32_t, audio_maxqframes);
+// The SDK's audio flags until A4, same names and defaults.
+ITC_FLAG_BOOL(audio_mute, false, "Audio", "Mute audio output");
+ITC_FLAG_INT32(audio_maxqframes, 8, "Audio",
+               "Max buffered audio frames (range 4-64). Lower reduces latency but may cause "
+               "stuttering.");
 
 namespace native_audio {
 namespace {
-
-using rex::X_STATUS;
 
 // A frame as the game's XAudio mixes it: 256 samples a channel, 6 channels
 // one after another, big-endian floats, at 48 kHz.
@@ -89,67 +104,21 @@ struct Client {
   std::chrono::steady_clock::time_point logged_at = {};
 };
 
-class ItcAudioSystem : public rex::audio::AudioSystem {
+class ItcAudioSystem {
  public:
-  explicit ItcAudioSystem(rex::runtime::FunctionDispatcher* function_dispatcher)
-      : AudioSystem(function_dispatcher) {
+  ItcAudioSystem() {
     queued_frames_limit_ = uint32_t(std::clamp<int32_t>(ITC_FLAG(audio_maxqframes), 4, 64));
   }
 
-  ~ItcAudioSystem() override {
-    if (g_system == this) {
-      g_system = nullptr;
-    }
-  }
-
-  static std::unique_ptr<rex::system::IAudioSystem> Create(
-      rex::runtime::FunctionDispatcher* function_dispatcher) {
-    return std::make_unique<ItcAudioSystem>(function_dispatcher);
-  }
-
-  // Only our thread: the base class would start the Audio Worker and the XMA
-  // decoder (its thread and the XMA registers), which nothing uses since B2.
-  X_STATUS Setup(rex::system::KernelState* kernel_state) override {
+  // Our thread (no Audio Worker or XMA decoder: nothing uses them since B2).
+  void Setup() {
     running_ = true;
-    thread_ = rex::system::object_ref<rex::system::XHostThread>(new rex::system::XHostThread(
-        kernel_state, 128 * 1024, 0, [this]() {
-          ThreadMain();
-          return 0;
-        }));
-    thread_->set_name("ITC Audio");
-    thread_->Create();
+    // One of our threads (E1, src/threads/): a guest stack and per-thread
+    // block for the game's mixer callback, no SDK thread behind it.
+    thread_ = threads::StartThread(128 * 1024, "native audio",
+                                   [this](lifted::Args args) { ThreadMain(args); });
     g_system = this;
     ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
-    return X_STATUS_SUCCESS;
-  }
-
-  void Shutdown() override {
-    if (!running_) {
-      return;
-    }
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      running_ = false;
-    }
-    wake_.notify_all();
-    if (thread_) {
-      // The thread may be inside the game's mixer; give it time to return
-      // before terminating, as the SDK's worker does.
-      rex::thread::Thread* host_thread = thread_->thread();
-      bool exited = host_thread && rex::thread::Wait(host_thread, false,
-                                                     std::chrono::milliseconds(500)) ==
-                                       rex::thread::WaitResult::kSuccess;
-      if (!exited) {
-        ITC_LOG_WARN("native audio: thread didn't exit within 500 ms; terminating");
-        thread_->Terminate(0);
-      }
-      thread_.reset();
-    }
-    for (size_t i = 0; i < kMaxClients; i++) {
-      if (clients_[i].in_use) {
-        Unregister(kHandleBase | uint32_t(i));
-      }
-    }
   }
 
   // Returns the driver handle, or 0.
@@ -174,8 +143,8 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     if (!OpenStream(index, &stream, &device_channels)) {
       return 0;
     }
-    uint32_t wrapped_arg = memory()->SystemHeapAlloc(4);
-    rex::memory::store_and_swap<uint32_t>(memory()->TranslateVirtual(wrapped_arg), callback_arg);
+    const uint32_t wrapped_arg = memory::Alloc(4, 0);
+    guest::StoreU32(wrapped_arg, callback_arg);
     {
       std::lock_guard<std::mutex> lock(mutex_);
       client = {};
@@ -222,7 +191,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       client = {};
     }
     if (wrapped_arg) {
-      memory()->SystemHeapFree(wrapped_arg);
+      memory::Free(wrapped_arg);
     }
   }
 
@@ -232,7 +201,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       ITC_LOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
       return;
     }
-    const float* input = memory()->TranslateVirtual<const float*>(samples);
+    const float* input = reinterpret_cast<const float*>(guest::Pointer(samples));
     std::lock_guard<std::mutex> lock(mutex_);
     Client& client = clients_[index];
     if (!client.in_use) {
@@ -249,21 +218,23 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     client.queued.push_back(std::move(frame));
   }
 
- protected:
-  // Not used: the game's driver object calls Register, not the kernel's
-  // XAudioRegisterRenderDriverClient.
-  X_STATUS CreateDriver(size_t index, rex::thread::Semaphore*,
-                        rex::audio::AudioDriver**) override {
-    ITC_LOG_ERROR("native audio: the SDK's render driver was asked for (client {})", index);
-    return X_STATUS_NOT_IMPLEMENTED;
-  }
-  void DestroyDriver(rex::audio::AudioDriver*) override {}
-
  private:
+  // Runs the client's callback (XAudio::MixerCallback, sub_8245FBE0) with
+  // r3 = `arg`, as the SDK's FunctionDispatcher::Execute did: the stack
+  // padded by 176 bytes, the link register a marker; through our dispatch
+  // table on our thread's stack and per-thread block (`thread`).
+  void RunCallback(const lifted::Args& thread, uint32_t callback, uint64_t arg) {
+    lifted::Args call;
+    call.r1 = thread.r1 - (64 + 112);
+    call.r13 = thread.r13;
+    call.lr = 0xBCBCBCBC;
+    call.r[0] = arg;
+    lifted::Call(callback, call);
+  }
+
   // Runs each client's mixer while it has credits. The mixer submits its
   // frame (Submit) before returning.
-  void ThreadMain() {
-    auto* thread_state = thread_->thread_state();
+  void ThreadMain(const lifted::Args& thread) {
     std::unique_lock<std::mutex> lock(mutex_);
     while (running_) {
       size_t index = kMaxClients;
@@ -282,7 +253,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       uint32_t callback = client.callback;
       uint64_t args[] = {client.wrapped_arg};
       lock.unlock();
-      function_dispatcher()->Execute(thread_state, callback, args, 1);
+      RunCallback(thread, callback, args[0]);
       lock.lock();
     }
   }
@@ -395,7 +366,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   }
 
   uint32_t queued_frames_limit_ = 8;
-  rex::system::object_ref<rex::system::XHostThread> thread_;
+  std::thread thread_;
   bool running_ = false;
   std::mutex mutex_;
   std::condition_variable wake_;
@@ -408,10 +379,14 @@ bool IsOurHandle(uint32_t handle) {
 
 }  // namespace
 
-void Configure(rex::RuntimeConfig& config) {
-  if (ITC_FLAG(native_audio)) {
-    config.audio_factory = REX_AUDIO_BACKEND(ItcAudioSystem);
+void Start() {
+  if (!ITC_FLAG(native_audio)) {
+    ITC_LOG_WARN("native audio: --native_audio=false is ignored (the SDK's driver is gone)");
   }
+  // Never destroyed: its thread may be inside the game's mixer when the
+  // process ends (a host thread can't be terminated).
+  static ItcAudioSystem* const system = new ItcAudioSystem;
+  system->Setup();
 }
 
 }  // namespace native_audio
@@ -423,23 +398,22 @@ using native_audio::g_system;
 
 // Register: r4 = the mixer callback (0 only unregisters). Unregisters any
 // earlier handle first. Returns 0 (S_OK).
-extern "C" REX_FUNC(sub_824657E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
   if (!g_system) {
-    __imp__sub_824657E0(ctx, base);
+    lifted::original::c824657E0(ctx);
     return;
   }
-  uint32_t object = ctx.r3.u32;
+  const schema::AudioRenderDriver object(ctx.r3.u32);
   uint32_t callback = ctx.r4.u32;
-  uint32_t handle = guest::LoadU32(base, object + 16);
+  uint32_t handle = object.handle();
   if (handle) {
     g_system->Unregister(handle);
-    guest::StoreU32(base, object + 16, 0);
+    object.set_handle(0);
   }
   ctx.r3.u64 = 0;
   if (callback) {
-    handle = g_system->Register(callback, guest::LoadU32(base, object + 12));
-    guest::StoreU32(base, object + 16, handle);
+    handle = g_system->Register(callback, object.callback_arg());
+    object.set_handle(handle);
     if (!handle) {
       ctx.r3.u64 = uint32_t(0x80004005);  // E_FAIL
     }
@@ -449,34 +423,37 @@ extern "C" REX_FUNC(sub_824657E0) {
 // Submit: r4 = the mixed buffer; sub_8245F718 gives its descriptor, whose
 // third word (+8) is the samples' address. Returns 0, or the descriptor's
 // failure.
-extern "C" REX_FUNC(sub_82465870) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   if (!g_system) {
-    __imp__sub_82465870(ctx, base);
+    lifted::original::c82465870(ctx);
     return;
   }
-  uint32_t object = ctx.r3.u32;
+  const schema::AudioRenderDriver object(ctx.r3.u32);
   guest::StackFrame frame(ctx, 112);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = frame.Local(80);
-  sub_8245F718(ctx, base);
+  lifted::Enter(ctx, game::XAudioBuffer::GetFormatThunk);
   if (ctx.r3.s32 < 0) {
     return;
   }
-  g_system->Submit(guest::LoadU32(base, object + 16), guest::LoadU32(base, frame.Local(88)));
+  g_system->Submit(object.handle(), guest::LoadU32(frame.Local(88)));
   ctx.r3.u64 = 0;
 }
 
-// Destructor: unregisters the handle at +16 if it's ours, so the original
-// (which would call the kernel's XAudioUnregisterRenderDriverClient) sees
-// none.
-extern "C" REX_FUNC(sub_824658C8) {
-  REX_FUNC_PROLOGUE();
-  uint32_t object = ctx.r3.u32;
-  uint32_t handle = guest::LoadU32(base, object + 16);
+// Destructor: unregisters the handle at +16 if it's ours, so the game's
+// destructor (which would call the kernel's XAudioUnregisterRenderDriverClient)
+// sees none. The destructor's work: its plain C++ (audio/render_driver.h)
+// with --native_render_driver, else the original.
+ITC_NATIVE_ENTRY_ALWAYS(824658C8) {
+  const schema::AudioRenderDriver object(ctx.r3.u32);
+  uint32_t handle = object.handle();
   if (g_system && native_audio::IsOurHandle(handle)) {
     g_system->Unregister(handle);
-    guest::StoreU32(base, object + 16, 0);
+    object.set_handle(0);
   }
-  __imp__sub_824658C8(ctx, base);
+  if (ITC_FLAG(native_render_driver)) {
+    lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx);
+  } else {
+    lifted::original::c824658C8(ctx);
+  }
 }

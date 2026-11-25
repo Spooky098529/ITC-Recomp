@@ -1,0 +1,554 @@
+# The schema of docs/functions/tuning-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The tuning screen: the front end's tuning shop (the type 2 mode block's
+# +19792), its part tables, its command queue, the vinyl and sticker
+# editors' state (docs/known-data.md, "tuning screen"; src/tuning_screen/).
+#
+# For the lead: tuning-machine.toml's TuningMachine is the same object (the
+# screen's own machine at +9604 to +9616; the measure split it by the
+# functions' names), as is the queue there (new<28>@TuningMachine::Create)
+# and TuningCommandQueue here. Fields past +36828 are measure faults.
+
+[TuningScreen]
+measure = "TuningScreen"
+size = 91824
+origin = "embedded"
+# 261 functions; areas: car-makers.md, power-graph.md, stand-models.md, sticker-editor.md, tuning-machine.md, tuning-pages.md, tuning-screen.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::PlaceStickerNode)" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::PlaceStickerNode)" },
+  { name = "unknown_8", offset = 8, type = "f32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::PlaceStickerNode)" },
+  { name = "unknown_12", offset = 12, type = "f32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::PlaceStickerNode)" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::PlaceStickerNode)" },
+  { name = "scroll_direction", offset = 9640, type = "u32", note = "the vinyl editor's scroll (state 28, [0x826D84AC]; Command23 reads it, then 0)" },
+  { name = "vinyl_animation_a", offset = 9644, type = "u32", note = "the vinyl editor's animation pair (Command21 sets it, the update passes it to Command20)" },
+  { name = "vinyl_animation_b", offset = 9648, type = "u32", note = "the pair's second" },
+  { name = "state", offset = 9652, type = "u32", note = "the state machine (3 to 58; 61 picks movie 13 or 14, no handler)" },
+  { name = "category", offset = 9656, type = "u32", note = "0 power, 1 power train, 2 body, 3 tire, 4 aero, 5 exterior, 6 interior" },
+  { name = "item", offset = 9660, type = "u8", note = "the item in the category" },
+  { name = "level", offset = 9661, type = "u8", note = "the level pick" },
+  { name = "type", offset = 9662, type = "u8", note = "the type pick" },
+  { name = "bonnet_choice", offset = 9663, type = "u8", note = "the bonnet's choice (the second type pick)" },
+  { name = "option", offset = 9664, type = "u8", note = "the option pick (color, hardness or door type)" },
+  { name = "confirm_cursor", offset = 9665, type = "u8", note = "the buy and equip dialogs' cursor (states 9 and 11)" },
+  { name = "unknown_9666", offset = 9666, type = "u8" },
+  { name = "keep_cursor", offset = 9667, type = "u8", note = "state 12's cursor" },
+  { name = "discard_cursor", offset = 9668, type = "u8", note = "state 13's cursor" },
+  { name = "remove_cursor", offset = 9672, type = "u32", note = "state 14's cursor" },
+  { name = "item_count", offset = 9676, type = "u8", note = "the category's item count" },
+  { name = "level_count", offset = 9677, type = "u8", note = "the level list's length" },
+  { name = "type_count", offset = 9678, type = "u8", note = "the type list's length" },
+  { name = "color_rows", offset = 9679, type = "u8", note = "state 7's rows" },
+  { name = "option_count", offset = 9680, type = "u8", note = "state 8's options" },
+  { name = "open_items_mask", offset = 9688, type = "u32", note = "a mask of the items state 4 opens (-1 at creation)" },
+  { name = "refresh_pending", offset = 9708, type = "u32", note = "the refresh runs while 1 (then set to whether it answered 0)" },
+  { name = "bonnet_color_set", offset = 9712, type = "u32", note = "set by the bonnet's color choice" },
+  { name = "command_first_run", offset = 9716, type = "u32", note = "a command's first-run flag" },
+  { name = "command_end_after_setup", offset = 9720, type = "u32", note = "end the command at once after its set-up" },
+  { name = "command_end_now", offset = 9724, type = "u32", note = "end the command now" },
+  { name = "pages_enabled", offset = 9728, type = "u32", note = "the input pages run only while set" },
+  { name = "rewrite_car", offset = 9732, type = "u32", note = "the stand and garage car rewrite request" },
+  { name = "menu_category", offset = 9740, type = "u32", note = "the category copied from the menu" },
+  { name = "menu_pick", offset = 9744, type = "u32", note = "the level, type or option copied from the menu" },
+  { name = "unknown_9748", offset = 9748, type = "u32" },
+  { name = "state_history", offset = 9756, type = "bytes", count = 252, note = "the states pushed before a sub-page (4 bytes each by byte +10008; no bound check)" },
+  { name = "history_depth", offset = 10008, type = "u8", note = "the state history's top" },
+  { name = "stand_action", offset = 10012, type = "u32", note = "a pending stand action (1 to 4 ApplyAreaDecals, 5 to 8 ApplyDecals, 9 and 10 ApplyDecalWord, -1 none)" },
+  { name = "busy_shown", offset = 10016, type = "u32", note = "the busy icon shown" },
+  { name = "busy_movie", offset = 10020, type = "u32", note = "the busy icon's movie" },
+  { name = "busy_animation_0", offset = 10024, type = "u32", note = "the busy icon's named animations" },
+  { name = "busy_animation_1", offset = 10028, type = "u32" },
+  { name = "busy_animation_2", offset = 10032, type = "u32" },
+  { name = "queue", offset = 10036, type = "ptr", to = "TuningCommandQueue", note = "the command queue (28 bytes, VirtualAlloc'ed by TuningMachine::Create)" },
+  { name = "category_menu", offset = 10040, type = "ptr", to = "FrontEndMenu", note = "the category menu (68 bytes, a front-end menu)" },
+  { name = "sticker_menu", offset = 10044, type = "ptr", to = "FrontEndMenu", note = "the sticker editor's menu (68 bytes, a front-end menu)" },
+  { name = "decal_images", offset = 10048, type = "bytes", count = 8836, note = "the decal images (tuning-pages.toml's DecalImages: 200 36-byte entries, 200 kept textures of 8 bytes from +7236, the placeholders +8836)" },
+  { name = "placeholder_texture_0", offset = 18884, type = "u32", note = "movies 13's and 14's placeholder textures (the decal images' +8836 to +8848)" },
+  { name = "placeholder_texture_1", offset = 18888, type = "u32" },
+  { name = "placeholder_texture_2", offset = 18892, type = "u32" },
+  { name = "placeholder_texture_3", offset = 18896, type = "u32" },
+  { name = "vinyl_kept", offset = 18900, type = "u32", note = "set when a vinyl page is kept (the decal images' +8852)" },
+  { name = "save_data", offset = 18904, type = "ptr", note = "player 0's save data (SaveData::Of; its +6120 the garage)" },
+  { name = "car_data", offset = 18912, type = "bytes", count = 1856, note = "a car data (CarData::, PowerGraph::Draw; its +1268 the screen's +20180)" },
+  { name = "stat_displacement", offset = 20768, type = "u32", note = "SetCarStats' stats" },
+  { name = "stat_weight", offset = 20772, type = "u32" },
+  { name = "stat_peak_power", offset = 20776, type = "u32" },
+  { name = "stat_torque", offset = 20780, type = "f32" },
+  { name = "spec_byte_69", offset = 20784, type = "u32", note = "the car spec's byte +69" },
+  { name = "spec_byte_130", offset = 20788, type = "u32", note = "the car spec's byte +130" },
+  { name = "career_pick", offset = 20792, type = "u32", note = "a copy of the career's pick (+20792 to +20808; a name record shown in movie 2's sub-scene 9 child 6)" },
+  { name = "stand_record", offset = 20816, type = "bytes", count = 4244, note = "a scene model record copied from the stand car (state 4's A)" },
+  { name = "camera_preset_last", offset = 25072, type = "u32", note = "the camera preset command last picked" },
+  { name = "part_slot_last", offset = 25076, type = "u32", note = "the part slot last previewed" },
+  { name = "unknown_25080", offset = 25080, type = "u32" },
+  { name = "day", offset = 25092, type = "u32", note = "the day (at most 999), the header's text" },
+  { name = "weekday", offset = 25096, type = "u32", note = "the header's texture" },
+  { name = "list_scroll_row", offset = 25100, type = "u32", note = "the list's scrolled row (category 4) or the level for long lists" },
+  { name = "unknown_25104", offset = 25104, type = "u32" },
+  { name = "types_row", offset = 25108, type = "u32", note = "the types list's row" },
+  { name = "types_row_previous", offset = 25112, type = "u32" },
+  { name = "money", offset = 25116, type = "u32", note = "the save's +6116" },
+  { name = "price", offset = 25120, type = "u32", note = "GetPrice's answer kept" },
+  { name = "aero_available_0", offset = 25128, type = "u32", note = "the aero items' availability (SetAeroAvailability)" },
+  { name = "aero_available_1", offset = 25132, type = "u32" },
+  { name = "aero_available_2", offset = 25136, type = "u32" },
+  { name = "aero_available_3", offset = 25140, type = "u32" },
+  { name = "aero_available_4", offset = 25144, type = "u32" },
+  { name = "aero_available_5", offset = 25148, type = "u32" },
+  { name = "aero_available_6", offset = 25152, type = "u32" },
+  { name = "aero_available_7", offset = 25156, type = "u32" },
+  { name = "aero_available_8", offset = 25160, type = "u32" },
+  { name = "aero_available_9", offset = 25164, type = "u32" },
+  { name = "aero9_third_type", offset = 25168, type = "u32", note = "aero item 9's third type" },
+  { name = "aero3_type_remap", offset = 25172, type = "u32", note = "aero item 3's type remap (the spec's +120 set)" },
+  { name = "interior_slot_available_0", offset = 25176, type = "u32", note = "the interior's five slots' availability" },
+  { name = "interior_slot_available_1", offset = 25180, type = "u32" },
+  { name = "interior_slot_available_2", offset = 25184, type = "u32" },
+  { name = "interior_slot_available_3", offset = 25188, type = "u32" },
+  { name = "interior_slot_available_4", offset = 25192, type = "u32" },
+  { name = "wheel_part_cursor", offset = 25196, type = "u32", note = "the wheels' part cursor (0 both, 1 front, 2 rear)" },
+  { name = "unknown_25200", offset = 25200, type = "u32", note = "the wheels' pages' cursors and previous values (not told apart)" },
+  { name = "part_group", offset = 25204, type = "u32", note = "the part group or wheel brand (0 to 16)" },
+  { name = "unknown_25208", offset = 25208, type = "u32", note = "11 picks animation 71 (PlayGroupAnimation)" },
+  { name = "tabs_row", offset = 25212, type = "u32", note = "the brand tabs' row" },
+  { name = "unknown_25216", offset = 25216, type = "u32" },
+  { name = "list_cursor", offset = 25220, type = "u32", note = "the list's cursor (the model in the brand)" },
+  { name = "list_last", offset = 25224, type = "u32", note = "the list's last index" },
+  { name = "size_cursor", offset = 25228, type = "u32", note = "state 17's cursor (the size)" },
+  { name = "size_last", offset = 25232, type = "u32", note = "state 17's last index" },
+  { name = "unknown_25236", offset = 25236, type = "u32" },
+  { name = "size_back", offset = 25240, type = "u32", note = "set by state 16's B" },
+  { name = "second_wheels_step", offset = 25244, type = "u32", note = "1 claim them, 2 paint them, 0 done" },
+  { name = "wheel_prices", offset = 25248, type = "bytes", count = 2584, note = "the wheels' prices, 152 x brand + 4 x model" },
+  { name = "saved_wheel_both", offset = 27832, type = "u32", note = "the saved wheel words (+27836 the front wheel's match, +27840 the rear's)" },
+  { name = "saved_wheel_front", offset = 27836, type = "u32" },
+  { name = "saved_wheel_rear", offset = 27840, type = "u32" },
+  { name = "saved_wheel_3", offset = 27844, type = "u32" },
+  { name = "saved_wheel_4", offset = 27848, type = "u32" },
+  { name = "saved_wheel_5", offset = 27852, type = "u32" },
+  { name = "wheel_flags", offset = 27856, type = "bytes", count = 2584, note = "the wheels' flags (probably owned), 152 x group + 4 x index" },
+  { name = "paint_row", offset = 30440, type = "u32", note = "the paint page's row: hue, saturation, value, a two-way choice, the buttons" },
+  { name = "paint_hue", offset = 30444, type = "u32" },
+  { name = "paint_saturation", offset = 30448, type = "u32" },
+  { name = "paint_value", offset = 30452, type = "u32" },
+  { name = "paint_choice", offset = 30456, type = "u32", note = "the two-way choice" },
+  { name = "paint_buttons", offset = 30460, type = "u32" },
+  { name = "paint_previous_0", offset = 30464, type = "u32", note = "the paint page's previous values (probably)" },
+  { name = "paint_previous_1", offset = 30468, type = "u32" },
+  { name = "paint_previous_2", offset = 30472, type = "u32" },
+  { name = "saved_paint_0", offset = 30476, type = "u32", note = "the saved paint" },
+  { name = "saved_paint_1", offset = 30480, type = "u32" },
+  { name = "saved_paint_2", offset = 30484, type = "u32" },
+  { name = "saved_paint_3", offset = 30488, type = "u32" },
+  { name = "light_kit_group", offset = 30492, type = "u32", note = "the light kits' group" },
+  { name = "unknown_30496", offset = 30496, type = "u32" },
+  { name = "light_kit_kind", offset = 30500, type = "u32", note = "0, 1 or 2 remove" },
+  { name = "unknown_30504", offset = 30504, type = "u32" },
+  { name = "kit0_row", offset = 30508, type = "u32", note = "kind 0's row" },
+  { name = "kit0_value_0", offset = 30512, type = "u32", note = "kind 0's values" },
+  { name = "kit0_value_1", offset = 30516, type = "u32" },
+  { name = "kit0_value_2", offset = 30520, type = "u32" },
+  { name = "kit0_value_3", offset = 30524, type = "u32" },
+  { name = "kit0_cursor_b", offset = 30528, type = "u32", note = "kind 0's second cursor" },
+  { name = "unknown_30532", offset = 30532, type = "u32" },
+  { name = "unknown_30536", offset = 30536, type = "u32" },
+  { name = "unknown_30540", offset = 30540, type = "u32" },
+  { name = "kit1_row", offset = 30544, type = "u32", note = "kind 1's row" },
+  { name = "kit1_value_0", offset = 30548, type = "u32", note = "kind 1's values" },
+  { name = "kit1_value_1", offset = 30552, type = "u32" },
+  { name = "kit1_value_2", offset = 30556, type = "u32" },
+  { name = "kit1_cursor_b", offset = 30560, type = "u32", note = "kind 1's second cursor" },
+  { name = "unknown_30564", offset = 30564, type = "u32" },
+  { name = "unknown_30568", offset = 30568, type = "u32" },
+  { name = "unknown_30572", offset = 30572, type = "u32" },
+  { name = "unknown_30576", offset = 30576, type = "u32" },
+  { name = "light_kit_a", offset = 30580, type = "bytes", count = 80, note = "the first light kit's groups, 4g per group g (+30596 + 4g and +30612 + 4g two more values; the garage car's vinyl layers' kinds are read from here too)" },
+  { name = "light_kit_b", offset = 30660, type = "bytes", count = 52, note = "the second light kit's groups, 4g per group g" },
+  { name = "unknown_30712", offset = 30712, type = "u32" },
+  { name = "unknown_30716", offset = 30716, type = "u32" },
+  { name = "unknown_30720", offset = 30720, type = "u32" },
+  { name = "editor_page", offset = 30724, type = "u32", note = "the vinyl page (0 or 1), or the sticker area (0 to 7)" },
+  { name = "editor_page_wrapped", offset = 30728, type = "u32", note = "set when +30724's last step wrapped" },
+  { name = "layer_cursor", offset = 30732, type = "u32", note = "the layer cursor, or the sticker slot (0 to 4; 5 and 6 two buttons)" },
+  { name = "layer_button", offset = 30736, type = "u32", note = "the layer page's remembered button (3 or 4)" },
+  { name = "operation_cursor", offset = 30740, type = "u32", note = "0 edit, 1 order, 2 image, 3 remove" },
+  { name = "operation_wrapped", offset = 30744, type = "u32" },
+  { name = "edit_cursor", offset = 30748, type = "u32", note = "0 move, 1 rotate, 2 scale, 3 flip, 4 the free look, 5 and 6 two buttons" },
+  { name = "edit_row_saved", offset = 30752, type = "u32" },
+  { name = "order_position", offset = 30756, type = "u32", note = "state 27's position (the slot state 42 moves)" },
+  { name = "order_last_move", offset = 30760, type = "u32", note = "1 up, 2 down, 0 none" },
+  { name = "picked_image", offset = 30764, type = "u32", note = "the picked image or sticker" },
+  { name = "image_group", offset = 30768, type = "u32", note = "page 1's image group (0 to 11), the sticker picker's (0 to 5)" },
+  { name = "before_state_35", offset = 30772, type = "u32", note = "0 before state 35" },
+  { name = "before_state_36", offset = 30776, type = "u32", note = "0 before state 36" },
+  { name = "before_state_37", offset = 30780, type = "u32", note = "0 before states 37 and 52" },
+  { name = "last_page", offset = 30784, type = "u32", note = "the editor's last page" },
+  { name = "last_layer", offset = 30788, type = "u32", note = "the editor's last layer" },
+  { name = "order_last_position", offset = 30792, type = "u32", note = "state 27's last position" },
+  { name = "image_last_index", offset = 30796, type = "u32", note = "the image list's last index (4, 193 or 198)" },
+  { name = "page0_origin_x", offset = 30800, type = "u32", note = "the pages' layout origins and scales" },
+  { name = "page0_origin_y", offset = 30804, type = "u32" },
+  { name = "page0_size_scale", offset = 30808, type = "f32" },
+  { name = "page0_position_scale", offset = 30812, type = "f32" },
+  { name = "page1_origin_x", offset = 30816, type = "u32" },
+  { name = "page1_origin_y", offset = 30820, type = "u32" },
+  { name = "page1_size_scale", offset = 30824, type = "f32" },
+  { name = "page1_position_scale", offset = 30828, type = "f32" },
+  { name = "edited_x", offset = 30832, type = "u32", note = "the edited decal or sticker" },
+  { name = "edited_y", offset = 30836, type = "u32" },
+  { name = "edited_angle", offset = 30840, type = "f32" },
+  { name = "edited_scale", offset = 30844, type = "f32" },
+  { name = "edited_flip", offset = 30848, type = "u32" },
+  { name = "edited_word", offset = 30852, type = "u32" },
+  { name = "edited_backup", offset = 30856, type = "bytes", count = 24, note = "a copy of the edited decal (restored on B in states 29 to 31)" },
+  { name = "vinyl_layers_0", offset = 30880, type = "bytes", count = 72, note = "page 0's three vinyl layers, 24 bytes each (x, y, angle, scale, flag)" },
+  { name = "vinyl_layers_1", offset = 30952, type = "bytes", count = 72, note = "page 1's" },
+  { name = "saved_vinyl_layers_0", offset = 31024, type = "bytes", count = 72, note = "page 0's saved copies (24-byte decal layout records)" },
+  { name = "saved_vinyl_layers_1", offset = 31096, type = "bytes", count = 72, note = "page 1's" },
+  { name = "layer_ids_0", offset = 31168, type = "bytes", count = 12, note = "page 0's layers' current ids, 4j (-1 empty)" },
+  { name = "layer_ids_1", offset = 31180, type = "bytes", count = 12, note = "page 1's" },
+  { name = "saved_layer_ids_0", offset = 31192, type = "bytes", count = 12, note = "page 0's saved ids" },
+  { name = "saved_layer_ids_1", offset = 31204, type = "bytes", count = 12, note = "page 1's saved ids" },
+  { name = "order_ids", offset = 31216, type = "bytes", count = 12, note = "state 27's work list's ids" },
+  { name = "order_indices", offset = 31228, type = "bytes", count = 12, note = "state 27's work list's indices" },
+  { name = "saved_stickers", offset = 31240, type = "bytes", count = 960, note = "the saved stickers, 120 x area + 24 x slot" },
+  { name = "saved_sticker_ids", offset = 32200, type = "bytes", count = 160, note = "their ids, 20 x area + 4 x slot" },
+  { name = "stickers", offset = 32360, type = "bytes", count = 960, note = "the placed stickers, 120 x area + 24 x slot" },
+  { name = "sticker_ids", offset = 33320, type = "bytes", count = 160, note = "their ids, 20 x area + 4 x slot" },
+  { name = "sticker_order", offset = 33480, type = "bytes", count = 20, note = "state 42's order list (slot indices)" },
+  { name = "holding_164", offset = 33500, type = "u32", note = "1 while 164 is held (the other slots hidden)" },
+  { name = "holding_163", offset = 33504, type = "u32", note = "1 while 163 is held (the picker shows the slot's sticker)" },
+  { name = "no_car_id", offset = 33508, type = "u32", note = "1 when the garage car's id is 0" },
+  { name = "sticker_backup", offset = 33512, type = "bytes", count = 24, note = "a backup of the edited sticker (restored by B in states 44 to 46)" },
+  { name = "picker_wait", offset = 33536, type = "u32", note = "the sticker picker's wait (frames)" },
+  { name = "interior_mode", offset = 33540, type = "u32", note = "the interior item's mode" },
+  { name = "unknown_33544", offset = 33544, type = "u32" },
+  { name = "interior_pick", offset = 33548, type = "u32", note = "the interior accessory's pick or kind (GetPrice's mode 0 index; RefreshInterior compares it with 1)" },
+  { name = "unknown_33552", offset = 33552, type = "u32" },
+  { name = "unknown_33556", offset = 33556, type = "u32" },
+  { name = "interior_page_mode", offset = 33564, type = "u32", note = "the interior pages' mode (4 hides a node)" },
+  { name = "interior_pair_index", offset = 33572, type = "u32", note = "the picked pair's second index" },
+  { name = "interior_slot", offset = 33576, type = "u32", note = "the slot (0 to 4)" },
+  { name = "unknown_33580", offset = 33580, type = "u32" },
+  { name = "unknown_33588", offset = 33588, type = "u32" },
+  { name = "unknown_33592", offset = 33592, type = "u32" },
+  { name = "unknown_33596", offset = 33596, type = "u32" },
+  { name = "interior_choice", offset = 33616, type = "u32", note = "the interior item 3's current choice in mode 0 (GetCurrentChoice)" },
+  { name = "interior_choice_word", offset = 33620, type = "u32", note = "the interior item 3's word the garage car and the stand take" },
+  { name = "unknown_33624", offset = 33624, type = "u32" },
+  { name = "unknown_33640", offset = 33640, type = "u32" },
+  { name = "choice_code_0", offset = 33800, type = "u32", note = "five choice codes (tens and units into the car's +1824 + 12i; -1 empty)" },
+  { name = "choice_code_1", offset = 33804, type = "u32" },
+  { name = "choice_code_2", offset = 33808, type = "u32" },
+  { name = "choice_code_3", offset = 33812, type = "u32" },
+  { name = "choice_code_4", offset = 33816, type = "u32" },
+  { name = "unknown_33820", offset = 33820, type = "u32" },
+  { name = "price_class", offset = 33900, type = "u32", note = "the power and power train tables' row" },
+  { name = "part_tables", offset = 34104, type = "bytes", count = 2720, note = "the part tables: per item a price table (GetPrice), the current choice (GetCurrentChoice), flags (GetChoiceFlag) and IsItemAvailable's lists; +34104 + 40 x class + 4i the parts unlocked" },
+  { name = "power2_level", offset = 35020, type = "u32", note = "power item 2's current choice (the garage car's +1672)" },
+  { name = "power2_type", offset = 35024, type = "u32", note = "the cooling module's type (the car's +1668)" },
+  { name = "power3_level", offset = 35140, type = "u32", note = "power item 3's (the car's +1676)" },
+  { name = "train0_level", offset = 35228, type = "u32", note = "the power train's current choices (the car's +1680 to +1696)" },
+  { name = "train1_level", offset = 35316, type = "u32" },
+  { name = "train2_level", offset = 35404, type = "u32" },
+  { name = "train3_level", offset = 35492, type = "u32" },
+  { name = "train3_type", offset = 35496, type = "u32", note = "the caliper's choice (SetCaliper)" },
+  { name = "train4_level", offset = 35608, type = "u32", note = "the LSD's level (the car's +1700 and +1704 split it)" },
+  { name = "body_choice", offset = 35708, type = "u32", note = "the body's current choice (compared with 3: which stand choices interior slots 3 and 4 map to)" },
+  { name = "tire_both_choice", offset = 35820, type = "u32", note = "the tire's current choice (item 0)" },
+  { name = "tire_front_choice", offset = 35948, type = "u32", note = "the tire's front pair" },
+  { name = "tire_front_option", offset = 35952, type = "u32" },
+  { name = "tire_rear_choice", offset = 36076, type = "u32", note = "the tire's rear pair" },
+  { name = "tire_rear_option", offset = 36080, type = "u32" },
+  { name = "aero0_type", offset = 36164, type = "u32", note = "the aero items' current types (the car's +1744 to +1784)" },
+  { name = "aero1_type", offset = 36208, type = "u32" },
+  { name = "aero2_type", offset = 36252, type = "u32" },
+  { name = "aero3_type", offset = 36300, type = "u32", note = "the rear spoiler's (with +25172 set remapped)" },
+  { name = "aero4_type", offset = 36368, type = "u32", note = "the bonnet's (the car's +1760)" },
+  { name = "aero4_color_kind", offset = 36372, type = "u32", note = "the bonnet's color kind 0 to 2 (the car's +1764)" },
+  { name = "aero4_color", offset = 36376, type = "u32" },
+  { name = "aero5_type", offset = 36436, type = "u32" },
+  { name = "aero6_type", offset = 36472, type = "u32" },
+  { name = "aero7_type", offset = 36508, type = "u32" },
+  { name = "aero8_type", offset = 36544, type = "u32" },
+  { name = "aero9_type", offset = 36588, type = "u32", note = "aero item 9's current choice (AeroParts::Get82 takes it for the rear spoiler's help line)" },
+  { name = "exterior1_choice", offset = 36612, type = "u32", note = "the door type (the car's +1792)" },
+  { name = "exterior2_choice", offset = 36636, type = "u32", note = "the car's byte +1568" },
+  { name = "exterior3_choice", offset = 36668, type = "u32", note = "the car's +1796" },
+  { name = "interior0_choice", offset = 36708, type = "u32", note = "the interior items' current choices (the car's +1800 to +1812)" },
+  { name = "interior0_level", offset = 36712, type = "u32" },
+  { name = "interior1_choice", offset = 36752, type = "u32" },
+  { name = "interior2_choice", offset = 36796, type = "u32" },
+  { name = "paint_kept", offset = 36824, type = "u32", note = "set when a paint is kept, 0 when discarded; when set the garage car's halfwords +0 to +4 = -2" },
+  { name = "unknown_46244", offset = 46244, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46248", offset = 46248, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46250", offset = 46250, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46251", offset = 46251, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46252", offset = 46252, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46267", offset = 46267, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46268", offset = 46268, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_46304", offset = 46304, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::Refresh)" },
+  { name = "unknown_61212", offset = 61212, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61228", offset = 61228, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61244", offset = 61244, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61260", offset = 61260, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61276", offset = 61276, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61292", offset = 61292, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61308", offset = 61308, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61324", offset = 61324, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_61340", offset = 61340, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_64700", offset = 64700, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::DebugLayerOrder)" },
+  { name = "unknown_70988", offset = 70988, type = "u8", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_86524", offset = 86524, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_86568", offset = 86568, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_86572", offset = 86572, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_89160", offset = 89160, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_89164", offset = 89164, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_89168", offset = 89168, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_91804", offset = 91804, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_91808", offset = 91808, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_91812", offset = 91812, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_91816", offset = 91816, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+  { name = "unknown_91820", offset = 91820, type = "u32", note = "probably a measure fault: a register the measure kept as the screen after it was reused (TuningScreen::RestoreStand)" },
+]
+
+# The command queue at [+10036] (28 bytes): stepped by Advance and the
+# commands (src/tuning_screen/pages.cpp).
+[TuningCommandQueue]
+measure = "TuningScreen.+10036.+16"
+size = 28
+origin = "allocated"
+fields = [
+  { name = "page", offset = 0, type = "u32", note = "the state whose input page HandleInput runs (-1 while a command runs)" },
+  { name = "resume", offset = 4, type = "u32", note = "the state to resume after the command" },
+  { name = "previous_page", offset = 8, type = "u32" },
+  { name = "current", offset = 12, type = "u32", note = "the current command (0 to 64, -1 none)" },
+  { name = "next", offset = 16, type = "u32", note = "the next command or -1 (the measure took it for a pointer)" },
+  { name = "step", offset = 20, type = "u32", note = "0 when a command is made current" },
+  { name = "started", offset = 24, type = "u32" },
+]
+
+# A UI movie node (docs/known-data.md, "UI movie node"; UiMovie::Child's and
+# FindNode's answer). Pictures, scenes and groups share +100 to +136.
+[UiMovieNode]
+measure = "UiMovie::Child.ret"
+size = 140
+origin = "file"
+# 167 functions; areas: car-dealer.md, car-list.md, front-end-screen-helpers.md, garage-screen.md, lifted.md, network-mode.md, options-screen.md, race-menu.md, race-screens-unseen.md, race-screens.md, system-services.md, tuning-pages.md, tuning-screen.md, type10-mode.md, type6-type7-modes.md, type67-screens.md, type8-screens.md, ui-movies-game.md, ui-movies.md
+fields = [
+  { name = "tag", offset = 0, type = "u32", note = "GRP, PIC, PRM, SCE, TFM, TXT" },
+  { name = "id", offset = 8, type = "u32", note = "tracks find nodes by it" },
+  { name = "x", offset = 12, type = "f32", note = "the position (also read as words)" },
+  { name = "y", offset = 16, type = "f32" },
+  { name = "pivot_x", offset = 20, type = "u32" },
+  { name = "pivot_y", offset = 24, type = "u32" },
+  { name = "scale_x", offset = 28, type = "f32" },
+  { name = "scale_y", offset = 32, type = "f32" },
+  { name = "rotation", offset = 36, type = "f32", note = "degrees" },
+  { name = "clip_0", offset = 40, type = "u32", note = "a clip rectangle (+40 to +52)" },
+  { name = "clip_1", offset = 44, type = "u32" },
+  { name = "clip_2", offset = 48, type = "u32" },
+  { name = "clip_3", offset = 52, type = "u32" },
+  { name = "red", offset = 56, type = "u32", note = "the color (0-255)" },
+  { name = "green", offset = 60, type = "u32" },
+  { name = "blue", offset = 64, type = "u32" },
+  { name = "alpha", offset = 68, type = "f32" },
+  { name = "layer_offset", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "visible", offset = 80, type = "u32" },
+  { name = "width", offset = 100, type = "f32", note = "a picture's size; a group's first child index (also read as words)" },
+  { name = "height", offset = 104, type = "f32", note = "a picture's size; a group's child count; a primitive's texture entry" },
+  { name = "texture_entry", offset = 108, type = "u32", note = "a picture's texture entry (the frame index the screens set); a scene's child nodes" },
+  { name = "unknown_112", offset = 112, type = "u32", note = "a scene's child count; a primitive textured" },
+  { name = "texture_left", offset = 116, type = "f32", note = "a picture's texture pixel rectangle (+116 to +128); a scene's animations" },
+  { name = "texture_top", offset = 120, type = "f32" },
+  { name = "texture_right", offset = 124, type = "u32" },
+  { name = "texture_bottom", offset = 128, type = "u32" },
+  { name = "flip_x", offset = 132, type = "u32" },
+  { name = "flip_y", offset = 136, type = "u32" },
+]
+
+# The stand scene's holder (24 bytes, StandScene::Create; [0x826D83E0]).
+[StandHolder]
+measure = "new<24>@StandScene::Create"
+size = 24
+origin = "allocated"
+# In host memory since E5 step 5 (2026-11-24): made by StandScene::Create
+# (type67_modes::StandSceneCreate; its lifted original's VirtualAlloc(24) at
+# 0x82180B3C), freed by StandScene::Release (VirtualFree; the game's frees
+# take handles); the global at 0x826D83E0 holds its handle. Its three slots
+# (4-byte blocks at +0, +4, +8) stay pages.
+storage = "host"
+host_alloc = [0x82180B3C]
+# 81 functions; areas: car-dealer.md, car-list.md, car-makers.md, front-end-car-draw.md, garage-screen.md, power-graph.md, stand-models.md, sticker-editor.md, tuning-pages.md, tuning-screen.md, type2-screens.md, type6-type7-modes.md, ui-movies-game.md
+fields = [
+  { name = "stage_block_0", offset = 0, type = "u32", note = "a block holding the garage stage at +0" },
+  { name = "stage_block_1", offset = 4, type = "u32", note = "PanelSetBase::UpdateStand" },
+  { name = "stage_block_2", offset = 8, type = "u32", note = "PanelSetBase::UpdateStand" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "StandScene::Create, PollTeardown" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "StandScene::Create, PollTeardown" },
+  { name = "model_made", offset = 20, type = "u32", note = "a stand model was made (GarageStage::MakeModel)" },
+]
+
+# The stats record's day block (docs/known-data.md, "stats record": save
+# data +48 + 24), joined by the measure with the save data's own words
+# (+6116 the money, +6324 and +6328 the garage's, +104820): a measure fault.
+[DayBlock]
+measure = "DayBlock"
+measures = ["EventCondition::FloatAtLeast.r4", "GarageScreen::SetCarRow.r4", "CarPanel::ShowCarStats.r4"]
+size = 104824
+origin = "embedded"
+# 60 functions; areas: car-list.md, car-makers.md, career.md, garage-screen.md, mode-tick.md, race-event.md, replay-snapshots.md, stand-models.md, sticker-editor.md, tuning-machine.md, tuning-pages.md, tuning-screen.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32", note = "also read as a word" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_204", offset = 204, type = "u16", note = "GarageScreen::CopyGarageCar" },
+  { name = "win_streak", offset = 4828, type = "u16", note = "the day's win streak" },
+  { name = "best_streak", offset = 4830, type = "u16", note = "the day's best" },
+  { name = "word_4832", offset = 4832, type = "u32", note = "DayBlock::AddWord4832" },
+  { name = "money", offset = 6116, type = "u32", note = "measure fault: the save data's money" },
+  { name = "unknown_6324", offset = 6324, type = "u16", note = "measure fault: the save data's garage halfwords" },
+  { name = "unknown_6328", offset = 6328, type = "u16" },
+  { name = "unknown_104820", offset = 104820, type = "u32", note = "measure fault: TuningScreen::StoreOwnedParts" },
+]
+
+# The update's r4 (a front-end dispatcher): a ring of 50 12-byte messages at
+# +204 (PostDialogMessage).
+[TuningDispatcher]
+measure = "TuningScreen::Command52.r4"
+size = 812
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (+0 the event, +4, +8)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_first", offset = 808, type = "u32" },
+]
+
+# The node UpdateItems and AnimatePaint reach through a movie's +0
+# (probably a UI movie node; as UiMovieNode's offsets).
+[TuningMovieFirstNode]
+measure = "UiMovie.+0"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "tag", offset = 0, type = "u32" },
+  { name = "scale_y", offset = 32, type = "u32" },
+  { name = "clip_0", offset = 40, type = "u32" },
+  { name = "clip_1", offset = 44, type = "u32" },
+]
+
+[TuningScreenCategoryWord]
+measure = "TuningScreen.+9656"
+size = 44
+origin = "embedded"
+fields = [
+  { name = "pressed_slot", offset = 40, type = "u32", note = "measure fault: an action mapper's vtable slot 10 (ActionMapper::Pressed) in MoveCategory, not reached through the category" },
+]
+
+[globals]
+stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +0 the block holding the garage stage" }
+doors_open = { address = 0x826D8498, type = "u32", note = "the stand's doors animation open (1) or closed (0); UpdateStandAnimations toggles it with GarageStage::Command 4 and 5" }
+roof_open = { address = 0x826D849C, type = "u32", note = "the stand's roof animation open state; toggled with GarageStage::Command 2 and 3" }
+bonnet_open = { address = 0x826D84A0, type = "u32", note = "the stand's bonnet animation open state; toggled with GarageStage::Command 2 and 3" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from DayBlock.
+[DayBlockAt129104]
+measure = "Progress@+129104"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+# Split from DayBlock.
+[DayBlockAt6120]
+measure = "Progress@+6120"
+size = 206
+origin = "embedded"
+fields = [
+  { name = "unknown_204", offset = 204, type = "u16" },
+]
+
+# Split from TuningScreen.
+[TuningScreenAt30832]
+measure = "TuningScreen@+30832"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from DayBlock.
+[DayBlockAt72]
+measure = "Progress@+72"
+size = 4836
+origin = "embedded"
+fields = [
+  { name = "unknown_4828", offset = 4828, type = "u16" },
+  { name = "unknown_4830", offset = 4830, type = "u16" },
+  { name = "unknown_4832", offset = 4832, type = "u32" },
+]
+
+# Split from TuningScreen.
+[TuningScreenAt36588]
+measure = "TuningScreen@+36588"
+size = 33580
+origin = "embedded"
+fields = [
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+  { name = "unknown_9716", offset = 9716, type = "u32" },
+  { name = "unknown_10076", offset = 10076, type = "u32" },
+  { name = "unknown_10112", offset = 10112, type = "u32" },
+  { name = "unknown_10148", offset = 10148, type = "u32" },
+  { name = "unknown_10832", offset = 10832, type = "u32" },
+  { name = "unknown_10868", offset = 10868, type = "u32" },
+  { name = "unknown_10904", offset = 10904, type = "u32" },
+  { name = "unknown_25092", offset = 25092, type = "u32" },
+  { name = "unknown_25096", offset = 25096, type = "u32" },
+  { name = "unknown_25116", offset = 25116, type = "u32" },
+  { name = "unknown_25204", offset = 25204, type = "u32" },
+  { name = "unknown_25212", offset = 25212, type = "u32" },
+  { name = "unknown_25228", offset = 25228, type = "u32" },
+  { name = "unknown_30492", offset = 30492, type = "u32" },
+  { name = "unknown_30500", offset = 30500, type = "u32" },
+  { name = "unknown_30508", offset = 30508, type = "u32" },
+  { name = "unknown_30512", offset = 30512, type = "u32" },
+  { name = "unknown_30516", offset = 30516, type = "u32" },
+  { name = "unknown_30520", offset = 30520, type = "u32" },
+  { name = "unknown_30524", offset = 30524, type = "u32" },
+  { name = "unknown_30528", offset = 30528, type = "u32" },
+  { name = "unknown_30544", offset = 30544, type = "u32" },
+  { name = "unknown_30560", offset = 30560, type = "u32" },
+  { name = "unknown_30724", offset = 30724, type = "u32" },
+  { name = "unknown_30740", offset = 30740, type = "u32" },
+  { name = "unknown_30748", offset = 30748, type = "u32" },
+  { name = "unknown_30764", offset = 30764, type = "u32" },
+  { name = "unknown_30768", offset = 30768, type = "u32" },
+  { name = "unknown_30832", offset = 30832, type = "u32" },
+  { name = "unknown_30836", offset = 30836, type = "u32" },
+  { name = "unknown_30840", offset = 30840, type = "f32" },
+  { name = "unknown_30844", offset = 30844, type = "f32" },
+  { name = "unknown_30848", offset = 30848, type = "u32" },
+  { name = "unknown_31192", offset = 31192, type = "u32" },
+  { name = "unknown_33548", offset = 33548, type = "u32" },
+  { name = "unknown_33564", offset = 33564, type = "u32" },
+  { name = "unknown_33576", offset = 33576, type = "u32" },
+]

@@ -1,0 +1,333 @@
+// The interior accessories natively: adapters in front of src/accessories/
+// (docs/functions/accessories.md), with the register steps the harness
+// shares (hooks/accessories.h). The adapters left are those recompiled code
+// (the scene's constructor and teardown, the interior's loads, the
+// archive's callbacks) still calls; the functions only native code calls
+// have none (their register steps are the harness's).
+
+#include "hooks/accessories.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
+
+#include "accessories/accessories.h"
+#include "base/flags.h"
+#include "hooks/archive.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
+#include "memory/heap.h"
+#include "native/buffers.h"
+#include "schema/accessories.h"
+
+#include <functional>
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_accessories, true, "ITC",
+              "Run the interior accessories (docs/functions/accessories.md: the set at "
+              "[0x826C5510] sub_820F1038, sub_820F0F48, sub_820F0E60, sub_820F07B8, "
+              "sub_820F0F00; the file class sub_820F0C50, sub_820F0BF0, sub_820F0C90, "
+              "sub_820F0C20, sub_820F08D0, sub_820F0D30; Accessories::Free and Destroy "
+              "sub_820F0F90, sub_820F1078, the set's destructor through its vtable; the entry "
+              "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0; their "
+              "destructors sub_820F0988, sub_820EF310, sub_820EFFD8, sub_820F0DB8, "
+              "Accessories::ReleaseAll sub_820F0AD8 and the set's destructors sub_820F0B58, "
+              "sub_820F0FE0; the skeleton's set-up sub_820F0070, sub_820EFB30; "
+              "Accessory::SetTexture sub_820EF568, the provider's slot through the function "
+              "table; Matrix::FromScaleRotationTranslation sub_820EF660; the load's end "
+              "AccessoryEntry::OnLoaded sub_820F0820 with Accessory::Finish sub_820EF368; "
+              "Accessories::Acquire sub_820F0EB8 with AcquireEntry sub_820F09E0; "
+              "Accessories::Release sub_820F0A90) natively instead of through the translated code "
+              "(the same words; checked by --run_harnesses=accessories)");
+
+namespace hooks {
+
+namespace {
+
+// A guest call the plain C++ hands back: `function` through the function
+// table (its override when it has one) with r3, r4 set, from the frame at
+// `r1` with the link register `lr` (the original's return address); r1 and
+// lr put back after.
+void GuestCall(lifted::Regs& ctx, uint32_t function, uint32_t r1, uint32_t lr,
+               uint64_t r3, uint64_t r4) {
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.lr = lr;
+  lifted::CallFromContext(ctx, function);
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+}
+
+}  // namespace
+
+std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(lifted::Regs& ctx) {
+  return [&ctx](uint32_t set, uint32_t frame) {
+    const uint32_t function = schema::Accessories(set).vtable().destroy();
+    GuestCall(ctx, function, frame, 0x820F0FC4, set, 0);
+  };
+}
+
+bool AccessoriesSetFreeable(uint32_t slot) {
+  const uint32_t set = guest::LoadU32(slot);
+  return set == 0 || memory::IsPages(set);
+}
+
+bool AccessoriesNativeLoads() {
+  return NativeHeapActive() && NativeArchiveQueue();
+}
+
+// --- The file ---
+
+
+
+// The tail call to the file's callback (r3 to r5 as given, r6 its context,
+// lr the caller's): the guest function through the function table.
+ITC_REGS_STEP(AccessoryFileOnArchiveDone) {
+  const accessories::Callback callback =
+      accessories::FileOnArchiveDone(ctx.r3.u32, ctx.r6.u32);
+  if (callback.function == 0) {
+    return;
+  }
+  ctx.r6.u64 = callback.context;
+  lifted::CallFromContext(ctx, callback.function);
+}
+
+
+// --- The set ---
+
+
+
+
+ITC_REGS_STEP(AccessoriesCreate) {
+  if (!NativeHeapActive()) {
+    lifted::original::c820F1038(ctx);
+    return;
+  }
+  if (const auto r3 = accessories::SetCreate()) {
+    ctx.fpscr.disableFlushMode();
+    ctx.r3.u64 = *r3;
+  }
+}
+
+ITC_REGS_STEP(AccessoriesSetScale) {
+  accessories::SetScale(ctx.r3.u32, ctx.r4.u32);
+}
+
+
+ITC_REGS_STEP(AccessoriesDestroy) {
+  if (!NativeHeapActive() || !AccessoriesSetFreeable(accessories::kSet)) {
+    lifted::original::c820F1078(ctx);
+    return;
+  }
+  ctx.r3.u64 = accessories::SetDestroy(ctx.r1.u32, AccessoriesSetDestructor(ctx));
+}
+
+// --- The entry and the accessory ---
+
+
+
+
+// --- The destructors ---
+
+
+
+
+ITC_REGS_STEP(AccessoriesReleaseAll) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleasable(ctx.r3.u32)) {
+    lifted::original::c820F0AD8(ctx);
+    return;
+  }
+  if (const auto r3 = accessories::SetReleaseAll(ctx.r3.u32)) {
+    ctx.fpscr.disableFlushMode();
+    ctx.r3.u64 = *r3;
+  }
+}
+
+// Accessories::Release: r3 the set, r4 the index.
+ITC_REGS_STEP(AccessoriesRelease) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleaseNative(ctx.r3.u32, ctx.r4.s32)) {
+    lifted::original::c820F0A90(ctx);
+    return;
+  }
+  const uint32_t set = ctx.r3.u32;
+  const int32_t index = ctx.r4.s32;
+  if (index != 3) {
+    const uint32_t entry =
+        guest::LoadU32(set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu));
+    if (entry != 0 && schema::AccessoryEntry(entry).count() - 1 == 0) {
+      ctx.fpscr.disableFlushMode();  // as AccessoryEntry::Destroy's register step
+    }
+  }
+  if (const auto r3 = accessories::SetRelease(set, index)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+// --- The skeleton's set-up ---
+
+
+
+ITC_REGS_STEP(AccessoriesDestruct) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleasable(ctx.r3.u32) ||
+      ((ctx.r4.u32 & 1) && !memory::IsHeapBlock(ctx.r3.u32))) {
+    lifted::original::c820F0FE0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::SetDestruct(ctx.r3.u32, ctx.r4.u32);
+}
+
+// --- The draw's helpers ---
+
+// The texture provider's vtable +12 with r4 = 0, from SetTexture's frame,
+// returning to 0x820EF5A8.
+std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(lifted::Regs& ctx) {
+  return [&ctx](uint32_t provider, uint32_t frame) -> uint64_t {
+    // The provider is embedded at the accessory's +80 (Accessory::textures_vtable).
+    const uint32_t function =
+        schema::AccessoryTexturesVtable(guest::LoadU32(provider)).texture_set();
+    GuestCall(ctx, function, frame, 0x820EF5A8, provider, 0);
+    return ctx.r3.u64;
+  };
+}
+
+ITC_REGS_STEP(AccessorySetTexture) {
+  ctx.r3.u64 = accessories::AccessorySetTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
+                                                ctx.r1.u32, AccessoryTextureSet(ctx));
+}
+
+// --- The load's end ---
+
+namespace {
+
+// Accessory::Finish's guest calls from its frame: Model::Load's original
+// (returning to 0x820EF3A8) and AccessorySkeleton::SetUp's (0x820EF3CC).
+accessories::FinishCalls FinishGuestCalls(lifted::Regs& ctx, ModelLoadGuest& model_load) {
+  accessories::FinishCalls calls;
+  calls.model_load = model_load.Calls();
+  calls.load = [&ctx](uint32_t model, uint32_t file, uint32_t xpr, uint32_t frame) {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = model;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = xpr;
+    ctx.lr = 0x820EF3A8;
+    lifted::original::c82596920(ctx);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+  };
+  calls.set_up = [&ctx](uint32_t skeleton, uint32_t frame) -> uint32_t {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = skeleton;
+    ctx.lr = 0x820EF3CC;
+    lifted::original::c820F0070(ctx);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u32;
+  };
+  return calls;
+}
+
+}  // namespace
+
+bool AccessoriesFinishNative(uint32_t accessory) {
+  return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
+         accessories::Finishable(accessory);
+}
+
+ITC_REGS_STEP(AccessoryFinish) {
+  if (!AccessoriesFinishNative(ctx.r3.u32)) {
+    lifted::original::c820EF368(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ModelLoadGuest model_load{ctx};
+  bool ran_load = false;
+  const uint32_t r3 =
+      accessories::AccessoryFinish(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                   FinishGuestCalls(ctx, model_load), &ran_load);
+  if (ran_load) {
+    ctx.fpscr.disableFlushMode();  // as Model::Load's adapter leaves it
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+ITC_REGS_STEP(AccessoryEntryOnLoaded) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
+    lifted::original::c820F0820(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ModelLoadGuest model_load{ctx};
+  bool ran_load = false;
+  const uint64_t r3 = accessories::EntryOnLoaded(ctx.r6.u32, ctx.r1.u32,
+                                                 FinishGuestCalls(ctx, model_load),
+                                                 AccessoryTextureSet(ctx), &ran_load);
+  if (ran_load) {
+    ctx.fpscr.disableFlushMode();
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// --- The acquisition ---
+
+bool AccessoriesAcquireNative() {
+  return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
+         accessories::AccessoryConstructible();
+}
+
+// Accessories::Acquire: r3 the set, r4 the index, r5 the texture index; r3
+// the accessory or 0.
+ITC_REGS_STEP(AccessoriesAcquire) {
+  if (!AccessoriesAcquireNative()) {
+    lifted::original::c820F0EB8(ctx);
+    return;
+  }
+  const uint32_t set = ctx.r3.u32;
+  const int32_t index = ctx.r4.s32;
+  if (index != 3 && guest::LoadU32(set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu)) == 0) {
+    ctx.fpscr.disableFlushMode();  // as AccessoryEntry::New's register step leaves it
+  }
+  ctx.r3.u64 = accessories::SetAcquire(set, index, ctx.r5.u32, ctx.r1.u32,
+                                       NativeArchiveLoad(), AccessoryTextureSet(ctx));
+}
+
+ITC_REGS_STEP(MatrixFromScaleRotationTranslation) {
+  if (!native::Buffers_NativeMemcpy()) {
+    lifted::original::c820EF660(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::FromScaleRotationTranslation(ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();  // as the original's last lfs
+}
+
+}  // namespace hooks
+
+// Defines an adapter: the flag, else the original.
+#define ITC_ACCESSORIES(address, step)   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_accessories)) { \
+    hooks::step(ctx);              \
+  }
+
+ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
+ITC_ACCESSORIES(820F1038, AccessoriesCreate)
+ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
+// Accessories::Destroy sub_820F1078: no adapter (removed, B7 loop,
+// 2026-11-06): its caller in play, CarScene::Update's plain C++, calls its
+// step.
+ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
+ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
+ITC_ACCESSORIES(820EF568, AccessorySetTexture)
+ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
+ITC_ACCESSORIES(820F0820, AccessoryEntryOnLoaded)
+ITC_ACCESSORIES(820F0EB8, AccessoriesAcquire)
+// Accessories::Release sub_820F0A90: no adapter (its only caller in play,
+// Interior::Release, is native; AccessoriesRelease above is the harness's).

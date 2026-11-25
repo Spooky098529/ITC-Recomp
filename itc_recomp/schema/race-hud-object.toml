@@ -1,0 +1,292 @@
+# The schema of docs/functions/race-hud-object.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race's HUD object (RaceHud::, the in-race screens' holder's +16; the
+# holder, RaceScreens, is race-hud-machine.toml's), its curves and racers'
+# bars, the racers' block it reads at +444 and the packed times its splits
+# pass (src/race_hud_object/).
+
+# The race HUD (640 bytes, embedded at the holder [0x826D84F0] + 16; the
+# holder's +656 probably holds a second one, the split screen's). In host
+# memory (E5 step 4), inside the host holder (RaceScreens' hud embed). Its
+# curves and bars stay bytes (guest order): HudCurve and RaceHudBar are
+# guest views over them (raw accesses through the handle).
+[RaceHud]
+measure = "RaceHud"
+measures = ["sub_822155C0.r3", "sub_82213860.r3", "sub_82214C88.r3", "RaceHud::ApplyOptions.r3", "RaceHud::StopCountdown.r3"]
+size = 640
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "option_node3", offset = 0, type = "u32", note = "HUD option 0 (player 0's save data +0x1F85C): the dashboard's node 3 shown" },
+  { name = "option_node1", offset = 4, type = "u32", note = "HUD option 1: the dashboard's node 1 shown" },
+  { name = "option_gauges", offset = 8, type = "u32", note = "HUD option 2: nodes (0, 3) and (0, 4) shown, node (0, 1) with +476" },
+  { name = "option_mirror", offset = 12, type = "u32", note = "HUD option 3: the cockpit node 4 and the rear-view mirror by the view" },
+  { name = "player", offset = 16, type = "u32", note = "the player's index (RaceHud::SetPlayer)" },
+  { name = "tach_curve", offset = 20, type = "bytes", count = 112, note = "the tachometer's HudCurve (one of three at 0x8200D1F8)" },
+  { name = "tach_output", offset = 120, type = "f32", note = "the tachometer curve's output (its +100): the needle's rotation" },
+  { name = "boost_curve", offset = 132, type = "bytes", count = 112, note = "the boost's HudCurve (copied from 0x8200D348)" },
+  { name = "boost_output", offset = 232, type = "f32", note = "the boost curve's output (its +100): the needle's rotation" },
+  { name = "bars", offset = 244, type = "bytes", count = 160, note = "the racers' bars: four RaceHudBar, 40 bytes each" },
+  { name = "bar_value", offset = 404, type = "f32", note = "the bar at node 35: its value (the car's +2420)" },
+  { name = "bar_max", offset = 408, type = "f32", note = "the bar at node 35: its top" },
+  { name = "bar_min", offset = 412, type = "f32", note = "the bar at node 35: its bottom (0.0)" },
+  { name = "sign_zone", offset = 416, type = "u32", note = "the expressway sign's track zone (0-31, -1 none)" },
+  { name = "sign_flags", offset = 420, type = "u32", note = "the course's sign flags (one of the 24 tables at 0x8200D9D0, by Race::CourseLayout)" },
+  { name = "signs_on", offset = 424, type = "u32", note = "1 after RaceHud::SetUpSigns" },
+  { name = "place_zone", offset = 428, type = "u32", note = "the place name's track zone (32-69, -1 none)" },
+  { name = "view", offset = 432, type = "u32", note = "the camera view (viewport 0's +1860)" },
+  { name = "countdown_running", offset = 436, type = "u32", note = "1 from StartCountdown, then UiMovie::Run's answer on the countdown" },
+  { name = "vehicle", offset = 440, type = "ptr", to = "Vehicle", note = "Vehicle::Get(+16)" },
+  { name = "racers", offset = 444, type = "ptr", to = "RaceHudRacers", note = "the race progress [0x826D82E8] + 2184 (RaceHudMachine::StartCountdown)" },
+  { name = "mode", offset = 448, type = "u32", note = "the panel (0 the racers' bars, 1 the timer, 2 to 4 the time trial's and others'; RaceHud::SetMode)" },
+  { name = "racer_count", offset = 452, type = "u32" },
+  { name = "any_bar_low", offset = 456, type = "u32", note = "1 when a racer's bar fell below its warning level this tick" },
+  { name = "item_shown", offset = 460, type = "u32", note = "the item shown on the racers' movie (-1 none; the race progress's +7240)" },
+  { name = "timer_animation", offset = 464, type = "u32", note = "the timer movie's named animation playing (the racers' +12)" },
+  { name = "warning_shown", offset = 468, type = "u32", note = "the warning movie (+616) shown (the car's +6168, probably wrong way)" },
+  { name = "view_dashboard", offset = 472, type = "u32", note = "the cockpit node 4 shown by the view (RaceHud::UpdateView)" },
+  { name = "part_fitted", offset = 476, type = "u32", note = "a build entry of kind 1 (or the build's +12 10): node (0, 1) shown with +8" },
+  { name = "gauge_slot0", offset = 480, type = "u32", note = "the extra gauges' slots: 0 a float, 1 and 2 integers, -1 none" },
+  { name = "gauge_slot1", offset = 484, type = "u32" },
+  { name = "gauge_slot2", offset = 488, type = "u32" },
+  { name = "recording_full", offset = 492, type = "u32", note = "the input recording's full notice shown" },
+  { name = "unknown_496", offset = 496, type = "u32" },
+  { name = "unknown_572", offset = 572, type = "u32", note = "the splits' (mode 2)" },
+  { name = "unknown_576", offset = 576, type = "u32", note = "the splits' (mode 2)" },
+  { name = "unknown_580", offset = 580, type = "u32", note = "the splits' (mode 2)" },
+  { name = "unknown_584", offset = 584, type = "u32", note = "the splits' (mode 2)" },
+  { name = "swapped_texture", offset = 588, type = "u32", note = "the dashboard's texture 56 swapped out for the mirror (0 none)" },
+  { name = "mirror_texture", offset = 592, type = "ptr", note = "the mirror's texture record: render target 11 (CameraPasses::RenderTarget), then its width and height" },
+  { name = "mirror_width", offset = 596, type = "u32" },
+  { name = "mirror_height", offset = 600, type = "u32" },
+  { name = "racers_movie", offset = 604, type = "ptr", note = "UI movie id 10: the racers' gauges" },
+  { name = "dashboard", offset = 608, type = "ptr", note = "UI movie id 0: the dashboard" },
+  { name = "countdown", offset = 612, type = "ptr", note = "UI movie id 11: the start countdown" },
+  { name = "warning", offset = 616, type = "ptr", note = "UI movie id 3: the warning" },
+  { name = "movie2", offset = 620, type = "ptr", note = "UI movie id 2 (not read)" },
+  { name = "timer", offset = 624, type = "ptr", note = "UI movie id 13: the race timer" },
+  { name = "movie1", offset = 628, type = "ptr", note = "UI movie id 1 (not read)" },
+  { name = "splits", offset = 632, type = "ptr", note = "UI movie id 12: the time trial's splits" },
+  { name = "movie19", offset = 636, type = "ptr", note = "UI movie id 19 (never seen in play)" },
+]
+
+# The racers' block at the HUD's +444 (the race progress's +2184): 972-byte
+# records from +0 (each +8 an item id, +788 the bar's top), with the count
+# over record 0's +0.
+[RaceHudRacers]
+measure = "RaceHud.+444"
+measures = ["sub_822155C0.r3.+444", "sub_82214BA8.r4"]
+size = 3936
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "the racers' count" },
+  { name = "item0", offset = 8, type = "u32", note = "record 0's item id (-1 none); record i's at +8 + 972 i" },
+  { name = "timer_animation", offset = 12, type = "u32", note = "the timer movie's named animation (-1 the timer hidden)" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "bar_max0", offset = 788, type = "u32", note = "record 0's bar top (an int); record i's at +788 + 972 i" },
+  { name = "start_distance", offset = 828, type = "f32", note = "taken from the race progress's +7156 for the timer's distance" },
+  { name = "split", offset = 836, type = "u32", note = "the split (mode 4's rows at +24 + 76 x it)" },
+  { name = "item1", offset = 980, type = "u32", note = "record 1's item id" },
+  { name = "ticks", offset = 3932, type = "u32", note = "the race time in ticks (RaceTime::FromTicks)" },
+]
+
+# A racer's bar (40 bytes, the HUD's +244 + 40 i; HudBar::Step).
+[RaceHudBar]
+measure = "HudBar"
+size = 40
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f32" },
+  { name = "value_step", offset = 4, type = "f32", note = "the value's most a step (the top times the float at 0x82002A60)" },
+  { name = "trail", offset = 8, type = "f32" },
+  { name = "trail_step", offset = 12, type = "f32", note = "the trail's most a step (the top times the float at 0x8200F724)" },
+  { name = "min", offset = 16, type = "f32" },
+  { name = "max", offset = 20, type = "f32" },
+  { name = "target", offset = 24, type = "f32" },
+  { name = "rising", offset = 28, type = "u32", note = "set by HudBar::Step: the value at or above the trail and the target, moving up" },
+  { name = "animation_played", offset = 32, type = "u32", note = "the low bar's animation played" },
+  { name = "touched", offset = 36, type = "u32", note = "set when the racer touched something (the trail held), cleared when the value meets the trail" },
+]
+
+# A gauge curve (112 bytes: the HUD's +20 and +132, the alternate HUD's;
+# HudCurve::Eval).
+[HudCurve]
+measure = "HudCurve::Eval.r3"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "points", offset = 0, type = "bytes", count = 88, note = "(x, y) floats, 8 bytes a point (HudCurvePoint)" },
+  { name = "max_x", offset = 88, type = "f32" },
+  { name = "min_x", offset = 92, type = "f32" },
+  { name = "input", offset = 96, type = "f32", note = "the x evaluated (clamped to the bounds)" },
+  { name = "output", offset = 100, type = "f32", note = "the y at it (left as it was when x was clamped)" },
+  { name = "count", offset = 108, type = "u32", note = "the points' count" },
+]
+
+# One point of a HudCurve (its +8 i).
+[HudCurvePoint]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+]
+
+# A packed time passed by address (minutes in bits 16-30, seconds 10-15,
+# thousandths 0-9, bit 31 negative; race-states.md's Time::).
+[RaceHudPackedTime]
+measures = ["RaceHud::SetTime.r4", "sub_820FF4D0.r3", "sub_820FF628.r3", "sub_820FF628.ret", "sub_82213968.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "packed", offset = 0, type = "u32" },
+  { name = "sign_minutes", offset = 0, type = "u16", note = "the high half: bit 15 the sign, the minutes below" },
+]
+
+# A list of packed times (sub_820FF4D0's r4: the splits, probably).
+[RaceHudSplitTimes]
+measure = "sub_820FF4D0.r4"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "times", offset = 0, type = "u32", note = "the first packed time; time i at +4 i" },
+  { name = "count", offset = 60, type = "u32" },
+]
+
+# A UI movie node as the signs' code meets it (UiMovie::FinishNamed's r3,
+# as the measure files it).
+[RaceHudSignNode]
+measure = "UiMovie::FinishNamed.ret"
+size = 112
+origin = "embedded"
+fields = [
+  { name = "picture", offset = 108, type = "u32", note = "the node's picture" },
+]
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (race-states.toml's RaceData; left untyped: alt_hud.cpp reads it without that header): +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the race mode" }
+race_progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress: +2184 the HUD's racers, +7156 a distance, +7240 the item shown" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports (camera-modes.toml's Viewports): +0 viewport 0 (+1860 its view)" }
+track_zones = { address = 0x828161EC, type = "ptr", to = "TrackZones", note = "the track zones' owner (track-zones.md)" }
+screens_holder = { address = 0x826D84F0, type = "ptr", to = "RaceScreens", note = "the in-race screens' holder (race-hud-machine.toml's RaceScreens)" }
+strings = { address = 0x826C5C34, type = "ptr", to = "Strings", note = "the string table (Strings::Load and Release, 47)" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from RaceHud.
+[RaceHudAt656]
+measure = "RaceScreens@+656"
+size = 348
+origin = "embedded"
+# Host (E5 step 4): a view of the SplitHud at the holder's +656, inside the host holder.
+storage = "host"
+fields = [
+  { name = "unknown_328", offset = 328, type = "u32" },
+  { name = "unknown_336", offset = 336, type = "u32" },
+  { name = "unknown_340", offset = 340, type = "u32" },
+  { name = "unknown_344", offset = 344, type = "u32" },
+]
+
+# Embedded objects the measure split from their owners after its offset
+# and class-name fixes (2026-11-22): seeded from the measure; names kept
+# from the owners' fault_ fields, unknown_ until read.
+
+# Split from RaceHud.
+[RaceHudAt16]
+measure = "RaceHudMachine.+9608@+16"
+size = 636
+origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
+fields = [
+  { name = "unknown_444", offset = 444, type = "u32" },
+  { name = "unknown_456", offset = 456, type = "u32" },
+  { name = "unknown_604", offset = 604, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+  { name = "unknown_624", offset = 624, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+]
+
+# Split from RaceHud.
+[RaceHudAt16_2]
+measure = "RaceScreens::~RaceScreens.r3@+16"
+size = 612
+origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
+fields = [
+  { name = "unknown_588", offset = 588, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+]
+
+# Split from RaceHud.
+[RaceHudAt16_3]
+measure = "RaceScreens@+16"
+size = 640
+origin = "embedded"
+# Host (E5 step 4): a view of the RaceHud at the holder's +16, inside the host holder.
+storage = "host"
+fields = [
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "f32" },
+  { name = "unknown_232", offset = 232, type = "f32" },
+  { name = "unknown_404", offset = 404, type = "f32" },
+  { name = "unknown_408", offset = 408, type = "f32" },
+  { name = "unknown_412", offset = 412, type = "f32" },
+  { name = "unknown_416", offset = 416, type = "u32" },
+  { name = "unknown_420", offset = 420, type = "u32" },
+  { name = "unknown_424", offset = 424, type = "u32" },
+  { name = "unknown_428", offset = 428, type = "u32" },
+  { name = "unknown_432", offset = 432, type = "u32" },
+  { name = "unknown_436", offset = 436, type = "u32" },
+  { name = "unknown_440", offset = 440, type = "u32" },
+  { name = "unknown_444", offset = 444, type = "u32" },
+  { name = "unknown_448", offset = 448, type = "u32" },
+  { name = "unknown_452", offset = 452, type = "u32" },
+  { name = "unknown_456", offset = 456, type = "u32" },
+  { name = "unknown_460", offset = 460, type = "u32" },
+  { name = "unknown_464", offset = 464, type = "u32" },
+  { name = "unknown_468", offset = 468, type = "u32" },
+  { name = "unknown_472", offset = 472, type = "u32" },
+  { name = "unknown_476", offset = 476, type = "u32" },
+  { name = "unknown_480", offset = 480, type = "u32" },
+  { name = "unknown_488", offset = 488, type = "u32" },
+  { name = "unknown_492", offset = 492, type = "u32" },
+  { name = "unknown_496", offset = 496, type = "u32" },
+  { name = "unknown_572", offset = 572, type = "u32" },
+  { name = "unknown_576", offset = 576, type = "u32" },
+  { name = "unknown_580", offset = 580, type = "u32" },
+  { name = "unknown_584", offset = 584, type = "u32" },
+  { name = "unknown_588", offset = 588, type = "u32" },
+  { name = "unknown_592", offset = 592, type = "u32" },
+  { name = "unknown_596", offset = 596, type = "u32" },
+  { name = "unknown_600", offset = 600, type = "u32" },
+  { name = "unknown_604", offset = 604, type = "u32" },
+  { name = "unknown_608", offset = 608, type = "u32" },
+  { name = "unknown_612", offset = 612, type = "u32" },
+  { name = "unknown_616", offset = 616, type = "u32" },
+  { name = "unknown_620", offset = 620, type = "u32" },
+  { name = "unknown_624", offset = 624, type = "u32" },
+  { name = "unknown_628", offset = 628, type = "u32" },
+  { name = "unknown_632", offset = 632, type = "u32" },
+  { name = "unknown_636", offset = 636, type = "u32" },
+]
+
+# Split from RaceHudRacers.
+[RaceHudRacersPart]
+measure = "RaceScreens@+16.+444"
+size = 3936
+origin = "embedded"
+fields = [
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_828", offset = 828, type = "f32" },
+  { name = "unknown_836", offset = 836, type = "u32" },
+  { name = "unknown_3932", offset = 3932, type = "u32" },
+]

@@ -110,6 +110,35 @@ replaced (`--play_movies_with_ffmpeg`, `native-movies.md`): the third
 session's list, with the second's functions that neither are ours nor sit
 in the library's range (`82481A70`-`82575B07`).
 
+Both filters missed some (found 2026-10-29 by a read-only survey of the
+libraries linked into the game): 148 functions from the first session
+stayed in the list that no longer run. They were taken out of the list
+on 2026-10-29 (not a new session; every one without a row: no row yet
+2,946 -> 2,798):
+
+- 82 in the `.embsec_` sections (`825DC200`-`825FC1B8`, 120 functions):
+  the movie library's own code past `.text`, called only from
+  `sub_824D3148`, `sub_8251BB78` and `sub_825169A0` (the library's), and
+  named elsewhere only by the library's table at `0x8264EEC0`; it calls
+  only `memset` (`sub_825A71D0`) and imports nothing.
+- 66 in D3DX's address range (`822B8F10`-`8244FFFF`) reachable only
+  through the HLSL compiler's objects' vtables (the table at
+  `0x82018DE4`, the back end's at `0x8201EAxx`), through `sub_822B8230`'s
+  subtree, or through the movie library's tables: the 2026-10-25 filter
+  followed direct calls only.
+
+How they were found: a static pass from the functions in the list
+outside D3DX's range and the movie library, following direct calls,
+address constants and the function tables those constants point at (the
+`D3DXCompileShader` override reaching only `D3DXCreateBuffer`); then each
+one checked to be in the first session's list (`5fdc020`) and in none of
+the later ones without it. The live functions left in D3DX's range are
+texture compression (`functions/texture-compression.md`), `D3DXCreateBuffer`
+and its vtable, `sub_8235A688`, two start-up initializers and a few
+one-instruction bodies the linker shares with game code
+(`functions/functions.md`). A coverage session would confirm the cut:
+none of the 148 should come back.
+
 ## What's kept, and what isn't
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play, one
@@ -156,6 +185,123 @@ session took (an error, a rare menu branch). Before B7 relies on a function
 never running (to delete it, say), check it with the static pass or by
 reading its callers, the way B4's and B5's "Never called" rows were
 checked over several sessions.
+
+## The static map (B7's goal)
+
+Since 2026-11-14 B7's goal counts every function reachable from `main`,
+seen in play or not ("B7's goal" in `loops/b7-loop.md`), so the
+coverage list no longer bounds the work. `itc_recomp/tools/static_map.py`
+(~30 s, reports only) builds the static call graph and writes
+`loops/static-map.md` (made fresh on every run; never edit it) and a full
+dump, `itc_recomp/coverage/static_map.tsv` (not committed).
+
+- **Edges:** direct calls and tail branches in `generated/`; address
+  constants from the disassembly comments (`lis` then `addi`, `ori` or
+  `addis`, kept per register in program order, through `mr` and stack
+  spills, cleared by calls), an edge when one lands on a function's start;
+  and the image (`itc/xex_image/default.bin`, `known-data.md`): a constant
+  landing in `.rdata` or `.data` is scanned as a table (vtables, function
+  and state tables), its function words edges from the function that built
+  the address (so a vtable's methods have its constructor as a caller).
+  Jump-table cases the recompiler split off (a switch case that is a call,
+  referenced by nothing else) are folded into their parent.
+- **Our C++'s edges** (since 2026-11-14, `itc_recomp/tools/src_edges.py`;
+  before, ours was followed through the original's edges, so 3,544 of
+  4,170 unported functions were reached only as the original's callees of
+  native functions, many of which our C++ no longer calls): a function
+  that's ours takes its outgoing edges from `src/` (harnesses left out).
+  A small preprocessor expands `src/`'s own macros (so macro-made adapters
+  are seen with their addresses) and a brace parser splits the files into
+  definitions: functions (a lambda belongs to the function it's in),
+  namespace-level variables (constants, step tables) and enumerators. A
+  name in a body links to the definitions of that name the file can see
+  (itself, the headers it includes, or a `.cpp` including a header both
+  see that declares the name, `extern` variables included), as C++ looks
+  it up: namespace aliases (`namespace t67 = type67_modes;`, 231 in
+  `src/`) replaced by what they name before a qualifier is matched, and an
+  unqualified name taking the candidates in the reference's own
+  namespaces, innermost first (so type 8's `kListScreenVtable` isn't type
+  6 and 7's). A native function's C++ is its override
+  and every definition holding `ITC_NATIVE_RUNNING("sub_X ...")`, followed
+  through the plain C++ they call; reaching another native function's C++
+  is an edge to that function. A part of a body an address constant picks
+  (`case 0xA:` up to the next label, or the statement under `if (x ==
+  0xA)`) is a definition of its own: when `0xA` is a function's start, the
+  part is that function's C++, reached where the address is and never from
+  the dispatcher's callers (`type67_modes::RunInit`'s 18 Inits, each under
+  its own `case`; the slot dispatchers' methods, such as
+  `type67_screens::SlotNative`'s type 8 ones; a guest call's trampoline,
+  `case 0xA: __imp__sub_A(ctx, base)`, which runs the original); a part
+  holding a print also runs the code around it. When `0xA` is a table or
+  vtable, the part is no one's; a plain constant's is its parent's.
+  Targets: `sub_X` (through the function
+  table), `__imp__sub_X` (the original's body; never the function's own,
+  the flag-off fallback, except in a part its own address picks) and
+  hexadecimal constants (a guest call by
+  address, a function pointer, or a table or vtable it stores, scanned as
+  above; a `case` label or a constant beside `==` or `!=` only compares).
+  Tables naming addresses only as lookup keys (`info.address == address`:
+  the three `kInits` of `type67_modes`, `save_screen` and
+  `options_screen`) give no edges (`KEY_TABLES` in `src_edges.py`, an
+  annotation, not a detection); tables whose length the scan can't find
+  give the words our C++ calls (`CPP_TABLES` in `static_map.py`: the
+  device's render and sampler state setters). These rules (aliases,
+  lookup order, `extern`, address-picked parts, lookup tables) came in a
+  second pass on 2026-11-14, when the type 8 mode still counted as
+  reachable after the main menu's split screen item was cut: with them,
+  none of its 178 rows is (reachable 11,011 -> 10,865, ours 6,180 ->
+  6,034, unported unchanged at 3,232).
+  Left out: statements under a flag off by default (`if (ITC_FLAG(x))` with
+  `x` off, `if (!ITC_FLAG(x))` with `x` on, or the same through a function
+  that only returns the flag), the arguments of `ITC_LOG_*`, and
+  `src/debug/`'s functions other than overrides. An unported function
+  keeps the original's edges; an ours function without C++ (Merged) keeps
+  the original's, followed where something still reaches it; one reached
+  through an `__imp__` call runs its original.
+- **Roots:** `main` (`sub_82090108`), then every function seen in play that
+  the original's graph doesn't reach from `main` and isn't Dropped (as of
+  2026-11-14 all of them sit under `xstart`: the C runtime's start-up), and
+  the guest functions named by C++ that no native function's C++ reaches
+  (host code; they add 2 functions), leaving out definitions named only in
+  statements under a flag off by default (the multiplayer bypass's
+  `kShowSplitResults`, say: not host code, just not run). Dropped isn't followed.
+- **States:** ours as `b7_status.py` decides it; excluded, the replaced
+  libraries (`sub_822B8F10`, the movie library's ranges) and what only
+  they reach, unless game code still running as PPC calls them directly or
+  our C++ calls them; unported, the rest (Wrapped included).
+- **Output:** totals; blockers ranked by how many unported functions above
+  them wait on them (the loop's leads are picked by it); the frontier
+  (unported functions whose callees are all ours, excluded or imports)
+  in clusters; the unmapped areas; "Originals no longer called"
+  (reachable through the original's graph, not through ours, grouped by
+  the native function whose C++ left the call out: candidates for Dropped
+  rows, for the user's review); the ours functions whose original body is
+  still reachable (mostly `__imp__` fallbacks taken when the native C++
+  declines); and what's reached at `82575B08`-`8257FFFF` (as of
+  2026-11-14: 154 functions, all reached from game code, the Xbox Live
+  and XAM wrappers of `system-services.md` and their library; none only
+  through the movie library, so its first range ends at `82575B07`, as
+  `loops/b7-loop.md` has it, not at `8257FFFF`). `b7_groups.py --static`
+  gives a never-seen function's group, readiness and blockers from the
+  same graph.
+
+Gaps: a table is scanned from the address code builds to the next address
+anything points at (or 8 words with no pointer), so a table reached only
+through a pointer chain deeper than two, or built at run time, is missed
+(~180 function words in data no code-built address reaches); addresses
+computed some other way (an index into a table of offsets, `kBase +
+offset` in C++) are missed. The graph over-approximates: a vtable brings
+in every method, used or not. Our C++ is read per definition, not per
+branch, apart from the parts an address picks: a definition several
+native functions share by an argument (112 of them, for 287 functions,
+such as the car draw's left and right door) gives each, and its callers,
+all its edges, and a name two visible definitions share in the same
+namespace links to both. A
+function's own `__imp__` call is always left out, also where the native
+C++ declines for inputs never seen in play (XGCompressSurface's DXN and
+CTX1 formats, say), so those originals' callees are missed. Guest calls
+through a vtable read at run time name nothing, but the vtable's methods
+are already edges from whatever builds it.
 
 ## Results
 
@@ -221,4 +367,13 @@ replaced): 596 fewer functions left.
 in play (seen, or ours): 6451
   ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840)
 rows: 2824; for functions not seen in play: 213
+```
+
+After the 148 stale functions were taken out (2026-10-29, above; during
+B7's twenty-second loop run, so ours moved too):
+
+```
+in play (seen, or ours): 6316
+  ours 2905, work left 3411 (wrapped 103, known 510, unknown 2798)
+rows: 4123; for functions not seen in play: 605
 ```

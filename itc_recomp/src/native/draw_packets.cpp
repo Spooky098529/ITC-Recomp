@@ -16,13 +16,18 @@
 //
 // --native_renderer_library_packets turns the replacement off.
 
+#include <format>
+#include "lifted/functions.h"
+#include "lifted/originals.h"
 #include "draw_packets.h"
+#include "hooks/native_entry.h"
 #include "guest.h"
 #include "renderer.h"
 #include "state.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/command_buffer.h"
 
 #include <array>
 #include <chrono>
@@ -31,11 +36,17 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_renderer_check_draw_writes, false, "ITC",
               "Log the device fields the graphics library's draw and its packet-writing "
               "helpers change besides the command buffer (a debugging aid for the native "
               "renderer's exclusive mode; keeps the library's draw)");
+ITC_FLAG_BOOL(native_draw_packets, true, "ITC",
+              "Drop the work of the draw's packet writers (sub_822AE1D0, sub_822ADE30, "
+              "sub_822ADEF0, sub_822AE070, sub_822ADC08: GPU packets into the command buffer, "
+              "which nothing reads), keeping the native renderer's marks; checked by frame "
+              "dumps (src/native/draw_packets.cpp)");
 ITC_FLAG_BOOL(native_renderer_library_packets, false, "ITC",
               "In exclusive mode, let the graphics library write its GPU packets for "
               "indexed draws as before (nothing reads them)");
@@ -83,20 +94,20 @@ bool Checking() {
   return ITC_FLAG(native_renderer_check_draw_writes);
 }
 
-uint8_t* DevicePointer(uint8_t* base, uint32_t device) {
-  return REX_RAW_ADDR(device);
+uint8_t* DevicePointer(uint32_t device) {
+  return guest::Pointer(device);
 }
 
 // Runs `call` and records which device words it changed (the command
 // buffer pointer aside), and whether it ended a command segment (which
 // kicks, moving fences and positions).
 template <typename Call>
-void Checked(Helper helper, uint8_t* base, uint32_t device, Call call) {
-  std::vector<uint8_t> before(DevicePointer(base, device),
-                              DevicePointer(base, device) + kDeviceSize);
+void Checked(Helper helper, uint32_t device, Call call) {
+  std::vector<uint8_t> before(DevicePointer(device),
+                              DevicePointer(device) + kDeviceSize);
   uint32_t segment_ends = t_segment_ends;
   call();
-  const uint8_t* after = DevicePointer(base, device);
+  const uint8_t* after = DevicePointer(device);
   std::lock_guard lock(g_mutex);
   HelperStats& s = g_check.helpers[helper];
   s.calls++;
@@ -120,7 +131,7 @@ void LogCheck() {
     HelperStats& s = c.helpers[i];
     std::string changed;
     for (auto& [offset, count] : s.changed) {
-      changed += fmt::format(" +{}={}", offset, count);
+      changed += std::format(" +{}={}", offset, count);
     }
     ITC_LOG_INFO("native renderer: draw writes: {}: {} calls ({} ending a segment, not "
                  "compared); device fields changed:{}",
@@ -132,49 +143,72 @@ void LogCheck() {
 }  // namespace
 }  // namespace native
 
-#define NATIVE_CHECKED_HELPER(address, helper, mark)                                      \
-  extern "C" REX_FUNC(sub_##address) {                                                    \
-    REX_FUNC_PROLOGUE();                                                                  \
+// The draw's packet writers, r3 the device: shader constants into packets
+// (sub_822AE1D0), register blocks from the shadow (sub_822ADE30,
+// sub_822ADEF0), fetch constants (sub_822AE070), and the HiZ / surface
+// set-up (sub_822ADC08). Their work is Dropped with --native_draw_packets
+// (the graphics rule, as the device's setters' packets in
+// docs/functions/device-state.md): they write only GPU packets into the
+// command buffer, its write position (+40) and, when it's full, the segment's
+// end (sub_8229EF48), which nothing reads since the emulated GPU went (our
+// kick looks only for fences and interrupts; --native_renderer_check_draw_writes
+// found no other device field changed, "The indexed draw without its
+// packets" in docs/native-renderer.md). r3 is left as the device (their
+// recompiled callers don't read it), sub_822ADC08's is its mask with bit 8
+// cleared, as the original returns. The register blocks' and fetch
+// constants' masks (r4; r5 the first register) are still marked for the
+// native renderer to read again (draws other than the indexed draw in
+// exclusive mode flush with them). With the check flag, or the drop flag
+// off, the originals run.
+#define NATIVE_CHECKED_HELPER(address, helper, mark, dropped)                             \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                    \
+    \
     mark;                                                                                 \
     if (!native::Checking()) {                                                            \
-      __imp__sub_##address(ctx, base);                                                    \
+      if (ITC_FLAG(native_draw_packets)) {                                                \
+        dropped;                                                                          \
+        return;                                                                           \
+      }                                                                                   \
+      lifted::original::c##address(ctx);                                       \
       return;                                                                             \
     }                                                                                     \
-    native::Checked(helper, base, ctx.r3.u32, [&] { __imp__sub_##address(ctx, base); }); \
+    native::Checked(helper, ctx.r3.u32,                                             \
+                    [&] { lifted::original::c##address(ctx); });               \
   }
 
-// The draw's packet writers, r3 the device: shader constants into packets,
-// register blocks from the shadow, fetch constants, and the HiZ / surface
-// set-up (sub_822ADC08). The register blocks' and fetch constants' masks
-// (r4; r5 the first register) are what the native renderer is to read
-// again (draws other than the indexed draw in exclusive mode flush with
-// them).
-NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, )
+NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, , ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
 NATIVE_CHECKED_HELPER(822ADE30, native::kRegisters,
-                      native::MarkRegistersDirty(ctx.r5.u32, ctx.r4.u64))
-NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, )
+                      native::MarkRegistersDirty(ctx.r5.u32, ctx.r4.u64),
+                      ITC_NATIVE_RUNNING("sub_822ADE30 (dropped)"))
+NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, , ITC_NATIVE_RUNNING("sub_822ADEF0 (dropped)"))
 NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants,
-                      native::MarkFetchConstantsDirty(ctx.r4.u64))
-// sub_822ADC08 writes register 0x2203 (r5) itself.
-NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203, 1ull << 63))
+                      native::MarkFetchConstantsDirty(ctx.r4.u64),
+                      ITC_NATIVE_RUNNING("sub_822AE070 (dropped)"))
+// sub_822ADC08 writes register 0x2203 (r5) itself; it returns its mask (r4)
+// without bit 8.
+NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203, 1ull << 63), {
+  ITC_NATIVE_RUNNING("sub_822ADC08 (dropped)");
+  ctx.r3.u64 = ctx.r4.u64 & ~0x100ull;
+})
 
 // Ends the command segment when the buffer is full (kicking it); counted
-// so the check can leave those calls out.
-extern "C" REX_FUNC(sub_8229EF48) {
-  REX_FUNC_PROLOGUE();
+// so the check can leave those calls out. The work is the command buffer's
+// (native with --native_command_buffer, src/hooks/command_buffer.cpp).
+ITC_NATIVE_ENTRY_ALWAYS(8229EF48) {
+  
   native::t_segment_ends++;
-  __imp__sub_8229EF48(ctx, base);
+  hooks::EndCommandSegment(ctx);
 }
 
 // DrawIndexedVertices (sub_825BE708, wrapped in replay_hooks.cpp): r3
 // device, r4 primitive type, r5 base vertex, r6 start index, r7 index
 // count. Writes the dirty state's packets (five masks at device +0..+32)
 // and DRAW_INDX.
-void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
+void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
   uint32_t device = ctx.r3.u32;
-  bool predicated = guest::LoadU8(base, device + kDeviceTilingFlags) & 0x2;
+  bool predicated = guest::LoadU8(device + kDeviceTilingFlags) & 0x2;
   if (Checking()) {
-    bool shader_load = REX_LOAD_U64(device + kDeviceShaderStateDirty) & kShaderBits;
+    bool shader_load = guest::LoadU64(device + kDeviceShaderStateDirty) & kShaderBits;
     {
       std::lock_guard lock(g_mutex);
       g_check.draws++;
@@ -186,44 +220,44 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
       }
     }
     if (shader_load) {
-      __imp__sub_825BE708(ctx, base);  // its writes are expected
+      lifted::original::c825BE708(ctx);  // its writes are expected
     } else {
-      Checked(kDraw, base, device, [&] { __imp__sub_825BE708(ctx, base); });
+      Checked(kDraw, device, [&] { lifted::original::c825BE708(ctx); });
     }
     return;
   }
   if (ITC_FLAG(native_renderer_library_packets) || predicated) {
-    __imp__sub_825BE708(ctx, base);
+    lifted::original::c825BE708(ctx);
     return;
   }
-  REX_STORE_U64(device + kDeviceVertexConstantsDirty, 0);
-  REX_STORE_U64(device + kDevicePixelConstantsDirty, 0);
-  uint64_t shader_state = REX_LOAD_U64(device + kDeviceShaderStateDirty);
+  guest::StoreU64(device + kDeviceVertexConstantsDirty, 0);
+  guest::StoreU64(device + kDevicePixelConstantsDirty, 0);
+  uint64_t shader_state = guest::LoadU64(device + kDeviceShaderStateDirty);
   if (shader_state & kShaderBits) {
     // A shader's fence (+8) is the command position it was last loaded at;
     // the library patches a vertex shader in place only once the GPU has
     // passed it, and otherwise copies it into the command buffer. Nothing
     // reads the shaders but us, so they're never in use.
     for (uint32_t field : {kDeviceVertexShader, kDevicePixelShader}) {
-      if (uint32_t shader = guest::LoadU32(base, device + field)) {
-        guest::StoreU32(base, shader + kShaderFence, 0);
+      if (uint32_t shader = guest::LoadU32(device + field)) {
+        guest::StoreU32(shader + kShaderFence, 0);
       }
     }
-    PPCContext saved = ctx;
+    lifted::Regs saved = ctx;
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
-    sub_822AED18(ctx, base);
+    lifted::Enter(ctx, lifted::e822AED18);
     // The mask with the bits for what it wrote in the shadow.
     shader_state |= ctx.r3.u64;
     ctx = saved;
   }
   // What the library's draw would have flushed: read again.
-  MarkDeviceDirty(shader_state, REX_LOAD_U64(device + kDeviceRenderStateDirty),
-                  REX_LOAD_U64(device + kDeviceOtherStateDirty));
-  REX_STORE_U64(device + kDeviceShaderStateDirty, 0);
-  if (REX_LOAD_U64(device + kDeviceRenderStateDirty) & 0x2) {
-    REX_STORE_U64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
+  MarkDeviceDirty(shader_state, guest::LoadU64(device + kDeviceRenderStateDirty),
+                  guest::LoadU64(device + kDeviceOtherStateDirty));
+  guest::StoreU64(device + kDeviceShaderStateDirty, 0);
+  if (guest::LoadU64(device + kDeviceRenderStateDirty) & 0x2) {
+    guest::StoreU64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
   }
-  REX_STORE_U64(device + kDeviceRenderStateDirty, 0);
-  REX_STORE_U64(device + kDeviceOtherStateDirty, 0);
+  guest::StoreU64(device + kDeviceRenderStateDirty, 0);
+  guest::StoreU64(device + kDeviceOtherStateDirty, 0);
 }

@@ -1,0 +1,101 @@
+# The schema of docs/functions/save-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The front end's save screen (UI movie 44, src/save_screen/): the yes/no
+# dialogs and waits around the save layer, one state machine in five
+# front-end modes (type 6's at its block's +81616, type 2's at +0x255C0,
+# type 4's at +19280, type 10's at +9640, type 8's), with three
+# VirtualAlloc blocks at [0x826D844C] to [0x826D8454] (known-data.md).
+#
+# Left to other files (for the lead):
+# - The page block ([0x826D844C], 28 bytes) is menu-helpers.toml's
+#   PageObject: the measures "new<28>@SaveScreen::OnEnter" and
+#   "new<28>@SaveScreen::OnEnter.+-31668" (the block again, loaded from
+#   [0x826D844C] through the image base 0x826E0000) are its.
+# - The menu list ([0x826D8450], 72 bytes) is race-screens.toml's MenuList:
+#   the measure "new<72>@SaveScreen::OnEnter" is its.
+# - "Replay::CopyFrom.r4" (+177624 to +177644) is the replay (the measure's
+#   "Replay", 177648 bytes; replay-snapshots.md and type10-mode.md touch it).
+#
+# Measure faults left unclaimed: the page block's -31668 and -31660 (and
+# "new<28>@SaveScreen::OnEnter.+8"'s -31660, "...+-31660"'s -31660) are the
+# globals 0x826D844C and 0x826D8454 read through a register holding the
+# image base 0x826E0000 that the measure took for the page block or a
+# pointer loaded from it. "new<28>@SaveScreen::OnEnter.+-31660" is the data
+# block (SaveScreenData) but for that -31660 word, so it isn't claimed;
+# "...+8.+-31660" is claimed below.
+
+# The save screen's machine: a StateMachine (game-modes.toml) with the
+# modes' three words after it. The measure's +0 and +804/+808 are the
+# transitions (StateMachine::Add) and the mode's ring words reached from the
+# handlers (SaveScreenMode's), joined into the machine.
+# Dual (E5 step 4): embedded in the type 10 mode's host block
+# (ModeType10Block's +9640) and in the other modes' blocks, guest or host.
+[SaveScreen]
+measure = "SaveScreen"
+size = 9616
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 load the movie, 2 wait for it, 9 idle, 4 Show, 5 shown, 7 leaving, 6 left" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 44 is loaded (WaitMovie)" },
+  { name = "load_at_once", offset = 9612, type = "u32", note = "nonzero: OnEnter goes to 1 (load the movie now), else 9 (loaded when opened)" },
+]
+
+# The front-end mode as the handlers see it (r4): only its message ring,
+# which the end pages and SaveScreen::Leave post to.
+[SaveScreenMode]
+measure = "SaveScreen::Leave.r4"
+size = 812
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The screen's data ([0x826D8454], 68 bytes, made by OnEnter).
+[SaveScreenData]
+measures = ["new<68>@SaveScreen::OnEnter", "new<28>@SaveScreen::OnEnter.+8.+-31660"]
+size = 68
+origin = "allocated"
+# In host memory (E5 step 5, 2026-11-24): made by SaveScreen::OnEnter
+# (src/save_screen/handlers.cpp, in place of its VirtualAlloc at 0x821A26A4),
+# freed by SaveScreen::Destroy's VirtualFree (0x821A1CF8).
+storage = "host"
+fields = [
+  { name = "set_up", offset = 0, type = "u32", note = "1 once a dialog is set up" },
+  { name = "answer", offset = 4, type = "u32", note = "the result the end pages post by (kind 0: 1 one answer, else the other; kinds 2 to 5: 1 to 3, else 0)" },
+  { name = "kind2_flag", offset = 8, type = "u32", note = "kinds 2 and 3's flag (1 for kind 2), read by page 14" },
+  { name = "message", offset = 12, type = "u32", note = "the dialog's message (an index into the ShowMessage steps' tables)" },
+  { name = "dialog_state", offset = 16, type = "u32", note = "0 the question with two answers, 1 and 2 the note, -1 none" },
+  { name = "state_after_close", offset = 20, type = "u32", note = "step 2 (CloseDialog) copies it to dialog_state" },
+  { name = "wait", offset = 24, type = "u32", note = "the pages' wait counter (Draw's calls; 45 or 90)" },
+  { name = "cancel", offset = 28, type = "u32", note = "set by SaveScreen::Cancel; Draw turns it into the kind's end page" },
+  { name = "next_state", offset = 32, type = "u32", note = "the machine's state after Draw (21 none; the end pages set 9)" },
+  { name = "kind", offset = 36, type = "u32", note = "0 to 7, set by the open messages' handlers" },
+  { name = "replay_index", offset = 40, type = "u32", note = "a replay record's index (Replays::Load; the theater's pick)" },
+  { name = "player", offset = 44, type = "u32", note = "kind 6's player (0, then 1)" },
+  { name = "default_answer", offset = 48, type = "u32", note = "the dialog's default answer" },
+  { name = "controller_pick", offset = 52, type = "u32", note = "kind 7's controller pick (0 to 3, the player who pressed)" },
+  { name = "prompts", offset = 56, type = "u32", note = "1 after a set-up (which prompts the theater's WaitPage shows: 0 none, 1 one pair)" },
+  { name = "settings_stored", offset = 60, type = "u32", note = "1 once SaveScreen::StoreSettings ran" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+]
+
+[globals]
+pages = { address = 0x826D844C, type = "ptr", to = "PageObject", note = "the page block (28 bytes)" }
+list = { address = 0x826D8450, type = "ptr", to = "MenuList", note = "the menu list (72 bytes)" }
+data = { address = 0x826D8454, type = "ptr", to = "SaveScreenData" }
+mode_type = { address = 0x826032DC, type = "u32", note = "the mode type (Modes::), which the end pages post by" }
+save_buffers = { address = 0x828161F0, type = "ptr", to = "SaveBuffers", note = "the save buffers' header (save-interface.toml's SaveBuffers: +0 the game data's buffer, +4 a replay's, +20 the replays' count)" }
+kept_replay = { address = 0x826C5B50, type = "u32", note = "the replay kept for the replay screen" }
+profile_read = { address = 0x826C6080, type = "u32", note = "the profile's read (997 while pending)" }
+profile_wanted = { address = 0x826C7958, type = "u32", note = "whether to read the profile" }
+profile_reader = { address = 0x826C6AD0, type = "ptr", to = "SysProfileResults", note = "the profile read's results (system-services.toml's SysProfileResults: +4 the settings)" }

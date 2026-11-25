@@ -18,8 +18,8 @@ void Xmp(Context& h) {
   Results results("XMP take and hand back (sub_825894C8, sub_825895A0)");
   std::vector<uint8_t> result[2];
   for (int v = 0; v < 2; v++) {
-    for (GuestFunction f : {v == 0 ? __imp__sub_825894C8 : sub_825894C8,
-                            v == 0 ? __imp__sub_825895A0 : sub_825895A0}) {
+    for (GuestFunction f : {v == 0 ? __imp__sub_825894C8 : harness::Ours<0x825894C8>,
+                            v == 0 ? __imp__sub_825895A0 : harness::Ours<0x825895A0>}) {
       guest::StoreU32(base, slot, 0xCDCDCDCD);
       PPCContext t = CallContext(h);
       f(t, base);

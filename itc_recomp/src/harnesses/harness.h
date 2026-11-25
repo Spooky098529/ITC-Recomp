@@ -13,13 +13,25 @@
 #pragma once
 
 #include "guest.h"
+#include "lifted/regs.h"
+#include "lifted/sdk.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace harness {
+
+// Runs `f` (taking a `lifted::Regs&`) on a view of `ctx`, for native code
+// that runs on a register view since the rewiring (stage 3): the view's
+// registers go back in ctx when it returns. Returns what `f` returns.
+template <typename F>
+auto OnView(PPCContext& ctx, F&& f) {
+  lifted::RegsScope scope(ctx);
+  return f(scope.regs);
+}
 
 constexpr uint32_t kScratchBytes = 4096;
 
@@ -73,10 +85,27 @@ class Outputs {
   std::vector<Entry> entries_;
 };
 
+// Our version of the function at `address`, on the context: its dispatch
+// table entry (the recompiled original when its flag is off). What calling
+// its override `sub_X` did before the rewiring's stage 4 removed the
+// overrides (`sub_X` is the recompiled original's thunk since).
+template <uint32_t address>
+void Ours(PPCContext& ctx, uint8_t* base) {
+  lifted::CallFromContext(ctx, base, address);
+}
+
+// Whether a group is one the rewiring's stage 3 made differ
+// (rewiring_expected.cpp).
+bool RewiringExpected(const std::string& name);
+
 // Counts a harness's cases and differences; logs the first ten.
 class Results {
  public:
-  explicit Results(std::string name) : name_(std::move(name)) {}
+  explicit Results(std::string name) : name_(std::move(name)) {
+    if (RewiringExpected(name_)) {
+      name_ += " (expected to differ: the rewiring)";
+    }
+  }
   void Check(const std::vector<uint8_t>& recompiled, const std::vector<uint8_t>& native,
              const std::string& what);
   void Check(const Outputs& recompiled, const Outputs& native, const std::string& what);
@@ -123,6 +152,30 @@ void Both(Context& h, Results& results, Setup setup, Args args, GuestFunction re
   results.Check(result[0], result[1], what);
 }
 
+// Archive::Load's calls recorded instead of queued, for harnesses of its
+// callers: while alive, Archive::Load's adapter hands the recompiled
+// version's calls here (through hooks::g_start_up_recorder), and Native()
+// gives the plain C++'s LoadCall that records the same way. Each call's
+// r3 to r8 (the plain C++'s r7 and r8 0) are kept, and each is answered with
+// the next of `serials` (0 once they run out).
+class ArchiveLoads {
+ public:
+  explicit ArchiveLoads(std::vector<int64_t> serials);
+  ~ArchiveLoads();
+  ArchiveLoads(const ArchiveLoads&) = delete;
+  ArchiveLoads& operator=(const ArchiveLoads&) = delete;
+  std::function<int64_t(uint32_t, uint32_t, uint32_t, uint32_t)> Native();
+  const std::vector<uint32_t>& calls() const { return calls_; }
+  int64_t Answer(uint32_t id, uint32_t destination, uint32_t callback, uint32_t context,
+                 uint32_t r7, uint32_t r8);
+
+ private:
+  std::vector<int64_t> serials_;
+  size_t next_ = 0;
+  std::vector<uint32_t> calls_;
+  void* saved_recorder_;
+};
+
 // Runs the harnesses `--run_harnesses` asks for, the first time it's called.
 void RunRequested(PPCContext& ctx, uint8_t* base);
 
@@ -141,6 +194,7 @@ void Notify(Context& h);
 void Profile(Context& h);
 void Saves(Context& h);
 void FileClass(Context& h);
+void DataFile(Context& h);
 void MovieFiles(Context& h);
 void Xma(Context& h);
 void Sprites(Context& h);
@@ -172,13 +226,151 @@ void AiDrivers(Context& h);
 void RacerControllers(Context& h);
 void TrackZones(Context& h);
 void GraphicsResources(Context& h);
+void DeviceShaders(Context& h);
+// The render queue's methods (src/harnesses/render_queue.cpp).
+void RenderQueue(Context& h);
 void VideoOutput(Context& h);
 void DeviceState(Context& h);
 void CourseScenery(Context& h);
+// The course scenery's manager after Scenery::Setup (or Create and Setup):
+// what can be seen of it without its blocks' addresses (the manager's and
+// its pool records' words with the blocks' addresses as tags and offsets,
+// the tables, the visible areas, the bytes held), and its blocks freed
+// (src/harnesses/course_scenery.cpp; also used by the race's update).
+void SceneryOutputs(Context& h, Outputs& out, uint32_t manager, bool created);
+void SceneryFree(Context& h, uint32_t manager, bool created);
 void PostEffects(Context& h);
 void Input(Context& h);
 void ActionMappersBinding(Context& h);
 void ScreenObjects(Context& h);
 void HardcodedShaders(Context& h);
+void Framework(Context& h);
+void GameModes(Context& h);
+void ModeTick(Context& h);
+void Minimap(Context& h);
+void CRuntimeExit(Context& h);
+void CRuntimeCore(Context& h);
+void Models(Context& h);
+void SceneModels(Context& h);
+void RaceHud(Context& h);
+void UiMovieObjects(Context& h);
+void SceneryLists(Context& h);
+void ShaderObjects(Context& h);
+void RaceSetup(Context& h);
+void Vehicle(Context& h);
+void AppStates(Context& h);
+void SceneLoaders(Context& h);
+void CarModels(Context& h);
+void SaveData(Context& h);
+void Archive(Context& h);
+void FileLayer(Context& h);
+void CRuntimeFormat(Context& h);
+void RaceWorld(Context& h);
+void RaceStates(Context& h);
+void TextureCompression(Context& h);
+void SaveInterface(Context& h);
+void SaveHandlers(Context& h);
+void CarSounds(Context& h);
+void X3DAudioMath(Context& h);
+void XAudio(Context& h);
+void XAudioEngine(Context& h);
+void XactWaves(Context& h);
+void XactTracks(Context& h);
+void XAudioObjects(Context& h);
+void AppStartUp(Context& h);
+void DataLoad(Context& h);
+void Career(Context& h);
+void RaceEvent(Context& h);
+void CameraModes(Context& h);
+void LocationScreen(Context& h);
+void MaterialPasses(Context& h);
+void RaceHudObject(Context& h);
+// The alternate HUD (src/harnesses/alt_hud.cpp).
+void AltHud(Context& h);
+// The race scene (src/harnesses/race_scene.cpp).
+void RaceScene(Context& h);
+// The menu sounds (src/harnesses/menu_sounds.cpp).
+void MenuSounds(Context& h);
+// The race's sounds (src/harnesses/race_sounds.cpp).
+void RaceSounds(Context& h);
+// The interior accessories (src/harnesses/accessories.cpp).
+void Accessories(Context& h);
+// The race HUD machine (src/harnesses/race_hud_machine.cpp).
+void RaceHudMachine(Context& h);
+void RaceScreens(Context& h);
+// The in-race screens never seen in play (src/harnesses/race_screens.cpp).
+void RaceScreensUnseen(Context& h);
+void Scene(Context& h);
+// The second set's objects (src/harnesses/second_set.cpp).
+void SecondSet(Context& h);
+void LoadPoll(Context& h);
+void BootMode(Context& h);
+// The car draw (src/harnesses/car_draw.cpp).
+void CarDraw(Context& h);
+// The race flow (src/harnesses/race_flow.cpp).
+void RaceFlow(Context& h);
+// The car scene's draw (src/harnesses/car_scene_draw.cpp).
+void CarSceneDraw(Context& h);
+// The front end's car draw (src/harnesses/front_end_car_draw.cpp).
+void FrontEndCarDraw(Context& h);
+// The replay's snapshots (src/harnesses/replay_snapshots.cpp).
+void ReplaySnapshots(Context& h);
+// The race's loading (src/harnesses/race_loading.cpp).
+void RaceLoading(Context& h);
+void SceneTarget(Context& h);
+void FramePasses(Context& h);
+void FrameDriver(Context& h);
+void CommandBuffer(Context& h);
+// The render command replay's single commands (src/harnesses/single_commands.cpp).
+void SingleCommands(Context& h);
+void PredicatedTiling(Context& h);
+// The front end's power graph (src/harnesses/power_graph.cpp).
+void PowerGraph(Context& h);
+// The front end's menu helpers (src/harnesses/menu_helpers.cpp).
+void MenuHelpers(Context& h);
+void RaceUpdate(Context& h);
+// The car objects' makers (src/harnesses/car_makers.cpp).
+void CarMakers(Context& h);
+// The stand's scene model holders (src/harnesses/stand_models.cpp).
+void StandModels(Context& h);
+void BuildScreen(Context& h);
+void TuningScreen(Context& h);
+void TuningPages(Context& h);
+void ScreenConstructors(Context& h);
+void Type67Modes(Context& h);
+void OptionsScreen(Context& h);
+void OptionsLoadSave(Context& h);
+void Type67Screens(Context& h);
+void CarList(Context& h);
+void FrontEndScreenHelpers(Context& h);
+void CarDealer(Context& h);
+void SaveScreen(Context& h);
+void Type2Screens(Context& h);
+void Type2Dialog(Context& h);
+void GarageScreen(Context& h);
+void TuningMachine(Context& h);
+void RaceMenu(Context& h);
+void CarSettings(Context& h);
+void UserInfo(Context& h);
+void Type2Mode(Context& h);
+void TitleScreen(Context& h);
+void Type10Mode(Context& h);
+void Type5Mode(Context& h);
+void TodaysResult(Context& h);
+void NetworkMode(Context& h);
+// The race's end (src/harnesses/race_end.cpp).
+void RaceEnd(Context& h);
+void PowerGraphScreen(Context& h);
+void Achievements(Context& h);
+// The morph jobs and the work item (src/harnesses/morph_jobs.cpp).
+void MorphJobs(Context& h);
+// The type 8 mode's panel screen (src/harnesses/type8_screens.cpp).
+void Type8Screens(Context& h);
+void Type8Mode(Context& h);
+void Lifted(Context& h);
+// The audio functions native inside their wraps (src/harnesses/audio_wraps.cpp).
+void AudioWraps(Context& h);
+// The game's CreateFile (src/harnesses/create_file.cpp).
+void CreateFile(Context& h);
 
 }  // namespace harness

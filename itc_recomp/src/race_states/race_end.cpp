@@ -1,0 +1,302 @@
+// The race's end in the race's states (docs/functions/race-states.md):
+// RaceStates::OnRaceEnd and the course record it keeps (the race's best
+// times: a list of ten 28-byte entries in the race data's stage list, then
+// copied into player 0's save data). The course record's functions never
+// ran in play; ported with OnRaceEnd (the user's call, 2026-11-12: functions
+// never seen in play are ported too).
+
+#include "race_states/race_states.h"
+#include "race_states/steps.h"
+
+#include "achievements/achievements.h"
+#include "base/log.h"
+#include "c_runtime/strings.h"
+#include "career/career.h"
+#include "race_setup/race_setup.h"
+#include "replay_snapshots/replay_snapshots.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+namespace race_states {
+
+using namespace steps;
+namespace va = vehicle_accessors;
+
+using G = schema::RaceStatesGlobals;
+using Machine = schema::RaceStates;
+using List = schema::CourseTimeList;
+using Entry = schema::CourseTimeEntry;
+
+namespace {
+
+constexpr uint32_t kMemcpy = 0x825A7410;
+
+uint16_t U16(uint32_t address) {
+  return guest::LoadU16(address);
+}
+void StoreU16(uint32_t address, uint16_t value) {
+  guest::StoreU16(address, value);
+}
+
+// memcpy's plain C++, or its original through `call` (r1 `sp`, returning to
+// `lr`) where it refuses.
+void Copy(uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr,
+          const GuestCall& call) {
+  if (!c_runtime::Memcpy(to, from, bytes)) {
+    call(kMemcpy, sp, lr, to, from, bytes, 0, 0);
+  }
+}
+
+// The node `n` steps along the list from its head (+44): the address of the
+// link before node n (+44 itself for 0), each step a signed halfword index
+// times 4 from the list (the originals' rlwinm, wrapping in 32 bits).
+uint32_t LinkBefore(uint32_t list, uint32_t n) {
+  const List l(list);
+  if (n == 0) {
+    return l.first_address();
+  }
+  uint32_t at = l.nodes_address() + (uint32_t(int32_t(int16_t(l.first()))) << 2);
+  for (uint32_t k = n - 1; k != 0; k--) {
+    at = l.nodes_address() + (uint32_t(S16(at)) << 2);
+  }
+  return at;
+}
+
+// The entry at node `n` of the list (its halfword +2 an index into the
+// entries at +52).
+uint32_t EntryAt(uint32_t list, uint32_t n) {
+  const List l(list);
+  uint32_t node = l.nodes_address() + (uint32_t(int32_t(int16_t(l.first()))) << 2);
+  for (uint32_t k = n; k != 0; k--) {
+    node = l.nodes_address() + (uint32_t(S16(node)) << 2);
+  }
+  return l.entries_address() + uint32_t(S16(node + 2)) * Entry::kSize;
+}
+
+// achievements::Calls over a GuestCall.
+uint64_t WriteCall(void* user, uint32_t function, const uint64_t args[3], uint32_t r1,
+                   uint32_t lr) {
+  const GuestCall& call = *static_cast<const GuestCall*>(user);
+  return call(function, r1, lr, args[0], args[1], args[2], 0, 0);
+}
+
+}  // namespace
+
+uint64_t TimeAdd(uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_820FF458 Time::Add");
+  return race_setup::TimePack(uint64_t(Unpack(b) + Unpack(a)));
+}
+
+void CourseEntryClear(uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82105BC8 CourseEntry::Clear");
+  const Entry e(entry);
+  e.set_word_0(0);
+  e.set_word_4(0);
+  e.set_word_8(0);
+  e.set_word_12(0);
+  e.set_word_16(0);
+  e.set_time_a(G::no_time());
+  e.set_time_b(G::no_time());
+}
+
+uint32_t CourseRecordPlace(uint32_t list, uint32_t time, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82105EA0 CourseRecord::Place");
+  // The time stored to the caller's frame as the original's stw (sp + 28);
+  // read back from a value, as the entry's total (the original's frame +80,
+  // its 128-byte frame left out since E5 step 6).
+  Store(sp + 28, time);
+  uint32_t place = 0;
+  const List l(list);
+  const uint32_t count = uint32_t(int32_t(int16_t(l.count())));
+  if (count == 0) {
+    return 0;
+  }
+  for (uint32_t i = 0;;) {
+    const Entry entry(EntryAt(list, i));
+    const uint64_t total = TimeAdd(entry.time_a(), entry.time_b());
+    if (achievements::TimeLess(time, uint32_t(total)) != 0) {
+      return place;
+    }
+    i++;
+    place = i;
+    if (!(i < uint32_t(int32_t(int16_t(l.count()))))) {
+      return place;
+    }
+  }
+}
+
+void CourseRecordLink(uint32_t list, int32_t n) {
+  ITC_NATIVE_RUNNING("sub_82105D60 CourseRecord::Link");
+  const List l(list);
+  const uint32_t before = LinkBefore(list, uint32_t(n));
+  const uint32_t node = l.nodes_address() + (uint32_t(int32_t(int16_t(l.free_first()))) << 2);
+  const uint16_t index = l.free_first();
+  l.set_free_first(U16(node));
+  StoreU16(node, index);
+  StoreU16(node, U16(before));
+  StoreU16(before, index);
+  l.set_count(uint16_t(l.count() + 1));
+}
+
+void CourseRecordUnlink(uint32_t list, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_82105DC8 CourseRecord::Unlink");
+  const List l(list);
+  const uint32_t before = LinkBefore(list, n);
+  const uint16_t index = U16(before);
+  const uint32_t node = l.nodes_address() + (uint32_t(int32_t(int16_t(index))) << 2);
+  const uint16_t next = U16(node);
+  StoreU16(node, index);
+  StoreU16(before, next);
+  const uint16_t freed = U16(node);
+  const uint16_t free_head = l.free_first();
+  l.set_free_first(freed);
+  StoreU16(node, free_head);
+  l.set_count(uint16_t(l.count() - 1));
+}
+
+void CourseRecordInsert(uint32_t list, uint32_t entry, uint32_t n, uint32_t sp,
+                        const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82105E30 CourseRecord::Insert");
+  CourseRecordLink(list, int16_t(n));
+  // memcpy's original (where its plain C++ refuses) from `sp`: the
+  // original's 112-byte frame held nothing it reads (E5 step 6).
+  Copy(EntryAt(list, n), entry, Entry::kSize, sp, 0x82105E98, call);
+}
+
+uint32_t CourseRecordAdd(uint32_t list, uint32_t entry, uint32_t source,
+                         uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82105F50 CourseRecord::Add");
+  // The original's 128-byte frame held only the total (+80): a value since
+  // E5 step 6; its callees run from `sp` (none reads its caller's frame
+  // but CourseRecord::Place's own stw at sp + 28).
+  const Entry e(entry);
+  const uint64_t total = TimeAdd(e.time_a(), e.time_b());
+  const uint32_t place = CourseRecordPlace(list, uint32_t(total), sp);
+  const List l(list);
+  if (int32_t(place) == 0) {
+    Copy(l.best_address(), source, 76, sp, 0x82105FA4, call);
+  }
+  if (int32_t(place) < 10) {
+    if (l.count() == 10) {
+      CourseRecordUnlink(list, 9);
+    }
+    CourseRecordInsert(list, entry, place, sp, call);
+  }
+  return place;
+}
+
+void CourseRecordsSave(uint32_t records, uint32_t race, uint32_t sp,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82105C18 CourseRecords::Save");
+  const schema::RaceData data(race);
+  const uint32_t stages = data.stages_address();
+  const uint32_t route = data.route_course();
+  const uint32_t flag = data.word_59618() == 0 ? 1 : 0;
+  const int32_t type = int32_t(va::StagesType(stages, 0xFFFFFFFFu));
+  if (type == 1 || type == 3) {
+    const uint32_t slot = (route << 1) + flag;
+    // memcpy's original (where its plain C++ refuses) from `sp`: the
+    // original's 128-byte frame held nothing it reads (E5 step 6).
+    Copy(records + slot * List::kSize + 20, data.stages_course_record_address(),
+         List::kSize, sp, 0x82105C88, call);
+  }
+}
+
+uint64_t OnRaceEnd(uint64_t machine_r3, uint32_t frame, const GuestCall& call,
+                   bool keep_native) {
+  ITC_NATIVE_RUNNING("sub_821644D8 RaceStates::OnRaceEnd");
+  const uint32_t machine = uint32_t(machine_r3);
+  const Machine m(machine);
+  const schema::RaceData race_first = G::race_data();
+  if (race_first.flags() & 0x80) {
+    race_first.set_flags(race_first.flags() & ~0x40u);
+  } else {
+    // The results kept.
+    const uint32_t records = race_first.results_address();
+    const uint32_t record = m.progress().results_address();
+    uint32_t added = 0;
+    if (!va::RacerRecordsAdd(records, record, &added)) {
+      call(0x820FFE08, frame, 0x82164518, records, record, 0, 0, 0);
+    }
+    const int32_t mode = int32_t(G::race_data().race_mode());
+    int32_t kind = -1;  // the achievements' kind, when checked
+    if (mode == 0 || mode == 4) {
+      // The course record.
+      const schema::RaceData race = G::race_data();
+      const uint32_t list = race.stages_course_record_address();
+      const uint32_t entry = frame + 80;
+      CourseEntryClear(entry);
+      const schema::RaceProgress progress = m.progress();
+      const uint32_t time = progress.e0_time();
+      Store(frame + 100, time);
+      Store(frame + 92, progress.e0_track_hits());
+      Store(frame + 96, progress.e0_car_hits());
+      Store(frame + 104, progress.e0_lap_record_64());
+      const uint32_t index = progress.e0_record_index();
+      Store(frame + 80,
+            Load(index * kRecordBytes + G::race_data().record0_place_address()));
+      Store(frame + 84, race.effects_word());
+      Store(frame + 88, race.mode());
+      const uint32_t place = CourseRecordPlace(list, time, frame);
+      m.progress().set_e0_place(place);
+      CourseRecordAdd(list, entry, m.progress().e0_first_lap_record_address(), frame, call);
+      const uint32_t save = va::SaveDataOf(0);
+      CourseRecordsSave(save + 0x1D52C, G::race_data().address, frame, call);
+      kind = 1;
+    } else if (mode == 2 || mode == 3) {
+      const uint32_t save = va::SaveDataOf(0);
+      const uint32_t race = G::race_data().address;
+      if (career::AddRaceResultNative(save, race, frame)) {
+        career::StatsAddRaceResult(save, race, frame);
+      } else {
+        call(0x82115190, frame, 0x821645A8, save, race, 0, 0, 0);
+      }
+      kind = 0;
+    } else if (mode == 7) {
+      kind = 1;
+    } else if (mode == 8) {
+      const uint32_t which = int32_t(m.progress().end_reason()) == 1 ? 0 : 1;
+      const uint32_t identity = va::VehicleIdentity(va::VehicleGet(which));
+      const schema::RaceProgress to = m.progress();
+      to.set_kind8_section(U16(TrackPos(identity).route_section_address()));
+      to.set_kind8_slice(U16(TrackPos(identity).route_slice_address()));
+    }
+    if (kind >= 0) {
+      const uint32_t words = frame + 112;
+      if (int32_t(achievements::Check(uint32_t(kind), words, frame)) == 1) {
+        const achievements::Calls write{const_cast<GuestCall*>(&call), &WriteCall};
+        achievements::Write(words, frame, write);
+      }
+    }
+    // The race kept for its replay.
+    uint32_t save = 0;
+    if (int32_t(G::race_data().kind()) == 1) {
+      save = va::SaveDataOf(0);
+    }
+    const uint32_t race = G::race_data().address;
+    const uint32_t recordings = G::recordings();
+    const uint32_t replay = G::replay();
+    if (keep_native) {
+      machine_r3 = replay_snapshots::ReplayKeep(replay, race, recordings, save, 0, frame - 272,
+          [&call](uint32_t out, uint32_t stages, uint32_t stage, uint32_t sp) {
+            call(0x820FFD88, sp, 0x8210509C, out, stages, uint64_t(int64_t(int32_t(stage))), 0,
+                 0);
+          });
+    } else {
+      machine_r3 = call(0x82104F68, frame, 0x821646BC, replay, race, recordings, save, 0);
+    }
+    const schema::RaceData data = G::race_data();
+    data.set_flags(data.flags() & ~0x40u);
+  }
+  // The flags lose 0x40 (above), 0x20 and 0x20000.
+  {
+    const schema::RaceData data = G::race_data();
+    data.set_flags(data.flags() & ~0x20u);
+  }
+  {
+    const schema::RaceData data = G::race_data();
+    data.set_flags(data.flags() & ~0x20000u);
+  }
+  return machine_r3;
+}
+
+}  // namespace race_states

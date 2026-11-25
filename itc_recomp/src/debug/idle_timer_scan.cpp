@@ -8,6 +8,7 @@
 // every tick handler and message handler on logic passes, and the first
 // change each handler makes to one is logged, to name the code that counts.
 
+#include <format>
 #include "idle_timer_scan.h"
 
 #include "guest.h"
@@ -35,7 +36,7 @@ struct Range {
   uint32_t start;
   uint32_t size;
 };
-std::vector<Range> ReadableGuestRanges(uint8_t* base);
+std::vector<Range> ReadableGuestRanges();
 
 namespace {
 
@@ -71,11 +72,11 @@ double TimerStep(uint32_t before, uint32_t after) {
 
 class IdleTimerScan {
  public:
-  void OnLogicPass(uint8_t* base, bool in_race) {
+  void OnLogicPass(bool in_race) {
     if (in_race) {
       if (!in_race_) {
         in_race_ = true;
-        LogRaceStart(base);
+        LogRaceStart();
       }
       return;
     }
@@ -88,14 +89,15 @@ class IdleTimerScan {
     if (++passes_ % kPassesPerSample != 0) {
       return;
     }
-    std::vector<Range> ranges = ReadableGuestRanges(base);
+    std::vector<Range> ranges = ReadableGuestRanges();
     if (!snapshot_.empty()) {
-      Compare(base);
+      Compare();
     }
     ranges_ = std::move(ranges);
     snapshot_.clear();
     for (const Range& r : ranges_) {
-      snapshot_.insert(snapshot_.end(), base + r.start, base + r.start + r.size);
+      snapshot_.insert(snapshot_.end(), guest::Pointer(r.start),
+                       guest::Pointer(r.start) + r.size);
     }
   }
 
@@ -106,7 +108,7 @@ class IdleTimerScan {
     uint32_t value;
   };
 
-  void Compare(uint8_t* base) {
+  void Compare() {
     std::unordered_map<uint32_t, Streak> next;
     std::string sample;
     int logged = 0;
@@ -115,12 +117,12 @@ class IdleTimerScan {
       const uint8_t* then = snapshot_.data() + offset;
       offset += r.size;
       for (uint32_t i = 0; i + 4 <= r.size; i += 4) {
-        if (std::memcmp(base + r.start + i, then + i, 4) == 0) {
+        if (std::memcmp(guest::Pointer(r.start) + i, then + i, 4) == 0) {
           continue;
         }
         uint32_t address = r.start + i;
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
-        uint32_t after = guest::LoadU32(base, address);
+        uint32_t after = guest::LoadU32(address);
         double step = TimerStep(before, after);
         if (step == 0) {
           continue;
@@ -133,7 +135,7 @@ class IdleTimerScan {
         next[address] = s;
         if (s.count >= kStreakToLog && logged < 60) {
           logged++;
-          sample += fmt::format(" {:08X}:{}x{}={}({})", address, s.count, step, after,
+          sample += std::format(" {:08X}:{}x{}={}({})", address, s.count, step, after,
                                 AsFloat(after));
         }
       }
@@ -149,23 +151,23 @@ class IdleTimerScan {
   }
 
  public:
-  void Before(uint8_t* base) {
+  void Before() {
     std::vector<uint32_t> values(watched_.size());
     for (size_t i = 0; i < watched_.size(); i++) {
-      values[i] = guest::LoadU32(base, watched_[i]);
+      values[i] = guest::LoadU32(watched_[i]);
     }
     before_.push_back(std::move(values));
   }
 
   // Logs each watched word a handler changed, once per word and handler.
-  void After(uint8_t* base, const char* kind, uint32_t id) {
+  void After(const char* kind, uint32_t id) {
     if (before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
     before_.pop_back();
     for (size_t i = 0; i < values.size() && i < watched_.size(); i++) {
-      uint32_t now = guest::LoadU32(base, watched_[i]);
+      uint32_t now = guest::LoadU32(watched_[i]);
       if (now != values[i] && logged_.insert({watched_[i], id}).second) {
         ITC_LOG_INFO("idle timer: {} {:08X} changed {:08X}: {} -> {}", kind, id, watched_[i],
                      values[i], now);
@@ -175,12 +177,12 @@ class IdleTimerScan {
 
 
  private:
-  void LogRaceStart(uint8_t* base) {
+  void LogRaceStart() {
     std::string list;
     for (const auto& [address, s] : streaks_) {
       if (s.count >= kStreakToLog) {
-        uint32_t now = guest::LoadU32(base, address);
-        list += fmt::format(" {:08X}:{}x{} last {}({}) now {}({})", address, s.count, s.step,
+        uint32_t now = guest::LoadU32(address);
+        list += std::format(" {:08X}:{}x{} last {}({}) now {}({})", address, s.count, s.step,
                             s.value, AsFloat(s.value), now, AsFloat(now));
       }
     }
@@ -204,22 +206,22 @@ IdleTimerScan& Get() {
 
 }  // namespace
 
-void IdleTimerScan_OnPassStart(uint8_t* base, bool render_only, bool in_race) {
+void IdleTimerScan_OnPassStart(bool render_only, bool in_race) {
   g_logic_pass = false;
   if (!ITC_FLAG(find_idle_timer) || render_only) {
     return;
   }
   g_logic_pass = !render_only;
-  Get().OnLogicPass(base, in_race);
+  Get().OnLogicPass(in_race);
 }
 
-void IdleTimerScan_Before(uint8_t* base) {
+void IdleTimerScan_Before() {
   if (ITC_FLAG(find_idle_timer) && g_logic_pass) {
-    Get().Before(base);
+    Get().Before();
   }
 }
 
-void IdleTimerScan_After(uint8_t* base, const char* kind, uint32_t id) {
+void IdleTimerScan_After(const char* kind, uint32_t id) {
   if (ITC_FLAG(log_boot_modes)) {
     // Each handler the first time it runs, to see what runs when in the boot.
     static std::set<std::pair<std::string, uint32_t>> seen;
@@ -228,7 +230,7 @@ void IdleTimerScan_After(uint8_t* base, const char* kind, uint32_t id) {
     }
   }
   if (ITC_FLAG(find_idle_timer) && g_logic_pass) {
-    Get().After(base, kind, id);
+    Get().After(kind, id);
   }
 }
 

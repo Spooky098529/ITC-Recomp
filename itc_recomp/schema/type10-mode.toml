@@ -1,0 +1,244 @@
+# The schema of docs/functions/type10-mode.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 10 front-end mode, the replay theater (src/type10_mode/): the
+# mode (852 bytes), its block (19,300 bytes at +848) holding two state
+# machines, the replay theater (+0, UI movie 45) and the save screen
+# (+9640, save-screen.md), the theater's three VirtualAlloc blocks at
+# 0x828161E0 to 0x828161E8 (a page object, a menu list and its data), and
+# the kept replay Replay::SetUpRace reads ([0x826C5B50]).
+#
+# Seeded types not described here (another area's type; the lead adds the
+# measure names there):
+# - "new<28>@ReplayTheater::Create" ([0x828161E0], the page object) is
+#   menu-helpers.toml's PageObject;
+# - "new<72>@ReplayTheater::Create" ([0x828161E4], the replay list) is
+#   race-screens.toml's MenuList;
+# - the handlers' r4 "ReplayTheater::Wait.r4" and "ReplayTheater::Leave.r4"
+#   (812 bytes: +804 the ring count, +808 its start) are boot-mode.toml's
+#   ModeDispatcher (the mode's +36);
+# - "ModeType9.+816" is todays-result.toml's ModeType9Block already (the
+#   seed's ModeType9_816 dropped).
+
+# The type 10 mode (852 bytes, ModeType10::ModeType10 in game-modes.md;
+# vtable 0x82006CF0, 14 slots; +32 vtable 0x82006CE4): the game mode's base
+# (boot-mode.toml's GameMode), then the block. The measure joins the mode
+# with the next-mode answer (the delegate functions' r3: the byte +0 and
+# +4), its +32 interface (Interrupt and Resume get the mode + 32: the
+# fault_interface_* fields) and the block FindShown gets (fault_block_*).
+# NextModeAnswer is the type 9 mode's function (shared, slot 12): its r4 is
+# this mode here.
+# Dual (E5 step 4): made in host memory by Mode::Create; the measure joins
+# guest addresses with it (the delegates' answer on the stack, the block
+# in AllLoaded and FindShown), which the view reads as guest memory. Its
+# fields over the block were left out.
+[ModeType10]
+measures = ["ModeType10", "ModeType10::WaitForLoads.r4", "ModeType10::WaitForShown.r4",
+            "ModeType10::LeaveScreen.r4", "ModeType10::NextMode.r4", "ModeType10::Leaving.r4",
+            "ModeType9::NextModeAnswer.r4"]
+size = 852
+origin = "allocated"
+storage = "dual"
+host_alloc = [0x821078EC]
+vtable = 0x82006CF0
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006CF0 (14 slots)" },
+  { name = "answer_changed", offset = 0, type = "u8", note = "measure fault: the next-mode answer's byte +0 (ModeAnswer, the delegate functions' r3), not the mode's" },
+  { name = "answer", offset = 0, type = "u64", note = "measure fault: the next-mode answer's 8 bytes (ModeAnswer)" },
+  { name = "delegate_ptr", offset = 4, type = "ptr", to = "ModeDelegate", note = "the delegate at +8; 0 when its address wraps (never). Also the answer's next type +4 by the measure's join" },
+  { name = "delegate_vtable", offset = 8, type = "u32", note = "0x82010FA0 (ModeDelegate::Invoke)" },
+  { name = "delegate_object", offset = 12, type = "u32", note = "the mode" },
+  { name = "delegate_function", offset = 16, type = "fn", note = "Mode::Slot8Thunk (WaitForLoads) after Init, then NextModeThunk, Slot10Thunk, Slot11Thunk, Slot12Thunk or Slot13Thunk" },
+  { name = "delegate_adjustment", offset = 20, type = "u32", note = "0" },
+  { name = "vtable32", offset = 32, type = "u32", note = "0x82006CE4: Interrupt, ModeType9::ForceExit, Resume" },
+  { name = "handlers", offset = 36, type = "bytes", count = 200, note = "the dispatcher (+36, ModeDispatcher): 50 handler pointers (the theater, then the save screen)" },
+  { name = "handler_count", offset = 236, type = "u32" },
+  { name = "ring", offset = 240, type = "bytes", count = 600, note = "the dispatcher's ring: 50 messages of 12 bytes (ModeMessage)" },
+  { name = "ring_count", offset = 840, type = "u32" },
+  { name = "ring_start", offset = 844, type = "u32" },
+  { name = "block", offset = 848, type = "ptr", to = "ModeType10Block", note = "VirtualAlloc'ed by Init (19,300 bytes), freed by Release" },
+  { name = "fault_interface_ring_count", offset = 808, type = "u32", note = "measure fault: the +32 interface's +808 (ModeType10Interface32), the mode's +840" },
+  { name = "fault_interface_ring_start", offset = 812, type = "u32", note = "measure fault: the +32 interface's +812, the mode's +844" },
+  { name = "fault_interface_block", offset = 816, type = "u32", note = "measure fault: the +32 interface's +816, the mode's +848" },
+]
+
+# The type 10 mode seen through its +32 interface (vtable 0x82006CE4; r3
+# the mode + 32): Interrupt, ModeType9::ForceExit and Resume (none seen in
+# play). The measure joins it with ModeType10 (its fault_interface_*
+# fields).
+[ModeType10Interface32]
+size = 820
+origin = "embedded"
+storage = "dual"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006CE4" },
+  { name = "ring", offset = 208, type = "bytes", count = 600, note = "the mode's ring (+240)" },
+  { name = "ring_count", offset = 808, type = "u32", note = "the mode's +840" },
+  { name = "ring_start", offset = 812, type = "u32", note = "the mode's +844" },
+  { name = "block", offset = 816, type = "ptr", to = "ModeType10Block", note = "the mode's +848" },
+]
+
+# The type 10 mode's block (19,300 bytes at the mode's +848; known-data.md:
+# "type 10 mode block"): the replay theater's machine at +0, the save
+# screen's at +9640, the shown machine's index and the next mode's answer.
+# In host memory (E5 step 4): made by ModeType10::Init (the original's
+# VirtualAlloc(19300) at 0x8228897C; src/type10_mode/mode.cpp's New), freed
+# by ModeType10::Release (FreeBlock's memory::FreePages, which takes the
+# handle; src/front_end_screen_helpers/releases.cpp); the mode's +848 holds
+# its handle. Its two machines are embedded (the theater's host, the save
+# screen's dual: four other modes' blocks embed it too); the words below
+# over them are the embeds' words, kept as bytes for the measure.
+[ModeType10Block]
+measures = ["new<19300>@ModeType10::Init", "ModeType10.+816", "ModeType10::WaitForLoads.r4.+848",
+            "ModeType10::WaitForShown.r4.+848", "ModeType10::NextMode.r4.+848",
+            "ModeType10::Leaving.r4.+848", "ModeType9::NextModeAnswer.r4.+848"]
+size = 19300
+origin = "allocated"
+storage = "host"
+fields = [
+  { name = "theater", offset = 0, type = "embed", to = "ReplayTheaterMachine", note = "the replay theater's machine" },
+  { name = "theater_state", offset = 9604, type = "bytes", count = 4, note = "the theater's state (a word of the theater embed)" },
+  { name = "theater_loaded", offset = 9608, type = "bytes", count = 4, note = "movie 45 loaded (a word of the theater embed)" },
+  { name = "theater_reenter", offset = 9612, type = "bytes", count = 4, note = "1 at Init: open on message 5 (a word of the theater embed)" },
+  { name = "theater_delete_movie", offset = 9616, type = "bytes", count = 4, note = "0 at Init (a word of the theater embed)" },
+  { name = "save_screen", offset = 9640, type = "embed", to = "SaveScreen", note = "the save screen's machine (Type10SaveScreen::Init, save-screen.md)" },
+  { name = "save_screen_state", offset = 19244, type = "bytes", count = 4, note = "5 shown (Interrupt; a word of the save_screen embed)" },
+  { name = "save_screen_loaded", offset = 19248, type = "bytes", count = 4, note = "a word of the save_screen embed" },
+  { name = "save_screen_reenter", offset = 19252, type = "bytes", count = 4, note = "1 at Init (the embed's load_at_once)" },
+  { name = "save_screen_delete_movie", offset = 19256, type = "u32", note = "0 at Init (the machine's word after SaveScreen's 9,616 bytes)" },
+  { name = "shown", offset = 19280, type = "u32", note = "the shown machine's index: 0 the theater, 1 the save screen (FindShown)" },
+  { name = "shown_at_init", offset = 19284, type = "u32", note = "0 at Init (readers not looked for)" },
+  { name = "answer_word0", offset = 19292, type = "u32", note = "the answer's first word (changed and three bytes), as NextModeAnswer copies it" },
+  { name = "answer", offset = 19292, type = "u64", note = "the next mode's 8-byte answer ForceExit writes and NextModeAnswer hands to Modes::Tick (ModeAnswer)" },
+  { name = "answer_next_type", offset = 19296, type = "u32", note = "the answer's next mode type (4 or 12 from ForceExit)" },
+]
+
+# The replay theater's machine (the block's +0; ReplayTheater::InitStates):
+# a StateMachine (game-modes.toml), then its words. The measure joined the
+# record ShowRecord gets (save-interface.toml's SaveReplayRecord: the
+# halfwords and words at +0 to +32), the transitions' r3 (the page object's
+# started word, +0) and the pages' r3 (the dispatcher: +804, +808) with it:
+# the "measure fault" fields.
+# In host memory (E5 step 4): embedded only in ModeType10Block (its +0).
+# The measure's faults are named fault_ (never members).
+[ReplayTheaterMachine]
+measure = "ReplayTheater"
+size = 9620
+origin = "embedded"
+storage = "host"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition)" },
+  { name = "fault_step_started", offset = 0, type = "u32", note = "measure fault: the transitions' r3 (PageObject.step_started), and ShowRecord's record's word_0 (SaveReplayRecord)" },
+  { name = "fault_record_year", offset = 0, type = "u16", note = "measure fault: ShowRecord's record (SaveReplayRecord.year)" },
+  { name = "fault_record_month", offset = 2, type = "u16", note = "measure fault: SaveReplayRecord.month" },
+  { name = "fault_record_day", offset = 6, type = "u16", note = "measure fault: SaveReplayRecord.day" },
+  { name = "fault_record_hour", offset = 8, type = "u16", note = "measure fault: SaveReplayRecord.hour" },
+  { name = "fault_record_minute", offset = 10, type = "u16", note = "measure fault: SaveReplayRecord.minute" },
+  { name = "fault_record_time", offset = 16, type = "u32", note = "measure fault: SaveReplayRecord.time" },
+  { name = "fault_record_mode", offset = 20, type = "u32", note = "measure fault: SaveReplayRecord.mode" },
+  { name = "fault_record_course", offset = 24, type = "u32", note = "measure fault: SaveReplayRecord.course" },
+  { name = "fault_record_number", offset = 28, type = "u32", note = "measure fault: SaveReplayRecord.number" },
+  { name = "fault_record_result", offset = 32, type = "u32", note = "measure fault: SaveReplayRecord.result" },
+  { name = "fault_ring_count", offset = 804, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_count)" },
+  { name = "fault_ring_start", offset = 808, type = "u32", note = "measure fault: the pages' r3 is the dispatcher (ModeDispatcher.ring_start)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 or 9 at Create, 4 to start, 5 running, 7 leaving, 8 unloading, 9 waiting, 11 the race (a replay loaded), 14 the title (Destroy)" },
+  { name = "loaded", offset = 9608, type = "u32", note = "movie 45 loaded" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForMovie go to state 9 (open on message 5)" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "nonzero: Unload deletes movie 45 and clears loaded" },
+]
+
+# The replay theater's data ([0x828161E8], 16 bytes, VirtualAlloc'ed by
+# ReplayTheater::Create; known-data.md: "0x828161E0 to 0x828161E8").
+[ReplayTheaterData]
+measure = "new<16>@ReplayTheater::Create"
+size = 16
+origin = "allocated"
+# In host memory since E5 step 3 (2026-11-22): made by ReplayTheater::Create
+# (the original's VirtualAlloc(16) at 0x822894A4), freed by Destroy (its
+# VirtualFree at 0x82289554); the global at 0x828161E8 holds its handle.
+storage = "host"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "0 from Create, 1 from StartPage" },
+  { name = "asked", offset = 4, type = "u32", note = "what was asked of the save screen: 0 the list, 1 a replay's load, 2 the device lost, 3 back, -1 after an interrupt" },
+  { name = "replay_loaded", offset = 8, type = "u32", note = "1 once a replay is loaded and the race set up from it; Destroy then goes to state 11 (the race)" },
+  { name = "interrupted", offset = 12, type = "u32", note = "set by message 15 (OnInterrupt), cleared by 16 (OnResume)" },
+]
+
+# The kept replay ([0x826C5B50], 0x13C8F0 bytes, Replay::Create in
+# data-load.md; filled by Replay::Keep in replay-snapshots.md, read by
+# Replay::SetUpRace here and the save screen's replay save). known-data.md:
+# "0x826C5B50". The measure sees up to +0x2B5EC; the racer entries (1,908
+# bytes from +100) are named by entry 0's words (the others through an
+# index).
+[KeptReplay]
+measure = "Replay"
+size = 1296624
+origin = "allocated"
+fields = [
+  { name = "race_word_4", offset = 0, type = "u32", note = "the race data's +4 (the course)" },
+  { name = "race_word_28", offset = 4, type = "u32", note = "the race data's +28" },
+  { name = "race_word_32", offset = 8, type = "u32", note = "the race data's +32 (the mode)" },
+  { name = "racer_record_words", offset = 12, type = "bytes", count = 16, note = "the record word +12 of the four racers the stage lists (+12 to +24)" },
+  { name = "racer_record_word_12", offset = 12, type = "u32", note = "the first of them" },
+  { name = "stage_word_0", offset = 28, type = "u32", note = "the stage's word +0" },
+  { name = "save_pick", offset = 32, type = "u32", note = "five words of player 0's save data from +8 (or defaults), +32 to +51: the first" },
+  { name = "save_pick_flag", offset = 32, type = "u8", note = "the pick's first byte" },
+  { name = "save_pick_4", offset = 36, type = "u32" },
+  { name = "save_pick_8", offset = 40, type = "u16" },
+  { name = "save_pick_10", offset = 42, type = "u8" },
+  { name = "save_pick_12", offset = 44, type = "u32" },
+  { name = "save_pick_16", offset = 48, type = "u16" },
+  { name = "save_pick_18", offset = 50, type = "u8" },
+  { name = "race_words", offset = 52, type = "bytes", count = 32, note = "the race data's +4 to +35 (to +83)" },
+  { name = "race_word_59610", offset = 84, type = "u32", note = "the race data's +0x59610 (to +0x5961C at +96)" },
+  { name = "race_word_59614", offset = 88, type = "u32" },
+  { name = "race_word_59618", offset = 92, type = "u32" },
+  { name = "race_word_5961C", offset = 96, type = "u32" },
+  { name = "racer_flags", offset = 100, type = "u32", note = "the 93 racer entries (1,908 bytes each from +100): entry 0's flags" },
+  { name = "racer_word_3892", offset = 104, type = "u32", note = "entry 0's +3892 (then the record's first 1,884 bytes from +108)" },
+  { name = "racer_start_position", offset = 1992, type = "u16", note = "entry 0's start position" },
+  { name = "racer_half_1894", offset = 1994, type = "u16" },
+  { name = "racer_word_3908", offset = 1996, type = "f32", note = "entry 0's +3908" },
+  { name = "racer_id", offset = 2000, type = "u32", note = "entry 0's racer id" },
+  { name = "racer_word_3920", offset = 2004, type = "f32", note = "entry 0's +3920" },
+  { name = "stage", offset = 177544, type = "u64", note = "the stage (80 bytes from +0x2B588): its first doubleword (seven copied by SetUpRace)" },
+  { name = "stage_word_0_2B588", offset = 177544, type = "u32", note = "the stage's first word" },
+  { name = "stage_8", offset = 177552, type = "u64" },
+  { name = "stage_16", offset = 177560, type = "u64" },
+  { name = "stage_24", offset = 177568, type = "u64" },
+  { name = "stage_32", offset = 177576, type = "u64" },
+  { name = "stage_40", offset = 177584, type = "u64" },
+  { name = "stage_word_44", offset = 177588, type = "u32" },
+  { name = "stage_48", offset = 177592, type = "u64" },
+  { name = "result_3916", offset = 177624, type = "u32", note = "the last kept result's +3916 (to +3928 at +0x2B5E4)" },
+  { name = "result_3920", offset = 177628, type = "u32" },
+  { name = "result_3924", offset = 177632, type = "u32" },
+  { name = "result_3928", offset = 177636, type = "u32" },
+  { name = "race_word_A3AE0", offset = 177640, type = "u32", note = "the race data's +0xA3AE0" },
+  { name = "race_words_A3AE4", offset = 177644, type = "u32", note = "five words from the race data's +0xA3AE4: the first" },
+  { name = "unfilled", offset = 177664, type = "u32", note = "+0x2B600: 1 from Replay::Create, 0 once filled; SetUpRace returns 0 at once when nonzero" },
+  { name = "snapshot", offset = 177680, type = "bytes", count = 38928, note = "+0x2B610: a race snapshot (replay-snapshots.toml's ReplaySnapshot, block A's copy)" },
+  { name = "recording", offset = 216608, type = "bytes", count = 1079748, note = "+0x34E20: player 0's input recording with its count (0x107AC4 bytes)" },
+]
+
+[globals]
+pages = { address = 0x828161E0, type = "ptr", to = "PageObject", note = "the theater's page object (28 bytes)" }
+list = { address = 0x828161E4, type = "ptr", to = "MenuList", note = "the replay list (72 bytes, a menu list)" }
+data = { address = 0x828161E8, type = "ptr", to = "ReplayTheaterData" }
+save_buffers = { address = 0x828161F0, type = "ptr", to = "SaveBuffers", note = "the save layer's header (+12 the replays' 36-byte records, +20 their count)" }
+save_screen_data = { address = 0x826D8454, type = "ptr", to = "SaveScreenData", note = "the save screen's data (+40 the replay picked, +56 the prompts WaitPage shows)" }
+entered = { address = 0x826364EC, type = "u32", note = "how the title is entered: NextMode's 14 clears it, ForceExit's 0 and 1 set it" }
+pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked (the system UI, probably): either word set" }
+pad_blocked1 = { address = 0x826C7964, type = "u32" }
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer) OnDone hands to Replay::SetUpRace" }
+recordings = { address = 0x826C5B4C, type = "u32", note = "the input recordings (a pointer) OnDone hands to Replay::SetUpRace" }
+kept_replay = { address = 0x826C5B50, type = "ptr", to = "KeptReplay", note = "the kept replay OnDone hands to Replay::SetUpRace" }
+string_table = { address = 0x826C5C34, type = "u32", note = "the string table Strings::Load gets" }
+fades_in = { address = 0x82001BEC, type = "u32", note = "the fades' pass ScreenFades::FadeIn gets" }
+fades_out = { address = 0x82001BF0, type = "u32", note = "the fades' pass ScreenFades::FadeOut gets" }
+fade_count0 = { address = 0x826A50E4, type = "u32", note = "a fades' count FadeOut waits on" }
+fade_count1 = { address = 0x826A50DC, type = "u32", note = "the other fades' count FadeOut waits on" }

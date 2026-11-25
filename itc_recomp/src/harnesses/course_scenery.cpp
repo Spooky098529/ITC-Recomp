@@ -18,13 +18,28 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "cameras/cameras.h"
+#include "command_list/command_list.h"
 #include "course_scenery/course_scenery.h"
+#include "hooks/app_start_up.h"
+#include "hooks/archive.h"
+#include "hooks/course_scenery.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
+#include "memory/c_runtime_heap.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/texture_provider.h"
+#include "models/xpr.h"
+#include "scenery_lists/scenery_lists.h"
+#include "track_zones/track_zones.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -619,6 +634,205 @@ void PoolsShutdown(Context& h) {
   results.Report();
 }
 
+// Scenery::AllocPhysical and FreePhysical: the recompiled versions with the
+// game's own XPhysicalAlloc, XPhysicalSize and XPhysicalFree (the kernel's
+// imports, under hooks::RecompiledHeapScope), the native ones over the layer
+// (XPhysicalSize from its recorded sizes: the user's call, 2026-11-06).
+// Compared: the bytes held ([0x826C5518], from a random start) after each,
+// the block's alignment and r3 (the block as 0 or 1, then the free's r3).
+void PhysicalCases(Context& h) {
+  Random& r = h.random;
+  Results results("Scenery::AllocPhysical, FreePhysical (sub_820F1490, sub_820F14E8)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: Scenery::AllocPhysical: the native heap is off, no cases");
+    results.Report();
+    return;
+  }
+  const uint32_t saved = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  std::vector<uint32_t> sizes = {0, 1, 248, 272, 4095, 4096, 4097, 65536, 100000, 0x1D8000};
+  for (int i = 0; i < 24; i++) {
+    sizes.push_back(1 + r.Below(i < 16 ? 0x20000 : 0x400000));
+  }
+  for (uint32_t size : sizes) {
+    const uint32_t held = r.Next() & 0x0FFFFFFF;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, cs::kPhysicalHeld, held);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = size;
+      uint32_t block = 0;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        __imp__sub_820F1490(t, h.base);
+        block = t.r3.u32;
+      } else {
+        block = cs::AllocPhysical(h.base, size);
+      }
+      out[v].Word(block != 0);
+      out[v].Word(block % 4096);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      if (block == 0) {
+        continue;
+      }
+      PPCContext f = CallContext(h);
+      f.r3.u64 = block;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        __imp__sub_820F14E8(f, h.base);
+      } else {
+        cs::FreePhysical(h.base, block);
+        f.r3.u64 = 0;
+      }
+      out[v].Word(f.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+    }
+    results.Check(out[0], out[1], fmt::format("size {} held {:#x}", size, held));
+  }
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved);
+  results.Report();
+}
+
+// Scenery::Setup (with SetupPools): a 248-byte manager of physical memory
+// filled with 0xCD on each side, a configuration in the scratch area (the
+// mode 0, 1 or 2 with +4 0 or 1, +24 and +28 PoolSizes' cases' asset and
+// area table with up to 6 areas of their real-looking assets, +32 a word
+// for mode 2, +36 and +40 pool 0 and 1 on or off). Compared: r3 (0 or not),
+// the manager (SceneryOutputs), the frame's PoolSizes words and the five
+// descriptors (its r1 - 448 + 80 and + 112).
+void SetupCases(Context& h) {
+  Random r(0x53455455);
+  Results results("Scenery::Setup (sub_820F3020) with SetupPools (sub_820F2720)");
+  if (!hooks::CourseScenerySetUpNative()) {
+    ITC_LOG_INFO("harness: Scenery::Setup: its plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kConfig = 0, kTable = 64, kAsset = 512, kWord = 520;
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 40; c++) {
+    const uint32_t mode = c < 4 ? 2 : r.Below(2);
+    const uint32_t views = r.Below(2);
+    const uint32_t first_asset = r.Below(20000);
+    const uint32_t second_asset = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(20000);
+    const uint32_t areas = r.Below(7);
+    const uint32_t end = r.Below(3) == 0 ? r.Below(7) : 99;
+    const uint32_t pool0 = r.Below(2), pool1 = r.Below(2), word = r.Below(2);
+    uint32_t entries[6][3];
+    for (uint32_t i = 0; i < 6; i++) {
+      entries[i][0] = i == end ? 0x80000000u | uint32_t(r.Next()) : r.Below(20000);
+      entries[i][1] = r.Below(5) == 0 ? 0xFFFFFFF0u + r.Below(8) : r.Below(20000);
+      entries[i][2] = entries[i][1] + r.Below(5) - (r.Below(6) == 0 ? 2 : 0);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t config = h.data + kConfig, table = h.data + kTable;
+      guest::StoreU32(h.base, config + 0, mode);
+      guest::StoreU32(h.base, config + 4, views);
+      guest::StoreU32(h.base, config + 24, h.data + kAsset);
+      guest::StoreU32(h.base, config + 28, table);
+      guest::StoreU32(h.base, config + 32, h.data + kWord);
+      guest::StoreU32(h.base, config + 36, pool0);
+      guest::StoreU32(h.base, config + 40, pool1);
+      guest::StoreU32(h.base, h.data + kWord, word);
+      guest::StoreU32(h.base, h.data + kAsset, first_asset);
+      guest::StoreU32(h.base, table + 8, second_asset);
+      guest::StoreU32(h.base, table + 16, areas);
+      for (uint32_t i = 0; i < 6; i++) {
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, table + 20 + 12 * i + 4 * k, entries[i][k]);
+        }
+      }
+      const uint32_t manager = memory::AllocPhysical(248, 0, 0xFFFFFFFFu, 0, 4);
+      Fill(h.base, manager, 248);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x1234);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 1024, 1024);
+      t.r3.u64 = manager;
+      t.r4.u64 = config;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F3020(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::Setup(h.base, calls, t.r1.u32, t.r3.u32, t.r4.u32);
+          });
+        }
+      });
+      out[v].Word(t.r3.u32 != 0);
+      const uint32_t frame = t.r1.u32 - 112 - 336;
+      out[v].Bytes(Read(h.base, frame + 80, 20));
+      out[v].Bytes(Read(h.base, frame + 112, 120));
+      SceneryOutputs(h, out[v], manager, false);
+      SceneryFree(h, manager, false);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} mode {} areas {} pools {}{}", c, mode, areas, pool0, pool1));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
+// Scenery::Create: the manager made on each side (the native heap's
+// physical blocks and the provider's storage), then Setup's outputs' part
+// for what Create and Init write. Compared: r3 as an offset from the
+// manager, [0x826C5514] and [0x826C551C] the same, the bytes held, and
+// +52 to +179, +184 to +215, +224 to +235 and the provider's vector (its
+// storage's size and contents, its last and end as offsets).
+void CreateCases(Context& h) {
+  Results results("Scenery::Create (sub_820F2F88)");
+  if (!hooks::CourseScenerySetUpNative()) {
+    ITC_LOG_INFO("harness: Scenery::Create: its plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_created = guest::LoadU32(h.base, cs::kCreated);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x100u * uint32_t(c));
+      PPCContext t = CallContext(h);
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F2F88(t, h.base);
+        } else {
+          t.r3.u64 = cs::Create(h.base);
+        }
+      });
+      const uint32_t manager = guest::LoadU32(h.base, cs::kCreated);
+      out[v].Word(manager != 0);
+      out[v].Word(t.r3.u32 - manager);
+      out[v].Word(guest::LoadU32(h.base, cs::kManager) - manager);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Bytes(Read(h.base, manager + 52, 128));
+      out[v].Bytes(Read(h.base, manager + 184, 32));
+      out[v].Bytes(Read(h.base, manager + 224, 4));
+      // The provider's vector: +236 the first, +240 the last, +244 the end.
+      out[v].Word(guest::LoadU32(h.base, manager + 228));
+      out[v].Word(guest::LoadU32(h.base, manager + 232));
+      const uint32_t first = guest::LoadU32(h.base, manager + 236);
+      out[v].Word(first != 0);
+      out[v].Word(guest::LoadU32(h.base, manager + 240) - first);
+      out[v].Word(guest::LoadU32(h.base, manager + 244) - first);
+      if (first != 0) {
+        out[v].Word(memory::Size(first));
+        out[v].Bytes(Read(h.base, first, 256));
+      }
+      models::TextureProviderDestruct(h.base, manager + 228);
+      memory::FreePhysical(manager);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kCreated, saved_created);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
 // --- The scenery's lists ---
 
 void ModelAssets(Context& h) {
@@ -1087,6 +1301,188 @@ void StartLoadCases(Context& h) {
   results.Report();
 }
 
+// Scenery::CollectAreas and CollectModels: the manager at +0 (+112 the course
+// set, at +180, whose +1056 names the area file at +1240; lists A at +116
+// and B at +144, their pointers and items at +176/+240 and +496/+624), the
+// file's areas (1 to 4, little-endian count and offsets, each entry a model
+// count at +0, its four corners at +32 and 0 to 3 96-byte model records from
+// +96: a number, four corners at +32), the viewport at +2480 (+72 the far
+// distance, +1600 and +1608 the eye, in the scratch area's end). Rectangles
+// around the eye, near it and far, NaNs and infinities now and then; the
+// view one of the mask table's (0x82602F80) or not, the camera passes it
+// names enabled at random (their words put back after). The lists' items'
+// distances are compared as floats, the rest of the scratch area and r3
+// exactly.
+void CollectCases(Context& h) {
+  Random& r = h.random;
+  constexpr uint32_t kViewMasks = 0x82602F80;
+  constexpr uint32_t kCameraPasses = 0x826BAC00;
+  constexpr uint32_t kManager = 0, kSetAt = 180, kFile = 1240, kViewport = 2480;
+  constexpr uint32_t kPointersA = 176, kItemsA = 240, kPointersB = 496, kItemsB = 624;
+  constexpr uint32_t kItemsMaxA = 16, kItemsMaxB = 32;
+  // The camera passes' enabled words the table names, put back at the end.
+  std::vector<std::pair<uint32_t, uint32_t>> saved;
+  uint32_t views[14];
+  for (uint32_t i = 0; i < 14; i++) {
+    views[i] = guest::LoadU32(h.base, kViewMasks + 16 * i);
+    const uint32_t word =
+        guest::LoadU32(h.base, kViewMasks + 16 * i + 8) * 592u + kCameraPasses + 588;
+    if (std::none_of(saved.begin(), saved.end(), [&](const auto& s) { return s.first == word; })) {
+      saved.emplace_back(word, guest::LoadU32(h.base, word));
+    }
+  }
+  auto coordinate = [&](float center, float spread) -> uint32_t {
+    switch (r.Below(40)) {
+      case 0:
+        return 0x7FC00000u | (r.Below(2) << 31);
+      case 1:
+        return 0x7F800000u | (r.Below(2) << 31);
+      default:
+        return std::bit_cast<uint32_t>(center + (float(r.Below(20001)) / 10000.0f - 1.0f) * spread);
+    }
+  };
+  // A rectangle's four corners (0 and 2 the low and high), at `at`.
+  auto write_corners = [&](uint32_t at, float cx, float cz, float spread) {
+    const float x0 = cx - float(r.Below(400)) / 4.0f, x1 = cx + float(r.Below(400)) / 4.0f;
+    const float z0 = cz - float(r.Below(400)) / 4.0f, z1 = cz + float(r.Below(400)) / 4.0f;
+    const float xs[4] = {x0, x1, x1, x0}, zs[4] = {z0, z0, z1, z1};
+    for (uint32_t c = 0; c < 4; c++) {
+      const uint32_t point = at + 16 * c;
+      guest::StoreU32(h.base, point + 0, r.Below(30) == 0 ? coordinate(cx, spread)
+                                                         : std::bit_cast<uint32_t>(xs[c]));
+      guest::StoreU32(h.base, point + 4, uint32_t(r.Next()));
+      guest::StoreU32(h.base, point + 8, r.Below(30) == 0 ? coordinate(cz, spread)
+                                                         : std::bit_cast<uint32_t>(zs[c]));
+      guest::StoreU32(h.base, point + 12, uint32_t(r.Next()));
+    }
+  };
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "Scenery::CollectAreas (sub_820F3098)"
+                               : "Scenery::CollectModels (sub_820F32D0)");
+    for (int c = 0; c < 400; c++) {
+      // The inputs, written once and copied for each version.
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t manager = h.data + kManager;
+      guest::StoreU32(h.base, manager + 112, h.data + kSetAt);
+      guest::StoreU32(h.base, h.data + kSetAt + 1056, h.data + kFile);
+      const uint32_t areas = 1 + r.Below(4);
+      const float eye_x = float(r.Below(2001)) / 10.0f - 100.0f;
+      const float eye_z = float(r.Below(2001)) / 10.0f - 100.0f;
+      const uint32_t viewport = h.data + kViewport;
+      guest::StoreU32(h.base, viewport + 72,
+                      r.Below(20) == 0 ? coordinate(50.0f, 50.0f)
+                                       : std::bit_cast<uint32_t>(float(r.Below(1600)) / 8.0f));
+      guest::StoreU32(h.base, viewport + 1600,
+                      r.Below(30) == 0 ? coordinate(eye_x, 10.0f) : std::bit_cast<uint32_t>(eye_x));
+      guest::StoreU32(h.base, viewport + 1608,
+                      r.Below(30) == 0 ? coordinate(eye_z, 10.0f) : std::bit_cast<uint32_t>(eye_z));
+      // The file: little-endian count and offsets, then the entries.
+      const uint32_t file = h.data + kFile;
+      guest::StoreU32(h.base, file, std::byteswap(areas));
+      uint32_t offset = 4 + 4 * areas;
+      uint32_t models_left = 6;
+      uint32_t model_counts[4] = {};
+      for (uint32_t a = 0; a < areas; a++) {
+        const uint32_t entry = file + offset;
+        guest::StoreU32(h.base, file + 4 + 4 * a, std::byteswap(offset));
+        const uint32_t models = std::min(models_left, r.Below(4));
+        models_left -= models;
+        model_counts[a] = models;
+        guest::StoreU32(h.base, entry, models);
+        // Near the eye mostly, far now and then.
+        const float spread = r.Below(4) == 0 ? 400.0f : 60.0f;
+        const float cx = eye_x + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+        const float cz = eye_z + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+        write_corners(entry + 32, cx, cz, spread);
+        for (uint32_t m = 0; m < models; m++) {
+          const uint32_t record = entry + 96 + 96 * m;
+          guest::StoreU32(h.base, record, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(8));
+          write_corners(record + 32, cx + float(r.Below(80)) - 40.0f,
+                        cz + float(r.Below(80)) - 40.0f, spread);
+        }
+        offset += 96 + 96 * models;
+      }
+      // The lists, with a few items already (areas and models below 6, so
+      // some match what's added).
+      const uint32_t lists[2] = {manager + 116, manager + 144};
+      const uint32_t pointers[2] = {h.data + kPointersA, h.data + kPointersB};
+      const uint32_t items[2] = {h.data + kItemsA, h.data + kItemsB};
+      for (uint32_t l = 0; l < 2; l++) {
+        guest::StoreU32(h.base, lists[l] + 4, 0);
+        guest::StoreU32(h.base, lists[l] + 16, pointers[l]);
+        guest::StoreU32(h.base, lists[l] + 20, items[l]);
+        const uint32_t max = l == 0 ? kItemsMaxA : kItemsMaxB;
+        for (uint32_t i = 0; i < max; i++) {
+          const uint32_t item = items[l] + 16 * i;
+          guest::StoreU32(h.base, item + 0, std::bit_cast<uint32_t>(float(r.Below(800)) / 4.0f));
+          guest::StoreU32(h.base, item + 4, r.Below(4) == 0 ? uint32_t(r.Next()) : 0u);
+          guest::StoreU16(h.base, item + 8, uint16_t(r.Below(areas)));
+          guest::StoreU16(h.base, item + 10, uint16_t(r.Below(6)));
+          guest::StoreU32(h.base, item + 12, uint32_t(r.Next()));
+          guest::StoreU32(h.base, pointers[l] + 4 * i, item);
+        }
+      }
+      // List A: up to 4 items for the areas (room for every area); up to 6
+      // for the models (list B has room for all of theirs).
+      guest::StoreU32(h.base, lists[0] + 8, which == 0 ? r.Below(5) : r.Below(7));
+      guest::StoreU32(h.base, lists[1] + 8, r.Below(5));
+      const uint32_t view = r.Below(4) == 0 ? r.Below(16) : views[r.Below(14)];
+      std::vector<uint32_t> enabled;
+      for (size_t i = 0; i < saved.size(); i++) {
+        enabled.push_back(r.Below(3) == 0 ? 0u : 1u + r.Below(2));
+      }
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, kScratchBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, h.data, inputs.data(), kScratchBytes);
+        for (size_t i = 0; i < saved.size(); i++) {
+          guest::StoreU32(h.base, saved[i].first, enabled[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = view;
+        t.r5.u64 = viewport;
+        With(v, [&] {
+          if (v == 0) {
+            if (which == 0) {
+              __imp__sub_820F3098(t, h.base);
+            } else {
+              __imp__sub_820F32D0(t, h.base);
+            }
+          } else if (which == 0) {
+            t.r3.u64 = cs::CollectAreas(h.base, t.r1.u32, t.r3.u32, t.r4.u32, t.r5.u32, t.r3.u32);
+          } else {
+            t.r3.u64 = cs::CollectModels(h.base, t.r1.u32, t.r3.u32, t.r4.u32, t.r5.u32, t.r3.u32);
+          }
+        });
+        // The scratch area in order, the items' distances as floats.
+        uint32_t at = 0;
+        for (uint32_t l = 0; l < 2; l++) {
+          const uint32_t first = (l == 0 ? kItemsA : kItemsB);
+          const uint32_t max = l == 0 ? kItemsMaxA : kItemsMaxB;
+          out[v].Bytes(Read(h.base, h.data + at, first - at));
+          for (uint32_t i = 0; i < max; i++) {
+            const uint32_t item = h.data + first + 16 * i;
+            out[v].Floats(h.base, item, 1);
+            out[v].Bytes(Read(h.base, item + 4, 12));
+          }
+          at = first + 16 * max;
+        }
+        out[v].Bytes(Read(h.base, h.data + at, kScratchBytes - at));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} areas {} models {} {} {} {} view {}", c, areas,
+                                model_counts[0], model_counts[1], model_counts[2],
+                                model_counts[3], view));
+    }
+    results.Report();
+  }
+  for (const auto& [word, value] : saved) {
+    guest::StoreU32(h.base, word, value);
+  }
+}
+
 // TextureAnimations::Advance (with AnimationSet::Advance and
 // Animation::Advance): a course set's +1060 (0 now and then) naming a set
 // of up to 6 animations at random offsets, each with up to 8 frames, its
@@ -1138,7 +1534,1535 @@ void TextureAnimationCases(Context& h) {
   results.Report();
 }
 
+// --- The files' parses ---
+
+// A block of files, built as words and written for each side: containers
+// (a little-endian count and offsets from their start), minimal part files
+// (no shapes, shader pairs or skeleton; the wrong version now and then) and
+// an XPR2 file with one texture.
+struct Files {
+  static constexpr uint32_t kBytes = 0x40000;
+  static constexpr uint32_t kPartBytes = 0x5000;
+  static constexpr uint32_t kHeader = 0x4000;
+  static constexpr uint32_t kVertices = 0x800;
+  static constexpr uint32_t kXprBytes = 4096;
+  static constexpr uint32_t kXprHeader = 256;
+  std::vector<uint32_t> words = std::vector<uint32_t>(kBytes / 4, 0);
+  uint32_t next_part = 0x2000;
+
+  void Put(uint32_t at, uint32_t value) { words[at / 4] = value; }
+  // A container at `at` holding the entries at `entries` (block offsets).
+  void Container(uint32_t at, const std::vector<uint32_t>& entries) {
+    Put(at, __builtin_bswap32(uint32_t(entries.size())));
+    for (size_t i = 0; i < entries.size(); i++) {
+      Put(at + 4 + 4 * uint32_t(i), __builtin_bswap32(entries[i] - at));
+    }
+  }
+  uint32_t Part(Random& r) {
+    const uint32_t file = next_part;
+    next_part += kPartBytes;
+    Put(file + 0, r.Below(6) == 0 ? 0x00140000 : 0x00150000);
+    Put(file + 4, 7);
+    Put(file + 8, 9);
+    Put(file + 16, 3);
+    Put(file + 20, 0x80);
+    Put(file + 24, 0x90);
+    Put(file + 28, 0x100);
+    Put(file + 32, 0xA0);
+    Put(file + 44, 0x2000);
+    Put(file + 64, kHeader);
+    Put(file + 68, kVertices);
+    Put(file + 72, kHeader + kVertices);
+    for (uint32_t k = kHeader; k < kHeader + kVertices; k += 4) {
+      Put(file + k, uint32_t(r.Next()) & 0x0FFFFFFFu);
+    }
+    return file;
+  }
+  uint32_t Xpr(uint32_t at) {
+    Put(at + 0, 0x58505232);
+    Put(at + 4, kXprHeader);
+    Put(at + 8, kXprBytes - 12 - kXprHeader);
+    Put(at + 12, 1);
+    Put(at + 12 + 4, 0x54580000);
+    Put(at + 12 + 8, 64);
+    Put(at + 12 + 16, 128);
+    Put(at + 12 + 64 + 0x20, 0x00001003);
+    Put(at + 12 + 64 + 44, 0x80);
+    Put(at + 12 + 64 + 0x30, 0x00002005);
+    return at;
+  }
+  void Write(uint8_t* base, uint32_t block) const {
+    for (uint32_t k = 0; k < words.size(); k++) guest::StoreU32(base, block + 4 * k, words[k]);
+  }
+};
+
+// The blocks each side made, for comparing their bytes with the pointers
+// into them made "region r, offset o" (they sit at different addresses on
+// each side).
+struct Regions {
+  struct Region {
+    uint32_t start, bytes, compared;
+  };
+  std::vector<Region> list;
+  void Add(uint32_t start, uint32_t bytes, uint32_t compared = 0) {
+    if (start != 0) list.push_back({start, bytes, compared ? compared : bytes});
+  }
+  // A model's blocks: the header copy, the vertex data, the texture
+  // provider's slots.
+  void AddModelBlocks(uint8_t* base, uint32_t model) {
+    Add(guest::LoadU32(base, model + 16), Files::kHeader);
+    Add(guest::LoadU32(base, model + 20), Files::kVertices);
+    Add(guest::LoadU32(base, model + 88), 256);
+  }
+  void AddXprBlocks(uint8_t* base, uint32_t xpr) {
+    Add(guest::LoadU32(base, xpr + 0), Files::kXprHeader);
+    Add(guest::LoadU32(base, xpr + 8), Files::kXprBytes - 12 - Files::kXprHeader);
+  }
+  uint32_t Normalized(uint32_t word) const {
+    for (size_t r = 0; r < list.size(); r++) {
+      if (word >= list[r].start && word - list[r].start < list[r].bytes + 16) {
+        return 0xB0000000u | (uint32_t(r) << 20) | (word - list[r].start);
+      }
+    }
+    return word;
+  }
+  void AddBytes(Outputs& out, uint8_t* base, uint32_t start, uint32_t bytes) const {
+    std::vector<uint8_t> data = Read(base, start, bytes);
+    for (uint32_t at = 0; at + 4 <= bytes; at += 4) {
+      const uint32_t word = Normalized(guest::LoadU32(base, start + at));
+      for (int k = 0; k < 4; k++) data[at + k] = uint8_t(word >> (24 - 8 * k));
+    }
+    out.Bytes(data);
+  }
+  // Every block's bytes (a scenery model's first 432: the last 16 are as
+  // the heap gave them).
+  void AddAll(Outputs& out, uint8_t* base) const {
+    for (const Region& region : list) AddBytes(out, base, region.start, region.compared);
+  }
+};
+
+void RequireDone(bool done) {
+  if (!done) {
+    ITC_LOG_ERROR("harness: course_scenery: a model's or texture set's teardown declined");
+    std::abort();
+  }
+}
+
+// A model's blocks given back and the model torn down (the scenery models
+// then freed).
+void FreeModel(uint8_t* base, uint32_t model, bool heap_block) {
+  const uint32_t header = guest::LoadU32(base, model + 16);
+  const uint32_t vertices = guest::LoadU32(base, model + 20);
+  if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+  if (vertices != 0) memory::FreePhysical(vertices - models::kBlockHeaderBytes);
+  for (uint32_t offset : {16u, 20u, 24u, 420u}) guest::StoreU32(base, model + offset, 0);
+  RequireDone(models::ModelDestruct(base, model).has_value());
+  if (heap_block) RequireDone(memory::crt::OperatorDelete(model));
+}
+void FreeXpr(uint8_t* base, uint32_t xpr) {
+  const uint32_t header = guest::LoadU32(base, xpr + 0);
+  const uint32_t data = guest::LoadU32(base, xpr + 8);
+  if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+  if (data != 0) {
+    memory::crt::XMemFree(data - models::kBlockHeaderBytes, models::kXprDataAllocation);
+  }
+  for (uint32_t k = 0; k < models::kXprBytes; k += 4) guest::StoreU32(base, xpr + k, 0);
+}
+
+// The models of a list (its +0 count, positive, its data slots in order).
+std::vector<uint32_t> ListModels(uint8_t* base, uint32_t list) {
+  std::vector<uint32_t> found;
+  const int32_t count = int32_t(guest::LoadU32(base, list));
+  for (int32_t i = 0; i < count && i < 64; i++) {
+    found.push_back(guest::LoadU32(base, list + 4 + 268 + 4 * uint32_t(i)));
+  }
+  return found;
+}
+
+// AreaLights::Parse and OnLoaded: the lights (+4 a container of 0 to 2
+// entries, the first's first word 0 or not; +32 the flags) in the scratch
+// area; the scratch area and r3.
+void AreaLightsParses(Context& h) {
+  Results results("AreaLights::Parse (sub_820F11C0) and OnLoaded (sub_820F1C30)");
+  Random r(0x6C6967687473ull);
+  const uint32_t lights = h.data, container = h.data + 256;
+  for (int c = 0; c < 200; c++) {
+    const bool callback = c % 2 == 1;
+    const uint32_t count = r.Below(3);
+    const uint32_t first = r.Below(3) == 0 ? 0 : uint32_t(r.Next());
+    std::vector<uint32_t> words(64);
+    for (auto& w : words) w = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t k = 0; k < 64; k++) guest::StoreU32(h.base, lights + 4 * k, words[k]);
+      guest::StoreU32(h.base, lights + 4, container);
+      guest::StoreU32(h.base, container, __builtin_bswap32(count));
+      guest::StoreU32(h.base, container + 4, __builtin_bswap32(64));
+      guest::StoreU32(h.base, container + 8, __builtin_bswap32(128));
+      guest::StoreU32(h.base, container + 64, first);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = lights;
+      t.r6.u64 = lights;
+      if (v == 0) {
+        (callback ? __imp__sub_820F1C30 : __imp__sub_820F11C0)(t, h.base);
+      } else if (callback) {
+        guest::StoreU32(h.base, t.r1.u32 - 96, t.r1.u32);
+        t.r3.u64 = cs::AreaLightsOnLoaded(h.base, lights);
+      } else {
+        t.r3.u64 = cs::AreaLightsParse(h.base, lights);
+      }
+      ScratchAndR3(h, out[v], t);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({}, count {}, first word {:#x})", c,
+                                              callback ? "OnLoaded" : "Parse", count, first));
+  }
+  results.Report();
+}
+
+// AreaModel::Parse and OnLoaded: the area's model (560 bytes, its model at
+// +80 made by Model::Model, its XPR at +528 by XPR::XPR, the flags at +32),
+// the manager's +188 a container of a part file and an XPR2 file (each
+// there or an entry whose first word is 0, or the container shorter).
+// Compared: r3, the object's bytes and its blocks', pointers made offsets.
+void AreaModelParses(Context& h) {
+  Results results("AreaModel::Parse (sub_820F1258) and OnLoaded (sub_820F1CE8)");
+  Random r(0x617265616D6F64ull);
+  const uint32_t allocation = memory::Alloc(Files::kBytes + 1024 + 16, 0);
+  const uint32_t files = (allocation + 15) & ~15u;
+  const uint32_t object = files + Files::kBytes;  // 560 bytes
+  const uint32_t manager = object + 576;          // +188 read
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  for (int c = 0; c < 40; c++) {
+    const bool callback = c % 2 == 1;
+    Files f;
+    const bool with_model = c % 4 < 2 || r.Below(2) == 0;
+    const bool with_xpr = c % 8 < 4 || r.Below(2) == 0;
+    const uint32_t entries = c % 10 == 9 ? r.Below(2) : 2;
+    f.Container(0, {with_model ? f.Part(r) : 0x1F00, with_xpr ? f.Xpr(0x1000) : 0x1F00});
+    f.Put(0, __builtin_bswap32(entries));
+    std::vector<uint32_t> flags_word{uint32_t(r.Next())};
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      f.Write(h.base, files);
+      Fill(h.base, object, 576 + 256, 0);
+      guest::StoreU32(h.base, object + 32, flags_word[0]);
+      RequireDone(models::ModelConstruct(h.base, object + 80));
+      models::XprConstruct(h.base, object + 528);
+      guest::StoreU32(h.base, manager + 188, files);
+      guest::StoreU32(h.base, cs::kManager, manager);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = object;
+      t.r6.u64 = object;
+      if (v == 0) {
+        (callback ? __imp__sub_820F1CE8 : __imp__sub_820F1258)(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          if (callback) {
+            t.r3.u64 = cs::AreaModelOnLoaded(h.base, calls, t.r1.u32, object);
+          } else {
+            t.r3.u64 = cs::AreaModelParse(h.base, calls, t.r1.u32, object);
+          }
+        });
+      }
+      guest::StoreU32(h.base, cs::kManager, saved_manager);
+      Regions regions;
+      regions.AddModelBlocks(h.base, object + 80);
+      regions.AddXprBlocks(h.base, object + 528);
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, object, 560);
+      regions.AddAll(out[v], h.base);
+      FreeModel(h.base, object + 80, false);
+      FreeXpr(h.base, object + 528);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({}, {} entries{}{})", c, callback ? "OnLoaded" : "Parse",
+                              entries, with_model ? ", model" : "", with_xpr ? ", XPR" : ""));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// CourseSet::Parse: a course set (3,824 bytes, zeroed) whose first file
+// holds the XPR2 file, a container of one part file, five lists' containers
+// of 0 to 2 part files and the points' of 0 or 1 (each entry there or one
+// whose first word is 0), and whose second file holds three entries (each
+// there or not). Compared: r3, the set's bytes, its models' and blocks'.
+void CourseSetParses(Context& h) {
+  Results results("CourseSet::Parse (sub_820F1A70)");
+  Random r(0x636F75727365ull);
+  const uint32_t allocation = memory::Alloc(Files::kBytes + 4096 + 16, 0);
+  const uint32_t files = (allocation + 15) & ~15u;
+  const uint32_t set = files + Files::kBytes;
+  constexpr uint32_t kZeroEntry = 0x1F00;
+  for (int c = 0; c < 24; c++) {
+    Files f;
+    auto maybe = [&](uint32_t entry) { return r.Below(5) == 0 ? kZeroEntry : entry; };
+    std::vector<uint32_t> first;
+    first.push_back(maybe(f.Xpr(0x1000)));
+    f.Container(256, {f.Part(r)});
+    first.push_back(maybe(256));
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t at = 512 + 64 * i;
+      std::vector<uint32_t> parts;
+      const uint32_t n = i == 5 ? r.Below(2) : r.Below(3);
+      for (uint32_t k = 0; k < n; k++) parts.push_back(f.Part(r));
+      f.Container(at, parts);
+      // An empty container is an entry whose first word is 0 too.
+      first.push_back(maybe(at));
+    }
+    f.Container(0, first);
+    std::vector<uint32_t> second;
+    for (uint32_t i = 0; i < 3; i++) {
+      f.Put(128 + 16 * i, r.Below(4) == 0 ? 0 : uint32_t(r.Next()));
+      second.push_back(128 + 16 * i);
+    }
+    f.Container(64, second);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      f.Write(h.base, files);
+      Fill(h.base, set, 3824, 0);
+      guest::StoreU32(h.base, set + 3808, files);
+      guest::StoreU32(h.base, set + 3812, files + 64);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = set;
+      if (v == 0) {
+        __imp__sub_820F1A70(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 = cs::CourseSetParse(h.base, calls, t.r1.u32, set);
+        });
+      }
+      Regions regions;
+      regions.AddXprBlocks(h.base, set + 64);
+      regions.AddModelBlocks(h.base, set + 96);
+      constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652, 3180};
+      std::vector<uint32_t> list_models;
+      for (uint32_t list : kLists) {
+        for (uint32_t model : ListModels(h.base, set + list)) {
+          list_models.push_back(model);
+          regions.Add(model, scenery_lists::kSceneryModelBytes, 432);
+        }
+      }
+      for (uint32_t model : list_models) regions.AddModelBlocks(h.base, model);
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, set, 3824);
+      regions.AddAll(out[v], h.base);
+      for (uint32_t model : list_models) FreeModel(h.base, model, true);
+      if (guest::LoadU32(h.base, set + 96) != 0) FreeModel(h.base, set + 96, false);
+      FreeXpr(h.base, set + 64);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// --- The pools' objects: made and reset ---
+
+// A scenery model as ModelList::Load makes one (no blocks).
+uint32_t NewSceneryModel(uint8_t* base) {
+  const auto block = memory::crt::OperatorNew(base, scenery_lists::kSceneryModelBytes);
+  RequireDone(block.has_value() && *block != 0);
+  RequireDone(models::ModelConstruct(base, *block));
+  guest::StoreU32(base, *block, scenery_lists::kSceneryModelVtable);
+  return *block;
+}
+
+// Scenery::MakePoolObject: pools 0 to 6 (5 and 6 nothing), a null address
+// now and then, random sizes and index, over random bytes. Compared: r3 and
+// the object's 4,096 bytes, the models' texture provider slots' pointers
+// made offsets.
+void MakePoolObjects(Context& h) {
+  Results results("Scenery::MakePoolObject (sub_820F2638, with CourseSet::CourseSet "
+                  "sub_820F2478, CourseSet::InitParts sub_820F2230, AreaModel::AreaModel "
+                  "sub_820F1C68)");
+  Random r(0x706F6F6C6F626Aull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t object = (allocation + 15) & ~15u;
+  for (int c = 0; c < 70; c++) {
+    const uint32_t pool = uint32_t(c) % 7;
+    const uint32_t address = c % 10 == 9 ? 0 : object;
+    const uint32_t own = r.Below(4096), data = r.Below(4096), index = r.Below(64);
+    std::vector<uint32_t> words(1024);
+    for (auto& w : words) w = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t k = 0; k < 1024; k++) guest::StoreU32(h.base, object + 4 * k, words[k]);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pool;
+      t.r4.u64 = address;
+      t.r5.u64 = own;
+      t.r6.u64 = data;
+      t.r7.u64 = index;
+      if (v == 0) {
+        __imp__sub_820F2638(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 =
+              cs::MakePoolObject(h.base, calls, t.r1.u32, pool, address, own, data, index);
+        });
+      }
+      const uint32_t model = address == 0 ? 0 : pool == 2 ? object + 96 : pool == 4 ? object + 80 : 0;
+      Regions regions;
+      if (model != 0) regions.Add(guest::LoadU32(h.base, model + 88), 256);
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, object, 4096);
+      if (model != 0) RequireDone(models::ModelDestruct(h.base, model).has_value());
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (pool {}{})", c, pool,
+                                              address == 0 ? ", no address" : ""));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// CourseSet::Reset and AreaModel::Reset: objects made by their
+// constructors' plain C++; the course set's lists with 0 to 2 scenery models
+// each (no blocks), the area model's +56 and +60 set or not. Compared: r3
+// and the object's bytes (the freed models' addresses in the lists made
+// offsets).
+void Resets(Context& h) {
+  Results results("CourseSet::Reset (sub_820F1138) and AreaModel::Reset (sub_820F12F8)");
+  Random r(0x7265736574ull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t object = (allocation + 15) & ~15u;
+  for (int c = 0; c < 40; c++) {
+    const bool course = c % 2 == 0;
+    uint32_t counts[6];
+    for (auto& n : counts) n = r.Below(3);
+    const bool with_model = r.Below(2) == 0, with_xpr = r.Below(2) == 0;
+    const uint32_t flags = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, object, 4096, 0);
+      PPCContext t = CallContext(h);
+      Regions regions;
+      WithCalls(t, h.base, [&](const cs::Calls& calls) {
+        if (course) {
+          cs::CourseSetConstruct(h.base, calls, t.r1.u32, object, 3824, 0, 2);
+        } else {
+          cs::AreaModelConstruct(h.base, calls, t.r1.u32, object, 560, 0, 4);
+        }
+      });
+      guest::StoreU32(h.base, object + 32, flags);
+      if (course) {
+        constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652, 3180};
+        for (int i = 0; i < 6; i++) {
+          const uint32_t list = object + kLists[i];
+          for (uint32_t k = 0; k < counts[i]; k++) {
+            const uint32_t model = NewSceneryModel(h.base);
+            regions.Add(model, scenery_lists::kSceneryModelBytes);
+            track_zones::List64Insert(h.base, list + 4, model, k);
+          }
+          guest::StoreU32(h.base, list, counts[i]);
+        }
+        regions.Add(guest::LoadU32(h.base, object + 96 + 88), 256);
+      } else {
+        guest::StoreU32(h.base, object + 56, with_model ? object + 80 : 0);
+        guest::StoreU32(h.base, object + 60, with_xpr ? object + 528 : 0);
+        regions.Add(guest::LoadU32(h.base, object + 80 + 88), 256);
+      }
+      t.r3.u64 = object;
+      if (v == 0) {
+        (course ? __imp__sub_820F1138 : __imp__sub_820F12F8)(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 = course ? cs::CourseSetReset(h.base, calls, t.r1.u32, object)
+                            : cs::AreaModelReset(h.base, calls, t.r1.u32, object);
+        });
+      }
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, object, course ? 3824 : 560);
+      RequireDone(models::ModelDestruct(h.base, object + (course ? 96 : 80)).has_value());
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({}{}{})", c, course ? "CourseSet" : "AreaModel",
+                              !course && with_model ? ", model" : "",
+                              !course && with_xpr ? ", XPR" : ""));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// AreaModel::~Model: a scenery model (no blocks), the flags 0 to 3. Compared:
+// r3 and, when it isn't freed, the model's first 432 bytes (its texture
+// provider's slots' pointer made an offset).
+void SceneryModelDestructs(Context& h) {
+  Results results("AreaModel::~Model (sub_820F1208)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t flags = uint32_t(c) % 4;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t model = NewSceneryModel(h.base);
+      Regions regions;
+      regions.Add(model, scenery_lists::kSceneryModelBytes);
+      regions.Add(guest::LoadU32(h.base, model + 88), 256);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = flags;
+      if (v == 0) {
+        __imp__sub_820F1208(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 = cs::SceneryModelDestruct(h.base, calls, t.r1.u32, model, flags);
+        });
+      }
+      out[v].Word(regions.Normalized(t.r3.u32));
+      if ((flags & 1) == 0) {
+        regions.AddBytes(out[v], h.base, model, 432);
+        RequireDone(memory::crt::OperatorDelete(model));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (flags {})", c, flags));
+  }
+  results.Report();
+}
+
+void Parses(Context& h) {
+  AreaLightsParses(h);
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_INFO("harness: course_scenery: the parses with models skipped (Model::Load isn't "
+                 "native in this run)");
+    return;
+  }
+  AreaModelParses(h);
+  CourseSetParses(h);
+  MakePoolObjects(h);
+  Resets(h);
+  SceneryModelDestructs(h);
+}
+
 }  // namespace
+
+// --- Scenery::PoolSizes: a configuration in the scratch area (mode 0 or
+// not), its first asset, an area table of up to 8 areas (light assets
+// ending with a negative one, at the count or never; model ranges empty,
+// reversed or up to 12, some negative); the asset ids below 20,000 (the
+// TOC's sizes read by both); the scratch area (the counts and the five
+// sizes in it) and r3 compared. A random generator of its own. ---
+
+void PoolSizesCases(Context& h) {
+  Random r(0x5051534C);
+  Results results("Scenery::PoolSizes (sub_820F2030)");
+  constexpr uint32_t kConfig = 0, kTable = 64, kAsset = 512, kAreaCounts = 768,
+                     kModelCounts = 784, kOut = 800;
+  for (int c = 0; c < 160; c++) {
+    const uint32_t mode = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    const uint32_t first_asset = r.Below(20000);
+    const uint32_t second_asset = r.Below(4) == 0 ? 0x80000000u | uint32_t(r.Next())
+                                                  : r.Below(20000);
+    const uint32_t areas = r.Below(9);
+    const uint32_t end = r.Below(3) == 0 ? r.Below(9) : 99;  // a negative light asset
+    uint32_t entries[8][3];
+    for (uint32_t i = 0; i < 8; i++) {
+      entries[i][0] = i == end ? 0x80000000u | uint32_t(r.Next()) : r.Below(20000);
+      switch (r.Below(6)) {
+        case 0:
+          entries[i][1] = r.Below(20000);
+          entries[i][2] = entries[i][1] - 1 - r.Below(3);  // reversed
+          break;
+        case 1:
+          entries[i][1] = 0xFFFFFFF0u + r.Below(8);  // negative assets
+          entries[i][2] = entries[i][1] + r.Below(6);
+          break;
+        default:
+          entries[i][1] = r.Below(20000);
+          entries[i][2] = entries[i][1] + r.Below(12);
+          break;
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t config = h.data + kConfig, table = h.data + kTable;
+      guest::StoreU32(h.base, config, mode);
+      guest::StoreU32(h.base, config + 24, h.data + kAsset);
+      guest::StoreU32(h.base, config + 28, table);
+      guest::StoreU32(h.base, h.data + kAsset, first_asset);
+      guest::StoreU32(h.base, table + 8, second_asset);
+      guest::StoreU32(h.base, table + 16, areas);
+      for (uint32_t i = 0; i < 8; i++) {
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, table + 20 + 12 * i + 4 * k, entries[i][k]);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + kAreaCounts;
+      t.r4.u64 = h.data + kModelCounts;
+      t.r5.u64 = h.data + kOut;
+      t.r6.u64 = config;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F2030(t, h.base);
+        } else {
+          t.r3.u64 = cs::PoolSizes(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32);
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} mode {} areas {}", c, mode, areas));
+  }
+  results.Report();
+}
+
+// --- SceneryList::LoadAll and Stream: the manager at +0 is the pool set
+// (three pools of up to 6 objects, records at +2048), whose vtable is a
+// scratch one (at kKeyVtable): AreaLights::Key in slot 0 (a 4-byte key at
+// +84, so items find their objects by key) and PoolObject::Reset for the
+// load; a list at +2200 on one of the pools (its pointers at +2240, up to 8
+// items at +2280 with keys of areas and models below 4, its table at +2420
+// of up to 8 entries with such keys and their objects 0 or one of the
+// pool's); the done count from 0 to the count. LoadAll's cases whose pool
+// has fewer free objects than items are left out (the original loads object
+// -1 then). Both with the archive's queue length native and through the
+// guest (the queue as the game has it while the harnesses run: the full
+// queue's branches aren't reached). The scratch area and r3 compared. A
+// random generator of its own. ---
+
+constexpr uint32_t kKeyVtable = 4064;
+
+void ListLoadCases(Context& h) {
+  Random r(0x4C4F4144);
+  constexpr uint32_t kPoolRecords = 2048, kList = 2200, kPointers = 2240, kItems = 2280,
+                     kTable = 2420;
+  for (int stream = 0; stream < 2; stream++) {
+    Results results(stream != 0 ? "SceneryList::Stream (sub_820F16C0)"
+                                : "SceneryList::LoadAll (sub_820F1598)");
+    int done = 0;
+    for (int c = 0; c < 400 && done < 160; c++) {
+      const uint64_t seed = r.Next();
+      const bool native_queue = r.Below(2) != 0;
+      Outputs out[2];
+      bool skip = false;
+      for (int v = 0; v < 2 && !skip; v++) {
+        Random probe(seed);
+        Fill(h.base, h.data, kScratchBytes);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 0, 0x820F1C20);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 4, 0x820FB9D8);
+        guest::StoreU32(h.base, h.data + kKeyVtable + 8, 0x820FB9D8);
+        uint32_t counts[3];
+        RandomPools(h, probe, counts, true, 3, kPoolRecords, 6, kKeyVtable);
+        const uint32_t manager = h.data + kSet;
+        const uint32_t pool = probe.Below(3);
+        const uint32_t list = h.data + kList;
+        const uint32_t items = probe.Below(9);
+        const uint32_t entries = probe.Below(9);
+        const uint32_t first = h.data + kObjects + pool * 6 * kStride;
+        guest::StoreU32(h.base, list + 0, pool);
+        guest::StoreU32(h.base, list + 4, items == 0 ? 0 : probe.Below(items + 1));
+        guest::StoreU32(h.base, list + 8, items);
+        guest::StoreU32(h.base, list + 12, entries);
+        guest::StoreU32(h.base, list + 16, h.data + kPointers);
+        guest::StoreU32(h.base, list + 24, h.data + kTable);
+        for (uint32_t i = 0; i < 8; i++) {
+          const uint32_t item = h.data + kItems + 16 * i;
+          guest::StoreU32(h.base, h.data + kPointers + 4 * i, item);
+          guest::StoreU32(h.base, item + 8, probe.Below(4) << 16 | probe.Below(4));
+          const uint32_t entry = h.data + kTable + 12 * i;
+          guest::StoreU32(h.base, entry + 0, probe.Below(4) << 16 | probe.Below(4));
+          guest::StoreU32(h.base, entry + 8,
+                          probe.Below(2) == 0 || counts[pool] == 0
+                              ? 0
+                              : first + kStride * probe.Below(counts[pool]));
+        }
+        if (stream == 0) {
+          uint32_t free = 0;
+          for (uint32_t o = guest::LoadU32(h.base, h.data + kPoolRecords + 24 * pool + 16);
+               o != 0 && free < 16; o = guest::LoadU32(h.base, o + 24)) {
+            free++;
+          }
+          if (free < items) {
+            skip = true;
+            break;
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = list;
+        With(v, [&] {
+          if (v == 0) {
+            (stream != 0 ? __imp__sub_820F16C0 : __imp__sub_820F1598)(t, h.base);
+          } else {
+            WithCalls(t, h.base, [&](const cs::Calls& calls) {
+              t.r3.u64 = stream != 0 ? cs::ListStream(h.base, calls, t.r1.u32, t.r3.u32,
+                                                      t.r4.u32, native_queue)
+                                     : cs::ListLoadAll(h.base, calls, t.r1.u32, t.r3.u32,
+                                                       t.r4.u32, native_queue);
+            });
+          }
+        });
+        ScratchAndR3(h, out[v], t);
+      }
+      if (skip) {
+        continue;
+      }
+      done++;
+      results.Check(out[0], out[1],
+                    fmt::format("case {} queue {}", c, native_queue ? "native" : "guest"));
+    }
+    results.Report();
+  }
+}
+
+// --- Scenery::IsLoaded: ListLoadCases' world with the manager's lists A
+// (+116) and B (+144) on random pools of its three (up to 4 items each, A's
+// pointers, items and table as LoadAll's cases, B's after them), +192 0 or
+// set (both lists then loaded first: the done count at the count, or
+// below), the object last asked for (+172 the pool, +176 its index) -1 or
+// one of the pool's slots, its flags random. Cases whose pools have fewer
+// free objects than the lists' items left to load are left out (the
+// original loads object -1 then). Both with the archive's queue length
+// native and through the guest. The scratch area and r3 compared. A random
+// generator of its own. ---
+
+void IsLoadedCases(Context& h) {
+  Random r(0x49534C44);
+  constexpr uint32_t kPoolRecords = 2048;
+  constexpr uint32_t kPointers[2] = {2240, 2520}, kItems[2] = {2280, 2560},
+                     kTables[2] = {2420, 2700};
+  Results results("Scenery::IsLoaded (sub_820F1F68)");
+  int done = 0;
+  for (int c = 0; c < 400 && done < 160; c++) {
+    const uint64_t seed = r.Next();
+    const bool native_queue = r.Below(2) != 0;
+    Outputs out[2];
+    bool skip = false;
+    for (int v = 0; v < 2 && !skip; v++) {
+      Random probe(seed);
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 0, 0x820F1C20);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 4, 0x820FB9D8);
+      guest::StoreU32(h.base, h.data + kKeyVtable + 8, 0x820FB9D8);
+      uint32_t counts[3];
+      RandomPools(h, probe, counts, true, 3, kPoolRecords, 6, kKeyVtable);
+      const uint32_t manager = h.data + kSet;
+      const bool loading = probe.Below(3) != 0;
+      guest::StoreU32(h.base, manager + 192, loading ? (probe.Below(4) == 0 ? uint32_t(probe.Next()) | 1 : 1) : 0);
+      uint32_t needed[3] = {0, 0, 0};
+      for (uint32_t l = 0; l < 2; l++) {
+        const uint32_t list = manager + 116 + 28 * l;
+        const uint32_t pool = probe.Below(3);
+        const uint32_t items = probe.Below(5);
+        const uint32_t entries = probe.Below(5);
+        const uint32_t first = h.data + kObjects + pool * 6 * kStride;
+        // Mostly loaded already (the done count at the count), as the game
+        // polls it after the loads went out.
+        const uint32_t done_count =
+            items == 0 || probe.Below(2) == 0 ? items : probe.Below(items + 1);
+        needed[pool] += items - done_count;
+        guest::StoreU32(h.base, list + 0, pool);
+        guest::StoreU32(h.base, list + 4, done_count);
+        guest::StoreU32(h.base, list + 8, items);
+        guest::StoreU32(h.base, list + 12, entries);
+        guest::StoreU32(h.base, list + 16, h.data + kPointers[l]);
+        guest::StoreU32(h.base, list + 24, h.data + kTables[l]);
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t item = h.data + kItems[l] + 16 * i;
+          guest::StoreU32(h.base, h.data + kPointers[l] + 4 * i, item);
+          guest::StoreU32(h.base, item + 8, probe.Below(4) << 16 | probe.Below(4));
+          const uint32_t entry = h.data + kTables[l] + 12 * i;
+          guest::StoreU32(h.base, entry + 0, probe.Below(4) << 16 | probe.Below(4));
+          guest::StoreU32(h.base, entry + 8,
+                          probe.Below(2) == 0 || counts[pool] == 0
+                              ? 0
+                              : first + kStride * probe.Below(counts[pool]));
+        }
+      }
+      guest::StoreU32(h.base, manager + 172, probe.Below(5) == 0 ? 0xFFFFFFFFu : probe.Below(3));
+      guest::StoreU32(h.base, manager + 176, probe.Below(5) == 0 ? 0xFFFFFFFFu : probe.Below(6));
+      if (loading) {
+        for (uint32_t p = 0; p < 3; p++) {
+          uint32_t free = 0;
+          for (uint32_t o = guest::LoadU32(h.base, h.data + kPoolRecords + 24 * p + 16);
+               o != 0 && free < 16; o = guest::LoadU32(h.base, o + 24)) {
+            free++;
+          }
+          if (free < needed[p]) {
+            skip = true;
+          }
+        }
+        if (skip) {
+          break;
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = manager;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F1F68(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::SceneryIsLoaded(h.base, calls, t.r1.u32, t.r3.u32, native_queue);
+          });
+        }
+      });
+      ScratchAndR3(h, out[v], t);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    if (skip) {
+      continue;
+    }
+    done++;
+    results.Check(out[0], out[1],
+                  fmt::format("case {} queue {}", c, native_queue ? "native" : "guest"));
+  }
+  results.Report();
+}
+
+// --- Scenery::Update: a world of its own in a block from the allocation
+// layer (the manager, its two pools of up to 8 objects with the key vtable
+// of ListLoadCases, lists A and B with their pointers and items, list A's
+// and B's tables (every entry with an object: LoadAll's acquisition is
+// covered by its own cases), the course set and its area file (1 to 4
+// areas, now and then up to 24 so LimitLargeModels' table is read past
+// its five words, into the register saves and Update's frame), the
+// visible areas' block, the viewports' block and its two viewports (their
+// entries' eye, target, up, zoom and far as the game's, or random), and a
+// made-up scene for CameraPass::Update's records (the cameras harness's
+// FakeScene, room for 128 slots)). The game's camera passes the table at
+// 0x82602F80 names are given random words as the cameras harness's
+// FromViewport cases make them, enabled at random, and put back after each
+// run, as the viewports' and the scene's pointers, the open chunks and the
+// passes' mode. The block (the lists' distances as floats), the passes and
+// r3 compared; the stack below the call filled the same for both. Mode 0
+// or the streaming mode, 0 to 2 views. A random generator of its own. ---
+
+void UpdateCases(Context& h) {
+  Random r(0x5343555044415445ull);
+  constexpr uint32_t kBlockBytes = 24576;
+  const uint32_t w = memory::Alloc(kBlockBytes, 0);
+  if (w == 0) {
+    ITC_LOG_ERROR("harness: Scenery::Update: no block");
+    return;
+  }
+  constexpr uint32_t kViewMasks = 0x82602F80, kPassBase = 0x826BAC00, kPassBytes = 592;
+  constexpr uint32_t kScene = 0x826BABA0, kMode = cameras::kMode;
+  constexpr uint32_t kOpen = command_list::kOpenChunks;
+  // The block's layout.
+  constexpr uint32_t kManagerAt = 0, kRecordsAt = 256, kVtableAt = 320, kObjectsAt = 384;
+  constexpr uint32_t kObjectsPerPool = 8;
+  constexpr uint32_t kPointersA = 2048, kItemsA = 2176, kPointersB = 2688, kItemsB = 2944;
+  constexpr uint32_t kTableA = 3968, kTableB = 4256, kSetAt = 4544, kFileAt = 5632;
+  constexpr uint32_t kVisibleAt = 9216, kViewportBlock = 15872, kViewports = 15888;
+  constexpr uint32_t kSceneAt = 19712, kSlotsAt = 20736;
+  constexpr uint32_t kMaxA = 32, kMaxB = 64;  // the items' room
+  constexpr uint32_t kTableEntries = 24;
+  // The passes the table names, their bytes kept.
+  std::vector<uint32_t> passes;
+  for (uint32_t i = 0; i < 14; i++) {
+    const uint32_t pass = guest::LoadU32(h.base, kViewMasks + 16 * i + 8) * kPassBytes + kPassBase;
+    if (std::find(passes.begin(), passes.end(), pass) == passes.end()) passes.push_back(pass);
+  }
+  std::vector<std::vector<uint8_t>> kept_passes;
+  for (uint32_t pass : passes) kept_passes.push_back(Read(h.base, pass, kPassBytes));
+  const uint32_t kept_globals[4] = {
+      guest::LoadU32(h.base, kScene), guest::LoadU32(h.base, kOpen),
+      guest::LoadU32(h.base, 0x826C2CE8), guest::LoadU32(h.base, kMode)};
+  auto restore = [&] {
+    for (size_t i = 0; i < passes.size(); i++) {
+      Write(h.base, passes[i], kept_passes[i].data(), kPassBytes);
+    }
+    guest::StoreU32(h.base, kScene, kept_globals[0]);
+    guest::StoreU32(h.base, kOpen, kept_globals[1]);
+    guest::StoreU32(h.base, 0x826C2CE8, kept_globals[2]);
+    guest::StoreU32(h.base, kMode, kept_globals[3]);
+  };
+  auto float_word = [&]() -> uint32_t {
+    switch (r.Below(16)) {
+      case 0:
+        return 0x7FC00000u | (r.Below(2) << 31);
+      case 1:
+        return 0x7F800000u | (r.Below(2) << 31);
+      case 2:
+        return uint32_t(r.Next());
+      default:
+        return std::bit_cast<uint32_t>(float(int32_t(r.Below(1 << 20)) - (1 << 19)) / 8192.0f);
+    }
+  };
+  auto corners = [&](uint32_t at, float cx, float cz) {
+    const float x0 = cx - float(r.Below(400)) / 4.0f, x1 = cx + float(r.Below(400)) / 4.0f;
+    const float z0 = cz - float(r.Below(400)) / 4.0f, z1 = cz + float(r.Below(400)) / 4.0f;
+    const float xs[4] = {x0, x1, x1, x0}, zs[4] = {z0, z0, z1, z1};
+    for (uint32_t c = 0; c < 4; c++) {
+      guest::StoreU32(h.base, at + 16 * c + 0,
+                      r.Below(40) == 0 ? float_word() : std::bit_cast<uint32_t>(xs[c]));
+      guest::StoreU32(h.base, at + 16 * c + 4, uint32_t(r.Next()));
+      guest::StoreU32(h.base, at + 16 * c + 8,
+                      r.Below(40) == 0 ? float_word() : std::bit_cast<uint32_t>(zs[c]));
+      guest::StoreU32(h.base, at + 16 * c + 12, uint32_t(r.Next()));
+    }
+  };
+  Results results("Scenery::Update (sub_820F4558)");
+  for (int c = 0; c < 400; c++) {
+    // The inputs, written once and copied for each version.
+    Fill(h.base, w, kBlockBytes, uint8_t(r.Next()));
+    const uint32_t manager = w + kManagerAt;
+    const uint32_t mode = r.Below(4) == 0 ? 0 : 1;
+    const uint32_t views = r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(2);
+    const uint32_t areas = r.Below(4) == 0 ? 5 + r.Below(20) : 1 + r.Below(4);
+    guest::StoreU32(h.base, manager + 0, 2);
+    guest::StoreU32(h.base, manager + 4, w + kRecordsAt);
+    guest::StoreU32(h.base, manager + 8, mode);
+    guest::StoreU32(h.base, manager + 12, views);
+    guest::StoreU32(h.base, manager + 96, r.Below(8) == 0 ? 0 : 1 + r.Below(kMaxA / 2));
+    guest::StoreU32(h.base, manager + 104, r.Below(8) == 0 ? 0 : 1 + r.Below(kMaxB / 2));
+    guest::StoreU32(h.base, manager + 112, w + kSetAt);
+    guest::StoreU32(h.base, manager + 220, areas);
+    guest::StoreU32(h.base, manager + 224, w + kVisibleAt);
+    // The key vtable: AreaLights::Key (+84), PoolObject::Reset for the load
+    // and the reset.
+    guest::StoreU32(h.base, w + kVtableAt + 0, 0x820F1C20);
+    guest::StoreU32(h.base, w + kVtableAt + 4, 0x820FB9D8);
+    guest::StoreU32(h.base, w + kVtableAt + 8, 0x820FB9D8);
+    // The two pools (A's areas, B's models): objects with keys of the
+    // areas and models the file has, their used and free lists.
+    std::vector<uint32_t> objects[2];
+    for (uint32_t p = 0; p < 2; p++) {
+      const uint32_t record = w + kRecordsAt + 24 * p;
+      const uint32_t first = w + kObjectsAt + p * kObjectsPerPool * kStride;
+      const uint32_t n = r.Below(4) == 0 ? r.Below(kObjectsPerPool + 1) : kObjectsPerPool;
+      guest::StoreU32(h.base, record + 0, n);
+      guest::StoreU32(h.base, record + 4, kStride);
+      guest::StoreU32(h.base, record + 8, 0);
+      guest::StoreU32(h.base, record + 12, first);
+      for (uint32_t i = 0; i < n; i++) {
+        const uint32_t object = first + kStride * i;
+        const uint32_t key = r.Below(areas) << 16 | (p == 0 ? 0 : r.Below(8));
+        RandomObject(h, object, w + kVtableAt, r, key);
+        guest::StoreU32(h.base, object + 16, i);
+        guest::StoreU32(h.base, object + 36, r.Below(5) - 1);
+        if (r.Below(5) != 0) {
+          const uint32_t flags = guest::LoadU32(h.base, object + cs::kObjectFlags);
+          guest::StoreU32(h.base, object + cs::kObjectFlags, flags | 0x9);
+        }
+        objects[p].push_back(object);
+      }
+      // Most on the used list (found by key), the rest free.
+      const uint32_t used = n == 0 || r.Below(4) != 0 ? n : r.Below(n + 1);
+      auto link = [&](uint32_t from, uint32_t to, uint32_t head_at) {
+        guest::StoreU32(h.base, record + head_at, 0);
+        for (uint32_t i = from; i < to; i++) {
+          const uint32_t object = first + kStride * i;
+          guest::StoreU32(h.base, object + 20, i == from ? 0 : object - kStride);
+          guest::StoreU32(h.base, object + 24, i + 1 == to ? 0 : object + kStride);
+          if (i == from) guest::StoreU32(h.base, record + head_at, object);
+        }
+      };
+      link(0, used, 20);
+      link(used, n, 16);
+    }
+    // The lists: their pool, pointers, items and tables (each entry's
+    // object one of its pool's).
+    const uint32_t lists[2] = {manager + 116, manager + 144};
+    const uint32_t pointers[2] = {w + kPointersA, w + kPointersB};
+    const uint32_t items[2] = {w + kItemsA, w + kItemsB};
+    const uint32_t tables[2] = {w + kTableA, w + kTableB};
+    const uint32_t room[2] = {kMaxA, kMaxB};
+    for (uint32_t l = 0; l < 2; l++) {
+      guest::StoreU32(h.base, lists[l] + 0, l);
+      guest::StoreU32(h.base, lists[l] + 4, r.Below(3));
+      guest::StoreU32(h.base, lists[l] + 8, r.Below(5));
+      guest::StoreU32(h.base, lists[l] + 16, pointers[l]);
+      guest::StoreU32(h.base, lists[l] + 20, items[l]);
+      guest::StoreU32(h.base, lists[l] + 24, tables[l]);
+      for (uint32_t i = 0; i < room[l]; i++) {
+        guest::StoreU32(h.base, pointers[l] + 4 * i, items[l] + 16 * i);
+      }
+      const uint32_t entries = objects[l].empty() ? 0 : r.Below(kTableEntries + 1);
+      guest::StoreU32(h.base, lists[l] + 12, entries);
+      for (uint32_t e = 0; e < entries; e++) {
+        const uint32_t entry = tables[l] + 12 * e;
+        guest::StoreU32(h.base, entry + 0, r.Below(areas) << 16 | (l == 0 ? 0 : r.Below(8)));
+        guest::StoreU32(h.base, entry + 8, objects[l][r.Below(uint32_t(objects[l].size()))]);
+      }
+    }
+    // The viewports: entries 0 to 18 (80 bytes each; +16 the eye, +32 the
+    // target, +48 the up, +64 the roll, +68 the zoom, +72 the far
+    // distance), the eye at +1600 and +1608.
+    guest::StoreU32(h.base, w + kViewportBlock + 0, w + kViewports);
+    guest::StoreU32(h.base, w + kViewportBlock + 4, w + kViewports + 1872);
+    guest::StoreU32(h.base, w + kViewportBlock + 8, r.Below(2));
+    float eye[2][2];
+    for (uint32_t v = 0; v < 2; v++) {
+      const uint32_t viewport = w + kViewports + 1872 * v;
+      for (uint32_t i = 0; i < 468; i++) guest::StoreU32(h.base, viewport + 4 * i, float_word());
+      eye[v][0] = float(r.Below(2001)) / 10.0f - 100.0f;
+      eye[v][1] = float(r.Below(2001)) / 10.0f - 100.0f;
+      for (uint32_t e = 0; e < 19; e++) {
+        const uint32_t at = viewport + 80 * e;
+        if (r.Below(4) == 0) continue;  // random words
+        for (uint32_t k = 0; k < 3; k++) {
+          const float p = k == 0 ? eye[v][0] : k == 2 ? eye[v][1] : float(r.Below(40));
+          const float t = p + float(int32_t(r.Below(4096)) - 2048) / 64.0f;
+          guest::StoreU32(h.base, at + 16 + 4 * k, std::bit_cast<uint32_t>(p));
+          guest::StoreU32(h.base, at + 32 + 4 * k, std::bit_cast<uint32_t>(t));
+          guest::StoreU32(h.base, at + 48 + 4 * k, std::bit_cast<uint32_t>(k == 1 ? 1.0f : 0.0f));
+        }
+        guest::StoreU32(h.base, at + 64,
+                        std::bit_cast<uint32_t>(float(int32_t(r.Below(2000)) - 1000) / 300.0f));
+        guest::StoreU32(h.base, at + 68, std::bit_cast<uint32_t>(666.33f));
+        guest::StoreU32(h.base, at + 72,
+                        r.Below(20) == 0 ? float_word()
+                                         : std::bit_cast<uint32_t>(float(r.Below(1600)) / 8.0f));
+      }
+      guest::StoreU32(h.base, viewport + 1600,
+                      r.Below(30) == 0 ? float_word() : std::bit_cast<uint32_t>(eye[v][0]));
+      guest::StoreU32(h.base, viewport + 1608,
+                      r.Below(30) == 0 ? float_word() : std::bit_cast<uint32_t>(eye[v][1]));
+    }
+    // The course set's area file: little-endian count and offsets, each
+    // entry a big-endian model count, its corners at +32 and 96-byte model
+    // records from +96 (a number, its corners at +32); at most 10 models.
+    guest::StoreU32(h.base, w + kSetAt + 1056, w + kFileAt);
+    const uint32_t file = w + kFileAt;
+    guest::StoreU32(h.base, file, std::byteswap(areas));
+    uint32_t offset = 4 + 4 * areas;
+    uint32_t models_left = 10;
+    for (uint32_t a = 0; a < areas; a++) {
+      const uint32_t entry = file + offset;
+      guest::StoreU32(h.base, file + 4 + 4 * a, std::byteswap(offset));
+      const uint32_t models = std::min(models_left, r.Below(4));
+      models_left -= models;
+      guest::StoreU32(h.base, entry, models);
+      const float spread = r.Below(4) == 0 ? 400.0f : 60.0f;
+      const uint32_t near = r.Below(2);
+      const float cx = eye[near][0] + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+      const float cz = eye[near][1] + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+      corners(entry + 32, cx, cz);
+      for (uint32_t m = 0; m < models; m++) {
+        const uint32_t record = entry + 96 + 96 * m;
+        // Numbers around LimitLargeModels' thresholds (9 to 54), else small.
+        guest::StoreU32(h.base, record, r.Below(3) == 0 ? r.Below(60) : r.Below(8));
+        corners(record + 32, cx + float(r.Below(80)) - 40.0f, cz + float(r.Below(80)) - 40.0f);
+      }
+      offset += 96 + 96 * models;
+    }
+    // The made-up scene (FakeScene's kind 0 in the cameras harness).
+    const uint32_t scene = w + kSceneAt;
+    guest::StoreU32(h.base, scene, scene + 320);
+    guest::StoreU32(h.base, scene + 320 + 32, 0x8248CA78);
+    guest::StoreU32(h.base, scene + 284, scene + 400);
+    guest::StoreU32(h.base, scene + 400, scene + 720);
+    guest::StoreU32(h.base, scene + 720 + 4, 0x8248CA78);
+    guest::StoreU32(h.base, scene + 720 + 8, 0x82379320);
+    guest::StoreU32(h.base, scene + 400 + 284, scene + 840);
+    guest::StoreU32(h.base, scene + 400 + 124, scene + 760);
+    guest::StoreU32(h.base, scene + 760, scene + 800);
+    guest::StoreU32(h.base, scene + 800 + 16, 0x8209F5C8);
+    guest::StoreU32(h.base, scene + 840 + 8, 128);
+    guest::StoreU32(h.base, scene + 840 + 12, 0);
+    guest::StoreU32(h.base, scene + 840 + 32, w + kSlotsAt);
+    guest::StoreU8(h.base, scene + 840 + 52, 0);
+    // The passes: random words, the vtable, a type, the size; enabled or not.
+    std::vector<std::vector<uint8_t>> pass_inputs;
+    for (uint32_t pass : passes) {
+      for (uint32_t i = 0; i < 148; i++) guest::StoreU32(h.base, pass + 4 * i, float_word());
+      guest::StoreU32(h.base, pass, 0x82001EC0);
+      guest::StoreU32(h.base, pass + 584, r.Below(22));
+      guest::StoreU32(h.base, pass + 504, 1280);
+      guest::StoreU32(h.base, pass + 508, 720);
+      guest::StoreU32(h.base, pass + 588, r.Below(3) == 0 ? 0 : 1 + r.Below(2));
+      pass_inputs.push_back(Read(h.base, pass, kPassBytes));
+    }
+    const uint32_t passes_mode = r.Below(4);
+    const std::vector<uint8_t> inputs = Read(h.base, w, kBlockBytes);
+    const uint64_t stack_seed = r.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, w, inputs.data(), kBlockBytes);
+      for (size_t i = 0; i < passes.size(); i++) {
+        Write(h.base, passes[i], pass_inputs[i].data(), kPassBytes);
+      }
+      guest::StoreU32(h.base, kScene, scene);
+      guest::StoreU32(h.base, kOpen, 0);
+      guest::StoreU32(h.base, 0x826C2CE8, w + kViewportBlock);
+      guest::StoreU32(h.base, kMode, passes_mode);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 4096, 4096, uint8_t(stack_seed));
+      t.r3.u64 = manager;
+      t.r25.u64 = stack_seed * 3;
+      t.r26.u64 = stack_seed * 5;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F4558(t, h.base);
+        } else {
+          hooks::CourseSceneryUpdate(t, h.base);
+        }
+      });
+      // The block in order, the lists' items' distances as floats.
+      uint32_t at = 0;
+      for (uint32_t l = 0; l < 2; l++) {
+        const uint32_t first = l == 0 ? kItemsA : kItemsB;
+        out[v].Bytes(Read(h.base, w + at, first - at));
+        for (uint32_t i = 0; i < room[l]; i++) {
+          out[v].Floats(h.base, w + first + 16 * i, 1);
+          out[v].Bytes(Read(h.base, w + first + 16 * i + 4, 12));
+        }
+        at = first + 16 * room[l];
+      }
+      out[v].Bytes(Read(h.base, w + at, kBlockBytes - at));
+      for (uint32_t pass : passes) out[v].Bytes(Read(h.base, pass, kPassBytes));
+      out[v].Word(guest::LoadU32(h.base, kOpen));
+      out[v].Word(t.r3.u32);
+      restore();
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} mode {} views {} areas {}", c, mode, int32_t(views), areas));
+  }
+  results.Report();
+  memory::Free(w);
+}
+
+// --- Scenery::Unload (with UnloadPools) and Destroy ---
+
+// Scenery::Unload: a manager set up by Setup's plain C++ on each side (as
+// SetupCases' configurations: up to 6 areas, pools 0 and 1 on or off), then
+// some of its blocks freed and their words cleared beforehand (the visible
+// areas, a list's table, items or pointer array), +188 set or 0, and
+// Unload run. Compared: r3 as an offset from the manager, the manager's
+// 248 bytes, the bytes held and the two frames' back chains (its r1 - 96
+// and - 208).
+void UnloadCases(Context& h) {
+  Random r(0x554E4C44);
+  Results results("Scenery::Unload (sub_820F2B38) with UnloadPools (sub_820F1D20)");
+  if (!hooks::CourseScenerySetUpNative()) {
+    ITC_LOG_INFO("harness: Scenery::Unload: Setup's plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kConfig = 0, kTable = 64, kAsset = 512, kWord = 520;
+  constexpr uint32_t kOptional[] = {224, 132, 136, 140, 160, 164, 168};
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 32; c++) {
+    const uint32_t mode = c < 3 ? 2 : r.Below(2);
+    const uint32_t first_asset = r.Below(20000);
+    const uint32_t second_asset = r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(20000);
+    const uint32_t areas = r.Below(7);
+    const uint32_t pool0 = r.Below(2), pool1 = r.Below(2);
+    const uint32_t dropped = c < 4 ? 0 : r.Below(128);
+    const uint32_t file = r.Below(2) ? 0x40000000u | r.Below(0x10000) * 4 : 0;
+    uint32_t entries[6][3];
+    for (uint32_t i = 0; i < 6; i++) {
+      entries[i][0] = r.Below(20000);
+      entries[i][1] = r.Below(5) == 0 ? 0xFFFFFFF0u + r.Below(8) : r.Below(20000);
+      entries[i][2] = entries[i][1] + r.Below(5);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t config = h.data + kConfig, table = h.data + kTable;
+      guest::StoreU32(h.base, config + 0, mode);
+      guest::StoreU32(h.base, config + 4, 0);
+      guest::StoreU32(h.base, config + 24, h.data + kAsset);
+      guest::StoreU32(h.base, config + 28, table);
+      guest::StoreU32(h.base, config + 32, h.data + kWord);
+      guest::StoreU32(h.base, config + 36, pool0);
+      guest::StoreU32(h.base, config + 40, pool1);
+      guest::StoreU32(h.base, h.data + kWord, 1);
+      guest::StoreU32(h.base, h.data + kAsset, first_asset);
+      guest::StoreU32(h.base, table + 8, second_asset);
+      guest::StoreU32(h.base, table + 16, areas);
+      for (uint32_t i = 0; i < 6; i++) {
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, table + 20 + 12 * i + 4 * k, entries[i][k]);
+        }
+      }
+      const uint32_t manager = memory::AllocPhysical(248, 0, 0xFFFFFFFFu, 0, 4);
+      Fill(h.base, manager, 248);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 1024, 1024);
+      With(1, [&] {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          cs::Setup(h.base, calls, t.r1.u32, manager, config);
+        });
+      });
+      for (size_t i = 0; i < std::size(kOptional); i++) {
+        const uint32_t block = guest::LoadU32(h.base, manager + kOptional[i]);
+        if ((dropped >> i & 1) != 0 && block != 0) {
+          memory::FreePhysical(block);
+          guest::StoreU32(h.base, manager + kOptional[i], 0);
+        }
+      }
+      guest::StoreU32(h.base, manager + 188, file);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x10000000u);
+      Fill(h.base, t.r1.u32 - 1024, 1024);
+      t.r3.u64 = manager;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F2B38(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            uint32_t r3 = 0;
+            RequireDone(cs::Unload(h.base, calls, t.r1.u32, t.r3.u32, &r3));
+            t.r3.u64 = r3;
+          });
+        }
+      });
+      out[v].Word(t.r3.u32 - manager);
+      out[v].Bytes(Read(h.base, manager, 248));
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 96));
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 208));
+      memory::FreePhysical(manager);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} mode {} areas {} pools {}{} dropped {:#x}",
+                                              c, mode, areas, pool0, pool1, dropped));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
+// Scenery::Destroy: a block of physical memory at [0x826C551C] (the
+// recompiled side's from the game's own XPhysicalAlloc and freed by its
+// XPhysicalFree, under hooks::RecompiledHeapScope, as PhysicalCases: the
+// kernel's free leaves r3 0, the layer's adapter the address), [0x826C5514]
+// and the bytes held random. Compared: both pointers, the bytes held and r3.
+void DestroyCases(Context& h) {
+  Random r(0x44535452);
+  Results results("Scenery::Destroy (sub_820F2AF8)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: Scenery::Destroy: the native heap is off, no cases");
+    results.Report();
+    return;
+  }
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_created = guest::LoadU32(h.base, cs::kCreated);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 8; c++) {
+    const uint32_t size = c < 4 ? 248 : 1 + r.Below(0x20000);
+    const uint32_t global = uint32_t(r.Next());
+    const uint32_t held = 0x01000000u + r.Below(0x01000000);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      uint32_t manager = 0;
+      if (v == 0) {
+        hooks::RecompiledHeapScope recompiled;
+        PPCContext a = CallContext(h);
+        a.r3.u64 = size;
+        __imp__sub_820F1490(a, h.base);
+        manager = a.r3.u32;
+      } else {
+        manager = memory::AllocPhysical(size, 0, 0xFFFFFFFFu, 0, 4);
+      }
+      guest::StoreU32(h.base, cs::kCreated, manager);
+      guest::StoreU32(h.base, cs::kManager, global);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, held);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = 0x12345678;
+      With(v, [&] {
+        if (v == 0) {
+          hooks::RecompiledHeapScope recompiled;
+          __imp__sub_820F2AF8(t, h.base);
+        } else {
+          t.r3.u64 = cs::Destroy(h.base);
+        }
+      });
+      out[v].Word(guest::LoadU32(h.base, cs::kManager));
+      out[v].Word(guest::LoadU32(h.base, cs::kCreated));
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} size {}", c, size));
+  }
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kCreated, saved_created);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  results.Report();
+}
+
+// --- The pools' loads (slot 1) and CourseSet::OnLoaded ---
+
+// Archive::Load's calls, recorded by its adapter (hooks::g_start_up_recorder)
+// on the recompiled side and by hooks::NativeArchiveLoad's on the native
+// one: r3 to r8 each, answered with the next serial (-1 now and then).
+struct LoadRecord {
+  std::vector<uint32_t> calls;
+  std::vector<int64_t> serials;
+  size_t next = 0;
+};
+LoadRecord* g_loads = nullptr;
+
+bool RecordLoad(PPCContext& t, uint32_t address) {
+  if (address != 0x8209DE48 || g_loads == nullptr) {
+    return false;
+  }
+  for (const PPCRegister* reg : {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8}) {
+    g_loads->calls.push_back(reg->u32);
+  }
+  const int64_t serial = g_loads->serials[g_loads->next++ % g_loads->serials.size()];
+  hooks::SetArchiveSerial(t, serial);
+  return true;
+}
+
+// CourseSet::Load, AreaLights::Load and AreaModel::Load: the manager in the
+// scratch area at [0x826C5514] (+36 a configuration area table with random
+// assets, some negative; list A's and B's tables of 0 to 5 entries, keys
+// matching the object's now and then), the object in a block of its own
+// (random flags and fields, its data after it). Archive::Load recorded.
+// Compared: the object's bytes (the course set's +3808 as whether a block
+// came and its size, its +3812 as an offset), the calls (destinations as
+// offsets in the object's block, the course set's first as a tag), r3 and
+// the bytes held.
+void LoadCases(Context& h) {
+  Random r(0x4C4F4144);
+  const char* names[3] = {"CourseSet::Load (sub_820F2520)", "AreaLights::Load (sub_820F22F8)",
+                          "AreaModel::Load (sub_820F23C0)"};
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_INFO("harness: the course scenery's loads: the heap or the archive's queue "
+                 "isn't native, no cases");
+    for (const char* name : names) Results(name).Report();
+    return;
+  }
+  constexpr uint32_t kMgr = 0, kConfigTable = 256, kTableA = 512, kTableB = 768;
+  constexpr uint32_t kBlockBytes = 8192, kData = 4096;
+  const uint32_t saved_manager = guest::LoadU32(h.base, cs::kManager);
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  const auto saved_recorder = hooks::g_start_up_recorder;
+  const archive::LoadCall native_load = hooks::NativeArchiveLoad(h.base);
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  for (int kind = 0; kind < 3; kind++) {
+    Results results(names[kind]);
+    for (int c = 0; c < 48; c++) {
+      auto asset = [&] {
+        return r.Below(4) == 0 ? 0x80000000u | uint32_t(r.Next()) : r.Below(20000);
+      };
+      const uint32_t first = asset(), second = asset();
+      const uint32_t key = r.Below(4) << 16 | r.Below(4);
+      const uint32_t count = r.Below(6);
+      uint32_t table[5][3];
+      for (auto& entry : table) {
+        entry[0] = r.Below(3) == 0 ? key : (r.Below(4) << 16 | r.Below(4));
+        entry[1] = asset();
+        entry[2] = uint32_t(r.Next());
+      }
+      const uint32_t used = r.Below(4) == 0 ? uint32_t(r.Next()) & 0xFFF : 64 * r.Below(16);
+      const uint32_t flags = RandomFlags(r);
+      const uint32_t buffer = uint32_t(r.Next());
+      LoadRecord record;
+      for (int i = 0; i < 4; i++) {
+        record.serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, block, kBlockBytes);
+        const uint32_t manager = h.data + kMgr;
+        guest::StoreU32(h.base, cs::kManager, manager);
+        guest::StoreU32(h.base, manager + 36, h.data + kConfigTable);
+        guest::StoreU32(h.base, h.data + kConfigTable + 12, first);
+        guest::StoreU32(h.base, h.data + kConfigTable + 8, second);
+        guest::StoreU32(h.base, manager + 128, count);
+        guest::StoreU32(h.base, manager + 140, h.data + kTableA);
+        guest::StoreU32(h.base, manager + 156, count);
+        guest::StoreU32(h.base, manager + 168, h.data + kTableB);
+        guest::StoreU32(h.base, manager + 188, buffer);
+        for (uint32_t i = 0; i < 5; i++) {
+          for (uint32_t t : {kTableA, kTableB}) {
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU32(h.base, h.data + t + 12 * i + 4 * k, table[i][k]);
+            }
+          }
+        }
+        guest::StoreU32(h.base, block + 4, block + kData);
+        guest::StoreU32(h.base, block + 8, 2048);
+        guest::StoreU32(h.base, block + 12, used);
+        guest::StoreU32(h.base, block + 32, flags);
+        guest::StoreU32(h.base, block + (kind == 1 ? 84 : 64), key);
+        guest::StoreU32(h.base, cs::kPhysicalHeld, 0x01000000u);
+        record.calls.clear();
+        record.next = 0;
+        g_loads = &record;
+        hooks::g_start_up_recorder = RecordLoad;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        With(v, [&] {
+          if (v == 0) {
+            (kind == 0 ? __imp__sub_820F2520 : kind == 1 ? __imp__sub_820F22F8
+                                                         : __imp__sub_820F23C0)(t, h.base);
+          } else if (kind == 0) {
+            t.r3.u64 = cs::CourseSetLoad(h.base, block, native_load);
+          } else if (kind == 1) {
+            t.r3.u64 = cs::AreaLightsLoad(h.base, block, native_load);
+          } else {
+            t.r3.u64 = cs::AreaModelLoad(h.base, block, native_load);
+          }
+        });
+        hooks::g_start_up_recorder = saved_recorder;
+        g_loads = nullptr;
+        const uint32_t physical = kind == 0 ? guest::LoadU32(h.base, block + 3808) : 0;
+        auto normalized = [&](uint32_t word) {
+          if (physical != 0 && word == physical) return 0xB0000000u;
+          if (word - block < kBlockBytes) return 0xC0000000u | (word - block);
+          return word;
+        };
+        if (kind == 0) {
+          out[v].Bytes(Read(h.base, block, 40));
+          out[v].Bytes(Read(h.base, block + 1056, 8));
+          out[v].Word(physical != 0);
+          out[v].Word(physical != 0 ? memory::PhysicalSize(physical) : 0);
+          out[v].Word(normalized(guest::LoadU32(h.base, block + 3812)));
+        } else {
+          out[v].Bytes(Read(h.base, block, 96));
+        }
+        out[v].Word(uint32_t(record.calls.size()));
+        for (size_t i = 0; i < record.calls.size(); i++) {
+          out[v].Word(i % 6 == 1 || i % 6 == 3 ? normalized(record.calls[i]) : record.calls[i]);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+        out[v].Bytes(Read(h.base, h.data, 1024));
+        if (physical != 0) memory::FreePhysical(physical);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+    }
+    results.Report();
+  }
+  memory::Free(block);
+  guest::StoreU32(h.base, cs::kManager, saved_manager);
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+}
+
+// CourseSet::OnLoaded: CourseSetParses' files, the first in a block of
+// physical memory of its own on each side (freed by the callback). Compared:
+// as CourseSetParses, with the bytes held, the flags and r3.
+void CourseSetOnLoadedCases(Context& h) {
+  Results results("CourseSet::OnLoaded (sub_820F22B8)");
+  if (!hooks::ModelsNativeLifetime() || !hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: CourseSet::OnLoaded: its plain C++ can't run here, no cases");
+    results.Report();
+    return;
+  }
+  Random r(0x4F4E4C44ull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t set = (allocation + 15) & ~15u;
+  const uint32_t saved_held = guest::LoadU32(h.base, cs::kPhysicalHeld);
+  for (int c = 0; c < 12; c++) {
+    Files f;
+    std::vector<uint32_t> first;
+    first.push_back(f.Xpr(0x1000));
+    f.Container(256, {f.Part(r)});
+    first.push_back(256);
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t at = 512 + 64 * i;
+      std::vector<uint32_t> parts;
+      const uint32_t n = r.Below(2);
+      for (uint32_t k = 0; k < n; k++) parts.push_back(f.Part(r));
+      f.Container(at, parts);
+      first.push_back(at);
+    }
+    f.Container(0, first);
+    std::vector<uint32_t> second;
+    for (uint32_t i = 0; i < 3; i++) {
+      f.Put(128 + 16 * i, r.Below(4) == 0 ? 0 : uint32_t(r.Next()));
+      second.push_back(128 + 16 * i);
+    }
+    f.Container(64, second);
+    const uint32_t flags = RandomFlags(r);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t files = memory::AllocPhysical(Files::kBytes, 0, 0xFFFFFFFFu, 0, 4);
+      f.Write(h.base, files);
+      Fill(h.base, set, 3824, 0);
+      guest::StoreU32(h.base, set + 32, flags);
+      guest::StoreU32(h.base, set + 3808, files);
+      guest::StoreU32(h.base, set + 3812, files + 64);
+      guest::StoreU32(h.base, cs::kPhysicalHeld, 0x10000000u);
+      PPCContext t = CallContext(h);
+      t.r6.u64 = set;
+      With(v, [&] {
+        if (v == 0) {
+          __imp__sub_820F22B8(t, h.base);
+        } else {
+          WithCalls(t, h.base, [&](const cs::Calls& calls) {
+            t.r3.u64 = cs::CourseSetOnLoaded(h.base, calls, t.r1.u32, set);
+          });
+        }
+      });
+      Regions regions;
+      regions.AddXprBlocks(h.base, set + 64);
+      regions.AddModelBlocks(h.base, set + 96);
+      constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652, 3180};
+      std::vector<uint32_t> list_models;
+      for (uint32_t list : kLists) {
+        for (uint32_t model : ListModels(h.base, set + list)) {
+          list_models.push_back(model);
+          regions.Add(model, scenery_lists::kSceneryModelBytes, 432);
+        }
+      }
+      for (uint32_t model : list_models) regions.AddModelBlocks(h.base, model);
+      out[v].Word(t.r3.u32 - set);
+      out[v].Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+      out[v].Word(guest::LoadU32(h.base, set + 3808) - files);
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 96) - t.r1.u32);
+      // The second file's entries point into the freed block: as offsets.
+      for (uint32_t at : {3808u, 3812u, 1056u, 1060u, 1592u}) {
+        const uint32_t word = guest::LoadU32(h.base, set + at);
+        guest::StoreU32(h.base, set + at, word - files < Files::kBytes ? word - files : word);
+      }
+      regions.AddBytes(out[v], h.base, set, 3824);
+      regions.AddAll(out[v], h.base);
+      for (uint32_t model : list_models) FreeModel(h.base, model, true);
+      if (guest::LoadU32(h.base, set + 96) != 0) FreeModel(h.base, set + 96, false);
+      FreeXpr(h.base, set + 64);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, cs::kPhysicalHeld, saved_held);
+  memory::Free(allocation);
+  results.Report();
+}
+
+// AnimationSet::FindByTexture: TextureAnimationCases' sets (up to 6
+// animations, 1 to 8 frames: with none the original reads guest address 4,
+// unmapped here, and no set in play has an animation without frames), each
+// animation's texture word (+20 + 4 x frames) one of 4 values, the texture
+// asked for one of them or another. Compared: r3 (64 bits).
+void FindByTextureCases(Context& h) {
+  Random r(0x46494E44);
+  Results results("AnimationSet::FindByTexture (sub_82146A38)");
+  for (int c = 0; c < 128; c++) {
+    const uint32_t count = r.Below(5) == 0 ? 0 : r.Below(7);
+    uint32_t offsets[6], frames[6], textures[6];
+    for (uint32_t i = 0; i < 6; i++) {
+      offsets[i] = 96 * r.Below(8);
+      frames[i] = 1 + r.Below(8);
+      textures[i] = 0x30000000u + r.Below(4);
+    }
+    const uint32_t texture = 0x30000000u + r.Below(5);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t set = h.data + 256;
+      guest::StoreU32(h.base, set, count);
+      for (uint32_t i = 0; i < count; i++) {
+        guest::StoreU32(h.base, set + 4 + 4 * i, offsets[i]);
+        const uint32_t animation = set + 4 * (count + 1) + offsets[i];
+        guest::StoreU32(h.base, animation, frames[i]);
+        guest::StoreU32(h.base, animation + 20 + 4 * frames[i], textures[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = set;
+      t.r4.u64 = texture;
+      if (v == 0) {
+        __imp__sub_82146A38(t, h.base);
+      } else {
+        t.r3.u64 = cs::FindAnimationByTexture(h.base, set, texture);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+  }
+  results.Report();
+}
+
+// Scenery::RecordHeadlightProjectors' cases (course_scenery_headlights.cpp).
+void HeadlightProjectorCases(Context& h);
 
 void CourseScenery(Context& h) {
   ObjectLeaves(h);
@@ -1150,7 +3074,92 @@ void CourseScenery(Context& h) {
   Lists(h);
   ReleaseUnusedCases(h);
   StartLoadCases(h);
+  CollectCases(h);
   TextureAnimationCases(h);
+  Parses(h);
+  PoolSizesCases(h);
+  ListLoadCases(h);
+  IsLoadedCases(h);
+  PhysicalCases(h);
+  CreateCases(h);
+  SetupCases(h);
+  UpdateCases(h);
+  UnloadCases(h);
+  DestroyCases(h);
+  LoadCases(h);
+  CourseSetOnLoadedCases(h);
+  FindByTextureCases(h);
+  HeadlightProjectorCases(h);
+}
+
+namespace {
+
+// The manager's blocks: the pool set's (+4) and the lists' and visible
+// areas' (+132 to +168, +184, +224), and the provider's storage (+236).
+constexpr uint32_t kSceneryBlocks[] = {4, 132, 136, 140, 160, 164, 168, 184, 224};
+
+}  // namespace
+
+void SceneryOutputs(Context& h, Outputs& out, uint32_t manager, bool created) {
+  std::vector<std::pair<uint32_t, uint32_t>> blocks;  // address, bytes
+  for (uint32_t at : kSceneryBlocks) {
+    const uint32_t b = guest::LoadU32(h.base, manager + at);
+    blocks.emplace_back(b, b != 0 ? memory::PhysicalSize(b) : 0);
+  }
+  if (created) {
+    const uint32_t b = guest::LoadU32(h.base, manager + 236);
+    blocks.emplace_back(b, b != 0 && memory::IsHeapBlock(b) ? memory::Size(b) : 0);
+  }
+  blocks.emplace_back(manager, 248);
+  // A word in a block as its tag and offset.
+  auto tagged = [&](uint32_t word) {
+    for (size_t i = 0; i < blocks.size(); i++) {
+      if (blocks[i].first != 0 && word >= blocks[i].first &&
+          word - blocks[i].first < std::max(blocks[i].second, 1u)) {
+        return 0xB0000000u | uint32_t(i) << 24 | (word - blocks[i].first);
+      }
+    }
+    return word;
+  };
+  auto words = [&](uint32_t address, uint32_t bytes) {
+    std::vector<uint8_t> v;
+    for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+      const uint32_t w = tagged(guest::LoadU32(h.base, address + i));
+      for (int b = 0; b < 4; b++) v.push_back(uint8_t(w >> (24 - 8 * b)));
+    }
+    out.Bytes(v);
+  };
+  for (const auto& [address, bytes] : blocks) out.Word(bytes);
+  out.Word(guest::LoadU32(h.base, cs::kPhysicalHeld));
+  out.Word(tagged(guest::LoadU32(h.base, cs::kManager)));
+  words(manager, 248);
+  const uint32_t set_block = guest::LoadU32(h.base, manager + 4);
+  if (set_block != 0) words(set_block, 24 * guest::LoadU32(h.base, manager + 0));
+  const uint32_t areas = guest::LoadU32(h.base, manager + 128);
+  const uint32_t models = guest::LoadU32(h.base, manager + 156);
+  out.Bytes(Read(h.base, guest::LoadU32(h.base, manager + 136), areas * 16));
+  out.Bytes(Read(h.base, guest::LoadU32(h.base, manager + 140), areas * 12));
+  out.Bytes(Read(h.base, guest::LoadU32(h.base, manager + 164), models * 16));
+  out.Bytes(Read(h.base, guest::LoadU32(h.base, manager + 168), models * 12));
+  const uint32_t visible = guest::LoadU32(h.base, manager + 224);
+  for (uint32_t i = 0; i < guest::LoadU32(h.base, manager + 220); i++) {
+    out.Word(guest::LoadU32(h.base, visible + 272 * i + 4));
+    out.Word(guest::LoadU32(h.base, visible + 272 * i + 8));
+  }
+  // The course set (pool 2's object, after StartLoad): its header.
+  const uint32_t course_set = guest::LoadU32(h.base, manager + 112);
+  if (created && course_set != 0) words(course_set, 40);
+}
+
+void SceneryFree(Context& h, uint32_t manager, bool created) {
+  if (created) {
+    models::TextureProviderDestruct(h.base, manager + 228);
+  }
+  for (uint32_t at : kSceneryBlocks) {
+    const uint32_t b = guest::LoadU32(h.base, manager + at);
+    if (b != 0) memory::FreePhysical(b);
+  }
+  memory::FreePhysical(manager);
 }
 
 }  // namespace harness

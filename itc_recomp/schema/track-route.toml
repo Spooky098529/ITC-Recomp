@@ -1,0 +1,237 @@
+# The schema of docs/functions/track-route.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The course's route (the image's 0x826C5B10, 12 bytes) and its file: the
+# road as a graph of sections, each a run of 84-byte slice records; the
+# route positions (two halfwords, a section and a slice) the race code and
+# the track positions move along it; the points and the small cells (counts,
+# masks, lanes, distances) the queries take by address (src/track_route/,
+# docs/known-data.md "0x826C5B10").
+#
+# Measure faults (tools/type_map.py), each kept as a field with a name of
+# its own (`fault_...`) and a note: TrackRoute::ClampPosition's r3 is an out
+# position, joined with the route; TrackRoute::LinkDistance's r4 (a route
+# position) meets the file's +0. Where a fault's access has the width of a
+# real field at the same offset (SlicePoint's and SplinePoint's out vectors
+# on the route's three words), it fits that field and has no field of its
+# own.
+#
+# The section and link types the hand port reads through (TrackRouteSection
+# but for BranchesMatching's r5, TrackRouteLink) the measure never sees as
+# their own: it reaches sections through the file's table by index.
+
+# The course's route (12 bytes, the image's 0x826C5B10).
+[TrackRoute]
+measures = ["TrackRoute", "TrackRoute::LinkDistance.ret", "TrackRoute::Normalize.ret"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "file", offset = 0, type = "ptr", to = "TrackRouteFile", note = "the route's file (TrackRoute::Load); also SlicePoint's and SplinePoint's out vector's x (a measure fault)" },
+  { name = "fault_out_section", offset = 0, type = "u16", note = "measure fault: TrackRoute::ClampPosition's r3 is an out route position (its section)" },
+  { name = "fault_out_slice", offset = 2, type = "u16", note = "measure fault: TrackRoute::ClampPosition's out position's slice" },
+  { name = "slice_total", offset = 4, type = "u32", note = "the slices of every section, worked out on load (the linear index's size, TrackRoute::ToIndex); also the out vectors' y (a measure fault)" },
+  { name = "state", offset = 8, type = "u32", note = "1 loading, 2 loaded, 0 freed (TrackRoute::Prepare, Free); also the out vectors' z (a measure fault)" },
+]
+
+# The route's file (loaded per course with the collision mesh).
+[TrackRouteFile]
+measures = ["new<?>@TrackRoute::Load", "TrackRoute::LinkDistance.ret.+0", "TrackRoute::Normalize.ret.+0"]
+size = 68
+origin = "allocated"
+# A blob (E5 step 5, 2026-11-24): the asset read whole by Archive::Load into
+# its loader's VirtualAlloc (lifted; returning at 0x820F9E64), in PC memory
+# with the file's bytes; freed by the game's VirtualFree.
+storage = "blob"
+blob_alloc = [{ call = 0x820F9E64, reg = "r4" }]
+fields = [
+  { name = "section_count", offset = 0, type = "u32" },
+  { name = "fault_position_section", offset = 0, type = "u16", note = "measure fault: TrackRoute::LinkDistance's r4 (a route position's section)" },
+  { name = "count_4", offset = 4, type = "u32", note = "a count (use not known)" },
+  { name = "slice_length", offset = 8, type = "f32", note = "a slice's length: a distance in slices times it is in meters (TrackRoute::Distance)" },
+  { name = "sections", offset = 12, type = "u32", note = "the sections' table: a pointer (TrackRouteSection) per section after OnLoaded" },
+  { name = "corners", offset = 16, type = "u32", note = "the corners' table (pointers after OnLoaded; read by the AI drivers' paths)" },
+  { name = "route_bit_tables", offset = 20, type = "bytes", count = 48, note = "twelve more tables, one per route bit of the race data's +24 (OnLoaded)" },
+]
+
+# A section of the route (a run of slices; 124 bytes, then its slices'
+# records and two tables of 12-byte points).
+[TrackRouteSection]
+measure = "TrackRoute::BranchesMatching.r5"
+size = 124
+origin = "embedded"
+fields = [
+  { name = "slice_count", offset = 0, type = "u16" },
+  { name = "kind", offset = 2, type = "u8", note = "low four bits: 0 the plain road; 1 to 4 kinds the links treat apart (2 and 4 skipped going forward, 1 and 3 going back; probably branch or pit lanes); 0x30 and up searched by Follow's full search" },
+  { name = "branch", offset = 3, type = "u8", note = "a branch number: a bit in the masks the callers pass (the default mask leaves out 7, 8 and 29)" },
+  { name = "min_x", offset = 4, type = "f32" },
+  { name = "min_y", offset = 8, type = "f32" },
+  { name = "min_z", offset = 12, type = "f32" },
+  { name = "max_x", offset = 16, type = "f32" },
+  { name = "max_y", offset = 20, type = "f32" },
+  { name = "max_z", offset = 24, type = "f32" },
+  { name = "links", offset = 28, type = "bytes", count = 48, note = "twelve links (TrackRouteLink): 0 to 2 forward, 3 to 5 back, 6 and 8 the sections beside it (left and right)" },
+  { name = "link_lanes", offset = 76, type = "bytes", count = 48, note = "8 signed bytes a link: the lane taken on that link from each lane, -1 none (TrackRoute::LinkLane)" },
+  { name = "slices", offset = 124, type = "bytes", count = 0, note = "the slices' 84-byte records (TrackRouteSlice), then two tables of 12-byte points at +124 + 84 x count and +124 + 96 x count (probably the road's two edges)" },
+]
+
+# A link of a section (4 bytes, twelve at the section's +28).
+[TrackRouteLink]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16", note = "the section it leads to, -1 none" },
+  { name = "slice", offset = 2, type = "u16", note = "the slice there (signed)" },
+]
+
+# A slice's record (84 bytes, the section's +124 + 84 x slice).
+[TrackRouteSlice]
+measures = ["TrackRoute::AlongSlice.r6", "TrackRoute::Locate.r6", "TrackRoute::LocateShoulder.r6"]
+size = 84
+origin = "embedded"
+fields = [
+  { name = "center_x", offset = 0, type = "f32" },
+  { name = "center_y", offset = 4, type = "f32" },
+  { name = "center_z", offset = 8, type = "f32" },
+  { name = "width", offset = 12, type = "f32", note = "the road's width" },
+  { name = "left_margin", offset = 16, type = "f32", note = "the margin beyond the left side (Locate's 5)" },
+  { name = "right_margin", offset = 20, type = "f32", note = "the margin beyond the right side (Locate's 6)" },
+  { name = "raised", offset = 24, type = "f32", note = "a float OnLoaded raises or lowers by the race's route bits" },
+  { name = "lowered", offset = 28, type = "f32", note = "a float OnLoaded raises or lowers by the race's route bits" },
+  { name = "mesh_cell", offset = 32, type = "u32", note = "the collision mesh's section and slice there (halfwords; TrackPosition::Init)" },
+  { name = "mesh_section", offset = 32, type = "u16" },
+  { name = "mesh_slice", offset = 34, type = "u16" },
+  { name = "side_x", offset = 36, type = "f32", note = "the side direction (x, z)" },
+  { name = "side_z", offset = 40, type = "f32" },
+  { name = "forward_x", offset = 44, type = "f32", note = "the forward direction (x, z)" },
+  { name = "forward_z", offset = 48, type = "f32" },
+  { name = "lanes", offset = 56, type = "u8", note = "low four bits: the lanes' count" },
+  { name = "kind", offset = 57, type = "u8", note = "3 and 4 tested (SliceTest, SpecialSection)" },
+  { name = "corner_count", offset = 58, type = "u16", note = "the corners listed on the slice (AiPath::AddCornersAt)" },
+  { name = "corners", offset = 60, type = "bytes", count = 24, note = "4-byte entries: a corner's number in the file's +16 table, a slice" },
+]
+
+# A route position: two halfwords, a section and a slice in it (a track
+# position's +4, an AI driver's +4, a stack copy), passed by address.
+[TrackRoutePosition]
+measure = "TrackRoute::AlongSlice.r5"
+measures = ["TrackRoute::Distance.r5", "TrackRoute::Follow.r6", "TrackRoute::IsMainRoad.r4", "TrackRoute::LaneAt.r5", "TrackRoute::LanePoint.r5", "TrackRoute::LinkDistance.r4", "TrackRoute::LinkDistance.r5", "TrackRoute::LinkLane.r4", "TrackRoute::Normalize.r4", "TrackRoute::NormalizeBack.r4", "TrackRoute::NormalizeForward.r4", "TrackRoute::NormalizeForwardPath.r4", "TrackRoute::NormalizeLane.r4", "TrackRoute::NormalizeLaneMasked.r4", "TrackRoute::NormalizePath.r4", "TrackRoute::NoteShoulder.r5", "TrackRoute::NoteShoulder.r6", "TrackRoute::OnSlice.r5", "TrackRoute::SpecialSection.r4", "TrackRoute::StepAlongPath.r4", "TrackRoute::StepBack.r4", "TrackRoute::StepForward.r4", "TrackRoute::StepForwardLane.r4", "TrackRoute::StepForwardLaneMasked.r4", "TrackRoute::StepForwardMasked.r4", "TrackRoute::TakeBranch.r4", "TrackRoute::ToMainRoad.r4", "sub_820FB2B0.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "packed", offset = 0, type = "u32", note = "the section and slice as one word (section in the high halfword)" },
+  { name = "section", offset = 0, type = "u16", note = "a section of the route (-1, or above 0x7FFF, none)" },
+  { name = "slice", offset = 2, type = "u16", note = "the slice in it (signed: may run past either end before a normalizer moves it)" },
+]
+
+# A branch BranchesMatching writes out: a section and the link index to it.
+[TrackRouteBranch]
+measure = "TrackRoute::BranchesMatching.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "section", offset = 0, type = "u16" },
+  { name = "link", offset = 2, type = "u16", note = "the forward link's index (0 to 2)" },
+]
+
+# A point the queries take or write (x, y, z, and w for LanePoint's out).
+[TrackRoutePoint]
+measures = [
+  "TrackRoute::AlongSlice.r4",
+  "TrackRoute::LaneAt.r4",
+  "TrackRoute::LanePoint.r4",
+  "TrackRoute::Locate.r4",
+  "TrackRoute::LocateShoulder.r4",
+  "TrackRoute::OnSlice.r4",
+  "TrackRoute::SectionOutcode.r4",
+  "sub_820F8FA0.r4",
+  "sub_820F8FA0.r5",
+]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "1.0 (LanePoint's and Point's out)" },
+]
+
+# A word a query reads by address: a slices' count to take off a slice
+# (StepForward and the like), a branch mask, TakeBranch's link number.
+[TrackRouteWord]
+measures = [
+  "TrackRoute::BranchesMatching.r6",
+  "TrackRoute::StepAlongPath.r5",
+  "TrackRoute::StepForward.r5",
+  "TrackRoute::StepForwardLane.r6",
+  "TrackRoute::StepForwardLaneMasked.r6",
+  "TrackRoute::StepForwardMasked.r5",
+  "TrackRoute::TakeBranch.r5",
+]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# A list of branch masks (words ending with 0; 0x82008970's lists, the
+# default 0x82008A00).
+[TrackRouteMaskList]
+measures = ["TrackRoute::StepForwardLaneMasked.r7", "TrackRoute::StepForwardMasked.r6"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first", offset = 0, type = "u32", note = "the first mask (0 ends the list); the others follow, a word each" },
+]
+
+# A halfword a query reads (and may change) by address: a link number or a
+# lane.
+[TrackRouteHalfword]
+measures = [
+  "TrackRoute::LinkLane.r5",
+  "TrackRoute::LinkLane.r6",
+  "TrackRoute::StepForwardLane.r5",
+  "TrackRoute::StepForwardLaneMasked.r5",
+  "TrackRoute::TakeBranch.r5.+0",
+]
+size = 2
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u16", note = "signed; TakeBranch.r5.+0 is a measure fault (no pointer is read there)" },
+]
+
+# A float a query reads and writes by address: a distance or a score.
+[TrackRouteFloat]
+measures = ["TrackRoute::LinkDistance.r6", "TrackRoute::NoteShoulder.r7", "TrackRoute::OnSlice.r6"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "f32" },
+]
+
+# A path of sections (halfwords, ending with a negative one).
+[TrackRoutePath]
+measure = "TrackRoute::StepAlongPath.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 4, note = "halfwords: sections, a negative one ends it" },
+  { name = "first", offset = 0, type = "u16" },
+  { name = "second", offset = 2, type = "u16" },
+]
+
+[globals]
+route_file = { address = 0x826C5B10, type = "ptr", to = "TrackRouteFile", note = "the course's route (TrackRoute, 12 bytes): its file" }
+route_slice_total = { address = 0x826C5B14, type = "u32", note = "the route's slices' total" }
+route_state = { address = 0x826C5B18, type = "u32", note = "the route's state (1 loading, 2 loaded)" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5 (.rdata)" }
+bounds_margin = { address = 0x82002568, type = "f32", note = "20.0, the sections' bounds margin (.rdata)" }
+no_distance = { address = 0x82002814, type = "f32", note = "10000.0, no distance (.rdata)" }
+nine = { address = 0x82006844, type = "f32", note = "9.0 (.rdata)" }
+ten = { address = 0x82001FD8, type = "f32", note = "10.0 (.rdata)" }
+default_branch_mask = { address = 0x82008A00, type = "u32", note = "0xDFFFFE7F, then 0: the default branch mask list (.rdata)" }
+height_reach = { address = 0x82002A0C, type = "f32", note = "100.0, 10 m squared (.rdata)" }
+reach_squared = { address = 0x8200681C, type = "f32", note = "62500.0, 250 m squared (.rdata)" }
+farthest = { address = 0x82006824, type = "f32", note = "FullSearch's first score (.rdata)" }

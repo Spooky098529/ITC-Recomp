@@ -1,0 +1,340 @@
+// The race's sounds natively: adapters in front of src/race_sounds/
+// (docs/functions/race-sounds.md), with the register steps the harness
+// shares (hooks/race_sounds.h). The handlers are reached through the race
+// mode's state machine (functors) and the callbacks through function
+// pointers, so the adapters stay; the helpers' are gone
+// where every caller is native (SetListener, FadeMusic, RestoreMusicVolume,
+// SetUpCars, UpdateCars, PickRivalMusic, PlayRivalMusic, PlayStartMusic:
+// their register steps stay for the harness).
+
+#include "hooks/race_sounds.h"
+#include "hooks/native_entry.h"
+
+#include "base/flags.h"
+#include "hooks/car_sounds.h"
+#include "hooks/menu_sounds.h"
+#include "hooks/mode_tick.h"
+#include "race_sounds/race_sounds.h"
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
+              "Run the race's sounds (docs/functions/race-sounds.md: the race mode's sound "
+              "machine at +138284; SetListener sub_821758A0, FadeMusic sub_82175908, "
+              "RestoreMusicVolume sub_821759C8, EndTick sub_82175A40, Pause sub_82175AE8, Resume "
+              "sub_82175B80, PauseCars sub_82175C00, ResumeCars sub_82175C58, OnStageCountdown "
+              "sub_82175D20, OnRollingStartDone sub_82175D48, OnEffectsBankLoaded sub_82175ED0, "
+              "SetUpCars sub_82176188, UpdateCars sub_82175F20, PickRivalMusic sub_821764F0, "
+              "PlayRivalMusic sub_821762F8, RaceTick sub_821769D0, StageTick sub_82176F28, "
+              "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
+              "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
+              "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (its buffers blobs since E5 step 7, CarSounds::Init's and StateMachine::Add's plain C++), OnAbort sub_82175CA0, OnAbortDone sub_82175CF8 (both not seen in play), Unload sub_821772D8 (XPhysicalFree and the views' delete sub_82117B30 through the function table); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "function table) natively instead of through the translated code (the same "
+              "words; checked by --run_harnesses=race_sounds)");
+
+namespace hooks {
+
+namespace {
+
+namespace rs = race_sounds;
+
+// The guest calls the plain C++ makes (race_sounds::Calls), through this
+// context: r1, the first `set` of r3 to r6 and lr set; the car sounds run as
+// their register steps (their plain C++), the rest through the function
+// table (its override when it has one); r1 put back. The adapter's lr is
+// put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  rs::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], int set,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set && i < 4; i++) {
+      registers[i]->u64 = args[i];
+    }
+    if (set > 4) {
+      ctx.r7.u64 = args[4];
+    }
+    if (set > 5) {
+      ctx.r8.u64 = args[5];
+    }
+    ctx.lr = lr;
+    switch (function) {
+      case rs::kCarSoundPauseAll:
+        CarSoundsPauseAll(ctx);
+        break;
+      case rs::kCarSoundResumeAll:
+        CarSoundsResumeAll(ctx);
+        break;
+      case rs::kCarSoundsStopAll:
+        CarSoundsStopAll(ctx);
+        break;
+      case rs::kCarSoundsRelease:
+        CarSoundsReleaseAll(ctx);
+        break;
+      case rs::kCarSoundStop:
+        CarSoundsStop(ctx);
+        break;
+      case rs::kCarSoundStart:
+        CarSoundsCarSoundStart(ctx);
+        break;
+      case rs::kCarSoundUpdate:
+        CarSoundsUpdate(ctx);
+        break;
+      case rs::kMusicPlay:
+        ModeTickMusicPlay(ctx);
+        break;
+      case rs::kSoundPlay:
+        SoundPlay(ctx);
+        break;
+      case rs::kCarSoundsInit:
+        CarSoundsInit(ctx);
+        break;
+      default:
+        lifted::CallFromContext(ctx, function);
+    }
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  lifted::Regs& ctx_;
+  uint64_t lr_;
+};
+
+// Runs `body(calls)` with the guest calls through `ctx`, its r3 into r3.
+template <typename Body>
+void Step(lifted::Regs& ctx, Body body) {
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3;
+  {
+    GuestCalls guest(ctx);
+    r3 = body(guest.calls());
+  }
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+ITC_REGS_STEP(RaceSoundsSetListener) {
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx,
+       [&](const rs::Calls& c) { return rs::SetListener(r3, r4, r5, r6, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsFadeMusic) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::FadeMusic(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsRestoreMusicVolume) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::RestoreMusicVolume(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsEndTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::EndTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsPause) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::Pause(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsResume) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::Resume(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsPauseCars) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::PauseCars(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsResumeCars) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::ResumeCars(sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnStageCountdown) {
+  ctx.r3.u64 = rs::OnStageCountdown(ctx.r3.u64);
+}
+
+ITC_REGS_STEP(RaceSoundsOnRollingStartDone) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRollingStartDone(r3, sp, c); });
+}
+
+void RaceSoundsOnEffectsBankLoaded(lifted::Regs&) {
+  race_sounds::OnEffectsBankLoaded();
+}
+
+ITC_REGS_STEP(RaceSoundsSetUpCars) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::SetUpCars(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsUpdateCars) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::UpdateCars(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsPickRivalMusic) {
+  ctx.r3.u64 = rs::PickRivalMusic(ctx.r3.u64, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceSoundsPlayRivalMusic) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::PlayRivalMusic(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsRaceTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::RaceTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsStageTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::StageTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsRollingStartTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::RollingStartTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsAfterRaceTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::AfterRaceTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnCountdown) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnCountdown(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnRaceEnd) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRaceEnd(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnLeaveAfterRace) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnLeaveAfterRace(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnNextStage) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnNextStage(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnRollingStart) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnRollingStart(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsPlayStartMusic) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::PlayStartMusic(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsIdleTick) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::IdleTick(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsBegin) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::Begin(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnAbort) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::OnAbort(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsOnAbortDone) {
+  ctx.r3.u64 = rs::OnAbortDone(ctx.r3.u64);
+}
+
+ITC_REGS_STEP(RaceSoundsUnload) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, [&](const rs::Calls& c) { return rs::Unload(r3, sp, c); });
+}
+
+ITC_REGS_STEP(RaceSoundsInit) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  const uint32_t sp = ctx.r1.u32;
+  bool replaced = false;
+  uint32_t r3 = 0;
+  Step(ctx, [&](const rs::Calls& c) {
+    r3 = rs::Init(machine, sp, c, &replaced);
+    return uint64_t(0);
+  });
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+}  // namespace hooks
+
+// Defines an adapter: the flag, else the original.
+#define ITC_RACE_SOUNDS(address, step)   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_sounds)) { \
+    hooks::step(ctx);              \
+  }
+
+ITC_RACE_SOUNDS(82175A40, RaceSoundsEndTick)
+ITC_RACE_SOUNDS(82175AE8, RaceSoundsPause)
+ITC_RACE_SOUNDS(82175B80, RaceSoundsResume)
+ITC_RACE_SOUNDS(82175C00, RaceSoundsPauseCars)
+ITC_RACE_SOUNDS(82175C58, RaceSoundsResumeCars)
+ITC_RACE_SOUNDS(82175D20, RaceSoundsOnStageCountdown)
+ITC_RACE_SOUNDS(82175D48, RaceSoundsOnRollingStartDone)
+ITC_RACE_SOUNDS(82175ED0, RaceSoundsOnEffectsBankLoaded)
+ITC_RACE_SOUNDS(821769D0, RaceSoundsRaceTick)
+ITC_RACE_SOUNDS(82176F28, RaceSoundsStageTick)
+ITC_RACE_SOUNDS(82177130, RaceSoundsRollingStartTick)
+ITC_RACE_SOUNDS(82176C10, RaceSoundsAfterRaceTick)
+ITC_RACE_SOUNDS(82176968, RaceSoundsOnCountdown)
+ITC_RACE_SOUNDS(82176BA0, RaceSoundsOnRaceEnd)
+ITC_RACE_SOUNDS(82176E60, RaceSoundsOnLeaveAfterRace)
+ITC_RACE_SOUNDS(82176EC8, RaceSoundsOnNextStage)
+ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
+ITC_RACE_SOUNDS(821767A8, RaceSoundsIdleTick)
+ITC_RACE_SOUNDS(82176618, RaceSoundsBegin)
+ITC_RACE_SOUNDS(82177378, RaceSoundsInit)
+ITC_RACE_SOUNDS(82175CA0, RaceSoundsOnAbort)
+ITC_RACE_SOUNDS(82175CF8, RaceSoundsOnAbortDone)
+ITC_RACE_SOUNDS(821772D8, RaceSoundsUnload)

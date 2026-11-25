@@ -1,0 +1,456 @@
+# The schema of docs/functions/cameras.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's camera class (Camera, vtable 0x82001EC0), the game's
+# 21 camera passes built on it (592 bytes each from 0x826BAC00), and the
+# app's second camera class over it (AppCamera, the app's +120, and its
+# 832-byte camera). The viewports at [0x826C2CE8] are camera-modes.toml's
+# (Viewport). Vectors are described lane by lane, with their two doublewords
+# beside the lanes (the originals copy them with ld/std); matrices as bytes.
+# Hand ports: src/cameras/, src/hooks/cameras.cpp, src/app_start_up/app_camera.cpp.
+
+# A camera pass: a Camera (+0 to +399) and the pass's own fields. The 21 are
+# at 0x826BAC00 (CamerasGlobals::passes), made once at boot by CameraPasses::Init;
+# the measure's Camera is the passes met through the camera class's methods.
+[CameraPass]
+measures = ["CameraPass", "Camera",
+            "Billboards.+0"]
+size = 592
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CameraVtable", note = "0x82001EC0 (Camera); 0x820027B0 for AppCameraCamera" },
+  { name = "view", offset = 16, type = "bytes", count = 64, note = "the view matrix (4x4 floats, row-major, row vectors)" },
+  { name = "projection", offset = 80, type = "bytes", count = 64, note = "the projection (Camera::BuildProjection)" },
+  { name = "view_projection", offset = 144, type = "bytes", count = 64, note = "view x projection (Matrix::Multiply)" },
+  { name = "view_built", offset = 208, type = "bytes", count = 64, note = "Camera::Update's view as built, then copied to +16" },
+  { name = "position_xy", offset = 272, type = "u64", note = "the position Camera::Update builds the view from (w 1.0); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "position_x", offset = 272, type = "f32", note = "the position Camera::Update builds the view from (w 1.0)" },
+  { name = "position_y", offset = 276, type = "f32" },
+  { name = "position_zw", offset = 280, type = "u64", note = "z and w as one doubleword" },
+  { name = "position_z", offset = 280, type = "f32" },
+  { name = "position_w", offset = 284, type = "f32" },
+  { name = "angles_xy", offset = 288, type = "u64", note = "the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "angles_x", offset = 288, type = "f32", note = "the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated)" },
+  { name = "angles_y", offset = 292, type = "f32" },
+  { name = "angles_zw", offset = 296, type = "u64", note = "z and w as one doubleword" },
+  { name = "angles_z", offset = 296, type = "f32" },
+  { name = "angles_w", offset = 300, type = "f32" },
+  { name = "unknown_304", offset = 304, type = "bytes", count = 64, note = "a 4x4 matrix, probably (Camera::Camera sets its rows' fourth words to 1.0)" },
+  { name = "field_of_view", offset = 368, type = "f32", note = "radians, wrapped into [-pi, pi]" },
+  { name = "view_scale", offset = 372, type = "f32", note = "Camera::Update: +380 x 0.5 / the half field of view's cosine polynomial x its sine polynomial" },
+  { name = "width", offset = 376, type = "f32", note = "the viewport's width" },
+  { name = "height", offset = 380, type = "f32", note = "the viewport's height" },
+  { name = "near", offset = 384, type = "f32", note = "the near plane" },
+  { name = "far", offset = 388, type = "f32", note = "the far plane" },
+  { name = "aspect", offset = 392, type = "f32", note = "width / height" },
+  { name = "eye_xy", offset = 400, type = "u64", note = "the eye (CameraPass::FromViewport: a viewport entry's +16); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "eye_x", offset = 400, type = "f32", note = "the eye (CameraPass::FromViewport: a viewport entry's +16)" },
+  { name = "eye_y", offset = 404, type = "f32" },
+  { name = "eye_zw", offset = 408, type = "u64", note = "z and w as one doubleword" },
+  { name = "eye_z", offset = 408, type = "f32" },
+  { name = "eye_w", offset = 412, type = "f32" },
+  { name = "target_xy", offset = 416, type = "u64", note = "the target; x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "target_x", offset = 416, type = "f32", note = "the target" },
+  { name = "target_y", offset = 420, type = "f32" },
+  { name = "target_zw", offset = 424, type = "u64", note = "z and w as one doubleword" },
+  { name = "target_z", offset = 424, type = "f32" },
+  { name = "target_w", offset = 428, type = "f32" },
+  { name = "up_xy", offset = 432, type = "u64", note = "the up; x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "up_x", offset = 432, type = "f32", note = "the up" },
+  { name = "up_y", offset = 436, type = "f32" },
+  { name = "up_zw", offset = 440, type = "u64", note = "z and w as one doubleword" },
+  { name = "up_z", offset = 440, type = "f32" },
+  { name = "up_w", offset = 444, type = "f32" },
+  { name = "roll", offset = 448, type = "f32", note = "Matrix::RotateZ's angle on the view" },
+  { name = "forward_xy", offset = 464, type = "u64", note = "CameraPass::Update: target - eye, normalized (w 1.0); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "forward_x", offset = 464, type = "f32", note = "CameraPass::Update: target - eye, normalized (w 1.0)" },
+  { name = "forward_y", offset = 468, type = "f32" },
+  { name = "forward_zw", offset = 472, type = "u64", note = "z and w as one doubleword" },
+  { name = "forward_z", offset = 472, type = "f32" },
+  { name = "forward_w", offset = 476, type = "f32" },
+  { name = "up_again", offset = 480, type = "bytes", count = 16, note = "CameraPass::Update: the forward crossed with +432, normalized (stvx)" },
+  { name = "viewport_x", offset = 496, type = "u32" },
+  { name = "viewport_y", offset = 500, type = "u32" },
+  { name = "viewport_width", offset = 504, type = "u32", note = "pixels (Camera::SetViewportSize's width)" },
+  { name = "viewport_height", offset = 508, type = "u32", note = "pixels; CameraPass::SetZoom reads it signed" },
+  { name = "unknown_512", offset = 512, type = "u32", note = "0 (CameraPass::Init)" },
+  { name = "zoom", offset = 516, type = "f32", note = "CameraPass::SetZoom: the field of view is atan(height x 0.5 / zoom)" },
+  { name = "unknown_520", offset = 520, type = "f32", note = "the float at 0x82000A30 (CameraPass::Init)" },
+  { name = "unknown_524", offset = 524, type = "f32", note = "the float at 0x82000A30, 0x82001FD0 for type 0 (CameraPass::Init)" },
+  { name = "unknown_528", offset = 528, type = "f32", note = "the float at 0x82000A34 (CameraPass::Init)" },
+  { name = "unknown_532", offset = 532, type = "f32", note = "the float at 0x82001FD8 (CameraPass::Init)" },
+  { name = "unknown_536", offset = 536, type = "f32", note = "the float at 0x82001FD4 (CameraPass::Init)" },
+  { name = "unknown_540", offset = 540, type = "f32", note = "the float at 0x82001FD4 (CameraPass::Init)" },
+  { name = "init_near", offset = 544, type = "f32", note = "the near plane CameraPass::Init copies to +384" },
+  { name = "init_far", offset = 548, type = "f32", note = "the far plane CameraPass::Init copies to +388" },
+  { name = "unknown_552", offset = 552, type = "u32", note = "1 for types 1 to 3, else 0 (CameraPass::Init)" },
+  { name = "unknown_556", offset = 556, type = "u32", note = "0 (CameraPass::Init)" },
+  { name = "unknown_560", offset = 560, type = "u32", note = "1 (CameraPass::Init)" },
+  { name = "clear_color", offset = 564, type = "u32", note = "0xFF000000, 0 for type 19" },
+  { name = "unknown_568", offset = 568, type = "u32", note = "1 (CameraPass::Init)" },
+  { name = "clear_depth", offset = 572, type = "u32", note = "an unsigned integer, recorded as a float" },
+  { name = "color_surface", offset = 576, type = "ptr", to = "CameraSurface", note = "0 for none" },
+  { name = "depth_surface", offset = 580, type = "ptr", to = "CameraSurface", note = "0 for none" },
+  { name = "type", offset = 584, type = "u32", note = "0 to 20: sets the viewport, planes, clear and render targets" },
+  { name = "enabled", offset = 588, type = "u32", note = "1 when RecordBegins and RecordEnds record it" },
+]
+
+# The camera class's vtable (0x82001EC0; AppCameraCamera's 0x820027B0 has the same
+# slots 0 to 2). [826BB540] is pass 4's vtable word.
+[CameraVtable]
+measures = ["CameraPass.+0", "AppCamera.+28.+0", "[826BB540]"]
+size = 20
+origin = "file"
+fields = [
+  { name = "set_viewport_size", offset = 0, type = "fn", note = "slot 0: Camera::SetViewportSize (sub_82593500)" },
+  { name = "set_field_of_view", offset = 4, type = "fn", note = "slot 1: Camera::SetFieldOfView (sub_82593278)" },
+  { name = "update", offset = 8, type = "fn", note = "slot 2: Camera::Update (sub_82593568)" },
+  { name = "slot_3", offset = 12, type = "fn", note = "slot 3: sub_825C8390 in AppCameraCamera's vtable" },
+  { name = "destructor", offset = 16, type = "fn", note = "slot 4: sub_8209FB80, never run" },
+]
+
+# A device surface (Device::CreateSurface's 48-byte header, graphics-resources.md):
+# a camera pass's color and depth surfaces.
+[CameraSurface]
+measure = "Device::CreateSurface.ret"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "edram_bytes", offset = 44, type = "u32", note = "the surface's EDRAM tiles x 5120 (SurfaceHeader::Set); the pass's depth surface starts after its color one (+44 / 5120 tiles)" },
+]
+
+# The surface sub_822A5C50 makes (a cube map's face as a surface, GetSurfaceLevel
+# with a face; never run in play). Not read in detail.
+[CameraCubeFaceSurface]
+measure = "new<48>@sub_822A5C50"
+size = 48
+origin = "allocated"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "texture", offset = 24, type = "ptr", note = "probably the cube map it's a face of" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+]
+
+# The app's +120 (our name AppCamera, sub_820A8B88, made by App::App).
+[AppCamera]
+measure = "AppCamera"
+size = 368
+origin = "allocated"
+storage = "host"
+host_alloc = [0x82094760]
+vtable = 0x820026B8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820026B8" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 (AppCamera::AppCamera)" },
+  { name = "vtable_8", offset = 8, type = "u32", note = "0x820026A8 (0x82002680 first)" },
+  { name = "vtable_12", offset = 12, type = "u32", note = "0x8200269C (0x82002690 first)" },
+  { name = "service", offset = 16, type = "ptr", to = "AppCameraService", note = "the block's +4 (the app's +4)" },
+  { name = "camera", offset = 28, type = "ptr", to = "AppCameraCamera", note = "or 0" },
+  { name = "list", offset = 32, type = "ptr", to = "AppCameraList", note = "or 0" },
+  { name = "unknown_48", offset = 48, type = "bytes", count = 32, note = "two vectors, probably (1.0 at +60 and +76)" },
+  { name = "unknown_96", offset = 96, type = "bytes", count = 64, note = "a 4x4 matrix, probably (1.0 at its rows' fourth words)" },
+  { name = "unknown_160", offset = 160, type = "bytes", count = 64, note = "a 4x4 matrix, probably (1.0 at its rows' fourth words)" },
+  { name = "unknown_240", offset = 240, type = "bytes", count = 64, note = "a 4x4 matrix, probably (1.0 at its rows' fourth words)" },
+  { name = "unknown_316", offset = 316, type = "u32", note = "0 when made" },
+  { name = "unknown_320", offset = 320, type = "u32", note = "0 when made" },
+  { name = "unknown_324", offset = 324, type = "u32", note = "1 when made" },
+  { name = "unknown_328", offset = 328, type = "u32", note = "1 when made" },
+  { name = "unknown_332", offset = 332, type = "u32", note = "10 when made" },
+  { name = "unknown_336", offset = 336, type = "u32", note = "10 when made" },
+  { name = "unknown_340", offset = 340, type = "u32", note = "0 when made" },
+  { name = "unknown_344", offset = 344, type = "u32", note = "2 when made" },
+]
+
+# AppCamera's camera (AppCamera::Camera::Camera, sub_820A9E28): a Camera (+0 to
+# +399; Camera::Camera first) and its own fields, its methods not read.
+[AppCameraCamera]
+measures = ["AppCamera::Camera", "AppCamera.+28"]
+size = 832
+origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C34]
+vtable = 0x820027B0
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CameraVtable", note = "0x82001EC0 (Camera); 0x820027B0 for AppCameraCamera" },
+  { name = "view", offset = 16, type = "bytes", count = 64, note = "the view matrix (4x4 floats, row-major, row vectors)" },
+  { name = "projection", offset = 80, type = "bytes", count = 64, note = "the projection (Camera::BuildProjection)" },
+  { name = "view_projection", offset = 144, type = "bytes", count = 64, note = "view x projection (Matrix::Multiply)" },
+  { name = "view_built", offset = 208, type = "bytes", count = 64, note = "Camera::Update's view as built, then copied to +16" },
+  { name = "position_xy", offset = 272, type = "u64", note = "the position Camera::Update builds the view from (w 1.0); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "position_x", offset = 272, type = "f32", note = "the position Camera::Update builds the view from (w 1.0)" },
+  { name = "position_y", offset = 276, type = "f32" },
+  { name = "position_zw", offset = 280, type = "u64", note = "z and w as one doubleword" },
+  { name = "position_z", offset = 280, type = "f32" },
+  { name = "position_w", offset = 284, type = "f32" },
+  { name = "angles_xy", offset = 288, type = "u64", note = "the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated); x and y as one doubleword (the originals' ld/std copies)" },
+  { name = "angles_x", offset = 288, type = "f32", note = "the Euler angles: x turns by RotateX, y by RotateY, z by RotateZ (negated)" },
+  { name = "angles_y", offset = 292, type = "f32" },
+  { name = "angles_zw", offset = 296, type = "u64", note = "z and w as one doubleword" },
+  { name = "angles_z", offset = 296, type = "f32" },
+  { name = "angles_w", offset = 300, type = "f32" },
+  { name = "unknown_304", offset = 304, type = "bytes", count = 64, note = "a 4x4 matrix, probably (Camera::Camera sets its rows' fourth words to 1.0)" },
+  { name = "field_of_view", offset = 368, type = "f32", note = "radians, wrapped into [-pi, pi]" },
+  { name = "view_scale", offset = 372, type = "f32", note = "Camera::Update: +380 x 0.5 / the half field of view's cosine polynomial x its sine polynomial" },
+  { name = "width", offset = 376, type = "f32", note = "the viewport's width" },
+  { name = "height", offset = 380, type = "f32", note = "the viewport's height" },
+  { name = "near", offset = 384, type = "f32", note = "the near plane" },
+  { name = "far", offset = 388, type = "f32", note = "the far plane" },
+  { name = "aspect", offset = 392, type = "f32", note = "width / height" },
+  { name = "unknown_400", offset = 400, type = "bytes", count = 16, note = "(0, 0, 0, 1) when made" },
+  { name = "unknown_416", offset = 416, type = "bytes", count = 16, note = "(0, 0, 10, 1) when made" },
+  { name = "unknown_432", offset = 432, type = "bytes", count = 16, note = "the position (+272) when made" },
+  { name = "unknown_448", offset = 448, type = "bytes", count = 16, note = "+416 when made" },
+  { name = "unknown_464", offset = 464, type = "bytes", count = 16, note = "+416 when made" },
+  { name = "unknown_480", offset = 480, type = "bytes", count = 16, note = "1.0 at +492 when made" },
+  { name = "unknown_496", offset = 496, type = "bytes", count = 16, note = "1.0 at +508 when made" },
+  { name = "unknown_512", offset = 512, type = "bytes", count = 16, note = "1.0 at +524 when made" },
+  { name = "unknown_560", offset = 560, type = "bytes", count = 16, note = "1.0 at +572 when made" },
+  { name = "unknown_576", offset = 576, type = "bytes", count = 16, note = "1.0 at +588 when made" },
+  { name = "unknown_592", offset = 592, type = "bytes", count = 16, note = "1.0 at +604 when made" },
+  { name = "unknown_608", offset = 608, type = "bytes", count = 16, note = "1.0 at +620 when made" },
+  { name = "unknown_624", offset = 624, type = "bytes", count = 16, note = "(0, 0, 0, 1) when made" },
+  { name = "unknown_640", offset = 640, type = "bytes", count = 16, note = "(0, 0, 0, 1) when made" },
+  { name = "unknown_656", offset = 656, type = "bytes", count = 16, note = "(0, 0, 0, 1) when made" },
+  { name = "unknown_672", offset = 672, type = "f32", note = "45.0 when made" },
+  { name = "unknown_676", offset = 676, type = "f32", note = "0.09 when made" },
+  { name = "unknown_680", offset = 680, type = "f32", note = "1.5 when made" },
+  { name = "unknown_684", offset = 684, type = "f32", note = "0.0 when made" },
+  { name = "unknown_688", offset = 688, type = "f32", note = "30.0 when made" },
+  { name = "unknown_692", offset = 692, type = "f32", note = "200.0 when made" },
+  { name = "unknown_804", offset = 804, type = "f32", note = "-89.0 when made" },
+  { name = "unknown_808", offset = 808, type = "f32", note = "89.0 when made" },
+  { name = "unknown_812", offset = 812, type = "f32", note = "-45.0 when made" },
+  { name = "unknown_816", offset = 816, type = "f32", note = "45.0 when made" },
+]
+
+# AppCamera's +32 (AppCameraList::AppCameraList, sub_820A98C0).
+[AppCameraList]
+measures = ["AppCameraList", "AppCamera.+32", "sub_820A9200.r3"]
+size = 8
+origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C58]
+vtable = 0x82002780
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppCameraListVtable", note = "0x82002780" },
+  { name = "vector", offset = 4, type = "ptr", to = "NewAny_MessageVector_Allocate", note = "a std::vector of words (16 bytes) or 0" },
+]
+
+# AppCameraList's vtable (0x82002780).
+[AppCameraListVtable]
+measure = "AppCamera.+32.+0"
+size = 8
+origin = "file"
+fields = [
+  { name = "add", offset = 4, type = "fn", note = "slot 1: AppCameraList::Add (sub_820A9928)" },
+]
+
+# The entry AppCamera::AppCamera adds to its list (sub_820A75E8).
+[AppCameraEntry]
+measure = "AppCameraEntry"
+size = 16
+origin = "allocated"
+storage = "host"
+host_alloc = [0x820A8C7C, 0x820A8278, 0x820A82A0]
+vtable = 0x82002580
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82002580" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "0 when made" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "0 when made" },
+]
+
+# AppCamera::AppCamera's r4: the block {app + 20, app + 4}.
+[AppCameraBlock]
+measure = "AppCamera::AppCamera.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "handlers", offset = 0, type = "ptr", to = "AppCameraHandlerHost", note = "the app's +20 interface: slots 1, 3 and 4 take handlers" },
+  { name = "service", offset = 4, type = "ptr", to = "AppCameraService", note = "the app's +4 interface: slot 1 gives the object whose slot 3 is the screen" },
+]
+
+# The interface AppCamera::AppCamera hands its three handlers to (the app's +20).
+[AppCameraHandlerHost]
+measure = "AppCamera::AppCamera.r4.+0"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vtable_slot_1", offset = 4, type = "fn", note = "the measure files its vtable's slots here (a measure fault): slot 1" },
+  { name = "vtable_slot_3", offset = 12, type = "fn", note = "as +4: slot 3" },
+  { name = "vtable_slot_4", offset = 16, type = "fn", note = "as +4: slot 4" },
+]
+
+# The app's +4 interface, as AppCamera::AppCamera uses it.
+[AppCameraService]
+measures = ["AppCamera::AppCamera.r4.+4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "AppCameraServiceVtable" },
+]
+
+[AppCameraServiceVtable]
+measure = "AppCamera::AppCamera.r4.+4.+0"
+size = 8
+origin = "file"
+fields = [
+  { name = "slot_1", offset = 4, type = "fn", note = "gives the object whose slot 3 is the screen (its +296, +300)" },
+]
+
+# MessageVector::Allocate's block (a std::vector's storage of words) joined by the
+# measure with the 16-byte vector objects themselves (AppCameraList's +4: +4 first,
+# +8 last, +12 end): a measure fault, reported. The name is app-states.toml's
+# pointee (MessageVector's +4 and +12).
+[NewAny_MessageVector_Allocate]
+measures = ["new<?>@MessageVector::Allocate", "new<16>@AppCameraList::AppCameraList"]
+size = 16
+origin = "file"
+# A blob (E5 step 5, 2026-11-24): both shapes are words read and written by
+# address, so both are blobs in PC memory in the guest's byte order: the
+# storage from MessageVector::Allocate (app_states::MessagesAllocate; the
+# lifted original's operator new at 0x82092BD8, r3 = count x 4) and
+# AppCameraList's 16-byte vector (app_start_up::AppCameraListConstruct; the
+# lifted original's at 0x820A98E8, r3 = 16). Freed by operator delete (the
+# vectors' growth; the list's never in play).
+storage = "blob"
+blob_alloc = [{ call = 0x82092BD8, reg = "r3" }, { call = 0x820A98E8, reg = "r3" }]
+fields = [
+  { name = "word_0", offset = 0, type = "u32", note = "as storage: the first element; a vector object leaves it unwritten" },
+  { name = "first", offset = 4, type = "u32", note = "a vector of words' first (sub_820A93E8, sub_820A9818); as storage the second element" },
+  { name = "last", offset = 8, type = "u32", note = "the vector's last; as storage the third element" },
+  { name = "end", offset = 12, type = "ptr", to = "NewAny_MessageVector_Allocate", note = "the vector's end; as storage the fourth element" },
+]
+
+# A word of AppCameraList's vector (sub_820A9818, probably push_back; sub_820A93E8
+# the insert): the value's address, and the slot it's stored to.
+[CameraListWord]
+measures = ["new<?>@MessageVector::Allocate.+8", "sub_820A93E8.r6", "sub_820A9818.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "a word pushed onto AppCameraList's vector, or the slot it goes to" },
+]
+
+# A checked iterator of AppCameraList's vector (sub_820A9738's out).
+[CameraListIterator]
+measure = "sub_820A9738.r3"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "pair", offset = 0, type = "u64", note = "{vector, element} stored as one doubleword" },
+]
+
+# CourseView::Draw's object ([0x82814E50], sub_822282E8: probably the course map or a
+# preview; camera-modes.md). Not read in detail.
+[CourseView]
+measure = "CourseView"
+size = 672
+origin = "embedded"
+fields = [
+  { name = "eye_xy", offset = 0, type = "u64", note = "Viewport::Set reads its eye from +0 (eight bytes at a time)" },
+  { name = "eye_zw", offset = 8, type = "u64" },
+  { name = "scenery", offset = 552, type = "u32", note = "CourseView::Draw updates and draws this one's scenery (Scenery::Update, Draw)" },
+  { name = "unknown_664", offset = 664, type = "f32" },
+  { name = "unknown_668", offset = 668, type = "f32" },
+]
+
+# A vector Viewport::Set and Viewport::LookAt copy into a viewport (the eye,
+# target, up, fourth).
+[CameraVector4]
+measures = ["Viewport::Set.r6", "Viewport::Set.r7", "Viewport::LookAt.r4", "Viewport::LookAt.r5"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "xy", offset = 0, type = "u64", note = "copied eight bytes at a time" },
+  { name = "zw", offset = 8, type = "u64" },
+]
+
+[globals]
+mode = { address = 0x826BABC0, type = "u32", note = "CameraPasses::SetMode's: 0 a 2D render target 1, 1 a cube map" }
+render_target_12 = { address = 0x826BABC4, type = "u32", note = "a texture (CameraPasses::RenderTarget's ids 0 to 12)" }
+render_target_3 = { address = 0x826BABC8, type = "u32" }
+render_target_1_cube = { address = 0x826BABCC, type = "u32", note = "id 1 in mode 1" }
+render_target_9 = { address = 0x826BABD0, type = "u32" }
+render_target_4 = { address = 0x826BABD4, type = "u32" }
+render_target_10 = { address = 0x826BABD8, type = "u32" }
+render_target_2 = { address = 0x826BABDC, type = "u32" }
+render_target_11 = { address = 0x826BABE0, type = "u32" }
+init_argument = { address = 0x826BABE4, type = "u32", note = "handed to CameraPass::Init as r5 (not read by it); 0 at boot" }
+render_target_0 = { address = 0x826BABE8, type = "u32" }
+render_target_1_2d = { address = 0x826BABEC, type = "u32", note = "id 1 in mode 0" }
+render_target_8 = { address = 0x826BABF0, type = "u32" }
+render_target_7 = { address = 0x826BABF4, type = "u32" }
+render_target_6 = { address = 0x826BABF8, type = "u32" }
+render_target_5 = { address = 0x826BABFC, type = "u32" }
+passes = { address = 0x826BAC00, type = "bytes", count = 12432, note = "the 21 camera passes (CameraPass), 592 bytes each" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports' 12-byte block (camera-modes.toml): +0 and +4 the two viewports, +8 whether both are in use" }
+up_vector = { address = 0x826C2CF0, type = "bytes", count = 16, note = "(0, 1, 0, 1), made once by Viewport::Init" }
+side_vector = { address = 0x826C2D00, type = "bytes", count = 16, note = "(10, 0, 0, 1), made once by Viewport::Init" }
+origin_vector = { address = 0x826C2D10, type = "bytes", count = 16, note = "(0, 0, 0, 1), made once by Viewport::Init" }
+vector_guard = { address = 0x826C2D20, type = "u32", note = "bits 1, 2, 4: origin_vector, side_vector, up_vector made" }
+
+# Embedded objects the measure split from their owners after its offset
+# fix (2026-11-22): seeded from the measure, unknown_ until read.
+
+# Split from CameraPass.
+[CameraPassAt368]
+measure = "Camera@+368"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt384]
+measure = "Camera@+384"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt388]
+measure = "Camera@+388"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CameraPass.
+[CameraPassAt392]
+measure = "Camera@+392"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+]
+
+# Split from CourseView.
+[CourseViewAt592]
+measure = "CourseView@+592"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+]
+
+# Split from CourseView.
+[CourseViewAt608]
+measure = "CourseView@+608"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+]

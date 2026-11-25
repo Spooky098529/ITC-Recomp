@@ -1,0 +1,44 @@
+// The framework's adapter steps other overrides share
+// (src/hooks/framework.cpp, docs/functions/framework.md).
+
+#pragma once
+
+#include "guest.h"
+#include "hooks/native_entry.h"
+
+#include "framework/main_loop.h"
+
+namespace hooks {
+
+// Whether --native_framework is on.
+bool NativeFramework();
+// TickHandler::Invoke (sub_82099A98; r3 = the run loop, r4 = the map
+// node's key and delegate): the delegate's slot 1 as a guest call from a
+// 96-byte frame like the original's. For its Wrapped override in
+// src/frame_pacing/game_messages.cpp.
+void TickHandlerInvoke(lifted::Regs& ctx);
+// The delegate thunk sub_82096340 (r3 = the object): its slot 1 as a tail
+// call. For its Wrapped override in src/debug/frame_state_diff.cpp.
+void DelegateSlot1Thunk(lifted::Regs& ctx);
+
+// The main loop's guest calls made through `ctx` (src/framework/main_loop.h),
+// and the register steps of the entry and the main loop (their adapters'
+// work, the harness's native side): main (sub_82090108), sub_82090378,
+// sub_8209ABE8, App::Run (sub_8209A760), ForEachTickHandler (sub_82099D50)
+// and ForEachRequest (sub_82099EE8), each from a frame like the original's.
+framework::MainLoopCalls MainLoopCalls(lifted::Regs& ctx);
+void Main(lifted::Regs& ctx);
+void RunFrameworkAt(lifted::Regs& ctx);
+void RunFramework(lifted::Regs& ctx);
+void AppRun(lifted::Regs& ctx);
+void ForEachTickHandler(lifted::Regs& ctx);
+void ForEachRequest(lifted::Regs& ctx);
+
+// The debug font's register steps (the adapter's work, the harness's native
+// side): DebugText::LoadFont (sub_82090CC0; r3 the debug text) and
+// DebugFont::Init (sub_8258BD58; r3 the font's file, no adapter), each from
+// a frame like the original's; need --native_heap.
+void DebugTextLoadFontSteps(lifted::Regs& ctx);
+void DebugFontInitSteps(lifted::Regs& ctx);
+
+}  // namespace hooks

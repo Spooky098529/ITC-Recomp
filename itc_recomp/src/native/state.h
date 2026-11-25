@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <vector>
 #include <rex/graphics/register_file.h>
+#include "guest.h"
 
 namespace native {
 
@@ -52,7 +53,7 @@ constexpr uint32_t kDeviceVertexFloatConstants = 1792, kDevicePixelFloatConstant
 // before the first call) are copied: the rest of regs is as it was. Zero
 // regs once before the first call (clearing all 80 KB every draw was ~10%
 // of the render thread).
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs);
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs);
 
 // What ReadRegisters is to copy next (render thread). The library marks
 // what its setters write in the shadow as dirty in three masks of the
@@ -76,7 +77,7 @@ struct RegisterReadStats {
   uint64_t calls = 0, calls_changed = 0, words = 0, words_copied = 0, words_changed = 0;
   uint64_t blocks_changed[kRegisterReadBlocks] = {};
 };
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs,
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs,
                    RegisterReadStats& stats);
 
 // The GPU's physical address for a guest address, as the graphics library
@@ -85,13 +86,12 @@ inline uint32_t GpuPhysicalAddress(uint32_t address) {
   return (address & 0x1FFFFFFFu) + (((address >> 20) + 0x200u) & 0x1000u);
 }
 
-// Guest physical memory is one 512 MB mapping 4 GB above the virtual base
-// (rex::memory::Memory: physical membase = mapping base + 4 GB).
-constexpr uint64_t kPhysicalMemoryOffset = 0x100000000ull;
+// The physical memory: 512 MB of host memory of its own (memory::g_physical,
+// E5 step 7).
 constexpr uint32_t kPhysicalMemorySize = 0x20000000u;
 
-inline uint8_t* PhysicalHostAddress(uint8_t* base, uint32_t physical) {
-  return base + kPhysicalMemoryOffset + physical;
+inline uint8_t* PhysicalHostAddress(uint32_t physical) {
+  return memory::g_physical + physical;
 }
 
 }  // namespace native

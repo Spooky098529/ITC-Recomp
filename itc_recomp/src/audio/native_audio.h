@@ -3,12 +3,11 @@
 
 #pragma once
 
-#include <rex/runtime.h>
-
 namespace native_audio {
 
-// Puts our audio system in the runtime's config, unless --native_audio is
-// off. Called from ItcApp::OnPreSetup.
-void Configure(rex::RuntimeConfig& config);
+// Starts our audio output's thread (once, from main(), after guest memory
+// is mapped); the game's render driver reaches it through the hooks in
+// native_audio.cpp.
+void Start();
 
 }  // namespace native_audio

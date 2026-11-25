@@ -70,21 +70,21 @@ void FileClass(Context& h) {
         t.r3.u64 = file;
         if (s.kind == 0) {
           t.r4.u64 = path;
-          (v == 0 ? __imp__sub_8258C688 : sub_8258C688)(t, base);
+          (v == 0 ? __imp__sub_8258C688 : harness::Ours<0x8258C688>)(t, base);
         } else if (s.kind == 1) {
           Fill(base, buffer, kBuffer);
           guest::StoreU32(base, size, s.size);
           t.r4.u64 = buffer;
           t.r5.u64 = size;
-          (v == 0 ? __imp__sub_8258C820 : sub_8258C820)(t, base);
+          (v == 0 ? __imp__sub_8258C820 : harness::Ours<0x8258C820>)(t, base);
         } else if (s.kind == 2) {
           guest::StoreU32(base, offset, uint32_t(s.offset));
           guest::StoreU32(base, method, s.method);
           t.r4.u64 = offset;
           t.r5.u64 = method;
-          (v == 0 ? __imp__sub_8258C768 : sub_8258C768)(t, base);
+          (v == 0 ? __imp__sub_8258C768 : harness::Ours<0x8258C768>)(t, base);
         } else {
-          (v == 0 ? __imp__sub_8258C718 : sub_8258C718)(t, base);
+          (v == 0 ? __imp__sub_8258C718 : harness::Ours<0x8258C718>)(t, base);
         }
         std::vector<uint8_t> step = Read(base, file, 16);
         uint32_t handle = guest::LoadU32(base, file + 4);

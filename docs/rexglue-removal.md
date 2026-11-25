@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-24):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-14):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -101,8 +101,262 @@ goes in `src/` as overrides), American English.
   (`post-effects.md`, 44 of 57), the UI movie walk and the AI drivers'
   teardown, and the input manager (`input.md`, 29 of 29) with the action
   mappers' constructor native (ours 1,794), stopped on two harness lines
-  missing. The
-  runs' rows wait for the user's review (`docs/loops/review.md`). See
+  missing; its thirteenth run (branch `b7-loop-24-10-26-4`) made the
+  race's screen objects native (`screen-objects.md`, 38 of 42) and
+  mapped the app framework, beside the hardcoded shaders and the movies
+  through FFmpeg (ours 1,847); its fourteenth run (branch
+  `by-loop-25-10-26`) made the app framework native as far as
+  it was ready (`framework.md`, 56 of 68 ours, with `main` and
+  `App::Run`; `--native_framework`; ours 1,903), after fixing an
+  `ai_drivers` harness case that read a wild address; its fifteenth
+  run (branch `b7-loop-25-10-26-2`) made the game modes, the model
+  class (the memory blocks' lock a host mutex), the mode tick, the
+  minimap's parts and `atexit` (the exit lock a host mutex) with what
+  it unblocked native as far as they were ready (ours 2,013); its
+  sixteenth run (branch `b7-loop-25-10-26-3`) made the scene models'
+  set-up side, the UI movies' text draw, update and objects with the
+  race HUD's movie picker (two leads without mapping), the scenery
+  lists and the model draws, and the shader objects up to `Model::Load`
+  with the course set and string table it unblocked native as far as
+  they were ready (ours 2,152); its seventeenth run (branch
+  `b7-loop-25-10-26-4`, 2 subsystems by the user's call) made the
+  race's set-up, the rest of the car physics (a lead without mapping)
+  and the vehicle code above it native in full (ours 2,255); its
+  eighteenth run (branch `b7-loop-27-10-26`, merged 2026-10-28) made the app's update and
+  its state stack native in full (`app-states.md`), the scene's loading
+  objects as far as they were ready with their blockers in
+  `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead
+  without mapping) and the players' save data in memory in full
+  (`save-data.md`; ours 2,400); its nineteenth run (branch
+  `b7-loop-28-10-26`, merged 2026-10-28, 3 subsystems) made
+  texture compression (`texture-compression.md`) and the vinyl sheet
+  above it (`car-models.md`, two leads without mapping), the race world
+  (`race-world.md`, 49 of 50) and the race's states (`race-states.md`,
+  43 of 63) native (ours 2,540); its twentieth run (branch
+  `b7-loop-28-10-26-2`, merged 2026-10-28, 3 subsystems) made the archive (`archive.md`,
+  its four semaphores host ones by the user's call), the file layer
+  with sprintf (`file-layer.md`) and the save system's interface
+  (`save-interface.md`, 41 of 41) native (ours 2,628); its
+  twenty-first run (branch `b7-loop-28-10-26-3`, 2026-10-28 to 29, 3
+  subsystems, merged with the twenty-fifth 2026-10-30) made the car sounds with X3DAudio
+  (`car-sounds.md`, 62 of 62), XAudio's voices (`xaudio.md`, 92 of 96;
+  its locks the game's, taken as the original does, by the user's
+  calls) and XACT's waves and voices (`xact-waves.md`, 22 of 30) native
+  (ours 2,804); its twenty-second run (branch `b7-loop-29-10-26`,
+  2026-10-29, 3 subsystems, merged with the twenty-fifth 2026-10-30) made XACT's tracks and
+  events (`xact-tracks.md`, 55 of 55), XAudio's engine and mixer
+  (`xaudio-engine.md`, 47 of 47) and XAudio's factory objects
+  (`xaudio-objects.md`, 78 of 109) native, with QueryPerformanceCounter
+  from the host clock and the rest of XACT's waves (31 of 31) by the
+  user's calls; it stopped at a validation (two destructors with no
+  harness line) (ours 2,999); its twenty-third run (branch
+  `b7-loop-29-10-26-2`, 2026-10-29 to 30, merged with the twenty-fifth 2026-10-30) began with
+  that stop as a cleanup lead (not counted) and made the rest of
+  XAudio's objects native (110 of 110: the destructors' harness, the
+  resampler, the reverb), then stopped at its validation: an
+  intermittent difference in the car sounds' harness
+  (`CarSound::Part840Update`, 1 case of 80) (ours 3,031); its
+  twenty-fourth run (the same branch by the user's call, 2026-10-30, 3
+  subsystems, merged with the twenty-fifth 2026-10-30) fixed that harness (the mixer's stage
+  lists compared by role) and made the app's start-up (`app-start-up.md`,
+  the voice engine Dropped by the user's call), the data load at boot
+  (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
+  3,167); its twenty-fifth run (branch `b7-loop-30-10-26`, 3
+  subsystems, merged 2026-10-30 after a drive) made the race event (`race-event.md`,
+  100 of 102, with `Career::SetUpEvent`), the camera modes
+  (`camera-modes.md`, 87 of 90 in play) and the parking area
+  (`location-screen.md`, 57 of 77) native (ours 3,423); its
+  twenty-sixth run (branch `b7-loop-30-10-26-2`, 3 subsystems, merged
+  2026-10-31 before a drive; stopped at its last validation: `App::App`
+  and `App::Create`'s harnesses differed since a harness recorder was
+  added to `operator new`'s adapter, fixed after) made the car models (`car-models.md`, 48 of 50 in
+  play), the part models' material passes (`material-passes.md`, 22 of
+  22) and the race HUD object (`race-hud-object.md`, 45 of 58 in play)
+  native (ours 3,514); its twenty-seventh run (branch
+  `b7-loop-31-10-26`, 3 subsystems, merged into
+  `rexglue-removal-project` 2026-10-31 with the next) made two cleanup
+  leads under the models (`Model::RecordMaterials`, the shader pair's
+  load callback, eight adapters removed), the alternate HUD
+  (`alt-hud.md`, 21 of 21 in play), the race scene (`race-scene.md`, 11
+  of 20) and the menu sounds (`menu-sounds.md`, 4 of 4 in play) native
+  (ours 3,552); its twenty-eighth run (the same branch, continued by
+  the user's call, 3 subsystems, merged into `rexglue-removal-project`
+  2026-10-31 before a drive) made the interior
+  accessories (`accessories.md`, 31 of 31 in play), the race HUD
+  machine (`race-hud-machine.md`, 23 of 33, with the race HUD's
+  countdown, racer bar and warning as cleanup leads) and the other
+  in-race screens (`race-screens.md`, 93 of 116: the pause menu, the
+  confirm dialog, the career results, the menu after the race) native,
+  and by the user's call deleted adapters a harness had kept as hooks
+  (ours 3,705); its twenty-ninth run (branch `b7-loop-31-10-26-2`,
+  2026-10-31 to 11-01, 5 subsystems by the user's call, merged)
+  made the device's shader setters and the render queue
+  (`device-shaders.md`, 25 of 25 in play, with the per-frame replay),
+  the car scene (`scene.md`, 19 of 22), its second set of pools
+  (`second-set.md`, 152 of 152) and the scene models' load poll
+  (`load-poll.md`, 31 of 32) native, with cleanup leads finishing the
+  scene loaders (78 of 78, with `XPR::GetTexture`) and the race HUD
+  machine's draws (ours 3,962); its thirtieth run (branch
+  `b7-loop-01-11-26`, 2026-11-01, 2 subsystems by the user's call,
+  paused by the user, merged into `rexglue-removal-project` 2026-11-04) made the boot mode native
+  (`boot-mode.md`, 12 of 12 in play) and mapped the car draw
+  (`car-draw.md`, `Car::DrawUpdate` and the scene model's per-pass
+  draws, 86 rows), its migration paused after part 1 of about 16 (7 of
+  78; ours 3,988), then resumed on `b7-loop-03-11-26` (2026-11-03 to
+  04) and finished (78 of 78 ours, `--native_car_draw`; ours 4,059),
+  validated after a harness fix (the shadows harness's record 3 shape),
+  and stopped at its limit; its thirty-first run (the same branch,
+  the user's call, 2026-11-04, 3 subsystems) made the race flow's
+  set-up (`race-flow.md`, 1 of 1 in play), the car scene's draw
+  (`car-scene-draw.md`, 21 of 21) and the front end's car draw
+  (`front-end-car-draw.md`, 17 of 18 in play) native (ours 4,059 ->
+  4,099) and stopped at its limit; its thirty-second run (the same
+  branch, the user's call, 2026-11-04, 3 subsystems) made the replay's
+  snapshots (`replay-snapshots.md`, 26 of 26 in play), the race's
+  sounds (`race-sounds.md`, 31 of 31, with `rand` by the user's call)
+  and the race's loading (`race-loading.md`, 10 of 13 in play: the
+  race mode's +848 machine and the loading screen) native (ours 4,099
+  -> 4,167) and stopped at its limit; its thirty-third run (branch
+  `b7-loop-05-11-26`, 2026-11-05, 3 subsystems) finished the post
+  effects (`post-effects.md`, 58 of 58), made the scene target's passes
+  (`scene-target.md`, 6 of 6) and the frame passes object
+  (`frame-passes.md`, 10 of 10 in play) native (ours 4,167 -> 4,197)
+  and stopped at its limit; its thirty-fourth run (branch
+  `b7-loop-06-11-26`, 2026-11-06, 3 subsystems) made the graphics
+  library's command buffer (`command-buffer.md`, 24 of 24 in play), the
+  render replay's single commands (`single-commands.md`, 5 of 5 in
+  play) and predicated tiling (`predicated-tiling.md`) native (ours
+  4,197 -> 4,230) and stopped at its limit; its thirty-fifth run (the
+  same branch, 2026-11-06, 3 subsystems) made the power graph
+  (`power-graph.md`, 4 of 4 in play), the car objects' makers
+  (`car-makers.md`, 16 of 24 in play) and the front end's menu helpers
+  (`menu-helpers.md`, 2 of 2) native (ours 4,230 -> 4,252) and stopped
+  at its limit; its thirty-sixth run (the same branch, 2026-11-06 to
+  07, limit raised to 8 by the user) made the race's update
+  (`race-update.md`, 7 of 7, with the scenery's set-up and
+  `XPhysicalSize` from our allocation layer), the stand models
+  (`stand-models.md`, 28 of 28 in play), the build screen
+  (`build-screen.md`, 59 of 60, with `CarScene::Update`) and the tuning
+  screen (`tuning-screen.md`, 82 of 82 in play, with
+  `GarageStage::Draw`) native (ours 4,252 -> 4,476); its last
+  validation halted on an existing `car_makers` harness case (its
+  garage list could end on a random slot, a car outside the case's
+  block; fixed, then passed), and the run was concluded there by the
+  user's call; its thirty-seventh run (`b7-loop-07-11-26`, 2026-11-07,
+  3 subsystems) made the tuning screen's pages (`tuning-pages.md`, 72
+  of 74), the type 6 and 7 modes' screen constructors
+  (`screen-constructors.md`, 41 of 41) and the type 6 and 7 modes
+  themselves (`type6-type7-modes.md`, 110 of 117 in play: two
+  front-end hubs over the garage car on its stand) native, with 15
+  cleanup adapters removed (ours 4,476 -> 4,699), and stopped at its
+  limit; its thirty-eighth run (`b7-loop-07-11-26-2`, 2026-11-07 to
+  08, 3 subsystems) made the cleanup lead `sub_820C8DE8` with the type
+  6 and 7 modes' slot 0, the options screen (`options-screen.md`, 98
+  of 100 in play), the type 6 and 7 modes' list, panel and node screens
+  (`type67-screens.md`, 48 of 48 in play) and their car list
+  (`car-list.md`, 71 of 94 in play) native (ours 4,699 -> 4,920), and
+  stopped at its limit. Its thirty-ninth run (`b7-loop-08-11-26`,
+  2026-11-08, 3 subsystems) made the UI movie helpers
+  (`ui-movies-game.md`, 92 of 92, with the car list's rest: 94 of 94),
+  a cleanup lead over what they unblocked (the in-race screens, the
+  race HUD's set-ups, the countdown, the race's end, the pause menu's
+  pages), the front-end screen helpers (`front-end-screen-helpers.md`,
+  27 of 32, 5 Merged) and the car dealer (`car-dealer.md`, 58 of 58 in
+  play) native (ours 4,920 -> 5,074), and stopped at its limit. Its
+  fortieth run (`b7-loop-08-11-26-2`, 2026-11-08 to 09, ended by the
+  user during its third subsystem) made the type 2 mode's screens
+  (`type2-screens.md`, 121 of 121 in play: the hub, the spec sheet, the
+  build screen's machine, the license plate editor) and the save screen
+  (`save-screen.md`, 42 of 42 in play) native (ours 5,074 -> 5,237) and
+  mapped the type 2 mode's dialog (`type2-dialog.md`). Its forty-first
+  run (`b7-loop-09-11-26`, 2026-11-09, stopped at its limit) made the
+  type 2 dialog (`type2-dialog.md`, 28 of 28), the garage screen
+  (`garage-screen.md`, 22 of 22 in play) and the tuning screen's machine
+  (`tuning-machine.md`, 18 of 19 in play) native (ours 5,237 -> 5,305),
+  then, by the user's call, their paths never seen in play (ours 5,364);
+  the rest waits on `Garage::Sell`, the type 2 mode's +9640 and +0x173D0 machines, its
+  Init `sub_82197278`, the tuning screen's refresh `sub_821E3AD0` and
+  update `sub_821E6C50`. Its forty-second run (`b7-loop-10-11-26`,
+  2026-11-10, halted at its first validation) made the type 2 mode's
+  race menu (`race-menu.md`, 38 of 38) native (ours 5,364 -> 5,402);
+  `Transition3`'s harness read a wild address in the all-harness race,
+  fixed after the stop (4438f1c3) and validated again; the run was
+  ended there by the user and merged. Its forty-third run
+  (`b7-loop-10-11-26-2`, 2026-11-10 to 11, halted at its first
+  validation) made the car settings screen (`car-settings.md`, 7 of 7
+  in play: the type 2 mode's +0x173D0 machine) native (ours 5,402 ->
+  5,409); the all-harness race found `GarageScreen::Transition6`'s
+  harness (the forty-first run's) differing in 2 of 100 cases (a
+  harness index out of play's range, fixed, f691a91e, the user's call),
+  then went on: the type 2 mode and its user info screen
+  (`type2-mode.md`, 20 of 21; `user-info.md`, 14 of 14; ours 5,443)
+  and the tuning screen's refresh with `TuningMachine::Start` (ours
+  5,445), and stopped at its limit; the rest waits on the tuning
+  screen's update `sub_821E6C50`, `Garage::Sell`, the car settings'
+  `Update` and the leads in `docs/loops/leads.md`. Its forty-fourth
+  run (`b7-loop-11-11-26`, 2026-11-11, limit 5, ended by the user
+  during its third subsystem) made the tuning screen's update (with 40
+  of its 61 callees never seen in play; ours 5,488) and the title
+  screen (`title-screen.md`, 86 of 87; ours 5,574) native, both
+  validated (the update's first validation stalled on a harness wild
+  read, fixed, 505b2a31, the user's call), and ported the replay
+  theater (`type10-mode.md`) unchecked behind `--native_type10_mode`,
+  off by default (ours 5,612 by `b7_status.py`, which counts its
+  Overridden rows); the rest waits on the theater's harness and race,
+  the type 9 mode, the sticker and vinyl editors and the leads in
+  `docs/loops/leads.md`. Its forty-fifth run (`b7-loop-11-11-26`,
+  the same branch by the user's call, 2026-11-12 to 13, limit 5 then
+  10, not yet merged) checked the replay theater (on by default) and
+  made ten subsystems native: the type 9 mode (`todays-result.md`), the
+  Xbox Live network mode (`network-mode.md`, its Live calls answered
+  with plugged-in data, the user's call), the race's end
+  (`race-end.md`), the options' load and save (`options-load-save.md`),
+  `Type6Screen0`, the type 5 mode (`type5-mode.md`), the vinyl editor
+  (`tuning-pages.md`), the power graph screen
+  (`power-graph-screen.md`), the achievements (`achievements.md`, the
+  SDK's write kept, the user's call) and the frame driver
+  (`frame-driver.md`), with the course scenery finished and
+  `TuningScreen::HandleInput` as leads without mapping (ours 5,612 ->
+  5,989, work left 984 -> 718); the rest waits on the core's
+  `Event::` and sync, `Device::Swap` and `Resolve`, the sticker
+  editor and the leads in `docs/loops/leads.md`. Its forty-sixth run
+  (`b7-loop-13-11-26`, 2026-11-13 to 14, limit 10, the user's call;
+  merged with the forty-seventh, 2026-11-14) made ten subsystems native, most never seen in play
+  and ported by the 2026-11-12 call: the morph jobs
+  (`morph-jobs.md`), the save devices' constructor and slot handlers
+  (`save-interface.md`, with `SaveDevices::Update`; B4's steps split
+  into plain C++), the render manager's and texture provider's slots
+  with the static matrices, the sticker editor (`sticker-editor.md`),
+  the stand's setters (`stand-models.md`), the type 6 and 7 modes'
+  small pieces and list screens (`type67-screens.md`), and the type 8
+  mode (probably the two-player mode) with its screens
+  (`type8-screens.md`, `type8-mode.md`), with cleanup leads between
+  (`OnRaceEnd`, direct slot calls, the stand's and tuning screen's
+  never-seen rows, the tuning pages' blockers) (ours 5,989 -> 6,537,
+  work left 718 -> 676); the rest waits on the core's `Event::` and
+  sync (the worker pools, `Device::Clear`'s worker), `Device::Resolve`
+  and the never-seen leads in `docs/loops/leads.md`. Since 2026-11-14
+  (the user's call: no multiplayer) the main menu's Xbox Live and split
+  screen items do nothing (`title-screen.md`, "Multiplayer bypassed";
+  `--multiplayer_menu_items=true` restores them): the type 12 and type
+  8 modes made native above are out of reach, their code kept until the
+  user decides (static map: reachable 11,617 -> 11,011, unported 3,703
+  -> 3,232). Its forty-seventh run (`b7-loop-13-11-26` again,
+  2026-11-14, limit 10 lowered to 3, ended by the user after two
+  subsystems; merged into `rexglue-removal-project` the same day) made
+  the in-race screens never seen in play (`race-screens-unseen.md`,
+  99 rows, mostly unreachable since the bypass) and the C runtime's
+  core (`c-runtime-core.md`, `--native_c_runtime_core`, 115 of 118:
+  the per-thread data over the kernel's TLS, the lock table, `errno`,
+  exit, the streams and low-level I/O, the float formatting) native
+  (ours 6,537 -> 6,772, work left 676 -> 656). B7's goal is now no PPC
+  code reachable from `main` (the user's call, 2026-11-14), measured
+  by the static map (`docs/loops/static-map.md`,
+  `itc_recomp/tools/static_map.py`: reachable 10,845, unported 3,106,
+  624 of them seen in play); leads are picked by what they unblock.
+  The rest of the C runtime waits on `_cftoa_l` and the static
+  initializers `_cinit` runs.
+  The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2563,6 +2817,126 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | XAPI's memset (`XMemSet`: one host memset at the stride the game sets, the translated steps at any other; with what it unblocked: `Scenery::Init`, `CameraPasses::Init` and `InitPasses`; XAPI's `XPhysicalSize` and `XQueryMemoryProtect` mapped in `heap.md`, kept for the core) | `c-runtime.md` | 1 of 1 new (85 of 92 in the file; and `cameras.md` 40 of 42, `course-scenery.md` 38 of 73) | `--native_c_runtime` (`--native_cameras`, `--native_course_scenery`) |
 | 2026-10-24 | The post effects (the screen-space effects drawn over each view: the effect list's globals and toggles, the glow's and color filter's setters, the recording helpers (states, targets, constants, quads, resolves), the glare's definitions, the render textures' release, the destructors; frame interpolation's overrides kept; `RenderTextures::Acquire` left on `sub_8235A9F8`) | `post-effects.md` | 44 of 57 (one migration) | `--native_post_effects` |
 | 2026-10-24 | The race's screen objects (one 128,000-byte object a view: probably a screen blur while the nitrous runs, its strength from the speed; the two `std::map` instantiations of its ring UVs (`UvMap`, `UvColumn`: double keys), the rings, the strength, the release and teardown; the fan, its set-up and the draw left waiting on `rand` and the shader pairs) | `screen-objects.md` | 38 of 42 (one migration) | `--native_screen_objects` |
+| 2026-10-25 | The app framework (the framework object `main` makes, its services' factories and getters, the run loop `App::Run` with its two `std::map`s of handlers and its request vector, the tick handlers' dispatch, the constructors and `main` itself; `Framework::Init` and the services' set-ups left waiting on other subsystems and kernel sync) | `framework.md` | 56 of 68 (two migrations) | `--native_framework` |
+| 2026-10-25 | The game modes (the one mode object the game runs at a time; the race mode's message dispatcher and its state machines: transitions keyed by (state, message), `StateMachine::Add`, `Find` and `Handle`; the race overlays' state machine and its handlers; the race mode's members and 28-byte buffers; the race mode's constructor, destructor and set-ups left waiting on `XPR::XPR`, other set-ups and the mode constructors) | `game-modes.md` | 38 of 42 (two migrations, the second after the model class; 9 adapters removed, 3 Merged) | `--native_game_modes` |
+| 2026-10-25 | The model class (`Model::Model`, `Release`, `~Model`, the texture provider and its `std::vector` helpers, `XPR::XPR`, `Release` and `~XPR`, the put-off frees; the memory blocks' lock `0x8296BD38` a host lock taken by every user, the user's call; with `memmove_s` in `c-runtime.md`) | `models.md` | 17 of 17 new rows (19 of 50 in the file; one migration) | `--native_models` |
+| 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
+| 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
+| 2026-10-25 | `atexit` and what it unblocked (`atexit`, `_onexit` and `__onexitinit` over the game's exit table, the C runtime's exit lock a host mutex taken by every user through `_lock`/`_unlock` overridden for lock 8 only, the user's call by the recorded lock call; the global strings' static set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker draws, `Viewports::Init` and `Viewport::Init`; no mapping) | `c-runtime.md`, and `ui-movies.md`, `minimap.md`, `cameras.md`, `std-string.md`, `mode-tick.md` | 18 made native, 12 adapters removed (two migrations) | under `--native_c_runtime` and the files' own flags |
+| 2026-10-25 | The scene models' set-up side (the cars as the scene holds them, pool 7 of the second pool set: the parts' links, the 4,244-byte records' defaults, copies and constructor, the car records' reset and copy, the accessory, the sound loads' callback, the car model's pages through `memory::AllocPages`; `SceneModel::SetUp`, `Build`, `Update` and the loaders left waiting) | `scene-models.md` | 23 of 48 (one migration; 1 Native with no adapter) | `--native_scene_models` |
+| 2026-10-25 | `UiMovie::DrawTexts` and what it unblocked (no mapping, not counted: `DrawTexts`, `ScrollOffset`, `UiMovie::Update`, `Draw`, `Run`, `Finish`, `FinishNamed`, `FinishAll`; `_init_pointers` and the empty destructor `sub_82106540`; the race HUD's movie picker and the rival logo's draw in the new `race-hud.md`) | `ui-movies-game.md`, `ui-movies.md`, `c-runtime.md`, `race-hud.md` | 13 made native, 9 adapters removed, 1 Merged (two migrations) | `--native_ui_movies_game`, `--native_ui_movies`, `--native_c_runtime`, `--native_race_hud` |
+| 2026-10-25 | The UI movies' ready groups (no mapping, not counted: the movie's vectors, `UiMovie::UiMovie` and `~UiMovie`, the texts freed, `GetText` and the six text setters over it, the named animations' set-up, the HUD's mirror effect `sub_8211BEE8`) | `ui-movies-game.md` | 26 rows (19 with plain C++, 7 Merged; no adapter removable yet) | `--native_ui_movies_game` |
+| 2026-10-25 | The scenery lists (the course set's six model lists: release, the draw picks by race data, course layout and mode, `PointList::Draw`; the scenery model's and the shared model draws: `IsShapeVisible`, `RecordObject` inside its interpolation wrapper, `RecordSceneLights`, the depth draws, `Model::DrawShape` and `RecordShape`; the texture provider's slots 2 and 4; `models.md`'s accessors) | `scenery-lists.md` | 25 of 27, and 6 in `models.md` (two migrations; 1 adapter removed, 2 Native with none, 3 Merged) | `--native_scenery_lists`, `--native_models` |
+| 2026-10-25 | The shader objects and what they unblocked (the shader creates and inits, the memory blocks' makers and put-off frees under the host lock, `XMemCpy`, the relocations, `XPR::Create`, `Mesh::LoadShaders`, `Mesh::Parse`, `Model::Load`; then `DataFile::GetEntry`, the scenery lists' loads, the course set's parsers, pool objects, collect and draw, `Strings::Get`, `FormatV` and `Format`) | `shader-objects.md`, with `models.md`, `c-runtime.md`, `files-and-saves.md`, `scenery-lists.md`, `course-scenery.md`, `strings-and-font.md` | 7 of 7, and 38 in the other files (three migrations; 15 adapters removed) | `--native_shader_objects`, `--native_data_files` and the files' flags |
+| 2026-10-26 | The race's set-up (`Race::SetUp`, `SetUpRival`, the race data's reset and constructor, the course route table `CourseRoutes::Get`, the racers' adds and start positions, the stage list and routes, the car object's set-up `Car::Init`, `Clear`, `SetModel`, `FromBuild` and its parts' resets, `RacerRecord::Init`; then `Vehicle::SetupFromCar` with `CarData::Derive`, `ApplySettings` and `Vehicle::ApplyTuning`) | `race-setup.md`, with `vehicle-accessors.md`, `car-physics.md` | 52 of 52, and 1 in `vehicle-accessors.md` and 4 in `car-physics.md` (three migrations; 27 adapters removed) | `--native_race_setup`, `--native_car_physics` |
+| 2026-10-26 | The car physics' ready groups (no mapping, not counted: `Vehicle::PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, `DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`, the collision objects' init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity` and `Update` with its pairs, collide and respond) | `car-physics.md`, with `vehicle-accessors.md`, `matrix-math.md`, `collision.md` | 134 of 134 (two migrations; 84 adapters removed, 7 Native with none) | `--native_car_physics` |
+| 2026-10-27 | The vehicle code above the physics (the seven vehicles' create, constructor and destroy, `Vehicle::SetUp` and `ResetForCar`, the surface grip, `Vehicle::Tick` and `ApplyInput`, the track positions, the status record, `PlaceOnRoute`, `Racers::NearestHumanVehicle`; the engine's power curve and `RoutePosition::Step`) | `vehicle.md` | 25 of 25 (two migrations; 5 adapters removed, 1 Native with none, 1 Merged) | `--native_vehicle` |
+| 2026-10-28 | The app's update and its state stack (`App::Update`, `App::Start`, `App::IsRunning`, the handler maps, requests, messages and add slots; the state stack `AppStates` and its 48-byte state layers: their set-up, walks, updates, operations and toggle messages; the containers they use: the message vector, the operation list, `PtrList::Erase` and `ForEach`, the delegate's clone) | `app-states.md` | 56 of 56 (two migrations; 19 adapters removed, 4 Native with none, 1 Merged) | `--native_app_states` |
+| 2026-10-28 | The scene's loading objects (the first scene pool set's seven loading classes: car model, parts, cockpit body, interior, pool 4's model, wheels, traffic body; `ScenePools::MakeA`, the pool node, the classes' load checks, `CarParts::Part`, the XPR name lookups, `CarModelLoads`) | `scene-loaders.md` | 20 of 78 (one migration; 5 Native with no adapter) | `--native_scene_loaders` |
+| 2026-10-28 | The scene loaders' blockers (no mapping, not counted: the load slots, the deferred release, the part model, `CarModel::Release` and `Reset`; then the loading classes' constructors, releases and destructors, `ScenePools::CreateA`, `Interior::OnPartLoaded`, `Skeleton::ResetPose`, `Model::SetVinylTextures`, `SetSharedShaders`) | `scene-loaders.md`, with `car-models.md`, `models.md` | `scene-loaders.md` 60 of 78, `car-models.md` 4 of 42, `models.md` 45 of 50 (two migrations; 27 adapters removed) | `--native_car_models` (new), `--native_scene_loaders`, `--native_models` |
+| 2026-10-28 | The players' save data in memory (`SaveData::Create` and `Delete`, the progress's clear and defaults, the stats record, the course records, the options and control maps, the default tables' getters; `TitleScreen::ResetPlayer`, `MenuList::Init`, `Players::ResetControllers`) | `save-data.md` | 19 of 19 in play (one migration; 11 adapters removed; 4 rows not seen in play) | `--native_save_data` |
+| 2026-10-28 | Texture compression (XGraphics' `XGCompressSurface` over D3DX's image blitter, used in play only by `Vinyl::Compress` for the vinyl sheet, A8R8G8B8 to DXT5 premultiplied: the DXT alpha and color block encoders, the DXT4/5 encoders, the A8R8G8B8 and DXT codecs, `ImageCodec::Create`, the blitter) | `texture-compression.md` | 24 of 24 in play (one migration in five batches; 18 adapters removed; 133 rows not seen in play) | `--native_texture_compression` |
+| 2026-10-28 | The vinyl sheet above texture compression (no mapping, not counted: `Vinyl::Compress`, `Texture::Create` and `Free`; then the decal path under `CarModel::OnDecalLoaded`: the TGA reader, the software rasterizer, `Vinyl::DrawDecal`, `DrawDecals`, `ClearCorner`) | `car-models.md` | 27 of 46 (two migrations; 2 adapters removed, `XGCompressSurface` Native; `ClearCorner`'s harness doesn't reach it) | `--native_car_models` |
+| 2026-10-28 | The race world (the race mode's state machine at +116812: `RaceWorld::Init`, `OnLoaded`, `Tick`, `Unload`, the paused tick; the racers' manager at `[0x826D82F4]`: its tables, `AddRacers`, `ListRacers`, the vehicles streamed to the nearest entries by distance, `Refresh`, `ResetWorld`, `ResetVehicles`; the race event's start placements, `RaceStart::Place` and `PlaceRolling`; the save's distance on unload; with `TrackCollision::Tick`) | `race-world.md` | 49 of 50 in play (three migrations; 25 adapters removed; `OnLoad` waits on the archive) | `--native_race_world` |
+| 2026-10-28 | The race's states (`RaceStates::Init`'s machine at +107168, 87 transitions: the stage's start, the rolling and standing starts, the countdown, `RaceTick`, `OnGo`, quit, the end, the replay's and menu's handlers, free run; the race's progress at `[0x826D82E8]`: its checks for laps, finish, hits, damage, the SP drain, rank and time; the route helpers `StartRoute`, `FollowRoute`, `RouteDistance`, `MapToSection`) | `race-states.md` | 43 of 63 in play (two migrations; 20 Native; the rest waits on the loading screen, the archive's queue, the cars put back, the input recordings, the scene models' load poll, the items and achievements, the race event's lookups, the two-player cameras, the core) | `--native_race_states` |
+| 2026-10-28 | The archive (`Archive::Toc`, `AssetSize`, `Load`, the request queue and slots, the loader's picker, set-up and next request, WaitIdle, QueueLength, the cancels, the request finish, `LoaderFunctor::Invoke`, loose files, the Ucl/NRV2B unpacker; its four semaphores as host counting semaphores, the user's call) | `archive.md` (with the shared rows in `files-and-saves.md` and `video-output.md`) | 25 (all of `archive.md`'s 11 in play and 14 shared rows; two migrations; 8 adapters removed; the rest waits on the loose read's file object, open by name and sprintf, and the game's `Semaphore::Init`) | `--native_archive` |
+| 2026-10-28 | The file layer (the file object `GameFile` over `AsyncFile` and `File::`, the path objects and `Path::Build`, `GamePath::SetGame`, the open by name; with sprintf, `_vsnprintf`, `_vsnprintf_l` and `_output_l` it unblocked, and the archive's loose read) | `file-layer.md` (with rows in `c-runtime.md` and `files-and-saves.md`) | 17 (all 11 in play of `file-layer.md` with the 6 it unblocked; one migration; 7 adapters removed) | `--native_file_layer` (sprintf under `--native_c_runtime`, the loose read under `--native_archive`) |
+| 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
+| 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 62 of 62 in play (three migrations, the last two after XAudio's voices; 53 adapters removed) | `--native_car_sounds` |
+| 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
+| 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s); 31 of 31 since 2026-10-29 (`b7-loop-29-10-26`: the notifications, the release, Prepare and AudioUpdate, over QueryPerformanceCounter, ours) | `--native_xact_waves` |
+| 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 55 of 55 in play (three migrations; QueryPerformanceCounter from the host clock and `XACTGetTimeMs` under it, the user's call) | `--native_xact_tracks` |
+| 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 47 of 47 in play (two migrations; the threads, events and semaphore through the kernel's imports as the original, the user's call) | `--native_xaudio_engine` |
+| 2026-10-29 | XAudio's factory objects (the class tables, the codecs' packet queue and the PCM and XMA codecs' slots the voices call, the output matrices' set and mix, the volume meter, the render driver's set-up, the reverb's small parts; the XMA hardware path left in `audio.md`) | `xaudio-objects.md` (with 4 rows in `xaudio.md`) | 78 of 109 in play (one migration, stopped at its validation: two destructors with no harness line; the resampler and the reverb's core ready, not taken) | `--native_xaudio_objects` |
+| 2026-10-30 | Cleanup lead, no mapping (not counted): the rest of XAudio's factory objects (the XMA codec's destructors' harness, `SetLevels` copying as words, the resampler and its kernels, `PcmCodec::Process`, the reverb's stages, core, set-up, construction and pass) | `xaudio-objects.md` | 110 of 110 in play (three migrations; stopped at the last validation: the car sounds' harness differed once) | `--native_xaudio_objects` |
+| 2026-10-30 | The app's start-up (`App::App` and `App::Create`, `App::StartUp` with the text and font set-up, the network manager's set-up, the scene target, `Billboards::Init`, `Movie::Movie` with the movie wrapper's lock a host recursive mutex, `AudioManager::Create`, `XAudioInitialize`, the second camera class; the voice engine not made, Dropped, the user's call) | `app-start-up.md` (with rows in `system-services.md`, `strings-and-font.md`, `movies.md`, `sound-cues.md`, `cameras.md`, `video-output.md`, `framework.md`) | every ready group in play (three migrations; 59 rows changed or added) | `--native_app_start_up` |
+| 2026-10-30 | The game's data load at boot (`BootData::Load` and `CreateObjects`; the save defaults' bit sets, the race data, input recordings and replay objects with their records and the replay's static set-ups; the loading screen's movies; shared loads under their files' flags: the data tables, car parameters, shaders, text, font, strings, a UI movie) | `data-load.md` (with rows in `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`, `files-and-saves.md`, `ui-movies-game.md`) | every function seen in play (two migrations) | `--native_data_load` |
+| 2026-10-30 | The career (the player's items and stats over the save data: the win, loss and outcome records, the results and day logs, the garage list, the conditions and rewards, the race result's stats, the progress after a race and the next day; `Career::PickNext` up to its gate) | `career.md` | 49 of 53 in play (one migration; the rest waits on the race event and the car objects' makers) | `--native_career` |
+| 2026-10-30 | The race event (`RaceEvent::Make` and `Init` with the event pools and groups, `Destroy`, the refreshes for the career's event queries, the placements of opponents unlocked during a race and the section rival, the front end's `GroupItem`, `Items::Available`; `EventCondition::Met` with 60 of its 61 kind tests, the unlock states), with the career's `EventQuery`, `EventLocation` and `DayBlock::BestStreak` | `race-event.md` | 100 of 102 (one migration; `EventCondition::Power`, kind 40, waits on the power curve and is called through a guest call at the original's depth; `sub_82142868` Merged) | `--native_race_event` |
+| 2026-10-30 | The camera modes (the race mode's camera director, its six views' cameras: chase, two in-car, the start's look at the racers, the TV camera of replays and attract races with its path curves, the scripted cutscene with the rival logo; the camera animations, the garage camera), with `UiMovies::Open` and `Delete` | `camera-modes.md` | 87 of 90 in play (three migrations; `CameraDirector::Update` stays Wrapped by `--redraw_rival_logo`, which runs its native form on logic passes; `CourseView::Draw` waits on the scenery) | `--native_camera_modes` (with `--native_ui_movies_game`) |
+| 2026-10-30 | The parking area (the career's front-end screen where the player loads in, picks one of up to 6 opponent cars and races; its state machine, pages and transitions, the opponents' cards and pictures, the cars posed in the scene), with `UiMovie::SetText` and `SetNodeText` | `location-screen.md` | 57 of 77 in play (three migrations; the rest waits on the menu input and sound, the scene and its models, the scenery's set-up and teardown, `XPR::GetTexture`) | `--native_location_screen` (with `--native_ui_movies_game`) |
+| 2026-10-31 | The car models (already mapped: the load slots and shared loads, `LoadSetA` and `B`, `LoadExterior` with the team emblem, decals and vinyl textures, the wheels' set-up with the rims and brakes, the interior's set c body, parts and `CarInterior::Load`, `CarModel::MakePlate`, the file-loaded callbacks, `ReloadDecals`), with `GetLastError` (`functions.md`, no flag, as SetLastError) and `Skeleton::LocalMatrices` (`models.md`) | `car-models.md` | 48 of 50 in play (two migrations; the +3724 = 1 image branch `sub_820C4E68`, found running though not in the coverage list, stays on the originals, a lead, so `Vinyl::DrawDecal`'s adapter stays) | `--native_car_models` (with `--native_models`) |
+| 2026-10-31 | The part models' material passes (`PartModel::SetPaint`, `SetPaintBody` and `ApplyPalette` with `Color::HsvToRgb` and `HsvToRgb8`, `PaintPalette::Init`, the one-field passes, `SetMaterials` with `Model::MaterialTotal` and `MaterialAt`, `Projector::Matrices` with `Matrix::LookAt`, `Matrix::TransposeRotation`, four table lookups) | `material-passes.md` | 22 of 22 in play (two migrations; the adapters stay while the scene loaders' walks and the second set's objects, recompiled, call them) | `--native_material_passes` |
+| 2026-10-31 | The race HUD object (`RaceHud::` at +16 of the race screens' holder `[0x826D84F0]`: its UI movies, the dashboard's gauges and digits, the rear-view mirror's render target, the countdown, the warning, the expressway sign and place names from the track zones, the item popup, the timer, the tick and draw; `RaceScreens::Init` with its +1004 object's maker) | `race-hud-object.md` | 45 of 58 in play (two migrations; the rest calls the menu sound `sub_821103F0`, `sub_8211D930`, `sub_8211E370` or the other in-race screens; stopped at the last validation: `App::App` and `App::Create`'s harnesses differ since 83b2b76) | `--native_race_hud_object` |
+| 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
+| 2026-10-31 | The race scene (`RaceScene::` at `[0x826D82D4]`, 31,168 bytes: the seven car slots, the 11 lights, the screen objects; its machine `RaceSceneMachine::` at +87936 of the race mode: `Init`, the lights' set-up, the post effects' and glows' parameters, the pause toggle and `Resume`, `Destroy`) | `race-scene.md` | 11 of 20 in play (one migration; the rest waits on the course scenery's and scene models' owners, the scene and its update, `Race::DrawStep` and the screen objects) | `--native_race_scene` |
+| 2026-10-31 | The menu sounds (`MenuSound::Play`, cue r3 of bank 0 through the sound manager's `PlayCue2D`, ~270 callers; `Sound::Play`; the effects and music volume options over XACT's categories; the sound manager `[0x826C5C80]`'s other methods mapped, not seen in play) | `menu-sounds.md` | 4 of 4 in play (one migration; the manager's slots and XACT's category calls not ours yet, called through the table) | `--native_menu_sounds` |
+| 2026-10-31 | The interior accessories (`Accessories::` at `[0x826C5510]`, three reference-counted 1,104-byte entries loaded from the archive, assets 23008-23010; the accessory, a part model with a small skeleton whose nodes swing as a chain, probably a hanging ornament; its 36-byte file class) | `accessories.md` | 31 of 31 in play (two migrations; the anchor, the skeleton's step and swing, the draws and the deleting destructors never ran in play, and the step and draw wait on the skeleton's unread callees) | `--native_accessories` |
+| 2026-10-31 | The race HUD machine (`RaceHudMachine::`, the race mode's state machine at +128664: `Init` with its 65 transitions, the handlers that set up, update and draw the race HUD and the in-race screens' holder by the race kind at +9612, the prize lookups after a career race; with the race HUD's `RunCountdown`, `UpdateRacerBar`, `RunWarning`, `TickPanel` and `TickRacers` as cleanup leads, and 18 race HUD and alternate HUD adapters removed by the user's call) | `race-hud-machine.md` | 16 of 33 in play (one migration and a harness rewrite; the rest waits on the other in-race screens: the pause menu, the menu after the race, the career results) | `--native_race_hud_machine` |
+| 2026-10-31 | The other in-race screens (the race HUD holder's: the pause menu `PauseMenu::` with its six pages and options, the confirm dialog `RaceDialog::` with the replay save's steps, the career results `CareerResults::` with the prize tally, the menu after the race `AfterRaceMenu::`, four unseen screens' makers and teardowns, the menu list's and page object's helpers; with the race HUD machine's handlers they unblocked) | `race-screens.md` | 93 of 116 in play (three migrations; the rest waits on the UI movie calls `sub_8211C740` and `sub_8211CBD8` and the options screens) | `--native_race_screens` |
+| 2026-11-01 | The device's shader setters and the render queue (`D3DDevice_SetVertexShader` with `Device::SetVertexShader`, keeping `refcount.cpp`'s rebind skip; `SetPixelShader`, `SetVertexDeclaration`; `RenderQueue::RenderQueue` at scene + 64 with its two `PassList`s and `PassList::Clear`) | `device-shaders.md` | 7 of 7 in play (one migration; the render queue's methods a lead) | `--native_device_shaders` |
+| 2026-11-01 | The render queue's methods (the game's `OT`, an ordering table at scene + 64, vtable `0x8206CB8C`: `Init`, `Flip`, `ClearRecording`, `Add` with `PassList::Add`, `Recording`, `Replaying`, the release list's `PtrVector`, and the per-frame `Replay` with its quicksort and chunk walker) | `device-shaders.md` | 25 of 25 in play (with the shader setters and the queue's constructor; one migration) | `--native_render_queue` |
+| 2026-11-01 | The car scene (`CarScene::` at `[0x826C2E44]`: `Create`, the constructor, its set-up record, the lighting block, the shared assets at +64, `LoadAssets` and `OnFileLoaded`, the first set's update, the teardown and destructor) | `scene.md` | 19 of 22 in play (one migration; the rest waits on the scene models' updates and the parts' finishers) | `--native_scene` |
+| 2026-11-01 | The car scene's second set of pools (`sub_820C8DE8`'s eight objects: the car model, parts, cockpit, interior, the neon and LED kit, wheels, traffic car and scene model; their 240-byte point records, point groups and point set-ups, the wheels' morph of the tire, rim and brake shapes) | `second-set.md` | 148 of 152 in play (three migrations; the rest waits on `ScenePools::ReleaseB`) | `--native_second_set` |
+| 2026-11-01 | The scene models' load poll (`SceneModel::PollLoad`: each part's finisher, the ready flags, the palettes and paint applied once; `SceneParts::Build`, `SceneInterior::SetGauges`) | `load-poll.md` | 31 of 32 (one migration; `ApplyLightKit` is the front end's) | `--native_load_poll` |
+| 2026-11-01 | The boot mode (mode type 3: the movie list at `0x826C5BAC` played through its state machine at +848, `BootMode::Init`, `NextMode`, the destructors, `Boot::StartMovie`, `WaitForMovie` (inside `title_screen.cpp`'s `--skip_intro` wrap, kept) and `EndMovie` with the movie class's state calls; `ScreenMachine::ScreenMachine`, the mode delegate's thunk) | `boot-mode.md` | 12 of 12 in play (one migration; with 7 movie calls in `movies.md`; the rest never ran: the +32 interface's slots, the type 8 mode, the app's shut-down) | `--native_boot_mode` |
+| 2026-11-04 | The car draw (`Car::DrawUpdate` `sub_820DAC68` and the scene model's per-pass draws: the cockpit, the light kit, the parts with their lamps, doors and shadows, the interior, the traffic car, the wheels with their morphs, the shared `Model::Draw`, `CarPart::Draw`, `CarLighting::Gather` and the morph chain) | `car-draw.md` | 78 of 78 (16 parts, one subagent each, one at a time; 69 Native, 9 Overridden for their recompiled caller, the frame-state wraps, the cockpit dials and `--per_tick_blink_timers`) | `--native_car_draw` |
+| 2026-11-04 | The race flow's set-up (`RaceFlow::Init` `sub_82160AE0`, from `RaceMode::Init`: the race flow's state and players, its 53 transitions registered through `StateMachine::Add`, the functors' stack leftovers replayed in the original's frame) | `race-flow.md` | 1 of 1 in play (one migration; the four handlers it registers that never ran stay recompiled) | `--native_race_flow` |
+| 2026-11-04 | The car scene's draw (`CarScene::Draw` `sub_820C5DE8`: the headlight projectors and their texture projections, the other cars' light slots, the pass loop over `Car::DrawUpdate`; the frustum, plane, box and `Vector16` helpers under `TextureProjection::Fit`) | `car-scene-draw.md` | 21 of 21 (four parts, one subagent each, one at a time; 12 Native, 9 Overridden for their recompiled callers and the frame-state wraps) | `--native_car_scene_draw` |
+| 2026-11-04 | The front end's car draw (the garage stage: `GarageStage::Command` and its setters, the animation list with the car's turn and the doors, the deferred camera preset, the scene lights, the car's and wheels' pose, the floor reflection's draw, with `SceneModel::ApplyLightKit` in `load-poll.md`) | `front-end-car-draw.md` | 17 of 18 in play (one migration, one subagent for `PoseCar`; the root `GarageStage::Draw` waits on `CarScene::Update`) | `--native_front_end_car_draw` |
+| 2026-11-04 | The replay's snapshots (`RaceReplay::SaveStart` at the countdown, `SaveEnd`, `RestoreStart`, `RestoreEnd` around the replay; the 5,232-byte per-vehicle records' save, restore and copy; `Replay::Keep`) | `replay-snapshots.md` | 26 of 26 in play (one migration; RaceReplay's four cased in the `race_world` harness; none runs in an attract race or the pad replay) | `--native_replay_snapshots` |
+| 2026-11-04 | The race's sounds (the race mode's sound machine at +138284: `RaceSounds::Init` and its transitions, the cars' wave banks and sound updates, the pause and resume of the cars and the music, the start and rival music picked and faded, the unload; with `rand`) | `race-sounds.md` | 31 of 31 (two migrations, one subagent for `Init`) | `--native_race_sounds` (`rand` under `--native_c_runtime`) |
+| 2026-11-04 | The race's loading (the race mode's +848 machine `CourseSetup::`: its `Init` and handlers up to the course and draw waits; the loading screen's `Show`, `Run`, `Finish` with `UiMovie::SetFrames`; `sub_82293460`) | `race-loading.md` | 10 of 13 in play (one migration; `WaitCourse`, `EndTick`, `RaceMode::NextMode` wait on `Scenery::IsLoaded`, `CarScene::Update` and `sub_82150E00`) | `--native_race_loading` |
+| 2026-11-05 | The post effects, the rest (a stale lead, the graphics resources' other makers, whose functions were already here: `PostEffects::InitEdramBase` (new row), `Create` with the glow's, color filter's and motion blur's constructors and the render textures' `Acquire` and `Create`, `InitBoot`, the color filter's, target filter's and motion blur's records, `Glow::RecordStar` with `RecordStarPass`; five adapters removed) | `post-effects.md` | 57 of 58 (two migrations; `Glow::Record` `sub_821379D8`, Wrapped by frame interpolation, waits on `sub_8209AE48`) | `--native_post_effects` |
+| 2026-11-05 | The scene target's passes (`SceneTarget::RecordPasses` `sub_8209B3D0` once a frame: the menus' predicated tiling, the race's 1024×576 pair, the upscale draw to 1280×720; `RecordTargets`, `RecordTileTargets`, `RecordBoundTargets`, `TexturedRect::Record` and `RecordFlat`; with `Glow::Record` as a cleanup in `post-effects.md`) | `scene-target.md` | 6 of 6 (one migration; `RecordPasses`' adapter kept for its recompiled caller `sub_82096418`) | `--native_scene_target` |
+| 2026-11-05 | The frame passes object (framework +108, vtable `0x82000F20`: `FramePasses::Boot` with `PostEffects::InitBoot` at boot, `Record` once a frame, its ~20 shared pass chunks at 58 buckets, then the scene target's passes and the primitive reset states; `FlipWorkMem`, `RecordConstants`, `RecordSamplers`, the constructor, `Job::Wait`) | `frame-passes.md` | 10 of 10 in play (one migration, `Record` in three parts; `RecordPasses`' and `InitBoot`'s adapters removed) | `--native_frame_passes` |
+| 2026-11-06 | The graphics library's command buffer (`8229DBF0`-`8229F228`, `sub_822AF978`, `sub_822AC470`: the segments' tail, end, kick and next, the chain blocks, the data space `BeginVertices` writes inline vertices into, the reserved words, the callback packets, the fence wait; waits on the GPU, the coherency and data cache flushes and the WAIT_UNTIL packets Dropped by the graphics rule) | `command-buffer.md` | 24 of 24 in play (two migrations; 5 adapters removed) | `--native_command_buffer` |
+| 2026-11-06 | The render command replay's single commands (the table `0x8265ED48`, ids 0-36: in play the inline vertices (5), the shader constants (7), the drawer's set-up (13/14), its draw (15) and the movie frame's callback (28), run from `ChunkChain::RunSingles`' native dispatch) | `single-commands.md` | 5 of 5 in play (one migration) | `--native_single_commands` |
+| 2026-11-06 | Predicated tiling (the menus' tiled segments: `SetPredication`, `BeginTiledSegments`, `EndTiledSegments` with `RestoreSegment`, the library's worker threads' creation and loop; the bin mask packet, the chain header's words and the workers' event packets Dropped; the device lock +13548 a host mutex) | `predicated-tiling.md` | 5 of 7 in play (one migration; `CreateWorkers`' adapter and three of the command buffer's removed) | `--native_predicated_tiling` |
+| 2026-11-06 | The power graph (the front end's power and torque graph on the tuning and car list screens: `PowerGraph::Draw` `sub_8217C708`, two sets of 32 stack sprites drawn as lines through `Line::RecordFlat` `sub_8217B508`; `TuningScreen::DrawPowerGraph` `sub_821DF350`) | `power-graph.md` | 3 of 4 in play (one migration; `CarList::DrawEntryPowerGraph` `sub_82250670` waits on the car objects' makers) | `--native_power_graph` |
+| 2026-11-06 | The car objects' makers outside the race's set-up (the scene model record built from a car, `SceneModelRecord::FromCar` with its paint, wheels, choices and bytes setters and `CarModels::BlockOf`; the garage cars' reset and static set-up; `CarData::FromGarageCar` with the tuning screen's set-up; the front-end stand's `FitCar` and `CopyRecord`; the garage screen's busy marker) | `car-makers.md` | 16 of 24 in play (one migration; 4 adapters removed) | `--native_car_makers` |
+| 2026-11-06 | The front end's shared menu helpers (`Menu::Step` `sub_82186568`, the cursor moved by the pad through the action mappers' vtable; `Menu::Pressed` `sub_821864C8`; about 113 screens call them, each filling its 68-byte menu inline) | `menu-helpers.md` | 2 of 2 (one migration; adapters kept for the recompiled screens) | `--native_menu_helpers` |
+| 2026-11-06 | The race's update (`RaceScene::LoadScenery` `sub_8215B790` with the scenery's physical allocation (`XPhysicalSize` answered from our allocation layer, the user's call), `Create`, `Setup`, `SetupPools`; `RaceScene::Update` `sub_8215D2B0` once a tick with `Scenery::Update`, the race lights and `Car::TickUpdate`; `RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the second set's set-ups and `SceneModel::Build`; `RaceScene::VaryCar`) | `race-update.md` (and rows in `course-scenery.md`, `heap.md`, `scene-models.md`, `car-models.md`, `vehicle-accessors.md`, `post-effects.md`, `screen-objects.md`) | 7 of 7 (three migrations; ours 4,252 -> 4,286 with the other files' rows) | `--native_race_update` (and `--native_course_scenery`, `--native_scene_models`, `--native_vehicle_accessors`, `--native_heap`) |
+| 2026-11-06 | The garage stage's scene model holders (`GarageStage::MakeModel` `sub_8217FCB0`, the stand's record setters at `82178EC0`-`82179A18`, `SetWheel` `sub_8217DD38` with its 179-entry table, `FitAxles`, `SetTireGrade`, the second wheels; the wheels' setters `SceneWheels::SetSizes`, `SetTireGrades`, `Wheels::SetTireTextures`; the tuning screen's `PreviewWheel`, `StepSecondWheels`, `SetTireGrade`; with `SceneModel::ApplyRecord` `sub_820DA758` and `ReloadDecals` `sub_820D9D48`) | `stand-models.md` (and rows in `scene-models.md`) | 28 of 28 in play (one migration) | `--native_stand_models` (and `--native_scene_models`) |
+| 2026-11-06 | The build screen (the front-end screen over `[0x826D8448]`, four levels as the states of `[0x826D843C]`: groups by category, a group's builds, one build on the stand, its details; its 21 transitions, lists, rows and prompts; with `CarScene::Update` `sub_820C9608`, `SceneModel::Update`, `GarageStage::ReloadModel`; and the cleanup leads before it, `GarageStage::ReapplyRecord`, `SetCar`, `ShowCarById` and their pairs) | `build-screen.md` (and rows in `scene.md`, `scene-models.md`, `vehicle-accessors.md`, `accessories.md`, `car-makers.md`) | 59 of 60 (three migrations; `BackToBuilds` kept recompiled, the user's call) | `--native_build_screen` (and `--native_scene`, `--native_car_makers`) |
+| 2026-11-07 | The tuning screen (the front end's tuning shop: its update's subtree, not the update `sub_821E6C50` or its refresh `sub_821E3AD0`: the debug state handlers, the command queue's runners, the category bar, lists, pages, marks, texts, the stand's calls, `RefreshMenu`, `RefreshMovie13`; with `GarageStage::Draw` and three UI movie text calls) | `tuning-screen.md` (and rows in `front-end-car-draw.md`, `ui-movies-game.md`, `car-makers.md`) | 82 of 82 in play (five migrations) | `--native_tuning_screen` (and `--native_front_end_car_draw`, `--native_ui_movies_game`) |
+| 2026-11-07 | The tuning screen's pages (its input handler `TuningScreen::HandleInput` `sub_821E6950`'s pages for states 0, 3-8, 15-22, 53-62: the levels, types, options, items, wheels, wheel parts, inches and categories inputs, `Leave`, `OnDialogYes` with the sticker dialog, the vinyl editor's entry and exit, the decal images' load, update and unload, `Menu::StepList`, `Color::HsvToRgb`; not the handler itself) | `tuning-pages.md` | 72 of 74 (four migrations; 26 adapters removed) | `--native_tuning_pages` |
+| 2026-11-07 | The type 6 and 7 modes' screen constructors (the screen blocks the modes' slot 0 allocates at +848, `Type6Screens` `sub_822366F0` and `Type7Screens` `sub_82246B28`, with their list, node, panel and machine screens) | `screen-constructors.md` | 41 of 41 (one migration; 24 adapters removed) | `--native_screen_constructors` |
+| 2026-11-07 | The type 6 and 7 modes (probably two front-end hubs over the player's garage car on its stand: the list screen starts a race; with the stand scene, the garage camera and lights, the first screens, dialogs, options, controller pages and save screen's Inits, the modes' `NextMode`, `Leaving`, `WaitForLoads` and `TearDown`) | `type6-type7-modes.md` | 110 of 117 in play (four migrations; 7 adapters removed) | `--native_type67_modes` |
+| 2026-11-08 | The options screen (the front end's options: its machine's handlers, `Draw`'s 15 pages and `Update`'s 49 steps, the HUD, sound, sliders, buttons and analog pages, the settings' `Reset`, `Read`, `Write` and `Reload` over `[0x826D8478]`, the type 2, 4, 6 and 7 options' and controller pages' Inits; with the cleanup lead before it, `CarScene::SetUp` `sub_820C8DE8`, which unblocked `StandScene::Create` and the type 6 and 7 modes' slot 0) | `options-screen.md` | 98 of 100 in play (three migrations; 31 adapters removed) | `--native_options_screen` |
+| 2026-11-08 | The type 6 and 7 modes' screens (the list, panel and node screens the modes' menus open: their machines' handlers, movie opens and releases, the panel screens as the car pick with `Type7PanelScreen::PickCar`, the group pair and panel groups) | `type67-screens.md` | 48 of 48 in play (one migration; 1 adapter removed) | `--native_type67_screens` |
+| 2026-11-08 | The car list (`PanelSet`, the type 6 and 7 panel screens' car pick: its vtable slots, 9 pages and 27 steps, the tab, row, color and car panels, `Build` over our allocation layer, `Update` with the stand car and `GarageStages::DrawAll`) | `car-list.md` | 71 of 94 in play (three migrations; 24 adapters removed) | `--native_car_list` |
+| 2026-11-08 | The UI movie helpers (`UiMovie::IsNamedActive`, `UnloopNamed`, `ClearNodeText`, `SetNodeTextV`, `SetNodeNumberText`, `OnLoaded`, `UiMovies::DeleteAll`), with the car list's groups they unblocked (the panels, steps, `Step17`, `CarPage`) | `ui-movies-game.md`, `car-list.md` | 8 new rows, 92 of 92 ours; the car list 94 of 94 (two migrations; 34 adapters removed) | `--native_ui_movies_game`, `--native_car_list` |
+| 2026-11-08 | The front-end screen helpers (the 852-byte modes' releases, the save screen's and options' dialog text setters with their dialog steps and pages, the car cards) | `front-end-screen-helpers.md` | 27 of 32 in play (5 Merged; one migration; 6 adapters removed) | `--native_front_end_screen_helpers` |
+| 2026-11-08 | The car dealer (the type 2 mode's dealer machine: its 23 transitions, 6 pages, the car lists, the color pick, the purchase, the career's first car) | `car-dealer.md` | 58 of 58 in play (two migrations; 16 adapters removed) | `--native_car_dealer` |
+| 2026-11-08 | The type 2 mode's screens (the hub at the mode's +848: its menu over the stand car, notices, images, pages and transitions; the spec sheet's machine; the build screen's machine, entry and pages; the license plate editor the dealer's buy opens) | `type2-screens.md` | 121 of 121 in play (three migrations; 17 adapters removed) | `--native_type2_screens` |
+| 2026-11-09 | The save screen (one machine, UI movie 44, that the type 2, 4, 6, 10 and 8 modes' Inits set up: the game data's check, save and load, the replays, the controller pick; its 27 pages and 7 steps) | `save-screen.md` | 42 of 42 in play (one migration; 2 adapters removed) | `--native_save_screen` |
+| 2026-11-09 | The type 2 mode's dialog (its machine at the mode's +0x1E4C8: four dialogs over UI movies 16 to 19, the confirm and notice pairs; its 11 transitions, `Draw`'s 4 pages, `Update`'s 10 steps and `Init`) | `type2-dialog.md` | 28 of 28 (one migration; no adapter removable) | `--native_type2_dialog` |
+| 2026-11-09 | The type 2 mode's garage screen (its machine at the mode's +0x23018, UI movie 5: the player's garage cars over the stand; its handlers, `InitStates`' 20 transitions, the list and leave pages, `UpdatePage`, `Update`, the list's set-up) | `garage-screen.md` | 22 of 22 in play (one migration; 7 adapters removed) | `--native_garage_screen` |
+| 2026-11-09 | The tuning screen's machine (the type 2 mode's +19792: its Init, creation, UI movies 2, 13 and 14, `TuningScreen::SetUp` from the garage car with the part tables' loaders and prices, the dialog's replies, unload, close and teardown; not `Start`, which waits on the refresh `sub_821E3AD0`) | `tuning-machine.md` | 18 of 19 in play (one migration, `SetUp` split over five parts; 5 adapters removed, 3 Native without one) | `--native_tuning_machine` |
+| 2026-11-10 | The type 2 mode's race menu (its machine at the mode's +9640: the race mode, event and variant pages, the confirm, the event's start) | `race-menu.md` | 38 of 38 (one migration, 7 subagents; 21 Native, 3 Merged); validation halted on its harness, fixed (4438f1c3) and validated again | `--native_race_menu` |
+| 2026-11-11 | The car settings screen (the type 2 mode's +0x173D0 machine, UI movie 3, also set up by the type 5 mode: the garage car's gear ratios and settings, a test run; only its Inits and five handlers seen in play) | `car-settings.md` | 7 of 7 in play (one migration; no adapter removable: functors and recompiled callers); 84 never seen in play stay recompiled | `--native_car_settings` |
+| 2026-11-11 | The type 2 mode (its Init over the 14 machines' Inits, its vtable's delegates and slot thunks, `Interrupt`, `ForceExit`) and its user info screen (the player's record, UI movie 10, at the mode's block +0x102D8) | `type2-mode.md`, `user-info.md` | 20 of 21 and 14 of 14 (one migration; no adapter removable) | `--native_type2_mode`, `--native_user_info` |
+| 2026-11-11 | The tuning screen's refresh (`TuningScreen::Refresh`, 3,838 lines: the header, states 3 to 8 inside, the dispatch for 15 to 58; its 5 callees never seen in play stay recompiled) with `TuningMachine::Start` it unblocked | `tuning-screen.md`, `tuning-machine.md` | 83 of 83 and 22 of 22 in play (one migration, the refresh in four parts, 5 subagents; 15 adapters removed) | (`--native_tuning_screen`, `--native_tuning_machine`) |
+| 2026-11-11 | The tuning screen's update (`TuningScreen::Update` `sub_821E6C50`, 1,601 lines with its two pieces: its state switch over the debug handlers, the command queue's runners, the movie it picks, `UiMovie::Run`; 40 of its 61 callees never seen in play ported too) | `tuning-screen.md` | 126 of 126 rows ours (the update Overridden, its pieces Merged, 47 adapters removed; 21 never-seen runners stay recompiled, blocked by the sticker and vinyl editors' leads) | (`--native_tuning_screen`) |
+| 2026-11-11 | The title screen (the type 4 front-end mode: its Init, delegates and next mode; the title load machine with the boot's data load and logo; the title screen machine with press start, the main, career and fourth menus; `TitleScreen::Update` inside the `--attract_after_s` wrap) | `title-screen.md` | 86 of 87 (one migration; 2 adapters removed; `SetUpAttractRace` stays recompiled) | `--native_title_screen` |
+| 2026-11-11 | The replay theater (the type 10 mode: its Init, slots, its machine with UI movie 45 and 17 transitions; two of the type 9 mode's slots, shared) | `type10-mode.md` | 46 of 47 (38 Overridden, 8 Native; checked 2026-11-12 by the next run, 50318046..93b074ab, after a harness fix; `Replay::SetUpRace` stays recompiled) | `--native_type10_mode` (on by default since 2026-11-12) |
+| 2026-11-12 | The type 9 mode: the career's end of the day after a career race (today's result, UI movie 27, `Career::NextDay`; today's event, UI movie 0, the unlocks) | `todays-result.md` | 57 of 57 (38 Overridden, 19 Native) | `--native_todays_result` |
+| 2026-11-12 | The type 12 mode: the Xbox Live network mode (network battle and time attack: its mode select, 14 machines' set-ups and teardowns, the session memory; its Live calls answered with plugged-in data, the user's call) | `network-mode.md` | 130 of 130 rows (95 Overridden, 32 Native, 2 Merged, 1 Dropped) | `--native_network_mode` |
+| 2026-11-12 | The race's end (`RaceMode::ModeAfterRace`: which mode follows a race), with `RaceMode::NextMode` and `Progress::CheckUnlocks` (never seen, ported) | `race-end.md` | 1 of 1 (6 adapters removed) | `--native_race_end` |
+| 2026-11-13 | The options screen's load and save pages (category 5, page 9, the load; category 6, page 10, the save) | `options-load-save.md` | 16 of 16 (2 never seen, ported) | `--native_options_load_save` |
+| 2026-11-13 | `Type6Screen0`: the type 6 mode's first screen (a five-item menu over the type 6 car: pages, steps, helpers), with type 7's unported steps and `PowerGraph::SetFromCar` | `type6-type7-modes.md` | 13 of 13 new rows (with 6 of type 7's and `CarList::DrawCarPowerGraph`; 10 adapters removed) | (`--native_type67_modes`, `--native_power_graph`) |
+| 2026-11-13 | The type 5 mode: the parking area's front-end mode (its three machines: the car settings, the parking area, and its own dialog `Type5Dialog`) | `type5-mode.md` | 33 of 33 (16 never seen, ported) | `--native_type5_mode` |
+| 2026-11-13 | The tuning screen's vinyl editor (its pages for states 23 to 31 and 34, the decal images' list window and loads, the sticker helpers it calls) | `tuning-pages.md` | 29 new rows ours (with `HighlightItem`, `HighlightSelected` in `tuning-screen.md`; 7 adapters removed) | (`--native_tuning_pages`) |
+| 2026-11-13 | The power graph screen (the machine the type 6 and 7 modes share: its handlers, pages, steps, texts and the members' slots) | `power-graph-screen.md` | 22 of 22 | `--native_power_graph_screen` |
+| 2026-11-13 | The achievements check after a race (`Achievements::Check`, `Write`; `XUserWriteAchievements` kept as a guest call, the user's call) | `achievements.md` | 5 of 5 | `--native_achievements` |
+| 2026-11-13 | The frame driver and the app's scene (the game's object that drives each frame across its render thread, renamed from "renderer" by the user's call; the scene's update, draw and constructor; the game's threads) | `frame-driver.md` | 19 ours of 25 in play (`Present` and the `Event::`-blocked three stay) | `--native_frame_driver` |
+| 2026-11-13 | The cleanup leads `RaceStates::OnRaceEnd` (with the course record and `Time::Add`) and `DrawEntryPowerGraph`'s r31 (no mapping, not counted) | `race-states.md`, `power-graph.md` | 9 new ours, 5 adapters removed | (`--native_race_states`) |
+| 2026-11-13 | The morph jobs (the 224-byte job the second worker pool runs for `Model::MorphShape`, the wheels' morphs) and the shared work item | `morph-jobs.md` | 21 of 21 (and `Morph::Blend` Native) | `--native_morph_jobs` |
+| 2026-11-13 | The save devices' constructor and teardown (with `SaveDevices::Create`; the notification listener a stand-in, no call) | `save-interface.md` | 5 of 5 new rows (and `Create`) | (`--native_save_interface`) |
+| 2026-11-13 | The save devices' slot handlers (the states `SaveDevices::Update` runs, the save, load, check and delete steps and their waits, the overlapped results; B4's steps split into plain C++) | `save-interface.md` | 14 of 14 new rows (with `SaveDevices::Update`, `SaveStep`, `LoadStep`, both overlapped results, `Framework::DeviceList`) | (`--native_save_interface`) |
+| 2026-11-13 | Three small leads: the scene's render manager's slots 7 and 8 and their thunks, the texture provider's getters, the static zero and identity matrices | `app-start-up.md`, `models.md`, `matrix-math.md` | 13 of 13 new rows (and `Matrix::FromFloats` Native) | (`--native_app_start_up`, `--native_models`, `--native_matrix_math`) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): ~30 native callers in 16 subsystems call the render manager's slots 7 and 8 and the texture provider's getters directly (`hooks/direct_slots.h`) | 16 files' notes | none new | (existing flags) |
+| 2026-11-13 | The sticker editor (the tuning screen's states 38 to 46 and 49, their helpers, and the update's sticker commands 32 to 51; none seen in play) | `sticker-editor.md` | 25 of 25 Native (and 17 commands in `tuning-screen.md`, `UiMovie::Unloop`) | (`--native_tuning_pages`, `--native_tuning_screen`) |
+| 2026-11-13 | The stand's setters the tuning screen reaches (the colors, the sticker, the decal word, the aero set), with the tuning screen's `SetColor`, `ApplyAreaDecals`, `ApplyDecalWord`, `PreviewParts` | `stand-models.md`, `tuning-screen.md` | 9 new rows and 5 callers ours, 17 adapters removed | (`--native_stand_models`, the tuning screen's) |
+| 2026-11-13 | Cleanup lead (no mapping, not counted): the never-seen rows of the stand and the tuning screen (choices, aero, doors, light kits, accessories, calipers, axles, the refresh's paint and light kit pages) | `stand-models.md`, `tuning-screen.md` | 18 Native, a new row | (existing flags) |
+| 2026-11-13 | Cleanup leads (no mapping, not counted): the tuning pages' blockers (`IsSlotAvailable`, the paint and light kit bars) with `RefreshInterior` and commands 10, 13, 14; `MakeModel` and `FitSelectedCar` called directly, their adapters removed | `tuning-pages.md`, `tuning-screen.md`, `stand-models.md` | 8 Native, 2 adapters removed | (existing flags) |
+| 2026-11-13 | The type 6 and 7 modes' small pieces (the controller options' steps, the group pair's, panel screens' and panel sets' destructors, `SingleGroup`), with `DecalImages::UnloadAll` Native | `type6-type7-modes.md`, `type67-screens.md`, `car-list.md`, `archive.md` | 16 new rows and 3 blockers ours | (existing flags) |
+| 2026-11-14 | The type 6 and 7 list screens' and node screen's pages and steps (the six tables built on first use, the list part, the node tables, the color list, the panel screens, the screen blocks' destructors; none seen in play) | `type67-screens.md` | 174 rows ours (2 Merged), with `CourseRecords::Of` | (`--native_type67_screens`) |
+| 2026-11-14 | The type 8 mode's screens (probably the two-player mode's panel screen and list screens, built on the type 6 and 7 bases; none seen in play) | `type8-screens.md` | 128 of 128 (2 Merged), with 13 `car-list.md` rows and `TwoPlayerBlock` | `--native_type8_screens` |
+| 2026-11-14 | The type 8 mode itself (its Init, slots and teardown, its first screen and dialog), with the options', controller options' and save screen's type 8 Inits, the two-player save block's maker and four shared dialog handlers | `type8-mode.md` | 52 of 52 | `--native_type8_mode` |
+| 2026-11-14 | The in-race screens never seen in play (the split screen pause menu, the two results screens, the Live time attack's menu after the race), with the network manager's leaderboard helpers, the race dialog's save calls and `UiMovie::SetNodeCharText`; since the multiplayer bypass the same day, mostly unreachable | `race-screens-unseen.md` | 99 rows ours (3 Merged), the network battle's sends Dropped | `--native_race_screens_unseen` |
+| 2026-11-14 | The C runtime's core: the per-thread data over the kernel's TLS, the lock table and critical sections, `errno`, exit and C++ exceptions, the streams and low-level I/O, the float formatting, XAPI's thread notify list (functions that end the process checked by reading) | `c-runtime-core.md` | 115 of 118 | `--native_c_runtime_core` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -2775,7 +3149,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `generated/`: it is one host memset at 16, and the translated steps
     at any other stride. `atexit` (`sub_825A7068`) stays with the core
     (its critical sections) and blocks `Viewports::Init` and
-    `Viewport::Init`. The rest of the scenery waits on
+    `Viewport::Init` (native since 2026-10-25, the fifteenth run: the
+    exit lock a host mutex, with both viewports). The rest of the scenery waits on
     `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
     the archive's queue and the texture provider. Harnesses then drew
     from one shared `h.random`, so adding cases shifted the inputs of
@@ -2795,20 +3170,322 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     allocation (the creation side), memcpy's mirror recording (the
     `sub_825A7410` override has no plain C++ entry), and RaceOverlays::Run.
 
+## A4 brought forward: our start-up, rexglue as a library (2026-11-15)
+
+The user's call, after the lift sweep left `xstart` the only unported
+function (`docs/loops/lift-sweep.md`): rather than port `xstart`, the
+program's start becomes ours, and rexglue a library it uses for guest
+memory, the kernel and the image load.
+
+Today the SDK owns the program: its `main()`
+(`windowed_app_main_sdl.cpp`, compiled into our executable by
+`rexglue_configure_target`) parses the flags, makes an SDL app context
+(the event loop on the main thread), and runs `ReXApp`
+(`rex_app.cpp`, `src/itc_app.h` derives from it). `ReXApp` sets up the
+paths, `itc.toml` and the log, makes a window (which our renderer hides,
+routing its own window's events to it, `src/native/app_window.cpp`),
+builds `rex::Runtime`, loads `default.xex`, and makes the game's main
+thread through the kernel, starting at `xstart`.
+
+The new start-up:
+
+1. **Our `main()`** (`src/app/`), the executable's entry: the SDK's
+   flag parser (until a parser of our own), the paths (`--game_data_root`
+   or the executable's folder), `itc.toml`, the log (ours taking over
+   the SDK's file, A2), SDL, our own event loop on the main thread
+   (`SDL_RunOnMainThread` callbacks for the renderer's window, the
+   gamepads' event pump, our window's close ending the title as
+   `ReXApp::OnClosing` did).
+2. **`rex::Runtime` as a library**: built by our `main()` with the same
+   config (our audio, no SDK input, no graphics system, no app context:
+   XAM's dialogs, which drew on the hidden window, are skipped),
+   `Setup`, the modules registered, `default.xex` loaded, the C runtime
+   heap.
+3. **The game's main thread** is still made by the kernel
+   (`PrepareModuleLaunch`): the game needs a kernel thread for its
+   per-thread kernel state (its block in r13, TLS, thread IDs) and a
+   stack in guest memory, until E1 and E2. Its start routine is our
+   start-up (`REX_FUNC(xstart)`, the kernel's one way in, through
+   `lifted::Enter`): `xstart`'s work in plain C++, by "plug in data":
+   the C runtime's globals, the thread notify routines, `_mtinit`,
+   `_initterm_e` and `_cinit` (the static initializers), then `main`
+   with no arguments (the command line is split only when
+   `[0x829537B8]` is set, which nothing sets); the heap check kept (it
+   makes the process heap first, `CreateHeap`), the PAL-50 check
+   (Dropped) left out; `exit` after
+   `main` as the original does (never reached in play).
+4. **Gone**: the SDK's `main()` and `ReXApp` (taken out of our target's
+   sources), its window and ImGui overlays (unused since the native
+   renderer), the achievement toast (drawn on the hidden window).
+
+Checked by attract races, the pad replay, a drive by the user, and the
+Windows build under Wine (`wWinMain`: SDL's `SDL_main.h`).
+
+## Before E1: the rewiring (2026-11-15)
+
+After the lift sweep (merged into `rexglue-removal-project`
+2026-11-15, after an attract race; the drive and the Windows check left
+for later, the user's call), no recompiled function runs in play, but
+the scaffolding that let native and recompiled code share the game is
+all still there: 6,558 `REX_FUNC` overrides (3,548 hand-port adapters,
+3,399 of them in `src/hooks/`, and 3,010 lifted entries), 94 files whose
+guest calls (`Calls` callbacks, `REX_CALL_INDIRECT_FUNC`,
+`sub_X(ctx, base)`) go through the SDK's function table, 1,532 plain
+C++ functions taking a `Calls`, `generated/` compiled (~240k lines, for
+`PPCImageConfig`, the function table, the memory macros and the
+declarations) and the harnesses. The rewiring removes it, on
+`rewiring-15-11-26`, so that E1 can start.
+
+The goal: game code reaches rexglue in two places only. Calls out are
+the kernel imports. Calls in are the few entries the kernel itself
+calls: thread start routines and the callbacks the game hands it. There
+are no other overrides, and `generated/` and the harnesses aren't
+built. For the whole port, the goal is native C++ that needs rexglue only
+for guest memory, the kernel's functions and the SDL window.
+
+The stages, each leaving the game working and checked:
+
+1. **Record and inventory**: this section; every address the game hands
+   the kernel to call (thread start routines, registered callbacks, the
+   main thread's start), found from our C++ and from `generated/`'s
+   import call sites. Those are the only overrides that stay. The user
+   sees the list before going on.
+2. **Ctx-free guest calls**: the ports' `Calls` callback classes and
+   direct guest calls (94 files) switch from the SDK's function table to
+   `lifted::Call`, or a direct C++ call where the callee's plain C++ is
+   known.
+
+   Done (2026-11-15): `lifted::CallFromContext(ctx, base, address)`
+   (`src/lifted/sdk.h`) runs the dispatch table's entry when there is one,
+   as the function's own REX_FUNC entry does (through `Enter`), else the
+   SDK's table on the same context as before, so lr, the nonvolatile
+   registers and leftovers reach hand ports' overrides unchanged. Every
+   `REX_CALL_INDIRECT_FUNC` and `sub_X(ctx, base)` outside the harnesses
+   and `src/lifted/` was converted by a script (372 sites in 123 files),
+   and native audio's mixer callback no longer goes through
+   `FunctionDispatcher::Execute`. Direct C++ calls in place of these are
+   left to stage 3, where the adapters go: most callees are hand ports
+   whose plain C++ still takes the caller's `Calls`.
+3. **Every native function in our dispatch table**: each hand port gets
+   a ctx-free uniform entry (`lifted::Args` in, `lifted::Result` out) in
+   place of its `REX_FUNC` adapter, registered like the lifted batches'
+   `kEntries`. A tool converts the adapters that only read registers into
+   the plain C++ and store r3; migration agents take the irregular ones,
+   subsystem by subsystem. Each wrapper's own work (interpolation, replay
+   counting, diagnostics) is kept as it is.
+
+   The survey (2026-11-15; every source of ours preprocessed, each
+   adapter classified with the steps, `Calls` builders and helpers it
+   reaches, headers included): 3,548 adapters, about 2,700 of them made
+   by some 117 files' macros (an adapter macro around a step,
+   `hooks::Step(ctx, base)`, which the harnesses share).
+   - Simple, 1,692: argument registers in, plain C++, r3 or f1 out.
+   - Guest calls without other context state, 981: their `Calls` (or
+     `GuestCall`, `InFrame`) built from the context today, to be built
+     from the entry's arguments (the stack pointer, r13).
+   - Irregular, 870 (overlapping):
+     - the link register, 807: 595 only keep it and put it back
+       (nothing to do without a context); 208 pass it on, into the plain
+       C++ and from there as the return address of the port's own guest
+       calls, so a callee that acts on its caller sees the original's;
+     - the nonvolatile registers, 79: mostly kept and put back around
+       calls (`app_states`' 22); a few pass a value a callee reads from
+       its caller's registers (`car_draw`'s r24 and r28, the render
+       recorder's r24-r26, `Matrix_Copy`'s r29, the C runtime's
+       `__finally` blocks);
+     - r0, r2, r11, r12, 68 (34 in `native/replay_hooks.cpp`), and the
+       condition and XER registers, mostly `ctr` as a call's target.
+   - Already through `lifted::Enter`: 5.
+
+   Wraps that act on their caller (not only log it): interpolation's
+   `OnMultiply` (the recorder's multiply), the single sprites' pairing
+   key, the UI movies' per-tick tracks, `Buffers_Memcpy`'s caller, and
+   the input reads' counts. Today a lifted caller reaches them through
+   `lifted::Call`'s boundary with the context's last lr, not its own.
+
+   Done (2026-11-16): every hand port's adapter is a dispatch table entry
+   on our register view (`lifted::Regs`, `src/lifted/regs.h`: r1, r3-r10,
+   r13, f1-f13, ctr, lr and the caller's r31, under the SDK context's
+   names) through `ITC_NATIVE_ENTRY` / `ITC_NATIVE_ENTRY_ALWAYS`
+   (`src/hooks/native_entry.h`), registered under its address with its
+   flag; their REX_FUNCs only check the flag and `lifted::Enter` the entry
+   (stage 4 removes them). Steps have both forms (`ITC_REGS_STEP`: the
+   harnesses keep the context), SDK functions and recompiled fallbacks run
+   on a view through `lifted::Sdk`. Made by
+   `itc_recomp/tools/native_entries.py sweep` and six migration agents,
+   then checked group by group. The registers the view doesn't carry, by
+   the user's calls (2026-11-16, recorded in
+   `docs/loops/expected-differences.md`, 169 harness groups marked
+   "(expected to differ: the rewiring)"): leftover volatile registers for
+   callers (r11, r12, cr) deleted; stack saves of a caller's register 0;
+   registers other than r3 and f1 after a call through an entry not the
+   callee's leftovers. The callers' registers adapters read were passed
+   instead, by what they turned out to be: the per-object recorder's
+   pairing key reads lr and r31 (the part), now carried
+   (`lifted::Args::r31`, `lift.py`'s `LIFTED_ARGS(lr, r31)`); the draws'
+   r24 and r28 (the record context's slots 1-7) and the race draw step's
+   r31 only fed diagnostics, and the action mappers' r25 (held bits 30
+   and 31) came from an uninitialized stack word: 0. `Matrix_Copy`'s motion
+   blur branch only ran for the recompiled MotionBlur::Record (its port
+   notes the copy itself). Left as REX_FUNCs outside `src/lifted/`:
+   `xstart` (the kernel's main thread start) and the C runtime's five
+   `__finally` blocks, which only the recompiled parents' fallbacks reach.
+   The status tools follow the entries (macros making overrides through
+   `ITC_NATIVE_ENTRY`; registrations and `LIFTED_ARGS` name no callee).
+
+   The return address travels with the call (the user's call,
+   2026-11-15): `lifted::Args::lr`, filled by `Enter` from the context,
+   put in the context's lr by the boundary for code still on the SDK
+   side. `lift.py` passes each call's own return address (the
+   `ctx.lr = X` before it in `generated/`), and a function with a tail
+   call by address or import (about 1,700 tail calls in all: the
+   caller's return address passes on), or to a lifted function that
+   takes one, takes its own `lr` as a parameter; the batches and
+   `originals.cpp` were emitted again with it. Hand ports' calls carry
+   theirs through stage 3; until then `lifted_call::Call`'s 18 sites and
+   `ScreenObject::Record`'s pasted translation pass 0, where they passed
+   the context's last value.
+4. **Delete the overrides**: once nothing reaches them through the SDK's
+   function table, the hand ports' adapters and the lifted functions'
+   `REX_FUNC` entries go, except stage 1's kernel entries, which become
+   tool-written "unpack the context, call native code" entries.
+   `lifted::Call`'s fallback into the SDK goes: an unknown address logs
+   and stops. The user is asked before the deletions.
+   Done (2026-11-16, by the recommended option: the user was asleep and
+   had said to take it): first no recompiled code in play (logged once
+   each: calls falling to the SDK's function table and what `lifted::Sdk`
+   runs, in an attract race and the pad replay), by entries for the 188
+   import thunks (`src/lifted/imports.cpp`, `tools/import_entries.py`),
+   batch 034 (a worker thread's loop `sub_82095AF0`, the D3DX buffer's
+   slots) and 8 more lifted originals (FrameDriver::Present and seven
+   declines'); then the overrides deleted: `ITC_NATIVE_ENTRY` makes none,
+   `lift.py` writes none, and only `ITC_KERNEL_ENTRY` (the four thread
+   starts), `xstart` and the C runtime's five `__finally` blocks (only the
+   recompiled parents' fallbacks reach them) keep a REX_FUNC.
+   `lifted::Call`: an entry whose flag is off still runs the recompiled
+   original until stage 5; an address with no entry logs and stops.
+   Functions only the harnesses called by address with no entry: batch
+   035 (15). The harnesses call ours through `harness::Ours<address>`,
+   but their reference side now runs the original's whole call tree (its
+   `sub_X` callees are the originals' thunks), so they no longer compare
+   single functions (UiMovie::DrawTexts' writes through its fake world):
+   from here the game is the check, as `lift-sweep.md` planned ("once
+   adapters are gone"). Checked by attract races, the pad replay (127 s,
+   clean, no call without an entry) and a frame dump.
+5. **`generated/` out of the build**: our own small function table for
+   the SDK (`PPCImageConfig`: the image layout and the kernel entries
+   only) instead of `generated/`'s `itc_init.cpp` and
+   `itc_register.cpp`; our own copies of the memory macros
+   (`REX_LOAD_U32` and the like, from `generated/default/itc_pch.h`) and
+   declarations, so `guest.h` stops including `generated/`; the
+   `__imp__` fallbacks behind the `--native_*` flags removed;
+   `generated/` and `src/harnesses/` dropped from
+   `itc_recomp/CMakeLists.txt` (the user's call: translated code needs no
+   harnesses; git history keeps them). Then, before E1: whether the SDK's
+   typed kernel functions (behind its import shims) let our code call the
+   kernel without a `ctx`, reported to the user.
+
+### The kernel's entries (stage 1, 2026-11-15)
+
+Where the SDK runs guest code by address: `XThread::Execute` (a
+thread's start, or the XAPI start-up with the routine and its
+parameter), the APC kernel, normal and rundown routines, the audio
+system's client callback, the graphics interrupt, DllMain (DLL modules
+only) and `XexGetProcedureAddress`'s thunks. It stores but never runs
+DPCs (`KeInitializeDpc`) and title terminate notifications. Of the game's
+imports that take a routine, our C++ uses only `ExCreateThread` (three
+callers), `ExRegisterTitleTerminateNotification` and
+`VdSetGraphicsInterruptCallback` (to clear it, in `Device::Release`);
+nothing uses APCs, timers' APCs, DPCs, `NtReadFile`'s or `NtWriteFile`'s
+APC routines, or `XexGetProcedureAddress`.
+
+The kernel's entries, all seen in an attract race (`itc_5616`):
+
+| Address | Function | Started by |
+| --- | --- | --- |
+| `0x82296C80` | `xstart` (our start-up, `src/app/start_up.cpp`) | The kernel: the game's main thread (`PrepareModuleLaunch`) |
+| `0x825BA558` | `XapiThreadStartup` | `ExCreateThread` from `CreateThread` (`sub_825BA380`, `sub_825BA158`): the frame driver's threads (`Thread::Begin`), which then run `Thread::Start` `0x8258DE50` (game code, not an entry) |
+| `0x822B69A8` | `Device::WorkerThread` | `ExCreateThread`, raw: predicated tiling's per-CPU workers (`CreateWorkers`) |
+| `0x8245BE08` | `XAudio::MasterThread` | `ExCreateThread`, raw: XAudio's engine (`XAudioEngine::Init`) |
+| `0x8245BED0` | `XAudio::WorkerThread` | The same, for the other hardware threads |
+
+Registered with the kernel but never run by the SDK: XAudio's title
+terminate routine `0x8245B0D0` (`XAudioEngine::Init`; unregistered by
+`sub_8245AA48`) and the device's, probably `0x822ACB68` (unregistered by
+`Device::Release`).
+
+Not a kernel entry, but our own call into guest code through the SDK's
+table: native audio's thread runs the game's mixer callback
+(`XAudio::MixerCallback` `0x8245FBE0`, registered through our
+`sub_824657E0`) with `function_dispatcher()->Execute`
+(`src/audio/native_audio.cpp`); it moves to `lifted::Call` in stage 2.
+
+   Done (2026-11-16, autonomously by the recommended options while the
+   user slept):
+   - Every original our code named (`__imp__sub_X`: flag-off fallbacks and
+     declines, 1,408 with those macros build) is lifted
+     (`lifted::original::cX`, `lift_originals.py`); four couldn't be
+     (HeapAlloc, HeapFree, HeapReAlloc, TuningScreen::Update: they read
+     registers `lift.py` can't), reached only with a flag off: they log and
+     stop (`lifted::NoOriginal`). Entries run whatever their flag (the
+     `--native_*` flags no longer choose anything for an entry); `xstart`
+     and the kernel's thread starts always enter our code; the `__finally`
+     adapters removed (Merged).
+   - The functions only those lifted originals reach (695) lifted too
+     (batches 036 to 042, with rows). Left unported (static map, 9): the
+     Xbox Live mode's two, `xstart` (ours runs there), two C runtime float
+     control functions reading the FPSCR (`sub_825B0BB0`, `sub_825B0BE4`)
+     and four funclets reading their parent's registers: none seen in
+     play; reaching one logs and stops.
+   - `generated/` and `src/harnesses/` out of the build: our own
+     `src/guest_code.h` (what we used of `itc_pch.h`),
+     `src/lifted/imports.h` (the imports declared, by
+     `tools/import_entries.py`), `src/app/image.cpp` (`PPCImageConfig`
+     with the five kernel entries as its only function mappings) and
+     `cmake/rexglue.cmake` (the SDK's set-up without the recompiled code);
+     the coverage target removed (it instrumented the recompiled code).
+     `generated/` stays in the repo as the tools' input (`lift.py`,
+     `import_entries.py`, the static map). The executable holds no
+     recompiled function.
+   - The kernel without a context (the report asked for): the SDK's typed
+     kernel functions behind its import shims (`REX_EXPORT(__imp__X,
+     X_entry)`, `HostToGuestFunction` unpacking the context) are exported
+     from `librexruntime.so` (470 `rex::kernel::xboxkrnl::*_entry` and the
+     like), take plain values and guest pointers (`MappedPtr`), and find
+     the current thread through thread-local state, not the context. So
+     our code could call them directly, with declarations matching the
+     SDK's sources (they aren't in its public headers) and on a guest
+     thread; the raw hooks (`REX_HOOK_RAW`) and varargs ones (`DbgPrint`)
+     read the context and would need their own. Not done: for E1.
+   Checked by attract races, the pad replay (127 s, clean, no call without
+   an entry) and frame dumps.
+
+Checks at each stage: `attract_race.sh 40` as a smoke run;
+`attract_race.sh 180 --run_harnesses=all` while the harnesses exist (0
+differing outside the expected groups); the pad replay
+(`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s,
+no error lines); frame dumps on against off for the render path; and
+`static_map.py`, `boundary_status.py` and `b7_status.py` recorded in
+"The boundary over time".
+
 ## The end state: removing the core
 
 Only when no recompiled function is left (or none that touches what's
 being removed):
 
-E1. **Threads and sync** (291 boundary functions, plus every recompiled
-    function using the game's locks): host threads and locks in native
-    code. The graphics library's per-CPU workers read the CPU number from
-    the PCR (+268; "Interrupts are made at the library's level" in
+E1. **Threads and sync**: host threads and locks in native code. The
+    graphics library's per-CPU workers read the CPU number from the PCR
+    (+268; "Interrupts are made at the library's level" in
     `docs/native-renderer.md`), and timing has mattered before (the
-    deferred-kick race there).
+    deferred-kick race there). The plan as of 2026-11-16 is under "E1:
+    the plan" below; the count of 291 boundary functions written here
+    before the lift no longer applies (nothing recompiled runs).
 
 E2. **Memory**: native allocations once nothing uses guest addresses.
-    No guest mapping, no `/dev/shm` files.
+    No guest mapping, no `/dev/shm` files. Since the lift sweep, that end
+    comes only with E5 (the code reads and writes guest addresses
+    throughout); what E2 does before it, a guest address space of our own
+    with no SDK memory behind it, is under "E2: the plan" below.
 
 E3. **The image load**: the recompiled code reads strings, constants,
     vtables, tables and initialized globals from the image at
@@ -2830,6 +3507,864 @@ E4. **`PPCContext`, `rex/ppc.h`, the function table, `generated/`,
     modified). The `rexglue codegen` target goes with it. The SDK's
     graphics (`src/graphics/`, the `Vd*` and `XGetVideoMode` exports),
     unused since B3, go with it.
+
+E5. **The native code made native** (the user's call, 2026-11-09):
+    only after E4, once ReXGlue and guest memory are out of the picture.
+    B7's native code is a transcription of the recompiled code, not
+    native code yet: it reads and writes the game's objects in guest
+    memory by offset (big-endian), calls table and functor callees
+    through the guest, and copies what the PowerPC leaves behind (stack
+    frame words, register leftovers) to match the recompiled code byte
+    for byte. That shape is forced while native and recompiled code
+    share objects, so it stays until then. E5 reworks it, subsystem by
+    subsystem, into real C++: the game's objects as host structs and
+    classes, normal calls and interfaces, no stack or register
+    artifacts, harnesses comparing what the game observes instead of
+    bytes. Its inputs are the function files (`docs/functions/`,
+    `docs/known-data.md`) and the transcribed C++. The functions once kept
+    recompiled for a register leftover stored into live state
+    (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
+    `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`) were
+    lifted by the sweep and turned out to store 0, not a leftover ("E4:
+    the plan", the measure). The plan as of 2026-11-16 (after E4) is its own
+    document, `docs/e5-native.md` (a draft for the user's review).
+
+## E1: the plan (2026-11-16)
+
+On `e1-threads-sync-16-11-26`, after the rewiring (agreed with the user,
+2026-11-16). Where things start: every function the game runs is ours
+(hand ports or lifted), and the game reaches the SDK only through its
+imports (`lifted::Import`, the import thunks' entries in
+`src/lifted/imports.cpp`) and the five kernel entries. Our code names 184
+imports; 43 are threads and sync: `ExCreateThread`, `ExTerminateThread`,
+`NtResumeThread`, `NtSuspendThread`, `KeResumeThread`,
+`KeSetBasePriorityThread`, `KeSetAffinityThread`; `NtCreateEvent`,
+`NtSetEvent`, `NtClearEvent`, `KeSetEvent`, `KeResetEvent`,
+`KeInitializeSemaphore`, `KeReleaseSemaphore`, `KeWaitForSingleObject`,
+`KeWaitForMultipleObjects`, `NtWaitForSingleObjectEx`;
+`RtlInitializeCriticalSection`, `RtlEnterCriticalSection`,
+`RtlTryEnterCriticalSection`, `RtlLeaveCriticalSection`, the spin locks
+and IRQL (`KfAcquireSpinLock`, `KfReleaseSpinLock`,
+`KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`,
+`KeTryToAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`,
+`KfLowerIrql`, `KeEnterCriticalRegion`, `KeLeaveCriticalRegion`,
+`KeLockL2`); `KeTlsAlloc`, `KeTlsFree`, `KeTlsGetValue`,
+`KeTlsSetValue`; `NtCreateTimer`, `NtSetTimerEx`, `NtCancelTimer`,
+`KeDelayExecutionThread`; `NtClose`, `NtDuplicateObject`,
+`ObReferenceObjectByHandle`, `ObDereferenceObject`. Which of them run in
+play isn't known yet (lifted code names every import its original did).
+
+The constraint that orders the steps: the game's threads are kernel
+threads because the code reads the kernel's per-thread block through
+r13 (the PCR: the CPU number at +268, the TLS slots, the thread's
+kernel pointers) and because the SDK's import functions find the
+current `XThread` from the host thread they run on. A thread of ours
+can only start once nothing it reaches calls an import needing that.
+Guest stacks stay until E2 (frames are still in guest memory).
+
+1. **Measure.** A diagnostic flag (`--log_imports`) counting each
+   import's calls by name through `lifted::Import`, logged at exit and
+   now and then; run in attract races and the pad replay. The result
+   (which imports run in play, from which threads, how often) is
+   recorded here and picks the order below; imports never seen keep
+   running through the SDK until their step, and any we replace that
+   then turns up unseen logs once.
+
+   Done (2026-11-16): `--log_imports` (`src/lifted/import_log.cpp`;
+   names from `lifted::ImportName`, written into `imports.cpp` by
+   `tools/import_entries.py`). An attract race (`itc_5673`, 68 s) and the
+   pad replay (`itc_5674`, 127 s: the menus, a save, a race) call the same
+   **30 imports**, nothing else (no file, XAM, graphics or network import
+   runs in play). Calls in the pad replay, by import:
+
+   | Import | Calls | Kind |
+   | --- | --- | --- |
+   | `KeRaiseIrqlToDpcLevel` | 2,572,463 | IRQL |
+   | `KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql` | 2,477,245 each | spin locks, IRQL |
+   | `RtlEnterCriticalSection`, `RtlLeaveCriticalSection` | 331,752 each | critical sections |
+   | `KeWaitForSingleObject` | 49,018 | waits |
+   | `KeSetEvent` | 45,022 | events |
+   | `KeReleaseSemaphore`, `KeWaitForMultipleObjects` | 22,511 each | semaphores, waits |
+   | `NtSetEvent`, `NtWaitForSingleObjectEx` | 20,960, 20,959 | events by handle, waits |
+   | `KeTlsGetValue` | 4,320 | TLS |
+   | `RtlInitializeCriticalSection` | 38 | critical sections |
+   | `NtFreeVirtualMemory`, `NtAllocateVirtualMemory` | 32, 2 | memory (E2) |
+   | `NtCreateEvent` | 15 | events by handle |
+   | `ObReferenceObjectByHandle`, `ObDereferenceObject` | 10 each | threads (their objects) |
+   | `ExCreateThread`, `KeSetBasePriorityThread` | 7 each | threads |
+   | `NtResumeThread`, `KeSetAffinityThread` | 4 each | threads |
+   | `KeGetCurrentProcessType` | 3 | system |
+   | `KeTlsAlloc`, `KeTlsSetValue`, `KeResumeThread` | 2 each | TLS, threads |
+   | `KeInitializeSemaphore`, `ExRegisterTitleTerminateNotification` | 1 each | semaphores, threads |
+
+   Nine guest threads call them (by r13; the main thread `3001F000`
+   makes the others). Some hand ports still run lifted originals or
+   stand-ins of ours through `lifted::Sdk`, which `Import` also sees
+   (logged as "not an import"). Everything else our code names stays
+   behind its import, never seen; step 2 starts with the spin locks and
+   IRQL (nearly all the calls), then the critical sections.
+2. **Sync objects as host primitives.** Events, semaphores, critical
+   sections, spin locks and the waits on them, the timers and
+   `KeDelayExecutionThread`. Some are kernel structures inside game
+   objects in guest memory (a `KEVENT`'s or `RTL_CRITICAL_SECTION`'s
+   words), others handles; each kind gets a host object (a table keyed
+   by the structure's guest address or by the handle), with the
+   structure's words the game itself reads (if any) kept as the kernel
+   leaves them. The locks the user's calls kept as the game's own
+   (XAudio's API lock and voice lists' spin lock, XACT's lock: "until
+   every user is native, then host recursive locks with a readable
+   depth", 2026-10-29) become host recursive locks here. Done kind by
+   kind, each checked before the next.
+
+   Done (2026-11-16): `src/threads/`, behind `--native_threads` (on;
+   read once at start-up), routed in `lifted::Import` by a table of
+   native imports (`threads/native_imports.h`), so every caller, lifted or
+   hand port, reaches ours; `lifted::ImportFromSdk` is the way back to the
+   SDK for objects ours don't handle.
+   - Spin locks and IRQL (`spin_locks.cpp`): the lock stays a
+     compare-and-swap of the owner's r13 (big-endian) on the game's word;
+     IRQL plugged in (no game code reads the PCR's IRQL byte, +0x18:
+     raising answers 0, lowering does nothing).
+   - Critical sections (`critical_sections.cpp`): a host lock each, by
+     guest address, made on first use; the struct's lock count, recursion
+     count and owner (`[r13 + 256]`) written as the SDK writes them (the
+     lock count big-endian, where the SDK wrote host order).
+   - Events, semaphores and waits (`events.cpp`): objects in guest memory
+     keep their state in their own dispatcher header (type +0, signal
+     state +4, a semaphore's limit +0x10), as the original kernel did;
+     events by handle (`NtCreateEvent`) are host records under handles of
+     ours (`0xE1000000` up, below the SDK's `0xF8000000`); one host mutex
+     and condition variable; timeouts relative, absolute or a poll.
+     Waits on other objects (threads), SDK handles and named events fall
+     back to the SDK, logged once: none did in play.
+     `KeDelayExecutionThread` a host sleep.
+   Checked by attract races, the pad replay (127 s, no error lines, the
+   race at the frame cap) and a frame dump.
+3. **The per-thread block and TLS as ours.** r13's block in guest
+   memory filled by our code (the fields the game reads, found by
+   reading the lifted code), `KeTls*` over our own slots.
+
+   TLS done (2026-11-16, `threads/tls.cpp`): each thread's slots are
+   where its thread object points (`[[r13 + 256] + 0x68]` + 4 × slot), as
+   the SDK sets them up; slot numbers from our own table (lowest free
+   first, 256). Checked as above. What game code reads of the per-thread
+   block, from `generated/`: the PCR's +256 (the thread object), +268 (the
+   CPU number, a byte) and +336 (0 for a normal thread: `SetLastError`'s
+   check, `sub_82296E88`); the thread object's +88, +300, +332 and +352
+   (the last error), +0x68 (TLS, through our code). Those are what a block
+   of ours must fill.
+4. **Threads as host threads.** `std::thread` (or SDL's) with a guest
+   stack from our memory layer and our per-thread block in r13, for the
+   four thread starts the kernel runs today, then the game's main thread
+   (`xstart`'s, made by `PrepareModuleLaunch`). Only once step 1's list
+   shows nothing these threads reach still needs the SDK's `XThread`;
+   what's left of that (memory imports, the file reads, the audio
+   output's) is checked first, and may move this step after part of E2.
+
+   Found (2026-11-16, `--log_imports`' callers): every import still
+   answered by the SDK is called only from the main thread
+   (`NtAllocateVirtualMemory` and `NtFreeVirtualMemory` from the
+   allocation wrappers `82299AE4`, `82299B34`, `82295384`;
+   `KeGetCurrentProcessType`; `ExRegisterTitleTerminateNotification`;
+   the thread calls: `ExCreateThread` from `CreateThread` `825BA3C8`,
+   `Device::CreateWorkers` `822B6ED4` and `XAudioEngine::Init`
+   `8245C3F8`, `NtResumeThread`, `KeResumeThread`,
+   `KeSetBasePriorityThread`, `KeSetAffinityThread`, and
+   `ObReferenceObjectByHandle`/`ObDereferenceObject` on thread handles).
+   The other threads (XAudio's master and workers, the tiling workers,
+   the frame driver's, native audio's) reach only our sync and TLS. So
+   next: `ExCreateThread` and the thread calls ours, those threads host
+   threads with a guest stack and a PCR and thread object of ours; the
+   main thread after E2's memory imports.
+
+   Done (2026-11-16, `threads/threads.cpp`): `ExCreateThread` makes a
+   `std::thread` and, in guest memory from our allocation layer, only what
+   game code still reads through r1 and r13 (a stack, the code's frames
+   being there; a per-thread block with +256, +268 and +336; a thread
+   object with +0x58, +0x68 our TLS slots, +0x14C the thread ID and +0x160
+   the last error), then runs the start routine (through the XAPI
+   start-up when given) through our dispatch table; its handle is ours
+   (`threads/handles.h`, `0xE2000000` up). `NtResumeThread`,
+   `KeResumeThread`, `KeSetBasePriorityThread` (plugged in: kept and
+   answered, not applied), `KeSetAffinityThread` (the CPU number at
+   +268), `ObReferenceObjectByHandle` and `ObDereferenceObject` answer
+   for ours; `Device::CreateWorkers` hands `KeSetBasePriorityThread` the
+   handle where a thread object is expected (the SDK read it as a
+   pointer), so ours take either. Native code with no r13 at hand finds
+   its thread through `threads/current_thread.h` (`CurrentThreadId`,
+   `sub_825B9A60`, no longer asks the SDK on our threads). All seven of
+   the game's threads are ours (the frame driver's four, the tiling
+   worker, XAudio's master and worker); the main thread and native
+   audio's stay the SDK's. Attract races, the pad replay (127 s) and a
+   frame dump clean.
+
+   The main thread too (2026-11-16): first its last imports, none left to
+   the SDK in play. E2's first step (`src/memory/memory_imports.cpp`,
+   `--native_memory_imports`): the process heap's reserve and commit
+   (`RtlCreateHeap` `sub_822997B0`, from `CreateHeap` at start-up)
+   answered from our allocation layer, and `VirtualFree(0)` (34 in the pad
+   replay, from `0x820E85BC` and `0x820F864C`) plugged in as the original
+   answers it (0, `ERROR_INVALID_ADDRESS`), so `NtFreeVirtualMemory` isn't
+   called; `KeGetCurrentProcessType` plugged in (1, a title's process,
+   what `RtlCreateHeap` and XAudio read) and
+   `ExRegisterTitleTerminateNotification` (nothing kept: the SDK never ran
+   them). The native import table moved to `src/imports/`, with a flag per
+   group. Then `main()` starts the main thread through
+   `threads::StartMainThread` (our blocks, the module's stack size, our
+   start-up `app::StartUp` on a `std::thread`) in place of the SDK's
+   `PrepareModuleLaunch`, which only made the thread
+   (`SetExecutableModule` had run at load). Each of our threads binds a
+   context struct of its own (`lifted::BindThreadContext`), a register
+   carrier for the hand ports that still run lifted originals and
+   stand-ins through `lifted::Sdk` (4,411 calls in an attract race; to go
+   with `PPCContext` in E4). Native audio's thread too: it was an SDK
+   `XHostThread`, made only for a guest stack and r13 for the mixer
+   callback; now `threads::StartThread` (our blocks, a host body) and the
+   callback through our dispatch table. Every thread that runs game code
+   is ours. Attract races, the pad replay (127 s) and a frame dump clean.
+
+Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
+(`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
+error lines), frame dumps, a drive by the user before the merge, and
+`boundary_status.py` recorded in "The boundary over time" (its "live"
+count reads rows, not running code, since stage 5).
+
+## E2: the plan (2026-11-16, a draft for the user's review)
+
+Steps 1 to 5 done on `e1-threads-sync-16-11-26` with E1, and merged into
+`rexglue-removal-project` 2026-11-16 after a drive (sound, saves, a race
+and closing the window fine).
+
+After E1 (every import the game calls in play is ours, every thread
+running game code ours), the SDK's runtime still owns the memory the game
+lives in. E2 here is that memory made ours, guest addresses kept: the
+lifted and hand-ported code reads and writes the game's objects at guest
+addresses (big-endian, by offset), and keeps its stack frames there, so a
+guest address space stays until E5 makes the code real C++ (the old E2's
+"no guest mapping" moves there).
+
+### Where guest memory comes from today
+
+- **The mapping** (`rexglue-sdk` `src/system/xmemory.cpp`): a shared
+  memory file (`/dev/shm/xenia_memory_*` on Linux, a file mapping on
+  Windows) of 4 GB of guest virtual addresses plus 512 MB of physical
+  memory at +4 GB, mapped as views so the physical ranges `0xA0000000`
+  (64 KB pages), `0xC0000000` (16 MB pages) and `0xE0000000` (4 KB pages)
+  all alias the same physical memory. Heaps over it: `0x00000000` (4 KB
+  pages), `0x40000000` (64 KB), `0x80000000` and `0x90000000` (the XEX's),
+  and the physical ones.
+- **Our allocation layer** (`src/memory/heap.cpp`, `docs/native-memory.md`):
+  every allocation the game makes, but its virtual range (384 MB at
+  `0x10000`) is one reservation from the SDK's `0x00000000` heap, and each
+  physical block one allocation from the SDK's physical heaps (by page
+  size). Since E1 it also holds our threads' stacks and blocks.
+- **The image** (E3): `Runtime::LoadXexImage` decrypts and decompresses
+  `default.xex` into `0x82000000`, resolves its imports, and writes the
+  kernel's variable exports the image imports (the SDK's
+  `export_resolver`); code reads the image's data, vtables and globals
+  there.
+- **The SDK's own guest data**: the kernel's guest globals (the title
+  process block, the TLS bitmap), the export variables
+  (`XboxHardwareInfo`, `ExLoadedImageName`, `XexExecutableModuleHandle`
+  and the like; `graphics/predicated_tiling.cpp` and
+  `hooks/graphics_device.cpp` read some), the loader's module records.
+- **Readers of the mapping's layout** in our code: the renderer
+  (`native/state.h`: physical memory at the virtual base + 4 GB, the GPU's
+  physical addresses read from the command data), its guest memory
+  mirrors, `hooks/xma.cpp` and `debug/thread_cpu.cpp` (the SDK's memory
+  object), `app/main.cpp` (the base). The game turns virtual addresses
+  into GPU physical ones inline (about 270 sites masking with
+  `0x1FFFFFFF` in `generated/`).
+
+### The steps
+
+1. **Measure** (logging, no change in behavior): which of the SDK's guest
+   data the game reads in play (the export variables by name, the kernel
+   globals), whether any CPU access goes through a second alias of a
+   physical block (written at one of `0xA`, `0xC`, `0xE` and read at
+   another, or at its physical address), and every physical address the
+   renderer reads, by the block it falls in. Recorded here; it decides
+   steps 2 and 4.
+
+   Done (2026-11-16). **The kernel's variables**: the image imports 10
+   (the SDK binds each slot in the image's import table, logged at
+   `--log_level=debug`; slots found in the image's first pages under
+   gdb). Read by code that runs (the lifted functions found by scanning
+   `src/lifted/` for loads at `0x82000000` + the slot, checked against
+   `coverage/seen_in_play.txt`; our hand ports by their constants):
+
+   | Slot | Variable | Read by | What the SDK leaves there | To plug in |
+   | --- | --- | --- | --- | --- |
+   | `0x820007B0` | `VdGlobalDevice` | the graphics library's lifted functions, `Device::WorkerThread`, `hooks/graphics_device.cpp`, `graphics/predicated_tiling.cpp` | a word the game writes itself (the device, `0x001B6900`) | a word of ours |
+   | `0x820007B4` | `KeCertMonitorData` | `Device::BeginTiling` `825BED08`, `822B1E70` (seen in play) | zeros | a zeroed block |
+   | `0x820007F0` | `KeDebugMonitorData` | the same two, `CheckHeap`, XAudio (`xaudio/engine.h`), the C runtime (`c_runtime/core.h`) | zeros | a zeroed block |
+   | `0x820007EC` | `ExLoadedCommandLine` | `GetCommandLineA` `sub_822979D0` (`c_runtime/core.cpp`) | `"default.xex"` with its quotes | the same string |
+   | `0x820007FC` | `ExThreadObjectType` | `SetThreadPriority`, `XSetThreadProcessor`, XAudio: passed to `ObReferenceObjectByHandle`, which ours ignores | a zeroed type record, `Thrd` at +0x18 | the same |
+   | `0x8200088C` | `XboxKrnlVersion` | `sub_822AC918` (not seen in play) | 2, 0xFFFF, 0xFFFF, 0x8000 | the same |
+   | `0x82000734`, `0x82000744`, `0x820007DC`, `0x82000854` | `VdGpuClockInMHz`, `VdHSIOCalibrationLock`, `XexExecutableModuleHandle`, `KeTimeStampBundle` | nothing that runs (their readers aren't lifted, or our ports don't read them: `CreateHeap`'s size is fixed, `GetTickCount` is the host clock) | | left out |
+
+   **The physical aliases**: the renderer reads physical memory as one
+   flat 512 MB range (`native/state.h`'s `PhysicalHostAddress`: base +
+   4 GB + the physical address, from the GPU addresses the game computes;
+   the guest memory mirrors copy it as flat buffers; textures, index
+   ranges, shader microcode and the copy hashes read it there). Dropping
+   the aliases would mean a new memory model for the renderer, so the
+   views stay (step 4): one memory file of physical memory mapped at +4 GB
+   and at `0xA0000000`, `0xC0000000` and `0xE0000000` (the last at
+   physical + 0x1000, as the SDK maps it; `GpuPhysicalAddress` has the
+   same offset). The CPU-side alias check is then not needed.
+2. **The SDK's guest data plugged in**: the export variables the game
+   reads written by us as fixed data (plug in data), in our layer's
+   memory; the rest left out.
+
+   Done (2026-11-16, `src/memory/kernel_variables.cpp`,
+   `--native_kernel_variables`): after the image is loaded, the six read
+   slots point at blocks of ours holding step 1's data; the four nothing
+   reads are left as the loader bound them (step 3's loader leaves them
+   out). The import table's page is read-only after the load, so it's
+   made writable around the binding (through the SDK's heap until step 4).
+   A first try without that faulted, and the SDK's fault handler retried
+   the write for ever: a hang, not a crash. Attract race and pad replay
+   clean.
+3. **The image loaded by us** (E3 brought forward: our mapping must hold
+   it, and the SDK's loader writes into the SDK's): `default.xex` read,
+   decrypted (AES, the title key) and decompressed (LZX, through an
+   upstream library: libmspack's LZX decoder is the candidate, as FFmpeg
+   was for XMA) into `0x82000000`, its imports bound to our dispatch
+   table's thunk entries and plugged-in variables. Only the US release's
+   `default.xex` is supported, checked by its hash; its header's few
+   fields read for that file. The player's own file stays the source (the
+   repo never ships game data).
+
+   Done (2026-11-16, `src/app/image_load.cpp`): this `default.xex` turned
+   out to use the XEX's **basic** compression (two blocks of data, each
+   followed by zeros: 6,750,208 bytes then 3,211,264 zeros, then 196,608
+   bytes), not LZX, so libmspack isn't needed after all; only AES-128 (the
+   image key at the security info's +0x150 decrypted with the retail key,
+   then CBC from a zero IV over the data). AES and SHA-1 come from
+   FFmpeg's libavutil, already built for the XMA decoder (`itc_avutil`):
+   no new library. The file is checked by its SHA-1 (`32932de0...`).
+   `--check_image_load` (off by default) loads it beside the SDK's loader
+   and compares: 10,158,080 bytes at `0x82000000`, differing only in the
+   ten variable import slots the SDK binds (9 ranges, 39 bytes). The
+   loader isn't used for the game yet: step 4 switches to it.
+4. **Our own mapping**: one reservation of the guest's 4 GB (and the
+   physical range) by us: `memfd_create` and `mmap` on Linux,
+   `CreateFileMapping` and `MapViewOfFile` on Windows (`docs/windows.md`),
+   our allocation layer taking its ranges from it directly (its own
+   ranges for the 4 KB, 64 KB and physical pages) instead of from the
+   SDK's heaps. Whether the physical aliases are kept depends on step 1:
+   - if nothing reaches a block through a second alias, each physical
+     block lives once at its virtual address and the renderer maps a
+     GPU physical address to it through a table our layer keeps (no
+     aliased views: the "not emulating" rule's choice);
+   - if something does, the three views are mapped as the SDK maps them.
+   The renderer's `PhysicalHostAddress`, the mirrors, `xma.cpp` and
+   `thread_cpu.cpp` move to our layer's accessors.
+
+   Done (2026-11-16, `src/memory/mapping.cpp`, Linux only for now): one
+   `memfd_create` file (nothing in `/dev/shm`) of 4.5 GB plus a page, mapped
+   as the SDK's nine views (`map_info` in its `xmemory.cpp`) into one
+   reservation, so every alias the game or the renderer can reach is the
+   same as before: 4 KB and 64 KB virtual pages, `0x7F000000` (physical
+   0-16 MB: the tiling workers' L2 area and signals,
+   `graphics/predicated_tiling.h`), the image at `0x80000000` and its alias
+   at `0x90000000`, the three physical views (`0xE0000000` at physical +
+   4 KB) and the flat physical range at base + 4 GB. Page 0's 64 KB stay
+   unmapped (the SDK's `--protect_zero`), and nothing else is protected:
+   no page protection or access watches (nothing of ours used them: the
+   texture reloads come from our memcpy hook). The allocation layer
+   (`memory/heap.cpp`) takes its 384 MB at `0x10000` from it, and physical
+   memory from an allocator of its own over physical [0, 512 MB) (free
+   ranges by physical address, top down, the size and alignment rounded
+   to the page size, `[low, high]` clamped and rounded as the SDK's
+   `BaseHeap::AllocRange`), the address in the view for the page size;
+   the ranges the SDK kept for itself at start-up are kept out the same
+   way (0-16 MB, which `0x7F000000` shows; 3.25 MB below the top 64 KB;
+   the top 64 KB). `main()` maps it first, loads the image with our loader
+   (step 3) into `0x82000000`, binds the kernel variables (no page to
+   unprotect now) and starts the main thread with the header's stack size
+   (field `0x20200`: `0x40000`); native audio and `hooks/xma.cpp` allocate
+   from our layer instead of the SDK's system heap. `--native_threads=false`
+   (the SDK's `PrepareModuleLaunch`) no longer starts. While the SDK's
+   runtime is still made (until step 5) it maps its own memory at
+   `0x100000000` with `MAP_FIXED`, over anything there, so ours goes where
+   the kernel puts it; the first try had ours at `0x100000000`, the SDK's
+   views over it, and the image's copy faulting on the SDK's read-only
+   page. `--check_image_load` still matched (the 9 ranges of step 3).
+   Attract races, the pad replay (127 s, no error lines, the race at the
+   frame cap) and a frame dump clean.
+5. **The SDK's runtime not made**: with threads (E1), memory and the image
+   ours, `main()` stops making `rex::Runtime` (its kernel state, memory
+   and module loader); what's left of it for us (the flag parser, the log
+   forwarding, A4's) and the fallback paths into the SDK
+   (`lifted::ImportFromSdk`, the imports never seen in play, which then
+   log and stop like an address with no entry) are settled there, and
+   that is E4's start.
+
+   Done (2026-11-16): `main()` (`src/app/main.cpp`) no longer makes
+   `rex::Runtime`: no SDK memory, kernel state, module loader, VFS,
+   function table, audio system or C runtime heap. It parses the flags,
+   sets up the log and SDL (SDK library calls, until E4), maps guest
+   memory (now at `0x100000000`, the SDK's address, as nothing else maps
+   there), loads the image, binds the kernel variables, starts our audio
+   output and the main thread, and runs the event loop; closing flushes
+   the log and exits (no `TerminateTitle`: the game's threads are ours).
+   - Native audio (`src/audio/native_audio.cpp`) is a class of its own
+     started from `main()`, no longer an `AudioSystem` in the runtime's
+     config; `--native_audio=false` (the SDK's driver) is gone (the flag
+     stays accepted and is ignored with a warning, as scripts pass it).
+   - The guest timebase (`REX_QUERY_TIMEBASE`, nothing lifted reads it)
+     is our 50 MHz performance counter (`helpers/clock.h`), not the SDK's
+     guest clock, whose rate only the runtime set.
+   - `debug/thread_cpu.cpp` no longer labels threads with the SDK's
+     `XThread` starts (ours aren't `XThread`s); `CurrentThreadId` has no
+     SDK fallback (0, logged once, on a thread not ours).
+   - The fallbacks into the SDK (`lifted::ImportFromSdk`, and `Import` of
+     an SDK import with no answer of ours) log the import's name and the
+     caller and stop the program, as a call with no dispatch table entry
+     does; `lifted::Sdk` on our own functions and lifted originals still
+     runs them. Turning `--native_threads` or `--native_memory_imports`
+     off therefore stops at the first such import, and
+     `--check_image_load` is gone (no SDK loader to compare with).
+   - Left for E4: the SDK-facing entries nothing calls without the runtime
+     (`REX_FUNC(xstart)` in `app/start_up.cpp`, the `ITC_KERNEL_ENTRY`
+     functions, `app/image.cpp`'s `PPCImageConfig`), and the library
+     pieces that don't need the runtime (flags, logging, `rex::filesystem`
+     paths, `fpscr.h`, the shader translator, `xeRtlNtStatusToDosError`,
+     `global_critical_region`). The Windows build isn't kept working:
+     `memory/mapping.cpp` is Linux only (no Windows code until the user
+     asks).
+
+Checks at each step: attract races, the pad replay, frame dumps, a drive
+by the user, the Windows build under Wine for step 4, and saves loading
+(the Risks below).
+
+### Decisions for the user
+
+- **The physical aliases** (step 4): drop them if step 1 shows nothing
+  uses them, or keep the SDK's aliased views. After step 1: keep the views
+  (recommended now: the renderer reads physical memory as one flat range).
+- **The image load** (step 3): our own loader with an upstream LZX
+  library (recommended; only the US `default.xex`), or keep the SDK's
+  loader as a library writing into our mapping (less work now, but it
+  keeps the SDK's memory classes alive until it's replaced). **Decided
+  (the user, 2026-11-16): our own loader with libmspack**, not the SDK's.
+- **The order**: steps 2 and 3 before 4 (the image and the SDK's data
+  have to land somewhere before the SDK's memory goes), as above.
+
+## E4: the plan (2026-11-16, a draft for the user's review)
+
+A4 (the app shell) with E4 (`PPCContext`, `rex/ppc.h`, the function
+table, `generated/` and the SDK). After E1 and E2 (merged into
+`rexglue-removal-project` 2026-11-16), `rex::Runtime` isn't made: the SDK
+is a library our executable links (`librexruntime.so`) and a source tree
+it compiles part of (the shader translator). E4 ends with neither: no
+submodule, no `librexruntime`, no SDK header. Guest addresses stay until
+E5 (the user's call): E4 doesn't remove the guest mapping or the
+big-endian access. Linux only: the Windows build is already broken since
+E2 (`src/memory/mapping.cpp` is Linux only) and stays so until the user
+asks.
+
+### What still uses the SDK (the measure, 2026-11-16)
+
+From the sources (`grep -rn "rex::\|#include <rex" itc_recomp/src`,
+without `harnesses/`, which isn't built) and the link (`nm -D` of `itc`'s
+undefined symbols against `librexruntime.so`'s exports, on the merged
+`rexglue-removal-project` build).
+
+**The link**: 296 symbols from `librexruntime.so`, by kind:
+
+| Kind | Symbols | Who |
+| --- | --- | --- |
+| `__imp__*` import functions | 188 | `src/lifted/imports.cpp` and our native import tables use their addresses as keys only (`lifted::ImportFunction*`): since E2 none is run (an import with no answer of ours stops the program) |
+| SDL3 | 39 | `app/main.cpp` (the loop), `native/` (the window, the Vulkan surface), `input/gamepads.cpp`, `audio/native_audio.cpp`: SDL is built inside `librexruntime` |
+| spdlog | 23 | `base/log_sdk.cpp`: the SDK's logger, whose lines ours takes over (A2) |
+| `rex::` functions | 32 | below |
+| SDK flags' storage | 12 | `app/main.cpp`, `audio/native_audio.cpp`: `game_data_root`, `user_data_root`, `update_data_root`, `cache_root`, `metadata_root`, `log_file`, `log_level`, `log_verbose`, `video_driver`, `fullscreen`, `audio_mute`, `audio_maxqframes` |
+| fmt | 2 | the 158 `fmt::format` calls in `src/` (A2's leftover) |
+
+The 32 `rex::` functions: the flag registry and parser (`cvar::Init`,
+`ApplyEnvironment`, `LoadConfig`, `RegisterFlag`, `UnregisterFlag`);
+the logging set-up (`InitLoggingEarly`, `BuildLogConfig`,
+`ParseCategoryLevelsFromConfig`, `InitLogging`, `RegisterLogLevelCallback`,
+`RegisterLogCategory`, `GetLogger`, `GetLoggerRaw`, `AddSink`,
+`RemoveSink`, `FlushLogging`); the paths (`filesystem::GetExecutableFolder`,
+`GetUserFolder`, `OpenFile`); `kernel::xboxkrnl::xeRtlNtStatusToDosError`
+(`hooks/last_error.cpp`); `thread::global_critical_region::mutex`
+(`guest_code.h`, `lifted/lifted.cpp`: the lock lifted code takes for the
+360's interrupts off); and helpers that come with the translator's and the
+renderer's SDK headers (`string::StringBuffer`, `memory::copy_and_swap_32_*`,
+`bit_scan_forward`, `graphics::xenos::Float20e4To32` and `Float32To20e4`).
+
+**Compiled from the SDK's tree into our build**: `itc_xenos_shaders`
+(`itc_recomp/CMakeLists.txt`), the SDK's Xenos-to-SPIR-V translator, 14
+sources (`shader.cpp`, the `translator*.cpp`, the `spirv*.cpp`,
+`ucode.cpp`, `draw.cpp`, `registers.cpp`, `register_file.cpp`), linking
+glslang's SPIR-V builder; and the include paths of the SDK's third-party
+SDL3, Vulkan headers, simde and imgui (headers only).
+
+**The headers our code includes** (41 files outside `lifted/`, and
+`lifted/` through `lifted.h` and `imports.h`):
+
+| Header | Files | What for |
+| --- | --- | --- |
+| `rex/platform/fpscr.h` | 26 (hand ports, `xaudio/`) | `FPSCRPlatform`: reading and setting the host's float mode (MXCSR) as the original's `mtfsf` does |
+| `rex/ppc/intrinsics.h` | 3 (`xaudio/`), and every lifted file through `lifted/lifted.h` | simde helpers for vector instructions SSE lacks: `simde_mm_perm_epi8` (138 uses in `lifted/`), `cvtepu8_epi32` (138), `vsr` (106), `sllv_epi8` (49), `vctsxs` (5), `avg_epi8` (2), and `VectorMaskL` (7, hand ports) |
+| `rex/ppc.h`, `rex/ppc/func.h`, `rex/image_info.h` | `guest_code.h` (so every file), `lifted/imports.h`, `app/image.cpp` | `PPCContext`, `REX_FUNC`, `REX_EXTERN`, `PPCImageInfo` |
+| `rex/thread/mutex.h`, `rex/logging.h` | `guest_code.h` | the global lock, the SDK's log for the lift runtime |
+| `rex/cvar.h`, `rex/logging.h`, `rex/logging/sink.h`, `rex/filesystem.h` | `base/flags.h`, `base/log_sdk.cpp`, `app/main.cpp` | flags, the log, the paths (A4) |
+| `rex/version.h`, `rex/audio/flags.h` | `native/app_window.cpp`, `audio/native_audio.cpp` | the window title's version, the audio flags |
+| `rex/kernel/xboxkrnl/error.h` | `hooks/last_error.cpp` | NTSTATUS to Win32 error (six callers: file opens, the save slots, the C runtime, the time functions, the frame driver) |
+| `rex/graphics/*`, `rex/string/buffer.h`, `rex/ui/vulkan/api.h` | `native/shaders.cpp`, `passes.cpp`, `textures.cpp`, `state.h`, `vulkan_functions.h` | the translator, the register file and register layouts (`RegisterFile`, `reg::RB_*`, `PA_*`), the formats (`xenos::ColorRenderTargetFormat`, `TextureFormat`, `Endian`, `xe_gpu_texture_fetch_t`, ...), `draw_util`, and the Vulkan header's platform defines |
+
+**`PPCContext`**, 3,921 mentions outside `lifted/` and 2,836 in it, nearly
+all dead since the harnesses left the build:
+- 2,634 `ITC_REGS_STEP`s, each also defining a form taking the context
+  (for the harnesses), and 3,836 declarations of those forms in
+  `hooks/*.h`; 54 hand-written definitions taking a context;
+- `lifted/originals.cpp`'s 1,408 `cX(PPCContext&, ...)` forms of the
+  lifted originals (each also has a `Regs` form);
+- what's still run: `lifted::Sdk`'s 69 call sites in 28 files, which pass
+  a `void(PPCContext&, uint8_t*)` (an import's address, a lifted original's
+  `cX` form, three stand-ins) to `lifted::Import`. An import is looked up
+  by that address in our native tables; anything else runs through
+  `Boundary` on the thread's carrier context (`lifted::BindThreadContext`,
+  one per thread of ours, `threads/threads.cpp`): E1's 4,411 calls an
+  attract race;
+- the SDK-facing entries nothing calls since E2: `REX_FUNC(xstart)`
+  (`app/start_up.cpp`), the four `ITC_KERNEL_ENTRY`s' `REX_FUNC`s
+  (`hooks/native_entry.h`), `app/image.cpp`'s `PPCImageConfig`,
+  `lifted::Enter(PPCContext&)`, `RegsScope`, `CallFromContext(PPCContext&)`.
+
+**The three functions kept recompiled for a register leftover**
+(`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
+`Transition11` `sub_82195F10` and `Transition15` `sub_82196030`; "decide
+before E4" under E5): all three were lifted by the sweep (2026-11-15,
+batches 008 and 009), so they no longer keep the context alive. Read
+again in `generated/`: none of them stores a leftover. Each sets the
+register just before the store, with no call between (`li r7,0` then
+`stw r7,24(r11)` in `BackToBuilds`; `li r8,0` then `stw r8,24(r11)` in
+both transitions), so the word gets 0, as in the other back transitions.
+The rows' 2026-11-06 "correction" (r7 as `UiMovie::Run` leaves it) and
+the transitions' notes look wrong. Corrected rows to be shown to the user.
+Nothing to decide for E4.
+
+**The shaders in play**: the renderer translates each shader once (the
+game's Xenos microcode, by its hash and the interface: interpolators,
+point and rectangle modes) and keeps the result in `cache/shaders.bin`:
+the SPIR-V, the float and fetch constants it reads, its textures,
+samplers and vertex strides. The main build's cache (its last new shader
+added 2026-11-15, after the user's drives, attract races and pad
+replays) holds **109 translations of 105 programs** (52 vertex, 53
+pixel; 3.7 MB of SPIR-V). Every older cache in `itc_recomp/out/` (25
+files, from 2026-10-15 on, profiles, A/B runs, release folders) is a
+subset of it. The translations depend on the device's features, which
+are in the cache's header: the storage buffer range and whether clip
+distance, cull distance and demote-to-helper are on (this PC: all on).
+The programs come from the game's data (models, the XPRs) and from the
+game's HLSL compiler at boot, whose 14 shaders have been stored since the
+thirteenth loop run (`graphics/compiled_shaders.h`,
+`--use_hardcoded_shaders`). How many of the 105 those 14 account for
+isn't checked yet (the cache hashes the microcode, not the compiler's
+container).
+
+### The steps
+
+Each leaves the game working, smallest and most independent first.
+
+1. **Measure**: above. Done (2026-11-16), but for one check, which goes
+   with step 5: the shader set's completeness, from an empty cache in an
+   attract race, the pad replay and a drive by the user through the
+   modes, with a log line for each new translation
+   (`--log_shader_translations`).
+2. **The small leftovers ours** (no change in behavior):
+   - `xeRtlNtStatusToDosError`: a table of the statuses our six callers
+     pass (plug in data), checked against the SDK's table for those.
+   - The global lock: our own `std::recursive_mutex`. The SDK's kernel
+     was the only other user, and it no longer runs.
+   - `FPSCRPlatform`: `base/float_mode.h`, MXCSR's flush and rounding bits
+     through `<xmmintrin.h>` (x86-64 only, as the build is).
+   - The vector helpers: our own copies of the six `simde_mm_*` helpers
+     and `VectorMaskL` (`lifted/vector_helpers.h`, the SDK's BSD-3
+     notice kept), over our own simde (A1: a submodule at the SDK's
+     commit); the lifted batches' `rex::ppc::` qualifier replaced by
+     script.
+   - `rex/version.h`: our version string from git (the window title);
+     `rex/audio/flags.h`: `audio_mute`, `audio_maxqframes` as our flags.
+   - Checks: the build, an attract race, the pad replay, a frame dump.
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): the status conversion
+   (`hooks/last_error.cpp`: the four failures ours can pass, the general
+   rules, any other logged once and answered 317 as the kernel does), the
+   global lock (`guest_code.h`, a `std::recursive_mutex` of ours),
+   the float mode (`base/float_mode.h`, `::base::FloatMode`: the guest
+   memory parameter is also named `base`; the rounding conversion
+   `_ctrlfp` uses too) and the vector helpers
+   (`lifted/vector_helpers.h`, generated from the SDK's header: the four
+   mask tables and the nine helpers used, `sllv_epi16` with them;
+   `lift.py` now writes `vector_helpers::`). Moved to later steps: the
+   tables' global names (the SDK's, the same bytes, until step 3 takes
+   `rex/ppc.h` out: both can't be declared), simde (still the SDK's copy
+   until step 6), the version string (the SDK's CMake makes it from
+   `git describe`: step 7) and `audio_mute` and `audio_maxqframes` (the
+   SDK's library still defines them: step 4). An attract race
+   (`itc_5720`), the pad replay (`itc_5721`, 127 s, no error lines, the
+   race at ~150 fps) and a frame dump clean.
+3. **`PPCContext` out** (mechanical, by script; a change to
+   `guest_code.h` rebuilds every lifted file):
+   - Imports keyed by our own numbers (an enum written by
+     `tools/import_entries.py`) instead of the SDK's `__imp__` addresses.
+     `lifted::Import`'s fallback for an unknown import stays a log and a
+     stop, now by name.
+   - `lifted::Sdk`'s callables as `Regs` functions: the lifted originals'
+     `eX` forms, the three stand-ins; `Boundary` and the carrier context
+     go, and so do `BindThreadContext` and the context `threads.cpp` makes
+     for each thread.
+   - Deleted: `ITC_REGS_STEP`'s context form and the 3,836 declarations,
+     the 54 context definitions (or converted, where something still
+     calls them), the `cX` forms, `Enter(PPCContext&)`, `RegsScope`,
+     `CallFromContext(PPCContext&)`, `REX_FUNC(xstart)` (`app::StartUp` is
+     already what `threads::StartMainThread` runs), the kernel entries'
+     `REX_FUNC`s (`ITC_KERNEL_ENTRY` becomes `ITC_NATIVE_ENTRY`),
+     `app/image.cpp`, and `rex/ppc.h`, `rex/ppc/func.h` and
+     `rex/image_info.h` from `guest_code.h` and `lifted/imports.h`.
+   - The guest memory macros keep their `REX_` names (`REX_LOAD_U32` and
+     the like, ours since stage 5): renaming 3,010 lifted functions'
+     uses buys nothing before E5.
+   - Checks: as step 2, plus the link: no `__imp__` symbol and no
+     `PPCContext` left (`nm`, `grep`).
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): no `PPCContext`,
+   `rex/ppc.h` or SDK function left in our code.
+   - Imports: `lifted::ImportFunction` is a record of ours with the
+     import's name (`lifted/imports.h`, by `tools/import_entries.py`);
+     `__imp__X` is a pointer to it, so every site reads as before.
+     `lifted::Import` runs our answer or logs and stops; `ImportFromSdk`
+     only logs and stops.
+   - `lifted::Sdk` takes an import or a function on a register view
+     (`RegsFunction`: the lifted originals' `cX` forms); `Boundary`,
+     `Enter(PPCContext&)`, `RegsScope`, `CallFromContext(PPCContext&)`,
+     `BindThreadContext` and the threads' carrier contexts are gone, and so
+     are the originals' context forms (`tools/lift_originals.py` no longer
+     writes them).
+   - The context forms: `ITC_REGS_STEP` makes only the register-view form;
+     the 44 files' `ITC_CONTEXT_FORM` blocks, the seven `__finally` forms
+     (no callers), the title load's and network machines' template forms,
+     `EnterR3`'s, `Gpr` and a dead `CallFrom` overload deleted; the 3,834
+     context declarations turned into (mostly duplicate, then merged)
+     register-view ones; the four "caller r24" wrappers take a view.
+   - The harnesses' hooks (`g_start_up_recorder`, the stand-ins: set only by
+     harnesses, which aren't built, so always null) are typed on the
+     register view and called directly. Removing them altogether is left
+     as a cleanup.
+   - `REX_FUNC(xstart)`, the kernel entries' `REX_FUNC`s
+     (`ITC_KERNEL_ENTRY` is `ITC_NATIVE_ENTRY`) and `app/image.cpp`
+     (`PPCImageConfig`) removed; `guest_code.h` defines the short integer
+     names (`u32` and the like) itself, and the vector helpers' global mask
+     tables are ours (step 2).
+   The link: 106 symbols from `librexruntime.so` (296 at the measure): no
+   import, no `PPCContext` (SDL 39, spdlog 23, `rex::` 30, the SDK's flags
+   12, fmt 2). An attract race (`itc_5723`), the pad replay
+   (`itc_5724`, 127 s, no error lines, the race at ~150 fps;
+   `--log_imports`: 28 imports, all ours) and a frame dump (the same
+   frame as step 2's) clean.
+4. **A4: the app shell** (the 2026-10-21 survey, with what A4 brought
+   forward already did: our `main()`, our loop, no SDK window):
+   - A `--log_flags` flag landed first on the old parser, logging every
+     flag's value, so a run before and after can be compared.
+   - Our own flag registry and parser (`base/flags.h`'s macros keep their
+     names: 334 flags, 313 of them booleans), the command line over
+     `itc.toml`. `itc.toml` is a flat list of 8 keys (booleans, integers,
+     strings), so a small parser of that subset, not a TOML library.
+   - The SDK's 12 flags ours where something reads them (`game_data_root`,
+     `log_file`, `log_level`, `log_verbose`, `video_driver`, `fullscreen`,
+     `audio_mute`, `audio_maxqframes`); `user_data_root`,
+     `update_data_root`, `cache_root` and `metadata_root` are only logged
+     (saves and `cache/` don't use them), so they go, still accepted with a
+     warning as `--native_audio` is.
+   - The log file named by our logger (`logs/itc_<n>.log`, one more than
+     the highest there; `--log_file` overrides), with `base/log_sdk.cpp`
+     and spdlog gone; the 158 `fmt::format` calls to `std::format`.
+   - The paths from `std::filesystem` and `/proc/self/exe`.
+   - Checks: `--log_flags` the same before and after (with and without
+     `itc.toml`, and command-line values over it), the build, an attract
+     race, the pad replay, `--log_level=off`.
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`), by the user's calls
+   (2026-11-16): no `REX_*` environment variables, no log file with
+   `--log_level=off`, and `itc.toml` may set `game_data_root`.
+   - `--log_flags` first, on the old parser (`rex::cvar::ListFlags`).
+   - Our registry and parser (`base/flags.h`, `base/flags.cpp`): each flag a
+     function-local static (`itc_flag_<name>()`, as the SDK's storage was)
+     registered by name; `--name=value`, `--name value`, `--name` and
+     `--no-name` for booleans; `itc.toml` read as flat `name = value` lines
+     (booleans, numbers, basic and literal strings, comments) for the flags
+     the command line didn't set. Unknown flags, stray arguments, unknown
+     settings and bad values are logged as warnings once the log is open,
+     never fatal; the SDK's `user_data_root`, `update_data_root`,
+     `cache_root` and `metadata_root` (only logged) are gone and so warned
+     about if given.
+   - The SDK's flags our code read are ours, same names and defaults:
+     `game_data_root`, `log_level`, `log_file`, `log_verbose`,
+     `video_driver` (`app/main.cpp`), `fullscreen` (`native/renderer.cpp`,
+     default true as the SDK's; `itc.toml` sets false), `audio_mute` and
+     `audio_maxqframes` (`audio/native_audio.cpp`).
+   - `main()`: the command line, then `itc.toml` (next to the executable,
+     found through `/proc/self/exe`), then the paths, then the log. Our
+     logger names the file (`base::NextLogPath`: `logs/itc_<n>.log`, as the
+     SDK numbered it); the SDK's logging is set up with no file of its own,
+     only to forward its shader translator's lines into ours
+     (`base/log_sdk.cpp`, until step 5).
+   - The 137 `fmt::format` calls are `std::format` (`fmt` came in through
+     `rex/cvar.h`).
+   - Checked: `--log_flags` in three runs before and after (no `itc.toml`;
+     an `itc.toml`; an `itc.toml` with command-line values over it, in
+     every form): all 343 of our flags the same, but for one difference by
+     design: a flag given twice (`--fullscreen=false --fullscreen=true`) took
+     the first value with the SDK's parser and takes the last with ours.
+     `--log_level=off` made no file; `game_data_root` from `itc.toml`
+     worked; unknown flags and settings were warned about. An attract race
+     (`itc_5733`), the pad replay (127 s, no error lines, the race at the
+     cap, 28 imports, all ours) and a frame dump (as close to step 3's as
+     two runs' dumps are: 0.26% of pixels against 0.24%) clean. The link:
+     70 symbols from `librexruntime.so` (SDL 39, and the translator's: its
+     logging, flags, `StringBuffer` and float conversions).
+5. **The SDK out of our build** (the user's calls, 2026-11-16: we act as
+   if the SDK were deleted; the submodule stays only as the source of its
+   shader translator, a static dependency; every other third-party library
+   is ours). Was "the shaders" and "our own third-party libraries" (A1):
+   - Our own copies in `itc_recomp/thirdparty/` (submodules, pinned to the
+     SDK's versions): SDL3 (static, with the SDK's options), Vulkan-Headers,
+     simde, glslang (the SPIR-V builder only, as the SDK configured it) and
+     fmt (the translator's formatting).
+   - The translator (`itc_xenos_shaders`): its 14 sources and the few SDK
+     sources with the helpers it calls (the string buffer, the Xenos float
+     conversions, the format table, the tiled address math and the like),
+     built from the submodule's tree as a static library; its logging and
+     flags through small shims of ours (`itc_recomp/src/translator_shims/`:
+     its lines into our log, its flags at their defaults), so no spdlog,
+     no SDK flag registry and no `librexruntime`.
+   - The SDK no longer added to our build (`cmake/rexglue.cmake`, the
+     patches' application, `rex::runtime`), `base/log_sdk.cpp` gone, our own
+     version string for the window title.
+   - The tools (`attract_race.sh`, `scripted_run.sh`,
+     `profile_render_thread.sh`), CLAUDE.md and the Linux CI workflow
+     without `librexruntime.so`; the Windows workflow ignored for now.
+   - Checks: a clean configure and build, the test zip running from its own
+     folder, an attract race, the pad replay, frame dumps, gamepads and
+     rumble in a drive by the user.
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): the executable links no
+   SDK library (`readelf -d`: only libc, libm, libstdc++, libgcc_s).
+   - Submodules `itc_recomp/thirdparty/SDL`, `Vulkan-Headers`, `simde`,
+     `glslang` and `fmt`, at the SDK's commits (cloned from its copies,
+     pointed at upstream); `cmake/thirdparty.cmake` builds SDL static with
+     the SDK's options (the same backends: X11, Wayland, PipeWire,
+     PulseAudio, ALSA, HIDAPI, libudev) and glslang's SPIR-V builder only.
+   - `cmake/xenos_translator.cmake`: the 14 translator sources and 9 of the
+     SDK's with the helpers they call (`graphics/xenos.cpp`, the texture
+     format table and tiling, `ui/graphics_util.cpp`, the string buffer,
+     `core/memory.cpp`, `math_gcc.cpp`, `filesystem_posix.cpp`, the DXBC
+     checksum), with the SDK's flags for them (`-fno-strict-aliasing
+     -ffp-model=strict -fno-char8_t`, the large code model); our shims
+     (`src/translator_shims/`: `rex/logging/types.h`, `api.h`, `format.h`,
+     `rex/cvar.h`) stand in for the SDK's spdlog logging and flag registry.
+   - `cmake/rexglue.cmake`, the patches' application, `base/log_sdk.cpp` and
+     `rex/version.h` gone (our `cmake/version.cmake`: `git describe` in the
+     window title); the executable keeps the flags the SDK's set-up gave it
+     (`-mcmodel=large`, `-Wl,--no-relax`, `-msse4.1`).
+   - The tools, CLAUDE.md (the build line, packaging, the release tags) and
+     the Linux CI (non-recursive submodules: the build reads only the SDK's
+     own tracked `dxbc` and `renderdoc` files; no `librexruntime.so` in the
+     zip) updated.
+   - Checked: a fresh configure and build; an attract race and the pad
+     replay (127 s, no error lines, the race at the cap); the translator
+     itself, by the pad replay from an empty shader cache: the 84
+     translations it made byte-identical to the SDK-built translator's (the
+     other 25 of the 109 are in parts the replay doesn't reach); a frame
+     dump; the test zip run from its own folder (with `XDG_DATA_DIRS` as the
+     standard command sets it, for the Vulkan drivers). Left for the user's
+     drive: gamepads and rumble, and sound, on our SDL build.
+   - A lead for later (the user, 2026-11-16, "worth investigating later"):
+     no translator at all, the game's fixed set of shaders (105 programs,
+     109 translations) translated once with the game's data and the
+     SPIR-V committed, as the 14 HLSL shaders' microcode is; the open
+     points then were committing SPIR-V made from the game's shaders, the
+     device features the translations depend on (clip and cull distance to
+     require), and the set's coverage (a run from an empty cache through
+     the modes).
+6. (Folded into step 5.)
+7. **What's left of the SDK** (the user's calls, 2026-11-16: the submodule
+   stays, as the translator's source; `generated/` stays in the repo, out
+   of the build, to compare our behavior against later):
+   `patches/rexglue-sdk/` (the SDK's own build is no longer made, so its
+   patches no longer apply to anything we build) and the leftovers step 5
+   finds. Checks: a clean clone builds (`git clone`, submodules,
+   configure, build), the test zip runs from its own folder, an attract
+   race, the pad replay, a drive by the user.
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`, the user's go-ahead):
+   both patches checked to be exactly what the submodule's worktree held
+   (`git apply --reverse --check`), reversed there (the submodule clean at
+   its pinned commit) and `patches/rexglue-sdk/` deleted: 0001 (the
+   emulated GPU's glow switch, `--glow`, gone with it) and 0003 (the SDK's
+   Windows SDL as a DLL). CLAUDE.md, `docs/windows.md` and
+   `docs/frame-interpolation.md` say so; older mentions in the docs are
+   history. Checked: a fresh clone of the branch from GitHub with non-recursive
+   submodules (all fetched from upstream) configured and built from
+   scratch, its executable needing no SDK library and racing clean; on the
+   main build an attract race and the pad replay (127 s) clean.
+
+Checks at each step: the build, `timeout 120 attract_race.sh 40`, the
+pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
+~127 s, no error lines, the race at the frame cap), a frame dump,
+`--log_imports` for only our imports, and `boundary_status.py` in "The
+boundary over time" (its figures read the docs' rows, not the running
+code); a drive by the user before the merge.
+
+### Decisions for the user
+
+**Decided (the user, 2026-11-16):** the shader translator stays the SDK's,
+as a static dependency (the user's reason: what it makes depends on the GPU
+and driver; ours note that the SPIR-V is portable but the translations
+depend on the device's features); A4's three open questions yes (no
+`REX_*` environment variables, no log file with `--log_level=off`,
+`itc.toml` may set `game_data_root`); `generated/` kept in the repo, out
+of the build, to compare our behavior against later; the Windows CI job
+ignored for now. The order: as recommended. What was proposed:
+
+- **The shader translator** (step 5). The rule: don't port ReXGlue or
+  Xenia into `src/`.
+  - (Recommended) **Translate at build time, ship the SPIR-V**: the game's
+    shaders are a fixed set (105 programs), so a bake tool translates
+    them once and the executable carries the result, as with the 14 HLSL
+    shaders. No translator in `src/` or at run time. Part of this
+    decision: whether the translated shaders (derived from the game's
+    microcode) may be committed to the public repo, as the 14 stored
+    HLSL shaders' microcode already is. If not, the bake has to run on
+    the player's machine, which brings the translator back at run time.
+  - **Bring the translator into `src/`** (A3 as planned: 14 sources, BSD-3,
+    notices kept). Shaders unseen in testing still work, but it's the
+    porting the rule forbids.
+  - **Keep it as an outside library** (only the translator's files, as a
+    small vendored library): doesn't remove the SDK's code, only the rest
+    of it.
+- **The order of A4 against `PPCContext`**. Recommended: steps 2 and 3
+  first (what E4 is named for; it leaves only libraries in the link), then
+  A4 (4), the shaders (5, while the SDK is still there for the bake), the
+  libraries (6) and the deletion (7).
+- **`generated/`** (96 MB, 192 files): deleted with the SDK, as E4 says
+  (then `lift.py`, `lift_originals.py`, `import_entries.py`,
+  `static_map.py`, `static_reachability.py` and `init_step_tables.py` lose
+  their input, and `src/lifted/` is the source from then on), or kept as
+  the tools' input until E5.
+- **A4's open questions from 2026-10-21**: drop the `REX_*` environment
+  variables (nothing of ours uses them; recommended); no log file at all
+  with `--log_level=off` (recommended: the SDK made an empty one); whether
+  `itc.toml` may set `game_data_root` (our `main()` reads the flag before
+  loading the toml today).
+- **The Windows CI job** until Windows is asked for: disabled
+  (recommended) or left failing.
 
 ## Risks
 
@@ -3341,3 +4876,2089 @@ Imports: 186 called, 62 with a live caller. `seen_in_play.txt` made again
 from the user's third session (`docs/coverage.md`). B7 (`b7_status.py`):
 6,451 in play, ours 1,847, work left 4,604 (Wrapped 113, with a row 651,
 no row yet 3,840), from 5,200.
+
+**2026-10-25, the app framework (branch `by-loop-25-10-26`):** the B7
+loop's fourteenth run made the app framework native as far as it was
+ready (`framework.md`, 56 of 68: the run loop, its maps and request
+vector, the dispatch, the constructors, `main` and `App::Run`; 22
+adapters removed; `--native_framework`), after fixing an `ai_drivers`
+harness case that read a wild address since the hardcoded shaders moved
+the harness's block (dbc8ee0). The boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+6,451 in play, ours 1,903, work left 4,548 (Wrapped 111, with a row 597,
+no row yet 3,840), from 4,604. The rest of the framework waits on
+`Framework::Init`'s services (the worker pools' threads, events and
+critical sections, the renderer, the scene, the app), `sub_824936E8`
+(`files-and-saves.md`) and `sub_8258E1D8`'s critical section.
+
+**2026-10-25, the game modes (branch `b7-loop-25-10-26-2`):** the B7
+loop's fifteenth run made the game modes native as far as they were
+ready (`game-modes.md`, 21 of 31: the race mode's state machines, the
+race overlays' machine and handlers, the race mode's members and 28-byte
+buffers; `--native_game_modes`). `RaceOverlaysMachine::Init` replays the
+original's stores in the same stack frame, so the transitions keep the
+same unwritten stack words. The boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,451
+in play, ours 1,923, work left 4,528 (Wrapped 111, with a row 605, no
+row yet 3,812), from 4,548. The rest waits on `XPR::XPR` (`models.md`,
+a leaf blocking the race mode's constructor), the race mode's other
+set-ups (leads), the other modes' constructors and `Modes::Tick`'s
+callees.
+
+**2026-10-25, the model class (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made the model class native (`models.md`, all 17 new
+rows: `Model::Model`, `Release`, `~Model`, the texture provider, the
+XPR's constructor and teardown, the put-off frees; `memmove_s` in
+`c-runtime.md`; `--native_models`). The critical section at
+`0x8296BD38` (the memory blocks' pending frees) is a host
+`std::recursive_mutex` (the user's call, 2026-10-25), taken by the
+native frees and, through `ScopedLock` overridden for this critical
+section only, by its four recompiled users; the generic wrappers stay
+the game's. The boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,451
+in play, ours 1,944, work left 4,507 (Wrapped 111, with a row 601, no
+row yet 3,795), from 4,528. It makes the game modes' `sub_821067A0` and
+`sub_82106AF0` ready.
+
+**2026-10-25, the game modes' rest (branch `b7-loop-25-10-26-2`):**
+after the model class, the race mode's constructor (`RaceMode::RaceMode`
+with its members) and `Mode::Create` with the mode constructors became
+ready and were made native (`game-modes.md`, 38 of 42; 6 more adapters
+removed). The boundary unchanged: 449 functions (916 pairs). B7
+(`b7_status.py`): ours 1,961, work left 4,490 (Wrapped 111, with a row
+595, no row yet 3,784), from 4,507. Left: `Modes::Tick`, `RaceMode::Init`'s
+set-ups and `RaceMode::~RaceMode` (`RaceOverlays::Destroy`'s chain). The
+pad replay works again (d83677c: it waited for the movie library's draw,
+gone since the movies play through our FFmpeg).
+
+**2026-10-25, the mode tick (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made what `Modes::Tick` calls besides the mode's slots
+native (`mode-tick.md`, 21 of 23: the per-mode settings, the sign-in
+watch, the ring flip, the screen fades, the menu music; presence
+Dropped; `--native_mode_tick`), with XAPI's `lstrcmpA` and
+`CompareStringA` as plain C++ in `src/helpers/` (B6's call). The
+boundary unchanged: 449 functions (916 pairs): overridden 67, Native 5,
+Dropped 23, never called 70, live 284. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 1,983, work left 4,468 (Wrapped
+111, with a row 597, no row yet 3,760), from 4,490. Left:
+`SignInWatch::OnModeChange` (the save data's creation and deletion, a
+lead), `SignInWatch::StaticInit` (`atexit`), and so `Modes::Tick`.
+
+**2026-10-25, the minimap (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made the minimap's parts native (`minimap.md`, 12 of 15;
+`--native_minimap`), keeping frame interpolation's `BlendState_OnMultiply`
+and `OnCopy` calls (with the original return addresses) and
+`Minimap::Draw`'s `--per_tick_minimap_blink` wrap; its frame dump is
+pixel-identical with the fallback. The boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 1,995, work left 4,456 (Wrapped 111, with a row 599, no row yet
+3,746), from 4,468. The marker draws and `Minimap::Draw` wait on
+`atexit` (next, by the user's go-ahead: the exit lock a host mutex) and
+the course set's lists.
+
+**2026-10-25, `atexit` and what it unblocked (branch
+`b7-loop-25-10-26-2`):** the fifteenth run's last step (the user's
+go-ahead, counted as its fifth subsystem) made `atexit`, `_onexit` and
+`__onexitinit` native over the game's exit table, the C runtime's exit
+lock (lock 8, critical section `0x82971248`) a host
+`std::recursive_mutex` taken by every user (`_lock`/`_unlock`
+overridden for lock 8 only; its other users, the exit path, never run:
+closing the window hard-exits), then what it unblocked: the global
+strings' static set-ups, `SignInWatch::StaticInit`, the UI movies'
+`TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker
+draws and the viewports (12 adapters removed). The boundary: 449
+functions (916 pairs): overridden 69, Native 5, Dropped 23, never called
+70, live 282 (the two lock overrides). Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): 6,451 in play, ours 2,013, work left
+4,438 (Wrapped 110, with a row 590, no row yet 3,738), from 4,456 (from
+4,548 at the run's start). `Minimap::Draw` waits on the course set's
+lists; the semaphores' and the vblank event's static set-ups on their
+kernel objects; `sprintf` and `_vsnprintf_l` on `_output_l` and
+`_vsnprintf`.
+
+**2026-10-25, the scene models (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's first subsystem mapped the scene models' set-up side
+(`scene-models.md`, 48 rows; the rest of their code, ~227 functions, in
+six leads) and made 23 native (`--native_scene_models`): the parts'
+links, the records' defaults, copies and constructor, the car records'
+reset and copy, the accessory, the sound loads' callback and the car
+model's pages (VirtualAlloc through `memory::AllocPages`). Validated:
+every function ran in its harness and in play (two only in the pad
+replay). The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): 6,451 in play, ours
+2,037, work left 4,414 (Wrapped 110, with a row 614, no row yet 3,690),
+from 4,438. `SceneModel::SetUp`, `Build` and `Update` wait on the load
+slots, `Archive::Load`, `ScenePools::SetUp`, the asset's size,
+`sprintf` and `Texture::Create`.
+
+**2026-10-25, `UiMovie::DrawTexts` and what it unblocked (branch
+`b7-loop-25-10-26-3`):** a "no mapping" lead (not counted) made the UI
+movies' text draw native and what it unblocked: `UiMovie::Update`,
+`Draw`, `Run`, `Finish`, `FinishNamed` and `FinishAll`, `_init_pointers`
+with the empty destructor, the race HUD's movie picker and the rival
+logo's draw (`race-hud.md`, `--native_race_hud`; `--redraw_rival_logo`
+calls the native draw); 9 adapters removed; the title screen's text
+pixel-identical with the fallback. `_mtinit` waits on the kernel's TLS
+(no call yet). The boundary unchanged: 449 functions (916 pairs):
+overridden 69, Native 5, Dropped 23, never called 70, live 282.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): ours
+2,050, work left 4,401 (Wrapped 105, with a row 608, no row yet 3,688),
+from 4,414.
+
+**2026-10-25, the UI movies' ready groups (branch
+`b7-loop-25-10-26-3`):** a "no mapping" lead (not counted) made the
+rest of `ui-movies-game.md`'s ready groups native (26 rows: the vectors,
+the movie's constructor and destructor, the texts freed, `GetText` and
+the text setters, the named animations' set-up, the HUD's mirror
+effect, whose replay frame dumps match the fallback's). The boundary
+unchanged: 449 functions (916 pairs): overridden 69, Native 5, Dropped
+23, never called 70, live 282. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,076, work left 4,375 (Wrapped 105,
+with a row 582, no row yet 3,688), from 4,401. The rest of the file
+waits on `sub_82108860`, the string table's formatting, the archive
+load's events (`NtWaitForSingleObjectEx`, `NtSetEvent`) and the texture
+set.
+
+**2026-10-25, the scenery lists (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's second subsystem mapped the course set's model lists and
+the model draws (`scenery-lists.md`, 27 rows) and made them native as
+far as they were ready (`--native_scenery_lists`; `models.md`'s
+accessors and `Model::RecordShape` under `--native_models`): every model
+draw in a race now records natively, `Recorder::RecordObject` inside its
+interpolation wrapper (native callers run its hooks through
+`BlendState_SetRecordContext`); frame dumps and `--log_blend_state`
+counts matched the fallback. Cases the ports don't cover (material
+animations, more than 4 textures, a full command list, another list's
+chunk open) run the original from the start. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,107, work left 4,344 (Wrapped 104, with a row
+576, no row yet 3,664), from 4,375. The lists' loads wait on
+`Model::Load` (the shader objects' set-up, the memory blocks).
+
+**2026-10-25, the shader objects and what they unblocked (branch
+`b7-loop-25-10-26-3`):** the sixteenth run's third and last subsystem
+mapped the shader objects and the memory blocks (`shader-objects.md`, 7
+rows; `XMemCpy` in `c-runtime.md`) and, in three migrations, made the
+whole chain up to `Model::Load` native (`--native_shader_objects`;
+`models.md`'s under `--native_models`; `XMemCpy`'s step word logged as
+1; native copies into physical memory recorded for the renderer through
+a new `native::Buffers_Memcpy`), then `DataFile::GetEntry` (new
+`--native_data_files`) and what it unblocked: the scenery lists' loads,
+the course set's parsers, pool objects, `CollectAreas`, `CollectModels`
+and `DrawSetLists`, and the string table's `Get`, `FormatV` and `Format`
+(15 adapters removed). Race frame dumps matched the fallback (the
+attract race comes in two timing variants, 2,412 or 2,414 draws). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): 6,451 in play, ours 2,152, work left
+4,299 (Wrapped 104, with a row 540, no row yet 3,655), from 4,344 (from
+4,438 at the run's start). What's left in these files waits on the
+generic critical section wrappers, the video output's events and
+semaphores, `Archive::Load` and the asset's size.
+
+**2026-10-26, the race's set-up (branch `b7-loop-25-10-26-4`):** the
+seventeenth run's first subsystem mapped the race's set-up
+(`race-setup.md`, 52 rows) and made all of it native in three
+migrations (`--native_race_setup`): the car object's set-up and parts,
+the race data, the course route table (its 1,175 constant stores
+replayed into the original's frame), the racers and stages, up to
+`Race::SetUp` and `Race::SetUpRival`; then `RacerRecord::Init`
+(`vehicle-accessors.md`) and `Vehicle::SetupFromCar` with its car data
+derivation (`car-physics.md`, under `--native_car_physics`). Native
+callees run in the frame the original's call gives them, frame
+leftovers written as the original leaves them; register saves aren't,
+so `Race::SetUp`'s traffic records carry 42 bytes a record the
+original fills from them (an expected harness group, for review). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,209, work left 4,242 (Wrapped
+104, with a row 535, no row yet 3,603), from 4,299.
+
+**2026-10-26, the car physics' ready groups (branch
+`b7-loop-25-10-26-4`):** a lead without mapping, after the race's
+set-up: the rest of `car-physics.md` made native in two migrations,
+the vehicle's physics step, set-up, reset and destroy, the ground
+probe, and the collision world's set-up and update (134 of 134 ours;
+84 adapters removed). The translated `ble` is "not greater", so a NaN
+keeps the value so far (`car-physics.md`'s intro); callees refusing on
+paths never seen run their original in the caller's frame; the
+allocating ones run natively only under `--native_heap`. The boundary
+unchanged: 449 functions (916 pairs): overridden 69, Native 5, Dropped
+23, never called 70, live 282. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,230, work left 4,222 (Wrapped 104,
+with a row 516, no row yet 3,602), from 4,242.
+
+**2026-10-27, the vehicle code above the physics (branch
+`b7-loop-25-10-26-4`):** the seventeenth run's second and last
+subsystem (the user's limit for it) mapped the vehicle code
+(`vehicle.md`, 25 rows) and made all of it native in two migrations
+(`--native_vehicle`): the seven vehicles' lifetime, the set-ups from a
+car object, the tick (two physics steps of 1/60 a tick, the step read
+from guest memory), the input, the track positions and status, the
+engine's power curve and `PlaceOnRoute`. Never-seen callees (six under
+`ApplyInput`, `sub_820FA8F8` under `PlaceOnRoute`) run the whole
+original, decided before anything is written. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,255, work left 4,197 (Wrapped 104, with a row
+516, no row yet 3,577), from 4,222 (from 4,299 at the run's start).
+
+**2026-10-28, the app's update and its state stack (branch
+`b7-loop-27-10-26`):** the eighteenth run's first subsystem mapped the
+app's update and its state stack (`app-states.md`, 56 rows: the lead
+`820AE010`-`820AEC10` turned out to be the state stack's layers) and
+made all of it native in two migrations (`--native_app_states`): the
+app's update with its handler maps, requests and messages, `App::Start`
+(which pushes the game modes' holder, whose slot 10 is how `Modes::Tick`
+runs every pass), the state layers and the containers they use. Paths
+never seen in play (`StateLayer::ApplyOp`'s pop and replace,
+`AppStates::OnMessage`'s step and teardowns, failed allocations) run the
+original. The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,311, work
+left 4,141 (Wrapped 103, with a row 515, no row yet 3,523), from 4,197.
+
+**2026-10-28, the scene's loading objects (branch `b7-loop-27-10-26`):**
+the eighteenth run's second subsystem mapped the lead taken for the car
+code's skeletons as the first scene pool set's seven loading classes
+(`scene-loaders.md`, 78 rows) and made 20 native in one migration
+(`--native_scene_loaders`): the leaves, `ScenePools::MakeA` (over the
+allocation layer only), the pool node, the load checks, the XPR name
+lookups and `CarModelLoads`. The rest waits on functions in other
+files, each small and ready: `LoadSlot::Reset` `sub_820D0730` and
+`ReleaseBuffer` `sub_820D0758`, the deferred release `sub_820C3F50`
+and `CarModel::Release` `sub_820D4508` (`car-models.md`), the part
+model's `sub_820CE928`, `sub_820CE990`, `sub_820CE9C8` (`models.md`),
+the accessories' release; taken next as a "no mapping" lead. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,331, work left 4,121 (Wrapped
+103, with a row 573, no row yet 3,445), from 4,141.
+
+**2026-10-28, the scene loaders' blockers (branch `b7-loop-27-10-26`):**
+a "no mapping" lead (not counted toward the run's limit) made the scene
+loaders' small blockers in `car-models.md` and `models.md` native (the
+load slots, the deferred release, `CarModel::Release`, the part model;
+`--native_car_models`), then what they unblocked: the seven loading
+classes' lifetimes, `ScenePools::CreateA` and `Interior::OnPartLoaded`
+(`scene-loaders.md` 60 of 78 ours). Deleting destructors run natively
+only without bit 0 (the `operator delete` on `VirtualAlloc` pages
+never seen); matrices the originals build on their stacks and memcpy
+are written in place, a car model at or above `0xA0000000` running the
+original so memcpy's override still records the copies. The rest waits
+on the material passes, the accessories, `Skeleton`'s local matrices
+`sub_82599C58`, `XPR::GetTexture` and sprintf. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,381, work left 4,071 (Wrapped 103, with a row
+523, no row yet 3,445), from 4,121.
+
+**2026-10-28, the players' save data (branch `b7-loop-27-10-26`):** the
+eighteenth run's third and last subsystem mapped the save data in
+memory (`save-data.md`, 23 rows, 4 not seen in play) and made all 19 in
+play native in one migration (`--native_save_data`), at boot and the
+title screen: `SaveData::Create` and `Delete`, the progress, stats,
+course records, options and control maps, `TitleScreen::ResetPlayer`
+and `MenuList::Init` (about 75 front-end screens call it, so its
+adapter stays). Scratch below r1 isn't written (as earlier ports). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,400, work left 4,052 (Wrapped
+103, with a row 522, no row yet 3,427), from 4,071 (from 4,197 at the
+run's start).
+
+**2026-10-28, texture compression (branch `b7-loop-28-10-26`):** the
+nineteenth run's first subsystem mapped the top lead, `sub_8235AAC0`, as
+XGraphics' `XGCompressSurface` over D3DX's image blitter
+(`texture-compression.md`, 157 rows, 24 seen in play; not part of the
+replaced HLSL compiler), used in play only by `Vinyl::Compress`, and
+made all 24 native in one migration (`--native_texture_compression`,
+built with the strict-float options; six subagents one at a time, the
+color block encoder alone ~1,500 lines). The format paths never seen in
+play (DXN/CTX1, YUV, the filters, sRGB and others) go back to the
+recompiled code; a few words the original's callees leave below r1
+aren't written (as earlier ports). `XGCompressSurface`'s adapter stays
+for its recompiled caller `Vinyl::Compress` (`car-models.md`, which
+waits on two small ready groups). The boundary unchanged: 449 functions
+(916 pairs): overridden 69, Native 5, Dropped 23, never called 70, live
+282. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 2,424, work left 4,028 (Wrapped 103, with a row 522, no row yet
+3,403), from 4,052.
+
+**2026-10-28, the vinyl sheet (branch `b7-loop-28-10-26`):** two leads
+without mapping in `car-models.md` made `Vinyl::Compress` with
+`Texture::Create` and `Free`, then the decal path under
+`CarModel::OnDecalLoaded` (the TGA reader, the CPU's software
+rasterizer, `Vinyl::DrawDecal` and `DrawDecals`) native under
+`--native_car_models` (`car-models.md` 27 of 46 ours; `XGCompressSurface`
+and `Vinyl::Compress` Native). Paths never seen (RLE TGAs, region
+numbers above 9, memory outside the allocation layer) go to the
+originals. The TGA headers' two unwritten bytes in `DrawDecals`' frame
+differ in the harness (expected to differ, for review). The run
+stopped at the validation: `Vinyl::ClearCorner` `sub_820D3C80` ran in
+play but its harness never reaches it. The boundary unchanged: 449
+functions (916 pairs): overridden 69, Native 5, Dropped 23, never called
+70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,447, work left 4,006 (Wrapped 103, with a row
+503, no row yet 3,400), from 4,028 (from 4,052 at the run's start).
+
+**2026-10-28, the race world (branch `b7-loop-28-10-26`):** the
+nineteenth run's second subsystem mapped the race's states and manager
+(`race-world.md`, 54 rows, 50 in play) and made 49 native in three
+migrations (`--native_race_world`; `TrackCollision::Tick` under
+`--native_collision_world`): the race mode's state machine, the
+racers' manager (80 entries; at most 4 opponents and the allowed traffic
+given one of the 7 vehicles, streamed by distance each tick), the start
+placements and the save's distance. `StreamTraffic`'s neighbor search
+is left out as dead code (its count never goes below 0); two
+functions never seen got harness stand-in overrides (Wrapped). One
+harness group expected to differ (`AddRacers` with random traffic
+numbers: stack leftovers). `RaceWorld::OnLoad` waits on the archive
+(`sub_8209DE48`, `sub_820A0678`). The harnesses now take ~29 s of
+`attract_race.sh 40` (`race_world`'s ~8 s), leaving ~9 s of race. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,497, work left 3,961 (Wrapped
+103, with a row 503, no row yet 3,355), from 4,006.
+
+**2026-10-28, the race's states (branch `b7-loop-28-10-26`):** the
+nineteenth run's third and last subsystem mapped the race's second
+state machine (`race-states.md`, 78 rows, 63 in play: `RaceStates::Init`
+at +107168, 87 transitions, and the race's progress at `[0x826D82E8]`)
+and made 43 native in two migrations (`--native_race_states`), with
+`RaceStates::Init` split in two and its transitions checked against the
+listing. Float compares follow the translated code's `bge` as `!lt` and
+`ble` as `!gt` (a NaN takes them). The System Link case of
+`StandingStartTick` runs the original whole. The attract race reaches
+only `Init`, `RaceProgress::Create`, `Reset` and `Begin`; the replay's
+free-start race most of the rest; 23 functions wait for a drive
+(`docs/loops/to-drive.md`). The rest waits on the loading screen, the
+archive's queue, the cars put back, the input recordings, the scene
+models' load poll, the items and achievements, the race event's
+lookups, the two-player cameras and the core. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,540, work left 3,920 (Wrapped 103, with a row
+523, no row yet 3,294), from 3,961 (from 4,052 at the run's start).
+
+**2026-10-28, the archive (branch `b7-loop-28-10-26-2`):** the
+twentieth run's first subsystem mapped the archive (`archive.md`, 27
+new rows; its B4 rows stay in `files-and-saves.md`) and made 25
+functions native in two migrations (`--native_archive`): the TOC and
+asset sizes, the request list and slots, the queue, the loader's
+picker, set-up and next request, the waits and cancels, the request
+finish and the Ucl unpacker. The loader's four semaphores (queue lock
+`0x826BAAE0`, work `0x826BAAB8`, request-done `0x826BAA68`, idle
+`0x826BAA90`) are host counting semaphores with a readable count, taken
+by every user (the user's call, 2026-10-28): `Semaphore::Wait` and
+`Signal` route those four addresses to them and every other semaphore
+to the game's code. The rest waits on the loose read's file object
+(`sub_820A6A00`, `sub_820A6A40`), the open by name (`sub_820A6AB8`) and
+sprintf, and the game's `Semaphore::Init` for the static set-ups. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,565, work left 3,896 (Wrapped
+103, with a row 510, no row yet 3,283), from 3,920.
+
+**2026-10-28, the file layer (branch `b7-loop-28-10-26-2`):** the
+twentieth run's second subsystem mapped the game's file layer
+(`file-layer.md`, 21 rows, 11 in play: the file object `GameFile` over
+`AsyncFile`, `File::` and a base stream; the path object and
+`Path::Build`; `GamePath::`, only from the movie library's open) and
+made it native with what it unblocked (`--native_file_layer`): sprintf
+and `_vsnprintf` with `_output_l` (`--native_c_runtime`,
+`src/c_runtime/narrow_format.cpp`, after `_woutput_l`'s precedent: the
+original runs for what the native formatter doesn't do), the open by
+name and the archive's loose read (`--native_archive`), so nothing
+ready is left in the archive or the file layer. The open by name and
+the loose read stay adapters calling B4's `File::` adapters through
+`ctx`. The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,582, work
+left 3,879 (Wrapped 103, with a row 504, no row yet 3,272), from 3,896.
+
+**2026-10-28, the save system's interface (branch
+`b7-loop-28-10-26-2`):** the twentieth run's third and last subsystem
+mapped the save system's interface (`save-interface.md`, 62 rows, 41 in
+play: the app's interface at `[0x826BDC90]`, app + 16, with the save
+devices and users behind its slots +12 and +8, the wrappers over the
+save slots' getters and request words, and the front end's save layer
+at `8228F6B0`-`82290640`) and made all 41 native in one migration
+(`--native_save_interface`), with `XContentCalculateSize`, the display
+name's copy and the users' two vtable targets. Nothing in it calls an
+Xbox service: it sets the slots' request words, which B4's `SaveSlot`
+steps answer. The plain C++ checks that each vtable target it calls is
+ours and hands back to the original when one isn't. The replays' list
+(`BuildList`, `Count`, `ReadEntry`, `Sort`) waits for a drive. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,628, work left 3,833 (Wrapped
+103, with a row 498, no row yet 3,232), from 3,879 (from 3,920 at the
+run's start).
+
+**2026-10-28, the car sounds and X3DAudio (branch
+`b7-loop-28-10-26-3`):** the twenty-first run's first subsystem mapped
+the car sounds with X3DAudio (`car-sounds.md`, 66 rows, 62 in play: the
+seven 1,264-byte per-racer car sound objects at `[0x826C5C3C]`, played
+straight through XAudio voices into a submix, not through XACT, with
+the game's own in-memory wave bank reader; and X3DAudio, 14 functions,
+translated as the game's code by the XACT precedent) and made 24 native
+in one migration (`--native_car_sounds`, `src/car_sounds/`; X3DAudio's
+math and `CarSound::Update3D` built with strict floating point), the
+eleven X3DAudio adapters and `EngineSound::EngineSound`'s removed. The
+rest (the voices' add, play, pitch, update and release, `CarSounds::Init`,
+`Start`, `Stop`) waits on XAudio's voice methods (`8245xxxx`, a lead).
+The boundary unchanged: 449 functions (916 pairs): overridden 69,
+Native 5, Dropped 23, never called 70, live 282. Imports: 186 called,
+62 with a live caller. B7 (`b7_status.py`): ours 2,652, work left
+3,809 (Wrapped 103, with a row 535, no row yet 3,171), from 3,833.
+
+**2026-10-29, XAudio's voices (branch `b7-loop-28-10-26-3`):** the
+twenty-first run's second subsystem mapped XAudio's voices
+(`xaudio.md`, 108 rows, 93 in play: the game's recompiled copy of
+XAudio, translated by the XACT precedent; its API lock the critical
+section at `0x8264D518`, the mixer's own `0x8264D4F8`, the voice lists'
+recursive spin lock `0x82954F10`) and made 92 of 96 in play native in
+two migrations (`--native_xaudio`, `src/xaudio/`), 37 Native. Two
+user's calls (2026-10-29): locks whose depth the code reads become
+host recursive locks with a readable depth, taken by every user; a lock
+taken inline whose users aren't all ours is taken natively as the
+original does until they are. So both locks are still the game's: the
+spin lock is inlined in 57 functions (the engine, mixer and codecs, a
+lead), and 8 of the API lock's 29 users wait on the engine lead.
+Native code calls the kernel imports through the guest call at their
+thunks. The rest (`XAudioShutDown`, the callback's registration, the
+commit) waits on the engine and mixer. The boundary: 449 functions
+(916 pairs): overridden 94, Native 12, Dropped 23, never called 70,
+live 250 (from overridden 69, Native 5, live 282). Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,744, work
+left 3,720 (Wrapped 103, with a row 539, no row yet 3,078), from 3,809.
+
+**2026-10-29, the car sounds finished (branch `b7-loop-28-10-26-3`):**
+with XAudio's voices native, two more migrations made the rest of the
+car sounds native (`car-sounds.md`, 62 of 62 in play,
+`--native_car_sounds`): the voices made, started, paused and released,
+`CarSounds::Init`, and `CarSound::Update` with every part's update
+(engine, tires, roll, hits, wind, pass-by, horn, turbo); the car
+sounds' plain C++ calls XAudio's plain C++ directly. `CarSound::Update`'s
+adapter stays for its recompiled caller in the race code
+(`sub_82175F20`). The boundary: 449 functions (916 pairs): overridden
+92, Native 14, Dropped 23, never called 70, live 250. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,782, work
+left 3,682 (Wrapped 103, with a row 501, no row yet 3,078), from 3,720.
+
+**2026-10-29, XACT's waves and voices (branch `b7-loop-28-10-26-3`):**
+the twenty-first run's third and last subsystem mapped XACT's voice
+class with the waves (`xact-waves.md`, 91 rows, 30 in play: the voice
+class over XAudio's entry points, the reverb submix wrapper, the base,
+in-memory and streaming waves, the tracks' volume and pitch getters)
+and made 22 native in one migration (`--native_xact_waves`,
+`src/xact/`), with 16 adapters removed (7 of XAudio's entry points, 5
+in `xact.md`). XACT's lock (the engine's critical section, +144, taken
+inline in 62 functions) is the game's, taken as the original does (the
+2026-10-29 call). The rest waits on `XACTWave::Notify`'s
+`XACTEngine::SendNotification` and `XACTGetTimeMs` over
+`QueryPerformanceCounter` (a lead). The boundary: 449 functions (916
+pairs): overridden 85, Native 22, Dropped 23, never called 70, live
+249. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 2,804, work left 3,660 (Wrapped 103, with a row 509, no row yet
+3,048), from 3,682 (from 3,833 at the run's start).
+
+**2026-10-29, XACT's tracks and events (branch `b7-loop-29-10-26`):**
+the twenty-second run's first subsystem mapped XACT's tracks, track
+instances and events (`xact-tracks.md`, 143 rows, 55 in play; the
+parameter events, none in play, left as a lead) and made 47 native in
+two migrations (`--native_xact_tracks`, `src/xact/tracks.cpp`), with
+16 adapters removed, and `XACTSound::ScheduleEvent` (`xact.md`).
+`XACTTrackInstance::CancelEvents` takes XACT's lock as the original
+does (the 2026-10-29 call). The other 8 in play (the tracks' and
+events' play, schedule, fire, done and audio updates) wait on
+`XACTGetTimeMs` (`sub_825BFE28`) over `QueryPerformanceCounter`, a
+kernel import. The boundary: 449 functions (916 pairs): overridden 85,
+Native 23, Dropped 23, never called 70, live 248. Imports: 186 called,
+62 with a live caller. B7 (`b7_status.py`): ours 2,852, work left 3,612
+(Wrapped 103, with a row 516, no row yet 2,993), from 3,660.
+
+**2026-10-29, XAudio's engine and mixer (branch `b7-loop-29-10-26`):**
+the twenty-second run's second subsystem mapped XAudio's engine and
+mixer (`xaudio-engine.md`, 70 rows, 47 in play) and made 40 native in
+one migration (`--native_xaudio_engine`, `src/xaudio/engine.cpp`), with
+11 adapters removed. The other 7 in play (`XAudio::CreateEngine` with
+`XAudioEngine::Create` and `Init`, the mixer callback with
+`XAudioEngine::Mix`, `XAudio::MasterThread` and `WorkerThread`) make,
+set, wait on or release kernel objects no call covers yet: XAudio's
+own guest threads (`ExCreateThread`), the events `0x82954EF8`,
+`0x82954EE8`, `0x82954EC4`, the semaphore `0x82954ED4` and the title
+terminate notification `0x82954EB4`; they wait on the user's call. The
+boundary: 449 functions (916 pairs): overridden 92, Native 24, Dropped
+23, never called 70, live 240. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,892, work left 3,572 (Wrapped 103,
+with a row 523, no row yet 2,946), from 3,612.
+
+**2026-10-29, stale functions out of the coverage list (branch
+`b7-loop-29-10-26`, beside the loop):** a read-only survey of the
+libraries linked into the game (the XEX's static library list names
+only Microsoft's: XAPILIB, D3D9, D3DX9, XGRAPHC, XNET, XAUD, X3DAUD,
+XMEDIA, XONLINE, XHV, XMP, LIBCPMT, XACT; no third-party library found
+in the image's strings or tables) found 148 functions in
+`seen_in_play.txt` that can no longer run: 82 of the movie library's in
+the `.embsec_` sections (`825DC200`-`825FC1B8`, now part of its range)
+and 66 in D3DX's range reached only through the HLSL compiler's
+objects' vtables or the movie library's tables (`docs/coverage.md`). Taken out of the list. The boundary unchanged: 449
+functions (916 pairs): overridden 92, Native 24, Dropped 23, never
+called 70, live 240. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,905, work left 3,411 (Wrapped 103, with a row
+510, no row yet 2,798).
+
+**2026-10-29, the continuations: QueryPerformanceCounter, XACT's
+tracks and waves, XAudio's engine finished (branch `b7-loop-29-10-26`):**
+by the user's calls of 2026-10-29, QueryPerformanceCounter
+(`sub_825BA0C8`) is answered from the host's steady clock at 50 MHz
+(`helpers::PerformanceCounter`, no flag, as GetTickCount), and
+XAudio's own threads, events, semaphore and title terminate
+notification are used by native code through the kernel's imports as
+the original does. With them, `XACTGetTimeMs` and the rest of XACT's
+tracks (`xact-tracks.md`, 55 of 55), XACT's waves (`xact-waves.md`, 31
+of 31: the notifications, the release, `InMemoryWave::Prepare`,
+`AudioUpdate`) and XAudio's engine (`xaudio-engine.md`, 47 of 47:
+`CreateEngine`, `Init`, the mixer callback, `Mix`, the master and
+worker threads) are native; register leftovers (r3) matched in full
+where the original sign-extends the time. The boundary: 449 functions
+(916 pairs): overridden 93, Native 27, Dropped 23, never called 70,
+live 236. Imports: 186 called, 58 with a live caller (from 62). B7
+(`b7_status.py`): ours 2,919, work left 3,398 (Wrapped 104, with a
+row 503, no row yet 2,791; the user's coverage commit cf7114c took 148
+stale entries out of the list), from 3,572.
+
+**2026-10-29, XAudio's factory objects (branch `b7-loop-29-10-26`):**
+the twenty-second run's third subsystem mapped the objects XAudio's
+factory makes (`xaudio-objects.md`, 121 rows, 109 in play: the class
+tables, the codecs' packet queue, the PCM and XMA codecs, the
+resampler, the output matrices, the reverb, the volume meter; the XAPO
+lead with them) and made 78 native in one migration
+(`--native_xaudio_objects`, `src/xaudio/objects.cpp`), with
+`XAudioRegisterProcessingCallback` and `XAudio::Commit` (`xaudio.md`,
+94 of 96). The run stopped at its validation: the XMA codec's two
+destructors (`sub_8246A918`, `sub_8246AAD0`) ran in play but their
+harness case calls the original release directly. Ready and not taken:
+the resampler (`sub_8246F140` and its kernels, which `PcmCodec::Process`
+waits on) and the reverb's core (`ReverbCore::Process` and its stages,
+3,829 lines, `Init`, `Apply`). The boundary: 449 functions (916 pairs):
+overridden 110, Native 28, Dropped 23, never called 70, live 218.
+Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
+2,999, work left 3,318 (Wrapped 104, with a row 532, no row yet 2,682),
+from 3,398 (from 3,660 at the run's start).
+
+**2026-10-30, the rest of XAudio's factory objects (branch
+`b7-loop-29-10-26-2`):** the twenty-third run took the last run's stop
+as a cleanup lead: the XMA codec's destructors given harness cases of
+their own, then the resampler and its kernels, `PcmCodec::Process` and
+the reverb (its stages, `ReverbCore::Process`, `Apply`, `Init`, the
+construction and the pass) made native in three migrations
+(`xaudio-objects.md` 110 of 110; `src/xaudio/resampler.cpp`,
+`reverb_stages.cpp`, `reverb_core.cpp`, `reverb_setup.cpp`; the float
+helpers in `ppc_float.h`), 41 adapters removed. It stopped at the third
+validation: `CarSound::Part840Update`'s harness (`car-sounds.md`)
+differed on 1 of 80 cases (two pointer words), after 0 in the run's
+three earlier validations. The boundary: 449 functions (916 pairs):
+overridden 108, Native 33, Dropped 23, never called 70, live 215.
+Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
+3,031, work left 3,287 (Wrapped 104, with a row 501, no row yet 2,682),
+from 3,318.
+
+**2026-10-30, the app's start-up (branch `b7-loop-29-10-26-2`):** the
+twenty-fourth run first fixed the last stop's `CarSound::Part840Update`
+harness (the game's mixer swaps XAudio's two source-voice stage lists
+between a case's versions: compared by role), then mapped and made
+native the app's start-up (`app-start-up.md`, `--native_app_start_up`,
+`src/app_start_up/`): `App::App`, `App::Create`, `App::StartUp` and
+what they build. The voice engine (XHV, under the network manager's
+`sub_8214F6E8`) isn't made, by the user's call (2026-10-30): no reader
+of the engine runs in play once B5's `Network::Update` skips its
+per-frame users, so the set-up alone is Dropped. The movie wrapper's
+critical section is a host recursive mutex by its address, as the
+memory blocks' lock. What's left above it: `Framework::Init`'s
+services (`framework.md`). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,090, work left 3,230 (Wrapped 104, with a row 479, no row yet 2,647),
+from 3,287.
+
+**2026-10-30, the data load at boot (branch `b7-loop-29-10-26-2`):**
+mapped and made native (`data-load.md`, `--native_data_load`,
+`src/data_load/`): `BootData::Load` (`sub_82106618`) and what it
+loads and builds, every function seen in play, in two migrations, with
+no new call needed. Native loads go through `archive::LoadCall`, and a
+harness's recorder takes them when one is set
+(`hooks::NativeArchiveLoad`), so a harness can't queue a real load.
+What's left above it: the front end's state machine that runs it
+(`sub_82220C88`, a lead). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,118, work left 3,202 (Wrapped 104, with a row 470, no row yet 2,628),
+from 3,230.
+
+**2026-10-30, the career (branch `b7-loop-29-10-26-2`):** the
+twenty-fourth run's third subsystem, mapped and made native in one
+migration (`career.md`, `--native_career`, `src/career/`): the player's
+items and stats over the save data, 49 of the 53 functions seen in
+play; no career function runs in an attract race, and the pad replay
+reached 15 (the rest are on the drive list). What blocks the rest: the
+race event (`RaceEvent::Make` `sub_82144E58`, a lead) under
+`Career::SetUpEvent` and two event queries, and the car objects' makers
+(`sub_821104D8`) under `Garage::Add`. The run stopped at its limit.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 3,167, work left 3,165 (Wrapped
+104, with a row 474, no row yet 2,587), from 3,202 (from 3,287 at the
+run's start).
+
+**2026-10-30, the race event (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's first subsystem, mapped and made native in one
+migration (`race-event.md`, `--native_race_event`, `src/race_event/`):
+the race event at `[0x826C6078]` and the unlock conditions it's built
+from, 100 of 102 rows ours (58 kind tests never seen in play ported
+with harness cases); none of it runs in an attract race, the pad replay
+reached 26 (the rest are on the drive list). `EventCondition::Power`
+(kind 40, `sub_82141668`) stays recompiled, waiting on the power curve
+(`sub_820CE7F0`, `sub_820CE600`, a lead); native `Met` calls it at the
+original's stack depth, as it reads stack words it never writes. It
+unblocks `Career::SetUpEvent` (`sub_82114268`). The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,271, work left 3,126 (Wrapped 104, with a row
+472, no row yet 2,550), from 3,165.
+
+**2026-10-30, the camera modes (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's second subsystem, mapped and made native in three
+migrations (`camera-modes.md`, `--native_camera_modes`,
+`src/camera_modes/`): the camera director at the race mode's +10512
+and its six views' cameras, 87 of the 90 functions seen in play, with
+`UiMovies::Open` and `Delete` (`ui-movies-game.md`). Two of its
+functions were split across subagents (the 4,907-line cutscene
+constructor, whose 30 scripts are tables read from the generated code;
+the TV camera's update). `CameraDirector::Update` stays Wrapped:
+`--redraw_rival_logo`'s wrapper runs the native form on logic passes.
+`CourseView::Draw` (`sub_822282E8`) waits on the course scenery. The
+user's call this subsystem: all harnesses outgrew `attract_race.sh 40`,
+so validation runs `attract_race.sh 60`. The boundary: 449 functions
+(916 pairs): overridden 108, Native 34, Dropped 26, never called 70,
+live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,364, work left 3,033 (Wrapped 104, with a row
+468, no row yet 2,461), from 3,123.
+
+**2026-10-30, the parking area (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's third subsystem, mapped and made native in three
+migrations (`location-screen.md`, `--native_location_screen`,
+`src/location_screen/`): the parking area (the user, 2026-10-30), 57
+of the 77 functions seen in play, with `UiMovie::SetText` and
+`SetNodeText` (`ui-movies-game.md`). The user's call: those varargs
+setters' unset arguments are passed as 0 by native callers. None of it
+runs in an attract race or the pad replay: the harnesses are its only
+check so far (the drive list). What blocks the rest: the menu input
+(`sub_82186568`, `sub_821864C8`) and sound (`sub_821103F0`), the scene
+and its models, the scenery's set-up and teardown, `XPR::GetTexture`
+(`sub_82597118`, a lead). The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,423, work left 2,974 (Wrapped 103, with a row
+487, no row yet 2,384), from 3,033 (from 3,165 at the run's start).
+
+**2026-10-30, the twenty-fifth run merged (branch `b7-loop-30-10-26`
+into `rexglue-removal-project`):** after a drive (`itc_2819`, the user:
+everything worked): the parking area, a career race and the rival intro
+cutscene ran as native code, 166 functions off the drive list
+(`docs/loops/to-drive.md`), 0 errors and 0 warnings. Totals unchanged
+from the run's end: ours 3,423, work left 2,974.
+
+**2026-10-31, the car models (branch `b7-loop-30-10-26-2`):** the
+twenty-sixth run's first subsystem, already mapped (`car-models.md`,
+the map checked, not remapped) and made native in two migrations under
+`--native_car_models`: 48 of the 50 functions seen in play, with
+`GetLastError` (`last_error::Get`, no flag, as B6's SetLastError) and
+`Skeleton::LocalMatrices` (`--native_models`). The coverage list misses
+`sub_820C4E68`, the car model's +3724 = 1 image branch, seen running in
+an attract race (`itc_2848`): its callers hand that branch back to their
+originals until it is native (a lead). The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 3,447, work left 2,950 (Wrapped 103, with a row 467, no row yet
+2,380), from 2,974.
+
+**2026-10-31, the material passes (branch `b7-loop-30-10-26-2`):** the
+twenty-sixth run's second subsystem, mapped and made native in two
+migrations (`material-passes.md`, `--native_material_passes`,
+`src/material_passes/`): the part models' paint from three HSV colors
+or the 16-entry paint palette at `0x826C5110`, its set-up, the small
+material passes and their helpers, 22 of the 22 seen in play. Their
+adapters stay until their callers are native: the scene loaders' walks,
+the scene's set-up and the second set's objects (`820DB000`-`820EB400`,
+a lead). The boundary: 449 functions (916 pairs): overridden 108,
+Native 34, Dropped 26, never called 70, live 211. Imports: 186 called,
+56 with a live caller. B7 (`b7_status.py`): ours 3,469, work left 2,928
+(Wrapped 103, with a row 467, no row yet 2,358), from 2,950.
+
+**2026-10-31, the race HUD object (branch `b7-loop-30-10-26-2`):** the
+twenty-sixth run's third subsystem, mapped and made native in two
+migrations (`race-hud-object.md`, `--native_race_hud_object`,
+`src/race_hud_object/`): the race's HUD at +16 of the race screens'
+holder, 45 of the 58 functions seen in play, none of them in an attract
+race (no HUD there; the pad replay's race runs them). What blocks the
+rest: the menu sound (`sub_821103F0`), `sub_8211D930`, `sub_8211E370`
+and the other in-race screens (leads). The run stopped at its limit and
+at the last validation: `App::App` and `App::Create`'s harnesses differ
+since `operator new`'s adapter reports to the start-up harnesses'
+shared recorder (83b2b76). The harnesses now take 56.7 s of the
+validation's 60. The boundary: 449 functions (916 pairs): overridden
+108, Native 34, Dropped 26, never called 70, live 211. Imports: 186
+called, 56 with a live caller. B7 (`b7_status.py`): ours 3,514, work
+left 2,883 (Wrapped 103, with a row 480, no row yet 2,300), from 2,928
+(from 2,974 at the run's start).
+
+**2026-10-31, the alternate HUD (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's first subsystem, mapped and made native in one
+migration (`alt-hud.md`, `--native_alt_hud`, `src/alt_hud/`): the race
+HUD holder's object at +1004, a second dashboard on UI movie 22, 21 of
+the 21 functions seen in play. Before it, two cleanup leads: `Model::RecordMaterials`
+(`sub_820CECA0`) and the shader pair's load callback (`sub_820A06D0`)
+under `--native_models`, with eight adapters removed. The validation's
+attract race is 120 s from this run (the user's call, 2026-10-31): the
+harnesses take ~58 s. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,537, work left 2,860 (Wrapped 103, with a row 478, no row yet 2,279),
+from 2,883 at the run's start.
+
+**2026-10-31, the race scene (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's second subsystem, mapped and made native in one
+migration (`race-scene.md`, `--native_race_scene`, `src/race_scene/`):
+the race scene at `[0x826D82D4]` and its machine, 11 of the 20
+functions seen in play, two leads merged (the race's post effect users,
+the race object). What blocks the rest: the course scenery's and scene
+models' owners, the scene at `[0x826C2E44]` and its update,
+`Race::DrawStep` (Wrapped) and the screen objects (leads). The
+boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
+26, never called 70, live 211. Imports: 186 called, 56 with a live
+caller. B7 (`b7_status.py`): ours 3,548, work left 2,850 (Wrapped 103,
+with a row 487, no row yet 2,260), from 2,860.
+
+**2026-10-31, the menu sounds (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's third subsystem, mapped and made native in one
+migration (`menu-sounds.md`, `--native_menu_sounds`,
+`src/menu_sounds/`): `MenuSound::Play`, `Sound::Play` and the two
+volume options, 4 of the 4 seen in play; `[0x826C5C80]` is the sound
+manager, not a music player, and the music is XACT banks it loads (the
+user's call, 2026-10-31: translated with XACT). It unblocked
+`RaceHud::UpdateRacerBar` and `RunCountdown` (a cleanup lead). The run
+stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,552, work left 2,846 (Wrapped 103, with a row 487, no row yet 2,256),
+from 2,850 (from 2,883 at the run's start).
+
+**2026-10-31, the interior accessories (branch `b7-loop-31-10-26`):**
+the twenty-eighth run's first subsystem (the previous run's branch,
+continued by the user's call), mapped and made native in two
+migrations (`accessories.md`, `--native_accessories`,
+`src/accessories/`): the set, its entries, the accessory and its file
+class, 31 of the 31 seen in play, 19 Native with their adapters
+removed; the accessories' release lead folded in. Only the set's
+creation and `SetScale` run in an attract race; the rest runs when the
+player's interior loads (the replay). What's left never ran in play.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 3,584, work left 2,814 (Wrapped
+103, with a row 486, no row yet 2,225), from 2,846 at the run's start.
+
+**2026-10-31, the race HUD machine (branch `b7-loop-31-10-26`):** the
+twenty-eighth run's second subsystem (`race-hud-machine.md`,
+`--native_race_hud_machine`, `src/race_hud_machine/`): the race
+mode's state machine at +128664 and its handlers, 16 of the 33 seen in
+play, with three race HUD cleanup leads before it (`RunCountdown`,
+`UpdateRacerBar`, `TickPanel`, `TickRacers`, `RunWarning`, 7
+adapters removed). By the user's call (2026-10-31), adapters a harness
+would use as hooks are deleted anyway and the harness builds the
+callees' world: the machine's harness was rewritten and 18 more
+adapters removed. The holder's +8 bit 0 is the replay bit. What blocks
+the rest: the other in-race screens (the pause menu, the menu after the
+race, the career results; the next lead). The boundary: 449 functions
+(916 pairs): overridden 108, Native 34, Dropped 26, never called 70,
+live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,605, work left 2,794 (Wrapped 103, with a row
+498, no row yet 2,193), from 2,814.
+
+**2026-10-31, the other in-race screens (branch `b7-loop-31-10-26`):**
+the twenty-eighth run's third subsystem, mapped and made native in
+three migrations (`race-screens.md`, `--native_race_screens`,
+`src/race_screens/`): the pause menu, the confirm dialog, the career
+results, the menu after the race and their helpers, 93 of the 116 seen
+in play, with the race HUD machine's openers, `CloseResults`,
+`ResultsUpdate`, `PauseUpdate` and `AfterRaceUpdate` and
+`RaceScreens::Create` (the machine 23 of 33, the race HUD object 51 of
+58). The pause menu's logging overrides keep logging, and pages still
+run on logic passes with draws on every pass. What blocks the rest: the
+UI movie calls `sub_8211C740` and `sub_8211CBD8`, the options
+screens' `sub_821BEA48` and `sub_821BE5A8`; the machine's
+`CreateScreens`, `ClosePause`, `ResultsDraw` and `AfterRaceDraw`
+are ready (a cleanup lead). The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26,
+never called 70, live 211. Imports: 186 called, 56 with a live caller.
+B7 (`b7_status.py`): ours 3,705, work left 2,694 (Wrapped 101, with a
+row 513, no row yet 2,080), from 2,794 (from 2,846 at the run's start).
+
+**2026-11-01, the device's shader setters and the render queue (branch
+`b7-loop-31-10-26-2`):** the twenty-ninth run's first subsystem, the
+graphics device's side under the primitive drawer, mapped and made
+native in one migration (`device-shaders.md`, `--native_device_shaders`,
+`src/graphics/device_shaders.cpp`): the vertex and pixel shader and
+vertex declaration setters (kept: the renderer reads what they write)
+and the render queue's constructor with its pass lists, 7 of 7 in play.
+SetVertexShader's rebind skip (`src/native/refcount.cpp`) is done by the
+native setter itself. Left: the render queue's methods (a lead) and the
+setters' recompiled callers. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,712, work left 2,687 (Wrapped 100, with a row 513, no row yet 2,074),
+from 2,694.
+
+**2026-11-01, the render queue's methods (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's second subsystem, added to `device-shaders.md`
+and made native in one migration (`--native_render_queue`,
+`src/graphics/render_queue.cpp`): every slot of the queue seen in play,
+with the replay `Scene::Draw` runs once a frame on the render thread
+(sort by key and sequence, the chunk walker, the release list). The
+`--find_menu_selection` wrappers moved into its adapters; the command
+handlers stay recompiled, called through their tables as guest calls,
+so the renderer's hooks on them see every command (a frame dump
+pixel-identical with the flag off). The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 3,738, work left 2,661 (Wrapped 98, with a row 505, no row yet
+2,058), from 2,679.
+
+**2026-11-01, the car scene (branch `b7-loop-31-10-26-2`):** the
+twenty-ninth run's third subsystem, mapped and made native in one
+migration (`scene.md`, `--native_scene`, `src/scene/`): the scene at
+`[0x826C2E44]` the race and the front end's car screens build, its
+assets' loads and its teardown, 19 of the 22 in play (made ready by the
+scene loaders, 78 of 78 this run with `XPR::GetTexture`). What blocks
+the rest: `CarScene::Update` waits on the scene models' updates
+(`sub_820C5A60`), `ScenePools::DestroyB` and `CarScene::LoadsDone` on
+the parts' finishers (Wrapped in `functions.md`). The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,777, work left 2,622 (Wrapped 97, with a row
+489, no row yet 2,036), from 2,661.
+
+**2026-11-01, the car scene's second set (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's fourth subsystem (the run's limit raised to 5 by
+the user's call), mapped and made native in three migrations
+(`second-set.md`, `--native_second_set`, `src/second_set/`): the eight
+pools' objects with their constructors, resets, releases and
+destructors, the point records and the parts' point set-ups, and the
+wheels' morph (`Morph::SetUp`, `Run`, `Blend`), 148 of the 152 in play,
+with the original's quirks copied. What blocks the rest: `ScenePools::ReleaseB`
+(`sub_820C5C88`, Wrapped by `frame_state_diff`; a lead), for the
+cockpit's and the scene model's releases. The replays of the car scene's
+and this subsystem's validations logged the SDK's intermittent
+"BaseHeap::Release failed" at the race-end change, as replays before
+the run did (`review.md`). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,925, work left 2,474 (Wrapped 97, with a row 493, no row yet 1,884),
+from 2,622.
+
+**2026-11-01, the scene models' load poll (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's fifth and last subsystem, mapped and made native
+in one migration (`load-poll.md`, `--native_load_poll`, `src/load_poll/`):
+the poll the race and the front end run until a car's parts are loaded,
+its 13 part finishers (run inside their `frame_state_diff` wraps, kept
+for their recompiled callers), the palettes and paint applied once, 31
+of 32 (`SceneModel::ApplyLightKit` is the front end's). The flag takes
+effect only with its callees' flags on. Left for the scene: the car
+scene's update (the scene models' updates, `sub_820C5A60`), the scene's
+draw and `Car::DrawUpdate` (leads). The run stopped at its limit. The
+boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
+26, never called 70, live 211. Imports: 186 called, 56 with a live
+caller. B7 (`b7_status.py`): ours 3,962, work left 2,441 (Wrapped 82,
+with a row 490, no row yet 1,869), from 2,469 (from 2,694 at the run's
+start).
+
+**2026-11-01, the boot mode (branch `b7-loop-01-11-26`):** the
+thirtieth run's first subsystem, mapped and made native in one
+migration (`boot-mode.md`, `--native_boot_mode`, `src/boot_mode/`): the
+game mode that plays the boot movies from its list and then answers
+the front end, its state machine, the movie steps and the movie
+class's state calls under them, 12 of 12 in play. The lead it came
+from (the modes' constructors beside the string table) was already
+ours in `game-modes.md`. `title_screen.cpp`'s `--skip_intro` wraps now
+wrap the native bodies. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,981, work left 2,424 (Wrapped 80, with a row 483, no row yet 1,861),
+from 2,441.
+
+**2026-11-04, the car draw (branches `b7-loop-01-11-26` and
+`b7-loop-03-11-26`):** the thirtieth run's second and last subsystem
+(`car-draw.md`, `--native_car_draw`, `src/car_draw/`): `Car::DrawUpdate`
+and every per-pass draw under it, 78 of 78, made native bottom up in 16
+parts (paused by the user after part 1, resumed 2026-11-03). Left as
+guest calls from the native frames: the LEDs, spots and
+`LightKit::ChaseLevel` (not seen in play), the morph's worker job,
+`Accessory::Draw` and the cockpit dials' poses. Its validation first
+halted on the shadows harness (record 3's shape left as random bytes,
+read through by the original; fixed, 44a55624). The run stopped at its
+limit. The boundary: 449 functions (916 pairs): overridden 108, Native
+34, Dropped 26, never called 70, live 211. Imports: 186 called, 56 with
+a live caller. B7 (`b7_status.py`): ours 4,059, work left 2,346
+(Wrapped 71, with a row 482, no row yet 1,793), from 2,424.
+
+**2026-11-04, the race flow's set-up (branch `b7-loop-03-11-26`):** the
+thirty-first run's first subsystem (`race-flow.md`,
+`--native_race_flow`, `src/race_flow/`): `RaceFlow::Init`, one function
+of 1,661 lines, made native in one migration by replaying its 562
+stores and copies into the original's 3,600-byte frame from a table
+(as `RaceHudMachine::Init`); its adapter stays until `RaceMode::Init`
+is ours. The registration helpers and the handlers seen in play were
+already in other files. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,060, work left 2,345 (Wrapped 71, with a row 482, no row yet 1,792),
+from 2,346.
+
+**2026-11-04, the car scene's draw (branch `b7-loop-03-11-26`):** the
+thirty-first run's second subsystem (`car-scene-draw.md`,
+`--native_car_scene_draw`, `src/car_scene_draw/`): `CarScene::Draw`,
+the per-frame draw above `Car::DrawUpdate`, with its whole subtree, 21
+of 21, in four parts (the root in three). The root falls back to the
+recompiled code when `--native_models`, `--native_matrix_math` or
+`--native_vehicle_accessors` is off or a command list diagnostic is on;
+the `frame_state_diff` wraps are kept around the native bodies. Frame
+dumps with the flag on and off: the same 2,430 draws. Its adapter stays
+for its recompiled callers (the race's draw step, the front end's car
+draws). The boundary: 449 functions (916 pairs): overridden 108, Native
+34, Dropped 26, never called 70, live 211. Imports: 186 called, 56 with
+a live caller. B7 (`b7_status.py`): ours 4,081, work left 2,324
+(Wrapped 62, with a row 480, no row yet 1,782), from 2,345.
+
+**2026-11-04, the front end's car draw (branch `b7-loop-03-11-26`):**
+the thirty-first run's third and last subsystem
+(`front-end-car-draw.md`, `--native_front_end_car_draw`,
+`src/front_end_car_draw/`): the garage stage the front end's screens
+draw the player's car on (the garage, the shops), 17 of the 18 seen in
+play, with `SceneModel::ApplyLightKit`. The root `GarageStage::Draw`
+`sub_8217FE60` waits on `CarScene::Update` `sub_820C9608` (`scene.md`),
+whose subtree is still blocked. Checked in the pad replay, which reaches
+the garage and the tuning shop (frame dumps there pixel-identical on and
+off; how to dump a front-end frame in a replay: `docs/pad-replay.md`).
+The run stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,099, work left 2,309 (Wrapped 62, with a row 480, no row yet 1,767),
+from 2,324.
+
+**2026-11-04, the replay's snapshots (branch `b7-loop-03-11-26`):**
+the thirty-second run's first subsystem (`replay-snapshots.md`,
+`--native_replay_snapshots`, `src/replay_snapshots/`): two leads, the
+race data's record copies and the race code at `82104310`-`82104E00`,
+turned out to be the replay's start and end snapshots (blocks A and B
+of the input recordings `0x826C5B4C`), not a reset; 26 of 26 in play,
+2 adapters removed. Neither the attract race nor the pad replay takes
+them (to drive). The boundary: 449 functions (916 pairs): overridden
+108, Native 34, Dropped 26, never called 70, live 211. Imports: 186
+called, 56 with a live caller. B7 (`b7_status.py`): ours 4,125, work
+left 2,283 (Wrapped 62, with a row 480, no row yet 1,741), from 2,309.
+
+**2026-11-04, the race's sounds (branch `b7-loop-03-11-26`):** the
+thirty-second run's second subsystem (`race-sounds.md`,
+`--native_race_sounds`, `src/race_sounds/`): the race mode's sound
+machine at +138284, 31 of 31, with `CarSounds::Release`'s adapter
+removed. `rand` `sub_825A9BB8` blocked three of its functions: by the
+user's call (2026-11-04) it is native over the calling thread's guest
+seed, found through the guest TLS as the original does
+(`src/c_runtime/random.cpp`, `--native_c_runtime`), while `_getptd`
+and `_mtinit` stay for the core. The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 4,157, work left 2,253 (Wrapped 62, with a row 479, no row yet
+1,712), from 2,283.
+
+**2026-11-04, the race's loading (branch `b7-loop-03-11-26`):** the
+thirty-second run's third and last subsystem (`race-loading.md`,
+`--native_race_loading`, `src/race_loading/`): the race mode's +848
+machine (`CourseSetup::`, the course's and the draw's waits) and the
+loading screen every load in the race's states shows, 10 of the 13
+seen in play. `WaitCourse`, `EndTick` and `RaceMode::NextMode` wait on
+`Scenery::IsLoaded` (`course-scenery.md`), `CarScene::Update`
+`sub_820C9608` (`scene.md`) and the career's `sub_82150E00`. The run
+stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,167, work left 2,243 (Wrapped 62, with a row 482, no row yet 1,699),
+from 2,253.
+
+**2026-11-05, the post effects' rest (branch `b7-loop-05-11-26`):**
+the thirty-third run's first subsystem (`post-effects.md`,
+`--native_post_effects`, `src/post_effects/`): the top lead (the
+graphics resources' other makers) was stale, its functions already
+mapped, so the run took the rest of the post effects, all ready since
+their 2026-10-24 blockers went: the effects' creation at boot, the
+render textures, the three records and the glow's star; 57 of 58,
+`Glow::Record` waiting on `sub_8209AE48` (the command list's lead).
+`src/post_effects/record.cpp` is built with strict floats. The
+boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 4,180, work left 2,230 (Wrapped
+62, with a row 470, no row yet 1,698), from 2,243.
+
+**2026-11-05, the scene target's passes (branch `b7-loop-05-11-26`):**
+the thirty-third run's second subsystem (`scene-target.md`,
+`--native_scene_target`, `src/scene_target/`): the scene target
+`[0x8266D08C]`'s once-a-frame passes and its render-target records, 6
+of 6, with `Glow::Record` (frame interpolation's wrap kept around the
+native body), which finishes `post-effects.md` (58 of 58). Every
+command they record is one the renderer replays. `RecordPasses`'
+adapter waits on its caller `sub_82096418` (the frame passes object's
+slot, 2,658 lines). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,187, work left 2,223 (Wrapped 61, with a row 469, no row yet
+1,693), from 2,230.
+
+**2026-11-05, the frame passes (branch `b7-loop-05-11-26`):** the
+thirty-third run's third and last subsystem (`frame-passes.md`,
+`--native_frame_passes`, `src/frame_passes/`): the 44-byte object at
+framework +108, its boot job and its once-a-frame record of the
+shared pass chunks, 10 of the 10 seen in play; `SceneTarget::RecordPasses`
+and `PostEffects::InitBoot` lost their adapters with it. Its constructor's
+and `Job::Wait`'s adapters wait on `Framework::Init` and the movie and
+audio managers' callers. The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26,
+never called 70, live 211. Imports: 186 called, 56 with a live caller.
+B7 (`b7_status.py`): ours 4,197, work left 2,213 (Wrapped 60, with a
+row 469, no row yet 1,684), from 2,223.
+
+**2026-11-06, the command buffer (branch `b7-loop-06-11-26`):** the
+thirty-fourth run's first subsystem (`command-buffer.md`,
+`--native_command_buffer`, `src/graphics/command_buffer.*`): the
+graphics library's command buffer, 24 of the 24 seen in play: the
+segment flow (one mutually recursive group, the kick's guest callbacks
+reached through a guest call, `EndSegment`'s packet counter kept as a
+wrap), the chain blocks, the data space and reserved words the renderer
+copies from, the callback packets; the waits on the GPU, the coherency
+and data cache flushes and the packets nothing reads Dropped (the
+graphics rule). The rest is Overridden while its callers, the packet
+writers, the tiling worker, `BeginVertices`, `Device::Resolve` and
+`Device::Clear`'s worker, are recompiled. The boundary: 449 functions
+(916 pairs): overridden 108, Native 34, Dropped 26, never called 70,
+live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 4,219, work left 2,191 (Wrapped 59, with a row
+460, no row yet 1,672), from 2,213.
+
+**2026-11-06, the single commands (branch `b7-loop-06-11-26`):** the
+thirty-fourth run's second subsystem (`single-commands.md`,
+`--native_single_commands`, `src/graphics/single_commands.*`): the
+render command replay's single-command table, the five handlers seen
+in play, run from `ChunkChain::RunSingles`' native dispatch through a
+callback (the guest call with the flag off), id 15 inside its
+renderer wrap; they call the device setters' plain C++. Their
+adapters stay (the table reaches them); the other 22 ids never ran.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 4,224, work left 2,186
+(Wrapped 58, with a row 460, no row yet 1,668), from 2,191.
+
+**2026-11-06, predicated tiling (branch `b7-loop-06-11-26`):** the
+thirty-fourth run's third and last subsystem (`predicated-tiling.md`,
+`--native_predicated_tiling`, `src/graphics/predicated_tiling.*`): the
+menus' tiled segments' start and end, the predication select, and the
+graphics library's worker threads (made, waited and reset through the
+kernel imports, as XAudio's; their device lock +13548 a host
+`std::mutex`); the tiling limit, the chains and the kicks kept, so the
+segment flow takes the same path; the packets and header nothing reads
+Dropped. `Device::BeginTiling` waits on `Device::Clear`'s worker
+`sub_8229FC40`, `Device::EndTiling` on `Device::Resolve` `sub_822AFA58`
+(both leads). The run stopped at its limit. The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 4,230, work left 2,181 (Wrapped 57, with a row
+458, no row yet 1,666), from 2,186.
+
+**2026-11-06, the power graph (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's first subsystem (`power-graph.md`,
+`--native_power_graph`, `src/power_graph/`): the front end's power and
+torque graph, drawn as line segments from the car data's torque curve
+by `PowerGraph::Draw` through `Line::RecordFlat`, and the tuning
+screen's call; past 32 segments (never in play) the original reads its
+caller's frame, so the draw falls back there. The car list screen's
+call `sub_82250670` waits on the car objects' makers (a lead). Seen in
+the pad replay only (front end). The boundary: 449 functions (916
+pairs): overridden 109, Native 35, Dropped 26, never called 70, live
+209. Imports: 186 called, 55 with a live caller. B7 (`b7_status.py`):
+ours 4,233, work left 2,178 (Wrapped 57, with a row 459, no row yet
+1,662), from 2,181.
+
+**2026-11-06, the car makers (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's second subsystem (`car-makers.md`,
+`--native_car_makers`, `src/car_makers/`): the car objects' makers
+outside the race's set-up, as far as they were ready: the stand car's
+scene model record built from a car (also in attract races), the
+garage cars at boot, the car data made from a garage car (the tuning
+screen's, which adds a racer from the front end), the stand's fit and
+record copy. Float words the original copies with `lfs`/`stfs` are
+copied as bits (the translated code keeps a signaling NaN). The rest
+(the stand's makers by id, its re-applies and reload, a front-end
+screen's update `sub_821A1380`) waits on `SceneModel::ApplyRecord`
+`sub_820DA758`, `ReloadDecals` `sub_820D9D48`, `ScenePools::SetUpB`
+`sub_820C5B28`, `CarScene::Update` `sub_820C9608`, `GarageStage::Draw`
+`sub_8217FE60` and the screen's 21 handlers (a lead). The boundary: 449
+functions (916 pairs): overridden 109, Native 35, Dropped 26, never
+called 70, live 209. Imports: 186 called, 55 with a live caller. B7
+(`b7_status.py`): ours 4,249, work left 2,162 (Wrapped 57, with a row
+467, no row yet 1,638), from 2,178.
+
+**2026-11-06, the menu helpers (branch `b7-loop-06-11-26`):** the
+thirty-fifth run's third and last subsystem (`menu-helpers.md`,
+`--native_menu_helpers`, `src/menu_helpers/`): the front end's shared
+menu helpers, `Menu::Step` (the cursor moved by the pad) and
+`Menu::Pressed`, calling the action mappers' slots through the
+mapper's vtable (plain C++ where the slot is native, else a guest
+call); their adapters stay for the ~113 recompiled screens that call
+them. Seen in the pad replay, which reached its race through the menus
+as before. The run stopped at its limit. The boundary: 449 functions
+(916 pairs): overridden 109, Native 35, Dropped 26, never called 70,
+live 209. Imports: 186 called, 55 with a live caller. B7
+(`b7_status.py`): ours 4,252, work left 2,159 (Wrapped 57, with a row
+466, no row yet 1,636), from 2,161.
+
+**2026-11-06, the race's update (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's first subsystem (`race-update.md`,
+`--native_race_update`, `src/race_update/`), in three migrations: the
+race scene's scenery load (`RaceScene::LoadScenery` with `Scenery::Create`,
+`Setup`, `SetupPools` and the physical allocation; `XPhysicalSize`
+`sub_822965C0` answered from our allocation layer, which now records each
+physical block's size rounded to its page, a size-0 block one page, by
+the user's call of 2026-11-06), the per-tick update (`RaceScene::Update`,
+`Scenery::Update` with `LimitLargeModels`' reads below its frame written
+as the original leaves them, the race lights, `Car::TickUpdate`), the car
+model remake (`RaceScene::RemakeCarModel` with `ScenePools::SetUpB`, the
+second set's set-ups and `SceneModel::Build`) and `RaceScene::VaryCar`;
+25 adapters removed. Adapters kept for recompiled callers:
+`RaceScene::Update` (`RaceSceneMachine::OnUpdate` `sub_8215D538`),
+`RemakeCarModel` (`RaceScene::SetUpCars` `sub_8215C248`) and
+`SceneModel::Build` (`SceneModel::Update` `sub_820DA180`). The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,286, work left 2,125 (Wrapped 57, with a row
+438, no row yet 1,630), from 2,159.
+
+**2026-11-06, the stand models (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's second subsystem (`stand-models.md`,
+`--native_stand_models`, `src/stand_models/`): the garage stage's scene
+model holders in the front end (the stand's record setters, the
+wheels' setters, the tuning screen's wheel and tire helpers), with
+`SceneModel::ApplyRecord` and `ReloadDecals` (`scene-models.md`,
+`src/scene_models/apply.cpp`); `ApplyRecord`'s race-side path (the
+scene's +4 set) still runs the original, never taken in play. Every
+adapter stays (recompiled front-end callers); 19 of the functions wait
+for a drive (`docs/loops/to-drive.md`). It unblocked
+`GarageStage::ReapplyRecord` and `ReapplyRecordNoDecals`
+(`car-makers.md`, a cleanup lead). The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 26, never called 70, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 4,319, work left 2,092 (Wrapped 57, with a row 433, no row yet
+1,602), from 2,125.
+
+**2026-11-06, the build screen (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's third subsystem (`build-screen.md`,
+`--native_build_screen`, `src/build_screen/`), after two cleanup leads
+in `car-makers.md` (`GarageStage::ReapplyRecord`, `ReapplyRecordNoDecals`,
+`SetCar`, `SetCarClass`, `ShowCarById`, `ShowCarByIdWithClass`; the
+adapters of `SceneModel::ApplyRecord`, `ReloadDecals`, `ApplyLightKit`,
+`CopyRecord` and the wraps of `ApplyPaint` and `ApplyWheelPaint`
+removed, their native callers running them inside the same diagnostics'
+checks). The build screen, a front-end screen with four levels (groups
+by category, a group's builds, one build on the stand, its details),
+in three migrations, the last taking `CarScene::Update` `sub_820C9608`,
+a blocker for many runs, with `SceneModel::Update` (its accessory
+branch, never seen in play, on the originals) and
+`GarageStage::ReloadModel`. `BuildScreen::BackToBuilds` stays
+recompiled by the user's call (2026-11-06): it stores the r7
+`UiMovie::Run` leaves into live state. Neither the attract race nor the
+pad replay reaches the screen: its functions wait for a drive
+(`docs/loops/to-drive.md`). The validation's harnesses now take ~85 s of
+its 120. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 4,390, work left 2,021
+(Wrapped 57, with a row 422, no row yet 1,542), from 2,092.
+
+**2026-11-07, the tuning screen (branch `b7-loop-06-11-26`):** the
+thirty-sixth run's fourth subsystem (`tuning-screen.md`,
+`--native_tuning_screen`, `src/tuning_screen/`), in five migrations:
+the screen's update subtree (its 17 debug state handlers, which only
+print through the empty `sub_82106540`, the command queue's runners,
+the category bar, lists, pages, marks and texts, the stand's calls,
+`RefreshMenu` and `RefreshMovie13`), with `GarageStage::Draw`
+`sub_8217FE60` and three UI movie text calls (`SetNumberText`,
+`SetChildNameText`, `SetNameText`); the screen's update `sub_821E6C50`
+and its refresh `sub_821E3AD0` are leads. The fifth validation first
+halted on an existing `car_makers` harness case crashing only in the
+all-harnesses run (its garage list could end on a node with no slot, a
+car ~18 MB outside the case's block); fixed (the list walked through
+distinct nodes), then it passed. The run concluded there, by the user's
+call. The boundary: 449 functions (916 pairs): overridden 109, Native
+36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
+a live caller. B7 (`b7_status.py`): ours 4,476, work left 1,937
+(Wrapped 57, with a row 418, no row yet 1,462), from 2,021.
+
+**2026-11-07, the tuning screen's pages (branch `b7-loop-07-11-26`):**
+the thirty-seventh run's first subsystem (`tuning-pages.md`,
+`--native_tuning_pages`, `src/tuning_pages/`), in four migrations: the
+pages `TuningScreen::HandleInput` `sub_821E6950` runs by state (the
+levels, types, options, items, wheels, wheel parts, inches and
+categories inputs with their moves and animations, `Leave`,
+`OnDialogYes` with the sticker dialog's callees, the vinyl editor's
+entry and exit), the decal images' load, update and unload with
+`Texture::FromTga`, `Menu::StepList` and `Color::HsvToRgb`. The handler
+waits on the vinyl and sticker editors' pages (leads). Only the pad
+replay reaches the screen; the rest waits for a drive. The harnesses'
+new set-ups seed their generators through splitmix64 (consecutive
+xorshift streams fell into step). The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 26, never called 70, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 4,548, work left 1,872 (Wrapped 57, with a row 420, no row yet
+1,395), from 1,937.
+
+**2026-11-07, the screen constructors (branch `b7-loop-07-11-26`):** the
+thirty-seventh run's second subsystem (`screen-constructors.md`,
+`--native_screen_constructors`, `src/screen_constructors/`), in one
+migration: the constructors of the screen blocks the type 6 and 7
+modes allocate (91,272 and 71,292 bytes) and of their members; stack
+leftovers (`NodeScreen` storing into its caller's frame,
+`PanelSetBase` below its stack pointer) copied as the original leaves
+them. The modes' slot 0 functions that call them, with their screens'
+Inits, are leads. Neither the attract race nor the pad replay reaches
+the two modes: their functions wait for a drive. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,589, work left 1,831 (Wrapped 57, with a row
+420, no row yet 1,354), from 1,872.
+
+**2026-11-07, the type 6 and 7 modes (branch `b7-loop-07-11-26`):** the
+thirty-seventh run's third subsystem (`type6-type7-modes.md`,
+`--native_type67_modes`, `src/type67_modes/`), in four migrations: the
+two modes' machines' Inits (their step tables generated from
+`generated/`), the first screens, dialogs and controller options, the
+list, panel and node screens' Inits, the stand scene, the garage camera
+and lights, the modes' `NextMode`, `Leaving`, `WaitForLoads` and
+`TearDown`. Their slot 0 (`sub_82236880`, `sub_82246C90`) waits on
+`StandScene::Create` `sub_82180B00` and its fill `sub_820C8DE8` (a
+cleanup lead); the screens' pages and handlers are leads. The pad
+replay reaches only the stand, the garage camera and the controller
+options: the rest waits for a drive. The run stopped at its limit (3
+subsystems). The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 4,699, work left 1,721
+(Wrapped 57, with a row 427, no row yet 1,237), from 1,831.
+
+**2026-11-08, the options screen (branch `b7-loop-07-11-26-2`):** the
+thirty-eighth run's first subsystem (`options-screen.md`,
+`--native_options_screen`, `src/options_screen/`), in three
+migrations, after the cleanup lead `sub_820C8DE8` (`CarScene::SetUp`,
+`StandScene::Create` and the type 6 and 7 modes' slot 0, now 113 of
+117 in play). The machines' step tables are generated from
+`generated/` by `itc_recomp/tools/init_step_tables.py`.
+`Options::FadeOut` stays recompiled (a register leftover stored into
+live state, the `BackToBuilds` call); `Options::OpenCategory` waits on
+the save screens' lead and `sub_8211CBD8`. Code addresses `lis` leaves
+in registers are sign-extended in the 64-bit registers. The pad replay
+reaches the options' categories, HUD and sound pages; the sliders,
+buttons and analog pages wait for a drive. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,801, work left 1,624 (Wrapped 56, with a row
+425, no row yet 1,143), from 1,721.
+
+**2026-11-08, the type 6 and 7 modes' screens (branch
+`b7-loop-07-11-26-2`):** the thirty-eighth run's second subsystem
+(`type67-screens.md`, `--native_type67_screens`,
+`src/type67_screens/`), in one migration: the list, panel and node
+screens' handlers, the panel screens (the car pick) and their group
+pair. The panel screens call the car list (`PanelSet`) through its
+vtable, still recompiled (a lead); the list and node screens' pages
+and the 97 functions never seen in play keep their recompiled code.
+Neither the attract race nor the pad replay reaches the modes: all 48
+wait for a drive. The boundary: 449 functions (916 pairs): overridden
+109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
+called, 54 with a live caller. B7 (`b7_status.py`): ours 4,849, work
+left 1,576 (Wrapped 56, with a row 425, no row yet 1,095), from 1,624.
+
+**2026-11-08, the car list (branch `b7-loop-07-11-26-2`):** the
+thirty-eighth run's third subsystem (`car-list.md`, `--native_car_list`,
+`src/car_list/`), in three migrations: `PanelSet`'s slots, its pages
+and steps (the steps through the 27-entry table its `Update` writes on
+its frame), the panels, `Build` over `memory::AllocPages`, the stand
+car and `GarageStages::DrawAll`. The rest waits on two UI movie
+helpers, `sub_8211BC18` (a lead) and `sub_8211DE30`. Neither the
+attract race nor the pad replay reaches the panel screens: all wait for
+a drive. The run stopped at its limit (3 subsystems). The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 4,920, work left 1,506 (Wrapped 56, with a row
+448, no row yet 1,002), from 1,576.
+
+**2026-11-08, the UI movie helpers (branch `b7-loop-08-11-26`):** the
+thirty-ninth run's first subsystem, mapped into `ui-movies-game.md`
+(8 new rows, 3 in play) and made native in two migrations under
+`--native_ui_movies_game`, with what they unblocked: the car list's
+panels, steps, `Step17` and `CarPage` (`car-list.md`, now 94 of 94
+ours) and `File::GetSize` (`--native_file_layer`). `CarPage` and
+`Step17`'s harness cases use a shared world with the stand's car
+(`src/harnesses/stand_car_world.h`, laid by `load_poll.cpp`).
+`sub_8211CBD8` takes a `va_list` (`UiMovie::SetNodeTextV`). Newly
+ready in other files: `RaceScreens::~RaceScreens`,
+`StandMode::Release`, `RaceDialog::SetText` and the debug font loader
+(a cleanup lead). The panel screens still wait for a drive. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 4,952, work left 1,474 (Wrapped
+56, with a row 419, no row yet 999), from 1,506.
+
+**2026-11-08, the front-end screen helpers (branch
+`b7-loop-08-11-26`):** between the first and second subsystems, a
+cleanup lead (four migrations, ~60 adapters removed) made native what
+the UI movie helpers unblocked in mapped files: the in-race screens'
+teardown, the race dialog, the pause menu's pages and transitions, the
+race HUD's set-ups, the countdown, the race's end with its prizes, the
+career results and the menu after the race (`race-screens.md`,
+`race-hud-machine.md`, `race-hud-object.md`, `career.md`); the replay
+reaches the pause menu, but not always the countdown. The thirty-ninth
+run's second subsystem (`front-end-screen-helpers.md`,
+`--native_front_end_screen_helpers`,
+`src/front_end_screen_helpers/`), in one migration: the six 852-byte
+modes' releases (vtable slot 1), the save screen's and options' dialog
+text setters with the dialog steps and pages they unblocked, and the
+car cards. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,016, work left
+1,411 (Wrapped 56, with a row 390, no row yet 965), from 1,474.
+
+**2026-11-08, the car dealer (branch `b7-loop-08-11-26`):** the
+thirty-ninth run's third subsystem (`car-dealer.md`,
+`--native_car_dealer`, `src/car_dealer/`), in two migrations: the
+type 2 mode's dealer machine (`InitStates` and its transitions, the six
+pages, `Update`, the two car lists, the car info and color swatches,
+the purchase, the career's first car and its race start). The
+transitions keep their adapters (`Update`'s table); callees never seen
+in play run as the originals. The pad replay only opens and closes the
+dealer: the rest waits for a drive. The run stopped at its limit (3
+subsystems). The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,074, work left
+1,354 (Wrapped 56, with a row 390, no row yet 908), from 1,411.
+
+**2026-11-09, the type 2 mode's screens (branch `b7-loop-08-11-26-2`):**
+the fortieth run's first subsystem (`type2-screens.md`,
+`--native_type2_screens`, `src/type2_screens/`), in three migrations:
+four of the type 2 mode's screen machines (the hub at +0, the spec
+sheet at +56624, the build screen at +0x1BF20, the license plate editor
+at +0x20A70), their `InitStates`, handlers, pages, transitions and
+updates; `Type2Hub::WaitForLoad` keeps its patched count of 1. The
+mode's other machines (+9640, +0x23018, +0x173D0, the tuning screen's
+Init) and the mode's Init are leads. The four `InitStates` keep their
+adapters for the recompiled mode Init. The replay reaches the hub and
+opens the plate editor and the build screen; their pages wait for a
+drive. The boundary: 449 functions (916 pairs): overridden 109, Native
+36, Dropped 26, never called 70, live 208. Imports: 186 called, 54 with
+a live caller. B7 (`b7_status.py`): ours 5,195, work left 1,233
+(Wrapped 56, with a row 389, no row yet 788), from 1,354.
+
+**2026-11-09, the save screen (branch `b7-loop-08-11-26-2`):** the
+fortieth run's second subsystem (`save-screen.md`,
+`--native_save_screen`, `src/save_screen/`), in one migration: the save
+screen machine five front-end modes set up (the type 6 quit's save, the
+title's load and controller pick, the replays), its handlers, `Draw`'s
+pages and `Update`'s steps, and the type 2, 4 and 10 Inits. Its 35
+adapters stay, reached as functors or through the page and step tables;
+callees never seen in play run as the originals. The replay reaches the
+title's load; the rest waits for a drive. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 26, never called 70,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,237, work left 1,196 (Wrapped 56, with a row
+389, no row yet 751), from 1,233.
+
+**2026-11-09, the type 2 mode's dialog (branch `b7-loop-09-11-26`):**
+the forty-first run's first subsystem (`type2-dialog.md`, mapped by the
+fortieth run, `--native_type2_dialog`, `src/type2_dialog/`), in one
+migration: the dialog machine at the type 2 mode's +0x1E4C8, its
+transitions, pages, steps, `Draw`, `Update` and `Init` (a step table
+over `StateMachine::Add`). Its 28 adapters stay: 27 reached as functors
+or through the page and step tables, `Init` from the type 2 mode's
+still recompiled Init `sub_82197278`. The replay opens and closes the
+confirm dialog; the notice and second pairs wait for a drive. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+26, never called 70, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,265, work left 1,175 (Wrapped 56,
+with a row 389, no row yet 730), from 1,196.
+
+**2026-11-09, the type 2 mode's garage screen (branch
+`b7-loop-09-11-26`):** the forty-first run's second subsystem
+(`garage-screen.md`, `--native_garage_screen`, `src/garage_screen/`),
+in one migration: the machine at the type 2 mode's +0x23018 (the
+player's garage cars over the stand), its handlers, `InitStates`, the
+list and leave pages, `UpdatePage`, `Update` and the list's set-up; 7
+helper adapters removed. The 56 functions never seen in play (the
+sell, plate, view and spec sheet paths) stay recompiled, reached
+through the tables, functors and a few direct guest calls. The replay
+opens and closes the screen; its pages wait for a drive. The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,287, work left 1,153 (Wrapped 56, with a row
+389, no row yet 708), from 1,175.
+
+**2026-11-09, the tuning screen's machine (branch `b7-loop-09-11-26`):**
+the forty-first run's third subsystem (`tuning-machine.md`,
+`--native_tuning_machine`, `src/tuning_machine/`), in one migration:
+the tuning screen's machine at the type 2 mode's +19792, its Init and
+handlers, and `TuningScreen::SetUp` with its five loaders (3,748 lines,
+split over five parts); 5 adapters removed. `Start` `sub_821E7368`
+stays recompiled, waiting on the refresh `sub_821E3AD0`; the three
+handlers never seen in play stay recompiled. The replay opens the
+tuning screen and reaches 17 of the 18. The run stopped at its limit
+(3 subsystems). The boundary: 449 functions (916 pairs): overridden
+109, Native 36, Dropped 26, never called 70, live 208. Imports: 186
+called, 54 with a live caller. B7 (`b7_status.py`): ours 5,305, work
+left 1,135 (Wrapped 56, with a row 390, no row yet 689), from 1,153.
+
+**2026-11-09, the garage screen's and tuning machine's paths never seen
+in play (branch `b7-loop-09-11-26`, after the forty-first run's stop):**
+by the user's call (they will run in play), a cleanup without a map:
+53 of the garage screen's 56 unseen functions (the car's actions, view
+and options pages, the sale, plate and spec sheet set-ups, the
+transitions), the tuning machine's three unseen handlers and the
+stand's camera command (`type6-type7-modes.md`). `Transition11` and
+`Transition15` stay recompiled (a register leftover stored into live
+state, as `BackToBuilds`); `OnYes` waits on `Garage::Sell`. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+26, never called 70, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,364, work left 1,133 (Wrapped 56,
+with a row 390, no row yet 687), from 1,135.
+
+**2026-11-11, the car settings screen (branch `b7-loop-10-11-26-2`,
+the forty-third run, halted at its first validation):** `car-settings.md`
+(91 rows, 7 in play), `--native_car_settings`, `src/car_settings/`: the
+type 2 mode's machine at +0x173D0 (UI movie 3), its two Inits (the type
+2 and type 5 modes', by step tables) and the five handlers seen in play;
+`Start`, `Draw`, `Update` and everything under them never ran and stay
+recompiled (`Update`'s 114-function subtree a lead). The validation's
+all-harness race (`itc_4810`) found `GarageScreen::Transition6`'s
+harness differing in 2 of 100 cases, so the run halted. The boundary:
+449 functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,409, work left 1,095 (Wrapped 56, with a row
+390, no row yet 649), from 1,102.
+
+**2026-11-11, the type 2 mode and its user info screen (branch
+`b7-loop-10-11-26-2`, the forty-third run, after its halt was fixed):**
+the garage screen harness's action list kept to its 5 actions
+(f691a91e: `Transition6` read text from random ids in the all-harness
+race). `type2-mode.md` (21 rows, `--native_type2_mode`,
+`src/type2_mode/`): the mode's Init `sub_82197278` (by step tables,
+calling the 14 machines' Inits through their adapters), the vtable
+`0x82006B9C`'s delegates and slot thunks, `Interrupt`, `ForceExit`;
+`Resume` a jump into the hub's recompiled `sub_8218DE18`.
+`user-info.md` (14 rows, `--native_user_info`, `src/user_info/`): the
+user info screen (UI movie 10, the player's record). The replay ran 16
+of them. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,443, work left 1,065
+(Wrapped 56, with a row 390, no row yet 619), from 1,095.
+
+**2026-11-11, the tuning screen's refresh (branch `b7-loop-10-11-26-2`,
+the forty-third run, its third subsystem; the run stopped at its
+limit):** `TuningScreen::Refresh` `sub_821E3AD0` (rows in
+`tuning-screen.md`, under `--native_tuning_screen`, which now also needs
+`--native_car_specs`; `src/tuning_screen/refresh*.cpp`), migrated in
+four parts (the header, states 3 and 4 and the dispatch; state 5;
+state 6; states 7 and 8); its five callees never seen in play stay
+recompiled behind guest calls. `TuningMachine::Start` `sub_821E7368`
+(`tuning-machine.md`) it unblocked; 15 adapters removed. The tuning
+screen's update `sub_821E6C50` is now ready (a lead). The replay ran 14
+of the 17. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 26, never called 70, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,445, work left 1,063
+(Wrapped 56, with a row 389, no row yet 618), from 1,065.
+
+**2026-11-11, the tuning screen's update (branch `b7-loop-11-11-26`,
+the forty-fourth run, its first subsystem):** `TuningScreen::Update`
+`sub_821E6C50` (rows in `tuning-screen.md`, under
+`--native_tuning_screen`; `src/tuning_screen/`), its pieces
+`sub_821E6CD4` and `sub_821E6F90` merged into it; 47 adapters removed;
+40 of its 61 callees never seen in play ported (the 23 debug state
+handlers, movie 2's and some of movies 13 and 14's command runners);
+21 stay recompiled behind guest calls: the sticker editor's commands
+and `Command21` wait on the sticker and vinyl editors' leads,
+`Command10`, `13` and `14` on three never-seen `tuning-pages.md`
+setters. Its validation first stalled on a harness wild read (the
+restore path's random engine stage indexing the spec's engine records
+past their end; fixed, 505b2a31, by the user's call), then passed. The
+replay ran 20 of the 88. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 26, never called 70, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,488, work left 1,060 (Wrapped 56, with a row 389, no row yet 615),
+from 1,063.
+
+**2026-11-11, the title screen (branch `b7-loop-11-11-26`, the
+forty-fourth run, its second subsystem):** `title-screen.md` (87 rows,
+`--native_title_screen`, `src/title_screen/`): the type 4 front-end
+mode (vtable `0x82006BE0`, Init `sub_82224C70`), its title load machine
+at +28920 (`TitleLoad::Init`, the boot's data load, the logo movie, a
+debug sequence never seen in play) and its title screen machine at
++38560 (`TitleScreen::Init`, press start, the main, career and fourth
+menus), with `Players::AssignController`; `TitleScreen::Update` runs
+natively inside the `--attract_after_s` wrap. `SetUpAttractRace`
+`sub_82222038` stays recompiled: its harness needs the race data and
+car specs, which aren't loaded when the harnesses run. Three existing
+adapters (`BootData::Load`, `Career::NextDay`,
+`CarDealer::StartFirstRace`) now check the harness recorder first. The
+attract race ran 37 of them, the replay 12 more. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 26, never
+called 70, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,574, work left 1,005 (Wrapped 55, with a row
+388, no row yet 562), from 1,060.
+
+**2026-11-11, the replay theater, unchecked (branch `b7-loop-11-11-26`,
+the forty-fourth run, its third subsystem; the run was ended by the
+user during its migration):** `type10-mode.md` (47 rows, 25 in play,
+`src/type10_mode/`): the type 10 mode's Init `sub_82288940`, its slots,
+`ReplayTheater::InitStates` `sub_8228AC48` and its transitions, ported
+in one batch (49287852) whose harness and race never ran:
+`--native_type10_mode` is off by default and the rows say "not yet
+checked". Left: run the `type10_mode` harness, fix any harness fault,
+turn the flag on, set the eight functions without adapters to Native.
+`Replay::SetUpRace` `sub_82105228` stays recompiled. The boundary: 449 functions, 916 pairs: overridden 109, native 36, dropped 26, never called 70, live 208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours 5,612 (counting the
+unchecked Overridden rows), work left 984 (Wrapped 55, with a row 392,
+no row yet 537), from 1,005.
+
+**2026-11-12, the replay theater checked (branch `b7-loop-11-11-26`,
+the forty-fifth run, a lead without mapping):** the previous run's
+unchecked port (`type10-mode.md`) checked by its harness (46 functions,
+0 differing, after a harness fault was fixed: a replay record's +28 laid
+as play's 0-99, 50318046) and turned on by default (93b074ab); the eight
+functions without adapters set to Native. The attract race and the pad
+replay don't reach the theater: its 46 functions are on the drive list.
+The boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 26, never called 70, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,620, work left 980 (Wrapped
+55, with a row 388, no row yet 537), from 984.
+
+**2026-11-12, the type 9 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its first subsystem):** `todays-result.md` (57 rows,
+31 in play, `src/todays_result/`): the career's end of the day after a
+career race, its two machines, today's result (block +0, UI movie 27,
+the day's and career's counts, `Career::NextDay`) and today's event
+(block +9640, UI movie 0, a page per unlock with its images), leaving
+for the boot mode when a movie is queued, else the garage. All 57 ours
+(never-seen paths ported with their callers); `Progress::CheckUnlocks`
+`sub_821162B0` stays recompiled (never seen). The harness builds its
+own stand-ins for the data tables and `BUILD.TOC`, which aren't loaded
+when the harnesses run. The replay ran today's result's path (31);
+today's event's 26 are on the drive list. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 26, never called 70,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,677, work left 949 (Wrapped 55, with a row
+388, no row yet 506), from 980.
+
+**2026-11-12, the type 12 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its second subsystem):** `network-mode.md` (132 rows,
+108 in play, `src/network_mode/`): the game's Xbox Live mode (network
+battle and network time attack), reached from the title's main menu:
+its Init, delegates, 14 machines' InitStates and set-ups and teardowns,
+`NetScreen::InitBase`, the mode select's running screen, and the game's
+session memory (`Session::Make`, `Free`, `Init`, `Release`). By the
+user's call (2026-11-12) its Xbox Live calls are answered with
+plugged-in data, the values the SDK gives today: the Live mask
+`[0x826C795C]` read as B5's stub writes it (0), the multiplayer
+privilege check answered 0 (`sub_8214F620` and `XUserCheckPrivilege`
+Dropped), `XShowSigninUI` left out (its answer unread); nothing the
+game shows changes. `Interrupt` `sub_822785E0` stays recompiled
+(unread helpers); the other screens' pages and transitions are leads.
+The replay doesn't open the mode: its 127 are on the drive list. The
+boundary: 449 functions (916 pairs): overridden 109, Native 36,
+Dropped 27, never called 69, live 208. Imports: 186 called, 54 with a
+live caller. B7 (`b7_status.py`): ours 5,808, work left 840 (Wrapped
+55, with a row 388, no row yet 397), from 949.
+
+**2026-11-12, the race's end (branch `b7-loop-11-11-26`, the
+forty-fifth run, its third subsystem):** `race-end.md` (1 row,
+`src/race_end/`): `RaceMode::ModeAfterRace` `sub_82150E00`, the mode a
+race goes to after it ends (by race kind and flags; movies 6 to 9 at
+the career's stages 6 and 8), with its caller `RaceMode::NextMode`
+`sub_82151EF0` (`race-loading.md`) and `Progress::CheckUnlocks`
+`sub_821162B0` (never seen, ported by the user's call to keep as little
+recompiled as possible); six adapters removed (`AfterRace`,
+`EventLocation`, `Session::Free`, `CheckSystemRequest` among them).
+`race-loading.md`'s `WaitCourse` and `EndTick` still wait on
+`Scenery::IsLoaded`. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,811, work left 838 (Wrapped 55, with a row 387, no row yet 396),
+from 840.
+
+**2026-11-12 to 13, the course scenery finished (branch
+`b7-loop-11-11-26`, the forty-fifth run, leads without mapping):**
+`Scenery::IsLoaded` (with `CourseSetup::WaitCourse` and `EndTick`,
+`race-loading.md`), the scenery's load and unload (`CourseSet::Load`,
+the area lights and models, `Scenery::Unload`, `Destroy`),
+`LocationScreen::PollLoad`, and the whole of `Scenery::Draw`'s group
+(the headlight projectors, `DrawArea`, `DrawSetLists`, the light groups,
+the billboards' record and draw, `Minimap::Draw`, `Scenery::Draw`
+itself inside its frame-state wrap, with the per-frame wraps of the
+texture animations and the minimap kept) made native; about 50 adapters
+removed across `course-scenery.md`, `sprites.md`, `minimap.md`,
+`scenery-lists.md`, `camera-modes.md`, `model-animation.md` and others.
+Frame dumps at 30 fps without interpolation were pixel-identical against
+the fallback flags. A harness fault on the way (a removed adapter
+exposing `ScenePools::GetB`'s frame in dead stack, 1fdeb678) is now a
+note for migration agents: after removing an adapter, run its callers'
+harnesses. Nothing ready is left in `course-scenery.md`; what's left
+waits on recompiled callers (`Race::DrawStep`, `CourseView::Draw`). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,831, work left 818 (Wrapped 52,
+with a row 370, no row yet 396), from 838.
+
+**2026-11-13, the options' load and save pages (branch
+`b7-loop-11-11-26`, the forty-fifth run, its fourth subsystem):**
+`options-load-save.md` (16 rows, 14 in play, `src/options_screen/load_save.cpp`):
+the options screen's category 5 (page 9, the load) and 6 (page 10, the
+save): their sub-page tables, device checks, dialog answers, waits and
+leaves. The map found that the names given before in other files have
+load and save swapped (category 5 calls `GameData::Load`); left for the
+user's review. The replay ran the save page; the load page is on the
+drive list. The boundary: 449 functions (916 pairs): overridden 109,
+Native 36, Dropped 27, never called 69, live 208. Imports: 186 called,
+54 with a live caller. B7 (`b7_status.py`): ours 5,847, work left 804
+(Wrapped 52, with a row 370, no row yet 382), from 818.
+
+**2026-11-13, `Type6Screen0` (branch `b7-loop-11-11-26`, the
+forty-fifth run, its fifth subsystem):** 13 new rows in
+`type6-type7-modes.md` (`src/type67_modes/screen0.cpp`): the type 6
+mode's first screen (a five-item menu over the type 6 car), its pages,
+steps and helpers, made native beside type 7's, with type 7's
+unported steps, `PowerGraph::SetFromCar` (type 7's menu page and the
+car list call its plain C++) and `CarList::DrawCarPowerGraph`
+(`power-graph.md`). Neither the attract race nor the replay opens the
+type 6 or 7 modes: 24 on the drive list. The boundary: 449 functions
+(916 pairs): overridden 109, Native 36, Dropped 27, never called 69,
+live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,866, work left 792 (Wrapped 52, with a row
+367, no row yet 373), from 804.
+
+**2026-11-13, the type 5 mode (branch `b7-loop-11-11-26`, the
+forty-fifth run, its sixth subsystem):** `type5-mode.md` (33 rows, 17
+in play, `src/type5_mode/`): the parking area's front-end mode (vtable
+`0x82006C24`, 15 slots, the only one with a slot 14), its delegates and
+its dialog machine at +19280 (`Type5Dialog`, "TXR_PaCmnWindow", the
+type 2 dialog's design), all native; its quirks kept (`Leaving`'s
+machine check over ids 0 to 2, never this mode's; `NextMode`'s answer
+bytes as stack leftovers). Neither the attract race nor the replay
+enters the parking area: 33 on the drive list. The boundary: 449
+functions (916 pairs): overridden 109, Native 36, Dropped 27, never
+called 69, live 208. Imports: 186 called, 54 with a live caller. B7
+(`b7_status.py`): ours 5,899, work left 775 (Wrapped 52, with a row
+367, no row yet 356), from 792.
+
+**2026-11-13, the vinyl editor (branch `b7-loop-11-11-26`, the
+forty-fifth run, its seventh subsystem):** the stand screens' lead
+turned out mostly mapped already (6 of 8); its 2 new functions, the
+vinyl editor's state 34 free look, took the vinyl editor's lead with
+them: 29 new rows in `tuning-pages.md` (`src/tuning_pages/loads.cpp`,
+`vinyl_pages.cpp`): the editor's pages for states 23 to 31 and 34
+with their movie sides, the decal images' list window, loads and
+archive callback, and the sticker editor's helpers the pages call,
+made native in three migrations (the never-seen pages ported with
+their callers); `HighlightItem` and `HighlightSelected`
+(`tuning-screen.md`) with them. Harness faults fixed on the way (a
+recording sound manager and mapper block in the tuning stand world;
+the state history laid). `TuningScreen::HandleInput` and `Command21`
+are now ready. The replay doesn't open the vinyl editor: its functions
+are on the drive list. The boundary: 449 functions (916 pairs):
+overridden 109, Native 36, Dropped 27, never called 69, live 208.
+Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`): ours
+5,935, work left 758 (Wrapped 52, with a row 366, no row yet 340), from
+775.
+
+**2026-11-13, the power graph screen and `HandleInput` (branch
+`b7-loop-11-11-26`, the forty-fifth run, its eighth subsystem and a
+lead without mapping):** `TuningScreen::HandleInput` and `Command21`
+made native with 29 adapters removed (the tuning screen's pages it
+alone called); 20 never-seen pages it calls stay recompiled (the
+option rows, paint, light kits, interior, the sticker editor).
+`power-graph-screen.md` (22 rows, `src/power_graph_screen/`): the power
+graph screen machine the type 6 and 7 modes share, all native. Neither
+runs in the replay: on the drive list. The boundary: 449 functions (916
+pairs): overridden 109, Native 36, Dropped 27, never called 69, live
+208. Imports: 186 called, 54 with a live caller. B7 (`b7_status.py`):
+ours 5,963, work left 741 (Wrapped 52, with a row 365, no row yet
+324), from 758.
+
+**2026-11-13, the achievements (branch `b7-loop-11-11-26`, the
+forty-fifth run, its ninth subsystem):** `achievements.md` (5 rows,
+`src/achievements/`): after a race, which of the 27 achievements were
+earned and their write. By the user's call (2026-11-13) the write keeps
+calling `XUserWriteAchievements` through the guest, so the SDK goes on
+recording unlocks in its achievements file; it is Wrapped for the
+harness alone. `RaceStates::OnRaceEnd` became ready (a lead). The
+boundary: 449 functions (916 pairs): overridden 109, Native 36, Dropped
+27, never called 69, live 208. Imports: 186 called, 54 with a live
+caller. B7 (`b7_status.py`): ours 5,968, work left 739 (Wrapped 52,
+with a row 365, no row yet 322), from 741.
+
+**2026-11-13, the frame driver (branch `b7-loop-11-11-26`, the
+forty-fifth run, its tenth subsystem):** `frame-driver.md` (41 rows,
+`src/frame_driver/`; mapped as `renderer.md`, renamed by the user's
+call as "renderer" was confusing beside our Vulkan renderer): the
+game's object at framework + 76 that drives each frame across its
+render thread (listeners, requests, `DrawFrame`) and the app's scene
+at + 80 (`Scene::Update`, `Draw`, its constructor), with the game's
+`Thread` class and its thread imports, made native inside the frame
+state and present wraps; frame 600 pixel-identical against the
+fallback. A pre-existing bug fixed: the `set_register` helper in
+`hooks/app_states.cpp` and `framework.cpp` put register n into r(n+1)
+(c96869cc). `FrameDriver::Present` stays (its harness would run
+`Device::Swap`'s override), and `Init`, `StartFrame`, `WaitForFrame`
+wait on the core's `Event::`. The run stopped at its limit of 10. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 5,989, work left 718 (Wrapped
+51, with a row 361, no row yet 306), from 739.
+
+**2026-11-13, the morph jobs (branch `b7-loop-13-11-26`, the
+forty-sixth run, its first subsystem, after the cleanup leads
+`RaceStates::OnRaceEnd` and `DrawEntryPowerGraph`):** `morph-jobs.md`
+(21 rows, `src/morph_jobs/`): the 224-byte job `Model::MorphShape`
+builds through the second pool maker's slot 1 and the 36-byte work
+item every pool job holds; the post to the worker pool stays a guest
+call (the `DebugText` precedent), and the pools themselves wait on the
+core's sync. The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,019, work left 703
+(Wrapped 51, with a row 360, no row yet 292), from 718.
+
+**2026-11-13, the save devices' constructor (branch
+`b7-loop-13-11-26`, the forty-sixth run, its second subsystem):** 5
+rows added to `save-interface.md` (`src/save_interface/save_devices.cpp`),
+with `SaveDevices::Create` from `framework.md`: the object
+`SaveDevices::Update` runs on, its four slots and their buffers; the
+notification listener stored as `user::kNoListener` without
+`XNotifyCreateListener` (the 2026-10-30 precedent). The slot handlers
+`SaveDevices::Update` runs are the next lead. The boundary: 449
+functions (916 pairs): overridden 110, Native 40, Dropped 26, never
+called 68, live 205. Imports: 186 called, 49 with a live caller. B7
+(`b7_status.py`): ours 6,025, work left 700 (Wrapped 51, with a row
+359, no row yet 290), from 703.
+
+**2026-11-13, the save devices' slot handlers (branch
+`b7-loop-13-11-26`, the forty-sixth run, its third subsystem):** 14
+rows added to `save-interface.md` (`src/save_interface/slot_handlers`),
+with `SaveDevices::Update` (`system-services.md`), `SaveStep`,
+`LoadStep`, `XGetOverlappedResult` and `GetOverlappedResult`
+(`files-and-saves.md`; their never-taken wait a guest call to
+`WaitForSingleObject`, the 2026-10-24 and 2026-10-29 calls) and
+`Framework::DeviceList`; B4's 13 content steps split into plain C++
+(`src/saves/slot_steps`) behind their adapters, which stay so the
+fallback keeps reaching `saves/`. The replay ran the enumeration, save
+and load machines as native code. The boundary: 449 functions (916
+pairs): overridden 110, Native 40, Dropped 26, never called 68, live
+205. Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`):
+ours 6,044, work left 686 (Wrapped 51, with a row 354, no row yet 281),
+from 700.
+
+**2026-11-13, three small leads (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fourth subsystem):** 13 rows in `app-start-up.md`
+(the render manager `[0x826BABA0]`'s slots 7 and 8, through which the
+scene and the frame driver are reached), `models.md` (the texture
+provider's `Get` and its `XPR` slots) and `matrix-math.md` (the zero
+and identity matrices' `_cinit` set-ups); `Matrix::FromFloats` Native.
+About 30 native callers still reach these slots through guest calls (a
+cleanup lead). The boundary: 449 functions (916 pairs): overridden 110,
+Native 40, Dropped 26, never called 68, live 205. Imports: 186 called,
+49 with a live caller. B7 (`b7_status.py`): ours 6,057, work left 676
+(Wrapped 51, with a row 354, no row yet 271), from 686.
+
+**2026-11-13, the sticker editor (branch `b7-loop-13-11-26`, the
+forty-sixth run, its fifth subsystem):** `sticker-editor.md` (25 rows,
+`src/tuning_pages/sticker_pages.cpp`, `sticker_commands.cpp`): the
+tuning screen's ten sticker input pages, their helpers and the
+update's sticker commands 32 to 51 (`tuning-screen.md`), none seen in
+play, ported by the user's 2026-11-12 call; two migrations, all 25
+rows Native, with `UiMovie::Unloop`. The stand's setters
+(`ApplyAreaDecals`' `sub_8217B3D8`, the next subsystem) are what
+`UpdateStand` still waits on. The boundary: unchanged (449 functions,
+overridden 110, Native 40, Dropped 26, never called 68, live 205;
+imports 186 called, 49 with a live caller). B7 (`b7_status.py`): ours
+6,100, work left 676 (Wrapped 51, with a row 354, no row yet 271);
+work left counts only functions seen in play.
+
+**2026-11-13, the stand's setters (branch `b7-loop-13-11-26`, the
+forty-sixth run, its sixth subsystem):** 8 new rows in `stand-models.md`
+(`src/stand_models/setters.cpp`) and `SetDecalWord`, none seen in
+play, with the tuning screen's `SetColor`, `ApplyAreaDecals`,
+`ApplyDecalWord`, `PreviewParts` and `SetParts` (`UpdateStand` no
+longer calls recompiled code); 17 adapters removed. The validation's
+harnesses took ~130 s of the 180. The boundary: unchanged. B7
+(`b7_status.py`): ours 6,114, work left 676 (Wrapped 51, with a row
+354, no row yet 271).
+
+**2026-11-13, the type 6 and 7 modes' small pieces (branch
+`b7-loop-13-11-26`, the forty-sixth run, its seventh subsystem, after
+cleanup leads over the stand's and tuning screen's never-seen rows and
+the tuning pages' blockers):** 16 new rows in `type6-type7-modes.md`,
+`type67-screens.md` and `car-list.md` and three blockers, none seen in
+play, ported by the 2026-11-12 call. The validation's harnesses take
+~131 s of the 180. The boundary: unchanged. B7 (`b7_status.py`): ours
+6,160, work left 676 (Wrapped 51, with a row 354, no row yet 271).
+
+**2026-11-14, the type 6 and 7 list screens (branch
+`b7-loop-13-11-26`, the forty-sixth run, its eighth subsystem):**
+`type67-screens.md`'s 77 new rows and every row left without Status
+(~174 functions, `src/type67_screens/`), none seen in play, ported by
+the 2026-11-12 call in two migrations of five and seven batches; two
+traffic-records groups expected to differ (`Type6ListScreen::SetUpRace`
+and `Type7ListScreen::SetUpRace`, as `Race::SetUp`'s). The validation's
+harnesses now take ~132 s of the 180. The boundary: unchanged. B7
+(`b7_status.py`): ours 6,335, work left 676 (Wrapped 51, with a row
+354, no row yet 271).
+
+**2026-11-14, the type 8 mode's screens (branch `b7-loop-13-11-26`,
+the forty-sixth run, its ninth subsystem):** `type8-screens.md` (128
+rows, `src/type8_screens/`): the type 8 mode (the title's main menu
+item 4, built for two players: probably the two-player mode) and its
+panel screen and list screens, none seen in play, in one migration of
+eight batches, with 13 `car-list.md` rows (`PanelSetPair`, the panels'
+base); two more traffic-records groups expected to differ. The
+validation's harnesses take ~133 s of the 180. The boundary:
+unchanged. B7 (`b7_status.py`): ours 6,477, work left 676 (Wrapped 51,
+with a row 354, no row yet 271).
+
+**2026-11-14, the type 8 mode (branch `b7-loop-13-11-26`, the
+forty-sixth run, its tenth subsystem):** `type8-mode.md` (52 rows,
+`src/type8_mode/`): the type 8 mode's Init, slots, teardown, first
+screen and dialog, none seen in play, with the type 8 options',
+controller options' and save screen's Inits, the two-player save
+block's maker and four shared dialog handlers. The run stopped at its
+limit of 10. The validation's harnesses take ~133 s of the 180. The
+boundary: 449 functions (916 pairs): overridden 110, Native 40,
+Dropped 26, never called 68, live 205. Imports: 186 called, 49 with a
+live caller. B7 (`b7_status.py`): ours 6,537, work left 676 (Wrapped
+51, with a row 354, no row yet 271), from 718 at the run's start.
+
+**2026-11-14, the in-race screens never seen (branch
+`b7-loop-13-11-26`, the forty-seventh run, its first subsystem):**
+`race-screens-unseen.md` (99 rows, `src/race_screens/`): the race's
+kind 4 (split screen) pause menu, the two results screens and kind
+6's (the Live time attack's) menu after the race, none seen in play.
+The same day, by the user's calls: B7's goal is no PPC code reachable
+from `main`, measured by the static map (`docs/loops/static-map.md`,
+`itc_recomp/tools/static_map.py`); multiplayer is bypassed (the main
+menu's Xbox Live and split screen items do nothing,
+`--multiplayer_menu_items`, off by default), so most of these screens
+are unreachable now. The boundary: 449 functions (916 pairs):
+overridden 110, Native 40, Dropped 26, never called 68, live 205.
+Imports: 186 called, 49 with a live caller. B7 (`b7_status.py`): ours
+6,651, work left 676 (Wrapped 51, with a row 354, no row yet 271).
+Static map: reachable 10,853, ours 6,027, unported 3,227 (644 seen in
+play, 2,583 never seen).
+
+**2026-11-14, the C runtime's core (branch `b7-loop-13-11-26`, the
+forty-seventh run, its second subsystem; the run ended there by the
+user's call):** `c-runtime-core.md` (118 rows, `src/c_runtime/core.cpp`):
+the C runtime's wrappers over the kernel imports, ported by B7's new
+goal (the imports called as the original does); five migrations, the
+first three validated, the last two (fclose to `_cftog_l`) checked by
+their own harnesses only (the user ended the run). Left: `_cftoa_l`,
+`_cfltcvt` and `_cinit`. The boundary: 449 functions (916 pairs):
+overridden 128, Native 48, Dropped 24, never called 67, live 182.
+Imports: 186 called, 45 with a live caller. B7 (`b7_status.py`): ours
+6,772, work left 656 (Wrapped 51, with a row 354, no row yet 251).
+Static map: reachable 10,845, ours 6,138, unported 3,106 (624 seen in
+play, 2,482 never seen).
+
+**2026-11-15, the lift sweep (branch `lift-sweep`,
+`docs/loops/lift-sweep.md`):** `itc_recomp/tools/lift.py` translated
+2,749 of the static map's 3,106 unported functions from `generated/`
+into plain C++ (`src/lifted/`, 29 batches, `--native_lifted_000` to
+`028`), calling each other directly, through a dispatch table by
+address, or the SDK's imports. Refused: 205 vector functions, 64 with
+an override of ours (Wrapped), and about 90 that read registers another
+function left or their caller saved, or use the global lock. Every
+harness at 0 in `attract_race.sh 180 --run_harnesses=all`; the pad
+replay ran 124 s with no error lines (465 lifted functions ran in it).
+The boundary: 449 functions (916 pairs): overridden 264, Native 48,
+Dropped 24, never called 34, live 79. Imports: 186 called, 36 with a
+live caller. B7 (`b7_status.py`): ours 9,521, work left 111 (Wrapped
+51, with a row 39, no row yet 21); 1,577 lifted functions have no row
+yet. Static map: reachable 9,131, ours 8,793, unported 329 (75 seen in
+play, 254 never seen).
+
+**2026-11-15, the lift sweep's vector code (branch `lift-sweep`):**
+`lift.py` now lifts vector code (registers as locals of our own `Vec`,
+the simde calls and the SDK's vector helpers in `rex/ppc/intrinsics.h`
+called as the generated code calls them): 188 more functions, 2,937 in
+all (batches 029 and 030). Every harness at 0; the pad replay ran 127 s
+with no error lines. The boundary: 449 functions (916 pairs):
+overridden 265, Native 48, Dropped 24, never called 34, live 78.
+Imports: 186 called, 36 with a live caller. B7 (`b7_status.py`): ours
+9,709, work left 98 (Wrapped 51, with a row 28, no row yet 19). Static
+map: reachable 9,125, ours 8,975, unported 141 (62 seen in play).
+
+**2026-11-15, the lift sweep's leftover registers (branch `lift-sweep`):**
+the 360's compiler lets a caller keep a value in a volatile register
+across a call it knows doesn't touch it; `lift.py` now wipes, at a
+direct call, only what the callee (through its calls) may write, and
+our lift code's SDK boundary puts the argument registers it loads back
+after the call. `__chkstk` calls are left out (Dropped). 64 more
+functions lifted, 3,001 in all (batches 031 and 032); before them, two
+B7-style migration agents made 60 of the 67 Wrapped functions native or
+Dropped (the render replay's handlers, the draw packet writers, the
+frame pacing and diagnostics wraps, `CreateFile`, the achievements'
+wrapper). Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 267, Native 48, Dropped 24, never called
+34, live 76. Imports: 186 called, 32 with a live caller. B7
+(`b7_status.py`): ours 9,833, work left 45 (Wrapped 7, with a row 19,
+no row yet 19). Static map: reachable 9,118, ours 9,092, unported 17
+(9 seen in play).
+
+**2026-11-15, the lift sweep's last functions (branch `lift-sweep`):**
+the spin locks (the SDK's global lock taken through our helpers), the
+time base (`helpers::PerformanceCounter`), nested fragments and the
+360's no-op moves in `lift.py` (3,010 lifted); a migration agent made
+the draw library's inline draws, `Device::Resolve` (checked against the
+original on 262,144 real calls) and `ScreenObject::Record` native inside
+their wraps. Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 268, Native 48, Dropped 24, never called
+34, live 75. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 9,848, work left 37 (Wrapped 3, with a row 16, no
+row yet 18). Static map: reachable 9,106, ours 9,095, **unported 2**:
+`sub_821743A8` (reached only by the Xbox Live mode's network battle)
+and `xstart`.
+
+**2026-11-15, the rewiring's stage 2 (branch `rewiring-15-11-26`):**
+`lift-sweep` merged into `rexglue-removal-project` after an attract
+race; the kernel's entries listed (five thread starts, "Before E1: the
+rewiring"); every guest call our hand ports made through the SDK's
+function table (372 sites in 123 files, native audio's mixer callback
+among them) goes through `lifted::CallFromContext`, so only
+`src/lifted/lifted.cpp` reaches the table. No behavior change. Every
+harness at 0; the pad replay ran 127 s with no error lines. The
+boundary: overridden 268, Native 48, Dropped 24, never called 34, live
+75. Imports: 186 called, 30 with a live caller. B7 (`b7_status.py`):
+ours 9,848, work left 37. Static map: reachable 9,081, ours 9,068,
+unported 2.
+
+**2026-11-16, the rewiring's stage 3 (branch `rewiring-15-11-26`):**
+every hand port's adapter a dispatch table entry on our register view
+(3,548 adapters; `native_entries.py sweep`, six migration agents, a
+validation); calls carry their return address and caller's r31 (the
+batches emitted again). Left as REX_FUNCs outside `src/lifted/`: `xstart`
+and five `__finally` blocks. 169 harness groups expected to differ (the
+user's call), none other; the pad replay ran 127 s with no error lines;
+frame dumps look right. The boundary: overridden 268, Native 48, Dropped
+24, never called 34, live 75. Imports: 186 called, 30 with a live caller.
+B7 (`b7_status.py`): ours 9,848, work left 37. Static map: reachable
+9,076, ours 9,063, unported 2.
+
+**2026-11-16, the rewiring's stage 4 (branch `rewiring-15-11-26`):** no
+recompiled code in play (import thunk entries, batches 034 and 035, 80
+lifted originals), the overrides deleted but the kernel's (four thread
+starts, `xstart`) and the five `__finally` blocks; an address with no
+entry stops the program. The harnesses no longer compare single
+functions; attract races and the pad replay (127 s) clean, a frame dump
+right. The boundary: overridden 128, Native (with Lifted) 188, Dropped 24,
+never called 34, live 75. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 9,858, work left 32. Static map: reachable 9,091,
+ours 9,082, unported 2.
+
+**2026-11-16, the rewiring's stage 5 (branch `rewiring-15-11-26`):**
+`generated/` and the harnesses out of the build, no recompiled function
+in the executable: every original our code falls back to lifted (1,408),
+the functions only those reach lifted (batches 036 to 042, 695), our own
+guest header, import declarations, image description and CMake set-up.
+Attract races and the pad replay (127 s) clean; frame dumps right. The
+boundary: overridden 128, Native (with Lifted) 204, Dropped 24, never
+called 20, live 73. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 10,556, work left 32. Static map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
+translate, none seen in play).
+
+**2026-11-16, E1's threads and sync (branch `e1-threads-sync-16-11-26`):**
+every import the game calls in play is answered by our code (`src/threads/`,
+`src/memory/memory_imports.cpp`, `src/imports/`; `--log_imports`: 30 imports
+in play, none reaching the SDK), and every thread running game code is a host
+thread of ours (the main thread, the frame driver's four, the tiling worker,
+XAudio's two, native audio's). Attract races, the pad replay (127 s) and frame
+dumps clean. `boundary_status.py` reads the function rows, not the running
+code, so its figures don't move with E1: overridden 128, Native (with Lifted)
+204, Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.
+
+**2026-11-16, E2's steps 2 to 5 (branch `e1-threads-sync-16-11-26`):** the
+kernel variables the game reads plugged in, `default.xex` loaded by our
+own loader, guest memory mapped by us (`src/memory/mapping.cpp`: one
+memfd as the SDK's nine views, nothing in `/dev/shm`) with the allocation
+layer's ranges and its own physical allocator, and `rex::Runtime` no
+longer made: no SDK memory, kernel, loader or VFS; the SDK is a library
+(flags, log, paths) until E4. Attract races, the pad replay (127 s, no
+error lines, the race at the frame cap) and frame dumps clean;
+`--log_imports`: 28 imports in play, all ours (any other now stops the
+program). `boundary_status.py` reads the docs' function rows, not the
+running code, so its figures don't move with E2: overridden 128, Native
+(with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
+called, 30 with a live caller.
+
+**2026-11-16, E4's steps 2 and 3 (branch `e4-sdk-removal-16-11-26`):** the
+status conversion, the global lock, the float mode and the vector helpers
+ours; no `PPCContext`, `rex/ppc.h` or SDK import left; 106 symbols linked
+from `librexruntime.so` (296 before). Attract races, the pad replay (127 s)
+and frame dumps clean. `boundary_status.py` reads the docs' function rows,
+not the running code, so its figures don't move: overridden 128, Native
+(with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
+called, 30 with a live caller.
+
+**2026-11-16, E4's steps 4 and 5 (branch `e4-sdk-removal-16-11-26`):** our
+own flag parser, `itc.toml` reader and log file naming (A4); the SDK out of
+our build: its shader translator a static library from the submodule, SDL,
+Vulkan-Headers, simde, glslang and fmt our own submodules; the executable
+links no SDK library. Attract races, the pad replay (127 s), frame dumps and
+fresh translations (byte-identical) clean. `boundary_status.py` reads the
+docs' function rows, not the running code, so its figures don't move:
+overridden 128, Native (with Lifted) 204, Dropped 24, never called 20, live
+73; imports: 186 called, 30 with a live caller.
+
+**2026-11-16, E5's step 0 (branch `e5-native-16-11-26`,
+`docs/e5-native.md`):** calls by constant address made direct (13,731 to
+hand ports' entries, 215 to lifted functions, 227 in the hand ports), the
+game's functions called by their names from the rows (`game::`, 4,423), and
+one spelling for guest memory (`guest::Load*`, `Store*`, `Pointer`; the
+`REX_LOAD_*`, `REX_STORE_*` and `REX_RAW_ADDR` macros gone). Attract races,
+the pad replay (127 s) and frame dumps clean. `boundary_status.py` reads the
+docs' function rows, so its figures don't move: overridden 128, Native (with
+Lifted) 204, Dropped 24, never called 20, live 73; imports: 186 called, 30
+with a live caller.
+
+**2026-11-22, E5's step 3 (branch `e5-native-16-11-26`, merged into
+`rexglue-removal-project`; `docs/loops/e5-loop.md`, "Where step 3
+stands"):** 16 of the game's private objects in host memory behind handles
+(the pilot, three swarm batches and the lead's leftovers), lifted
+allocation and free sites replaced by `lift.py`'s `host_alloc` and
+`host_free`; the other 39 wait on step 4. Attract races, the pad replay by
+tick (both races matching the baseline) and frame dumps clean. The
+boundary's figures don't move: overridden 128, Native (with Lifted) 204,
+Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.

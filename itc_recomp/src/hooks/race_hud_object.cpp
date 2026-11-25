@@ -1,0 +1,521 @@
+// The race HUD object natively: adapters in front of src/race_hud_object/
+// (docs/functions/race-hud-object.md), with the register steps the harness
+// shares (hooks/race_hud_object.h).
+
+#include "hooks/race_hud_object.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
+
+
+#include "base/flags.h"
+#include "hooks/heap.h"
+#include "menu_sounds/menu_sounds.h"
+#include "race_hud_object/race_hud_object.h"
+#include "track_zones/track_zones.h"
+
+#include <optional>
+#include "lifted/sdk.h"
+
+ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
+              "Run the race HUD object's functions (docs/functions/race-hud-object.md: "
+              "HudCurve::Eval sub_82212118, PowInt sub_82213C40 (no adapters: only their native "
+              "callers reach them in play, here and in the alternate HUD), HudBar::Step sub_82211FB8, "
+              "RaceHud::SetGear sub_82212DB0, SetBar sub_82214698, ResetBar sub_82212668, "
+              "ClearWarning sub_822122A0, SetPlayer sub_82212690, Touching sub_82215820, "
+              "SetTach sub_82212D58, SetBoost sub_82212E18, SetSpeed sub_82214260, SetTime "
+              "sub_82213750, SetDistance sub_82214A50, Reset sub_822121C0, ShowGauge "
+              "sub_82212D08, SetUpExtraGauges sub_82213DB0, ApplyOptions sub_82212768, "
+              "UpdateView sub_82212B68, SetUpGauges sub_82213C90, SetUpMirror sub_822135B0, "
+              "TearDown sub_822141A0 (no adapter: only RaceScreens::~RaceScreens's plain C++ "
+              "reaches it), SetUpSigns sub_822122B0, UpdateExtraGauges sub_82215160; "
+              "memcpy where its plain C++ refuses, CameraPasses::RenderTarget, "
+              "TrackZones::Create and the extra gauges' digits through their overrides "
+              "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
+              "UpdatePlaceName sub_82213510, with TrackZones::Update and IsInside's plain C++; "
+              "UiMovie::FinishNamed, SetText and ClearText through their overrides; Tick "
+              "sub_822153A0, TickTimer sub_82214D78 (no adapter since TickPanel's plain C++: "
+              "only it reaches TickTimer, UpdateRecordingFull, HudBar::Step and Touching in "
+              "play); ShowGauge, SetSpeed, UpdateExtraGauges, SetGear, "
+              "SetTach, SetBoost, SetBar, UpdateSigns, UpdateSign, UpdatePlaceName, SetTime and "
+              "SetDistance have no adapters: only their native callers reach them, and the flag "
+              "switches those; StartCountdown sub_82212270, StartMovie1 sub_82212718, "
+              "FinishMovie1 sub_82212878, DrawWarning sub_82212AC8 (no adapter: only the race HUD "
+              "machine's PauseDraw's and RacePauseDraw's plain C++ reach it in play), RunMovie1 sub_82212AF8, "
+              "RunItem sub_82212B08 (UiMovie::Run and FinishNamed through their overrides), "
+              "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260, Draw sub_822128A8 "
+              "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides; no adapter: "
+              "only the race HUD machine's draws' plain C++ reach it in play), "
+              "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
+              "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
+              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
+              "(and RaceScreens::Destroy sub_82211D18 with --native_heap, no adapter: only the race "
+              "HUD machine's DestroyScreens' plain C++ reaches it: the in-race screens' "
+              "teardowns' plain C++, the holder freed; RaceScreens::~RaceScreens sub_82211B98 "
+              "with --native_heap, no adapter: only Destroy's plain C++ reaches it: TearDown's and "
+              "AltHud::Destroy's plain C++, Strings::Release and UiMovies::DeleteAll's jump "
+              "through their overrides) "
+              "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
+              "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
+              "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
+              "switches it); RunCountdown sub_822129A8 (UiMovie::Run through its override, "
+              "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (no adapter: only TickRacers' "
+              "plain C++ reaches it in play; UiMovie::Finish and "
+              "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
+              "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
+              "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals), "
+              "RunWarning sub_82212A48 (the sound manager's slot 14 and UiMovie::Run through the "
+              "function table, MenuSound::Play's plain C++), RaceScreens::DrawPauseMenu sub_82211D08 "
+              "and DrawAfterRaceMenu sub_82211D10 (no adapters: only the race HUD machine's "
+              "PauseDraw's, RacePauseDraw's and AfterRaceDraw's plain C++ reach them; PauseMenu::Draw's and AfterRaceMenu::Draw's "
+              "plain C++) "
+              "; SetMode sub_822157A8 (modes 2 to 4's set-ups, never seen in play, the "
+              "originals), SetUpTimer sub_822123C8 and SetUpRacers sub_82213F20 (UiMovie::"
+              "FinishNamed, Finish, SetText, ClearText and SetChildNameText through their "
+              "overrides, ShowItem's plain C++) "
+              "natively instead of through the translated code (the same writes; checked by "
+              "--run_harnesses=race_hud_object). No adapter is left (2026-11-08): every "
+              "function here is reached in play only from native callers, which call the plain "
+              "C++ and are switched by their own flags; this one switches nothing in the game");
+
+namespace hooks {
+
+namespace rh = race_hud_object;
+
+namespace {
+
+// The guest calls the plain C++ makes (race_hud_object::Calls), through
+// this context: r1, r3 to r6, f1 when given and lr set, the function run
+// through the function table (its override when it has one), r1 put back.
+// The adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  rh::Calls calls() { return {this, &GuestCalls::Call}; }
+  // The zones' slots that aren't the native ones (track_zones::OwnerCalls):
+  // r4 set when asked, else left.
+  track_zones::OwnerCalls zone_calls() { return {this, &GuestCalls::CallZone}; }
+  // MenuSound::Play's slot call (menu_sounds::Calls): the first `set` of r3
+  // to r6 set, the others left, as MenuSound::Play's own adapter does.
+  menu_sounds::Calls sound_calls() { return {this, &GuestCalls::CallSound}; }
+
+ private:
+  static uint64_t CallSound(void* user, uint32_t function, const uint64_t args[4], int set,
+                            uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  static uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
+                           uint32_t frame, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    if (set_r4) {
+      ctx.r4.u64 = r4;
+    }
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  }
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    lifted::Regs& ctx = self.ctx_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    lifted::CallFromContext(ctx, function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  lifted::Regs& ctx_;
+  uint64_t lr_;
+};
+
+}  // namespace
+
+ITC_REGS_STEP(RaceHudObjectCurveEval) {
+  ctx.fpscr.disableFlushMode();
+  rh::CurveEval(ctx.r3.u32, ctx.f1.f64);
+}
+
+ITC_REGS_STEP(RaceHudObjectPowInt) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = rh::PowInt(ctx.f1.f64, ctx.r4.s32);
+}
+
+ITC_REGS_STEP(RaceHudObjectBarStep) {
+  ctx.fpscr.disableFlushMode();
+  rh::BarStep(ctx.r3.u32, ctx.r4.s32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetGear) {
+  ctx.r3.u64 = rh::SetGear(ctx.r3.u32, ctx.r4.s32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetBar) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rh::SetBar(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectResetBar) {
+  ctx.fpscr.disableFlushMode();
+  rh::ResetBar(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectClearWarning) {
+  rh::ClearWarning(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetPlayer) {
+  ctx.r3.u64 = rh::SetPlayer(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectTouching) {
+  ctx.r3.u64 = rh::Touching(ctx.r4.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetTach) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rh::SetTach(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetBoost) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rh::SetBoost(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetSpeed) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = ctx.f1.f64;
+  ctx.r3.u64 = rh::SetSpeed(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+
+ITC_REGS_STEP(RaceHudObjectSetTime) {
+  ctx.r3.u64 = rh::SetTime(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetDistance) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = ctx.f1.f64;
+  ctx.r3.u64 = rh::SetDistance(ctx.r3.u32, ctx.r1.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+
+ITC_REGS_STEP(RaceHudObjectReset) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rh::Reset(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectShowGauge) {
+  ctx.r3.u64 = rh::ShowGauge(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpExtraGauges) {
+  ctx.r3.u64 = rh::SetUpExtraGauges(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectApplyOptions) {
+  ctx.r3.u64 = rh::ApplyOptions(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateView) {
+  ctx.r3.u64 = rh::UpdateView(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpGauges) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetUpGauges(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpMirror) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetUpMirror(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectTearDown) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::TearDown(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpSigns) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetUpSigns(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateExtraGauges) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateExtraGauges(ctx.r3.u32, ctx.f1.f64, ctx.r5.u64, ctx.r6.u64,
+                                     ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateSigns) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateSigns(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                               guest.zone_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateSign) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateSign(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                              guest.zone_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdatePlaceName) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 =
+      rh::UpdatePlaceName(ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.zone_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectTick) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::Tick(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                        guest.zone_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectTickTimer) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::TickTimer(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectStartCountdown) {
+  ctx.r3.u64 = rh::StartCountdown(ctx.r3.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectStartMovie1) {
+  ctx.r3.u64 = rh::StartMovie1(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectFinishMovie1) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::FinishMovie1(ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectDrawWarning) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::DrawWarning(ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectRunMovie1) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::RunMovie1(ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectRunItem) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::RunItem(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectMovieMask) {
+  ctx.r3.u64 = rh::MovieMask(ctx.r4.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectInit) {
+  ctx.r3.u64 = rh::Init(ctx.r3.u32, ctx.r1.u32);
+}
+
+ITC_REGS_STEP(RaceHudObjectDraw) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::Draw(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateWarning) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateWarning(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateRecordingFull) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateRecordingFull(ctx.r3.u32, ctx.r4.s32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectShowItem) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::ShowItem(ctx.r3.u32, ctx.r4.s32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateItem) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateItem(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpTimer) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetUpTimer(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectSetUpRacers) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetUpRacers(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectSetMode) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::SetMode(ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectMake1004) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::Make1004(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectScreensInit) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::ScreensInit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectScreensCreate) {
+  if (!NativeHeapActive()) {
+    lifted::original::c82211F40(ctx);
+    return;
+  }
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::ScreensCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectScreensDestruct) {
+  if (!NativeHeapActive()) {
+    lifted::original::c82211B98(ctx);
+    return;
+  }
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::ScreensDestruct(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectScreensDestroy) {
+  if (!NativeHeapActive()) {
+    lifted::original::c82211D18(ctx);
+    return;
+  }
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::ScreensDestroy(ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectDrawPauseMenu) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::DrawPauseMenu(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectDrawAfterRaceMenu) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::DrawAfterRaceMenu(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectRunCountdown) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 =
+      rh::RunCountdown(ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls(), &ctx.f1.f64);
+}
+
+ITC_REGS_STEP(RaceHudObjectUpdateRacerBar) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::UpdateRacerBar(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+                                  guest.calls(), guest.sound_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectRunWarning) {
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::RunWarning(ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectTickRacers) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 =
+      rh::TickRacers(ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+ITC_REGS_STEP(RaceHudObjectTickPanel) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rh::TickPanel(ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+}  // namespace hooks
+
+// The adapters: the register steps above, or the originals with the flag
+// off. None for the functions only native callers reach (their register
+// steps stay for the harness): ShowGauge (from SetUpExtraGauges), SetSpeed,
+// UpdateExtraGauges, SetGear, SetTach, SetBoost, SetBar and UpdateSigns
+// (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
+// and SetDistance (from TickTimer), RaceScreens::MovieMask, RaceHud::Init and
+// RaceScreens::Make1004 (from RaceScreens::Init), TickRacers (from
+// TickPanel), UpdateRacerBar (from TickRacers; mode 3's tick, never seen in
+// play, runs the original), HudBar::Step and Touching (from UpdateRacerBar;
+// sub_822161D0, never seen in play, runs the originals), TickTimer and
+// UpdateRecordingFull (from TickPanel), HudCurve::Eval (from SetTach, SetBoost,
+// SetUpGauges and the alternate HUD's SetUpGauges, SetTach and SetBoost) and
+// PowInt (from SetSpeed, SetDistance and the alternate HUD's SetSpeed; the
+// +656 object's and the other digits' callers, never seen in play, run the
+// originals); and the race HUD machine's callees only its native handlers
+// reach in play (src/race_hud_machine/, by their plain C++; kind 4's paths,
+// never seen in play, reach the originals): UpdateView, UpdateItem,
+// RunWarning, RunItem, RunCountdown, StartMovie1, FinishMovie1, RunMovie1,
+// SetPlayer, Reset, ClearWarning, SetUpGauges, ResetBar, SetUpExtraGauges,
+// SetUpMirror and SetUpSigns (the user's call, 2026-10-31), and Tick,
+// UpdateWarning and TickPanel (since the machine's PauseUpdate and
+// AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
+// DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
+// DrawPauseMenu and DrawWarning (from the race HUD machine's PauseDraw and
+// RacePauseDraw, native); Draw (from the race HUD machine's eight draws in
+// play, native);
+// TearDown (from RaceScreens::~RaceScreens, native, 2026-11-08);
+// RaceScreens::Create (from the race HUD machine's CreateScreens, native,
+// with --native_heap; without it the original); ApplyOptions (from the race
+// HUD machine's SetUp, PauseUpdate and ClosePause, native).
+
+// StartCountdown, ShowItem, SetMode, SetUpTimer and SetUpRacers have no
+// adapters either (removed, 2026-11-08): only the race HUD machine's
+// StartCountdown's plain C++ reaches SetMode and StartCountdown, only
+// SetMode's reaches SetUpTimer and SetUpRacers, and only SetUpRacers' and
+// UpdateItem's reach ShowItem in play (the unseen sub_822155C0 runs the
+// original). RaceScreens::Destroy and ~RaceScreens have none (removed,
+// 2026-11-08): only the race HUD machine's DestroyScreens' plain C++ calls
+// Destroy's, and only Destroy's calls ~RaceScreens'. So no adapter is left
+// here, and --native_race_hud_object switches nothing in the game: the
+// native callers' flags (--native_race_hud_machine, --native_alt_hud) do;
+// the harnesses still set it.

@@ -18,13 +18,20 @@
 // one bound (device +12436), also when they're the same object. Then the
 // pair changes nothing (the device's own reference keeps the count above 0
 // throughout), so both are skipped; the rest of the call runs as before.
-// How many calls bind the same shader is logged every 5 s.
+// How many calls bind the same shader is logged every 5 s. SetVertexShader
+// is native since the B7 loop (src/graphics/device_shaders.cpp, which skips
+// the pair itself); its adapter (src/hooks/device_shaders.cpp) marks the
+// shader here only for the recompiled fallback.
 //
 // --refcount_global_lock=true runs the library's own functions instead
 // (for the recompiled callers; native callers, src/graphics/, call
 // refcount::AddRef, lock-free, either way).
 
 #include "native/refcount.h"
+#include "lifted/names.h"
+#include "lifted/entries.h"
+#include "lifted/originals.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -32,6 +39,7 @@
 #include "base/log.h"
 
 #include <chrono>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(refcount_global_lock, false, "ITC",
               "Let the graphics library's AddRef and Release take the recompiler's "
@@ -41,7 +49,6 @@ namespace {
 
 constexpr uint32_t kCount = 4;
 constexpr uint32_t kChild = 24;
-constexpr uint32_t kDeviceVertexShader = 12436;
 
 // The object whose AddRef and Release SetVertexShader makes no-ops.
 thread_local uint32_t g_unchanged_shader = 0;
@@ -52,8 +59,8 @@ thread_local uint64_t g_set_calls = 0, g_set_same = 0;
 thread_local std::chrono::steady_clock::time_point g_last_log;
 
 // Adds `delta` to the big-endian count at `address`; returns the new count.
-uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+uint32_t AddToCount(uint32_t address, int32_t delta) {
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {
@@ -64,8 +71,8 @@ uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
 }
 
 // Type 4 with +0 bit 0x40000000: the object holds a reference on +24.
-bool HoldsChild(uint8_t* base, uint32_t object) {
-  uint32_t common = guest::LoadU32(base, object);
+bool HoldsChild(uint32_t object) {
+  uint32_t common = guest::LoadU32(object);
   return (common & 0xF) == 4 && (common & 0x40000000);
 }
 
@@ -73,70 +80,23 @@ bool HoldsChild(uint8_t* base, uint32_t object) {
 
 namespace refcount {
 
-uint32_t AddRef(uint8_t* base, uint32_t object) {
+uint32_t AddRef(uint32_t object) {
   ITC_NATIVE_RUNNING("sub_822A6738 Resource::AddRef");
   if (object == g_unchanged_shader) {
-    return guest::LoadU32(base, object + kCount);  // unused by the caller
+    return guest::LoadU32(object + kCount);  // unused by the caller
   }
-  uint32_t count = AddToCount(base, object + kCount, 1);
-  if (count == 1 && HoldsChild(base, object)) {
-    AddRef(base, guest::LoadU32(base, object + kChild));
+  uint32_t count = AddToCount(object + kCount, 1);
+  if (count == 1 && HoldsChild(object)) {
+    AddRef(guest::LoadU32(object + kChild));
   }
   return count;
 }
 
-}  // namespace refcount
+void SetUnchangedShader(uint32_t object) { g_unchanged_shader = object; }
 
-extern "C" REX_FUNC(sub_822A6738) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A6738(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_822A67B0) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A67B0(ctx, base);
-    return;
-  }
-  uint32_t object = ctx.r3.u32;
-  if (object == g_unchanged_shader) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kCount);  // unused by the caller
-    return;
-  }
-  uint32_t count = AddToCount(base, object + kCount, -1);
-  if (count != 0) {
-    ctx.r3.u64 = count;
-    return;
-  }
-  if (HoldsChild(base, object)) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kChild);
-    ctx.lr = 0x822A6810;
-    sub_822A67B0(ctx, base);
-  }
-  ctx.r3.u64 = object;
-  ctx.lr = 0x822A6818;
-  sub_822A6210(ctx, base);
-  ctx.r3.u64 = 0;
-}
-
-extern "C" REX_FUNC(sub_822A8808) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A8808(ctx, base);
-    return;
-  }
-  uint32_t shader = ctx.r4.u32;
-  bool same = shader && shader == guest::LoadU32(base, ctx.r3.u32 + kDeviceVertexShader);
+void NoteSetVertexShader(bool same) {
   g_set_calls++;
   g_set_same += same;
-  if (same) g_unchanged_shader = shader;
-  __imp__sub_822A8808(ctx, base);
-  g_unchanged_shader = 0;
-
   if (g_set_calls % 65536 == 0) {
     auto now = std::chrono::steady_clock::now();
     if (now - g_last_log >= std::chrono::seconds(5)) {
@@ -146,4 +106,42 @@ extern "C" REX_FUNC(sub_822A8808) {
                    g_set_calls, g_set_same);
     }
   }
+}
+
+}  // namespace refcount
+
+ITC_NATIVE_ENTRY_ALWAYS(822A6738) {
+  
+  if (ITC_FLAG(refcount_global_lock)) {
+    lifted::original::c822A6738(ctx);
+    return;
+  }
+  ctx.r3.u64 = refcount::AddRef(ctx.r3.u32);
+}
+
+ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
+  
+  if (ITC_FLAG(refcount_global_lock)) {
+    lifted::original::c822A67B0(ctx);
+    return;
+  }
+  uint32_t object = ctx.r3.u32;
+  if (object == g_unchanged_shader) {
+    ctx.r3.u64 = guest::LoadU32(object + kCount);  // unused by the caller
+    return;
+  }
+  uint32_t count = AddToCount(object + kCount, -1);
+  if (count != 0) {
+    ctx.r3.u64 = count;
+    return;
+  }
+  if (HoldsChild(object)) {
+    ctx.r3.u64 = guest::LoadU32(object + kChild);
+    ctx.lr = 0x822A6810;
+    lifted::Enter(ctx, game::Resource::Release);
+  }
+  ctx.r3.u64 = object;
+  ctx.lr = 0x822A6818;
+  lifted::Enter(ctx, game::Resource::Destroy);
+  ctx.r3.u64 = 0;
 }

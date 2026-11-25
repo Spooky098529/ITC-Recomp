@@ -74,7 +74,7 @@ void SaveDevicesUpdate(Context& h) {
            t.r3.u64 = devices;
            t.r4.u64 = r4;
          },
-         __imp__sub_820A4610, sub_820A4610, h.data, kScratchBytes,
+         __imp__sub_820A4610, harness::Ours<0x820A4610>, h.data, kScratchBytes,
          fmt::format("{} slots, listener {}", count, listener));
   }
   results.Report();
@@ -97,6 +97,16 @@ void Notify(Context& h) {
     ITC_LOG_INFO("harness: notify: no SDK listener made");
     return;
   }
+  // The SDK sends its start-up set (system UI, sign-in changed, input
+  // devices) to the first listener with the system bit: since the voice
+  // engine's listener is no longer made (2026-10-30), that's this one. Its
+  // cases start from an empty queue.
+  {
+    rex::system::XNotificationID id;
+    uint32_t data;
+    while (sdk_listener->DequeueNotification(&id, &data)) {
+    }
+  }
   Results results("App::PollSignIn (sub_82099828)");
   for (int queued = 1; queued >= 0; queued--) {
     std::vector<uint8_t> result[2];
@@ -109,7 +119,7 @@ void Notify(Context& h) {
       notify_hooks::SetUsersBuilt(!queued);
       PPCContext c = CallContext(h);
       c.r3.u64 = app;
-      (v == 0 ? __imp__sub_82099828 : sub_82099828)(c, base);
+      (v == 0 ? __imp__sub_82099828 : harness::Ours<0x82099828>)(c, base);
       guest::StoreU32(base, app + 240, 0);  // the handles differ by design
       result[v] = Read(base, app, 256);
       for (int i = 0; i < 4; i++) {
