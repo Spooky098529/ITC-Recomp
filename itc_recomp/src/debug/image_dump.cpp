@@ -22,14 +22,14 @@ constexpr uint32_t kImageEnd = 0x82980000;
 
 }  // namespace
 
-void debug::ImageDump_OnPass(uint8_t* base) {
+void debug::ImageDump_OnPass() {
   std::string path = ITC_FLAG(dump_image);
   if (path.empty()) {
     return;
   }
   std::vector<uint8_t> image(kImageEnd - kImageStart);
   for (uint32_t i = 0; i < image.size(); i++) {
-    image[i] = guest::LoadU8(base, kImageStart + i);
+    image[i] = guest::LoadU8(kImageStart + i);
   }
   FILE* f = std::fopen(path.c_str(), "wb");
   if (!f || std::fwrite(image.data(), 1, image.size(), f) != image.size()) {

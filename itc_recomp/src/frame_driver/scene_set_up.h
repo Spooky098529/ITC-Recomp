@@ -48,12 +48,12 @@ struct SceneSetUpCalls {
 // into +20 and +24, +28 the second half, +8 half the slots, and both
 // buffers begun (+4 flipped twice, +32, +16, +12) as the original leaves
 // them. Returns 1. From a 112-byte frame (its calls').
-uint32_t CommandListInit(uint8_t* base, uint32_t list, uint32_t slots,
+uint32_t CommandListInit(uint32_t list, uint32_t slots,
                          const SceneSetUpCalls& calls);
 
 // sub_82178B28 ColorRect::SetTargets: [0x826D83D0] = `queue`,
 // [0x826D83D4] = `list`.
-void ColorRectSetTargets(uint8_t* base, uint32_t queue, uint32_t list);
+void ColorRectSetTargets(uint32_t queue, uint32_t list);
 
 // sub_82589E78 DrawGlobals::Init: from a 368-byte frame, the identity
 // matrix at 0x8265ECA0, the float4 defaults (0x8265ECE0 to 0x8265ED0F, the
@@ -64,13 +64,13 @@ void ColorRectSetTargets(uint8_t* base, uint32_t queue, uint32_t list);
 // bytes twice when `count` isn't 0, the counters 0), the defaults at
 // 0x8265ED20 and 0x8265ED30 and the sort keys [0x8296B90C] = 0,
 // [0x8296B900] = 1. r22 and r23 as the original keeps them.
-void DrawGlobalsInit(uint8_t* base, uint32_t capacity, uint32_t count,
+void DrawGlobalsInit(uint32_t capacity, uint32_t count,
                      const SceneSetUpCalls& calls);
 
 // sub_82591858 PrimitiveDecl::Init: from a 96-byte frame,
 // [0x82970BC8] = CreateVertexDeclaration(0x8206CBB4), [0x82970BDC] = 1.
 // Returns 1.
-uint32_t PrimitiveDeclInit(uint8_t* base, const SceneSetUpCalls& calls);
+uint32_t PrimitiveDeclInit(const SceneSetUpCalls& calls);
 
 // sub_82098A98 Scene::Scene: `scene` (80 bytes), `block` (+0 the run
 // loop, +4 the framework's +8 interface), its 192-byte frame at `frame`:
@@ -86,7 +86,7 @@ uint32_t PrimitiveDeclInit(uint8_t* base, const SceneSetUpCalls& calls);
 // Scene::OnEvent5 as its listener for event 5, each delegate built in the
 // frame as the original builds it. r27 to r31 as the original keeps them.
 // Returns `scene`.
-uint32_t SceneConstruct(uint8_t* base, uint32_t scene, uint32_t block, uint32_t frame,
+uint32_t SceneConstruct(uint32_t scene, uint32_t block, uint32_t frame,
                         const SceneSetUpCalls& calls);
 
 }  // namespace frame_driver

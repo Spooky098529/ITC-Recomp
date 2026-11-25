@@ -45,19 +45,19 @@ inline double ToSingle(int64_t value) { return double(float(double(value))); }
 inline double Single(double value) { return double(float(value)); }
 
 // lfs.
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+inline double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
 
 // stfs.
-inline void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+inline void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 
 // lfd.
-inline double Lfd(uint8_t* base, uint32_t address) {
-  const uint64_t bits = (uint64_t(guest::LoadU32(base, address)) << 32) |
-                        guest::LoadU32(base, address + 4);
+inline double Lfd(uint32_t address) {
+  const uint64_t bits = (uint64_t(guest::LoadU32(address)) << 32) |
+                        guest::LoadU32(address + 4);
   return std::bit_cast<double>(bits);
 }
 

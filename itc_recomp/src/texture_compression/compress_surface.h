@@ -54,7 +54,7 @@ struct CompressArguments {
 // plain C++) for the GPU format `format`, its width stored at `width` and
 // height at `height` where they aren't null. The original's r3: `format`
 // (what BlockSize leaves).
-uint32_t GetBlockDimensions(uint8_t* base, uint32_t format, uint32_t width, uint32_t height);
+uint32_t GetBlockDimensions(uint32_t format, uint32_t width, uint32_t height);
 
 // sub_8235AAC0 XGCompressSurface: r3 to r7 saved in the caller's frame; the
 // blit object made (Blitter::Blitter); the filter triangle with dither
@@ -76,7 +76,7 @@ uint32_t GetBlockDimensions(uint8_t* base, uint32_t format, uint32_t width, uint
 // its channels not in the standard order: HeapAlloc and
 // XGEndianSwapSurface), a DXT or YUV destination that must be swapped after
 // (not 8-in-16).
-std::optional<uint32_t> CompressSurface(uint8_t* base, const CompressArguments& arguments,
+std::optional<uint32_t> CompressSurface(const CompressArguments& arguments,
                                         uint32_t stack, const GuestCall& call);
 
 }  // namespace texture_compression

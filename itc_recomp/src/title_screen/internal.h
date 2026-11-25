@@ -17,9 +17,9 @@
 
 namespace title_screen {
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 using G = schema::TitleScreenGlobals;
@@ -32,9 +32,9 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemRelease = 0x8000;
 
 // The original's frame below `sp`, its back chain written.
-inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
+  Store(frame, sp);
   return frame;
 }
 
@@ -53,17 +53,17 @@ inline uint64_t FreePages(uint32_t address, uint32_t frame, uint32_t lr, const C
 
 // UiMovies::Find with the id stored at `key` (the original's frame word):
 // the movie in the pair's value.
-inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  Store(base, key, id);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+inline uint32_t FindMovie(uint32_t id, uint32_t key) {
+  Store(key, id);
+  return Load(ui_movies::PairsFind(ui_movies::kMovieTable, key));
 }
 
 // The title's words ([0x82814E34], loaded at each call).
-inline schema::TitleScreenData Words(uint8_t* base) { return G::data(base); }
+inline schema::TitleScreenData Words() { return G::data(); }
 
 // The menu list ([0x82814E30], race-screens' MenuList; loaded at each call).
-inline schema::MenuList MenuListOf(uint8_t* base) { return G::list(base); }
-inline uint32_t ListAddress(uint8_t* base) { return G::list(base).address; }
+inline schema::MenuList MenuListOf() { return G::list(); }
+inline uint32_t ListAddress() { return G::list().address; }
 
 // Menu4's menu reset (TitleScreen::Create, SetUpMenu4): first item 0, last
 // 1, wrapping, the rest cleared, in the originals' order.
@@ -87,8 +87,8 @@ inline void ResetMenu(const schema::FrontEndMenu& menu) {
 // Posts the message (id, 0, 0) on the dispatcher's ring (`mode`, the
 // handlers' r4: boot-mode's ModeDispatcher, the mode's +36; its count,
 // start, 50 slots of 12 bytes), as the handlers do inline.
-inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const schema::ModeDispatcher d(base, mode);
+inline void Post(uint32_t mode, uint32_t id) {
+  const schema::ModeDispatcher d(mode);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t start = d.ring_start();
   d.set_ring_count(count);

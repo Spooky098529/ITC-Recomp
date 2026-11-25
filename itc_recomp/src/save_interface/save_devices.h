@@ -30,10 +30,10 @@ constexpr uint32_t kSaveRecordBytes = 308;  // an XCONTENT_DATA
 // Whether SaveSlot::AllocBuffers can run natively for `saves`: a process
 // heap, and both sizes within what malloc takes (else the original's new
 // handler path, never in play: 100 in play).
-bool CanAllocBuffers(uint8_t* base, uint32_t saves);
+bool CanAllocBuffers(uint32_t saves);
 // sub_820A4560 SaveSlot::AllocBuffers: +80 = operator new[] of saves x 308
 // bytes, +84 = operator new[] of saves x 4. Only after CanAllocBuffers.
-void SlotAllocBuffers(uint8_t* base, uint32_t slot, uint32_t saves);
+void SlotAllocBuffers(uint32_t slot, uint32_t saves);
 
 // sub_820A6160 SaveDevices::SaveDevices: r3 `devices` (116 bytes), r4
 // `block` (+0 the run loop, +4 the interface, +8 and +12 the keys), r5
@@ -44,7 +44,7 @@ void SlotAllocBuffers(uint8_t* base, uint32_t slot, uint32_t saves);
 // below the frame are written as it leaves them. Returns `devices`;
 // nullopt, with nothing done, where CanAllocBuffers refuses.
 std::optional<uint32_t> SaveDevicesConstruct(
-    uint8_t* base, uint32_t devices, uint32_t block, uint32_t saves, uint32_t frame,
+    uint32_t devices, uint32_t block, uint32_t saves, uint32_t frame,
     const std::function<void(uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate)>&
         add);
 
@@ -53,7 +53,7 @@ std::optional<uint32_t> SaveDevicesConstruct(
 // constructor's register step) unless it's 0. Returns the save devices or
 // 0; nullopt, with nothing done, where operator new or CanAllocBuffers
 // would refuse.
-std::optional<uint32_t> SaveDevicesCreate(uint8_t* base, uint32_t saves,
+std::optional<uint32_t> SaveDevicesCreate(uint32_t saves,
                                           const std::function<void(uint32_t devices)>& construct);
 
 // sub_820A55F0 SlotArray::Reset: `holder` the word holding a slot array.
@@ -61,17 +61,17 @@ std::optional<uint32_t> SaveDevicesCreate(uint8_t* base, uint32_t saves,
 // header; else `destroy` (the first slot's vtable slot 0 with r4 = 3, a
 // guest call answering r3); the word then 0. Returns r3 as the original
 // leaves it (holder, the header, or destroy's answer).
-uint32_t SlotArrayReset(uint8_t* base, uint32_t holder,
+uint32_t SlotArrayReset(uint32_t holder,
                         const std::function<uint32_t(uint32_t slot)>& destroy);
 // sub_820A56E8 SaveDevices::Destroy: the vtable, the listener's CloseHandle
 // left out, the slots reset (SlotArrayReset on +44 when it isn't 0), the
 // base vtable. Returns r3 as the original leaves it after the CloseHandle
 // (holder or Reset's answer).
-uint32_t SaveDevicesDestroy(uint8_t* base, uint32_t devices,
+uint32_t SaveDevicesDestroy(uint32_t devices,
                             const std::function<uint32_t(uint32_t slot)>& destroy);
 // sub_820A6110 SaveDevices::~SaveDevices (deleting): Destroy, then with bit
 // 0 of `flags` operator delete. Returns `devices`.
-uint32_t SaveDevicesDelete(uint8_t* base, uint32_t devices, uint32_t flags,
+uint32_t SaveDevicesDelete(uint32_t devices, uint32_t flags,
                            const std::function<uint32_t(uint32_t slot)>& destroy);
 
 }  // namespace save_interface

@@ -44,12 +44,12 @@ schema::ScreenObject ScreenObjectAt(const schema::RaceScene& scene, uint32_t k) 
 
 }  // namespace
 
-uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
+uint64_t RaceDrawStep(uint32_t sp, uint64_t r13, uint32_t race) {
   ITC_NATIVE_RUNNING("sub_8215B4F8 Race::DrawStep");
-  const schema::RaceScene scene(base, race);
-  const uint32_t frame = lifted_call::PushFrame(base, sp, 112);
+  const schema::RaceScene scene(race);
+  const uint32_t frame = lifted_call::PushFrame(sp, 112);
   auto call = [&](uint32_t function, std::initializer_list<uint64_t> args) {
-    return lifted_call::Call(base, function, frame, r13, args).r3;
+    return lifted_call::Call(function, frame, r13, args).r3;
   };
   uint64_t r3 = 0;
   for (uint32_t pass = kCameraPasses; int32_t(pass) < int32_t(kCameraPassesEnd);
@@ -62,9 +62,9 @@ uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
   // Whether the race's views are drawn: camera pass 0's +588, or with the
   // mode word 4 and the flags' bit 0x80 clear, pass 2's +1772 when pass 1's
   // +1180 is set (nothing drawn when it isn't).
-  const schema::RaceData mode = G::race_data(base);
+  const schema::RaceData mode = G::race_data();
   const auto camera_pass = [&](uint32_t n) {
-    return schema::CameraPass(base, kCameraPasses + kCameraPassBytes * n);
+    return schema::CameraPass(kCameraPasses + kCameraPassBytes * n);
   };
   uint32_t drawn = 0;
   if (int32_t(mode.kind()) == 4 && ((mode.flags() >> 7) & 1) == 0) {
@@ -79,7 +79,7 @@ uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
     return r3;
   }
   r3 = call(kCarSceneUpdate, {r3});
-  r3 = call(kCarSceneDraw, {G::car_scene(base).address, 0});
+  r3 = call(kCarSceneDraw, {G::car_scene().address, 0});
   r3 = call(kSceneryDraw, {scene.scenery<schema::View>().address});
   // Each screen object's two post effects (1 and 2, 5 and 6, 9 and 10).
   for (uint32_t k = 0; k < 3; k++) {
@@ -92,7 +92,7 @@ uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
     ScreenObjectAt(scene, k).set_second_effect(uint32_t(r3));
   }
   // The screen objects recorded when the HUD's +1860 is 0, 1 or 2.
-  const int32_t hud = int32_t(G::viewports(base).first().view_mode());
+  const int32_t hud = int32_t(G::viewports().first().view_mode());
   if (hud == 0 || hud == 1 || hud == 2) {
     for (uint32_t k = 0; k < 3; k++) {
       r3 = ScreenObjectAt(scene, k).address;

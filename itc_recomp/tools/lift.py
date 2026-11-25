@@ -796,7 +796,7 @@ def signature(info, qualified=False):
     ret = "lifted::Result" if r3 and f1 else "uint64_t" if r3 else "double" if f1 else "void"
     def typed(p):
         return ("double " if p.startswith("f") else "lifted::Vec " if p.startswith("v") else "uint64_t ") + p
-    params = ["uint8_t* base"] + [typed(p) for p in info.params]
+    params = [typed(p) for p in info.params]
     if getattr(info, "needs_lr", False):
         params.append("uint64_t lr")
     return f"{ret} {'lifted::' if qualified else ''}{fname(info.name)}({', '.join(params)})"
@@ -931,7 +931,7 @@ def vtable_words(body):
                     break
             else:
                 if re.match(rf"\s*// mtctr {slot}$", s):
-                    body[i + 1] = f"  {a} = lifted::VtableWord(base, uint32_t({obj}));"
+                    body[i + 1] = f"  {a} = lifted::VtableWord(uint32_t({obj}));"
                     VTABLE_WORDS[0] += 1
                     break
                 if re.match(rf"\s*{slot} = ", s) or re.match(r"\s*(if|switch) ", s) or "lifted::" in s:
@@ -964,27 +964,27 @@ def emit_function(info, infos, emitting):
                 continue
             if is_direct(st, infos, emitting):
                 callee = infos[st.target]
-                call = f"{name_of(st.target, fname(st.target))}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
+                call = f"{name_of(st.target, fname(st.target))}({', '.join(callee.params + ([lr] if callee.needs_lr else []))})"
                 used.update(callee.params)
                 line = assign_result(callee, call)
             elif st.how == "direct" and st.target[4:] in entries():
                 # A hand port's entry (lifted/entries.h): called directly.
-                line = assign_result(None, f"{name_of(st.target, 'lifted::entry::e' + st.target[4:])}(base, LIFTED_ARGS({lr}, r31))")
+                line = assign_result(None, f"{name_of(st.target, 'lifted::entry::e' + st.target[4:])}(LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "direct":
                 # No function of ours at the address (not seen in play):
                 # the dispatch table, which stops the program.
-                line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
+                line = assign_result(None, f"lifted::Call(0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "import":
                 # Straight to our answer, found once per call site (E5 step 6).
                 record = st.target.removeprefix("__imp__")
                 line = assign_result(None, f"lifted::ImportAt<&lifted::import_records::{record}>"
-                                           f"(base, LIFTED_ARGS({lr}, r31))")
+                                           f"(LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             else:
                 target = rewrite(st.target)
-                line = assign_result(None, f"lifted::Call(base, uint32_t({target}), LIFTED_ARGS({lr}, r31))")
+                line = assign_result(None, f"lifted::Call(uint32_t({target}), LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             body.append("  " + line)
             used.update({"r3", "f1"})
@@ -1051,7 +1051,7 @@ def emit_function(info, infos, emitting):
 
 
 def emit_entry(info):
-    args = ["base"]
+    args = []
     for p in info.params:
         if p == "r1":
             args.append("a.r1")
@@ -1077,7 +1077,7 @@ def emit_entry(info):
         body = f"return {{a.r[0], {call}}};"
     else:
         body = f"{call};\n  return {{a.r[0], a.f[0]}};"
-    return [f"lifted::Result {ename(info.name)}(uint8_t* base, const lifted::Args& a) {{",
+    return [f"lifted::Result {ename(info.name)}(const lifted::Args& a) {{",
             f"  {body}", "}"]
 
 
@@ -1186,7 +1186,7 @@ def views():
 def name_fields(fn, st, line):
     """A load's or store's address named by the schema's view
     (docs/e5-native.md, step 2): `REX_LOAD_U32(uint32_t(r31) + 24)` as
-    `REX_LOAD_U32(schema::T(base, uint32_t(r31)).field_address())` where the
+    `REX_LOAD_U32(schema::T(uint32_t(r31)).field_address())` where the
     measure knows r31 holds a T; the access itself is unchanged."""
     v = views().get((fn, st.insn))
     if v is None:
@@ -1198,7 +1198,7 @@ def name_fields(fn, st, line):
     obj = f"uint32_t({m.group(3)})" + (f" - {off}" if off > 0 else f" + {-off}" if off < 0 else "")
     if ty.host:
         return host_access(fn, ty, f, obj, off + disp - f["offset"], m, line)
-    address = f"schema::{ty.name}(base, {obj}).{f['name']}_address()"
+    address = f"schema::{ty.name}({obj}).{f['name']}_address()"
     inside = off + disp - f["offset"]
     if inside:
         address += f" + {inside}"
@@ -1229,7 +1229,7 @@ def host_site(st):
     VIEW_HEADERS.add(ty.header())
     HOST_SITES_EMITTED.add(int(st.lr, 16))
     if site[0] == "alloc":
-        return (f"{{ r3 = schema::{ty.name}::New(base).address; f1 = 0; }}"
+        return (f"{{ r3 = schema::{ty.name}::New().address; f1 = 0; }}"
                 f"  // host_alloc {st.lr} ({ty.name})")
     if site[0] == "blob":
         reg = site[2]
@@ -1239,13 +1239,13 @@ def host_site(st):
     if site[0] == "alloc_array":
         reg = site[2]
         HOST_SITE_REGS.add(reg)
-        return (f"{{ r3 = schema::{ty.name}::NewArray(base, uint32_t({reg}) / schema::{ty.name}::kSize).address; f1 = 0; }}"
+        return (f"{{ r3 = schema::{ty.name}::NewArray(uint32_t({reg}) / schema::{ty.name}::kSize).address; f1 = 0; }}"
                 f"  // host_alloc {st.lr} ({ty.name}, an array)")
     _, _, reg, returns = site
     HOST_SITE_REGS.add(reg)
     # No `returns`: r3 as it was (operator delete and free leave it).
     after = "" if returns is None else f" r3 = {returns};"
-    return (f"{{ schema::{ty.name}(base, uint32_t({reg})).Delete();{after} }}"
+    return (f"{{ schema::{ty.name}(uint32_t({reg})).Delete();{after} }}"
             f"  // host_free {st.lr} ({ty.name})")
 
 
@@ -1275,7 +1275,7 @@ def host_access(fn, ty, f, obj, inside, m, line):
     inside a bytes field. A partial access to a plain field stays raw (it
     faults on the handle if reached) and is listed."""
     VIEW_HEADERS.add(ty.header())
-    view = f"schema::{ty.name}(base, {obj})"
+    view = f"schema::{ty.name}({obj})"
     width = int(m.group(2))
     store = m.group(1) == "STORE"
     if f["type"] == "bytes":
@@ -1320,12 +1320,12 @@ OWN_SPELLING = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(|\bREX_RAW_ADDR\("
 def own_spelling(text):
     """Guest memory accesses in our own spelling (docs/e5-native.md, step
     0): the generated code's REX_LOAD_U32(x), REX_STORE_U32(x, y) and
-    REX_RAW_ADDR(x) as guest::LoadU32(base, x), guest::StoreU32(base, x, y)
-    and guest::Pointer(base, x) (guest.h), as the hand ports write them."""
+    REX_RAW_ADDR(x) as guest::LoadU32(x), guest::StoreU32(x, y)
+    and guest::Pointer(x) (guest.h), as the hand ports write them."""
     def rep(m):
         if m.group(1):
-            return f"guest::{m.group(1).capitalize()}U{m.group(2)}(base, "
-        return "guest::Pointer(base, "
+            return f"guest::{m.group(1).capitalize()}U{m.group(2)}("
+        return "guest::Pointer("
     return OWN_SPELLING.sub(rep, text)
 
 
@@ -1346,7 +1346,7 @@ def emit_header(signatures):
     lines += ["", "// Their uniform entries (the dispatch table's), for code that holds a",
               "// call's registers (a hand port's lifted::Regs: lifted::Enter).", ""]
     for name in sorted(signatures):
-        lines.append(f"Result {ename(name)}(uint8_t* base, const Args& a);")
+        lines.append(f"Result {ename(name)}(const Args& a);")
     lines += ["", "}  // namespace lifted", ""]
     return "\n".join(lines)
 

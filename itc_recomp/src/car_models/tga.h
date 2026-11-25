@@ -33,36 +33,36 @@ constexpr uint32_t kTgaReaderInFrame = 80;
 constexpr uint32_t kTgaReaderText = 0x820021F0;
 
 // sub_820EEBC0: the 20-byte header cleared (but for +3 and +9).
-void TgaHeaderClear(uint8_t* base, uint32_t header);
+void TgaHeaderClear(uint32_t header);
 // sub_820EED38: the image's +4 to +24 cleared.
-void TgaImageClear(uint8_t* base, uint32_t image);
+void TgaImageClear(uint32_t image);
 // sub_820EED58: the image's pixels (+12), when set, freed (VirtualFree,
 // MEM_RELEASE) and +12 = 0.
-void TgaImageFree(uint8_t* base, uint32_t image);
+void TgaImageFree(uint32_t image);
 // sub_820EEB58: the string emptied (_Tidy, then assign of 0 characters),
 // the header and image cleared, +32 = 0.
-void TgaReaderInit(uint8_t* base, uint32_t reader);
+void TgaReaderInit(uint32_t reader);
 // sub_820EEAE8: the buffer (+32), when set, freed (VirtualFree) and +32 =
 // 0; the image freed; the string destroyed (_Tidy(true, 0)).
-void TgaReaderFree(uint8_t* base, uint32_t reader);
+void TgaReaderFree(uint32_t reader);
 // sub_820EEBF8 TGA::ParseHeader: the file's 18 header bytes into the
 // 20-byte header, the u16s swapped. Returns 0.
-uint32_t TgaParseHeader(uint8_t* base, uint32_t header, uint32_t buffer);
+uint32_t TgaParseHeader(uint32_t header, uint32_t buffer);
 // sub_820EF168 TGA::Decode: the image's buffer, header, width and height
 // set; for 24 or 32 bits the pixels' size and the pixels (VirtualAlloc)
 // copied from buffer + 18 (type 2 only: TgaDecodable). Returns 0.
-uint32_t TgaDecode(uint8_t* base, uint32_t image, uint32_t buffer, uint32_t header);
+uint32_t TgaDecode(uint32_t image, uint32_t buffer, uint32_t header);
 // sub_820EEA78: 5 when the reader is busy (+32 set); else +28 the size,
 // +32 the buffer, the header parsed and the image decoded (its answer).
-uint32_t TgaReaderLoad(uint8_t* base, uint32_t reader, uint32_t size, uint32_t buffer);
+uint32_t TgaReaderLoad(uint32_t reader, uint32_t size, uint32_t buffer);
 // sub_820EEF08 TGA::ToARGB: w x h ARGB words (VirtualAlloc) stored at
 // `pixels_out`, the rows flipped; 24-bit pixels get alpha 255.
-void TgaToArgb(uint8_t* base, uint32_t image, uint32_t pixels_out);
+void TgaToArgb(uint32_t image, uint32_t pixels_out);
 
 // Whether the file at `buffer` takes the paths ported here: an
 // uncompressed true-color image (type 2) of 24 or 32 bits. The others (the
 // RLE type 10, never seen in play, and the errors) run the original.
-bool TgaDecodable(uint8_t* base, uint32_t buffer);
+bool TgaDecodable(uint32_t buffer);
 
 // sub_820ED020 TGA::CreateImage: the reader in its frame (`stack` - 208 +
 // 80) set up, loaded from the buffer whose address is at `buffer_at`, the
@@ -70,7 +70,7 @@ bool TgaDecodable(uint8_t* base, uint32_t buffer);
 // to `header_out`, the buffer word cleared (so it isn't freed) and the
 // reader freed. Returns 1; nullopt, with nothing done, where the file isn't
 // TgaDecodable.
-std::optional<uint32_t> TgaCreateImage(uint8_t* base, uint32_t header_out, uint32_t size,
+std::optional<uint32_t> TgaCreateImage(uint32_t header_out, uint32_t size,
                                        uint32_t buffer_at, uint32_t pixels_out,
                                        uint32_t stack);
 

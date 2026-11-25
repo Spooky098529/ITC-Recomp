@@ -40,17 +40,17 @@ constexpr uint32_t kReleaseBucket = 0x8296B904;
 constexpr uint32_t kMakeMorphJob = 0x820AC7F0;  // the second pool maker's slot 1
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
 
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
 }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
-uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
+uint32_t Frame(uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
-  Store(base, frame, stack);
+  Store(frame, stack);
   return frame;
 }
 
@@ -66,12 +66,12 @@ uint32_t UsedAfter(uint32_t used, uint32_t bytes) {
 
 // Whether `bytes` and a header fit with `used` bytes and `headers` headers
 // taken from the current buffer (the original's unsigned compares).
-bool Fits(uint8_t* base, uint32_t bytes, uint32_t used, uint32_t headers) {
-  return used + bytes < Load(base, kWorkCapacity) && headers < kHeadersPerBuffer;
+bool Fits(uint32_t bytes, uint32_t used, uint32_t headers) {
+  return used + bytes < Load(kWorkCapacity) && headers < kHeadersPerBuffer;
 }
 
-uint32_t Take(uint8_t* base, uint32_t list) {
-  const uint32_t slot = command_list::AllocateSlots(base, list, 1);
+uint32_t Take(uint32_t list) {
+  const uint32_t slot = command_list::AllocateSlots(list, 1);
   if (slot == 0) {
     ITC_LOG_ERROR("car_draw: the command list refused a release slot after its checks");
     std::abort();
@@ -83,15 +83,15 @@ uint32_t Take(uint8_t* base, uint32_t list) {
 
 // --- XGSetVertexBufferHeader ---
 
-uint32_t XgSetVertexBufferHeader(uint8_t* base, uint32_t length, uint32_t usage, uint32_t offset,
+uint32_t XgSetVertexBufferHeader(uint32_t length, uint32_t usage, uint32_t offset,
                                  uint32_t header, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8235A688 XGSetVertexBufferHeader");
-  Frame(base, stack, kXgVertexBufferHeaderFrame);
+  Frame(stack, kXgVertexBufferHeaderFrame);
   // memset (sub_825A71D0) with 0: the same bytes.
   for (uint32_t i = 0; i < 32; i += 4) {
-    Store(base, header + i, 0);
+    Store(header + i, 0);
   }
-  const schema::BufferHeader h(base, header);
+  const schema::BufferHeader h(header);
   h.set_common(1);
   if ((usage & 0x4) != 0) {
     h.set_common(0x00200001);
@@ -109,56 +109,56 @@ uint32_t XgSetVertexBufferHeader(uint8_t* base, uint32_t length, uint32_t usage,
 
 // --- WorkMem::AllocVertexBuffer ---
 
-std::optional<uint32_t> WorkMemAllocVertexBuffer(uint8_t* base, uint32_t header_out,
+std::optional<uint32_t> WorkMemAllocVertexBuffer(uint32_t header_out,
                                                  uint32_t bytes, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258A9E8 WorkMem::AllocVertexBuffer");
-  const uint32_t i4 = Load(base, kWorkIndex) << 2;
-  const uint32_t headers = Load(base, kWorkHeaders + i4);
-  const uint32_t used = Load(base, kWorkUsed + i4);
-  if (!Fits(base, bytes, used, headers)) {
+  const uint32_t i4 = Load(kWorkIndex) << 2;
+  const uint32_t headers = Load(kWorkHeaders + i4);
+  const uint32_t used = Load(kWorkUsed + i4);
+  if (!Fits(bytes, used, headers)) {
     return std::nullopt;
   }
-  const uint32_t frame = Frame(base, stack, kAllocVertexBufferFrame);
+  const uint32_t frame = Frame(stack, kAllocVertexBufferFrame);
   const uint32_t header =
-      kHeaderTable + ((((Load(base, kWorkIndex) * 5) << 8) + headers) << 5);
-  XgSetVertexBufferHeader(base, bytes, 0, used, header, frame);
-  models::RelocateResource(base, header, Load(base, kWorkStart + i4));
-  Store(base, kWorkHeaders + i4, Load(base, kWorkHeaders + i4) + 1);
-  const uint32_t unrounded = bytes + Load(base, kWorkUsed + i4);
-  Store(base, kWorkUsed + i4, unrounded);
-  Store(base, kWorkUsed + i4, UsedAfter(unrounded, 0));
-  Store(base, header_out, header);
-  return Load(base, kWorkStart + i4) + used;
+      kHeaderTable + ((((Load(kWorkIndex) * 5) << 8) + headers) << 5);
+  XgSetVertexBufferHeader(bytes, 0, used, header, frame);
+  models::RelocateResource(header, Load(kWorkStart + i4));
+  Store(kWorkHeaders + i4, Load(kWorkHeaders + i4) + 1);
+  const uint32_t unrounded = bytes + Load(kWorkUsed + i4);
+  Store(kWorkUsed + i4, unrounded);
+  Store(kWorkUsed + i4, UsedAfter(unrounded, 0));
+  Store(header_out, header);
+  return Load(kWorkStart + i4) + used;
 }
 
 // --- Model::QueueJobRelease ---
 
-std::optional<Left> ModelQueueJobRelease(uint8_t* base, const Calls& calls, uint32_t job,
+std::optional<Left> ModelQueueJobRelease(const Calls& calls, uint32_t job,
                                          uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82594E88 Model::QueueJobRelease");
-  const uint32_t list = Load(base, kRecordList);
-  if (!sl::CommandListHasRoom(base, list, 4)) {
+  const uint32_t list = Load(kRecordList);
+  if (!sl::CommandListHasRoom(list, 4)) {
     return std::nullopt;
   }
-  const uint32_t frame = Frame(base, stack, kQueueJobReleaseFrame);
-  command_list::OpenChunk(base, list);
-  const uint32_t head = Take(base, list);
-  const uint32_t command = Take(base, list);
-  Store(base, command + 0, 22);
-  Store(base, command + 4, 1);
-  Store(base, command + 8, 0);
-  const uint32_t argument = Take(base, list);
-  Store(base, argument + 4, job);
-  Store(base, argument + 8, 1);
-  const uint32_t end = Take(base, list);
-  Store(base, end + 4, 0);
-  Store(base, end + 8, 0);
-  Store(base, end + 0, 36);
-  command_list::CloseChunk(base, list);
-  Store(base, head + 4, command);
-  const double key = double(guest::LoadFloat(base, kZero));
-  guest::StoreU16(base, head + 2, 4);
-  calls.draw.submit(calls.draw.user, head, Load(base, kReleaseBucket), key, frame, 0x82594F4C);
+  const uint32_t frame = Frame(stack, kQueueJobReleaseFrame);
+  command_list::OpenChunk(list);
+  const uint32_t head = Take(list);
+  const uint32_t command = Take(list);
+  Store(command + 0, 22);
+  Store(command + 4, 1);
+  Store(command + 8, 0);
+  const uint32_t argument = Take(list);
+  Store(argument + 4, job);
+  Store(argument + 8, 1);
+  const uint32_t end = Take(list);
+  Store(end + 4, 0);
+  Store(end + 8, 0);
+  Store(end + 0, 36);
+  command_list::CloseChunk(list);
+  Store(head + 4, command);
+  const double key = double(guest::LoadFloat(kZero));
+  guest::StoreU16(head + 2, 4);
+  calls.draw.submit(calls.draw.user, head, Load(kReleaseBucket), key, frame, 0x82594F4C);
   Left left;
   left.in_ctx = true;
   return left;
@@ -166,58 +166,58 @@ std::optional<Left> ModelQueueJobRelease(uint8_t* base, const Calls& calls, uint
 
 // --- Model::MorphShape ---
 
-std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t model,
+std::optional<Left> ModelMorphShape(const Calls& calls, uint32_t model,
                                     uint32_t morph, uint64_t shape_index, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82595110 Model::MorphShape");
   const uint32_t shape = uint32_t(shape_index * schema::ModelShape::kSize +
-                                  schema::Model(base, model).shapes().address);
-  const schema::ModelShape s(base, shape);
+                                  schema::Model(model).shapes().address);
+  const schema::ModelShape s(shape);
   const uint32_t stream0 = s.skin_array_a();
   const uint32_t stream1 = s.skin_array_b();
   const uint32_t weights = s.skin().address;
   // Both allocations and the release checked before anything is done.
   {
-    const uint32_t i4 = Load(base, kWorkIndex) << 2;
-    const uint32_t headers = Load(base, kWorkHeaders + i4);
-    const uint32_t used = Load(base, kWorkUsed + i4);
-    const uint32_t bytes0 = Load(base, stream0 + 12);
-    if (!Fits(base, bytes0, used, headers)) {
+    const uint32_t i4 = Load(kWorkIndex) << 2;
+    const uint32_t headers = Load(kWorkHeaders + i4);
+    const uint32_t used = Load(kWorkUsed + i4);
+    const uint32_t bytes0 = Load(stream0 + 12);
+    if (!Fits(bytes0, used, headers)) {
       return std::nullopt;
     }
-    const uint32_t bytes1 = Load(base, stream1 + 12);
-    if (bytes1 != 0 && !Fits(base, bytes1, UsedAfter(used, bytes0), headers + 1)) {
+    const uint32_t bytes1 = Load(stream1 + 12);
+    if (bytes1 != 0 && !Fits(bytes1, UsedAfter(used, bytes0), headers + 1)) {
       return std::nullopt;
     }
-    if (schema::CarDrawGlobals::pool_maker(base) != 0 &&
-        !sl::CommandListHasRoom(base, Load(base, kRecordList), 4)) {
+    if (schema::CarDrawGlobals::pool_maker() != 0 &&
+        !sl::CommandListHasRoom(Load(kRecordList), 4)) {
       return std::nullopt;
     }
   }
-  const uint32_t frame = Frame(base, stack, kMorphShapeFrame);
+  const uint32_t frame = Frame(stack, kMorphShapeFrame);
   auto alloc = [&](uint32_t header_out, uint32_t bytes) {
-    const auto memory = WorkMemAllocVertexBuffer(base, header_out, bytes, frame);
+    const auto memory = WorkMemAllocVertexBuffer(header_out, bytes, frame);
     if (!memory) {
       ITC_LOG_ERROR("car_draw: WorkMem::AllocVertexBuffer declined after its checks");
       std::abort();
     }
     return *memory;
   };
-  Store(base, shape + 416, alloc(s.skinned_stream1_address(), Load(base, stream0 + 12)));
-  const uint32_t bytes1 = Load(base, stream1 + 12);
+  Store(shape + 416, alloc(s.skinned_stream1_address(), Load(stream0 + 12)));
+  const uint32_t bytes1 = Load(stream1 + 12);
   if (bytes1 == 0) {
-    Store(base, shape + 424, 0);
+    Store(shape + 424, 0);
   } else {
-    Store(base, shape + 424, alloc(s.skinned_stream2_address(), bytes1));
+    Store(shape + 424, alloc(s.skinned_stream2_address(), bytes1));
   }
-  const schema::Morph m(base, morph);
-  m.set_out1(Load(base, shape + 416));
-  m.set_out2(Load(base, shape + 424));
-  const uint32_t maker = schema::CarDrawGlobals::pool_maker(base);
+  const schema::Morph m(morph);
+  m.set_out1(Load(shape + 416));
+  m.set_out2(Load(shape + 424));
+  const uint32_t maker = schema::CarDrawGlobals::pool_maker();
   Left left;
   if (maker != 0) {
     // The maker's slot 1 (sub_820AC7F0 in play: a job blending on a worker
     // thread), its plain C++ where it runs natively.
-    const uint32_t slot = Load(base, guest::VtableWord(base, maker) + 4);  // the maker may be in host memory
+    const uint32_t slot = Load(guest::VtableWord(maker) + 4);  // the maker may be in host memory
     std::optional<uint32_t> made;
     if (slot == kMakeMorphJob && calls.make_morph_job) {
       made = calls.make_morph_job(maker, morph, frame);
@@ -229,15 +229,15 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
       const uint64_t regs[2] = {maker, morph};
       job = uint32_t(calls.call(slot, regs, 2, frame, 0x825951A4));
     }
-    schema::SkinBlock(base, weights).set_object(job);
-    const auto release = ModelQueueJobRelease(base, calls, job, frame);
+    schema::SkinBlock(weights).set_object(job);
+    const auto release = ModelQueueJobRelease(calls, job, frame);
     if (!release) {
       ITC_LOG_ERROR("car_draw: Model::QueueJobRelease declined after its checks");
       std::abort();
     }
     left = *release;
   } else {
-    const auto blend = second_set::MorphBlend(base, morph, frame);
+    const auto blend = second_set::MorphBlend(morph, frame);
     if (blend) {
       left.r3 = blend->r3;
     } else {
@@ -245,7 +245,7 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
       calls.call(0x8258BD28, regs, 1, frame, 0x825951CC);
       left.in_ctx = true;
     }
-    schema::SkinBlock(base, weights).set_object(0);
+    schema::SkinBlock(weights).set_object(0);
   }
   s.set_skinned(1);
   return left;

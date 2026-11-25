@@ -24,23 +24,23 @@ enum State : uint32_t { kNone = 0, kLoaded = 1, kPlaying = 2, kPaused = 3 };
 
 // Slot 1, Movie::Play (sub_820AEC10): `path` (the game's, "DATA\TXR\MOVIE\...")
 // copied to +48 as strncpy copies it, the player opened, state 1.
-void Play(uint8_t* base, uint32_t movie, uint32_t path);
+void Play(uint32_t movie, uint32_t path);
 
 // Slots 2-6 (sub_820AE4E0, sub_820AE828, sub_820AE898, sub_820AE8F8,
 // sub_820AEA80): the state changes, done to the player. Each tests the
 // open's status first, as the originals do.
-void Start(uint8_t* base, uint32_t movie);
-void Stop(uint8_t* base, uint32_t movie);
-void Pause(uint8_t* base, uint32_t movie);
-void Resume(uint8_t* base, uint32_t movie);
-uint32_t GetState(uint8_t* base, uint32_t movie);
+void Start(uint32_t movie);
+void Stop(uint32_t movie);
+void Pause(uint32_t movie);
+void Resume(uint32_t movie);
+uint32_t GetState(uint32_t movie);
 
 // Slot 7, Movie::Release (sub_820AE528): the player closed unless playing.
-void Release(uint8_t* base, uint32_t movie);
+void Release(uint32_t movie);
 
 // Slot 0, Movie::RenderFrame (sub_820AE958), on the render thread from
 // command 28: the frame due drawn over render target 0 (native renderer);
 // state 1 once the movie has ended.
-void RenderFrame(uint8_t* base, uint32_t movie);
+void RenderFrame(uint32_t movie);
 
 }  // namespace movies::movie

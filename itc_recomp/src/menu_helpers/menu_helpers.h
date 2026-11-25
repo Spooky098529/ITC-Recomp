@@ -48,14 +48,14 @@ struct Calls {
 // (its 128-byte frame's back chain written at sp - 128; its register saves
 // above that aren't). Moves the cursor from the player's mapper and returns
 // +8 (1, -1 or 0) as the original's r3.
-uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, const Calls& calls);
+uint32_t Step(uint32_t menu, uint32_t sp, bool native_slots, const Calls& calls);
 
 // Menu::Pressed (sub_821864C8): 1 when the last step didn't move the menu
 // nor ask for a side, the player's entry isn't blocked and the mapper's
 // slot 10 answers nonzero for `action` (r4 as the caller gives it, all 64
 // bits passed on to a guest slot); else 0. Its 96-byte frame's back chain at
 // sp - 96 (its lr save above it isn't written).
-uint32_t Pressed(uint8_t* base, uint32_t menu, uint64_t action, uint32_t sp, bool native_slots,
+uint32_t Pressed(uint32_t menu, uint64_t action, uint32_t sp, bool native_slots,
                  const Calls& calls);
 
 }  // namespace menu_helpers

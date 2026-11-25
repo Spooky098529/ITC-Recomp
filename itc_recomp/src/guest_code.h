@@ -34,13 +34,9 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-// A function's prologue: `base` is 32-byte aligned (lets the compiler fold
-// guest addresses).
-#if defined(__clang__)
-#define REX_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0x1F) == 0)
-#else
+// A function's prologue: nothing since E5 step 10 (it told the compiler the
+// guest mapping's base was aligned; there is no base any more).
 #define REX_FUNC_PROLOGUE() ((void)0)
-#endif
 
 // Guest memory is read and written through guest.h's guest::Load*,
 // guest::Store* and guest::Pointer (docs/e5-native.md, step 0: one spelling

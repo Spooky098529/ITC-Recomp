@@ -26,21 +26,21 @@ namespace tuning_pages {
 namespace {
 
 // The screen (tuning-screen.toml's TuningScreen).
-schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
+schema::TuningScreen Screen(uint32_t s) { return schema::TuningScreen(s); }
 // The screen's command queue (tuning-screen.toml's TuningCommandQueue).
-schema::TuningCommandQueue CommandQueue(uint8_t* base, uint32_t q) {
-  return schema::TuningCommandQueue(base, q);
+schema::TuningCommandQueue CommandQueue(uint32_t q) {
+  return schema::TuningCommandQueue(q);
 }
 
 using G = schema::TuningPagesGlobals;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  Store(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  Store(sp - bytes, sp);
   return sp - bytes;
 }
 
@@ -61,8 +61,8 @@ constexpr uint32_t kFitSelectedCar = 0x8217DAC0;  // GarageStage::FitSelectedCar
 constexpr uint32_t kMemcpy = 0x825A7410;
 
 // The player's mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
-uint32_t PlayerEntry(uint8_t* base) {
-  return (Load(base, kControllerEntries) << 3) + kMapperEntries;
+uint32_t PlayerEntry() {
+  return (Load(kControllerEntries) << 3) + kMapperEntries;
 }
 
 // The mapper's read slot at `offset` (+32 slot 8, +40 slot 10, +44 slot 11,
@@ -70,22 +70,22 @@ uint32_t PlayerEntry(uint8_t* base) {
 // to `lr`: ActionMapper::Held's, Pressed's or Fired's plain C++ when the
 // vtable holds it and `native_slots` (logged for --log_pause_menu as their
 // adapters do), else the slot through `call`. Its r3.
-uint64_t ReadSlot(uint8_t* base, const tuning_screen::GuestCall& call, uint32_t mapper,
+uint64_t ReadSlot(const tuning_screen::GuestCall& call, uint32_t mapper,
                   uint32_t offset, uint64_t action, uint32_t frame, uint32_t lr,
                   bool native_slots) {
-  const uint32_t function = Load(base, Load(base, mapper) + offset);
+  const uint32_t function = Load(Load(mapper) + offset);
   if (native_slots) {
     const uint32_t id = uint32_t(action);
     uint32_t r3;
     int slot;
     if (function == kHeldSlot) {
-      r3 = action_mappers::Held(base, mapper, id);
+      r3 = action_mappers::Held(mapper, id);
       slot = 8;
     } else if (function == kPressedSlot) {
-      r3 = action_mappers::Pressed(base, mapper, id);
+      r3 = action_mappers::Pressed(mapper, id);
       slot = 10;
     } else if (function == kFiredSlot) {
-      r3 = action_mappers::Fired(base, mapper, id);
+      r3 = action_mappers::Fired(mapper, id);
       slot = 12;
     } else {
       return call(function, {mapper, action}, frame, lr);
@@ -107,71 +107,71 @@ struct Reads {
   uint64_t r3;
   // Slot `offset` on `action`: whether its low byte is set.
   bool operator()(uint32_t offset, uint64_t action, uint32_t lr) {
-    if (int32_t(schema::PlayerMapperEntry(base, entry).unread()) == 1) {
+    if (int32_t(schema::PlayerMapperEntry(entry).unread()) == 1) {
       return false;
     }
-    r3 = ReadSlot(base, call, Load(base, entry), offset, action, frame, lr, native_slots);
+    r3 = ReadSlot(call, Load(entry), offset, action, frame, lr, native_slots);
     return (r3 & 0xFF) != 0;
   }
 };
 
 // The history popped once: byte +10008 - 1, +9652 = the word there. The
 // popped state.
-uint32_t Pop(uint8_t* base, uint32_t s) {
-  const uint32_t depth = (uint32_t(Screen(base, s).history_depth()) + 255) & 0xFF;
-  Screen(base, s).set_history_depth(uint8_t(depth));
-  const uint32_t popped = Load(base, ((depth + 2439) << 2) + s);
-  Screen(base, s).set_state(popped);
+uint32_t Pop(uint32_t s) {
+  const uint32_t depth = (uint32_t(Screen(s).history_depth()) + 255) & 0xFF;
+  Screen(s).set_history_depth(uint8_t(depth));
+  const uint32_t popped = Load(((depth + 2439) << 2) + s);
+  Screen(s).set_state(popped);
   return popped;
 }
 
 // Push(s): the history's word at the byte +10008 = s, the byte read again
 // + 1.
-void Push(uint8_t* base, uint32_t s, uint32_t state) {
-  Store(base, ((uint32_t(Screen(base, s).history_depth()) + 2439) << 2) + s, state);
+void Push(uint32_t s, uint32_t state) {
+  Store(((uint32_t(Screen(s).history_depth()) + 2439) << 2) + s, state);
   // The byte read again (a push at depth 63 writes over it).
-  Screen(base, s).set_history_depth(uint8_t(uint32_t(Screen(base, s).history_depth()) + 1));
+  Screen(s).set_history_depth(uint8_t(uint32_t(Screen(s).history_depth()) + 1));
 }
 
 // Go's first half to state `state`: q+4 = q+0 = q+8 = s, q+20 = q+12 = -1,
 // q+24 = 0 (q = [+10036]).
-void GoFirstHalf(uint8_t* base, uint32_t s, uint32_t state) {
-  const uint32_t queue = Screen(base, s).queue().address;
-  CommandQueue(base, queue).set_step(kNone);
-  CommandQueue(base, queue).set_current(kNone);
-  CommandQueue(base, queue).set_started(0);
-  CommandQueue(base, queue).set_resume(state);
-  CommandQueue(base, queue).set_page(state);
-  CommandQueue(base, queue).set_previous_page(state);
+void GoFirstHalf(uint32_t s, uint32_t state) {
+  const uint32_t queue = Screen(s).queue().address;
+  CommandQueue(queue).set_step(kNone);
+  CommandQueue(queue).set_current(kNone);
+  CommandQueue(queue).set_started(0);
+  CommandQueue(queue).set_resume(state);
+  CommandQueue(queue).set_page(state);
+  CommandQueue(queue).set_previous_page(state);
 }
 
 // Go's second half with command `command`: the queue reloaded, q+8 = q+0
 // when +9652 isn't q+0, q+16 = -1, q+4 = +9652, q+0 = -1, q+12 = command.
-void GoSecondHalf(uint8_t* base, uint32_t s, uint32_t command) {
-  const uint32_t queue = Screen(base, s).queue().address;
-  const uint32_t state = Screen(base, s).state();
-  const uint32_t current = CommandQueue(base, queue).page();
+void GoSecondHalf(uint32_t s, uint32_t command) {
+  const uint32_t queue = Screen(s).queue().address;
+  const uint32_t state = Screen(s).state();
+  const uint32_t current = CommandQueue(queue).page();
   if (int32_t(state) != int32_t(current)) {
-    CommandQueue(base, queue).set_previous_page(current);
+    CommandQueue(queue).set_previous_page(current);
   }
-  CommandQueue(base, queue).set_next(kNone);
-  CommandQueue(base, queue).set_resume(state);
-  CommandQueue(base, queue).set_page(kNone);
-  CommandQueue(base, queue).set_current(command);
+  CommandQueue(queue).set_next(kNone);
+  CommandQueue(queue).set_resume(state);
+  CommandQueue(queue).set_page(kNone);
+  CommandQueue(queue).set_current(command);
 }
 
 // Go(state, command): +9652 = state, both halves.
-void Go(uint8_t* base, uint32_t s, uint32_t state, uint32_t command) {
-  Screen(base, s).set_state(state);
-  GoFirstHalf(base, s, state);
-  GoSecondHalf(base, s, command);
+void Go(uint32_t s, uint32_t state, uint32_t command) {
+  Screen(s).set_state(state);
+  GoFirstHalf(s, state);
+  GoSecondHalf(s, command);
 }
 
 // memcpy(destination, source, n) from `frame` returning to `lr`: its plain
 // C++ where Buffers_Memcpy takes it, else the guest's. Its r3.
-uint64_t Memcpy(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t destination,
+uint64_t Memcpy(const tuning_screen::GuestCall& call, uint64_t destination,
                 uint64_t source, uint32_t n, uint32_t frame, uint32_t lr) {
-  if (native::Buffers_Memcpy(base, uint32_t(destination), uint32_t(source), n, lr)) {
+  if (native::Buffers_Memcpy(uint32_t(destination), uint32_t(source), n, lr)) {
     return destination;
   }
   return call(kMemcpy, {destination, source, n}, frame, lr);
@@ -180,20 +180,20 @@ uint64_t Memcpy(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t de
 // A bar's position: the word sign-extended as a doubleword at frame + 80,
 // converted (fcfid), rounded to a single, times 40.0f rounded to a single;
 // its bits.
-uint32_t BarPosition(uint8_t* base, uint32_t frame, uint32_t word) {
+uint32_t BarPosition(uint32_t frame, uint32_t word) {
   const int64_t x = int32_t(word);
-  Store(base, frame + 80, uint32_t(uint64_t(x) >> 32));
-  Store(base, frame + 84, uint32_t(x));
+  Store(frame + 80, uint32_t(uint64_t(x) >> 32));
+  Store(frame + 84, uint32_t(x));
   const double f13 = double(float(double(x)));
-  const double step = double(G::bar_step(base));
+  const double step = double(G::bar_step());
   return std::bit_cast<uint32_t>(float(f13 * step));
 }
 
 // Entry i's texture words (+28, +32) copied to the kept texture k (images
 // + 7236 + 8k), both read first.
-void KeepTexture(uint8_t* base, uint32_t images, uint32_t i, uint32_t k) {
-  const schema::DecalImageEntry entry = DecalEntryAt(base, images, i);
-  const schema::DecalImageKept kept = DecalKeptAt(base, images, k);
+void KeepTexture(uint32_t images, uint32_t i, uint32_t k) {
+  const schema::DecalImageEntry entry = DecalEntryAt(images, i);
+  const schema::DecalImageKept kept = DecalKeptAt(images, k);
   const uint32_t header = entry.texture_header();
   const uint32_t data = entry.texture_data();
   kept.set_texture_header(header);
@@ -201,97 +201,97 @@ void KeepTexture(uint8_t* base, uint32_t images, uint32_t i, uint32_t k) {
 }
 
 // The stand holder [[0x826D83E0]] (tuning-screen.toml's StandHolder's +0).
-uint32_t Holder(uint8_t* base) {
-  return schema::TuningScreenGlobals::stand_holder(base).stage_block_0();
+uint32_t Holder() {
+  return schema::TuningScreenGlobals::stand_holder().stage_block_0();
 }
 
 }  // namespace
 
-uint64_t FitSelectedCar(uint8_t* base, const tuning_screen::GuestCall& call, const StandFit& fit,
+uint64_t FitSelectedCar(const tuning_screen::GuestCall& call, const StandFit& fit,
                         uint32_t holder, uint64_t r4, uint64_t r5, uint32_t frame, uint32_t lr) {
   if (fit.calls == nullptr) {
     return call(kFitSelectedCar, {holder, r4, r5}, frame, lr);
   }
   double f1 = 0.0;
-  const uint64_t r3 = tuning_screen::FitSelectedCar(base, *fit.calls, holder, r4, r5, frame, &f1);
+  const uint64_t r3 = tuning_screen::FitSelectedCar(*fit.calls, holder, r4, r5, frame, &f1);
   *fit.f1 = f1;
   return r3;
 }
 
-uint64_t LeaveVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t LeaveVinylView(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_82201B40 TuningScreen::LeaveVinylView");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   if (!asked(40, 159, 0x82201BA8) && !asked(40, 158, 0x82201BD4)) {
     return asked.r3;
   }
-  Screen(base, s).set_stand_action(8);
-  FitSelectedCar(base, call, fit, Holder(base), 0, 0, frame, 0x82201BFC);
+  Screen(s).set_stand_action(8);
+  FitSelectedCar(call, fit, Holder(), 0, 0, frame, 0x82201BFC);
   tuning_screen::FinishNamed(call, frame, 0x82201C08, movie, 241);
   uint64_t r3 = tuning_screen::PlayNamed(call, frame, 0x82201C24, movie, 241, 1);
-  const int32_t area = int32_t(Screen(base, s).editor_page());
+  const int32_t area = int32_t(Screen(s).editor_page());
   if (area == 0) {
-    r3 = call(kStageCommand, {Holder(base), 40}, frame, 0x82201C50);
+    r3 = call(kStageCommand, {Holder(), 40}, frame, 0x82201C50);
   } else if (area == 1) {
-    r3 = call(kStageCommand, {Holder(base), 41}, frame, 0x82201C50);
+    r3 = call(kStageCommand, {Holder(), 41}, frame, 0x82201C50);
   }
   return r3;
 }
 
-uint64_t InputVinylView(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylView(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_82202928 TuningScreen::InputVinylView");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t entry = PlayerEntry(base);
-  Reads asked{base, call, entry, frame, native_slots, 0};
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t entry = PlayerEntry();
+  Reads asked{call, entry, frame, native_slots, 0};
   if (asked(40, 159, 0x82202978) || asked(40, 158, 0x822029A4)) {
     // A or B: Pop, Go(the popped state, 18), the turns cancelled, the camera
     // reset.
     call(kMenuSoundPlay, {2}, frame, 0x822029B4);
-    Screen(base, s).set_refresh_pending(1);
-    const uint32_t popped = Pop(base, s);
-    GoFirstHalf(base, s, popped);
-    GoSecondHalf(base, s, 18);
-    call(kStageCommand, {Holder(base), 1}, frame, 0x82202A40);
-    call(kCameraCommand, {Holder(base), 20}, frame, 0x82202A50);
+    Screen(s).set_refresh_pending(1);
+    const uint32_t popped = Pop(s);
+    GoFirstHalf(s, popped);
+    GoSecondHalf(s, 18);
+    call(kStageCommand, {Holder(), 1}, frame, 0x82202A40);
+    call(kCameraCommand, {Holder(), 20}, frame, 0x82202A50);
   }
   // The held buttons: the distance, the turns and the tilt.
   if (asked(32, 163, 0x82202A74)) {
-    call(kCameraCommand, {Holder(base), 4}, frame, 0x82202A8C);
+    call(kCameraCommand, {Holder(), 4}, frame, 0x82202A8C);
   }
   if (asked(32, 164, 0x82202AB0)) {
-    call(kCameraCommand, {Holder(base), 5}, frame, 0x82202AC8);
+    call(kCameraCommand, {Holder(), 5}, frame, 0x82202AC8);
   }
   if (asked(32, 173, 0x82202AEC)) {
-    call(kStageCommand, {Holder(base), 1}, frame, 0x82202B04);
-    call(kStageCommand, {Holder(base), 9}, frame, 0x82202B14);
+    call(kStageCommand, {Holder(), 1}, frame, 0x82202B04);
+    call(kStageCommand, {Holder(), 9}, frame, 0x82202B14);
   }
   if (asked(32, 174, 0x82202B38)) {
-    call(kStageCommand, {Holder(base), 1}, frame, 0x82202B50);
-    call(kStageCommand, {Holder(base), 10}, frame, 0x82202B60);
+    call(kStageCommand, {Holder(), 1}, frame, 0x82202B50);
+    call(kStageCommand, {Holder(), 10}, frame, 0x82202B60);
   }
   if (asked(32, 171, 0x82202B84)) {
-    call(kStageCommand, {Holder(base), 1}, frame, 0x82202B9C);
-    call(kCameraCommand, {Holder(base), 0}, frame, 0x82202BAC);
+    call(kStageCommand, {Holder(), 1}, frame, 0x82202B9C);
+    call(kCameraCommand, {Holder(), 0}, frame, 0x82202BAC);
   }
   if (asked(32, 172, 0x82202BD0)) {
-    call(kStageCommand, {Holder(base), 1}, frame, 0x82202BE8);
-    call(kCameraCommand, {Holder(base), 1}, frame, 0x82202BF8);
+    call(kStageCommand, {Holder(), 1}, frame, 0x82202BE8);
+    call(kCameraCommand, {Holder(), 1}, frame, 0x82202BF8);
   }
-  return LeaveVinylView(base, call, screen, frame, native_slots, fit);
+  return LeaveVinylView(call, screen, frame, native_slots, fit);
 }
 
-void SetLastImage(uint8_t* base, uint32_t screen) {
+void SetLastImage(uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821FE498 TuningScreen::SetLastImage");
   uint32_t last;
-  if (int32_t(Screen(base, screen).category()) == 5 && uint32_t(Screen(base, screen).item()) == 6) {
-    const int32_t page = int32_t(Screen(base, screen).editor_page());
+  if (int32_t(Screen(screen).category()) == 5 && uint32_t(Screen(screen).item()) == 6) {
+    const int32_t page = int32_t(Screen(screen).editor_page());
     if (page == 0) {
       last = 4;
     } else if (page == 1) {
@@ -302,19 +302,19 @@ void SetLastImage(uint8_t* base, uint32_t screen) {
   } else {
     last = 198;
   }
-  Screen(base, screen).set_image_last_index(last);
+  Screen(screen).set_image_last_index(last);
 }
 
-uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylMenu(const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots, const StandFit& fit) {
   ITC_NATIVE_RUNNING("sub_821FF3A0 TuningScreen::MoveVinylMenu");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
-  auto page = [&] { return uint64_t(Screen(base, s).editor_page()); };
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
+  auto page = [&] { return uint64_t(Screen(s).editor_page()); };
   auto finish = [&](uint64_t named, uint32_t lr) {
     return tuning_screen::FinishNamed(call, frame, lr, movie, named);
   };
@@ -323,16 +323,16 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
   };
   // The bar snapped to the page: node (3, 0)'s +16.
   auto snap = [&] {
-    const uint32_t node = ui_movies::FindNode(base, movie, 3, 0);
-    schema::UiMovieNode(base, node).set_y(std::bit_cast<float>(uint32_t(BarPosition(base, frame, Screen(base, s).editor_page()))));
+    const uint32_t node = ui_movies::FindNode(movie, 3, 0);
+    schema::UiMovieNode(node).set_y(std::bit_cast<float>(uint32_t(BarPosition(frame, Screen(s).editor_page()))));
   };
   uint64_t old;
   if (asked(48, 153, 0x821FF408) || asked(48, 167, 0x821FF434)) {
     // Up.
-    if (Screen(base, s).refresh_pending() == 0) {
+    if (Screen(s).refresh_pending() == 0) {
       return asked.r3;
     }
-    if (Screen(base, s).editor_page_wrapped() != 0) {
+    if (Screen(s).editor_page_wrapped() != 0) {
       finish(16, 0x821FF62C);
       finish(17, 0x821FF638);
       snap();
@@ -344,14 +344,14 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
     }
   } else if (asked(48, 154, 0x821FF460) || asked(48, 168, 0x821FF48C)) {
     // Down.
-    if (Screen(base, s).refresh_pending() == 0) {
+    if (Screen(s).refresh_pending() == 0) {
       return asked.r3;
     }
-    if (Screen(base, s).editor_page_wrapped() != 0) {
+    if (Screen(s).editor_page_wrapped() != 0) {
       finish(16, 0x821FF588);
       finish(17, 0x821FF594);
       snap();
-      old = uint64_t(Screen(base, s).last_page()) + 6;
+      old = uint64_t(Screen(s).last_page()) + 6;
     } else {
       finish(17, 0x821FF5E0);
       play(17, 0x821FF5FC);
@@ -363,8 +363,8 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
     finish(16, 0x821FF4CC);
     finish(17, 0x821FF4D8);
     finish(page() + 6, 0x821FF4E8);
-    Screen(base, s).set_stand_action(5);
-    return FitSelectedCar(base, call, fit, Holder(base), 0, 0, frame, 0x821FF508);
+    Screen(s).set_stand_action(5);
+    return FitSelectedCar(call, fit, Holder(), 0, 0, frame, 0x821FF508);
   } else if (asked(40, 158, 0x821FF530)) {
     // B: the same, nothing applied.
     finish(16, 0x821FF544);
@@ -380,12 +380,12 @@ uint64_t MoveVinylMenu(uint8_t* base, const tuning_screen::GuestCall& call, uint
   return tuning_screen::LoopNamed(call, frame, 0x821FF6E8, movie, page() + 6);
 }
 
-uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylPages(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82204B70 TuningScreen::InputVinylPages");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
   const uint64_t images = screen + 10048;
   const uint32_t im = uint32_t(images);
   const bool native_free = flags.native_heap && flags.native_free;
@@ -393,12 +393,12 @@ uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   // 6, 7, 8), page 1's (kept 15 to 20 = entries 21, 22, 23, 27, 28, 29).
   static constexpr uint32_t kPage0[6] = {0, 1, 2, 6, 7, 8};
   static constexpr uint32_t kPage1[6] = {21, 22, 23, 27, 28, 29};
-  if (Screen(base, s).vinyl_kept() != 0) {
+  if (Screen(s).vinyl_kept() != 0) {
     // A page kept: its textures freed and kept again on the third frame.
-    const uint32_t count = G::keep_counter(base) + 1;
-    G::set_keep_counter(base, count);
+    const uint32_t count = G::keep_counter() + 1;
+    G::set_keep_counter(count);
     if (int32_t(count) == 3) {
-      const int32_t page = int32_t(Screen(base, s).editor_page());
+      const int32_t page = int32_t(Screen(s).editor_page());
       if (page == 0 || page == 1) {
         const uint32_t first = page == 0 ? 0 : 15;
         const uint32_t lrs0[6] = {0x82204BDC, 0x82204BE8, 0x82204BF4,
@@ -406,92 +406,92 @@ uint64_t InputVinylPages(uint8_t* base, const tuning_screen::GuestCall& call, ui
         const uint32_t lrs1[6] = {0x82204C94, 0x82204CA0, 0x82204CAC,
                                   0x82204CB8, 0x82204CC4, 0x82204CD0};
         for (uint32_t k = 0; k < 6; k++) {
-          FreeKept(base, images, first + k,
-                   GuestTextureFree(base, call, frame, page == 0 ? lrs0[k] : lrs1[k],
+          FreeKept(images, first + k,
+                   GuestTextureFree(call, frame, page == 0 ? lrs0[k] : lrs1[k],
                                     native_free));
         }
         for (uint32_t k = 0; k < 6; k++) {
-          KeepTexture(base, im, page == 0 ? kPage0[k] : kPage1[k], first + k);
+          KeepTexture(im, page == 0 ? kPage0[k] : kPage1[k], first + k);
         }
       }
-      Screen(base, s).set_vinyl_kept(0);
-      G::set_keep_counter(base, 0);
+      Screen(s).set_vinyl_kept(0);
+      G::set_keep_counter(0);
     }
   }
-  if (Screen(base, s).vinyl_kept() == 0) {
-    Reads asked{base, call, entry, frame, flags.native_slots, 0};
+  if (Screen(s).vinyl_kept() == 0) {
+    Reads asked{call, entry, frame, flags.native_slots, 0};
     if (asked(48, 153, 0x82204D6C) || asked(48, 167, 0x82204D98)) {
       // Up, wrapping to the last page +30784.
       call(kMenuSoundPlay, {4}, frame, 0x822050D4);
-      const int32_t page = int32_t(Screen(base, s).editor_page() - 1);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_editor_page(uint32_t(page));
+      const int32_t page = int32_t(Screen(s).editor_page() - 1);
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_editor_page(uint32_t(page));
       if (page < 0) {
-        Screen(base, s).set_editor_page(Screen(base, s).last_page());
-        Screen(base, s).set_editor_page_wrapped(1);
+        Screen(s).set_editor_page(Screen(s).last_page());
+        Screen(s).set_editor_page_wrapped(1);
       } else {
-        Screen(base, s).set_editor_page_wrapped(0);
+        Screen(s).set_editor_page_wrapped(0);
       }
     } else if (asked(48, 154, 0x82204DC4) || asked(48, 168, 0x82204DF0)) {
       // Down, wrapping to 0 past +30784.
       call(kMenuSoundPlay, {4}, frame, 0x822050A4);
-      const int32_t page = int32_t(Screen(base, s).editor_page() + 1);
-      const int32_t last = int32_t(Screen(base, s).last_page());
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_editor_page(uint32_t(page));
+      const int32_t page = int32_t(Screen(s).editor_page() + 1);
+      const int32_t last = int32_t(Screen(s).last_page());
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_editor_page(uint32_t(page));
       if (last < page) {
-        Screen(base, s).set_editor_page(0);
-        Screen(base, s).set_editor_page_wrapped(1);
+        Screen(s).set_editor_page(0);
+        Screen(s).set_editor_page_wrapped(1);
       } else {
-        Screen(base, s).set_editor_page_wrapped(0);
+        Screen(s).set_editor_page_wrapped(0);
       }
     } else if (asked(40, 159, 0x82204E1C)) {
       // A: the page's layers 0 and 1 (not 2: the loop stops at 2) copied to
       // their saved ids and records, then the layers' page.
       call(kMenuSoundPlay, {0}, frame, 0x82204E2C);
-      SetLastImage(base, s);
+      SetLastImage(s);
       for (uint32_t j = 0; j < 2; j++) {
-        const uint32_t n = Screen(base, s).editor_page() * 3 + j;
-        Store(base, ((n + 7798) << 2) + s, Load(base, ((n + 7792) << 2) + s));
-        const uint64_t m = uint64_t(Screen(base, s).editor_page()) * 3 + j;
+        const uint32_t n = Screen(s).editor_page() * 3 + j;
+        Store(((n + 7798) << 2) + s, Load(((n + 7792) << 2) + s));
+        const uint64_t m = uint64_t(Screen(s).editor_page()) * 3 + j;
         const uint64_t at = m * 24 + screen;
-        Memcpy(base, call, at + 31024, at + 30880, 24, frame, 0x82204E80);
+        Memcpy(call, at + 31024, at + 30880, 24, frame, 0x82204E80);
       }
-      Screen(base, s).set_layer_cursor(0);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_command_first_run(1);
-      Screen(base, s).set_layer_button(3);
-      Push(base, s, 23);
-      Screen(base, s).set_state(24);
-      GoFirstHalf(base, s, 24);
+      Screen(s).set_layer_cursor(0);
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_command_first_run(1);
+      Screen(s).set_layer_button(3);
+      Push(s, 23);
+      Screen(s).set_state(24);
+      GoFirstHalf(s, 24);
       // The page's kept textures set again (no FreeKept this time).
-      const int32_t page = int32_t(Screen(base, s).editor_page());
+      const int32_t page = int32_t(Screen(s).editor_page());
       if (page == 0 || page == 1) {
         for (uint32_t k = 0; k < 6; k++) {
-          KeepTexture(base, im, page == 0 ? kPage0[k] : kPage1[k], (page == 0 ? 0 : 15) + k);
+          KeepTexture(im, page == 0 ? kPage0[k] : kPage1[k], (page == 0 ? 0 : 15) + k);
         }
       }
-      GoSecondHalf(base, s, 16);
+      GoSecondHalf(s, 16);
     } else if (asked(40, 158, 0x82205018)) {
       // B: state 61 (leaving the editor) with no command, the vinyls stored,
       // the fade out.
       call(kMenuSoundPlay, {2}, frame, 0x82205028);
-      Screen(base, s).set_state(61);
-      GoFirstHalf(base, s, 61);
-      const uint32_t queue = Screen(base, s).queue().address;
-      const uint32_t state = Screen(base, s).state();
-      const uint32_t current = CommandQueue(base, queue).page();
+      Screen(s).set_state(61);
+      GoFirstHalf(s, 61);
+      const uint32_t queue = Screen(s).queue().address;
+      const uint32_t state = Screen(s).state();
+      const uint32_t current = CommandQueue(queue).page();
       if (int32_t(state) != int32_t(current)) {
-        CommandQueue(base, queue).set_previous_page(current);
+        CommandQueue(queue).set_previous_page(current);
       }
-      CommandQueue(base, queue).set_page(state);
-      CommandQueue(base, queue).set_current(kNone);
-      CommandQueue(base, queue).set_next(kNone);
-      StoreVinyls(base, screen, frame);
-      mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);
+      CommandQueue(queue).set_page(state);
+      CommandQueue(queue).set_current(kNone);
+      CommandQueue(queue).set_next(kNone);
+      StoreVinyls(screen, frame);
+      mode_tick::ScreenFadesFadeOut(G::fade_out_passes(), 0, 0, 0, 0);
     }
   }
-  return MoveVinylMenu(base, call, screen, frame, flags.native_slots, flags.fit);
+  return MoveVinylMenu(call, screen, frame, flags.native_slots, flags.fit);
 }
 
 namespace {
@@ -550,15 +550,15 @@ constexpr EditMoveCalls kScaleMove = {
 
 // The edited decal's node: movie 13's (-1, 19 + layer) on page 0, (-1, 22 +
 // layer) on page 1; 0 on other pages.
-uint32_t DecalNode(uint8_t* base, uint32_t movie, uint32_t s, int32_t page) {
-  const uint32_t layer = Screen(base, s).layer_cursor();
-  return ui_movies::FindNode(base, movie, 0xFFFFFFFFu, layer + (page == 0 ? 19 : 22));
+uint32_t DecalNode(uint32_t movie, uint32_t s, int32_t page) {
+  const uint32_t layer = Screen(s).layer_cursor();
+  return ui_movies::FindNode(movie, 0xFFFFFFFFu, layer + (page == 0 ? 19 : 22));
 }
 
 // A doubleword at `at` (an int sign-extended through the stack for fcfid).
-void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
-  Store(base, at, uint32_t(uint64_t(value) >> 32));
-  Store(base, at + 4, uint32_t(value));
+void StoreDoubleword(uint32_t at, int64_t value) {
+  Store(at, uint32_t(uint64_t(value) >> 32));
+  Store(at + 4, uint32_t(value));
 }
 
 // Place: the node's +12 and +16 from the decal's x and y (+30832, +30836)
@@ -566,84 +566,84 @@ void StoreDoubleword(uint8_t* base, uint32_t at, int64_t value) {
 // plus the page's offsets; the conversions' doublewords at frame + 80
 // (the y origin) and + 88 (y) as they're left. The node, or nullopt on
 // other pages.
-std::optional<uint32_t> Place(uint8_t* base, uint32_t movie, uint32_t s, uint32_t frame) {
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+std::optional<uint32_t> Place(uint32_t movie, uint32_t s, uint32_t frame) {
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page != 0 && page != 1) {
     return std::nullopt;
   }
-  const uint32_t node = DecalNode(base, movie, s, page);
+  const uint32_t node = DecalNode(movie, s, page);
   const uint32_t scale_at = page == 0 ? 30812 : 30828;
   const uint32_t origin_at = page == 0 ? 30800 : 30816;
   const uint32_t x_offset = page == 0 ? 0x8200CAF4 : 0x8200CAEC;
   const uint32_t y_offset = page == 0 ? 0x8200CAF0 : 0x8200CAE8;
   auto coordinate = [&](uint32_t at, uint32_t origin, uint32_t offset) {
-    const double scale = fs::Lfs(base, s + scale_at);
-    const int64_t v = int32_t(Load(base, s + at));
-    const int64_t o = int32_t(Load(base, s + origin));
+    const double scale = fs::Lfs(s + scale_at);
+    const int64_t v = int32_t(Load(s + at));
+    const int64_t o = int32_t(Load(s + origin));
     const double f13 = fs::ToSingle(v), f12 = fs::ToSingle(o);
     const double sum = fs::Single(std::fma(f13, scale, f12));
-    StoreDoubleword(base, frame + 80, o);
-    StoreDoubleword(base, frame + 88, v);
-    return fs::Single(sum + fs::Lfs(base, offset));
+    StoreDoubleword(frame + 80, o);
+    StoreDoubleword(frame + 88, v);
+    return fs::Single(sum + fs::Lfs(offset));
   };
-  schema::UiMovieNode(base, node).set_x(float(coordinate(30832, origin_at, x_offset)));
-  schema::UiMovieNode(base, node).set_y(float(coordinate(30836, origin_at + 4, y_offset)));
+  schema::UiMovieNode(node).set_x(float(coordinate(30832, origin_at, x_offset)));
+  schema::UiMovieNode(node).set_y(float(coordinate(30836, origin_at + 4, y_offset)));
   return node;
 }
 
 // The node's pivot: +20 and +24 the first lookup's +100 and +104 times 0.5
 // (fctiwz) into the second's.
-void Pivot(uint8_t* base, uint32_t first, uint32_t second) {
-  const double half = fs::Lfs(base, 0x82001BE4);
-  schema::UiMovieNode(base, second).set_pivot_x(uint32_t(fs::Fctiwz(fs::Single(double(schema::UiMovieNode(base, first).width()) * half))));
-  schema::UiMovieNode(base, second).set_pivot_y(uint32_t(fs::Fctiwz(fs::Single(double(schema::UiMovieNode(base, first).height()) * half))));
+void Pivot(uint32_t first, uint32_t second) {
+  const double half = fs::Lfs(0x82001BE4);
+  schema::UiMovieNode(second).set_pivot_x(uint32_t(fs::Fctiwz(fs::Single(double(schema::UiMovieNode(first).width()) * half))));
+  schema::UiMovieNode(second).set_pivot_y(uint32_t(fs::Fctiwz(fs::Single(double(schema::UiMovieNode(first).height()) * half))));
 }
 
 // Turn: the node (looked up twice) pivoted, its +36 the angle +30840.
-std::optional<uint32_t> Turn(uint8_t* base, uint32_t movie, uint32_t s) {
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+std::optional<uint32_t> Turn(uint32_t movie, uint32_t s) {
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page != 0 && page != 1) {
     return std::nullopt;
   }
-  const uint32_t first = DecalNode(base, movie, s, page);
-  const uint32_t second = DecalNode(base, movie, s, page);
-  Pivot(base, first, second);
-  schema::UiMovieNode(base, second).set_rotation(float(double(Screen(base, s).edited_angle())));
+  const uint32_t first = DecalNode(movie, s, page);
+  const uint32_t second = DecalNode(movie, s, page);
+  Pivot(first, second);
+  schema::UiMovieNode(second).set_rotation(float(double(Screen(s).edited_angle())));
   return second;
 }
 
 // Size: the node (looked up twice): +28 and +32 the scale +30844 times the
 // page's (+30808 or +30824), then pivoted.
-std::optional<uint32_t> Size(uint8_t* base, uint32_t movie, uint32_t s) {
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+std::optional<uint32_t> Size(uint32_t movie, uint32_t s) {
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page != 0 && page != 1) {
     return std::nullopt;
   }
-  const uint32_t first = DecalNode(base, movie, s, page);
-  const uint32_t second = DecalNode(base, movie, s, page);
+  const uint32_t first = DecalNode(movie, s, page);
+  const uint32_t second = DecalNode(movie, s, page);
   const uint32_t factor = s + (page == 0 ? 30808 : 30824);
-  schema::UiMovieNode(base, second).set_scale_x(float(fs::Single(double(Screen(base, s).edited_scale()) * fs::Lfs(base, factor))));
-  schema::UiMovieNode(base, second).set_scale_y(float(fs::Single(double(Screen(base, s).edited_scale()) * fs::Lfs(base, factor))));
-  Pivot(base, first, second);
+  schema::UiMovieNode(second).set_scale_x(float(fs::Single(double(Screen(s).edited_scale()) * fs::Lfs(factor))));
+  schema::UiMovieNode(second).set_scale_y(float(fs::Single(double(Screen(s).edited_scale()) * fs::Lfs(factor))));
+  Pivot(first, second);
   return second;
 }
 
-uint64_t MoveDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecal(const tuning_screen::GuestCall& call, uint64_t screen,
                    uint32_t sp, bool native_slots, Edit edit) {
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   const EditMoveCalls& lr = edit == Edit::kPosition ? kPositionMove
                             : edit == Edit::kAngle  ? kAngleMove
                                                     : kScaleMove;
   auto apply = [&]() -> std::optional<uint32_t> {
     switch (edit) {
-      case Edit::kPosition: return Place(base, movie, s, frame);
-      case Edit::kAngle: return Turn(base, movie, s);
-      default: return Size(base, movie, s);
+      case Edit::kPosition: return Place(movie, s, frame);
+      case Edit::kAngle: return Turn(movie, s);
+      default: return Size(movie, s);
     }
   };
   static constexpr uint32_t kPositionMoves[8] = {153, 167, 154, 168, 156, 170, 155, 169};
@@ -672,20 +672,20 @@ uint64_t MoveDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t
 // An edit page's move: the field at `at` stepped and clamped (the
 // position's ints) or the float stepped by [step] and wrapped or clamped
 // (the angle's and scale's); +9708 = 1 first.
-void Step(uint8_t* base, uint32_t s, Edit edit, uint32_t move) {
-  Screen(base, s).set_refresh_pending(1);
+void Step(uint32_t s, Edit edit, uint32_t move) {
+  Screen(s).set_refresh_pending(1);
   if (edit == Edit::kPosition) {
     // 0 up (y - 1, y min), 1 down (y + 1, y max), 2 left (x - 1, x min), 3
     // right (x + 1, x max).
     const uint32_t at = move < 2 ? 30836 : 30832;
     const int32_t delta = (move % 2 == 0) ? -1 : 1;
-    const uint32_t limits = (Screen(base, s).editor_page() << 4) + kLimits;
+    const uint32_t limits = (Screen(s).editor_page() << 4) + kLimits;
     const uint32_t limit_at = limits + (move < 2 ? 8 : 0) + (move % 2 == 0 ? 0 : 4);
-    const int32_t value = int32_t(Load(base, s + at) + uint32_t(delta));
-    Store(base, s + at, uint32_t(value));
-    const int32_t limit = int32_t(Load(base, limit_at));
+    const int32_t value = int32_t(Load(s + at) + uint32_t(delta));
+    Store(s + at, uint32_t(value));
+    const int32_t limit = int32_t(Load(limit_at));
     if (delta < 0 ? value < limit : value > limit) {
-      Store(base, s + at, uint32_t(limit));
+      Store(s + at, uint32_t(limit));
     }
     return;
   }
@@ -693,37 +693,37 @@ void Step(uint8_t* base, uint32_t s, Edit edit, uint32_t move) {
   const bool plus = move == 1;
   const uint32_t at = s + (edit == Edit::kAngle ? 30840 : 30844);
   const uint32_t step = edit == Edit::kAngle ? 0x82000A30 : 0x8200222C;
-  const double old = fs::Lfs(base, at);
-  const double value = fs::Single(plus ? old + fs::Lfs(base, step) : old - fs::Lfs(base, step));
-  fs::Stfs(base, at, value);
+  const double old = fs::Lfs(at);
+  const double value = fs::Single(plus ? old + fs::Lfs(step) : old - fs::Lfs(step));
+  fs::Stfs(at, value);
   if (edit == Edit::kAngle) {
     // 0.0 to 359.0, wrapped.
-    if (plus ? value > fs::Lfs(base, 0x8200C54C) : value < fs::Lfs(base, 0x82000A34)) {
-      fs::Stfs(base, at, fs::Lfs(base, plus ? 0x82000A34 : 0x8200C54C));
+    if (plus ? value > fs::Lfs(0x8200C54C) : value < fs::Lfs(0x82000A34)) {
+      fs::Stfs(at, fs::Lfs(plus ? 0x82000A34 : 0x8200C54C));
     }
   } else {
     // 0.1 to 2.0, clamped.
-    const double limit = fs::Lfs(base, plus ? 0x820021E8 : 0x82001FBC);
+    const double limit = fs::Lfs(plus ? 0x820021E8 : 0x82001FBC);
     if (plus ? value > limit : value < limit) {
-      fs::Stfs(base, at, limit);
+      fs::Stfs(at, limit);
     }
   }
 }
 
-uint64_t InputDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecal(const tuning_screen::GuestCall& call, uint64_t screen,
                     uint32_t sp, const PageFlags& flags, Edit edit) {
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t entry = PlayerEntry(base);
-  Reads asked{base, call, entry, frame, flags.native_slots, 0};
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t entry = PlayerEntry();
+  Reads asked{call, entry, frame, flags.native_slots, 0};
   const EditInputCalls& lr = edit == Edit::kPosition ? kPositionInput
                              : edit == Edit::kAngle  ? kAngleInput
                                                      : kScaleInput;
   // 164 held: the selected decal highlighted (0), released: back (1).
   if (asked(32, 164, lr.held)) {
-    tuning_screen::HighlightSelected(base, screen, 0, frame);
+    tuning_screen::HighlightSelected(screen, 0, frame);
   } else if (asked(44, 164, lr.released)) {
-    tuning_screen::HighlightSelected(base, screen, 1, frame);
+    tuning_screen::HighlightSelected(screen, 1, frame);
   }
   // The moves: the position's up, down, left, right; the angle's and
   // scale's left, right.
@@ -734,7 +734,7 @@ uint64_t InputDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
   bool moved = false;
   for (uint32_t k = 0; k < count && !moved; k++) {
     if (asked(48, moves[k], lr.moves[k])) {
-      Step(base, s, edit, k / 2);
+      Step(s, edit, k / 2);
       moved = true;
     }
   }
@@ -751,62 +751,62 @@ uint64_t InputDecal(uint8_t* base, const tuning_screen::GuestCall& call, uint64_
     }
     if (a || b) {
       call(kMenuSoundPlay, {a ? 0u : 2u}, frame, a ? lr.a_sound : lr.b_sound);
-      Screen(base, s).set_refresh_pending(1);
-      const uint32_t popped = Pop(base, s);
-      GoFirstHalf(base, s, popped);
+      Screen(s).set_refresh_pending(1);
+      const uint32_t popped = Pop(s);
+      GoFirstHalf(s, popped);
       if (b) {
-        Memcpy(base, call, screen + 30832, screen + 30856, 24, frame, lr.b_memcpy);
+        Memcpy(call, screen + 30832, screen + 30856, 24, frame, lr.b_memcpy);
       }
-      GoSecondHalf(base, s, 18);
+      GoSecondHalf(s, 18);
     }
   }
-  return MoveDecal(base, call, screen, frame, flags.native_slots, edit);
+  return MoveDecal(call, screen, frame, flags.native_slots, edit);
 }
 
 }  // namespace
 
-uint64_t MoveDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalPosition(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82200DC0 TuningScreen::MoveDecalPosition");
-  return MoveDecal(base, call, screen, sp, native_slots, Edit::kPosition);
+  return MoveDecal(call, screen, sp, native_slots, Edit::kPosition);
 }
-uint64_t MoveDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalAngle(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_822012E8 TuningScreen::MoveDecalAngle");
-  return MoveDecal(base, call, screen, sp, native_slots, Edit::kAngle);
+  return MoveDecal(call, screen, sp, native_slots, Edit::kAngle);
 }
-uint64_t MoveDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveDecalScale(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82201620 TuningScreen::MoveDecalScale");
-  return MoveDecal(base, call, screen, sp, native_slots, Edit::kScale);
+  return MoveDecal(call, screen, sp, native_slots, Edit::kScale);
 }
-uint64_t InputDecalPosition(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalPosition(const tuning_screen::GuestCall& call, uint64_t screen,
                             uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82206A50 TuningScreen::InputDecalPosition");
-  return InputDecal(base, call, screen, sp, flags, Edit::kPosition);
+  return InputDecal(call, screen, sp, flags, Edit::kPosition);
 }
-uint64_t InputDecalAngle(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalAngle(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82206F48 TuningScreen::InputDecalAngle");
-  return InputDecal(base, call, screen, sp, flags, Edit::kAngle);
+  return InputDecal(call, screen, sp, flags, Edit::kAngle);
 }
-uint64_t InputDecalScale(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputDecalScale(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82207320 TuningScreen::InputDecalScale");
-  return InputDecal(base, call, screen, sp, flags, Edit::kScale);
+  return InputDecal(call, screen, sp, flags, Edit::kScale);
 }
 
-uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerEdit(const tuning_screen::GuestCall& call, uint64_t screen,
                        uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82200760 TuningScreen::MoveLayerEdit");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   uint64_t r3 = found;
-  auto cursor = [&] { return Screen(base, s).edit_cursor(); };
+  auto cursor = [&] { return Screen(s).edit_cursor(); };
   auto finish = [&](uint64_t named, uint32_t lr) {
     return r3 = tuning_screen::FinishNamed(call, frame, lr, movie, named);
   };
@@ -818,8 +818,8 @@ uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint
   };
   // The list's scroll node: Child(FindNode(11, 1), 0)'s +16 = [constant].
   auto scroll = [&](uint32_t constant) {
-    const uint32_t node = ui_movies::Child(base, ui_movies::FindNode(base, movie, 11, 1), 0);
-    schema::UiMovieNode(base, node).set_y(std::bit_cast<float>(uint32_t(Load(base, constant))));
+    const uint32_t node = ui_movies::Child(ui_movies::FindNode(movie, 11, 1), 0);
+    schema::UiMovieNode(node).set_y(std::bit_cast<float>(uint32_t(Load(constant))));
     r3 = node;
   };
   // The rows' highlights finished (130 to 134, 136, 137).
@@ -844,14 +844,14 @@ uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint
   }
   r3 = asked.r3;
   if (moved) {
-    if (Screen(base, s).refresh_pending() != 0) {
+    if (Screen(s).refresh_pending() != 0) {
       const int32_t c = int32_t(cursor());
       if (c < 0 || c > 4) {
         finish(102, 0x82200C80);
         finish(103, 0x82200C8C);
         scroll(0x820027A4);  // 200.0
       } else {
-        Reads again{base, call, entry, frame, native_slots, r3};
+        Reads again{call, entry, frame, native_slots, r3};
         if (again(48, 153, 0x82200B50) || again(48, 167, 0x82200B7C)) {
           if (int32_t(cursor()) == 4) {
             scroll(0x820081D8);  // 160.0
@@ -908,54 +908,54 @@ uint64_t MoveLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint
     r3 = asked.r3;
   }
   // The flip shown on the edited decal's node: +132 = (+30848 != 0).
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page == 0 || page == 1) {
-    const uint32_t node = DecalNode(base, movie, s, page);
-    schema::UiMovieNode(base, node).set_flip_x(Screen(base, s).edited_flip() != 0 ? 1 : 0);
+    const uint32_t node = DecalNode(movie, s, page);
+    schema::UiMovieNode(node).set_flip_x(Screen(s).edited_flip() != 0 ? 1 : 0);
     r3 = node;
   }
   return r3;
 }
 
-uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerEdit(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82205110 TuningScreen::InputLayerEdit");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t entry = PlayerEntry(base);
-  Reads asked{base, call, entry, frame, flags.native_slots, 0};
-  auto cursor = [&] { return int32_t(Screen(base, s).edit_cursor()); };
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t entry = PlayerEntry();
+  Reads asked{call, entry, frame, flags.native_slots, 0};
+  auto cursor = [&] { return int32_t(Screen(s).edit_cursor()); };
   auto sound = [&](uint32_t cue, uint32_t lr) { call(kMenuSoundPlay, {cue}, frame, lr); };
   if (asked(32, 164, 0x82205164)) {
-    tuning_screen::HighlightSelected(base, screen, 0, frame);
+    tuning_screen::HighlightSelected(screen, 0, frame);
   } else if (asked(44, 164, 0x82205198)) {
-    tuning_screen::HighlightSelected(base, screen, 1, frame);
+    tuning_screen::HighlightSelected(screen, 1, frame);
   }
   if (asked(48, 153, 0x822051D0) || asked(48, 167, 0x822051FC)) {
     // Up: from the buttons to the free look (4); else the row before,
     // below 0 to the last (+30752).
     sound(4, 0x822058A0);
-    Screen(base, s).set_refresh_pending(1);
+    Screen(s).set_refresh_pending(1);
     const int32_t c = cursor();
     if (c == 5 || c == 6) {
-      Screen(base, s).set_edit_cursor(4);
+      Screen(s).set_edit_cursor(4);
     } else {
-      Screen(base, s).set_edit_cursor(uint32_t(c - 1));
+      Screen(s).set_edit_cursor(uint32_t(c - 1));
       if (c - 1 < 0) {
-        Screen(base, s).set_edit_cursor(Screen(base, s).edit_row_saved());
+        Screen(s).set_edit_cursor(Screen(s).edit_row_saved());
       }
     }
   } else if (asked(48, 154, 0x82205228) || asked(48, 168, 0x82205254)) {
     // Down: from the buttons to 0; else the next row, above 4 to +30752.
     sound(4, 0x8220585C);
-    Screen(base, s).set_refresh_pending(1);
+    Screen(s).set_refresh_pending(1);
     const int32_t c = cursor();
     if (c == 5 || c == 6) {
-      Screen(base, s).set_edit_cursor(0);
+      Screen(s).set_edit_cursor(0);
     } else {
-      Screen(base, s).set_edit_cursor(uint32_t(c + 1));
+      Screen(s).set_edit_cursor(uint32_t(c + 1));
       if (c + 1 > 4) {
-        Screen(base, s).set_edit_cursor(Screen(base, s).edit_row_saved());
+        Screen(s).set_edit_cursor(Screen(s).edit_row_saved());
       }
     }
   } else if (asked(48, 155, 0x82205280) || asked(48, 169, 0x822052AC)) {
@@ -963,90 +963,90 @@ uint64_t InputLayerEdit(uint8_t* base, const tuning_screen::GuestCall& call, uin
     const int32_t c = cursor();
     if (c == 5 || c == 6) {
       sound(4, 0x82205830);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_edit_cursor(uint32_t(c - 1));
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_edit_cursor(uint32_t(c - 1));
       if (c - 1 < 5) {
-        Screen(base, s).set_edit_cursor(6);
+        Screen(s).set_edit_cursor(6);
       }
-      Screen(base, s).set_edit_row_saved(Screen(base, s).edit_cursor());
+      Screen(s).set_edit_row_saved(Screen(s).edit_cursor());
     }
   } else if (asked(48, 156, 0x822052D8) || asked(48, 170, 0x82205304)) {
     // Right, between the buttons only (above 6 to 5).
     const int32_t c = cursor();
     if (c == 5 || c == 6) {
       sound(4, 0x822057E4);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_edit_cursor(uint32_t(c + 1));
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_edit_cursor(uint32_t(c + 1));
       if (c + 1 > 6) {
-        Screen(base, s).set_edit_cursor(5);
+        Screen(s).set_edit_cursor(5);
       }
-      Screen(base, s).set_edit_row_saved(Screen(base, s).edit_cursor());
+      Screen(s).set_edit_row_saved(Screen(s).edit_cursor());
     }
   } else if (asked(32, 164, 0x82205330) || asked(44, 164, 0x8220535C)) {
     // 164 held or released: nothing.
   } else if (asked(40, 159, 0x82205388)) {
     sound(0, 0x82205398);
-    Screen(base, s).set_refresh_pending(1);
-    const uint32_t c = Screen(base, s).edit_cursor();
+    Screen(s).set_refresh_pending(1);
+    const uint32_t c = Screen(s).edit_cursor();
     if (c <= 2 || c == 4) {
       // The edits (Go(29, 25), (30, 26), (31, 27), the edited decal kept at
       // +30856 for B) and the free look (Go(34, 29)).
       static constexpr uint32_t kStates[5] = {29, 30, 31, 0, 34};
       static constexpr uint32_t kCommands[5] = {25, 26, 27, 0, 29};
       static constexpr uint32_t kMemcpyLrs[3] = {0x82205704, 0x8220567C, 0x822055FC};
-      Screen(base, s).set_command_first_run(1);
+      Screen(s).set_command_first_run(1);
       if (c <= 2) {
-        Memcpy(base, call, screen + 30856, screen + 30832, 24, frame, kMemcpyLrs[c]);
+        Memcpy(call, screen + 30856, screen + 30832, 24, frame, kMemcpyLrs[c]);
       }
-      Push(base, s, 26);
-      Go(base, s, kStates[c], kCommands[c]);
+      Push(s, 26);
+      Go(s, kStates[c], kCommands[c]);
     } else if (c == 3) {
       // The flip.
-      Screen(base, s).set_edited_flip(Screen(base, s).edited_flip() == 0 ? 1 : 0);
+      Screen(s).set_edited_flip(Screen(s).edited_flip() == 0 ? 1 : 0);
     } else if (c == 5) {
       // OK: back to the layers (Pop until 24, Go(24, 16)), the edit kept in
       // the layer's saved record.
       uint32_t state;
       do {
-        state = Pop(base, s);
+        state = Pop(s);
       } while (int32_t(state) != 24);
-      GoFirstHalf(base, s, state);
-      GoSecondHalf(base, s, 16);
-      const uint64_t n = uint64_t(Screen(base, s).editor_page()) * 3 + Screen(base, s).layer_cursor();
-      Memcpy(base, call, n * 24 + screen + 31024, screen + 30832, 24, frame, 0x82205560);
+      GoFirstHalf(s, state);
+      GoSecondHalf(s, 16);
+      const uint64_t n = uint64_t(Screen(s).editor_page()) * 3 + Screen(s).layer_cursor();
+      Memcpy(call, n * 24 + screen + 31024, screen + 30832, 24, frame, 0x82205560);
     } else if (c == 6) {
       // Cancel: Pop; from the image picker (28) back to the layer's actions
       // (25) with 24 left pushed.
-      if (int32_t(Pop(base, s)) == 28) {
+      if (int32_t(Pop(s)) == 28) {
         uint32_t state;
         do {
-          state = Pop(base, s);
+          state = Pop(s);
         } while (int32_t(state) != 24);
-        Screen(base, s).set_history_depth(uint8_t(uint32_t(Screen(base, s).history_depth()) + 1));
-        Screen(base, s).set_state(25);
+        Screen(s).set_history_depth(uint8_t(uint32_t(Screen(s).history_depth()) + 1));
+        Screen(s).set_state(25);
       }
-      const uint32_t state = Screen(base, s).state();
-      GoFirstHalf(base, s, state);
-      const bool vinyls = int32_t(Screen(base, s).category()) == 5 && uint32_t(Screen(base, s).item()) == 6;
-      GoSecondHalf(base, s, vinyls ? 17 : 36);
+      const uint32_t state = Screen(s).state();
+      GoFirstHalf(s, state);
+      const bool vinyls = int32_t(Screen(s).category()) == 5 && uint32_t(Screen(s).item()) == 6;
+      GoSecondHalf(s, vinyls ? 17 : 36);
     }
   } else if (asked(40, 158, 0x822057A4)) {
     sound(2, 0x822057B4);
-    Screen(base, s).set_refresh_pending(1);
-    Screen(base, s).set_edit_cursor(6);
+    Screen(s).set_refresh_pending(1);
+    Screen(s).set_edit_cursor(6);
   }
-  return MoveLayerEdit(base, call, screen, frame, flags.native_slots);
+  return MoveLayerEdit(call, screen, frame, flags.native_slots);
 }
 
-uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylLayers(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_821FFB20 TuningScreen::MoveVinylLayers");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   auto finish = [&](uint64_t named, uint32_t lr) {
     return tuning_screen::FinishNamed(call, frame, lr, movie, named);
   };
@@ -1065,11 +1065,11 @@ uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, ui
     moved = asked(48, kMoves[k], kMoveLrs[k]);
   }
   if (moved) {
-    if (Screen(base, s).refresh_pending() == 0) {
+    if (Screen(s).refresh_pending() == 0) {
       return asked.r3;
     }
-    const uint32_t c = Screen(base, s).layer_cursor();
-    const bool page0 = int32_t(Screen(base, s).editor_page()) == 0;
+    const uint32_t c = Screen(s).layer_cursor();
+    const bool page0 = int32_t(Screen(s).editor_page()) == 0;
     if (c >= 5) {
       return asked.r3;
     }
@@ -1108,11 +1108,11 @@ uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, ui
   }
   if (asked(40, 159, 0x821FFD14)) {
     // A: on a layer, the rows finished and the layer's picker row played.
-    const int32_t c = int32_t(Screen(base, s).layer_cursor());
+    const int32_t c = int32_t(Screen(s).layer_cursor());
     if (c < 0 || c > 2) {
       return asked.r3;
     }
-    const bool page0 = int32_t(Screen(base, s).editor_page()) == 0;
+    const bool page0 = int32_t(Screen(s).editor_page()) == 0;
     if (page0) {
       finish(195, 0x821FFD48);
       finish(196, 0x821FFD54);
@@ -1122,29 +1122,29 @@ uint64_t MoveVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, ui
       finish(170, 0x821FFD80);
       finish(171, 0x821FFD8C);
     }
-    const uint64_t named = uint64_t(Screen(base, s).layer_cursor()) + (page0 ? 198 : 172);
+    const uint64_t named = uint64_t(Screen(s).layer_cursor()) + (page0 ? 198 : 172);
     return play(named, 0x822000F4);
   }
   // B asked; its answer's low byte stored into the frame (nothing else).
-  if (int32_t(schema::PlayerMapperEntry(base, entry).unread()) == 1) {
+  if (int32_t(schema::PlayerMapperEntry(entry).unread()) == 1) {
     return asked.r3;
   }
   asked(40, 158, 0x821FFDBC);
-  Store(base, frame + 80, uint32_t(asked.r3 & 0xFF));
+  Store(frame + 80, uint32_t(asked.r3 & 0xFF));
   return asked.r3;
 }
 
-uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylLayers(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82208CE0 TuningScreen::InputVinylLayers");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
   const uint64_t images = screen + 10048;
   const bool native_free = flags.native_heap && flags.native_free;
-  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  Reads asked{call, entry, frame, flags.native_slots, found};
   // r3 as the original leaves it: the last call's (the reads' while no
   // other call follows them).
   uint64_t r3 = found;
@@ -1157,13 +1157,13 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
     r3 = tuning_screen::FinishNamed(call, frame, lr, movie, named);
     called = true;
   };
-  auto cursor = [&] { return int32_t(Screen(base, s).layer_cursor()); };
+  auto cursor = [&] { return int32_t(Screen(s).layer_cursor()); };
   // Push(24), then Go(state, command).
   auto go = [&](uint32_t state, uint32_t command) {
-    Push(base, s, 24);
-    Go(base, s, state, command);
+    Push(s, 24);
+    Go(s, state, command);
   };
-  if (G::layers_wait(base) == 0) {
+  if (G::layers_wait() == 0) {
     bool answered = true;
     if (asked(48, 153, 0x82208D6C) || asked(48, 167, 0x82208D98)) {
       // Up: from the first layer to the button last left (+30736), from the
@@ -1171,16 +1171,16 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
       sound(4, 0x82209464);
       const int32_t c = cursor();
       if (c == 0) {
-        Screen(base, s).set_layer_cursor(Screen(base, s).layer_button());
+        Screen(s).set_layer_cursor(Screen(s).layer_button());
       } else if (c > 0 && c < 3) {
-        Screen(base, s).set_layer_cursor(uint32_t(c - 1));
+        Screen(s).set_layer_cursor(uint32_t(c - 1));
       } else if (c == 3 || c == 4) {
-        Screen(base, s).set_layer_cursor(2);
+        Screen(s).set_layer_cursor(2);
       } else {
         answered = false;
       }
       if (answered) {
-        Screen(base, s).set_refresh_pending(1);
+        Screen(s).set_refresh_pending(1);
       }
     } else if (asked(48, 154, 0x82208DC4) || asked(48, 168, 0x82208DF0)) {
       // Down: from the last layer to the button, from the buttons to the
@@ -1188,16 +1188,16 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
       sound(4, 0x82209418);
       const int32_t c = cursor();
       if (c == 2) {
-        Screen(base, s).set_layer_cursor(Screen(base, s).layer_button());
+        Screen(s).set_layer_cursor(Screen(s).layer_button());
       } else if (c >= 0 && c < 2) {
-        Screen(base, s).set_layer_cursor(uint32_t(c + 1));
+        Screen(s).set_layer_cursor(uint32_t(c + 1));
       } else if (c == 3 || c == 4) {
-        Screen(base, s).set_layer_cursor(0);
+        Screen(s).set_layer_cursor(0);
       } else {
         answered = false;
       }
       if (answered) {
-        Screen(base, s).set_refresh_pending(1);
+        Screen(s).set_refresh_pending(1);
       }
     } else if (asked(48, 155, 0x82208E1C) || asked(48, 169, 0x82208E48)) {
       // Left: between the buttons only.
@@ -1205,12 +1205,12 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
       if (c == 3 || c == 4) {
         sound(4, 0x822093F0);
         const int32_t next = cursor() - 1;
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_layer_cursor(uint32_t(next));
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_layer_cursor(uint32_t(next));
         if (next < 3) {
-          Screen(base, s).set_layer_cursor(4);
+          Screen(s).set_layer_cursor(4);
         }
-        Screen(base, s).set_layer_button(Screen(base, s).layer_cursor());
+        Screen(s).set_layer_button(Screen(s).layer_cursor());
       }
     } else if (asked(48, 156, 0x82208E74) || asked(48, 170, 0x82208EA0)) {
       // Right: the same the other way.
@@ -1218,28 +1218,28 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
       if (c == 3 || c == 4) {
         sound(4, 0x822093A8);
         const int32_t next = cursor() + 1;
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_layer_cursor(uint32_t(next));
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_layer_cursor(uint32_t(next));
         if (next > 4) {
-          Screen(base, s).set_layer_cursor(3);
+          Screen(s).set_layer_cursor(3);
         }
-        Screen(base, s).set_layer_button(Screen(base, s).layer_cursor());
+        Screen(s).set_layer_button(Screen(s).layer_cursor());
       }
     } else if (asked(40, 159, 0x82208ECC)) {
       sound(0, 0x82208EDC);
       const int32_t c = cursor();
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_command_first_run(1);
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_command_first_run(1);
       if (c >= 0 && c <= 2) {
-        const uint32_t page = Screen(base, s).editor_page();
-        const uint32_t id = Load(base, ((page * 3 + uint32_t(c) + 7798) << 2) + s);
+        const uint32_t page = Screen(s).editor_page();
+        const uint32_t id = Load(((page * 3 + uint32_t(c) + 7798) << 2) + s);
         if (int32_t(id) == -1) {
           // An empty layer: the image picker's wait started, the picker's
           // row played, the page's six picker textures put back to their
           // placeholder.
-          Screen(base, s).set_picked_image(0);
-          Screen(base, s).set_image_group(0);
-          G::set_layers_wait(base, 1);
+          Screen(s).set_picked_image(0);
+          Screen(s).set_image_group(0);
+          G::set_layers_wait(1);
           const bool page0 = int32_t(page) == 0;
           if (page0) {
             finish(195, 0x82208F3C);
@@ -1250,63 +1250,63 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
             finish(170, 0x82208F74);
             finish(171, 0x82208F80);
           }
-          const uint64_t named = uint64_t(Screen(base, s).layer_cursor()) + (page0 ? 198 : 172);
+          const uint64_t named = uint64_t(Screen(s).layer_cursor()) + (page0 ? 198 : 172);
           r3 = tuning_screen::PlayNamed(call, frame, 0x82208FA0, movie, named, 1);
-          const int32_t now = int32_t(Screen(base, s).editor_page());
+          const int32_t now = int32_t(Screen(s).editor_page());
           if (now == 0 || now == 1) {
-            const schema::DecalImages decals(base, uint32_t(images));
+            const schema::DecalImages decals(uint32_t(images));
             const uint32_t first = now == 0 ? 168 : 160;
             for (uint32_t k = 0; k < 6; k++) {
-              const uint32_t again = Load(base, tuning_screen::MovieEntry(base, frame, 13));
+              const uint32_t again = Load(tuning_screen::MovieEntry(frame, 13));
               const uint32_t value =
                   now == 0 ? decals.vinyl_placeholder_0() : decals.vinyl_placeholder_1();
-              MovieTexture(base, again, first + k).set_texture(value);
-              r3 = RestoreStickerTexture(base, images, uint32_t(now), first + k, frame);
+              MovieTexture(again, first + k).set_texture(value);
+              r3 = RestoreStickerTexture(images, uint32_t(now), first + k, frame);
             }
           }
         } else {
           // A layer with an image: its actions.
-          Screen(base, s).set_operation_cursor(0);
+          Screen(s).set_operation_cursor(0);
           go(25, 17);
         }
       } else if (c == 3) {
-        Screen(base, s).set_before_state_35(0);
+        Screen(s).set_before_state_35(0);
         go(35, 30);
       } else if (c == 4) {
-        Screen(base, s).set_before_state_36(0);
+        Screen(s).set_before_state_36(0);
         go(36, 30);
       }
     } else if (asked(40, 158, 0x82209370)) {
       // B: to the second button.
       sound(2, 0x82209380);
-      Screen(base, s).set_layer_button(4);
-      Screen(base, s).set_layer_cursor(4);
-      Screen(base, s).set_refresh_pending(1);
+      Screen(s).set_layer_button(4);
+      Screen(s).set_layer_cursor(4);
+      Screen(s).set_refresh_pending(1);
     }
     if (!called) {
       r3 = asked.r3;
     }
-    if (G::layers_wait(base) == 0) {
-      return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+    if (G::layers_wait() == 0) {
+      return MoveVinylLayers(call, screen, frame, flags.native_slots);
     }
   }
   // The wait: on its third frame the picker's window freed and loaded from
   // the picked image; after it, once nothing loads, the window's middle
   // texture bound to the layer and the image picker.
-  const uint32_t count = G::layers_wait(base) + 1;
-  G::set_layers_wait(base, count);
+  const uint32_t count = G::layers_wait() + 1;
+  G::set_layers_wait(count);
   if (int32_t(count) == 3) {
-    const int32_t page = int32_t(Screen(base, s).editor_page());
+    const int32_t page = int32_t(Screen(s).editor_page());
     if (page != 0 && page != 1) {
       return r3;
     }
     const uint32_t first = page == 0 ? 12 : 33;
     for (uint32_t k = 0; k < 9; k++) {
-      FreeTexture(base, images, first + k,
-                  GuestTextureFree(base, call, frame, page == 0 ? 0x822094E4 : 0x822095E0,
+      FreeTexture(images, first + k,
+                  GuestTextureFree(call, frame, page == 0 ? 0x822094E4 : 0x822095E0,
                                    native_free));
     }
-    const uint64_t picked = Screen(base, s).picked_image();
+    const uint64_t picked = Screen(s).picked_image();
     const uint64_t x = picked - 4;
     uint64_t v;
     if (page == 0) {
@@ -1318,42 +1318,42 @@ uint64_t InputVinylLayers(uint8_t* base, const tuning_screen::GuestCall& call, u
     } else {
       v = (int32_t(x) >= 194 ? x - 194 : int32_t(x) < 0 ? x + 194 : x) + 189;
     }
-    return LoadWindow(base, call, images, v, first, 9, uint32_t(page), frame);
+    return LoadWindow(call, images, v, first, 9, uint32_t(page), frame);
   }
   if (int32_t(count) < 3) {
     // (A wait of -1 comes to 0 here: the movie side runs.)
     if (count == 0) {
-      return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+      return MoveVinylLayers(call, screen, frame, flags.native_slots);
     }
     return r3;
   }
   for (uint32_t i = 0; i < 200; i++) {
-    if (int32_t(DecalEntryAt(base, images, i).state()) == 1) {
+    if (int32_t(DecalEntryAt(images, i).state()) == 1) {
       return r3;
     }
   }
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page == 0 || page == 1) {
-    const uint32_t header = DecalEntryAt(base, images, page == 0 ? 16 : 37).texture_header();
-    const uint32_t n = Screen(base, s).layer_cursor() + (page == 0 ? 191 : 194);
-    MovieTexture(base, movie, n).set_texture(header);
+    const uint32_t header = DecalEntryAt(images, page == 0 ? 16 : 37).texture_header();
+    const uint32_t n = Screen(s).layer_cursor() + (page == 0 ? 191 : 194);
+    MovieTexture(movie, n).set_texture(header);
   }
-  Screen(base, s).set_refresh_pending(1);
-  Screen(base, s).set_command_first_run(1);
-  G::set_layers_wait(base, 0);
+  Screen(s).set_refresh_pending(1);
+  Screen(s).set_command_first_run(1);
+  G::set_layers_wait(0);
   go(28, 22);
-  return MoveVinylLayers(base, call, screen, frame, flags.native_slots);
+  return MoveVinylLayers(call, screen, frame, flags.native_slots);
 }
 
-uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveVinylImages(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82202530 TuningScreen::MoveVinylImages");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   // Nothing while 164 is held or released, or on a move left or right.
   if (asked(32, 164, 0x82202598) || asked(44, 164, 0x822025C4) || asked(48, 155, 0x822025F0) ||
       asked(48, 169, 0x8220261C) || asked(48, 156, 0x82202648) ||
@@ -1362,7 +1362,7 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   }
   // B: the window's arrows finished, then the layer's row (234 an empty
   // layer, else 224) restarted.
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page == 0) {
     tuning_screen::FinishNamed(call, frame, 0x822026C0, movie, 167);
     tuning_screen::FinishNamed(call, frame, 0x822026E8, movie, 166);
@@ -1370,8 +1370,8 @@ uint64_t MoveVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
     tuning_screen::FinishNamed(call, frame, 0x822026DC, movie, 162);
     tuning_screen::FinishNamed(call, frame, 0x822026E8, movie, 161);
   }
-  const uint32_t n = Screen(base, s).editor_page() * 3 + Screen(base, s).layer_cursor();
-  const bool empty = int32_t(Load(base, ((n + 7798) << 2) + s)) == -1;
+  const uint32_t n = Screen(s).editor_page() * 3 + Screen(s).layer_cursor();
+  const bool empty = int32_t(Load(((n + 7798) << 2) + s)) == -1;
   const uint64_t named = empty ? 234 : 224;
   tuning_screen::FinishNamed(call, frame, empty ? 0x82202718 : 0x82202728, movie, named);
   return tuning_screen::PlayNamed(call, frame, 0x82202744, movie, named, 1);
@@ -1390,18 +1390,18 @@ uint64_t Wrap5(uint64_t y) {
 
 }  // namespace
 
-uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputVinylImages(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_822058F8 TuningScreen::InputVinylImages");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 240);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  const uint32_t entry = PlayerEntry(base);
+  const uint32_t frame = Frame(sp, 240);
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  const uint32_t entry = PlayerEntry();
   const uint64_t images = screen + 10048;
   const uint32_t im = uint32_t(images);
   const bool native_free = flags.native_heap && flags.native_free;
-  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  Reads asked{call, entry, frame, flags.native_slots, found};
   // r3 as the original leaves it: the last call's (the reads' too).
   uint64_t r3 = found;
   auto read = [&](uint32_t offset, uint64_t action, uint32_t lr) {
@@ -1412,89 +1412,89 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
   };
   auto sound = [&](uint64_t cue, uint32_t lr) { r3 = call(kMenuSoundPlay, {cue}, frame, lr); };
   auto free_texture = [&](uint64_t i, uint32_t lr) {
-    r3 = FreeTexture(base, images, i, GuestTextureFree(base, call, frame, lr, native_free));
+    r3 = FreeTexture(images, i, GuestTextureFree(call, frame, lr, native_free));
   };
   auto bind = [&](uint64_t i, uint32_t group) {
-    r3 = BindVinylTexture(base, images, uint32_t(i), group, frame);
+    r3 = BindVinylTexture(images, uint32_t(i), group, frame);
   };
   auto memcpy36 = [&](uint64_t destination, uint64_t source, uint32_t lr) {
-    r3 = Memcpy(base, call, destination, source, 36, frame, lr);
+    r3 = Memcpy(call, destination, source, 36, frame, lr);
   };
   auto loading = [&] {
     bool any = false;
     for (uint32_t i = 0; i < 200; i++) {
-      if (int32_t(DecalEntryAt(base, im, i).state()) == 1) {
+      if (int32_t(DecalEntryAt(im, i).state()) == 1) {
         any = true;
       }
     }
     return any;
   };
-  auto layer = [&] { return uint64_t(Screen(base, s).layer_cursor()); };
-  auto picked = [&] { return uint64_t(Screen(base, s).picked_image()); };
-  auto page = [&] { return int32_t(Screen(base, s).editor_page()); };
+  auto layer = [&] { return uint64_t(Screen(s).layer_cursor()); };
+  auto picked = [&] { return uint64_t(Screen(s).picked_image()); };
+  auto page = [&] { return int32_t(Screen(s).editor_page()); };
   // The saved id word of the layer: ((page × 3 + l) + 7798) × 4 + s.
   auto saved_id = [&] {
-    return ((Screen(base, s).editor_page() * 3 + Screen(base, s).layer_cursor() + 7798) << 2) + s;
+    return ((Screen(s).editor_page() * 3 + Screen(s).layer_cursor() + 7798) << 2) + s;
   };
   // Movie 13's texture n (by the movie first looked up) = decal image
   // `entry`'s texture.
   auto set_slot = [&](uint32_t n, uint32_t entry) {
-    const uint32_t value = DecalEntryAt(base, im, entry).texture_header();
-    MovieTexture(base, movie, n).set_texture(value);
+    const uint32_t value = DecalEntryAt(im, entry).texture_header();
+    MovieTexture(movie, n).set_texture(value);
   };
-  if (G::pick_wait(base) == 0 && G::scroll_wait(base) == 0 &&
-      G::group_wait(base) == 0) {
+  if (G::pick_wait() == 0 && G::scroll_wait() == 0 &&
+      G::group_wait() == 0) {
     if (read(48, 155, 0x822059B0) || read(48, 169, 0x822059DC)) {
       // Left: the previous image (wrapped to +30796), the window scrolled.
       sound(4, 0x822061A8);
       const uint64_t x = picked() - 1;
-      G::set_scroll_wait(base, 1);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_picked_image(uint32_t(x));
+      G::set_scroll_wait(1);
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_picked_image(uint32_t(x));
       if (int32_t(x) < 0) {
-        Screen(base, s).set_picked_image(Screen(base, s).image_last_index());
+        Screen(s).set_picked_image(Screen(s).image_last_index());
       }
       const int32_t p = page();
       if (p == 0) {
         const uint64_t id = Wrap5(Wrap5(picked() - 4)) + 163;
-        r3 = ScrollImages(base, call, images, 0, 12, 9, id, frame, native_free);
-        set_slot(Screen(base, s).layer_cursor() + 191, 16);
+        r3 = ScrollImages(call, images, 0, 12, 9, id, frame, native_free);
+        set_slot(Screen(s).layer_cursor() + 191, 16);
       } else if (p == 1) {
-        SetImageGroup(base, screen, picked());
+        SetImageGroup(screen, picked());
         r3 = screen;
         const uint64_t v = picked();
         const uint64_t y = v - 4;
         const uint64_t id = (int32_t(y) >= 194 ? v - 198 : int32_t(y) < 0 ? v + 190 : y) + 189;
-        r3 = ScrollImages(base, call, images, 0, 33, 9, id, frame, native_free);
-        set_slot(Screen(base, s).layer_cursor() + 194, 37);
+        r3 = ScrollImages(call, images, 0, 33, 9, id, frame, native_free);
+        set_slot(Screen(s).layer_cursor() + 194, 37);
       }
-      G::set_scroll_way(base, 1);
+      G::set_scroll_way(1);
     } else if (read(48, 156, 0x82205A08) || read(48, 170, 0x82205A34)) {
       // Right: the next image (wrapped to 0), the window scrolled.
       sound(4, 0x8220600C);
       const uint64_t x = picked() + 1;
-      const uint32_t last = Screen(base, s).image_last_index();
-      G::set_scroll_wait(base, 1);
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_picked_image(uint32_t(x));
+      const uint32_t last = Screen(s).image_last_index();
+      G::set_scroll_wait(1);
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_picked_image(uint32_t(x));
       if (int32_t(x) > int32_t(last)) {
-        Screen(base, s).set_picked_image(0);
+        Screen(s).set_picked_image(0);
       }
       const int32_t p = page();
       if (p == 0) {
         const uint64_t id = Wrap5(Wrap5(picked() + 4)) + 163;
-        r3 = ScrollImages(base, call, images, 1, 12, 9, id, frame, native_free);
-        set_slot(Screen(base, s).layer_cursor() + 191, 16);
+        r3 = ScrollImages(call, images, 1, 12, 9, id, frame, native_free);
+        set_slot(Screen(s).layer_cursor() + 191, 16);
       } else if (p == 1) {
-        SetImageGroup(base, screen, picked());
+        SetImageGroup(screen, picked());
         r3 = screen;
         const uint64_t v = picked();
         const uint64_t y = v + 4;
         const uint64_t id = (int32_t(y) >= 194 ? v - 190 : int32_t(y) < 0 ? v + 198 : y) + 189;
-        r3 = ScrollImages(base, call, images, 1, 33, 9, id, frame, native_free);
-        set_slot(Screen(base, s).layer_cursor() + 194, 37);
+        r3 = ScrollImages(call, images, 1, 33, 9, id, frame, native_free);
+        set_slot(Screen(s).layer_cursor() + 194, 37);
       }
-      G::set_scroll_way(base, 2);
+      G::set_scroll_way(2);
     } else if (read(32, 164, 0x82205A60) || read(44, 164, 0x82205A8C)) {
       // 164 held or released: nothing.
     } else if (read(48, 161, 0x82205AB8) || read(48, 162, 0x82205AE4)) {
@@ -1502,13 +1502,13 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
       // group stepped and its window loaded.
       sound(4, 0x82205E6C);
       const int32_t p = page();
-      G::set_group_wait(base, 1);
-      Screen(base, s).set_refresh_pending(1);
+      G::set_group_wait(1);
+      Screen(s).set_refresh_pending(1);
       if (p == 0) {
-        Screen(base, s).set_picked_image(0);
+        Screen(s).set_picked_image(0);
         for (uint32_t k = 0; k < 9; k++) {
-          const schema::DecalImageEntry e = DecalEntryAt(base, im, 12 + k);
-          const schema::DecalImageKept kept = DecalKeptAt(base, im, 6 + k);
+          const schema::DecalImageEntry e = DecalEntryAt(im, 12 + k);
+          const schema::DecalImageKept kept = DecalKeptAt(im, 6 + k);
           const uint32_t kept_header = kept.texture_header();
           const uint32_t header = e.texture_header();
           const uint32_t data = e.texture_data();
@@ -1518,22 +1518,22 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
           kept.set_texture_data(data);
           bind(12 + k, 0);
         }
-        set_slot(Screen(base, s).layer_cursor() + 191, 16);
+        set_slot(Screen(s).layer_cursor() + 191, 16);
       } else if (p == 1) {
         if (read(48, 162, 0x82205F30)) {
-          const uint32_t g = Screen(base, s).image_group() + 1;
-          Screen(base, s).set_image_group(g);
+          const uint32_t g = Screen(s).image_group() + 1;
+          Screen(s).set_image_group(g);
           if (int32_t(g) > 11) {
-            Screen(base, s).set_image_group(0);
+            Screen(s).set_image_group(0);
           }
         } else if (read(48, 161, 0x82205F78)) {
-          const uint32_t g = Screen(base, s).image_group() - 1;
-          Screen(base, s).set_image_group(g);
+          const uint32_t g = Screen(s).image_group() - 1;
+          Screen(s).set_image_group(g);
           if (int32_t(g) < 0) {
-            Screen(base, s).set_image_group(11);
+            Screen(s).set_image_group(11);
           }
         }
-        SetGroupImage(base, screen, Screen(base, s).image_group());
+        SetGroupImage(screen, Screen(s).image_group());
         r3 = screen;
         for (uint32_t j = 0; j < 9; j++) {
           free_texture(42 + j, 0x82205FB8);
@@ -1541,7 +1541,7 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
         const uint64_t v = picked();
         const uint64_t y = v - 4;
         const uint64_t first = (int32_t(y) >= 194 ? v - 198 : int32_t(y) < 0 ? v + 190 : y) + 189;
-        r3 = LoadWindow(base, call, images, first, 42, 9, 1, frame);
+        r3 = LoadWindow(call, images, first, 42, 9, 1, frame);
       }
     } else if (read(40, 159, 0x82205B10) ||
                (read(40, 159, 0x82205B3C) && read(48, 163, 0x82205B68))) {
@@ -1549,29 +1549,29 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
       // into the edited decal; else the edited decal and the saved record
       // reset), the layer's two entries freed and reloaded with it.
       sound(0, 0x82205C8C);
-      G::set_pick_wait(base, 1);
+      G::set_pick_wait(1);
       if (read(40, 159, 0x82205CB4) && read(48, 163, 0x82205CE0)) {
-        const uint64_t n = uint64_t(Screen(base, s).editor_page()) * 3 + Screen(base, s).layer_cursor();
-        Screen(base, s).set_state(26);
-        r3 = Memcpy(base, call, screen + 30832, n * 24 + screen + 31024, 24, frame, 0x82205D18);
+        const uint64_t n = uint64_t(Screen(s).editor_page()) * 3 + Screen(s).layer_cursor();
+        Screen(s).set_state(26);
+        r3 = Memcpy(call, screen + 30832, n * 24 + screen + 31024, 24, frame, 0x82205D18);
       } else if (read(40, 159, 0x82205D40)) {
-        const uint32_t angle = Load(base, G::zero_address());
-        Screen(base, s).set_state(26);
-        Screen(base, s).set_edited_angle(std::bit_cast<float>(uint32_t(angle)));
-        Screen(base, s).set_edited_x(0);
-        Screen(base, s).set_edited_y(0);
-        Screen(base, s).set_edited_flip(0);
-        const uint32_t scale = Load(base, G::one_address());
-        Screen(base, s).set_edited_word(0);
-        Screen(base, s).set_edited_scale(std::bit_cast<float>(uint32_t(scale)));
+        const uint32_t angle = Load(G::zero_address());
+        Screen(s).set_state(26);
+        Screen(s).set_edited_angle(std::bit_cast<float>(uint32_t(angle)));
+        Screen(s).set_edited_x(0);
+        Screen(s).set_edited_y(0);
+        Screen(s).set_edited_flip(0);
+        const uint32_t scale = Load(G::one_address());
+        Screen(s).set_edited_word(0);
+        Screen(s).set_edited_scale(std::bit_cast<float>(uint32_t(scale)));
         const uint32_t record =
-            (Screen(base, s).editor_page() * 3 + Screen(base, s).layer_cursor()) * 24 + s;
-        Store(base, record + 31032, angle);
-        Store(base, record + 31024, 0);
-        Store(base, record + 31036, scale);
-        Store(base, record + 31028, 0);
-        Store(base, record + 31040, 0);
-        Store(base, record + 31044, 0);
+            (Screen(s).editor_page() * 3 + Screen(s).layer_cursor()) * 24 + s;
+        Store(record + 31032, angle);
+        Store(record + 31024, 0);
+        Store(record + 31036, scale);
+        Store(record + 31028, 0);
+        Store(record + 31040, 0);
+        Store(record + 31044, 0);
       }
       const int32_t p = page();
       if (p == 0 || p == 1) {
@@ -1579,54 +1579,54 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
         free_texture(layer() + a, p == 0 ? 0x82205DC8 : 0x82205E20);
         free_texture(layer() + b, p == 0 ? 0x82205DD8 : 0x82205E30);
         const uint64_t i = layer() + a;
-        r3 = ReloadImage(base, call, images, picked() + list, i, frame);
+        r3 = ReloadImage(call, images, picked() + list, i, frame);
         const uint64_t j = layer() + b;
-        r3 = ReloadImage(base, call, images, picked() + list, j, frame);
+        r3 = ReloadImage(call, images, picked() + list, j, frame);
       }
     } else if (read(40, 158, 0x82205B94)) {
       // B: back to the state before, the layer's texture bound again.
       sound(2, 0x82205BA4);
-      Screen(base, s).set_refresh_pending(1);
-      const uint32_t popped = Pop(base, s);
-      GoFirstHalf(base, s, popped);
+      Screen(s).set_refresh_pending(1);
+      const uint32_t popped = Pop(s);
+      GoFirstHalf(s, popped);
       const int32_t p = page();
       if (p == 0) {
         bind(layer() + 6, 0);
       } else if (p == 1) {
         bind(layer() + 27, 1);
       }
-      const bool empty = int32_t(Load(base, saved_id())) == -1;
-      GoSecondHalf(base, s, empty ? 16 : 17);
+      const bool empty = int32_t(Load(saved_id())) == -1;
+      GoSecondHalf(s, empty ? 16 : 17);
     }
   }
-  if (G::pick_wait(base) != 0 && !loading()) {
+  if (G::pick_wait() != 0 && !loading()) {
     // The pick's loads done: to the state +9652 (26 the layer's edit menu,
     // 25 its actions, 24 the layers), the saved id = the picked image, the
     // window's middle entries swapped into the layer's.
-    G::set_pick_wait(base, 0);
-    Screen(base, s).set_refresh_pending(1);
-    const int32_t state = int32_t(Screen(base, s).state());
+    G::set_pick_wait(0);
+    Screen(s).set_refresh_pending(1);
+    const int32_t state = int32_t(Screen(s).state());
     if (state == 26) {
-      Screen(base, s).set_command_first_run(1);
-      Push(base, s, 28);
-      Screen(base, s).set_edit_cursor(0);
-      Screen(base, s).set_edit_row_saved(5);
-      GoFirstHalf(base, s, Screen(base, s).state());
-      GoSecondHalf(base, s, 18);
+      Screen(s).set_command_first_run(1);
+      Push(s, 28);
+      Screen(s).set_edit_cursor(0);
+      Screen(s).set_edit_row_saved(5);
+      GoFirstHalf(s, Screen(s).state());
+      GoSecondHalf(s, 18);
     } else if (state == 25) {
       r3 = tuning_screen::FinishNamed(call, frame, 0x82206410, movie, 224);
       r3 = tuning_screen::PlayNamed(call, frame, 0x8220642C, movie, 224, 1);
-      GoFirstHalf(base, s, Screen(base, s).state());
-      GoSecondHalf(base, s, 17);
+      GoFirstHalf(s, Screen(s).state());
+      GoSecondHalf(s, 17);
     } else if (state == 24) {
-      if (int32_t(Load(base, saved_id())) == -1) {
+      if (int32_t(Load(saved_id())) == -1) {
         r3 = tuning_screen::FinishNamed(call, frame, 0x822064A4, movie, 234);
         r3 = tuning_screen::PlayNamed(call, frame, 0x822064C0, movie, 234, 1);
       }
-      GoFirstHalf(base, s, Screen(base, s).state());
-      GoSecondHalf(base, s, 16);
+      GoFirstHalf(s, Screen(s).state());
+      GoSecondHalf(s, 16);
     }
-    Store(base, saved_id(), Screen(base, s).picked_image());
+    Store(saved_id(), Screen(s).picked_image());
     const int32_t p = page();
     if (p == 0 || p == 1) {
       // Entries (a + l, b + l) and (c + l, d + l) swapped through the scratch
@@ -1651,45 +1651,45 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
       bind(layer() + second[1], group);
     }
   }
-  if (G::scroll_wait(base) != 0 && !loading() && G::scroll_way(base) != 0) {
+  if (G::scroll_wait() != 0 && !loading() && G::scroll_way() != 0) {
     // The scroll's loads done: command 23 (the window's move) the way it
     // went.
-    const uint32_t way = G::scroll_way(base);
-    const uint32_t queue = Screen(base, s).queue().address;
-    G::set_scroll_wait(base, 0);
-    Screen(base, s).set_scroll_direction(way);
-    const uint32_t current = CommandQueue(base, queue).page();
+    const uint32_t way = G::scroll_way();
+    const uint32_t queue = Screen(s).queue().address;
+    G::set_scroll_wait(0);
+    Screen(s).set_scroll_direction(way);
+    const uint32_t current = CommandQueue(queue).page();
     if (int32_t(current) != 28) {
-      CommandQueue(base, queue).set_previous_page(current);
+      CommandQueue(queue).set_previous_page(current);
     }
-    CommandQueue(base, queue).set_next(kNone);
-    CommandQueue(base, queue).set_resume(28);
-    CommandQueue(base, queue).set_page(kNone);
-    CommandQueue(base, queue).set_current(23);
-    G::set_scroll_way(base, 0);
+    CommandQueue(queue).set_next(kNone);
+    CommandQueue(queue).set_resume(28);
+    CommandQueue(queue).set_page(kNone);
+    CommandQueue(queue).set_current(23);
+    G::set_scroll_way(0);
   }
-  if (G::group_wait(base) != 0) {
+  if (G::group_wait() != 0) {
     const int32_t p = page();
     if (p == 0) {
       // On the third frame the kept textures freed and kept again from the
       // window.
-      const uint32_t count = G::group_wait(base) + 1;
-      G::set_group_wait(base, count);
+      const uint32_t count = G::group_wait() + 1;
+      G::set_group_wait(count);
       if (int32_t(count) == 3) {
-        G::set_group_wait(base, 0);
+        G::set_group_wait(0);
         for (uint32_t k = 0; k < 9; k++) {
-          r3 = FreeKept(base, images, 6 + k,
-                        GuestTextureFree(base, call, frame, 0x822067A0, native_free));
-          KeepTexture(base, images, 12 + k, 6 + k);
+          r3 = FreeKept(images, 6 + k,
+                        GuestTextureFree(call, frame, 0x822067A0, native_free));
+          KeepTexture(images, 12 + k, 6 + k);
         }
       }
     } else if (p == 1 && !loading()) {
-      if (int32_t(G::group_wait(base)) == 1) {
+      if (int32_t(G::group_wait()) == 1) {
         // The group's window (42 to 50) swapped with the list's (33 to 41),
         // movie 13's slots +640 to +660 = entries 35 to 40's headers.
         for (uint32_t j = 0; j < 9; j++) {
-          const schema::DecalImageEntry a = DecalEntryAt(base, im, 42 + j);
-          const schema::DecalImageEntry b = DecalEntryAt(base, im, 33 + j);
+          const schema::DecalImageEntry a = DecalEntryAt(im, 42 + j);
+          const schema::DecalImageEntry b = DecalEntryAt(im, 33 + j);
           const uint32_t a_header = a.texture_header();
           const uint32_t b_header = b.texture_header();
           const uint32_t a_data = a.texture_data();
@@ -1699,21 +1699,21 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
           b.set_texture_data(a_data);
         }
         for (uint32_t k = 0; k < 6; k++) {
-          const uint32_t again = tuning_screen::MovieEntry(base, frame, 13);
+          const uint32_t again = tuning_screen::MovieEntry(frame, 13);
           r3 = again;
-          const uint32_t value = DecalEntryAt(base, im, 35 + k).texture_header();
-          MovieTexture(base, Load(base, again), 160 + k).set_texture(value);
+          const uint32_t value = DecalEntryAt(im, 35 + k).texture_header();
+          MovieTexture(Load(again), 160 + k).set_texture(value);
         }
-        set_slot(Screen(base, s).layer_cursor() + 194, 37);
+        set_slot(Screen(s).layer_cursor() + 194, 37);
       }
-      const uint32_t count = G::group_wait(base) + 1;
-      G::set_group_wait(base, count);
+      const uint32_t count = G::group_wait() + 1;
+      G::set_group_wait(count);
       if (int32_t(count) == 3) {
-        G::set_group_wait(base, 0);
+        G::set_group_wait(0);
         for (uint32_t j = 0; j < 9; j++) {
           free_texture(42 + j, 0x82206998);
-          const schema::DecalImageEntry a = DecalEntryAt(base, im, 42 + j);
-          const schema::DecalImageEntry b = DecalEntryAt(base, im, 33 + j);
+          const schema::DecalImageEntry a = DecalEntryAt(im, 42 + j);
+          const schema::DecalImageEntry b = DecalEntryAt(im, 33 + j);
           a.set_texture_header(b.texture_header());
           a.set_texture_data(b.texture_data());
         }
@@ -1723,42 +1723,42 @@ uint64_t InputVinylImages(uint8_t* base, const tuning_screen::GuestCall& call, u
   // The layer's node shown or hidden.
   const int32_t p = page();
   if (p == 0 || p == 1) {
-    const bool shown = G::show_picker_node(base) != 0;
+    const bool shown = G::show_picker_node() != 0;
     const uint64_t node = layer() + (p == 0 ? 19 : 22);
     r3 = call(shown ? kShowNode : kHideNode, {movie, ~0ull, node}, frame,
               shown ? 0x82206A10 : 0x82206A18);
   }
-  if (G::pick_wait(base) == 0 && G::scroll_wait(base) == 0 &&
-      G::group_wait(base) == 0) {
-    r3 = MoveVinylImages(base, call, screen, frame, flags.native_slots);
+  if (G::pick_wait() == 0 && G::scroll_wait() == 0 &&
+      G::group_wait() == 0) {
+    r3 = MoveVinylImages(call, screen, frame, flags.native_slots);
   }
   return r3;
 }
 
-void BeginLayerOrder(uint8_t* base, uint64_t screen) {
+void BeginLayerOrder(uint64_t screen) {
   ITC_NATIVE_RUNNING("sub_821FE370 TuningScreen::BeginLayerOrder");
   const uint32_t s = uint32_t(screen);
-  if (int32_t(Screen(base, s).category()) != 5 || uint32_t(Screen(base, s).item()) != 6) {
+  if (int32_t(Screen(s).category()) != 5 || uint32_t(Screen(s).item()) != 6) {
     return;
   }
   // The page read again each pass, the index stored before the id.
   for (uint32_t k = 0; k < 3; k++) {
-    const uint32_t page = Screen(base, s).editor_page();
-    const uint32_t id = Load(base, ((page * 3 + k + 7798) << 2) + s);
-    Store(base, Screen(base, s).order_indices_address() + 4 * k, k);
-    Store(base, Screen(base, s).order_ids_address() + 4 * k, id);
+    const uint32_t page = Screen(s).editor_page();
+    const uint32_t id = Load(((page * 3 + k + 7798) << 2) + s);
+    Store(Screen(s).order_indices_address() + 4 * k, k);
+    Store(Screen(s).order_ids_address() + 4 * k, id);
   }
 }
 
-uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerActions(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82200230 TuningScreen::MoveLayerActions");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   uint64_t r3 = found;
   auto finish = [&](uint64_t named, uint32_t lr) {
     r3 = tuning_screen::FinishNamed(call, frame, lr, movie, named);
@@ -1766,7 +1766,7 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
   auto play = [&](uint64_t named, uint32_t lr) {
     r3 = tuning_screen::PlayNamed(call, frame, lr, movie, named, 1);
   };
-  auto cursor = [&] { return uint64_t(Screen(base, s).operation_cursor()); };
+  auto cursor = [&] { return uint64_t(Screen(s).operation_cursor()); };
   // The operate items' rows (49 to 52) and both arrows (60 twice) finished.
   auto finish_rows = [&](const uint32_t (&lrs)[6]) {
     static constexpr uint32_t kRows[6] = {60, 60, 49, 50, 51, 52};
@@ -1778,17 +1778,17 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
   const bool down = !up && (asked(48, 154, 0x822002F0) || asked(48, 168, 0x8220031C));
   r3 = asked.r3;
   if (up || down) {
-    if (Screen(base, s).refresh_pending() == 0) {
+    if (Screen(s).refresh_pending() == 0) {
       return r3;
     }
     uint64_t named;
-    if (Screen(base, s).operation_wrapped() != 0) {
+    if (Screen(s).operation_wrapped() != 0) {
       // A wrap: both arrows finished, the cursor's bar placed, the row it
       // left (52 down, 49 up) finished.
       finish(59, up ? 0x82200558 : 0x822004B8);
       finish(60, up ? 0x82200564 : 0x822004C4);
-      const uint32_t node = ui_movies::FindNode(base, movie, 10, 0);
-      schema::UiMovieNode(base, node).set_y(std::bit_cast<float>(uint32_t(BarPosition(base, frame, Screen(base, s).operation_cursor()))));
+      const uint32_t node = ui_movies::FindNode(movie, 10, 0);
+      schema::UiMovieNode(node).set_y(std::bit_cast<float>(uint32_t(BarPosition(frame, Screen(s).operation_cursor()))));
       r3 = node;
       named = up ? 49 : 52;
     } else {
@@ -1819,21 +1819,21 @@ uint64_t MoveLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, u
   return asked.r3;
 }
 
-uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerActions(const tuning_screen::GuestCall& call, uint64_t screen,
                            uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_82209738 TuningScreen::InputLayerActions");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
   const uint64_t images = screen + 10048;
   const bool native_free = flags.native_heap && flags.native_free;
-  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  Reads asked{call, entry, frame, flags.native_slots, found};
   // r3 as the original leaves it: the last call's.
   uint64_t r3 = found;
   auto ask = [&](uint32_t offset, uint64_t action, uint32_t lr) {
-    if (int32_t(schema::PlayerMapperEntry(base, entry).unread()) == 1) {
+    if (int32_t(schema::PlayerMapperEntry(entry).unread()) == 1) {
       return false;
     }
     const bool answered = asked(offset, action, lr);
@@ -1846,37 +1846,37 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
   };
   // Push(25), then Go(state, command).
   auto go = [&](uint32_t state, uint32_t command) {
-    Push(base, s, 25);
-    Go(base, s, state, command);
+    Push(s, 25);
+    Go(s, state, command);
   };
-  auto move = [&] { return MoveLayerActions(base, call, screen, frame, flags.native_slots); };
+  auto move = [&] { return MoveLayerActions(call, screen, frame, flags.native_slots); };
   // 164 held or released: the selected item lit (all three on release).
   if (ask(32, 164, 0x822097A4)) {
-    r3 = tuning_screen::HighlightSelected(base, screen, 0, frame);
+    r3 = tuning_screen::HighlightSelected(screen, 0, frame);
   } else if (ask(44, 164, 0x822097D8)) {
-    r3 = tuning_screen::HighlightSelected(base, screen, 1, frame);
+    r3 = tuning_screen::HighlightSelected(screen, 1, frame);
   }
-  if (G::actions_wait(base) == 0) {
+  if (G::actions_wait() == 0) {
     if (ask(48, 153, 0x82209830) || ask(48, 167, 0x8220985C)) {
       // Up: the cursor +30740 back one, from 0 around to 3 (+30744 the wrap).
       sound(4, 0x82209F00);
-      const int32_t c = int32_t(Screen(base, s).operation_cursor()) - 1;
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_operation_cursor(uint32_t(c));
+      const int32_t c = int32_t(Screen(s).operation_cursor()) - 1;
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_operation_cursor(uint32_t(c));
       if (c < 0) {
-        Screen(base, s).set_operation_cursor(3);
+        Screen(s).set_operation_cursor(3);
       }
-      Screen(base, s).set_operation_wrapped(c < 0 ? 1 : 0);
+      Screen(s).set_operation_wrapped(c < 0 ? 1 : 0);
     } else if (ask(48, 154, 0x82209888) || ask(48, 168, 0x822098B4)) {
       // Down: on one, from 3 around to 0.
       sound(4, 0x82209ED8);
-      const int32_t c = int32_t(Screen(base, s).operation_cursor()) + 1;
-      Screen(base, s).set_refresh_pending(1);
-      Screen(base, s).set_operation_cursor(uint32_t(c));
+      const int32_t c = int32_t(Screen(s).operation_cursor()) + 1;
+      Screen(s).set_refresh_pending(1);
+      Screen(s).set_operation_cursor(uint32_t(c));
       if (c > 3) {
-        Screen(base, s).set_operation_cursor(0);
+        Screen(s).set_operation_cursor(0);
       }
-      Screen(base, s).set_operation_wrapped(c > 3 ? 1 : 0);
+      Screen(s).set_operation_wrapped(c > 3 ? 1 : 0);
     } else if (ask(32, 164, 0x822098E0) || ask(44, 164, 0x8220990C)) {
       // 164 held or released: nothing.
     } else if (ask(40, 159, 0x82209938)) {
@@ -1888,74 +1888,74 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
       for (uint32_t k = 0; k < 6; k++) {
         finish(kRows[k], kLrs[k]);
       }
-      const uint32_t item = Screen(base, s).operation_cursor();
+      const uint32_t item = Screen(s).operation_cursor();
       if (item == 0) {
         // Edit: the layer's saved record into the edited decal.
         const uint64_t record =
-            (uint64_t(Screen(base, s).editor_page()) * 3 + uint64_t(Screen(base, s).layer_cursor())) * 24 +
+            (uint64_t(Screen(s).editor_page()) * 3 + uint64_t(Screen(s).layer_cursor())) * 24 +
             screen + 31024;
-        r3 = Memcpy(base, call, screen + 30832, record, 24, frame, 0x82209DB4);
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_command_first_run(1);
-        Push(base, s, 25);
-        Screen(base, s).set_state(26);
-        Screen(base, s).set_edit_cursor(0);
-        Screen(base, s).set_edit_row_saved(5);
-        GoFirstHalf(base, s, 26);
-        GoSecondHalf(base, s, 18);
+        r3 = Memcpy(call, screen + 30832, record, 24, frame, 0x82209DB4);
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_command_first_run(1);
+        Push(s, 25);
+        Screen(s).set_state(26);
+        Screen(s).set_edit_cursor(0);
+        Screen(s).set_edit_row_saved(5);
+        GoFirstHalf(s, 26);
+        GoSecondHalf(s, 18);
       } else if (item == 1) {
         // The order.
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_command_first_run(1);
-        Push(base, s, 25);
-        Screen(base, s).set_state(27);
-        Screen(base, s).set_order_position(Screen(base, s).layer_cursor());
-        GoFirstHalf(base, s, 27);
-        GoSecondHalf(base, s, 19);
-        BeginLayerOrder(base, screen);
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_command_first_run(1);
+        Push(s, 25);
+        Screen(s).set_state(27);
+        Screen(s).set_order_position(Screen(s).layer_cursor());
+        GoFirstHalf(s, 27);
+        GoSecondHalf(s, 19);
+        BeginLayerOrder(screen);
         r3 = screen;
       } else if (item == 2) {
         // Another image: the wait started from the layer's saved id, the
         // page's six picker textures put back to their placeholder.
-        const uint32_t page = Screen(base, s).editor_page();
-        const uint32_t layer = Screen(base, s).layer_cursor();
-        G::set_actions_wait(base, 1);
-        const uint32_t id = Load(base, ((page * 3 + layer + 7798) << 2) + s);
-        Screen(base, s).set_image_group(0);
-        Screen(base, s).set_picked_image(id);
-        SetImageGroup(base, screen, id);
+        const uint32_t page = Screen(s).editor_page();
+        const uint32_t layer = Screen(s).layer_cursor();
+        G::set_actions_wait(1);
+        const uint32_t id = Load(((page * 3 + layer + 7798) << 2) + s);
+        Screen(s).set_image_group(0);
+        Screen(s).set_picked_image(id);
+        SetImageGroup(screen, id);
         r3 = screen;
-        const int32_t now = int32_t(Screen(base, s).editor_page());
+        const int32_t now = int32_t(Screen(s).editor_page());
         if (now == 0 || now == 1) {
-          const schema::DecalImages decals(base, uint32_t(images));
+          const schema::DecalImages decals(uint32_t(images));
           const uint32_t first = now == 0 ? 168 : 160;
           for (uint32_t k = 0; k < 6; k++) {
-            const uint32_t again = Load(base, tuning_screen::MovieEntry(base, frame, 13));
+            const uint32_t again = Load(tuning_screen::MovieEntry(frame, 13));
             const uint32_t value =
                 now == 0 ? decals.vinyl_placeholder_0() : decals.vinyl_placeholder_1();
-            MovieTexture(base, again, first + k).set_texture(value);
-            r3 = RestoreStickerTexture(base, images, uint32_t(now), first + k, frame);
+            MovieTexture(again, first + k).set_texture(value);
+            r3 = RestoreStickerTexture(images, uint32_t(now), first + k, frame);
           }
         }
       } else if (item == 3) {
         // Remove.
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_command_first_run(1);
-        Push(base, s, 25);
-        Screen(base, s).set_state(37);
-        Screen(base, s).set_before_state_37(0);
-        GoFirstHalf(base, s, 37);
-        GoSecondHalf(base, s, 30);
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_command_first_run(1);
+        Push(s, 25);
+        Screen(s).set_state(37);
+        Screen(s).set_before_state_37(0);
+        GoFirstHalf(s, 37);
+        GoSecondHalf(s, 30);
       }
     } else if (ask(40, 158, 0x82209E4C)) {
       // B: back to the state popped.
       sound(2, 0x82209E5C);
-      Screen(base, s).set_refresh_pending(1);
-      const uint32_t popped = Pop(base, s);
-      GoFirstHalf(base, s, popped);
-      GoSecondHalf(base, s, 16);
+      Screen(s).set_refresh_pending(1);
+      const uint32_t popped = Pop(s);
+      GoFirstHalf(s, popped);
+      GoSecondHalf(s, 16);
     }
-    if (G::actions_wait(base) == 0) {
+    if (G::actions_wait() == 0) {
       return move();
     }
   }
@@ -1963,25 +1963,25 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
   // on its third frame the picker's window freed and loaded from the saved
   // id; after it, once nothing loads, the window's middle texture bound to
   // the layer's movie texture and the image picker.
-  const uint32_t count = G::actions_wait(base) + 1;
-  const int32_t item = int32_t(Screen(base, s).operation_cursor());
-  G::set_actions_wait(base, count);
+  const uint32_t count = G::actions_wait() + 1;
+  const int32_t item = int32_t(Screen(s).operation_cursor());
+  G::set_actions_wait(count);
   if (item != 2 || int32_t(count) < 3) {
     // (A wait of -1 comes to 0 here: the movie side runs.)
     return count == 0 ? move() : r3;
   }
   if (int32_t(count) == 3) {
-    const int32_t page = int32_t(Screen(base, s).editor_page());
+    const int32_t page = int32_t(Screen(s).editor_page());
     if (page != 0 && page != 1) {
       return r3;
     }
     const uint32_t first = page == 0 ? 12 : 33;
     for (uint32_t k = 0; k < 9; k++) {
-      FreeTexture(base, images, first + k,
-                  GuestTextureFree(base, call, frame, page == 0 ? 0x82209F74 : 0x8220A070,
+      FreeTexture(images, first + k,
+                  GuestTextureFree(call, frame, page == 0 ? 0x82209F74 : 0x8220A070,
                                    native_free));
     }
-    const uint64_t x = uint64_t(Screen(base, s).picked_image()) - 4;
+    const uint64_t x = uint64_t(Screen(s).picked_image()) - 4;
     uint64_t v;
     if (page == 0) {
       // Brought into 0 to 4, twice at most.
@@ -1992,30 +1992,30 @@ uint64_t InputLayerActions(uint8_t* base, const tuning_screen::GuestCall& call, 
     } else {
       v = (int32_t(x) >= 194 ? x - 194 : int32_t(x) < 0 ? x + 194 : x) + 189;
     }
-    r3 = LoadWindow(base, call, images, v, first, 9, uint32_t(page), frame);
+    r3 = LoadWindow(call, images, v, first, 9, uint32_t(page), frame);
     // (The wait read again.)
-    return G::actions_wait(base) == 0 ? move() : r3;
+    return G::actions_wait() == 0 ? move() : r3;
   }
   for (uint32_t i = 0; i < 200; i++) {
-    if (int32_t(DecalEntryAt(base, images, i).state()) == 1) {
+    if (int32_t(DecalEntryAt(images, i).state()) == 1) {
       return r3;
     }
   }
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page == 0 || page == 1) {
-    const uint32_t n = Screen(base, s).layer_cursor() + (page == 0 ? 191 : 194);
-    const uint32_t header = DecalEntryAt(base, images, page == 0 ? 16 : 37).texture_header();
-    MovieTexture(base, movie, n).set_texture(header);
+    const uint32_t n = Screen(s).layer_cursor() + (page == 0 ? 191 : 194);
+    const uint32_t header = DecalEntryAt(images, page == 0 ? 16 : 37).texture_header();
+    MovieTexture(movie, n).set_texture(header);
   }
-  Screen(base, s).set_refresh_pending(1);
-  Screen(base, s).set_command_first_run(1);
-  G::set_actions_wait(base, 0);
+  Screen(s).set_refresh_pending(1);
+  Screen(s).set_command_first_run(1);
+  G::set_actions_wait(0);
   go(28, 22);
   return move();
 }
 
 
-void SetGroupImage(uint8_t* base, uint64_t screen, uint64_t group) {
+void SetGroupImage(uint64_t screen, uint64_t group) {
   ITC_NATIVE_RUNNING("sub_821FD5C0 TuningScreen::SetGroupImage");
   // The jump table over the group (its case 0 the piece sub_821FD5F0).
   static constexpr uint32_t kFirst[12] = {0, 43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
@@ -2023,10 +2023,10 @@ void SetGroupImage(uint8_t* base, uint64_t screen, uint64_t group) {
   if (g > 11) {
     return;
   }
-  Store(base, uint32_t(screen) + 30764, kFirst[g]);
+  Store(uint32_t(screen) + 30764, kFirst[g]);
 }
 
-void SetImageGroup(uint8_t* base, uint64_t screen, uint64_t image) {
+void SetImageGroup(uint64_t screen, uint64_t image) {
   ITC_NATIVE_RUNNING("sub_821FD658 TuningScreen::SetImageGroup");
   static constexpr int32_t kBounds[11] = {43, 78, 106, 114, 142, 156, 165, 175, 180, 187, 192};
   const int32_t i = int32_t(uint32_t(image));
@@ -2034,14 +2034,14 @@ void SetImageGroup(uint8_t* base, uint64_t screen, uint64_t image) {
   while (group < 11 && i >= kBounds[group]) {
     group++;
   }
-  Store(base, uint32_t(screen) + 30768, group);
+  Store(uint32_t(screen) + 30768, group);
 }
 
-uint64_t SwapLayerRecords(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t SwapLayerRecords(const tuning_screen::GuestCall& call, uint64_t screen,
                           uint64_t first, uint64_t second, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821FD518 TuningScreen::SwapLayerRecords");
-  const uint32_t frame = Frame(base, sp, 144);
-  const int32_t page = int32_t(Load(base, uint32_t(screen) + 30724));
+  const uint32_t frame = Frame(sp, 144);
+  const int32_t page = int32_t(Load(uint32_t(screen) + 30724));
   if (page != 0 && page != 1) {
     return screen;
   }
@@ -2049,42 +2049,42 @@ uint64_t SwapLayerRecords(uint8_t* base, const tuning_screen::GuestCall& call, u
   const uint64_t a = first * 24 + screen + records;
   const uint64_t b = second * 24 + screen + records;
   const uint64_t temp = uint64_t(frame) + 80;
-  Memcpy(base, call, temp, a, 24, frame, page == 0 ? 0x821FD554 : 0x821FD588);
-  Memcpy(base, call, a, b, 24, frame, 0x821FD5A4);
-  return Memcpy(base, call, b, temp, 24, frame, 0x821FD5B4);
+  Memcpy(call, temp, a, 24, frame, page == 0 ? 0x821FD554 : 0x821FD588);
+  Memcpy(call, a, b, 24, frame, 0x821FD5A4);
+  return Memcpy(call, b, temp, 24, frame, 0x821FD5B4);
 }
 
-void EndLayerOrder(uint8_t* base, uint64_t screen) {
+void EndLayerOrder(uint64_t screen) {
   ITC_NATIVE_RUNNING("sub_821FE3C8 TuningScreen::EndLayerOrder");
   const uint32_t s = uint32_t(screen);
-  if (int32_t(Screen(base, s).category()) != 5 || uint32_t(Screen(base, s).item()) != 6) {
+  if (int32_t(Screen(s).category()) != 5 || uint32_t(Screen(s).item()) != 6) {
     return;
   }
   // The page read again each pass, the id stored before the index.
   for (uint32_t k = 0; k < 3; k++) {
-    const uint32_t page = Screen(base, s).editor_page();
-    const uint32_t id = Load(base, Screen(base, s).order_ids_address() + 4 * k);
-    Store(base, ((page * 3 + k + 7798) << 2) + s, id);
-    Store(base, Screen(base, s).order_indices_address() + 4 * k, k);
+    const uint32_t page = Screen(s).editor_page();
+    const uint32_t id = Load(Screen(s).order_ids_address() + 4 * k);
+    Store(((page * 3 + k + 7798) << 2) + s, id);
+    Store(Screen(s).order_indices_address() + 4 * k, k);
   }
 }
 
-uint64_t SwapOrderTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
+uint64_t SwapOrderTextures(uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82207F38 TuningScreen::SwapOrderTextures");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const uint32_t frame = Frame(sp, 128);
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page != 0 && page != 1) {
     return screen;
   }
   // The two entries the move swapped (+30760 1 up, 2 down; other values
   // none), their texture words (+28, +32) exchanged.
-  const int32_t way = int32_t(Screen(base, s).order_last_move());
+  const int32_t way = int32_t(Screen(s).order_last_move());
   if (way == 1 || way == 2) {
-    const uint64_t p = Screen(base, s).order_position();
+    const uint64_t p = Screen(s).order_position();
     const uint64_t at = (page == 0 ? 7 : 28) - uint64_t(way - 1);
-    const schema::DecalImageEntry a = DecalEntryAt(base, screen + 10048, p + at);
-    const schema::DecalImageEntry b = DecalEntryAt(base, screen + 10048, p + at - 1);
+    const schema::DecalImageEntry a = DecalEntryAt(screen + 10048, p + at);
+    const schema::DecalImageEntry b = DecalEntryAt(screen + 10048, p + at - 1);
     const uint32_t a_header = a.texture_header();
     a.set_texture_header(b.texture_header());
     const uint32_t b_data = b.texture_data();
@@ -2099,20 +2099,20 @@ uint64_t SwapOrderTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
   const uint32_t textures = page == 0 ? 191 : 194;
   uint32_t entry = 0;
   for (uint32_t k = 0; k < 3; k++) {
-    entry = tuning_screen::MovieEntry(base, frame, 13);
-    const uint32_t header = DecalEntryAt(base, Screen(base, s).decal_images_address(), first + k).texture_header();
-    MovieTexture(base, Load(base, entry), textures + k).set_texture(header);
+    entry = tuning_screen::MovieEntry(frame, 13);
+    const uint32_t header = DecalEntryAt(Screen(s).decal_images_address(), first + k).texture_header();
+    MovieTexture(Load(entry), textures + k).set_texture(header);
   }
   return entry;
 }
 
-uint64_t ShowOrderNodes(uint8_t* base, uint64_t screen, uint32_t sp) {
+uint64_t ShowOrderNodes(uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82203A30 TuningScreen::ShowOrderNodes");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t entry = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, entry);
-  const int32_t page = int32_t(Screen(base, s).editor_page());
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t entry = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(entry);
+  const int32_t page = int32_t(Screen(s).editor_page());
   if (page != 0 && page != 1) {
     return entry;
   }
@@ -2120,22 +2120,22 @@ uint64_t ShowOrderNodes(uint8_t* base, uint64_t screen, uint32_t sp) {
   // scene's node: its +80 set; r3 the node.
   uint32_t node = 0;
   for (uint32_t k = 0; k < 3; k++) {
-    const bool empty = int32_t(Load(base, Screen(base, s).order_ids_address() + 4 * k)) == -1;
-    node = ui_movies::FindNode(base, movie, kNone, (page == 0 ? 19 : 22) + k);
-    schema::UiMovieNode(base, node).set_visible(empty ? 0 : 1);
+    const bool empty = int32_t(Load(Screen(s).order_ids_address() + 4 * k)) == -1;
+    node = ui_movies::FindNode(movie, kNone, (page == 0 ? 19 : 22) + k);
+    schema::UiMovieNode(node).set_visible(empty ? 0 : 1);
   }
   return node;
 }
 
-uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t MoveLayerOrder(const tuning_screen::GuestCall& call, uint64_t screen,
                         uint32_t sp, bool native_slots) {
   ITC_NATIVE_RUNNING("sub_82201DB8 TuningScreen::MoveLayerOrder");
   (void)screen;
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
-  Reads asked{base, call, entry, frame, native_slots, found};
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
+  Reads asked{call, entry, frame, native_slots, found};
   // Nothing on 164 held or released, a move or A.
   if (asked(32, 164, 0x82201E24) || asked(44, 164, 0x82201E50) ||
       asked(48, 153, 0x82201E7C) || asked(48, 167, 0x82201EA8) ||
@@ -2151,9 +2151,9 @@ uint64_t MoveLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uin
 namespace {
 
 // A float constant's single loaded and stored (lfs, stfs) at `to`.
-void CopyFloat(uint8_t* base, uint32_t from, uint32_t to) {
-  const float value = float(double(std::bit_cast<float>(Load(base, from))));
-  Store(base, to, std::bit_cast<uint32_t>(value));
+void CopyFloat(uint32_t from, uint32_t to) {
+  const float value = float(double(std::bit_cast<float>(Load(from))));
+  Store(to, std::bit_cast<uint32_t>(value));
 }
 
 // An address in the screen's word array: (x << 2) + s, low 32 bits.
@@ -2161,77 +2161,77 @@ uint32_t WordAt(uint32_t s, uint64_t x) { return (uint32_t(x) << 2) + s; }
 
 }  // namespace
 
-uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, uint64_t screen,
+uint64_t InputLayerOrder(const tuning_screen::GuestCall& call, uint64_t screen,
                          uint32_t sp, const PageFlags& flags) {
   ITC_NATIVE_RUNNING("sub_8220A1C8 TuningScreen::InputLayerOrder");
   const uint32_t s = uint32_t(screen);
-  const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t entry = PlayerEntry(base);
-  const uint32_t found = tuning_screen::MovieEntry(base, frame, 13);
-  const uint32_t movie = Load(base, found);
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t entry = PlayerEntry();
+  const uint32_t found = tuning_screen::MovieEntry(frame, 13);
+  const uint32_t movie = Load(found);
   const uint64_t images = screen + 10048;
-  Reads asked{base, call, entry, frame, flags.native_slots, found};
+  Reads asked{call, entry, frame, flags.native_slots, found};
   auto sound = [&](uint64_t cue, uint32_t lr) { call(kMenuSoundPlay, {cue}, frame, lr); };
-  Screen(base, s).set_order_last_move(0);
-  bool counting = G::order_count(base) != 0;
+  Screen(s).set_order_last_move(0);
+  bool counting = G::order_count() != 0;
   if (!counting) {
     // A move: the work list's ids (+31216 + 4k, words 7804 on) and indices
     // (+31228 + 4k, words 7807 on) at the position and the one it moves to
     // swapped, each word's index read again from +30756 as the original
     // does; then the records and textures swapped and command 20 queued.
     auto moved = [&](uint64_t r4, uint64_t r5, uint64_t at, uint64_t before) {
-      Screen(base, s).set_vinyl_animation_a(Load(base, WordAt(s, at)));
-      Screen(base, s).set_vinyl_animation_b(Load(base, WordAt(s, before)));
-      SwapLayerRecords(base, call, screen, r4, r5, frame);
-      SwapOrderTextures(base, screen, frame);
-      const uint32_t queue = Screen(base, s).queue().address;
-      const uint32_t current = CommandQueue(base, queue).page();
+      Screen(s).set_vinyl_animation_a(Load(WordAt(s, at)));
+      Screen(s).set_vinyl_animation_b(Load(WordAt(s, before)));
+      SwapLayerRecords(call, screen, r4, r5, frame);
+      SwapOrderTextures(screen, frame);
+      const uint32_t queue = Screen(s).queue().address;
+      const uint32_t current = CommandQueue(queue).page();
       if (int32_t(current) != 27) {
-        CommandQueue(base, queue).set_previous_page(current);
+        CommandQueue(queue).set_previous_page(current);
       }
-      CommandQueue(base, queue).set_next(kNone);
-      CommandQueue(base, queue).set_page(kNone);
-      CommandQueue(base, queue).set_resume(27);
-      CommandQueue(base, queue).set_current(20);
+      CommandQueue(queue).set_next(kNone);
+      CommandQueue(queue).set_page(kNone);
+      CommandQueue(queue).set_resume(27);
+      CommandQueue(queue).set_current(20);
     };
-    auto position = [&] { return uint64_t(Screen(base, s).order_position()); };
+    auto position = [&] { return uint64_t(Screen(s).order_position()); };
     if (asked(48, 153, 0x8220A254) || asked(48, 167, 0x8220A280)) {
       // Up, from a position above 0.
-      if (int32_t(Screen(base, s).order_position()) > 0) {
+      if (int32_t(Screen(s).order_position()) > 0) {
         sound(4, 0x8220A578);
         const uint64_t p = position();
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_order_last_move(1);
-        const uint32_t id = Load(base, WordAt(s, p + 7804));
-        Screen(base, s).set_order_position(uint32_t(p - 1));
-        const uint32_t other = Load(base, WordAt(s, p - 1 + 7804));
-        Store(base, WordAt(s, p - 1 + 7804), id);
-        Store(base, WordAt(s, position() + 7805), other);
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_order_last_move(1);
+        const uint32_t id = Load(WordAt(s, p + 7804));
+        Screen(s).set_order_position(uint32_t(p - 1));
+        const uint32_t other = Load(WordAt(s, p - 1 + 7804));
+        Store(WordAt(s, p - 1 + 7804), id);
+        Store(WordAt(s, position() + 7805), other);
         const uint64_t q = position();
-        const uint32_t index = Load(base, WordAt(s, q + 7808));
-        const uint32_t before = Load(base, WordAt(s, q + 7807));
-        Store(base, WordAt(s, q + 7807), index);
-        Store(base, WordAt(s, position() + 7808), before);
+        const uint32_t index = Load(WordAt(s, q + 7808));
+        const uint32_t before = Load(WordAt(s, q + 7807));
+        Store(WordAt(s, q + 7807), index);
+        Store(WordAt(s, position() + 7808), before);
         const uint64_t r5 = position();
         moved(r5 + 1, r5, r5 + 7808, r5 + 7807);
       }
     } else if (asked(48, 154, 0x8220A2AC) || asked(48, 168, 0x8220A2D8)) {
       // Down, from a position below the last (+30792).
-      if (int32_t(Screen(base, s).order_position()) < int32_t(Screen(base, s).order_last_position())) {
+      if (int32_t(Screen(s).order_position()) < int32_t(Screen(s).order_last_position())) {
         sound(4, 0x8220A4D8);
         const uint64_t p = position();
-        Screen(base, s).set_refresh_pending(1);
-        Screen(base, s).set_order_last_move(2);
-        const uint32_t id = Load(base, WordAt(s, p + 7804));
-        Screen(base, s).set_order_position(uint32_t(p + 1));
-        const uint32_t other = Load(base, WordAt(s, p + 1 + 7804));
-        Store(base, WordAt(s, p + 1 + 7804), id);
-        Store(base, WordAt(s, position() + 7803), other);
+        Screen(s).set_refresh_pending(1);
+        Screen(s).set_order_last_move(2);
+        const uint32_t id = Load(WordAt(s, p + 7804));
+        Screen(s).set_order_position(uint32_t(p + 1));
+        const uint32_t other = Load(WordAt(s, p + 1 + 7804));
+        Store(WordAt(s, p + 1 + 7804), id);
+        Store(WordAt(s, position() + 7803), other);
         const uint64_t q = position();
-        const uint32_t before = Load(base, WordAt(s, q + 7806));
-        const uint32_t index = Load(base, WordAt(s, q + 7807));
-        Store(base, WordAt(s, q + 7807), before);
-        Store(base, WordAt(s, position() + 7806), index);
+        const uint32_t before = Load(WordAt(s, q + 7806));
+        const uint32_t index = Load(WordAt(s, q + 7807));
+        Store(WordAt(s, q + 7807), before);
+        Store(WordAt(s, position() + 7806), index);
         const uint64_t r4 = position();
         moved(r4, r4 - 1, r4 + 7807, r4 + 7806);
       }
@@ -2240,12 +2240,12 @@ uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, ui
     } else if (asked(40, 159, 0x8220A35C)) {
       // A: the order kept, the count started; the layer's animations.
       sound(0, 0x8220A36C);
-      const int32_t page = int32_t(Screen(base, s).editor_page());
-      G::set_order_count(base, 1);
-      Screen(base, s).set_refresh_pending(1);
+      const int32_t page = int32_t(Screen(s).editor_page());
+      G::set_order_count(1);
+      Screen(s).set_refresh_pending(1);
       if (page == 0 || page == 1) {
         auto named = [&] {
-          const uint64_t layer = Screen(base, s).layer_cursor();
+          const uint64_t layer = Screen(s).layer_cursor();
           return page == 0 ? uint64_t(uint32_t(layer << 2)) + 202
                            : uint64_t(uint32_t((layer + 44) << 2));
         };
@@ -2258,55 +2258,55 @@ uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, ui
     } else if (asked(40, 158, 0x8220A444)) {
       // B: back to the state popped, command 21 with 17 next.
       sound(2, 0x8220A454);
-      Screen(base, s).set_refresh_pending(1);
-      const uint32_t popped = Pop(base, s);
-      GoFirstHalf(base, s, popped);
-      const uint32_t queue = Screen(base, s).queue().address;
-      const uint32_t state = Screen(base, s).state();
-      const uint32_t current = CommandQueue(base, queue).page();
+      Screen(s).set_refresh_pending(1);
+      const uint32_t popped = Pop(s);
+      GoFirstHalf(s, popped);
+      const uint32_t queue = Screen(s).queue().address;
+      const uint32_t state = Screen(s).state();
+      const uint32_t current = CommandQueue(queue).page();
       if (int32_t(state) != int32_t(current)) {
-        CommandQueue(base, queue).set_previous_page(current);
+        CommandQueue(queue).set_previous_page(current);
       }
-      CommandQueue(base, queue).set_next(17);
-      CommandQueue(base, queue).set_page(kNone);
-      CommandQueue(base, queue).set_resume(state);
-      CommandQueue(base, queue).set_current(21);
+      CommandQueue(queue).set_next(17);
+      CommandQueue(queue).set_page(kNone);
+      CommandQueue(queue).set_resume(state);
+      CommandQueue(queue).set_current(21);
     }
-    counting = G::order_count(base) != 0;
+    counting = G::order_count() != 0;
   }
   if (counting) {
-    const uint32_t count = G::order_count(base) + 1;
-    G::set_order_count(base, count);
+    const uint32_t count = G::order_count() + 1;
+    G::set_order_count(count);
     if (count == 10) {
       // The marks hidden, the three layers' nodes placed and their textures
       // and movie slots set in the new order.
-      tuning_screen::ShowOptionMarks(base, s, 0, frame);
-      const int32_t page = int32_t(Screen(base, s).editor_page());
+      tuning_screen::ShowOptionMarks(s, 0, frame);
+      const int32_t page = int32_t(Screen(s).editor_page());
       if (page == 0 || page == 1) {
         const uint32_t sub_scene = page == 0 ? 28 : 27;
         const uint32_t constants[3] = {0x82000A34, page == 0 ? 0x8200CAFCu : 0x82001E8Cu,
                                        page == 0 ? 0x8200CAF8u : 0x820081D8u};
         for (uint32_t k = 0; k < 3; k++) {
-          const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, 2 + k);
-          CopyFloat(base, constants[k], node + 16);
+          const uint32_t node = ui_movies::FindNode(movie, sub_scene, 2 + k);
+          CopyFloat(constants[k], node + 16);
         }
-        Store(base, frame + 80, 13);
+        Store(frame + 80, 13);
         const uint32_t first = page == 0 ? 0 : 21;
-        const uint32_t i0 = Load(base, Screen(base, s).order_indices_address() + 4);
-        const uint32_t i1 = Load(base, Screen(base, s).order_indices_address());
-        const uint32_t i2 = Load(base, Screen(base, s).order_indices_address() + 8);
-        const schema::DecalImageEntry a = DecalEntryAt(base, images + 36 * first, i1);
-        const schema::DecalImageEntry b = DecalEntryAt(base, images + 36 * first, i0);
-        const schema::DecalImageEntry c = DecalEntryAt(base, images + 36 * first, i2);
+        const uint32_t i0 = Load(Screen(s).order_indices_address() + 4);
+        const uint32_t i1 = Load(Screen(s).order_indices_address());
+        const uint32_t i2 = Load(Screen(s).order_indices_address() + 8);
+        const schema::DecalImageEntry a = DecalEntryAt(images + 36 * first, i1);
+        const schema::DecalImageEntry b = DecalEntryAt(images + 36 * first, i0);
+        const schema::DecalImageEntry c = DecalEntryAt(images + 36 * first, i2);
         const uint32_t a_header = a.texture_header();
         const uint32_t b_header = b.texture_header();
         const uint32_t c_header = c.texture_header();
         const uint32_t a_data = a.texture_data();
         const uint32_t b_data = b.texture_data();
         const uint32_t c_data = c.texture_data();
-        const schema::DecalImageEntry to0 = DecalEntryAt(base, images, first);
-        const schema::DecalImageEntry to1 = DecalEntryAt(base, images, first + 1);
-        const schema::DecalImageEntry to2 = DecalEntryAt(base, images, first + 2);
+        const schema::DecalImageEntry to0 = DecalEntryAt(images, first);
+        const schema::DecalImageEntry to1 = DecalEntryAt(images, first + 1);
+        const schema::DecalImageEntry to2 = DecalEntryAt(images, first + 2);
         to0.set_texture_header(a_header);
         to0.set_texture_data(a_data);
         to1.set_texture_header(b_header);
@@ -2316,51 +2316,51 @@ uint64_t InputLayerOrder(uint8_t* base, const tuning_screen::GuestCall& call, ui
         // Movie 13's textures 181, 183, 184 (page 0) or 175, 177, 178.
         static constexpr uint32_t kTextures[2][3] = {{181, 183, 184}, {175, 177, 178}};
         for (uint32_t k = 0; k < 3; k++) {
-          const uint32_t again = tuning_screen::MovieEntry(base, frame, 13);
-          const uint32_t header = DecalEntryAt(base, images, first + k).texture_header();
-          MovieTexture(base, Load(base, again), kTextures[page][k]).set_texture(header);
+          const uint32_t again = tuning_screen::MovieEntry(frame, 13);
+          const uint32_t header = DecalEntryAt(images, first + k).texture_header();
+          MovieTexture(Load(again), kTextures[page][k]).set_texture(header);
         }
       }
     } else if (count == 13) {
       // The end: 237 restarted, the history popped down to state 24,
       // Go(24, 16), the layer the position moved to, the order stored.
-      G::set_order_count(base, 0);
+      G::set_order_count(0);
       tuning_screen::FinishNamed(call, frame, 0x8220A904, movie, 237);
       tuning_screen::PlayNamed(call, frame, 0x8220A920, movie, 237, 1);
-      uint32_t depth = uint32_t(Screen(base, s).history_depth());
-      Screen(base, s).set_refresh_pending(1);
+      uint32_t depth = uint32_t(Screen(s).history_depth());
+      Screen(s).set_refresh_pending(1);
       uint32_t popped;
       do {
         depth = (depth + 255) & 0xFF;
-        Screen(base, s).set_history_depth(uint8_t(depth));
-        popped = Load(base, WordAt(s, depth + 2439));
-        Screen(base, s).set_state(popped);
+        Screen(s).set_history_depth(uint8_t(depth));
+        popped = Load(WordAt(s, depth + 2439));
+        Screen(s).set_state(popped);
       } while (int32_t(popped) != 24);
-      uint32_t queue = Screen(base, s).queue().address;
-      CommandQueue(base, queue).set_resume(popped);
-      CommandQueue(base, queue).set_page(popped);
-      CommandQueue(base, queue).set_previous_page(popped);
-      CommandQueue(base, queue).set_step(kNone);
-      CommandQueue(base, queue).set_current(kNone);
-      CommandQueue(base, queue).set_started(0);
-      queue = Screen(base, s).queue().address;
-      const uint32_t state = Screen(base, s).state();
-      const uint32_t current = CommandQueue(base, queue).page();
+      uint32_t queue = Screen(s).queue().address;
+      CommandQueue(queue).set_resume(popped);
+      CommandQueue(queue).set_page(popped);
+      CommandQueue(queue).set_previous_page(popped);
+      CommandQueue(queue).set_step(kNone);
+      CommandQueue(queue).set_current(kNone);
+      CommandQueue(queue).set_started(0);
+      queue = Screen(s).queue().address;
+      const uint32_t state = Screen(s).state();
+      const uint32_t current = CommandQueue(queue).page();
       if (int32_t(state) != int32_t(current)) {
-        CommandQueue(base, queue).set_previous_page(current);
+        CommandQueue(queue).set_previous_page(current);
       }
-      CommandQueue(base, queue).set_next(kNone);
-      CommandQueue(base, queue).set_resume(state);
-      CommandQueue(base, queue).set_page(kNone);
-      CommandQueue(base, queue).set_current(16);
-      Screen(base, s).set_layer_cursor(Screen(base, s).order_position());
-      EndLayerOrder(base, screen);
-      Screen(base, s).set_layer_cursor(Screen(base, s).order_position());
+      CommandQueue(queue).set_next(kNone);
+      CommandQueue(queue).set_resume(state);
+      CommandQueue(queue).set_page(kNone);
+      CommandQueue(queue).set_current(16);
+      Screen(s).set_layer_cursor(Screen(s).order_position());
+      EndLayerOrder(screen);
+      Screen(s).set_layer_cursor(Screen(s).order_position());
     }
   }
-  uint64_t r3 = ShowOrderNodes(base, screen, frame);
-  if (G::order_count(base) == 0) {
-    r3 = MoveLayerOrder(base, call, screen, frame, flags.native_slots);
+  uint64_t r3 = ShowOrderNodes(screen, frame);
+  if (G::order_count() == 0) {
+    r3 = MoveLayerOrder(call, screen, frame, flags.native_slots);
   }
   return r3;
 }

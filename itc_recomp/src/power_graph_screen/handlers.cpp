@@ -25,17 +25,17 @@ using G = schema::PowerGraphScreenGlobals;
 using Member = schema::PowerGraphScreen67;
 
 // The original's frame below `sp`, its back chain written.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   return frame;
 }
 
 }  // namespace
 
-void Post(uint8_t* base, uint32_t mode, uint32_t id) {
+void Post(uint32_t mode, uint32_t id) {
   // r4 is the mode's dispatcher (boot-mode.toml's ModeDispatcher).
-  const schema::ModeDispatcher dispatcher(base, mode);
+  const schema::ModeDispatcher dispatcher(mode);
   const uint32_t count = dispatcher.ring_count() + 1;
   const uint32_t end = dispatcher.ring_start() + count - 1;
   dispatcher.set_ring_count(count);
@@ -45,7 +45,7 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   schema::host::StoreU32(slot + 8, 0);
 }
 
-void SlotPost(uint8_t* base, uint32_t mode, uint32_t slot) {
+void SlotPost(uint32_t mode, uint32_t slot) {
   uint32_t id = 0;
   switch (slot) {
     case 0x82237A88:
@@ -69,29 +69,29 @@ void SlotPost(uint8_t* base, uint32_t mode, uint32_t slot) {
       id = 20;
       break;
   }
-  Post(base, mode, id);
+  Post(mode, id);
 }
 
-uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls) {
+uint64_t OnEnter(uint32_t member, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250778 PowerGraphScreen67::OnEnter");
   // The original's 112-byte frame (only its back chain) left out: no guest
   // call is made from it (E5 step 6).
   (void)sp;
   (void)calls;
-  const Member m(base, member);
+  const Member m(member);
   m.set_machine_loaded(0);
   // Host objects (E5 step 5) in place of the VirtualAlloc(28) at 0x822507AC
   // and the VirtualAlloc(68) at 0x822507E8; the globals hold their handles.
-  const schema::PageObject pages = schema::PageObject::New(base);
-  G::set_pages(base, pages);
+  const schema::PageObject pages = schema::PageObject::New();
+  G::set_pages(pages);
   pages.set_next_page(0);
   pages.set_page(0);
   pages.set_previous_page(0);
   pages.set_step_started(0);
   pages.set_unknown_20(0xFFFFFFFFu);
   pages.set_step(0xFFFFFFFFu);
-  const schema::FrontEndMenu menu = schema::FrontEndMenu::New(base);
-  G::set_menu(base, menu);
+  const schema::FrontEndMenu menu = schema::FrontEndMenu::New();
+  G::set_menu(menu);
   menu.set_first_item(0);
   menu.set_wraps(0);
   menu.set_cursor(0);
@@ -109,43 +109,43 @@ uint64_t OnEnter(uint8_t* base, uint32_t member, uint32_t sp, const Calls& calls
   menu.set_shoulders_step(0);
   // The data lives in host memory (E5 step 4): the original's
   // VirtualAlloc(92) returning to 0x82250844; the global holds its handle.
-  const schema::PowerGraphScreenData data = schema::PowerGraphScreenData::New(base);
+  const schema::PowerGraphScreenData data = schema::PowerGraphScreenData::New();
   const uint64_t r3 = data.address;
-  G::set_data(base, data);
+  G::set_data(data);
   data.set_movie_loaded(0);
   data.set_queued_state(21);
   m.set_machine_state(m.machine_reenter() != 0 ? 1 : 9);
-  G::set_shown(base, 0);
+  G::set_shown(0);
   return r3;
 }
 
-uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp) {
+uint64_t WaitForLoad(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82250D70 PowerGraphScreen67::WaitForLoad");
   // The original's 96-byte frame (only its back chain) left out (E5 step 6).
   (void)sp;
-  const Member m(base, uint32_t(r3));
+  const Member m(uint32_t(r3));
   if (m.machine_loaded() == 0) {
-    const uint32_t loaded = ui_movies::IsLoaded(base, kMovie);
+    const uint32_t loaded = ui_movies::IsLoaded(kMovie);
     if (int32_t(loaded) != 0) {
       m.set_machine_loaded(1);
     }
     return loaded;
   }
-  G::data(base).set_movie_loaded(1);
+  G::data().set_movie_loaded(1);
   m.set_machine_state(9);
   return r3;
 }
 
-void Shown(uint8_t* base) {
+void Shown() {
   ITC_NATIVE_RUNNING("sub_82250338 PowerGraphScreen67::Shown");
-  G::set_shown(base, 0);
+  G::set_shown(0);
 }
 
-void Open(uint8_t* base, uint32_t member) {
+void Open(uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82250890 PowerGraphScreen67::Open");
-  const Member m(base, member);
+  const Member m(member);
   if (m.machine_loaded() != 0) {
-    const schema::PageObject pages = G::pages(base);
+    const schema::PageObject pages = G::pages();
     const uint32_t before = pages.page();
     if (before != 0) {
       pages.set_previous_page(before);
@@ -158,12 +158,12 @@ void Open(uint8_t* base, uint32_t member) {
   } else {
     m.set_machine_state(1);
   }
-  G::set_shown(base, 0);
+  G::set_shown(0);
 }
 
-uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
+uint64_t Leave(uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250900 PowerGraphScreen67::Leave");
-  const Member m(base, uint32_t(r3));
+  const Member m(uint32_t(r3));
   // The original's 112-byte frame held only its back chain: its calls run
   // from `sp` (E5 step 6; neither reads its caller's frame).
   m.set_machine_state(7);
@@ -175,7 +175,7 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Cal
   return answer;
 }
 
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t OnLeft(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822502C0 PowerGraphScreen67::OnLeft");
   // VirtualFree (sub_82295330) as its adapter answers it, called directly
   // (E5 step 6); through the dispatch, from the original's 112-byte frame,
@@ -187,14 +187,14 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
       freed = hooks::VirtualFree(pages, 0, kMemRelease, lr);
     }
     return freed ? uint64_t(*freed)
-                 : calls.Call(kVirtualFree, Frame(base, sp, 112), lr, pages, 0, kMemRelease);
+                 : calls.Call(kVirtualFree, Frame(sp, 112), lr, pages, 0, kMemRelease);
   };
-  free(G::pages(base).address, 0x822502E8);
-  free(G::menu(base).address, 0x822502FC);
-  const uint64_t r3 = free(G::data(base).address, 0x82250310);
-  G::set_pages(base, 0u);
-  G::set_menu(base, 0u);
-  G::set_data(base, 0u);
+  free(G::pages().address, 0x822502E8);
+  free(G::menu().address, 0x822502FC);
+  const uint64_t r3 = free(G::data().address, 0x82250310);
+  G::set_pages(0u);
+  G::set_menu(0u);
+  G::set_data(0u);
   return r3;
 }
 

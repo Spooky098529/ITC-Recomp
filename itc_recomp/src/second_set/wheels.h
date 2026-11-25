@@ -54,7 +54,7 @@ struct WheelCalls {
 // first, the rear's second); sub_820E7010 (the index from the record or the
 // table at 0x820044B0; outputs +328, +352, +356); when the wheels record's
 // +8 is 0, the base shape (+596) morphed toward the five (weights +328).
-uint64_t WheelsSetUpTire(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+uint64_t WheelsSetUpTire(uint32_t group, uint32_t model, uint32_t stack,
                          WheelCalls& calls);
 // WheelPoints::SetUpRimA (sub_820E79C8): FindShape on 7 records (+32);
 // +1712 = 32 bytes of the matrix at +0 (the first when +12 isn't 0, else
@@ -62,12 +62,12 @@ uint64_t WheelsSetUpTire(uint8_t* base, uint32_t group, uint32_t model, uint32_t
 // toward record 1's by +16 when record 0 found its model (+36), then record
 // 2's toward 3's, its second copy with the first stream's size, as the
 // original does.
-uint64_t WheelsSetUpRimA(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+uint64_t WheelsSetUpRimA(uint32_t group, uint32_t model, uint32_t stack,
                          WheelCalls& calls);
 // WheelPoints::SetUpRimB (sub_820E7CA0): as SetUpRimA with three morphs
 // (records 0 to 1, 2 to 3, 4 to 5), none checked, each copying both
 // streams by their own sizes.
-uint64_t WheelsSetUpRimB(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+uint64_t WheelsSetUpRimB(uint32_t group, uint32_t model, uint32_t stack,
                          WheelCalls& calls);
 // WheelPoints::SetUpBrakes (sub_820E8028): FindShape on 12 records (+32);
 // PartModel::ScaleBlended by 1.0 on records 10 and 11; +2912 = 32 bytes of
@@ -76,7 +76,7 @@ uint64_t WheelsSetUpRimB(uint8_t* base, uint32_t group, uint32_t model, uint32_t
 // wheels record's +8 is 0, +16 = (that word - 9, +1 for kinds 3 to 5 at
 // +68, +2 for 6) x [0x82006634], and six morphs (record 2k toward 2k + 1)
 // by it.
-uint64_t WheelsSetUpBrakes(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+uint64_t WheelsSetUpBrakes(uint32_t group, uint32_t model, uint32_t stack,
                            WheelCalls& calls);
 // WheelPoints::SetUp (sub_820E8668): r3 = the block: the tires (+32,
 // +1872), the rims of the scene's model set ([[0x826C2E44] + 4]: 0 set a's
@@ -84,6 +84,6 @@ uint64_t WheelsSetUpBrakes(uint8_t* base, uint32_t group, uint32_t model, uint32
 // SetUpRimB) and the brakes (+10688, +13632), each with its model (+16,
 // +20, +24; the rear's + 464), the car model's loading object's matrix
 // (+6976 of [[+0] + 24]) or +8, and +12.
-uint64_t WheelPointsSetUp(uint8_t* base, uint32_t block, uint32_t stack, WheelCalls& calls);
+uint64_t WheelPointsSetUp(uint32_t block, uint32_t stack, WheelCalls& calls);
 
 }  // namespace second_set

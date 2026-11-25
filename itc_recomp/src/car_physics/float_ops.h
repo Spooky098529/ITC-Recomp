@@ -20,15 +20,15 @@ constexpr uint32_t kOne = 0x82000A30;         // the game's float 1.0
 constexpr uint32_t kZero = 0x82000A34;        // the game's float 0.0
 constexpr uint32_t kZeroVector = 0x82953790;  // the game's zero vector
 
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+inline double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
-inline void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+inline void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 // An lfs then stfs of one word: its bits.
-inline void CopyWord(uint8_t* base, uint32_t from, uint32_t to) {
-  guest::StoreU32(base, to, guest::LoadU32(base, from));
+inline void CopyWord(uint32_t from, uint32_t to) {
+  guest::StoreU32(to, guest::LoadU32(from));
 }
 inline double Fmuls(double a, double b) {
   return double(float(a * b));

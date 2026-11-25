@@ -36,19 +36,19 @@ ITC_NATIVE_ENTRY_ALWAYS(82296648) {
   const uint32_t destination = ctx.r7.u32;
   const int32_t destination_length = ctx.r8.s32;
   if (code_page == kCodePageUtf8) {
-    InFrame(ctx, base, 96, 0x82296680, [&](uint32_t) {
+    InFrame(ctx, 96, 0x82296680, [&](uint32_t) {
       ctx.r3.u64 = source;
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      lifted::Enter(ctx, base, lifted::e82297340);
+      lifted::Enter(ctx, lifted::e82297340);
     });
     return;
   }
   int32_t length = source_length;
   if (length == -1) {
     uint32_t n = 0;
-    while (guest::LoadU8(base, source + n)) {
+    while (guest::LoadU8(source + n)) {
       n++;
     }
     length = int32_t(n + 1);
@@ -58,7 +58,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296648) {
       ctx.r3.s64 = length;
       return;
     case helpers::Conversion::kTooSmall:
-      last_error::Set(base, ctx.r13.u32, kErrorInsufficientBuffer);
+      last_error::Set(ctx.r13.u32, kErrorInsufficientBuffer);
       ctx.r3.u64 = 0;
       return;
     case helpers::Conversion::kConvert:
@@ -66,12 +66,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82296648) {
   }
   std::vector<uint8_t> in(static_cast<size_t>(length));
   for (int32_t i = 0; i < length; i++) {
-    in[i] = guest::LoadU8(base, source + uint32_t(i));
+    in[i] = guest::LoadU8(source + uint32_t(i));
   }
   std::vector<uint16_t> out(static_cast<size_t>(length));
   helpers::Widen(in.data(), out.data(), in.size());
   for (int32_t i = 0; i < length; i++) {
-    guest::StoreU16(base, destination + 2 * uint32_t(i), out[i]);
+    guest::StoreU16(destination + 2 * uint32_t(i), out[i]);
   }
   ctx.r3.s64 = length;
 }
@@ -88,22 +88,22 @@ ITC_NATIVE_ENTRY_ALWAYS(82296720) {
   const uint32_t destination = ctx.r7.u32;
   const int32_t destination_length = ctx.r8.s32;
   if (ctx.r10.u32) {
-    guest::StoreU32(base, ctx.r10.u32, 0);
+    guest::StoreU32(ctx.r10.u32, 0);
   }
   if (code_page == kCodePageUtf8) {
-    InFrame(ctx, base, 128, 0x82296764, [&](uint32_t) {
+    InFrame(ctx, 128, 0x82296764, [&](uint32_t) {
       ctx.r3.u64 = source;
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      lifted::Enter(ctx, base, lifted::e82297540);
+      lifted::Enter(ctx, lifted::e82297540);
     });
     return;
   }
   int32_t length = source_length;
   if (length == -1) {
     uint32_t n = 0;
-    while (guest::LoadU16(base, source + 2 * n)) {
+    while (guest::LoadU16(source + 2 * n)) {
       n++;
     }
     length = int32_t(n + 1);
@@ -113,7 +113,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296720) {
       ctx.r3.s64 = length;
       return;
     case helpers::Conversion::kTooSmall:
-      last_error::Set(base, ctx.r13.u32, kErrorInsufficientBuffer);
+      last_error::Set(ctx.r13.u32, kErrorInsufficientBuffer);
       ctx.r3.u64 = 0;
       return;
     case helpers::Conversion::kConvert:
@@ -121,12 +121,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82296720) {
   }
   std::vector<uint16_t> in(static_cast<size_t>(length));
   for (int32_t i = 0; i < length; i++) {
-    in[i] = guest::LoadU16(base, source + 2 * uint32_t(i));
+    in[i] = guest::LoadU16(source + 2 * uint32_t(i));
   }
   std::vector<uint8_t> out(static_cast<size_t>(length));
   helpers::Narrow(in.data(), out.data(), in.size());
   for (int32_t i = 0; i < length; i++) {
-    guest::StoreU8(base, destination + uint32_t(i), out[i]);
+    guest::StoreU8(destination + uint32_t(i), out[i]);
   }
   ctx.r3.s64 = length;
 }
@@ -145,7 +145,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296870) {
   }
   std::u16string format;
   for (uint32_t a = format_address;; a += 2) {
-    char16_t c = char16_t(guest::LoadU16(base, a));
+    char16_t c = char16_t(guest::LoadU16(a));
     if (!c) {
       break;
     }
@@ -157,8 +157,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82296870) {
                   format_address, uint32_t(ctx.lr));
   }
   for (size_t i = 0; i < text.size(); i++) {
-    guest::StoreU16(base, buffer + 2 * uint32_t(i), uint16_t(text[i]));
+    guest::StoreU16(buffer + 2 * uint32_t(i), uint16_t(text[i]));
   }
-  guest::StoreU16(base, buffer + 2 * uint32_t(text.size()), 0);
+  guest::StoreU16(buffer + 2 * uint32_t(text.size()), 0);
   ctx.r3.s64 = int64_t(text.size());
 }

@@ -49,9 +49,9 @@ bool Overlaps(const Range& a, const Range& b) {
 // nothing native code can't do.
 class NarrowOutput {
  public:
-  NarrowOutput(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
+  NarrowOutput(uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
                uint32_t frame, bool dry)
-      : base_(base),
+      : base_(),
         out_(buffer),
         counts_only_(buffer == 0),
         room_(room),
@@ -489,10 +489,10 @@ bool NarrowOutput::Run(int32_t* result) {
 // real one only where it needs nothing the original alone does, and where
 // what it writes (with the terminator) reads none of its own inputs or its
 // frame (the original would read its own writes there).
-bool Format(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
+bool Format(uint32_t buffer, int32_t room, uint32_t format, uint32_t args,
             uint32_t frame, int32_t* count) {
   {
-    NarrowOutput dry(base, buffer, room, format, args, frame, true);
+    NarrowOutput dry(buffer, room, format, args, frame, true);
     int32_t ignored;
     if (!dry.Run(&ignored)) {
       return false;
@@ -512,35 +512,35 @@ bool Format(uint8_t* base, uint32_t buffer, int32_t room, uint32_t format, uint3
       }
     }
   }
-  NarrowOutput output(base, buffer, room, format, args, frame, false);
+  NarrowOutput output(buffer, room, format, args, frame, false);
   output.Run(count);
   if (buffer != 0) {
-    guest::StoreU8(base, output.pointer(), 0);
+    guest::StoreU8(output.pointer(), 0);
   }
   return true;
 }
 
 }  // namespace
 
-bool Sprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+bool Sprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
              int32_t* count) {
   if (buffer == 0 || format == 0) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
-  if (!Format(base, buffer, 0x7FFFFFFF, format, args, frame, count)) {
+  if (!Format(buffer, 0x7FFFFFFF, format, args, frame, count)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_825A93D0 sprintf");
   return true;
 }
 
-bool Vsnprintf(uint8_t* base, uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
+bool Vsnprintf(uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
                uint32_t frame, int32_t* count) {
   if (format == 0 || (size != 0 && buffer == 0)) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
   const int32_t room = size > 0x7FFFFFFFu ? 0x7FFFFFFF : int32_t(size);
-  if (!Format(base, buffer, room, format, args, frame, count)) {
+  if (!Format(buffer, room, format, args, frame, count)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_825AB010 _vsnprintf");

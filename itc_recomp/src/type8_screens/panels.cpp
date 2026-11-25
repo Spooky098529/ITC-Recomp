@@ -19,8 +19,8 @@ using guest::StoreU32;
 
 namespace sc = screen_constructors;
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  StoreU32(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  StoreU32(sp - bytes, sp);
   return sp - bytes;
 }
 
@@ -42,12 +42,12 @@ car_list::Calls CarListCalls(const Calls& calls) {
   return {const_cast<Calls*>(&calls), &ThroughCalls};
 }
 
-uint64_t PanelGroup8Construct(uint8_t* base, uint64_t r3, uint32_t movie, uint32_t sp) {
+uint64_t PanelGroup8Construct(uint64_t r3, uint32_t movie, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82239C10 PanelGroup8::PanelGroup8");
   const uint32_t group = uint32_t(r3);
-  const schema::Type8PanelGroup g(base, group);
-  Frame(base, sp, 112);
-  sc::PanelGroupBase(base, group);
+  const schema::Type8PanelGroup g(group);
+  Frame(sp, 112);
+  sc::PanelGroupBase(group);
   g.set_movie(movie);
   g.set_text_node_set(10);
   g.set_vtable(kGroupVtable);
@@ -55,13 +55,13 @@ uint64_t PanelGroup8Construct(uint8_t* base, uint64_t r3, uint32_t movie, uint32
   return r3;
 }
 
-uint64_t Panel8FConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t group,
+uint64_t Panel8FConstruct(uint64_t r3, uint32_t player, uint32_t group,
                           uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82239C70 Panel8F::Panel8F");
   const uint32_t p = uint32_t(r3);
-  const schema::Type8TabPanel f(base, p);
-  Frame(base, sp, 112);
-  sc::PanelFBase(base, p);
+  const schema::Type8TabPanel f(p);
+  Frame(sp, 112);
+  sc::PanelFBase(p);
   f.set_player(player);
   f.set_group(group);
   f.set_buttons_node(11);
@@ -86,13 +86,13 @@ uint64_t Panel8FConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t 
   return r3;
 }
 
-uint64_t Panel8EConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t group,
+uint64_t Panel8EConstruct(uint64_t r3, uint32_t player, uint32_t group,
                           uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82239D58 Panel8E::Panel8E");
   const uint32_t p = uint32_t(r3);
-  const schema::Type8RowPanel e(base, p);
-  Frame(base, sp, 112);
-  sc::PanelEBase(base, p);
+  const schema::Type8RowPanel e(p);
+  Frame(sp, 112);
+  sc::PanelEBase(p);
   e.set_player(player);
   e.set_group(group);
   e.set_row_node0(1);
@@ -121,13 +121,13 @@ uint64_t Panel8EConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t 
   return r3;
 }
 
-uint64_t Panel8CConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t group,
+uint64_t Panel8CConstruct(uint64_t r3, uint32_t player, uint32_t group,
                           uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82239E78 Panel8C::Panel8C");
   const uint32_t p = uint32_t(r3);
-  const schema::Type8CarPanel c(base, p);
-  Frame(base, sp, 128);
-  sc::PanelCBase(base, p);
+  const schema::Type8CarPanel c(p);
+  Frame(sp, 128);
+  sc::PanelCBase(p);
   // The shared words, in the original's order.
   c.set_group(group);
   c.set_player(player);
@@ -202,13 +202,13 @@ uint64_t Panel8CConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t 
   return r3;
 }
 
-uint64_t Panel8DConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t group,
+uint64_t Panel8DConstruct(uint64_t r3, uint32_t player, uint32_t group,
                           uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223A100 Panel8D::Panel8D");
   const uint32_t p = uint32_t(r3);
-  const schema::Type8ColorPanel d(base, p);
-  Frame(base, sp, 112);
-  sc::PanelDBase(base, p);
+  const schema::Type8ColorPanel d(p);
+  Frame(sp, 112);
+  sc::PanelDBase(p);
   d.set_player(player);
   d.set_group(group);
   d.set_swatches(1);
@@ -232,13 +232,13 @@ uint64_t Panel8DConstruct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t 
   return r3;
 }
 
-uint64_t ConfirmPanel8Construct(uint8_t* base, uint64_t r3, uint32_t player, uint32_t group,
+uint64_t ConfirmPanel8Construct(uint64_t r3, uint32_t player, uint32_t group,
                                 uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8223A208 ConfirmPanel8::ConfirmPanel8");
   const uint32_t p = uint32_t(r3);
-  const schema::Type8ConfirmPanel c(base, p);
-  Frame(base, sp, 112);
-  car_list::ConfirmPanelConstruct(base, r3);
+  const schema::Type8ConfirmPanel c(p);
+  Frame(sp, 112);
+  car_list::ConfirmPanelConstruct(r3);
   c.set_player(player);
   c.set_group(group);
   c.set_node_c(3);
@@ -252,11 +252,11 @@ uint64_t ConfirmPanel8Construct(uint8_t* base, uint64_t r3, uint32_t player, uin
   return r3;
 }
 
-uint64_t PanelGroup8DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t PanelGroup8DeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                      const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223A2A8 PanelGroup8::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  car_list::GroupBaseDestruct(base, r3);
+  const uint32_t frame = Frame(sp, 112);
+  car_list::GroupBaseDestruct(r3);
   if (flags & 1) {
     const uint64_t args[6] = {r3, flags, 0, 0, 0, 0};
     calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x8223A2D8);
@@ -264,11 +264,11 @@ uint64_t PanelGroup8DeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags,
   return r3;
 }
 
-uint64_t Panel8CDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t Panel8CDeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223A348 Panel8C::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  car_list::CarPanelBaseDestruct(base, r3);
+  const uint32_t frame = Frame(sp, 112);
+  car_list::CarPanelBaseDestruct(r3);
   if (flags & 1) {
     const uint64_t args[6] = {r3, flags, 0, 0, 0, 0};
     calls.call_set(car_list::kOperatorDelete, args, 2, frame, 0x8223A378);
@@ -276,22 +276,22 @@ uint64_t Panel8CDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uin
   return r3;
 }
 
-uint64_t Panel8CSetStats(uint8_t* base, uint64_t r3, uint32_t record, uint32_t sp,
+uint64_t Panel8CSetStats(uint64_t r3, uint32_t record, uint32_t sp,
                          const car_list::Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223A090 Panel8C::SetStats");
-  return car_list::Panel6CSetStats(base, uint32_t(r3), record, sp, calls);
+  return car_list::Panel6CSetStats(uint32_t(r3), record, sp, calls);
 }
 
-uint64_t Panel8CShowArrows(uint8_t* base, uint64_t r3, uint64_t shown, uint32_t sp,
+uint64_t Panel8CShowArrows(uint64_t r3, uint64_t shown, uint32_t sp,
                            const car_list::Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223A098 Panel8C::ShowArrows");
-  const uint32_t p = uint32_t(r3), frame = Frame(base, sp, 112);
-  const schema::Type8CarPanel c(base, p);
+  const uint32_t p = uint32_t(r3), frame = Frame(sp, 112);
+  const schema::Type8CarPanel c(p);
   if (int32_t(c.arrows_child()) < 0) {
     return r3;
   }
   const uint32_t m =
-      uint32_t(type67_screens::PanelGroupMovie(base, c.group().address, frame));
+      uint32_t(type67_screens::PanelGroupMovie(c.group().address, frame));
   const uint32_t child = c.arrows_child();
   const uint32_t sub_scene = c.node_set();
   if (uint32_t(shown) == 0) {

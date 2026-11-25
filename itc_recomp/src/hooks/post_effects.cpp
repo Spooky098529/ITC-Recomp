@@ -104,18 +104,18 @@ using namespace post_effects;
 
 // --- The effects: no arguments but Get's r3 = the index ---
 
-ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(base, ctx.r3.u32))
+ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(ctx.r3.u32))
 // MarkUpdated (sub_82133A08) has no adapter: its only caller in play,
 // RaceScene::Update, calls its plain C++ (--native_race_update switches it).
 // The deleting destructors through the effects' slot 1 (r4 = 1), from the
 // original's 112-byte frame.
 ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
-                 guest_call::InFrame(ctx, base, 112, 0x82133ABC, [&](uint32_t) {
-                   r3 = DestroyRace(base, [&](uint32_t function, uint32_t effect) {
+                 guest_call::InFrame(ctx, 112, 0x82133ABC, [&](uint32_t) {
+                   r3 = DestroyRace([&](uint32_t function, uint32_t effect) {
                      ctx.r3.u64 = effect;
                      ctx.r4.u64 = 1;
                      ctx.lr = 0x82133ABC;
-                     lifted::CallFromContext(ctx, base, function);
+                     lifted::CallFromContext(ctx, function);
                      return ctx.r3.u32;
                    });
                  });
@@ -126,7 +126,7 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
 #define ITC_GLOW_SET(address, offset)                   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_post_effects)) { \
     ctx.fpscr.disableFlushMode();                       \
-    GlowSet(base, ctx.r3.u32, offset, ctx.f1.f64);      \
+    GlowSet(ctx.r3.u32, offset, ctx.f1.f64);      \
   }
 
 ITC_GLOW_SET(82136EF8, 8436)
@@ -145,14 +145,14 @@ ITC_GLOW_SET(82136F48, 8476)
 // original's 112-byte frame; r3 and f1 come back as the last one leaves them.
 ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = ctx.r3.u32;
                  const double speed = ctx.f1.f64; const uint64_t lr = ctx.lr;
-                 guest_call::InFrame(ctx, base, 112, 0x821338FC, [&](uint32_t) {
+                 guest_call::InFrame(ctx, 112, 0x821338FC, [&](uint32_t) {
                    static constexpr uint32_t kReturns[3] = {0x821338FC, 0x82133920, 0x82133944};
                    int call = 0;
-                   GlowSetFromSpeed(base, glow, speed, [&](uint32_t function, double value) {
+                   GlowSetFromSpeed(glow, speed, [&](uint32_t function, double value) {
                      ctx.r3.u64 = glow;
                      ctx.f1.f64 = value;
                      ctx.lr = kReturns[call++];
-                     lifted::CallFromContext(ctx, base, function);
+                     lifted::CallFromContext(ctx, function);
                    });
                  });
                  ctx.lr = lr)
@@ -161,13 +161,13 @@ ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = c
 
 // f1, f2, f3 = the color.
 ITC_POST_EFFECTS(821350F8, ctx.fpscr.disableFlushMode();
-                 ColorFilterSetColor0(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
+                 ColorFilterSetColor0(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64))
 ITC_POST_EFFECTS(82135138, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8112, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8112, ctx.f1.f64))
 ITC_POST_EFFECTS(82135140, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8116, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8116, ctx.f1.f64))
 ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
-                 ColorFilterSet(base, ctx.r3.u32, 8120, ctx.f1.f64))
+                 ColorFilterSet(ctx.r3.u32, 8120, ctx.f1.f64))
 
 // --- The recording helpers: r3 = the effect, r4 = the command list ---
 
@@ -180,30 +180,30 @@ ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
       r3 = __VA_ARGS__;                                       \
     }                                                         \
     if (!r3) {                                                \
-      lifted::original::c##address(ctx, base);                        \
+      lifted::original::c##address(ctx);                        \
       return;                                                 \
     }                                                         \
     ctx.r3.u64 = *r3;                                         \
   }
 
-ITC_POST_EFFECTS_RECORD(82133340, RecordBeginStates(base, ctx.r4.u32))
-ITC_POST_EFFECTS_RECORD(82133608, RecordEndStates(base, ctx.r4.u32))
+ITC_POST_EFFECTS_RECORD(82133340, RecordBeginStates(ctx.r4.u32))
+ITC_POST_EFFECTS_RECORD(82133608, RecordEndStates(ctx.r4.u32))
 // r5 = the surface, r6 = the depth surface.
-ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_POST_EFFECTS_RECORD(82133790, RecordTargets(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 // r5 = the 16 bytes, r6 = the register, r7 = the count.
 ITC_POST_EFFECTS_RECORD(82133D00,
-                        RecordPixelConstants(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
+                        RecordPixelConstants(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
 // f1 = width, f2 = height.
 ITC_POST_EFFECTS_RECORD(82133DD8, (ctx.fpscr.disableFlushMode(),
-                                   RecordTexelSize(base, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))
+                                   RecordTexelSize(ctx.r4.u32, ctx.f1.f64, ctx.f2.f64)))
 // r5 = the texture, r6, r7 = the flags, r8 = by the view's rectangle.
-ITC_POST_EFFECTS_RECORD(82133F58, RecordResolve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_POST_EFFECTS_RECORD(82133F58, RecordResolve(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                 ctx.r6.u32, ctx.r7.u32, ctx.r8.u32 != 0))
 
 // PostEffect::AddQuad: r4 = width, r5 = height, f1 = the value, r7 = at the
 // view's position.
 ITC_POST_EFFECTS(82133E30, ctx.fpscr.disableFlushMode();
-                 ctx.r3.u64 = AddQuad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
+                 ctx.r3.u64 = AddQuad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
                                       ctx.r7.u32 != 0))
 
 // --- The render textures and surfaces ---
@@ -218,18 +218,18 @@ bool FreesNative() {
 // The video output, as the device's users reach it: `[0x8266D088]`'s vtable
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
-uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
+uint32_t VideoOutputCall(lifted::Regs& ctx, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app().address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 =
-      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
-  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    lifted::CallFromContext(ctx, base, slot7);
+      guest::LoadU32(schema::AppInterface16(ctx.r3.u32).vtable() + 28);
+  if (!hooks::DirectSlotCall(ctx, slot7)) {
+    lifted::CallFromContext(ctx, slot7);
   }
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 12);
   ctx.lr = second;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -243,10 +243,10 @@ namespace hooks {
 ITC_REGS_STEP(PostEffectsReleaseTexture) {
   std::optional<uint32_t> r3;
   if (FreesNative()) {
-    r3 = RenderTexturesRelease(base, ctx.r3.u32);
+    r3 = RenderTexturesRelease(ctx.r3.u32);
   }
   if (!r3) {
-    lifted::original::c821332F0(ctx, base);
+    lifted::original::c821332F0(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -258,39 +258,39 @@ ITC_REGS_STEP(PostEffectsReleaseTexture) {
 // body, as ReleaseTexture.
 ITC_REGS_STEP(PostEffectsReleaseSurface) {
   if (!ITC_FLAG(native_video_output)) {
-    lifted::original::c82133C60(ctx, base);
+    lifted::original::c82133C60(ctx);
     return;
   }
   const uint32_t at = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, 112, 0x82133C90, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, 112, 0x82133C90, [&](uint32_t frame) {
     const SurfaceCalls calls{
         [&](int which) {
-          return which == 0 ? VideoOutputCall(ctx, base, 0x82133C90, 0x82133CA0)
-                            : VideoOutputCall(ctx, base, 0x82133CCC, 0x82133CDC);
+          return which == 0 ? VideoOutputCall(ctx, 0x82133C90, 0x82133CA0)
+                            : VideoOutputCall(ctx, 0x82133CCC, 0x82133CDC);
         },
         [&](uint32_t resource) {
           ctx.r3.u64 = resource;
           ctx.lr = 0x82133CB0;
-          lifted::Enter(ctx, base, game::Resource::Release);
+          lifted::Enter(ctx, game::Resource::Release);
         }};
-    r3 = ReleaseSurface(base, frame, at, calls);
+    r3 = ReleaseSurface(frame, at, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
 // The destructors' calls: the two above, r3 = the field's address.
-DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx, uint8_t* base) {
-  return {[&ctx, base](uint32_t at) {
+DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx) {
+  return {[&ctx](uint32_t at) {
             ctx.r3.u64 = at;
-            PostEffectsReleaseSurface(ctx, base);
+            PostEffectsReleaseSurface(ctx);
             return ctx.r3.u32;
           },
-          [&ctx, base](uint32_t at) {
+          [&ctx](uint32_t at) {
             ctx.r3.u64 = at;
-            PostEffectsReleaseTexture(ctx, base);
+            PostEffectsReleaseTexture(ctx);
             return ctx.r3.u32;
           }};
 }
@@ -299,27 +299,27 @@ DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx, uint8_t* base) {
 
 // PostEffects::InitEdramBase: no arguments (a static initializer, through
 // _cinit's table).
-ITC_POST_EFFECTS(825D99D0, ctx.r3.u64 = InitEdramBase(base))
+ITC_POST_EFFECTS(825D99D0, ctx.r3.u64 = InitEdramBase())
 
 namespace {
 
 // PostEffects::Create's guest calls (the video output's slots with the
 // original's return addresses; the constructors of kinds 1 and 4).
-CreateCalls MakeCreateCalls(lifted::Regs& ctx, uint8_t* base) {
-  return {[&ctx, base](int which) {
-            return which == 0 ? VideoOutputCall(ctx, base, 0x82138A54, 0x82138A64)
-                              : VideoOutputCall(ctx, base, 0x82138C18, 0x82138C28);
+CreateCalls MakeCreateCalls(lifted::Regs& ctx) {
+  return {[&ctx](int which) {
+            return which == 0 ? VideoOutputCall(ctx, 0x82138A54, 0x82138A64)
+                              : VideoOutputCall(ctx, 0x82138C18, 0x82138C28);
           },
-          [&ctx, base](uint32_t function, uint32_t object, uint32_t entry, uint32_t device) {
+          [&ctx](uint32_t function, uint32_t object, uint32_t entry, uint32_t device) {
             ctx.r3.u64 = object;
             ctx.r4.u64 = entry;
             ctx.r5.u64 = device;
             if (function == 0x82134410) {
               ctx.lr = 0x82138BB8;
-              lifted::Enter(ctx, base, lifted::e82134410);
+              lifted::Enter(ctx, lifted::e82134410);
             } else {
               ctx.lr = 0x82138B10;
-              lifted::Enter(ctx, base, lifted::e82133B10);
+              lifted::Enter(ctx, lifted::e82133B10);
             }
             return ctx.r3.u32;
           }};
@@ -333,7 +333,7 @@ CreateCalls MakeCreateCalls(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
   
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    lifted::original::c82138A18(ctx, base);
+    lifted::original::c82138A18(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -342,8 +342,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
   const uint32_t index = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, 128, 0x82138A54, [&](uint32_t) {
-    r3 = Create(base, stack, device, index, MakeCreateCalls(ctx, base));
+  guest_call::InFrame(ctx, 128, 0x82138A54, [&](uint32_t) {
+    r3 = Create(stack, device, index, MakeCreateCalls(ctx));
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -353,9 +353,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
 // frame like the original's (112 bytes; PostEffects::Create's below it, 128
 // bytes, and memcpy's, where CreateVertexDeclaration's plain C++ hands it
 // back, below CreateVertexDeclaration's, 160 bytes).
-void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
+void hooks::PostEffectsInitBoot(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    lifted::original::c82138C38(ctx, base);
+    lifted::original::c82138C38(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -363,27 +363,27 @@ void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t device = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, 112, 0x82138C78, [&](uint32_t) {
+  guest_call::InFrame(ctx, 112, 0x82138C78, [&](uint32_t) {
     const InitBootCalls calls{
         [&](int which) {
-          return which == 0 ? VideoOutputCall(ctx, base, 0x82138C78, 0x82138C88)
-                            : VideoOutputCall(ctx, base, 0x82138CCC, 0x82138CDC);
+          return which == 0 ? VideoOutputCall(ctx, 0x82138C78, 0x82138C88)
+                            : VideoOutputCall(ctx, 0x82138CCC, 0x82138CDC);
         },
         [&](uint32_t to, uint32_t from, uint32_t size) {
-          guest_call::InFrame(ctx, base, 160, 0x822A8A54, [&](uint32_t) {
+          guest_call::InFrame(ctx, 160, 0x822A8A54, [&](uint32_t) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+            lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
           });
         },
         [&](const std::function<uint32_t(const CreateCalls&)>& create) {
           uint32_t made = 0;
-          guest_call::InFrame(ctx, base, 128, 0x82138A54,
-                              [&](uint32_t) { made = create(MakeCreateCalls(ctx, base)); });
+          guest_call::InFrame(ctx, 128, 0x82138A54,
+                              [&](uint32_t) { made = create(MakeCreateCalls(ctx)); });
           return made;
         }};
-    r3 = InitBoot(base, stack, device, calls);
+    r3 = InitBoot(stack, device, calls);
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -393,9 +393,9 @@ void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
 
 namespace hooks {
 
-RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
+RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx) {
   RecordCalls calls;
-  calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
+  calls.call = [&ctx](uint32_t function, const uint64_t* regs, int count,
                             const double* fregs, int fcount, uint32_t sp,
                             uint32_t lr) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
@@ -410,17 +410,17 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
-  calls.tan = [&ctx, base](double x, uint32_t sp, uint32_t lr) {
+  calls.tan = [&ctx](double x, uint32_t sp, uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.f1.f64 = x;
-    lifted::Enter(ctx, base, game::tan);
+    lifted::Enter(ctx, game::tan);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.f1.f64;
@@ -440,29 +440,29 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.fpscr.disableFlushMode();                                                    \
       const uint64_t lr = ctx.lr;                                                      \
       const uint64_t effect = ctx.r3.u64;                                              \
-      r3 = Record(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base)); \
+      r3 = Record(ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx)); \
       ctx.lr = lr;                                                                     \
       ctx.r3.u64 = effect;                                                             \
     }                                                                                  \
     if (!r3) {                                                                         \
-      lifted::original::c##address(ctx, base);                                                 \
+      lifted::original::c##address(ctx);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \
   }
 
-void hooks::PostEffectsGlowRecord(lifted::Regs& ctx, uint8_t* base) {
+void hooks::PostEffectsGlowRecord(lifted::Regs& ctx) {
   std::optional<uint32_t> r3;
   if (ITC_FLAG(native_post_effects)) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
     const uint64_t glow = ctx.r3.u64;
-    r3 = GlowRecord(base, ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx, base));
+    r3 = GlowRecord(ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx));
     ctx.lr = lr;
     ctx.r3.u64 = glow;
   }
   if (!r3) {
-    lifted::original::c821379D8(ctx, base);
+    lifted::original::c821379D8(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -483,19 +483,19 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
     \
     if (!ITC_FLAG(native_post_effects) || ((ctx.r4.u32 & 1) != 0 && !FreesNative())) { \
-      lifted::original::c##address(ctx, base);                                                 \
+      lifted::original::c##address(ctx);                                                 \
       return;                                                                          \
     }                                                                                  \
     const uint64_t lr = ctx.lr;                                                        \
     const uint32_t effect = ctx.r3.u32;                                                \
     const uint32_t flags = ctx.r4.u32;                                                 \
     std::optional<uint32_t> r3;                                                        \
-    guest_call::InFrame(ctx, base, 112, 0, [&](uint32_t) {                             \
-      r3 = DeleteEffect(base, kind, effect, flags, hooks::PostEffectsDestroyCalls(ctx, base));       \
+    guest_call::InFrame(ctx, 112, 0, [&](uint32_t) {                             \
+      r3 = DeleteEffect(kind, effect, flags, hooks::PostEffectsDestroyCalls(ctx));       \
     });                                                                                \
     ctx.lr = lr;                                                                       \
     if (!r3) {                                                                         \
-      lifted::original::c##address(ctx, base);                                                 \
+      lifted::original::c##address(ctx);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \

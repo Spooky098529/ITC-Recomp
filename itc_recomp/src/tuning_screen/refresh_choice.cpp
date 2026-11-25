@@ -45,7 +45,7 @@ void Context::State7() {
   // The bonnet's rows (sub-scene 30's child 1's children 5 to 14) hidden.
   for (uint32_t row = 0; row < 10; row++) {
     if (bonnet()) {
-      UiNode(base, ChildOf(Node(30, 1), row + 5)).set_visible(0);
+      UiNode(ChildOf(Node(30, 1), row + 5)).set_visible(0);
     }
   }
   // The rows' texts: the bonnet's two (r10 the item byte, left from the
@@ -55,14 +55,14 @@ void Context::State7() {
     const uint32_t r10 = Item();
     const uint32_t parent = Node(30, 1);
     const uint32_t first = ChildOf(parent, 5);
-    UiNode(base, first).set_visible(1);
+    UiNode(first).set_visible(1);
     NodeText(first, 376, 0x821E5D08, 0, r10);
     const uint32_t second = ChildOf(parent, 6);
-    UiNode(base, second).set_visible(1);
+    UiNode(second).set_visible(1);
     NodeText(second, 380, 0x821E5D5C, 0, r10);
   } else if (Category() == 1 && Item() == 3) {
     const uint32_t node = ChildOf(Node(32, 2), 1);
-    UiNode(base, node).set_visible(1);
+    UiNode(node).set_visible(1);
     NodeText(node, 376, 0x821E5D5C);
   }
 
@@ -72,24 +72,24 @@ void Context::State7() {
   for (uint32_t n = 26; n < 36; n++) {
     if (bonnet()) {
       const uint32_t node = Node(30, 0);
-      UiNode(base, ChildOf(node, n - 11)).set_visible(0);
-      UiNode(base, ChildOf(node, n)).set_visible(0);
+      UiNode(ChildOf(node, n - 11)).set_visible(0);
+      UiNode(ChildOf(node, n)).set_visible(0);
     }
   }
-  if (bonnet() && uint32_t(TS(base, screen).color_rows()) != 0) {
-    for (uint32_t row = 0; int32_t(row) < int32_t(uint32_t(TS(base, screen).color_rows())); row++) {
+  if (bonnet() && uint32_t(TS(screen).color_rows()) != 0) {
+    for (uint32_t row = 0; int32_t(row) < int32_t(uint32_t(TS(screen).color_rows())); row++) {
       const uint32_t node = Node(30, 0);
       const uint32_t mark = ChildOf(node, row + 15);
       const uint32_t flag = ChildOf(node, 38 + 2 * row);
-      UiNode(base, mark).set_visible(1);
-      guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, row) != 0 ? 0 : 1);
-      UiNode(base, ChildOf(node, row + 26)).set_visible(1);
+      UiNode(mark).set_visible(1);
+      guest::StoreU32(flag + 108, GetChoiceFlag(screen, row) != 0 ? 0 : 1);
+      UiNode(ChildOf(node, row + 26)).set_visible(1);
     }
   }
 
   // A swatch: the node's color (UiNode::SetRgb sub_821E7DA0's plain C++).
   const auto swatch = [&](uint32_t node, uint64_t r, uint64_t g, uint64_t b, uint32_t) {
-    SetRgb(base, node, uint32_t(r), uint32_t(g), uint32_t(b));
+    SetRgb(node, uint32_t(r), uint32_t(g), uint32_t(b));
   };
   if (Category() == 1 && Item() == 3) {
     // Sub-scene 32's child 2: its children 2 to 5's child 2.
@@ -103,7 +103,7 @@ void Context::State7() {
     // before its test), then by the type 1 to 4 the first ones shown with
     // their child 2's color.
     for (uint32_t k = 1; k <= 6; k++) {
-      UiNode(base, ChildOf(Node(32, 3), k)).set_visible(0);
+      UiNode(ChildOf(Node(32, 3), k)).set_visible(0);
     }
     struct Swatch {
       uint32_t r, g, b, lr;
@@ -115,12 +115,12 @@ void Context::State7() {
         const uint32_t row = ChildOf(parent, k);
         const uint32_t shown = ChildOf(parent, k);
         const uint32_t node = ChildOf(row, 2);
-        UiNode(base, shown).set_visible(1);
+        UiNode(shown).set_visible(1);
         swatch(node, s.r, s.g, s.b, s.lr);
         k++;
       }
     };
-    switch (uint32_t(TS(base, screen).type())) {
+    switch (uint32_t(TS(screen).type())) {
       case 1:
       case 2:
         colors({{170, 170, 170, 0x821E5FD8},
@@ -146,35 +146,35 @@ void Context::State7() {
   // interior's frame shown for a type.
   if (Category() == 4) {
     if (Item() == 4) {
-      if (uint32_t(TS(base, screen).type()) == 0) {
+      if (uint32_t(TS(screen).type()) == 0) {
         Shown(kAll, 17, 0);
       } else {
         Shown(kAll, 17, 1);
         const uint32_t child = ChildOf(Node(kAll, 17), 0);
-        const uint64_t r4 = uint64_t(uint32_t(TS(base, screen).type())) - 1;
+        const uint64_t r4 = uint64_t(uint32_t(TS(screen).type())) - 1;
         const uint64_t r5 = Item();
         // AeroPartValue leaves r4 and r5 as they came: its second call has
         // the same arguments.
-        if (int32_t(uint32_t(AeroPartValue(base, screen, r4, r5, frame))) == -1) {
+        if (int32_t(uint32_t(AeroPartValue(screen, r4, r5, frame))) == -1) {
           Shown(kAll, 17, 0);
-          UiNode(base, child).set_texture_entry(0);
+          UiNode(child).set_texture_entry(0);
         } else {
-          UiNode(base, child)
-              .set_texture_entry(uint32_t(AeroPartValue(base, screen, r4, r5, frame)));
+          UiNode(child)
+              .set_texture_entry(uint32_t(AeroPartValue(screen, r4, r5, frame)));
         }
       }
     }
   } else if (Category() == 6 && Item() == 0) {
-    Shown(kAll, 17, uint32_t(TS(base, screen).type()) == 0 ? 0 : 1);
+    Shown(kAll, 17, uint32_t(TS(screen).type()) == 0 ? 0 : 1);
   }
   if (Category() == 6 && Item() == 0) {
-    ShowInteriorPicture(base, screen, uint32_t(TS(base, screen).type()),
-                        uint32_t(TS(base, screen).bonnet_choice()), frame);
+    ShowInteriorPicture(screen, uint32_t(TS(screen).type()),
+                        uint32_t(TS(screen).bonnet_choice()), frame);
   }
 
   // The help line.
   ResetHelp(0x821E63A4);
-  switch (TS(base, screen).category()) {
+  switch (TS(screen).category()) {
     case 1:
       if (Item() == 3) {
         Help(758);
@@ -200,7 +200,7 @@ void Context::State8() {
   // r6 at the door's rows: 31 once the textures were set (the second
   // SetNodeTexture's, which nothing after sets again), else unset (0).
   uint64_t door_r6 = 0;
-  if (door() && int32_t(TS(base, screen).command_first_run()) != 0) {
+  if (door() && int32_t(TS(screen).command_first_run()) != 0) {
     Texture(3, 1, 6);
     Texture(3, 2, 31);
     door_r6 = 31;
@@ -219,12 +219,12 @@ void Context::State8() {
     } else {
       continue;
     }
-    UiNode(base, node).set_visible(0);
+    UiNode(node).set_visible(0);
   }
 
   // The rows' texts.
   const auto row = [&](uint32_t node, uint64_t id, uint32_t lr, uint64_t r6, uint64_t r10) {
-    UiNode(base, node).set_visible(1);
+    UiNode(node).set_visible(1);
     NodeText(node, id, lr, r6, r10);
   };
   if (Category() == 3) {
@@ -258,18 +258,18 @@ void Context::State8() {
       continue;
     }
     const uint32_t node = Node(sub, 0);
-    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
-    UiNode(base, ChildOf(node, n)).set_visible(0);
+    UiNode(ChildOf(node, n - 11)).set_visible(0);
+    UiNode(ChildOf(node, n)).set_visible(0);
   }
   if (const uint32_t sub = marks_scene();
-      sub != 0 && uint32_t(TS(base, screen).option_count()) != 0) {
-    for (uint32_t r = 0; int32_t(r) < int32_t(uint32_t(TS(base, screen).option_count())); r++) {
+      sub != 0 && uint32_t(TS(screen).option_count()) != 0) {
+    for (uint32_t r = 0; int32_t(r) < int32_t(uint32_t(TS(screen).option_count())); r++) {
       const uint32_t node = Node(sub, 0);
       const uint32_t mark = ChildOf(node, r + 15);
       const uint32_t flag = ChildOf(node, 38 + 2 * r);
-      UiNode(base, mark).set_visible(1);
-      guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, r) != 0 ? 0 : 1);
-      UiNode(base, ChildOf(node, r + 26)).set_visible(1);
+      UiNode(mark).set_visible(1);
+      guest::StoreU32(flag + 108, GetChoiceFlag(screen, r) != 0 ? 0 : 1);
+      UiNode(ChildOf(node, r + 26)).set_visible(1);
     }
   }
 
@@ -278,24 +278,24 @@ void Context::State8() {
   // plain C++ doesn't report it, and its adapter, which the recompiled
   // refresh reaches, leaves f1 as it was: f1 left as that adapter leaves it.
   if (door()) {
-    const uint32_t holder = schema::TuningScreenGlobals::stand_holder(base).stage_block_0();
-    front_end_car_draw::GarageStageCommand(base, stand.calls, holder, 4, frame);
+    const uint32_t holder = schema::TuningScreenGlobals::stand_holder().stage_block_0();
+    front_end_car_draw::GarageStageCommand(stand.calls, holder, 4, frame);
   }
 
   // Node 17: the bonnet's part picture, as state 7's.
   if (bonnet()) {
-    if (uint32_t(TS(base, screen).type()) == 0) {
+    if (uint32_t(TS(screen).type()) == 0) {
       Shown(kAll, 17, 0);
     } else {
       Shown(kAll, 17, 1);
       const uint32_t child = ChildOf(Node(kAll, 17), 0);
-      const uint64_t r4 = uint64_t(uint32_t(TS(base, screen).type())) - 1;
+      const uint64_t r4 = uint64_t(uint32_t(TS(screen).type())) - 1;
       const uint64_t r5 = Item();
-      if (int32_t(uint32_t(AeroPartValue(base, screen, r4, r5, frame))) == -1) {
+      if (int32_t(uint32_t(AeroPartValue(screen, r4, r5, frame))) == -1) {
         Shown(kAll, 17, 0);
-        UiNode(base, child).set_texture_entry(0);
+        UiNode(child).set_texture_entry(0);
       } else {
-        UiNode(base, child).set_texture_entry(uint32_t(AeroPartValue(base, screen, r4, r5, frame)));
+        UiNode(child).set_texture_entry(uint32_t(AeroPartValue(screen, r4, r5, frame)));
       }
     }
   }
@@ -303,9 +303,9 @@ void Context::State8() {
   // The help line by the option.
   ResetHelp(0x821E6874);
   if (Category() == 3) {
-    Help(uint64_t(uint32_t(TS(base, screen).option())) + 781);
+    Help(uint64_t(uint32_t(TS(screen).option())) + 781);
   } else if (door()) {
-    Help(uint64_t(uint32_t(TS(base, screen).option())) + 790);
+    Help(uint64_t(uint32_t(TS(screen).option())) + 790);
   } else {
     HelpScroll();
   }

@@ -42,7 +42,7 @@ namespace ds = graphics::device_state;
     if (uses_float) {                                       \
       ctx.fpscr.disableFlushMode();                         \
     }                                                       \
-    ds::name(base, ctx.r3.u32, ctx.r4.u32);                 \
+    ds::name(ctx.r3.u32, ctx.r4.u32);                 \
   }
 
 ITC_DEVICE_STATE_SETTER(822A18D8, SetZEnable, false)
@@ -136,7 +136,7 @@ ITC_DEVICE_STATE_SETTER(822A2A50, SetPresentImmediateThreshold, false)
     if (uses_float) {                                         \
       ctx.fpscr.disableFlushMode();                           \
     }                                                         \
-    ds::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);       \
+    ds::name(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);       \
   }
 
 ITC_DEVICE_SAMPLER_SETTER(822A31A0, SetAddressU, false)
@@ -161,7 +161,7 @@ ITC_DEVICE_SAMPLER_SETTER(822A3398, SetWhiteBorderColorW, false)
 ITC_DEVICE_SAMPLER_SETTER(822A33F0, SetPointBorderEnable, false)
 
 ITC_NATIVE_ENTRY(822A2470, ITC_FLAG(native_device_state)) {
-  ctx.r3.u64 = ds::GetViewportEnable(base, ctx.r3.u32);
+  ctx.r3.u64 = ds::GetViewportEnable(ctx.r3.u32);
 }
 
 // The bound objects and the shader constants: the original runs where the
@@ -173,34 +173,34 @@ ITC_NATIVE_ENTRY(822A2470, ITC_FLAG(native_device_state)) {
   }
 
 ITC_DEVICE_STATE_CALL(822A3740, {
-  if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c822A3740(ctx, base);
+  if (!ds::GetViewport(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c822A3740(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r4.u32;  // memcpy's: the destination
 })
 ITC_DEVICE_STATE_CALL(822A3758, {
-  if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  if (!ds::SetStreamSource(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                            ctx.r8.u64)) {
-    lifted::original::c822A3758(ctx, base);
+    lifted::original::c822A3758(ctx);
   }
 })
 ITC_DEVICE_STATE_CALL(822A3908, {
-  if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c822A3908(ctx, base);
+  if (!ds::SetIndices(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c822A3908(ctx);
   }
 })
 ITC_DEVICE_STATE_CALL(822A6008, {
-  if (!ds::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
-    lifted::original::c822A6008(ctx, base);
+  if (!ds::SetTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
+    lifted::original::c822A6008(ctx);
   }
 })
-ITC_DEVICE_STATE_CALL(822A3B30, ds::SetBlendControl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_DEVICE_STATE_CALL(822A81F8, ds::SetVertexShaderConstantF(base, ctx.r3.u32, ctx.r4.u32,
+ITC_DEVICE_STATE_CALL(822A3B30, ds::SetBlendControl(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_DEVICE_STATE_CALL(822A81F8, ds::SetVertexShaderConstantF(ctx.r3.u32, ctx.r4.u32,
                                                              ctx.r5.u32, ctx.r6.u32, ctx.r7.u64))
-ITC_DEVICE_STATE_CALL(822A8308, ds::SetPixelShaderConstantF(base, ctx.r3.u32, ctx.r4.u32,
+ITC_DEVICE_STATE_CALL(822A8308, ds::SetPixelShaderConstantF(ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r6.u32, ctx.r7.u64))
-ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ctx.r4.u32,
+ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r6.u32))
 // VertexDeclaration::FromFvf (sub_822A6A88) has no adapter: its only caller
 // is Device::SetFVF, whose plain C++ calls it.
@@ -217,15 +217,15 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ct
 ITC_NATIVE_ENTRY_ALWAYS(822A0F80) {
   
   if (!ITC_FLAG(native_device_state)) {
-    lifted::original::c822A0F80(ctx, base);
+    lifted::original::c822A0F80(ctx);
   }
 }
 
-ITC_DEVICE_STATE_CALL(822A3450, ds::SetScissorRect(base, ctx.r3.u32, ctx.r4.u32))
-ITC_DEVICE_STATE_CALL(822A3D20, ds::SetScissorTestEnable(base, ctx.r3.u32, ctx.r4.u32))
+ITC_DEVICE_STATE_CALL(822A3450, ds::SetScissorRect(ctx.r3.u32, ctx.r4.u32))
+ITC_DEVICE_STATE_CALL(822A3D20, ds::SetScissorTestEnable(ctx.r3.u32, ctx.r4.u32))
 ITC_DEVICE_STATE_CALL(822A3518, {
   ctx.fpscr.disableFlushMode();
-  ds::SetViewport(base, ctx.r3.u32, ctx.r4.u32);
+  ds::SetViewport(ctx.r3.u32, ctx.r4.u32);
 })
 // SetRenderTarget_External and SetDepthStencilSurface: the originals leave a
 // temporary in r3, which none of their callers read; these leave the device.
@@ -235,11 +235,11 @@ ITC_DEVICE_STATE_CALL(822A3518, {
 // override, src/hooks/graphics_device.cpp).
 ITC_DEVICE_STATE_CALL(822A4340, {
   ctx.fpscr.disableFlushMode();
-  ds::SetRenderTargetExternal(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ds::SetRenderTargetExternal(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 })
 ITC_DEVICE_STATE_CALL(822A4060, {
   ctx.fpscr.disableFlushMode();
-  ds::SetDepthStencilSurface(base, ctx.r3.u32, ctx.r4.u32);
+  ds::SetDepthStencilSurface(ctx.r3.u32, ctx.r4.u32);
 })
 
 // --- The packet writers (their packets left out, src/graphics/device_state.h) ---
@@ -257,15 +257,15 @@ ITC_DEVICE_STATE_CALL(822A4060, {
 // SetScreenScissor dropped; Device::Swap returns it).
 ITC_DEVICE_STATE_CALL(822A3B90, {
   const uint32_t device = ctx.r3.u32;
-  ds::DirtyAllState(base, device, ctx.r4.u32);
+  ds::DirtyAllState(device, ctx.r4.u32);
   ctx.r3.u64 = device;
 })
 
 ITC_DEVICE_STATE_CALL(822A8A60, {
   const uint32_t device = ctx.r3.u32, vertex = ctx.r5.u32, pixel = ctx.r6.u32;
-  guest_call::InFrame(ctx, base, 112, 0x822A8AF4, [&](uint32_t) {
-    ds::SetShaderGprAllocation(base, device, vertex, pixel,
-                               hooks::DeviceStateCalls(ctx, base, device));
+  guest_call::InFrame(ctx, 112, 0x822A8AF4, [&](uint32_t) {
+    ds::SetShaderGprAllocation(device, vertex, pixel,
+                               hooks::DeviceStateCalls(ctx, device));
   });
 })
 

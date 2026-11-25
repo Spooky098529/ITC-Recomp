@@ -15,12 +15,12 @@
 namespace debug {
 
 // Main thread, as a main loop pass is about to start (after the frame wait).
-void FrameStateDiff_OnPassStart(uint8_t* base, bool render_only);
+void FrameStateDiff_OnPassStart(bool render_only);
 
 // Main thread, around a tick handler (by its target) or a delivered message
 // (by its id), on render-only passes.
-void FrameStateDiff_Before(uint8_t* base);
-void FrameStateDiff_After(uint8_t* base, const char* kind, uint32_t id);
+void FrameStateDiff_Before();
+void FrameStateDiff_After(const char* kind, uint32_t id);
 
 // Watches a guest word from now on, logging every change with its values.
 void FrameStateDiff_Watch(uint32_t address);
@@ -33,11 +33,11 @@ bool IsHidden(uint32_t function);
 // --debug_hide names it, else the work between FrameStateDiff_Before and
 // After. Native callers of Vec4::Transform call this instead of the plain
 // C++ alone.
-void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v);
+void Vec4Transform(uint32_t out, uint32_t m, uint32_t v);
 
 // --watch_lights (with --find_per_frame_state): watches the first two
 // lights' words of a light list Billboards::Record (sub_8209CC38) draws, the
 // first 64 lists seen. Called by its wrap and by its native callers.
-void WatchLights(uint8_t* base, uint32_t list);
+void WatchLights(uint32_t list);
 
 }  // namespace debug

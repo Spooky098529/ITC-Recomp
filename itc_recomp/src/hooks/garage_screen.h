@@ -14,96 +14,96 @@ namespace hooks {
 // The movie 5 helpers (SetCarRow r3 a row node and r4 a garage car;
 // SetPrompts r3 to r8; SetHelpLine r3 a string id; the others no
 // arguments).
-void GarageScreenSetCarRow(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenFillRows(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetPrompts(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetHelpLine(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpLists(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenSetCarRow(lifted::Regs& ctx);
+void GarageScreenFillRows(lifted::Regs& ctx);
+void GarageScreenSetPrompts(lifted::Regs& ctx);
+void GarageScreenSetHelpLine(lifted::Regs& ctx);
+void GarageScreenSetUpLists(lifted::Regs& ctx);
 // The transitions seen in play (r3 the started word's address).
-void GarageScreenTransition0(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition1(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition3(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenTransition0(lifted::Regs& ctx);
+void GarageScreenTransition1(lifted::Regs& ctx);
+void GarageScreenTransition3(lifted::Regs& ctx);
 // The pages seen in play (r3 the mode).
-void GarageScreenCarListPage(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenLeavePage(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenCarListPage(lifted::Regs& ctx);
+void GarageScreenLeavePage(lifted::Regs& ctx);
 // UpdatePage and Update (r3 the machine, r4 the mode).
-void GarageScreenUpdatePage(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenUpdate(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenUpdatePage(lifted::Regs& ctx);
+void GarageScreenUpdate(lifted::Regs& ctx);
 // The machine's handlers (r3 the machine and r4 the mode where read;
 // ReadSave, SetHeader, Start and Destroy no arguments).
-void GarageScreenCreate(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOpenMovie(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenWaitForLoad(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenReadSave(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetHeader(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenStart(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenUnload(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenClose(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenDestroy(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenCreate(lifted::Regs& ctx);
+void GarageScreenOpenMovie(lifted::Regs& ctx);
+void GarageScreenWaitForLoad(lifted::Regs& ctx);
+void GarageScreenReadSave(lifted::Regs& ctx);
+void GarageScreenSetHeader(lifted::Regs& ctx);
+void GarageScreenStart(lifted::Regs& ctx);
+void GarageScreenUnload(lifted::Regs& ctx);
+void GarageScreenClose(lifted::Regs& ctx);
+void GarageScreenDestroy(lifted::Regs& ctx);
 // The texts, markers and stand helpers never seen in play
 // (SetScrollArrows r3 the scroll, r4 the count; the markers r3 the index;
 // ShowSpecTexts r3 a record; ShowCarNames r3 an id, r4 a maker;
 // CopyGarageCar r3 out, r4 a garage, r5 an index; CarValue and SalePrice
 // r3 a car; the others no arguments).
-void GarageScreenSetScrollArrows(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetActionMarker(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetOptionMarker(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenShowSpecTexts(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenShowCarNames(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetPlateQuestion(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenCopyGarageCar(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenShowBusy(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenHideBusy(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenHideBusyNow(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenResetStand(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpView(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenToggleTurn(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenToggleDoors(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenToggleDoors2(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTurnLeft(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTurnRight(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenCarValue(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSalePrice(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenSetScrollArrows(lifted::Regs& ctx);
+void GarageScreenSetActionMarker(lifted::Regs& ctx);
+void GarageScreenSetOptionMarker(lifted::Regs& ctx);
+void GarageScreenShowSpecTexts(lifted::Regs& ctx);
+void GarageScreenShowCarNames(lifted::Regs& ctx);
+void GarageScreenSetPlateQuestion(lifted::Regs& ctx);
+void GarageScreenCopyGarageCar(lifted::Regs& ctx);
+void GarageScreenShowBusy(lifted::Regs& ctx);
+void GarageScreenHideBusy(lifted::Regs& ctx);
+void GarageScreenHideBusyNow(lifted::Regs& ctx);
+void GarageScreenResetStand(lifted::Regs& ctx);
+void GarageScreenSetUpView(lifted::Regs& ctx);
+void GarageScreenToggleTurn(lifted::Regs& ctx);
+void GarageScreenToggleDoors(lifted::Regs& ctx);
+void GarageScreenToggleDoors2(lifted::Regs& ctx);
+void GarageScreenTurnLeft(lifted::Regs& ctx);
+void GarageScreenTurnRight(lifted::Regs& ctx);
+void GarageScreenCarValue(lifted::Regs& ctx);
+void GarageScreenSalePrice(lifted::Regs& ctx);
 // The car objects never seen in play (r3 a garage car but ReloadStandCar,
 // PutCarOnStand and the cameras: no arguments).
-void GarageScreenReloadStandCar(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenPutCarOnStand(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenShowCarSpecs(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUseQuestion(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetSaleQuestion(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpPlateEditor(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpSpecSheet(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenCameraA(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenCameraB(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenReloadStandCar(lifted::Regs& ctx);
+void GarageScreenPutCarOnStand(lifted::Regs& ctx);
+void GarageScreenShowCarSpecs(lifted::Regs& ctx);
+void GarageScreenSetUseQuestion(lifted::Regs& ctx);
+void GarageScreenSetSaleQuestion(lifted::Regs& ctx);
+void GarageScreenSetUpPlateEditor(lifted::Regs& ctx);
+void GarageScreenSetUpSpecSheet(lifted::Regs& ctx);
+void GarageScreenCameraA(lifted::Regs& ctx);
+void GarageScreenCameraB(lifted::Regs& ctx);
 // The transitions never seen in play (r3 the started word) and the
 // actions' and options' set-ups (no arguments).
-void GarageScreenTransition2(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition4(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition5(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition6(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition7(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition8(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition9(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition10(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition12(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition13(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition14(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition16(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenTransition17(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpActions(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenSetUpOptions(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenTransition2(lifted::Regs& ctx);
+void GarageScreenTransition4(lifted::Regs& ctx);
+void GarageScreenTransition5(lifted::Regs& ctx);
+void GarageScreenTransition6(lifted::Regs& ctx);
+void GarageScreenTransition7(lifted::Regs& ctx);
+void GarageScreenTransition8(lifted::Regs& ctx);
+void GarageScreenTransition9(lifted::Regs& ctx);
+void GarageScreenTransition10(lifted::Regs& ctx);
+void GarageScreenTransition12(lifted::Regs& ctx);
+void GarageScreenTransition13(lifted::Regs& ctx);
+void GarageScreenTransition14(lifted::Regs& ctx);
+void GarageScreenTransition16(lifted::Regs& ctx);
+void GarageScreenTransition17(lifted::Regs& ctx);
+void GarageScreenSetUpActions(lifted::Regs& ctx);
+void GarageScreenSetUpOptions(lifted::Regs& ctx);
 // The pages never seen in play (r3 the mode) and the reply handlers (r3
 // the machine, r4 the mode).
-void GarageScreenActionsPage(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenViewPage(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenViewOptionsPage(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnSpecSheetClosed(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnPlateCancelled(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnPlateDone(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnPlateEditorLeft(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnNo(lifted::Regs& ctx, uint8_t* base);
-void GarageScreenOnDialogDone(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenActionsPage(lifted::Regs& ctx);
+void GarageScreenViewPage(lifted::Regs& ctx);
+void GarageScreenViewOptionsPage(lifted::Regs& ctx);
+void GarageScreenOnSpecSheetClosed(lifted::Regs& ctx);
+void GarageScreenOnPlateCancelled(lifted::Regs& ctx);
+void GarageScreenOnPlateDone(lifted::Regs& ctx);
+void GarageScreenOnPlateEditorLeft(lifted::Regs& ctx);
+void GarageScreenOnNo(lifted::Regs& ctx);
+void GarageScreenOnDialogDone(lifted::Regs& ctx);
 // InitStates (r3 the machine).
-void GarageScreenInitStates(lifted::Regs& ctx, uint8_t* base);
+void GarageScreenInitStates(lifted::Regs& ctx);
 
 }  // namespace hooks

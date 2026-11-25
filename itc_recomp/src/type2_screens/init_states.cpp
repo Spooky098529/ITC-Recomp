@@ -38,10 +38,10 @@ struct Step {
 #include "type2_screens/init_tables.h"
 
 template <size_t N>
-uint32_t RunSteps(uint8_t* base, const Step (&steps)[N], uint32_t machine, uint32_t frame,
+uint32_t RunSteps(const Step (&steps)[N], uint32_t machine, uint32_t frame,
                   uint32_t bytes, bool* replaced) {
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kObject:
@@ -51,19 +51,19 @@ uint32_t RunSteps(uint8_t* base, const Step (&steps)[N], uint32_t machine, uint3
     }
     return frame + v.value;
   };
-  guest::StoreU32(base, frame, frame + bytes);
+  guest::StoreU32(frame, frame + bytes);
   uint32_t r3 = machine;
   *replaced = false;
   for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, at(step.c), at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(at(step.c), at(step.a), at(step.b), replaced);
         break;
     }
   }
@@ -72,24 +72,24 @@ uint32_t RunSteps(uint8_t* base, const Step (&steps)[N], uint32_t machine, uint3
 
 }  // namespace
 
-uint32_t HubInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t HubInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82190B18 Type2Hub::InitStates");
-  return RunSteps(base, k82190B18, machine, frame, kHubInitFrame, replaced);
+  return RunSteps(k82190B18, machine, frame, kHubInitFrame, replaced);
 }
 
-uint32_t SheetInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t SheetInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_821B90D8 PowerGraphScreen2::InitStates");
-  return RunSteps(base, k821B90D8, machine, frame, kSheetInitFrame, replaced);
+  return RunSteps(k821B90D8, machine, frame, kSheetInitFrame, replaced);
 }
 
-uint32_t BuildInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t BuildInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_821A16C0 BuildScreen::InitStates");
-  return RunSteps(base, k821A16C0, machine, frame, kBuildInitFrame, replaced);
+  return RunSteps(k821A16C0, machine, frame, kBuildInitFrame, replaced);
 }
 
-uint32_t PlateInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t PlateInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8219B2E8 PlateEditor::InitStates");
-  return RunSteps(base, k8219B2E8, machine, frame, kPlateInitFrame, replaced);
+  return RunSteps(k8219B2E8, machine, frame, kPlateInitFrame, replaced);
 }
 
 }  // namespace type2_screens

@@ -45,13 +45,13 @@ constexpr uint32_t kIndices8 = G::alpha_indices_8_address();
 
 }  // namespace
 
-void FitAlphaEndpoints(uint8_t* base, const float values[16], uint32_t steps, float* low,
+void FitAlphaEndpoints(const float values[16], uint32_t steps, float* low,
                        float* high) {
   ITC_NATIVE_RUNNING("sub_824207D8 DxtAlpha::FitEndpoints");
   const uint32_t low_weights = steps == 6 ? kLowWeights6 : kLowWeights8;     // r7
   const uint32_t high_weights = steps == 6 ? kHighWeights6 : kHighWeights8;  // r29
-  const double one = Lfs(base, kOne);    // f30
-  const double zero = Lfs(base, kZero);  // f4
+  const double one = Lfs(kOne);    // f30
+  const double zero = Lfs(kZero);  // f4
   double lo = one;                       // f7
   double hi = zero;                      // f6
   if (steps == 8) {
@@ -80,10 +80,10 @@ void FitAlphaEndpoints(uint8_t* base, const float values[16], uint32_t steps, fl
   }
 
   const uint32_t last = steps - 1;                       // r31
-  const double gradient_min = Lfs(base, kGradientMin);   // f1
+  const double gradient_min = Lfs(kGradientMin);   // f1
   const double last_f = IntToSingle(int64_t(last));      // f31
-  const double half = Lfs(base, kHalf);                  // f3
-  const double range_min = Lfs(base, kRangeMin);         // f2
+  const double half = Lfs(kHalf);                  // f3
+  const double range_min = Lfs(kRangeMin);         // f2
   double points[8] = {};  // the steps' values (the original's r1 - 80)
   for (uint32_t pass = 0; pass < 8; pass++) {
     const double range = Fsubs(hi, lo);
@@ -92,8 +92,8 @@ void FitAlphaEndpoints(uint8_t* base, const float values[16], uint32_t steps, fl
     }
     const double scale = Fdivs(last_f, range);  // f5
     for (uint32_t k = 0; k < steps; k++) {
-      const double l = Fmuls(Lfs(base, low_weights + 4 * k), lo);
-      points[k] = double(float(Fmadds(Lfs(base, high_weights + 4 * k), hi, l)));
+      const double l = Fmuls(Lfs(low_weights + 4 * k), lo);
+      points[k] = double(float(Fmadds(Lfs(high_weights + 4 * k), hi, l)));
     }
     double low_sq = zero;   // f11
     double high_sq = zero;  // f10
@@ -119,11 +119,11 @@ void FitAlphaEndpoints(uint8_t* base, const float values[16], uint32_t steps, fl
       if (!(index < steps)) {
         continue;
       }
-      const double lw = Lfs(base, (index << 2) + low_weights);
+      const double lw = Lfs((index << 2) + low_weights);
       const double point = points[index];
       low_sq = Fmadds(lw, lw, low_sq);
       const double d = Fsubs(v, point);
-      const double hw = Lfs(base, (index << 2) + high_weights);
+      const double hw = Lfs((index << 2) + high_weights);
       high_sq = Fmadds(hw, hw, high_sq);
       low_err = Fmadds(lw, d, low_err);
       high_err = Fmadds(hw, d, high_err);
@@ -172,15 +172,15 @@ void Diffuse(float err[16], uint32_t i, double e, double right, double below_lef
 
 }  // namespace
 
-void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uint8_t block[8]) {
+void EncodeAlphaBlock(const float alphas[16], int32_t dither, uint8_t block[8]) {
   ITC_NATIVE_RUNNING("sub_82422178 DxtAlpha::EncodeBlock");
-  const double w_below_right = Lfs(base, kWeightBelowRight);  // f23
-  const double w_below = Lfs(base, kWeightBelow);             // f24
-  const double w_below_left = Lfs(base, kWeightBelowLeft);    // f25
-  const double w_right = Lfs(base, kWeightRight);             // f26
-  const double inv255 = Lfs(base, kInv255);                   // f30
-  const double half = Lfs(base, kHalf);                       // f29
-  const double scale255 = Lfs(base, k255);                    // f31
+  const double w_below_right = Lfs(kWeightBelowRight);  // f23
+  const double w_below = Lfs(kWeightBelow);             // f24
+  const double w_below_left = Lfs(kWeightBelowLeft);    // f25
+  const double w_right = Lfs(kWeightRight);             // f26
+  const double inv255 = Lfs(kInv255);                   // f30
+  const double half = Lfs(kHalf);                       // f29
+  const double scale255 = Lfs(k255);                    // f31
 
   // The alphas rounded to 1/255 steps (with the error carried when
   // dithering), and their range; both ends start at the first raw alpha.
@@ -206,7 +206,7 @@ void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uin
     }
   }
 
-  const double one = Lfs(base, kOne);  // f27
+  const double one = Lfs(kOne);  // f27
   auto solid = [&](uint8_t first, uint8_t second) {
     block[1] = second;
     block[0] = first;
@@ -216,12 +216,12 @@ void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uin
     solid(255, 255);
     return;
   }
-  const double zero = Lfs(base, kZero);  // f28
+  const double zero = Lfs(kZero);  // f28
   const uint32_t steps = (mn == zero || mx == one) ? 6 : 8;
 
   float lo_fit;
   float hi_fit;
-  FitAlphaEndpoints(base, quantized, steps, &lo_fit, &hi_fit);
+  FitAlphaEndpoints(quantized, steps, &lo_fit, &hi_fit);
   const uint32_t lo_byte = uint32_t(Fctiwz(Fmadds(lo_fit, scale255, half))) & 0xFF;
   const uint32_t hi_byte = uint32_t(Fctiwz(Fmadds(hi_fit, scale255, half))) & 0xFF;
   const double lo_value = Fmuls(IntToSingle(int32_t(lo_byte)), inv255);
@@ -240,7 +240,7 @@ void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uin
     palette[1] = float(lo_value);
     palette[0] = float(hi_value);
     block[0] = uint8_t(hi_byte);
-    const double inv7 = Lfs(base, kInv7);
+    const double inv7 = Lfs(kInv7);
     for (uint32_t k = 1; k < 7; k++) {
       const double h = Fmuls(IntToSingle(int64_t(k)), double(palette[1]));
       const double p = Fmadds(IntToSingle(int64_t(7 - k)), double(palette[0]), h);
@@ -252,7 +252,7 @@ void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uin
     palette[0] = float(lo_value);
     palette[1] = float(hi_value);
     block[1] = uint8_t(hi_byte);
-    const double inv5 = Lfs(base, kInv5);
+    const double inv5 = Lfs(kInv5);
     for (uint32_t k = 1; k < 5; k++) {
       const double h = Fmuls(IntToSingle(int64_t(k)), double(palette[1]));
       const double p = Fmadds(IntToSingle(int64_t(5 - k)), double(palette[0]), h);
@@ -287,7 +287,7 @@ void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uin
         index = (steps == 6 && !(a < Fmuls(Fadds(second, one), half))) ? 7 : 1;
       } else {
         const int32_t n = Fctiwz(Fadds(t, half));
-        index = guest::LoadU32(base, (uint32_t(n) << 2) + indices);
+        index = guest::LoadU32((uint32_t(n) << 2) + indices);
       }
       bits = (index << 21) | (bits >> 3);
       if (dither != 0) {

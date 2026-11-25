@@ -16,7 +16,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82295020) {
   uint32_t bytes;
   const uint32_t result = user::Name(ctx.r3.u32, ctx.r5.u32, name, &bytes);
   for (uint32_t i = 0; i < bytes; i++) {
-    guest::StoreU8(base, ctx.r4.u32 + i, uint8_t(name[i]));
+    guest::StoreU8(ctx.r4.u32 + i, uint8_t(name[i]));
   }
   ctx.r3.u64 = result;
 }
@@ -37,8 +37,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82295268) {
   }
   uint64_t xuid;
   const uint32_t result = user::Xuid(ctx.r3.u32, &xuid);
-  guest::StoreU32(base, out, uint32_t(xuid >> 32));
-  guest::StoreU32(base, out + 4, uint32_t(xuid));
+  guest::StoreU32(out, uint32_t(xuid >> 32));
+  guest::StoreU32(out + 4, uint32_t(xuid));
   ctx.r3.u64 = result;
 }
 
@@ -62,6 +62,6 @@ ITC_NATIVE_ENTRY_ALWAYS(822952C0) {
 // then read; the same here.
 ITC_NATIVE_ENTRY_ALWAYS(82294F70) {
   
-  last_error::Set(base, ctx.r13.u32, 0);
+  last_error::Set(ctx.r13.u32, 0);
   ctx.r3.u64 = 0;
 }

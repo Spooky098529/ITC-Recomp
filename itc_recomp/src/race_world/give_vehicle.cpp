@@ -40,65 +40,65 @@ constexpr uint32_t kRecordBytes = 3936;
 
 }  // namespace
 
-uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager, uint32_t entry) {
+uint64_t GiveVehicle(uint32_t sp, uint64_t r13, uint32_t manager, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_821706E8 RaceManager::GiveVehicle");
-  const uint32_t frame = lifted_call::PushFrame(base, sp, 176);
+  const uint32_t frame = lifted_call::PushFrame(sp, 176);
   auto call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                   std::initializer_list<double> floats = {}) {
-    return lifted_call::CallFloats(base, function, frame, r13, args, floats).r3;
+    return lifted_call::CallFloats(function, frame, r13, args, floats).r3;
   };
   uint32_t index = 0;
   for (;; index++) {
     if (index >= 7) {
       return 0;
     }
-    const int32_t slot = int32_t(guest::LoadU32(base, schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index));
+    const int32_t slot = int32_t(guest::LoadU32(schema::RaceManager(manager).vehicle_slots_address() + 4 * index));
     if (slot == 0 || slot == -1) {
       break;
     }
   }
-  const schema::MinimapRacerEntry e(base, entry);
+  const schema::MinimapRacerEntry e(entry);
   e.set_vehicle_index(index);
   const uint32_t vehicle = uint32_t(call(kVehicleGet, {index}));
-  const schema::Vehicle v(base, vehicle);
-  const uint32_t slot = schema::RaceManager(base, manager).vehicle_slots_address() + 4 * index;
+  const schema::Vehicle v(vehicle);
+  const uint32_t slot = schema::RaceManager(manager).vehicle_slots_address() + 4 * index;
   const uint32_t record =
-      schema::RaceData(base, guest::LoadU32(base, kRaceData)).racer_records_address() +
+      schema::RaceData(guest::LoadU32(kRaceData)).racer_records_address() +
       e.record() * kRecordBytes;
-  call(int32_t(guest::LoadU32(base, slot)) == -1 ? kResetForCar : kVehicleSetUp,
+  call(int32_t(guest::LoadU32(slot)) == -1 ? kResetForCar : kVehicleSetUp,
        {vehicle, record});
   // Placed at the entry's route position with the start speed, or with flag
   // 0x10 at the record's +3904 with its +3908 (at rest when that's 0.0).
-  const double zero = double(guest::LoadFloat(base, kZero));
+  const double zero = double(guest::LoadFloat(kZero));
   double speed;
   if ((e.flags() & 0x10) != 0) {
-    const schema::Car car(base, record);
-    guest::StoreU32(base, frame + 80, car.start_position());
+    const schema::Car car(record);
+    guest::StoreU32(frame + 80, car.start_position());
     speed = double(car.start_float());
     if (speed == zero) {
       v.set_forced_rest(1);
     }
   } else {
-    guest::StoreU32(base, frame + 80, e.position());
-    speed = double(guest::LoadFloat(base, kPlaceSpeed));
+    guest::StoreU32(frame + 80, e.position());
+    speed = double(guest::LoadFloat(kPlaceSpeed));
   }
   call(kPlaceOnRoute, {vehicle, frame + 80, 0, 0, 1}, {speed, zero});
   // The vehicle's input record cleared on the frame and copied to its
   // pointer's five words.
   call(kInputRecordClear, {frame + 96});
   const uint32_t to =
-      guest::LoadU32(base, kInputRecords + 4 * (e.vehicle_index() & 0xFF));
+      guest::LoadU32(kInputRecords + 4 * (e.vehicle_index() & 0xFF));
   // A host record (E5 step 4) is copied with each field swapped.
-  if (!memory::CopyWithHandles(base, to, frame + 96, 20)) {
+  if (!memory::CopyWithHandles(to, frame + 96, 20)) {
     for (uint32_t k = 0; k < 20; k += 4) {
-      guest::StoreU32(base, to + k, guest::LoadU32(base, frame + 96 + k));
+      guest::StoreU32(to + k, guest::LoadU32(frame + 96 + k));
     }
   }
   call(kBodySetUp, {v.status_address(), vehicle});
-  call(kPhysicsStep, {vehicle}, {double(guest::LoadFloat(base, kStepTime))});
+  call(kPhysicsStep, {vehicle}, {double(guest::LoadFloat(kStepTime))});
   call(kStatusUpdate, {v.status_address(), vehicle, 0, 1});
   e.set_flags(e.flags() | 0x240);
-  guest::StoreU32(base, slot, 1);
+  guest::StoreU32(slot, 1);
   return 1;
 }
 

@@ -55,7 +55,7 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                        \
     \
     if (!ITC_FLAG(native_collision_world) || !hooks::NativeHeapActive()) {     \
-      lifted::original::c##address(ctx, base);                           \
+      lifted::original::c##address(ctx);                           \
       return;                                                                 \
     }                                                                         \
     body;                                                                     \
@@ -66,39 +66,39 @@ using namespace track_collision;
 // --- The world's owner ---
 
 ITC_COLLISION_WORLD(8228F090, ctx.r3.u64 = TimesThreePlus(ctx.r3.u32, ctx.r4.u32))
-ITC_COLLISION_WORLD(821705F8, ctx.r3.u64 = RaceRacerCount(base))
-ITC_COLLISION_WORLD(820FEFF8, ctx.r3.u64 = RacersCarsCollide(base, ctx.r3.u32))
-ITC_COLLISION_WORLD(820FEAF8, ctx.r3.u64 = TrackCollisionResetWorld(base))
+ITC_COLLISION_WORLD(821705F8, ctx.r3.u64 = RaceRacerCount())
+ITC_COLLISION_WORLD(820FEFF8, ctx.r3.u64 = RacersCarsCollide(ctx.r3.u32))
+ITC_COLLISION_WORLD(820FEAF8, ctx.r3.u64 = TrackCollisionResetWorld())
 // No arguments; r3 not kept (no caller reads it). The update's guest calls
 // as its adapter's.
-ITC_COLLISION_WORLD(820FF050, TrackCollisionTick(base, ctx.r1.u32 - 144,
-                                                 hooks::CollisionWorldUpdateCalls(ctx, base)))
+ITC_COLLISION_WORLD(820FF050, TrackCollisionTick(ctx.r1.u32 - 144,
+                                                 hooks::CollisionWorldUpdateCalls(ctx)))
 
 // --- The mesh's and the route's lifetime ---
 
 // TrackMesh::InitScratch (sub_820F6898) has no adapter: its only caller,
 // TrackMesh::Prepare, is native.
-ITC_COLLISION_WORLD_PAGES(820F68E8, ctx.r3.u64 = TrackMeshPrepare(base, ctx.r3.u32))
+ITC_COLLISION_WORLD_PAGES(820F68E8, ctx.r3.u64 = TrackMeshPrepare(ctx.r3.u32))
 // A block that isn't the layer's: the original.
 ITC_COLLISION_WORLD_PAGES(820F6940, uint32_t r3 = 0;
-                          if (!TrackMeshFree(base, ctx.r3.u32, &r3)) {
-                            lifted::original::c820F6940(ctx, base);
+                          if (!TrackMeshFree(ctx.r3.u32, &r3)) {
+                            lifted::original::c820F6940(ctx);
                             return;
                           } ctx.r3.u64 = r3)
-ITC_COLLISION_WORLD(820F8600, TrackRoutePrepare(base, ctx.r3.u32))
+ITC_COLLISION_WORLD(820F8600, TrackRoutePrepare(ctx.r3.u32))
 ITC_COLLISION_WORLD_PAGES(820F8618, uint32_t r3 = 0;
-                          if (!TrackRouteFree(base, ctx.r3.u32, &r3)) {
-                            lifted::original::c820F8618(ctx, base);
+                          if (!TrackRouteFree(ctx.r3.u32, &r3)) {
+                            lifted::original::c820F8618(ctx);
                             return;
                           } ctx.r3.u64 = r3)
 // No arguments; r3 isn't kept (its caller doesn't read it). A block to free
 // that isn't the layer's: the original.
-ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload(base)) {
-  lifted::original::c820FEFB0(ctx, base);
+ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload()) {
+  lifted::original::c820FEFB0(ctx);
   return;
 })
 // Archive::Load's callback: r6 = the mesh.
-ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
+ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(ctx.r6.u32))
 
 // --- The mesh's lookups ---
 
@@ -116,7 +116,7 @@ ITC_COLLISION_WORLD(820F69B0, TrackMeshOnLoaded(base, ctx.r6.u32))
 // play, GroundCallback and GroundHits, are native.
 // The collision world's +8 (CollisionWorld::Callback).
 ITC_COLLISION_WORLD(820FEAB0,
-                    ctx.r3.u64 = TrackCollisionGroundCallback(base, ctx.r3.u32, ctx.r4.u32,
+                    ctx.r3.u64 = TrackCollisionGroundCallback(ctx.r3.u32, ctx.r4.u32,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
 // The collision world's second query: r3 = the hit records, r4 = the shape
 // (r5 not read). A shape that isn't a box: the original.
@@ -127,8 +127,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820FEBD0) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
-      !TrackCollisionGroundHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
-    lifted::original::c820FEBD0(ctx, base);
+      !TrackCollisionGroundHits(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
+    lifted::original::c820FEBD0(ctx);
     return;
   }
   ctx.r3.u64 = count;
@@ -146,14 +146,14 @@ ITC_NATIVE_ENTRY_ALWAYS(820FEBD0) {
 // r3 left as it came (no caller reads it). They call the course's route's
 // Follow and Point (src/track_route/) natively whatever --native_track_route
 // says.
-ITC_COLLISION_WORLD(820F8470, TrackPositionUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144))
-ITC_COLLISION_WORLD(820F8578, TrackPositionInit(base, ctx.r3.u32, ctx.r1.u32 - 128))
+ITC_COLLISION_WORLD(820F8470, TrackPositionUpdate(ctx.r3.u32, ctx.r1.u32 - 144))
+ITC_COLLISION_WORLD(820F8578, TrackPositionInit(ctx.r3.u32, ctx.r1.u32 - 128))
 
 // --- The route ---
 
 // Archive::Load's callback: r6 = the route; r3 comes back as 12 (the
 // original's count of route bits).
-ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 = 12)
+ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(ctx.r6.u32); ctx.r3.u64 = 12)
 
 // --- The wall query ---
 
@@ -173,8 +173,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820FF1B0) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
-      !TrackCollisionWallHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1584, &count)) {
-    lifted::original::c820FF1B0(ctx, base);
+      !TrackCollisionWallHits(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1584, &count)) {
+    lifted::original::c820FF1B0(ctx);
     return;
   }
   ctx.r3.u64 = count;

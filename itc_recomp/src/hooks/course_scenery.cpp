@@ -147,7 +147,7 @@ uint32_t CallGuest(void* user, uint32_t function, const uint32_t* args, int coun
   for (int i = 0; i < count; i++) {
     registers[i]->u64 = args[i];
   }
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = saved;
   return ctx.r3.u32;
 }
@@ -155,12 +155,12 @@ uint32_t CallGuest(void* user, uint32_t function, const uint32_t* args, int coun
 // Archive::Load for the pools' loads' plain C++ (Calls::load), or null
 // where they may not run (the flag off, the archive's queue or the heap not
 // native).
-const archive::LoadCall* SceneryLoads(uint8_t* base) {
+const archive::LoadCall* SceneryLoads() {
   if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
     return nullptr;
   }
-  static const archive::LoadCall load = hooks::NativeArchiveLoad(base);
+  static const archive::LoadCall load = hooks::NativeArchiveLoad();
   return &load;
 }
 
@@ -180,10 +180,10 @@ course_scenery::Calls hooks::CourseSceneryCalls(CourseSceneryGuest* guest) {
   return {guest, [](void* user, uint32_t function, const uint32_t* args, int count,
                     uint32_t frame, uint32_t lr) {
             auto* g = static_cast<CourseSceneryGuest*>(user);
-            GuestCalls call{g->ctx, g->base};
+            GuestCalls call{g->ctx};
             return CallGuest(&call, function, args, count, frame, lr);
           },
-          SceneryLoads(guest->base)};
+          SceneryLoads()};
 }
 
 bool hooks::CourseScenerySetUpNative() {
@@ -192,23 +192,23 @@ bool hooks::CourseScenerySetUpNative() {
 
 // The calls the plain C++ makes into code that takes the context.
 #define ITC_SCENERY_CALLS        \
-  GuestCalls call{&ctx, base};   \
-  const Calls calls { &call, CallGuest, SceneryLoads(base) }
+  GuestCalls call{&ctx};   \
+  const Calls calls { &call, CallGuest, SceneryLoads() }
 
 // --- Pool objects: r3 = the object ---
 
 // The vtables' slots stay reached through them: the reset (slot 2 of the
 // base and pool 3's) and the keys (slot 0), r4 = &the size.
-ITC_COURSE_SCENERY(820FB9D8, ResetObject(base, ctx.r3.u32))
+ITC_COURSE_SCENERY(820FB9D8, ResetObject(ctx.r3.u32))
 ITC_COURSE_SCENERY(820FB9F0, uint32_t size = 0;
                    ctx.r3.u64 = PoolObjectKey(ctx.r3.u32, &size);
-                   guest::StoreU32(base, ctx.r4.u32, size))
+                   guest::StoreU32(ctx.r4.u32, size))
 ITC_COURSE_SCENERY(820F1C20, uint32_t size = 0;
                    ctx.r3.u64 = AreaLightsKey(ctx.r3.u32, &size);
-                   guest::StoreU32(base, ctx.r4.u32, size))
+                   guest::StoreU32(ctx.r4.u32, size))
 ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
                    ctx.r3.u64 = AreaModelKey(ctx.r3.u32, &size);
-                   guest::StoreU32(base, ctx.r4.u32, size))
+                   guest::StoreU32(ctx.r4.u32, size))
 
 // --- The pools: r3 = the pool set, r4 = a pool ---
 
@@ -220,20 +220,20 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
 ITC_NATIVE_ENTRY_ALWAYS(820F2F88) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
-    lifted::original::c820F2F88(ctx, base);
+    lifted::original::c820F2F88(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = Create(base);
+  ctx.r3.u64 = Create();
 }
 ITC_NATIVE_ENTRY_ALWAYS(820F3020) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
-    lifted::original::c820F3020(ctx, base);
+    lifted::original::c820F3020(ctx);
     return;
   }
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = Setup(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = Setup(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 // Scenery::Unload: r3 = the manager; r3 as the original leaves it (the
 // manager + 116). From the race scene's sub_8215AA88 and the front end's
@@ -245,22 +245,22 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2B38) {
   if (ITC_FLAG(native_course_scenery)) {
     ITC_SCENERY_CALLS;
     uint32_t r3 = 0;
-    if (Unload(base, calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
+    if (Unload(calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
       ctx.r3.u64 = r3;
       return;
     }
   }
-  lifted::original::c820F2B38(ctx, base);
+  lifted::original::c820F2B38(ctx);
 }
 // Scenery::Destroy: no arguments; r3 = 0. From sub_8215AA88 and the front
 // end's sub_82228548 (recompiled).
 ITC_NATIVE_ENTRY_ALWAYS(820F2AF8) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
-    lifted::original::c820F2AF8(ctx, base);
+    lifted::original::c820F2AF8(ctx);
     return;
   }
-  ctx.r3.u64 = Destroy(base);
+  ctx.r3.u64 = Destroy();
 }
 // Scenery::IsLoaded (sub_820F1F68) has no adapter (B7 loop, 2026-11-12):
 // its callers in play, the race's loading's handlers (CourseSetup::
@@ -268,7 +268,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2AF8) {
 // PollLoad (sub_82229238, --native_location_screen), call its plain C++.
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
-                   ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))
+                   ctx.r3.u64 = StartLoad(calls, ctx.r1.u32, ctx.r3.u32))
 
 // --- What a view sees ---
 
@@ -278,33 +278,33 @@ ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
 // table can reach them), then the plain C++; its guest calls (CameraPass::
 // Update) put flush-to-zero back off after, as the originals' next float
 // instruction does. r3 as the original leaves it; lr put back.
-void hooks::CourseSceneryUpdate(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryUpdate(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   // __savegprlr_18's stores: lr at r1 - 8, r18 to r31 below it (the
   // caller's: not carried by the view, stored as 0); f31 likewise.
-  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
+  guest::StoreU32(ctx.r1.u32 - 8, uint32_t(lr));
   for (uint32_t offset = 16; offset <= 120; offset += 8) {
-    guest::StoreU32(base, ctx.r1.u32 - offset, 0);
-    guest::StoreU32(base, ctx.r1.u32 - offset + 4, 0);
+    guest::StoreU32(ctx.r1.u32 - offset, 0);
+    guest::StoreU32(ctx.r1.u32 - offset + 4, 0);
   }
-  guest::StoreU32(base, ctx.r1.u32 - 128, 0);
-  guest::StoreU32(base, ctx.r1.u32 - 124, 0);
-  GuestCalls call{&ctx, base};
+  guest::StoreU32(ctx.r1.u32 - 128, 0);
+  guest::StoreU32(ctx.r1.u32 - 124, 0);
+  GuestCalls call{&ctx};
   const Calls calls{&call, [](void* user, uint32_t function, const uint32_t* args, int count,
                               uint32_t frame, uint32_t back) {
                       const uint32_t r3 = CallGuest(user, function, args, count, frame, back);
                       static_cast<GuestCalls*>(user)->ctx->fpscr.disableFlushMode();
                       return r3;
                     },
-                    SceneryLoads(base)};
-  ctx.r3.u64 = Update(base, calls, ctx.r1.u32, ctx.r3.u32,
+                    SceneryLoads()};
+  ctx.r3.u64 = Update(calls, ctx.r1.u32, ctx.r3.u32,
                       // (the caller's r25 and r26, saved below by the
                       // callees: not carried by the view)
                       {0, 0, ctx.r3.u64}, hooks::NativeArchiveQueue());
   ctx.lr = lr;
 }
-ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
+ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx))
 
 // AnimationSet::FindByTexture (sub_82146A38) has no adapter (removed
 // 2026-11-13, B7 loop): its only caller in play, LightGroups::Draw, calls
@@ -312,16 +312,16 @@ ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
 // --- The course set's draws ---
 
-void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx) {
   if (hooks::SceneryListsSlotDiagnostics()) {
-    lifted::original::c820F52A8(ctx, base);
+    lifted::original::c820F52A8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  hooks::SceneryDrawGuest guest{ctx, base};
+  hooks::SceneryDrawGuest guest{ctx};
   const scenery_lists::DrawCalls calls = hooks::SceneryListsDrawCalls(&guest);
-  const uint32_t r3 = DrawSetLists(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  const uint32_t r3 = DrawSetLists(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -337,16 +337,16 @@ void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
 // C++, and its adapter is removed, 2026-11-13). The original
 // runs where its callees' plain C++ may not (their flags) or with the
 // command list's diagnostics on (as the car scene's draw).
-void hooks::CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx) {
   if (!ITC_FLAG(native_cameras) || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_vehicle_accessors) || hooks::SceneryListsSlotDiagnostics()) {
-    lifted::original::c820F34C8(ctx, base);
+    lifted::original::c820F34C8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
-  const uint64_t r3 = RecordHeadlightProjectors(base, calls, ctx.r1.u32, ctx.r4.u32);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
+  const uint64_t r3 = RecordHeadlightProjectors(calls, ctx.r1.u32, ctx.r4.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -365,14 +365,14 @@ bool hooks::CourseSceneryDrawAreaNative() {
          hooks::LightGroupsNative() && !hooks::SceneryListsSlotDiagnostics();
 }
 
-void hooks::CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDrawArea(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  hooks::SceneryDrawGuest guest{ctx, base};
+  hooks::SceneryDrawGuest guest{ctx};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
   // (the caller's r28: diagnostic only, not carried)
-  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 0);
+  DrawArea(draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 0);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -388,12 +388,12 @@ bool hooks::CourseSceneryDrawNative() {
   return hooks::CourseSceneryDrawAreaNative();
 }
 
-void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDraw(lifted::Regs& ctx) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  hooks::SceneryDrawGuest guest{ctx, base};
+  hooks::SceneryDrawGuest guest{ctx};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx);
   // A call into our own code from `frame` with the original's return
   // address, r1 put back.
   auto in_frame = [&](uint32_t frame, uint32_t back, auto&& run) {
@@ -412,7 +412,7 @@ void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
   steps.advance = [&](uint32_t frame, uint32_t set) {
     in_frame(frame, 0x820F60B8, [&] {
       ctx.r3.u64 = set;
-      lifted::Enter(ctx, base, game::TextureAnimations::Advance);  // the per-frame logic's wrap
+      lifted::Enter(ctx, game::TextureAnimations::Advance);  // the per-frame logic's wrap
     });
   };
   steps.record_clear = [&](uint32_t frame, uint32_t key, uint32_t flags, uint32_t color,
@@ -423,17 +423,17 @@ void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
       ctx.r5.u64 = flags;
       ctx.r6.u64 = color;
       ctx.r7.u64 = depth;
-      hooks::RecordClear(ctx, base);
+      hooks::RecordClear(ctx);
     });
   };
   steps.minimap = [&](uint32_t frame, uint32_t manager, uint32_t description) {
     in_frame(frame, 0x820F6888, [&] {
       ctx.r3.u64 = manager;
       ctx.r4.u64 = description;
-      lifted::Enter(ctx, base, game::Minimap::Draw);  // the per-frame logic's wrap
+      lifted::Enter(ctx, game::Minimap::Draw);  // the per-frame logic's wrap
     });
   };
-  Draw(base, draws, calls, steps, ctx.r1.u32, ctx.r3.u32);
+  Draw(draws, calls, steps, ctx.r1.u32, ctx.r3.u32);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -454,20 +454,20 @@ bool NativeParses() {
 
 // AreaLights::OnLoaded (Archive::Load's callback): r6 = the area's lights;
 // r3 = them, as PoolObject::MarkLoaded leaves it.
-ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(base, ctx.r1.u32 - 96, ctx.r1.u32);
-                   ctx.r3.u64 = AreaLightsOnLoaded(base, ctx.r6.u32))
+ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(ctx.r1.u32 - 96, ctx.r1.u32);
+                   ctx.r3.u64 = AreaLightsOnLoaded(ctx.r6.u32))
 
 // AreaModel::OnLoaded (Archive::Load's callback): r6 = the area's model; r3
 // = it, as PoolObject::MarkLoaded leaves it.
 ITC_NATIVE_ENTRY_ALWAYS(820F1CE8) {
   
   if (!NativeParses()) {
-    lifted::original::c820F1CE8(ctx, base);
+    lifted::original::c820F1CE8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = AreaModelOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
+  ctx.r3.u64 = AreaModelOnLoaded(calls, ctx.r1.u32, ctx.r6.u32);
 }
 
 // --- The pools' loads (slot 1; no direct callers: ObjectPools::Load calls
@@ -476,32 +476,32 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1CE8) {
 // CourseSet::Load: r3 = the course set; r3 as the original leaves it.
 ITC_NATIVE_ENTRY_ALWAYS(820F2520) {
   
-  const archive::LoadCall* load = SceneryLoads(base);
+  const archive::LoadCall* load = SceneryLoads();
   if (load == nullptr) {
-    lifted::original::c820F2520(ctx, base);
+    lifted::original::c820F2520(ctx);
     return;
   }
-  ctx.r3.u64 = CourseSetLoad(base, ctx.r3.u32, *load);
+  ctx.r3.u64 = CourseSetLoad(ctx.r3.u32, *load);
 }
 // AreaLights::Load and AreaModel::Load: r3 = the object; r3 as the
 // originals leave it.
 ITC_NATIVE_ENTRY_ALWAYS(820F22F8) {
   
-  const archive::LoadCall* load = SceneryLoads(base);
+  const archive::LoadCall* load = SceneryLoads();
   if (load == nullptr) {
-    lifted::original::c820F22F8(ctx, base);
+    lifted::original::c820F22F8(ctx);
     return;
   }
-  ctx.r3.u64 = AreaLightsLoad(base, ctx.r3.u32, *load);
+  ctx.r3.u64 = AreaLightsLoad(ctx.r3.u32, *load);
 }
 ITC_NATIVE_ENTRY_ALWAYS(820F23C0) {
   
-  const archive::LoadCall* load = SceneryLoads(base);
+  const archive::LoadCall* load = SceneryLoads();
   if (load == nullptr) {
-    lifted::original::c820F23C0(ctx, base);
+    lifted::original::c820F23C0(ctx);
     return;
   }
-  ctx.r3.u64 = AreaModelLoad(base, ctx.r3.u32, *load);
+  ctx.r3.u64 = AreaModelLoad(ctx.r3.u32, *load);
 }
 
 // CourseSet::OnLoaded (Archive::Load's callback): r6 = the course set; r3 =
@@ -509,12 +509,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820F23C0) {
 ITC_NATIVE_ENTRY_ALWAYS(820F22B8) {
   
   if (!NativeParses() || !hooks::NativeHeapActive()) {
-    lifted::original::c820F22B8(ctx, base);
+    lifted::original::c820F22B8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = CourseSetOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
+  ctx.r3.u64 = CourseSetOnLoaded(calls, ctx.r1.u32, ctx.r6.u32);
 }
 
 // --- The pools' objects: made and reset (as the parses' condition) ---
@@ -528,12 +528,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820F22B8) {
 ITC_NATIVE_ENTRY_ALWAYS(820F2638) {
   
   if (!NativeParses()) {
-    lifted::original::c820F2638(ctx, base);
+    lifted::original::c820F2638(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = MakePoolObject(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  ctx.r3.u64 = MakePoolObject(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                               ctx.r6.u32, ctx.r7.u32);
 }
 
@@ -541,20 +541,20 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2638) {
 ITC_NATIVE_ENTRY_ALWAYS(820F1138) {
   
   if (!NativeParses()) {
-    lifted::original::c820F1138(ctx, base);
+    lifted::original::c820F1138(ctx);
     return;
   }
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = CourseSetReset(base, calls, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = CourseSetReset(calls, ctx.r1.u32, ctx.r3.u32);
 }
 ITC_NATIVE_ENTRY_ALWAYS(820F12F8) {
   
   if (!NativeParses()) {
-    lifted::original::c820F12F8(ctx, base);
+    lifted::original::c820F12F8(ctx);
     return;
   }
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = AreaModelReset(base, calls, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = AreaModelReset(calls, ctx.r1.u32, ctx.r3.u32);
 }
 
 // AreaModel::~Model (slot 0 of the scenery models' vtable): r3 = the model,
@@ -562,9 +562,9 @@ ITC_NATIVE_ENTRY_ALWAYS(820F12F8) {
 ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   
   if (!NativeParses()) {
-    lifted::original::c820F1208(ctx, base);
+    lifted::original::c820F1208(ctx);
     return;
   }
   ITC_SCENERY_CALLS;
-  ctx.r3.u64 = SceneryModelDestruct(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = SceneryModelDestruct(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }

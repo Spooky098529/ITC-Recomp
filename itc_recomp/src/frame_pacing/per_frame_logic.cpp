@@ -89,10 +89,10 @@ ITC_NATIVE_ENTRY_ALWAYS(820DC958) {
     return;
   }
   if (ITC_FLAG(native_car_draw)) {
-    hooks::CarDrawBlinkTimersAdvance(ctx, base);
+    hooks::CarDrawBlinkTimersAdvance(ctx);
     return;
   }
-  lifted::original::c820DC958(ctx, base);
+  lifted::original::c820DC958(ctx);
 }
 
 // Texture animations (sub_820F11A8, from the draw step part sub_820F6068):
@@ -107,10 +107,10 @@ ITC_NATIVE_ENTRY_ALWAYS(820F11A8) {
   }
   // The advance itself is the course scenery's (src/course_scenery/).
   if (ITC_FLAG(native_course_scenery)) {
-    ctx.r3.u64 = course_scenery::AdvanceTextureAnimations(base, ctx.r3.u32);
+    ctx.r3.u64 = course_scenery::AdvanceTextureAnimations(ctx.r3.u32);
     return;
   }
-  lifted::original::c820F11A8(ctx, base);
+  lifted::original::c820F11A8(ctx);
 }
 
 // Minimap blink clock (sub_820F5740, from the draw step part sub_820F6068):
@@ -122,12 +122,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820F11A8) {
 // Minimap::Draw's body is native under --native_minimap (src/minimap/draw.cpp,
 // hooks::MinimapDraw), inside the same wrap.
 namespace {
-void MinimapDrawBody(lifted::Regs& ctx, uint8_t* base) {
+void MinimapDrawBody(lifted::Regs& ctx) {
   if (hooks::MinimapDrawNative()) {
     // (the caller's r24: diagnostic only, not carried)
-    hooks::MinimapDraw(ctx, base, 0);
+    hooks::MinimapDraw(ctx, 0);
   } else {
-    lifted::original::c820F5740(ctx, base);
+    lifted::original::c820F5740(ctx);
   }
 }
 }  // namespace
@@ -135,14 +135,14 @@ void MinimapDrawBody(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(820F5740) {
   constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !ITC_FLAG(per_tick_minimap_blink)) {
-    MinimapDrawBody(ctx, base);
+    MinimapDrawBody(ctx);
     return;
   }
-  uint32_t frames = guest::LoadU32(base, kBlinkFrames);
-  uint32_t phase = guest::LoadU32(base, kBlinkPhase);
-  MinimapDrawBody(ctx, base);
-  guest::StoreU32(base, kBlinkFrames, frames);
-  guest::StoreU32(base, kBlinkPhase, phase);
+  uint32_t frames = guest::LoadU32(kBlinkFrames);
+  uint32_t phase = guest::LoadU32(kBlinkPhase);
+  MinimapDrawBody(ctx);
+  guest::StoreU32(kBlinkFrames, frames);
+  guest::StoreU32(kBlinkPhase, phase);
 }
 
 // Play time (sub_82107910, Modes::Tick, from Draw): adds one to the frame
@@ -155,12 +155,12 @@ ITC_NATIVE_ENTRY_ALWAYS(82107910) {
   
   constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
   if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_play_time)) {
-    guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
+    guest::StoreU32(kPlayTimeFrames, guest::LoadU32(kPlayTimeFrames) - 1);
   }
   if (ITC_FLAG(native_modes_tick)) {
-    hooks::ModesTickSteps(ctx, base);
+    hooks::ModesTickSteps(ctx);
   } else {
-    lifted::original::c82107910(ctx, base);
+    lifted::original::c82107910(ctx);
   }
 }
 
@@ -181,7 +181,7 @@ class ReplayFromLogicPass {
   ReplayFromLogicPass(const char* name, uint32_t bytes) : name_(name), bytes_(bytes) {}
 
   template <typename Call>
-  void Run(uint8_t* base, uint32_t object, Call&& call) {
+  void Run(uint32_t object, Call&& call) {
     uint64_t pass = frame_pacing::GameMessages_PassNumber();
     if (pass != pass_) {
       pass_ = pass;
@@ -193,7 +193,7 @@ class ReplayFromLogicPass {
     // saved and put back as they are kept there.
     uint8_t* state = memory::IsHandle(object)
                          ? static_cast<uint8_t*>(memory::HandleObject(object))
-                         : guest::Pointer(base, object);
+                         : guest::Pointer(object);
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
       States& states = states_[key];
       g_replay_outcome = "logic pass";
@@ -291,10 +291,10 @@ namespace {
 // The update's work: natively with --native_ui_movies (src/hooks/ui_movies.cpp).
 ITC_REGS_STEP(UpdateUiMovie) {
   if (ctx.r4.u32 != 0 || !ITC_FLAG(per_tick_ui_movies)) {
-    ui_movies_hooks::Update(ctx, base);
+    ui_movies_hooks::Update(ctx);
     return;
   }
-  g_ui_movies.Run(base, ctx.r3.u32, [&] { ui_movies_hooks::Update(ctx, base); });
+  g_ui_movies.Run(ctx.r3.u32, [&] { ui_movies_hooks::Update(ctx); });
 }
 }  // namespace
 
@@ -337,11 +337,11 @@ std::vector<AddedTarget>* g_added = nullptr;
 // Targets of adding tracks the last logic pass's update put back.
 std::unordered_set<uint32_t> g_put_back_targets;
 
-uint32_t TrackTarget(uint8_t* base, uint32_t node, uint32_t track, uint32_t descriptor) {
-  uint32_t target = node + guest::LoadU32(base, descriptor);
-  if (guest::LoadU8(base, descriptor + 9) != 0) {
-    target += 16 * (guest::LoadU32(base, node + 112) +
-                    2 * (guest::LoadU32(base, track + 12) + 4));
+uint32_t TrackTarget(uint32_t node, uint32_t track, uint32_t descriptor) {
+  uint32_t target = node + guest::LoadU32(descriptor);
+  if (guest::LoadU8(descriptor + 9) != 0) {
+    target += 16 * (guest::LoadU32(node + 112) +
+                    2 * (guest::LoadU32(track + 12) + 4));
   }
   return target;
 }
@@ -349,9 +349,9 @@ uint32_t TrackTarget(uint8_t* base, uint32_t node, uint32_t track, uint32_t desc
 // At the end of a logic pass's update: a target is put back when it holds
 // its value from before its first track in the update (walked from the
 // end, so that track decides).
-void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTarget>& added) {
+void NotePutBackTargets(uint32_t movie, const std::vector<AddedTarget>& added) {
   for (auto it = added.rbegin(); it != added.rend(); ++it) {
-    bool put_back = guest::LoadU32(base, it->target) == it->before;
+    bool put_back = guest::LoadU32(it->target) == it->before;
     bool changed = put_back ? g_put_back_targets.insert(it->target).second
                             : g_put_back_targets.erase(it->target) != 0;
     if (changed && ITC_FLAG(log_pause_movie)) {
@@ -363,23 +363,23 @@ void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTa
 
 ITC_NATIVE_ENTRY_ALWAYS(825A0548) {
   
-  if (guest::LoadU8(base, kTrackPropertiesReady) == 0) {
-    ui_movies_hooks::ApplyTrack(ctx, base);
+  if (guest::LoadU8(kTrackPropertiesReady) == 0) {
+    ui_movies_hooks::ApplyTrack(ctx);
     return;
   }
   uint32_t node = ctx.r3.u32, track = ctx.r4.u32;
-  uint32_t property = guest::LoadU32(base, track);
+  uint32_t property = guest::LoadU32(track);
   uint32_t descriptor = kTrackProperties + 12 * property;
-  bool adds = property < kTrackPropertyCount && guest::LoadU8(base, descriptor + 8) == 0;
-  uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(base, descriptor + 4) : 3;
+  bool adds = property < kTrackPropertyCount && guest::LoadU8(descriptor + 8) == 0;
+  uint32_t type = property < kTrackPropertyCount ? guest::LoadU32(descriptor + 4) : 3;
   bool noted = adds && g_added != nullptr;
   bool log = ITC_FLAG(log_pause_movie) && debug::PauseMovieLog_TracksWanted();
   if (type >= 3 || (!noted && !log)) {
-    ui_movies_hooks::ApplyTrack(ctx, base);
+    ui_movies_hooks::ApplyTrack(ctx);
     return;
   }
-  uint32_t target = TrackTarget(base, node, track, descriptor);
-  uint32_t before = guest::LoadU32(base, target);
+  uint32_t target = TrackTarget(node, track, descriptor);
+  uint32_t before = guest::LoadU32(target);
   bool skip = false;
   if (noted) {
     if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
@@ -393,17 +393,17 @@ ITC_NATIVE_ENTRY_ALWAYS(825A0548) {
       debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
     }
   } else {
-    ui_movies_hooks::ApplyTrack(ctx, base);
+    ui_movies_hooks::ApplyTrack(ctx);
   }
   if (log) {
     debug::PauseMovieLog_Track(g_ui_movie, node, property, type, adds, target, before,
-                               guest::LoadU32(base, target), skip);
+                               guest::LoadU32(target), skip);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211D2F8) {
   
-  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211D2F8, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211D2F8, ctx)) {
     return;
   }
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
@@ -420,17 +420,17 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D2F8) {
   bool log = ITC_FLAG(log_pause_movie);
   if (log) {
     g_ui_movie = movie;
-    debug::PauseMovieLog_Before(base, movie, r4, caller);
+    debug::PauseMovieLog_Before(movie, r4, caller);
     g_replay_outcome = "not replayed";
     g_replay_occurrence = -1;
   }
-  UpdateUiMovie(ctx, base);
+  UpdateUiMovie(ctx);
   if (log) {
-    debug::PauseMovieLog_After(base, movie, caller, g_replay_outcome, g_replay_occurrence);
+    debug::PauseMovieLog_After(movie, caller, g_replay_outcome, g_replay_occurrence);
   }
   if (tracks) {
     if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
-      NotePutBackTargets(base, movie, *g_added);
+      NotePutBackTargets(movie, *g_added);
     }
     g_update_depth--;
   }
@@ -469,7 +469,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
   constexpr uint32_t kRecordContext = 0x8215E150;
   uint32_t list = ctx.r3.u32;
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-  uint8_t* cameras = guest::Pointer(base, kCameraPasses);
+  uint8_t* cameras = guest::Pointer(kCameraPasses);
   std::vector<uint8_t> current;
   if (!render_only) {
     g_overlay_cameras.assign(cameras, cameras + kCameraPassesBytes);
@@ -485,14 +485,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
   guest::StackFrame frame(ctx, 112);
   auto for_each_overlay = [&](uint32_t slot) {
     for (uint32_t i = 0; i < kOverlayCount; i++) {
-      uint32_t overlay = guest::LoadU32(base, list + 4 * i);
+      uint32_t overlay = guest::LoadU32(list + 4 * i);
       if (overlay == 0) {
         continue;
       }
       ctx.r3.u64 = overlay;
       // The car overlays are host objects since E5 step 4: their vtable
       // word through the handle.
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::VtableWord(base, overlay) + slot));
+      lifted::CallFromContext(ctx, guest::LoadU32(guest::VtableWord(overlay) + slot));
     }
   };
   if (!render_only) {
@@ -501,7 +501,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
   }
   interpolation::BlendState_SetHandler(kRecordContext);
   for_each_overlay(kRecordSlot);
-  interpolation::BlendState_LogOverlayAllocations(base);
+  interpolation::BlendState_LogOverlayAllocations();
   if (render_only) {
     std::memcpy(cameras, current.data(), kCameraPassesBytes);
   }
@@ -533,10 +533,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82211A28) {
     g_rival_logo = ctx.r3.u32;
   }
   if (race_hud_hooks::g_rival_logo_draw_stand_in != nullptr) {
-    lifted::Sdk(ctx, base, race_hud_hooks::g_rival_logo_draw_stand_in);
+    lifted::Sdk(ctx, race_hud_hooks::g_rival_logo_draw_stand_in);
     return;
   }
-  race_hud_hooks::DrawRivalLogo(ctx, base);
+  race_hud_hooks::DrawRivalLogo(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(821594B8) {
@@ -545,7 +545,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821594B8) {
     g_rival_logo = 0;
     g_in_rival_cutscene = true;
     // Natively with --native_camera_modes (src/hooks/camera_modes.cpp).
-    hooks::CameraModesUpdate(ctx, base);
+    hooks::CameraModesUpdate(ctx);
     g_in_rival_cutscene = false;
     return;
   }
@@ -556,7 +556,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821594B8) {
   guest::StackFrame frame(ctx, 176);
   ctx.r3.u64 = g_rival_logo;
   ctx.lr = 0x82155BE0;
-  lifted::Enter(ctx, base, game::RivalLogo::Draw);
+  lifted::Enter(ctx, game::RivalLogo::Draw);
 }
 
 // World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the
@@ -601,7 +601,7 @@ ITC_FLAG_BOOL(blend_world_sprites, true, "ITC",
 ITC_FLAG_BOOL(log_world_sprites, false, "ITC",
               "Log the world-space sprite lists as recorded, every 2 s");
 
-void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
+void PerFrameLogic_RecordWorldSprites(uint32_t list,
                                       const std::function<void()>& record) {
   if (ITC_FLAG(log_world_sprites)) {
     static std::chrono::steady_clock::time_point last{};
@@ -613,8 +613,8 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     }
     if (lines < 40) {
       lines++;
-      uint32_t n = guest::LoadU32(base, list + kSpriteCountOffset);
-      auto f = [&](uint32_t a) { return guest::LoadFloat(base, a); };
+      uint32_t n = guest::LoadU32(list + kSpriteCountOffset);
+      auto f = [&](uint32_t a) { return guest::LoadFloat(a); };
       auto it = g_sprite_lists.find({list, g_sprite_occurrences[list]});
       SpriteList s = it != g_sprite_lists.end() ? it->second : SpriteList{};
       ITC_LOG_INFO("world sprites: list {:08X} pass {} {} in race {} amount {:.2f} count {} "
@@ -633,7 +633,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     record();
     return;
   }
-  uint32_t count = std::min(guest::LoadU32(base, list + kSpriteCountOffset), kMaxSprites);
+  uint32_t count = std::min(guest::LoadU32(list + kSpriteCountOffset), kMaxSprites);
   auto corner = [&](uint32_t i, uint32_t k) {
     return list + kSpriteCornersOffset + kSpriteStride * i + 4 * k;  // k: 16 floats
   };
@@ -648,7 +648,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     sprites.now.resize(count * 16);
     for (uint32_t i = 0; i < count; i++) {
       for (uint32_t k = 0; k < 16; k++) {
-        sprites.now[i * 16 + k] = guest::LoadFloat(base, corner(i, k));
+        sprites.now[i * 16 + k] = guest::LoadFloat(corner(i, k));
       }
     }
   }
@@ -662,7 +662,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
     bool same = true, near = true;
     for (uint32_t k = 0; k < 16; k++) {
       // Only while the list holds this tick's corners.
-      same = same && guest::LoadFloat(base, corner(i, k)) == b[k];
+      same = same && guest::LoadFloat(corner(i, k)) == b[k];
       near = near && std::isfinite(a[k]) && std::abs(b[k] - a[k]) <= kMaxSpriteStep;
     }
     if (!same || !near) {
@@ -673,7 +673,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
         continue;
       }
       saved.push_back({corner(i, k), b[k]});
-      guest::StoreFloat(base, corner(i, k), a[k] + (b[k] - a[k]) * amount);
+      guest::StoreFloat(corner(i, k), a[k] + (b[k] - a[k]) * amount);
     }
   }
   if (ITC_FLAG(log_world_sprites) && !saved.empty()) {
@@ -689,7 +689,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
                      list, i, count, amount, a[0], a[1], a[2], a[4], a[5], a[6], b[0], b[1], b[2],
                      b[4], b[5], b[6]);
       }
-      auto f = [&](uint32_t o) { return guest::LoadFloat(base, list + o); };
+      auto f = [&](uint32_t o) { return guest::LoadFloat(list + o); };
       ITC_LOG_INFO("world sprites: list {:08X} matrix {:.4g} {:.4g} {:.4g} | {:.4g} {:.4g} {:.4g} "
                    "| {:.4g} {:.4g} {:.4g} | {:.5g} {:.5g} {:.5g}",
                    list, f(0), f(4), f(8), f(16), f(20), f(24), f(32), f(36), f(40), f(48), f(52),
@@ -698,7 +698,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
   }
   record();
   for (const auto& [address, value] : saved) {
-    guest::StoreFloat(base, address, value);
+    guest::StoreFloat(address, value);
   }
 }
 
@@ -707,22 +707,22 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
 namespace {
 ITC_REGS_STEP(RecordSpriteList) {
   if (!ITC_FLAG(native_world_sprites)) {
-    lifted::original::c82128750(ctx, base);
+    lifted::original::c82128750(ctx);
     return;
   }
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {sprites::SpriteListRecord(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    return {sprites::SpriteListRecord(uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                       uint32_t(a.r[1]), uint32_t(a.r[2])),
             a.f[0]};
   });
 }
 ITC_REGS_STEP(RecordSprite) {
   if (!ITC_FLAG(native_world_sprites)) {
-    lifted::original::c821281A8(ctx, base);
+    lifted::original::c821281A8(ctx);
     return;
   }
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {sprites::SpriteRecord(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    return {sprites::SpriteRecord(uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                   uint32_t(a.r[1]), uint32_t(a.r[2])),
             a.f[0]};
   });
@@ -736,7 +736,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82128750) {
   if (debug::IsHidden(0x82128750)) {
     return;
   }
-  PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] { RecordSpriteList(ctx, base); });
+  PerFrameLogic_RecordWorldSprites(ctx.r3.u32, [&] { RecordSpriteList(ctx); });
 }
 
 // Diagnostics (--log_camera_pass_records): which camera passes are recorded
@@ -764,7 +764,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A3978) {
         auto [pass, handler, message] = key;
         ITC_LOG_INFO("camera pass record: pass {:08X} (type {}) in handler {:08X} message {}: {} "
                      "on {} logic, {} on {} render-only passes",
-                     pass, guest::LoadU32(base, pass + 584), handler, int32_t(message), n.first,
+                     pass, guest::LoadU32(pass + 584), handler, int32_t(message), n.first,
                      logic - logic_start, n.second, render - render_start);
       }
       counts.clear();
@@ -774,8 +774,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820A3978) {
   }
   // The work natively (src/cameras/cameras.cpp, --native_cameras) or
   // translated.
-  if (!hooks::CameraPassUpdate(ctx, base)) {
-    lifted::original::c820A3978(ctx, base);
+  if (!hooks::CameraPassUpdate(ctx)) {
+    lifted::original::c820A3978(ctx);
   }
 }
 
@@ -821,7 +821,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821281A8) {
   SingleSpriteKey key{sprite, caller, g_single_sprite_occurrences[{sprite, caller}]++};
   std::array<float, 16> corners;
   for (uint32_t k = 0; k < 16; k++) {
-    corners[k] = guest::LoadFloat(base, sprite + kSpriteCornersOffset + 4 * k);
+    corners[k] = guest::LoadFloat(sprite + kSpriteCornersOffset + 4 * k);
   }
   SingleSprite& state = g_single_sprites[key];
   if (!render_only) {
@@ -847,7 +847,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821281A8) {
     if (lines++ < 40) {
       uint32_t handler, message;
       frame_pacing::GameMessages_CurrentHandler(handler, message);
-      auto f = [&](uint32_t o) { return guest::LoadFloat(base, sprite + o); };
+      auto f = [&](uint32_t o) { return guest::LoadFloat(sprite + o); };
       ITC_LOG_INFO("single sprite: pass {} {} amount {:.2f} sprite {:08X} from {:08X} #{} handler "
                    "{:08X} message {} camera {:08X} matrix row3 ({:.5g} {:.5g} {:.5g}) corner0 "
                    "({:.5g} {:.5g} {:.5g}) before ({:.5g} {:.5g} {:.5g}) blend {}",
@@ -858,17 +858,17 @@ ITC_NATIVE_ENTRY_ALWAYS(821281A8) {
     }
   }
   if (!blend) {
-    RecordSprite(ctx, base);
+    RecordSprite(ctx);
     return;
   }
   for (uint32_t k = 0; k < 16; k++) {
     if (k % 4 != 3) {
-      guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k,
+      guest::StoreFloat(sprite + kSpriteCornersOffset + 4 * k,
                         state.before[k] + (state.now[k] - state.before[k]) * amount);
     }
   }
-  RecordSprite(ctx, base);
+  RecordSprite(ctx);
   for (uint32_t k = 0; k < 16; k++) {
-    guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k, corners[k]);
+    guest::StoreFloat(sprite + kSpriteCornersOffset + 4 * k, corners[k]);
   }
 }

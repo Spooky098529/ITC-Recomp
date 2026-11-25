@@ -83,7 +83,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -109,7 +109,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -123,7 +123,7 @@ class GuestCalls {
 
 #define ITC_CL_STEP(name, expression)          \
   ITC_REGS_STEP(name) {  \
-    GuestCalls guest(ctx, base);               \
+    GuestCalls guest(ctx);               \
     const car_list::Calls calls = guest.calls(); \
     (void)calls;                               \
     const uint32_t sp = ctx.r1.u32;            \
@@ -132,164 +132,164 @@ class GuestCalls {
 
 namespace cl = car_list;
 
-ITC_CL_STEP(CarListSetCaption, cl::SetCaption(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListPartFinishAll, cl::PartFinishAll(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListTabSetCursorY, cl::TabSetCursorY(base, ctx.r3.u32, ctx.r4.u64, sp))
-ITC_CL_STEP(CarListTabSetButtons, cl::TabSetButtons(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListSetCaption, cl::SetCaption(ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListPartFinishAll, cl::PartFinishAll(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListTabSetCursorY, cl::TabSetCursorY(ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListTabSetButtons, cl::TabSetButtons(ctx.r3.u32, sp, calls))
 ITC_CL_STEP(CarListRowSetRow,
-            cl::RowSetRow(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp, calls))
-ITC_CL_STEP(CarListRowSetArrows, cl::RowSetArrows(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
-ITC_CL_STEP(CarListRowUnhighlight, cl::RowUnhighlight(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListRowHide, cl::RowHide(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListColorShow, cl::ColorShow(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListColorSelect, cl::ColorSelect(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+            cl::RowSetRow(ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp, calls))
+ITC_CL_STEP(CarListRowSetArrows, cl::RowSetArrows(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListRowUnhighlight, cl::RowUnhighlight(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListRowHide, cl::RowHide(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListColorShow, cl::ColorShow(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListColorSelect, cl::ColorSelect(ctx.r3.u32, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListColorSetArrows,
-            cl::ColorSetArrows(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp))
-ITC_CL_STEP(CarListColorShowSwatches, cl::ColorShowSwatches(base, ctx.r3.u32, ctx.r4.u64, sp))
-ITC_CL_STEP(CarListColorPlaceCursor, cl::ColorPlaceCursor(base, ctx.r3.u32, ctx.r4.u64, sp))
-ITC_CL_STEP(CarListColorSetCount, cl::ColorSetCount(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
+            cl::ColorSetArrows(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListColorShowSwatches, cl::ColorShowSwatches(ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListColorPlaceCursor, cl::ColorPlaceCursor(ctx.r3.u32, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListColorSetCount, cl::ColorSetCount(ctx.r3.u32, ctx.r4.u64, sp, calls))
 ITC_CL_STEP(CarListColorSetSwatch,
-            cl::ColorSetSwatch(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp))
+            cl::ColorSetSwatch(ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, sp))
 ITC_CL_STEP(CarListColorSetSwatches,
-            cl::ColorSetSwatches(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp))
-ITC_CL_STEP(CarListCarSetTexts, cl::CarSetTexts(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListCarSetButtons, cl::CarSetButtons(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
+            cl::ColorSetSwatches(ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp))
+ITC_CL_STEP(CarListCarSetTexts, cl::CarSetTexts(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetButtons, cl::CarSetButtons(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
                                                     ctx.r6.u64, ctx.r7.u64, sp, calls))
-ITC_CL_STEP(CarListCarPlaceCursor, cl::CarPlaceCursor(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_CL_STEP(CarListCarSelect, cl::CarSelect(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListCarStopArrows, cl::CarStopArrows(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListCarSetName, cl::CarSetName(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListGroupBaseDestruct, cl::GroupBaseDestruct(base, ctx.r3.u64))
-ITC_CL_STEP(CarListSetBaseDestruct, cl::SetBaseDestruct(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListSetDestruct, cl::SetDestruct(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListCarPlaceCursor, cl::CarPlaceCursor(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_CL_STEP(CarListCarSelect, cl::CarSelect(ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListCarStopArrows, cl::CarStopArrows(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListCarSetName, cl::CarSetName(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListGroupBaseDestruct, cl::GroupBaseDestruct(ctx.r3.u64))
+ITC_CL_STEP(CarListSetBaseDestruct, cl::SetBaseDestruct(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetDestruct, cl::SetDestruct(ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListSetInterfaceDeletingDestruct,
-            cl::SetInterfaceDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListCarSetStats, cl::CarSetStats(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
+            cl::SetInterfaceDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListCarSetStats, cl::CarSetStats(ctx.r3.u32, ctx.r4.u32, sp, calls))
 ITC_CL_STEP(CarListCarSetCarName,
-            cl::CarSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
-ITC_CL_STEP(CarListPanel7CShowArrows, cl::Panel7CShowArrows(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListCarShowStats, cl::CarShowStats(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListTabSetTab, cl::TabSetTab(base, ctx.r3.u32, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListTabMove, cl::TabMove(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp,
+            cl::CarSetCarName(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListPanel7CShowArrows, cl::Panel7CShowArrows(ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListCarShowStats, cl::CarShowStats(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListTabSetTab, cl::TabSetTab(ctx.r3.u32, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListTabMove, cl::TabMove(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp,
                                         calls))
 ITC_CL_STEP(CarListRowFill,
-            cl::RowFill(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, sp, calls))
-ITC_CL_STEP(CarListRowRefresh, cl::RowRefresh(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp, calls))
-ITC_CL_STEP(CarListRowMove, cl::RowMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+            cl::RowFill(ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_CL_STEP(CarListRowRefresh, cl::RowRefresh(ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListRowMove, cl::RowMove(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
                                         ctx.r7.u64, ctx.r9.u32, sp, calls))
 ITC_CL_STEP(CarListColorMove,
-            cl::ColorMove(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+            cl::ColorMove(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                           ctx.r8.u64, ctx.r9.u64, ctx.r10.u32, sp, calls))
-ITC_CL_STEP(CarListTabIsShown, cl::TabIsShown(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListRowIsShown, cl::RowIsShown(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListRowIsHidden, cl::RowIsHidden(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListCarIsShown, cl::CarIsShown(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListColorIsShown, cl::ColorIsShown(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListColorIsIdle, cl::ColorIsIdle(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListTabShow, cl::TabShow(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListTabSelect, cl::TabSelect(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListRowShow, cl::RowShow(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListRowSelect, cl::RowSelect(base, ctx.r3.u32, sp, calls))
-ITC_CL_STEP(CarListCarShow, cl::CarShow(base, ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListTabIsShown, cl::TabIsShown(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListRowIsShown, cl::RowIsShown(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListRowIsHidden, cl::RowIsHidden(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListCarIsShown, cl::CarIsShown(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListColorIsShown, cl::ColorIsShown(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListColorIsIdle, cl::ColorIsIdle(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListTabShow, cl::TabShow(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListTabSelect, cl::TabSelect(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListRowShow, cl::RowShow(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListRowSelect, cl::RowSelect(ctx.r3.u32, sp, calls))
+ITC_CL_STEP(CarListCarShow, cl::CarShow(ctx.r3.u32, sp, calls))
 ITC_CL_STEP(CarListCarMove,
-            cl::CarMove(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
-ITC_CL_STEP(CarListCarPick, cl::CarPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp, calls))
-ITC_CL_STEP(CarListPowerGraphSetEntry, cl::PowerGraphSetEntry(base, ctx.r3.u64, ctx.r4.u64))
-ITC_CL_STEP(CarListSetReset, cl::SetReset(base, ctx.r3.u64))
-ITC_CL_STEP(CarListSetPicked, cl::SetPicked(base, ctx.r3.u32))
-ITC_CL_STEP(CarListSetWentBack, cl::SetWentBack(base, ctx.r3.u32))
-ITC_CL_STEP(CarListSetWantsPowerGraph, cl::SetWantsPowerGraph(base, ctx.r3.u32))
-ITC_CL_STEP(CarListSetOpenKind, cl::SetWord(base, ctx.r3.u64, 1932, ctx.r4.u64))
-ITC_CL_STEP(CarListSetPreviousTab, cl::SetWord(base, ctx.r3.u64, 1884, ctx.r4.u64))
-ITC_CL_STEP(CarListSetPreviousEntry, cl::SetWord(base, ctx.r3.u64, 1888, ctx.r4.u64))
-ITC_CL_STEP(CarListSetPreviousColor, cl::SetWord(base, ctx.r3.u64, 1892, ctx.r4.u64))
-ITC_CL_STEP(CarListPickedPage, cl::PickedPage(base, ctx.r3.u64))
-ITC_CL_STEP(CarListSaveData, cl::SaveData(base, ctx.r3.u32, sp))
-ITC_CL_STEP(CarListToTabs, cl::ToTabs(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListOpen, cl::Open(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListBaseFree, cl::Free(base, ctx.r3.u64, sp, calls))
+            cl::CarMove(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, sp, calls))
+ITC_CL_STEP(CarListCarPick, cl::CarPick(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListPowerGraphSetEntry, cl::PowerGraphSetEntry(ctx.r3.u64, ctx.r4.u64))
+ITC_CL_STEP(CarListSetReset, cl::SetReset(ctx.r3.u64))
+ITC_CL_STEP(CarListSetPicked, cl::SetPicked(ctx.r3.u32))
+ITC_CL_STEP(CarListSetWentBack, cl::SetWentBack(ctx.r3.u32))
+ITC_CL_STEP(CarListSetWantsPowerGraph, cl::SetWantsPowerGraph(ctx.r3.u32))
+ITC_CL_STEP(CarListSetOpenKind, cl::SetWord(ctx.r3.u64, 1932, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousTab, cl::SetWord(ctx.r3.u64, 1884, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousEntry, cl::SetWord(ctx.r3.u64, 1888, ctx.r4.u64))
+ITC_CL_STEP(CarListSetPreviousColor, cl::SetWord(ctx.r3.u64, 1892, ctx.r4.u64))
+ITC_CL_STEP(CarListPickedPage, cl::PickedPage(ctx.r3.u64))
+ITC_CL_STEP(CarListSaveData, cl::SaveData(ctx.r3.u32, sp))
+ITC_CL_STEP(CarListToTabs, cl::ToTabs(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListOpen, cl::Open(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseFree, cl::Free(ctx.r3.u64, sp, calls))
 // PanelSet::Free and HandleInput are tail calls of the base's on the set
 // + 4, with no plain C++ of their own: their prints are here.
 ITC_REGS_STEP(CarListSetFree) {
   ITC_NATIVE_RUNNING("sub_8224B880 PanelSet::Free");
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const car_list::Calls calls = guest.calls();
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = cl::Free(base, ctx.r3.u64 + 4, sp, calls);
+  ctx.r3.u64 = cl::Free(ctx.r3.u64 + 4, sp, calls);
 }
-ITC_CL_STEP(CarListBaseHandleInput, cl::HandleInput(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseHandleInput, cl::HandleInput(ctx.r3.u64, sp, calls))
 ITC_REGS_STEP(CarListSetHandleInput) {
   ITC_NATIVE_RUNNING("sub_8224CA28 PanelSet::HandleInput");
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const car_list::Calls calls = guest.calls();
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = cl::HandleInput(base, ctx.r3.u64 + 4, sp, calls);
+  ctx.r3.u64 = cl::HandleInput(ctx.r3.u64 + 4, sp, calls);
 }
-ITC_CL_STEP(CarListBackPage8, cl::BackPage8(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListStep2, cl::Step2(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep3, cl::Step3(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep7, cl::Step7(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep11, cl::Step11(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep18, cl::Step18(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep26, cl::Step26(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep0, cl::Step0(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep1, cl::Step1(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep4, cl::Step4(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep6, cl::Step6(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep8, cl::Step8(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep9, cl::Step9(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep12, cl::Step12(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListStep19, cl::Step19(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListBaseBuild, cl::Build(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListTabsPage, cl::TabsPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListRowsPage, cl::RowsPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListSetUpColors, cl::SetUpColors(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListStep17, cl::Step17(base, ctx.r3.u64, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListCarPage, cl::CarPage(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListDrawAll, cl::DrawAll(base, sp, calls))
-ITC_CL_STEP(CarListUpdateStand, cl::UpdateStand(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListBaseUpdate, cl::Update(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBackPage8, cl::BackPage8(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListStep2, cl::Step2(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep3, cl::Step3(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep7, cl::Step7(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep11, cl::Step11(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep18, cl::Step18(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep26, cl::Step26(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep0, cl::Step0(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep1, cl::Step1(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep4, cl::Step4(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep6, cl::Step6(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep8, cl::Step8(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep9, cl::Step9(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep12, cl::Step12(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListStep19, cl::Step19(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListSetUpRows, cl::SetUpRows(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetUpCarPage, cl::SetUpCarPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseBuild, cl::Build(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListTabsPage, cl::TabsPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListRowsPage, cl::RowsPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListColorsPage, cl::ColorsPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPowerGraphPage, cl::PowerGraphPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListSetUpColors, cl::SetUpColors(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListStep17, cl::Step17(ctx.r3.u64, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarPage, cl::CarPage(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListShowStandCar, cl::ShowStandCar(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListDrawAll, cl::DrawAll(sp, calls))
+ITC_CL_STEP(CarListUpdateStand, cl::UpdateStand(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListBaseUpdate, cl::Update(ctx.r3.u64, sp, calls))
 // PanelSet::Update: a tail call of the base's on the set + 4.
 ITC_REGS_STEP(CarListSetUpdate) {
   ITC_NATIVE_RUNNING("sub_8224CF18 PanelSet::Update");
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const car_list::Calls calls = guest.calls();
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = cl::Update(base, ctx.r3.u64 + 4, sp, calls);
+  ctx.r3.u64 = cl::Update(ctx.r3.u64 + 4, sp, calls);
 }
 // PanelSet::Build: a tail call of the base's on the set + 4.
 ITC_REGS_STEP(CarListSetBuild) {
   ITC_NATIVE_RUNNING("sub_8224CAD8 PanelSet::Build");
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   const car_list::Calls calls = guest.calls();
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = cl::Build(base, ctx.r3.u64 + 4, sp, calls);
+  ctx.r3.u64 = cl::Build(ctx.r3.u64 + 4, sp, calls);
 }
 
 // PanelSetPair (never seen in play), the C panels' base and the confirm
 // panel.
 ITC_CL_STEP(CarListBaseSetCarName,
-            cl::BaseSetCarName(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
-ITC_CL_STEP(CarListPanel6CSetStats, cl::Panel6CSetStats(base, ctx.r3.u32, ctx.r4.u32, sp, calls))
-ITC_CL_STEP(CarListCarPanelBaseDestruct, cl::CarPanelBaseDestruct(base, ctx.r3.u64))
-ITC_CL_STEP(CarListConfirmPanelConstruct, cl::ConfirmPanelConstruct(base, ctx.r3.u64))
+            cl::BaseSetCarName(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, sp, calls))
+ITC_CL_STEP(CarListPanel6CSetStats, cl::Panel6CSetStats(ctx.r3.u32, ctx.r4.u32, sp, calls))
+ITC_CL_STEP(CarListCarPanelBaseDestruct, cl::CarPanelBaseDestruct(ctx.r3.u64))
+ITC_CL_STEP(CarListConfirmPanelConstruct, cl::ConfirmPanelConstruct(ctx.r3.u64))
 ITC_CL_STEP(CarListPairConstruct,
-            cl::PairConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+            cl::PairConstruct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                               ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, sp))
-ITC_CL_STEP(CarListPairDestruct, cl::PairDestruct(base, ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairDestruct, cl::PairDestruct(ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListPairDeletingDestruct,
-            cl::PairDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_CL_STEP(CarListPairReset, cl::PairReset(base, ctx.r3.u64, sp))
-ITC_CL_STEP(CarListPairOpen, cl::PairOpen(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListPairHandleInput, cl::PairHandleInput(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListPairUpdate, cl::PairUpdate(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListPairBuild, cl::PairBuild(base, ctx.r3.u64, sp, calls))
-ITC_CL_STEP(CarListPairPicked, cl::PairPicked(base, ctx.r3.u32))
+            cl::PairDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_CL_STEP(CarListPairReset, cl::PairReset(ctx.r3.u64, sp))
+ITC_CL_STEP(CarListPairOpen, cl::PairOpen(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairHandleInput, cl::PairHandleInput(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairUpdate, cl::PairUpdate(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairBuild, cl::PairBuild(ctx.r3.u64, sp, calls))
+ITC_CL_STEP(CarListPairPicked, cl::PairPicked(ctx.r3.u32))
 
 #undef ITC_CL_STEP
 
@@ -297,7 +297,7 @@ ITC_CL_STEP(CarListPairPicked, cl::PairPicked(base, ctx.r3.u32))
 
 #define ITC_CAR_LIST(address, step)       \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_list)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 // The panel groups and panels (from the car list's functions, recompiled,
@@ -399,10 +399,10 @@ ITC_CAR_LIST(8224B8D8, CarListCarPage)
 ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
   
   if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
-    lifted::original::c8224C450(ctx, base);
+    lifted::original::c8224C450(ctx);
     return;
   }
-  hooks::CarListStep17(ctx, base);
+  hooks::CarListStep17(ctx);
 }
 // PanelSet's slot 6 (the panel screens' update): the same gate as the
 // stand's car (Car::Init, SetModel and Refresh's plain C++). PanelSetBase::
@@ -415,10 +415,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                       \
     \
     if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {      \
-      lifted::original::c##address(ctx, base);                                          \
+      lifted::original::c##address(ctx);                                          \
       return;                                                                                \
     }                                                                                        \
-    hooks::step(ctx, base);                                                                  \
+    hooks::step(ctx);                                                                  \
   }
 ITC_CAR_LIST_STAND(8224CF18, CarListSetUpdate)
 // PanelSetPair's slot 6 (never seen in play): the same gate.

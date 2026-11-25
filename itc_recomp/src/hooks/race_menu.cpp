@@ -52,7 +52,7 @@ namespace rm = race_menu;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -78,7 +78,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -91,126 +91,126 @@ class GuestCalls {
 }  // namespace
 
 ITC_REGS_STEP(RaceMenuCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Create(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuOpenMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::OpenMovie(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::OpenMovie(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuWaitForMovie) {
-  ctx.r3.u64 = rm::WaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = rm::WaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(RaceMenuOnYes) {
-  ctx.r3.u64 = rm::OnAnswer(base, ctx.r3.u32, true, ctx.r1.u32);
+  ctx.r3.u64 = rm::OnAnswer(ctx.r3.u32, true, ctx.r1.u32);
 }
 ITC_REGS_STEP(RaceMenuOnNo) {
-  ctx.r3.u64 = rm::OnAnswer(base, ctx.r3.u32, false, ctx.r1.u32);
+  ctx.r3.u64 = rm::OnAnswer(ctx.r3.u32, false, ctx.r1.u32);
 }
-ITC_REGS_STEP(RaceMenuOnBack) { rm::OnBack(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceMenuOnBack) { rm::OnBack(ctx.r3.u32); }
 ITC_REGS_STEP(RaceMenuOnDialogClosed) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::OnDialogClosed(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::OnDialogClosed(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Unload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuLeaveToHub) {
-  rm::LeaveToHub(base, ctx.r3.u32, ctx.r4.u32);
+  rm::LeaveToHub(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(RaceMenuDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Destroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Start(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Start(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-ITC_REGS_STEP(RaceMenuBack) { rm::Back(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceMenuBack) { rm::Back(ctx.r3.u32); }
 ITC_REGS_STEP(RaceMenuSetEventRange) {
-  rm::SetEventRange(base, ctx.r3.u32);
+  rm::SetEventRange(ctx.r3.u32);
 }
 ITC_REGS_STEP(RaceMenuSetUpEvents) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::SetUpEvents(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::SetUpEvents(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuRefresh) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Refresh(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Refresh(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuTransition0) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Transition0(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuTransition3) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Transition3(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuTransition5) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Transition5(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuAskConfirm) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::AskConfirm(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::AskConfirm(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuTransition12) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Transition12(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Transition12(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuDebugKindPage) {
-  ctx.r3.u64 = rm::DebugKindPage(base, ctx.r1.u32);
+  ctx.r3.u64 = rm::DebugKindPage(ctx.r1.u32);
 }
 ITC_REGS_STEP(RaceMenuDebugEventPage) {
-  ctx.r3.u64 = rm::DebugEventPage(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = rm::DebugEventPage(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(RaceMenuDebugVariantPage) {
-  ctx.r3.u64 = rm::DebugVariantPage(base, ctx.r1.u32);
+  ctx.r3.u64 = rm::DebugVariantPage(ctx.r1.u32);
 }
 ITC_REGS_STEP(RaceMenuAnimateVariantPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::AnimateVariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::AnimateVariantPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuKindPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::KindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::KindPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuAnimateKindPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::AnimateKindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::AnimateKindPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuVariantPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::VariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::VariantPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuEventPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::EventPage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::EventPage(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuAnimateEventPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::AnimateEventPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::AnimateEventPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Update(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuStartEvent) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::StartEvent(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::StartEvent(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuStartPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::StartPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::StartPage(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuLeavePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::LeavePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::LeavePage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(RaceMenuDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = rm::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = rm::Draw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
@@ -218,7 +218,7 @@ ITC_REGS_STEP(RaceMenuInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = rm::Init(base, machine, ctx.r1.u32 - rm::kInitFrame, &replaced);
+  const uint32_t r3 = rm::Init(machine, ctx.r1.u32 - rm::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -226,7 +226,7 @@ ITC_REGS_STEP(RaceMenuInit) {
 
 #define ITC_RACE_MENU(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_menu)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // The machine's handlers (functors).

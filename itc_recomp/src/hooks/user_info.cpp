@@ -38,7 +38,7 @@ namespace ui = user_info;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -64,7 +64,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -77,52 +77,52 @@ class GuestCalls {
 }  // namespace
 
 ITC_REGS_STEP(UserInfoCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Create(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = ui::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(UserInfoWaitForLoad) {
-  ctx.r3.u64 = ui::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ui::WaitForLoad(ctx.r3.u64, ctx.r1.u32);
 }
-ITC_REGS_STEP(UserInfoReenter) { ui::Reenter(base, ctx.r3.u32); }
+ITC_REGS_STEP(UserInfoReenter) { ui::Reenter(ctx.r3.u32); }
 ITC_REGS_STEP(UserInfoClose) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Close(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Destroy(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Destroy(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoUpdatePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::UpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::UpdatePage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoUpdate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Update(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Update(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoMenuPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::MenuPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::MenuPage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoSetPlayTimeText) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::SetPlayTimeText(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::SetPlayTimeText(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoOpening) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Opening(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Opening(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoClosing) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::Closing(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::Closing(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(UserInfoSetTexts) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = ui::SetTexts(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = ui::SetTexts(ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
@@ -130,7 +130,7 @@ ITC_REGS_STEP(UserInfoInitStates) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = ui::InitStates(base, machine, ctx.r1.u32 - ui::kInitFrame, &replaced);
+  const uint32_t r3 = ui::InitStates(machine, ctx.r1.u32 - ui::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -138,7 +138,7 @@ ITC_REGS_STEP(UserInfoInitStates) {
 
 #define ITC_USER_INFO(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_user_info)) { \
-    hooks::step(ctx, base);             \
+    hooks::step(ctx);             \
   }
 
 // The machine's handlers (member function functors the machine calls; no

@@ -30,35 +30,35 @@ uint64_t RunMovie(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movi
 uint64_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
 
 // The list's selection's row (its animation: selection + 5).
-uint64_t Row(uint8_t* base) {
-  return uint64_t(race_screens::ListSelection(base, List(base).address)) + 5;
+uint64_t Row() {
+  return uint64_t(race_screens::ListSelection(List().address)) + 5;
 }
 
 // The replays' 36-byte records (the save buffers' +12).
-uint32_t Records(uint8_t* base) { return SaveBuffers(base).records().address; }
+uint32_t Records() { return SaveBuffers().records().address; }
 
 // The cursor node (sub-scene 3, child 2, its child 0)'s +16 = n × 40 as a
 // float, through the original's frame doubleword at `slot` (the integer
 // stored there for the conversion).
-void StoreCursor(uint8_t* base, uint32_t slot, uint32_t movie, uint32_t n) {
-  const uint32_t list_node = ui_movies::FindNode(base, movie, 3, 2);
+void StoreCursor(uint32_t slot, uint32_t movie, uint32_t n) {
+  const uint32_t list_node = ui_movies::FindNode(movie, 3, 2);
   const int32_t value = int32_t(n * 40u);
   const uint64_t wide = uint64_t(int64_t(value));
-  Store(base, slot, uint32_t(wide >> 32));
-  Store(base, slot + 4, uint32_t(wide));
-  const Node cursor(base, ui_movies::Child(base, list_node, 0));
+  Store(slot, uint32_t(wide >> 32));
+  Store(slot + 4, uint32_t(wide));
+  const Node cursor(ui_movies::Child(list_node, 0));
   cursor.set_y(float(double(int64_t(value))));
 }
 
 }  // namespace
 
-uint64_t Intro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t Intro(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289AC0 ReplayTheater::Intro");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
     Play(calls, frame, 0x82289B1C, movie, 52);
-    Store(base, started, 1);
+    Store(started, 1);
   }
   if (uint32_t(RunMovie(calls, frame, 0x82289B30, movie)) == 0) {
     Play(calls, frame, 0x82289B54, movie, 49);
@@ -71,156 +71,156 @@ uint64_t Intro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls)
   return 1;
 }
 
-uint64_t FadeOut(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t FadeOut(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289BD0 ReplayTheater::FadeOut");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
-    Finish(calls, frame, 0x82289C2C, movie, Row(base));
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
+    Finish(calls, frame, 0x82289C2C, movie, Row());
     Finish(calls, frame, 0x82289C38, movie, 49);
     Finish(calls, frame, 0x82289C44, movie, 43);
     Finish(calls, frame, 0x82289C50, movie, 0);
-    calls.Call(kFadeOut, frame, 0x82289C6C, G::fades_out(base), 0, 0, 0);
-    Store(base, started, 1);
+    calls.Call(kFadeOut, frame, 0x82289C6C, G::fades_out(), 0, 0, 0);
+    Store(started, 1);
   }
   RunMovie(calls, frame, 0x82289C80, movie);
-  return (G::fade_count0(base) | G::fade_count1(base)) == 0 ? 1 : 0;
+  return (G::fade_count0() | G::fade_count1()) == 0 ? 1 : 0;
 }
 
-uint64_t FadeInList(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t FadeInList(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289CC0 ReplayTheater::FadeInList");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
     Play(calls, frame, 0x82289D1C, movie, 50);
-    calls.Call(kFadeIn, frame, 0x82289D38, G::fades_in(base), 0, 0, 0);
-    Store(base, started, 1);
+    calls.Call(kFadeIn, frame, 0x82289D38, G::fades_in(), 0, 0, 0);
+    Store(started, 1);
   }
   return Done(RunMovie(calls, frame, 0x82289D4C, movie));
 }
 
-uint64_t ShowCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t ShowCursor(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289D70 ReplayTheater::ShowCursor");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
-    const uint64_t row = Row(base);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
+    const uint64_t row = Row();
     Play(calls, frame, 0x82289DD8, movie, row);
     Loop(calls, frame, 0x82289DE4, movie, row);
-    Store(base, started, 1);
+    Store(started, 1);
   }
   RunMovie(calls, frame, 0x82289DF8, movie);
   return 1;
 }
 
-uint64_t HideCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t HideCursor(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289E08 ReplayTheater::HideCursor");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
-    Finish(calls, frame, 0x82289E64, movie, Row(base));
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
+    Finish(calls, frame, 0x82289E64, movie, Row());
     Play(calls, frame, 0x82289E80, movie, 51);
-    Store(base, started, 1);
+    Store(started, 1);
   }
   return Done(RunMovie(calls, frame, 0x82289E94, movie));
 }
 
-uint64_t PickReplay(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t PickReplay(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289EB8 ReplayTheater::PickReplay");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
-    Finish(calls, frame, 0x82289F14, movie, Row(base));
-    Store(base, started, 1);
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
+    Finish(calls, frame, 0x82289F14, movie, Row());
+    Store(started, 1);
   }
   RunMovie(calls, frame, 0x82289F28, movie);
   return 1;
 }
 
-uint64_t MoveCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls) {
+uint64_t MoveCursor(uint32_t started, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8228A658 ReplayTheater::MoveCursor");
-  const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t movie = FindMovie(base, frame + 80);
-  if (Load(base, started) == 0) {
-    const uint32_t selection = race_screens::ListSelection(base, List(base).address);
-    const uint32_t before = List(base).selection_before();
-    const schema::MenuList list = List(base);
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t movie = FindMovie(frame + 80);
+  if (Load(started) == 0) {
+    const uint32_t selection = race_screens::ListSelection(List().address);
+    const uint32_t before = List().selection_before();
+    const schema::MenuList list = List();
     const uint32_t scroll = list.scroll();
     const uint32_t scrolled = scroll - list.scroll_before();
     const uint32_t wrapped = list.wrapped();
-    const uint32_t records = Records(base);
+    const uint32_t records = Records();
     Finish(calls, frame, 0x8228A6DC, movie, uint64_t(before) + 5);
     const uint64_t row = uint64_t(selection) + 5;
     Play(calls, frame, 0x8228A6FC, movie, row);
     Loop(calls, frame, 0x8228A708, movie, row);
-    ShowRecord(base, (scroll + selection) * 36 + records, frame, calls);
+    ShowRecord((scroll + selection) * 36 + records, frame, calls);
     Finish(calls, frame, 0x8228A724, movie, 15);
     Finish(calls, frame, 0x8228A730, movie, 16);
     if (wrapped != 0) {
-      StoreCursor(base, frame + 80, movie, selection);
+      StoreCursor(frame + 80, movie, selection);
     } else {
-      const int32_t direction = int32_t(List(base).move());
-      const uint32_t list_node = ui_movies::FindNode(base, movie, 3, 2);
+      const int32_t direction = int32_t(List().move());
+      const uint32_t list_node = ui_movies::FindNode(movie, 3, 2);
       if (direction < 0) {
-        calls.Call(kSetNodeText, frame, 0x8228A7A8, movie, ui_movies::Child(base, list_node, 15),
-                   471, Record(base, records, scroll).number());
+        calls.Call(kSetNodeText, frame, 0x8228A7A8, movie, ui_movies::Child(list_node, 15),
+                   471, Record(records, scroll).number());
         Play(calls, frame, 0x8228A7F4, movie, 15);
       } else if (direction > 0) {
-        calls.Call(kSetNodeText, frame, 0x8228A7D8, movie, ui_movies::Child(base, list_node, 14),
-                   471, Record(base, records, scroll + 9).number());
+        calls.Call(kSetNodeText, frame, 0x8228A7D8, movie, ui_movies::Child(list_node, 14),
+                   471, Record(records, scroll + 9).number());
         Play(calls, frame, 0x8228A7F4, movie, 16);
       }
     }
     if (scrolled != 0) {
       Finish(calls, frame, 0x8228A808, movie, 28);
       Finish(calls, frame, 0x8228A814, movie, 27);
-      ShowListPage(base, frame, calls);
+      ShowListPage(frame, calls);
       Play(calls, frame, 0x8228A840, movie, int32_t(scrolled) > 0 ? 28 : 27);
     }
-    Store(base, started, 1);
+    Store(started, 1);
   }
   RunMovie(calls, frame, 0x8228A854, movie);
   return 1;
 }
 
-uint64_t BuildList(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t BuildList(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8228A560 ReplayTheater::BuildList");
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, frame + 96);
-  const schema::SaveBuffers header = SaveBuffers(base);
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t movie = FindMovie(frame + 96);
+  const schema::SaveBuffers header = SaveBuffers();
   const uint32_t count = header.count();
   const uint32_t records = header.records().address;
   const uint32_t shown = int32_t(count) < 9 ? count : 9;
   // The accept and back actions, the stack arguments.
-  Store(base, frame + 84, 159);
-  Store(base, frame + 92, 158);
+  Store(frame + 84, 159);
+  Store(frame + 92, 158);
   calls.CallArgs(kListInit, frame, 0x8228A5DC,
-                 {List(base).address, count, shown, 1, 154, 153, 155, 156});
-  const uint32_t selection = race_screens::ListSelection(base, List(base).address);
-  StoreCursor(base, frame + 96, movie, selection);
-  ShowListPage(base, frame, calls);
-  ShowRecord(base, selection * 36 + records, frame, calls);
+                 {List().address, count, shown, 1, 154, 153, 155, 156});
+  const uint32_t selection = race_screens::ListSelection(List().address);
+  StoreCursor(frame + 96, movie, selection);
+  ShowListPage(frame, calls);
+  ShowRecord(selection * 36 + records, frame, calls);
   static constexpr uint32_t kPrompts[3] = {0, 1, kNone};
-  return SetPrompts(base, kPrompts, kPrompts, frame, calls);
+  return SetPrompts(kPrompts, kPrompts, frame, calls);
 }
 
-uint64_t ShowListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t ShowListPage(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82289F48 ReplayTheater::ShowListPage");
-  const uint32_t frame = Frame(base, sp, 176);
-  const schema::SaveBuffers header = SaveBuffers(base);
+  const uint32_t frame = Frame(sp, 176);
+  const schema::SaveBuffers header = SaveBuffers();
   const uint32_t records = header.records().address;
-  const uint32_t movie = FindMovie(base, frame + 80);
+  const uint32_t movie = FindMovie(frame + 80);
   const int32_t count = int32_t(header.count());
-  const uint32_t scroll = List(base).scroll();
+  const uint32_t scroll = List().scroll();
   const int32_t shown = count < 9 ? count : 9;
-  const uint32_t list_node = ui_movies::FindNode(base, movie, 3, 2);
+  const uint32_t list_node = ui_movies::FindNode(movie, 3, 2);
   for (uint32_t i = 0; i < 9; i++) {
-    calls.Call(kClearNodeText, frame, 0x82289FD0, movie, ui_movies::Child(base, list_node, i + 5));
+    calls.Call(kClearNodeText, frame, 0x82289FD0, movie, ui_movies::Child(list_node, i + 5));
   }
   for (int32_t i = 0; i < shown; i++) {
     calls.Call(kSetNodeText, frame, 0x8228A014, movie,
-               ui_movies::Child(base, list_node, uint32_t(i) + 5), 471,
-               Record(base, records, scroll + uint32_t(i)).number());
+               ui_movies::Child(list_node, uint32_t(i) + 5), 471,
+               Record(records, scroll + uint32_t(i)).number());
   }
   // The scroll arrows (children 7 and 8 of sub-scene 3).
   uint32_t up = 0, down = 0;
@@ -234,17 +234,17 @@ uint64_t ShowListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       down = 1;
     }
   }
-  Node(base, ui_movies::FindNode(base, movie, 3, 7)).set_visible(up);
-  const Node last(base, ui_movies::FindNode(base, movie, 3, 8));
+  Node(ui_movies::FindNode(movie, 3, 7)).set_visible(up);
+  const Node last(ui_movies::FindNode(movie, 3, 8));
   last.set_visible(down);
   return last.address;
 }
 
-uint64_t ShowRecord(uint8_t* base, uint32_t record, uint32_t sp, const Calls& calls) {
+uint64_t ShowRecord(uint32_t record, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8228A0D8 ReplayTheater::ShowRecord");
-  const uint32_t frame = Frame(base, sp, 192);
-  const uint32_t movie = FindMovie(base, frame + 96);
-  const schema::SaveReplayRecord r(base, record);
+  const uint32_t frame = Frame(sp, 192);
+  const uint32_t movie = FindMovie(frame + 96);
+  const schema::SaveReplayRecord r(record);
   if (record == 0 || r.number() == 0) {
     static constexpr uint32_t kTexts[6] = {9, 10, 13, 19, 20, 21};
     static constexpr uint32_t kLr[6] = {0x8228A330, 0x8228A340, 0x8228A350,
@@ -252,7 +252,7 @@ uint64_t ShowRecord(uint8_t* base, uint32_t record, uint32_t sp, const Calls& ca
     for (uint32_t k = 0; k < 6; k++) {
       calls.Call(kClearText, frame, kLr[k], movie, 3, kTexts[k]);
     }
-    Node(base, ui_movies::FindNode(base, movie, 3, 17)).set_texture_entry(0);
+    Node(ui_movies::FindNode(movie, 3, 17)).set_texture_entry(0);
     return calls.Call(kClearText, frame, 0x8228A3AC, movie, 3, 12);
   }
   uint32_t time = r.time();
@@ -260,7 +260,7 @@ uint64_t ShowRecord(uint8_t* base, uint32_t record, uint32_t sp, const Calls& ca
     time = 0x3BEFE7u | (time & 0x80000000u);  // 59:59.999
   }
   // The date: its fifth argument on the stack (+84).
-  Store(base, frame + 84, uint32_t(r.minute()));
+  Store(frame + 84, uint32_t(r.minute()));
   calls.CallArgs(kSetText, frame, 0x8228A164,
                  {movie, 3, 9, 530, uint64_t(r.year()), uint64_t(r.month()), uint64_t(r.day()),
                   uint64_t(r.hour())});
@@ -276,25 +276,25 @@ uint64_t ShowRecord(uint8_t* base, uint32_t record, uint32_t sp, const Calls& ca
     if (kind == 1 || kind == 3) {
       static constexpr uint32_t kModes[8] = {395, 396, 397, 398, 401, 402, 404, 403};
       for (uint32_t k = 0; k < 8; k++) {
-        Store(base, frame + 112 + 4 * k, kModes[k]);
+        Store(frame + 112 + 4 * k, kModes[k]);
       }
-      Node(base, ui_movies::FindNode(base, movie, 3, 17)).set_texture_entry(1);
-      text = Load(base, frame + 112 + (r.result() << 2));
+      Node(ui_movies::FindNode(movie, 3, 17)).set_texture_entry(1);
+      text = Load(frame + 112 + (r.result() << 2));
     } else if (kind == 2) {
-      Node(base, ui_movies::FindNode(base, movie, 3, 17)).set_texture_entry(0);
+      Node(ui_movies::FindNode(movie, 3, 17)).set_texture_entry(0);
       text = 477;
     } else {
-      Node(base, ui_movies::FindNode(base, movie, 3, 17)).set_texture_entry(0);
+      Node(ui_movies::FindNode(movie, 3, 17)).set_texture_entry(0);
       text = uint64_t(r.result()) + 4650;
     }
     calls.Call(kSetText, frame, 0x8228A2C4, movie, 3, 12, text);
   }
   // The record's +28 in two digits (children 5 and 6).
-  const uint32_t tens = ui_movies::FindNode(base, movie, 3, 5);
-  const uint32_t units = ui_movies::FindNode(base, movie, 3, 6);
+  const uint32_t tens = ui_movies::FindNode(movie, 3, 5);
+  const uint32_t units = ui_movies::FindNode(movie, 3, 6);
   const int32_t number = int32_t(r.number());
-  Node(base, tens).set_texture_entry(number < 10 ? 0 : uint32_t(number / 10));
-  Node(base, units).set_texture_entry(uint32_t(number % 10));
+  Node(tens).set_texture_entry(number < 10 ? 0 : uint32_t(number / 10));
+  Node(units).set_texture_entry(uint32_t(number % 10));
   return units;
 }
 

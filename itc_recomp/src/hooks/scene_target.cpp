@@ -50,49 +50,49 @@ bool Native() {
 }  // namespace
 
 
-void hooks::SceneTargetTexturedRect(lifted::Regs& ctx, uint8_t* base) {
+void hooks::SceneTargetTexturedRect(lifted::Regs& ctx) {
   const uint32_t rect = ctx.r3.u32;
   const uint64_t bucket = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
   bool done = false;
-  guest_call::InFrame(ctx, base, scene_target::kRecordFlatFrame, 0x8217AEA0, [&](uint32_t frame) {
-    const auto chunk = scene_target::TexturedRectRecordFlat(base, rect, frame);
+  guest_call::InFrame(ctx, scene_target::kRecordFlatFrame, 0x8217AEA0, [&](uint32_t frame) {
+    const auto chunk = scene_target::TexturedRectRecordFlat(rect, frame);
     if (!chunk) {
       return;
     }
     done = true;
     // The render queue's slot 4: r4 = the chunk, r5 = the bucket, f1 = 0.0.
-    ctx.r3.u64 = schema::SceneTargetGlobals::rect_queue(base);
+    ctx.r3.u64 = schema::SceneTargetGlobals::rect_queue();
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = bucket;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(schema::SceneTargetGlobals::zero(base));
+    ctx.f1.f64 = double(schema::SceneTargetGlobals::zero());
     const uint32_t function =
-        guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
+        guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 16);
     ctx.ctr.u64 = function;
     ctx.lr = 0x8217AEA0;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
   });
   ctx.lr = lr;
   if (!done) {
-    lifted::original::c8217C368(ctx, base);
+    lifted::original::c8217C368(ctx);
   }
 }
 
-void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
+void hooks::SceneTargetRecordPasses(lifted::Regs& ctx) {
   const uint32_t scene = ctx.r3.u32, list = ctx.r4.u32;
   const uint32_t bucket5 = ctx.r5.u32, bucket6 = ctx.r6.u32, bucket7 = ctx.r7.u32;
   const uint64_t lr = ctx.lr;
   bool done = false;
   guest_call::InFrame(
-      ctx, base, scene_target::kRecordPassesFrame, 0x8209B634, [&](uint32_t frame) {
+      ctx, scene_target::kRecordPassesFrame, 0x8209B634, [&](uint32_t frame) {
         auto vtable_call = [&](uint32_t byte, uint32_t return_address) {
-          const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + byte);
+          const uint32_t function = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + byte);
           ctx.ctr.u64 = function;
           ctx.lr = return_address;
           // Slot 8's plain C++ where it's the game's (hooks::DirectSlotCall).
-          if (!hooks::DirectSlotCall(ctx, base, function)) {
-            lifted::CallFromContext(ctx, base, function);
+          if (!hooks::DirectSlotCall(ctx, function)) {
+            lifted::CallFromContext(ctx, function);
           }
         };
         scene_target::PassCalls calls;
@@ -100,11 +100,11 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
         // queue), the queue's slot 4 (f1 = 0.0, the original's f30).
         calls.submit = [&](uint32_t chunk, uint32_t bucket, uint32_t lr1, uint32_t lr2,
                            uint32_t lr3) {
-          ctx.r3.u64 = schema::AppStartUpGlobals::render_app<schema::View>(base).address;
+          ctx.r3.u64 = schema::AppStartUpGlobals::render_app<schema::View>().address;
           vtable_call(32, lr1);
           vtable_call(8, lr2);
           ctx.fpscr.disableFlushMode();
-          ctx.f1.f64 = double(schema::SceneTargetGlobals::zero(base));
+          ctx.f1.f64 = double(schema::SceneTargetGlobals::zero());
           ctx.r5.u64 = bucket;
           ctx.r4.u64 = chunk;
           vtable_call(16, lr3);
@@ -114,14 +114,14 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
           ctx.r4.u64 = 0;
           ctx.r5.u64 = bucket;
           ctx.lr = return_address;
-          hooks::SceneTargetTexturedRect(ctx, base);
+          hooks::SceneTargetTexturedRect(ctx);
         };
-        done = scene_target::RecordPasses(base, frame, scene, list, bucket5, bucket6, bucket7,
+        done = scene_target::RecordPasses(frame, scene, list, bucket5, bucket6, bucket7,
                                           calls);
       });
   ctx.lr = lr;
   if (!done) {
-    lifted::original::c8209B3D0(ctx, base);
+    lifted::original::c8209B3D0(ctx);
   }
 }
 
@@ -129,10 +129,10 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
 // r5, r6, r7 = the buckets; r3 as the last guest call leaves it (the scene
 // target when no pass is recorded). No adapter: only FramePasses::Record's
 // adapter calls this.
-void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx, uint8_t* base) {
+void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx) {
   if (!Native()) {
-    lifted::original::c8209B3D0(ctx, base);
+    lifted::original::c8209B3D0(ctx);
     return;
   }
-  hooks::SceneTargetRecordPasses(ctx, base);
+  hooks::SceneTargetRecordPasses(ctx);
 }

@@ -35,13 +35,13 @@ namespace {
 // AllBeaten's walk over the items, wherever their words are (the guest list,
 // or Check's lists, C++ locals since E5 step 6).
 template <typename Item>
-uint32_t AllBeatenItems(uint8_t* base, uint32_t count, Item item_at) {
+uint32_t AllBeatenItems(uint32_t count, Item item_at) {
   ITC_NATIVE_RUNNING("sub_82290698 Achievements::AllBeaten");
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t item = item_at(i);
     // The item's record: SaveData's item records are 12 bytes by item id.
-    if (schema::SaveData(base, item * 12 + save).item_record_wins() == 0) {
+    if (schema::SaveData(item * 12 + save).item_record_wins() == 0) {
       return 0;
     }
   }
@@ -50,30 +50,29 @@ uint32_t AllBeatenItems(uint8_t* base, uint32_t count, Item item_at) {
 
 }  // namespace
 
-uint32_t AllBeaten(uint8_t* base, uint32_t list, uint32_t count, uint32_t sp) {
+uint32_t AllBeaten(uint32_t list, uint32_t count, uint32_t sp) {
   // No guest frame (E5 step 6): the original's 112 bytes held only the back
   // chain, and nothing here calls guest code.
   (void)sp;
-  return AllBeatenItems(base, count,
-                        [&](uint32_t i) { return guest::LoadU32(base, list + 4 * i); });
+  return AllBeatenItems(count,
+                        [&](uint32_t i) { return guest::LoadU32(list + 4 * i); });
 }
 
-uint32_t BeatsCourseTime(uint8_t* base, uint32_t route, uint32_t time, uint32_t sp) {
+uint32_t BeatsCourseTime(uint32_t route, uint32_t time, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82290710 Achievements::BeatsCourseTime");
   (void)sp;  // no guest frame (E5 step 6): only the back chain, no guest calls
-  const int32_t wanted = int32_t(guest::LoadU32(base, route));
+  const int32_t wanted = int32_t(guest::LoadU32(route));
   for (uint32_t i = 0; i < kCourseTargetCount; i++) {
-    const schema::AchievementCourseTarget target(
-        base, schema::AchievementsGlobals::course_targets_address() +
+    const schema::AchievementCourseTarget target(schema::AchievementsGlobals::course_targets_address() +
                   schema::AchievementCourseTarget::kSize * i);
     if (target.route() == wanted) {
-      return TimeLess(schema::AchievementsPackedTime(base, time).packed(), target.time());
+      return TimeLess(schema::AchievementsPackedTime(time).packed(), target.time());
     }
   }
   return 0;
 }
 
-uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
+uint32_t Check(uint32_t kind, uint32_t out, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82290788 Achievements::Check");
   // No guest frame (E5 step 6): the item lists (the original's +80, +88
   // and +112) are C++ locals, read only by AllBeaten; nothing here calls
@@ -85,10 +84,9 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
                                             391, 396, 392, 0,   397, 398, 399};
   uint32_t any = 0;
   for (int i = 0; i < kCount; i++) {
-    const schema::AchievementFlag word(base, out + schema::AchievementFlag::kSize * i);
+    const schema::AchievementFlag word(out + schema::AchievementFlag::kSize * i);
     word.set_earned(0);
-    const schema::AchievementPair pair(
-        base, schema::AchievementsGlobals::table_address() + schema::AchievementPair::kSize * i);
+    const schema::AchievementPair pair(schema::AchievementsGlobals::table_address() + schema::AchievementPair::kSize * i);
     if (pair.kind() != int32_t(kind)) {
       continue;
     }
@@ -110,20 +108,19 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
         items[0] = kOneItem[index];
         count = 1;
       }
-      word.set_earned(AllBeatenItems(base, count, [&](uint32_t k) { return items[k]; }));
+      word.set_earned(AllBeatenItems(count, [&](uint32_t k) { return items[k]; }));
     } else if (index <= 22) {  // ids 17 to 24: route id - 17
-      const schema::RaceProgress progress = schema::AchievementsGlobals::progress(base);
+      const schema::RaceProgress progress = schema::AchievementsGlobals::progress();
       if (int32_t(progress.route_course()) == int32_t(index - 15)) {
-        word.set_earned(BeatsCourseTime(base, progress.route_course_address(),
+        word.set_earned(BeatsCourseTime(progress.route_course_address(),
                                         progress.e0_time_address(), sp));
       }
     } else if (index <= 26) {  // ids 25 to 28: a count of the player's
-      const int32_t slot = mode_tick::PlayersSignedInSlot(base, 0);
+      const int32_t slot = mode_tick::PlayersSignedInSlot(0);
       if (slot >= 0) {
         const uint32_t threshold =
-            guest::LoadU32(base, schema::AchievementsGlobals::thresholds_address() + 4 * i);
-        const uint32_t value = guest::LoadU32(
-            base, schema::AchievementsGlobals::user_counts_address() + 4 * uint32_t(slot)) + 1;
+            guest::LoadU32(schema::AchievementsGlobals::thresholds_address() + 4 * i);
+        const uint32_t value = guest::LoadU32(schema::AchievementsGlobals::user_counts_address() + 4 * uint32_t(slot)) + 1;
         if (value >= threshold) {
           word.set_earned(1);
         }
@@ -136,21 +133,20 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
   return any;
 }
 
-uint64_t Write(uint8_t* base, uint64_t words, uint32_t sp, const Calls& calls) {
+uint64_t Write(uint64_t words, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82290A30 Achievements::Write");
   // No guest frame (E5 step 6): the original's 144 bytes held only the back
   // chain; XUserWriteAchievements (native, plugged in) is called from `sp`
   // and reads no caller slot.
   uint64_t r3 = words;
   for (uint32_t i = 0; i < uint32_t(kCount); i++) {
-    if (schema::AchievementFlag(base, uint32_t(words) + schema::AchievementFlag::kSize * i)
+    if (schema::AchievementFlag(uint32_t(words) + schema::AchievementFlag::kSize * i)
             .earned() == 0) {
       continue;
     }
-    const schema::AchievementEntry entry(
-        base, schema::AchievementsGlobals::entries_address() + schema::AchievementEntry::kSize * i);
-    entry.set_user(schema::AchievementsGlobals::player_user(base));
-    entry.set_id(schema::AchievementPair(base, schema::AchievementsGlobals::table_address() +
+    const schema::AchievementEntry entry(schema::AchievementsGlobals::entries_address() + schema::AchievementEntry::kSize * i);
+    entry.set_user(schema::AchievementsGlobals::player_user());
+    entry.set_id(schema::AchievementPair(schema::AchievementsGlobals::table_address() +
                                                    schema::AchievementPair::kSize * i)
                      .id());
     // The XAM wrapper through the guest, as the original (the user's call,
@@ -162,7 +158,7 @@ uint64_t Write(uint8_t* base, uint64_t words, uint32_t sp, const Calls& calls) {
   return r3;
 }
 
-uint32_t WriteAchievements(uint8_t* base, uint32_t count, uint32_t list,
+uint32_t WriteAchievements(uint32_t count, uint32_t list,
                            uint32_t overlapped) {
   ITC_NATIVE_RUNNING("sub_82294E58 XUserWriteAchievements");
   // Plugged in (the user's call, 2026-11-16): the game reads nothing back
@@ -171,7 +167,7 @@ uint32_t WriteAchievements(uint8_t* base, uint32_t count, uint32_t list,
   // ids are only logged.
   for (uint32_t i = 0; i < count; i++) {
     ITC_LOG_INFO("achievement {} earned (not recorded)",
-                 schema::AchievementEntry(base, list + schema::AchievementEntry::kSize * i).id());
+                 schema::AchievementEntry(list + schema::AchievementEntry::kSize * i).id());
   }
   constexpr uint32_t kIoPending = 997;
   return overlapped != 0 ? kIoPending : 0;

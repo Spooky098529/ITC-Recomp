@@ -109,7 +109,7 @@ namespace graphics::device_state {
 
 // Each: r3 the device, r4 the value (a float's bits for the float ones).
 #define ITC_DECLARE_SETTER(address, name, uses_float) \
-  void name(uint8_t* base, uint32_t device, uint32_t value);
+  void name(uint32_t device, uint32_t value);
 ITC_RENDER_STATE_SETTERS(ITC_DECLARE_SETTER)
 #undef ITC_DECLARE_SETTER
 
@@ -140,13 +140,13 @@ ITC_RENDER_STATE_SETTERS(ITC_DECLARE_SETTER)
   X(822A33F0, SetPointBorderEnable, false)
 
 #define ITC_DECLARE_SAMPLER_SETTER(address, name, uses_float) \
-  void name(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t value);
+  void name(uint32_t device, uint32_t sampler, uint32_t value);
 ITC_SAMPLER_STATE_SETTERS(ITC_DECLARE_SAMPLER_SETTER)
 #undef ITC_DECLARE_SAMPLER_SETTER
 
 // sub_822A2470 Device::GetRenderState_ViewportEnable: PA_CL_VTE_CNTL's
 // shadow (+10444) bit 0.
-uint32_t GetViewportEnable(uint8_t* base, uint32_t device);
+uint32_t GetViewportEnable(uint32_t device);
 
 // The bound objects and the shader constants. The ones that fence the
 // object they replace return false, with nothing written, when the fence
@@ -157,43 +157,43 @@ uint32_t GetViewportEnable(uint8_t* base, uint32_t device);
 // to `out` (memcpy's copy). False, with nothing copied, where memcpy's
 // override has to run (a destination in the physical views, which it
 // records for the renderer, or ranges that may share memory).
-bool GetViewport(uint8_t* base, uint32_t device, uint32_t out);
+bool GetViewport(uint32_t device, uint32_t out);
 
 // sub_822A3758 Device::SetStreamSource: the stream's vertex fetch constant
 // (with a buffer; `dirty` ORed into +16), the previous buffer fenced, the
 // buffer and its stride / 4 kept, and +16 bit 51 when the stride differs
 // from the vertex shader's.
-bool SetStreamSource(uint8_t* base, uint32_t device, uint32_t stream, uint32_t buffer,
+bool SetStreamSource(uint32_t device, uint32_t stream, uint32_t buffer,
                      uint32_t offset, uint32_t stride, uint64_t dirty);
 
 // sub_822A3908 Device::SetIndices: the previous index buffer fenced, then
 // +12180 = `buffer`.
-bool SetIndices(uint8_t* base, uint32_t device, uint32_t buffer);
+bool SetIndices(uint32_t device, uint32_t buffer);
 
 // sub_822A6008 Device::SetTexture: with a texture, its fetch constant
 // merged into the stage's (the sampler states' bits kept, the mip levels
 // clamped by the stage's), `dirty` ORed into +16; the texture kept and the
 // previous one fenced.
-bool SetTexture(uint8_t* base, uint32_t device, uint32_t stage, uint32_t texture,
+bool SetTexture(uint32_t device, uint32_t stage, uint32_t texture,
                 uint64_t dirty);
 
 // sub_822A3B30 Device::SetBlendControl: RB_BLENDCONTROL of render target
 // `target` = `value`; its register's dirty bit and +16 bit 49.
-void SetBlendControl(uint8_t* base, uint32_t device, uint32_t target, uint32_t value);
+void SetBlendControl(uint32_t device, uint32_t target, uint32_t value);
 
 // sub_822A81F8 Device::SetVertexShaderConstantF and sub_822A8308
 // Device::SetPixelShaderConstantF: `count` four-float constants from
 // `data` (any alignment) to device + 1792 (+5888) + 16 x `first`, stored
 // 16-byte aligned as the original's stvx; `dirty` ORed into +0 (+8).
-void SetVertexShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+void SetVertexShaderConstantF(uint32_t device, uint32_t first, uint32_t data,
                               uint32_t count, uint64_t dirty);
-void SetPixelShaderConstantF(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+void SetPixelShaderConstantF(uint32_t device, uint32_t first, uint32_t data,
                              uint32_t count, uint64_t dirty);
 
 // sub_822A8470 Device::SetPixelShaderConstantB: `count` (at least 1, as
 // the original's do-while) bool constants from `data` (a word each, bit 0)
 // into the bits at +10000; +24 bit 1.
-void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uint32_t data,
+void SetPixelShaderConstantB(uint32_t device, uint32_t first, uint32_t data,
                              uint32_t count);
 
 // sub_822A6A88 VertexDeclaration::FromFvf: the declaration for flexible
@@ -202,12 +202,12 @@ void SetPixelShaderConstantB(uint8_t* base, uint32_t device, uint32_t first, uin
 // after them), its element count at +24 and +28, +48 = 0. Returns the
 // elements written before the end marker. The end marker's last byte (a
 // pad) is the original's uninitialized stack byte; 0 here.
-uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declaration);
+uint32_t VertexDeclarationFromFvf(uint32_t fvf, uint32_t declaration);
 
 // sub_822AA0E8 Device::SetFVF: +12176 = `fvf`, the device's own declaration
 // built from it at +11936 and made the current one (+11552), +16 bit 51 (the
 // vertex shader, patched again).
-void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf);
+void SetFVF(uint32_t device, uint32_t fvf);
 
 // The scissor and the viewport. Device::SetScreenScissor (sub_822A0F80)
 // only wrote the window scissor into the command buffer, which nothing reads
@@ -218,22 +218,22 @@ void SetFVF(uint8_t* base, uint32_t device, uint32_t fvf);
 // bottom at `rect`) kept at +12416; the window scissor's shadow (+10308,
 // +10312) from it clipped to the viewport with the scissor test on
 // (+11600), else from the viewport.
-void SetScissorRect(uint8_t* base, uint32_t device, uint32_t rect);
+void SetScissorRect(uint32_t device, uint32_t rect);
 
 // sub_822A3D20 Device::SetRenderState_ScissorTestEnable (render state 200):
 // +11600 = `value`, then SetScissorRect with the kept rectangle.
-void SetScissorTestEnable(uint8_t* base, uint32_t device, uint32_t value);
+void SetScissorTestEnable(uint32_t device, uint32_t value);
 
 // sub_822A3518 Device::SetViewport: nothing without render target 0 or a
 // depth surface; the viewport (`viewport`: x, y, width, height, min and max
 // Z) clipped to the bound surface (or the tiling's size), kept at +12392,
 // SetScissorRect with the kept rectangle, and PA_CL_VPORT's shadow.
-void SetViewport(uint8_t* base, uint32_t device, uint32_t viewport);
+void SetViewport(uint32_t device, uint32_t viewport);
 
 // sub_822A3C88 Device::SetSurfaceInfo: the AA config and RB_SURFACE_INFO
 // from `surface`, the scissor rectangle and the viewport set to the whole
 // surface (from the image's 0x82013618 and 0x82013600).
-void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface);
+void SetSurfaceInfo(uint32_t device, uint32_t surface);
 
 // sub_822A3D30 Device::SetRenderTarget: render target `index` = `surface`
 // (+12184 + 4 x index); with a surface, its +28 into RB_COLOR_INFO's shadow
@@ -241,10 +241,10 @@ void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface);
 // Target 0: SetSurfaceInfo with the surface (or the depth surface) and the
 // predicated tiling bit (+10808 bit 1) worked out again; targets 0-3 their
 // color write mask applied again to RB_COLOR_MASK (+24 bit 18).
-void SetRenderTarget(uint8_t* base, uint32_t device, uint32_t index, uint32_t surface);
+void SetRenderTarget(uint32_t device, uint32_t index, uint32_t surface);
 
 // sub_822A4340 Device::SetRenderTarget_External: a jump to SetRenderTarget.
-void SetRenderTargetExternal(uint8_t* base, uint32_t device, uint32_t index,
+void SetRenderTargetExternal(uint32_t device, uint32_t index,
                              uint32_t surface);
 
 // sub_822A4060 Device::SetDepthStencilSurface: the depth surface
@@ -253,7 +253,7 @@ void SetRenderTargetExternal(uint8_t* base, uint32_t device, uint32_t index,
 // top bits from the tiling's with +10811 bit 6); the predicated tiling bit
 // worked out again, and the Z and stencil enables applied again to
 // RB_DEPTHCONTROL.
-void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface);
+void SetDepthStencilSurface(uint32_t device, uint32_t surface);
 
 // --- The packet writers ---
 //
@@ -283,7 +283,7 @@ struct DeviceCalls {
 
 // sub_8229B7D8: +10788 bits 12-13 = `bits`; its WAIT_UNTIL and register
 // 0xF01 packets left out.
-void SetRegisterF01Bits(uint8_t* base, uint32_t device, uint32_t bits);
+void SetRegisterF01Bits(uint32_t device, uint32_t bits);
 
 // The predicated tiling bit (+10808 bit 1) worked out again, as
 // SetRenderTarget and SetDepthStencilSurface do (inline in each, and in
@@ -292,25 +292,25 @@ void SetRegisterF01Bits(uint8_t* base, uint32_t device, uint32_t bits);
 // (+10808 bit 4, or bit 5 with each bound surface the one saved at
 // +12468..+12484 or none), +10808 bit 3 clear, and +10811 bit 6 or neither
 // +11865 nor +11931 set.
-void UpdatePredicatedTiling(uint8_t* base, uint32_t device);
+void UpdatePredicatedTiling(uint32_t device);
 
 // sub_822A3B90 Device::DirtyAllState: with `mode` 0, sub_8229B7D8 with the
 // bits +10788 holds (its binning packets left out); every dirty mask
 // (+0..+39) set, so the next draw writes every register block again (the
 // screen scissor's packets, Dropped, left out).
-void DirtyAllState(uint8_t* base, uint32_t device, uint32_t mode);
+void DirtyAllState(uint32_t device, uint32_t mode);
 
 // sub_8229F680: the dirty register blocks flushed as a draw does (the flush
 // helpers, guest calls) and their mask bits cleared; then the blocks its
 // dummy draws would overwrite marked dirty again (its built-in shaders,
 // register writes, screen scissors and two dummy draws left out).
-void FlushForGprAllocation(uint8_t* base, uint32_t device, const DeviceCalls& calls);
+void FlushForGprAllocation(uint32_t device, const DeviceCalls& calls);
 
 // sub_822A8A60 Device::SetShaderGprAllocation: the GPU register split
 // (SQ_GPR_MANAGEMENT: `vertex` registers in bits 12-18, `pixel` in bits
 // 4-10; 0x40400 when both are 0) at +10792, its packets left out, then
 // sub_8229F680.
-void SetShaderGprAllocation(uint8_t* base, uint32_t device, uint32_t vertex, uint32_t pixel,
+void SetShaderGprAllocation(uint32_t device, uint32_t vertex, uint32_t pixel,
                             const DeviceCalls& calls);
 
 // sub_822A3A20 Device::SetGammaRamp: the ramp at `ramp` (three channels of
@@ -319,7 +319,7 @@ void SetShaderGprAllocation(uint8_t* base, uint32_t device, uint32_t vertex, uin
 // bytes), copied there (its packets, sub_822B0C38, left out). False, with
 // nothing written, for a device in the physical views (memcpy's override
 // records those for the renderer): the original runs.
-bool SetGammaRamp(uint8_t* base, uint32_t device, uint32_t ramp);
+bool SetGammaRamp(uint32_t device, uint32_t ramp);
 
 // sub_822ACB90 Device::SetDefaultState: the setter tables filled from the
 // image's (render states at 0x826388F8, sampler states at 0x82638D78 for
@@ -328,7 +328,7 @@ bool SetGammaRamp(uint8_t* base, uint32_t device, uint32_t ramp);
 // textures unset, the default vertex declaration, the present interval kept,
 // the predicated tiling bit worked out again, and, with +10808 bit 7 clear,
 // SetShaderGprAllocation(0, 0).
-void SetDefaultState(uint8_t* base, uint32_t device, const DeviceCalls& calls);
+void SetDefaultState(uint32_t device, const DeviceCalls& calls);
 
 // The device's fields: schema::Device (itc_recomp/schema/device-state.toml).
 

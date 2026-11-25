@@ -28,10 +28,10 @@ struct Layout {
 // When either range is a handle's: the copy done (as memmove: overlapping
 // host ranges come out right) and true; else false, nothing done (a copy
 // in guest memory, the caller's).
-bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
+bool CopyWithHandles(uint32_t destination, uint32_t source, uint32_t size);
 
 // When the destination is a handle's: the fill done and true; else false.
-bool FillWithHandles(uint8_t* base, uint32_t destination, uint8_t value, uint32_t size);
+bool FillWithHandles(uint32_t destination, uint8_t value, uint32_t size);
 
 // A field over other fields of a host object (a union, a word read as two
 // halves, a byte of a word): its value as the guest's bytes would give it.

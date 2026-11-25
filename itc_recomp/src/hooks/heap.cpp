@@ -58,16 +58,16 @@ void LogOnce(uint32_t kind, uint32_t value, const char* what, uint32_t caller) {
   }
 }
 
-bool IsProcessHeap(uint8_t* base, uint32_t heap, uint32_t caller) {
-  if (heap == schema::HeapGlobals::process_heap(base).address) {
+bool IsProcessHeap(uint32_t heap, uint32_t caller) {
+  if (heap == schema::HeapGlobals::process_heap().address) {
     return true;
   }
   LogOnce(0, heap, "a heap other than the process heap's", caller);
   return false;
 }
 
-uint32_t PhysicalProtection(uint8_t* base, uint32_t protection) {
-  if (schema::HeapGlobals::no_large_physical_pages(base) != 0) {
+uint32_t PhysicalProtection(uint32_t protection) {
+  if (schema::HeapGlobals::no_large_physical_pages() != 0) {
     protection &= ~kMemLargePages;
   }
   return protection;
@@ -92,7 +92,7 @@ RecompiledHeapScope::~RecompiledHeapScope() {
 // HeapAlloc: r3 = heap, r4 = flags, r5 = size; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(82299D60) {
   
-  if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
+  if (!hooks::Native() || !hooks::IsProcessHeap(ctx.r3.u32, uint32_t(ctx.lr))) {
     lifted::NoOriginal(0x82299D60);
     return;
   }
@@ -102,7 +102,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82299D60) {
 // HeapFree: r3 = heap, r4 = flags, r5 = block; returns whether it was freed.
 ITC_NATIVE_ENTRY_ALWAYS(8229A648) {
   
-  if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
+  if (!hooks::Native() || !hooks::IsProcessHeap(ctx.r3.u32, uint32_t(ctx.lr))) {
     lifted::NoOriginal(0x8229A648);
     return;
   }
@@ -113,7 +113,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229A648) {
 // block.
 ITC_NATIVE_ENTRY_ALWAYS(8229A930) {
   
-  if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
+  if (!hooks::Native() || !hooks::IsProcessHeap(ctx.r3.u32, uint32_t(ctx.lr))) {
     lifted::NoOriginal(0x8229A930);
     return;
   }
@@ -123,8 +123,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8229A930) {
 // HeapSize: r3 = heap, r4 = flags (unread), r5 = block; returns its size.
 ITC_NATIVE_ENTRY_ALWAYS(82298FF8) {
   
-  if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
-    lifted::original::c82298FF8(ctx, base);
+  if (!hooks::Native() || !hooks::IsProcessHeap(ctx.r3.u32, uint32_t(ctx.lr))) {
+    lifted::original::c82298FF8(ctx);
     return;
   }
   ctx.r3.u64 = memory::Size(ctx.r5.u32);
@@ -137,13 +137,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82295398) {
   const uint32_t address = ctx.r3.u32, size = ctx.r4.u32, type = ctx.r5.u32;
   const uint32_t caller = uint32_t(ctx.lr);
   if (!hooks::Native()) {
-    lifted::original::c82295398(ctx, base);
+    lifted::original::c82295398(ctx);
     return;
   }
   if (address != 0 || !(type & hooks::kMemCommit) || (type & ~hooks::kTypesTaken)) {
     hooks::LogOnce(1, type, address != 0 ? "VirtualAlloc at an address, type" : "VirtualAlloc type",
                    caller);
-    lifted::original::c82295398(ctx, base);
+    lifted::original::c82295398(ctx);
     return;
   }
   if (ctx.r6.u32 != 4) {
@@ -177,13 +177,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82295330) {
   // before the kernel (the original's first branch, kept).
   if (ctx.r3.u32 == 0 && !((ctx.r5.u32 & hooks::kMemRelease) && ctx.r4.u32 != 0)) {
     constexpr uint32_t kErrorInvalidAddress = 487;
-    last_error::Set(base, ctx.r13.u32, kErrorInvalidAddress);
+    last_error::Set(ctx.r13.u32, kErrorInvalidAddress);
     ctx.r3.u64 = 0;
     return;
   }
   auto r3 = hooks::VirtualFree(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   if (!r3) {
-    lifted::original::c82295330(ctx, base);
+    lifted::original::c82295330(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -195,11 +195,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82295330) {
 ITC_NATIVE_ENTRY_ALWAYS(822964C8) {
   
   if (!hooks::Native()) {
-    lifted::original::c822964C8(ctx, base);
+    lifted::original::c822964C8(ctx);
     return;
   }
   const uint32_t size = ctx.r3.u32, physical = ctx.r4.u32;
-  const uint32_t protection = hooks::PhysicalProtection(base, ctx.r6.u32);
+  const uint32_t protection = hooks::PhysicalProtection(ctx.r6.u32);
   ctx.r3.u64 = physical == 0xFFFFFFFF
                    ? memory::AllocPhysical(size, 0, 0xFFFFFFFF, ctx.r5.u32, protection)
                    : memory::AllocPhysical(size, physical, size + physical - 1, 0, protection);
@@ -210,18 +210,18 @@ ITC_NATIVE_ENTRY_ALWAYS(822964C8) {
 ITC_NATIVE_ENTRY_ALWAYS(82296550) {
   
   if (!hooks::Native()) {
-    lifted::original::c82296550(ctx, base);
+    lifted::original::c82296550(ctx);
     return;
   }
   ctx.r3.u64 = memory::AllocPhysical(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                     hooks::PhysicalProtection(base, ctx.r7.u32));
+                                     hooks::PhysicalProtection(ctx.r7.u32));
 }
 
 // XPhysicalFree: r3 = the address.
 ITC_NATIVE_ENTRY_ALWAYS(822965C8) {
   
   if (!hooks::Native()) {
-    lifted::original::c822965C8(ctx, base);
+    lifted::original::c822965C8(ctx);
     return;
   }
   memory::FreePhysical(ctx.r3.u32);

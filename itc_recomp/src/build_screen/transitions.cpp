@@ -23,16 +23,16 @@ constexpr uint32_t kLoopNamed = 0x8211DDE0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kRun = 0x8211E1B8;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 using G = schema::BuildScreenGlobals;
 
-schema::BuildScreenData Screen(uint8_t* base) { return G::screen(base); }
+schema::BuildScreenData Screen() { return G::screen(); }
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  Store(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  Store(sp - bytes, sp);
   return sp - bytes;
 }
 
@@ -62,26 +62,26 @@ struct Movie6 {
 // A transition: its work on the first call (the step word 0, then 1), the
 // movie run each call.
 template <typename Work>
-uint64_t Transition(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, uint32_t run_lr,
+uint64_t Transition(uint32_t step, uint32_t sp, uint32_t bytes, uint32_t run_lr,
                     const Calls& calls, Work&& work) {
-  const uint32_t frame = Frame(base, sp, bytes);
-  const Movie6 m{calls, frame, Movie(base, frame)};
-  if (Load(base, step) == 0) {
+  const uint32_t frame = Frame(sp, bytes);
+  const Movie6 m{calls, frame, Movie(frame)};
+  if (Load(step) == 0) {
     work(m);
-    Store(base, step, 1);
+    Store(step, 1);
   }
   return m.Run(run_lr);
 }
 
-uint32_t Selection(uint8_t* base) {
-  return race_screens::ListSelection(base, G::list(base).address);
+uint32_t Selection() {
+  return race_screens::ListSelection(G::list().address);
 }
 
 // A back transition's end, once the movie's animations are done: the state
 // left (+0) kept at +8 unless it is `level`, +4 `level`, +0 and +16 -1, +12
 // `highlight` (that level's highlight transition) with its word +24 0.
-void Back(uint8_t* base, uint32_t level, uint32_t highlight) {
-  const schema::PageObject machine = G::machine(base);
+void Back(uint32_t level, uint32_t highlight) {
+  const schema::PageObject machine = G::machine();
   const uint32_t left = machine.page();
   if (left != level) {
     machine.set_previous_page(left);
@@ -90,15 +90,15 @@ void Back(uint8_t* base, uint32_t level, uint32_t highlight) {
   machine.set_next_page(level);
   machine.set_step(highlight);
   machine.set_page(0xFFFFFFFFu);
-  G::machine(base).set_step_started(0);
+  G::machine().set_step_started(0);
 }
 
 // HighlightGroups and HighlightGroups2: the groups' animations looped (the
 // first also 84), the row's, the category's tab played.
-void HighlightGroups(uint8_t* base, const Movie6& m, const uint32_t* lrs, int loops,
+void HighlightGroups(const Movie6& m, const uint32_t* lrs, int loops,
                      uint32_t row_lr, uint32_t finish_lr, uint32_t tab_lr) {
   constexpr uint32_t kNamed[5] = {44, 42, 43, 80, 84};
-  const uint32_t s = Selection(base);
+  const uint32_t s = Selection();
   for (int i = 0; i < loops; i++) {
     m.PlayLoop(lrs[i], kNamed[i]);
   }
@@ -106,42 +106,42 @@ void HighlightGroups(uint8_t* base, const Movie6& m, const uint32_t* lrs, int lo
   for (uint32_t k = 0; k < 4; k++) {
     m.Finish(finish_lr, 76 + k);
   }
-  m.Play(tab_lr, uint64_t(Screen(base).category()) + 76, 1);
+  m.Play(tab_lr, uint64_t(Screen().category()) + 76, 1);
 }
 
 }  // namespace
 
-uint64_t HighlightGroupsA(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightGroupsA(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219C528 BuildScreen::HighlightGroups");
   static constexpr uint32_t kLrs[5] = {0x8219C58C, 0x8219C5B4, 0x8219C5DC, 0x8219C604,
                                        0x8219C62C};
-  Transition(base, step, sp, 128, 0x8219C6C4, calls, [&](const Movie6& m) {
-    HighlightGroups(base, m, kLrs, 5, 0x8219C658, 0x8219C674, 0x8219C6B0);
+  Transition(step, sp, 128, 0x8219C6C4, calls, [&](const Movie6& m) {
+    HighlightGroups(m, kLrs, 5, 0x8219C658, 0x8219C674, 0x8219C6B0);
   });
   return 1;
 }
 
-uint64_t HighlightGroupsB(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightGroupsB(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219C6D0 BuildScreen::HighlightGroups2");
   static constexpr uint32_t kLrs[4] = {0x8219C734, 0x8219C75C, 0x8219C784, 0x8219C7AC};
-  Transition(base, step, sp, 128, 0x8219C844, calls, [&](const Movie6& m) {
-    HighlightGroups(base, m, kLrs, 4, 0x8219C7D8, 0x8219C7F4, 0x8219C830);
+  Transition(step, sp, 128, 0x8219C844, calls, [&](const Movie6& m) {
+    HighlightGroups(m, kLrs, 4, 0x8219C7D8, 0x8219C7F4, 0x8219C830);
   });
   return 1;
 }
 
-uint64_t FadeOut(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t FadeOut(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219C850 BuildScreen::FadeOut");
-  Transition(base, step, sp, 112, 0x8219C8C0, calls, [&](const Movie6&) {
-    mode_tick::ScreenFadesFadeOut(base, Load(base, 0x82001BF0), 0, 0, 0, 0);
+  Transition(step, sp, 112, 0x8219C8C0, calls, [&](const Movie6&) {
+    mode_tick::ScreenFadesFadeOut(Load(0x82001BF0), 0, 0, 0, 0);
   });
-  return (G::fade_out_counts(base) | G::fade_in_counts(base)) == 0 ? 1 : 0;
+  return (G::fade_out_counts() | G::fade_in_counts()) == 0 ? 1 : 0;
 }
 
-uint64_t HighlightBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightBuilds(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219C8F8 BuildScreen::HighlightBuilds");
-  Transition(base, step, sp, 128, 0x8219C9F8, calls, [&](const Movie6& m) {
-    const uint32_t s = Selection(base);
+  Transition(step, sp, 128, 0x8219C9F8, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection();
     m.PlayLoop(0x8219C95C, 71);
     m.PlayLoop(0x8219C984, 70);
     m.PlayLoop(0x8219C9AC, 69);
@@ -150,9 +150,9 @@ uint64_t HighlightBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
   return 1;
 }
 
-uint64_t HighlightStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightStand(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219CA08 BuildScreen::HighlightStand");
-  Transition(base, step, sp, 112, 0x8219CAFC, calls, [&](const Movie6& m) {
+  Transition(step, sp, 112, 0x8219CAFC, calls, [&](const Movie6& m) {
     m.PlayLoop(0x8219CA64, 96);
     m.PlayLoop(0x8219CA8C, 97);
     m.PlayLoop(0x8219CAB4, 108);
@@ -161,96 +161,96 @@ uint64_t HighlightStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   return 1;
 }
 
-uint64_t HighlightStand2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightStand2(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219CB18 BuildScreen::HighlightStand2");
-  Transition(base, step, sp, 112, 0x8219CBBC, calls, [&](const Movie6& m) {
+  Transition(step, sp, 112, 0x8219CBBC, calls, [&](const Movie6& m) {
     m.PlayLoop(0x8219CB74, 108);
     m.PlayLoop(0x8219CB9C, 93);
   });
   return 1;
 }
 
-uint64_t HighlightDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t HighlightDetails(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219CBD8 BuildScreen::HighlightDetails");
-  Transition(base, step, sp, 112, 0x8219CC54, calls,
+  Transition(step, sp, 112, 0x8219CC54, calls,
              [&](const Movie6& m) { m.PlayLoop(0x8219CC34, 74); });
   return 1;
 }
 
-uint64_t Open(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t Open(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A08D8 BuildScreen::Open");
-  const uint64_t done = Transition(base, step, sp, 128, 0x821A0A28, calls, [&](const Movie6& m) {
+  const uint64_t done = Transition(step, sp, 128, 0x821A0A28, calls, [&](const Movie6& m) {
     m.Play(0x821A092C, 101, 1);
     m.PlayLoop(0x821A0948, 100);
     m.PlayLoop(0x821A0970, 1);
     m.PlayLoop(0x821A0998, 83);
-    if (Screen(base).opened() == 0) {
+    if (Screen().opened() == 0) {
       m.Play(0x821A09DC, 81, 1);
     }
-    Screen(base).set_category(0);
-    Screen(base).set_group_selection(0);
-    Screen(base).set_group_scroll(0);
-    SetUpGroups(base, m.frame, calls);
+    Screen().set_category(0);
+    Screen().set_group_selection(0);
+    Screen().set_group_scroll(0);
+    SetUpGroups(m.frame, calls);
   });
   return uint32_t(done) == 0 ? 1 : 0;
 }
 
-uint64_t BackToGroups(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t BackToGroups(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A0A38 BuildScreen::BackToGroups");
-  const uint64_t done = Transition(base, step, sp, 128, 0x821A0AE4, calls, [&](const Movie6& m) {
-    const uint32_t s = Selection(base);
+  const uint64_t done = Transition(step, sp, 128, 0x821A0AE4, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection();
     m.Finish(0x821A0A8C, 71);
     m.Finish(0x821A0A98, 70);
     m.Finish(0x821A0AA4, 69);
     m.Finish(0x821A0AB0, uint64_t(s) + 61);
     m.Play(0x821A0ACC, 103);
-    SetUpGroups(base, m.frame, calls);
+    SetUpGroups(m.frame, calls);
   });
   if (uint32_t(done) == 0) {
-    Back(base, 0, 2);
+    Back(0, 2);
   }
   return 0;
 }
 
-uint64_t ChangeCategory(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t ChangeCategory(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FC60 BuildScreen::ChangeCategory");
-  Transition(base, step, sp, 160, 0x8219FE00, calls, [&](const Movie6& m) {
-    const uint32_t delta = G::list(base).side();
+  Transition(step, sp, 160, 0x8219FE00, calls, [&](const Movie6& m) {
+    const uint32_t delta = G::list().side();
     do {
-      const schema::BuildScreenData at = Screen(base);
+      const schema::BuildScreenData at = Screen();
       at.set_category(at.category() + delta);
-      const uint32_t category = Screen(base).category();
+      const uint32_t category = Screen().category();
       if (int32_t(category) < 0) {
-        Screen(base).set_category(4);
+        Screen().set_category(4);
       } else if (int32_t(category) > 4) {
-        Screen(base).set_category(0);
+        Screen().set_category(0);
       } else {
-        Screen(base).set_category(category);
+        Screen().set_category(category);
       }
-    } while (FilterGroups(base, m.frame) == 0);
+    } while (FilterGroups(m.frame) == 0);
     for (uint32_t k = 0; k < 4; k++) {
       m.Finish(0x8219FD10, 76 + k);
     }
-    m.Play(0x8219FD40, uint64_t(Screen(base).category()) + 76, 1);
-    m.Finish(0x8219FD58, uint64_t(Selection(base)) + 29);
-    Screen(base).set_group_selection(0);
-    Screen(base).set_group_scroll(0);
-    InitGroupLists(base, m.frame, calls);
-    const uint32_t s = Selection(base);
+    m.Play(0x8219FD40, uint64_t(Screen().category()) + 76, 1);
+    m.Finish(0x8219FD58, uint64_t(Selection()) + 29);
+    Screen().set_group_selection(0);
+    Screen().set_group_scroll(0);
+    InitGroupLists(m.frame, calls);
+    const uint32_t s = Selection();
     const uint64_t row = uint64_t(s) + 29;
     m.Play(0x8219FDA8, row);
     m.Loop(0x8219FDB4, row);
-    DrawGroupRows(base, m.frame, calls);
-    ShowGroup(base, m.frame, Load(base, Screen(base).shown_groups_address() + (s << 2)), calls);
-    GroupArrows(base, m.frame, G::list(base).scroll(), Screen(base).shown_group_count());
+    DrawGroupRows(m.frame, calls);
+    ShowGroup(m.frame, Load(Screen().shown_groups_address() + (s << 2)), calls);
+    GroupArrows(m.frame, G::list().scroll(), Screen().shown_group_count());
   });
   return 1;
 }
 
-uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t OpenBuilds(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A1138 BuildScreen::OpenBuilds");
-  const uint64_t done = Transition(base, step, sp, 128, 0x821A1244, calls, [&](const Movie6& m) {
-    const uint32_t s = Selection(base);
+  const uint64_t done = Transition(step, sp, 128, 0x821A1244, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection();
     m.Finish(0x821A118C, 44);
     m.Finish(0x821A1198, 42);
     m.Finish(0x821A11A4, 43);
@@ -259,51 +259,51 @@ uint64_t OpenBuilds(uint8_t* base, uint32_t step, uint32_t sp, const Calls& call
     m.Play(0x821A11D8, 28);
     m.Finish(0x821A11E4, 28);
     m.Play(0x821A1200, 102);
-    KeepGroupList(base, m.frame);
-    Screen(base).set_build_selection(0);
-    Screen(base).set_build_scroll(0);
-    SetUpBuilds(base, m.frame, calls);
+    KeepGroupList(m.frame);
+    Screen().set_build_selection(0);
+    Screen().set_build_scroll(0);
+    SetUpBuilds(m.frame, calls);
   });
   return uint32_t(done) == 0 ? 1 : 0;
 }
 
-uint64_t BackToStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t BackToStand(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FF78 BuildScreen::BackToStand");
-  const uint64_t done = Transition(base, step, sp, 112, 0x8219FFF8, calls, [&](const Movie6& m) {
+  const uint64_t done = Transition(step, sp, 112, 0x8219FFF8, calls, [&](const Movie6& m) {
     m.Finish(0x8219FFC4, 74);
     m.Play(0x8219FFE0, 107);
-    RestoreStand(base, m.frame, calls);
+    RestoreStand(m.frame, calls);
   });
   if (uint32_t(done) == 0) {
-    Back(base, 2, 13);
+    Back(2, 13);
   }
   return 0;
 }
 
-uint64_t OpenDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t OpenDetails(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FEC8 BuildScreen::OpenDetails");
-  const uint64_t done = Transition(base, step, sp, 112, 0x8219FF58, calls, [&](const Movie6& m) {
+  const uint64_t done = Transition(step, sp, 112, 0x8219FF58, calls, [&](const Movie6& m) {
     m.Finish(0x8219FF14, 108);
     m.Finish(0x8219FF20, 93);
     m.Play(0x8219FF3C, 106);
-    KeepStandList(base, m.frame);
-    SetUpDetails(base, m.frame, calls);
+    KeepStandList(m.frame);
+    SetUpDetails(m.frame, calls);
   });
   return uint32_t(done) == 0 ? 1 : 0;
 }
 
 
-uint64_t OpenStand(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
+uint64_t OpenStand(uint32_t step, uint32_t sp, const Calls& calls,
                    const ReloadCall& reload) {
   ITC_NATIVE_RUNNING("sub_8219FE10 BuildScreen::OpenStand");
-  Transition(base, step, sp, 128, 0x8219FEBC, calls, [&](const Movie6& m) {
-    const uint32_t s = Selection(base);
+  Transition(step, sp, 128, 0x8219FEBC, calls, [&](const Movie6& m) {
+    const uint32_t s = Selection();
     m.Finish(0x8219FE64, 71);
     m.Finish(0x8219FE70, 70);
     m.Finish(0x8219FE7C, 69);
     m.Finish(0x8219FE88, uint64_t(s) + 61);
     m.Play(0x8219FEA4, 104);
-    SetUpStand(base, m.frame, calls, reload);
+    SetUpStand(m.frame, calls, reload);
   });
   return 1;
 }

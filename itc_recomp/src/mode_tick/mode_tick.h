@@ -23,7 +23,7 @@ namespace mode_tick {
 // ring_count.
 
 // sub_8209BD18 Billboards::FlipRing: the other half, its count 0.
-void BillboardsFlipRing(uint8_t* base);
+void BillboardsFlipRing();
 
 // --- The screen fades (two layers) ---
 
@@ -35,15 +35,15 @@ constexpr uint32_t kFadeInCounts = 0x826A50DC;
 constexpr uint32_t kFadeOutCounts = 0x826A50E4;
 
 // sub_8209CDE8 ScreenFades::Init: both layers' words 0.
-void ScreenFadesInit(uint8_t* base);
+void ScreenFadesInit();
 // sub_8209D038 ScreenFades::FadeIn: `layer` fades in from the color over
 // `passes`; the other layer's (layer 0's for any layer but 0) counts and
 // alpha 0.
-void ScreenFadesFadeIn(uint8_t* base, uint32_t passes, uint32_t red, uint32_t green,
+void ScreenFadesFadeIn(uint32_t passes, uint32_t red, uint32_t green,
                        uint32_t blue, uint32_t layer);
 // sub_8209D0C8 ScreenFades::FadeOut: `layer` fades out to the color over
 // `passes`.
-void ScreenFadesFadeOut(uint8_t* base, uint32_t passes, uint32_t red, uint32_t green,
+void ScreenFadesFadeOut(uint32_t passes, uint32_t red, uint32_t green,
                         uint32_t blue, uint32_t layer);
 
 // The two layers' sort keys (668 and 676, words in the image: fade_keys) and
@@ -64,7 +64,7 @@ constexpr uint32_t kFadeRect = 112;
 // and, when its alpha is above 0, `draw(key, rect)` (the adapter's
 // ScreenFades::RecordScissor with the key, then ColorRect::RecordFlat with
 // key + 1: guest calls). Returns 1 while any count isn't 0, else 0.
-uint32_t ScreenFadesUpdate(uint8_t* base, uint32_t frame,
+uint32_t ScreenFadesUpdate(uint32_t frame,
                            const std::function<void(uint32_t key, uint32_t rect)>& draw);
 
 // sub_8209CE68 ScreenFades::RecordScissor's two chunks on the scene's
@@ -75,9 +75,9 @@ uint32_t ScreenFadesUpdate(uint8_t* base, uint32_t frame,
 // ScissorChunksFit says whether both can be recorded without the messages
 // the original's command list calls would print (a chunk open, the list
 // full): else the original runs.
-bool ScissorChunksFit(uint8_t* base, uint32_t list);
-uint32_t RecordScissorChunk(uint8_t* base, uint32_t list);
-uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list);
+bool ScissorChunksFit(uint32_t list);
+uint32_t RecordScissorChunk(uint32_t list);
+uint32_t RecordScissorEndChunk(uint32_t list);
 
 // sub_8217A370 ColorRect::RecordFlat's chunk on the command list at
 // [0x826D83D0 + 4]: the blend states by the alpha, the helper object's
@@ -85,7 +85,7 @@ uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list);
 // slot, which the adapter hands to the render queue at [0x826D83D0] (its
 // slot 4, with the key and 0.0); nullopt, with nothing done, where the
 // original's command list calls would print a message.
-std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect);
+std::optional<uint32_t> ColorRectRecordFlat(uint32_t rect);
 
 // --- The music ---
 
@@ -99,7 +99,7 @@ constexpr uint32_t kMusicPlayFrame = 288;
 struct MusicIds {
   uint32_t r7, r8;
 };
-MusicIds MusicPlay(uint8_t* base, uint32_t pcr, uint32_t frame, uint32_t name);
+MusicIds MusicPlay(uint32_t pcr, uint32_t frame, uint32_t name);
 
 // --- The sign-in watch and the players ---
 
@@ -110,13 +110,13 @@ constexpr uint32_t kSignedInMask = 0x826C7954;
 
 // sub_8209F658 Players::SignedInSlot: the player's user's index among the
 // signed-in users, or -1.
-int32_t PlayersSignedInSlot(uint8_t* base, uint32_t player);
+int32_t PlayersSignedInSlot(uint32_t player);
 
 // The action mappers' entries (8 bytes each, four; action-mappers.md):
 // action_mapper_entries.
 
 // sub_8209F318 ActionMappers::SetBlocked: each entry's +4 = value.
-void ActionMappersSetBlocked(uint8_t* base, uint32_t value);
+void ActionMappersSetBlocked(uint32_t value);
 
 // --- The per-mode settings, set when a mode is made ---
 
@@ -131,12 +131,12 @@ void ActionMappersSetBlocked(uint8_t* base, uint32_t value);
 // False, with nothing written, where Stages::Copy's plain C++ declines (the
 // original then runs).
 constexpr uint32_t kSetChecksFrame = 176;
-bool ModesSetChecks(uint8_t* base, uint32_t type, uint32_t frame);
+bool ModesSetChecks(uint32_t type, uint32_t frame);
 
 // sub_82106740 Modes::SetSceneTargetMode (with its switch's piece
 // sub_82106778): the 1024 x 576 target object's (`[0x8266D08C]`) +28 by the
 // new mode's type.
-void ModesSetSceneTargetMode(uint8_t* base, uint32_t type);
+void ModesSetSceneTargetMode(uint32_t type);
 
 // sub_822934B8 Presence::SetForMode (with its switch's piece sub_82293504):
 // presence is an Xbox feature (mapped, not ported), and its calls'
@@ -144,16 +144,16 @@ void ModesSetSceneTargetMode(uint8_t* base, uint32_t type);
 // left of the calls is the wrapper's, the last error cleared (`pcr` the
 // thread's r13). False for type 1, which makes no call (r3 left); true
 // otherwise (r3 = 0, the wrapper's answer).
-bool PresenceSetForMode(uint8_t* base, uint32_t pcr, uint32_t type);
+bool PresenceSetForMode(uint32_t pcr, uint32_t type);
 
 // sub_8209ED58 SignInWatch::CheckIdle: state 0's check, the state set to 1
 // with a reason when one comes up. False, with nothing written, where the
 // original would trap (the network's vector at 0x826C7308 with its end
 // before its begin, or not a whole number of 384-byte entries).
-bool SignInWatchCheckIdle(uint8_t* base);
+bool SignInWatchCheckIdle();
 // Whether SignInWatch::CheckIdle's plain C++ would hand the original the
 // call (its traps).
-bool SignInWatchCheckIdleTraps(uint8_t* base);
+bool SignInWatchCheckIdleTraps();
 
 // The user table's names (32-byte UTF-16, from +14, 32 bytes a slot;
 // Network::Update's: user_table), the last pass's signed-in count, mask and
@@ -167,13 +167,13 @@ bool SignInWatchCheckIdleTraps(uint8_t* base);
 // False, with nothing written, where the original must run: the state 1 to
 // 9 (the prompts' handlers, never seen in play) or CheckIdle's traps.
 constexpr uint32_t kSignInWatchUpdateFrame = 224;
-bool SignInWatchUpdate(uint8_t* base, uint32_t frame);
+bool SignInWatchUpdate(uint32_t frame);
 
 // sub_825D9518 SignInWatch::StaticInit (a static set-up, no direct callers):
 // the state 0x826BAB3C = 0, the seven checks at 0x826BAB40 = 0, 0x826BAB70 =
 // 0, the 32-byte name at 0x826BAB1C cleared, and its clean-up 0x825DAF08 (an
 // empty function) registered with atexit (through `call` when the native one
 // can't); returns atexit's r3.
-int32_t SignInWatchStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
+int32_t SignInWatchStaticInit(const c_runtime::AtexitCall& call);
 
 }  // namespace mode_tick

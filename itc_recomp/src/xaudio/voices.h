@@ -31,17 +31,17 @@ constexpr uint32_t kPcrProcessor = 268;
 // `out` for the source format at `format`: +0 = 0, +1 the channels (for type
 // 4, XMA, the sum of its +4 streams' channel bytes at +12 + 8i; else byte
 // +4), +4 = 48,000.
-void SourceOutputFormat(uint8_t* base, uint32_t format, uint32_t out);
+void SourceOutputFormat(uint32_t format, uint32_t out);
 
 // XAudioSubmixVoice::Describe (sub_8245F010): the 32-byte voice description
 // at `out` (cleared) for the submix description at `description`.
-void SubmixDescribe(uint8_t* base, uint32_t description, uint32_t out);
+void SubmixDescribe(uint32_t description, uint32_t out);
 
 // XAudio::DefaultMatrix (sub_8245EC40): the default matrix for `inputs` to
 // `outputs` channels (their low bytes) written to the 8-byte entry at `out`
 // (+0 the count, +4 the coefficients in the table at 0x8204A7B8); returns
 // `out`, or 0 (nothing written) for pairs it doesn't cover.
-uint32_t DefaultMatrix(uint8_t* base, uint32_t inputs, uint32_t outputs, uint32_t out);
+uint32_t DefaultMatrix(uint32_t inputs, uint32_t outputs, uint32_t out);
 
 // XAudioBuffer::Size (sub_8245FA28): the size of a buffer to [out] for
 // `format` (+0 a type byte, then an 8-byte voice format at +4: +5 the
@@ -49,7 +49,7 @@ uint32_t DefaultMatrix(uint8_t* base, uint32_t inputs, uint32_t outputs, uint32_
 // 128 + 36 for type 0, else 36; returns 0. nullopt, with nothing written,
 // when the rate is 0 or above 48,000 (the original traps on its
 // divisions).
-std::optional<uint32_t> BufferSize(uint8_t* base, uint32_t format, uint32_t out);
+std::optional<uint32_t> BufferSize(uint32_t format, uint32_t out);
 
 // XAudioBuffer::Clear (sub_8245F8E8): checks the format at `format` (0: the
 // buffer's own, +12) against the buffer's capacity and current channels,
@@ -57,31 +57,31 @@ std::optional<uint32_t> BufferSize(uint8_t* base, uint32_t format, uint32_t out)
 // channels; returns the original's r3 (0, E_OUTOFMEMORY or E_UNEXPECTED).
 // nullopt, with nothing done, where the original traps (a rate of 0 or
 // above 48,000 among the format's, +16 and +24).
-std::optional<uint32_t> BufferClear(uint8_t* base, uint32_t buffer, uint32_t format,
+std::optional<uint32_t> BufferClear(uint32_t buffer, uint32_t format,
                                     uint32_t flags);
 
 // --- Small accessors ---
 
 // XAudioVoice::EngineBuffer (sub_8245DEB0): the engine's buffer for
 // processor `processor` (the engine's +12 + 8 x the processor).
-uint32_t EngineBuffer(uint8_t* base, uint32_t processor);
+uint32_t EngineBuffer(uint32_t processor);
 
 // XAudioVoice::GetType (sub_8245E318): byte +12 to [out]; returns 0.
-uint32_t GetType(uint8_t* base, uint32_t voice, uint32_t out);
+uint32_t GetType(uint32_t voice, uint32_t out);
 // XAudioVoice::GetFormat (sub_8245E328): the 8 bytes at +52 to [out];
 // returns 0.
-uint32_t GetFormat(uint8_t* base, uint32_t voice, uint32_t out);
+uint32_t GetFormat(uint32_t voice, uint32_t out);
 // XAudioVoice::SetFormatWords (sub_82461140): the 8 bytes at `format` to
 // +52.
-void SetFormatWords(uint8_t* base, uint32_t voice, uint32_t format);
+void SetFormatWords(uint32_t voice, uint32_t format);
 // XAudioVoice::AddRef (sub_8245F860): +4 up by one; returns it.
-uint32_t AddRef(uint8_t* base, uint32_t object);
+uint32_t AddRef(uint32_t object);
 // sub_8245FB00: the root vtable (0x8204A6B8) to +0.
-void SetRootVtable(uint8_t* base, uint32_t object);
+void SetRootVtable(uint32_t object);
 
 // XAudio::AddStat (sub_8245F640): `amount` added atomically to the counter
 // `index` (0x82954F24 + 4 x the index); returns 0.
-uint32_t AddStat(uint8_t* base, uint32_t index, uint32_t amount);
+uint32_t AddStat(uint32_t index, uint32_t amount);
 
 // --- Calls into the recompiled objects ---
 //
@@ -120,7 +120,7 @@ uint64_t& LastCallR3();
 // lowered to it: for plain C++ outside XAudio (the car sounds) calling an
 // entry point's plain C++ from its own frame, as the original's call makes
 // the callee's frame there.
-uint32_t FrameBelow(uint8_t* base, uint32_t frame, uint32_t bytes);
+uint32_t FrameBelow(uint32_t frame, uint32_t bytes);
 
 // A call to function 0 only sets the registers given (and the stack
 // pointer is ignored): a plain C++ caller sets them as the original does
@@ -128,72 +128,72 @@ uint32_t FrameBelow(uint8_t* base, uint32_t frame, uint32_t bytes);
 // registers that function's calls don't set are the original's.
 
 // The method at `slot` of the vtable of the object at `object`.
-uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot);
+uint32_t Method(uint32_t object, uint32_t slot);
 
 // The interface thunks: the object 8 bytes before the interface at `iface`
 // (0 stays 0), whose method they tail-call with the other registers as they
 // are. Each returns the object; its method to `function`.
 // XAudioFactory::Size (sub_8245D610): slot +20.
-uint32_t FactorySizeThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+uint32_t FactorySizeThunk(uint32_t iface, uint32_t* function);
 // XAudioFactory::Create (sub_8245D630): slot +24.
-uint32_t FactoryCreateThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+uint32_t FactoryCreateThunk(uint32_t iface, uint32_t* function);
 // XAudioBuffer::AddRefThunk (sub_8245F6B0): slot +4.
-uint32_t BufferAddRefThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+uint32_t BufferAddRefThunk(uint32_t iface, uint32_t* function);
 // XAudioBuffer::ReleaseThunk (sub_8245F6D0): slot +8.
-uint32_t BufferReleaseThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+uint32_t BufferReleaseThunk(uint32_t iface, uint32_t* function);
 
 // XAudioVoice::Release (sub_8245F878): +4 down by one; at 0 the object's
 // slot +12 (free) and 0, else the count.
-uint32_t Release(uint8_t* base, uint32_t object, const GuestCall& call);
+uint32_t Release(uint32_t object, const GuestCall& call);
 
 // XAudioObject::Free (sub_8245AAD8): the allocator (+8) AddRef'd (its slot
 // +0), the object's slot +0 with 1 (its deleting destructor), the allocator
 // released (slot +4). Returns the last call's r3.
-uint32_t ObjectFree(uint8_t* base, uint32_t object, const GuestCall& call);
+uint32_t ObjectFree(uint32_t object, const GuestCall& call);
 
 // XAudioSourceVoice::ApplyVolume (sub_8245DFC0): the category's volume
 // (the engine's +132 + 4 x +144 for categories 0 and 1, else 1.0 from
 // 0x82000A30) times +140, to the codec's (+76) slot +88 in f1 (a tail
 // call). Returns its r3.
-uint32_t ApplyVolume(uint8_t* base, uint32_t voice, const GuestCall& call);
+uint32_t ApplyVolume(uint32_t voice, const GuestCall& call);
 
 // XAudioSourceVoice::StopAndReset (sub_8245DD60): slot +60 with 1; when it
 // succeeds and there's a codec (+76), the codec's slot +32. Returns the
 // last call's r3.
-uint32_t StopAndReset(uint8_t* base, uint32_t voice, const GuestCall& call);
+uint32_t StopAndReset(uint32_t voice, const GuestCall& call);
 
 // XAudioVoice::SetEffectParameters (sub_82461418): E_INVALIDARG past the
 // +60 effects; else the effect's (+36 + 8 x the index) slot +16 with
 // `r5`-`r7` as r4-r6. Returns its r3.
-uint32_t SetEffectParameters(uint8_t* base, uint32_t voice, uint32_t index, uint64_t r5,
+uint32_t SetEffectParameters(uint32_t voice, uint32_t index, uint64_t r5,
                              uint64_t r6, uint64_t r7, const GuestCall& call);
 
 // XAudioVoice::ReleaseOutputs (sub_82460A58): each output's target (+72 +
 // 12i, +69 of them, the count read again each time) released (slot +8);
 // +69 = 0. Returns the last call's r3, or `voice` when there were none (the
 // original's r3 then).
-uint32_t ReleaseOutputs(uint8_t* base, uint32_t voice, const GuestCall& call);
+uint32_t ReleaseOutputs(uint32_t voice, const GuestCall& call);
 
 // XAudioVoice::SetOutputMatrices (sub_82460AB8): for each of the matrices'
 // entries (count byte +0, +4 the 8-byte entries) until a call fails, the
 // output's matrix object (+72 + 12 x the index byte, +4) gets its slot +56
 // with the matrix and whether the voice isn't playing. Returns the last
 // call's r3 (0 with no entries).
-uint32_t SetOutputMatrices(uint8_t* base, uint32_t voice, uint32_t matrices,
+uint32_t SetOutputMatrices(uint32_t voice, uint32_t matrices,
                            const GuestCall& call);
 
 // XAudioVoice::SetFormat (sub_82460778): SetFormatWords, then slot +36
 // (set output voices) with `outputs`. Returns its r3.
-uint32_t SetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
+uint32_t SetFormat(uint32_t voice, uint32_t format, uint32_t outputs,
                    const GuestCall& call);
 
 // XAudio::Alloc (sub_8245EF80): XMemAlloc (sub_822976F8)'s plain C++ with
 // `size` and `attributes`. Only while hooks::NativeHeapActive().
-uint32_t Alloc(uint8_t* base, uint32_t size, uint32_t attributes);
+uint32_t Alloc(uint32_t size, uint32_t attributes);
 
 // XAudioBuffer::ClearThunk (sub_8245FA10): BufferClear on the object 8 bytes
 // before the interface at `iface` (0 stays 0); nullopt where it refuses.
-std::optional<uint32_t> BufferClearThunk(uint8_t* base, uint32_t iface, uint32_t format,
+std::optional<uint32_t> BufferClearThunk(uint32_t iface, uint32_t format,
                                          uint32_t flags);
 
 // XAudioSourceVoice::Describe (sub_8245E010): the 32-byte voice
@@ -203,14 +203,14 @@ std::optional<uint32_t> BufferClearThunk(uint8_t* base, uint32_t iface, uint32_t
 // set, +16 the callback (+76), +20 its context (+88), +24 the output count
 // (+57, 1 when 0), +25 the outputs' channels (+58, 6 when 0), +28 the
 // outputs (+72).
-void SourceDescribe(uint8_t* base, uint32_t description, uint32_t out);
+void SourceDescribe(uint32_t description, uint32_t out);
 
 // XAudioSourceVoice::Reformat (sub_8245DCF0): the 56-byte format at
 // `format` copied to +84, the codec's (+76) slot +112 with the format and
 // `r6`; when that succeeds, its output format (SourceOutputFormat, at the
 // frame's +80) set with `outputs` (SetFormat). Returns the last call's r3.
 // nullopt, with nothing done, where memcpy's plain C++ refuses the copy.
-std::optional<uint32_t> Reformat(uint8_t* base, uint32_t voice, uint32_t format,
+std::optional<uint32_t> Reformat(uint32_t voice, uint32_t format,
                                  uint32_t outputs, uint64_t r6, uint32_t frame,
                                  const GuestCall& call);
 
@@ -222,7 +222,7 @@ std::optional<uint32_t> Reformat(uint8_t* base, uint32_t voice, uint32_t format,
 // (its slot +20 through XAudioFactory::Size's thunk, the size at the
 // frame's +80) and 8 bytes each. Returns the last call's r3 (on a failure,
 // with nothing written).
-uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+uint32_t BaseSize(uint32_t description, uint32_t out, uint32_t frame,
                   const GuestCall& call);
 
 // --- Buffers, allocators and the base voice ---
@@ -241,21 +241,21 @@ constexpr uint32_t kAllocatorUnseen = 0x82460538;  // GetAllocator's for a size 
 // samples), the allocator `allocator`. Returns the buffer. nullopt, with
 // nothing done, where the original traps (type 0 with a rate of 0 or above
 // 48,000).
-std::optional<uint32_t> BufferConstruct(uint8_t* base, uint32_t buffer, uint32_t format,
+std::optional<uint32_t> BufferConstruct(uint32_t buffer, uint32_t format,
                                         uint32_t allocator, const GuestCall& call);
 
 // XAudioBuffer::Create (sub_8245FA80): 36 bytes from the allocator's slot
 // +20, the buffer constructed (BufferConstruct; its original through `call`
 // where that refuses), its slot +20 with `out`. Returns 0, or E_OUTOFMEMORY
 // when the allocation (or the constructor) gives 0.
-uint32_t BufferCreate(uint8_t* base, uint32_t format, uint32_t allocator, uint32_t out,
+uint32_t BufferCreate(uint32_t format, uint32_t allocator, uint32_t out,
                       const GuestCall& call);
 
 // XAudioVoice::Construct (sub_82461500): the base voice at `voice`: vtable
 // 0x8204A6CC, the count 1, the allocator (+8, AddRef'd by its slot +0 when
 // set), then vtable 0x8204AA00, +12 = `type`'s low byte, the two empty list
 // nodes at +16 and +24, +40 = 0. Returns the voice.
-uint32_t VoiceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+uint32_t VoiceConstruct(uint32_t voice, uint32_t allocator, uint32_t type,
                         const GuestCall& call);
 
 // XAudio::DefaultAllocator (sub_824605E8): one block of `size` + 28 from
@@ -263,7 +263,7 @@ uint32_t VoiceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint3
 // vtables, the count 1, the attributes, the size, 0 used, the next free
 // byte +28) and the block to [out]; 0, or E_OUTOFMEMORY. Only while
 // hooks::NativeHeapActive().
-uint32_t DefaultAllocator(uint8_t* base, uint32_t attributes, uint32_t size, uint32_t out);
+uint32_t DefaultAllocator(uint32_t attributes, uint32_t size, uint32_t out);
 
 // XAudio::GetAllocator (sub_82460688): with no allocator in [inout], the
 // default one (DefaultAllocator for a size, `kAllocatorUnseen` through
@@ -271,7 +271,7 @@ uint32_t DefaultAllocator(uint8_t* base, uint32_t attributes, uint32_t size, uin
 // with one, its slots +0, +8 (with `size`) and +12 (with `attributes`).
 // Returns the last r3. `native_heap`: DefaultAllocator may run (else
 // nullopt, with nothing done, where it would).
-std::optional<uint32_t> GetAllocator(uint8_t* base, uint32_t attributes, uint32_t size,
+std::optional<uint32_t> GetAllocator(uint32_t attributes, uint32_t size,
                                      uint32_t inout, uint32_t frame, bool native_heap,
                                      const GuestCall& call);
 
@@ -281,7 +281,7 @@ constexpr uint32_t kOutputsVtable = 0x8204A998;  // the voice with outputs'
 
 // XAudioVoice::ConstructOutputs (sub_82460738): VoiceConstruct, then the
 // vtable 0x8204A998. Returns the voice.
-uint32_t ConstructOutputs(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+uint32_t ConstructOutputs(uint32_t voice, uint32_t allocator, uint32_t type,
                           const GuestCall& call);
 
 // XAudioVoice::OutputsSize (sub_824607C8): for the voice description at
@@ -291,7 +291,7 @@ uint32_t ConstructOutputs(uint8_t* base, uint32_t voice, uint32_t allocator, uin
 // +8 the outputs' channels from +25; the size at the frame's +80), to
 // [out]. `frame` is this function's frame (144 bytes). Returns the last
 // call's r3 (on a failure, with nothing written).
-uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+uint32_t OutputsSize(uint32_t description, uint32_t out, uint32_t frame,
                      const GuestCall& call);
 
 // XAudioVoice::SetOutput (sub_82460998): the output entry `entry` (0: the
@@ -302,7 +302,7 @@ uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t
 // voice's channels (+53) to the target's (its slot +64 at the frame's +80;
 // DefaultMatrix at +88). `frame` is this function's (128 bytes). Returns
 // the last call's r3.
-uint32_t SetOutput(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t slot, uint32_t frame,
+uint32_t SetOutput(uint32_t voice, uint32_t entry, uint32_t slot, uint32_t frame,
                    const GuestCall& call);
 
 // XAudioVoice::SetOutputVoices (sub_82460BF0, and sub_8245F228 jumps to
@@ -311,7 +311,7 @@ uint32_t SetOutput(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t slot,
 // one fails, and +69 the count; with no outputs (0), the default one when
 // the voice has room (+68) and +69 = 1. `frame` is this function's (144
 // bytes). Returns the last result.
-uint32_t SetOutputVoices(uint8_t* base, uint32_t voice, uint32_t outputs, uint32_t frame,
+uint32_t SetOutputVoices(uint32_t voice, uint32_t outputs, uint32_t frame,
                          const GuestCall& call);
 
 // XAudioVoice::Pass (sub_82461070): one mixer pass: the voice's slot +72
@@ -321,14 +321,14 @@ uint32_t SetOutputVoices(uint8_t* base, uint32_t voice, uint32_t outputs, uint32
 // pass) with the frame's +84. DebugSwitchOff's plain C++ (sub_825C8388)
 // where the original calls it. `frame` is this function's (112 bytes).
 // Returns the last method's r3.
-uint32_t Pass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
+uint32_t Pass(uint32_t voice, uint32_t frame, const GuestCall& call);
 
 // XAudioVoice::Destroy (sub_82461240): the base's destructor: vtable
 // 0x8204AA00, each effect (+36 + 8i, +60 of them) released (its slot +4)
 // and cleared, the output buffer (+32) released (its interface's thunk) and
 // cleared, vtable 0x8204A6CC, the allocator (+8) released (its slot +4) and
 // cleared, the root vtable. Returns the allocator's release's r3, or 0.
-uint32_t Destroy(uint8_t* base, uint32_t voice, const GuestCall& call);
+uint32_t Destroy(uint32_t voice, const GuestCall& call);
 
 // XAudioVoice::CreateObject (sub_82461308): the engine's factory (+60)
 // makes the object described at `description` with the voice's allocator
@@ -336,7 +336,7 @@ uint32_t Destroy(uint8_t* base, uint32_t voice, const GuestCall& call);
 // byte, +2 a halfword size): +4 = `flag`'s low byte, +5 = 1, +6 = the
 // frame's +80, the voice's +62 raised to the size. `frame` is this
 // function's (128 bytes). Returns the last call's r3.
-uint32_t CreateObject(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t description,
+uint32_t CreateObject(uint32_t voice, uint32_t entry, uint32_t description,
                       uint32_t flag, uint32_t frame, const GuestCall& call);
 
 // XAudioVoice::ProcessEffect (sub_82461678): an effect entry `entry` (+0
@@ -347,7 +347,7 @@ uint32_t CreateObject(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t de
 // 1 the buffer and 0; for bit 2, 0 and the buffer; for none, the word at
 // the frame's +80 for both (a leftover, as the original). `frame` is this
 // function's (96 bytes). Returns its r3.
-uint32_t ProcessEffect(uint8_t* base, uint32_t entry, uint32_t inout, uint32_t processor,
+uint32_t ProcessEffect(uint32_t entry, uint32_t inout, uint32_t processor,
                        uint32_t frame, const GuestCall& call);
 
 // --- Making a voice and its passes (lock-free) ---
@@ -362,14 +362,14 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // 56-byte format, +64 the float +60, +68 the bytes +59 and +64, +72 the
 // words +80 and +84; the size at +84). `frame` is this function's (240
 // bytes). Returns 0, also on a failure (the original's).
-uint32_t SourceSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+uint32_t SourceSize(uint32_t description, uint32_t out, uint32_t frame,
                     const GuestCall& call);
 
 // XAudioVoice::CreateEffects (sub_82461600): each of the chain's (count
 // byte +0, +4 the descriptions) effects made into +36 + 8i (CreateObject,
 // the flag its index, in a frame below `frame`, 112 bytes) until one fails.
 // Returns the last r3 (0 with none).
-uint32_t CreateEffects(uint8_t* base, uint32_t voice, uint32_t chain, uint32_t frame,
+uint32_t CreateEffects(uint32_t voice, uint32_t chain, uint32_t frame,
                        const GuestCall& call);
 
 // XAudioVoice::InitBase (sub_82461D50): from the voice description at
@@ -380,7 +380,7 @@ uint32_t CreateEffects(uint8_t* base, uint32_t voice, uint32_t chain, uint32_t f
 // from the allocator's slot +20 into +36 and made (CreateEffects).
 // `frame` is this function's (144 bytes). Returns the last r3, 0, or
 // E_OUTOFMEMORY.
-uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+uint32_t InitBase(uint32_t voice, uint32_t description, uint32_t frame,
                   const GuestCall& call);
 
 // XAudioVoice::InitOutputs (sub_82460880): +68 the output count (+24),
@@ -390,7 +390,7 @@ uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t 
 // 255), then the voice's slot +36 (set output voices) with the outputs
 // (+28). `frame` is this function's (144 bytes). Returns the last r3, or
 // E_OUTOFMEMORY.
-uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+uint32_t InitOutputs(uint32_t voice, uint32_t description, uint32_t frame,
                      const GuestCall& call);
 
 // XAudioSourceVoice::Init (sub_8245E348): the 56-byte format to +84, +144
@@ -399,7 +399,7 @@ uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32
 // the codec's description at +112, as SourceSize's; the flag 255).
 // memcpy's plain C++, or its original where that refuses. `frame` is this
 // function's (224 bytes). Returns the last r3.
-uint32_t SourceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+uint32_t SourceInit(uint32_t voice, uint32_t description, uint32_t frame,
                     const GuestCall& call);
 
 // XAudioSubmixVoice::Init (sub_8245F230): the voice's description
@@ -407,27 +407,27 @@ uint32_t SourceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_
 // its buffer cleared (ClearThunk with flags 3, its original where it
 // refuses). `frame` is this function's (144 bytes). Returns InitOutputs'
 // r3.
-uint32_t SubmixInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+uint32_t SubmixInit(uint32_t voice, uint32_t description, uint32_t frame,
                     const GuestCall& call);
 
 // XAudioVoice::ProcessEffects (sub_82461E88): ProcessEffect for each effect
 // (+36 + 8i, +60 of them) over [inout] until one fails. `frame` is this
 // function's (112 bytes). Returns the last r3 (0 with none).
-uint32_t ProcessEffects(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+uint32_t ProcessEffects(uint32_t voice, uint32_t inout, uint32_t processor,
                         uint32_t frame, const GuestCall& call);
 
 // XAudioVoice::MixToOutputs (sub_82460CB8): ProcessEffects, then for each
 // output (+69) until one fails, the target's slot +72 (its input buffer)
 // and the matrix object's slot +24 with [inout] and that buffer. `frame` is
 // this function's (128 bytes). Returns the last r3.
-uint32_t MixToOutputs(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+uint32_t MixToOutputs(uint32_t voice, uint32_t inout, uint32_t processor,
                       uint32_t frame, const GuestCall& call);
 
 // XAudioSubmixVoice::Pass (sub_8245EFA0): Pass; when it succeeds, its
 // buffer (+32, the interface) cleared for its format (+52) with flags 3
 // (its original where the plain C++ refuses) and the counter 1 up
 // (AddStat). `frame` is this function's (112 bytes). Returns Pass' r3.
-uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
+uint32_t SubmixPass(uint32_t voice, uint32_t frame, const GuestCall& call);
 
 // --- The game's locks, taken as the original does ---
 //
@@ -452,11 +452,11 @@ constexpr uint32_t kRtlLeaveCriticalSection = 0x825DB8D4;
 // The spin lock taken by `thread` (r13): the IRQL raised; unless it already
 // owns it, the kernel's spin lock acquired and the owner and saved IRQL
 // set; the depth up by one.
-void SpinTake(uint8_t* base, uint32_t thread, const GuestCall& call);
+void SpinTake(uint32_t thread, const GuestCall& call);
 // One level released when `thread` owns it: the depth down by one; at 0,
 // the owner and saved IRQL cleared, the kernel's spin lock released and the
 // IRQL lowered to the saved one.
-void SpinRelease(uint8_t* base, uint32_t thread, const GuestCall& call);
+void SpinRelease(uint32_t thread, const GuestCall& call);
 
 // --- Under the voice lists' spin lock ---
 
@@ -464,7 +464,7 @@ void SpinRelease(uint8_t* base, uint32_t thread, const GuestCall& call);
 // codec's (+76) slot +44 (its state at the frame's +80); when it succeeds,
 // that or'ed with the voice's flags (+61) to [out]. `frame` is this
 // function's (144 bytes). Returns the codec's r3.
-uint32_t SourceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t thread,
+uint32_t SourceGetState(uint32_t voice, uint32_t out, uint32_t thread,
                         uint32_t frame, const GuestCall& call);
 
 // XAudioVoice::Play (sub_82461798): under the spin lock, a playing voice's
@@ -472,7 +472,7 @@ uint32_t SourceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t th
 // 0 and 6 cleared and bit 0 set (taken again) and slot +76 (Activate).
 // DebugSwitchOff's plain C++ where the original calls sub_825C8388. Returns
 // 0.
-uint32_t Play(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+uint32_t Play(uint32_t voice, uint32_t thread, const GuestCall& call);
 
 // XAudioVoice::Activate (sub_82460EF0): each output's target (+72 + 12i,
 // +69 of them) has its use count (+40) raised and its slot +56 called until
@@ -481,21 +481,21 @@ uint32_t Play(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& c
 // +76, + 40), the voice added at its end under the spin lock (its node at
 // the list's +8 offset). `frame` is this function's (144 bytes). Returns 0,
 // or the failing target's r3.
-uint32_t Activate(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
+uint32_t Activate(uint32_t voice, uint32_t thread, uint32_t frame,
                   const GuestCall& call);
 
 // XAudioVoice::Deactivate (sub_82460D50): under the spin lock, the voice
 // out of its active list (the node at +24, left pointing at itself); then
 // each output's target's use count (+40) lowered, its slot +60 with 0 (stop
 // at once) at 0, until one fails. Returns the last r3 (0 when not called).
-uint32_t Deactivate(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+uint32_t Deactivate(uint32_t voice, uint32_t thread, const GuestCall& call);
 
 // XAudioSourceVoice::StartLater (sub_8245E7D0): under the spin lock:
 // E_UNEXPECTED when playing (+61 bit 0); else unless pending (bit 6), bit 6
 // set and the voice added at the end of the engine's pending list (+68, its
 // node at the list's +8 offset), each under the lock taken again. Returns 0
 // or E_UNEXPECTED.
-uint32_t StartLater(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+uint32_t StartLater(uint32_t voice, uint32_t thread, const GuestCall& call);
 
 // XAudio::WaitForVoice (sub_8245AE60): unless the caller is the mixer's
 // thread (the engine's +300, or its +332 + 4 x the processor), while the
@@ -503,7 +503,7 @@ uint32_t StartLater(uint8_t* base, uint32_t voice, uint32_t thread, const GuestC
 // released one level, the API lock left as many times as its recursion
 // count (+20) and entered again as many, the spin lock taken again.
 // `thread` is r13, `mixer_thread` its +256, `processor` its +268.
-void WaitForVoice(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t thread,
+void WaitForVoice(uint32_t engine, uint32_t voice, uint32_t thread,
                   uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
 
 // XAudioSourceVoice::CancelPendingStart (sub_8245E428): under the spin
@@ -511,7 +511,7 @@ void WaitForVoice(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t threa
 // mixer waited for (WaitForVoice), the voice out of the pending list (its
 // node at the engine's +76 offset, left pointing at itself) and bit 6
 // cleared, each under the lock taken again. Returns 0 or 0x80004004.
-uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
+uint32_t CancelPendingStart(uint32_t voice, uint32_t thread,
                             uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
 
 // XAudioVoice::StopOrTail (sub_824619B0): with `flags` bit 0 (at once),
@@ -520,7 +520,7 @@ uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
 // playing voice's stopping bit (+61 bit 2) set (taken again) and the
 // tail's passes (+64) from +62. DebugSwitchOff's plain C++ where the
 // original calls sub_825C8388. Returns 0.
-uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thread,
+uint32_t StopOrTail(uint32_t voice, uint32_t flags, uint32_t thread,
                     uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
 
 // --- Starting, stopping, passes, making and destroying voices ---
@@ -542,7 +542,7 @@ struct Thread {
 // else the pending start cancelled (CancelPendingStart; any failure but
 // 0x80004004 returned), slot +92 (the volume), the codec's (+76) slot +48
 // (start) and when it succeeds Play. Returns the last r3.
-uint32_t SourceStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+uint32_t SourceStart(uint32_t voice, uint32_t flags, const Thread& thread,
                      const GuestCall& call);
 
 // XAudioSourceVoice::Stop (sub_8245E9F0): when no start was pending
@@ -551,7 +551,7 @@ uint32_t SourceStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread
 // `flags` hasn't it and the codec's state (slot +44, at the frame's +80)
 // hasn't bit 0 (at once when the codec's done). Else CancelPendingStart's
 // r3. `frame` is this function's (128 bytes).
-uint32_t SourceStop(uint8_t* base, uint32_t voice, uint64_t flags, const Thread& thread,
+uint32_t SourceStop(uint32_t voice, uint64_t flags, const Thread& thread,
                     uint32_t frame, const GuestCall& call);
 
 // XAudioSourceVoice::Pass (sub_8245DED0): the volume applied again (slot
@@ -562,27 +562,27 @@ uint32_t SourceStop(uint8_t* base, uint32_t voice, uint64_t flags, const Thread&
 // voice isn't stopping (+61 bit 2), StopOrTail with 0. `frame` is this
 // function's (128 bytes). Returns the first failure, StopOrTail's r3 or
 // the state's.
-uint32_t SourcePass(uint8_t* base, uint32_t voice, uint32_t inout, const Thread& thread,
+uint32_t SourcePass(uint32_t voice, uint32_t inout, const Thread& thread,
                     uint32_t frame, const GuestCall& call);
 
 // XAudioSourceVoice::XAudioSourceVoice (sub_8245E6A8): ConstructOutputs (the
 // type `type`), the source vtable, +140 = 1.0 (0x82000A30), the voice added
 // at the end of the engine's source list (+80, its node at the list's +8
 // offset) under the spin lock. Returns the voice.
-uint32_t SourceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+uint32_t SourceConstruct(uint32_t voice, uint32_t allocator, uint32_t type,
                          const Thread& thread, const GuestCall& call);
 
 // XAudioSubmixVoice::XAudioSubmixVoice (sub_8245F298): ConstructOutputs (type
 // 1), the submix vtable, +76 the stage (the description's +10), the voice
 // added at the end of its stage's list (the engine's [+124] + 44 x the
 // stage) under the spin lock. Returns the voice.
-uint32_t SubmixConstruct(uint8_t* base, uint32_t voice, uint32_t description,
+uint32_t SubmixConstruct(uint32_t voice, uint32_t description,
                          uint32_t allocator, const Thread& thread, const GuestCall& call);
 
 // XAudioVoice::~XAudioVoiceOutputs (sub_82460B50): its vtable, StopOrTail
 // at once, ReleaseOutputs, each output's matrix object (+72 + 12i + 4, +68
 // of them) released (slot +4) and cleared, Destroy. Returns Destroy's r3.
-uint32_t OutputsDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+uint32_t OutputsDestroy(uint32_t voice, const Thread& thread,
                         const GuestCall& call);
 
 // XAudioSourceVoice::~XAudioSourceVoice (sub_8245E1B8): its vtable, slot +60
@@ -590,23 +590,23 @@ uint32_t OutputsDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
 // the voice out of the engine's source list (its node at the engine's +88
 // offset) under the spin lock; the codec released (slot +4) and cleared;
 // OutputsDestroy. Returns its r3.
-uint32_t SourceDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+uint32_t SourceDestroy(uint32_t voice, const Thread& thread,
                        const GuestCall& call);
 
 // XAudioSourceVoice::DeletingDestructor (sub_8245E7A0): SourceDestroy;
 // returns the voice (the memory is the allocator's).
-uint32_t SourceDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+uint32_t SourceDeletingDestructor(uint32_t voice, const Thread& thread,
                                   const GuestCall& call);
 
 // XAudioSubmixVoice::~XAudioSubmixVoice (sub_8245F108): its vtable,
 // StopOrTail at once, the voice out of its stage's list under the spin
 // lock, OutputsDestroy. Returns its r3.
-uint32_t SubmixDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+uint32_t SubmixDestroy(uint32_t voice, const Thread& thread,
                        const GuestCall& call);
 
 // XAudioSubmixVoice::DeletingDestructor (sub_8245F3A0): SubmixDestroy;
 // returns the voice.
-uint32_t SubmixDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+uint32_t SubmixDeletingDestructor(uint32_t voice, const Thread& thread,
                                   const GuestCall& call);
 
 // XAudioVoice::CreateSource (sub_8245EAA0): the size (SourceSize, + 148),
@@ -617,7 +617,7 @@ uint32_t SubmixDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& t
 // slot +12), the voice to [out]; the allocator released (slot +4). `frame`
 // is this function's (128 bytes); `native_heap` whether GetAllocator's
 // default allocator may run. Returns 0 or the failure.
-uint32_t CreateSource(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+uint32_t CreateSource(uint32_t description, uint32_t allocator, uint32_t out,
                       bool native_heap, const Thread& thread, uint32_t frame,
                       const GuestCall& call);
 
@@ -625,7 +625,7 @@ uint32_t CreateSource(uint8_t* base, uint32_t description, uint32_t allocator, u
 // voice: SubmixDescribe (the frame's +96), OutputsSize (+80) + 80 bytes,
 // the allocator at the frame's +204, SubmixConstruct and SubmixInit.
 // `frame` is this function's (176 bytes).
-uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+uint32_t CreateSubmix(uint32_t description, uint32_t allocator, uint32_t out,
                       bool native_heap, const Thread& thread, uint32_t frame,
                       const GuestCall& call);
 
@@ -636,8 +636,8 @@ uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, u
 // user of it is native.
 
 // The API lock entered and left as the entry points do.
-void ApiEnter(uint8_t* base, const GuestCall& call);
-void ApiLeave(uint8_t* base, const GuestCall& call);
+void ApiEnter(const GuestCall& call);
+void ApiLeave(const GuestCall& call);
 
 // The entry points that call one of the voice's methods (the slot of its
 // vtable) or its codec's (+76) with r4-r7 as given (as many as the
@@ -649,57 +649,57 @@ void ApiLeave(uint8_t* base, const GuestCall& call);
 // GetOutputFormat (sub_8245A3B8, +64, r4); the codec's: SubmitPacket
 // (sub_8245A050, +28, r4-r5), sub_8245A108 (+36, r4-r5), FlushPackets
 // (sub_8245A208, +56), sub_8245A270 (+72, r4).
-uint32_t ApiAddRef(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiAddRef(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiRelease(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiRelease(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiSetEffectParameters(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiSetEffectParameters(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiSetOutputVoices(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiSetOutputVoices(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiSetOutputMatrix(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiSetOutputMatrix(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiGetState(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiGetState(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiStop(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiStop(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiGetOutputFormat(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiGetOutputFormat(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiSubmitPacket(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiSubmitPacket(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiCodec36(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiCodec36(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiFlushPackets(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiFlushPackets(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
-uint32_t ApiCodec72(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+uint32_t ApiCodec72(uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
                  uint64_t r7, const GuestCall& call);
 
 // XAudioSourceVoice::SetFormat (sub_82459FF8): Reformat (its own frame
 // below `frame`, 128 bytes; its original where the plain C++ refuses).
-uint32_t ApiSetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
+uint32_t ApiSetFormat(uint32_t voice, uint32_t format, uint32_t outputs,
                       uint64_t r6, uint32_t frame, const GuestCall& call);
 // XAudioSourceVoice::Reset (sub_8245A0B0): StopAndReset.
-uint32_t ApiReset(uint8_t* base, uint32_t voice, const GuestCall& call);
+uint32_t ApiReset(uint32_t voice, const GuestCall& call);
 // XAudioVoice::Start (sub_8245A168): XAudioSourceVoice::Start.
-uint32_t ApiStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+uint32_t ApiStart(uint32_t voice, uint32_t flags, const Thread& thread,
                   const GuestCall& call);
 // XAudioSourceVoice::SetVolume (sub_8245A2C8): +140 = `volume` (as a
 // float), then slot +92 (the volume applied; f1 still `volume`).
-uint32_t ApiSetVolume(uint8_t* base, uint32_t voice, double volume, const GuestCall& call);
+uint32_t ApiSetVolume(uint32_t voice, double volume, const GuestCall& call);
 // XAudioSourceVoice::SetFrequencyRatio (sub_8245A340): the codec's (+76)
 // slot +96 with f1 `ratio`.
-uint32_t ApiSetFrequencyRatio(uint8_t* base, uint32_t voice, double ratio, const GuestCall& call);
+uint32_t ApiSetFrequencyRatio(uint32_t voice, double ratio, const GuestCall& call);
 // XAudioGetMasteringVoice (sub_8245A568): the engine's +64 to [out] and 0;
 // E_FAIL (0x80004005) without an engine or one.
-uint32_t ApiGetMasteringVoice(uint8_t* base, uint32_t out, const GuestCall& call);
+uint32_t ApiGetMasteringVoice(uint32_t out, const GuestCall& call);
 // XAudioCreateSourceVoice (sub_8245A768) and XAudioCreateSubmixVoice
 // (sub_8245A7C8): CreateSource or CreateSubmix with no allocator (in a
 // frame below `frame`, 128 bytes), the voice (at the frame's +80) to [out]
 // when it succeeds.
-uint32_t ApiCreateSourceVoice(uint8_t* base, uint32_t description, uint32_t out,
+uint32_t ApiCreateSourceVoice(uint32_t description, uint32_t out,
                               bool native_heap, const Thread& thread, uint32_t frame,
                               const GuestCall& call);
-uint32_t ApiCreateSubmixVoice(uint8_t* base, uint32_t description, uint32_t out,
+uint32_t ApiCreateSubmixVoice(uint32_t description, uint32_t out,
                               bool native_heap, const Thread& thread, uint32_t frame,
                               const GuestCall& call);
 

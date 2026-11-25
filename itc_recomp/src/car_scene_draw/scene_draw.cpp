@@ -53,8 +53,8 @@ using CameraPass = schema::CameraPass;
 using SceneModel = schema::SceneModel;
 
 // Record r of the three at 0x82002D40.
-Record RecordAt(uint8_t* base, uint32_t r) {
-  return Record(base, G::records_address() + r * Record::kSize);
+Record RecordAt(uint32_t r) {
+  return Record(G::records_address() + r * Record::kSize);
 }
 
 // The originals' wrapped callees (src/debug/frame_state_diff.cpp).
@@ -80,47 +80,47 @@ constexpr uint32_t kCarDrawUpdate = 0x820DAC68;
 constexpr uint32_t kOpenChunk = 0x8258C9D0;
 constexpr uint32_t kAllocateSlots = 0x8258CAA0;
 
-int32_t LoadS(uint8_t* base, uint32_t address) { return int32_t(Load(base, address)); }
+int32_t LoadS(uint32_t address) { return int32_t(Load(address)); }
 
 // Flush-to-zero off, as the callees' plain C++ expects at entry.
 void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); }
 
 // The doubleword at `from` to `to` (an ld/std pair).
-void CopyDoubleword(uint8_t* base, uint32_t to, uint32_t from) {
+void CopyDoubleword(uint32_t to, uint32_t from) {
   uint64_t word;
-  std::memcpy(&word, guest::Pointer(base, from), 8);
-  std::memcpy(guest::Pointer(base, to), &word, 8);
+  std::memcpy(&word, guest::Pointer(from), 8);
+  std::memcpy(guest::Pointer(to), &word, 8);
 }
 
 // std of a 64-bit value (big-endian, high word first).
-void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
+void StoreDoubleword(uint32_t address, uint64_t value) {
+  Store(address, uint32_t(value >> 32));
+  Store(address + 4, uint32_t(value));
 }
 
-uint32_t Pass(uint8_t* base, uint32_t index) { return kCameraPasses + index * kPassSize; }
+uint32_t Pass(uint32_t index) { return kCameraPasses + index * kPassSize; }
 
 // A wrapped callee's call: nothing when --debug_hide names it (r3 then
 // `r3`, the argument the original set), else `body` between
 // FrameStateDiff_Before and After, flush-to-zero off around it. Returns r3.
 template <typename Body>
-uint64_t Wrapped(uint8_t* base, uint32_t function, uint64_t r3, Body body) {
+uint64_t Wrapped(uint32_t function, uint64_t r3, Body body) {
   if (debug::IsHidden(function)) {
     return r3;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   FlushOff();
   const uint64_t left = body();
   FlushOff();
-  debug::FrameStateDiff_After(base, "draw step part", function);
+  debug::FrameStateDiff_After("draw step part", function);
   return left;
 }
 
 // The root's work, with its frame and calls.
 class SceneDraw {
  public:
-  SceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t f, uint32_t scene)
-      : base_(base), calls_(calls), f_(f), scene_(scene) {}
+  SceneDraw(const SceneDrawCalls& calls, uint32_t f, uint32_t scene)
+      : base_(), calls_(calls), f_(f), scene_(scene) {}
 
   void SetUp(uint32_t matrix);
   // Each returns the original's r24 at loc_820C7C50 (Car::DrawUpdate's
@@ -1143,22 +1143,22 @@ void SceneDraw::End() {
 
 }  // namespace
 
-uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
+uint32_t CarSceneDraw(const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
                       uint32_t matrix) {
   ITC_NATIVE_RUNNING("sub_820C5DE8 CarScene::Draw");
   const uint32_t f = stack - kSceneDrawFrame;
-  Store(base, f, stack);  // the back chain, as stwu
-  const int32_t state = LoadS(base, schema::CarScene(base, scene).state_address());
-  Store(base, f + 1716, scene);
+  Store(f, stack);  // the back chain, as stwu
+  const int32_t state = LoadS(schema::CarScene(scene).state_address());
+  Store(f + 1716, scene);
   if (state == 4) {
     return scene;  // r3 as it came
   }
-  SceneDraw draw(base, calls, f, scene);
+  SceneDraw draw(calls, f, scene);
   draw.SetUp(matrix);
   SceneDrawFrame frame;
   frame.f = f;
   frame.scene = scene;
-  frame.second_path = LoadS(base, schema::CarScene(base, scene).model_set_address()) != 0;
+  frame.second_path = LoadS(schema::CarScene(scene).model_set_address()) != 0;
   const uint64_t r24 = frame.second_path ? draw.SecondPath() : draw.FirstPath();
   // Both paths: the pass descriptions, then pass 0's view-projection put
   // back.
@@ -1166,7 +1166,7 @@ uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack
   draw.End();
   FlushOff();
   // r3 as Matrix::Copy leaves it: its destination, pass 0's view-projection.
-  return Load(base, f + 88) + 144;
+  return Load(f + 88) + 144;
 }
 
 }  // namespace car_scene_draw

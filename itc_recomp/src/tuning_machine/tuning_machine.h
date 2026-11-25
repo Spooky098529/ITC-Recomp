@@ -67,54 +67,54 @@ constexpr uint32_t kUnloadAll = 0x82208738;  // DecalImages::UnloadAll
 //
 // sub_821FE540 TuningMachine::ZeroRecord16 (r4 a 16-byte record): +0, +4 =
 // 0, +8, +12 = the float word [0x82000A34]. A leaf (r3 left).
-void ZeroRecord16(uint8_t* base, uint32_t record);
+void ZeroRecord16(uint32_t record);
 // sub_821FE590 DecalImages::Reset (r3 the decal images): the 200 36-byte
 // entries' +0 = -1, +4 to +32 = 0; +8852 = 0. A leaf (r3 left).
-void ResetImages(uint8_t* base, uint32_t images);
+void ResetImages(uint32_t images);
 // sub_821CE4C8 TuningMachine::Create (r3 the screen): the screen's words
 // reset (its row), ZeroRecord16 twice, the command queue and the two menus
 // VirtualAlloc'ed (unchecked) and their first words, DecalImages::Reset;
 // +9604 = 1 or 9 by +9612. r3 the decal images (Reset leaves it; all 64
 // bits from `r3`). 144-byte frame (the screen also kept at sp + 20).
-uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t Create(uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_821CBDB0 TuningMachine::OpenMovies (r3 the screen): UiMovies::Open
 // of 2, 13 and 14 (assets 22547 to 22549); +9608 = 0. The last Open's r3.
 // 96-byte frame.
-uint64_t OpenMovies(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t OpenMovies(uint32_t screen, uint32_t sp, const Calls& calls);
 // sub_821CE9E8 TuningMachine::WaitForMovies (r3 the screen): while +9608
 // is 0, IsLoaded of 2, 13 and 14 (stopping at the first not loaded), +9608
 // = 1 once all are; with +9608 set, +9708 = 1 and +9604 = 9 or 4 by +9612.
 // r3 the last IsLoaded's when called, else `r3`. 112-byte frame.
-uint64_t WaitForMovies(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t WaitForMovies(uint64_t r3, uint32_t sp);
 // sub_821D8898 TuningMachine::OnDialogClosed (r3 the screen, r4 the mode):
 // in state 11 (+9652), movie 16's texts (SetText(-1, 0, 15), (1, 3, 2), (1,
 // 4, 3); their unset varargs 0), its +40960 = 0 and message 34 posted;
 // always +9728 = 1. The last SetText's r3, else `r3`. 128-byte frame.
-uint64_t OnDialogClosed(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,
+uint64_t OnDialogClosed(uint64_t r3, uint32_t mode, uint32_t sp,
                         const Calls& calls);
 // sub_821D69A0 TuningMachine::Unload (r3 the screen): with +9608,
 // UiMovie::FinishAll(movie 2); with +9616, UiMovies::Delete of 2, 13 and 14
 // and +9608 = 0. The last call's r3, else `r3`. 112-byte frame.
-uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t Unload(uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_821CEA88 TuningMachine::OnDialogNo (5, 39 and 5, 41; r3 the screen):
 // the dialogs' no and back by the state +9652 (9, 11 to 14, 35 to 37: the
 // state history popped, the command queue reset and given the page's
 // command, the category menu set up again from PageItemCount and
 // PageCursor), then StickerDialogNo. Its r3. 96-byte frame.
-uint64_t OnDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Calls& calls);
+uint64_t OnDialogNo(uint64_t screen, uint32_t sp, const Calls& calls);
 // sub_821F7988 TuningMachine::StickerDialogNo (r3 the screen): states 50
 // and 51 back to 39 (movie 14's node (1, 1) hidden, UiMovie::HideNode
 // through its override), 52 to 40 with command 64 then 36. HideNode's r3,
 // or `screen`. 96-byte frame.
-uint64_t StickerDialogNo(uint8_t* base, uint64_t screen, uint32_t sp, const Calls& calls);
+uint64_t StickerDialogNo(uint64_t screen, uint32_t sp, const Calls& calls);
 // sub_821CF8B8 TuningMachine::OnNoticeClosed (5, 40; r3 the screen): in
 // state 10 (the money short) back to the category's page, the menu set up
 // again, the page's command. PageCursor's r3, or `screen`. No guest calls
 // (its 96-byte frame holds only its back chain).
-uint64_t OnNoticeClosed(uint8_t* base, uint64_t screen, uint32_t sp);
+uint64_t OnNoticeClosed(uint64_t screen, uint32_t sp);
 // sub_821D6A78 TuningMachine::Close (r3 the machine, r4 the mode): +9604 =
 // 7, message 4 posted. A leaf (r3 left).
-void Close(uint8_t* base, uint32_t machine, uint32_t mode);
+void Close(uint32_t machine, uint32_t mode);
 // DecalImages::UnloadAll by its plain C++ (with the native heap): its
 // guest calls and whether Texture::Free goes by car_models' plain C++.
 struct UnloadAllNative {
@@ -125,16 +125,16 @@ struct UnloadAllNative {
 // DecalImages::UnloadAll(+10048) (its plain C++ with `unload`, else a guest
 // call), VirtualFree of the queue and the two menus. The last VirtualFree's
 // r3. 112-byte frame.
-uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
+uint64_t Destroy(uint64_t r3, uint32_t sp, const Calls& calls,
                  const UnloadAllNative* unload = nullptr);
 // sub_821F8950 DecalImages::SavePlaceholders14 (r3 the decal images): movie
 // 14's placeholder textures ([[[m +28] +640]], [[[m +28] +636]]) into
 // +8844 and +8848. r3 Find's (the pair's address). 112-byte frame.
-uint32_t SavePlaceholders14(uint8_t* base, uint32_t images, uint32_t sp);
+uint32_t SavePlaceholders14(uint32_t images, uint32_t sp);
 // sub_82208130 DecalImages::SavePlaceholders (r3 the decal images): movie
 // 13's ([[[m +28] +724]], [[[m +28] +700]]) into +8836 and +8840, then
 // SavePlaceholders14. Its r3. 112-byte frame.
-uint32_t SavePlaceholders(uint8_t* base, uint32_t images, uint32_t sp);
+uint32_t SavePlaceholders(uint32_t images, uint32_t sp);
 
 // --- The machine's set-up (init.cpp) ---
 //
@@ -143,14 +143,14 @@ uint32_t SavePlaceholders(uint8_t* base, uint32_t images, uint32_t sp);
 // (`frame`, the original's stores in order). The last Add's r3 (an index
 // when `replaced`, else the new transition).
 constexpr uint32_t kInitFrame = 1232;
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced);
 
 // --- The screen's set-up's callees (set_up.cpp) ---
 //
 // sub_821DE280 TuningScreen::LoadInteriorSlots (r3 the screen): when the
 // selected garage car's id (its +12) is 10, +25192 = 0 (the interior's
 // fifth slot unavailable). A leaf, no frame (r3 left).
-void LoadInteriorSlots(uint8_t* base, uint32_t screen);
+void LoadInteriorSlots(uint32_t screen);
 // sub_821DA4B0 TuningScreen::LoadCurrentChoices (r3 the screen): the
 // selected garage car's choices into the screen's current choice words (the
 // inverse of TuningScreen::StoreToGarageCar), the paint from the car or its
@@ -160,7 +160,7 @@ void LoadInteriorSlots(uint8_t* base, uint32_t screen);
 // frame. `r1` the caller's (all 64 bits); r3 as the original leaves it: the
 // frame's +80 (r1's high word kept).
 constexpr uint32_t kLoadCurrentChoicesFrame = 192;
-uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1);
+uint64_t LoadCurrentChoices(uint32_t screen, uint64_t r1);
 
 // --- The owned parts (owned_parts.cpp) ---
 //
@@ -175,7 +175,7 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1);
 // 160-byte frame (the back chain and the table written). r3: the last
 // TestAndSetWheelFlag's, else 35960 (a leftover of the tires' loop).
 constexpr uint32_t kLoadOwnedPartsFrame = 160;
-uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
+uint64_t LoadOwnedParts(uint32_t screen, uint32_t sp);
 
 // --- The prices (prices.cpp) ---
 //
@@ -189,7 +189,7 @@ uint64_t LoadOwnedParts(uint8_t* base, uint32_t screen, uint32_t sp);
 // 200); +36280 0 when +25172 is set. No frame: the conversions' words left
 // below `sp` (sp - 160 to sp - 137) as the original leaves them; its
 // register saves (r17 on, sp - 128) aren't written. A leaf (r3 left).
-void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp);
+void SetPrices(uint32_t screen, uint32_t sp);
 
 // --- The unlocked parts (unlocked_parts.cpp) ---
 //
@@ -201,7 +201,7 @@ void SetPrices(uint8_t* base, uint32_t screen, uint32_t sp);
 // items' lists (+34992 to +35704), the tires (+35800: tire 0 from bit 95,
 // tire i when any of bits 95 + i, 99 + i, 103 + i), +25164 cleared then set
 // from bit 187, +36576 (3) from bits 186 to 188. A leaf, no frame (r3 left).
-void LoadUnlockedParts(uint8_t* base, uint32_t screen);
+void LoadUnlockedParts(uint32_t screen);
 
 // --- The screen's set-up (set_up.cpp) ---
 //
@@ -219,7 +219,7 @@ void LoadUnlockedParts(uint8_t* base, uint32_t screen);
 // register saves, r27 on, aren't). `r1` the caller's (all 64 bits); r3 as
 // given.
 constexpr uint32_t kSetUpFrame = 4128;
-uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls);
+uint64_t SetUp(uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls);
 
 // --- The screen's start (start.cpp) ---
 //
@@ -237,7 +237,7 @@ uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const
 // saves, r28 on, aren't). `r1` the caller's (all 64 bits). r3 FadeIn's (the
 // passes); `*f1` set to the car data's f1, then as the refresh leaves it.
 constexpr uint32_t kStartFrame = 1216;
-uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Calls& calls,
+uint64_t Start(const tuning_screen::StandCalls& stand, const Calls& calls,
                uint64_t r3, uint64_t r1, std::optional<double>* f1);
 
 }  // namespace tuning_machine

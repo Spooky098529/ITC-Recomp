@@ -62,7 +62,7 @@ struct Result {
 
 // A function's uniform entry: its parameters taken from `args`. The
 // dispatch table holds these.
-using Entry = Result (*)(uint8_t* base, const Args& args);
+using Entry = Result (*)(const Args& args);
 
 // The generated code's scratch value (its views share the low bytes, as
 // the recompiler's register union does).
@@ -176,11 +176,11 @@ void RegisterFallbacks(const Registration* entries, size_t count);
 // Calls the function at `address`: its entry in the dispatch table (lifted,
 // a hand port's or an import thunk's), else its lifted original. An address
 // with neither is logged and stops the program.
-Result Call(uint8_t* base, uint32_t address, const Args& args);
+Result Call(uint32_t address, const Args& args);
 
 // An object's vtable word for a virtual call: guest::VtableWord (a guest
 // address or a handle), what lift.py emits for the vtable idiom.
-inline uint32_t VtableWord(uint8_t* base, uint32_t object) { return guest::VtableWord(base, object); }
+inline uint32_t VtableWord(uint32_t object) { return guest::VtableWord(object); }
 
 // A function's original asked for where it couldn't be lifted (a flag off,
 // or a case the port declines): logged, and the program stops.

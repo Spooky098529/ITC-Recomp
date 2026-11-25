@@ -25,13 +25,13 @@ namespace mv = movies::movie;
     __VA_ARGS__;                                \
   }
 
-ITC_MOVIE(820AEC10, mv::Play(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MOVIE(820AE4E0, mv::Start(base, ctx.r3.u32))
-ITC_MOVIE(820AE828, mv::Stop(base, ctx.r3.u32))
-ITC_MOVIE(820AE898, mv::Pause(base, ctx.r3.u32))
-ITC_MOVIE(820AE8F8, mv::Resume(base, ctx.r3.u32))
-ITC_MOVIE(820AEA80, ctx.r3.u64 = mv::GetState(base, ctx.r3.u32))
-ITC_MOVIE(820AE528, mv::Release(base, ctx.r3.u32))
+ITC_MOVIE(820AEC10, mv::Play(ctx.r3.u32, ctx.r4.u32))
+ITC_MOVIE(820AE4E0, mv::Start(ctx.r3.u32))
+ITC_MOVIE(820AE828, mv::Stop(ctx.r3.u32))
+ITC_MOVIE(820AE898, mv::Pause(ctx.r3.u32))
+ITC_MOVIE(820AE8F8, mv::Resume(ctx.r3.u32))
+ITC_MOVIE(820AEA80, ctx.r3.u64 = mv::GetState(ctx.r3.u32))
+ITC_MOVIE(820AE528, mv::Release(ctx.r3.u32))
 
 #undef ITC_MOVIE
 
@@ -40,9 +40,9 @@ ITC_MOVIE(820AE528, mv::Release(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY_ALWAYS(820AE958) {
   
   if (ITC_FLAG(play_movies_with_ffmpeg)) {
-    mv::RenderFrame(base, ctx.r3.u32);
+    mv::RenderFrame(ctx.r3.u32);
   } else {
-    lifted::original::c820AE958(ctx, base);
+    lifted::original::c820AE958(ctx);
   }
   hooks::TitleScreen_MovieRendered();
 }

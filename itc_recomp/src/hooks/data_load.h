@@ -10,11 +10,11 @@
 namespace hooks {
 
 // LoadingScreen::Load (sub_82247B98) and sub_82291328: no arguments.
-void LoadingScreenLoadSteps(lifted::Regs& ctx, uint8_t* base);
-void OtherMoviesLoadSteps(lifted::Regs& ctx, uint8_t* base);
+void LoadingScreenLoadSteps(lifted::Regs& ctx);
+void OtherMoviesLoadSteps(lifted::Regs& ctx);
 // BootData::CreateObjects (sub_82105868) and BootData::Load (sub_82106618),
 // their callees through their adapters from frames like the originals'.
-void CreateObjectsSteps(lifted::Regs& ctx, uint8_t* base);
-void BootDataLoadSteps(lifted::Regs& ctx, uint8_t* base);
+void CreateObjectsSteps(lifted::Regs& ctx);
+void BootDataLoadSteps(lifted::Regs& ctx);
 
 }  // namespace hooks

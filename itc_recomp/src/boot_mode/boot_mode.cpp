@@ -21,22 +21,22 @@ namespace {
 
 using G = schema::BootModeGlobals;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // A movie class slot (MovieVtable's, a tail call from the caller's frame at
 // `sp`): ours where the slot holds it, else the guest's. r3 as the slot
 // leaves it (ours leave the object).
 using MovieSlotField = uint32_t (schema::MovieVtable::*)() const;
-uint64_t MovieSlot(uint8_t* base, MovieSlotField slot, uint32_t ours,
+uint64_t MovieSlot(MovieSlotField slot, uint32_t ours,
                    void (*native)(uint8_t*, uint32_t), uint32_t sp, uint32_t lr,
                    const Calls& calls) {
-  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
-  const uint32_t target = (schema::Movie(base, movie).vtable().*slot)();
+  const uint32_t movie = schema::MoviesGlobals::movie_class().address;
+  const uint32_t target = (schema::Movie(movie).vtable().*slot)();
   if (calls.ffmpeg_movies && target == ours) {
-    native(base, movie);
+    native(movie);
     return movie;
   }
   return calls.call(target, sp, lr, movie, 0);
@@ -124,126 +124,125 @@ constexpr Step kMachineSteps[] = {
 
 // --- Movies:: ---
 
-uint64_t MoviesPlay(uint8_t* base, uint32_t id, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesPlay(uint32_t id, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43A8 Movies::Play");
-  const uint32_t path = Load(base, kMoviePaths + (id << 2));
-  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
-  const uint32_t target = schema::Movie(base, movie).vtable().play();
+  const uint32_t path = Load(kMoviePaths + (id << 2));
+  const uint32_t movie = schema::MoviesGlobals::movie_class().address;
+  const uint32_t target = schema::Movie(movie).vtable().play();
   if (calls.ffmpeg_movies && target == kMoviePlay) {
-    movies::movie::Play(base, movie, path);
+    movies::movie::Play(movie, path);
     return movie;
   }
   return calls.call(target, sp, lr, movie, path);
 }
 
-uint64_t MoviesStart(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesStart(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43D8 Movies::Start");
-  return MovieSlot(base, &schema::MovieVtable::start, kMovieStart, movies::movie::Start, sp, lr, calls);
+  return MovieSlot(&schema::MovieVtable::start, kMovieStart, movies::movie::Start, sp, lr, calls);
 }
 
-uint64_t MoviesStop(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesStop(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43F0 Movies::Stop");
-  return MovieSlot(base, &schema::MovieVtable::stop, kMovieStop, movies::movie::Stop, sp, lr, calls);
+  return MovieSlot(&schema::MovieVtable::stop, kMovieStop, movies::movie::Stop, sp, lr, calls);
 }
 
-uint64_t MoviesPause(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesPause(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4408 Movies::Pause");
-  return MovieSlot(base, &schema::MovieVtable::pause, kMoviePause, movies::movie::Pause, sp, lr, calls);
+  return MovieSlot(&schema::MovieVtable::pause, kMoviePause, movies::movie::Pause, sp, lr, calls);
 }
 
-uint64_t MoviesResume(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesResume(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4420 Movies::Resume");
-  return MovieSlot(base, &schema::MovieVtable::resume, kMovieResume, movies::movie::Resume, sp, lr, calls);
+  return MovieSlot(&schema::MovieVtable::resume, kMovieResume, movies::movie::Resume, sp, lr, calls);
 }
 
-uint64_t MoviesRelease(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
+uint64_t MoviesRelease(uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4438 Movies::Release");
-  return MovieSlot(base, &schema::MovieVtable::release, kMovieRelease, movies::movie::Release, sp, lr, calls);
+  return MovieSlot(&schema::MovieVtable::release, kMovieRelease, movies::movie::Release, sp, lr, calls);
 }
 
-uint64_t MoviesState(uint8_t* base, uint32_t frame, const Calls& calls) {
+uint64_t MoviesState(uint32_t frame, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4450 Movies::State");
   if (calls.finished_early && calls.finished_early()) {
     return 1;
   }
-  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
-  const uint32_t target = schema::Movie(base, movie).vtable().state();
+  const uint32_t movie = schema::MoviesGlobals::movie_class().address;
+  const uint32_t target = schema::Movie(movie).vtable().state();
   uint32_t state;
   if (calls.ffmpeg_movies && target == kMovieGetState) {
-    state = movies::movie::GetState(base, movie);
+    state = movies::movie::GetState(movie);
   } else {
     state = uint32_t(calls.call(target, frame, 0x820A4474, movie, 0));
   }
   if (state <= 3) {
     return state;
   }
-  return Load(base, frame + 80);  // never written: the stack's word
+  return Load(frame + 80);  // never written: the stack's word
 }
 
 // --- The boot machine's handlers ---
 
-uint64_t StartMovie(uint8_t* base, uint32_t frame, const Calls& calls) {
+uint64_t StartMovie(uint32_t frame, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82107B90 Boot::StartMovie");
   // sub_825894C8, XMP's playback taken: Dropped (system-services.md), only
   // the last error it clears.
-  last_error::Set(base, calls.pcr, 0);
-  const uint32_t id = Load(base, G::movie_ids_address() + (G::movie_index(base) << 2));
-  MoviesPlay(base, id, frame, 0x82107BBC, calls);
-  const uint32_t passes = G::start_fade_passes(base);
-  G::set_movie_index(base, G::movie_index(base) + 1);
-  mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
+  last_error::Set(calls.pcr, 0);
+  const uint32_t id = Load(G::movie_ids_address() + (G::movie_index() << 2));
+  MoviesPlay(id, frame, 0x82107BBC, calls);
+  const uint32_t passes = G::start_fade_passes();
+  G::set_movie_index(G::movie_index() + 1);
+  mode_tick::ScreenFadesFadeIn(passes, 0, 0, 0, 0);
   return passes;
 }
 
-uint64_t WaitForMovie(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
+uint64_t WaitForMovie(uint32_t machine, uint32_t dispatcher, uint32_t frame,
                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82107C58 Boot::WaitForMovie");
-  const schema::BootMachine boot(base, machine);
+  const schema::BootMachine boot(machine);
   bool end = false;
-  if (G::skippable(base) != 0) {
+  if (G::skippable() != 0) {
     using RC = schema::RacerControllersGlobals;
-    const schema::PlayerMapperEntry entry(
-        base, RC::mapper_entries_address() + (Load(base, RC::player_entries_address()) << 3));
+    const schema::PlayerMapperEntry entry(RC::mapper_entries_address() + (Load(RC::player_entries_address()) << 3));
     if (entry.unread() != 1) {
       const uint32_t mapper = entry.mapper().address;
-      const uint32_t target = Load(base, Load(base, mapper) + 40);
+      const uint32_t target = Load(Load(mapper) + 40);
       if ((calls.call(target, frame, 0x82107CC0, mapper, kSkipAction) & 0xFF) != 0) {
         end = true;
       }
     }
   }
   const uint32_t state_frame = frame - kStateFrame;
-  if (int32_t(MoviesState(base, state_frame, calls)) == 1 && boot.movie_started() == 1) {
+  if (int32_t(MoviesState(state_frame, calls)) == 1 && boot.movie_started() == 1) {
     end = true;
   }
   if (end) {
-    mode_tick::ScreenFadesFadeOut(base, 1, 0, 0, 0, 0);
-    Queue(schema::ModeDispatcher(base, dispatcher), 1);
+    mode_tick::ScreenFadesFadeOut(1, 0, 0, 0, 0);
+    Queue(schema::ModeDispatcher(dispatcher), 1);
   }
-  uint64_t r3 = MoviesState(base, state_frame, calls);
+  uint64_t r3 = MoviesState(state_frame, calls);
   if (int32_t(r3) == 1 && boot.movie_started() == 0) {
-    r3 = MoviesStart(base, frame, 0x82107D70, calls);
+    r3 = MoviesStart(frame, 0x82107D70, calls);
     boot.set_movie_started(1);
   }
   return r3;
 }
 
-uint64_t EndMovie(uint8_t* base, uint32_t frame, const Calls& calls) {
+uint64_t EndMovie(uint32_t frame, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82107BF8 Boot::EndMovie");
-  MoviesStop(base, frame, 0x82107C08, calls);
-  MoviesRelease(base, frame, 0x82107C0C, calls);
+  MoviesStop(frame, 0x82107C08, calls);
+  MoviesRelease(frame, 0x82107C0C, calls);
   // sub_825895A0, XMP's playback handed back: Dropped (system-services.md),
   // only the last error it clears and its answer, 0.
-  last_error::Set(base, calls.pcr, 0);
+  last_error::Set(calls.pcr, 0);
   return 0;
 }
 
 // --- The boot mode ---
 
-uint32_t MachineInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t MachineInit(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82107DD0 BootMachine::Init");
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -257,96 +256,96 @@ uint32_t MachineInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* repl
   for (const Step& step : kMachineSteps) {
     switch (step.op) {
       case Op::kStore:
-        Store(base, at(step.a), at(step.b));
+        Store(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          Store(base, at(step.b) + 4 * i, Load(base, at(step.a) + 4 * i));
+          Store(at(step.b) + 4 * i, Load(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }
-  schema::BootMachine(base, machine).set_movie_started(0);
+  schema::BootMachine(machine).set_movie_started(0);
   return r3;
 }
 
-uint32_t Init(uint8_t* base, uint32_t mode, uint32_t frame, bool* replaced) {
+uint32_t Init(uint32_t mode, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82107F68 BootMode::Init");
-  const schema::BootMode boot(base, mode);
+  const schema::BootMode boot(mode);
   const uint32_t machine = boot.machine_address();
-  const uint32_t r3 = MachineInit(base, machine, frame - kMachineInitFrame, replaced);
+  const uint32_t r3 = MachineInit(machine, frame - kMachineInitFrame, replaced);
   // The delegate's function and adjustment, built at the frame's +80.
-  Store(base, frame + 84, 0);
+  Store(frame + 84, 0);
   const uint32_t count = boot.handler_count();
-  Store(base, frame + 80, kNextModeThunk);
+  Store(frame + 80, kNextModeThunk);
   boot.set_handler_count(count + 1);
-  Store(base, boot.handlers_address() + (count << 2), machine);
-  const schema::ModeDelegate delegate(base, mode + 8);
+  Store(boot.handlers_address() + (count << 2), machine);
+  const schema::ModeDelegate delegate(mode + 8);
   if (delegate.address != 0) {
-    const uint32_t function = Load(base, frame + 80), adjustment = Load(base, frame + 84);
+    const uint32_t function = Load(frame + 80), adjustment = Load(frame + 84);
     delegate.set_object(mode);
     delegate.set_function(function);
     delegate.set_adjustment(adjustment);
     delegate.set_vtable(kDelegateVtable);
   }
   boot.set_delegate_ptr(delegate);
-  G::set_mode_asked(base, kNoModeAsked);
-  G::set_movie_paused(base, 0);
+  G::set_mode_asked(kNoModeAsked);
+  G::set_movie_paused(0);
   return r3;
 }
 
-void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t frame, const Calls& calls) {
+void NextMode(uint32_t answer, uint32_t mode, uint32_t frame, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82108018 BootMode::NextMode");
-  const schema::ModeAnswer out(base, answer);
-  const schema::BootMode boot(base, mode);
-  const uint32_t blocked0 = G::pad_blocked0(base);
+  const schema::ModeAnswer out(answer);
+  const schema::BootMode boot(mode);
+  const uint32_t blocked0 = G::pad_blocked0();
   out.set_next_type(0);
-  const uint32_t was_paused = G::movie_paused(base);
+  const uint32_t was_paused = G::movie_paused();
   out.set_changed(0);
   uint32_t paused;
-  if ((blocked0 != 0 || G::pad_blocked1(base) != 0) && G::skippable(base) != 0) {
+  if ((blocked0 != 0 || G::pad_blocked1() != 0) && G::skippable() != 0) {
     paused = 1;
   } else {
-    paused = G::mode_asked(base) == kNoModeAsked ? 0 : 1;
+    paused = G::mode_asked() == kNoModeAsked ? 0 : 1;
   }
-  G::set_movie_paused(base, paused);
+  G::set_movie_paused(paused);
   if (was_paused != paused) {
     if (paused != 0) {
-      MoviesPause(base, frame, 0x821080AC, calls);
+      MoviesPause(frame, 0x821080AC, calls);
     } else {
-      MoviesResume(base, frame, 0x821080B4, calls);
+      MoviesResume(frame, 0x821080B4, calls);
     }
   }
-  Queue(schema::ModeDispatcher(base, mode + 36), 0);  // the boot mode's dispatcher
+  Queue(schema::ModeDispatcher(mode + 36), 0);  // the boot mode's dispatcher
   // GameMessages::Dispatch (its override, src/frame_pacing/game_messages.cpp).
   calls.call(0x821062E8, frame, 0x82108108, boot.handlers_address(), mode);
   if (boot.machine_state() != 2) {
     return;
   }
-  uint32_t type = G::mode_asked(base);
+  uint32_t type = G::mode_asked();
   if (type == kNoModeAsked) {
-    const uint32_t index = G::movie_index(base);
-    if (index >= 5 || Load(base, G::movie_ids_address() + (index << 2)) == kEndOfList) {
-      type = G::next_type(base);
+    const uint32_t index = G::movie_index();
+    if (index >= 5 || Load(G::movie_ids_address() + (index << 2)) == kEndOfList) {
+      type = G::next_type();
     } else {
       type = 3;
     }
   }
   // The answer built at the frame's +80 (bytes +81 to +83 not written: the
   // stack's), then its 8 bytes copied.
-  Store(base, frame + 84, type);
-  guest::StoreU8(base, frame + 80, 1);
-  const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
+  Store(frame + 84, type);
+  guest::StoreU8(frame + 80, 1);
+  const uint32_t w0 = Load(frame + 80), w1 = Load(frame + 84);
   out.set_word0(w0);
   out.set_next_type(w1);
 }
 
-void Destruct(uint8_t* base, uint32_t mode) {
+void Destruct(uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82106D08 BootMode::~BootMode");
-  const schema::BootMode boot(base, mode);
+  const schema::BootMode boot(mode);
   boot.set_vtable(kBootModeVtable);
   boot.set_vtable32(kBootModeVtable32);
   // sub_82106540 on +848 (the state machine needs nothing): empty.
@@ -354,19 +353,19 @@ void Destruct(uint8_t* base, uint32_t mode) {
   boot.set_vtable32(kModeVtable32);
 }
 
-void DeletingDestructor(uint8_t* base, uint32_t mode, uint32_t flags, uint32_t frame,
+void DeletingDestructor(uint32_t mode, uint32_t flags, uint32_t frame,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82106D68 BootMode::DeletingDestructor");
-  Destruct(base, mode);
+  Destruct(mode);
   if (flags & 1) {
     calls.call(kOperatorDelete, frame, 0x82106D98, mode, flags);
   }
 }
 
-void ModeDeletingDestructor(uint8_t* base, uint32_t mode, uint32_t flags, uint32_t frame,
+void ModeDeletingDestructor(uint32_t mode, uint32_t flags, uint32_t frame,
                             const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82106E38 Mode::DeletingDestructor");
-  const schema::GameMode game_mode(base, mode);
+  const schema::GameMode game_mode(mode);
   game_mode.set_vtable(kModeVtable);
   game_mode.set_vtable32(kModeVtable32);
   if (flags & 1) {
@@ -374,22 +373,22 @@ void ModeDeletingDestructor(uint8_t* base, uint32_t mode, uint32_t flags, uint32
   }
 }
 
-uint64_t NextModeThunk(uint8_t* base, uint64_t answer, uint64_t mode, uint32_t sp, uint32_t lr,
+uint64_t NextModeThunk(uint64_t answer, uint64_t mode, uint32_t sp, uint32_t lr,
                        const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82235C08 Mode::NextModeThunk");
   const uint32_t target =
-      schema::GameModeVtable(base, schema::GameMode(base, uint32_t(mode)).vtable()).next_mode();
+      schema::GameModeVtable(schema::GameMode(uint32_t(mode)).vtable()).next_mode();
   if (target == kNextMode) {
-    NextMode(base, uint32_t(answer), uint32_t(mode), sp - kNextModeFrame, calls);
+    NextMode(uint32_t(answer), uint32_t(mode), sp - kNextModeFrame, calls);
     return answer;
   }
   return calls.call(target, sp, lr, answer, mode);
 }
 
-void ModeDelegateInvoke(uint8_t* base, uint32_t answer, uint32_t delegate, uint32_t frame,
+void ModeDelegateInvoke(uint32_t answer, uint32_t delegate, uint32_t frame,
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8223D440 ModeDelegate::Invoke");
-  const schema::ModeDelegate view(base, delegate);
+  const schema::ModeDelegate view(delegate);
   const uint32_t adjustment = view.adjustment();
   const uint32_t object = view.object();
   const uint32_t function = view.function();
@@ -397,18 +396,18 @@ void ModeDelegateInvoke(uint8_t* base, uint32_t answer, uint32_t delegate, uint3
   const uint32_t buffer = frame + 80;
   constexpr uint32_t kReturn = 0x8223D470;
   const uint64_t r3 = function == kNextModeThunk
-                          ? NextModeThunk(base, buffer, r4, frame, kReturn, calls)
+                          ? NextModeThunk(buffer, r4, frame, kReturn, calls)
                           : calls.call(function, frame, kReturn, buffer, r4);
-  const uint32_t w0 = Load(base, uint32_t(r3)), w1 = Load(base, uint32_t(r3) + 4);
-  const schema::ModeAnswer out(base, answer);
+  const uint32_t w0 = Load(uint32_t(r3)), w1 = Load(uint32_t(r3) + 4);
+  const schema::ModeAnswer out(answer);
   out.set_word0(w0);
   out.set_next_type(w1);
 }
 
-void ScreenMachineConstruct(uint8_t* base, uint32_t machine) {
+void ScreenMachineConstruct(uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82107358 ScreenMachine::ScreenMachine");
-  game_modes::StateMachineConstruct(base, machine);
-  const schema::ScreenMachine screen(base, machine);
+  game_modes::StateMachineConstruct(machine);
+  const schema::ScreenMachine screen(machine);
   screen.set_transition_count(0);
   screen.set_state(0);
   screen.set_loaded(0);

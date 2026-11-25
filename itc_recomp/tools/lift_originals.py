@@ -41,7 +41,7 @@ def calls_without_entry():
             # logged when reached, and lifted then.
             continue
         text = open(path, errors="ignore").read()
-        targets |= {a.upper() for a in re.findall(r"lifted::Call\(base, 0x(8[0-9A-Fa-f]{7})", text)}
+        targets |= {a.upper() for a in re.findall(r"lifted::Call\(0x(8[0-9A-Fa-f]{7})", text)}
         targets |= {a.upper() for a in re.findall(
             r"CallFromContext\([^,()]+, [^,()]+, 0x(8[0-9A-Fa-f]{7})", text)}
     return {"sub_" + a for a in targets - entries - lifted}
@@ -131,9 +131,9 @@ def main(argv):
     ]
     for n in names:
         h.append(f"// {n}'s original.")
-        h.append(f"Result {lift.ename(n)}(uint8_t* base, const Args& a);")
+        h.append(f"Result {lift.ename(n)}(const Args& a);")
         h.append(f"// The same on a register view (in place of __imp__{n}).")
-        h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
+        h.append(f"inline void c{n[4:]}(Regs& regs) {{ regs.Apply({lift.ename(n)}(regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
     batch_functions = set()
     for path in glob.glob(os.path.join(lift.OUT, "batch_*.cpp")):

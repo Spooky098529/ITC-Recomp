@@ -38,22 +38,22 @@ using RouteSection = schema::TrackRouteSection;
 using RouteLink = schema::TrackRouteLink;
 using RouteSlice = schema::TrackRouteSlice;
 
-inline uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+inline uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
 }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 // A doubleword (big-endian, as std and ld).
-inline uint64_t Load64(uint8_t* base, uint32_t address) {
-  return uint64_t(Load(base, address)) << 32 | Load(base, address + 4);
+inline uint64_t Load64(uint32_t address) {
+  return uint64_t(Load(address)) << 32 | Load(address + 4);
 }
-inline void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
+inline void Store64(uint32_t address, uint64_t value) {
+  Store(address, uint32_t(value >> 32));
+  Store(address + 4, uint32_t(value));
 }
-inline int32_t S16(uint8_t* base, uint32_t address) {
-  return int16_t(guest::LoadU16(base, address));
+inline int32_t S16(uint32_t address) {
+  return int16_t(guest::LoadU16(address));
 }
 
 // fctiwz's low word, as the translation leaves it (stfiwx).
@@ -85,14 +85,13 @@ inline uint32_t FctidzWord(double value) {
 
 // A route section's record: the route file's table (+12) at the section's
 // low 16 bits (the originals' rlwinm by 2 into bits 14-29).
-inline uint32_t SectionRecord(uint8_t* base, uint32_t section) {
-  const uint32_t file = schema::RaceStatesGlobals::route(base);
-  return Load(base, RouteFile(base, file).sections() + ((section << 2) & 0x3FFFC));
+inline uint32_t SectionRecord(uint32_t section) {
+  const uint32_t file = schema::RaceStatesGlobals::route();
+  return Load(RouteFile(file).sections() + ((section << 2) & 0x3FFFC));
 }
 // A section's link `link` (a signed halfword at +28 + 4 x link).
-inline int32_t Link(uint8_t* base, uint32_t record, uint32_t link) {
-  return S16(base,
-             RouteLink(base, RouteSection(base, record).links_address() + (link << 2)).section_address());
+inline int32_t Link(uint32_t record, uint32_t link) {
+  return S16(RouteLink(RouteSection(record).links_address() + (link << 2)).section_address());
 }
 
 // A packed time unpacked as the originals do (rotations, subfic and
@@ -107,28 +106,28 @@ inline int64_t Unpack(uint32_t w) {
 
 // The screen fades are done: their in and out counts (0x826A50DC,
 // 0x826A50E4) both 0.
-inline bool FadesDone(uint8_t* base) {
+inline bool FadesDone() {
   using G = schema::RaceStatesGlobals;
-  return (G::fade_out_count(base) | G::fade_in_count(base)) == 0;
+  return (G::fade_out_count() | G::fade_in_count()) == 0;
 }
 
 // A message posted to every machine: appended to the dispatcher's ring
 // (+204: 50 entries of 12 bytes, +0 the message, +4 and +8 0; +804 the
 // count, +808 the start), as the handlers write it inline.
-inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const schema::RaceStatesDispatcher d(base, dispatcher);
+inline void Post(uint32_t dispatcher, uint32_t message) {
+  const schema::RaceStatesDispatcher d(dispatcher);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t at = d.ring_start() + count - 1;
   d.set_ring_count(count);
-  const schema::ModeMessage entry(base, (at - at / 50 * 50) * 12 + d.ring_address());
+  const schema::ModeMessage entry((at - at / 50 * 50) * 12 + d.ring_address());
   entry.set_id(message);
   entry.set_arg0(0);
   entry.set_arg1(0);
 }
 
 // The race data's kind (+0xA3AF0).
-inline uint32_t Kind(uint8_t* base) {
-  return schema::RaceStatesGlobals::race_data(base).kind();
+inline uint32_t Kind() {
+  return schema::RaceStatesGlobals::race_data().kind();
 }
 
 }  // namespace race_states::steps

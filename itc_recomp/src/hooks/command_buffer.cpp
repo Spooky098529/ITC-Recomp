@@ -47,101 +47,101 @@ namespace cb = graphics::command_buffer;
 // (2026-11-06): their only callers, predicated tiling's start and end, are
 // native (src/graphics/predicated_tiling.cpp), and --native_predicated_tiling
 // switches only those callers.
-ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ctx.r4.u32,
+ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32))
 // Reserve: the recording command buffer's path (never in play) is the
 // original's.
 ITC_COMMAND_BUFFER(8229E308, {
-  if (schema::Device(base, ctx.r3.u32).recorder().address != 0) {
-    lifted::original::c8229E308(ctx, base);
+  if (schema::Device(ctx.r3.u32).recorder().address != 0) {
+    lifted::original::c8229E308(ctx);
     return;
   }
-  ctx.r3.u64 = cb::Reserve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = cb::Reserve(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 })
 // The chains: a recording command buffer (+13160, never in play) makes
 // Reserve the original's, so they run the original whole.
 ITC_COMMAND_BUFFER(8229EB10, {
-  if (schema::Device(base, schema::CommandChain(base, ctx.r3.u32).device()).recorder().address !=
+  if (schema::Device(schema::CommandChain(ctx.r3.u32).device()).recorder().address !=
       0) {
-    lifted::original::c8229EB10(ctx, base);
+    lifted::original::c8229EB10(ctx);
     return;
   }
-  ctx.r3.u64 = cb::NewBlock(base, ctx.r3.u32);
+  ctx.r3.u64 = cb::NewBlock(ctx.r3.u32);
 })
 // The segment flow: with a recording command buffer (never in play), the
 // originals whole. The adapters of sub_8229E768, sub_8229E100, sub_8229EDA8,
 // sub_8229EC00 and sub_8229E908 are gone (2026-11-06): their callers in play
 // are native (Device::Swap's call to sub_8229EC00 through
 // hooks::NextCommandSegment), and the flag switches only those callers.
-graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
+graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx) {
+  return [&ctx](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
                       uint32_t interrupts, uint32_t list) {
     uint32_t r3 = 0;
-    guest_call::InFrame(ctx, base, 128, 0x8229EEE0, [&](uint32_t) {
+    guest_call::InFrame(ctx, 128, 0x8229EEE0, [&](uint32_t) {
       ctx.r3.u64 = device;
       ctx.r4.u64 = result;
       ctx.r5.u64 = address;
       ctx.r6.u64 = words;
       ctx.r7.u64 = interrupts;
       ctx.r8.u64 = list;
-      lifted::Enter(ctx, base, game::Device::DeferredKick);
+      lifted::Enter(ctx, game::Device::DeferredKick);
       r3 = ctx.r3.u32;
     });
     return r3;
   };
 }
 
-void hooks::EndCommandSegment(lifted::Regs& ctx, uint8_t* base) {
-  if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    lifted::original::c8229EF48(ctx, base);
+void hooks::EndCommandSegment(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {
+    lifted::original::c8229EF48(ctx);
     return;
   }
   const uint32_t device = ctx.r3.u32;
-  ctx.r3.u64 = cb::EndSegment(base, device, CommandBufferKick(ctx, base));
+  ctx.r3.u64 = cb::EndSegment(device, CommandBufferKick(ctx));
 }
 
-void hooks::NextCommandSegment(lifted::Regs& ctx, uint8_t* base) {
-  if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    lifted::original::c8229EC00(ctx, base);
+void hooks::NextCommandSegment(lifted::Regs& ctx) {
+  if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {
+    lifted::original::c8229EC00(ctx);
     return;
   }
   const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
-  ctx.r3.u64 = cb::NextSegment(base, device, words, CommandBufferKick(ctx, base));
+  ctx.r3.u64 = cb::NextSegment(device, words, CommandBufferKick(ctx));
 }
 
 #define ITC_SEGMENT_FLOW(address, ...)                                             \
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                           \
     \
-    if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {   \
-      lifted::original::c##address(ctx, base);                              \
+    if (!ITC_FLAG(native_command_buffer) || cb::Recording(ctx.r3.u32)) {   \
+      lifted::original::c##address(ctx);                              \
       return;                                                                    \
     }                                                                            \
-    const cb::Kick kick = hooks::CommandBufferKick(ctx, base);                   \
+    const cb::Kick kick = hooks::CommandBufferKick(ctx);                   \
     __VA_ARGS__;                                                                 \
   }
 
 ITC_SEGMENT_FLOW(8229F148, {
   const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
-  ctx.r3.u64 = cb::ReserveWords(base, device, words, kick);
+  ctx.r3.u64 = cb::ReserveWords(device, words, kick);
 })
 ITC_SEGMENT_FLOW(8229F228, {
   const uint32_t device = ctx.r3.u32, flags = ctx.r4.u32, function = ctx.r5.u32,
                  argument = ctx.r6.u32;
-  ctx.r3.u64 = cb::InsertCallback(base, device, flags, function, argument, kick);
+  ctx.r3.u64 = cb::InsertCallback(device, flags, function, argument, kick);
 })
 // Without their packets (and the full wait without its spin on the pending
 // kicks): see command_buffer.h.
 ITC_SEGMENT_FLOW(8229F0E0, {
   const uint32_t device = ctx.r3.u32;
-  ctx.r3.u64 = cb::WriteIdlePackets(base, device, kick);
+  ctx.r3.u64 = cb::WriteIdlePackets(device, kick);
 })
 ITC_SEGMENT_FLOW(8229F1B0, {
   const uint32_t device = ctx.r3.u32;
-  ctx.r3.u64 = cb::WaitForIdle(base, device, kick);
+  ctx.r3.u64 = cb::WaitForIdle(device, kick);
 })
 
 ITC_COMMAND_BUFFER(822AF978,
-                   ctx.r3.u64 = cb::WriteDefaultDrawRegisters(base, ctx.r3.u32, ctx.r4.u32))
+                   ctx.r3.u64 = cb::WriteDefaultDrawRegisters(ctx.r3.u32, ctx.r4.u32))
 
 // Device::WriteFlushPackets (sub_8229E5D0): Dropped. Its block only made the
 // GPU flush caches for memory the CPU wrote (COHER_* registers and a
@@ -154,7 +154,7 @@ ITC_COMMAND_BUFFER(822AF978,
 // range it took (sub_8229DE48) has had no writer in play since
 // Resource::Lock is native.
 ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
-  schema::CommandFlushWords(base, ctx.r5.u32).set_words(0);
+  schema::CommandFlushWords(ctx.r5.u32).set_words(0);
 }
 
 // The data cache flush (sub_822AC470): Dropped (no data cache to flush on
@@ -163,6 +163,6 @@ ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
 ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
   
   if (!ITC_FLAG(native_command_buffer)) {
-    lifted::original::c822AC470(ctx, base);
+    lifted::original::c822AC470(ctx);
   }
 }

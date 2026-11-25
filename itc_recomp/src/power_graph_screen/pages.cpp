@@ -32,26 +32,26 @@ constexpr uint32_t kDrawFrame = 112;
 
 }  // namespace
 
-uint64_t MenuPage(uint8_t* base, uint64_t member, uint64_t mode, uint32_t sp, const Calls& calls) {
+uint64_t MenuPage(uint64_t member, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250948 PowerGraphScreen67::MenuPage");
   // The original's 112-byte frame held only its back chain: its calls run
   // from `sp` (E5 step 6; none reads its caller's frame).
-  uint64_t answer = calls.Call(kMenuStep, sp, 0x82250968, G::menu(base).address);
-  const uint32_t tab = G::data(base).tab();
+  uint64_t answer = calls.Call(kMenuStep, sp, 0x82250968, G::menu().address);
+  const uint32_t tab = G::data().tab();
   if (tab >= 6) {
     return answer;
   }
   // Back (158), then accept (159) below 3 or the opening button (163).
   answer = calls.Call(kMenuPressed, sp, tab < 3 ? 0x822509AC : 0x82250990,
-                      G::menu(base).address, 158);
+                      G::menu().address, 158);
   if (int32_t(answer) == 0) {
-    answer = calls.Call(kMenuPressed, sp, 0x822509C0, G::menu(base).address, tab < 3 ? 159 : 163);
+    answer = calls.Call(kMenuPressed, sp, 0x822509C0, G::menu().address, tab < 3 ? 159 : 163);
     if (int32_t(answer) == 0) {
       return answer;
     }
   }
   calls.Call(kMenuSoundPlay, sp, 0x822509D0, 2);
-  const schema::PageObject pages = G::pages(base);
+  const schema::PageObject pages = G::pages();
   const uint32_t before = pages.page();
   if (before != 1) {
     pages.set_previous_page(before);
@@ -61,20 +61,20 @@ uint64_t MenuPage(uint8_t* base, uint64_t member, uint64_t mode, uint32_t sp, co
   pages.set_next_page(1);
   pages.set_page(0xFFFFFFFFu);
   // The member's slot 2 (its closing message).
-  return calls.Call(Member(base, uint32_t(member)).vtable().post_closing(), sp, 0x82250A18, member, mode);
+  return calls.Call(Member(uint32_t(member)).vtable().post_closing(), sp, 0x82250A18, member, mode);
 }
 
-uint64_t ClosedPage(uint8_t* base, uint64_t member, uint64_t mode, uint32_t sp, uint32_t lr,
+uint64_t ClosedPage(uint64_t member, uint64_t mode, uint32_t sp, uint32_t lr,
                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250348 PowerGraphScreen67::ClosedPage");
-  G::data(base).set_queued_state(9);
+  G::data().set_queued_state(9);
   // The member's slot 3 (its closed message), a tail call.
-  return calls.Call(Member(base, uint32_t(member)).vtable().post_closed(), sp, lr, member, mode);
+  return calls.Call(Member(uint32_t(member)).vtable().post_closed(), sp, lr, member, mode);
 }
 
-uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
+uint64_t Draw(uint64_t r3, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82250A20 PowerGraphScreen67::Draw");
-  const uint32_t page = G::pages(base).page();
+  const uint32_t page = G::pages().page();
   if (page == 0xFFFFFFFFu) {
     return r3;
   }
@@ -90,8 +90,8 @@ uint64_t Draw(uint8_t* base, uint64_t r3, uint64_t mode, uint32_t sp, const Call
     adjust = kPages[page].adjust;
     target = kPages[page].function;
   } else {
-    adjust = LoadU32(base, table + 4 + (page << 3));
-    target = LoadU32(base, table + (page << 3));
+    adjust = LoadU32(table + 4 + (page << 3));
+    target = LoadU32(table + (page << 3));
   }
   return calls.CallArgs(target, sp, 0x82250A94,
                         {uint64_t(adjust) + r3, mode, 0, 0, 0, 0, table, adjust});

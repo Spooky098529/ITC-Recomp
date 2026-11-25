@@ -20,8 +20,8 @@ namespace {
 constexpr uint32_t kLodBiasOffset = 18188;
 
 // A float as the original moves it: loaded to a double, stored as a float.
-float LoadConverted(uint8_t* base, uint32_t address) {
-  const double value = double(guest::LoadFloat(base, address));
+float LoadConverted(uint32_t address) {
+  const double value = double(guest::LoadFloat(address));
   return float(value);
 }
 
@@ -40,7 +40,7 @@ void End(Recorder& r) { r.Slot3(36, 0, 0); }
 // A float stored as a word of the frame (the original's stfs there; the
 // slots read it back with LoadFrame).
 void FrameFloat(Recorder& r, uint32_t offset, float value) {
-  guest::StoreFloat(r.base, r.frame + offset, value);
+  guest::StoreFloat(r.frame + offset, value);
 }
 
 // Heads 16 and 17: alpha blend, alpha test, alpha reference 0, alpha
@@ -71,7 +71,7 @@ void SamplerPass(Recorder& r, bool counter_in_frame) {
       const uint32_t s = r.Slot();
       r.Store(s + 0, sampler);
       r.Store(s + 4, 28);  // LOD bias
-      FrameFloat(r, 84, LoadConverted(r.base, r.LoadFrame(88) - kLodBiasOffset));
+      FrameFloat(r, 84, LoadConverted(r.LoadFrame(88) - kLodBiasOffset));
       r.Store(s + 8, r.LoadFrame(84));
     }
     r.Slot3(sampler, 20, 1);  // min filter

@@ -43,14 +43,14 @@ constexpr uint32_t kFail = 0x80004005;
 constexpr uint32_t kInvalidCall = 0x8876086C;
 
 // sub_82368D20 Blitter::Blitter: +0 and +4 = 0 (+4 first).
-void BlitterConstruct(uint8_t* base, uint32_t blitter);
+void BlitterConstruct(uint32_t blitter);
 
 // sub_82368D30 Blitter::Release: the destination's codec (+4), then the
 // source's (+0), deleted through their slot 0 (r4 = 1) when not null; the
 // words left as they are. `stack` is the guest r1 at entry (the deletes run
 // at `stack` - 96). The original's r3: the last delete's, or 0 when the
 // source's codec is null.
-uint32_t BlitterRelease(uint8_t* base, uint32_t blitter, uint32_t stack, const GuestCall& call);
+uint32_t BlitterRelease(uint32_t blitter, uint32_t stack, const GuestCall& call);
 
 // sub_82369860 Blitter::CopyRows: when the codecs' formats match (+4, bit 8
 // aside), the source has no color key (+24), the boxes' sizes (+104 to
@@ -63,7 +63,7 @@ uint32_t BlitterRelease(uint8_t* base, uint32_t blitter, uint32_t stack, const G
 // `call`), slice by slice, and 0 returned. E_FAIL when it doesn't apply (in
 // play: the formats differ). `stack` is the guest r1 at entry (calls at
 // `stack` - 144).
-uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const GuestCall& call);
+uint32_t BlitterCopyRows(uint32_t blitter, uint32_t stack, const GuestCall& call);
 
 // sub_823699F8 Blitter::ConvertRows: when the boxes' sizes match, a float4
 // row (the width x 16 bytes, operator new), both +16 cleared when both are
@@ -75,7 +75,7 @@ uint32_t BlitterCopyRows(uint8_t* base, uint32_t blitter, uint32_t stack, const 
 // (or operator new gives 0). `stack` is the guest r1 at entry (calls at
 // `stack` - 128). nullopt, with nothing done, for a row size operator new
 // refuses (the whole original runs then).
-std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint32_t stack,
+std::optional<uint32_t> BlitterConvertRows(uint32_t blitter, uint32_t stack,
                                            const GuestCall& call);
 
 // sub_8236C630 Blitter::Init: the filter at +8, +0 and +4 cleared; a filter
@@ -94,7 +94,7 @@ std::optional<uint32_t> BlitterConvertRows(uint8_t* base, uint32_t blitter, uint
 // plain C++ where they take the case, else their functions through `call`.
 // `stack` is the guest r1 at entry (calls at `stack` - 112). The original's
 // r3: 0, Prepare's error, E_FAIL or D3DERR_INVALIDCALL.
-uint32_t BlitterInit(uint8_t* base, uint32_t blitter, uint32_t destination, uint32_t source,
+uint32_t BlitterInit(uint32_t blitter, uint32_t destination, uint32_t source,
                      uint32_t filter, uint32_t stack, const GuestCall& call);
 
 }  // namespace texture_compression

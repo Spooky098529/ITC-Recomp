@@ -20,29 +20,29 @@ constexpr uint32_t kGamePathVtable = 0x820022A0;
 
 // File::GetSize (sub_822B80D8): the file object's +12 (its size; on an XMD
 // archive its entry count, the same code). A leaf.
-uint32_t FileGetSize(uint8_t* base, uint32_t file);
+uint32_t FileGetSize(uint32_t file);
 
 // File::File (sub_8258C938): +0 the vtable, +4 = -1 (closed), +8 = 0 (the
 // position), +12 = 0 (the size).
-void FileConstruct(uint8_t* base, uint32_t file);
+void FileConstruct(uint32_t file);
 // File::~File (sub_8258C5F8): the base stream's vtable written, nothing else.
-void FileDestruct(uint8_t* base, uint32_t file);
+void FileDestruct(uint32_t file);
 // AsyncFile::AsyncFile (sub_82593AC0): File::File, then its vtable.
-void AsyncFileConstruct(uint8_t* base, uint32_t file);
+void AsyncFileConstruct(uint32_t file);
 // AsyncFile::~AsyncFile (sub_82593B00): its vtable, then File::~File.
-void AsyncFileDestruct(uint8_t* base, uint32_t file);
+void AsyncFileDestruct(uint32_t file);
 // GameFile::GameFile (sub_820A6A00): AsyncFile::AsyncFile, then its vtable.
-void GameFileConstruct(uint8_t* base, uint32_t file);
+void GameFileConstruct(uint32_t file);
 // GameFile::~GameFile (sub_820A6A40): its vtable, then AsyncFile::~AsyncFile.
 // The handle isn't closed.
-void GameFileDestruct(uint8_t* base, uint32_t file);
+void GameFileDestruct(uint32_t file);
 
 // Path::Path (sub_82593C28): the vtable, the text's first byte (+4) = 0.
-void PathConstruct(uint8_t* base, uint32_t path);
+void PathConstruct(uint32_t path);
 // Path::~Path (sub_82593C48): the vtable written again.
-void PathDestruct(uint8_t* base, uint32_t path);
+void PathDestruct(uint32_t path);
 // GamePath::GamePath (sub_820A6BE0, also its destructor): the vtable.
-void GamePathConstruct(uint8_t* base, uint32_t path);
+void GamePathConstruct(uint32_t path);
 
 // Path::Build (sub_82593CA0): `name`'s full path written into the path's
 // text (+4) by sprintf with the kind's format: 0 0x8206CC48 ("game:\%s")
@@ -52,7 +52,7 @@ void GamePathConstruct(uint8_t* base, uint32_t path);
 // its entry: sprintf's arguments and frame go where the original's would.
 // False, with nothing written but sprintf's arguments in the frame, where
 // c_runtime::Sprintf declines (the original must run).
-bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint32_t stack,
+bool PathBuild(uint32_t path, uint32_t kind, uint32_t name, uint32_t stack,
                uint32_t* result);
 
 // GamePath::SetGame (sub_820A6BF0): a Path on the stack (r1 + 80 in the
@@ -60,15 +60,15 @@ bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint3
 // into `game_path` + 4 (up to its terminator), the Path released.
 // `*result` game_path + 4. False, with only the Path's stack bytes written,
 // where Path::Build's is.
-bool GamePathSetGame(uint8_t* base, uint32_t game_path, uint32_t name, uint32_t stack,
+bool GamePathSetGame(uint32_t game_path, uint32_t name, uint32_t stack,
                      uint32_t* result);
 
 // The open for read by name (sub_820A6AB8)'s Path: made at r1 + 80 in the
 // original's 640-byte frame below `stack` and built with kind 0; `*text`
 // its text. False where Path::Build's is.
 constexpr uint32_t kOpenFrameBytes = 640;
-bool OpenPathBuild(uint8_t* base, uint32_t name, uint32_t stack, uint32_t* text);
+bool OpenPathBuild(uint32_t name, uint32_t stack, uint32_t* text);
 // Its end: the Path released.
-void OpenPathRelease(uint8_t* base, uint32_t stack);
+void OpenPathRelease(uint32_t stack);
 
 }  // namespace file_layer

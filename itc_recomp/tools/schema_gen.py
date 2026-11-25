@@ -4,7 +4,7 @@ schema (itc_recomp/schema/*.toml) into itc_recomp/src/schema/: a header per
 area (`<area>.h`, the area's name with `_`) and `types.h` (every type
 declared, so a pointer field may name a type of another area).
 
-A view is `base` and a guest address (schema/view.h): it holds no storage,
+A view is a guest address (schema/view.h): it holds no storage,
 and its accessors read and write guest memory as the code does today
 (guest::Load*, guest::Store*), so code switched to views changes nothing
 the game sees. For each field `name` at +offset:
@@ -13,7 +13,7 @@ the game sees. For each field `name` at +offset:
   name_address()      the field's own guest address
 and `kSize`, the type's size. A type with `storage = "host"` (step 3) lives
 in host memory instead: see host_type. The `[globals]` table of an area becomes a
-struct `<Area>Globals` with the same accessors, static, taking `base`.
+struct `<Area>Globals` with the same accessors, static.
 
 usage: schema_gen.py              (writes every header; checks names and pointees)
        schema_gen.py --area <a>   (only <a>'s header; other files that don't
@@ -31,17 +31,17 @@ SCHEMA = os.path.join(ROOT, "schema")
 OUT = os.path.join(ROOT, "src", "schema")
 
 SCALARS = {
-    "u8": ("uint8_t", "guest::LoadU8(base, {a})", "guest::StoreU8(base, {a}, v)"),
-    "s8": ("int8_t", "int8_t(guest::LoadU8(base, {a}))", "guest::StoreU8(base, {a}, uint8_t(v))"),
-    "u16": ("uint16_t", "guest::LoadU16(base, {a})", "guest::StoreU16(base, {a}, v)"),
-    "s16": ("int16_t", "int16_t(guest::LoadU16(base, {a}))", "guest::StoreU16(base, {a}, uint16_t(v))"),
-    "u32": ("uint32_t", "guest::LoadU32(base, {a})", "guest::StoreU32(base, {a}, v)"),
-    "s32": ("int32_t", "int32_t(guest::LoadU32(base, {a}))", "guest::StoreU32(base, {a}, uint32_t(v))"),
-    "fn": ("uint32_t", "guest::LoadU32(base, {a})", "guest::StoreU32(base, {a}, v)"),
-    "u64": ("uint64_t", "guest::LoadU64(base, {a})", "guest::StoreU64(base, {a}, v)"),
-    "f32": ("float", "guest::LoadFloat(base, {a})", "guest::StoreFloat(base, {a}, v)"),
-    "f64": ("double", "std::bit_cast<double>(guest::LoadU64(base, {a}))",
-            "guest::StoreU64(base, {a}, std::bit_cast<uint64_t>(v))"),
+    "u8": ("uint8_t", "guest::LoadU8({a})", "guest::StoreU8({a}, v)"),
+    "s8": ("int8_t", "int8_t(guest::LoadU8({a}))", "guest::StoreU8({a}, uint8_t(v))"),
+    "u16": ("uint16_t", "guest::LoadU16({a})", "guest::StoreU16({a}, v)"),
+    "s16": ("int16_t", "int16_t(guest::LoadU16({a}))", "guest::StoreU16({a}, uint16_t(v))"),
+    "u32": ("uint32_t", "guest::LoadU32({a})", "guest::StoreU32({a}, v)"),
+    "s32": ("int32_t", "int32_t(guest::LoadU32({a}))", "guest::StoreU32({a}, uint32_t(v))"),
+    "fn": ("uint32_t", "guest::LoadU32({a})", "guest::StoreU32({a}, v)"),
+    "u64": ("uint64_t", "guest::LoadU64({a})", "guest::StoreU64({a}, v)"),
+    "f32": ("float", "guest::LoadFloat({a})", "guest::StoreFloat({a}, v)"),
+    "f64": ("double", "std::bit_cast<double>(guest::LoadU64({a}))",
+            "guest::StoreU64({a}, std::bit_cast<uint64_t>(v))"),
 }
 WIDTHS = {"u8": 1, "s8": 1, "u16": 2, "s16": 2, "u32": 4, "s32": 4, "fn": 4, "ptr": 4,
           "f32": 4, "u64": 8, "f64": 8}
@@ -215,7 +215,7 @@ def field_width(f, alltypes):
 
 ALLTYPES = {}
 HOST_VIEW_MEMBERS = {"data", "on_host", "New", "NewArray", "Delete", "at", "load_at", "store_at",
-                     "base", "address"}
+                     "address"}
 TYPE_AREA = {}
 
 
@@ -227,17 +227,17 @@ def embed_accessors(f, view_address):
     # A template, as a pointer field's: the type may be defined further on.
     if f.get("count", 1) > 1:
         return [f"  template <typename T = {to}>",
-                f"  T {n}(uint32_t i) const {{ return T(base, {view_address} + {off} + i * T::kSize); }}"]
+                f"  T {n}(uint32_t i) const {{ return T({view_address} + {off} + i * T::kSize); }}"]
     return [f"  template <typename T = {to}>",
-            f"  T {n}() const {{ return T(base, {view_address} + {off}); }}"]
+            f"  T {n}() const {{ return T({view_address} + {off}); }}"]
 
 
 def accessors(fname, f, at, static):
     """The accessors of a field at the address expression `at`."""
     pre = "static " if static else ""
     cst = "" if static else " const"
-    bp = "uint8_t* base" if static else ""
-    sep = ", " if static else ""
+    bp = ""
+    sep = ""
     ty = f["type"]
     out = []
     if ty == "embed":
@@ -246,11 +246,11 @@ def accessors(fname, f, at, static):
         to = f.get("to")
         if to:
             out.append(f"  template <typename T = {to}>")
-            out.append(f"  {pre}T {fname}({bp}){cst} {{ return T(base, guest::LoadU32(base, {at})); }}")
-            out.append(f"  {pre}void set_{fname}({bp}{sep}const View& v){cst} {{ guest::StoreU32(base, {at}, v.address); }}")
+            out.append(f"  {pre}T {fname}({bp}){cst} {{ return T(guest::LoadU32({at})); }}")
+            out.append(f"  {pre}void set_{fname}({bp}{sep}const View& v){cst} {{ guest::StoreU32({at}, v.address); }}")
         else:
-            out.append(f"  {pre}View {fname}({bp}){cst} {{ return View(base, guest::LoadU32(base, {at})); }}")
-        out.append(f"  {pre}void set_{fname}({bp}{sep}uint32_t v){cst} {{ guest::StoreU32(base, {at}, v); }}")
+            out.append(f"  {pre}View {fname}({bp}){cst} {{ return View(guest::LoadU32({at})); }}")
+        out.append(f"  {pre}void set_{fname}({bp}{sep}uint32_t v){cst} {{ guest::StoreU32({at}, v); }}")
     elif ty == "bytes":
         pass
     else:
@@ -382,20 +382,20 @@ def host_type(name, t):
     out.append(f"  {dn}* data() const {{ return static_cast<{dn}*>(memory::HandleObject(address)); }}")
     if dual:
         out.append("  bool on_host() const { return memory::IsHandle(address); }")
-    out.append(f"  static {name} New(uint8_t* base) {{")
-    out.append(f"    return {name}(base, memory::MakeHandle(new {dn}(), sizeof({dn}), \"{name}\", &k{name}Layout));")
+    out.append(f"  static {name} New() {{")
+    out.append(f"    return {name}(memory::MakeHandle(new {dn}(), sizeof({dn}), \"{name}\", &k{name}Layout));")
     out.append("  }")
     # An array allocated at once (new[] without a count header, one block of
     # `count` objects): one handle; element i is the handle + i * kSize, and
     # copies and raw accesses use the element's layout at offset % kSize.
     out.append(f"  template <uint32_t Stride = kSize>")
-    out.append(f"  static {name} NewArray(uint8_t* base, uint32_t count) {{")
+    out.append(f"  static {name} NewArray(uint32_t count) {{")
     out.append(f"    static_assert(sizeof({dn}) == Stride, \"an array's stride is the guest size\");")
     out.append(f"    auto* p = static_cast<{dn}*>(::operator new(sizeof({dn}) * std::max<uint32_t>(count, 1)));")
     out.append(f"    for (uint32_t i = 0; i < count; i++) new (p + i) {dn}();")
-    out.append(f"    return {name}(base, memory::MakeHandle(p, sizeof({dn}) * count, \"{name}\", &k{name}Layout, sizeof({dn})));")
+    out.append(f"    return {name}(memory::MakeHandle(p, sizeof({dn}) * count, \"{name}\", &k{name}Layout, sizeof({dn})));")
     out.append("  }")
-    out.append(f"  {name} at(uint32_t i) const {{ return {name}(base, address + i * kSize); }}")
+    out.append(f"  {name} at(uint32_t i) const {{ return {name}(address + i * kSize); }}")
     # One object or an array's first: the block freed whole (0 does nothing).
     out.append(f"  void Delete() const {{ if (address) memory::FreeHandle(address); }}")
 
@@ -410,24 +410,24 @@ def host_type(name, t):
 
     def by_address(at, w):
         return (f"(memory::IsHandle({at}) ? {BT[w]}(memory::OwnerLoad({at}, {w})) "
-                f": guest::Load{U[w]}(base, {at}))")
+                f": guest::Load{U[w]}({at}))")
 
     def by_address_store(at, w, v):
         return (f"if (memory::IsHandle({at})) memory::OwnerStore({at}, {w}, {v}); "
-                f"else guest::Store{U[w]}(base, {at}, {v});")
+                f"else guest::Store{U[w]}({at}, {v});")
 
     # Any offset, any width (1, 2, 4 or 8 bytes), as the guest's bytes give it:
     # for accesses inside a field (a byte of a word) and code reading by offset.
     hl = f"memory::LoadOverlay(reinterpret_cast<const uint8_t*>(d), k{name}Layout, offset, width)"
     hs = f"memory::StoreOverlay(reinterpret_cast<uint8_t*>(d), k{name}Layout, offset, width, v)"
     gl = ("memory::IsHandle(address + offset) ? memory::OwnerLoad(address + offset, width) : "
-          "width == 1 ? guest::LoadU8(base, address + offset) : width == 2 ? "
-          "guest::LoadU16(base, address + offset) : width == 4 ? guest::LoadU32(base, address + offset) "
-          ": guest::LoadU64(base, address + offset)")
+          "width == 1 ? guest::LoadU8(address + offset) : width == 2 ? "
+          "guest::LoadU16(address + offset) : width == 4 ? guest::LoadU32(address + offset) "
+          ": guest::LoadU64(address + offset)")
     gs = ("if (memory::IsHandle(address + offset)) memory::OwnerStore(address + offset, width, v); "
-          "else if (width == 1) guest::StoreU8(base, address + offset, uint8_t(v)); else if (width == 2) "
-          "guest::StoreU16(base, address + offset, uint16_t(v)); else if (width == 4) "
-          "guest::StoreU32(base, address + offset, uint32_t(v)); else guest::StoreU64(base, address + offset, v);")
+          "else if (width == 1) guest::StoreU8(address + offset, uint8_t(v)); else if (width == 2) "
+          "guest::StoreU16(address + offset, uint16_t(v)); else if (width == 4) "
+          "guest::StoreU32(address + offset, uint32_t(v)); else guest::StoreU64(address + offset, v);")
     out.append(f"  uint64_t load_at(uint32_t offset, uint32_t width) const {{ if (auto* d = direct()) return {hl}; return {gl}; }}")
     out.append(f"  void store_at(uint32_t offset, uint32_t width, uint64_t v) const {{ if (auto* d = direct()) {{ {hs}; return; }} {gs} }}")
 
@@ -447,7 +447,7 @@ def host_type(name, t):
             # scalar members), or guest memory's.
             out.append(f"  uint8_t* {n}() const {{ return memory::IsHandle(address) ? "
                        f"static_cast<uint8_t*>(memory::HandleObject(address)) + {off} : "
-                       f"guest::Pointer(base, address + {off}); }}")
+                       f"guest::Pointer(address + {off}); }}")
             continue
         member, bits = HOST[ty]
         w = WIDTHS[ty]
@@ -473,10 +473,10 @@ def host_type(name, t):
             to = f.get("to")
             if to:
                 out.append(f"  template <typename T = {to}>")
-                out.append(f"  T {n}() const {{ return T(base, {n}_bits()); }}")
+                out.append(f"  T {n}() const {{ return T({n}_bits()); }}")
                 out.append(f"  void set_{n}(const View& w) const {{ set_{n}_bits(w.address); }}")
             else:
-                out.append(f"  View {n}() const {{ return View(base, {n}_bits()); }}")
+                out.append(f"  View {n}() const {{ return View({n}_bits()); }}")
             out.append(f"  void set_{n}(uint32_t v) const {{ set_{n}_bits(v); }}")
         elif n in overlaid or member != bits or ty in ("s8", "s16", "s32"):
             out.append(f"  {member} {n}() const {{ return {to_member}; }}")
@@ -526,8 +526,8 @@ def emit_area(area, data):
             # A file's data or another raw buffer in PC memory, its bytes in
             # the guest's order (memory::NewBlob, E5 step 5): read by address
             # as guest memory is.
-            lines.append(f"  static {name} New(uint8_t* base, uint32_t size) {{ "
-                         f"return {name}(base, memory::NewBlob(size, \"{name}\")); }}")
+            lines.append(f"  static {name} New(uint32_t size) {{ "
+                         f"return {name}(memory::NewBlob(size, \"{name}\")); }}")
             lines.append("  void Delete() const { if (address) memory::FreeHandle(address); }")
         for f in t.get("fields", []):
             if f.get("note"):

@@ -18,87 +18,87 @@ namespace {
 
 constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
-uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
+uint32_t Frame(uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
-  Store(base, frame, stack);
+  Store(frame, stack);
   return frame;
 }
 
 }  // namespace
 
-Left TrafficDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+Left TrafficDrawBody(const Calls& calls, uint32_t stack, uint32_t records,
                      uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E55A0 TrafficPoints::DrawBody");
-  const uint32_t frame = Frame(base, stack, kTrafficBodyFrame);
-  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
+  const uint32_t frame = Frame(stack, kTrafficBodyFrame);
+  const uint32_t vp = schema::CameraPass(pass).view_projection_address(), world = block + 16;
   Left left;
   for (uint32_t k = 0; k < 4; k++) {
     if (k < 2) {
-      left = PartsDrawRecord(base, calls, frame, records + 240 * k, vp, world, 0, caller_r24,
+      left = PartsDrawRecord(calls, frame, records + 240 * k, vp, world, 0, caller_r24,
                              pass, 0x820E5650);
       continue;
     }
     // The plates: their texture (+456) and the override (+432) on around
     // the draw, off after it (the model word read again each time).
-    const schema::CarPart record(base, records + 240 * k);
+    const schema::CarPart record(records + 240 * k);
     if (record.model() == 0) {
       continue;
     }
-    const schema::TrafficPoints body(base, records);
+    const schema::TrafficPoints body(records);
     const uint32_t texture = k == 2 ? body.front_plate_texture() : body.rear_plate_texture();
-    Store(base, record.model() + 456, texture);
-    Store(base, record.model() + 432, 1);
-    left = PartsDrawRecord(base, calls, frame, record.address, vp, world, 0, caller_r24, pass,
+    Store(record.model() + 456, texture);
+    Store(record.model() + 432, 1);
+    left = PartsDrawRecord(calls, frame, record.address, vp, world, 0, caller_r24, pass,
                            0x820E5628);
-    Store(base, record.model() + 432, 0);
+    Store(record.model() + 432, 0);
   }
   return left;
 }
 
-Left TrafficDrawWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+Left TrafficDrawWindow(const Calls& calls, uint32_t stack, uint32_t records,
                        uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E5668 TrafficPoints::DrawWindow");
-  const uint32_t frame = Frame(base, stack, kTrafficWindowFrame);
+  const uint32_t frame = Frame(stack, kTrafficWindowFrame);
   // window01's alpha (record 5's model and shape, the block's +632).
-  const schema::TrafficPoints body(base, records);
+  const schema::TrafficPoints body(records);
   const uint32_t shape = body.record5_shape();
-  const double alpha = double(schema::CarDrawBlock(base, block).window_alpha_01());
+  const double alpha = double(schema::CarDrawBlock(block).window_alpha_01());
   const uint32_t model = body.record5_model();
-  material_passes::SetPair1002Alpha(base, model, shape, alpha, frame);
-  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
+  material_passes::SetPair1002Alpha(model, shape, alpha, frame);
+  const uint32_t vp = schema::CameraPass(pass).view_projection_address(), world = block + 16;
   Left left;
   for (uint32_t record : {960u, 1200u}) {
-    left = PartsDrawRecord(base, calls, frame, records + record, vp, world, 0, caller_r24, world,
+    left = PartsDrawRecord(calls, frame, records + record, vp, world, 0, caller_r24, world,
                            0x820E56B8);
   }
   return left;
 }
 
-Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left TrafficPointsDraw(const Calls& calls, uint32_t stack, uint32_t points,
                        uint32_t block, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E6820 TrafficPoints::Draw");
-  const uint32_t frame = Frame(base, stack, kTrafficPointsFrame);
+  const uint32_t frame = Frame(stack, kTrafficPointsFrame);
   // The scene's current camera pass (0 when its address's low word is 0 or
   // it isn't enabled).
-  uint32_t pass = kCameraPasses + schema::CarDrawGlobals::scene(base).pass_camera() * schema::CameraPass::kSize;
-  if (pass == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
+  uint32_t pass = kCameraPasses + schema::CarDrawGlobals::scene().pass_camera() * schema::CameraPass::kSize;
+  if (pass == 0 || int32_t(schema::CameraPass(pass).enabled()) == 0) {
     pass = 0;
   }
   const uint32_t records = points + 16;  // r28 from here on
-  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
-  TrafficDrawBody(base, calls, frame, records, block, pass, caller_r24);
-  PartsDrawRecord(base, calls, frame, points + 2432, vp, world, 0, caller_r24, records,
+  const uint32_t vp = schema::CameraPass(pass).view_projection_address(), world = block + 16;
+  TrafficDrawBody(calls, frame, records, block, pass, caller_r24);
+  PartsDrawRecord(calls, frame, points + 2432, vp, world, 0, caller_r24, records,
                   0x820E6898);
-  PartsDrawRecord(base, calls, frame, points + 5072, vp, world, 0, caller_r24, records,
+  PartsDrawRecord(calls, frame, points + 5072, vp, world, 0, caller_r24, records,
                   0x820E68B0);
-  TrafficDrawWindow(base, calls, frame, records, block, pass, caller_r24);
-  TrafficDrawHeadlights(base, calls, frame, points + 1472, block, pass, caller_r24, records);
-  return TrafficDrawTailLights(base, calls, frame, points + 3152, block, pass, caller_r24,
+  TrafficDrawWindow(calls, frame, records, block, pass, caller_r24);
+  TrafficDrawHeadlights(calls, frame, points + 1472, block, pass, caller_r24, records);
+  return TrafficDrawTailLights(calls, frame, points + 3152, block, pass, caller_r24,
                                records);
 }
 

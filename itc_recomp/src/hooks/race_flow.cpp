@@ -22,7 +22,7 @@ ITC_REGS_STEP(RaceFlowInit) {
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
   const uint32_t r3 =
-      race_flow::Init(base, machine, ctx.r1.u32 - race_flow::kInitFrame, &replaced);
+      race_flow::Init(machine, ctx.r1.u32 - race_flow::kInitFrame, &replaced);
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
   // transition's address from the machine's 64-bit r3.
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
@@ -33,5 +33,5 @@ ITC_REGS_STEP(RaceFlowInit) {
 // The adapter: the register step above, or the original with the flag off.
 // Its only caller, RaceMode::Init sub_82151D20, is recompiled.
 ITC_NATIVE_ENTRY(82160AE0, ITC_FLAG(native_race_flow)) {
-  hooks::RaceFlowInit(ctx, base);
+  hooks::RaceFlowInit(ctx);
 }

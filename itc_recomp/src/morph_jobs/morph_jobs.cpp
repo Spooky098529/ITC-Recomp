@@ -14,17 +14,17 @@ namespace morph_jobs {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
+uint32_t Load(uint32_t address) {
+  return guest::LoadU32(address);
 }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The frame `bytes` below `stack`, its back chain written (stwu's).
-uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
+uint32_t Frame(uint32_t stack, uint32_t bytes) {
   const uint32_t frame = stack - bytes;
-  Store(base, frame, stack);
+  Store(frame, stack);
   return frame;
 }
 
@@ -40,7 +40,7 @@ void ItemState(const schema::MorphJob& j) {
 
 }  // namespace
 
-uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface,
+uint32_t ConstructJob(Kind kind, uint32_t job, uint32_t interface,
                       uint32_t record, uint32_t stack, const ConstructCalls& calls) {
   const bool morph = kind == Kind::kMorph;
   if (morph) {
@@ -48,8 +48,8 @@ uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface
   } else {
     ITC_NATIVE_RUNNING("sub_820ACAA8 SkinJob::SkinJob");
   }
-  const uint32_t frame = Frame(base, stack, kConstructFrame);
-  const schema::MorphJob j(base, job);
+  const uint32_t frame = Frame(stack, kConstructFrame);
+  const schema::MorphJob j(job);
   const uint32_t item = j.item_vtable_address();
   j.set_released(0);
   j.set_vtable(kJobVtable);
@@ -67,10 +67,10 @@ uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface
   const uint32_t to = morph ? j.morph_record_address() : j.skin_influence_counts_address();
   const uint32_t bytes = morph ? 128 : 48;
   const uint32_t memcpy_lr = morph ? 0x820ACC94 : 0x820ACB34;
-  if (!native::Buffers_Memcpy(base, to, record, bytes, memcpy_lr)) {
+  if (!native::Buffers_Memcpy(to, record, bytes, memcpy_lr)) {
     calls.memcpy(to, record, bytes, frame, memcpy_lr);
   }
-  const uint32_t stack_word = Load(base, frame + 100);
+  const uint32_t stack_word = Load(frame + 100);
   j.set_kind(morph ? 1 : 0);
   ItemState(j);
   j.set_item_waiter(stack_word);
@@ -80,24 +80,24 @@ uint32_t ConstructJob(uint8_t* base, Kind kind, uint32_t job, uint32_t interface
   return job;
 }
 
-std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32_t record,
+std::optional<uint32_t> MakeJob(Kind kind, uint32_t maker, uint32_t record,
                                 uint32_t stack, const ConstructCalls& calls) {
   // operator new(224) at 0x820AC814 (0x820AC8C4 for the skinning job): the
   // job in host memory (E5 step 4), its handle the r3 the original kept.
   // Freed by the deleting destructor's operator delete (the game's frees
   // take handles).
-  const uint32_t job = schema::MorphJob::New(base).address;
+  const uint32_t job = schema::MorphJob::New().address;
   if (kind == Kind::kMorph) {
     ITC_NATIVE_RUNNING("sub_820AC7F0 PoolMaker2::MakeMorphJob");
   } else {
     ITC_NATIVE_RUNNING("sub_820AC8A0 PoolMaker::MakeSkinJob");
   }
-  const uint32_t frame = Frame(base, stack, kMakeFrame);
+  const uint32_t frame = Frame(stack, kMakeFrame);
   if (job == 0) {
     return 0u;
   }
-  return ConstructJob(base, kind, job,
-                      schema::MorphJobMaker(base, maker).worker_pool().address, record,
+  return ConstructJob(kind, job,
+                      schema::MorphJobMaker(maker).worker_pool().address, record,
                       frame, calls);
 }
 
@@ -105,9 +105,9 @@ std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32
 // WorkItemDestroy) hold only their back chains, which nothing reads
 // (operator delete, from the adapter, makes its own): not written (E5 step
 // 6).
-void DestroyJob(uint8_t* base, uint32_t job, [[maybe_unused]] uint32_t stack) {
+void DestroyJob(uint32_t job, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ACB90 MorphJob::~MorphJob");
-  const schema::MorphJob j(base, job);
+  const schema::MorphJob j(job);
   j.set_delegate_vtable(0x82000ABC);
   j.set_item_interface(0x82000BA8);
   j.set_item_interface(0x82000AB4);
@@ -115,24 +115,24 @@ void DestroyJob(uint8_t* base, uint32_t job, [[maybe_unused]] uint32_t stack) {
   j.set_vtable(kJobBaseVtable);
 }
 
-void DestroyJobBase(uint8_t* base, uint32_t job, [[maybe_unused]] uint32_t stack) {
+void DestroyJobBase(uint32_t job, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820AC9E8 Job::~Job");
-  schema::MorphJob(base, job).set_vtable(kJobBaseVtable);
+  schema::MorphJob(job).set_vtable(kJobBaseVtable);
 }
 
-uint32_t IsReleased(uint8_t* base, uint32_t job) {
+uint32_t IsReleased(uint32_t job) {
   ITC_NATIVE_RUNNING("sub_820AC9D0 MorphJob::IsReleased");
-  return schema::MorphJob(base, job).released();
+  return schema::MorphJob(job).released();
 }
 
-void SetReleased(uint8_t* base, uint32_t job) {
+void SetReleased(uint32_t job) {
   ITC_NATIVE_RUNNING("sub_820AC9D8 MorphJob::SetReleased");
-  schema::MorphJob(base, job).set_released(1);
+  schema::MorphJob(job).set_released(1);
 }
 
-RunTarget Run(uint8_t* base, uint32_t job) {
+RunTarget Run(uint32_t job) {
   ITC_NATIVE_RUNNING("sub_820AC998 MorphJob::Run");
-  const schema::MorphJob j(base, job);
+  const schema::MorphJob j(job);
   const uint32_t kind_word = j.kind();
   if (kind_word != 0) {
     return {true, j.morph_record_address(), kind_word};
@@ -140,66 +140,66 @@ RunTarget Run(uint8_t* base, uint32_t job) {
   return {false, j.skin_influence_counts_address(), kind_word};
 }
 
-void WorkItemPosted(uint8_t* base, uint32_t item, uint32_t waiter, uint32_t r5) {
+void WorkItemPosted(uint32_t item, uint32_t waiter, uint32_t r5) {
   ITC_NATIVE_RUNNING("sub_82090DD0 WorkItem::Posted");
-  const schema::WorkItem i(base, item);
+  const schema::WorkItem i(item);
   i.set_waiter(waiter);
   i.set_post_flag(uint8_t(r5));
   i.set_state(1);
   i.set_posted(1);
 }
 
-void WorkItemStarted(uint8_t* base, uint32_t item, uint32_t value) {
+void WorkItemStarted(uint32_t item, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82090DE8 WorkItem::Started");
-  const schema::WorkItem i(base, item);
+  const schema::WorkItem i(item);
   i.set_worker_value(value);
   i.set_state(2);
 }
 
-void WorkItemFinished(uint8_t* base, uint32_t item) {
+void WorkItemFinished(uint32_t item) {
   ITC_NATIVE_RUNNING("sub_82090DF8 WorkItem::Finished");
-  schema::WorkItem(base, item).set_state(3);
+  schema::WorkItem(item).set_state(3);
 }
 
-void WorkItemSkip(uint8_t* base, uint32_t item) {
+void WorkItemSkip(uint32_t item) {
   ITC_NATIVE_RUNNING("sub_82090E08 WorkItem::Skip");
-  schema::WorkItem(base, item).set_skip(1);
+  schema::WorkItem(item).set_skip(1);
 }
 
-uint32_t WorkItemIsSkipped(uint8_t* base, uint32_t item) {
+uint32_t WorkItemIsSkipped(uint32_t item) {
   ITC_NATIVE_RUNNING("sub_82090CB8 WorkItem::IsSkipped");
-  return schema::WorkItem(base, item).skip();
+  return schema::WorkItem(item).skip();
 }
 
-void WorkItemDestroy(uint8_t* base, uint32_t item, [[maybe_unused]] uint32_t stack) {
+void WorkItemDestroy(uint32_t item, [[maybe_unused]] uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82090E40 WorkItem::~WorkItem");
-  const schema::WorkItem i(base, item);
+  const schema::WorkItem i(item);
   i.set_delegate_vtable(0x82000ABC);
   i.set_interface(0x82000BA8);
   i.set_interface(0x82000AB4);
   i.set_vtable(0x82000EB8);
 }
 
-TailCall WorkItemRun(uint8_t* base, uint64_t r3) {
+TailCall WorkItemRun(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82090E18 WorkItem::Run");
   const uint32_t item = uint32_t(r3);
   const uint64_t r4 = item != 0 ? r3 + 4 : 0;
-  const auto vtable = schema::WorkItem(base, item).vtable();
+  const auto vtable = schema::WorkItem(item).vtable();
   return {vtable.call(), r3, r4, vtable.address};
 }
 
-TailCall WorkItemCall(uint8_t* base, uint64_t r3) {
+TailCall WorkItemCall(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_820ACA30 WorkItem::Call");
-  const schema::WorkItem i(base, uint32_t(r3));
+  const schema::WorkItem i(uint32_t(r3));
   const uint64_t delegate = r3 + 24;
   // The delegate's vtable (app-states.toml's AppDelegateVtable): slot 1.
-  const schema::AppDelegateVtable vtable(base, i.delegate_vtable());
+  const schema::AppDelegateVtable vtable(i.delegate_vtable());
   return {vtable.invoke(), delegate, 0, vtable.address};
 }
 
-TailCall RunThunk(uint8_t* base, uint64_t r3) {
+TailCall RunThunk(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_820AC9C0 MorphJob::RunThunk");
-  const auto vtable = schema::MorphJob(base, uint32_t(r3)).vtable();
+  const auto vtable = schema::MorphJob(uint32_t(r3)).vtable();
   return {vtable.run(), r3, 0, vtable.address};
 }
 

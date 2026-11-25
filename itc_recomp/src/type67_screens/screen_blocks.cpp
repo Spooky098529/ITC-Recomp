@@ -29,35 +29,35 @@ constexpr uint32_t kPowerGraphBaseVtable = 0x82010A2C;
 
 }  // namespace
 
-uint64_t Type6ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type6ScreensDestruct(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822367C0 Type6Screens::~Type6Screens");
-  const uint32_t block = uint32_t(r3), frame = Frame(base, sp, 96);
-  Blocks6(base, block).set_vtable(kType6ScreensVtable);
-  Blocks6(base, block).set_power_graph_vtable(kPowerGraphBaseVtable);
-  PanelScreenDestruct(base, r3 + 40948, false, frame, calls);
-  Type6NodeScreenDestruct(base, r3 + 30396, frame, calls);
-  Type6ListScreenDestruct(base, r3 + 19432, frame, calls);
+  const uint32_t block = uint32_t(r3), frame = Frame(sp, 96);
+  Blocks6(block).set_vtable(kType6ScreensVtable);
+  Blocks6(block).set_power_graph_vtable(kPowerGraphBaseVtable);
+  PanelScreenDestruct(r3 + 40948, false, frame, calls);
+  Type6NodeScreenDestruct(r3 + 30396, frame, calls);
+  Type6ListScreenDestruct(r3 + 19432, frame, calls);
   // The first screen's base: the empty handler on +4 (its r3 left).
   return r3 + 4;
 }
 
-uint64_t Type7ScreensDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type7ScreensDestruct(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82246BE0 Type7Screens::~Type7Screens");
-  const uint32_t block = uint32_t(r3), frame = Frame(base, sp, 96);
-  Blocks7(base, block).set_vtable(kType7ScreensVtable);
-  Blocks7(base, block).set_power_graph_vtable(kPowerGraphBaseVtable);
-  PanelScreenDestruct(base, r3 + 30608, true, frame, calls);
-  Type7ListScreenDestruct(base, r3 + 19428, frame, calls);
+  const uint32_t block = uint32_t(r3), frame = Frame(sp, 96);
+  Blocks7(block).set_vtable(kType7ScreensVtable);
+  Blocks7(block).set_power_graph_vtable(kPowerGraphBaseVtable);
+  PanelScreenDestruct(r3 + 30608, true, frame, calls);
+  Type7ListScreenDestruct(r3 + 19428, frame, calls);
   // The first screen's base: ListNode::~ListNode on +4 (its r3 left).
-  archive::NodeDestruct(base, block + 4);
+  archive::NodeDestruct(block + 4);
   return r3 + 4;
 }
 
-uint64_t Type6ScreensDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t Type6ScreensDeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82236830 Type6Screens::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  Type6ScreensDestruct(base, r3, frame, calls);
+  const uint32_t frame = Frame(sp, 112);
+  Type6ScreensDestruct(r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.
     Call1(calls, car_list::kOperatorDelete, r3, frame, 0x82236860);
@@ -65,11 +65,11 @@ uint64_t Type6ScreensDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags
   return r3;
 }
 
-uint64_t Type7ScreensDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t Type7ScreensDeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82246C40 Type7Screens::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  Type7ScreensDestruct(base, r3, frame, calls);
+  const uint32_t frame = Frame(sp, 112);
+  Type7ScreensDestruct(r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.
     Call1(calls, car_list::kOperatorDelete, r3, frame, 0x82246C70);

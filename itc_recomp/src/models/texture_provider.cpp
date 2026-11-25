@@ -49,7 +49,7 @@ struct InsertPlan {
   uint32_t capacity;  // the new storage's, when growing
 };
 
-std::optional<InsertPlan> PlanInsert(uint8_t* base, uint32_t first, uint32_t last,
+std::optional<InsertPlan> PlanInsert(uint32_t first, uint32_t last,
                                      uint32_t end, uint32_t where, uint32_t count) {
   const uint32_t capacity = first == 0 ? 0 : Count(first, end);
   const uint32_t size = first == 0 ? 0 : Count(first, last);
@@ -65,7 +65,7 @@ std::optional<InsertPlan> PlanInsert(uint8_t* base, uint32_t first, uint32_t las
     if (grown < size + count) {
       grown = size + count;
     }
-    if (!CanAllocatePointers(base, grown) || !Deletable(first)) {
+    if (!CanAllocatePointers(grown) || !Deletable(first)) {
       return std::nullopt;
     }
     return InsertPlan{true, grown};
@@ -78,87 +78,87 @@ std::optional<InsertPlan> PlanInsert(uint8_t* base, uint32_t first, uint32_t las
 
 // The insert as planned (count not 0). nullopt only when room in the old
 // storage and the tail's memmove_s is left to the original (nothing changed).
-std::optional<R3> RunInsert(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
+std::optional<R3> RunInsert(uint32_t vector, uint32_t where, uint32_t count,
                             uint32_t value, const InsertPlan& plan) {
   const uint32_t bytes = count << 2;
   if (plan.grow) {
-    const auto made = PointersAllocate(base, plan.capacity);
+    const auto made = PointersAllocate(plan.capacity);
     Require(made.has_value(), "TextureProvider::Allocate");
     const uint32_t storage = *made;
-    const uint32_t first = V(base, vector).first().address;
+    const uint32_t first = V(vector).first().address;
     const uint32_t front = Count(first, where);
     const uint32_t front_bytes = front << 2;
     const uint32_t at = storage + front_bytes;
     if (front != 0) {
-      Require(c_runtime::MemmoveS(base, storage, front_bytes, first, front_bytes).has_value(),
+      Require(c_runtime::MemmoveS(storage, front_bytes, first, front_bytes).has_value(),
               "memmove_s");
     }
     for (uint32_t i = 0; i < count; i++) {
-      Slot(base, at + Slot::kSize * i).set_texture(value);
+      Slot(at + Slot::kSize * i).set_texture(value);
     }
-    const uint32_t tail = Count(where, V(base, vector).last().address);
+    const uint32_t tail = Count(where, V(vector).last().address);
     if (tail != 0) {
       const uint32_t tail_bytes = tail << 2;
-      Require(c_runtime::MemmoveS(base, at + bytes, tail_bytes, where, tail_bytes).has_value(),
+      Require(c_runtime::MemmoveS(at + bytes, tail_bytes, where, tail_bytes).has_value(),
               "memmove_s");
     }
-    const uint32_t old = V(base, vector).first().address;
-    const uint32_t size = (old == 0 ? 0 : Count(old, V(base, vector).last().address)) + count;
+    const uint32_t old = V(vector).first().address;
+    const uint32_t size = (old == 0 ? 0 : Count(old, V(vector).last().address)) + count;
     if (old != 0) {
       Delete(old);
     }
-    V(base, vector).set_first(storage);
-    V(base, vector).set_end(storage + (plan.capacity << 2));
-    V(base, vector).set_last(storage + (size << 2));
+    V(vector).set_first(storage);
+    V(vector).set_end(storage + (plan.capacity << 2));
+    V(vector).set_last(storage + (size << 2));
     return R3{false, old};
   }
-  const uint32_t last = V(base, vector).last().address;
+  const uint32_t last = V(vector).last().address;
   const uint32_t tail = Count(where, last);
   if (tail != 0) {
     const uint32_t tail_bytes = tail << 2;
-    if (!c_runtime::MemmoveS(base, where + bytes, tail_bytes, where, tail_bytes)) {
+    if (!c_runtime::MemmoveS(where + bytes, tail_bytes, where, tail_bytes)) {
       return std::nullopt;
     }
   }
-  const uint32_t moved = V(base, vector).last().address;
+  const uint32_t moved = V(vector).last().address;
   const uint32_t more = count - Count(where, moved);
   for (uint32_t i = 0; i < more; i++) {
-    Slot(base, moved + Slot::kSize * i).set_texture(value);
+    Slot(moved + Slot::kSize * i).set_texture(value);
   }
-  const uint32_t new_last = V(base, vector).last().address + bytes;
+  const uint32_t new_last = V(vector).last().address + bytes;
   const uint32_t old_last = new_last - bytes;
-  V(base, vector).set_last(new_last);
+  V(vector).set_last(new_last);
   for (uint32_t p = where; p != old_last; p += 4) {
-    Slot(base, p).set_texture(value);
+    Slot(p).set_texture(value);
   }
   return tail != 0 ? R3{false, 0} : R3{true, 0};
 }
 
 }  // namespace
 
-bool CanAllocatePointers(uint8_t* base, uint32_t count) {
+bool CanAllocatePointers(uint32_t count) {
   if (count != 0 && 0xFFFFFFFFu / count < 4) {
     return false;  // the bad_alloc path
   }
-  return (count << 2) <= 0xFFFFF000u && memory::crt::GetProcessHeap(base) != 0;
+  return (count << 2) <= 0xFFFFF000u && memory::crt::GetProcessHeap() != 0;
 }
 
-std::optional<uint32_t> PointersAllocate(uint8_t* base, uint32_t count) {
+std::optional<uint32_t> PointersAllocate(uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825942B8 TextureProvider::Allocate");
-  if (!CanAllocatePointers(base, count)) {
+  if (!CanAllocatePointers(count)) {
     return std::nullopt;
   }
   // A blob in PC memory (E5 step 5): the words in the guest's byte order,
   // read and moved by address as before; operator delete frees it.
-  return Slot::New(base, count << 2).address;
+  return Slot::New(count << 2).address;
 }
 
-uint32_t PointersUninitializedCopy(uint8_t* base, uint32_t first, uint32_t last,
+uint32_t PointersUninitializedCopy(uint32_t first, uint32_t last,
                                    uint32_t destination) {
   ITC_NATIVE_RUNNING("sub_82594380 TextureProvider::UninitializedCopy");
   while (first != last) {
     if (destination != 0) {
-      Slot(base, destination).set_texture(Slot(base, first).texture());
+      Slot(destination).set_texture(Slot(first).texture());
     }
     first += 4;
     destination += 4;
@@ -166,188 +166,188 @@ uint32_t PointersUninitializedCopy(uint8_t* base, uint32_t first, uint32_t last,
   return destination;
 }
 
-std::optional<R3> PointersReserve(uint8_t* base, uint32_t vector, uint32_t count) {
+std::optional<R3> PointersReserve(uint32_t vector, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82594570 TextureProvider::Reserve");
   if (count > kVectorMaxSize) {
     return std::nullopt;  // _Xlen
   }
-  const uint32_t first = V(base, vector).first().address;
-  const uint32_t capacity = first == 0 ? 0 : Count(first, V(base, vector).end());
+  const uint32_t first = V(vector).first().address;
+  const uint32_t capacity = first == 0 ? 0 : Count(first, V(vector).end());
   if (capacity >= count) {
     return R3{true, 0};
   }
-  if (!CanAllocatePointers(base, count) || !Deletable(first)) {
+  if (!CanAllocatePointers(count) || !Deletable(first)) {
     return std::nullopt;
   }
-  const auto made = PointersAllocate(base, count);
+  const auto made = PointersAllocate(count);
   Require(made.has_value(), "TextureProvider::Allocate");
   const uint32_t storage = *made;
-  PointersUninitializedCopy(base, V(base, vector).first().address,
-                            V(base, vector).last().address, storage);
-  const uint32_t old = V(base, vector).first().address;
+  PointersUninitializedCopy(V(vector).first().address,
+                            V(vector).last().address, storage);
+  const uint32_t old = V(vector).first().address;
   uint32_t size = 0;
   if (old != 0) {
-    size = Count(old, V(base, vector).last().address);
+    size = Count(old, V(vector).last().address);
     Delete(old);
   }
-  V(base, vector).set_first(storage);
-  V(base, vector).set_end(storage + (count << 2));
-  V(base, vector).set_last(storage + (size << 2));
+  V(vector).set_first(storage);
+  V(vector).set_end(storage + (count << 2));
+  V(vector).set_last(storage + (size << 2));
   return R3{false, old};
 }
 
-std::optional<R3> PointersInsertN(uint8_t* base, uint32_t vector, uint32_t where,
+std::optional<R3> PointersInsertN(uint32_t vector, uint32_t where,
                                   uint32_t count, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82590EF0 TextureProvider::InsertN");
   if (count == 0) {
     return R3{true, 0};
   }
-  const auto plan = PlanInsert(base, V(base, vector).first().address,
-                               V(base, vector).last().address,
-                               V(base, vector).end(), where, count);
+  const auto plan = PlanInsert(V(vector).first().address,
+                               V(vector).last().address,
+                               V(vector).end(), where, count);
   if (!plan) {
     return std::nullopt;
   }
-  return RunInsert(base, vector, where, count, value, *plan);
+  return RunInsert(vector, where, count, value, *plan);
 }
 
-std::optional<R3> PointersAssign(uint8_t* base, uint32_t vector, uint32_t count,
+std::optional<R3> PointersAssign(uint32_t vector, uint32_t count,
                                  uint32_t value) {
   ITC_NATIVE_RUNNING("sub_825947D0 TextureProvider::Assign");
-  const uint32_t first = V(base, vector).first().address;
+  const uint32_t first = V(vector).first().address;
   // After the clear, the insert is before the first element of none.
-  if (count != 0 && !PlanInsert(base, first, first, V(base, vector).end(), first,
+  if (count != 0 && !PlanInsert(first, first, V(vector).end(), first,
                                 count)) {
     return std::nullopt;
   }
-  if (first != V(base, vector).last().address) {
+  if (first != V(vector).last().address) {
     // erase(begin, end): no elements after the end to move (memmove_s with
     // 0 bytes, not called).
-    V(base, vector).set_last(first);
+    V(vector).set_last(first);
   }
-  const auto r3 = PointersInsertN(base, vector, V(base, vector).first().address, count, value);
+  const auto r3 = PointersInsertN(vector, V(vector).first().address, count, value);
   Require(r3.has_value(), "TextureProvider::InsertN");
   return r3;
 }
 
-uint32_t PointersClear(uint8_t* base, uint32_t vector) {
+uint32_t PointersClear(uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_82590D68 TextureProvider::Clear");
-  const uint32_t first = V(base, vector).first().address;
-  if (first != V(base, vector).last().address) {
-    V(base, vector).set_last(first);
+  const uint32_t first = V(vector).first().address;
+  if (first != V(vector).last().address) {
+    V(vector).set_last(first);
   }
   return first;
 }
 
-std::optional<uint32_t> TextureProviderConstruct(uint8_t* base, uint32_t provider,
+std::optional<uint32_t> TextureProviderConstruct(uint32_t provider,
                                                  int32_t count) {
   ITC_NATIVE_RUNNING("sub_82594850 TextureProvider::TextureProvider");
   const uint32_t slots = count == -1 ? kTextureProviderSlots : uint32_t(count);
-  if (slots > kVectorMaxSize || (slots != 0 && !CanAllocatePointers(base, slots))) {
+  if (slots > kVectorMaxSize || (slots != 0 && !CanAllocatePointers(slots))) {
     return std::nullopt;
   }
-  const uint32_t vector = Provider(base, provider).vector_address();
-  Provider(base, provider).set_vtable(kTextureProviderVtable);
-  V(base, vector).set_first(0);
-  V(base, vector).set_last(0);
-  V(base, vector).set_end(0);
-  Require(PointersReserve(base, vector, slots).has_value(), "TextureProvider::Reserve");
-  Require(PointersAssign(base, vector, slots, 0).has_value(), "TextureProvider::Assign");
+  const uint32_t vector = Provider(provider).vector_address();
+  Provider(provider).set_vtable(kTextureProviderVtable);
+  V(vector).set_first(0);
+  V(vector).set_last(0);
+  V(vector).set_end(0);
+  Require(PointersReserve(vector, slots).has_value(), "TextureProvider::Reserve");
+  Require(PointersAssign(vector, slots, 0).has_value(), "TextureProvider::Assign");
   return provider;
 }
 
-std::optional<uint32_t> TextureProviderDestruct(uint8_t* base, uint32_t provider) {
+std::optional<uint32_t> TextureProviderDestruct(uint32_t provider) {
   ITC_NATIVE_RUNNING("sub_825943E0 TextureProvider::~TextureProvider");
-  const uint32_t vector = Provider(base, provider).vector_address();
-  if (!Deletable(V(base, vector).first().address)) {
+  const uint32_t vector = Provider(provider).vector_address();
+  if (!Deletable(V(vector).first().address)) {
     return std::nullopt;
   }
-  Provider(base, provider).set_vtable(kTextureProviderVtable);
-  PointersClear(base, vector);
-  const uint32_t storage = V(base, vector).first().address;
+  Provider(provider).set_vtable(kTextureProviderVtable);
+  PointersClear(vector);
+  const uint32_t storage = V(vector).first().address;
   if (storage != 0) {
     Delete(storage);
   }
-  V(base, vector).set_first(0);
-  V(base, vector).set_last(0);
-  V(base, vector).set_end(0);
+  V(vector).set_first(0);
+  V(vector).set_last(0);
+  V(vector).set_end(0);
   return storage;
 }
 
-std::optional<uint32_t> PointersAt(uint8_t* base, uint32_t vector, uint32_t index) {
+std::optional<uint32_t> PointersAt(uint32_t vector, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82594648 TextureProvider::At");
-  const uint32_t first = V(base, vector).first().address;
-  if (first == 0 || !(Count(first, V(base, vector).last().address) > index)) {
+  const uint32_t first = V(vector).first().address;
+  if (first == 0 || !(Count(first, V(vector).last().address) > index)) {
     return std::nullopt;  // _Xran (sub_825944B0)
   }
   return first + (index << 2);
 }
 
-uint32_t TextureProviderGet(uint8_t* base, uint32_t provider, uint32_t slot) {
+uint32_t TextureProviderGet(uint32_t provider, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_825946B8 TextureProvider::Get");
-  const uint32_t vector = Provider(base, provider).vector_address();
-  const uint32_t first = V(base, vector).first().address;
-  if (first == 0 || !(slot < Count(first, V(base, vector).last().address))) {
+  const uint32_t vector = Provider(provider).vector_address();
+  const uint32_t first = V(vector).first().address;
+  if (first == 0 || !(slot < Count(first, V(vector).last().address))) {
     return 0;
   }
-  const auto at = PointersAt(base, vector, slot);
+  const auto at = PointersAt(vector, slot);
   Require(at.has_value(), "TextureProvider::At");
-  return Slot(base, *at).texture();
+  return Slot(*at).texture();
 }
 
 namespace {
 
 // The provider's slot 3 with `slot`, as slots 5 to 10 call it (from their
 // frame, the return address `lr`).
-uint64_t SlotGet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_t frame, uint32_t lr,
+uint64_t SlotGet(uint32_t provider, uint32_t slot, uint32_t frame, uint32_t lr,
                  const ProviderCall& call) {
-  const uint32_t target = Provider(base, provider).vtable().get();
+  const uint32_t target = Provider(provider).vtable().get();
   if (target == kTextureProviderGet) {
-    return TextureProviderGet(base, provider, slot);
+    return TextureProviderGet(provider, slot);
   }
   return call(target, frame, lr, provider, slot);
 }
 
 }  // namespace
 
-uint64_t TextureProviderXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+uint64_t TextureProviderXprTexture(uint32_t provider, uint32_t slot,
                                    uint32_t index, uint32_t sp, const ProviderCall& call) {
   ITC_NATIVE_RUNNING("sub_825941D0 TextureProvider::GetXprTexture");
   const uint32_t frame = sp - 96;
-  const uint64_t xpr = SlotGet(base, provider, slot, frame, 0x825941F4, call);
+  const uint64_t xpr = SlotGet(provider, slot, frame, 0x825941F4, call);
   if (uint32_t(xpr) == 0) {
     return 0;
   }
-  return XprGetTexture(base, uint32_t(xpr), index);
+  return XprGetTexture(uint32_t(xpr), index);
 }
 
-uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+uint64_t TextureProviderFindXprTexture(uint32_t provider, uint32_t slot,
                                        uint32_t name, uint32_t sp, const ProviderCall& call) {
   ITC_NATIVE_RUNNING("sub_82594230 TextureProvider::FindXprTexture");
   constexpr uint32_t kXprFindTexture = 0x82596E88;
   const uint32_t frame = sp - 96;
-  const uint64_t xpr = SlotGet(base, provider, slot, frame, 0x82594254, call);
+  const uint64_t xpr = SlotGet(provider, slot, frame, 0x82594254, call);
   if (uint32_t(xpr) == 0) {
     return 0;
   }
   return call(kXprFindTexture, frame, 0x82594264, xpr, name);
 }
 
-std::optional<uint32_t> CallGet(uint8_t* base, uint32_t provider, uint32_t slot) {
+std::optional<uint32_t> CallGet(uint32_t provider, uint32_t slot) {
   if (!ITC_FLAG(native_models) ||
-      Provider(base, provider).vtable().get() != kTextureProviderGet) {
+      Provider(provider).vtable().get() != kTextureProviderGet) {
     return std::nullopt;
   }
-  return TextureProviderGet(base, provider, slot);
+  return TextureProviderGet(provider, slot);
 }
 
-std::optional<uint64_t> CallXprTexture(uint8_t* base, uint32_t function, uint32_t provider,
+std::optional<uint64_t> CallXprTexture(uint32_t function, uint32_t provider,
                                        uint32_t slot, uint32_t index, uint32_t sp,
                                        const ProviderCall& call) {
   if (!ITC_FLAG(native_models) || function != kTextureProviderXprTexture) {
     return std::nullopt;
   }
-  return TextureProviderXprTexture(base, provider, slot, index, sp, call);
+  return TextureProviderXprTexture(provider, slot, index, sp, call);
 }
 
 }  // namespace models

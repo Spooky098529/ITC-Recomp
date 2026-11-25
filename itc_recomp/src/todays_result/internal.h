@@ -21,9 +21,9 @@
 
 namespace todays_result {
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
@@ -37,25 +37,25 @@ using Node = schema::UiMovieNode;
 using Save = schema::SaveData;
 
 // The original's frame below `sp`, its back chain written.
-inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
+  Store(frame, sp);
   return frame;
 }
 
 // UiMovies::Find for movie `id`: the movie in the pair's value. The original
 // stored the id at `key` (its frame word) and passed its address; only the
 // lookup read it, so the id goes by value (E5 step 6) and `key` is unused.
-inline uint32_t FindMovie(uint8_t* base, [[maybe_unused]] uint32_t key, uint32_t id) {
-  return Load(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
+inline uint32_t FindMovie([[maybe_unused]] uint32_t key, uint32_t id) {
+  return Load(ui_movies::PairsFindKey(ui_movies::kMovieTable, id));
 }
 
 // Posts the message (id, 0, 0) on a dispatcher's ring (a mode's +36: 50
 // ModeMessages of 12 bytes from +204, its count at +804 and start at +808),
 // as the originals do inline. A dual view (E5 step 4: the type 9 mode is in
 // host memory), the ring's bytes in guest order.
-inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
-  const schema::ModeDispatcher d(base, dispatcher);
+inline void Post(uint32_t dispatcher, uint32_t id) {
+  const schema::ModeDispatcher d(dispatcher);
   const uint32_t count = d.ring_count() + 1;
   const uint32_t start = d.ring_start();
   d.set_ring_count(count);
@@ -66,7 +66,7 @@ inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
 }
 // On the type 9 mode's ring (its dispatcher's at +36).
 inline void PostMode(const schema::ModeType9& mode, uint32_t id) {
-  Post(mode.base, mode.address + 36, id);
+  Post(mode.address + 36, id);
 }
 
 // A screen's new menu set up as both Creates do: every word 0 but the last

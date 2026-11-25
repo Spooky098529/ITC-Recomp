@@ -40,7 +40,7 @@ namespace t2m = type2_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -66,7 +66,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -78,17 +78,17 @@ class GuestCalls {
 
 // A delegate function's step: r3 the answer, left as it is.
 template <void (*Function)(uint8_t*, uint32_t, uint32_t, uint32_t, const t2m::Calls&)>
-void Delegate(lifted::Regs& ctx, uint8_t* base) {
+void Delegate(lifted::Regs& ctx) {
   const uint64_t answer = ctx.r3.u64;
-  GuestCalls guest(ctx, base);
-  Function(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  Function(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
   ctx.r3.u64 = answer;
 }
 
-void Thunk(lifted::Regs& ctx, uint8_t* base, uint32_t slot) {
+void Thunk(lifted::Regs& ctx, uint32_t slot) {
   const uint32_t lr = uint32_t(ctx.lr);
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2m::SlotThunk(base, slot, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2m::SlotThunk(slot, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
 }
 
 }  // namespace
@@ -97,46 +97,46 @@ void Type2ModeMachineOf(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = t2m::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
 ITC_REGS_STEP(Type2ModeAllLoaded) {
-  ctx.r3.u64 = t2m::AllLoaded(base, ctx.r3.u32);
+  ctx.r3.u64 = t2m::AllLoaded(ctx.r3.u32);
 }
 ITC_REGS_STEP(Type2ModeFindShown) {
-  ctx.r3.u64 = t2m::FindShown(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t2m::FindShown(ctx.r3.u64, ctx.r1.u32);
 }
-ITC_REGS_STEP(Type2ModeTearDown) { Delegate<t2m::TearDown>(ctx, base); }
+ITC_REGS_STEP(Type2ModeTearDown) { Delegate<t2m::TearDown>(ctx); }
 ITC_REGS_STEP(Type2ModeLeaveScreen) {
-  Delegate<t2m::LeaveScreen>(ctx, base);
+  Delegate<t2m::LeaveScreen>(ctx);
 }
 ITC_REGS_STEP(Type2ModeAfterLeaveScreen) {
-  t2m::AfterLeaveScreen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  t2m::AfterLeaveScreen(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-ITC_REGS_STEP(Type2ModeRestart) { Delegate<t2m::Restart>(ctx, base); }
-ITC_REGS_STEP(Type2ModeLeaving) { Delegate<t2m::Leaving>(ctx, base); }
-ITC_REGS_STEP(Type2ModeNextMode) { Delegate<t2m::NextMode>(ctx, base); }
+ITC_REGS_STEP(Type2ModeRestart) { Delegate<t2m::Restart>(ctx); }
+ITC_REGS_STEP(Type2ModeLeaving) { Delegate<t2m::Leaving>(ctx); }
+ITC_REGS_STEP(Type2ModeNextMode) { Delegate<t2m::NextMode>(ctx); }
 ITC_REGS_STEP(Type2ModeWaitForLoads) {
-  Delegate<t2m::WaitForLoads>(ctx, base);
+  Delegate<t2m::WaitForLoads>(ctx);
 }
-ITC_REGS_STEP(ModeSlot8Thunk) { Thunk(ctx, base, 8); }
-ITC_REGS_STEP(ModeSlot9Thunk) { Thunk(ctx, base, 9); }
-ITC_REGS_STEP(ModeSlot10Thunk) { Thunk(ctx, base, 10); }
-ITC_REGS_STEP(ModeSlot11Thunk) { Thunk(ctx, base, 11); }
-ITC_REGS_STEP(ModeSlot12Thunk) { Thunk(ctx, base, 12); }
-ITC_REGS_STEP(ModeSlot13Thunk) { Thunk(ctx, base, 13); }
+ITC_REGS_STEP(ModeSlot8Thunk) { Thunk(ctx, 8); }
+ITC_REGS_STEP(ModeSlot9Thunk) { Thunk(ctx, 9); }
+ITC_REGS_STEP(ModeSlot10Thunk) { Thunk(ctx, 10); }
+ITC_REGS_STEP(ModeSlot11Thunk) { Thunk(ctx, 11); }
+ITC_REGS_STEP(ModeSlot12Thunk) { Thunk(ctx, 12); }
+ITC_REGS_STEP(ModeSlot13Thunk) { Thunk(ctx, 13); }
 ITC_REGS_STEP(Type2ModeInterrupt) {
-  ctx.r3.u64 = t2m::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t2m::Interrupt(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(Type2ModeForceExit) {
-  t2m::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  t2m::ForceExit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(Type2ModeInit) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = t2m::Init(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = t2m::Init(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
 
 #define ITC_TYPE2_MODE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type2_mode)) { \
-    hooks::step(ctx, base);              \
+    hooks::step(ctx);              \
   }
 
 // The block's helpers (from the recompiled screens' code and the mode's

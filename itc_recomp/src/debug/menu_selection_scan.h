@@ -16,7 +16,7 @@ namespace debug {
 
 // Main thread, as a main loop pass is about to start. `listener` is input
 // listener 0's guest address (0 when not known yet).
-void MenuSelectionScan_OnPassStart(uint8_t* base, bool render_only, bool paused,
+void MenuSelectionScan_OnPassStart(bool render_only, bool paused,
                                    uint32_t listener);
 
 // Whether anything is watched (--find_menu_selection found candidates, or
@@ -24,7 +24,7 @@ void MenuSelectionScan_OnPassStart(uint8_t* base, bool render_only, bool paused,
 bool MenuSelectionScan_Active();
 
 // Main thread, around a tick handler, message handler or screen update.
-void MenuSelectionScan_Before(uint8_t* base);
-void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id);
+void MenuSelectionScan_Before();
+void MenuSelectionScan_After(const char* kind, uint32_t id);
 
 }  // namespace debug

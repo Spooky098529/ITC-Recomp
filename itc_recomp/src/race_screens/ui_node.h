@@ -15,13 +15,13 @@ namespace race_screens {
 using UiNode = schema::UiMovieNode;
 
 // A group's first child index (+100, a word).
-inline uint32_t FirstChild(uint8_t* base, uint32_t node) {
-  return guest::LoadU32(base, UiNode(base, node).width_address());
+inline uint32_t FirstChild(uint32_t node) {
+  return guest::LoadU32(UiNode(node).width_address());
 }
 
 // A group's child count (+104, a word).
-inline uint32_t ChildCount(uint8_t* base, uint32_t node) {
-  return guest::LoadU32(base, UiNode(base, node).height_address());
+inline uint32_t ChildCount(uint32_t node) {
+  return guest::LoadU32(UiNode(node).height_address());
 }
 
 }  // namespace race_screens

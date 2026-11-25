@@ -14,15 +14,15 @@ namespace hooks {
 // rectangle at +112; RecordScissor's 160, RecordFlat's 368); the original
 // with the command list's diagnostics on, and its callees' originals where
 // their chunks wouldn't fit.
-void ModeTickScreenFadesUpdate(lifted::Regs& ctx, uint8_t* base);
+void ModeTickScreenFadesUpdate(lifted::Regs& ctx);
 
 // Music::Play (sub_821063B0): its names' lookup natively, the call through
 // [0x826C5C80]'s slot 4 from a 288-byte frame like the original's; r3 as
 // that call leaves it.
-void ModeTickMusicPlay(lifted::Regs& ctx, uint8_t* base);
+void ModeTickMusicPlay(lifted::Regs& ctx);
 // Modes::Tick sub_82107910 (r3 the holder, r4 the layer): its plain C++
 // entered through lifted::Enter, without the flag (its wrap's in
 // src/frame_pacing/per_frame_logic.cpp, and the harness's).
-void ModesTickSteps(lifted::Regs& ctx, uint8_t* base);
+void ModesTickSteps(lifted::Regs& ctx);
 
 }  // namespace hooks

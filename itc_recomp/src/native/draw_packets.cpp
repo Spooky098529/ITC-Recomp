@@ -94,20 +94,20 @@ bool Checking() {
   return ITC_FLAG(native_renderer_check_draw_writes);
 }
 
-uint8_t* DevicePointer(uint8_t* base, uint32_t device) {
-  return guest::Pointer(base, device);
+uint8_t* DevicePointer(uint32_t device) {
+  return guest::Pointer(device);
 }
 
 // Runs `call` and records which device words it changed (the command
 // buffer pointer aside), and whether it ended a command segment (which
 // kicks, moving fences and positions).
 template <typename Call>
-void Checked(Helper helper, uint8_t* base, uint32_t device, Call call) {
-  std::vector<uint8_t> before(DevicePointer(base, device),
-                              DevicePointer(base, device) + kDeviceSize);
+void Checked(Helper helper, uint32_t device, Call call) {
+  std::vector<uint8_t> before(DevicePointer(device),
+                              DevicePointer(device) + kDeviceSize);
   uint32_t segment_ends = t_segment_ends;
   call();
-  const uint8_t* after = DevicePointer(base, device);
+  const uint8_t* after = DevicePointer(device);
   std::lock_guard lock(g_mutex);
   HelperStats& s = g_check.helpers[helper];
   s.calls++;
@@ -169,11 +169,11 @@ void LogCheck() {
         dropped;                                                                          \
         return;                                                                           \
       }                                                                                   \
-      lifted::original::c##address(ctx, base);                                       \
+      lifted::original::c##address(ctx);                                       \
       return;                                                                             \
     }                                                                                     \
-    native::Checked(helper, base, ctx.r3.u32,                                             \
-                    [&] { lifted::original::c##address(ctx, base); });               \
+    native::Checked(helper, ctx.r3.u32,                                             \
+                    [&] { lifted::original::c##address(ctx); });               \
   }
 
 NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, , ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
@@ -197,18 +197,18 @@ NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203,
 ITC_NATIVE_ENTRY_ALWAYS(8229EF48) {
   
   native::t_segment_ends++;
-  hooks::EndCommandSegment(ctx, base);
+  hooks::EndCommandSegment(ctx);
 }
 
 // DrawIndexedVertices (sub_825BE708, wrapped in replay_hooks.cpp): r3
 // device, r4 primitive type, r5 base vertex, r6 start index, r7 index
 // count. Writes the dirty state's packets (five masks at device +0..+32)
 // and DRAW_INDX.
-void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
+void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
   uint32_t device = ctx.r3.u32;
-  bool predicated = guest::LoadU8(base, device + kDeviceTilingFlags) & 0x2;
+  bool predicated = guest::LoadU8(device + kDeviceTilingFlags) & 0x2;
   if (Checking()) {
-    bool shader_load = guest::LoadU64(base, device + kDeviceShaderStateDirty) & kShaderBits;
+    bool shader_load = guest::LoadU64(device + kDeviceShaderStateDirty) & kShaderBits;
     {
       std::lock_guard lock(g_mutex);
       g_check.draws++;
@@ -220,44 +220,44 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
       }
     }
     if (shader_load) {
-      lifted::original::c825BE708(ctx, base);  // its writes are expected
+      lifted::original::c825BE708(ctx);  // its writes are expected
     } else {
-      Checked(kDraw, base, device, [&] { lifted::original::c825BE708(ctx, base); });
+      Checked(kDraw, device, [&] { lifted::original::c825BE708(ctx); });
     }
     return;
   }
   if (ITC_FLAG(native_renderer_library_packets) || predicated) {
-    lifted::original::c825BE708(ctx, base);
+    lifted::original::c825BE708(ctx);
     return;
   }
-  guest::StoreU64(base, device + kDeviceVertexConstantsDirty, 0);
-  guest::StoreU64(base, device + kDevicePixelConstantsDirty, 0);
-  uint64_t shader_state = guest::LoadU64(base, device + kDeviceShaderStateDirty);
+  guest::StoreU64(device + kDeviceVertexConstantsDirty, 0);
+  guest::StoreU64(device + kDevicePixelConstantsDirty, 0);
+  uint64_t shader_state = guest::LoadU64(device + kDeviceShaderStateDirty);
   if (shader_state & kShaderBits) {
     // A shader's fence (+8) is the command position it was last loaded at;
     // the library patches a vertex shader in place only once the GPU has
     // passed it, and otherwise copies it into the command buffer. Nothing
     // reads the shaders but us, so they're never in use.
     for (uint32_t field : {kDeviceVertexShader, kDevicePixelShader}) {
-      if (uint32_t shader = guest::LoadU32(base, device + field)) {
-        guest::StoreU32(base, shader + kShaderFence, 0);
+      if (uint32_t shader = guest::LoadU32(device + field)) {
+        guest::StoreU32(shader + kShaderFence, 0);
       }
     }
     lifted::Regs saved = ctx;
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
-    lifted::Enter(ctx, base, lifted::e822AED18);
+    lifted::Enter(ctx, lifted::e822AED18);
     // The mask with the bits for what it wrote in the shadow.
     shader_state |= ctx.r3.u64;
     ctx = saved;
   }
   // What the library's draw would have flushed: read again.
-  MarkDeviceDirty(shader_state, guest::LoadU64(base, device + kDeviceRenderStateDirty),
-                  guest::LoadU64(base, device + kDeviceOtherStateDirty));
-  guest::StoreU64(base, device + kDeviceShaderStateDirty, 0);
-  if (guest::LoadU64(base, device + kDeviceRenderStateDirty) & 0x2) {
-    guest::StoreU64(base, device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
+  MarkDeviceDirty(shader_state, guest::LoadU64(device + kDeviceRenderStateDirty),
+                  guest::LoadU64(device + kDeviceOtherStateDirty));
+  guest::StoreU64(device + kDeviceShaderStateDirty, 0);
+  if (guest::LoadU64(device + kDeviceRenderStateDirty) & 0x2) {
+    guest::StoreU64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
   }
-  guest::StoreU64(base, device + kDeviceRenderStateDirty, 0);
-  guest::StoreU64(base, device + kDeviceOtherStateDirty, 0);
+  guest::StoreU64(device + kDeviceRenderStateDirty, 0);
+  guest::StoreU64(device + kDeviceOtherStateDirty, 0);
 }

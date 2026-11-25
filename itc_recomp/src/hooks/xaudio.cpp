@@ -60,66 +60,66 @@ namespace hooks {
 namespace xa = xaudio;
 
 ITC_REGS_STEP(XAudioSourceOutputFormat) {
-  xa::SourceOutputFormat(base, ctx.r3.u32, ctx.r4.u32);
+  xa::SourceOutputFormat(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioSubmixDescribe) {
-  xa::SubmixDescribe(base, ctx.r3.u32, ctx.r4.u32);
+  xa::SubmixDescribe(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioDefaultMatrix) {
-  ctx.r3.u64 = xa::DefaultMatrix(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = xa::DefaultMatrix(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(XAudioBufferSize) {
-  if (const auto r3 = xa::BufferSize(base, ctx.r3.u32, ctx.r4.u32)) {
+  if (const auto r3 = xa::BufferSize(ctx.r3.u32, ctx.r4.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c8245FA28(ctx, base);
+  lifted::original::c8245FA28(ctx);
 }
 
 ITC_REGS_STEP(XAudioBufferClear) {
-  if (const auto r3 = xa::BufferClear(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+  if (const auto r3 = xa::BufferClear(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
-  lifted::original::c8245F8E8(ctx, base);
+  lifted::original::c8245F8E8(ctx);
 }
 
 ITC_REGS_STEP(XAudioEngineBuffer) {
-  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
-  ctx.r3.u64 = xa::EngineBuffer(base, processor);
+  const uint32_t processor = guest::LoadU8(ctx.r13.u32 + xa::kPcrProcessor);
+  ctx.r3.u64 = xa::EngineBuffer(processor);
 }
 
 ITC_REGS_STEP(XAudioGetType) {
-  ctx.r3.u64 = xa::GetType(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = xa::GetType(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioGetFormat) {
-  ctx.r3.u64 = xa::GetFormat(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = xa::GetFormat(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioSetFormatWords) {
-  xa::SetFormatWords(base, ctx.r3.u32, ctx.r4.u32);
+  xa::SetFormatWords(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioAddRef) {
-  ctx.r3.u64 = xa::AddRef(base, ctx.r3.u32);
+  ctx.r3.u64 = xa::AddRef(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(XAudioSetRootVtable) {
-  xa::SetRootVtable(base, ctx.r3.u32);
+  xa::SetRootVtable(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(XAudioAddStat) {
-  ctx.r3.u64 = xa::AddStat(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = xa::AddStat(ctx.r3.u32, ctx.r4.u32);
 }
 
 namespace {
 
-xa::GuestCall Caller(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t return_address, const xa::Regs& regs) {
+xa::GuestCall Caller(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t return_address, const xa::Regs& regs) {
     lifted::Temp* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                                &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (uint32_t i = 0; i < regs.count; i++) {
@@ -145,25 +145,25 @@ xa::GuestCall Caller(lifted::Regs& ctx, uint8_t* base) {
     switch (function) {
       // The kernel imports, at their thunks' guest addresses.
       case xa::kKeRaiseIrqlToDpcLevel:
-        lifted::Sdk(ctx, base, __imp__KeRaiseIrqlToDpcLevel);
+        lifted::Sdk(ctx, __imp__KeRaiseIrqlToDpcLevel);
         break;
       case xa::kKeAcquireSpinLockAtRaisedIrql:
-        lifted::Sdk(ctx, base, __imp__KeAcquireSpinLockAtRaisedIrql);
+        lifted::Sdk(ctx, __imp__KeAcquireSpinLockAtRaisedIrql);
         break;
       case xa::kKeReleaseSpinLockFromRaisedIrql:
-        lifted::Sdk(ctx, base, __imp__KeReleaseSpinLockFromRaisedIrql);
+        lifted::Sdk(ctx, __imp__KeReleaseSpinLockFromRaisedIrql);
         break;
       case xa::kKfLowerIrql:
-        lifted::Sdk(ctx, base, __imp__KfLowerIrql);
+        lifted::Sdk(ctx, __imp__KfLowerIrql);
         break;
       case xa::kRtlEnterCriticalSection:
-        lifted::Sdk(ctx, base, __imp__RtlEnterCriticalSection);
+        lifted::Sdk(ctx, __imp__RtlEnterCriticalSection);
         break;
       case xa::kRtlLeaveCriticalSection:
-        lifted::Sdk(ctx, base, __imp__RtlLeaveCriticalSection);
+        lifted::Sdk(ctx, __imp__RtlLeaveCriticalSection);
         break;
       default:
-        lifted::CallFromContext(ctx, base, function);
+        lifted::CallFromContext(ctx, function);
         break;
     }
     ctx.r1.u64 = sp;
@@ -174,16 +174,16 @@ xa::GuestCall Caller(lifted::Regs& ctx, uint8_t* base) {
 
 // A body with calls, run in a frame of the original's size; r3 its result.
 template <typename Body>
-void Framed(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
+void Framed(lifted::Regs& ctx, uint32_t frame_bytes, Body body) {
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
   const uint32_t floor = xa::StackFloor();
   xa::StackFloor() = 0;
-  guest_call::InFrame(ctx, base, frame_bytes, uint32_t(lr), [&](uint32_t frame) {
+  guest_call::InFrame(ctx, frame_bytes, uint32_t(lr), [&](uint32_t frame) {
     if constexpr (std::is_invocable_v<Body, const xa::GuestCall&, uint32_t>) {
-      r3 = body(Caller(ctx, base), frame);
+      r3 = body(Caller(ctx), frame);
     } else {
-      r3 = body(Caller(ctx, base));
+      r3 = body(Caller(ctx));
     }
   });
   xa::StackFloor() = floor;
@@ -193,63 +193,63 @@ void Framed(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
 
 using ThunkFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t*);
 
-void Thunk(lifted::Regs& ctx, uint8_t* base, ThunkFn thunk) {
+void Thunk(lifted::Regs& ctx, ThunkFn thunk) {
   uint32_t function = 0;
-  ctx.r3.u64 = thunk(base, ctx.r3.u32, &function);
-  lifted::CallFromContext(ctx, base, function);
+  ctx.r3.u64 = thunk(ctx.r3.u32, &function);
+  lifted::CallFromContext(ctx, function);
 }
 
 }  // namespace
 
-ITC_REGS_STEP(XAudioFactorySize) { Thunk(ctx, base, xa::FactorySizeThunk); }
-ITC_REGS_STEP(XAudioFactoryCreate) { Thunk(ctx, base, xa::FactoryCreateThunk); }
-ITC_REGS_STEP(XAudioBufferAddRefThunk) { Thunk(ctx, base, xa::BufferAddRefThunk); }
-ITC_REGS_STEP(XAudioBufferReleaseThunk) { Thunk(ctx, base, xa::BufferReleaseThunk); }
+ITC_REGS_STEP(XAudioFactorySize) { Thunk(ctx, xa::FactorySizeThunk); }
+ITC_REGS_STEP(XAudioFactoryCreate) { Thunk(ctx, xa::FactoryCreateThunk); }
+ITC_REGS_STEP(XAudioBufferAddRefThunk) { Thunk(ctx, xa::BufferAddRefThunk); }
+ITC_REGS_STEP(XAudioBufferReleaseThunk) { Thunk(ctx, xa::BufferReleaseThunk); }
 
 ITC_REGS_STEP(XAudioRelease) {
   const uint32_t object = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xa::GuestCall& call) { return xa::Release(base, object, call); });
+  Framed(ctx, 96, [&](const xa::GuestCall& call) { return xa::Release(object, call); });
 }
 
 ITC_REGS_STEP(XAudioObjectFree) {
   const uint32_t object = ctx.r3.u32;
-  Framed(ctx, base, 112,
-         [&](const xa::GuestCall& call) { return xa::ObjectFree(base, object, call); });
+  Framed(ctx, 112,
+         [&](const xa::GuestCall& call) { return xa::ObjectFree(object, call); });
 }
 
 ITC_REGS_STEP(XAudioApplyVolume) {
   // A tail call: the codec's method runs at the caller's frame.
   ctx.fpscr.disableFlushMode();
   const uint32_t voice = ctx.r3.u32;
-  ctx.r3.u64 = xa::ApplyVolume(base, voice, Caller(ctx, base));
+  ctx.r3.u64 = xa::ApplyVolume(voice, Caller(ctx));
 }
 
 ITC_REGS_STEP(XAudioStopAndReset) {
   const uint32_t voice = ctx.r3.u32;
-  Framed(ctx, base, 96,
-         [&](const xa::GuestCall& call) { return xa::StopAndReset(base, voice, call); });
+  Framed(ctx, 96,
+         [&](const xa::GuestCall& call) { return xa::StopAndReset(voice, call); });
 }
 
 ITC_REGS_STEP(XAudioSetEffectParameters) {
   const uint32_t voice = ctx.r3.u32;
   const uint32_t index = ctx.r4.u32;
   const uint64_t r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 96, [&](const xa::GuestCall& call) {
-    return xa::SetEffectParameters(base, voice, index, r5, r6, r7, call);
+  Framed(ctx, 96, [&](const xa::GuestCall& call) {
+    return xa::SetEffectParameters(voice, index, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioReleaseOutputs) {
   const uint32_t voice = ctx.r3.u32;
-  Framed(ctx, base, 128,
-         [&](const xa::GuestCall& call) { return xa::ReleaseOutputs(base, voice, call); });
+  Framed(ctx, 128,
+         [&](const xa::GuestCall& call) { return xa::ReleaseOutputs(voice, call); });
 }
 
 ITC_REGS_STEP(XAudioSetOutputMatrices) {
   const uint32_t voice = ctx.r3.u32;
   const uint32_t matrices = ctx.r4.u32;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::SetOutputMatrices(base, voice, matrices, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::SetOutputMatrices(voice, matrices, call);
   });
 }
 
@@ -257,13 +257,13 @@ ITC_REGS_STEP(XAudioSetFormat) {
   const uint32_t voice = ctx.r3.u32;
   const uint32_t format = ctx.r4.u32;
   const uint32_t outputs = ctx.r5.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::SetFormat(base, voice, format, outputs, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::SetFormat(voice, format, outputs, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourceDescribe) {
-  xa::SourceDescribe(base, ctx.r3.u32, ctx.r4.u32);
+  xa::SourceDescribe(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XAudioReformat) {
@@ -271,8 +271,8 @@ ITC_REGS_STEP(XAudioReformat) {
   const uint64_t r6 = ctx.r6.u64;
   bool refused = false;
   const lifted::Regs saved = ctx;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    if (const auto r3 = xa::Reformat(base, voice, format, outputs, r6, frame, call)) {
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    if (const auto r3 = xa::Reformat(voice, format, outputs, r6, frame, call)) {
       return *r3;
     }
     refused = true;
@@ -280,7 +280,7 @@ ITC_REGS_STEP(XAudioReformat) {
   });
   if (refused) {
     ctx = saved;
-    lifted::original::c8245DCF0(ctx, base);
+    lifted::original::c8245DCF0(ctx);
   }
 }
 
@@ -288,24 +288,24 @@ ITC_REGS_STEP(XAudioAlloc) {
   // XMemAlloc (sub_822976F8)'s plain C++ while the heap is the native
   // layer's, else the original (a tail call to XMemAlloc's adapter).
   if (NativeHeapActive()) {
-    ctx.r3.u64 = xa::Alloc(base, ctx.r4.u32, ctx.r5.u32);
+    ctx.r3.u64 = xa::Alloc(ctx.r4.u32, ctx.r5.u32);
     return;
   }
-  lifted::original::c8245EF80(ctx, base);
+  lifted::original::c8245EF80(ctx);
 }
 
 ITC_REGS_STEP(XAudioBufferClearThunk) {
-  if (const auto r3 = xa::BufferClearThunk(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+  if (const auto r3 = xa::BufferClearThunk(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
-  lifted::original::c8245FA10(ctx, base);
+  lifted::original::c8245FA10(ctx);
 }
 
 ITC_REGS_STEP(XAudioBaseSize) {
   const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
-  Framed(ctx, base, 176, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::BaseSize(base, description, out, frame, call);
+  Framed(ctx, 176, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::BaseSize(description, out, frame, call);
   });
 }
 
@@ -313,8 +313,8 @@ ITC_REGS_STEP(XAudioBufferConstruct) {
   const uint32_t buffer = ctx.r3.u32, format = ctx.r4.u32, allocator = ctx.r5.u32;
   bool refused = false;
   const lifted::Regs saved = ctx;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    if (const auto r3 = xa::BufferConstruct(base, buffer, format, allocator, call)) {
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    if (const auto r3 = xa::BufferConstruct(buffer, format, allocator, call)) {
       return *r3;
     }
     refused = true;
@@ -322,21 +322,21 @@ ITC_REGS_STEP(XAudioBufferConstruct) {
   });
   if (refused) {
     ctx = saved;
-    lifted::original::c8245F750(ctx, base);
+    lifted::original::c8245F750(ctx);
   }
 }
 
 ITC_REGS_STEP(XAudioBufferCreate) {
   const uint32_t format = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::BufferCreate(base, format, allocator, out, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::BufferCreate(format, allocator, out, call);
   });
 }
 
 ITC_REGS_STEP(XAudioVoiceConstruct) {
   const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::VoiceConstruct(base, voice, allocator, type, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::VoiceConstruct(voice, allocator, type, call);
   });
 }
 
@@ -344,18 +344,18 @@ ITC_REGS_STEP(XAudioDefaultAllocator) {
   // XAudio::Alloc's plain C++ (XMemAlloc's) while the heap is the native
   // layer's, else the original.
   if (!NativeHeapActive()) {
-    lifted::original::c824605E8(ctx, base);
+    lifted::original::c824605E8(ctx);
     return;
   }
-  ctx.r3.u64 = xa::DefaultAllocator(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = xa::DefaultAllocator(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(XAudioGetAllocator) {
   const uint32_t attributes = ctx.r3.u32, size = ctx.r4.u32, inout = ctx.r5.u32;
   bool refused = false;
   const lifted::Regs saved = ctx;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    if (const auto r3 = xa::GetAllocator(base, attributes, size, inout, frame,
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    if (const auto r3 = xa::GetAllocator(attributes, size, inout, frame,
                                          NativeHeapActive(), call)) {
       return *r3;
     }
@@ -364,198 +364,198 @@ ITC_REGS_STEP(XAudioGetAllocator) {
   });
   if (refused) {
     ctx = saved;
-    lifted::original::c82460688(ctx, base);
+    lifted::original::c82460688(ctx);
   }
 }
 
 ITC_REGS_STEP(XAudioConstructOutputs) {
   const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
-  Framed(ctx, base, 96, [&](const xa::GuestCall& call) {
-    return xa::ConstructOutputs(base, voice, allocator, type, call);
+  Framed(ctx, 96, [&](const xa::GuestCall& call) {
+    return xa::ConstructOutputs(voice, allocator, type, call);
   });
 }
 
 ITC_REGS_STEP(XAudioOutputsSize) {
   const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::OutputsSize(base, description, out, frame, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::OutputsSize(description, out, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSetOutput) {
   const uint32_t voice = ctx.r3.u32, entry = ctx.r4.u32, slot = ctx.r5.u32;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SetOutput(base, voice, entry, slot, frame, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SetOutput(voice, entry, slot, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSetOutputVoices) {
   const uint32_t voice = ctx.r3.u32, outputs = ctx.r4.u32;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SetOutputVoices(base, voice, outputs, frame, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SetOutputVoices(voice, outputs, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioPass) {
   const uint32_t voice = ctx.r3.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::Pass(base, voice, frame, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::Pass(voice, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioDestroy) {
   const uint32_t voice = ctx.r3.u32;
-  Framed(ctx, base, 128,
-         [&](const xa::GuestCall& call) { return xa::Destroy(base, voice, call); });
+  Framed(ctx, 128,
+         [&](const xa::GuestCall& call) { return xa::Destroy(voice, call); });
 }
 
 ITC_REGS_STEP(XAudioCreateObject) {
   const uint32_t voice = ctx.r3.u32, entry = ctx.r4.u32, description = ctx.r5.u32,
                  flag = ctx.r6.u32;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::CreateObject(base, voice, entry, description, flag, frame, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateObject(voice, entry, description, flag, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioProcessEffect) {
   const uint32_t entry = ctx.r4.u32, inout = ctx.r5.u32;
-  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
-  Framed(ctx, base, 96, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::ProcessEffect(base, entry, inout, processor, frame, call);
+  const uint32_t processor = guest::LoadU8(ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, 96, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ProcessEffect(entry, inout, processor, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourceSize) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 240, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SourceSize(base, r3, r4, frame, call);
+  Framed(ctx, 240, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceSize(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioCreateEffects) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::CreateEffects(base, r3, r4, frame, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateEffects(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioInitBase) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::InitBase(base, r3, r4, frame, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::InitBase(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioInitOutputs) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::InitOutputs(base, r3, r4, frame, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::InitOutputs(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourceInit) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 224, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SourceInit(base, r3, r4, frame, call);
+  Framed(ctx, 224, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceInit(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSubmixInit) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SubmixInit(base, r3, r4, frame, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SubmixInit(r3, r4, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioProcessEffects) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::ProcessEffects(base, r3, r4, processor, frame, call);
+  const uint32_t processor = guest::LoadU8(ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ProcessEffects(r3, r4, processor, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioMixToOutputs) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
-  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::MixToOutputs(base, r3, r4, processor, frame, call);
+  const uint32_t processor = guest::LoadU8(ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MixToOutputs(r3, r4, processor, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSubmixPass) {
   const uint32_t r3 = ctx.r3.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SubmixPass(base, r3, frame, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SubmixPass(r3, frame, call);
   });
 }
 
 // The thread's r13 (the spin lock's owner), its +256 (the mixer's thread
 // check) and +268 (the processor).
-xa::Thread ThreadOf(lifted::Regs& ctx, uint8_t* base) {
+xa::Thread ThreadOf(lifted::Regs& ctx) {
   xa::Thread thread;
   thread.r13 = ctx.r13.u32;
-  thread.mixer = guest::LoadU32(base, ctx.r13.u32 + 256);
-  thread.processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  thread.mixer = guest::LoadU32(ctx.r13.u32 + 256);
+  thread.processor = guest::LoadU8(ctx.r13.u32 + xa::kPcrProcessor);
   return thread;
 }
 
-xa::GuestCall XAudioCaller(lifted::Regs& ctx, uint8_t* base) { return Caller(ctx, base); }
-xa::Thread XAudioThreadOf(lifted::Regs& ctx, uint8_t* base) { return ThreadOf(ctx, base); }
+xa::GuestCall XAudioCaller(lifted::Regs& ctx) { return Caller(ctx); }
+xa::Thread XAudioThreadOf(lifted::Regs& ctx) { return ThreadOf(ctx); }
 
 ITC_REGS_STEP(XAudioSpinTake) {
-  const xa::Thread th = ThreadOf(ctx, base);
-  xa::SpinTake(base, th.r13, Caller(ctx, base));
+  const xa::Thread th = ThreadOf(ctx);
+  xa::SpinTake(th.r13, Caller(ctx));
 }
 
 ITC_REGS_STEP(XAudioSpinRelease) {
-  const xa::Thread th = ThreadOf(ctx, base);
-  xa::SpinRelease(base, th.r13, Caller(ctx, base));
+  const xa::Thread th = ThreadOf(ctx);
+  xa::SpinRelease(th.r13, Caller(ctx));
 }
 
 ITC_REGS_STEP(XAudioSourceGetState) {
   const uint32_t voice = ctx.r3.u32, out = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SourceGetState(base, voice, out, th.r13, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceGetState(voice, out, th.r13, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioPlay) {
   const uint32_t voice = ctx.r3.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128,
-         [&](const xa::GuestCall& call) { return xa::Play(base, voice, th.r13, call); });
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128,
+         [&](const xa::GuestCall& call) { return xa::Play(voice, th.r13, call); });
 }
 
 ITC_REGS_STEP(XAudioActivate) {
   const uint32_t voice = ctx.r3.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::Activate(base, voice, th.r13, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::Activate(voice, th.r13, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioDeactivate) {
   const uint32_t voice = ctx.r3.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128,
-         [&](const xa::GuestCall& call) { return xa::Deactivate(base, voice, th.r13, call); });
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128,
+         [&](const xa::GuestCall& call) { return xa::Deactivate(voice, th.r13, call); });
 }
 
 ITC_REGS_STEP(XAudioStartLater) {
   const uint32_t voice = ctx.r3.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 144,
-         [&](const xa::GuestCall& call) { return xa::StartLater(base, voice, th.r13, call); });
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 144,
+         [&](const xa::GuestCall& call) { return xa::StartLater(voice, th.r13, call); });
 }
 
 ITC_REGS_STEP(XAudioWaitForVoice) {
   // Leaves r3 the engine, as the original's early returns and loop do.
   const uint32_t engine = ctx.r3.u32, voice = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call) {
-    xa::WaitForVoice(base, engine, voice, th.r13, th.mixer, th.processor, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 144, [&](const xa::GuestCall& call) {
+    xa::WaitForVoice(engine, voice, th.r13, th.mixer, th.processor, call);
     return 0u;
   });
   ctx.r3.u64 = engine;
@@ -563,66 +563,66 @@ ITC_REGS_STEP(XAudioWaitForVoice) {
 
 ITC_REGS_STEP(XAudioCancelPendingStart) {
   const uint32_t voice = ctx.r3.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::CancelPendingStart(base, voice, th.r13, th.mixer, th.processor, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::CancelPendingStart(voice, th.r13, th.mixer, th.processor, call);
   });
 }
 
 ITC_REGS_STEP(XAudioStopOrTail) {
   const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::StopOrTail(base, voice, flags, th.r13, th.mixer, th.processor, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::StopOrTail(voice, flags, th.r13, th.mixer, th.processor, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourceStart) {
   const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 96,
-         [&](const xa::GuestCall& call) { return xa::SourceStart(base, voice, flags, th, call); });
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 96,
+         [&](const xa::GuestCall& call) { return xa::SourceStart(voice, flags, th, call); });
 }
 
 ITC_REGS_STEP(XAudioSourceStop) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t flags = ctx.r4.u64;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SourceStop(base, voice, flags, th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceStop(voice, flags, th, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourcePass) {
   const uint32_t voice = ctx.r3.u32, inout = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::SourcePass(base, voice, inout, th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourcePass(voice, inout, th, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSourceConstruct) {
   const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::SourceConstruct(base, voice, allocator, type, th, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::SourceConstruct(voice, allocator, type, th, call);
   });
 }
 
 ITC_REGS_STEP(XAudioSubmixConstruct) {
   const uint32_t voice = ctx.r3.u32, description = ctx.r4.u32, allocator = ctx.r5.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::SubmixConstruct(base, voice, description, allocator, th, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::SubmixConstruct(voice, description, allocator, th, call);
   });
 }
 
 #define ITC_XAUDIO_VOICE_STEP(name, fn, bytes)                                     \
   ITC_REGS_STEP(name) {                                      \
     const uint32_t voice = ctx.r3.u32;                                             \
-    const xa::Thread th = ThreadOf(ctx, base);                                     \
-    Framed(ctx, base, bytes,                                                       \
-           [&](const xa::GuestCall& call) { return xa::fn(base, voice, th, call); }); \
+    const xa::Thread th = ThreadOf(ctx);                                     \
+    Framed(ctx, bytes,                                                       \
+           [&](const xa::GuestCall& call) { return xa::fn(voice, th, call); }); \
   }
 ITC_XAUDIO_VOICE_STEP(XAudioOutputsDestroy, OutputsDestroy, 128)
 ITC_XAUDIO_VOICE_STEP(XAudioSourceDestroy, SourceDestroy, 128)
@@ -633,157 +633,157 @@ ITC_XAUDIO_VOICE_STEP(XAudioSubmixDeletingDestructor, SubmixDeletingDestructor, 
 
 ITC_REGS_STEP(XAudioCreateSource) {
   const uint32_t description = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::CreateSource(base, description, allocator, out, NativeHeapActive(), th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateSource(description, allocator, out, NativeHeapActive(), th, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioCreateSubmix) {
   const uint32_t description = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 176, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::CreateSubmix(base, description, allocator, out, NativeHeapActive(), th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 176, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateSubmix(description, allocator, out, NativeHeapActive(), th, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiAddRef) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiAddRef(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiAddRef(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiRelease) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiRelease(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiRelease(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiSetEffectParameters) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 144, [&](const xa::GuestCall& call) {
-    return xa::ApiSetEffectParameters(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 144, [&](const xa::GuestCall& call) {
+    return xa::ApiSetEffectParameters(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiSetOutputVoices) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiSetOutputVoices(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetOutputVoices(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiSetOutputMatrix) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiSetOutputMatrix(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetOutputMatrix(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiGetState) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiGetState(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiGetState(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiStop) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiStop(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiStop(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiGetOutputFormat) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiGetOutputFormat(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiGetOutputFormat(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiSubmitPacket) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::ApiSubmitPacket(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::ApiSubmitPacket(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiCodec36) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return xa::ApiCodec36(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return xa::ApiCodec36(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiFlushPackets) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiFlushPackets(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiFlushPackets(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiCodec72) {
   const uint32_t voice = ctx.r3.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiCodec72(base, voice, r4, r5, r6, r7, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiCodec72(voice, r4, r5, r6, r7, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiSetFormat) {
   const uint32_t voice = ctx.r3.u32, format = ctx.r4.u32, outputs = ctx.r5.u32;
   const uint64_t r6 = ctx.r6.u64;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::ApiSetFormat(base, voice, format, outputs, r6, frame, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiSetFormat(voice, format, outputs, r6, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiReset) {
   const uint32_t voice = ctx.r3.u32;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) { return xa::ApiReset(base, voice, call); });
+  Framed(ctx, 112, [&](const xa::GuestCall& call) { return xa::ApiReset(voice, call); });
 }
 
 ITC_REGS_STEP(XAudioApiStart) {
   const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 112,
-         [&](const xa::GuestCall& call) { return xa::ApiStart(base, voice, flags, th, call); });
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiStart(voice, flags, th, call); });
 }
 
 ITC_REGS_STEP(XAudioApiSetVolume) {
   ctx.fpscr.disableFlushMode();
   const uint32_t voice = ctx.r3.u32;
   const double volume = ctx.f1.f64;
-  Framed(ctx, base, 112,
-         [&](const xa::GuestCall& call) { return xa::ApiSetVolume(base, voice, volume, call); });
+  Framed(ctx, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiSetVolume(voice, volume, call); });
 }
 
 ITC_REGS_STEP(XAudioApiSetFrequencyRatio) {
   const uint32_t voice = ctx.r3.u32;
   const double ratio = ctx.f1.f64;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    return xa::ApiSetFrequencyRatio(base, voice, ratio, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetFrequencyRatio(voice, ratio, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiRegisterCallback) {
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
-  const uint32_t thread = ThreadOf(ctx, base).r13;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
-    return uint32_t(xa::ApiRegisterCallback(base, r3, r4, r5, r6, thread, call));
+  const uint32_t thread = ThreadOf(ctx).r13;
+  Framed(ctx, 128, [&](const xa::GuestCall& call) {
+    return uint32_t(xa::ApiRegisterCallback(r3, r4, r5, r6, thread, call));
   });
   ctx.r3.s64 = int32_t(ctx.r3.u32);  // 0, E_FAIL or E_OUTOFMEMORY as lis/ori leave them
 }
@@ -798,18 +798,18 @@ ITC_REGS_STEP(XAudioApiInitialize) {
   const uint32_t params = ctx.r3.u32;
   ctx.r4.u64 = 0;
   uint64_t r3 = 0;
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    r3 = xa::ApiInitialize(base, params, 0, frame, call);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    r3 = xa::ApiInitialize(params, 0, frame, call);
     return uint32_t(r3);
   });
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(XAudioApiCommit) {
-  const xa::Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx);
   uint64_t r3 = 0;
-  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
-    r3 = xa::ApiCommit(base, th, call);
+  Framed(ctx, 112, [&](const xa::GuestCall& call) {
+    r3 = xa::ApiCommit(th, call);
     return uint32_t(r3);
   });
   ctx.r3.u64 = r3;
@@ -817,23 +817,23 @@ ITC_REGS_STEP(XAudioApiCommit) {
 
 ITC_REGS_STEP(XAudioApiGetMasteringVoice) {
   const uint32_t out = ctx.r3.u32;
-  Framed(ctx, base, 112,
-         [&](const xa::GuestCall& call) { return xa::ApiGetMasteringVoice(base, out, call); });
+  Framed(ctx, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiGetMasteringVoice(out, call); });
 }
 
 ITC_REGS_STEP(XAudioApiCreateSourceVoice) {
   const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::ApiCreateSourceVoice(base, description, out, NativeHeapActive(), th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiCreateSourceVoice(description, out, NativeHeapActive(), th, frame, call);
   });
 }
 
 ITC_REGS_STEP(XAudioApiCreateSubmixVoice) {
   const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
-  const xa::Thread th = ThreadOf(ctx, base);
-  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
-    return xa::ApiCreateSubmixVoice(base, description, out, NativeHeapActive(), th, frame, call);
+  const xa::Thread th = ThreadOf(ctx);
+  Framed(ctx, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiCreateSubmixVoice(description, out, NativeHeapActive(), th, frame, call);
   });
 }
 
@@ -841,7 +841,7 @@ ITC_REGS_STEP(XAudioApiCreateSubmixVoice) {
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_xaudio)) { \
-    hooks::step(ctx, base);                 \
+    hooks::step(ctx);                 \
   }
 
 ITC_XAUDIO_ADAPTER(8245FA28, XAudioBufferSize)
@@ -867,7 +867,7 @@ ITC_XAUDIO_ADAPTER(82460BF0, XAudioSetOutputVoices)
 // own: its print is here.
 ITC_NATIVE_ENTRY(8245F228, ITC_FLAG(native_xaudio)) {
   ITC_NATIVE_RUNNING("sub_8245F228 XAudioSubmixVoice::SetOutputVoices (jump)");
-  hooks::XAudioSetOutputVoices(ctx, base);
+  hooks::XAudioSetOutputVoices(ctx);
 }
 ITC_XAUDIO_ADAPTER(82461070, XAudioPass)
 ITC_XAUDIO_ADAPTER(82461D50, XAudioInitBase)

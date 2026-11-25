@@ -52,7 +52,7 @@ uint64_t MachineOf(uint64_t block, uint64_t index) {
   }
 }
 
-uint32_t AllLoaded(uint8_t* base, uint32_t block) {
+uint32_t AllLoaded(uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82197130 ModeType2::AllLoaded");
   // The loaded words (+9608) of the hub, the race menu, the tuning screen,
   // the car settings, the car dealer, the garage screen, the build screen,
@@ -61,25 +61,25 @@ uint32_t AllLoaded(uint8_t* base, uint32_t block) {
   static constexpr uint32_t kMachines[] = {0,       9640,    19792,   0x173D0, 0x19978, 0x23018,
                                            0x1BF20, 0x12880, 56624,   0x102D8, 0x20A70, 0x255C0};
   for (const uint32_t at : kMachines) {
-    if (schema::Type2ScreenMachine(base, block + at).loaded() == 0) {
+    if (schema::Type2ScreenMachine(block + at).loaded() == 0) {
       return 0;
     }
   }
   return 1;
 }
 
-uint64_t FindShown(uint8_t* base, uint64_t block, uint32_t sp) {
+uint64_t FindShown(uint64_t block, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82197218 ModeType2::FindShown");
-  guest::StoreU32(base, sp - 96, sp);
+  guest::StoreU32(sp - 96, sp);
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 8; i++) {
     r3 = MachineOf(block, i);
     if (uint32_t(r3) == 0) {
       continue;
     }
-    const int32_t state = int32_t(schema::Type2ScreenMachine(base, uint32_t(r3)).state());
+    const int32_t state = int32_t(schema::Type2ScreenMachine(uint32_t(r3)).state());
     if (state == 5 || state == 4) {
-      schema::Type2ModeBlock(base, uint32_t(block)).set_shown(i);
+      schema::Type2ModeBlock(uint32_t(block)).set_shown(i);
     }
   }
   return r3;

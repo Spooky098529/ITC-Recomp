@@ -54,8 +54,8 @@ ITC_FLAG_BOOL(native_resolve, true, "ITC",
 namespace rc = graphics::replay_commands;
 namespace inline_draws = graphics::inline_draws;
 
-rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
+rc::GuestCall native::ReplayCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t sp, uint32_t return_address,
                       std::initializer_list<uint64_t> args, std::optional<double> f1) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -68,7 +68,7 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -87,21 +87,21 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                              \
     \
     uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
-    debug::ReplayStats_OnCommand(base, id, payload, arg1, arg2);                    \
-    native::Renderer_OnCommand(base, id, payload, arg1, arg2);                      \
+    debug::ReplayStats_OnCommand(id, payload, arg1, arg2);                    \
+    native::Renderer_OnCommand(id, payload, arg1, arg2);                      \
     uint32_t outer_command = native::g_current_command;                             \
     native::g_current_command = id;                                                 \
     native::g_command_serial++;                                                     \
     if (ITC_FLAG(native_replay_commands)) {                                         \
       [[maybe_unused]] const uint32_t sp = ctx.r1.u32;                              \
-      [[maybe_unused]] const rc::GuestCall call = native::ReplayCall(ctx, base);    \
+      [[maybe_unused]] const rc::GuestCall call = native::ReplayCall(ctx);    \
       ctx.fpscr.disableFlushMode();                                                 \
       ctx.r3.u64 = (body);                                                          \
     } else {                                                                        \
-      lifted::original::c##address(ctx, base);                                 \
+      lifted::original::c##address(ctx);                                 \
     }                                                                               \
     native::g_current_command = outer_command;                                      \
-    native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
+    native::Renderer_AfterCommand(id, payload, arg1, arg2);                   \
   }
 
 // The library's vertex shader patcher (see "Vertex declaration" in
@@ -134,14 +134,14 @@ void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t si
   ctx.r4.u64 = source;
   ctx.r5.u64 = size;
   ctx.lr = 0x822AE900;
-  lifted::Enter(ctx, base, game::memcpy_825A7410);
+  lifted::Enter(ctx, game::memcpy_825A7410);
   ctx.r1.u64 = stack;
 }
 ITC_REGS_STEP(NativePatchVertexShader) {
-  PatchCopyContext context{&ctx, base};
+  PatchCopyContext context{&ctx};
   const uint32_t shader = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32,
                  streams = ctx.r6.u32, sp = ctx.r1.u32;
-  ctx.r3.u64 = graphics::shader_patch::PatchVertexShader(base, shader, microcode, declaration,
+  ctx.r3.u64 = graphics::shader_patch::PatchVertexShader(shader, microcode, declaration,
                                                          streams, sp, PatchCopy, &context);
 }
 }  // namespace
@@ -155,23 +155,23 @@ ITC_REGS_STEP(NativePatchVertexShader) {
 ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
   
   uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
-  bool copy = microcode != guest::LoadU32(base, object + 48);
+  bool copy = microcode != guest::LoadU32(object + 48);
   native::g_vertex_shader_patches++;
   native::g_last_patch[0] = object;
   native::g_last_patch[1] = declaration;
-  native::g_last_patch[2] = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+  native::g_last_patch[2] = declaration ? guest::LoadU32(declaration + 48) : 0;
   if (ITC_FLAG(native_replay_commands)) {
     ctx.fpscr.disableFlushMode();
-    NativePatchVertexShader(ctx, base);
+    NativePatchVertexShader(ctx);
   } else {
-    lifted::original::c822AE340(ctx, base);
+    lifted::original::c822AE340(ctx);
   }
   if (copy) {
     native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
     loaded.object = object;
-    loaded.declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-    uint32_t size = guest::LoadU32(base, object + 600);
-    loaded.microcode.assign(guest::Pointer(base, microcode), guest::Pointer(base, microcode) + size);
+    loaded.declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
+    uint32_t size = guest::LoadU32(object + 600);
+    loaded.microcode.assign(guest::Pointer(microcode), guest::Pointer(microcode) + size);
   } else {
     native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
   }
@@ -205,13 +205,13 @@ ITC_NATIVE_ENTRY_ALWAYS(825BD8F0) {
   uint32_t type = ctx.r4.u32, count = ctx.r5.u32, stride = ctx.r6.u32;
   uint32_t caller = uint32_t(ctx.lr);
   if (ITC_FLAG(native_inline_draws)) {
-    lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-      return {inline_draws::BeginVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+    lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+      return {inline_draws::BeginVertices(uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                           uint32_t(a.r[2]), uint32_t(a.r[3])),
               a.f[0]};
     });
   } else {
-    lifted::original::c825BD8F0(ctx, base);
+    lifted::original::c825BD8F0(ctx);
   }
   g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
 }
@@ -223,52 +223,52 @@ ITC_NATIVE_ENTRY_ALWAYS(825BDDA0) {
   if (draw.pending) {
     uint32_t command = native::g_current_command;
     if (command == 15 || command == 19) {
-      native::Renderer_InlineDraw(base, draw.type, draw.count, draw.stride, draw.data);
+      native::Renderer_InlineDraw(draw.type, draw.count, draw.stride, draw.data);
     } else {
       LogOutside("an inline vertex draw, not drawn, BeginVertices", 0x825BD8F0, draw.caller,
                  command);
     }
   }
   if (ITC_FLAG(native_inline_draws)) {
-    inline_draws::EndVertices(base, ctx.r3.u32);  // r3 left as the device, as the original
+    inline_draws::EndVertices(ctx.r3.u32);  // r3 left as the device, as the original
     return;
   }
-  lifted::original::c825BDDA0(ctx, base);
+  lifted::original::c825BDDA0(ctx);
 }
 
-REPLAY_COUNTED_HANDLER(8258FBD0, 1, rc::SetRenderStates(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258FC30, 2, rc::SetSamplerStates(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258FC90, 3, rc::SetBlendControls(base, payload, arg1))
-REPLAY_COUNTED_HANDLER(8258FCE0, 4, rc::SetTextures(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258E9F8, 5, rc::InlineVertices(base, payload, arg1))
-REPLAY_COUNTED_HANDLER(8258EA20, 6, rc::InlineIndices(base, payload, arg1, arg2))
-REPLAY_COUNTED_HANDLER(8258FF50, 8, rc::SetVertexShaders(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258FFA0, 9, rc::SetPixelShaders(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258FFF0, 10, rc::SetVertexDeclarations(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590040, 11, rc::SetStreamSources(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(825900B8, 12, rc::SetIndices(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258EA58, 13, rc::SetUpDrawer(base, payload, arg1, sp, call))  // also 14: one handler
-REPLAY_COUNTED_HANDLER(82590108, 15, rc::DrawerDraw(base, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(825901B0, 16, rc::DrawerDrawIndexed(base, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590268, 17, rc::DrawVertices(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(825902E0, 18, rc::DrawIndexedVertices(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590360, 19, rc::DrawVerticesUP(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(825903D8, 20, rc::ReleaseResources(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FBD0, 1, rc::SetRenderStates(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FC30, 2, rc::SetSamplerStates(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FC90, 3, rc::SetBlendControls(payload, arg1))
+REPLAY_COUNTED_HANDLER(8258FCE0, 4, rc::SetTextures(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258E9F8, 5, rc::InlineVertices(payload, arg1))
+REPLAY_COUNTED_HANDLER(8258EA20, 6, rc::InlineIndices(payload, arg1, arg2))
+REPLAY_COUNTED_HANDLER(8258FF50, 8, rc::SetVertexShaders(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FFA0, 9, rc::SetPixelShaders(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FFF0, 10, rc::SetVertexDeclarations(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590040, 11, rc::SetStreamSources(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825900B8, 12, rc::SetIndices(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258EA58, 13, rc::SetUpDrawer(payload, arg1, sp, call))  // also 14: one handler
+REPLAY_COUNTED_HANDLER(82590108, 15, rc::DrawerDraw(arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825901B0, 16, rc::DrawerDrawIndexed(arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590268, 17, rc::DrawVertices(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825902E0, 18, rc::DrawIndexedVertices(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590360, 19, rc::DrawVerticesUP(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825903D8, 20, rc::ReleaseResources(payload, arg1, sp, call))
 REPLAY_COUNTED_HANDLER(8258EAD0, 21, rc::Skip(arg1))
-REPLAY_COUNTED_HANDLER(82591798, 22, rc::DeferRelease(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590428, 23, rc::SetRenderTargets(base, payload, arg1))
-REPLAY_COUNTED_HANDLER(82590478, 24, rc::SetDepthStencilSurfaces(base, payload, arg1))
-REPLAY_COUNTED_HANDLER(825904C8, 25, rc::Resolves(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590620, 26, rc::Clears(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590698, 27, rc::DrawIndexedVerticesUP(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(8258EAE0, 28, rc::Callbacks(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590768, 29, rc::RestoreSurfaces(base, payload, arg1))
-REPLAY_COUNTED_HANDLER(82590860, 30, rc::SetViewports(base, payload, arg1, sp))
-REPLAY_COUNTED_HANDLER(825908E0, 31, rc::SetScissorRects(base, payload, arg1, sp))
-REPLAY_COUNTED_HANDLER(82590968, 32, rc::BeginTiling(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(825909E8, 33, rc::EndTiling(base, payload, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590A68, 34, rc::SaveSurfaces(base, arg1, sp, call))
-REPLAY_COUNTED_HANDLER(82590AD0, 35, rc::RestoreSavedSurfaces(base, arg1))
+REPLAY_COUNTED_HANDLER(82591798, 22, rc::DeferRelease(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590428, 23, rc::SetRenderTargets(payload, arg1))
+REPLAY_COUNTED_HANDLER(82590478, 24, rc::SetDepthStencilSurfaces(payload, arg1))
+REPLAY_COUNTED_HANDLER(825904C8, 25, rc::Resolves(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590620, 26, rc::Clears(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590698, 27, rc::DrawIndexedVerticesUP(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258EAE0, 28, rc::Callbacks(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590768, 29, rc::RestoreSurfaces(payload, arg1))
+REPLAY_COUNTED_HANDLER(82590860, 30, rc::SetViewports(payload, arg1, sp))
+REPLAY_COUNTED_HANDLER(825908E0, 31, rc::SetScissorRects(payload, arg1, sp))
+REPLAY_COUNTED_HANDLER(82590968, 32, rc::BeginTiling(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825909E8, 33, rc::EndTiling(payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590A68, 34, rc::SaveSurfaces(arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590AD0, 35, rc::RestoreSavedSurfaces(arg1))
 
 
 // The chain walker (sub_8258EE98) also has items of single commands, a
@@ -283,12 +283,12 @@ REPLAY_COUNTED_HANDLER(82590AD0, 35, rc::RestoreSavedSurfaces(base, arg1))
 ITC_NATIVE_ENTRY_ALWAYS(8258F5C0) {
   
   if (ITC_FLAG(native_single_commands)) {
-    hooks::NativeSingleDrawerDraw(ctx, base);
+    hooks::NativeSingleDrawerDraw(ctx);
     return;
   }
   uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
-  lifted::original::c8258F5C0(ctx, base);
+  lifted::original::c8258F5C0(ctx);
   native::g_current_command = outer_command;
 }
 
@@ -300,15 +300,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D998) {
   
   uint32_t video_output = ctx.r3.u32;
   uint32_t front_buffer =
-      guest::LoadU32(base, video_output + 4 * (68 + guest::LoadU32(base, video_output + 268)));
-  native::Renderer_FrontBufferResolve(base, guest::LoadU32(base, video_output + 140), front_buffer);
+      guest::LoadU32(video_output + 4 * (68 + guest::LoadU32(video_output + 268)));
+  native::Renderer_FrontBufferResolve(guest::LoadU32(video_output + 140), front_buffer);
   if (!ITC_FLAG(native_replay_commands)) {
-    lifted::original::c8258D998(ctx, base);
+    lifted::original::c8258D998(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = graphics::video_output::ResolveFrontBuffer(base, video_output, ctx.r1.u32,
-                                                          native::ReplayCall(ctx, base));
+  ctx.r3.u64 = graphics::video_output::ResolveFrontBuffer(video_output, ctx.r1.u32,
+                                                          native::ReplayCall(ctx));
 }
 
 // The library's other draws and Resolve: logged when called outside the
@@ -321,12 +321,12 @@ ITC_NATIVE_ENTRY_ALWAYS(825BE300) {
     LogOutside("DrawVertices", 0x825BE300, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    lifted::original::c825BE300(ctx, base);
+    lifted::original::c825BE300(ctx);
     return;
   }
   // r3 left as the device (its callers don't read it).
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    inline_draws::DrawVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    inline_draws::DrawVertices(uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
                                uint32_t(a.r[2]), uint32_t(a.r[3]));
     return {a.r[0], a.f[0]};
   });
@@ -337,11 +337,11 @@ ITC_NATIVE_ENTRY_ALWAYS(825BDDC0) {
     LogOutside("BeginIndexedVertices", 0x825BDDC0, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    lifted::original::c825BDDC0(ctx, base);
+    lifted::original::c825BDDC0(ctx);
     return;
   }
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {inline_draws::BeginIndexedVertices(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    return {inline_draws::BeginIndexedVertices(uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                                uint32_t(a.r[3]), uint32_t(a.r[4]),
                                                uint32_t(a.r[5]), uint32_t(a.r[6]),
                                                uint32_t(a.r[7])),
@@ -356,7 +356,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BE708) {
   if (native::g_current_command != 18) {
     LogOutside("DrawIndexedVertices", 0x825BE708, uint32_t(ctx.lr), native::g_current_command);
   }
-  native::DrawPackets_IndexedDraw(ctx, base);
+  native::DrawPackets_IndexedDraw(ctx);
 }
 
 // The library's Resolve (r3 device, r4 flags, r5 source rect, r6
@@ -374,18 +374,18 @@ ITC_NATIVE_ENTRY_ALWAYS(822AFA58) {
       tile = 0;
     }
     uint32_t device = ctx.r3.u32;
-    native::Renderer_TiledResolve(base, device, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+    native::Renderer_TiledResolve(device, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                                   ctx.r10.u32, float(ctx.f1.f64), tile++,
-                                  guest::LoadU32(base, device + 12488));
+                                  guest::LoadU32(device + 12488));
   } else if (command != 25) {
     LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
   }
   if (!ITC_FLAG(native_resolve)) {
-    lifted::original::c822AFA58(ctx, base);
+    lifted::original::c822AFA58(ctx);
     return;
   }
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    graphics::resolve::Resolve(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
+  lifted::Enter(ctx, [](const lifted::Args& a) -> lifted::Result {
+    graphics::resolve::Resolve(uint32_t(a.r1), a.r13, uint32_t(a.r[0]), uint32_t(a.r[1]),
                                uint32_t(a.r[2]), uint32_t(a.r[3]), uint32_t(a.r[4]),
                                uint32_t(a.r[5]), uint32_t(a.r[6]), uint32_t(a.r[7]), a.f[0]);
     return {a.r[0], a.f[0]};  // r3 not kept (no caller reads it)

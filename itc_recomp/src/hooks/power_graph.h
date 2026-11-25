@@ -15,12 +15,12 @@ namespace hooks {
 // plain C++ in a frame made as the original's, with Line::RecordFlat's
 // guest calls; r3 as the original leaves it. The original where the plain
 // C++ declines (a segment count above 32).
-void PowerGraphDraw(lifted::Regs& ctx, uint8_t* base);
+void PowerGraphDraw(lifted::Regs& ctx);
 // TuningScreen::DrawPowerGraph (sub_821DF350): r3 = the tuning screen. Its
 // test's plain C++ in a frame made as the original's, then, when it draws,
 // PowerGraph::Draw through its adapter (sub_8217C708, so the flag and the
 // diagnostics still pick its version); r3 as the original leaves it.
-void TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base);
+void TuningScreenDrawPowerGraph(lifted::Regs& ctx);
 // CarList::DrawEntryPowerGraph (sub_82250670): r3 = an entry of the car
 // list screen's list. Its set-up's plain C++ in a frame made as the
 // original's (its lr and r31 saved in its caller's frame), then, when it
@@ -28,11 +28,11 @@ void TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base);
 // the original holds it; r3 as the original leaves it. The original unless
 // its callees run natively (CarListDrawEntryCalleesNative).
 bool CarListDrawEntryCalleesNative();
-void CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base);
+void CarListDrawEntryPowerGraph(lifted::Regs& ctx);
 // CarList::DrawCarPowerGraph (sub_82250700): r3 = a garage car. As
 // DrawEntryPowerGraph's without making the car (its 1,952-byte frame). The
 // original unless the car makers' callees run natively
 // (CarMakersGarageCalleesNative with --native_car_makers).
-void CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base);
+void CarListDrawCarPowerGraph(lifted::Regs& ctx);
 
 }  // namespace hooks

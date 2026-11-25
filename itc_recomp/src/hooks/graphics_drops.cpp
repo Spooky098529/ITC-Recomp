@@ -37,5 +37,5 @@ ITC_NATIVE_ENTRY_ALWAYS(822B2610) {
 // docs/rexglue-removal.md.
 ITC_NATIVE_ENTRY_ALWAYS(822B8868) {
   
-  lifted::CallFromContext(ctx, base, 0x822B8230);
+  lifted::CallFromContext(ctx, 0x822B8230);
 }

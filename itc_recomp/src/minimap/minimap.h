@@ -33,14 +33,14 @@ namespace minimap {
 
 // Race::FindPlayerEntry (sub_82170608): the first of `manager`'s entries
 // whose word +0 has 0x4 (`which` not 0) or 0x8 (`which` 0), or 0.
-uint32_t RaceFindPlayerEntry(uint8_t* base, uint32_t manager, uint32_t which);
+uint32_t RaceFindPlayerEntry(uint32_t manager, uint32_t which);
 // Race::RacerVehicle (sub_82170578): 0 without a manager, else
 // Vehicle::Get of racer `racer`'s +20 (no checks).
-uint32_t RaceRacerVehicle(uint8_t* base, uint32_t racer);
+uint32_t RaceRacerVehicle(uint32_t racer);
 
 // SetList::Point (sub_82147D18): out = the x, y and z at
 // [list + 528 + 4 x entry] + 64 x point + 16 x part, w = 1.0.
-void SetListPoint(uint8_t* base, uint32_t list, uint32_t out, uint32_t entry, uint32_t point,
+void SetListPoint(uint32_t list, uint32_t out, uint32_t entry, uint32_t point,
                   uint32_t part);
 
 // Minimap::RacerMarkerType (sub_820F2D28, with its switch's case 1,
@@ -48,7 +48,7 @@ void SetListPoint(uint8_t* base, uint32_t list, uint32_t out, uint32_t entry, ui
 // player's branch number `branch` (1 to 4, or -1 for none). nullopt, with
 // nothing written, where the original must run: an id whose item's +88 is
 // 3 (sub_820F2CA8's chained record, never seen in play).
-std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t branch);
+std::optional<int32_t> RacerMarkerType(uint32_t entry, int32_t branch);
 
 // --- The markers' shapes ---
 
@@ -56,11 +56,11 @@ std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t br
 // and z at +0, +20 and +40 (read after the identity is written). False,
 // with nothing written, for an out in the physical views (the original's
 // memcpy is recorded there for the renderer's mirrors).
-bool Scaling(uint8_t* base, uint32_t out, uint32_t vector);
+bool Scaling(uint32_t out, uint32_t vector);
 // Triangle::Init (sub_820F4040): an identity at +0 (its rows stored at
 // their 16-byte boundaries, as stvx), the kind +64 = 0, +68 = 0, +72 = 2,
 // and 1.0 at +92, +108 and +124.
-void TriangleInit(uint8_t* base, uint32_t triangle);
+void TriangleInit(uint32_t triangle);
 
 // --- The 80-slot lists of 64-byte matrices (List80::) ---
 // track_zones' layout for 80 slots: nodes from +0 (the next node, -1 for
@@ -70,18 +70,18 @@ void TriangleInit(uint8_t* base, uint32_t triangle);
 // List80::Link (sub_820F40C0): the free head taken and linked in at
 // `position` (after the head for 0, else after the node at position - 1),
 // the count up by 1. No check for a full list.
-void List80Link(uint8_t* base, uint32_t list, int16_t position);
+void List80Link(uint32_t list, int16_t position);
 // List80::Insert (sub_820F5238): Link at the position's low halfword, then
 // Matrix::Copy of `matrix` into the data slot of the node `position` steps
 // from the head (noted for interpolation with the original's return
 // address). Returns the data slot's address (the original's r3).
-uint32_t List80Insert(uint8_t* base, uint32_t list, uint32_t matrix, uint32_t position);
+uint32_t List80Insert(uint32_t list, uint32_t matrix, uint32_t position);
 // List80::Copy (sub_820F51A8): out's +12, +28, +44, +60 = 1.0, then the
 // data of the node `position` steps from the head copied to out (memcpy, 64
 // bytes). False where the copy can't be made natively (an out in the
 // physical views, or ranges that share memory: c_runtime::Memcpy); the
 // original then runs (its stores the same again).
-bool List80Copy(uint8_t* base, uint32_t out, uint32_t list, uint32_t position);
+bool List80Copy(uint32_t out, uint32_t list, uint32_t position);
 
 // --- Recording ---
 
@@ -97,14 +97,14 @@ constexpr uint32_t kTransformProduct = 80;
 // the list at [0x826D83D4]. Returns the last slot (the original's r3).
 // nullopt, with nothing done, where the list hasn't room for the five slots
 // (the original prints a message there and writes through 0).
-std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t primitive,
+std::optional<uint32_t> RecordTransform(uint32_t pass, uint32_t primitive,
                                         uint32_t product);
 
 // Triangle::Record (sub_8217DAA0): which recording the triangle's kind
 // (+64) takes: 0 Triangle::RecordFlat, 1 sub_8217C4C0 (never seen in play;
 // the original's, a tail call), above 1 none.
 enum class TriangleRecording { kFlat, kOther, kNone };
-TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle);
+TriangleRecording TriangleRecord(uint32_t triangle);
 
 // The render queue and the command list the triangles go to are
 // schema::MinimapGlobals' triangle_queue and triangle_list.
@@ -123,7 +123,7 @@ constexpr uint32_t kRecordFlatFrame = 128;
 // key and 0.0). nullopt, with nothing done, where the original's command
 // list calls would print a message (a chunk open on any list, or no room
 // for the 14 slots).
-std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uint32_t pass,
+std::optional<uint32_t> TriangleRecordFlat(uint32_t triangle, uint32_t pass,
                                            uint32_t frame);
 
 // --- The markers' draws ---
@@ -154,13 +154,13 @@ constexpr uint32_t kMarkerKey = 104;
 // frame's +80: Triangle::Init, its vertices from the table, its three
 // colors (the color for triangle 0, else (0, 0, 0, 255)), the matrix copied
 // in (memcpy, 64 bytes), and Triangle::Record with key 104.
-void DrawCarMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+void DrawCarMarker(uint32_t pass, uint32_t color, uint32_t matrix,
                    uint32_t frame, const MarkerCalls& calls);
 // Minimap::DrawPointMarker (sub_820F4BA8): the same with 22 triangles (the
 // table at 0x826C5680, 1,056 bytes, also from 0x82002C1C and
 // 0x820067DC-0x82006800; guard 0x826C5AA0, clean-up 0x825DAF00), 0 to 5 in
 // the color.
-void DrawPointMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+void DrawPointMarker(uint32_t pass, uint32_t color, uint32_t matrix,
                      uint32_t frame, const MarkerCalls& calls);
 
 // --- The draw (draw.cpp) ---
@@ -186,7 +186,7 @@ struct DrawCalls {
 // car markers in their five pools (their colors made once, with atexit),
 // and the blink clock's step (0x826C5AA4, 0x826C5AA8). r3 isn't given (its
 // caller doesn't read it). Leaves flush-to-zero off.
-void Draw(uint8_t* base, const DrawCalls& calls, uint32_t stack, uint32_t manager,
+void Draw(const DrawCalls& calls, uint32_t stack, uint32_t manager,
           uint32_t description, uint32_t caller_r24);
 
 }  // namespace minimap

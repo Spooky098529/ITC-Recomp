@@ -21,10 +21,10 @@ namespace car_models {
 // done, where a callee would go to the original (a buffer that isn't the
 // layer's pages, node values the layer didn't give, CarModel::Reset's
 // checks).
-std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model);
+std::optional<uint32_t> CarModelRelease(uint32_t car_model);
 // Whether CarModelRelease runs natively (its checks, nothing changed; the
 // pending frees' room for CarModel::Reset's four nodes included).
-bool CarModelReleasable(uint8_t* base, uint32_t car_model);
+bool CarModelReleasable(uint32_t car_model);
 
 // The callbacks the sets' loads hand Archive::Load: CarModel::OnFileLoaded
 // (set a) and OnFileLoadedB (set b).
@@ -39,7 +39,7 @@ constexpr uint32_t kOnFileLoadedB = 0x820D4F80;
 // Returns the original's r3 (the last load's serial, sign-extended as
 // Archive::Load's r3, or the last pages).
 // Only while --native_heap routes VirtualAlloc to the layer.
-int64_t CarModelLoadSetA(uint8_t* base, uint32_t car_model, const archive::LoadCall& load);
+int64_t CarModelLoadSetA(uint32_t car_model, const archive::LoadCall& load);
 
 // CarModel::LoadSetB (sub_820D5AC0): LoadSlot::Load of the node file 11063
 // + 197 x block into +3728 (OnFileLoadedB, the car model), then the body
@@ -48,7 +48,7 @@ int64_t CarModelLoadSetA(uint8_t* base, uint32_t car_model, const archive::LoadC
 // compared), +3956 = Archive::Load(id, the buffer, OnFileLoadedB, the car
 // model), +3972 = 2. Returns the serial (r3, sign-extended). Only while --native_heap
 // routes VirtualAlloc to the layer.
-int64_t CarModelLoadSetB(uint8_t* base, uint32_t car_model, uint32_t pcr,
+int64_t CarModelLoadSetB(uint32_t car_model, uint32_t pcr,
                           const archive::LoadCall& load);
 
 // sub_820D3CF8 (the team emblem): for blocks 18 to 44 the emblem's asset id
@@ -66,7 +66,7 @@ constexpr uint32_t kOnDecalLoaded = 0x820D5750;
 // index + 383, or the index itself when the record's +8 is 9) into +4380 +
 // 48j, with OnDecalLoaded and the car model; a negative index leaves the
 // slot's +20 = 1. +4088 = 2, or 3 when nothing was asked for. Returns 1.
-uint32_t CarModelLoadDecals(uint8_t* base, uint32_t car_model, const archive::LoadCall& load);
+uint32_t CarModelLoadDecals(uint32_t car_model, const archive::LoadCall& load);
 
 // CarModel::LoadExterior (sub_820D5EC8): the 3,696-byte set-up copied to
 // +32 (memcpy, native::Buffers_Memcpy), the vinyl sheet made (Texture::Create
@@ -77,7 +77,7 @@ uint32_t CarModelLoadDecals(uint8_t* base, uint32_t car_model, const archive::Lo
 // above), then LoadDecals. Returns 1 (LoadDecals' r3); nullopt, with nothing
 // done, where the copy can't be native (the original runs). Only while
 // --native_heap routes the game's heap to the layer.
-std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, uint32_t setup,
+std::optional<uint32_t> CarModelLoadExterior(uint32_t car_model, uint32_t setup,
                                              uint32_t stack, uint32_t pcr,
                                              const archive::LoadCall& load);
 
@@ -91,13 +91,13 @@ std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, 
 // drawn into the sheet, sub_820C4E68, not mapped: the adapter runs the
 // original). Only while --native_heap routes the game's heap to the
 // layer.
-uint32_t CarModelReloadDecals(uint8_t* base, uint32_t car_model, uint32_t stack,
+uint32_t CarModelReloadDecals(uint32_t car_model, uint32_t stack,
                               const archive::LoadCall& load);
 
 // CarModel::SetVinylTextures (sub_820D5F88): r3 = the scene model (its car
 // model at +24): the six part models at +688, 464 bytes apart, given the car
 // model's vinyl sheet (Model::SetVinylTextures with [+6684], [+6692], the
 // car model reread each time). Returns the last part model (its r3).
-uint32_t CarModelSetVinylTextures(uint8_t* base, uint32_t scene_model);
+uint32_t CarModelSetVinylTextures(uint32_t scene_model);
 
 }  // namespace car_models

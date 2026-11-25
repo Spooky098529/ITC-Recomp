@@ -20,17 +20,17 @@ namespace material_passes {
 // puts the value in +0 to +8 (+12 left); a sector outside 0-5 (a negative
 // hue) writes nothing. The color is copied to sp - 16 and the sector's
 // integers go through there, as the original's.
-void HsvToRgb(uint8_t* base, uint32_t out, uint32_t color, uint32_t sp);
+void HsvToRgb(uint32_t out, uint32_t color, uint32_t sp);
 // Color::HsvToRgb8 (sub_820C9808): the packed color at `color` (+0 the hue,
 // s16 degrees; +2 the saturation, +3 the value, bytes) into three bytes at
 // `out` (+3 left).
-void HsvToRgb8(uint8_t* base, uint32_t out, uint32_t color);
+void HsvToRgb8(uint32_t out, uint32_t color);
 
 // --- Tables and matrices (helpers.cpp) ---
 
 // sub_820D35D0: the 16 bytes at 0x82601A00 + 16 x (4 x index + sub) copied
 // to `out` (two doublewords, each loaded then stored).
-void TableVector(uint8_t* base, uint32_t out, uint32_t index, uint32_t sub);
+void TableVector(uint32_t out, uint32_t index, uint32_t sub);
 // sub_820D3600: 1 for 1, 26, 28, 33 and 36, else 0.
 uint32_t IsBlockSetA(int32_t value);
 // sub_820D3638: 1 for 10 and 37, else 0.
@@ -42,7 +42,7 @@ uint64_t RecordAt(uint64_t index);
 // then out's upper 3x3 = m's transposed (each word through lfs and stfs).
 // False, with only the frame written, where c_runtime::Memcpy refuses the
 // copy (the original runs there).
-bool TransposeRotation(uint8_t* base, uint32_t out, uint32_t m, uint32_t sp);
+bool TransposeRotation(uint32_t out, uint32_t m, uint32_t sp);
 
 // --- The passes over a part model's materials (passes.cpp) ---
 //
@@ -52,20 +52,20 @@ bool TransposeRotation(uint8_t* base, uint32_t out, uint32_t m, uint32_t sp);
 
 // PartModel::SetTexture (sub_820D17D8): +144 = 0 and +176 = `texture` on
 // every material of `shape`, or of every shape for -1.
-uint32_t SetTexture(uint8_t* base, uint32_t model, uint32_t texture, int32_t shape, uint32_t sp);
+uint32_t SetTexture(uint32_t model, uint32_t texture, int32_t shape, uint32_t sp);
 // PartModel::FlipCulling (sub_820D1950): +344 2 becomes 6 and 6 becomes 2,
 // on every shape.
-uint32_t FlipCulling(uint8_t* base, uint32_t model, uint32_t sp);
+uint32_t FlipCulling(uint32_t model, uint32_t sp);
 // PartModel::ScaleBlended (sub_820D1A68): group 1 of `shape`: +0 to +8
 // times `factor` where +0 is below 1.1, then +12 = 1.0 and +108 = 2.
-uint32_t ScaleBlended(uint8_t* base, uint32_t model, uint32_t shape, double factor, uint32_t sp);
+uint32_t ScaleBlended(uint32_t model, uint32_t shape, double factor, uint32_t sp);
 // PartModel::SetPair1002Alpha (sub_820D1B38): +12 = `alpha` on the
 // materials of `shape` whose +392 is 1002.
-uint32_t SetPair1002Alpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha,
+uint32_t SetPair1002Alpha(uint32_t model, uint32_t shape, double alpha,
                           uint32_t sp);
 // PartModel::SetAlpha (sub_820D1C00): +12 = `alpha` on every material of
 // `shape`.
-uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, uint32_t sp);
+uint32_t SetAlpha(uint32_t model, uint32_t shape, double alpha, uint32_t sp);
 
 // --- The paint passes (paint.cpp) ---
 //
@@ -82,17 +82,17 @@ uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, u
 // shape: +64 = (1, 1, 1, 1); category 1 or pair 1000 or 1001: +0 = (1, 1,
 // 1, 1), +64 = A, +32 = C; category 2 or pair 1004: the same with B. Frame
 // 320 bytes, its temporaries written as the original's.
-uint32_t SetPaint(uint8_t* base, uint32_t model, const uint64_t regs[6], uint32_t sp);
+uint32_t SetPaint(uint32_t model, const uint64_t regs[6], uint32_t sp);
 // PartModel::SetPaintBody (sub_820D1378): as SetPaint without the first
 // +64 = (1, 1, 1, 1): category 1 or pair 1000: +0 = A, +64 = (1, 1, 1, 1),
 // +32 = C; category 2: +0 = B, the rest the same. Frame 288 bytes.
-uint32_t SetPaintBody(uint8_t* base, uint32_t model, const uint64_t regs[6], uint32_t sp);
+uint32_t SetPaintBody(uint32_t model, const uint64_t regs[6], uint32_t sp);
 // PartModel::ApplyPalette (sub_820D2EA8): each material's colors from the
 // paint palette (0x826C5110) by its category (1-10: entry k) and its shared
 // pair (1000 + j: entry 11 + j, with entry j's third color; in group 0 +16
 // to +28 not written), through Color::HsvToRgb into its frame's +80, +96
 // and +112. Frame 224 bytes.
-uint32_t ApplyPalette(uint8_t* base, uint32_t model, uint32_t sp);
+uint32_t ApplyPalette(uint32_t model, uint32_t sp);
 
 // --- The paint palette (palette.cpp) ---
 
@@ -103,16 +103,16 @@ uint32_t ApplyPalette(uint8_t* base, uint32_t model, uint32_t sp);
 // scene's +4 isn't zero. Its frame (sp - 1184, only it reads it) left out
 // since E5 step 6 (`sp` unused). r3 as the original leaves it, or nullopt
 // (r3 untouched) when there's no scene.
-std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> PaintPaletteInit(uint32_t sp);
 
 // --- A part model's materials' fields by a mask (set_materials.cpp) ---
 
 // Model::MaterialTotal (sub_82594AC0): the shape's material block's +0 (the
 // count of both groups).
-uint32_t MaterialTotal(uint8_t* base, uint32_t model, uint64_t shape);
+uint32_t MaterialTotal(uint32_t model, uint64_t shape);
 // Model::MaterialAt (sub_82594B00): the block + 16 + 512 x index, as the
 // original's 64-bit sum.
-uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t index);
+uint64_t MaterialAt(uint32_t model, uint64_t shape, uint64_t index);
 // PartModel::SetMaterialFields (sub_820D3250): the fields the six flags
 // pick (the high and low words of args 0 to 2, r3 to r5 as the original
 // homes them in its caller's frame) copied into `material`: +0 the first
@@ -120,7 +120,7 @@ uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t inde
 // the first doubleword of `copied`, the 24 bytes SetMaterials copies), +80
 // to +88 the three floats (`copied`'s words 2 to 4). The caller's frame the
 // original reads (+16 to +116) is values since E5 step 6.
-void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
+void SetMaterialFields(uint32_t material, const uint64_t args[8],
                        const uint32_t copied[6]);
 // PartModel::SetMaterials (sub_820D3318): `regs` = r4 to r10 (the flags'
 // three registers and the first two float4s); the rest from the caller's
@@ -131,7 +131,7 @@ void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
 // into its frame, left out since E5 step 6) and SetMaterialFields. Always
 // true (it was false where c_runtime::Memcpy refused the copy); `r3` set to
 // r3 as the original leaves it when a call changed it.
-bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
+bool SetMaterials(uint32_t model, const uint64_t regs[7], uint32_t sp,
                   std::optional<uint64_t>* r3);
 
 // --- A projector's matrices (projector.cpp) ---
@@ -142,7 +142,7 @@ bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_
 // copied to +144, the rows over it), translated by `position`
 // (car_physics::MatrixMultiplyTranslation, its frame below) and inverted
 // into `out` (matrix_math::Inverse).
-void LookAt(uint8_t* base, uint32_t out, uint32_t position, uint32_t direction, uint32_t up,
+void LookAt(uint32_t out, uint32_t position, uint32_t direction, uint32_t up,
             uint32_t sp);
 struct ProjectorArgs {
   uint32_t object;  // r3: +16 the world matrix W, +464 a direction
@@ -157,6 +157,6 @@ struct ProjectorArgs {
 // 1, the matrices written); its frame (sp - 544) as the original leaves it.
 // nullopt where c_runtime::Memcpy refuses the last copy (the original runs
 // there).
-std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& args, uint32_t sp);
+std::optional<uint32_t> ProjectorMatrices(const ProjectorArgs& args, uint32_t sp);
 
 }  // namespace material_passes

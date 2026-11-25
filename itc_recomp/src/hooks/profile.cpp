@@ -17,11 +17,11 @@ constexpr uint32_t kErrorIoPending = 997;
 // The answer without an overlapped, or ERROR_IO_PENDING with the answer
 // completed in it as the SDK did: its result, length (0, or -1 for an error)
 // and extended error. The game's has no event or completion routine.
-uint32_t Answer(uint8_t* base, uint32_t overlapped, uint32_t result) {
+uint32_t Answer(uint32_t overlapped, uint32_t result) {
   if (!overlapped) {
     return result;
   }
-  const schema::SysXOverlapped answer(base, overlapped);
+  const schema::SysXOverlapped answer(overlapped);
   answer.set_result(result);
   answer.set_length(result ? 0xFFFFFFFF : 0);
   answer.set_extended_error(result);
@@ -38,25 +38,25 @@ ITC_NATIVE_ENTRY_ALWAYS(82576E78) {
   
   const uint32_t user_index = ctx.r4.u32, size_address = ctx.r7.u32, buffer = ctx.r8.u32;
   const uint32_t overlapped = ctx.r9.u32;
-  const uint32_t size = guest::LoadU32(base, size_address);
+  const uint32_t size = guest::LoadU32(size_address);
   if (!buffer || size < user::kProfileBytes) {
     if (!size) {
-      guest::StoreU32(base, size_address, user::kProfileBytes);
+      guest::StoreU32(size_address, user::kProfileBytes);
     }
     ctx.r3.u64 = kErrorInsufficientBuffer;
     return;
   }
   if (user_index) {
-    ctx.r3.u64 = Answer(base, overlapped, user::kErrorNoSuchUser);
+    ctx.r3.u64 = Answer(overlapped, user::kErrorNoSuchUser);
     return;
   }
   std::vector<uint8_t> bytes(user::kProfileBytes);
   for (uint32_t i = 0; i < user::kProfileBytes; i++) {
-    bytes[i] = guest::LoadU8(base, buffer + i);
+    bytes[i] = guest::LoadU8(buffer + i);
   }
   user::ProfileSettings(user_index, buffer, bytes);
   for (uint32_t i = 0; i < user::kProfileBytes; i++) {
-    guest::StoreU8(base, buffer + i, bytes[i]);
+    guest::StoreU8(buffer + i, bytes[i]);
   }
-  ctx.r3.u64 = Answer(base, overlapped, 0);
+  ctx.r3.u64 = Answer(overlapped, 0);
 }

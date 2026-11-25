@@ -21,6 +21,6 @@ constexpr uint32_t kInitFrame = 3600;
 // (StateMachine::Add), built in the original's stack frame at `frame` (its
 // r1 less kInitFrame: see race_flow_init.cpp). Returns the last
 // StateMachine::Add's answer (`replaced` as its).
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced);
 
 }  // namespace race_flow

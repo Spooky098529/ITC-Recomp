@@ -23,20 +23,20 @@ namespace graphics::inline_draws {
 // BeginVertices (sub_825BD8F0): `count` vertices of `stride` bytes. Returns
 // the space reserved for them (16-byte aligned, in the command buffer's
 // data space), or 0 when none is left.
-uint32_t BeginVertices(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t device, uint32_t count,
+uint32_t BeginVertices(uint32_t sp, uint64_t r13, uint32_t device, uint32_t count,
                        uint32_t stride);
 
 // EndVertices (sub_825BDDA0): the write position +40 set to where Begin
 // left it (+13092). Its tail call to the empty sub_82106540 (without a
 // recording command buffer, +10808 bit 0x80) does nothing and is left out.
-void EndVertices(uint8_t* base, uint32_t device);
+void EndVertices(uint32_t device);
 
 // BeginIndexedVertices (sub_825BDDC0): `vertex_count` vertices of `stride`
 // bytes and `index_count` indices (32-bit with `format` bit 0x4, else
 // 16-bit). The index space goes to [index_out], the vertex space to the
 // word at sp + 84 points to. Returns 0, or 0x8007000E (both 0) when either
 // can't be reserved.
-uint32_t BeginIndexedVertices(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t device,
+uint32_t BeginIndexedVertices(uint32_t sp, uint64_t r13, uint32_t device,
                               uint32_t vertex_count, uint32_t index_count, uint32_t format,
                               uint32_t stride, uint32_t index_out);
 
@@ -44,7 +44,7 @@ uint32_t BeginIndexedVertices(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t
 // `type`, cut into draws of at most 65,535 vertices (the type's pair at
 // 0x82000950) as the original's packets are. r3 not kept (its callers
 // don't read it).
-void DrawVertices(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t device, uint32_t type,
+void DrawVertices(uint32_t sp, uint64_t r13, uint32_t device, uint32_t type,
                   uint32_t start, uint32_t count);
 
 }  // namespace graphics::inline_draws

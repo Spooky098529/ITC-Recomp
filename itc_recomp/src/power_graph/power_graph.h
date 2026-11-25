@@ -70,15 +70,15 @@ struct LineCalls {
 // would print a message (a chunk open on any list, no room for the 12
 // slots) or Primitive::RecordTransform's list isn't this one: the original
 // then runs (its getters and stores the same again).
-bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key, uint32_t frame,
+bool LineRecordFlat(uint32_t sprite, uint32_t pass, uint32_t key, uint32_t frame,
                     const LineCalls& calls);
 
 // The segment count PowerGraph::Draw records: fctiwz of car data +1280 ×
 // 0.0025 + 1.0 (one fused multiply-add, rounded to single).
-int32_t SegmentCount(uint8_t* base, uint32_t car);
+int32_t SegmentCount(uint32_t car);
 // Whether PowerGraph::Draw can run natively: its count is 32 or less (past
 // 32 the original's lines read its saved registers and its caller's frame).
-bool DrawReady(uint8_t* base, uint32_t car);
+bool DrawReady(uint32_t car);
 
 // sub_8217C708 PowerGraph::Draw: f1 = `x` (the graph's left), f2 = `y`
 // (its baseline), r6 = `car` (a car data), its frame at `frame`. The two
@@ -93,7 +93,7 @@ bool DrawReady(uint8_t* base, uint32_t car);
 // `calls` where it declines); the sprites' empty destructors (the power
 // set, then the torque set, 31 to 0). The frame's +80 to +103 left as the
 // original's conversions leave them. Only after DrawReady.
-void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
+void Draw(uint32_t frame, double x, double y, uint32_t car,
           const LineCalls& calls);
 
 // TuningScreen::DrawPowerGraph's frame (its r1 less this, below its
@@ -118,10 +118,10 @@ struct TuningDraw {
 // (Find's answer, or the movie after AnimationTime), and `movie` (the
 // original's r30 at the draw: PowerGraph::Draw saves it in its frame, where
 // a segment count above 32 reads it back).
-bool TuningScreenShowsGraph(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* r3,
+bool TuningScreenShowsGraph(uint32_t screen, uint32_t frame, uint32_t* r3,
                             uint32_t* movie);
 // The draw's arguments for `screen`.
-TuningDraw TuningScreenDraw(uint8_t* base, uint32_t screen);
+TuningDraw TuningScreenDraw(uint32_t screen);
 
 // CarList::DrawEntryPowerGraph's frame (its r1 less this, below its
 // caller's), where its car object (+1936) and car data (+80) live.
@@ -140,12 +140,12 @@ constexpr uint32_t kEntryR31 = 0x826E0000;
 // from the car), each callee's frame below `frame` as the original's (the
 // car makers' callees through `calls` where their plain C++ declines);
 // true: PowerGraph::Draw is then called with CarListEntryDraw's arguments.
-bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t entry,
+bool CarListEntrySetUp(const front_end_car_draw::Calls& calls, uint32_t entry,
                        uint32_t frame);
 // The draw's arguments: r3 = the front end's car holder's first word
 // ([[0x826D83E0]]), f1 = 1042.0 (0x8200AD98), f2 = 500.0 (0x82001FC0), r6 =
 // the car data at `frame` + 80.
-TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame);
+TuningDraw CarListEntryDraw(uint32_t frame);
 
 // CarList::DrawCarPowerGraph's frame (its r1 less this, below its caller's),
 // its car data at +80 (as the entry's: CarListEntryDraw gives the draw's
@@ -160,7 +160,7 @@ constexpr uint32_t kCarDrawReturn = 0x82250764;
 // as the original's (FromGarageCar's callees through `calls` where their
 // plain C++ declines); true: PowerGraph::Draw is then called with
 // CarListEntryDraw's arguments.
-bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
+bool CarListCarSetUp(const front_end_car_draw::Calls& calls, uint32_t car,
                      uint32_t frame);
 
 // A guest call PowerGraph::SetFromCar makes where a callee's plain C++
@@ -186,7 +186,7 @@ constexpr uint32_t kSetFromCarFrame = 6960;
 // +44, +48 = fctiwz(curve +1056, +1060); +52 = curve +1048 x [0x82009EC0];
 // +56 = fctiwz(curve +1052). Returns the curve's address (+80: r3 as
 // ShiftPeak leaves it).
-uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
+uint32_t SetFromCar(uint32_t car, uint32_t tab, uint32_t sp,
                     const SetFromCarCall& call);
 
 }  // namespace power_graph

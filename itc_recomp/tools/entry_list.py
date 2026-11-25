@@ -56,7 +56,7 @@ def main(argv):
         "namespace lifted::entry {",
         "",
     ]
-    lines += [f"Result e{a}(uint8_t* base, const Args& args);" for a in addresses]
+    lines += [f"Result e{a}(const Args& args);" for a in addresses]
     lines += ["", "}  // namespace lifted::entry", ""]
     with open(HEADER, "w") as f:
         f.write("\n".join(lines))

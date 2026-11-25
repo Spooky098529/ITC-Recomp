@@ -29,8 +29,8 @@ constexpr uint32_t kStartFirstRace = 0x82180CE8;
 
 // The page object to `page` through `transition`: +8 the old page unless
 // it's `page` already, +12, +16 -1, +4, +0 -1.
-void Through(uint8_t* base, uint32_t transition, uint32_t page) {
-  const auto pages = G::pages(base);
+void Through(uint32_t transition, uint32_t page) {
+  const auto pages = G::pages();
   const uint32_t old = pages.page();
   if (old != page) {
     pages.set_previous_page(old);
@@ -43,29 +43,29 @@ void Through(uint8_t* base, uint32_t transition, uint32_t page) {
 
 // The title's +4 from the list's selection: the selection first, then the
 // title's pointer, as the original.
-void SetMainItem(uint8_t* base) {
-  const uint32_t selection = race_screens::ListSelection(base, ListAddress(base));
-  Words(base).set_main_item(selection);
+void SetMainItem() {
+  const uint32_t selection = race_screens::ListSelection(ListAddress());
+  Words().set_main_item(selection);
 }
 
 }  // namespace
 
-uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
+uint64_t MainMenu(uint32_t mode, uint32_t sp, const Calls& calls,
                   bool multiplayer_items) {
   ITC_NATIVE_RUNNING("sub_82222700 TitleScreen::MainMenu");
-  const uint32_t frame = Frame(base, sp, 144);
-  calls.Call(kListUpdate, frame, 0x822227C4, ListAddress(base));
-  const schema::MenuList list = MenuListOf(base);
+  const uint32_t frame = Frame(sp, 144);
+  calls.Call(kListUpdate, frame, 0x822227C4, ListAddress());
+  const schema::MenuList list = MenuListOf();
   uint32_t sound = 0;
   if (list.move() != 0) {
-    Through(base, 7, 2);
+    Through(7, 2);
     sound = 4;
   } else {
     const uint64_t accepted = calls.Call(kListAccepted, frame, 0x82222814, list.address);
     if (uint32_t(accepted) == 0) {
       return accepted;
     }
-    const uint32_t s = race_screens::ListSelection(base, ListAddress(base));
+    const uint32_t s = race_screens::ListSelection(ListAddress());
     if (s >= 7) {
       return s;
     }
@@ -80,18 +80,18 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
     }
     switch (s) {
       case 0:
-        Through(base, 11, 3);
-        G::pages(base).set_queued_step(12);
-        SetMainItem(base);
+        Through(11, 3);
+        G::pages().set_queued_step(12);
+        SetMainItem();
         break;
       case 3:
       case 6:
-        Through(base, 8, 5);
-        SetMainItem(base);
+        Through(8, 5);
+        SetMainItem();
         break;
       case 4: {
-        SetMainItem(base);
-        const auto pages = G::pages(base);
+        SetMainItem();
+        const auto pages = G::pages();
         const uint32_t old = pages.page();
         if (old != kNone) {
           pages.set_previous_page(old);
@@ -99,7 +99,7 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
         pages.set_page(kNone);
         pages.set_step(kNone);
         pages.set_queued_step(kNone);
-        Post(base, mode, 15);
+        Post(mode, 15);
         break;
       }
       case 5:
@@ -114,51 +114,51 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
         break;
     }
     if (leave) {
-      SetMainItem(base);
-      Through(base, 8, 5);
+      SetMainItem();
+      Through(8, 5);
     }
   }
   return calls.Call(kMenuSoundPlay, frame, 0x822229C8, sound);
 }
 
-uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t CareerMenu(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82221AC0 TitleScreen::CareerMenu");
-  const uint32_t frame = Frame(base, sp, 128);
-  calls.Call(kListUpdate, frame, 0x82221B58, ListAddress(base));
-  const schema::MenuList list = MenuListOf(base);
+  const uint32_t frame = Frame(sp, 128);
+  calls.Call(kListUpdate, frame, 0x82221B58, ListAddress());
+  const schema::MenuList list = MenuListOf();
   uint32_t sound = 0;
   if (list.move() != 0) {
-    Through(base, 13, 3);
+    Through(13, 3);
     sound = 4;
   } else if (uint32_t(calls.Call(kListAccepted, frame, 0x82221B94, list.address)) == 0) {
-    const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82221CA0, ListAddress(base));
+    const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82221CA0, ListAddress());
     if (uint32_t(cancelled) == 0) {
       return cancelled;
     }
-    Through(base, 14, 2);
+    Through(14, 2);
     sound = 2;
   } else {
-    const uint32_t s = race_screens::ListSelection(base, ListAddress(base));
+    const uint32_t s = race_screens::ListSelection(ListAddress());
     if (s >= 3) {
       return s;
     }
-    if (s != 0 && Words(base).can_continue() == 0) {
+    if (s != 0 && Words().can_continue() == 0) {
       sound = 3;
     } else if (s == 0) {
-      const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+      const uint32_t save = vehicle_accessors::SaveDataOf(0);
       calls.Call(kProgressClear, frame, 0x82221C90, save);
       calls.Call(kProgressSetDefaults, frame, 0x82221C98, save);
-      Through(base, 8, 5);
+      Through(8, 5);
     } else if (s == 1) {
-      const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+      const uint32_t save = vehicle_accessors::SaveDataOf(0);
       calls.Call(kPlayTimeMark, frame, 0x82221C58, save);
-      Through(base, 8, 5);
+      Through(8, 5);
     } else {
-      const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+      const uint32_t save = vehicle_accessors::SaveDataOf(0);
       calls.Call(kProgressRestart, frame, 0x82221BDC, save);
       calls.Call(kCareerPickFromCar, frame, 0x82221BE4, save);
       calls.Call(kCareerNextDay, frame, 0x82221BEC, save);
-      Through(base, 8, 5);
+      Through(8, 5);
       // StartFirstRace reads no argument: r3 MenuSound::Play's, as the
       // original leaves it.
       const uint64_t played = calls.Call(kMenuSoundPlay, frame, 0x82221C28, 0);
@@ -168,20 +168,20 @@ uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   return calls.Call(kMenuSoundPlay, frame, 0x82221CE4, sound);
 }
 
-uint64_t Menu4(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t Menu4(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82222378 TitleScreen::Menu4");
-  const uint32_t frame = Frame(base, sp, 112);
-  calls.Call(kMenuStep, frame, 0x82222400, G::menu(base).address);
-  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8222240C, G::menu(base).address, 159);
+  const uint32_t frame = Frame(sp, 112);
+  calls.Call(kMenuStep, frame, 0x82222400, G::menu().address);
+  uint64_t r3 = calls.Call(kMenuPressed, frame, 0x8222240C, G::menu().address, 159);
   if (uint32_t(r3) != 0) {
-    Through(base, 8, 5);
+    Through(8, 5);
     return r3;
   }
-  r3 = calls.Call(kMenuPressed, frame, 0x82222444, G::menu(base).address, 158);
+  r3 = calls.Call(kMenuPressed, frame, 0x82222444, G::menu().address, 158);
   if (uint32_t(r3) != 0) {
-    Through(base, 16, 2);
-  } else if (G::menu(base).moved() != 0) {
-    Through(base, 17, 4);
+    Through(16, 2);
+  } else if (G::menu().moved() != 0) {
+    Through(17, 4);
   }
   return r3;
 }

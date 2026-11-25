@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_lifted_026, true, "ITC",
 namespace lifted {
 
 // sub_825D97A0: lifted from generated/ by lift.py.
-lifted::Result f825D97A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D97A0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D97A0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -38,12 +38,12 @@ lifted::Result f825D97A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20624
   r3 = uint64_t(int64_t(int64_t(r11) + -20624));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D97B0: lifted from generated/ by lift.py.
-lifted::Result f825D97B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D97B0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D97B0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -52,12 +52,12 @@ lifted::Result f825D97B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20616
   r3 = uint64_t(int64_t(int64_t(r11) + -20616));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D97C0: lifted from generated/ by lift.py.
-void f825D97C0(uint8_t* base) {
+void f825D97C0() {
   ITC_NATIVE_RUNNING("sub_825D97C0 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -66,14 +66,14 @@ void f825D97C0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28252(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28252);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 28252);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31476(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31476);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31476);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -81,13 +81,13 @@ void f825D97C0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23856(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23856, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23856, temp.u32);
   // blr
   return;
 }
 
 // sub_825D97E8: lifted from generated/ by lift.py.
-void f825D97E8(uint8_t* base) {
+void f825D97E8() {
   ITC_NATIVE_RUNNING("sub_825D97E8 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -96,14 +96,14 @@ void f825D97E8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28464(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28464);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 28464);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31464(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31464);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31464);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -111,13 +111,13 @@ void f825D97E8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23888(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23888, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23888, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9810: lifted from generated/ by lift.py.
-void f825D9810(uint8_t* base) {
+void f825D9810() {
   ITC_NATIVE_RUNNING("sub_825D9810 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lis r11,-32159
@@ -127,15 +127,15 @@ void f825D9810(uint8_t* base) {
   // addi r11,r11,28496
   r11 = uint64_t(int64_t(int64_t(r11) + 28496));
   // stw r10,164(r11)
-  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 164, uint32_t(r10));
   // stw r10,168(r11)
-  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 168, uint32_t(r10));
   // blr
   return;
 }
 
 // sub_825D9828: lifted from generated/ by lift.py.
-void f825D9828(uint8_t* base) {
+void f825D9828() {
   ITC_NATIVE_RUNNING("sub_825D9828 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lis r11,-32159
@@ -145,15 +145,15 @@ void f825D9828(uint8_t* base) {
   // addi r11,r11,28672
   r11 = uint64_t(int64_t(int64_t(r11) + 28672));
   // stw r10,164(r11)
-  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 164, uint32_t(r10));
   // stw r10,168(r11)
-  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 168, uint32_t(r10));
   // blr
   return;
 }
 
 // sub_825D9840: lifted from generated/ by lift.py.
-lifted::Result f825D9840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9840(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9840 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -162,12 +162,12 @@ lifted::Result f825D9840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20608
   r3 = uint64_t(int64_t(int64_t(r11) + -20608));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9850: lifted from generated/ by lift.py.
-lifted::Result f825D9850(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9850(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9850 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -176,12 +176,12 @@ lifted::Result f825D9850(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20600
   r3 = uint64_t(int64_t(int64_t(r11) + -20600));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9860: lifted from generated/ by lift.py.
-void f825D9860(uint8_t* base) {
+void f825D9860() {
   ITC_NATIVE_RUNNING("sub_825D9860 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -190,14 +190,14 @@ void f825D9860(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28856(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28856);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 28856);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31412(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31412);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31412);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -205,13 +205,13 @@ void f825D9860(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23892(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23892, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23892, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9888: lifted from generated/ by lift.py.
-void f825D9888(uint8_t* base) {
+void f825D9888() {
   ITC_NATIVE_RUNNING("sub_825D9888 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -220,14 +220,14 @@ void f825D9888(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28940(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28940);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 28940);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31164(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31164);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31164);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -235,13 +235,13 @@ void f825D9888(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23896(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23896, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23896, temp.u32);
   // blr
   return;
 }
 
 // sub_825D98B0: lifted from generated/ by lift.py.
-void f825D98B0(uint8_t* base) {
+void f825D98B0() {
   ITC_NATIVE_RUNNING("sub_825D98B0 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -250,14 +250,14 @@ void f825D98B0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28960(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28960);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 28960);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31048(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31048);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31048);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -265,13 +265,13 @@ void f825D98B0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23908(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23908, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23908, temp.u32);
   // blr
   return;
 }
 
 // sub_825D98D8: lifted from generated/ by lift.py.
-void f825D98D8(uint8_t* base) {
+void f825D98D8() {
   ITC_NATIVE_RUNNING("sub_825D98D8 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -280,14 +280,14 @@ void f825D98D8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29064(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29064);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 29064);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31004(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31004);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -31004);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -295,13 +295,13 @@ void f825D98D8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23912(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23912, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23912, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9900: lifted from generated/ by lift.py.
-void f825D9900(uint8_t* base) {
+void f825D9900() {
   ITC_NATIVE_RUNNING("sub_825D9900 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -310,14 +310,14 @@ void f825D9900(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29080(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29080);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 29080);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30952(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30952);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -30952);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -325,13 +325,13 @@ void f825D9900(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23916(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23916, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23916, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9928: lifted from generated/ by lift.py.
-void f825D9928(uint8_t* base) {
+void f825D9928() {
   ITC_NATIVE_RUNNING("sub_825D9928 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -340,14 +340,14 @@ void f825D9928(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29096(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29096);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 29096);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30908(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30908);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -30908);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -355,13 +355,13 @@ void f825D9928(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23920(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23920, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23920, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9950: lifted from generated/ by lift.py.
-void f825D9950(uint8_t* base) {
+void f825D9950() {
   ITC_NATIVE_RUNNING("sub_825D9950 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -370,14 +370,14 @@ void f825D9950(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29112(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29112);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 29112);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30860(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30860);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -30860);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -385,13 +385,13 @@ void f825D9950(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23924(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23924, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23924, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9978: lifted from generated/ by lift.py.
-void f825D9978(uint8_t* base) {
+void f825D9978() {
   ITC_NATIVE_RUNNING("sub_825D9978 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -400,14 +400,14 @@ void f825D9978(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29128(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29128);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 29128);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30808(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30808);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -30808);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -415,13 +415,13 @@ void f825D9978(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23928(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 23928, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 23928, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9A10: lifted from generated/ by lift.py.
-lifted::Result f825D9A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A10(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A10 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -430,12 +430,12 @@ lifted::Result f825D9A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20592
   r3 = uint64_t(int64_t(int64_t(r11) + -20592));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A20: lifted from generated/ by lift.py.
-lifted::Result f825D9A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A20(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A20 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -444,12 +444,12 @@ lifted::Result f825D9A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20584
   r3 = uint64_t(int64_t(int64_t(r11) + -20584));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A30: lifted from generated/ by lift.py.
-lifted::Result f825D9A30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A30(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A30 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -458,12 +458,12 @@ lifted::Result f825D9A30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20576
   r3 = uint64_t(int64_t(int64_t(r11) + -20576));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A40: lifted from generated/ by lift.py.
-lifted::Result f825D9A40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A40(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A40 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -472,12 +472,12 @@ lifted::Result f825D9A40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20568
   r3 = uint64_t(int64_t(int64_t(r11) + -20568));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A50: lifted from generated/ by lift.py.
-lifted::Result f825D9A50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A50(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A50 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -486,12 +486,12 @@ lifted::Result f825D9A50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20560
   r3 = uint64_t(int64_t(int64_t(r11) + -20560));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A60: lifted from generated/ by lift.py.
-lifted::Result f825D9A60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A60(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A60 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -500,12 +500,12 @@ lifted::Result f825D9A60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20552
   r3 = uint64_t(int64_t(int64_t(r11) + -20552));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A70: lifted from generated/ by lift.py.
-lifted::Result f825D9A70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A70(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A70 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -514,12 +514,12 @@ lifted::Result f825D9A70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20544
   r3 = uint64_t(int64_t(int64_t(r11) + -20544));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A80: lifted from generated/ by lift.py.
-lifted::Result f825D9A80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A80(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A80 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -528,12 +528,12 @@ lifted::Result f825D9A80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20536
   r3 = uint64_t(int64_t(int64_t(r11) + -20536));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9A90: lifted from generated/ by lift.py.
-lifted::Result f825D9A90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9A90(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9A90 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -542,12 +542,12 @@ lifted::Result f825D9A90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20528
   r3 = uint64_t(int64_t(int64_t(r11) + -20528));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AA0: lifted from generated/ by lift.py.
-lifted::Result f825D9AA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AA0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AA0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -556,12 +556,12 @@ lifted::Result f825D9AA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20520
   r3 = uint64_t(int64_t(int64_t(r11) + -20520));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AB0: lifted from generated/ by lift.py.
-lifted::Result f825D9AB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AB0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AB0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -570,12 +570,12 @@ lifted::Result f825D9AB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20512
   r3 = uint64_t(int64_t(int64_t(r11) + -20512));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AC0: lifted from generated/ by lift.py.
-lifted::Result f825D9AC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AC0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AC0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -584,12 +584,12 @@ lifted::Result f825D9AC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20504
   r3 = uint64_t(int64_t(int64_t(r11) + -20504));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AD0: lifted from generated/ by lift.py.
-lifted::Result f825D9AD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AD0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AD0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -598,12 +598,12 @@ lifted::Result f825D9AD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20496
   r3 = uint64_t(int64_t(int64_t(r11) + -20496));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AE0: lifted from generated/ by lift.py.
-lifted::Result f825D9AE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AE0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AE0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -612,12 +612,12 @@ lifted::Result f825D9AE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20488
   r3 = uint64_t(int64_t(int64_t(r11) + -20488));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9AF0: lifted from generated/ by lift.py.
-lifted::Result f825D9AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9AF0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9AF0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -626,12 +626,12 @@ lifted::Result f825D9AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20480
   r3 = uint64_t(int64_t(int64_t(r11) + -20480));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B00: lifted from generated/ by lift.py.
-lifted::Result f825D9B00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B00(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B00 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -640,12 +640,12 @@ lifted::Result f825D9B00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20472
   r3 = uint64_t(int64_t(int64_t(r11) + -20472));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B10: lifted from generated/ by lift.py.
-lifted::Result f825D9B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B10(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B10 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -654,12 +654,12 @@ lifted::Result f825D9B10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20464
   r3 = uint64_t(int64_t(int64_t(r11) + -20464));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B20: lifted from generated/ by lift.py.
-lifted::Result f825D9B20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B20(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B20 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -668,12 +668,12 @@ lifted::Result f825D9B20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20456
   r3 = uint64_t(int64_t(int64_t(r11) + -20456));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B30: lifted from generated/ by lift.py.
-lifted::Result f825D9B30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B30(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B30 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -682,12 +682,12 @@ lifted::Result f825D9B30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20448
   r3 = uint64_t(int64_t(int64_t(r11) + -20448));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B40: lifted from generated/ by lift.py.
-lifted::Result f825D9B40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B40(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B40 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -696,12 +696,12 @@ lifted::Result f825D9B40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20440
   r3 = uint64_t(int64_t(int64_t(r11) + -20440));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B50: lifted from generated/ by lift.py.
-lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825D9B50(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825D9B50 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -709,10 +709,10 @@ lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -720,18 +720,18 @@ lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 30752));
   // bl 0x8214e608
   // (left out: dead in C++)
-  r3 = f8214E608(base, r1, r13, r3);
+  r3 = f8214E608(r1, r13, r3);
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-20432
   r3 = uint64_t(int64_t(int64_t(r11) + -20432));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825D9B74, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825D9B74, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -739,7 +739,7 @@ lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825D9B88: lifted from generated/ by lift.py.
-lifted::Result f825D9B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9B88(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9B88 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -748,12 +748,12 @@ lifted::Result f825D9B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20400
   r3 = uint64_t(int64_t(int64_t(r11) + -20400));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9B98: lifted from generated/ by lift.py.
-lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825D9B98(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825D9B98 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -761,10 +761,10 @@ lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -772,18 +772,18 @@ lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 29856));
   // bl 0x8214f660
   // (left out: dead in C++)
-  game::NetworkManager::Ctor(base, r3);
+  game::NetworkManager::Ctor(r3);
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-20416
   r3 = uint64_t(int64_t(int64_t(r11) + -20416));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825D9BBC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825D9BBC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -791,7 +791,7 @@ lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825D9BD0: lifted from generated/ by lift.py.
-lifted::Result f825D9BD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825D9BD0(uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825D9BD0 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -801,14 +801,14 @@ lifted::Result f825D9BD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  guest::StoreU64(base, uint32_t(r1) + -24, r30);
+  guest::StoreU64(uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  guest::StoreU64(base, uint32_t(r1) + -16, r31);
+  guest::StoreU64(uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -822,7 +822,7 @@ lifted::Result f825D9BD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r31;
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x825D9BFC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(LIFTED_ARGS(0x825D9BFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r30,3
   r30 = uint64_t(int64_t(3));
   // addi r31,r31,384
@@ -832,7 +832,7 @@ loc_825D9C04:
   r3 = r31;
   // bl 0x8214aa18
   // (left out: dead in C++)
-  { const lifted::Result o = f8214AA18(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f8214AA18(r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -847,23 +847,23 @@ loc_825D9C04:
   r3 = uint64_t(int64_t(int64_t(r11) + -20320));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825D9C24, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825D9C24, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
 
 // sub_825D9C58: lifted from generated/ by lift.py.
-lifted::Result f825D9C58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1, uint64_t lr) {
+lifted::Result f825D9C58(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9C58 (lifted)");
   uint64_t r3 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -881,13 +881,13 @@ lifted::Result f825D9C58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = r9;
 loc_825D9C6C:
   // stw r8,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r8));
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r8));
   // addic. r10,r10,-1
   ca = uint32_t(r10) > 0;
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r8,260(r11)
-  guest::StoreU32(base, uint32_t(r11) + 260, uint32_t(r8));
+  guest::StoreU32(uint32_t(r11) + 260, uint32_t(r8));
   // addi r11,r11,264
   r11 = uint64_t(int64_t(int64_t(r11) + 264));
   // bge 0x825d9c6c
@@ -903,14 +903,14 @@ loc_825D9C6C:
   // addi r3,r10,-20240
   r3 = uint64_t(int64_t(int64_t(r10) + -20240));
   // stwx r11,r9,r8
-  guest::StoreU32(base, uint32_t(r9) + uint32_t(r8), uint32_t(r11));
+  guest::StoreU32(uint32_t(r9) + uint32_t(r8), uint32_t(r11));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9CA0: lifted from generated/ by lift.py.
-void f825D9CA0(uint8_t* base) {
+void f825D9CA0() {
   ITC_NATIVE_RUNNING("sub_825D9CA0 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -919,14 +919,14 @@ void f825D9CA0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-29784(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -29784);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -29784);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27976(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27976);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27976);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -934,13 +934,13 @@ void f825D9CA0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32324(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32324, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32324, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9CC8: lifted from generated/ by lift.py.
-void f825D9CC8(uint8_t* base) {
+void f825D9CC8() {
   ITC_NATIVE_RUNNING("sub_825D9CC8 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -949,14 +949,14 @@ void f825D9CC8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-29260(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -29260);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -29260);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27916(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27916);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27916);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -964,13 +964,13 @@ void f825D9CC8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32048(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32048, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32048, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9CF0: lifted from generated/ by lift.py.
-lifted::Result f825D9CF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9CF0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9CF0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -979,12 +979,12 @@ lifted::Result f825D9CF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20136
   r3 = uint64_t(int64_t(int64_t(r11) + -20136));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9D00: lifted from generated/ by lift.py.
-void f825D9D00(uint8_t* base) {
+void f825D9D00() {
   ITC_NATIVE_RUNNING("sub_825D9D00 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -993,14 +993,14 @@ void f825D9D00(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27796(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27796);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27796);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27692(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27692);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27692);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1008,13 +1008,13 @@ void f825D9D00(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32040(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32040, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32040, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9D28: lifted from generated/ by lift.py.
-void f825D9D28(uint8_t* base) {
+void f825D9D28() {
   ITC_NATIVE_RUNNING("sub_825D9D28 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1023,14 +1023,14 @@ void f825D9D28(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27780(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27780);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27780);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26708(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26708);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26708);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1038,13 +1038,13 @@ void f825D9D28(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32036(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32036, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32036, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9D50: lifted from generated/ by lift.py.
-void f825D9D50(uint8_t* base) {
+void f825D9D50() {
   ITC_NATIVE_RUNNING("sub_825D9D50 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1053,14 +1053,14 @@ void f825D9D50(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27764(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27764);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27764);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26664(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26664);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26664);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1068,13 +1068,13 @@ void f825D9D50(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32032(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32032, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32032, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9D78: lifted from generated/ by lift.py.
-void f825D9D78(uint8_t* base) {
+void f825D9D78() {
   ITC_NATIVE_RUNNING("sub_825D9D78 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1083,14 +1083,14 @@ void f825D9D78(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27748(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27748);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27748);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26648(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26648);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26648);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1098,13 +1098,13 @@ void f825D9D78(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32028(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32028, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32028, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9DA0: lifted from generated/ by lift.py.
-void f825D9DA0(uint8_t* base) {
+void f825D9DA0() {
   ITC_NATIVE_RUNNING("sub_825D9DA0 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1113,14 +1113,14 @@ void f825D9DA0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27732(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27732);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27732);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26632(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26632);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26632);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1128,13 +1128,13 @@ void f825D9DA0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32020(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32020, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32020, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9DC8: lifted from generated/ by lift.py.
-void f825D9DC8(uint8_t* base) {
+void f825D9DC8() {
   ITC_NATIVE_RUNNING("sub_825D9DC8 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1143,14 +1143,14 @@ void f825D9DC8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27716(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27716);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27716);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26340(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26340);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26340);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1158,13 +1158,13 @@ void f825D9DC8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32016(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32016, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32016, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9DF0: lifted from generated/ by lift.py.
-void f825D9DF0(uint8_t* base) {
+void f825D9DF0() {
   ITC_NATIVE_RUNNING("sub_825D9DF0 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1173,14 +1173,14 @@ void f825D9DF0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27700(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27700);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27700);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26268(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26268);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26268);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1188,13 +1188,13 @@ void f825D9DF0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32008(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -32008, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -32008, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9E18: lifted from generated/ by lift.py.
-void f825D9E18(uint8_t* base) {
+void f825D9E18() {
   ITC_NATIVE_RUNNING("sub_825D9E18 (lifted)");
   uint64_t r11 = 0;
   double f0 = 0.0, f13 = 0.0;
@@ -1203,14 +1203,14 @@ void f825D9E18(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27628(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27628);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -27628);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26148(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26148);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + -26148);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1218,13 +1218,13 @@ void f825D9E18(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-31796(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + -31796, temp.u32);
+  guest::StoreU32(uint32_t(r11) + -31796, temp.u32);
   // blr
   return;
 }
 
 // sub_825D9E40: lifted from generated/ by lift.py.
-lifted::Result f825D9E40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9E40(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9E40 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1233,12 +1233,12 @@ lifted::Result f825D9E40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20128
   r3 = uint64_t(int64_t(int64_t(r11) + -20128));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9E50: lifted from generated/ by lift.py.
-lifted::Result f825D9E50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9E50(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9E50 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1247,12 +1247,12 @@ lifted::Result f825D9E50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20120
   r3 = uint64_t(int64_t(int64_t(r11) + -20120));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9EC0: lifted from generated/ by lift.py.
-lifted::Result f825D9EC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9EC0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9EC0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1261,12 +1261,12 @@ lifted::Result f825D9EC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20088
   r3 = uint64_t(int64_t(int64_t(r11) + -20088));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9ED0: lifted from generated/ by lift.py.
-lifted::Result f825D9ED0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9ED0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9ED0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1275,12 +1275,12 @@ lifted::Result f825D9ED0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20080
   r3 = uint64_t(int64_t(int64_t(r11) + -20080));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9EE0: lifted from generated/ by lift.py.
-lifted::Result f825D9EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9EE0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9EE0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1289,12 +1289,12 @@ lifted::Result f825D9EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20072
   r3 = uint64_t(int64_t(int64_t(r11) + -20072));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9F48: lifted from generated/ by lift.py.
-lifted::Result f825D9F48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9F48(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9F48 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1303,12 +1303,12 @@ lifted::Result f825D9F48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20064
   r3 = uint64_t(int64_t(int64_t(r11) + -20064));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9F58: lifted from generated/ by lift.py.
-lifted::Result f825D9F58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825D9F58(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9F58 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1317,12 +1317,12 @@ lifted::Result f825D9F58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-20056
   r3 = uint64_t(int64_t(int64_t(r11) + -20056));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825D9FC8: lifted from generated/ by lift.py.
-uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
+uint64_t f825D9FC8(uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825D9FC8 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1331,10 +1331,10 @@ uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-160(r1)
   ea = -160 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32107
   r11 = uint64_t(int64_t(-2104164352));
@@ -1352,68 +1352,68 @@ uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
   r4 = uint64_t(int64_t(int64_t(r1) + 128));
   // lfs f0,2612(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2612);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2612);
   f0 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // stfs f0,80(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 80, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 80, temp.u32);
   // stfs f0,84(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 84, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 84, temp.u32);
   // stfs f0,88(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 88, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 88, temp.u32);
   // stfs f0,96(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 96, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 96, temp.u32);
   // lfs f13,2608(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f13 = double(temp.f32);
   // stfs f13,92(r1)
   temp.f32 = float(f13);
-  guest::StoreU32(base, uint32_t(r1) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 92, temp.u32);
   // stfs f0,100(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 100, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 100, temp.u32);
   // stfs f13,104(r1)
   temp.f32 = float(f13);
-  guest::StoreU32(base, uint32_t(r1) + 104, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 104, temp.u32);
   // stfs f0,108(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 108, temp.u32);
   // stfs f0,112(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 112, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 112, temp.u32);
   // stfs f13,116(r1)
   temp.f32 = float(f13);
-  guest::StoreU32(base, uint32_t(r1) + 116, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 116, temp.u32);
   // stfs f0,120(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 120, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 120, temp.u32);
   // stfs f0,124(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 124, temp.u32);
   // stfs f13,128(r1)
   temp.f32 = float(f13);
-  guest::StoreU32(base, uint32_t(r1) + 128, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 128, temp.u32);
   // stfs f0,132(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 132, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 132, temp.u32);
   // stfs f0,136(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 136, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 136, temp.u32);
   // stfs f0,140(r1)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r1) + 140, temp.u32);
+  guest::StoreU32(uint32_t(r1) + 140, temp.u32);
   // bl 0x820bfbb8
   // (left out: dead in C++)
-  { const lifted::Result o = game::Matrix::FromRows(base, LIFTED_ARGS(0x825DA040, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Matrix::FromRows(LIFTED_ARGS(0x825DA040, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,160
   r1 = uint64_t(int64_t(int64_t(r1) + 160));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1421,7 +1421,7 @@ uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
 }
 
 // sub_825DA050: lifted from generated/ by lift.py.
-uint64_t f825DA050(uint8_t* base, uint64_t r1, uint64_t r13) {
+uint64_t f825DA050(uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DA050 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1429,12 +1429,12 @@ uint64_t f825DA050(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  guest::StoreU64(base, uint32_t(r1) + -16, r31);
+  guest::StoreU64(uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32156
   r11 = uint64_t(int64_t(-2107375616));
@@ -1444,25 +1444,25 @@ uint64_t f825DA050(uint8_t* base, uint64_t r1, uint64_t r13) {
   r3 = uint64_t(int64_t(int64_t(r31) + 48));
   // bl 0x822936e0
   // (left out: dead in C++)
-  { const lifted::Result o = game::Matrix::SetIdentity(base, LIFTED_ARGS(0x825DA070, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Matrix::SetIdentity(LIFTED_ARGS(0x825DA070, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,112(r31)
-  guest::StoreU32(base, uint32_t(r31) + 112, uint32_t(r11));
+  guest::StoreU32(uint32_t(r31) + 112, uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
   // blr
   return r3;
 }
 
 // sub_825DA090: lifted from generated/ by lift.py.
-uint64_t f825DA090(uint8_t* base, uint64_t r1, uint64_t r13) {
+uint64_t f825DA090(uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DA090 (lifted)");
   uint64_t r3 = 0, r4 = 0, r11 = 0;
   double f1 = 0.0;
@@ -1473,12 +1473,12 @@ uint64_t f825DA090(uint8_t* base, uint64_t r1, uint64_t r13) {
   // addi r3,r11,19924
   r3 = uint64_t(int64_t(int64_t(r11) + 19924));
   // b 0x82411640
-  r3 = f82411640(base, r1, r13, r3, r4);
+  r3 = f82411640(r1, r13, r3, r4);
   return r3;
 }
 
 // sub_825DA0B8: lifted from generated/ by lift.py.
-lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA0B8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA0B8 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1486,10 +1486,10 @@ lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32155
   r11 = uint64_t(int64_t(-2107310080));
@@ -1499,18 +1499,18 @@ lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(base, LIFTED_ARGS(0x825DA0D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(LIFTED_ARGS(0x825DA0D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-20024
   r3 = uint64_t(int64_t(int64_t(r11) + -20024));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA0E0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA0E0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1518,7 +1518,7 @@ lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA0F0: lifted from generated/ by lift.py.
-lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA0F0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA0F0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1526,10 +1526,10 @@ lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32155
   r11 = uint64_t(int64_t(-2107310080));
@@ -1539,18 +1539,18 @@ lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(base, LIFTED_ARGS(0x825DA10C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(LIFTED_ARGS(0x825DA10C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-20000
   r3 = uint64_t(int64_t(int64_t(r11) + -20000));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA118, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA118, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1558,7 +1558,7 @@ lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA128: lifted from generated/ by lift.py.
-uint64_t f825DA128(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
+uint64_t f825DA128(uint64_t r1, uint64_t r13, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA128 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1571,12 +1571,12 @@ uint64_t f825DA128(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // b 0x825a71d0
-  { const lifted::Result o = game::memset(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
 // sub_825DA140: lifted from generated/ by lift.py.
-lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA140(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA140 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1584,10 +1584,10 @@ lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32154
   r11 = uint64_t(int64_t(-2107244544));
@@ -1597,18 +1597,18 @@ lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(base, LIFTED_ARGS(0x825DA15C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::ImportAt<&lifted::import_records::RtlInitializeCriticalSection>(LIFTED_ARGS(0x825DA15C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19976
   r3 = uint64_t(int64_t(int64_t(r11) + -19976));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA168, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA168, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1616,7 +1616,7 @@ lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA178: lifted from generated/ by lift.py.
-lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA178(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA178 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1624,10 +1624,10 @@ lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1635,18 +1635,18 @@ lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + -18128));
   // bl 0x8258e548
   // (left out: dead in C++)
-  { const lifted::Result o = game::InitializeCriticalSection(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::InitializeCriticalSection(r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19952
   r3 = uint64_t(int64_t(int64_t(r11) + -19952));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA19C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA19C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1654,7 +1654,7 @@ lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA1B0: lifted from generated/ by lift.py.
-lifted::Result f825DA1B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA1B0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA1B0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1663,12 +1663,12 @@ lifted::Result f825DA1B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19936
   r3 = uint64_t(int64_t(int64_t(r11) + -19936));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA1C0: lifted from generated/ by lift.py.
-lifted::Result f825DA1C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA1C0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA1C0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1677,12 +1677,12 @@ lifted::Result f825DA1C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19928
   r3 = uint64_t(int64_t(int64_t(r11) + -19928));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA1D0: lifted from generated/ by lift.py.
-lifted::Result f825DA1D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA1D0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA1D0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1691,12 +1691,12 @@ lifted::Result f825DA1D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19920
   r3 = uint64_t(int64_t(int64_t(r11) + -19920));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA1E0: lifted from generated/ by lift.py.
-lifted::Result f825DA1E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA1E0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA1E0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1705,12 +1705,12 @@ lifted::Result f825DA1E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19912
   r3 = uint64_t(int64_t(int64_t(r11) + -19912));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA1F0: lifted from generated/ by lift.py.
-lifted::Result f825DA1F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA1F0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA1F0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1719,12 +1719,12 @@ lifted::Result f825DA1F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19904
   r3 = uint64_t(int64_t(int64_t(r11) + -19904));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA200: lifted from generated/ by lift.py.
-lifted::Result f825DA200(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA200(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA200 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1733,12 +1733,12 @@ lifted::Result f825DA200(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19896
   r3 = uint64_t(int64_t(int64_t(r11) + -19896));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA210: lifted from generated/ by lift.py.
-lifted::Result f825DA210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA210(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA210 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1751,7 +1751,7 @@ lifted::Result f825DA210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19888));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1759,20 +1759,20 @@ lifted::Result f825DA210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18096));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA238: lifted from generated/ by lift.py.
-lifted::Result f825DA238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA238(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA238 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1785,7 +1785,7 @@ lifted::Result f825DA238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19880));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1793,20 +1793,20 @@ lifted::Result f825DA238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18048));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA260: lifted from generated/ by lift.py.
-lifted::Result f825DA260(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA260(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA260 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1819,7 +1819,7 @@ lifted::Result f825DA260(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19872));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1827,20 +1827,20 @@ lifted::Result f825DA260(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18000));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA288: lifted from generated/ by lift.py.
-lifted::Result f825DA288(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA288(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA288 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1853,7 +1853,7 @@ lifted::Result f825DA288(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19864));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1861,35 +1861,35 @@ lifted::Result f825DA288(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17952));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA2C8: lifted from generated/ by lift.py.
-lifted::Result f825DA2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA2C8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA2C8 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1902,7 +1902,7 @@ lifted::Result f825DA2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19856));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1910,35 +1910,35 @@ lifted::Result f825DA2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17824));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA308: lifted from generated/ by lift.py.
-lifted::Result f825DA308(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA308(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA308 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -1951,7 +1951,7 @@ lifted::Result f825DA308(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19848));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1959,35 +1959,35 @@ lifted::Result f825DA308(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17696));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA348: lifted from generated/ by lift.py.
-lifted::Result f825DA348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA348(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA348 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2000,7 +2000,7 @@ lifted::Result f825DA348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19840));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2008,35 +2008,35 @@ lifted::Result f825DA348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17568));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA388: lifted from generated/ by lift.py.
-lifted::Result f825DA388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA388(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA388 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2049,7 +2049,7 @@ lifted::Result f825DA388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19832));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2057,35 +2057,35 @@ lifted::Result f825DA388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17440));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA3C8: lifted from generated/ by lift.py.
-lifted::Result f825DA3C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
+lifted::Result f825DA3C8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA3C8 (lifted)");
   uint64_t r3 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2098,7 +2098,7 @@ lifted::Result f825DA3C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19824));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2106,35 +2106,35 @@ lifted::Result f825DA3C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17312));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA408: lifted from generated/ by lift.py.
-lifted::Result f825DA408(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA408(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA408 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2143,12 +2143,12 @@ lifted::Result f825DA408(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19816
   r3 = uint64_t(int64_t(int64_t(r11) + -19816));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA418: lifted from generated/ by lift.py.
-lifted::Result f825DA418(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA418(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA418 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2157,12 +2157,12 @@ lifted::Result f825DA418(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19808
   r3 = uint64_t(int64_t(int64_t(r11) + -19808));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA428: lifted from generated/ by lift.py.
-lifted::Result f825DA428(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA428(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA428 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2171,12 +2171,12 @@ lifted::Result f825DA428(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19800
   r3 = uint64_t(int64_t(int64_t(r11) + -19800));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA438: lifted from generated/ by lift.py.
-lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA438(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA438 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2184,10 +2184,10 @@ lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2195,18 +2195,18 @@ lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + -17140));
   // bl 0x8258e548
   // (left out: dead in C++)
-  { const lifted::Result o = game::InitializeCriticalSection(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::InitializeCriticalSection(r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19792
   r3 = uint64_t(int64_t(int64_t(r11) + -19792));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA45C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA45C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2214,7 +2214,7 @@ lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA470: lifted from generated/ by lift.py.
-lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA470(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA470 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2222,10 +2222,10 @@ lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2233,18 +2233,18 @@ lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + -17100));
   // bl 0x8258dcc8
   // (left out: dead in C++)
-  { const lifted::Result o = game::Event::Create(base, r1, r13, r3, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Event::Create(r1, r13, r3, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19776
   r3 = uint64_t(int64_t(int64_t(r11) + -19776));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA494, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA494, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2252,7 +2252,7 @@ lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA4A8: lifted from generated/ by lift.py.
-lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA4A8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA4A8 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2260,10 +2260,10 @@ lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2271,18 +2271,18 @@ lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + -17096));
   // bl 0x8258e548
   // (left out: dead in C++)
-  { const lifted::Result o = game::InitializeCriticalSection(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::InitializeCriticalSection(r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19760
   r3 = uint64_t(int64_t(int64_t(r11) + -19760));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA4CC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA4CC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2290,7 +2290,7 @@ lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DA4E0: lifted from generated/ by lift.py.
-lifted::Result f825DA4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825DA4E0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825DA4E0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2300,22 +2300,22 @@ lifted::Result f825DA4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // li r3,12
   r3 = uint64_t(int64_t(12));
   // bl 0x825a6880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x825DA4F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x825DA4F4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x825da500
   if (cr6.eq) goto loc_825DA500;
   // stw r3,0(r3)
-  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r3));
+  guest::StoreU32(uint32_t(r3) + 0, uint32_t(r3));
 loc_825DA500:
   // addi r11,r3,4
   r11 = uint64_t(int64_t(int64_t(r3) + 4));
@@ -2324,7 +2324,7 @@ loc_825DA500:
   // beq cr6,0x825da510
   if (cr6.eq) goto loc_825DA510;
   // stw r3,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r3));
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r3));
 loc_825DA510:
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2333,20 +2333,20 @@ loc_825DA510:
   // addi r11,r11,-17068
   r11 = uint64_t(int64_t(int64_t(r11) + -17068));
   // stw r3,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r3));
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r3));
   // addi r3,r10,-19744
   r3 = uint64_t(int64_t(int64_t(r10) + -19744));
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 8, uint32_t(r10));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA530, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DA530, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2354,7 +2354,7 @@ loc_825DA510:
 }
 
 // sub_825DA5C0: lifted from generated/ by lift.py.
-lifted::Result f825DA5C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DA5C0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DA5C0 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -2363,12 +2363,12 @@ lifted::Result f825DA5C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19496
   r3 = uint64_t(int64_t(int64_t(r11) + -19496));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DA648: lifted from generated/ by lift.py.
-void f825DA648(uint8_t* base) {
+void f825DA648() {
   ITC_NATIVE_RUNNING("sub_825DA648 (lifted)");
   uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
   lifted::Cr cr6;
@@ -2382,14 +2382,14 @@ void f825DA648(uint8_t* base) {
   // addi r11,r11,3908
   r11 = uint64_t(int64_t(int64_t(r11) + 3908));
   // lwz r9,-16(r8)
-  r9 = guest::LoadU32(base, uint32_t(r8) + -16);
+  r9 = guest::LoadU32(uint32_t(r8) + -16);
   // mr r7,r9
   r7 = r9;
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r9));
 loc_825DA664:
   // lbz r10,0(r9)
-  r10 = guest::LoadU8(base, uint32_t(r9) + 0);
+  r10 = guest::LoadU8(uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r10,0
@@ -2399,22 +2399,22 @@ loc_825DA664:
   // subf r7,r7,r9
   r7 = r9 - r7;
   // lwz r10,-12(r8)
-  r10 = guest::LoadU32(base, uint32_t(r8) + -12);
+  r10 = guest::LoadU32(uint32_t(r8) + -12);
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 8, uint32_t(r9));
   // addi r9,r7,-1
   r9 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 12, uint32_t(r10));
   // mr r7,r10
   r7 = r10;
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r9));
 loc_825DA694:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(uint32_t(r10) + 0);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // cmplwi cr6,r9,0
@@ -2424,22 +2424,22 @@ loc_825DA694:
   // subf r7,r7,r10
   r7 = r10 - r7;
   // lwz r9,-8(r8)
-  r9 = guest::LoadU32(base, uint32_t(r8) + -8);
+  r9 = guest::LoadU32(uint32_t(r8) + -8);
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 20, uint32_t(r10));
   // addi r10,r7,-1
   r10 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r9,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 24, uint32_t(r9));
   // mr r7,r9
   r7 = r9;
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 16, uint32_t(r10));
 loc_825DA6C4:
   // lbz r10,0(r9)
-  r10 = guest::LoadU8(base, uint32_t(r9) + 0);
+  r10 = guest::LoadU8(uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r10,0
@@ -2449,22 +2449,22 @@ loc_825DA6C4:
   // subf r7,r7,r9
   r7 = r9 - r7;
   // lwz r10,-4(r8)
-  r10 = guest::LoadU32(base, uint32_t(r8) + -4);
+  r10 = guest::LoadU32(uint32_t(r8) + -4);
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // stw r9,32(r11)
-  guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 32, uint32_t(r9));
   // addi r9,r7,-1
   r9 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r10,36(r11)
-  guest::StoreU32(base, uint32_t(r11) + 36, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 36, uint32_t(r10));
   // mr r7,r10
   r7 = r10;
   // stw r9,28(r11)
-  guest::StoreU32(base, uint32_t(r11) + 28, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 28, uint32_t(r9));
 loc_825DA6F4:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(uint32_t(r10) + 0);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // cmplwi cr6,r9,0
@@ -2472,24 +2472,24 @@ loc_825DA6F4:
   // bne cr6,0x825da6f4
   if (!cr6.eq) goto loc_825DA6F4;
   // lwz r9,0(r8)
-  r9 = guest::LoadU32(base, uint32_t(r8) + 0);
+  r9 = guest::LoadU32(uint32_t(r8) + 0);
   // subf r8,r7,r10
   r8 = r10 - r7;
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,44(r11)
-  guest::StoreU32(base, uint32_t(r11) + 44, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 44, uint32_t(r10));
   // addi r10,r8,-1
   r10 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,48(r11)
-  guest::StoreU32(base, uint32_t(r11) + 48, uint32_t(r9));
+  guest::StoreU32(uint32_t(r11) + 48, uint32_t(r9));
   // stw r10,40(r11)
-  guest::StoreU32(base, uint32_t(r11) + 40, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 40, uint32_t(r10));
   // mr r10,r9
   r10 = r9;
 loc_825DA724:
   // lbz r8,0(r9)
-  r8 = guest::LoadU8(base, uint32_t(r9) + 0);
+  r8 = guest::LoadU8(uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r8,0
@@ -2501,17 +2501,17 @@ loc_825DA724:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,56(r11)
-  guest::StoreU32(base, uint32_t(r11) + 56, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 56, uint32_t(r10));
   // addi r10,r9,-1
   r10 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,52(r11)
-  guest::StoreU32(base, uint32_t(r11) + 52, uint32_t(r10));
+  guest::StoreU32(uint32_t(r11) + 52, uint32_t(r10));
   // blr
   return;
 }
 
 // sub_825DA750: lifted from generated/ by lift.py.
-lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
+lifted::Result f825DA750(uint64_t r1, uint64_t r13, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825DA750 (lifted)");
   uint64_t r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f31 = 0.0;
@@ -2520,31 +2520,31 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  guest::StoreU64(base, uint32_t(r1) + -24, r30);
+  guest::StoreU64(uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  guest::StoreU64(base, uint32_t(r1) + -16, r31);
+  guest::StoreU64(uint32_t(r1) + -16, r31);
   // stfd f31,-32(r1)
   lifted::ScalarFloatMode();
-  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f2,8792(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 8792)));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f31,22232(r11)
-  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 22232)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 22232)));
   // fmr f1,f31
   f1 = f31;
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA780, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA780, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2555,7 +2555,7 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8784(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8784)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 8784)));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // addi r31,r11,3968
@@ -2563,16 +2563,16 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,0(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 0, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 0, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA7B0, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2583,16 +2583,16 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,4(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 4, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 4, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7D0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA7D0, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2601,20 +2601,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-31160(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -31160)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + -31160)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,8(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 8, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 8, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA7F4, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2623,20 +2623,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-18120(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -18120)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + -18120)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,12(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 12, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA818, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA818, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2645,20 +2645,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-9632(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -9632)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + -9632)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,16(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 16, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 16, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA83C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA83C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2667,20 +2667,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8840(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8840)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 8840)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,20(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 20, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 20, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA860, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA860, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2689,20 +2689,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-9640(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -9640)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + -9640)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,24(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 24, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 24, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA884, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA884, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2711,20 +2711,20 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,12936(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 12936)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 12936)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,28(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 28, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA8A8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA8A8, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -2733,49 +2733,49 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8832(r11)
-  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8832)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + 8832)));
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,32(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 32, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 32, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA8CC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(LIFTED_ARGS(0x825DA8CC, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f13,f1
   lifted::ScalarFloatMode();
   f13 = double(float(f1));
   // lfs f0,8796(r30)
-  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,36(r31)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r31) + 36, temp.u32);
+  guest::StoreU32(uint32_t(r31) + 36, temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
 
 // sub_825DA8F8: lifted from generated/ by lift.py.
-lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+lifted::Result f825DA8F8(uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA8F8 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f31 = 0.0;
@@ -2784,17 +2784,17 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  guest::StoreU64(base, uint32_t(r1) + -24, r30);
+  guest::StoreU64(uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  guest::StoreU64(base, uint32_t(r1) + -16, r31);
+  guest::StoreU64(uint32_t(r1) + -16, r31);
   // stfd f31,-32(r1)
   lifted::ScalarFloatMode();
-  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2803,23 +2803,23 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // lfs f0,0(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 0);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
   f0 = double(temp.f32);
   // lfs f31,8848(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8848);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 8848);
   f31 = double(temp.f32);
   // fmuls f1,f0,f31
   f1 = double(float(f0 * f31));
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA92C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA92C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // lfs f13,4(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 4);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
   f13 = double(temp.f32);
   // addi r30,r11,4008
   r30 = uint64_t(int64_t(int64_t(r11) + 4008));
@@ -2829,15 +2829,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,0(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 0, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 0, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA94C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA94C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,8(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 8);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 8);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2845,15 +2845,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,4(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 4, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 4, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA964, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA964, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,12(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 12);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 12);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2861,15 +2861,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,8(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 8, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 8, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA97C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA97C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,16(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 16);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 16);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2877,15 +2877,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,12(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 12, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA994, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA994, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,20(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 20);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 20);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2893,15 +2893,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,16(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 16, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 16, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9AC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA9AC, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,24(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 24);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 24);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2909,15 +2909,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,20(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 20, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 20, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9C4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA9C4, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,28(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 28);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 28);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2925,15 +2925,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,24(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 24, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 24, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA9DC, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,32(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 32);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 32);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2941,15 +2941,15 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,28(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 28, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DA9F4, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,36(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 36);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 36);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2957,34 +2957,34 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,32(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 32, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 32, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
-  { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DAA0C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::tan(LIFTED_ARGS(0x825DAA0C, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f0,f1
   lifted::ScalarFloatMode();
   f0 = double(float(f1));
   // stfs f0,36(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 36, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 36, temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
 
 // sub_825DAA30: lifted from generated/ by lift.py.
-double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
+double f825DAA30(uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DAA30 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
   double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f30 = 0.0, f31 = 0.0;
@@ -2993,19 +2993,19 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  guest::StoreU64(base, uint32_t(r1) + -24, r30);
+  guest::StoreU64(uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  guest::StoreU64(base, uint32_t(r1) + -16, r31);
+  guest::StoreU64(uint32_t(r1) + -16, r31);
   // stfd f30,-40(r1)
   lifted::ScalarFloatMode();
-  guest::StoreU64(base, uint32_t(r1) + -40, std::bit_cast<uint64_t>(f30));
+  guest::StoreU64(uint32_t(r1) + -40, std::bit_cast<uint64_t>(f30));
   // stfd f31,-32(r1)
-  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3014,28 +3014,28 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,0(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 0);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
   f0 = double(temp.f32);
   // lfs f31,8124(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8124);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 8124);
   f31 = double(temp.f32);
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // fmuls f0,f0,f31
   f0 = double(float(f0 * f31));
   // lfs f30,8852(r11)
-  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8852);
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 8852);
   f30 = double(temp.f32);
   // fmuls f1,f0,f30
   f1 = double(float(f0 * f30));
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAA74, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAA74, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,4(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 4);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3051,15 +3051,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,0(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 0, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 0, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAA9C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAA9C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,8(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 8);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 8);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3071,15 +3071,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,4(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 4, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 4, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAABC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAABC, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,12(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 12);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 12);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3091,15 +3091,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,8(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 8, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 8, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAADC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAADC, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,16(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 16);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 16);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3111,15 +3111,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,12(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 12, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 12, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAAFC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAAFC, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,20(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 20);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 20);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3131,15 +3131,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,16(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 16, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 16, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB1C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAB1C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,24(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 24);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 24);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3151,15 +3151,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,20(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 20, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 20, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB3C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAB3C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,28(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 28);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 28);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3171,15 +3171,15 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,24(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 24, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 24, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB5C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAB5C, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,32(r31)
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 32);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 32);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3191,13 +3191,13 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,28(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 28, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 28, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB7C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAB7C, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f13,36(r31)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 36);
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 36);
   f13 = double(temp.f32);
   // fmr f0,f1
   f0 = f1;
@@ -3211,10 +3211,10 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,32(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 32, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 32, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
-  { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB9C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::cos(LIFTED_ARGS(0x825DAB9C, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f0,f1
   lifted::ScalarFloatMode();
   f0 = double(float(f1));
@@ -3222,27 +3222,27 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,36(r30)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r30) + 36, temp.u32);
+  guest::StoreU32(uint32_t(r30) + 36, temp.u32);
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f30,-40(r1)
-  f30 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -40)));
+  f30 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -40)));
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
   // blr
   return f1;
 }
 
 // sub_825DABC8: lifted from generated/ by lift.py.
-lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825DABC8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825DABC8 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -3250,10 +3250,10 @@ lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3261,18 +3261,18 @@ lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 4224));
   // bl 0x825a6bd0
   // (left out: dead in C++)
-  { const lifted::Result o = f825A6BD0(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f825A6BD0(r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19416
   r3 = uint64_t(int64_t(int64_t(r11) + -19416));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DABEC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DABEC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -3280,7 +3280,7 @@ lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DAC00: lifted from generated/ by lift.py.
-lifted::Result f825DAC00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DAC00(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DAC00 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -3289,12 +3289,12 @@ lifted::Result f825DAC00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19400
   r3 = uint64_t(int64_t(int64_t(r11) + -19400));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DAC10: lifted from generated/ by lift.py.
-lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825DAC10(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825DAC10 (lifted)");
   uint64_t r3 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -3302,10 +3302,10 @@ lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  guest::StoreU32(base, ea, uint32_t(r1));
+  guest::StoreU32(ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3313,18 +3313,18 @@ lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r11) + 4408));
   // bl 0x825a6bd0
   // (left out: dead in C++)
-  { const lifted::Result o = f825A6BD0(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f825A6BD0(r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32162
   r11 = uint64_t(int64_t(-2107768832));
   // addi r3,r11,-19320
   r3 = uint64_t(int64_t(int64_t(r11) + -19320));
   // bl 0x825a7068
   // (left out: dead in C++)
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DAC34, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(0x825DAC34, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -3332,7 +3332,7 @@ lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
 }
 
 // sub_825DAC48: lifted from generated/ by lift.py.
-lifted::Result f825DAC48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+lifted::Result f825DAC48(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DAC48 (lifted)");
   uint64_t r3 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
@@ -3341,12 +3341,12 @@ lifted::Result f825DAC48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-19304
   r3 = uint64_t(int64_t(int64_t(r11) + -19304));
   // b 0x825a7068
-  { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::atexit(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
 // sub_825DACA8: lifted from generated/ by lift.py.
-uint64_t f825DACA8(uint8_t* base, uint64_t r1, uint64_t r13) {
+uint64_t f825DACA8(uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DACA8 (lifted)");
   uint64_t r3 = 0, r11 = 0;
   double f1 = 0.0;
@@ -3355,12 +3355,12 @@ uint64_t f825DACA8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // addi r3,r11,832
   r3 = uint64_t(int64_t(int64_t(r11) + 832));
   // b 0x8258e530
-  f8258E530(base, r3);
+  f8258E530(r3);
   return r3;
 }
 
 // sub_825DACB8: lifted from generated/ by lift.py.
-lifted::Result f825DACB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+lifted::Result f825DACB8(uint64_t r1, uint64_t r13, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825DACB8 (lifted)");
   uint64_t r3 = 0, r11 = 0;
   // lis r11,-32148
@@ -3368,431 +3368,431 @@ lifted::Result f825DACB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // addi r3,r11,-21752
   r3 = uint64_t(int64_t(int64_t(r11) + -21752));
   // b 0x82294d38
-  { const lifted::Result o = game::RequestQueue::Dtor_82294D38(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RequestQueue::Dtor_82294D38(r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
-lifted::Result e825D97A0(uint8_t* base, const lifted::Args& a) {
-  return f825D97A0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D97A0(const lifted::Args& a) {
+  return f825D97A0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D97B0(uint8_t* base, const lifted::Args& a) {
-  return f825D97B0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D97B0(const lifted::Args& a) {
+  return f825D97B0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D97C0(uint8_t* base, const lifted::Args& a) {
-  f825D97C0(base);
+lifted::Result e825D97C0(const lifted::Args& a) {
+  f825D97C0();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D97E8(uint8_t* base, const lifted::Args& a) {
-  f825D97E8(base);
+lifted::Result e825D97E8(const lifted::Args& a) {
+  f825D97E8();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9810(uint8_t* base, const lifted::Args& a) {
-  f825D9810(base);
+lifted::Result e825D9810(const lifted::Args& a) {
+  f825D9810();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9828(uint8_t* base, const lifted::Args& a) {
-  f825D9828(base);
+lifted::Result e825D9828(const lifted::Args& a) {
+  f825D9828();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9840(uint8_t* base, const lifted::Args& a) {
-  return f825D9840(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9840(const lifted::Args& a) {
+  return f825D9840(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9850(uint8_t* base, const lifted::Args& a) {
-  return f825D9850(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9850(const lifted::Args& a) {
+  return f825D9850(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9860(uint8_t* base, const lifted::Args& a) {
-  f825D9860(base);
+lifted::Result e825D9860(const lifted::Args& a) {
+  f825D9860();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9888(uint8_t* base, const lifted::Args& a) {
-  f825D9888(base);
+lifted::Result e825D9888(const lifted::Args& a) {
+  f825D9888();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D98B0(uint8_t* base, const lifted::Args& a) {
-  f825D98B0(base);
+lifted::Result e825D98B0(const lifted::Args& a) {
+  f825D98B0();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D98D8(uint8_t* base, const lifted::Args& a) {
-  f825D98D8(base);
+lifted::Result e825D98D8(const lifted::Args& a) {
+  f825D98D8();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9900(uint8_t* base, const lifted::Args& a) {
-  f825D9900(base);
+lifted::Result e825D9900(const lifted::Args& a) {
+  f825D9900();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9928(uint8_t* base, const lifted::Args& a) {
-  f825D9928(base);
+lifted::Result e825D9928(const lifted::Args& a) {
+  f825D9928();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9950(uint8_t* base, const lifted::Args& a) {
-  f825D9950(base);
+lifted::Result e825D9950(const lifted::Args& a) {
+  f825D9950();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9978(uint8_t* base, const lifted::Args& a) {
-  f825D9978(base);
+lifted::Result e825D9978(const lifted::Args& a) {
+  f825D9978();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9A10(uint8_t* base, const lifted::Args& a) {
-  return f825D9A10(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A10(const lifted::Args& a) {
+  return f825D9A10(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A20(uint8_t* base, const lifted::Args& a) {
-  return f825D9A20(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A20(const lifted::Args& a) {
+  return f825D9A20(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A30(uint8_t* base, const lifted::Args& a) {
-  return f825D9A30(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A30(const lifted::Args& a) {
+  return f825D9A30(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A40(uint8_t* base, const lifted::Args& a) {
-  return f825D9A40(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A40(const lifted::Args& a) {
+  return f825D9A40(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A50(uint8_t* base, const lifted::Args& a) {
-  return f825D9A50(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A50(const lifted::Args& a) {
+  return f825D9A50(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A60(uint8_t* base, const lifted::Args& a) {
-  return f825D9A60(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A60(const lifted::Args& a) {
+  return f825D9A60(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A70(uint8_t* base, const lifted::Args& a) {
-  return f825D9A70(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A70(const lifted::Args& a) {
+  return f825D9A70(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A80(uint8_t* base, const lifted::Args& a) {
-  return f825D9A80(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A80(const lifted::Args& a) {
+  return f825D9A80(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9A90(uint8_t* base, const lifted::Args& a) {
-  return f825D9A90(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9A90(const lifted::Args& a) {
+  return f825D9A90(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AA0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AA0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AA0(const lifted::Args& a) {
+  return f825D9AA0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AB0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AB0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AB0(const lifted::Args& a) {
+  return f825D9AB0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AC0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AC0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AC0(const lifted::Args& a) {
+  return f825D9AC0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AD0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AD0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AD0(const lifted::Args& a) {
+  return f825D9AD0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AE0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AE0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AE0(const lifted::Args& a) {
+  return f825D9AE0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9AF0(uint8_t* base, const lifted::Args& a) {
-  return f825D9AF0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9AF0(const lifted::Args& a) {
+  return f825D9AF0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B00(uint8_t* base, const lifted::Args& a) {
-  return f825D9B00(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B00(const lifted::Args& a) {
+  return f825D9B00(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B10(uint8_t* base, const lifted::Args& a) {
-  return f825D9B10(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B10(const lifted::Args& a) {
+  return f825D9B10(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B20(uint8_t* base, const lifted::Args& a) {
-  return f825D9B20(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B20(const lifted::Args& a) {
+  return f825D9B20(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B30(uint8_t* base, const lifted::Args& a) {
-  return f825D9B30(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B30(const lifted::Args& a) {
+  return f825D9B30(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B40(uint8_t* base, const lifted::Args& a) {
-  return f825D9B40(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B40(const lifted::Args& a) {
+  return f825D9B40(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B50(uint8_t* base, const lifted::Args& a) {
-  return f825D9B50(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825D9B50(const lifted::Args& a) {
+  return f825D9B50(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825D9B88(uint8_t* base, const lifted::Args& a) {
-  return f825D9B88(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9B88(const lifted::Args& a) {
+  return f825D9B88(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9B98(uint8_t* base, const lifted::Args& a) {
-  return f825D9B98(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825D9B98(const lifted::Args& a) {
+  return f825D9B98(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825D9BD0(uint8_t* base, const lifted::Args& a) {
-  return f825D9BD0(base, a.r1, a.r13, a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825D9BD0(const lifted::Args& a) {
+  return f825D9BD0(a.r1, a.r13, a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825D9C58(uint8_t* base, const lifted::Args& a) {
-  return f825D9C58(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.f[0], a.lr);
+lifted::Result e825D9C58(const lifted::Args& a) {
+  return f825D9C58(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.f[0], a.lr);
 }
 
-lifted::Result e825D9CA0(uint8_t* base, const lifted::Args& a) {
-  f825D9CA0(base);
+lifted::Result e825D9CA0(const lifted::Args& a) {
+  f825D9CA0();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9CC8(uint8_t* base, const lifted::Args& a) {
-  f825D9CC8(base);
+lifted::Result e825D9CC8(const lifted::Args& a) {
+  f825D9CC8();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9CF0(uint8_t* base, const lifted::Args& a) {
-  return f825D9CF0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9CF0(const lifted::Args& a) {
+  return f825D9CF0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9D00(uint8_t* base, const lifted::Args& a) {
-  f825D9D00(base);
+lifted::Result e825D9D00(const lifted::Args& a) {
+  f825D9D00();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9D28(uint8_t* base, const lifted::Args& a) {
-  f825D9D28(base);
+lifted::Result e825D9D28(const lifted::Args& a) {
+  f825D9D28();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9D50(uint8_t* base, const lifted::Args& a) {
-  f825D9D50(base);
+lifted::Result e825D9D50(const lifted::Args& a) {
+  f825D9D50();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9D78(uint8_t* base, const lifted::Args& a) {
-  f825D9D78(base);
+lifted::Result e825D9D78(const lifted::Args& a) {
+  f825D9D78();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9DA0(uint8_t* base, const lifted::Args& a) {
-  f825D9DA0(base);
+lifted::Result e825D9DA0(const lifted::Args& a) {
+  f825D9DA0();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9DC8(uint8_t* base, const lifted::Args& a) {
-  f825D9DC8(base);
+lifted::Result e825D9DC8(const lifted::Args& a) {
+  f825D9DC8();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9DF0(uint8_t* base, const lifted::Args& a) {
-  f825D9DF0(base);
+lifted::Result e825D9DF0(const lifted::Args& a) {
+  f825D9DF0();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9E18(uint8_t* base, const lifted::Args& a) {
-  f825D9E18(base);
+lifted::Result e825D9E18(const lifted::Args& a) {
+  f825D9E18();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825D9E40(uint8_t* base, const lifted::Args& a) {
-  return f825D9E40(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9E40(const lifted::Args& a) {
+  return f825D9E40(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9E50(uint8_t* base, const lifted::Args& a) {
-  return f825D9E50(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9E50(const lifted::Args& a) {
+  return f825D9E50(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9EC0(uint8_t* base, const lifted::Args& a) {
-  return f825D9EC0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9EC0(const lifted::Args& a) {
+  return f825D9EC0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9ED0(uint8_t* base, const lifted::Args& a) {
-  return f825D9ED0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9ED0(const lifted::Args& a) {
+  return f825D9ED0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9EE0(uint8_t* base, const lifted::Args& a) {
-  return f825D9EE0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9EE0(const lifted::Args& a) {
+  return f825D9EE0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9F48(uint8_t* base, const lifted::Args& a) {
-  return f825D9F48(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9F48(const lifted::Args& a) {
+  return f825D9F48(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9F58(uint8_t* base, const lifted::Args& a) {
-  return f825D9F58(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825D9F58(const lifted::Args& a) {
+  return f825D9F58(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825D9FC8(uint8_t* base, const lifted::Args& a) {
-  return {f825D9FC8(base, a.r1, a.r13), a.f[0]};
+lifted::Result e825D9FC8(const lifted::Args& a) {
+  return {f825D9FC8(a.r1, a.r13), a.f[0]};
 }
 
-lifted::Result e825DA050(uint8_t* base, const lifted::Args& a) {
-  return {f825DA050(base, a.r1, a.r13), a.f[0]};
+lifted::Result e825DA050(const lifted::Args& a) {
+  return {f825DA050(a.r1, a.r13), a.f[0]};
 }
 
-lifted::Result e825DA090(uint8_t* base, const lifted::Args& a) {
-  return {f825DA090(base, a.r1, a.r13), a.f[0]};
+lifted::Result e825DA090(const lifted::Args& a) {
+  return {f825DA090(a.r1, a.r13), a.f[0]};
 }
 
-lifted::Result e825DA0B8(uint8_t* base, const lifted::Args& a) {
-  return f825DA0B8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA0B8(const lifted::Args& a) {
+  return f825DA0B8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA0F0(uint8_t* base, const lifted::Args& a) {
-  return f825DA0F0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA0F0(const lifted::Args& a) {
+  return f825DA0F0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA128(uint8_t* base, const lifted::Args& a) {
-  return {f825DA128(base, a.r1, a.r13, a.lr), a.f[0]};
+lifted::Result e825DA128(const lifted::Args& a) {
+  return {f825DA128(a.r1, a.r13, a.lr), a.f[0]};
 }
 
-lifted::Result e825DA140(uint8_t* base, const lifted::Args& a) {
-  return f825DA140(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA140(const lifted::Args& a) {
+  return f825DA140(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA178(uint8_t* base, const lifted::Args& a) {
-  return f825DA178(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA178(const lifted::Args& a) {
+  return f825DA178(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA1B0(uint8_t* base, const lifted::Args& a) {
-  return f825DA1B0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA1B0(const lifted::Args& a) {
+  return f825DA1B0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA1C0(uint8_t* base, const lifted::Args& a) {
-  return f825DA1C0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA1C0(const lifted::Args& a) {
+  return f825DA1C0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA1D0(uint8_t* base, const lifted::Args& a) {
-  return f825DA1D0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA1D0(const lifted::Args& a) {
+  return f825DA1D0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA1E0(uint8_t* base, const lifted::Args& a) {
-  return f825DA1E0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA1E0(const lifted::Args& a) {
+  return f825DA1E0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA1F0(uint8_t* base, const lifted::Args& a) {
-  return f825DA1F0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA1F0(const lifted::Args& a) {
+  return f825DA1F0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA200(uint8_t* base, const lifted::Args& a) {
-  return f825DA200(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA200(const lifted::Args& a) {
+  return f825DA200(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA210(uint8_t* base, const lifted::Args& a) {
-  return f825DA210(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA210(const lifted::Args& a) {
+  return f825DA210(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA238(uint8_t* base, const lifted::Args& a) {
-  return f825DA238(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA238(const lifted::Args& a) {
+  return f825DA238(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA260(uint8_t* base, const lifted::Args& a) {
-  return f825DA260(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA260(const lifted::Args& a) {
+  return f825DA260(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA288(uint8_t* base, const lifted::Args& a) {
-  return f825DA288(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA288(const lifted::Args& a) {
+  return f825DA288(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA2C8(uint8_t* base, const lifted::Args& a) {
-  return f825DA2C8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA2C8(const lifted::Args& a) {
+  return f825DA2C8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA308(uint8_t* base, const lifted::Args& a) {
-  return f825DA308(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA308(const lifted::Args& a) {
+  return f825DA308(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA348(uint8_t* base, const lifted::Args& a) {
-  return f825DA348(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA348(const lifted::Args& a) {
+  return f825DA348(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA388(uint8_t* base, const lifted::Args& a) {
-  return f825DA388(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA388(const lifted::Args& a) {
+  return f825DA388(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA3C8(uint8_t* base, const lifted::Args& a) {
-  return f825DA3C8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
+lifted::Result e825DA3C8(const lifted::Args& a) {
+  return f825DA3C8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
-lifted::Result e825DA408(uint8_t* base, const lifted::Args& a) {
-  return f825DA408(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA408(const lifted::Args& a) {
+  return f825DA408(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA418(uint8_t* base, const lifted::Args& a) {
-  return f825DA418(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA418(const lifted::Args& a) {
+  return f825DA418(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA428(uint8_t* base, const lifted::Args& a) {
-  return f825DA428(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA428(const lifted::Args& a) {
+  return f825DA428(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA438(uint8_t* base, const lifted::Args& a) {
-  return f825DA438(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA438(const lifted::Args& a) {
+  return f825DA438(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA470(uint8_t* base, const lifted::Args& a) {
-  return f825DA470(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA470(const lifted::Args& a) {
+  return f825DA470(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA4A8(uint8_t* base, const lifted::Args& a) {
-  return f825DA4A8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA4A8(const lifted::Args& a) {
+  return f825DA4A8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DA4E0(uint8_t* base, const lifted::Args& a) {
-  return f825DA4E0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825DA4E0(const lifted::Args& a) {
+  return f825DA4E0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825DA5C0(uint8_t* base, const lifted::Args& a) {
-  return f825DA5C0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DA5C0(const lifted::Args& a) {
+  return f825DA5C0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DA648(uint8_t* base, const lifted::Args& a) {
-  f825DA648(base);
+lifted::Result e825DA648(const lifted::Args& a) {
+  f825DA648();
   return {a.r[0], a.f[0]};
 }
 
-lifted::Result e825DA750(uint8_t* base, const lifted::Args& a) {
-  return f825DA750(base, a.r1, a.r13, a.r[0]);
+lifted::Result e825DA750(const lifted::Args& a) {
+  return f825DA750(a.r1, a.r13, a.r[0]);
 }
 
-lifted::Result e825DA8F8(uint8_t* base, const lifted::Args& a) {
-  return f825DA8F8(base, a.r1, a.r13, a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
+lifted::Result e825DA8F8(const lifted::Args& a) {
+  return f825DA8F8(a.r1, a.r13, a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
-lifted::Result e825DAA30(uint8_t* base, const lifted::Args& a) {
-  return {a.r[0], f825DAA30(base, a.r1, a.r13)};
+lifted::Result e825DAA30(const lifted::Args& a) {
+  return {a.r[0], f825DAA30(a.r1, a.r13)};
 }
 
-lifted::Result e825DABC8(uint8_t* base, const lifted::Args& a) {
-  return f825DABC8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825DABC8(const lifted::Args& a) {
+  return f825DABC8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825DAC00(uint8_t* base, const lifted::Args& a) {
-  return f825DAC00(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DAC00(const lifted::Args& a) {
+  return f825DAC00(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DAC10(uint8_t* base, const lifted::Args& a) {
-  return f825DAC10(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825DAC10(const lifted::Args& a) {
+  return f825DAC10(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
-lifted::Result e825DAC48(uint8_t* base, const lifted::Args& a) {
-  return f825DAC48(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
+lifted::Result e825DAC48(const lifted::Args& a) {
+  return f825DAC48(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
-lifted::Result e825DACA8(uint8_t* base, const lifted::Args& a) {
-  return {f825DACA8(base, a.r1, a.r13), a.f[0]};
+lifted::Result e825DACA8(const lifted::Args& a) {
+  return {f825DACA8(a.r1, a.r13), a.f[0]};
 }
 
-lifted::Result e825DACB8(uint8_t* base, const lifted::Args& a) {
-  return f825DACB8(base, a.r1, a.r13, a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+lifted::Result e825DACB8(const lifted::Args& a) {
+  return f825DACB8(a.r1, a.r13, a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
 namespace {

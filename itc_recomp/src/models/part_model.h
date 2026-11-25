@@ -19,21 +19,21 @@ constexpr uint32_t kPartModelBytes = 464;
 
 // sub_820CE9C8: +444 to +460, +432 and +440 = 0, +436 = -1 (the original's
 // order).
-void PartModelClear(uint8_t* base, uint32_t model);
+void PartModelClear(uint32_t model);
 
 // sub_820CE9F8 Model::SetVinylTextures: +444 = `a` (the vinyl sheet), +448 =
 // `b`.
-void PartModelSetVinylTextures(uint8_t* base, uint32_t model, uint32_t a, uint32_t b);
+void PartModelSetVinylTextures(uint32_t model, uint32_t a, uint32_t b);
 
 // sub_820CE928 (the part model's constructor): Model::Model, the vtable,
 // then PartModelClear. False, with nothing done, where Model::Model would go
 // to the original.
-bool PartModelConstruct(uint8_t* base, uint32_t model);
+bool PartModelConstruct(uint32_t model);
 
 // sub_820CE990 (the part model's destructor): the vtable, PartModelClear,
 // then Model::~Model. Returns the original's r3 (Model::~Model's); nullopt
 // where Model::~Model would go to the original, with only the part's own
 // words written (the original writes the same first).
-std::optional<uint32_t> PartModelDestruct(uint8_t* base, uint32_t model);
+std::optional<uint32_t> PartModelDestruct(uint32_t model);
 
 }  // namespace models

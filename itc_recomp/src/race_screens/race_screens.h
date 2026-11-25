@@ -59,58 +59,58 @@ constexpr uint32_t kListBlock = 68;
 
 // ScreenPages::Init (sub_8220BA98): +0, +4, +8 = `page`, +20 and +12 = -1,
 // +24 = 0.
-void PagesInit(uint8_t* base, uint32_t pages, uint32_t page);
+void PagesInit(uint32_t pages, uint32_t page);
 // ScreenPages::Go (sub_8220BA68): `transition` -1: +0 = `page`, +12 and +16
 // = -1; else +12 = `transition`, +16 = `queued`, +4 = `page`, +0 = -1.
-void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t transition, uint32_t queued);
+void PagesGo(uint32_t pages, uint32_t page, uint32_t transition, uint32_t queued);
 // ScreenPages::Finish (sub_8220BA28): nothing when `result` is 0; else with
 // no queued transition (+16 -1) +12 = -1 and +0 = +4, or the queued one
 // running (+20 = 0, +12 = it, +16 = -1); then +24 = 0.
-void PagesFinish(uint8_t* base, uint32_t pages, uint32_t result);
+void PagesFinish(uint32_t pages, uint32_t result);
 
 // --- The menu list (menu_list.cpp) ---
 
 // MenuList::Selection (sub_8220BC20): +16.
-uint32_t ListSelection(uint8_t* base, uint32_t list);
+uint32_t ListSelection(uint32_t list);
 // MenuList::SetSelection (sub_8220BC30): +20 = the old +16, +16 = `selection`.
-void ListSetSelection(uint8_t* base, uint32_t list, uint32_t selection);
+void ListSetSelection(uint32_t list, uint32_t selection);
 // MenuList::SetEnabled and IsEnabled (sub_8220BC00, sub_8220BC10): the
 // item's word in the block (+68).
-void ListSetEnabled(uint8_t* base, uint32_t list, uint32_t item, uint32_t value);
-uint32_t ListIsEnabled(uint8_t* base, uint32_t list, uint32_t item);
+void ListSetEnabled(uint32_t list, uint32_t item, uint32_t value);
+uint32_t ListIsEnabled(uint32_t list, uint32_t item);
 // MenuList::Fit (sub_8220BC40): the scroll and selection refitted; `quiet`
 // (r4) nonzero keeps the move word 0 and the "before" words the new ones.
-void ListFit(uint8_t* base, uint32_t list, uint32_t quiet);
+void ListFit(uint32_t list, uint32_t quiet);
 // MenuList::Fired (sub_8220C020): whether the list's player's mapper fired
 // `action` (slot 12; a direction's two ids, 153/167, 154/168, 155/169,
 // 156/170, each tried in turn), 0 when the entry's +4 is 1. The slot's
 // plain C++ when `native_slots` and it's ActionMapper::Fired, else the slot
 // through `calls`.
-uint32_t ListFired(uint8_t* base, uint32_t list, uint32_t action, uint32_t sp, bool native_slots,
+uint32_t ListFired(uint32_t list, uint32_t action, uint32_t sp, bool native_slots,
                    const Calls& calls);
 // MenuList::Update (sub_8220C1E0): left, right, up and down (Fired on +44,
 // +48, +40, +36) moving the side word or the selection over the enabled
 // items, wrapping when +64 is set, the scroll kept around it; returns -1.
-uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint64_t ListUpdate(uint32_t list, uint32_t sp, bool native_slots,
                     const Calls& calls);
 // MenuList::Accepted, Cancelled, Pressed152 and Pressed166 (sub_8220BD50,
 // sub_8220BDE0, sub_8220BE70, sub_8220BF90): 1 when the list's player's
 // mapper answers slot 10 (Pressed) on `action` (+52, +56, 152 or 166) and
 // the list's move word (+24) is 0, else 0 (0 when the entry's +4 is 1).
-uint32_t ListAccepted(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint32_t ListAccepted(uint32_t list, uint32_t sp, bool native_slots,
                       const Calls& calls);
-uint32_t ListCancelled(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint32_t ListCancelled(uint32_t list, uint32_t sp, bool native_slots,
                        const Calls& calls);
-uint32_t ListPressed152(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint32_t ListPressed152(uint32_t list, uint32_t sp, bool native_slots,
                         const Calls& calls);
-uint32_t ListPressed166(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
+uint32_t ListPressed166(uint32_t list, uint32_t sp, bool native_slots,
                         const Calls& calls);
 
 // A mapper's read slot 10 (+40, ActionMapper::Pressed) on `action`, as an
 // original's bctrl from `frame` returning to `lr`: the slot's plain C++ when
 // it's ActionMapper::Pressed and `native_slots` (logged for --log_pause_menu
 // as its adapter does), else the slot through `calls`.
-uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t frame,
+uint64_t MapperPressed(uint32_t mapper, uint32_t action, uint32_t frame,
                        uint32_t lr, bool native_slots, const Calls& calls);
 
 // --- The screens' globals ---
@@ -152,48 +152,48 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // sub_8221B1F0 AfterRaceMenu::Create, sub_82217D70 RaceDialog::Create,
 // sub_82219138 CareerResults::Create, sub_8221F390 RaceResults::Create,
 // sub_8221FA30 SplitResults::Create, sub_8221BDD0 Kind6Menu::Create.
-uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp);
-uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp);
-uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp);
-uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp);
-uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp);
-uint64_t RaceResultsCreate(uint8_t* base, uint32_t sp);
-uint64_t SplitResultsCreate(uint8_t* base, uint32_t sp);
-uint64_t Kind6MenuCreate(uint8_t* base, uint32_t sp);
+uint64_t PauseMenuCreate(uint32_t sp);
+uint64_t PauseMenu4Create(uint32_t sp);
+uint64_t AfterRaceMenuCreate(uint32_t sp);
+uint64_t RaceDialogCreate(uint32_t sp);
+uint64_t CareerResultsCreate(uint32_t sp);
+uint64_t RaceResultsCreate(uint32_t sp);
+uint64_t SplitResultsCreate(uint32_t sp);
+uint64_t Kind6MenuCreate(uint32_t sp);
 // sub_8220C4C8 PauseMenu::Destroy, sub_8220FC98 PauseMenu4::Destroy,
 // sub_8221A3E8 AfterRaceMenu::Destroy, sub_82217CD0 RaceDialog::Destroy,
 // sub_82219170 CareerResults::Destroy, sub_8221F3C8 RaceResults::Destroy,
 // sub_8221FA68 SplitResults::Destroy, sub_8221BE30 Kind6Menu::Destroy.
-std::optional<uint64_t> PauseMenuDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> AfterRaceMenuDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> RaceDialogDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> CareerResultsDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> RaceResultsDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> SplitResultsDestroy(uint8_t* base, uint32_t sp);
-std::optional<uint64_t> Kind6MenuDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> PauseMenuDestroy(uint32_t sp);
+std::optional<uint64_t> PauseMenu4Destroy(uint32_t sp);
+std::optional<uint64_t> AfterRaceMenuDestroy(uint32_t sp);
+std::optional<uint64_t> RaceDialogDestroy(uint32_t sp);
+std::optional<uint64_t> CareerResultsDestroy(uint32_t sp);
+std::optional<uint64_t> RaceResultsDestroy(uint32_t sp);
+std::optional<uint64_t> SplitResultsDestroy(uint32_t sp);
+std::optional<uint64_t> Kind6MenuDestroy(uint32_t sp);
 // sub_8221A498 AfterRaceMenu::Close: MenuList::Release([0x826D851C]) (a
 // tail call: `sp` the caller's); nullopt where it isn't native.
-std::optional<uint64_t> AfterRaceMenuClose(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> AfterRaceMenuClose(uint32_t sp);
 
 // --- The pause menu's data and the answers (screens.cpp) ---
 
 // sub_8220F840 PauseMenu::LoadData: the data from player 0's save data (see
 // the row); r3 as the original leaves it.
-uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuLoadData(uint32_t sp, const Calls& calls);
 // sub_8220D6A0 PauseMenu::SaveOptions (and sub_8220D890 PauseMenu::Close,
 // its tail call) and sub_8220D740 PauseMenu::SaveHudOptions: the data's
 // options written back into player 0's save data (+0x1F85C). Return the
 // save data (r3).
-uint64_t PauseMenuSaveOptions(uint8_t* base, uint32_t sp);
-uint64_t PauseMenuClose(uint8_t* base, uint32_t sp);
-uint64_t PauseMenuSaveHudOptions(uint8_t* base, uint32_t sp);
+uint64_t PauseMenuSaveOptions(uint32_t sp);
+uint64_t PauseMenuClose(uint32_t sp);
+uint64_t PauseMenuSaveHudOptions(uint32_t sp);
 // sub_8220C5D0 PauseMenu::AnswerPage: the data's +140. sub_8221A720
 // AfterRaceMenu::AnswerPage: the data's +12. sub_82217D40 RaceDialog::Answer:
 // the data's +32 = 0; 1 when its +0 is 1, else 2.
-uint32_t PauseMenuAnswerPage(uint8_t* base);
-uint32_t AfterRaceMenuAnswerPage(uint8_t* base);
-uint32_t RaceDialogAnswer(uint8_t* base);
+uint32_t PauseMenuAnswerPage();
+uint32_t AfterRaceMenuAnswerPage();
+uint32_t RaceDialogAnswer();
 
 // --- The pages' dispatch and the pause menu's steps (pages.cpp) ---
 //
@@ -205,19 +205,19 @@ uint32_t RaceDialogAnswer(uint8_t* base);
 
 // sub_8220F638 PauseMenu::Update: the page [[0x826D84D8]] (r3 and r4 its
 // caller's).
-uint64_t PauseMenuUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t PauseMenuUpdate(uint64_t r3, uint64_t r4, uint32_t sp,
                          const Calls& calls);
 // sub_8221A090 CareerResults::Update: r3 = the screen, its +184 the page
 // (r4 and r5 its caller's).
-uint64_t CareerResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
+uint64_t CareerResultsUpdate(uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
                              const Calls& calls);
 // sub_8221BD20 AfterRaceMenu::Update: the page [[0x826D8518]].
-uint64_t AfterRaceMenuUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuUpdate(uint32_t sp, const Calls& calls);
 // sub_822185B0 RaceDialog::Update: with the data's +36 1 (and no page with
 // no transition, or a page) and the page not 5, ScreenPages::Go(5,
 // transition 1) and the data's +0 = 0; then the page's handler (r4 its
 // caller's, or 5 after the Go).
-uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogUpdate(uint64_t r4, uint32_t sp, const Calls& calls);
 // sub_82218838 RaceDialog::SetText: the varargs (r4 to r10, `varargs`)
 // stored in the caller's area (`sp` + 24 to + 79, as the original's
 // prologue does), then from a 144-byte frame: UI movie 14 found (the id at
@@ -227,7 +227,7 @@ uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& 
 // and in r6), and its child 1's children 3 and 4 set to strings 2 and 3
 // (UiMovie::SetNodeText, its varargs 0: the user's call for the parking
 // area, 2026-10-30), the three through their overrides. The last's r3.
-uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+uint64_t RaceDialogSetText(uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
 // The race's replay [0x826C5B50] (0x13C8F0 bytes, type10-mode.toml's
 // KeptReplay). The replay list's header [0x828161F0] is
@@ -242,12 +242,12 @@ constexpr uint32_t kRaceReplay = 0x826C5B50;
 // and MenuList::Init(list, 2, 2, 1, 154, 153, 155, 156; 159, 158 at the
 // frame's +84 and +92) through their overrides; +0 = 0, +32 = 1, +36 = 0;
 // StoreReplay. Its r3 (the header's replay).
-uint32_t RaceDialogAskSlot(uint8_t* base, uint32_t slot, uint32_t record, uint32_t replay,
+uint32_t RaceDialogAskSlot(uint32_t slot, uint32_t record, uint32_t replay,
                            uint32_t sp, const Calls& calls);
 // sub_82218FF8 RaceDialog::StoreReplay (r3 the record, r4 the replay), from
 // a 112-byte frame: the record copied (memcpy, 36 bytes) to the header's
 // +8 block, then Replay::CopyFrom(the header's +4, the replay). Its r3.
-uint32_t RaceDialogStoreReplay(uint8_t* base, uint32_t record, uint32_t replay, uint32_t sp,
+uint32_t RaceDialogStoreReplay(uint32_t record, uint32_t replay, uint32_t sp,
                                const Calls& calls);
 // sub_821A66A8 Replay::CopyFrom (r3 a replay, r4 another), from a 112-byte
 // frame: the second copied into the first in parts: memcpy 52 bytes, 32 at
@@ -255,7 +255,7 @@ uint32_t RaceDialogStoreReplay(uint8_t* base, uint32_t record, uint32_t replay, 
 // +0x2B5E8, five at +0x2B5EC, one at +0x2B600; RaceSnapshot::Copy at
 // +0x2B610 (its plain C++); memcpy 0x107AC4 bytes at +0x34E20 (memcpy's
 // plain C++, or the original through `calls` where it refuses). Returns r3.
-uint32_t ReplayCopyFrom(uint8_t* base, uint32_t replay, uint32_t from, uint32_t sp,
+uint32_t ReplayCopyFrom(uint32_t replay, uint32_t from, uint32_t sp,
                         const Calls& calls);
 // sub_82218B30 RaceDialog::Open: from a 128-byte frame, the dialog list's
 // player (+60) = 0 for `player` 0, 1 for 1 (left for others); for `mode` 0
@@ -264,19 +264,19 @@ uint32_t ReplayCopyFrom(uint8_t* base, uint32_t replay, uint32_t from, uint32_t 
 // frame words differ, as the user's call for the parking area,
 // 2026-10-30); the data's +12 = 13, +16 = 1, +28 = 1, ScreenPages::Go(the
 // pages, 1, 0, -1) through its override, +32 = 1, +36 = 0. Go's r3.
-uint64_t RaceDialogOpen(uint8_t* base, uint32_t mode, uint64_t player, uint32_t sp,
+uint64_t RaceDialogOpen(uint32_t mode, uint64_t player, uint32_t sp,
                         const Calls& calls);
 // sub_822191D0 CareerResults::Start: ScreenPages::Go([0x826D8500] + 184, 1,
 // transition 1); returns 0.
-uint64_t CareerResultsStart(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsStart(uint32_t sp, const Calls& calls);
 // sub_8220CED0 PauseMenu::StepVolume and sub_8220D248 PauseMenu::StepAdjust:
 // by the list's side (+28: -1 down, 1 up) the selected value stepped (the
 // volumes +52, +56 within 0 to 15; the three values +60 to +68 within -10
 // to 10) or the last item's +144 toggled; 1 when it changed, else 0
 // (StepVolume's clamped steps store the bound and answer 0). StepAdjust
 // first looks up the type-10 node 0's children 4 to 6 (unused).
-uint32_t PauseMenuStepVolume(uint8_t* base, uint32_t sp);
-uint32_t PauseMenuStepAdjust(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuStepVolume(uint32_t sp);
+uint32_t PauseMenuStepAdjust(uint32_t sp);
 
 // The page object's Go through its override (its --log_pause_movie line
 // kept).
@@ -310,96 +310,96 @@ constexpr uint32_t kPauseItems = 0x8200CBF0;
 // +24) run the pause menu's movie ([[0x826D84D0]]) once (UiMovie::Run(movie,
 // 0)) after their first call's work, and answer whether they're done.
 // sub_8220C5E0 PauseMenu::RunTen: the data's +152 counted from 0, done at 10.
-uint64_t PauseMenuRunTen(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuRunTen(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C668 PauseMenu::BackToMain: the selected item's animation (type 7,
 // selection + 1) played (r6 1) and looped; done.
-uint64_t PauseMenuBackToMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuBackToMain(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C700 PauseMenu::CloseMain: the item's animation and animation 0
 // finished, animation 2 played; done when the run answers 0.
-uint64_t PauseMenuCloseMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseMain(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C7B8 PauseMenu::MoveMain: the previous item's animation (+20 + 1)
 // finished, the new one's played (r6 1) and looped; done.
-uint64_t PauseMenuMoveMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuMoveMain(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C868 PauseMenu::ShowOptionsRow: the type-8 row (selection + 4
 // below item 4, else 2 or 1 by the data's +144) played and looped; done.
-uint64_t PauseMenuShowOptionsRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowOptionsRow(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C930 PauseMenu::ToggleOptions: on item 4, the type-8 row by +144
 // finished and the other played and looped; done.
-uint64_t PauseMenuToggleOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuToggleOptions(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220CA28 PauseMenu::ShowVolumeRow: the type-9 row 1 played and
 // LoopLast; done.
-uint64_t PauseMenuShowVolumeRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowVolumeRow(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220CAB0 PauseMenu::ShowAdjustRow: named animation 192 played and
 // looped; done.
-uint64_t PauseMenuShowAdjustRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowAdjustRow(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220C578 PauseMenu::ConfirmPage: RaceDialog::Update (r4 the caller's);
 // its 1 (yes) Go(5, transition 5), its 2 (no) Go(0) at once. Returns 0.
-uint64_t PauseMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuConfirmPage(uint64_t r4, uint32_t sp, const Calls& calls);
 // sub_8220CB38 PauseMenu::ShowItems: the type-7 node 0's children (+100 on,
 // +104 of them): string 1989 + the kind's item (UiMovie::SetText) for the
 // first six items, else hidden (+80 = 0). r3 as the original leaves it.
-uint64_t PauseMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowItems(uint32_t sp, const Calls& calls);
 // sub_8220CBF8 PauseMenu::SetArrowA: the type-8 node 0's child 0's +16 =
 // `value` as a float (its double word left at the frame's +80). Returns the
 // child.
-uint32_t PauseMenuSetArrowA(uint8_t* base, uint64_t value, uint32_t sp);
+uint32_t PauseMenuSetArrowA(uint64_t value, uint32_t sp);
 // sub_8220CC60 PauseMenu::ShowOptions: for each child of the type-8 node 2,
 // its two parts' children 0 and 2 marked on or off (+108, +80) by the
 // matching edit (the data's +36 to +48, +144, copied to the frame's +80).
 // Returns r3 as the original leaves it.
-uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuShowOptions(uint32_t sp);
 // sub_8220D040 PauseMenu::ShowVolume (never seen in play): r3 a volume
 // node, r4 the volume. UiMovie::SetNodeText(movie, child 2, 8, volume) (the
 // unset varargs 0), then children 4 to 18's +80 = 1 for the one at the
 // volume, else 0. Returns the last child (the original's r3).
-uint64_t PauseMenuShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+uint64_t PauseMenuShowVolume(uint32_t node, uint64_t volume, uint32_t sp,
                              const Calls& calls);
 // sub_8220D0B8 PauseMenu::ShowVolumes: the type-9 nodes 5 and 6 shown by
 // PauseMenu::ShowVolume (sub_8220D040: through its wrap, which keeps its
 // --log_pause_movie line) with the data's +52 and +56. r3 its.
-uint64_t PauseMenuShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowVolumes(uint32_t sp, const Calls& calls);
 // sub_8220D130 PauseMenu::ShowSlider: UiMovie::SetNodeText(movie, child 0,
 // 8, value); child 2's +12 = 16 - (value + 10) x [0x8200A6AC] truncated, as
 // a float (the original's words left at the frame's +80). Returns child 2.
-uint32_t PauseMenuShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp,
+uint32_t PauseMenuShowSlider(uint32_t slider, uint64_t value, uint32_t sp,
                              const Calls& calls);
 // sub_8220D5D0 PauseMenu::RestoreNodes: child `child` (under `group` when
 // not -1) of the movie's file, live and saved scenes, UiMovie::RestorePose
 // (through its override) on the live and the saved one against the file's.
 // r3 its.
-uint64_t PauseMenuRestoreNodes(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+uint64_t PauseMenuRestoreNodes(uint32_t group, uint32_t child, uint32_t sp,
                                const Calls& calls);
 // sub_8220DD98 PauseMenu::MoveOptions (transition 8): the previous row's
 // animation finished (item 4's by +144, the arrow at 0 or 120 for items 0
 // and 3 through SetArrowA, +144 = 1), the new row's played and looped,
 // named animations 20 and 19 finished and, unless either row is 4, 20
 // (down) or 19 (up) played; done.
-uint64_t PauseMenuMoveOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuMoveOptions(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220E1F8 PauseMenu::MoveAdjust (transition 18): the same with named
 // animations 192 to 196 (item 3 by +144: 195 or 196; leaving it +144 = 0
 // and sub_8220D1D8, never seen in play, the original, at 0 or 80 for items
 // 0 and 2) and the slide 149 (down) or 148 (up); done.
-uint64_t PauseMenuMoveAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuMoveAdjust(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220E700 PauseMenu::ColorItems: the type-7 node 0's children colored
 // (+56 to +64): 205, 235, 67 where MenuList::IsEnabled answers nonzero, else
 // 255, 255, 255. r3 as the original leaves it.
-uint32_t PauseMenuColorItems(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuColorItems(uint32_t sp);
 // sub_8220E888 PauseMenu::ShowAdjust: the type-10 node 0's children 4 to 6
 // each by ShowSlider with the data's +60 to +68 (copied to the frame's +80).
 // r3 the last ShowSlider's.
-uint32_t PauseMenuShowAdjust(uint8_t* base, uint32_t sp, const Calls& calls);
+uint32_t PauseMenuShowAdjust(uint32_t sp, const Calls& calls);
 // sub_8220D418 PauseMenu::ShowCareer: the node -1/0's +80 = 1 for kinds 0
 // to 2, else 0; the career's numbers as texts (SetText(movie, -1, child, 8,
 // value), the unset varargs 0; the car's two values times the double at
 // 0x8200A510, truncated, the words left at the frame's +80 and +84; node
 // 21 by SetNumberText, strings 2009 to 2011 at 31 to 33) and node -1/24's
 // +108 = the weekday (+112). Returns that node.
-uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowCareer(uint32_t sp, const Calls& calls);
 // sub_8220E418 PauseMenu::SetUpMain: the item count (+136: the kind's items
 // up to the first -1, at most 6), MenuList::Init(list, count, count, 1, 154,
 // 153, 155, 156; 159, 158), the selection from +148, with +156 set the items
 // of id 4 disabled, ShowItems, ShowCareer. r3 ShowCareer's.
-uint64_t PauseMenuSetUpMain(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetUpMain(uint32_t sp, const Calls& calls);
 // sub_8220E810 PauseMenu::ShowVolumesB: Options::ShowVolumeBar (through its
 // override, the pause movie log's) on the type-9 nodes 5 and 6 with the
 // data's +52 and +56. r3 the last call's.
@@ -409,16 +409,16 @@ uint64_t PauseMenuSetUpMain(uint8_t* base, uint32_t sp, const Calls& calls);
 constexpr uint32_t kShowVolumeBar = 0x821BE5A8;
 constexpr uint32_t kShowSliderMark = 0x821BEA48;
 constexpr uint32_t kSetNumberText = 0x8211C740;
-uint64_t PauseMenuShowVolumesB(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t PauseMenuShowAdjustB(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowVolumesB(uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowAdjustB(uint32_t sp, const Calls& calls);
 // sub_8220EE28 PauseMenu::ShowMain (transition 2): animation 0 played and
 // looped, the selected item's (type 7, selection + 1, r6 1) played and
 // looped, ColorItems; done.
-uint64_t PauseMenuShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuShowMain(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220ED90 PauseMenu::OpenMain (transition 1): on its first call
 // animation 1 played, the data's +148 = 0, SetUpMain; done when the run
 // answers 0.
-uint64_t PauseMenuOpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOpenMain(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220EFA8 PauseMenu::CloseOptions, sub_8220F0A0 CloseVolume and
 // sub_8220F2A8 CloseAdjust (transitions 10, 15 and 20): on their first call
 // the row's animation finished (type 8: selection + 4, or for item 4 by
@@ -426,21 +426,21 @@ uint64_t PauseMenuOpenMain(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // named: items 0 to 2 192 to 194, item 3 by +144 195 or 196; none past the
 // last item), animation 4, 6 or 8 played, SetUpMain; when the run answers
 // 0, ScreenPages::Go(0, transition 3) and the step word 0. Return 0.
-uint64_t PauseMenuCloseOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t PauseMenuCloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t PauseMenuCloseAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseOptions(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseVolume(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuCloseAdjust(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220F6D0 PauseMenu::OpenVolume and sub_8220F788 OpenAdjust
 // (transitions 11 and 16): on their first call the data's +148 = the
 // selection, the item's animation (type 7, selection + 1) finished,
 // SetUpVolume or SetUpAdjust, then animation 5 or 7 played; done when the
 // run answers 0.
-uint64_t PauseMenuOpenVolume(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t PauseMenuOpenAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOpenVolume(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOpenAdjust(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8220FA88 PauseMenu::Open: the data's +132 = `kind`, +156 = `flag`, UI
 // movie 4 found into the screen's +0, UiMovie::ResetPose, PauseMenu::LoadData,
 // ScreenPages::Go(0, transition 1, then 2), MenuSound::Play(6) (both through
 // their overrides). r3 MenuSound::Play's.
-uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag, uint32_t sp,
+uint64_t PauseMenuOpen(uint32_t screen, uint64_t kind, uint64_t flag, uint32_t sp,
                        const Calls& calls);
 // --- The pause menu's options page (options.cpp) ---
 //
@@ -460,31 +460,31 @@ constexpr uint32_t kStageWord = 0x826C7824;
 // sub_8220D898 PauseMenu::MainPage (page 0; its case 0, sub_8220DA38,
 // merged), from a 208-byte frame: see the row. The debug texts (the empty
 // sub_82106540) left out. Returns 0.
-uint64_t PauseMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuMainPage(uint32_t sp, const Calls& calls);
 // sub_8220CDA0 PauseMenu::ToggleOption: by the list's side (+28: -1 sets, 1
 // clears) the selected item's edit (+36 to +48, item 4's +144; their
 // addresses at the frame's +80) changed when it differs, then ShowOptions; 1
 // when it changed, else 0.
-uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuToggleOption(uint32_t sp);
 // sub_8220DB98 PauseMenu::OptionsPage (page 1): see the row. 0 or 8.
-uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOptionsPage(uint32_t sp, const Calls& calls);
 // sub_8220EBD8 PauseMenu::AdjustPage (page 3): see the row. Returns 0.
-uint64_t PauseMenuAdjustPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuAdjustPage(uint32_t sp, const Calls& calls);
 // sub_8220D7A0 PauseMenu::SaveVolumes (never seen in play; only caller
 // VolumePage), from a 96-byte frame: player 0's save data's options
 // (+0x1F85C) bytes +28 and +29 from the data's +52 and +56. Returns the
 // save data (the original's r3).
-uint32_t PauseMenuSaveVolumes(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuSaveVolumes(uint32_t sp);
 // sub_8220E988 PauseMenu::VolumePage (page 2): see the row. SoundOptions::
 // SetEffectsVolume and SetMusicVolume through their overrides. Returns 0.
 constexpr uint32_t kSetEffectsVolume = 0x821B9C20;
 constexpr uint32_t kSetMusicVolume = 0x821B9CF0;
-uint64_t PauseMenuVolumePage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuVolumePage(uint32_t sp, const Calls& calls);
 // sub_8220E530 PauseMenu::SetUpOptions: MenuList::Init(list, 5, 5, 1, 154,
 // 153, 155, 156; 159, 158), the edits from the options, +144 = 1,
 // RestoreNodes(-1, 8), the labels (UiMovie::SetNodeText, unset varargs 0),
 // ShowOptions. r3 ShowOptions'.
-uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetUpOptions(uint32_t sp, const Calls& calls);
 // sub_8220F3C0 PauseMenu::SetUpVolume and sub_8220F500 SetUpAdjust, from a
 // 128- and a 144-byte frame: MenuList::Init(list, 3 or 4 items, 1, 154,
 // 153, 155, 156; 159, 158), the edits (+52, +56; +60 to +68) from the saved
@@ -494,11 +494,11 @@ uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
 // child 0's children 5 to 7; 4 and 7 on node 1's children 3 and 4), then
 // ShowVolumes and ShowVolumesB, or ShowAdjust and ShowAdjustB. r3 the last
 // one's.
-uint64_t PauseMenuSetUpVolume(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t PauseMenuSetUpAdjust(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetUpVolume(uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetUpAdjust(uint32_t sp, const Calls& calls);
 // sub_8220F1B8 PauseMenu::SetAdjust (transition 19): on item 3 the named
 // animations 195 and 196 swapped by +144, else ShowAdjust; done.
-uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuSetAdjust(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The menu after the race's pages and transitions (after_race.cpp) ---
 //
@@ -512,7 +512,7 @@ constexpr uint32_t kAfterItems = 0x82010428;
 // with them (UiMovie::SetNodeTextV through its override, the va_list sp +
 // 24 at the frame's +80). Its r3. No adapter: the native StartSave and
 // ShowSaving call it (the recompiled ShowMessage's messages the original).
-uint64_t RaceDialogSetNote(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
+uint64_t RaceDialogSetNote(uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
 // sub_822189B8 RaceDialog::StartSave (never seen in play), from a 128-byte
 // frame: by SaveSlots::State(0) (through its override) the note 70 (the
@@ -524,12 +524,12 @@ uint64_t RaceDialogSetNote(uint8_t* base, uint64_t id, const uint64_t varargs[7]
 // frame: note 98, +12 = 12, +16 = 0, Go(0, 0, -1), +32 = 1, +36 = 0. Go's
 // r3. No adapters: their callers (AfterRaceMenu::MainPage and SavePage...
 // see the rows) call the plain C++ where native.
-uint64_t RaceDialogStartSave(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t RaceDialogShowSaving(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogStartSave(uint32_t sp, const Calls& calls);
+uint64_t RaceDialogShowSaving(uint32_t sp, const Calls& calls);
 
 // sub_8221A6C8 AfterRaceMenu::ConfirmPage (page 6): RaceDialog::Update (r4
 // the caller's); its 1 Go(7, transition 4), its 2 Go(1) at once. Returns 0.
-uint64_t AfterRaceMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuConfirmPage(uint64_t r4, uint32_t sp, const Calls& calls);
 // The transitions (r3 the step word, set to 1 first on the first call):
 // sub_8221A730 AfterRaceMenu::Intro (animation 0 played; done when the run
 // answers 0), sub_8221A7A8 AfterRaceMenu::Show (animation 2, the selected
@@ -538,35 +538,35 @@ uint64_t AfterRaceMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const
 // 40 finished, animation 1 played; done when the run answers 0),
 // sub_8221AA20 AfterRaceMenu::Move (the previous item's finished, the new
 // one's played and looped; done).
-uint64_t AfterRaceMenuIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t AfterRaceMenuShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t AfterRaceMenuCloseMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t AfterRaceMenuMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuIntro(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuShow(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuCloseMain(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuMove(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_8221AC00 AfterRaceMenu::ShowItems: the type-4 node 0's children:
 // string 1960 + the kind's item (SetText) for the first four, else hidden.
-uint64_t AfterRaceMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuShowItems(uint32_t sp, const Calls& calls);
 // sub_8221B5C8 AfterRaceMenu::SetUpItems: MenuList::Init(list, the data's
 // +4 twice, 1, 154, 153, 155, 156; 159, 158), the selection from +16, with
 // +8 set the items of id 1 and 2 disabled, ShowItems. r3 ShowItems'.
-uint64_t AfterRaceMenuSetUpItems(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuSetUpItems(uint32_t sp, const Calls& calls);
 // sub_8221B768 AfterRaceMenu::ColorItems (r3 the screen): as the pause
 // menu's on type 4.
-uint32_t AfterRaceMenuColorItems(uint8_t* base, uint32_t screen, uint32_t sp);
+uint32_t AfterRaceMenuColorItems(uint32_t screen, uint32_t sp);
 // sub_8221B860 AfterRaceMenu::Start (page 0): ColorItems, Go(1, transition
 // 1). Returns 0.
-uint64_t AfterRaceMenuStart(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuStart(uint32_t sp, const Calls& calls);
 // sub_8221A4A8 AfterRaceMenu::MainPage (page 1; its case 0, sub_8221A56C,
 // merged), from a 112-byte frame: see the row. The replay's save (item 2)
 // runs SaveBuffers::Create through its override and RaceDialog::StartSave
 // (never seen in play) the original. Returns 0.
 constexpr uint32_t kSaveBuffersCreate = 0x8228F6B0;
 constexpr uint32_t kStartSave = 0x822189B8;
-uint64_t AfterRaceMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuMainPage(uint32_t sp, const Calls& calls);
 // sub_8221BA68 AfterRaceMenu::Open: the data's +0 = `kind`, UI movie 9 into
 // the screen's +0 and its pose reset, +4 the kind's item count (at most 4),
 // +8 = `flag`, +16 = 0, SetUpItems, ScreenPages::Init(pages, 1) and Go(0,
 // 0, -1), +20 = 0. r3 Go's.
-uint64_t AfterRaceMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag,
+uint64_t AfterRaceMenuOpen(uint32_t screen, uint64_t kind, uint64_t flag,
                            uint32_t sp, const Calls& calls);
 
 // --- The confirm dialog's pages, transitions and draw (dialog.cpp) ---
@@ -579,22 +579,22 @@ uint64_t AfterRaceMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64
 constexpr uint32_t kRequestDevice = 0x8228F9B0;
 constexpr uint32_t kReplaysDelete = 0x822905C0;
 // sub_82217F40 RaceDialog::Question (page 1): see the row. Returns 0.
-uint64_t RaceDialogQuestion(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogQuestion(uint32_t sp, const Calls& calls);
 // sub_822186A8 RaceDialog::OpenAnim (transition 1): on its first call by the
 // data's +16: 0 named animation 15 played; 1 the selection's (+2) finished
 // and 14 played; 2 named 0 finished and 15 played; sound 5. Done when the
 // run answers 0, then +16 = +20.
-uint64_t RaceDialogOpenAnim(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogOpenAnim(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_82218788 RaceDialog::Move (transition 2): on its first call the
 // previous item's named animation (+2) finished, the new one's played and
 // looped; done.
-uint64_t RaceDialogMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogMove(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_82218F30 RaceDialog::Draw: with a transition running, its handler (0
 // ShowMessage, 1 OpenAnim, 2 Move, from a table in the frame, through the
 // function table) with the page object's +24, then ScreenPages::Finish (a
 // negative transition other than -1: Finish(1)); else UiMovie::Run(movie,
 // 0). r3 as the original leaves it.
-uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t RaceDialogDraw(uint32_t sp, const Calls& calls);
 // sub_82218C10 RaceDialog::ShowMessage (transition 0), from a 160-byte
 // frame: on its first call (the step word 0; it's set to 1) by the data's
 // +16: 0 the named animation 13 played, the type-0 node 0's +80 = 0 and node
@@ -606,14 +606,14 @@ uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls);
 // answered 0. nullopt, with nothing done, for a first call with the data's
 // +12 0 to 11 (the jump table's messages: RaceDialog::SetNote, sub_82218918,
 // and case 0, sub_82218C90, never seen in play).
-std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint32_t sp,
+std::optional<uint64_t> RaceDialogShowMessage(uint32_t step, uint32_t sp,
                                               const Calls& calls);
 
 // sub_8220EEF0 PauseMenu::OpenOptions (transition 6): on its first call the
 // data's +148 = the selection, the item's animation (type 7) finished,
 // animation 3 played, SetUpOptions, then the step word 1; done when the run
 // answers 0 (options.cpp).
-uint64_t PauseMenuOpenOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuOpenOptions(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The screens' draws (draws.cpp) ---
 //
@@ -625,15 +625,15 @@ uint64_t PauseMenuOpenOptions(uint8_t* base, uint32_t step, uint32_t sp, const C
 // the pages that show it. r3 as the original leaves it.
 // sub_8220FB10 PauseMenu::Draw (r3 the screen): 21 transitions; a negative
 // one other than -1 Finish(1); RaceDialog::Draw on page 4.
-uint64_t PauseMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t PauseMenuDraw(uint32_t screen, uint32_t sp, const Calls& calls);
 // sub_8221BB48 AfterRaceMenu::Draw (r3 the screen): the debug texts (the
 // empty sub_82106540: nothing done); 10 transitions (any negative one the
 // run); RaceDialog::Draw on pages 2 to 4 and 6.
-uint64_t AfterRaceMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuDraw(uint32_t screen, uint32_t sp, const Calls& calls);
 // sub_8221A2F8 CareerResults::Draw (r3 the screen): its page object at
 // +184, its transition +196, 9 transitions (any negative one the run of
 // the movie +180) with +208.
-uint64_t CareerResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsDraw(uint32_t screen, uint32_t sp, const Calls& calls);
 
 // --- The career's results' pages and transitions (career.cpp) ---
 //
@@ -641,18 +641,18 @@ uint64_t CareerResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Ca
 // again before each use, as the originals do.
 // sub_82219210 CareerResults::Intro (transition 0): on its first call
 // animation 0, 1 or 2 by the kind played; done when the run answers 0.
-uint64_t CareerResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsIntro(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_822192B0 CareerResults::Show (transition 1): on its first call
 // animation 3 and 11, 12 or 13 by the kind played and looped; done.
-uint64_t CareerResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsShow(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_822193D8 CareerResults::Close1 (transition 6): on its first call
 // animation 3 and 11, 12 or 13 by the kind finished, 4 played; done when the
 // run answers 0.
-uint64_t CareerResultsClose1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsClose1(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_82219A78 CareerResults::Page1 (page 1): on accept or back (actions
 // 159, 158 through player 0's mapper, slot 10; sound 0): +20 above 0 Go(2,
 // 2); else +24 above 0.0 Go(3, 3); else Go(4, 6). Returns 0.
-uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
+uint64_t CareerResultsPage1(uint32_t sp, bool native_slots, const Calls& calls);
 // sub_822197A8 CareerResults::SetTexts (r3 the screen), from a 128-byte
 // frame: the texts on the screen's movie (+180, read again before each
 // call) type-7 node 0's and 2's children (strings 1969 on, 2051), type-8
@@ -663,7 +663,7 @@ uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const
 // 1973 to 1975, 1982, 2051 and 2052 (+24 times the double at 0x8200A510,
 // rounded to single). The setters through their overrides, SetText's unset
 // varargs 0 (the user's call, 2026-10-30). SetNumberText's last r3.
-uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+uint64_t CareerResultsSetTexts(uint32_t screen, uint32_t sp, const Calls& calls);
 // sub_8221A1F0 CareerResults::Open (r3 the screen, r4 the 168-byte block),
 // from a 112-byte frame: the block copied to +0 (memcpy: c_runtime::Memcpy,
 // else the guest's), UI movie 6 found (the id at the frame's +80) into +180
@@ -672,7 +672,7 @@ uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, cons
 // +28 + +164 + +20 + +16 (at least 0), +172 = 0, then [0x826D8500]'s movie's
 // type -1 node 11's +108 = 0, 1 or 2 by [0x826D8500]'s +0 (0, 1, 2; left
 // for 3 and above). Returns that node.
-uint64_t CareerResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint32_t sp,
+uint64_t CareerResultsOpen(uint32_t screen, uint32_t block, uint32_t sp,
                            const Calls& calls);
 
 constexpr uint32_t kShowVolume = 0x8220D040;

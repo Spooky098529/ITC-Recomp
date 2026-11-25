@@ -35,166 +35,166 @@ using Result = schema::RacerResultsRecord;
 using Race = schema::RaceData;
 using Save = schema::CareerSave;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
 
 // The original's frame: its back chain at sp - bytes. The frame.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  guest::StoreU32(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  guest::StoreU32(sp - bytes, sp);
   return sp - bytes;
 }
 
-uint32_t Holder(uint8_t* base, uint32_t machine) { return Machine(base, machine).holder().address; }
+uint32_t Holder(uint32_t machine) { return Machine(machine).holder().address; }
 
-bool ReplayBit(uint8_t* base, uint32_t holder) {
-  return (Screens(base, holder).flags() & 1) != 0;
+bool ReplayBit(uint32_t holder) {
+  return (Screens(holder).flags() & 1) != 0;
 }
 
 }  // namespace
 
-std::optional<uint64_t> PreRaceUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> PreRaceUpdate(uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216C210 RaceHudMachine::PreRaceUpdate");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind <= 0 || (kind > 3 && kind != 6)) {
     return r3;
   }
-  callees.Call(kHudTick, frame, 0x8216C258, Holder(base, machine) + kHud, 0);
-  callees.Call(kHudUpdateView, frame, 0x8216C264, Holder(base, machine) + kHud);
-  callees.Call(kHudUpdateWarning, frame, 0x8216C270, Holder(base, machine) + kHud);
-  return callees.Call(kHudUpdateItem, frame, 0x8216C27C, Holder(base, machine) + kHud);
+  callees.Call(kHudTick, frame, 0x8216C258, Holder(machine) + kHud, 0);
+  callees.Call(kHudUpdateView, frame, 0x8216C264, Holder(machine) + kHud);
+  callees.Call(kHudUpdateWarning, frame, 0x8216C270, Holder(machine) + kHud);
+  return callees.Call(kHudUpdateItem, frame, 0x8216C27C, Holder(machine) + kHud);
 }
 
-std::optional<uint64_t> PreRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> PreRaceDraw(uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216C2A0 RaceHudMachine::PreRaceDraw");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 3 && kind != 6) {
     return r3;
   }
-  callees.Call(kHudDraw, frame, 0x8216C2E0, Holder(base, machine) + kHud);
-  callees.Call(kHudRunWarning, frame, 0x8216C2EC, Holder(base, machine) + kHud);
-  return callees.Call(kHudRunItem, frame, 0x8216C2F8, Holder(base, machine) + kHud);
+  callees.Call(kHudDraw, frame, 0x8216C2E0, Holder(machine) + kHud);
+  callees.Call(kHudRunWarning, frame, 0x8216C2EC, Holder(machine) + kHud);
+  return callees.Call(kHudRunItem, frame, 0x8216C2F8, Holder(machine) + kHud);
 }
 
-std::optional<uint64_t> CountdownDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> CountdownDraw(uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216C330 RaceHudMachine::CountdownDraw");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind == 5) {
-    return callees.Call(kAltRunMovie, frame, 0x8216C3A0, Holder(base, machine) + kAltHud);
+    return callees.Call(kAltRunMovie, frame, 0x8216C3A0, Holder(machine) + kAltHud);
   }
   if (kind > 6) {
     return r3;
   }
-  const uint32_t hud = Holder(base, machine) + kHud;
+  const uint32_t hud = Holder(machine) + kHud;
   callees.Call(kHudDraw, frame, 0x8216C374, hud);
   callees.Call(kHudRunMovie, frame, 0x8216C380, hud, 0);
   callees.Call(kHudRunCountdown, frame, 0x8216C388, hud);
   return callees.Call(kHudRunWarning, frame, 0x8216C390, hud);
 }
 
-uint64_t StartIntro(uint8_t* base, uint32_t machine, uint32_t sp, uint32_t lr,
+uint64_t StartIntro(uint32_t machine, uint32_t sp, uint32_t lr,
                     const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C510 RaceHudMachine::StartIntro");
-  return callees.Call(kHudStartMovie1, sp, lr, Holder(base, machine) + kHud);
+  return callees.Call(kHudStartMovie1, sp, lr, Holder(machine) + kHud);
 }
 
-uint64_t EndIntro(uint8_t* base, uint32_t machine, uint32_t sp, uint32_t lr,
+uint64_t EndIntro(uint32_t machine, uint32_t sp, uint32_t lr,
                   const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C520 RaceHudMachine::EndIntro");
-  return callees.Call(kHudFinishMovie1, sp, lr, Holder(base, machine) + kHud);
+  return callees.Call(kHudFinishMovie1, sp, lr, Holder(machine) + kHud);
 }
 
-std::optional<uint64_t> IntroUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> IntroUpdate(uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216C530 RaceHudMachine::IntroUpdate");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind <= 0 || (kind > 3 && kind != 6)) {
     return r3;
   }
-  callees.Call(kHudTick, frame, 0x8216C578, Holder(base, machine) + kHud, 0);
-  callees.Call(kHudUpdateView, frame, 0x8216C584, Holder(base, machine) + kHud);
-  return callees.Call(kHudUpdateWarning, frame, 0x8216C590, Holder(base, machine) + kHud);
+  callees.Call(kHudTick, frame, 0x8216C578, Holder(machine) + kHud, 0);
+  callees.Call(kHudUpdateView, frame, 0x8216C584, Holder(machine) + kHud);
+  return callees.Call(kHudUpdateWarning, frame, 0x8216C590, Holder(machine) + kHud);
 }
 
-std::optional<uint64_t> IntroDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> IntroDraw(uint64_t r3, uint32_t sp,
                                   const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216C5B8 RaceHudMachine::IntroDraw");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 3 && kind != 6) {
     return r3;
   }
-  callees.Call(kHudRunMovie1, frame, 0x8216C5F8, Holder(base, machine) + kHud);
-  callees.Call(kHudDraw, frame, 0x8216C604, Holder(base, machine) + kHud);
-  return callees.Call(kHudRunWarning, frame, 0x8216C610, Holder(base, machine) + kHud);
+  callees.Call(kHudRunMovie1, frame, 0x8216C5F8, Holder(machine) + kHud);
+  callees.Call(kHudDraw, frame, 0x8216C604, Holder(machine) + kHud);
+  return callees.Call(kHudRunWarning, frame, 0x8216C610, Holder(machine) + kHud);
 }
 
-std::optional<uint64_t> CountdownUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> CountdownUpdate(uint64_t r3, uint32_t sp,
                                         const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216CB98 RaceHudMachine::CountdownUpdate");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   if (kind == 5) {
-    Machine(base, machine).set_state(7);
+    Machine(machine).set_state(7);
     return r3;
   }
   if (kind <= 0 || (kind > 3 && kind != 6)) {
     return r3;
   }
-  callees.Call(kHudTick, frame, 0x8216CBEC, Holder(base, machine) + kHud, 1);
-  callees.Call(kHudUpdateWarning, frame, 0x8216CBF8, Holder(base, machine) + kHud);
-  callees.Call(kHudTickPanel, frame, 0x8216CC04, Holder(base, machine) + kHud);
+  callees.Call(kHudTick, frame, 0x8216CBEC, Holder(machine) + kHud, 1);
+  callees.Call(kHudUpdateWarning, frame, 0x8216CBF8, Holder(machine) + kHud);
+  callees.Call(kHudTickPanel, frame, 0x8216CC04, Holder(machine) + kHud);
   const uint64_t last =
-      callees.Call(kHudUpdateView, frame, 0x8216CC10, Holder(base, machine) + kHud);
-  if (Screens(base, Holder(base, machine)).hud().countdown_running() == 0) {
-    Machine(base, machine).set_state(7);
+      callees.Call(kHudUpdateView, frame, 0x8216CC10, Holder(machine) + kHud);
+  if (Screens(Holder(machine)).hud().countdown_running() == 0) {
+    Machine(machine).set_state(7);
   }
   return last;
 }
 
-std::optional<uint64_t> RaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> RaceDraw(uint64_t r3, uint32_t sp,
                                  const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216CE00 RaceHudMachine::RaceDraw");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 6) {
     return r3;
   }
-  const uint32_t holder = Holder(base, machine);
-  if (kind == 5 || ReplayBit(base, holder)) {
+  const uint32_t holder = Holder(machine);
+  if (kind == 5 || ReplayBit(holder)) {
     return callees.Call(kAltRunMovie, frame, 0x8216CE74, holder + kAltHud);
   }
   const uint32_t hud = holder + kHud;
@@ -203,20 +203,20 @@ std::optional<uint64_t> RaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
   return callees.Call(kHudRunMovie, frame, 0x8216CE64, hud, 0);
 }
 
-std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+std::optional<uint64_t> RaceUpdate(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                    const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216D918 RaceHudMachine::RaceUpdate");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   if (kind <= 0 || (kind > 3 && kind != 5 && kind != 6)) {
     return r3;
   }
-  const uint32_t holder = Holder(base, machine);
-  if (kind != 5 && !ReplayBit(base, holder)) {
+  const uint32_t holder = Holder(machine);
+  if (kind != 5 && !ReplayBit(holder)) {
     const uint32_t hud = holder + kHud;
     callees.Call(kHudTick, frame, 0x8216D980, hud, 1);
     callees.Call(kHudUpdateView, frame, 0x8216D988, hud);
@@ -225,95 +225,95 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
   }
   const uint64_t answer = callees.Call(kAltTick, frame, 0x8216D9A8, holder + kAltHud);
   if (uint32_t(answer) != 0) {
-    race_states::steps::Post(base, dispatcher, 20);
+    race_states::steps::Post(dispatcher, 20);
   }
   return answer;
 }
 
-std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+std::optional<uint64_t> ResultsUpdate(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = G::race_data(base).address;
-  const int32_t race_kind = int32_t(Race(base, race).kind());
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t race = G::race_data().address;
+  const int32_t race_kind = int32_t(Race(race).kind());
+  const uint32_t kind = Machine(machine).kind();
   // Kind 4's sub_82216850 and the results of race kinds 2, 4 and 6 and of
   // kind 1 outside the career (sub_8221F930, sub_8221FFF0) are never seen
   // in play: the original runs.
   if (kind == 4 || race_kind == 2 || race_kind == 4 || race_kind == 6 ||
-      (race_kind == 1 && int32_t(Race(base, race).race_mode()) == 0)) {
+      (race_kind == 1 && int32_t(Race(race).race_mode()) == 0)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216DFD0 RaceHudMachine::ResultsUpdate");
-  const uint32_t frame = Frame(base, sp, 144);
-  vehicle_accessors::RacerRecordsAt(base, Race(base, race).results_address(), 0xFFFFFFFFu);
+  const uint32_t frame = Frame(sp, 144);
+  vehicle_accessors::RacerRecordsAt(Race(race).results_address(), 0xFFFFFFFFu);
   if (kind < 4 || kind == 6) {
-    const uint32_t hud = Holder(base, machine) + kHud;
+    const uint32_t hud = Holder(machine) + kHud;
     callees.Call(kHudTick, frame, 0x8216E038, hud, 0);
     callees.Call(kHudUpdateWarning, frame, 0x8216E040, hud);
   }
   uint64_t answer = 0;
-  if (race_kind == 1 && IsFirstDay(base, frame) == 0) {
+  if (race_kind == 1 && IsFirstDay(frame) == 0) {
     answer = callees.Call(kCareerResultsUpdate, frame, 0x8216E0C4,
-                          Screens(base, Holder(base, machine)).career_results().address);
+                          Screens(Holder(machine)).career_results().address);
   }
-  const uint32_t first_day = IsFirstDay(base, frame);
+  const uint32_t first_day = IsFirstDay(frame);
   if (first_day != 0) {
-    race_states::steps::Post(base, dispatcher, 48);
-  } else if (uint32_t(answer) != 0 || ReplayBit(base, Holder(base, machine))) {
-    Machine(base, machine).set_state(22);
+    race_states::steps::Post(dispatcher, 48);
+  } else if (uint32_t(answer) != 0 || ReplayBit(Holder(machine))) {
+    Machine(machine).set_state(22);
   }
   return first_day;
 }
 
-std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+std::optional<uint64_t> PauseUpdate(uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;  // kind 4's pause (sub_82211458), never seen in play
   }
   ITC_NATIVE_RUNNING("sub_8216DB70 RaceHudMachine::PauseUpdate");
-  const uint32_t frame = Frame(base, sp, 128);
-  const int32_t mode = int32_t(G::race_data(base).race_mode());
+  const uint32_t frame = Frame(sp, 128);
+  const int32_t mode = int32_t(G::race_data().race_mode());
   uint64_t answer = 0;
   if (kind > 0 && (kind <= 3 || kind == 5 || kind == 6)) {
     if (kind == 6 && mode == 8) {
-      const uint32_t hud = Holder(base, machine) + kHud;
+      const uint32_t hud = Holder(machine) + kHud;
       callees.Call(kHudTick, frame, 0x8216DBE8, hud, 1);
       callees.Call(kHudUpdateWarning, frame, 0x8216DBF0, hud);
       callees.Call(kHudTickPanel, frame, 0x8216DBF8, hud);
     }
     // PauseMenu::Update's handlers don't read r4: the dispatcher passed.
     answer = callees.Call(kPauseMenuUpdate, frame, 0x8216DC04,
-                          G::holder(base).pause_menu().address, dispatcher);
+                          G::holder().pause_menu().address, dispatcher);
   }
   switch (uint32_t(answer)) {
     case 1:
-      race_states::steps::Post(base, dispatcher, 29);
+      race_states::steps::Post(dispatcher, 29);
       break;
     case 2:
     case 6:
     case 7:
-      race_states::steps::Post(base, dispatcher, 48);
+      race_states::steps::Post(dispatcher, 48);
       break;
     case 3:
-      race_states::steps::Post(base, dispatcher, 45);
+      race_states::steps::Post(dispatcher, 45);
       // sub_82211D00 (the countdown stopped), never seen in play: the
       // original.
-      return callees.Call(0x82211D00, frame, 0x8216DCF4, Holder(base, machine));
+      return callees.Call(0x82211D00, frame, 0x8216DCF4, Holder(machine));
     case 4:
-      race_states::steps::Post(base, dispatcher, 20);
+      race_states::steps::Post(dispatcher, 20);
       break;
     case 5:
-      race_states::steps::Post(base, dispatcher, 21);
+      race_states::steps::Post(dispatcher, 21);
       break;
     case 8:
       return callees.Call(kHudApplyOptions, frame, 0x8216DD14,
-                          uint64_t(G::holder(base).address) + kHud);
+                          uint64_t(G::holder().address) + kHud);
     case 9:
-      race_states::steps::Post(base, dispatcher, 48);
+      race_states::steps::Post(dispatcher, 48);
       if (mode == 7) {
-        G::network_session(base).set_screen3_after_race(1);
+        G::network_session().set_screen3_after_race(1);
       }
       break;
     default:
@@ -322,13 +322,13 @@ std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatc
   return answer;
 }
 
-std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher,
+std::optional<uint64_t> AfterRaceUpdate(uint64_t r3, uint32_t dispatcher,
                                         uint32_t sp, const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = G::race_data(base).address;
-  const uint32_t kind = Machine(base, machine).kind();
-  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, Race(base, race).results_address(), 0xFFFFFFFFu);
-  const uint32_t word = Result(base, record).kind6_result();
+  const uint32_t race = G::race_data().address;
+  const uint32_t kind = Machine(machine).kind();
+  const uint32_t record = vehicle_accessors::RacerRecordsAt(Race(race).results_address(), 0xFFFFFFFFu);
+  const uint32_t word = Result(record).kind6_result();
   // Kind 0's +12 screen, kind 4's and kind 6's screen after the race
   // (sub_8220B9E8, sub_82216850, sub_8221F1E8), never seen in play: the
   // original.
@@ -336,28 +336,28 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216DD88 RaceHudMachine::AfterRaceUpdate");
-  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t frame = Frame(sp, 128);
   uint64_t last = record;
   if ((kind >= 1 && kind <= 3) || kind == 6) {
-    const uint32_t hud = Holder(base, machine) + kHud;
+    const uint32_t hud = Holder(machine) + kHud;
     callees.Call(kHudTick, frame, 0x8216DDEC, hud, 0);
     last = callees.Call(kHudUpdateWarning, frame, 0x8216DDF4, hud);
   }
   // A post, then the replay bit (+8 bit 0) set or cleared.
   auto post = [&](uint32_t message, bool set) {
-    race_states::steps::Post(base, dispatcher, message);
-    const uint32_t holder = Holder(base, machine);
-    const Screens screens(base, holder);
+    race_states::steps::Post(dispatcher, message);
+    const uint32_t holder = Holder(machine);
+    const Screens screens(holder);
     const uint32_t flags = screens.flags();
     screens.set_flags(set ? (flags | 1) : (flags & ~1u));
   };
-  const int32_t now = int32_t(Machine(base, machine).kind());
+  const int32_t now = int32_t(Machine(machine).kind());
   if (now <= 0) {
     return last;
   }
   if (now == 6) {
     if (word == 0 || word == 2) {
-      race_states::steps::Post(base, dispatcher, 40);
+      race_states::steps::Post(dispatcher, 40);
     }
     return last;
   }
@@ -365,7 +365,7 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
     return last;
   }
   const uint64_t answer = callees.Call(kAfterRaceUpdate, frame, 0x8216DF90,
-                                       Screens(base, Holder(base, machine)).after_race_menu().address);
+                                       Screens(Holder(machine)).after_race_menu().address);
   switch (uint32_t(answer)) {
     case 1:
     case 8:
@@ -389,61 +389,61 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
   return answer;
 }
 
-std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> CloseResults(uint64_t r3, uint32_t sp,
                                      const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = G::race_data(base).address;
-  const int32_t kind = int32_t(Race(base, race).kind());
+  const uint32_t race = G::race_data().address;
+  const int32_t kind = int32_t(Race(race).kind());
   if (kind == 6) {
     return std::nullopt;  // kind 6's screen after the race, never seen in play
   }
   ITC_NATIVE_RUNNING("sub_8216D198 RaceHudMachine::CloseResults");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   // The results' screen by the kind (the empty sub_82106540 on it: only its
   // loads are left).
   if (kind == 1) {
-    const int32_t mode = int32_t(Race(base, race).race_mode());
-    const Screens screens(base, Holder(base, machine));
+    const int32_t mode = int32_t(Race(race).race_mode());
+    const Screens screens(Holder(machine));
     mode != 0 ? screens.career_results() : screens.race_results();
   } else if (kind == 2) {
-    Screens(base, Holder(base, machine)).race_results();
+    Screens(Holder(machine)).race_results();
   } else if (kind == 4) {
-    Screens(base, Holder(base, machine)).split_results_screen();
+    Screens(Holder(machine)).split_results_screen();
   }
   const uint64_t closed =
-      callees.Call(kAfterRaceClose, frame, 0x8216D24C, Screens(base, Holder(base, machine)).after_race_menu().address);
-  Screens(base, Holder(base, machine)).hud().set_signs_on(1);
+      callees.Call(kAfterRaceClose, frame, 0x8216D24C, Screens(Holder(machine)).after_race_menu().address);
+  Screens(Holder(machine)).hud().set_signs_on(1);
   return closed;
 }
 
-std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+std::optional<uint64_t> SetUp(uint64_t r3, uint32_t sp, const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216D450 RaceHudMachine::SetUp");
-  const uint32_t frame = Frame(base, sp, 160);
+  const uint32_t frame = Frame(sp, 160);
   uint64_t last = r3;
   uint32_t hud = 0;
   bool hud_set_up = false;
   if (kind == 1 || kind == 2) {
     // Then as kind 3.
-    callees.Call(kAltSetUp, frame, 0x8216D598, Holder(base, machine) + kAltHud, 0);
+    callees.Call(kAltSetUp, frame, 0x8216D598, Holder(machine) + kAltHud, 0);
   }
   if (kind >= 1 && kind <= 3) {
-    hud = Holder(base, machine) + kHud;
+    hud = Holder(machine) + kHud;
     callees.Call(kHudSetPlayer, frame, 0x8216D5AC, hud, 0);
     hud_set_up = true;
   } else if (kind == 5) {
-    last = callees.Call(kAltSetUp, frame, 0x8216D584, Holder(base, machine) + kAltHud, 0);
+    last = callees.Call(kAltSetUp, frame, 0x8216D584, Holder(machine) + kAltHud, 0);
   } else if (kind == 6) {
-    const uint32_t holder = Holder(base, machine);
+    const uint32_t holder = Holder(machine);
     hud = holder + kHud;
     // The player's racer record's word +3888 (race data + 3,936 x (its
     // index + 1)), bit 0x400.
-    const uint32_t index = G::racers_manager(base).racer0().record();
-    const uint32_t word = Load(base, (index + 1) * 3936 + G::race_data(base).address);
+    const uint32_t index = G::racers_manager().racer0().record();
+    const uint32_t word = Load((index + 1) * 3936 + G::race_data().address);
     const uint32_t player = (word >> 10) & 1;
     callees.Call(kHudSetPlayer, frame, player != 0 ? 0x8216D4D8 : 0x8216D4E8, hud, player);
     callees.Call(kAltSetUp, frame, 0x8216D4F4, holder + kAltHud, player);
@@ -459,17 +459,17 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     callees.Call(kHudApplyOptions, frame, 0x8216D5E4, hud);
     last = callees.Call(kHudSetUpSigns, frame, 0x8216D5EC, hud);
   }
-  Machine(base, machine).set_message30(0);
+  Machine(machine).set_message30(0);
   return last;
 }
 
-uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees) {
+uint64_t CreateScreens(uint32_t machine, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CA28 RaceHudMachine::CreateScreens");
-  const uint32_t frame = Frame(base, sp, 112);
-  Machine(base, machine).set_kind(G::race_data(base).kind());
-  const uint32_t race = G::race_data(base).address;
-  const int32_t type = int32_t(vehicle_accessors::StagesType(base, Race(base, race).stages_address(), 0xFFFFFFFFu));
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t frame = Frame(sp, 112);
+  Machine(machine).set_kind(G::race_data().kind());
+  const uint32_t race = G::race_data().address;
+  const int32_t type = int32_t(vehicle_accessors::StagesType(Race(race).stages_address(), 0xFFFFFFFFu));
+  const uint32_t kind = Machine(machine).kind();
   // The holder's kind, or -1 for none.
   int32_t holder_kind = -1;
   auto by_type = [type](int32_t even, int32_t odd) {
@@ -486,7 +486,7 @@ uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
       if (type == 0 || type == 2 || type == 4) {
         holder_kind = 0;
       } else if (type == 1 || type == 3) {
-        holder_kind = G::race_data(base).race_mode() == 0 ? 2 : 1;
+        holder_kind = G::race_data().race_mode() == 0 ? 2 : 1;
       }
       break;
     case 2:
@@ -512,19 +512,19 @@ uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   if (holder_kind >= 0) {
     r3 = callees.Call(kScreensCreate, frame, 0x8216CB74, uint32_t(holder_kind));
   }
-  Machine(base, machine).set_holder(G::holder(base).address);
+  Machine(machine).set_holder(G::holder().address);
   return r3;
 }
 
-uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+uint64_t StartCountdown(uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CC60 RaceHudMachine::StartCountdown");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 112);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
-  const uint32_t race = G::race_data(base).address;
+  const uint32_t frame = Frame(sp, 112);
+  const int32_t kind = int32_t(Machine(machine).kind());
+  const uint32_t race = G::race_data().address;
   uint64_t result = r3;
   auto type = [&]() {
-    const uint32_t t = vehicle_accessors::StagesType(base, Race(base, race).stages_address(), 0xFFFFFFFFu);
+    const uint32_t t = vehicle_accessors::StagesType(Race(race).stages_address(), 0xFFFFFFFFu);
     result = t;
     return t;
   };
@@ -533,7 +533,7 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     case 1: {
       const uint32_t t = type();
       if (t == 1 || t == 3) {
-        mode = G::race_data(base).race_mode() == 0 ? 2 : 1;
+        mode = G::race_data().race_mode() == 0 ? 2 : 1;
       }
       break;
     }
@@ -553,142 +553,142 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     default:
       break;
   }
-  if (ReplayBit(base, Holder(base, machine))) {
+  if (ReplayBit(Holder(machine))) {
     return result;
   }
-  const int32_t now = int32_t(Machine(base, machine).kind());
+  const int32_t now = int32_t(Machine(machine).kind());
   if (now <= 0) {
     return result;
   }
   if (now <= 3 || now == 6) {
-    Screens(base, Holder(base, machine)).hud().set_racers(G::race_progress(base).address + 2184);
-    callees.Call(kHudSetMode, frame, 0x8216CDB4, Holder(base, machine) + kHud, mode);
-    return callees.Call(kHudStartCountdown, frame, 0x8216CDC0, Holder(base, machine) + kHud);
+    Screens(Holder(machine)).hud().set_racers(G::race_progress().address + 2184);
+    callees.Call(kHudSetMode, frame, 0x8216CDB4, Holder(machine) + kHud, mode);
+    return callees.Call(kHudStartCountdown, frame, 0x8216CDC0, Holder(machine) + kHud);
   }
   if (now == 4) {
-    Screens(base, Holder(base, machine)).split_hud().set_results(G::race_progress(base).address + 2184);
-    callees.Call(k656SetMode, frame, 0x8216CDEC, Holder(base, machine) + 656, mode);
-    return callees.Call(k656Start, frame, 0x8216CDF8, Holder(base, machine) + 656);
+    Screens(Holder(machine)).split_hud().set_results(G::race_progress().address + 2184);
+    callees.Call(k656SetMode, frame, 0x8216CDEC, Holder(machine) + 656, mode);
+    return callees.Call(k656Start, frame, 0x8216CDF8, Holder(machine) + 656);
   }
   return result;
 }
 
-uint64_t ClosePause(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+uint64_t ClosePause(uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C658 RaceHudMachine::ClosePause");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const uint32_t frame = Frame(sp, 96);
+  const int32_t kind = int32_t(Machine(machine).kind());
   uint64_t last = r3;
   if (kind == 4) {
     // The empty sub_82106540 on the holder's +1016: its r3 left.
-    last = Screens(base, Holder(base, machine)).kind4_pause_menu().address;
+    last = Screens(Holder(machine)).kind4_pause_menu().address;
   } else if (kind > 0 && (kind <= 3 || kind == 6)) {
-    callees.Call(kPauseMenuClose, frame, 0x8216C69C, Screens(base, Holder(base, machine)).pause_menu().address);
+    callees.Call(kPauseMenuClose, frame, 0x8216C69C, Screens(Holder(machine)).pause_menu().address);
     last = callees.Call(kHudApplyOptions, frame, 0x8216C6A8,
-                        uint64_t(Holder(base, machine)) + kHud);
+                        uint64_t(Holder(machine)) + kHud);
   }
-  Machine(base, machine).set_message30(0);
+  Machine(machine).set_message30(0);
   return last;
 }
 
-std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> ResultsDraw(uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = G::race_data(base).address;
-  const uint32_t race_kind = Race(base, race).kind();
-  const bool career = race_kind == 1 && Race(base, race).race_mode() != 0;
-  if (Machine(base, machine).kind() == 4 || race_kind == 0 || race_kind == 2 || race_kind == 4 ||
+  const uint32_t race = G::race_data().address;
+  const uint32_t race_kind = Race(race).kind();
+  const bool career = race_kind == 1 && Race(race).race_mode() != 0;
+  if (Machine(machine).kind() == 4 || race_kind == 0 || race_kind == 2 || race_kind == 4 ||
       race_kind == 6 || (race_kind == 1 && !career)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216D6D0 RaceHudMachine::ResultsDraw");
-  const uint32_t frame = Frame(base, sp, 96);
-  if (career && IsFirstDay(base, frame) == 0) {
-    callees.Call(kCareerResultsDraw, frame, 0x8216D76C, Screens(base, Holder(base, machine)).career_results().address);
+  const uint32_t frame = Frame(sp, 96);
+  if (career && IsFirstDay(frame) == 0) {
+    callees.Call(kCareerResultsDraw, frame, 0x8216D76C, Screens(Holder(machine)).career_results().address);
   }
-  return callees.Call(kHudDraw, frame, 0x8216D794, uint64_t(Holder(base, machine)) + kHud);
+  return callees.Call(kHudDraw, frame, 0x8216D794, uint64_t(Holder(machine)) + kHud);
 }
 
-std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> AfterRaceDraw(uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = G::race_data(base).address;
-  const uint32_t kind = Machine(base, machine).kind();
-  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, Race(base, race).results_address(), 0xFFFFFFFFu);
+  const uint32_t race = G::race_data().address;
+  const uint32_t kind = Machine(machine).kind();
+  const uint32_t record = vehicle_accessors::RacerRecordsAt(Race(race).results_address(), 0xFFFFFFFFu);
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   if (kind == 6) {
-    const int32_t word = int32_t(Result(base, record).kind6_result());
+    const int32_t word = int32_t(Result(record).kind6_result());
     if (word == 1 || word == 3) {
       return std::nullopt;
     }
   }
   ITC_NATIVE_RUNNING("sub_8216C6D8 RaceHudMachine::AfterRaceDraw");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 3) {
     return record;
   }
-  callees.Call(kHudDraw, frame, 0x8216C768, uint64_t(Holder(base, machine)) + kHud);
-  return callees.Call(kDrawAfterRaceMenu, frame, 0x8216C770, Holder(base, machine));
+  callees.Call(kHudDraw, frame, 0x8216C768, uint64_t(Holder(machine)) + kHud);
+  return callees.Call(kDrawAfterRaceMenu, frame, 0x8216C770, Holder(machine));
 }
 
-std::optional<uint64_t> PauseDraw(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+std::optional<uint64_t> PauseDraw(uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CF08 RaceHudMachine::PauseDraw");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 6) {
     return r3;
   }
-  if (kind != 5 && !ReplayBit(base, Holder(base, machine))) {
-    callees.Call(kHudDraw, frame, 0x8216CF58, uint64_t(Holder(base, machine)) + kHud);
-    callees.Call(kHudDrawWarning, frame, 0x8216CF64, uint64_t(Holder(base, machine)) + kHud);
-    return callees.Call(kDrawPauseMenu, frame, 0x8216CF6C, Holder(base, machine));
+  if (kind != 5 && !ReplayBit(Holder(machine))) {
+    callees.Call(kHudDraw, frame, 0x8216CF58, uint64_t(Holder(machine)) + kHud);
+    callees.Call(kHudDrawWarning, frame, 0x8216CF64, uint64_t(Holder(machine)) + kHud);
+    return callees.Call(kDrawPauseMenu, frame, 0x8216CF6C, Holder(machine));
   }
-  callees.Call(kDrawPauseMenu, frame, 0x8216CF78, Holder(base, machine));
-  return callees.Call(kAltRunMovie, frame, 0x8216CF84, uint64_t(Holder(base, machine)) + kAltHud);
+  callees.Call(kDrawPauseMenu, frame, 0x8216CF78, Holder(machine));
+  return callees.Call(kAltRunMovie, frame, 0x8216CF84, uint64_t(Holder(machine)) + kAltHud);
 }
 
-std::optional<uint64_t> RacePauseDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+std::optional<uint64_t> RacePauseDraw(uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CFE0 RaceHudMachine::RacePauseDraw");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Machine(base, machine).kind();
+  const uint32_t kind = Machine(machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   if (kind > 6) {
     return r3;
   }
-  if (kind != 5 && !ReplayBit(base, Holder(base, machine))) {
-    callees.Call(kHudDraw, frame, 0x8216D030, uint64_t(Holder(base, machine)) + kHud);
-    callees.Call(kHudRunMovie, frame, 0x8216D040, uint64_t(Holder(base, machine)) + kHud, 1);
-    callees.Call(kHudDrawWarning, frame, 0x8216D04C, uint64_t(Holder(base, machine)) + kHud);
-    return callees.Call(kDrawPauseMenu, frame, 0x8216D054, Holder(base, machine));
+  if (kind != 5 && !ReplayBit(Holder(machine))) {
+    callees.Call(kHudDraw, frame, 0x8216D030, uint64_t(Holder(machine)) + kHud);
+    callees.Call(kHudRunMovie, frame, 0x8216D040, uint64_t(Holder(machine)) + kHud, 1);
+    callees.Call(kHudDrawWarning, frame, 0x8216D04C, uint64_t(Holder(machine)) + kHud);
+    return callees.Call(kDrawPauseMenu, frame, 0x8216D054, Holder(machine));
   }
-  callees.Call(kDrawPauseMenu, frame, 0x8216D060, Holder(base, machine));
-  return callees.Call(kAltRunMovie, frame, 0x8216D06C, uint64_t(Holder(base, machine)) + kAltHud);
+  callees.Call(kDrawPauseMenu, frame, 0x8216D060, Holder(machine));
+  return callees.Call(kAltRunMovie, frame, 0x8216D06C, uint64_t(Holder(machine)) + kAltHud);
 }
 
 namespace {
 
 // PauseMenu::Open(holder +1012, page, flag) as a tail call.
-uint64_t OpenAt(uint8_t* base, uint32_t holder, uint64_t page, uint64_t flag, uint32_t sp,
+uint64_t OpenAt(uint32_t holder, uint64_t page, uint64_t flag, uint32_t sp,
                 uint32_t lr, const Calls& callees) {
-  return callees.Call(kPauseMenuOpen, sp, lr, Screens(base, holder).pause_menu().address, page, flag);
+  return callees.Call(kPauseMenuOpen, sp, lr, Screens(holder).pause_menu().address, page, flag);
 }
 
 }  // namespace
 
-std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+std::optional<uint64_t> OpenPause(uint64_t r3, uint32_t sp, uint32_t lr,
                                   const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const int32_t kind = int32_t(Machine(machine).kind());
   if (kind == 4 || kind == 6) {
     return std::nullopt;
   }
@@ -696,78 +696,78 @@ std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint3
     return r3;
   }
   ITC_NATIVE_RUNNING("sub_8216D600 RaceHudMachine::OpenPause");
-  const uint32_t holder = Holder(base, machine);
+  const uint32_t holder = Holder(machine);
   switch (kind) {
     case 1:
-      return OpenAt(base, holder, ReplayBit(base, holder) ? 8 : 0, 0, sp, lr, callees);
+      return OpenAt(holder, ReplayBit(holder) ? 8 : 0, 0, sp, lr, callees);
     case 2:
-      return OpenAt(base, holder, 3, 0, sp, lr, callees);
+      return OpenAt(holder, 3, 0, sp, lr, callees);
     case 3:
-      return OpenAt(base, holder, 4, 0, sp, lr, callees);
+      return OpenAt(holder, 4, 0, sp, lr, callees);
     default:
-      return OpenAt(base, holder, 8, 0, sp, lr, callees);
+      return OpenAt(holder, 8, 0, sp, lr, callees);
   }
 }
 
-std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+std::optional<uint64_t> OpenRacePause(uint64_t r3, uint32_t sp, uint32_t lr,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Machine(base, machine).kind());
-  if (kind == 4 || (kind == 6 && !ReplayBit(base, Holder(base, machine)))) {
+  const int32_t kind = int32_t(Machine(machine).kind());
+  if (kind == 4 || (kind == 6 && !ReplayBit(Holder(machine)))) {
     return std::nullopt;
   }
   if (kind < 1 || kind > 6) {
     return r3;
   }
   ITC_NATIVE_RUNNING("sub_8216DA40 RaceHudMachine::OpenRacePause");
-  const uint32_t holder = Holder(base, machine);
+  const uint32_t holder = Holder(machine);
   switch (kind) {
     case 1:
-      if (ReplayBit(base, holder)) {
-        return OpenAt(base, holder, 8, 0, sp, lr, callees);
+      if (ReplayBit(holder)) {
+        return OpenAt(holder, 8, 0, sp, lr, callees);
       }
-      if (G::race_data(base).race_mode() != 0) {
-        return OpenCareerPause(base, machine, sp, callees);
+      if (G::race_data().race_mode() != 0) {
+        return OpenCareerPause(machine, sp, callees);
       }
-      return OpenAt(base, holder, 2, 0, sp, lr, callees);
+      return OpenAt(holder, 2, 0, sp, lr, callees);
     case 2:
-      return OpenAt(base, holder, ReplayBit(base, holder) ? 8 : 3, 0, sp, lr, callees);
+      return OpenAt(holder, ReplayBit(holder) ? 8 : 3, 0, sp, lr, callees);
     case 3:
-      return OpenAt(base, holder, 4, 0, sp, lr, callees);
+      return OpenAt(holder, 4, 0, sp, lr, callees);
     default:  // 5, and 6 with the replay bit
-      return OpenAt(base, holder, 8, 0, sp, lr, callees);
+      return OpenAt(holder, 8, 0, sp, lr, callees);
   }
 }
 
-uint64_t OpenCareerPause(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees) {
+uint64_t OpenCareerPause(uint32_t machine, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216D8C8 RaceHudMachine::OpenCareerPause");
-  const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t first_day = IsFirstDay(base, frame);
-  return OpenAt(base, Holder(base, machine), 1, first_day != 0 ? 1 : 0, frame, 0x8216D900,
+  const uint32_t frame = Frame(sp, 96);
+  const uint32_t first_day = IsFirstDay(frame);
+  return OpenAt(Holder(machine), 1, first_day != 0 ? 1 : 0, frame, 0x8216D900,
                 callees);
 }
 
-uint32_t IsFirstDay(uint8_t* base, uint32_t sp) {
+uint32_t IsFirstDay(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8216D3F0 RaceHudMachine::IsFirstDay");
-  Frame(base, sp, 96);
-  if (int32_t(G::race_data(base).kind()) != 1) {
+  Frame(sp, 96);
+  if (int32_t(G::race_data().kind()) != 1) {
     return 0;
   }
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const int32_t day = int32_t(Save(base, save).day());
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
+  const int32_t day = int32_t(Save(save).day());
   return day <= 999 && day == 1 ? 1 : 0;
 }
 
-uint32_t OpponentPrize(uint8_t* base, uint32_t id, uint32_t sp) {
+uint32_t OpponentPrize(uint32_t id, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8216C820 RaceHudMachine::OpponentPrize");
-  Frame(base, sp, 112);
+  Frame(sp, 112);
   if (int32_t(id) == -1) {
     return 0;
   }
-  const uint32_t item = data_tables::Item(base, id);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const schema::CareerItemRecord record(base, Save(base, save).item_records_address() + id * 12);
-  const int32_t level = int32_t(int8_t(schema::OpponentItem(base, item).sort_key())) + 1;
+  const uint32_t item = data_tables::Item(id);
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
+  const schema::CareerItemRecord record(Save(save).item_records_address() + id * 12);
+  const int32_t level = int32_t(int8_t(schema::OpponentItem(item).sort_key())) + 1;
   int32_t times = 1;
   if (record.wins() == 1) {
     times = record.losses() != 0 ||
@@ -776,7 +776,7 @@ uint32_t OpponentPrize(uint8_t* base, uint32_t id, uint32_t sp) {
                 : 3;
   }
   // The item's byte +35 (signed, compared unsigned).
-  const uint32_t grade = uint32_t(int32_t(int8_t(schema::OpponentItem(base, item).kind())));
+  const uint32_t grade = uint32_t(int32_t(int8_t(schema::OpponentItem(item).kind())));
   int32_t bonus = 0;
   if (grade == 0) {
     bonus = 10;
@@ -793,14 +793,14 @@ uint32_t OpponentPrize(uint8_t* base, uint32_t id, uint32_t sp) {
   return uint32_t(int32_t(value) / 1000);
 }
 
-uint32_t ItemBonus(uint8_t* base, uint32_t id, uint32_t sp) {
+uint32_t ItemBonus(uint32_t id, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8216C938 RaceHudMachine::ItemBonus");
-  Frame(base, sp, 96);
+  Frame(sp, 96);
   if (int32_t(id) == -1) {
     return 0;
   }
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  if (schema::CareerItemRecord(base, Save(base, save).item_records_address() + id * 12).wins() != 1) {
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
+  if (schema::CareerItemRecord(Save(save).item_records_address() + id * 12).wins() != 1) {
     return 0;
   }
   const uint32_t n = id - 376;
@@ -823,25 +823,25 @@ uint32_t ItemBonus(uint8_t* base, uint32_t id, uint32_t sp) {
   return uint32_t(value / 1000);
 }
 
-uint64_t DestroyScreens(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+uint64_t DestroyScreens(uint64_t r3, uint32_t sp, uint32_t lr,
                         const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216C208 RaceHudMachine::DestroyScreens");
   return callees.Call(kScreensDestroy, sp, lr, r3);
 }
 
-uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+uint64_t OnRaceEnd(uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216E5B0 RaceHudMachine::OnRaceEnd");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   uint64_t last = r3;
-  switch (int32_t(Machine(base, machine).kind())) {
+  switch (int32_t(Machine(machine).kind())) {
     case 1:
-      if (G::race_data(base).race_mode() == 0) {
+      if (G::race_data().race_mode() == 0) {
         last = callees.Call(kShowResults, frame, 0x8216E630, r3, 1);
       } else {
-        last = IsFirstDay(base, frame);
+        last = IsFirstDay(frame);
         if (uint32_t(last) == 0) {
-          last = AwardPrize(base, r3, frame, callees);
+          last = AwardPrize(r3, frame, callees);
         }
       }
       break;
@@ -867,32 +867,32 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees
     default:
       break;
   }
-  Screens(base, Holder(base, machine)).hud().set_signs_on(0);
+  Screens(Holder(machine)).hud().set_signs_on(0);
   return last;
 }
 
-uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+uint64_t AwardPrize(uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216E150 RaceHudMachine::AwardPrize");
   using namespace camera_modes::steps;
   const uint32_t machine = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 336);
+  const uint32_t frame = Frame(sp, 336);
   const uint32_t block = frame + 96;
-  auto store = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, block + offset, value); };
-  auto word = [&](uint32_t offset) { return Load(base, block + offset); };
+  auto store = [&](uint32_t offset, uint32_t value) { guest::StoreU32(block + offset, value); };
+  auto word = [&](uint32_t offset) { return Load(block + offset); };
   const uint32_t result =
-      vehicle_accessors::RacerRecordsAt(base, G::race_data(base).results_address(), 0xFFFFFFFFu);
+      vehicle_accessors::RacerRecordsAt(G::race_data().results_address(), 0xFFFFFFFFu);
   uint32_t save = 0;
-  if (int32_t(Machine(base, machine).kind()) == 1) {
-    save = vehicle_accessors::SaveDataOf(base, 0);
+  if (int32_t(Machine(machine).kind()) == 1) {
+    save = vehicle_accessors::SaveDataOf(0);
   }
-  if (!ReplayBit(base, Holder(base, machine))) {
+  if (!ReplayBit(Holder(machine))) {
     // memset(block, 0, 168).
     for (uint32_t i = 0; i < 168; i++) {
-      guest::StoreU8(base, block + i, 0);
+      guest::StoreU8(block + i, 0);
     }
-    const int32_t outcome = int32_t(Result(base, result).outcome());
+    const int32_t outcome = int32_t(Result(result).outcome());
     if (outcome == 1) {
-      const int32_t place = int32_t(Result(base, result).finish());
+      const int32_t place = int32_t(Result(result).finish());
       if (place == 1) {
         store(0, 0);
       } else if (place == 2) {
@@ -900,24 +900,24 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
       } else if (place == 3) {
         store(0, 1);
       }
-      if (int32_t(Result(base, result).finish()) == 1) {
+      if (int32_t(Result(result).finish()) == 1) {
         store(8, 0);
         store(4, 0);
         store(20, 0);
-        const double f0 = Fmuls(Lfs(base, Result(base, result).e0_route_distance_address()), Lfs(base, G::prize_distance_scale_address()));
-        guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(f0)));
-        store(8, uint32_t(int32_t(Load(base, frame + 80)) / 1000));
-        if (int32_t(Result(base, result).count()) > 1) {
+        const double f0 = Fmuls(Lfs(Result(result).e0_route_distance_address()), Lfs(G::prize_distance_scale_address()));
+        guest::StoreU32(frame + 80, uint32_t(Fctiwz(f0)));
+        store(8, uint32_t(int32_t(Load(frame + 80)) / 1000));
+        if (int32_t(Result(result).count()) > 1) {
           int32_t i = 1;
-          uint32_t at = Result(base, result).e1_item_address();
+          uint32_t at = Result(result).e1_item_address();
           do {
-            const uint32_t prize = OpponentPrize(base, Load(base, at), frame);
+            const uint32_t prize = OpponentPrize(Load(at), frame);
             store(4, prize + word(4));
-            const uint32_t bonus = ItemBonus(base, Load(base, at), frame);
+            const uint32_t bonus = ItemBonus(Load(at), frame);
             i++;
             at += 972;
             store(20, bonus + word(20));
-          } while (i < int32_t(Result(base, result).count()));
+          } while (i < int32_t(Result(result).count()));
         }
       }
     } else if (outcome == 3) {
@@ -925,104 +925,104 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
       store(8, 0);
       store(0, 2);
     }
-    const double f30 = Lfs(base, G::one_address());
-    const double f31 = Lfs(base, G::zero_address());
+    const double f30 = Lfs(G::one_address());
+    const double f31 = Lfs(G::zero_address());
     double factor = f31;
     if (save != 0) {
-      const uint32_t day = schema::CareerStats(base, Save(base, save).stats_address()).day_address();
+      const uint32_t day = schema::CareerStats(Save(save).stats_address()).day_address();
       // DayBlock::WinStreak again before each test, as the original.
-      auto streak = [&] { return int32_t(int16_t(career::DayBlockWinStreak(base, day))); };
+      auto streak = [&] { return int32_t(int16_t(career::DayBlockWinStreak(day))); };
       if (streak() >= 20) {
-        factor = Lfs(base, G::streak_factor_20_address());
+        factor = Lfs(G::streak_factor_20_address());
       } else if (streak() >= 15) {
-        factor = Lfs(base, G::streak_factor_15_address());
+        factor = Lfs(G::streak_factor_15_address());
       } else if (streak() >= 10) {
-        factor = Lfs(base, G::streak_factor_10_address());
+        factor = Lfs(G::streak_factor_10_address());
       } else if (streak() >= 7) {
-        factor = Lfs(base, G::streak_factor_7_address());
+        factor = Lfs(G::streak_factor_7_address());
       } else if (streak() >= 5) {
-        factor = Lfs(base, G::streak_factor_5_address());
+        factor = Lfs(G::streak_factor_5_address());
       } else if (streak() >= 3) {
-        factor = Lfs(base, G::streak_factor_3_address());
+        factor = Lfs(G::streak_factor_3_address());
       } else {
         factor = f30;
       }
     }
-    Stfs(base, block + 12, factor);
+    Stfs(block + 12, factor);
     {
       // (+4 + +8) as a doubleword at the frame's +80 (fcfid), times it.
       const int64_t sum = int32_t(word(8) + word(4));
-      guest::StoreU32(base, frame + 80, uint32_t(uint64_t(sum) >> 32));
-      guest::StoreU32(base, frame + 84, uint32_t(sum));
+      guest::StoreU32(frame + 80, uint32_t(uint64_t(sum) >> 32));
+      guest::StoreU32(frame + 84, uint32_t(sum));
       store(16, uint32_t(Fctiwz(Fmuls(Single(double(sum)), factor))));
     }
     double f0;
-    if (Result(base, result).e0_split_count() == 0) {
+    if (Result(result).e0_split_count() == 0) {
       f0 = f31;
-      Stfs(base, block + 24, f0);
+      Stfs(block + 24, f0);
     } else {
-      f0 = Lfs(base, Result(base, result).e0_split_0_address());
-      Stfs(base, block + 24, f0);
+      f0 = Lfs(Result(result).e0_split_0_address());
+      Stfs(block + 24, f0);
       if (f0 == f31) {
         f0 = f30;
-        Stfs(base, block + 24, f0);
+        Stfs(block + 24, f0);
       }
     }
-    const double scale = Lfs(base, G::split_scale_address());
+    const double scale = Lfs(G::split_scale_address());
     store(28, uint32_t(Fctiwz(Fmuls(f0, scale))));
-    if (int32_t(int16_t(Result(base, result).e0_split_count())) > 1) {
+    if (int32_t(int16_t(Result(result).e0_split_count())) > 1) {
       int32_t k = 1;
-      uint32_t at = Result(base, result).e0_split_1_address();
+      uint32_t at = Result(result).e0_split_1_address();
       do {
-        double value = Lfs(base, at);
-        Stfs(base, frame + 80, value);
+        double value = Lfs(at);
+        Stfs(frame + 80, value);
         if (value == f31) {
           value = f30;
-          Stfs(base, frame + 80, value);
+          Stfs(frame + 80, value);
         }
         const uint32_t n = word(160);
         const double product = Fmuls(value, scale);
         store(160, n + 1);
         k++;
         at += 8;
-        guest::StoreU32(base, frame + 84, uint32_t(Fctiwz(product)));
+        guest::StoreU32(frame + 84, uint32_t(Fctiwz(product)));
         // The doubleword at the frame's +80 (the float, the int) copied as
         // one (ld, std).
-        const uint32_t high = Load(base, frame + 80), low = Load(base, frame + 84);
+        const uint32_t high = Load(frame + 80), low = Load(frame + 84);
         const uint32_t pair = frame + 128 + (n << 3);
-        guest::StoreU32(base, pair, high);
-        guest::StoreU32(base, pair + 4, low);
-      } while (k < int32_t(int16_t(Result(base, result).e0_split_count())));
+        guest::StoreU32(pair, high);
+        guest::StoreU32(pair + 4, low);
+      } while (k < int32_t(int16_t(Result(result).e0_split_count())));
     }
-    store(164, Save(base, save).money());
-    callees.Call(kCareerResultsOpen, frame, 0x8216E4A4, Screens(base, Holder(base, machine)).career_results().address,
+    store(164, Save(save).money());
+    callees.Call(kCareerResultsOpen, frame, 0x8216E4A4, Screens(Holder(machine)).career_results().address,
                  block);
     uint64_t total = uint64_t(word(28)) + word(16) + word(20);
     const uint32_t pairs = word(160);
     for (uint32_t p = 0; p < pairs; p++) {
-      total += Load(base, block + 36 + 8 * p);
+      total += Load(block + 36 + 8 * p);
     }
-    career::DayBlockAddWord4832(base, schema::CareerStats(base, Save(base, save).stats_address()).day_address(), total);
-    uint32_t money = uint32_t(Save(base, save).money() + total);
+    career::DayBlockAddWord4832(schema::CareerStats(Save(save).stats_address()).day_address(), total);
+    uint32_t money = uint32_t(Save(save).money() + total);
     if (int32_t(money) > 9999999) {
       money = 9999999;
     }
-    Save(base, save).set_money(money);
-    career::StatsAddPoints(base, Save(base, save).stats_address(), total);
+    Save(save).set_money(money);
+    career::StatsAddPoints(Save(save).stats_address(), total);
   }
-  const uint32_t flag = Result(base, result).outcome() == 3 ? 1 : 0;
-  uint32_t race = G::race_data(base).address;
+  const uint32_t flag = Result(result).outcome() == 3 ? 1 : 0;
+  uint32_t race = G::race_data().address;
   uint32_t menu;
-  if (Race(base, race).race_mode() == 0) {
+  if (Race(race).race_mode() == 0) {
     menu = 4;
-  } else if (vehicle_accessors::StagesHasNext(base, Race(base, race).stages_address()) != 0 &&
-             int32_t(Result(base, result).finish()) == 1) {
+  } else if (vehicle_accessors::StagesHasNext(Race(race).stages_address()) != 0 &&
+             int32_t(Result(result).finish()) == 1) {
     menu = 3;
   } else {
-    race = G::race_data(base).address;
-    menu = int32_t(vehicle_accessors::StagesWord808(base, Race(base, race).stages_address())) != 0 ? 1 : 0;
+    race = G::race_data().address;
+    menu = int32_t(vehicle_accessors::StagesWord808(Race(race).stages_address())) != 0 ? 1 : 0;
   }
-  return callees.Call(kAfterRaceOpen, frame, 0x8216E5A0, Screens(base, Holder(base, machine)).after_race_menu().address,
+  return callees.Call(kAfterRaceOpen, frame, 0x8216E5A0, Screens(Holder(machine)).after_race_menu().address,
                       menu, flag);
 }
 

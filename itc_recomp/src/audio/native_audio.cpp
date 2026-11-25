@@ -115,7 +115,7 @@ class ItcAudioSystem {
     running_ = true;
     // One of our threads (E1, src/threads/): a guest stack and per-thread
     // block for the game's mixer callback, no SDK thread behind it.
-    thread_ = threads::StartThread(memory::Base(), 128 * 1024, "native audio",
+    thread_ = threads::StartThread(128 * 1024, "native audio",
                                    [this](lifted::Args args) { ThreadMain(args); });
     g_system = this;
     ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
@@ -144,7 +144,7 @@ class ItcAudioSystem {
       return 0;
     }
     const uint32_t wrapped_arg = memory::Alloc(4, 0);
-    guest::StoreU32(memory::Base(), wrapped_arg, callback_arg);
+    guest::StoreU32(wrapped_arg, callback_arg);
     {
       std::lock_guard<std::mutex> lock(mutex_);
       client = {};
@@ -201,7 +201,7 @@ class ItcAudioSystem {
       ITC_LOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
       return;
     }
-    const float* input = reinterpret_cast<const float*>(guest::Pointer(memory::Base(), samples));
+    const float* input = reinterpret_cast<const float*>(guest::Pointer(samples));
     std::lock_guard<std::mutex> lock(mutex_);
     Client& client = clients_[index];
     if (!client.in_use) {
@@ -229,7 +229,7 @@ class ItcAudioSystem {
     call.r13 = thread.r13;
     call.lr = 0xBCBCBCBC;
     call.r[0] = arg;
-    lifted::Call(memory::Base(), callback, call);
+    lifted::Call(callback, call);
   }
 
   // Runs each client's mixer while it has credits. The mixer submits its
@@ -400,10 +400,10 @@ using native_audio::g_system;
 // earlier handle first. Returns 0 (S_OK).
 ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
   if (!g_system) {
-    lifted::original::c824657E0(ctx, base);
+    lifted::original::c824657E0(ctx);
     return;
   }
-  const schema::AudioRenderDriver object(base, ctx.r3.u32);
+  const schema::AudioRenderDriver object(ctx.r3.u32);
   uint32_t callback = ctx.r4.u32;
   uint32_t handle = object.handle();
   if (handle) {
@@ -425,18 +425,18 @@ ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
 // failure.
 ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   if (!g_system) {
-    lifted::original::c82465870(ctx, base);
+    lifted::original::c82465870(ctx);
     return;
   }
-  const schema::AudioRenderDriver object(base, ctx.r3.u32);
+  const schema::AudioRenderDriver object(ctx.r3.u32);
   guest::StackFrame frame(ctx, 112);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = frame.Local(80);
-  lifted::Enter(ctx, base, game::XAudioBuffer::GetFormatThunk);
+  lifted::Enter(ctx, game::XAudioBuffer::GetFormatThunk);
   if (ctx.r3.s32 < 0) {
     return;
   }
-  g_system->Submit(object.handle(), guest::LoadU32(base, frame.Local(88)));
+  g_system->Submit(object.handle(), guest::LoadU32(frame.Local(88)));
   ctx.r3.u64 = 0;
 }
 
@@ -445,15 +445,15 @@ ITC_NATIVE_ENTRY_ALWAYS(82465870) {
 // sees none. The destructor's work: its plain C++ (audio/render_driver.h)
 // with --native_render_driver, else the original.
 ITC_NATIVE_ENTRY_ALWAYS(824658C8) {
-  const schema::AudioRenderDriver object(base, ctx.r3.u32);
+  const schema::AudioRenderDriver object(ctx.r3.u32);
   uint32_t handle = object.handle();
   if (g_system && native_audio::IsOurHandle(handle)) {
     g_system->Unregister(handle);
     object.set_handle(0);
   }
   if (ITC_FLAG(native_render_driver)) {
-    lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx, base);
+    lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx);
   } else {
-    lifted::original::c824658C8(ctx, base);
+    lifted::original::c824658C8(ctx);
   }
 }

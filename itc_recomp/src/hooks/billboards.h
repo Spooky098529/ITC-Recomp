@@ -16,12 +16,12 @@ bool BillboardsNative();
 // Billboards::Record (sub_8209CC38): r3 = the set, r4 = the material; r3
 // as the original leaves it, lr put back, flush-to-zero off. The plain C++
 // only (its wrap makes the checks).
-void BillboardsRecord(lifted::Regs& ctx, uint8_t* base);
+void BillboardsRecord(lifted::Regs& ctx);
 
 // Billboards::Draw (sub_8209CDB0, no adapter: the harness's steps): r3 =
 // the set, r4 = the material; r3 = 0 or 1. The plain C++ (Record inside its
 // wrap's checks).
-void BillboardsDraw(lifted::Regs& ctx, uint8_t* base);
+void BillboardsDraw(lifted::Regs& ctx);
 
 // Whether the light groups' plain C++ may run: the recording's flags with
 // --native_models, --native_course_scenery and --native_scenery_lists (its
@@ -30,6 +30,6 @@ bool LightGroupsNative();
 
 // LightGroups::Draw (sub_82148658): r3 = the set, r4 = the groups, r5 = the
 // XPR, r6 = the animation set; r3 as the original leaves it.
-void LightGroupsDraw(lifted::Regs& ctx, uint8_t* base);
+void LightGroupsDraw(lifted::Regs& ctx);
 
 }  // namespace hooks

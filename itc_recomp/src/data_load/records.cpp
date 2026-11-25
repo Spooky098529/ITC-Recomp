@@ -25,9 +25,9 @@ uint32_t FloatWord(float loaded) {
 }
 
 template <size_t N>
-void StoreAll(uint8_t* base, uint32_t object, const uint16_t (&offsets)[N], uint32_t word) {
+void StoreAll(uint32_t object, const uint16_t (&offsets)[N], uint32_t word) {
   for (const uint16_t offset : offsets) {
-    guest::StoreU32(base, object + offset, word);
+    guest::StoreU32(object + offset, word);
   }
 }
 
@@ -46,40 +46,40 @@ constexpr uint16_t kRecordZero[] = {636, 652, 684, 716, 748, 764, 796,
 
 }  // namespace
 
-uint32_t Part464Construct(uint8_t* base, uint32_t part) {
+uint32_t Part464Construct(uint32_t part) {
   ITC_NATIVE_RUNNING("sub_821042A0 Part464::Part464");
-  StoreAll(base, part, kPart464Zero, FloatWord(G::zero(base)));
+  StoreAll(part, kPart464Zero, FloatWord(G::zero()));
   return part;
 }
 
-uint32_t Member4080Construct(uint8_t* base, uint32_t member) {
+uint32_t Member4080Construct(uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82104690 Member4080::Member4080");
-  const schema::ReplayCollisionState state(base, member);
-  Part464Construct(base, state.shape_previous_address());
-  Part464Construct(base, state.shape_current_address());
-  StoreAll(base, member, kMember4080Zero, FloatWord(G::zero(base)));
+  const schema::ReplayCollisionState state(member);
+  Part464Construct(state.shape_previous_address());
+  Part464Construct(state.shape_current_address());
+  StoreAll(member, kMember4080Zero, FloatWord(G::zero()));
   return member;
 }
 
-uint32_t Member1136Construct(uint8_t* base, uint32_t member) {
+uint32_t Member1136Construct(uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82102888 Member1136::Member1136");
-  StoreAll(base, member, kMember1136Zero, FloatWord(G::zero(base)));
+  StoreAll(member, kMember1136Zero, FloatWord(G::zero()));
   return member;
 }
 
-uint32_t Record5232Construct(uint8_t* base, uint32_t record) {
+uint32_t Record5232Construct(uint32_t record) {
   ITC_NATIVE_RUNNING("sub_82104C20 Record5232::Record5232");
-  const uint32_t one = FloatWord(G::one(base));
-  StoreAll(base, record, kRecordOne, one);
+  const uint32_t one = FloatWord(G::one());
+  StoreAll(record, kRecordOne, one);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t k = 0; k < 4; k++) {
-      guest::StoreU32(base, record + 252 + 96 * row + 16 * k, one);
+      guest::StoreU32(record + 252 + 96 * row + 16 * k, one);
     }
   }
-  StoreAll(base, record, kRecordZero, FloatWord(G::zero(base)));
-  const schema::ReplayRecord view(base, record);
-  Member1136Construct(base, view.physics_address());
-  Member4080Construct(base, view.collision_address());
+  StoreAll(record, kRecordZero, FloatWord(G::zero()));
+  const schema::ReplayRecord view(record);
+  Member1136Construct(view.physics_address());
+  Member4080Construct(view.collision_address());
   return record;
 }
 

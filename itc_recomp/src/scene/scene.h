@@ -29,31 +29,30 @@ constexpr uint32_t kAssetsBytes = 4880;
 // --- The small pieces ---
 
 // SceneSetUp::SceneSetUp (sub_820D0D50): +36 and +40 = 0.
-void SetUpConstruct(uint8_t* base, uint32_t record);
+void SetUpConstruct(uint32_t record);
 
 // FreePagesIn (sub_820D09A0): VirtualFree([at], 0, MEM_RELEASE), a tail
 // call; returns VirtualFree's 1. nullopt, with nothing done, where the word
 // isn't pages the allocation layer gave (VirtualFree's adapter would go to
 // the original; 0 too).
-std::optional<uint32_t> FreePagesIn(uint8_t* base, uint32_t at);
+std::optional<uint32_t> FreePagesIn(uint32_t at);
 
 // ScenePools::StartTeardownA (sub_820C3C80): the first set's (not checked)
 // +4 = 4 and +0 = 2, the pointer read again for each.
-void StartTeardownA(uint8_t* base);
+void StartTeardownA();
 
 // CarScene::StartTeardown (sub_820C4D88): when the scene exists, +0 = 4 and
 // +48 = 2 (the pointer read again), StartTeardownA, then
 // `release_all(the accessories' set)` (Accessories::ReleaseAll, the r3 it
 // leaves). The r3 it leaves: release_all's, or nullopt (r3 as given) when
 // the scene is gone.
-std::optional<uint64_t> StartTeardown(uint8_t* base,
-                                      const std::function<uint64_t(uint32_t set)>& release_all);
+std::optional<uint64_t> StartTeardown(const std::function<uint64_t(uint32_t set)>& release_all);
 
 // CarScene::SetInteriorWord (sub_820C8950): for each scene model in pool 7
 // (+5028, its count +5036; List::At) whose interior is ready (+5072), the
 // interior's (+5068) +11616 = `word`. Returns the r3 it leaves: the last
 // List::At's, or nullopt (r3 as given) for an empty count.
-std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t word);
+std::optional<uint32_t> SetInteriorWord(uint32_t scene, uint32_t word);
 
 // CarScene::LoadsDone (sub_820C5798): 0 while any of the shared assets'
 // eight slots (+84, +132, +156, +268, +472, +964, +4156, +4764) is loading
@@ -70,7 +69,7 @@ std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t 
 using FinishCall =
     std::function<uint64_t(uint32_t function, uint32_t frame, uint32_t lr, uint32_t r3,
                            uint32_t r4)>;
-uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish);
+uint32_t LoadsDone(uint32_t scene, uint32_t sp, const FinishCall& finish);
 
 // ScenePools::DestroyA (sub_820C3CF8): for each of the first set's seven
 // pools (+56 + 12 x pool), while List::At(list, 0) finds an object:
@@ -79,12 +78,12 @@ uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall&
 // VirtualFree(object, 0, MEM_RELEASE) (the allocation layer's pages). r3 is
 // left 0 (the last List::At's). Only where DestroyAFreeable (the adapter's
 // check).
-void DestroyA(uint8_t* base, uint32_t set, uint32_t sp,
+void DestroyA(uint32_t set, uint32_t sp,
               const std::function<void(uint32_t object, uint32_t frame)>& destroy);
 // Whether DestroyA frees natively: every object in the seven lists (linked
 // by +8) the allocation layer's pages, and each list's walk ends (at most
 // 4,096 nodes).
-bool DestroyAFreeable(uint8_t* base, uint32_t set);
+bool DestroyAFreeable(uint32_t set);
 
 // --- The shared assets (scene + 64) ---
 
@@ -102,7 +101,7 @@ constexpr uint32_t kAssetsModels[6] = {416, 1184, 1648, 2112, 2576, 4096};
 // assets. False, with nothing done, where a member's plain C++ would refuse
 // (a provider's storage operator new can't give natively); only where the
 // models' lifetime is native (the adapter's check).
-bool AssetsConstruct(uint8_t* base, uint32_t assets);
+bool AssetsConstruct(uint32_t assets);
 
 // SceneAssets::Reset (sub_820C4A70): LoadSlot::Reset on every slot,
 // XPR::Release on every XPR, the providers' slot 2 (TextureProvider::ClearAll),
@@ -110,18 +109,18 @@ bool AssetsConstruct(uint8_t* base, uint32_t assets);
 // 4i) = 0, in the layout's order. Returns the r3 it leaves (the last
 // provider, +4860); nullopt, with nothing done, where AssetsResettable says
 // no. Only where the models' lifetime is native.
-std::optional<uint32_t> AssetsReset(uint8_t* base, uint32_t assets);
+std::optional<uint32_t> AssetsReset(uint32_t assets);
 // Whether AssetsReset runs natively (nothing changed): each provider's slot
 // 2 TextureProvider::ClearAll, room in the pending frees for every block it
 // may put off.
-bool AssetsResettable(uint8_t* base, uint32_t assets);
+bool AssetsResettable(uint32_t assets);
 
 // SceneAssets::~SceneAssets (sub_820C5168): what the constructor made, last
 // first (the TGA headers' empty destructor left out). Returns the r3 it
 // leaves (XPR::~XPR's on +24); nullopt, with nothing done, where a member's
 // plain C++ would refuse. Only where the models' lifetime is native.
-std::optional<uint32_t> AssetsDestruct(uint8_t* base, uint32_t assets);
-bool AssetsDestructible(uint8_t* base, uint32_t assets);
+std::optional<uint32_t> AssetsDestruct(uint32_t assets);
+bool AssetsDestructible(uint32_t assets);
 
 // --- The scene ---
 
@@ -131,7 +130,7 @@ bool AssetsDestructible(uint8_t* base, uint32_t assets);
 // `sp` (left as the original leaves it) and copied into +0 to +271 as
 // doublewords, then the float at 0x8200256C into +272. Returns the r3 it
 // leaves (the doubleword at the frame's +96).
-uint64_t InitLighting(uint8_t* base, uint32_t block, uint32_t sp);
+uint64_t InitLighting(uint32_t block, uint32_t sp);
 
 // SceneAssets::Release (sub_820C4C80): LoadSlot::ReleaseBuffer on the
 // slots and FreePagesIn on the TGA pixels' words (scene.md's row), in its
@@ -139,9 +138,9 @@ uint64_t InitLighting(uint8_t* base, uint32_t block, uint32_t sp);
 // for a pixels' word that isn't the layer's pages (0 too: the original's
 // VirtualFree, a guest call). Returns the r3 it leaves (Reset's); nullopt,
 // with nothing done, where AssetsReleasable says no.
-std::optional<uint32_t> AssetsRelease(uint8_t* base, uint32_t assets,
+std::optional<uint32_t> AssetsRelease(uint32_t assets,
                                       const std::function<void(uint32_t at)>& free_pages_in);
-bool AssetsReleasable(uint8_t* base, uint32_t assets);
+bool AssetsReleasable(uint32_t assets);
 
 // CarScene::Create (sub_820C8A50): the scene's pages (VirtualAlloc(5536),
 // the layer's) into [0x826C2E44], CarScene::CarScene on them when given;
@@ -153,7 +152,7 @@ bool AssetsReleasable(uint8_t* base, uint32_t assets);
 // `sp`. Returns the r3 it leaves (the accessories' set). Only where
 // CreateNative (the adapter's check, with the layer and the models'
 // lifetime).
-uint64_t Create(uint8_t* base, uint32_t sp);
+uint64_t Create(uint32_t sp);
 
 // CarScene::OnFileLoaded's address, the callback the loads are given.
 constexpr uint32_t kOnFileLoaded = 0x820C52A0;
@@ -165,7 +164,7 @@ constexpr uint32_t kOnFileLoaded = 0x820C52A0;
 // LoadSlot::Load's GetLastError. Returns the r3 it leaves (the last
 // LoadShared's). Only over the layer with the archive's queue native (the
 // adapter's check).
-uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::LoadCall& load);
+uint32_t LoadAssets(uint32_t scene, uint32_t pcr, const archive::LoadCall& load);
 
 // The guest calls CarScene::OnFileLoaded makes, from its 128-byte frame with
 // the original's return addresses: Model::Load's own (`model_load`), the
@@ -184,7 +183,7 @@ struct FileLoadedCalls {
 // Whether CarScene::OnFileLoaded runs natively for `request` (nothing
 // changed): the slots the matching branch releases freed natively (each
 // its own pages).
-bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene);
+bool FileLoadedNative(uint32_t request, uint32_t scene);
 
 // CarScene::OnFileLoaded (sub_820C52A0, the loads' callback): r3 =
 // `request`, r4 = `data`, r6 = the scene. `data` stored at the caller's
@@ -194,16 +193,16 @@ bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene);
 // Returns the r3 it leaves: the last call's, or `request` (nullopt) where
 // none matched or a part file arrived. Only where FileLoadedNative and the
 // models' lifetime are native (the adapter's checks).
-std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t data,
+std::optional<uint64_t> FileLoaded(uint32_t request, uint32_t data,
                                    uint32_t scene, uint32_t sp, const FileLoadedCalls& calls);
-bool CreateNative(uint8_t* base);
+bool CreateNative();
 
 // CarScene::CarScene (sub_820C89A8): SceneSetUp::SceneSetUp (+4),
 // SceneAssets::SceneAssets (+64), List::Init on the eight lists at +4944 +
 // 12i, then the float at 0x82000A30 (1.0) into +5180 + 16i (five), +5260 +
 // 16i (eight) and +5388 + 16i (nine). Returns the scene; false where
 // AssetsConstruct refuses (nothing done).
-bool CarSceneConstruct(uint8_t* base, uint32_t scene);
+bool CarSceneConstruct(uint32_t scene);
 
 // The pool objects' deleting destructors (vtable slot 0 with r4 = `flags`),
 // a guest call from `frame` (its back chain stored), from the return address
@@ -213,18 +212,18 @@ using DestroyCall = std::function<void(uint32_t object, uint32_t flags, uint32_t
 // List::DeleteAll (sub_82593FF8), through List::~List (sub_82594188, a
 // jump): while the list's first node (+0) isn't 0, its slot 0 with r4 = 1,
 // from the 96-byte frame below `sp`. r3 is left 0.
-void ListDeleteAll(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy);
+void ListDeleteAll(uint32_t list, uint32_t sp, const DestroyCall& destroy);
 // List::~List (sub_82594188): a jump to DeleteAll (the same frame).
-void ListDestruct(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy);
+void ListDestruct(uint32_t list, uint32_t sp, const DestroyCall& destroy);
 
 // CarScene::~CarScene (sub_820C9110): List::~List on the eight lists, last
 // first (from the 128-byte frame below `sp`), SceneAssets::~SceneAssets
 // (+64), the set-up record's empty destructor left out, then operator
 // delete when `flags`' bit 0 is set. Returns the scene; nullopt, with
 // nothing done, where CarSceneDestructible says no.
-std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t flags,
+std::optional<uint32_t> CarSceneDestruct(uint32_t scene, uint32_t flags,
                                          uint32_t sp, const DestroyCall& destroy);
-bool CarSceneDestructible(uint8_t* base, uint32_t scene, uint32_t flags);
+bool CarSceneDestructible(uint32_t scene, uint32_t flags);
 
 // ScenePools::UpdateA (sub_820C3DA0): the first set's update (scene.md's
 // row): the deferred texture releases counted down and freed
@@ -241,12 +240,12 @@ bool CarSceneDestructible(uint8_t* base, uint32_t scene, uint32_t flags);
 // them.
 using TextureFreeCall =
     std::function<uint32_t(uint32_t header_in, uint32_t data_in, uint32_t frame)>;
-std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& destroy,
+std::optional<uint32_t> UpdateA(uint32_t sp, const DestroyCall& destroy,
                                 const TextureFreeCall& texture_free);
 // Whether UpdateA runs natively (nothing changed): no first set, no
 // teardown due, or DestroyAFreeable with the records' block (+52) and the
 // set the allocation layer's pages.
-bool UpdateANative(uint8_t* base);
+bool UpdateANative();
 
 
 // --- The scene's update ---
@@ -258,7 +257,7 @@ bool UpdateANative(uint8_t* base);
 // then `free(object, frame)` (VirtualFree(object, 0, MEM_RELEASE)). r3 is
 // left 0 (the last List::At's).
 using FreeCall = std::function<uint64_t(uint32_t pages, uint32_t frame)>;
-void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& finish,
+void DestroyB(uint32_t scene, uint32_t sp, const FinishCall& finish,
               const std::function<void(uint32_t object, uint32_t frame)>& destroy,
               const FreeCall& free);
 
@@ -269,7 +268,7 @@ void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& fini
 // it leaves (the last call's), or nullopt (r3 as given) for a count of 0
 // or below.
 std::optional<uint64_t> UpdateModels(
-    uint8_t* base, uint32_t scene, uint32_t sp,
+    uint32_t scene, uint32_t sp,
     const std::function<uint64_t(uint32_t model, uint32_t frame)>& model_update);
 
 // CarScene::Update (sub_820C9608): no arguments (scene.md's row). The calls
@@ -286,6 +285,6 @@ struct UpdateCalls {
   std::function<uint64_t(uint32_t frame)> accessories_destroy;      // Accessories::Destroy
 };
 // Returns the r3 it leaves (`r3` the r3 at entry).
-uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& calls);
+uint64_t Update(uint32_t sp, uint64_t r3, const UpdateCalls& calls);
 
 }  // namespace scene

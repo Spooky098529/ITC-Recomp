@@ -29,22 +29,22 @@ constexpr uint32_t kNoMachineId = 1;
 constexpr uint32_t kWsaStarted = 0;
 
 // sub_82148958: the system link socket not made.
-inline void SystemLinkSocketNotMade(uint8_t* base) {
-  schema::SystemServicesGlobals::set_system_link_socket(base, kInvalidSocket);
+inline void SystemLinkSocketNotMade() {
+  schema::SystemServicesGlobals::set_system_link_socket(kInvalidSocket);
 }
 
 // XNetGetTitleXnAddr (sub_82459D50) into the 36-byte XNADDR at `address`:
 // the loopback address, no online address or port, CC for each Ethernet
 // address byte, no online id. Returns kXnAddrStatic.
-inline uint32_t XNetGetTitleXnAddr(uint8_t* base, uint32_t address) {
-  guest::StoreU32(base, address + 0, 0x7F000001);  // ina
-  guest::StoreU32(base, address + 4, 0);           // inaOnline
-  guest::StoreU16(base, address + 8, 0);           // wPortOnline
+inline uint32_t XNetGetTitleXnAddr(uint32_t address) {
+  guest::StoreU32(address + 0, 0x7F000001);  // ina
+  guest::StoreU32(address + 4, 0);           // inaOnline
+  guest::StoreU16(address + 8, 0);           // wPortOnline
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU8(base, address + 10 + i, 0xCC);  // abEnet
+    guest::StoreU8(address + 10 + i, 0xCC);  // abEnet
   }
   for (uint32_t i = 0; i < 20; i++) {
-    guest::StoreU8(base, address + 16 + i, 0);  // abOnline
+    guest::StoreU8(address + 16 + i, 0);  // abOnline
   }
   return kXnAddrStatic;
 }

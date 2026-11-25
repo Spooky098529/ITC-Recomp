@@ -84,7 +84,7 @@ void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uin
   ctx.r3.u64 = input;
   ctx.r4.u64 = index;
   ctx.r5.u64 = flag;
-  hooks::AiDriveCar(ctx, call.base);
+  hooks::AiDriveCar(ctx);
   ctx.r1.u64 = saved;
 }
 
@@ -98,7 +98,7 @@ void CallUpdateIdle(void* user, uint64_t driver, uint32_t frame, uint32_t lr, co
   if (f1 != nullptr) {
     ctx.f1.f64 = *f1;
   }
-  hooks::AiUpdateIdle(ctx, call.base);
+  hooks::AiUpdateIdle(ctx);
   ctx.r1.u64 = saved;
 }
 
@@ -114,7 +114,7 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
   if (set_r4) {
     ctx.r4.u64 = r4;
   }
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
   ctx.r1.u64 = saved;
   if (f1 != nullptr) {
     *f1 = ctx.f1.f64;
@@ -126,13 +126,13 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
 
 // The calls the plain C++ makes into code that takes the context.
 #define ITC_RACER_CALLS          \
-  GuestCalls call{&ctx, base};   \
+  GuestCalls call{&ctx};   \
   const Calls calls { &call, CallDriveCar, CallGuest, CallUpdateIdle, \
                       ITC_FLAG(native_action_mappers) }
 
 // --- The input recording ---
 
-ITC_RACER_CONTROLLERS(82102968, ctx.r3.u64 = RecordingHasRoom(base, ctx.r3.u32))
+ITC_RACER_CONTROLLERS(82102968, ctx.r3.u64 = RecordingHasRoom(ctx.r3.u32))
 
 // --- The race flow's handlers (through the race flow's functors) ---
 
@@ -140,21 +140,21 @@ ITC_RACER_CONTROLLERS(82102968, ctx.r3.u64 = RecordingHasRoom(base, ctx.r3.u32))
 // where operator new can't be native.
 ITC_RACER_CONTROLLERS(8215F728, {
   uint32_t r3 = 0;
-  if (OnSetUp(base, ctx.r3.u32, &r3)) {
+  if (OnSetUp(ctx.r3.u32, &r3)) {
     ctx.r3.u64 = r3;
     return;
   }
-  lifted::original::c8215F728(ctx, base);
+  lifted::original::c8215F728(ctx);
 })
 // r3 left at the last record, as operator delete leaves it. The original
 // where a record isn't the layer's.
 ITC_RACER_CONTROLLERS(8215F5E8, {
   uint32_t last = 0;
-  if (OnEnd(base, &last)) {
+  if (OnEnd(&last)) {
     ctx.r3.u64 = last;
     return;
   }
-  lifted::original::c8215F5E8(ctx, base);
+  lifted::original::c8215F5E8(ctx);
 })
 
 // --- The AI drivers' hand-off (r3 as the originals leave it; f1 DriveCar's) ---
@@ -162,11 +162,11 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
 // Through the race flow's functors: a jump to HoldAll, and state 16's.
 ITC_RACER_CONTROLLERS(8215FC28, {
   ITC_RACER_CALLS;
-  ctx.r3.u64 = OnHold(base, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnHold(ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(8215FB90, {
   ITC_RACER_CALLS;
-  ctx.r3.u64 = OnState16(base, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState16(ctx.r1.u32, calls);
 })
 
 // --- The AI drivers' set-up ---
@@ -174,7 +174,7 @@ ITC_RACER_CONTROLLERS(8215FB90, {
 // r3 = &the racer's index, r4 = &the item id, r5 = &the hold flag.
 ITC_RACER_CONTROLLERS(82170FF8, {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = Setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+  ctx.r3.u64 = Setup(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 })
 
 // --- The race flow's per-racer states (r3 = the race flow, r4 = the message
@@ -185,19 +185,19 @@ ITC_RACER_CONTROLLERS(82170FF8, {
 ITC_RACER_CONTROLLERS(82160940, {
   ITC_RACER_CALLS;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnState7(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState7(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(82160948, {
   ITC_RACER_CALLS;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnState22(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState22(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(821609E0, {
   ITC_RACER_CALLS;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = OnState23(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState23(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 })
 ITC_RACER_CONTROLLERS(8215FC38, {
   ITC_RACER_CALLS;
-  ctx.r3.u64 = OnState34(base, ctx.r1.u32, calls);
+  ctx.r3.u64 = OnState34(ctx.r1.u32, calls);
 })

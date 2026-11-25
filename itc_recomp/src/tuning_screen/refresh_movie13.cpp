@@ -23,9 +23,9 @@ namespace tuning_screen {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 namespace steps = camera_modes::steps;
@@ -45,25 +45,25 @@ struct Movie13 {
   std::optional<double>* f1;
   uint64_t r3;
 
-  uint32_t Word(uint32_t offset) const { return Load(base, screen + offset); }
+  uint32_t Word(uint32_t offset) const { return Load(screen + offset); }
 
   uint32_t Node(uint32_t sub_scene, uint32_t child) {
-    const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
+    const uint32_t node = ui_movies::FindNode(movie, sub_scene, child);
     r3 = node;
     return node;
   }
   uint32_t ChildOf(uint32_t node, uint32_t i) {
-    const uint32_t child = ui_movies::Child(base, node, i);
+    const uint32_t child = ui_movies::Child(node, i);
     r3 = child;
     return child;
   }
   // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48).
   void Shown(uint32_t sub_scene, uint32_t child, uint32_t shown) {
-    UiNode(base, Node(sub_scene, child)).set_visible(shown);
+    UiNode(Node(sub_scene, child)).set_visible(shown);
   }
   // UiMovie::SetNodeTexture (sub_8211A708).
   void Texture(uint32_t sub_scene, uint32_t child, uint32_t texture) {
-    r3 = ui_movies::SetNodeTexture(base, Node(sub_scene, child), texture);
+    r3 = ui_movies::SetNodeTexture(Node(sub_scene, child), texture);
   }
   void Call(uint32_t function, std::initializer_list<uint64_t> args, uint32_t lr) {
     r3 = call(function, args, frame, lr);
@@ -76,7 +76,7 @@ struct Movie13 {
   void NodeText(uint32_t node, uint64_t id, uint32_t lr) {
     Call(kSetNodeText, {movie, node, id, 0, 0, 0, 0, 0}, lr);
   }
-  void ShowItems(uint32_t show) { r3 = tuning_screen::ShowItems(base, screen, show, frame); }
+  void ShowItems(uint32_t show) { r3 = tuning_screen::ShowItems(screen, show, frame); }
 
   // The text (2, 0)'s scroll reset, then string `id` (when given), then
   // scrolled.
@@ -91,13 +91,13 @@ struct Movie13 {
   // The part that every state shares.
   void Common() {
     Call(kSetChildNameText, {movie, 0, 6, uint64_t(screen) + 20792}, 0x82207728);
-    Call(kSetNumberText, {movie, 0, 9, TS(base, screen).money()}, 0x8220773C);
-    Text(0, 13, 8, TS(base, screen).day(), 0x82207754);
-    Texture(0, 11, TS(base, screen).weekday());
+    Call(kSetNumberText, {movie, 0, 9, TS(screen).money()}, 0x8220773C);
+    Text(0, 13, 8, TS(screen).day(), 0x82207754);
+    Texture(0, 11, TS(screen).weekday());
     Shown(1, 0, 1);
     Shown(1, 1, 1);
     // (1, 2)'s +68 = 0.0 (lfs, stfs).
-    steps::Stfs(base, UiNode(base, Node(1, 2)).alpha_address(), steps::Lfs(base, 0x82000A34));
+    steps::Stfs(UiNode(Node(1, 2)).alpha_address(), steps::Lfs(0x82000A34));
     Shown(1, 10, 0);
     Texture(1, 4, 0);
     Texture(1, 5, 0);
@@ -110,24 +110,24 @@ struct Movie13 {
     Text(kAllScenes, 43, 457, 0, 0x8220785C);
     Text(kAllScenes, 44, 458, 0, 0x82207870);
     Text(kAllScenes, 45, 459, 0, 0x82207884);
-    Text(kAllScenes, 34, 8, TS(base, screen).edited_x(), 0x8220789C);
-    Text(kAllScenes, 35, 8, TS(base, screen).edited_y(), 0x822078B4);
+    Text(kAllScenes, 34, 8, TS(screen).edited_x(), 0x8220789C);
+    Text(kAllScenes, 35, 8, TS(screen).edited_y(), 0x822078B4);
     // +30840 as an int (fctiwz; the original's low word through the frame's
     // +80, a value since E5 step 6).
     const uint32_t angle =
-        uint32_t(steps::Fctiwz(steps::Lfs(base, TS(base, screen).edited_angle_address())));
+        uint32_t(steps::Fctiwz(steps::Lfs(TS(screen).edited_angle_address())));
     Text(kAllScenes, 36, 8, angle, 0x822078DC);
     // +30844 as a double in r7 (the original's through the frame's +48, a
     // value since E5 step 6), and in f1.
-    const double value = steps::Lfs(base, TS(base, screen).edited_scale_address());
+    const double value = steps::Lfs(TS(screen).edited_scale_address());
     const uint64_t bits = std::bit_cast<uint64_t>(value);
     *f1 = value;
     Text(kAllScenes, 37, 452, bits, 0x822078FC);
-    Text(kAllScenes, 38, int32_t(TS(base, screen).edited_flip()) != 0 ? 0 : 1, 0, 0x82207920);
-    if (int32_t(TS(base, screen).state()) != 28) {
-      r3 = LayOutItems(base, screen, frame);
+    Text(kAllScenes, 38, int32_t(TS(screen).edited_flip()) != 0 ? 0 : 1, 0, 0x82207920);
+    if (int32_t(TS(screen).state()) != 28) {
+      r3 = LayOutItems(screen, frame);
     }
-    r3 = ShowOptionMarks(base, screen, 0, frame);
+    r3 = ShowOptionMarks(screen, 0, frame);
   }
 
   // State 34: the view.
@@ -138,28 +138,28 @@ struct Movie13 {
     Shown(1, 10, 1);
     Texture(1, 4, 0);
     Texture(1, 5, 1);
-    steps::Stfs(base, UiNode(base, Node(1, 3)).x_address(), steps::Lfs(base, 0x82008650));
+    steps::Stfs(UiNode(Node(1, 3)).x_address(), steps::Lfs(0x82008650));
   }
 
   // State 28: a layer's settings, on sub-scene 26 (+30724 0) or 25 (1).
   void LayerSet() {
-    const int32_t set = int32_t(TS(base, screen).editor_page());
+    const int32_t set = int32_t(TS(screen).editor_page());
     if (set == 0) {
-      Text(26, 2, uint64_t(TS(base, screen).picked_image()) + 1442, 0, 0x82207A24);
+      Text(26, 2, uint64_t(TS(screen).picked_image()) + 1442, 0, 0x82207A24);
       Text(26, 10, 1241, 0, 0x82207A38);
       Text(26, 7, 449, 0, 0x82207A4C);
-      Text(26, 8, 8, uint64_t(TS(base, screen).picked_image()) + 1, 0x82207A68);
+      Text(26, 8, 8, uint64_t(TS(screen).picked_image()) + 1, 0x82207A68);
       Text(26, 9, 8, 5, 0x82207AF4);
     } else if (set == 1) {
-      Text(25, 2, uint64_t(TS(base, screen).picked_image()) + 1248, 0, 0x82207A94);
-      Text(25, 10, uint64_t(TS(base, screen).image_group()) + 1229, 0, 0x82207AAC);
+      Text(25, 2, uint64_t(TS(screen).picked_image()) + 1248, 0, 0x82207A94);
+      Text(25, 10, uint64_t(TS(screen).image_group()) + 1229, 0, 0x82207AAC);
       Text(25, 7, 449, 0, 0x82207AC0);
-      Text(25, 8, 8, uint64_t(TS(base, screen).picked_image()) + 1, 0x82207ADC);
+      Text(25, 8, 8, uint64_t(TS(screen).picked_image()) + 1, 0x82207ADC);
       Text(25, 9, 8, 194, 0x82207AF4);
     }
     Shown(kAll, 26, 0);
     Shown(kAll, 25, 0);
-    const int32_t now = int32_t(TS(base, screen).editor_page());
+    const int32_t now = int32_t(TS(screen).editor_page());
     if (now == 0) {
       Shown(kAll, 26, 1);
     } else if (now == 1) {
@@ -184,11 +184,11 @@ struct Movie13 {
       NodeText(ChildOf(node, 5), 5, 0x82207C38);
     }
     const uint32_t first = ChildOf(Node(11, 1), 0);
-    const int32_t pick = int32_t(TS(base, screen).edit_cursor());
-    UiNode(base, first).set_visible(pick >= 0 && pick <= 4 ? 1 : 0);
+    const int32_t pick = int32_t(TS(screen).edit_cursor());
+    UiNode(first).set_visible(pick >= 0 && pick <= 4 ? 1 : 0);
     // 816 not used.
     static constexpr uint32_t kHelp[7] = {812, 813, 814, 815, 817, 818, 819};
-    const uint32_t which = TS(base, screen).edit_cursor();
+    const uint32_t which = TS(screen).edit_cursor();
     Scroll(which < 7 ? std::optional<uint64_t>(kHelp[which]) : std::nullopt,
            {0x82207C80, 0x82207CF4, 0x82207D08});
     Shown(1, 1, 0);
@@ -200,7 +200,7 @@ struct Movie13 {
     for (uint32_t i = 0; i < 4; i++) {
       Text(10, 5 + i, 333 + i, 0, kLr[i]);
     }
-    const uint32_t which = TS(base, screen).operation_cursor();
+    const uint32_t which = TS(screen).operation_cursor();
     Scroll(which < 4 ? std::optional<uint64_t>(806 + which) : std::nullopt,
            {0x82207D6C, 0x82207DB4, 0x82207DC8});
   }
@@ -210,15 +210,15 @@ struct Movie13 {
   void Layers() {
     Shown(kAll, 28, 0);
     Shown(kAll, 27, 0);
-    const int32_t set = int32_t(TS(base, screen).editor_page());
+    const int32_t set = int32_t(TS(screen).editor_page());
     if (set == 0 || set == 1) {
       Shown(kAll, set == 0 ? 28 : 27, 1);
       static constexpr uint32_t kSlots[2][3] = {{724, 732, 736}, {700, 708, 712}};
       static constexpr uint32_t kFrom[2][3] = {{10076, 10112, 10148}, {10832, 10868, 10904}};
       for (uint32_t i = 0; i < 3; i++) {
         const uint32_t value = Word(kFrom[set][i]);
-        const uint32_t textures = Load(base, schema::UiMovie(base, movie).textures_address());
-        Store(base, Load(base, textures + kSlots[set][i]), value);
+        const uint32_t textures = Load(schema::UiMovie(movie).textures_address());
+        Store(Load(textures + kSlots[set][i]), value);
       }
     }
     Text(9, 4, 4, 0, 0x82207E94);
@@ -241,23 +241,23 @@ struct Movie13 {
 
 }  // namespace
 
-uint64_t RefreshMovie13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+uint64_t RefreshMovie13(const GuestCall& call, uint32_t screen, uint32_t sp,
                         std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_822076E8 TuningScreen::RefreshMovie13");
   const uint32_t frame = sp - 128;
-  Store(base, frame, sp);  // the back chain, as stwu
+  Store(frame, sp);  // the back chain, as stwu
   // The movie's id passed to UiMovies::Find as a value (the original's
   // frame +80; E5 step 6).
-  const uint32_t entry = ui_movies::PairsFindKey(base, ui_movies::kMovieTable, kMovie13);
-  Movie13 m{base, call, screen, frame, Load(base, entry), f1, entry};
+  const uint32_t entry = ui_movies::PairsFindKey(ui_movies::kMovieTable, kMovie13);
+  Movie13 m{call, screen, frame, Load(entry), f1, entry};
   m.Common();
-  switch (int32_t(TS(m.base, m.screen).state())) {
+  switch (int32_t(TS(m.screen).state())) {
     case 23: m.Top(); break;
     case 24: m.Layers(); break;
     case 25: m.Kinds(); break;
     case 26: m.LayerEdit(); break;
     case 27:
-      m.r3 = ShowOptionMarks(base, screen, 1, frame);
+      m.r3 = ShowOptionMarks(screen, 1, frame);
       m.ShowItems(0);
       break;
     case 28: m.LayerSet(); break;

@@ -13,12 +13,12 @@ struct NodeBase : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
   static constexpr uint32_t kVtable = 0x82010B5C;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable() const { return guest::LoadU32(address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(address + 0, v); }
   uint32_t vtable_address() const { return address + 0; }
   // 0 in the constructor; the classes above it keep their group or movie there
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t unknown_4() const { return guest::LoadU32(address + 4); }
+  void set_unknown_4(uint32_t v) const { guest::StoreU32(address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
 };
 
@@ -27,16 +27,16 @@ struct Type7ListRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
   // 0, 1, or 2 and more
-  int32_t count() const { return int32_t(guest::LoadU32(base, address + 0)); }
-  void set_count(int32_t v) const { guest::StoreU32(base, address + 0, uint32_t(v)); }
+  int32_t count() const { return int32_t(guest::LoadU32(address + 0)); }
+  void set_count(int32_t v) const { guest::StoreU32(address + 0, uint32_t(v)); }
   uint32_t count_address() const { return address + 0; }
   // a bit number (in the mask from a count of 1 up)
-  uint32_t bit_a() const { return guest::LoadU32(base, address + 12); }
-  void set_bit_a(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t bit_a() const { return guest::LoadU32(address + 12); }
+  void set_bit_a(uint32_t v) const { guest::StoreU32(address + 12, v); }
   uint32_t bit_a_address() const { return address + 12; }
   // a bit number (in the mask from a count of 2 up)
-  uint32_t bit_b() const { return guest::LoadU32(base, address + 16); }
-  void set_bit_b(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t bit_b() const { return guest::LoadU32(address + 16); }
+  void set_bit_b(uint32_t v) const { guest::StoreU32(address + 16, v); }
   uint32_t bit_b_address() const { return address + 16; }
 };
 

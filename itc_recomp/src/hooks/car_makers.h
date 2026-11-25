@@ -14,19 +14,19 @@
 namespace hooks {
 
 // CarModels::BlockOf sub_8215AAD0 (r3 a car id).
-void CarMakersBlockOf(lifted::Regs& ctx, uint8_t* base);
+void CarMakersBlockOf(lifted::Regs& ctx);
 // SceneModelRecord::SetPaint sub_8215AC70 (r3 a record, r4 a car object, r5
 // the paint pick) and SetWheels sub_8215B238 (r3 a record, r4 a car object).
-void CarMakersSetPaint(lifted::Regs& ctx, uint8_t* base);
-void CarMakersSetWheels(lifted::Regs& ctx, uint8_t* base);
+void CarMakersSetPaint(lifted::Regs& ctx);
+void CarMakersSetWheels(lifted::Regs& ctx);
 // SceneModelRecord::SetChoice sub_8215B1A0 (r3 the out, r4:r5 the value).
-void CarMakersSetChoice(lifted::Regs& ctx, uint8_t* base);
+void CarMakersSetChoice(lifted::Regs& ctx);
 // CarRecord::SetBytes sub_8215B0E0 (r3 a car record, r4 the car's +1568).
-void CarMakersSetBytes(lifted::Regs& ctx, uint8_t* base);
+void CarMakersSetBytes(lifted::Regs& ctx);
 // SceneModelRecord::FromCar sub_8215B878 (r3 a record, r4 a car object, r5
 // the paint pick); the original unless --native_scene_models and
 // --native_car_specs.
-void CarMakersFromCar(lifted::Regs& ctx, uint8_t* base);
+void CarMakersFromCar(lifted::Regs& ctx);
 // The garage cars' makers, the originals unless --native_race_setup,
 // --native_save_data, --native_car_specs and --native_car_physics:
 // GarageCar::Reset sub_82110448 (r3 a garage car), GarageCars::StaticInit
@@ -34,44 +34,44 @@ void CarMakersFromCar(lifted::Regs& ctx, uint8_t* base);
 // car data; f1 as it leaves it) and TuningScreen::SetUpCarData sub_821DF2F8
 // (r3 the tuning screen).
 bool CarMakersGarageCalleesNative();
-void CarMakersGarageCarReset(lifted::Regs& ctx, uint8_t* base);
-void CarMakersStaticInit(lifted::Regs& ctx, uint8_t* base);
-void CarMakersFromGarageCar(lifted::Regs& ctx, uint8_t* base);
-void CarMakersSetUpCarData(lifted::Regs& ctx, uint8_t* base);
+void CarMakersGarageCarReset(lifted::Regs& ctx);
+void CarMakersStaticInit(lifted::Regs& ctx);
+void CarMakersFromGarageCar(lifted::Regs& ctx);
+void CarMakersSetUpCarData(lifted::Regs& ctx);
 // GarageStage::FitCar sub_82178C40 (r3 the holder, r4 a car object; f1 as
 // it leaves it; with --native_car_physics and --native_math),
 // GarageStage::CopyRecord sub_8217FC60 (r3 the holder, r4 a record; with
 // --native_vehicle_accessors and --native_scene_models) and the stand's busy
 // marker shown and hidden, sub_8219ED10 and sub_8219EDB0 (with
 // --native_ui_movies_game).
-void CarMakersFitCar(lifted::Regs& ctx, uint8_t* base);
-void CarMakersCopyRecord(lifted::Regs& ctx, uint8_t* base);
-void CarMakersShowBusyMarker(lifted::Regs& ctx, uint8_t* base);
+void CarMakersFitCar(lifted::Regs& ctx);
+void CarMakersCopyRecord(lifted::Regs& ctx);
+void CarMakersShowBusyMarker(lifted::Regs& ctx);
 // GarageStage::ReapplyRecord sub_82178DF8 and ReapplyRecordNoDecals
 // sub_82178E60 (r3 the holder), the originals unless
 // CarMakersReapplyCalleesNative (--native_scene_models,
 // --native_front_end_car_draw and FrontEndCarDrawCalleesNative, with the
 // load poll's flags).
 bool CarMakersReapplyCalleesNative();
-void CarMakersReapplyRecord(lifted::Regs& ctx, uint8_t* base);
-void CarMakersReapplyRecordNoDecals(lifted::Regs& ctx, uint8_t* base);
-void CarMakersHideBusyMarker(lifted::Regs& ctx, uint8_t* base);
+void CarMakersReapplyRecord(lifted::Regs& ctx);
+void CarMakersReapplyRecordNoDecals(lifted::Regs& ctx);
+void CarMakersHideBusyMarker(lifted::Regs& ctx);
 // GarageStage::ReloadModel sub_8217F880 (r3 the holder, r4 a model block or
 // -1; with --native_vehicle_accessors and --native_scene_models).
-void CarMakersReloadModel(lifted::Regs& ctx, uint8_t* base);
+void CarMakersReloadModel(lifted::Regs& ctx);
 // GarageStage::SetCar sub_8217FD58 and SetCarClass sub_8217FDC8 (r3 the
 // holder, r4 a car object, r5 the paint pick; SetCar's f1 FitCar's), the
 // originals unless their callees' flags are on (FromCar's, CopyRecord's,
 // the re-applies' and, for SetCar, FitCar's).
 bool CarMakersSetCarCalleesNative();
 bool CarMakersSetCarClassCalleesNative();
-void CarMakersSetCar(lifted::Regs& ctx, uint8_t* base);
-void CarMakersSetCarClass(lifted::Regs& ctx, uint8_t* base);
+void CarMakersSetCar(lifted::Regs& ctx);
+void CarMakersSetCarClass(lifted::Regs& ctx);
 // GarageStage::ShowCarById sub_82182C90 and ShowCarByIdWithClass
 // sub_82182D30 (r3 the paint pick; f1 SetCar's), the originals unless
 // --native_race_setup and SetCar's (or SetCarClass') callees' flags are on.
 bool CarMakersShowCarByIdCalleesNative(bool with_class);
-void CarMakersShowCarById(lifted::Regs& ctx, uint8_t* base);
-void CarMakersShowCarByIdWithClass(lifted::Regs& ctx, uint8_t* base);
+void CarMakersShowCarById(lifted::Regs& ctx);
+void CarMakersShowCarByIdWithClass(lifted::Regs& ctx);
 
 }  // namespace hooks

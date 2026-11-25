@@ -316,18 +316,18 @@ constexpr Step kSteps[] = {
 
 }  // namespace
 
-uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced) {
+uint32_t Init(uint32_t world, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82174D28 RaceWorld::Init");
-  schema::RaceWorld(base, world).set_state(1);
-  schema::RaceWorld(base, world).set_two_humans(0);
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  if (int32_t(schema::RaceData(base, race).kind()) == 6 &&
-      int32_t(vehicle_accessors::StagesWord76(base, schema::RaceData(base, race).stages_address(),
+  schema::RaceWorld(world).set_state(1);
+  schema::RaceWorld(world).set_two_humans(0);
+  const uint32_t race = guest::LoadU32(kRaceData);
+  if (int32_t(schema::RaceData(race).kind()) == 6 &&
+      int32_t(vehicle_accessors::StagesWord76(schema::RaceData(race).stages_address(),
                                               0xFFFFFFFF)) >= 2) {
-    schema::RaceWorld(base, world).set_two_humans(1);
+    schema::RaceWorld(world).set_two_humans(1);
   }
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -341,15 +341,15 @@ uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced) {
   for (const Step& step : kSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, world, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(world, at(step.a), at(step.b), replaced);
         break;
     }
   }

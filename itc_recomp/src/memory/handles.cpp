@@ -32,109 +32,18 @@ struct Entry {
 };
 
 Entry* g_entries = nullptr;            // kGranules, allocated once
-std::atomic<uint8_t*> g_base{nullptr};
 std::mutex g_mutex;
 uint32_t g_next = 0;                   // the first granule never handed out
 // Freed spans by their granule count (reused first fit by count).
 std::vector<std::pair<uint32_t, uint32_t>> g_free;  // (first granule, count)
-struct sigaction g_previous {};
 
 uint32_t Granule(uint32_t handle) { return (handle - kHandlesStart) / kHandleGranule; }
 
-// Async-signal-safe enough for a last message: snprintf into a stack
-// buffer, write(2) to stderr, then the log's own line.
-void OnFault(int sig, siginfo_t* info, void* context) {
-  uint8_t* base = g_base.load(std::memory_order_relaxed);
-  const uintptr_t at = reinterpret_cast<uintptr_t>(info->si_addr);
-  const uintptr_t lo = reinterpret_cast<uintptr_t>(base) + kHandlesStart;
-  const uintptr_t hi = reinterpret_cast<uintptr_t>(base) + kHandlesEnd;
-  if (base && at >= lo && at < hi) {
-    const uint32_t guest = uint32_t(at - reinterpret_cast<uintptr_t>(base));
-    const Entry* e = g_entries ? &g_entries[Granule(guest)] : nullptr;
-    char text[256];
-    if (e && e->object) {
-      std::snprintf(text, sizeof(text),
-                    "handle fault: a raw access at %08X, +%u into a %s (handle %08X, %u bytes): "
-                    "code reaching a host object through guest memory\n",
-                    guest, guest - e->start, e->type, e->start, e->size);
-    } else {
-      std::snprintf(text, sizeof(text), "handle fault: a raw access at %08X (no live handle)\n",
-                    guest);
-    }
-    ITC_LOG_ERROR("{}", text);
-    ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
-    (void)ignored;
-    std::_Exit(3);
-  }
-  // The guest's addresses for the physical memory, unmapped since E5 step 7
-  // (guest.h translates them): code reaching it through base + address.
-  if (base) {
-    const uintptr_t lo = reinterpret_cast<uintptr_t>(base);
-    if (at >= lo + 0x7F000000u && at < lo + 0x80000000u ||
-        at >= lo + 0xA0000000u && at < lo + 0x100000000ull) {
-      char text[200];
-      std::snprintf(text, sizeof(text),
-                    "physical fault: a raw access at %08X: code reaching the physical memory "
-                    "through base + address (guest.h translates it)\n",
-                    uint32_t(at - lo));
-      ITC_LOG_ERROR("{}", text);
-      ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
-      (void)ignored;
-      std::_Exit(3);
-    }
-  }
-  // Anything else in the range `base` stands for (E5 step 9: nothing is
-  // mapped there; guest.h translates the heap's and the image's addresses to
-  // their blocks): code reaching memory through base + address, or a null
-  // pointer (below 0x10000).
-  if (base) {
-    const uintptr_t lo = reinterpret_cast<uintptr_t>(base);
-    if (at >= lo && at < lo + 0x100000000ull) {
-      const uint32_t guest = uint32_t(at - lo);
-      const char* what = guest < 0x10000                    ? "a null pointer"
-                         : guest - kHeapStart < kHeapBytes   ? "the heap"
-                         : guest - kImageStart < kImageBytes ? "the image"
-                                                             : "no block";
-      char text[200];
-      std::snprintf(text, sizeof(text),
-                    "guest fault: a raw access at %08X (%s): code reaching memory through "
-                    "base + address (guest.h translates it)\n",
-                    guest, what);
-      ITC_LOG_ERROR("{}", text);
-      ssize_t ignored = write(STDERR_FILENO, text, std::strlen(text));
-      (void)ignored;
-      std::_Exit(3);
-    }
-  }
-  // Not ours: as before.
-  if (g_previous.sa_flags & SA_SIGINFO) {
-    if (g_previous.sa_sigaction) {
-      g_previous.sa_sigaction(sig, info, context);
-      return;
-    }
-  } else if (g_previous.sa_handler != SIG_DFL && g_previous.sa_handler != SIG_IGN) {
-    g_previous.sa_handler(sig);
-    return;
-  }
-  signal(sig, SIG_DFL);
-  raise(sig);
-}
-
 }  // namespace
 
-bool ProtectHandles(uint8_t* base) {
+bool SetUpHandles() {
   g_entries = new Entry[kGranules]();
-  if (mprotect(base + kHandlesStart, kHandlesEnd - kHandlesStart, PROT_NONE) != 0) {
-    ITC_LOG_ERROR("handles: can't protect {:#x} to {:#x}", kHandlesStart, kHandlesEnd);
-    return false;
-  }
-  struct sigaction action {};
-  action.sa_sigaction = OnFault;
-  action.sa_flags = SA_SIGINFO | SA_ONSTACK;
-  sigemptyset(&action.sa_mask);
-  sigaction(SIGSEGV, &action, &g_previous);
-  g_base.store(base, std::memory_order_relaxed);
-  ITC_LOG_INFO("handles: {:#x} to {:#x}, inaccessible", kHandlesStart, kHandlesEnd);
+  ITC_LOG_INFO("handles: {:#x} to {:#x}", kHandlesStart, kHandlesEnd);
   return true;
 }
 

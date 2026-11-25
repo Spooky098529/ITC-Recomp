@@ -30,6 +30,6 @@ extern const Chunk kDataChunks[];
 extern const size_t kDataChunkCount;
 
 // Writes the image's data into guest memory at kLoadAddress (zeroed before).
-void CopyInto(uint8_t* base);
+void CopyInto();
 
 }  // namespace image

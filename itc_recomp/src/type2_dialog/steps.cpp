@@ -23,17 +23,17 @@ using G = schema::Type2DialogGlobals;
 using Machine = schema::StateMachine;
 
 // The original's frame below `sp`, its back chain written.
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   return frame;
 }
 
 // UiMovies::Find(id): the movie. The original stored the id at its frame's
 // +80 and passed the word's address; passed as a value (E5 step 6: only
 // the step read the word).
-uint32_t FindMovie(uint8_t* base, uint32_t id) {
-  return LoadU32(base, ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id));
+uint32_t FindMovie(uint32_t id) {
+  return LoadU32(ui_movies::PairsFindKey(ui_movies::kMovieTable, id));
 }
 
 // The highlights' table {1, 2} the original built at its frame's +80, a
@@ -42,21 +42,21 @@ constexpr uint32_t kHighlights[2] = {1, 2};
 
 // The table's entry at `index`, no bounds check as the original: past the
 // table, the frame's word there, as the original read it.
-uint32_t HighlightAt(uint8_t* base, uint32_t frame, uint32_t index) {
-  return index < 2 ? kHighlights[index] : LoadU32(base, frame + 80 + (index << 2));
+uint32_t HighlightAt(uint32_t frame, uint32_t index) {
+  return index < 2 ? kHighlights[index] : LoadU32(frame + 80 + (index << 2));
 }
 
 // The table's entry for the menu's word `field` reads (the cursor or the
 // previous one).
-uint32_t Highlight(uint8_t* base, uint32_t frame, uint32_t (schema::FrontEndMenu::*field)() const) {
-  return HighlightAt(base, frame, (G::menu(base).*field)());
+uint32_t Highlight(uint32_t frame, uint32_t (schema::FrontEndMenu::*field)() const) {
+  return HighlightAt(frame, (G::menu().*field)());
 }
 
 uint32_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
 
 }  // namespace
 
-uint64_t OpenConfirmStep(uint8_t* base, uint32_t started, bool second, uint32_t sp,
+uint64_t OpenConfirmStep(uint32_t started, bool second, uint32_t sp,
                          const Calls& calls) {
   if (second) {
     ITC_NATIVE_RUNNING("sub_821879F8 Type2Dialog::OpenConfirm2Step");
@@ -68,23 +68,23 @@ uint64_t OpenConfirmStep(uint8_t* base, uint32_t started, bool second, uint32_t 
       {0x8218776C, 0x82187788, 0x82187798, 0x821877E0, 0x821877E8},
       {0x82187A3C, 0x82187A58, 0x82187A68, 0x82187AB0, 0x82187AB8}};
   const uint32_t* lr = kLr[second ? 1 : 0];
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, second ? 18 : 16);
-  if (LoadU32(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(second ? 18 : 16);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, lr[0], 5);
     calls.CallArgs(kPlayNamed, frame, lr[1], {movie, 5, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, lr[2], movie, 0));
   if (done != 0) {
-    const uint32_t named = Highlight(base, frame, &schema::FrontEndMenu::cursor);
+    const uint32_t named = Highlight(frame, &schema::FrontEndMenu::cursor);
     calls.CallArgs(kPlayNamed, frame, lr[3], {movie, named, 0, 0, 0, 0, 0, 0});
     calls.Call(kLoopLast, frame, lr[4], movie);
   }
   return done;
 }
 
-uint64_t CloseConfirmStep(uint8_t* base, uint32_t started, bool second, uint32_t sp,
+uint64_t CloseConfirmStep(uint32_t started, bool second, uint32_t sp,
                           const Calls& calls) {
   if (second) {
     ITC_NATIVE_RUNNING("sub_82187AC8 Type2Dialog::CloseConfirm2Step");
@@ -95,27 +95,27 @@ uint64_t CloseConfirmStep(uint8_t* base, uint32_t started, bool second, uint32_t
   static constexpr uint32_t kLr[2][4] = {{0x82187840, 0x8218785C, 0x82187870, 0x82187884},
                                          {0x82187B10, 0x82187B2C, 0x82187B40, 0x82187B64}};
   const uint32_t* lr = kLr[second ? 1 : 0];
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, second ? 18 : 16);
-  if (LoadU32(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(second ? 18 : 16);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, lr[0], 5);
     calls.CallArgs(kPlayNamed, frame, lr[1], {movie, 6, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, lr[2], movie, 0));
   if (done != 0) {
     if (second) {
-      G::data(base).set_queued_state(9);
+      G::data().set_queued_state(9);
       calls.Call(kFinishAll, frame, lr[3], movie);
     } else {
       calls.Call(kFinishAll, frame, lr[3], movie);
-      G::data(base).set_queued_state(9);
+      G::data().set_queued_state(9);
     }
   }
   return done;
 }
 
-uint64_t NoticeStep(uint8_t* base, uint32_t started, bool second, bool close, uint32_t sp,
+uint64_t NoticeStep(uint32_t started, bool second, bool close, uint32_t sp,
                     const Calls& calls) {
   if (second) {
     if (close) {
@@ -135,21 +135,21 @@ uint64_t NoticeStep(uint8_t* base, uint32_t started, bool second, bool close, ui
                                          {0x82187BC8, 0x82187BE4, 0x82187BF8},
                                          {0x82187C60, 0x82187C7C, 0x82187C90}};
   const uint32_t* lr = kLr[(second ? 2 : 0) + (close ? 1 : 0)];
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, second ? 19 : 17);
-  if (LoadU32(base, started) == 0) {
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(second ? 19 : 17);
+  if (LoadU32(started) == 0) {
     calls.Call(kMenuSoundPlay, frame, lr[0], 5);
     calls.CallArgs(kPlayNamed, frame, lr[1], {movie, close ? 3u : 2u, 0, 0, 0, 0, 0, 0});
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   const uint32_t done = Done(calls.Call(kRun, frame, lr[2], movie, 0));
   if (close && done != 0) {
-    G::data(base).set_queued_state(9);
+    G::data().set_queued_state(9);
   }
   return done;
 }
 
-uint64_t MoveCursorStep(uint8_t* base, uint32_t started, bool second, uint32_t sp,
+uint64_t MoveCursorStep(uint32_t started, bool second, uint32_t sp,
                         const Calls& calls) {
   if (second) {
     ITC_NATIVE_RUNNING("sub_82187D80 Type2Dialog::MoveCursor2Step");
@@ -160,21 +160,21 @@ uint64_t MoveCursorStep(uint8_t* base, uint32_t started, bool second, uint32_t s
   static constexpr uint32_t kLr[2][4] = {{0x82187D30, 0x82187D5C, 0x82187D64, 0x82187D74},
                                          {0x82187DE8, 0x82187E14, 0x82187E30, 0x82187E40}};
   const uint32_t* lr = kLr[second ? 1 : 0];
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, second ? 18 : 16);
-  if (LoadU32(base, started) == 0) {
-    const uint32_t previous = Highlight(base, frame, &schema::FrontEndMenu::previous);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(second ? 18 : 16);
+  if (LoadU32(started) == 0) {
+    const uint32_t previous = Highlight(frame, &schema::FrontEndMenu::previous);
     calls.Call(kFinishNamed, frame, lr[0], movie, previous);
-    const uint32_t cursor = G::menu(base).cursor();
+    const uint32_t cursor = G::menu().cursor();
     calls.CallArgs(kPlayNamed, frame, lr[1],
-                   {movie, HighlightAt(base, frame, cursor), 0, 0, 0, 0, 0, 0});
+                   {movie, HighlightAt(frame, cursor), 0, 0, 0, 0, 0, 0});
     if (second) {
-      const uint32_t again = G::menu(base).cursor();
-      calls.Call(kLoopNamed, frame, lr[2], movie, HighlightAt(base, frame, again));
+      const uint32_t again = G::menu().cursor();
+      calls.Call(kLoopNamed, frame, lr[2], movie, HighlightAt(frame, again));
     } else {
       calls.Call(kLoopLast, frame, lr[2], movie);
     }
-    StoreU32(base, started, 1);
+    StoreU32(started, 1);
   }
   calls.Call(kRun, frame, lr[3], movie, 0);
   return 1;

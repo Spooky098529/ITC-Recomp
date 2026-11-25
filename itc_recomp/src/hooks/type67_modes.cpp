@@ -130,7 +130,7 @@ bool Type67ModesNative() {
   return ITC_FLAG(native_type67_modes);
 }
 
-void Type67Init(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
+void Type67Init(lifted::Regs& ctx, uint32_t address) {
   uint32_t frame_bytes = 0;
   for (const t67::InitInfo& info : t67::kInits) {
     if (info.address == address) {
@@ -139,7 +139,7 @@ void Type67Init(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
   }
   const uint64_t object_r3 = ctx.r3.u64;
   const t67::InitResult result =
-      t67::RunInit(base, address, ctx.r3.u32, ctx.r1.u32 - frame_bytes);
+      t67::RunInit(address, ctx.r3.u32, ctx.r1.u32 - frame_bytes);
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
   // transition's address from the machine's 64-bit r3.
   const uint64_t machine_r3 = object_r3 + (result.machine - ctx.r3.u32);
@@ -149,16 +149,16 @@ void Type67Init(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
 // --- The handlers without guest calls ---
 
 ITC_REGS_STEP(GarageStageSetPlates) {
-  ctx.r3.u64 = t67::GarageStageSetPlates(base, ctx.r3.u64, ctx.r4.u32);
+  ctx.r3.u64 = t67::GarageStageSetPlates(ctx.r3.u64, ctx.r4.u32);
 }
 ITC_REGS_STEP(GarageStageResetPose) {
-  ctx.r3.u64 = t67::GarageStageResetPose(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t67::GarageStageResetPose(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(CameraPresetConstruct) {
-  ctx.r3.u64 = t67::CameraPresetConstruct(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t67::CameraPresetConstruct(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(CameraPresetCopy) {
-  ctx.r3.u64 = t67::CameraPresetCopy(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = t67::CameraPresetCopy(ctx.r3.u32, ctx.r1.u32);
 }
 
 namespace {
@@ -173,153 +173,153 @@ bool Set(lifted::Regs& ctx, const std::optional<uint64_t>& r3) {
 
 }  // namespace
 
-bool GarageCameraFreePresets(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::GarageCameraFreePresets(base, ctx.r3.u64));
+bool GarageCameraFreePresets(lifted::Regs& ctx) {
+  return Set(ctx, t67::GarageCameraFreePresets(ctx.r3.u64));
 }
-bool GarageCameraOnPresetsLoaded(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::GarageCameraOnPresetsLoaded(base, ctx.r4.u32, ctx.r6.u32, ctx.r1.u32));
+bool GarageCameraOnPresetsLoaded(lifted::Regs& ctx) {
+  return Set(ctx, t67::GarageCameraOnPresetsLoaded(ctx.r4.u32, ctx.r6.u32, ctx.r1.u32));
 }
-bool StandSlotFree(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::StandSlotFree(base, ctx.r3.u64));
+bool StandSlotFree(lifted::Regs& ctx) {
+  return Set(ctx, t67::StandSlotFree(ctx.r3.u64));
 }
 ITC_REGS_STEP(ControllerOptionsOnEnter) {
-  ctx.r3.u64 = t67::ControllerOptionsOnEnter(base, ctx.r3.u32);
+  ctx.r3.u64 = t67::ControllerOptionsOnEnter(ctx.r3.u32);
 }
-bool ControllerOptionsOnLeft(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::ControllerOptionsOnLeft(base));
+bool ControllerOptionsOnLeft(lifted::Regs& ctx) {
+  return Set(ctx, t67::ControllerOptionsOnLeft());
 }
 ITC_REGS_STEP(ControllerOptionsShow) {
-  ctx.r3.u64 = t67::ControllerOptionsShow(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::ControllerOptionsShow(ctx.r3.u64);
 }
 ITC_REGS_STEP(ControllerOptionsOpen) {
-  ctx.r3.u64 = t67::ControllerOptionsOpen(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::ControllerOptionsOpen(ctx.r3.u64);
 }
 ITC_REGS_STEP(ControllerOptionsLeave) {
-  ctx.r3.u64 = t67::ControllerOptionsLeave(base, ctx.r3.u64, ctx.r4.u32);
+  ctx.r3.u64 = t67::ControllerOptionsLeave(ctx.r3.u64, ctx.r4.u32);
 }
 ITC_REGS_STEP(ControllerOptionsStepSliders) {
-  ctx.r3.u64 = t67::ControllerOptionsStepSliders(base);
+  ctx.r3.u64 = t67::ControllerOptionsStepSliders();
 }
 ITC_REGS_STEP(ControllerOptionsStepButtons) {
-  ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 672, 12);
+  ctx.r3.u64 = t67::ControllerOptionsStepSide(672, 12);
 }
 ITC_REGS_STEP(ControllerOptionsStepAnalog) {
-  ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 680, 6);
+  ctx.r3.u64 = t67::ControllerOptionsStepSide(680, 6);
 }
 ITC_REGS_STEP(ControllerOptionsSetMarkY) {
-  ctx.r3.u64 = t67::ControllerOptionsSetMarkY(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t67::ControllerOptionsSetMarkY(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(PanelScreenInitWords) {
-  ctx.r3.u64 = t67::PanelScreenInitWords(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::PanelScreenInitWords(ctx.r3.u64);
 }
 ITC_REGS_STEP(ScreenMachineWait) {
-  ctx.r3.u64 = t67::ScreenMachineWait(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::ScreenMachineWait(ctx.r3.u64);
 }
 ITC_REGS_STEP(ScreenReenter) {
-  ctx.r3.u64 = t67::ScreenReenter(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::ScreenReenter(ctx.r3.u64);
 }
 ITC_REGS_STEP(ScreenWait) {
-  ctx.r3.u64 = t67::ScreenWait(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::ScreenWait(ctx.r3.u64);
 }
 ITC_REGS_STEP(DialogQueueReopen) {
-  ctx.r3.u64 = t67::DialogQueueReopen(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::DialogQueueReopen(ctx.r3.u64);
 }
 ITC_REGS_STEP(Type6DialogShown) {
-  ctx.r3.u64 = t67::DialogShown(base, ctx.r3.u64, 9756);
+  ctx.r3.u64 = t67::DialogShown(ctx.r3.u64, 9756);
 }
 ITC_REGS_STEP(Type7DialogShown) {
-  ctx.r3.u64 = t67::DialogShown(base, ctx.r3.u64, 9760);
+  ctx.r3.u64 = t67::DialogShown(ctx.r3.u64, 9760);
 }
 ITC_REGS_STEP(Type6DialogOnEnter) {
-  ctx.r3.u64 = t67::DialogOnEnter(base, ctx.r3.u64, 9756);
+  ctx.r3.u64 = t67::DialogOnEnter(ctx.r3.u64, 9756);
 }
 ITC_REGS_STEP(Type7DialogOnEnter) {
-  ctx.r3.u64 = t67::DialogOnEnter(base, ctx.r3.u64, 9760);
+  ctx.r3.u64 = t67::DialogOnEnter(ctx.r3.u64, 9760);
 }
 ITC_REGS_STEP(Type6DialogWaitForMovies) {
-  ctx.r3.u64 = t67::DialogWaitForMovies(base, ctx.r3.u64, 9756);
+  ctx.r3.u64 = t67::DialogWaitForMovies(ctx.r3.u64, 9756);
 }
 ITC_REGS_STEP(Type7DialogWaitForMovies) {
-  ctx.r3.u64 = t67::DialogWaitForMovies(base, ctx.r3.u64, 9760);
+  ctx.r3.u64 = t67::DialogWaitForMovies(ctx.r3.u64, 9760);
 }
 ITC_REGS_STEP(Type6Screen0OnEnter) {
-  ctx.r3.u64 = t67::Screen0OnEnter(base, ctx.r3.u32, 0, 4);
+  ctx.r3.u64 = t67::Screen0OnEnter(ctx.r3.u32, 0, 4);
 }
 ITC_REGS_STEP(Type7Screen0OnEnter) {
-  ctx.r3.u64 = t67::Screen0OnEnter(base, ctx.r3.u32, 4, 3);
+  ctx.r3.u64 = t67::Screen0OnEnter(ctx.r3.u32, 4, 3);
 }
-bool Type6Screen0OnLeft(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::Screen0OnLeft(base, ctx.r3.u32, 0));
+bool Type6Screen0OnLeft(lifted::Regs& ctx) {
+  return Set(ctx, t67::Screen0OnLeft(ctx.r3.u32, 0));
 }
-bool Type7Screen0OnLeft(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::Screen0OnLeft(base, ctx.r3.u32, 4));
+bool Type7Screen0OnLeft(lifted::Regs& ctx) {
+  return Set(ctx, t67::Screen0OnLeft(ctx.r3.u32, 4));
 }
 ITC_REGS_STEP(Type6Screen0WaitForMovie) {
-  ctx.r3.u64 = t67::Screen0WaitForMovie(base, ctx.r3.u64, 0);
+  ctx.r3.u64 = t67::Screen0WaitForMovie(ctx.r3.u64, 0);
 }
 ITC_REGS_STEP(Type7Screen0WaitForMovie) {
-  ctx.r3.u64 = t67::Screen0WaitForMovie(base, ctx.r3.u64, 4);
+  ctx.r3.u64 = t67::Screen0WaitForMovie(ctx.r3.u64, 4);
 }
 ITC_REGS_STEP(Type6Screen0PickYes) {
-  ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9640, 1);
+  ctx.r3.u64 = t67::Screen0Pick(ctx.r3.u64, 9640, 1);
 }
 ITC_REGS_STEP(Type6Screen0PickNo) {
-  ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9640, 0);
+  ctx.r3.u64 = t67::Screen0Pick(ctx.r3.u64, 9640, 0);
 }
 ITC_REGS_STEP(Type7Screen0PickYes) {
-  ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9644, 1);
+  ctx.r3.u64 = t67::Screen0Pick(ctx.r3.u64, 9644, 1);
 }
 ITC_REGS_STEP(Type6Screen0GoOn) {
-  ctx.r3.u64 = t67::Type6Screen0GoOn(base, ctx.r3.u64);
+  ctx.r3.u64 = t67::Type6Screen0GoOn(ctx.r3.u64);
 }
 
 // --- The guest calls and the modes' delegate functions ---
 
-t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
+t67::Calls Type67Calls(lifted::Regs& ctx) {
   t67::Calls calls;
   calls.native_action_slots = ITC_FLAG(native_action_mappers);
-  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
+  calls.call = [&ctx](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
                             uint64_t r4) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    lifted::CallFromContext(ctx, base, target);
+    lifted::CallFromContext(ctx, target);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
   };
-  calls.open = [&ctx, base](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
+  calls.open = [&ctx](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
     if (ui_movies_game_hooks::OpenNative()) {
-      return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
-                                  ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+      return ui_movies::OpenMovie(id, asset, sp - 128, hooks::NativeArchiveLoad(),
+                                  ui_movies_game_hooks::OpenCalls(ctx, sp));
     }
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = id;
     ctx.r4.u64 = asset;
-    lifted::Enter(ctx, base, game::UiMovies::Open);
+    lifted::Enter(ctx, game::UiMovies::Open);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
   };
-  calls.remove = [&ctx, base](uint32_t id, uint32_t sp, uint32_t lr) -> uint64_t {
+  calls.remove = [&ctx](uint32_t id, uint32_t sp, uint32_t lr) -> uint64_t {
     if (ui_movies_game_hooks::DeleteNative()) {
-      return ui_movies::DeleteMovie(base, id, sp - 128,
-                                    ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+      return ui_movies::DeleteMovie(id, sp - 128,
+                                    ui_movies_game_hooks::DeleteCalls(ctx, sp));
     }
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = id;
-    lifted::Enter(ctx, base, game::UiMovies::Delete);
+    lifted::Enter(ctx, game::UiMovies::Delete);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
   };
-  calls.call_set = [&ctx, base](uint32_t function, const uint64_t args[6], int set, uint32_t r1,
+  calls.call_set = [&ctx](uint32_t function, const uint64_t args[6], int set, uint32_t r1,
                                 uint32_t lr) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = r1;
@@ -328,7 +328,7 @@ t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
@@ -339,86 +339,86 @@ t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
 
 namespace {
 
-t67::Calls GuestCalls(lifted::Regs& ctx, uint8_t* base) { return Type67Calls(ctx, base); }
+t67::Calls GuestCalls(lifted::Regs& ctx) { return Type67Calls(ctx); }
 
-void NextMode(lifted::Regs& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+void NextMode(lifted::Regs& ctx, const t67::ModeLayout& layout) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
-  t67::ModeNextMode(base, layout, answer, mode, ctx.r1.u32 - t67::kNextModeFrame,
-                    GuestCalls(ctx, base));
+  t67::ModeNextMode(layout, answer, mode, ctx.r1.u32 - t67::kNextModeFrame,
+                    GuestCalls(ctx));
   ctx.r3.u64 = r3;
 }
 
-void Leaving(lifted::Regs& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+void Leaving(lifted::Regs& ctx, const t67::ModeLayout& layout) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
-  t67::ModeLeaving(base, layout, answer, mode, ctx.r1.u32 - t67::kLeavingFrame,
-                   GuestCalls(ctx, base));
+  t67::ModeLeaving(layout, answer, mode, ctx.r1.u32 - t67::kLeavingFrame,
+                   GuestCalls(ctx));
   ctx.r3.u64 = r3;
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6ModeNextMode) { NextMode(ctx, base, t67::kType6Layout); }
-ITC_REGS_STEP(Type7ModeNextMode) { NextMode(ctx, base, t67::kType7Layout); }
-ITC_REGS_STEP(Type6ModeLeaving) { Leaving(ctx, base, t67::kType6Layout); }
-ITC_REGS_STEP(Type7ModeLeaving) { Leaving(ctx, base, t67::kType7Layout); }
+ITC_REGS_STEP(Type6ModeNextMode) { NextMode(ctx, t67::kType6Layout); }
+ITC_REGS_STEP(Type7ModeNextMode) { NextMode(ctx, t67::kType7Layout); }
+ITC_REGS_STEP(Type6ModeLeaving) { Leaving(ctx, t67::kType6Layout); }
+ITC_REGS_STEP(Type7ModeLeaving) { Leaving(ctx, t67::kType7Layout); }
 
 // --- The handlers with guest calls ---
 
 ITC_REGS_STEP(DialogOpenMovies) {
-  ctx.r3.u64 = t67::DialogOpenMovies(base, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogOpenMovies(ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type6DialogLeave) {
-  ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
-                                Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogLeave(ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
+                                Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type7DialogLeave) {
-  ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
-                                Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogLeave(ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
+                                Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type6Screen0Leave) {
-  ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
-                                 Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0Leave(ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
+                                 Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type7Screen0Leave) {
-  ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
-                                 Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0Leave(ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
+                                 Type67Calls(ctx));
 }
 ITC_REGS_STEP(ListScreenInit) {
-  ctx.r3.u64 = t67::ListScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ListScreenInit(ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(PanelScreenInit) {
-  ctx.r3.u64 = t67::PanelScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::PanelScreenInit(ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(NodeScreenInit) {
-  ctx.r3.u64 = t67::NodeScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::NodeScreenInit(ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type6Screen0Draw) {
-  ctx.r3.u64 = t67::Type6Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                     uint32_t(ctx.lr), Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Type6Screen0Draw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     uint32_t(ctx.lr), Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type6DialogDraw) {
-  ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
-                               Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogDraw(ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
+                               Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type7DialogDraw) {
-  ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
-                               Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogDraw(ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
+                               Type67Calls(ctx));
 }
 ITC_REGS_STEP(Type7Screen0Draw) {
-  ctx.r3.u64 = t67::Type7Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                     Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Type7Screen0Draw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     Type67Calls(ctx));
 }
 ITC_REGS_STEP(ControllerOptionsDraw) {
-  ctx.r3.u64 = t67::ControllerOptionsDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                          Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ControllerOptionsDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                          Type67Calls(ctx));
 }
 
 // --- The stand scene's teardown and the presets' load ---
 
 ITC_REGS_STEP(GarageCameraLoadPresets) {
-  SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(base, ctx.r3.u32, NativeArchiveLoad(base)));
+  SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(ctx.r3.u32, NativeArchiveLoad()));
 }
 namespace {
 
@@ -430,14 +430,14 @@ struct PanelNew {
   uint8_t* base;
   static uint32_t New(void* user, uint32_t size, uint32_t frame) {
     auto* p = static_cast<PanelNew*>(user);
-    if (auto block = memory::crt::OperatorNew(p->base, size)) {
+    if (auto block = memory::crt::OperatorNew(size)) {
       return *block;
     }
     lifted::Regs& ctx = *p->ctx;
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = size;
-    lifted::Sdk(ctx, p->base, lifted::original::c825A6880);
+    lifted::Sdk(ctx, lifted::original::c825A6880);
     const uint32_t block = ctx.r3.u32;
     ctx.r1.u64 = stack;
     ctx.lr = link;
@@ -445,10 +445,10 @@ struct PanelNew {
   }
 };
 
-void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void ModeInit(lifted::Regs& ctx, bool type7) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
-  const t67::Calls screens = Type67Calls(ctx, base);
-  PanelNew panel_new{&ctx, base};
+  const t67::Calls screens = Type67Calls(ctx);
+  PanelNew panel_new{&ctx};
   t67::ModeInitCalls calls;
   calls.call = screens.call_set;
   calls.construct = [&](uint32_t block, uint32_t sp) {
@@ -459,9 +459,9 @@ void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
       ctx.lr = type7 ? 0x82246CE4 : 0x822368D4;
       ctx.r3.u64 = block;
       if (type7) {
-        lifted::original::c82246B28(ctx, base);
+        lifted::original::c82246B28(ctx);
       } else {
-        lifted::original::c822366F0(ctx, base);
+        lifted::original::c822366F0(ctx);
       }
       ctx.r1.u64 = stack;
       ctx.lr = link;
@@ -469,15 +469,15 @@ void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
     }
     const screen_constructors::New new_panel{&panel_new, PanelNew::New};
     if (type7) {
-      screen_constructors::Type7Screens(base, block, sp, new_panel);
+      screen_constructors::Type7Screens(block, sp, new_panel);
     } else {
-      screen_constructors::Type6Screens(base, block, sp, new_panel);
+      screen_constructors::Type6Screens(block, sp, new_panel);
     }
     ctx.fpscr.disableFlushMode();
   };
   calls.screens = &screens;
   ctx.fpscr.disableFlushMode();
-  const uint64_t r3 = t67::ModeInit(base, type7, ctx.r3.u32, ctx.r1.u32, calls);
+  const uint64_t r3 = t67::ModeInit(type7, ctx.r3.u32, ctx.r1.u32, calls);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -485,8 +485,8 @@ void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
 
 }  // namespace
 
-ITC_REGS_STEP(Type6ModeInit) { ModeInit(ctx, base, false); }
-ITC_REGS_STEP(Type7ModeInit) { ModeInit(ctx, base, true); }
+ITC_REGS_STEP(Type6ModeInit) { ModeInit(ctx, false); }
+ITC_REGS_STEP(Type7ModeInit) { ModeInit(ctx, true); }
 
 ITC_REGS_STEP(StandSceneCreate) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
@@ -499,291 +499,291 @@ ITC_REGS_STEP(StandSceneCreate) {
     return ctx.r3.u64;
   };
   t67::StandSceneCalls calls;
-  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, [&] { lifted::Enter(ctx, base, game::Viewports::Init); }); };
-  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, [&] { lifted::Enter(ctx, base, game::CarScene::Create); }); };
+  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, [&] { lifted::Enter(ctx, game::Viewports::Init); }); };
+  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, [&] { lifted::Enter(ctx, game::CarScene::Create); }); };
   calls.scene_set_up = [&](uint32_t scene, uint32_t record, uint32_t frame) {
     ctx.r3.u64 = scene;
     ctx.r4.u64 = record;
     ctx.r5.u64 = 0;
-    return guest(frame, 0x82180BF4, [&] { CarModelsSceneSetUp(ctx, base); });
+    return guest(frame, 0x82180BF4, [&] { CarModelsSceneSetUp(ctx); });
   };
   ctx.fpscr.disableFlushMode();
-  const uint64_t r3 = t67::StandSceneCreate(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base),
+  const uint64_t r3 = t67::StandSceneCreate(ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(),
                                             calls);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
 
-bool StandSceneRelease(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::StandSceneRelease(base));
+bool StandSceneRelease(lifted::Regs& ctx) {
+  return Set(ctx, t67::StandSceneRelease());
 }
 
-bool StandModeRelease(lifted::Regs& ctx, uint8_t* base) {
-  return Set(ctx, t67::StandModeRelease(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base)));
+bool StandModeRelease(lifted::Regs& ctx) {
+  return Set(ctx, t67::StandModeRelease(ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx)));
 }
 
 // --- The dialogs' confirm ---
 
 ITC_REGS_STEP(Type6DialogOpenConfirm) {
-  ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, false, ctx.r1.u32);
+  ctx.r3.u64 = t67::DialogOpenConfirm(ctx.r3.u32, false, ctx.r1.u32);
 }
 ITC_REGS_STEP(Type7DialogOpenConfirm) {
-  ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, true, ctx.r1.u32);
+  ctx.r3.u64 = t67::DialogOpenConfirm(ctx.r3.u32, true, ctx.r1.u32);
 }
 ITC_REGS_STEP(DialogDrawWaiting) {
-  if (const std::optional<uint64_t> r3 = t67::DialogDrawWaiting(base, ctx.r3.u32, ctx.r1.u32)) {
+  if (const std::optional<uint64_t> r3 = t67::DialogDrawWaiting(ctx.r3.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
 ITC_REGS_STEP(DialogOpenConfirmStep) {
-  ctx.r3.u64 = t67::DialogOpenConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogOpenConfirmStep(ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(DialogCloseConfirmStep) {
-  ctx.r3.u64 = t67::DialogCloseConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogCloseConfirmStep(ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(DialogMoveCursorStep) {
-  ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogMoveCursorStep(ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(DialogOpenNoticeStep) {
   ctx.r3.u64 =
-      t67::DialogNoticeStep(base, ctx.r3.u32, false, ctx.r1.u32, Type67Calls(ctx, base));
+      t67::DialogNoticeStep(ctx.r3.u32, false, ctx.r1.u32, Type67Calls(ctx));
 }
 ITC_REGS_STEP(DialogCloseNoticeStep) {
-  ctx.r3.u64 = t67::DialogNoticeStep(base, ctx.r3.u32, true, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogNoticeStep(ctx.r3.u32, true, ctx.r1.u32, Type67Calls(ctx));
 }
 
 namespace {
 
 // The pages' and Updates' steps: the adapter's lr put back (their guest
 // calls set it).
-void ConfirmPage(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void ConfirmPage(lifted::Regs& ctx, bool type7) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::DialogConfirmPage(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
-                                      Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogConfirmPage(ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
+                                      Type67Calls(ctx));
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
 
-void Update(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void Update(lifted::Regs& ctx, bool type7) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::DialogUpdate(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
-                                 Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::DialogUpdate(ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
+                                 Type67Calls(ctx));
   ctx.lr = lr;
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6DialogConfirmPage) { ConfirmPage(ctx, base, false); }
-ITC_REGS_STEP(Type7DialogConfirmPage) { ConfirmPage(ctx, base, true); }
-ITC_REGS_STEP(Type6DialogUpdate) { Update(ctx, base, false); }
-ITC_REGS_STEP(Type7DialogUpdate) { Update(ctx, base, true); }
+ITC_REGS_STEP(Type6DialogConfirmPage) { ConfirmPage(ctx, false); }
+ITC_REGS_STEP(Type7DialogConfirmPage) { ConfirmPage(ctx, true); }
+ITC_REGS_STEP(Type6DialogUpdate) { Update(ctx, false); }
+ITC_REGS_STEP(Type7DialogUpdate) { Update(ctx, true); }
 
 // --- The first screens' helpers ---
 
-bool Type67TextsNative(uint8_t* base) {
+bool Type67TextsNative() {
   return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
-         NativeHeapActive() && memory::crt::GetProcessHeap(base) != 0;
+         NativeHeapActive() && memory::crt::GetProcessHeap() != 0;
 }
 
 namespace {
 
-void Confirm(lifted::Regs& ctx, uint8_t* base, const t67::ConfirmKind& kind) {
+void Confirm(lifted::Regs& ctx, const t67::ConfirmKind& kind) {
   ctx.fpscr.disableFlushMode();
   const uint32_t sp = ctx.r1.u32, dispatcher = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
-  FormatGuestCalls format(ctx, base);
-  ctx.r3.u64 = t67::Screen0Confirm(base, kind, dispatcher, sp, format.get());
+  FormatGuestCalls format(ctx);
+  ctx.r3.u64 = t67::Screen0Confirm(kind, dispatcher, sp, format.get());
   ctx.lr = lr;
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6Screen0Confirm) { Confirm(ctx, base, t67::kType6Confirm); }
+ITC_REGS_STEP(Type6Screen0Confirm) { Confirm(ctx, t67::kType6Confirm); }
 ITC_REGS_STEP(Type6Screen0ConfirmAgain) {
-  Confirm(ctx, base, t67::kType6ConfirmAgain);
+  Confirm(ctx, t67::kType6ConfirmAgain);
 }
-ITC_REGS_STEP(Type7Screen0Confirm) { Confirm(ctx, base, t67::kType7Confirm); }
+ITC_REGS_STEP(Type7Screen0Confirm) { Confirm(ctx, t67::kType7Confirm); }
 ITC_REGS_STEP(Type6Screen0ShowPage) {
-  ctx.r3.u64 = t67::Type6Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = t67::Type6Screen0ShowPage(ctx.r4.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(Type7Screen0ShowPage) {
-  ctx.r3.u64 = t67::Type7Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = t67::Type7Screen0ShowPage(ctx.r4.u32, ctx.r1.u32);
 }
 namespace {
 
-void PlaceCursor(lifted::Regs& ctx, uint8_t* base, bool type7) {
-  ctx.r3.u64 = t67::Screen0PlaceCursor(base, type7, ctx.r4.u64, ctx.r1.u32);
+void PlaceCursor(lifted::Regs& ctx, bool type7) {
+  ctx.r3.u64 = t67::Screen0PlaceCursor(type7, ctx.r4.u64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
-void ShowHelp(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void ShowHelp(lifted::Regs& ctx, bool type7) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32, item = ctx.r4.u32;
-  FormatGuestCalls format(ctx, base);
-  ctx.r3.u64 = t67::Screen0ShowHelp(base, type7, item, sp, format.get());
+  FormatGuestCalls format(ctx);
+  ctx.r3.u64 = t67::Screen0ShowHelp(type7, item, sp, format.get());
   ctx.lr = lr;
 }
-void FadeOutStep(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void FadeOutStep(lifted::Regs& ctx, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 =
-      t67::Screen0FadeOutStep(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+      t67::Screen0FadeOutStep(type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
-void PlayItem(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void PlayItem(lifted::Regs& ctx, bool type7) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0PlayItem(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0PlayItem(type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 // The steps 0 to 2 (they call ShowHelp: the text setters native).
 enum class Step { kOpening, kBack, kCursor };
-void Screen0Step(lifted::Regs& ctx, uint8_t* base, bool type7, Step step) {
+void Screen0Step(lifted::Regs& ctx, bool type7, Step step) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
-  const t67::Calls calls = Type67Calls(ctx, base);
-  FormatGuestCalls format(ctx, base);
+  const t67::Calls calls = Type67Calls(ctx);
+  FormatGuestCalls format(ctx);
   switch (step) {
     case Step::kOpening:
-      ctx.r3.u64 = t67::Screen0OpeningStep(base, type7, screen, sp, calls, format.get());
+      ctx.r3.u64 = t67::Screen0OpeningStep(type7, screen, sp, calls, format.get());
       break;
     case Step::kBack:
-      ctx.r3.u64 = t67::Screen0BackStep(base, type7, screen, sp, calls, format.get());
+      ctx.r3.u64 = t67::Screen0BackStep(type7, screen, sp, calls, format.get());
       break;
     case Step::kCursor:
-      ctx.r3.u64 = t67::Screen0CursorStep(base, type7, screen, sp, calls, format.get());
+      ctx.r3.u64 = t67::Screen0CursorStep(type7, screen, sp, calls, format.get());
       break;
   }
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
-void PowerGraphPage(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void PowerGraphPage(lifted::Regs& ctx, bool type7) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0PowerGraphPage(base, type7, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                          Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0PowerGraphPage(type7, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                          Type67Calls(ctx));
   ctx.lr = lr;
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6Screen0PlaceCursor) { PlaceCursor(ctx, base, false); }
-ITC_REGS_STEP(Type7Screen0PlaceCursor) { PlaceCursor(ctx, base, true); }
-ITC_REGS_STEP(Type6Screen0ShowHelp) { ShowHelp(ctx, base, false); }
-ITC_REGS_STEP(Type7Screen0ShowHelp) { ShowHelp(ctx, base, true); }
-ITC_REGS_STEP(Type6Screen0FadeOutStep) { FadeOutStep(ctx, base, false); }
-ITC_REGS_STEP(Type7Screen0FadeOutStep) { FadeOutStep(ctx, base, true); }
-ITC_REGS_STEP(Type6Screen0PlayItem) { PlayItem(ctx, base, false); }
-ITC_REGS_STEP(Type7Screen0PlayItem) { PlayItem(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0PlaceCursor) { PlaceCursor(ctx, false); }
+ITC_REGS_STEP(Type7Screen0PlaceCursor) { PlaceCursor(ctx, true); }
+ITC_REGS_STEP(Type6Screen0ShowHelp) { ShowHelp(ctx, false); }
+ITC_REGS_STEP(Type7Screen0ShowHelp) { ShowHelp(ctx, true); }
+ITC_REGS_STEP(Type6Screen0FadeOutStep) { FadeOutStep(ctx, false); }
+ITC_REGS_STEP(Type7Screen0FadeOutStep) { FadeOutStep(ctx, true); }
+ITC_REGS_STEP(Type6Screen0PlayItem) { PlayItem(ctx, false); }
+ITC_REGS_STEP(Type7Screen0PlayItem) { PlayItem(ctx, true); }
 ITC_REGS_STEP(Type6Screen0OpeningStep) {
-  Screen0Step(ctx, base, false, Step::kOpening);
+  Screen0Step(ctx, false, Step::kOpening);
 }
 ITC_REGS_STEP(Type7Screen0OpeningStep) {
-  Screen0Step(ctx, base, true, Step::kOpening);
+  Screen0Step(ctx, true, Step::kOpening);
 }
 ITC_REGS_STEP(Type6Screen0BackStep) {
-  Screen0Step(ctx, base, false, Step::kBack);
+  Screen0Step(ctx, false, Step::kBack);
 }
 ITC_REGS_STEP(Type7Screen0BackStep) {
-  Screen0Step(ctx, base, true, Step::kBack);
+  Screen0Step(ctx, true, Step::kBack);
 }
 ITC_REGS_STEP(Type6Screen0CursorStep) {
-  Screen0Step(ctx, base, false, Step::kCursor);
+  Screen0Step(ctx, false, Step::kCursor);
 }
 ITC_REGS_STEP(Type7Screen0CursorStep) {
-  Screen0Step(ctx, base, true, Step::kCursor);
+  Screen0Step(ctx, true, Step::kCursor);
 }
 ITC_REGS_STEP(Type6Screen0QuitPage) {
-  ctx.r3.u64 = t67::Type6Screen0QuitPage(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t67::Type6Screen0QuitPage(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(Type6Screen0ChosenPage) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Type6Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
-                                           Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Type6Screen0ChosenPage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                           Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type6Screen0PowerGraphPage) {
-  PowerGraphPage(ctx, base, false);
+  PowerGraphPage(ctx, false);
 }
 ITC_REGS_STEP(Type7Screen0PowerGraphPage) {
-  PowerGraphPage(ctx, base, true);
+  PowerGraphPage(ctx, true);
 }
 ITC_REGS_STEP(Type6Screen0OpenMovie) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0OpenMovie(base, false, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0OpenMovie(false, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7Screen0OpenMovie) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0OpenMovie(base, true, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0OpenMovie(true, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type6Screen0SetUpCar) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0SetUpCar(base, false, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0SetUpCar(false, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7Screen0SetUpCar) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Screen0SetUpCar(base, true, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0SetUpCar(true, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type6Screen0OnDialogClosed) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Type6Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                               Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Type6Screen0OnDialogClosed(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                               Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7Screen0OnDialogClosed) {
-  ctx.r3.u64 = t67::Type7Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = t67::Type7Screen0OnDialogClosed(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(ControllerOptionsUpdate) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::ControllerOptionsUpdate(base, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ControllerOptionsUpdate(ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type6ModeWaitForLoads) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::ModeWaitForLoads(base, false, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                     Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ModeWaitForLoads(false, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7ModeWaitForLoads) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::ModeWaitForLoads(base, true, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
-                                     Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ModeWaitForLoads(true, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
+                                     Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7Screen0ChosenPage) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::Type7Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
-                                           Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Type7Screen0ChosenPage(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                           Type67Calls(ctx));
   ctx.lr = lr;
 }
 
 // --- The garage camera's reset ---
 
 ITC_REGS_STEP(QuaternionFromAngles) {
-  t67::QuaternionFromAngles(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r1.u32);
+  t67::QuaternionFromAngles(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 ITC_REGS_STEP(GarageCameraReset) {
   const uint64_t camera = ctx.r3.u64;
-  t67::GarageCameraReset(base, ctx.r3.u32, ctx.r1.u32 - t67::kGarageCameraResetFrame);
+  t67::GarageCameraReset(ctx.r3.u32, ctx.r1.u32 - t67::kGarageCameraResetFrame);
   ctx.r3.u64 = camera + 192;
   ctx.fpscr.disableFlushMode();
 }
 ITC_REGS_STEP(GarageCameraCommand) {
-  ctx.r3.u64 = t67::GarageCameraCommand(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = t67::GarageCameraCommand(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 // A tail call to Command: from the adapter's stack pointer.
 ITC_REGS_STEP(GarageStageCameraCommand) {
-  ctx.r3.u64 = t67::GarageStageCameraCommand(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = t67::GarageStageCameraCommand(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 ITC_REGS_STEP(GarageLightsInit) {
   const uint32_t frame = ctx.r1.u32 - t67::kGarageLightsFrame;
-  t67::GarageLightsInit(base, ctx.r3.u32, frame);
+  t67::GarageLightsInit(ctx.r3.u32, frame);
   ctx.r3.u64 = ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | frame) + 96;
   ctx.fpscr.disableFlushMode();
 }
@@ -799,57 +799,57 @@ uint64_t LightsR3(const lifted::Regs& ctx, uint32_t stage_frame) {
 }  // namespace
 
 ITC_REGS_STEP(GarageCameraInit) {
-  SetArchiveSerial(ctx, t67::GarageCameraInit(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base)));
+  SetArchiveSerial(ctx, t67::GarageCameraInit(ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad()));
   ctx.fpscr.disableFlushMode();
 }
 ITC_REGS_STEP(StandScenePollTeardown) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::StandScenePollTeardown(base, ctx.r1.u32, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::StandScenePollTeardown(ctx.r1.u32, Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type6ModeTearDown) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::ModeTearDown(base, false, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
-                                 Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ModeTearDown(false, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                 Type67Calls(ctx));
   ctx.lr = lr;
 }
 ITC_REGS_STEP(Type7ModeTearDown) {
   const uint64_t lr = ctx.lr;
-  ctx.r3.u64 = t67::ModeTearDown(base, true, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
-                                 Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::ModeTearDown(true, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
+                                 Type67Calls(ctx));
   ctx.lr = lr;
 }
 namespace {
 
-void Show(lifted::Regs& ctx, uint8_t* base, bool type7, bool info) {
+void Show(lifted::Regs& ctx, bool type7, bool info) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr, r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  const t67::Calls calls = Type67Calls(ctx, base);
-  FormatGuestCalls format(ctx, base);
-  ctx.r3.u64 = info ? t67::Screen0ShowCarInfo(base, type7, sp, calls, format.get())
-                    : t67::Screen0Show(base, type7, r3, sp, calls, format.get());
+  const t67::Calls calls = Type67Calls(ctx);
+  FormatGuestCalls format(ctx);
+  ctx.r3.u64 = info ? t67::Screen0ShowCarInfo(type7, sp, calls, format.get())
+                    : t67::Screen0Show(type7, r3, sp, calls, format.get());
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6Screen0Show) { Show(ctx, base, false, false); }
-ITC_REGS_STEP(Type7Screen0Show) { Show(ctx, base, true, false); }
-ITC_REGS_STEP(Type6Screen0ShowCarInfo) { Show(ctx, base, false, true); }
-ITC_REGS_STEP(Type7Screen0ShowCarInfo) { Show(ctx, base, true, true); }
+ITC_REGS_STEP(Type6Screen0Show) { Show(ctx, false, false); }
+ITC_REGS_STEP(Type7Screen0Show) { Show(ctx, true, false); }
+ITC_REGS_STEP(Type6Screen0ShowCarInfo) { Show(ctx, false, true); }
+ITC_REGS_STEP(Type7Screen0ShowCarInfo) { Show(ctx, true, true); }
 
 ITC_REGS_STEP(Type7Screen0MenuPage) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
-  const t67::Calls calls = Type67Calls(ctx, base);
+  const t67::Calls calls = Type67Calls(ctx);
   // The confirm's plain C++ while the UI movies' text setters are native.
   std::optional<FormatGuestCalls> format;
-  if (Type67TextsNative(base)) format.emplace(ctx, base);
-  ctx.r3.u64 = t67::Type7Screen0MenuPage(base, r3, r4, sp, calls,
+  if (Type67TextsNative()) format.emplace(ctx);
+  ctx.r3.u64 = t67::Type7Screen0MenuPage(r3, r4, sp, calls,
                                          format ? &format->get() : nullptr);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
@@ -859,36 +859,36 @@ ITC_REGS_STEP(Type6Screen0MenuPage) {
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
-  const t67::Calls calls = Type67Calls(ctx, base);
+  const t67::Calls calls = Type67Calls(ctx);
   // The confirm's plain C++ while the UI movies' text setters are native.
   std::optional<FormatGuestCalls> format;
-  if (Type67TextsNative(base)) format.emplace(ctx, base);
-  ctx.r3.u64 = t67::Type6Screen0MenuPage(base, r3, r4, sp, calls,
+  if (Type67TextsNative()) format.emplace(ctx);
+  ctx.r3.u64 = t67::Type6Screen0MenuPage(r3, r4, sp, calls,
                                          format ? &format->get() : nullptr);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
 namespace {
 
-void Screen0Update(lifted::Regs& ctx, uint8_t* base, bool type7) {
+void Screen0Update(lifted::Regs& ctx, bool type7) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr, r3 = ctx.r3.u64, sp = ctx.r1.u64;
-  ctx.r3.u64 = t67::Screen0Update(base, type7, r3, sp, Type67Calls(ctx, base));
+  ctx.r3.u64 = t67::Screen0Update(type7, r3, sp, Type67Calls(ctx));
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
 
 }  // namespace
 
-ITC_REGS_STEP(Type6Screen0Update) { Screen0Update(ctx, base, false); }
-ITC_REGS_STEP(Type7Screen0Update) { Screen0Update(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0Update) { Screen0Update(ctx, false); }
+ITC_REGS_STEP(Type7Screen0Update) { Screen0Update(ctx, true); }
 ITC_REGS_STEP(GarageStageInit) {
-  t67::GarageStageInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base));
+  t67::GarageStageInit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad());
   ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kGarageStageInitFrame);
   ctx.fpscr.disableFlushMode();
 }
 ITC_REGS_STEP(StandSlotInit) {
-  if (t67::StandSlotInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base))) {
+  if (t67::StandSlotInit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad())) {
     ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kStandSlotInitFrame - t67::kGarageStageInitFrame);
   }
   ctx.fpscr.disableFlushMode();
@@ -899,7 +899,7 @@ ITC_REGS_STEP(StandSlotInit) {
 // Defines an adapter: the flag, else the original.
 #define ITC_TYPE67_MODES(address, step, ...)  \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type67_modes)) { \
-    hooks::step(ctx, base, ##__VA_ARGS__);    \
+    hooks::step(ctx, ##__VA_ARGS__);    \
   }
 
 // The members' state machine Inits the modes' slot 0 call (Type6Screen0
@@ -922,10 +922,10 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) { \
-      lifted::original::c##address(ctx, base);                 \
+      lifted::original::c##address(ctx);                 \
       return;                                                       \
     }                                                               \
-    hooks::step(ctx, base);                                         \
+    hooks::step(ctx);                                         \
   }
 
 // An adapter whose step frees: the original where it refuses (a block not
@@ -934,8 +934,8 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||     \
-        !hooks::step(ctx, base)) {                                          \
-      lifted::original::c##address(ctx, base);                         \
+        !hooks::step(ctx)) {                                          \
+      lifted::original::c##address(ctx);                         \
     }                                                                       \
   }
 
@@ -1040,11 +1040,11 @@ ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
 #define ITC_TYPE67_TEXTS(address, step)                                         \
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                          \
     \
-    if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative(base)) {    \
-      lifted::original::c##address(ctx, base);                             \
+    if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative()) {    \
+      lifted::original::c##address(ctx);                             \
       return;                                                                   \
     }                                                                           \
-    hooks::step(ctx, base);                                                     \
+    hooks::step(ctx);                                                     \
   }
 ITC_TYPE67_TEXTS(822340B0, Type6Screen0ConfirmAgain)
 // The first screens' Show (the machines' transitions), FadeOutStep (the
@@ -1126,18 +1126,18 @@ ITC_TYPE67_MODES(821808F0, GarageStageCameraCommand)
 ITC_NATIVE_ENTRY_ALWAYS(82236880) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    lifted::original::c82236880(ctx, base);
+    lifted::original::c82236880(ctx);
     return;
   }
-  hooks::Type6ModeInit(ctx, base);
+  hooks::Type6ModeInit(ctx);
 }
 ITC_NATIVE_ENTRY_ALWAYS(82246C90) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    lifted::original::c82246C90(ctx, base);
+    lifted::original::c82246C90(ctx);
     return;
   }
-  hooks::Type7ModeInit(ctx, base);
+  hooks::Type7ModeInit(ctx);
 }
 // StandScene::Create (from the modes' slot 0, recompiled): over the layer
 // and the archive's native queue only.
@@ -1145,8 +1145,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82180B00) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
-    lifted::original::c82180B00(ctx, base);
+    lifted::original::c82180B00(ctx);
     return;
   }
-  hooks::StandSceneCreate(ctx, base);
+  hooks::StandSceneCreate(ctx);
 }

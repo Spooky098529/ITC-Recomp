@@ -17,6 +17,6 @@ namespace mode_tick {
 // Modes::Tick (sub_82107910): r3 = the modes' holder (+4 the current mode),
 // r4 = the state layer (its slot 1 asked twice after a mode is made). From
 // its 208-byte frame below `sp`, r13 the PCR; returns the original's r3.
-uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, uint32_t layer);
+uint64_t ModesTick(uint32_t sp, uint64_t r13, uint32_t holder, uint32_t layer);
 
 }  // namespace mode_tick

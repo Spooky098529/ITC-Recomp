@@ -23,21 +23,21 @@ namespace {
 using G = schema::CarDrawGlobals;
 
 
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
 double Single(double value) {
   return double(float(value));
 }
-uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
+uint64_t LoadU64(uint32_t address) {
+  return (uint64_t(guest::LoadU32(address)) << 32) | guest::LoadU32(address + 4);
 }
-void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
+void StoreU64(uint32_t address, uint64_t value) {
+  guest::StoreU32(address, uint32_t(value >> 32));
+  guest::StoreU32(address + 4, uint32_t(value));
 }
-double LoadDouble(uint8_t* base, uint32_t address) {
-  return std::bit_cast<double>(LoadU64(base, address));
+double LoadDouble(uint32_t address) {
+  return std::bit_cast<double>(LoadU64(address));
 }
 
 // fctiwz as the translation does it: NaN 0x80000000, saturated at INT_MAX,
@@ -61,18 +61,18 @@ void Trap() {
 
 // --- LightKit::BlinkLevel ---
 
-double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, double rate,
+double LightKitBlinkLevel(uint64_t counter, double a, double b, double rate,
                           uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC4B0 LightKit::BlinkLevel");
   const uint64_t mask = std::rotl(counter, 1) - 1;
-  const double scale = Lfs(base, 0x82002C38);
-  const schema::CarScene scene = G::scene(base);
+  const double scale = Lfs(0x82002C38);
+  const schema::CarScene scene = G::scene();
   const int32_t race = int32_t(scene.model_set());
-  double full = Lfs(base, 0x82002A3C);
-  const double offset = Lfs(base, 0x82000D44);
+  double full = Lfs(0x82002A3C);
+  const double offset = Lfs(0x82000D44);
   const double frames = Single(std::fma(rate, scale, offset));
-  guest::StoreU32(base, stack - 16, uint32_t(ToInt32(frames)));
-  const int64_t period = int32_t(guest::LoadU32(base, stack - 16));
+  guest::StoreU32(stack - 16, uint32_t(ToInt32(frames)));
+  const int64_t period = int32_t(guest::LoadU32(stack - 16));
   const int64_t value = int64_t(counter);
   const int64_t quotient =
       (period != 0 && !(value == INT64_MIN && period == -1)) ? value / period : 0;
@@ -81,26 +81,26 @@ double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, d
   }
   const uint64_t check = uint64_t(period) & ~mask;
   const uint64_t product = uint64_t(quotient) * uint64_t(period);
-  StoreU64(base, stack - 16, uint64_t(period));
-  const double length = Single(double(int64_t(LoadU64(base, stack - 16))));
+  StoreU64(stack - 16, uint64_t(period));
+  const double length = Single(double(int64_t(LoadU64(stack - 16))));
   const uint64_t remainder = counter - product;
   if (int64_t(check) == -1) {
     Trap();
   }
-  StoreU64(base, stack - 8, remainder);
-  double t = Single(double(int64_t(LoadU64(base, stack - 8))));
+  StoreU64(stack - 8, remainder);
+  double t = Single(double(int64_t(LoadU64(stack - 8))));
   t = Single(t / length);
-  if (race == 1 && int32_t(schema::RaceStatesGlobals::race_data(base).mode()) == 2) {
-    full = Lfs(base, 0x82002A10);
+  if (race == 1 && int32_t(schema::RaceStatesGlobals::race_data().mode()) == 2) {
+    full = Lfs(0x82002A10);
   }
   if (a > t) {
     return full;
   }
-  const double zero = Lfs(base, 0x82000A34);
+  const double zero = Lfs(0x82000A34);
   if (b == zero) {
     return zero;
   }
-  const double one = Lfs(base, 0x82000A30);
+  const double one = Lfs(0x82000A30);
   const double after = Single(t - a);
   const double on = Single(one - a);
   const double before = Single(one - t);
@@ -121,21 +121,21 @@ double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, d
 
 // --- BlinkTimers::Advance ---
 
-void BlinkTimersAdvance(uint8_t* base, uint32_t block, uint32_t stack) {
+void BlinkTimersAdvance(uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC958 BlinkTimers::Advance");
-  const schema::LightPoints timers(base, block);
+  const schema::LightPoints timers(block);
   const uint64_t c24 = timers.sides_counter() + 1;
   const uint64_t c32 = timers.rear_counter() + 1;
   const uint64_t c16 = timers.front_counter() + 1;
   const uint64_t c8 = timers.blink_counter() + 1;
   const schema::LightKitRecord record = timers.record();
-  const double scale = LoadDouble(base, 0x820056D8);
+  const double scale = LoadDouble(0x820056D8);
   timers.set_sides_counter(c24);
   timers.set_rear_counter(c32);
   timers.set_front_counter(c16);
   timers.set_blink_counter(c8);
-  const double offset = LoadDouble(base, 0x820056C8);
-  const double factor = LoadDouble(base, 0x820056D0);
+  const double offset = LoadDouble(0x820056C8);
+  const double factor = LoadDouble(0x820056D0);
   // The front, sides and rear: the record's mode and rate, the counter.
   struct Group {
     uint32_t (schema::LightKitRecord::*mode)() const;
@@ -154,9 +154,9 @@ void BlinkTimersAdvance(uint8_t* base, uint32_t block, uint32_t stack) {
     if (int32_t((record.*g.mode)()) < 2) {
       continue;
     }
-    StoreU64(base, stack - 16, g.value);
+    StoreU64(stack - 16, g.value);
     const double limit = std::fma(double((record.*g.rate)()), factor, offset) * scale;
-    const double count = double(int64_t(LoadU64(base, stack - 16)));
+    const double count = double(int64_t(LoadU64(stack - 16)));
     if (!(limit > count)) {
       (timers.*g.reset)(0);
     }

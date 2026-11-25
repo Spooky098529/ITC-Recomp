@@ -38,12 +38,12 @@ struct Calls {
 // slot 10 (PlayCue2D) from the 112-byte frame below `sp` (+80 the float
 // 1.0, +84 the cue, +88 the bank 0; r4 to r6 their addresses). The slot's
 // r3.
-uint64_t PlayMenuSound(uint8_t* base, uint32_t cue, uint32_t sp, const Calls& calls);
+uint64_t PlayMenuSound(uint32_t cue, uint32_t sp, const Calls& calls);
 
 // Sound::Play (sub_82175850): the manager's slot 10 with r4, r5 = `bank`,
 // `cue` (the indexes' addresses) and r6 = the 96-byte frame's +80 (the
 // float 1.0). The slot's r3.
-uint64_t PlaySound(uint8_t* base, uint32_t bank, uint32_t cue, uint32_t sp, const Calls& calls);
+uint64_t PlaySound(uint32_t bank, uint32_t cue, uint32_t sp, const Calls& calls);
 
 // SoundOptions::SetEffectsVolume (sub_821B9C20) and SetMusicVolume
 // (sub_821B9CF0): `setting` (r3, its low byte sign-extended) as a gain (0.0
@@ -51,7 +51,7 @@ uint64_t PlaySound(uint8_t* base, uint32_t bank, uint32_t cue, uint32_t sp, cons
 // the 112-byte frame's +80; the category "Default" or "Music" (slot 29) at
 // +88 and, unless it's -1, its volume set (slot 30, r4 = +88, r5 = +80);
 // then +80 stored to the volume globals. r3 as the last slot leaves it.
-uint64_t SetEffectsVolume(uint8_t* base, uint64_t setting, uint32_t sp, const Calls& calls);
-uint64_t SetMusicVolume(uint8_t* base, uint64_t setting, uint32_t sp, const Calls& calls);
+uint64_t SetEffectsVolume(uint64_t setting, uint32_t sp, const Calls& calls);
+uint64_t SetMusicVolume(uint64_t setting, uint32_t sp, const Calls& calls);
 
 }  // namespace menu_sounds

@@ -94,9 +94,9 @@ constexpr uint32_t kDeviceDepthStencil = 12200;
 struct Surface {
   uint32_t pitch, msaa, edram_base, format;
 };
-Surface ReadSurface(uint8_t* base, uint32_t object) {
-  uint32_t surface_info = guest::LoadU32(base, object + 24);
-  uint32_t info = guest::LoadU32(base, object + 28);
+Surface ReadSurface(uint32_t object) {
+  uint32_t surface_info = guest::LoadU32(object + 24);
+  uint32_t info = guest::LoadU32(object + 28);
   return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF};
 }
 
@@ -715,7 +715,7 @@ struct Passes::State {
   uint32_t inline_slot_size() const {
     return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
   }
-  void MirrorByTickFrameStart(uint8_t* base);
+  void MirrorByTickFrameStart();
   std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
   uint32_t inline_offset = 0;  // this frame's inline vertices so far
   // With check_mirror: each range's hash when copied, to find ranges whose
@@ -840,7 +840,7 @@ struct Passes::State {
   // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
   // index range (kNewestUnknown if it didn't ask), for Mirror.
   uint64_t draw_index_newest = kNewestUnknown;
-  std::pair<uint32_t, uint32_t> DrawIndexRange(uint8_t* base, uint32_t address, uint32_t count,
+  std::pair<uint32_t, uint32_t> DrawIndexRange(uint32_t address, uint32_t count,
                                                bool index_32bit, uint32_t endian,
                                                bool skip_restart);
   // With log_index_ranges: each draw's index range (address, count and
@@ -1159,11 +1159,11 @@ struct Passes::State {
   bool log_constant_changes = false;
   bool log_register_reads = false;
   // ReadRegisters into regs, counted with log_register_reads.
-  void ReadState(uint8_t* base, uint32_t device) {
+  void ReadState(uint32_t device) {
     if (log_register_reads) {
-      ReadRegisters(base, device, regs, stats.register_reads);
+      ReadRegisters(device, regs, stats.register_reads);
     } else {
-      ReadRegisters(base, device, regs);
+      ReadRegisters(device, regs);
     }
   }
   // Points offset at a copy of the block's size bytes in the constant
@@ -1180,20 +1180,20 @@ struct Passes::State {
                    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
   // The bound surface's target, made (and cleared) on first use; null if
   // its format isn't drawn.
-  Target* GetTarget(VkCommandBuffer commands, uint8_t* base, uint32_t object, bool depth);
+  Target* GetTarget(VkCommandBuffer commands, uint32_t object, bool depth);
   // Clears the whole target (aspects: all if 0).
   void ClearTarget(VkCommandBuffer commands, Target& target, const VkClearValue& value,
                    VkImageAspectFlags aspects = 0);
   // Draws the source's rectangle (left, top, right, bottom; the whole
   // destination if null) into the resolve's destination texture at the
   // point (x, y; 0, 0 if null).
-  bool ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source, uint32_t destination,
+  bool ResolveInto(VkCommandBuffer commands, Target& source, uint32_t destination,
                    const int32_t* rect, const int32_t* point, uint32_t flags);
   // A resolve as the library's Resolve (sub_822AFA58) takes it: flags as
   // the XDK's D3DRESOLVE, from the device's bound surfaces; then the clears
   // its flags ask for (0x100 color, 0x200 depth and stencil), if
   // apply_clears.
-  void Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
+  void Resolve(VkCommandBuffer commands, uint32_t device, uint32_t flags,
                const int32_t* rect, uint32_t destination, const int32_t* point,
                bool level_or_slice, const float* clear_color, float clear_z,
                uint32_t clear_stencil, bool apply_clears);
@@ -1216,9 +1216,9 @@ struct Passes::State {
   // `newest`: Buffers_NewestWrite's answer for exactly this range if the
   // caller has just asked it (kNewestUnknown otherwise), to not ask twice.
   static constexpr uint64_t kNewestUnknown = ~uint64_t(0);
-  void Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+  void Mirror(uint32_t address, uint32_t size, bool index,
               uint64_t newest = kNewestUnknown);
-  void CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index);
+  void CheckClobbers(uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
   bool CreateTexturePool(Ring& ring);
@@ -1234,9 +1234,9 @@ struct Passes::State {
   // constants (stage: 0 vertex, 1 pixel): the last one for the stage again
   // when nothing it was built from changed (reuse_texture_sets), else
   // BuildTextureSet's.
-  VkDescriptorSet GetTextureSet(uint8_t* base, const TranslatedShader* shader,
+  VkDescriptorSet GetTextureSet(const TranslatedShader* shader,
                                 VkDescriptorSetLayout layout, uint32_t stage);
-  VkDescriptorSet BuildTextureSet(uint8_t* base, const TranslatedShader* shader,
+  VkDescriptorSet BuildTextureSet(const TranslatedShader* shader,
                                   VkDescriptorSetLayout layout);
   // Each stage's last texture set and what it was built from: the shader,
   // the layout, the fetch constants the shader reads (a bit each, and their
@@ -1265,7 +1265,7 @@ struct Passes::State {
   VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
   void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
-  void Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device, const DrawCall& call);
+  void Draw(VkCommandBuffer commands, uint32_t device, const DrawCall& call);
 };
 
 bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType view_type,
@@ -1369,7 +1369,7 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
   return true;
 }
 
-void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool index,
+void Passes::State::Mirror(uint32_t address, uint32_t size, bool index,
                            uint64_t newest) {
   if (!size || address >= kPhysicalMemorySize) {
     return;
@@ -1380,7 +1380,7 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   uint64_t key = (uint64_t(address) << 32) | size;
   if (check_mirror) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(base, address), size);
+    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
     auto [it, added] = mirrored_hashes.try_emplace(key, hash);
     if (!added && it->second != hash) {
       it->second = hash;
@@ -1409,14 +1409,14 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
   }
   if (check_late_writes) {
     // Hashed again at the end of the frame.
-    copied_ranges.push_back({address, size, base::Hash64(PhysicalHostAddress(base, address), size),
+    copied_ranges.push_back({address, size, base::Hash64(PhysicalHostAddress(address), size),
                              index, current_vertex_shader});
   }
   if (check_clobbers) {
-    CheckClobbers(base, address, size, index);
+    CheckClobbers(address, size, index);
   }
   if (check_mirror_frames) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(base, address), size);
+    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
     auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
     if (added) {
       mirror_new_bytes += size;
@@ -1484,7 +1484,7 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
       // checks every range every frame.
       if (verify_mirror &&
           (stats.mirror_checked++,
-           std::memcmp(mirror.mapped + address, PhysicalHostAddress(base, address), size))) {
+           std::memcmp(mirror.mapped + address, PhysicalHostAddress(address), size))) {
         stats.mirror_stale++;
         stats.mirror_stale_bytes += size;
         if (!stats.mirror_stale_sample_size) {
@@ -1497,11 +1497,11 @@ void Passes::State::Mirror(uint8_t* base, uint32_t address, uint32_t size, bool 
     }
     it->second = Buffers_Sequence();
   }
-  std::memcpy(mirror.mapped + address, PhysicalHostAddress(base, address), size);
+  std::memcpy(mirror.mapped + address, PhysicalHostAddress(address), size);
   stats.mirrored_bytes += size;
 }
 
-void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
+void Passes::State::MirrorByTickFrameStart() {
   by_tick.frames++;
   mirror_taken.clear();
   Buffers_TakeMirrorWrites(mirror_taken);
@@ -1517,7 +1517,7 @@ void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
     for (auto [start, end] : mirror_pending[m]) {
       end = std::min(end, kPhysicalMemorySize);
       if (start < end) {
-        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(base, start), end - start);
+        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(start), end - start);
         by_tick.writes++;
         by_tick.bytes += end - start;
       }
@@ -1548,11 +1548,11 @@ void Passes::State::MirrorByTickFrameStart(uint8_t* base) {
   std::sort(front_missing.begin(), front_missing.end());
 }
 
-std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint32_t address,
+std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint32_t address,
                                                             uint32_t count, bool index_32bit,
                                                             uint32_t endian, bool skip_restart) {
   if (!cache_index_ranges) {
-    return IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+    return IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
                       skip_restart);
   }
   uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
@@ -1569,7 +1569,7 @@ std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint8_t* base, uint3
   // Writes not yet taken get later sequences, so the entry is scanned again
   // once they are.
   uint64_t sequence = Buffers_Sequence();
-  range = IndexRange(PhysicalHostAddress(base, address), count, index_32bit, endian,
+  range = IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
                      skip_restart);
   if (!entry.key) {
     index_cache.Added();
@@ -1617,7 +1617,7 @@ void Passes::State::CountIndexRange(uint32_t address, uint32_t count, bool index
   seen = IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames};
 }
 
-void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size, bool index) {
+void Passes::State::CheckClobbers(uint32_t address, uint32_t size, bool index) {
   // Earlier ranges overlapping this one: the mirror holds what their draws
   // copied (the last copy of each byte); bytes differing from guest memory
   // now are about to be replaced under them.
@@ -1625,7 +1625,7 @@ void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size
   uint32_t end = address + size;
   uint32_t from = address > clobber_longest ? address - clobber_longest : 0;
   const uint8_t* mirror = draw_mirror().mapped;
-  const uint8_t* guest = PhysicalHostAddress(base, 0);
+  const uint8_t* guest = PhysicalHostAddress(0);
   for (auto it = clobber_ranges.lower_bound(from);
        it != clobber_ranges.end() && it->first < end; ++it) {
     uint32_t lo = std::max(address, it->first), hi = std::min(end, it->second.end);
@@ -1944,7 +1944,7 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
   return layout;
 }
 
-VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShader* shader,
+VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
                                                VkDescriptorSetLayout layout, uint32_t stage) {
   LastTextureSet& last = last_texture_sets[stage];
   const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
@@ -1962,7 +1962,7 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
     }
   }
   uint64_t unkept = textures.unkept_answers();
-  VkDescriptorSet set = BuildTextureSet(base, shader, layout);
+  VkDescriptorSet set = BuildTextureSet(shader, layout);
   if (shader != last.shader) {
     last.shader = shader;
     last.fetch_mask = 0;
@@ -1986,7 +1986,7 @@ VkDescriptorSet Passes::State::GetTextureSet(uint8_t* base, const TranslatedShad
   return set;
 }
 
-VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedShader* shader,
+VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
                                                  VkDescriptorSetLayout layout) {
   // The views and samplers for the shader's bindings, from the current
   // fetch constants; placeholders for what can't be had.
@@ -2021,7 +2021,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
     }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
-                           : textures.GetView(base, fetch, texture.view_type,
+                           : textures.GetView(fetch, texture.view_type,
                                                               texture.fetch_constant);
     bool mismatched = false;
     if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
@@ -2480,9 +2480,9 @@ void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Targ
   rendering = true;
 }
 
-Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32_t object,
+Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
                                  bool depth) {
-  Surface surface = ReadSurface(base, object);
+  Surface surface = ReadSurface(object);
   VkFormat format = depth ? kDepthFormat : ColorFormat(surface.format);
   if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
     return nullptr;
@@ -2804,14 +2804,14 @@ VkPipeline Passes::State::MakeFullscreenPipeline(VkShaderModule pixel, VkPipelin
   return pipeline;
 }
 
-bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
+bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
                                 uint32_t destination, const int32_t* rect,
                                 const int32_t* point, uint32_t flags) {
   // The destination texture's fetch constant (+28..+48), its addresses
   // made physical as SetTexture makes them.
   uint32_t fetch[6];
   for (uint32_t k = 0; k < 6; k++) {
-    fetch[k] = guest::LoadU32(base, destination + 28 + 4 * k);
+    fetch[k] = guest::LoadU32(destination + 28 + 4 * k);
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
@@ -3063,7 +3063,7 @@ VkPipeline Passes::State::GetMoviePipeline(VkFormat format, VkSampleCountFlagBit
   return it->second;
 }
 
-void Passes::DrawMovie(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
                        const MoviePlanes& planes) {
   State& s = *state_;
   if (s.movie_failed || !planes.width || !planes.height) {
@@ -3077,8 +3077,8 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint8_t* base, uint32_t device,
     }
     ITC_LOG_INFO("native renderer: movies drawn from {}x{} planes", planes.width, planes.height);
   }
-  uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0);
-  Target* target = object ? s.GetTarget(commands, base, object, false) : nullptr;
+  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   if (!target) {
     return;
   }
@@ -3153,7 +3153,7 @@ Passes::Passes() : state_(std::make_unique<State>()) {
 }
 Passes::~Passes() = default;
 
-bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_in_flight,
+bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
                   float resolution_scale) {
   State& s = *state_;
   s.context = context;
@@ -3344,22 +3344,22 @@ VkCommandBuffer Passes::EndUploads() {
   return state_->textures.EndUploads();
 }
 
-void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                          const DrawCall& call) {
   State& s = *this;
   auto& regs = s.regs;
   // The bound surfaces: render target 0 and depth (others aren't drawn).
-  uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0);
-  uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0);
+  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
   for (uint32_t i = 1; i < 4; i++) {
     // The same surface in another slot (seen: target 1 = target 0) adds
     // nothing.
-    if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i);
+    if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * i);
         object && object != color_object) {
       if (!s.logged_extra_targets) {
         s.logged_extra_targets = true;
-        Surface extra = ReadSurface(base, object);
-        Surface first = color_object ? ReadSurface(base, color_object) : Surface{};
+        Surface extra = ReadSurface(object);
+        Surface first = color_object ? ReadSurface(color_object) : Surface{};
         ITC_LOG_INFO("native renderer: render target {} bound ({:08X}: EDRAM base {}, pitch {}, "
                      "MSAA {}, format {}) with target 0 {:08X} (EDRAM base {}, pitch {}, MSAA {}, "
                      "format {})",
@@ -3370,8 +3370,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       break;
     }
   }
-  Target* color = color_object ? s.GetTarget(commands, base, color_object, false) : nullptr;
-  Target* depth = depth_object ? s.GetTarget(commands, base, depth_object, true) : nullptr;
+  Target* color = color_object ? s.GetTarget(commands, color_object, false) : nullptr;
+  Target* depth = depth_object ? s.GetTarget(commands, depth_object, true) : nullptr;
   if (!color && !depth) {
     s.stats.failed++;
     s.stats.failed_by[0]++;
@@ -3420,19 +3420,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
 
   // Shaders, read through physical memory as the GPU reads them.
   uint32_t program_control = regs.values[XE_GPU_REG_SQ_PROGRAM_CNTL];
-  uint32_t vertex_object = guest::LoadU32(base, device + kDeviceVertexShader);
-  uint32_t pixel_object = guest::LoadU32(base, device + kDevicePixelShader);
+  uint32_t vertex_object = guest::LoadU32(device + kDeviceVertexShader);
+  uint32_t pixel_object = guest::LoadU32(device + kDevicePixelShader);
   if (!vertex_object) {
     s.stats.failed++;
     s.stats.failed_by[1]++;
     return;
   }
-  uint32_t vertex_address = guest::LoadU32(base, vertex_object + 48);
-  const uint8_t* vertex_ucode = PhysicalHostAddress(base, GpuPhysicalAddress(vertex_address));
-  uint32_t vertex_size = guest::LoadU32(base, vertex_object + 600);
-  uint32_t declaration = guest::LoadU32(base, device + kDeviceVertexDeclaration);
-  uint32_t declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-  uint32_t patched_for = guest::LoadU32(base, vertex_object + 24);
+  uint32_t vertex_address = guest::LoadU32(vertex_object + 48);
+  const uint8_t* vertex_ucode = PhysicalHostAddress(GpuPhysicalAddress(vertex_address));
+  uint32_t vertex_size = guest::LoadU32(vertex_object + 600);
+  uint32_t declaration = guest::LoadU32(device + kDeviceVertexDeclaration);
+  uint32_t declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
+  uint32_t patched_for = guest::LoadU32(vertex_object + 24);
   bool patched = g_vertex_shader_patches != s.vertex_shader_patches;
   s.vertex_shader_patches = g_vertex_shader_patches;
   // The object's microcode is patched for another declaration: the GPU runs
@@ -3460,10 +3460,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       s.stats.declaration_sample = {patched_for, declaration_id};
     }
   }
-  uint32_t pixel_address = pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0;
+  uint32_t pixel_address = pixel_object ? guest::LoadU32(pixel_object + 24) : 0;
   const uint8_t* pixel_ucode =
-      pixel_object ? PhysicalHostAddress(base, GpuPhysicalAddress(pixel_address)) : nullptr;
-  uint32_t pixel_size = pixel_object ? guest::LoadU32(base, pixel_object + 64) : 0;
+      pixel_object ? PhysicalHostAddress(GpuPhysicalAddress(pixel_address)) : nullptr;
+  uint32_t pixel_size = pixel_object ? guest::LoadU32(pixel_object + 64) : 0;
   uint32_t context_misc = regs.values[XE_GPU_REG_SQ_CONTEXT_MISC];
   // The lookup in full: each microcode hashed once (the cache's lookups take
   // the hash), which interpolators connect them (an unconnected one the
@@ -3616,9 +3616,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
         uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
         glow_frame.constants += std::format(
-            "c{} {:.4g} {:.4g} {:.4g} {:.4g}; ", c, guest::LoadFloat(base, at),
-            guest::LoadFloat(base, at + 4), guest::LoadFloat(base, at + 8),
-            guest::LoadFloat(base, at + 12));
+            "c{} {:.4g} {:.4g} {:.4g} {:.4g}; ", c, guest::LoadFloat(at),
+            guest::LoadFloat(at + 4), guest::LoadFloat(at + 8),
+            guest::LoadFloat(at + 12));
       }
     }
     for (const ShaderTexture& texture : pixel->textures) {
@@ -3637,16 +3637,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   bool index_32bit = false;
   uint32_t index_endian = 0, index_address = 0;
   if (!call.inline_vertices) {
-    uint32_t index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
+    uint32_t index_buffer = guest::LoadU32(device + kDeviceIndexBuffer);
     if (!index_buffer) {
       s.stats.failed++;
       s.stats.failed_by[3]++;
       return;
     }
-    uint32_t index_word = guest::LoadU32(base, index_buffer);
+    uint32_t index_word = guest::LoadU32(index_buffer);
     index_32bit = index_word >> 31;
     index_endian = (index_word >> 29) & 3;
-    index_address = GpuPhysicalAddress(guest::LoadU32(base, index_buffer + 24)) +
+    index_address = GpuPhysicalAddress(guest::LoadU32(index_buffer + 24)) +
                     start_index * (index_32bit ? 4 : 2);
   }
 
@@ -3660,11 +3660,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
   // SetScissorRect; otherwise the whole target.
   draw_util::Scissor scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
-  if (guest::LoadU32(base, device + kDeviceScissorEnable)) {
-    int32_t left = int32_t(guest::LoadU32(base, device + kDeviceScissorRect));
-    int32_t top = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 4));
-    int32_t right = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 8));
-    int32_t bottom = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 12));
+  if (guest::LoadU32(device + kDeviceScissorEnable)) {
+    int32_t left = int32_t(guest::LoadU32(device + kDeviceScissorRect));
+    int32_t top = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4));
+    int32_t right = int32_t(guest::LoadU32(device + kDeviceScissorRect + 8));
+    int32_t bottom = int32_t(guest::LoadU32(device + kDeviceScissorRect + 12));
     scissor.offset[0] = uint32_t(std::max(left, 0));
     scissor.offset[1] = uint32_t(std::max(top, 0));
     scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
@@ -3694,7 +3694,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   bool mirror_per_draw = s.MirrorPerDraw();
   if (!call.inline_vertices && index_count && mirror_per_draw) {
     bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
-    auto [low, high] = s.DrawIndexRange(base, index_address, index_count, index_32bit,
+    auto [low, high] = s.DrawIndexRange(index_address, index_count, index_32bit,
                                         index_endian, skip_restart);
     if (s.log_index_ranges) {
       s.CountIndexRange(index_address, index_count, index_32bit, index_endian, skip_restart, low,
@@ -3711,7 +3711,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
         max_vertex = uint32_t(high_sum);
       } else {
         for (uint32_t i = 0; i < index_count; i++) {
-          auto [index, unused] = IndexRange(PhysicalHostAddress(base, index_address) +
+          auto [index, unused] = IndexRange(PhysicalHostAddress(index_address) +
                                                 (index_32bit ? 4 : 2) * i,
                                             1, index_32bit, index_endian, skip_restart);
           if (index == UINT32_MAX && !unused) {
@@ -3819,7 +3819,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
         uint32_t first = std::countr_zero(bits);
         uint32_t count = std::countr_one(bits >> first);
         bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        if (guest::CopyU32s(base, source + 16 * (64 * w + first), copy + 4 * packed,
+        if (guest::CopyU32s(source + 16 * (64 * w + first), copy + 4 * packed,
                             4 * count)) {
           same = false;
         }
@@ -3892,8 +3892,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (s.log_texture_bindings) {
     s.CountDrawBindings(vertex, pixel);
   }
-  VkDescriptorSet vertex_textures = s.GetTextureSet(base, vertex, vertex_layout, 0);
-  VkDescriptorSet pixel_textures = s.GetTextureSet(base, pixel, pixel_layout, 1);
+  VkDescriptorSet vertex_textures = s.GetTextureSet(vertex, vertex_layout, 0);
+  VkDescriptorSet pixel_textures = s.GetTextureSet(pixel, pixel_layout, 1);
   if (!vertex_textures || !pixel_textures) {
     s.stats.failed++;
     s.stats.failed_by[6]++;
@@ -3960,7 +3960,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
   if (!call.inline_vertices && mirror_per_draw) {
-    s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true,
+    s.Mirror(index_address, index_count * (index_32bit ? 4 : 2), true,
              s.draw_index_newest);
   }
   // The highest vertex the draw uses (indices as the GPU reads them, after
@@ -4006,7 +4006,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
         }
       }
     }
-    s.Mirror(base, word0 & 0x1FFFFFFCu, size, false);
+    s.Mirror(word0 & 0x1FFFFFFCu, size, false);
   }
 
   // Draw.
@@ -4344,7 +4344,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   id_drawn = true;
 }
 
-void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
+void Passes::AfterDraw(VkCommandBuffer commands, uint32_t id, uint32_t payload,
                        uint32_t arg1) {
   State& s = *state_;
   // Only indexed draws for now (command 18, 12 bytes an item).
@@ -4352,19 +4352,19 @@ void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uin
     s.stats.unsupported += arg1;
     return;
   }
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  s.ReadState(base, device);
+  uint32_t device = guest::LoadU32(kDevicePointer);
+  s.ReadState(device);
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 12 * i;
     DrawCall call;
-    call.type = guest::LoadU32(base, item);
-    call.base_start = guest::LoadU32(base, item + 4);
-    call.primitive_count = guest::LoadU32(base, item + 8);
-    s.Draw(commands, base, device, call);
+    call.type = guest::LoadU32(item);
+    call.base_start = guest::LoadU32(item + 4);
+    call.primitive_count = guest::LoadU32(item + 8);
+    s.Draw(commands, device, call);
   }
 }
 
-void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
+void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                         uint32_t stride, uint32_t data) {
   State& s = *state_;
   uint32_t size = count * stride;
@@ -4381,10 +4381,10 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   call.vertex_count = count;
   call.vertex_address =
       kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, guest::Pointer(base, data), size);
+  std::memcpy(s.draw_mirror().mapped + call.vertex_address, guest::Pointer(data), size);
   s.stats.mirrored_bytes += size;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  s.ReadState(base, device);
+  uint32_t device = guest::LoadU32(kDevicePointer);
+  s.ReadState(device);
   // What BeginVertices wrote to the GPU instead of the shadow.
   uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
   fetch[2 * (kInlineFetchConstant - 2)] = 1;
@@ -4395,50 +4395,50 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
   s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
-  s.Draw(commands, base, device, call);
+  s.Draw(commands, device, call);
   // Read them from the shadow again next time.
   static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);
   MarkFetchConstantsDirty(1ull << (63 - kInlineFetchConstant / 3));
   MarkRegistersDirty(XE_GPU_REG_VGT_INDX_OFFSET, 1ull << 63);
 }
 
-void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
+void Passes::AfterClear(VkCommandBuffer commands, uint32_t payload,
                         uint32_t arg1) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  uint32_t device = guest::LoadU32(kDevicePointer);
   // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
   // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
   // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
   // is cleared.
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 280 * i;
-    uint32_t flags = guest::LoadU32(base, item + 8);
+    uint32_t flags = guest::LoadU32(item + 8);
     s.stats.clears++;
-    if (guest::LoadU32(base, item + 4)) {
+    if (guest::LoadU32(item + 4)) {
       s.stats.clear_rects++;
     }
     if (flags & 0xF) {
-      uint32_t color = guest::LoadU32(base, item + 268);
+      uint32_t color = guest::LoadU32(item + 268);
       VkClearValue value{};
       value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
                       float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
       if (flags & 0xE) {
         s.stats.extra_targets++;
       }
-      if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0); object && (flags & 1)) {
-        if (Target* target = s.GetTarget(commands, base, object, false)) {
+      if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0); object && (flags & 1)) {
+        if (Target* target = s.GetTarget(commands, object, false)) {
           s.ClearTarget(commands, *target, value);
         }
       }
     }
     if (flags & 0x30) {
-      uint32_t object = guest::LoadU32(base, device + kDeviceDepthStencil);
-      Target* target = object ? s.GetTarget(commands, base, object, true) : nullptr;
+      uint32_t object = guest::LoadU32(device + kDeviceDepthStencil);
+      Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
       if (target) {
         VkClearValue value{};
-        uint32_t z = guest::LoadU32(base, item + 272);
+        uint32_t z = guest::LoadU32(item + 272);
         std::memcpy(&value.depthStencil.depth, &z, 4);
-        value.depthStencil.stencil = guest::LoadU32(base, item + 276) & 0xFF;
+        value.depthStencil.stencil = guest::LoadU32(item + 276) & 0xFF;
         s.ClearTarget(commands, *target, value,
                       ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
                           ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
@@ -4447,38 +4447,38 @@ void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payloa
   }
 }
 
-void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
+void Passes::AfterResolve(VkCommandBuffer commands, uint32_t payload,
                           uint32_t arg1) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  uint32_t device = guest::LoadU32(kDevicePointer);
   // Command 25's item (68 bytes; see "Pass command items" in
   // docs/gpu-functions.md); its flags are State::Resolve's.
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 68 * i;
-    uint32_t fields = guest::LoadU32(base, item);
-    uint32_t flags = guest::LoadU32(base, item + 4);
+    uint32_t fields = guest::LoadU32(item);
+    uint32_t flags = guest::LoadU32(item + 4);
     int32_t rect[4], point[2];
     for (uint32_t k = 0; k < 4; k++) {
-      rect[k] = int32_t(guest::LoadU32(base, item + 8 + 4 * k));
+      rect[k] = int32_t(guest::LoadU32(item + 8 + 4 * k));
     }
-    point[0] = int32_t(guest::LoadU32(base, item + 28));
-    point[1] = int32_t(guest::LoadU32(base, item + 32));
+    point[0] = int32_t(guest::LoadU32(item + 28));
+    point[1] = int32_t(guest::LoadU32(item + 32));
     // The clear color's 4 bytes, as floats (as the handler converts them).
     float color[4] = {};
     for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
-      color[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
+      color[c] = float(guest::LoadU8(item + 44 + c)) / 255.0f;
     }
-    uint32_t z = guest::LoadU32(base, item + 48);
+    uint32_t z = guest::LoadU32(item + 48);
     float clear_z;
     std::memcpy(&clear_z, &z, 4);
-    s.Resolve(commands, base, device, flags, (fields & 1) ? rect : nullptr,
-              (fields & 2) ? guest::LoadU32(base, item + 24) : 0, (fields & 4) ? point : nullptr,
-              guest::LoadU32(base, item + 36) || guest::LoadU32(base, item + 40), color, clear_z,
-              guest::LoadU32(base, item + 52), true);
+    s.Resolve(commands, device, flags, (fields & 1) ? rect : nullptr,
+              (fields & 2) ? guest::LoadU32(item + 24) : 0, (fields & 4) ? point : nullptr,
+              guest::LoadU32(item + 36) || guest::LoadU32(item + 40), color, clear_z,
+              guest::LoadU32(item + 52), true);
   }
 }
 
-void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
                             uint32_t flags, const int32_t* rect, uint32_t destination,
                             const int32_t* point, bool level_or_slice, const float* clear_color,
                             float clear_z, uint32_t clear_stencil, bool apply_clears) {
@@ -4491,12 +4491,12 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
     stats.resolve_flags_sample = flags;
   }
   bool from_depth = flags & 4;
-  uint32_t color_object = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * (flags & 3));
-  uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
+  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * (flags & 3));
+  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
   uint32_t source_object = from_depth ? depth_object : color_object;
-  Target* source = source_object ? GetTarget(commands, base, source_object, from_depth) : nullptr;
+  Target* source = source_object ? GetTarget(commands, source_object, from_depth) : nullptr;
   if (source && destination && !level_or_slice &&
-      ResolveInto(commands, base, *source, destination, rect, point, flags)) {
+      ResolveInto(commands, *source, destination, rect, point, flags)) {
     stats.resolves++;
   } else {
     stats.resolves_skipped++;
@@ -4505,7 +4505,7 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
     return;
   }
   if ((flags & 0x100) && color_object) {
-    if (Target* target = GetTarget(commands, base, color_object, false)) {
+    if (Target* target = GetTarget(commands, color_object, false)) {
       VkClearValue value{};
       for (uint32_t c = 0; clear_color && c < 4; c++) {
         value.color.float32[c] = clear_color[c];
@@ -4514,7 +4514,7 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
     }
   }
   if ((flags & 0x200) && depth_object) {
-    if (Target* target = GetTarget(commands, base, depth_object, true)) {
+    if (Target* target = GetTarget(commands, depth_object, true)) {
       VkClearValue value{};
       value.depthStencil.depth = clear_z;
       value.depthStencil.stencil = clear_stencil & 0xFF;
@@ -4523,27 +4523,27 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
   }
 }
 
-void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload) {
+void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
+  uint32_t device = guest::LoadU32(kDevicePointer);
   // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
   // rectangles (16 bytes each: left, top, right, bottom). The handler gives
   // BeginTiling a clear color and Z of the float at 0x82000A34, stencil 0.
-  uint32_t flags = guest::LoadU32(base, payload);
-  uint32_t count = guest::LoadU32(base, payload + 4);
-  uint32_t rects = guest::LoadU32(base, payload + 8);
+  uint32_t flags = guest::LoadU32(payload);
+  uint32_t count = guest::LoadU32(payload + 4);
+  uint32_t rects = guest::LoadU32(payload + 8);
   uint32_t width = 0, height = 0;
   std::string tiles;
   for (uint32_t i = 0; rects && i < count && i < 16; i++) {
     int32_t r[4];
     for (uint32_t k = 0; k < 4; k++) {
-      r[k] = int32_t(guest::LoadU32(base, rects + 16 * i + 4 * k));
+      r[k] = int32_t(guest::LoadU32(rects + 16 * i + 4 * k));
     }
     width = std::max(width, uint32_t(std::max(r[2], 0)));
     height = std::max(height, uint32_t(std::max(r[3], 0)));
     tiles += std::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
   }
-  uint32_t clear_bits = guest::LoadU32(base, 0x82000A34);
+  uint32_t clear_bits = guest::LoadU32(0x82000A34);
   float clear;
   std::memcpy(&clear, &clear_bits, 4);
   if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
@@ -4555,15 +4555,15 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
   s.stats.tilings++;
   // Each tile starts cleared to these.
-  if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0)) {
-    if (Target* target = s.GetTarget(commands, base, object, false)) {
+  if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0)) {
+    if (Target* target = s.GetTarget(commands, object, false)) {
       VkClearValue value{};
       value.color = {{clear, clear, clear, clear}};
       s.ClearTarget(commands, *target, value);
     }
   }
-  if (uint32_t object = guest::LoadU32(base, device + kDeviceDepthStencil)) {
-    if (Target* target = s.GetTarget(commands, base, object, true)) {
+  if (uint32_t object = guest::LoadU32(device + kDeviceDepthStencil)) {
+    if (Target* target = s.GetTarget(commands, object, true)) {
       VkClearValue value{};
       value.depthStencil = {clear, 0};
       s.ClearTarget(commands, *target, value);
@@ -4571,21 +4571,21 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   }
 }
 
-void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+void Passes::TiledResolve(VkCommandBuffer commands, uint32_t device,
                           uint32_t flags, uint32_t rect_address, uint32_t destination,
                           uint32_t point_address, uint32_t clear_color_address, float clear_z,
                           uint32_t tile, uint32_t tiles) {
   State& s = *state_;
   int32_t rect[4], point[2];
   for (uint32_t k = 0; rect_address && k < 4; k++) {
-    rect[k] = int32_t(guest::LoadU32(base, rect_address + 4 * k));
+    rect[k] = int32_t(guest::LoadU32(rect_address + 4 * k));
   }
   for (uint32_t k = 0; point_address && k < 2; k++) {
-    point[k] = int32_t(guest::LoadU32(base, point_address + 4 * k));
+    point[k] = int32_t(guest::LoadU32(point_address + 4 * k));
   }
   float color[4] = {};
   for (uint32_t c = 0; clear_color_address && c < 4; c++) {
-    uint32_t bits = guest::LoadU32(base, clear_color_address + 4 * c);
+    uint32_t bits = guest::LoadU32(clear_color_address + 4 * c);
     std::memcpy(&color[c], &bits, 4);
   }
   if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
@@ -4598,7 +4598,7 @@ void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t devi
   // The library clears the target after each tile but the last for the
   // next tile; the whole surface is drawn at once here, so only the last
   // tile's clears are made.
-  s.Resolve(commands, base, device, flags, rect_address ? rect : nullptr, destination,
+  s.Resolve(commands, device, flags, rect_address ? rect : nullptr, destination,
             point_address ? point : nullptr, false, color, clear_z, 0, tile + 1 >= tiles);
   s.stats.tiled_resolves++;
 }
@@ -4607,24 +4607,24 @@ void Passes::EndTiling() {
   state_->tiling = false;
 }
 
-void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+void Passes::FrontBufferResolve(VkCommandBuffer commands, uint32_t device,
                                 uint32_t front_buffer) {
   State& s = *state_;
-  uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0);
-  Target* target = object ? s.GetTarget(commands, base, object, false) : nullptr;
+  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   // The front buffer's size, from its fetch constant's word 2 (2D: width - 1
   // in bits 0-12, height - 1 in bits 13-25).
-  uint32_t size = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 8) : 0;
+  uint32_t size = front_buffer ? guest::LoadU32(front_buffer + 28 + 8) : 0;
   s.front_extent = {(size & 0x1FFF) + 1, ((size >> 13) & 0x1FFF) + 1};
   s.front = target;
   if (!s.logged_front) {
     s.logged_front = true;
-    Surface surface = object ? ReadSurface(base, object) : Surface{};
-    uint32_t format = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 4) & 0x3F : 0;
+    Surface surface = object ? ReadSurface(object) : Surface{};
+    uint32_t format = front_buffer ? guest::LoadU32(front_buffer + 28 + 4) & 0x3F : 0;
     ITC_LOG_INFO("native renderer: front buffer resolve: device {:08X} (ours {:08X}), render "
                  "target 0 {:08X} (pitch {}, MSAA {}, format {}, EDRAM base {}), into {:08X}: "
                  "{}x{} format {}",
-                 device, guest::LoadU32(base, kDevicePointer), object, surface.pitch, surface.msaa,
+                 device, guest::LoadU32(kDevicePointer), object, surface.pitch, surface.msaa,
                  surface.format, surface.edram_base, front_buffer, s.front_extent.width,
                  s.front_extent.height, format);
   }
@@ -5143,7 +5143,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     uint8_t* base = s.last_base;
     for (const State::CopiedRange& r : s.copied_ranges) {
       s.late_checked++;
-      if (base::Hash64(PhysicalHostAddress(base, r.address), r.size) != r.hash) {
+      if (base::Hash64(PhysicalHostAddress(r.address), r.size) != r.hash) {
         s.late_written++;
         s.late_by_shader[r.vertex_shader]++;
         if (s.late_sample.empty()) {

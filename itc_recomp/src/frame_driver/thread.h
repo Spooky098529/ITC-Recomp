@@ -50,14 +50,14 @@ struct ThreadCalls {
 
 // sub_8258DE88 Thread::Thread: +0 the vtable, +4 = -1, +8 = 0, +12 = 0, +16
 // = 2.
-void ThreadConstruct(uint8_t* base, uint32_t thread);
+void ThreadConstruct(uint32_t thread);
 
 // sub_825BA380 CreateThread (with a processor; -1 for none): from a 96-byte
 // frame, ExCreateThread(&handle at frame + 80, `stack`, `id`, the XAPI start
 // routine, `entry`, `parameter`, the suspended bit (`flags` bit 2) with
 // 1 << `processor` in the top byte). The handle, or 0 with the last error
 // set from the status when it fails.
-uint32_t CreateThread(uint8_t* base, uint32_t stack, uint32_t entry, uint32_t parameter,
+uint32_t CreateThread(uint32_t stack, uint32_t entry, uint32_t parameter,
                       uint32_t flags, uint32_t processor, uint32_t id,
                       const ThreadCalls& calls);
 
@@ -65,7 +65,7 @@ uint32_t CreateThread(uint8_t* base, uint32_t stack, uint32_t entry, uint32_t pa
 // (ObReferenceObjectByHandle with [0x820007FC], the thread object type), its base priority
 // (15 and -15 as 16 and -16), dereferenced; 1, or 0 with the last error set
 // when the handle fails.
-uint32_t SetThreadPriority(uint8_t* base, uint32_t handle, int32_t priority,
+uint32_t SetThreadPriority(uint32_t handle, int32_t priority,
                            const ThreadCalls& calls);
 
 // sub_82297888 XSetThreadProcessor: from a 112-byte frame, the thread
@@ -73,12 +73,12 @@ uint32_t SetThreadPriority(uint8_t* base, uint32_t handle, int32_t priority,
 // one at frame + 84), dereferenced; the old affinity's highest bit (0 for
 // none), or -1 with the last error set (STATUS_INVALID_PARAMETER for a
 // processor above 5).
-uint32_t XSetThreadProcessor(uint8_t* base, uint32_t handle, uint32_t processor,
+uint32_t XSetThreadProcessor(uint32_t handle, uint32_t processor,
                              const ThreadCalls& calls);
 
 // sub_825BA118 ResumeThread: from a 96-byte frame, NtResumeThread(handle,
 // &count at frame + 80); the count, or -1 with the last error set.
-uint32_t ResumeThread(uint8_t* base, uint32_t handle, const ThreadCalls& calls);
+uint32_t ResumeThread(uint32_t handle, const ThreadCalls& calls);
 
 // sub_8258DF18 Thread::Begin: `thread`'s +8 = `object` (`thread` when 0),
 // +12 and +16 from the words at `processor` and `priority`; from a 128-byte
@@ -87,7 +87,7 @@ uint32_t ResumeThread(uint8_t* base, uint32_t handle, const ThreadCalls& calls);
 // table {2, 1, 0, -1, -2} (on the frame at +80, read at +80 + 4 x the
 // index, as the original), XSetThreadProcessor and ResumeThread. Returns r3
 // as the original leaves it (the last call's).
-uint32_t ThreadBegin(uint8_t* base, uint32_t thread, uint32_t object, uint32_t processor,
+uint32_t ThreadBegin(uint32_t thread, uint32_t object, uint32_t processor,
                      uint32_t priority, const ThreadCalls& calls);
 
 }  // namespace frame_driver

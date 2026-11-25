@@ -44,45 +44,45 @@ struct R3 {
 // Whether TextureProvider::Allocate gives `count` pointers natively: no
 // bad_alloc path (0xFFFFFFFF / count below 4), a size malloc takes, a
 // process heap.
-bool CanAllocatePointers(uint8_t* base, uint32_t count);
+bool CanAllocatePointers(uint32_t count);
 
 // sub_825942B8 TextureProvider::Allocate (std::allocator<T*>::allocate):
 // operator new(4 x count). nullopt where the original must run.
-std::optional<uint32_t> PointersAllocate(uint8_t* base, uint32_t count);
+std::optional<uint32_t> PointersAllocate(uint32_t count);
 
 // sub_82594380 TextureProvider::UninitializedCopy: the words from `first` up
 // to `last` copied to `destination` on (a null destination slot skipped);
 // returns the destination's end.
-uint32_t PointersUninitializedCopy(uint8_t* base, uint32_t first, uint32_t last,
+uint32_t PointersUninitializedCopy(uint32_t first, uint32_t last,
                                    uint32_t destination);
 
 // sub_82594570 TextureProvider::Reserve (std::vector<T*>::reserve).
-std::optional<R3> PointersReserve(uint8_t* base, uint32_t vector, uint32_t count);
+std::optional<R3> PointersReserve(uint32_t vector, uint32_t count);
 
 // sub_82590EF0 TextureProvider::InsertN (std::vector<T*>::_Insert_n):
 // `count` copies of `value` inserted before `where`.
-std::optional<R3> PointersInsertN(uint8_t* base, uint32_t vector, uint32_t where,
+std::optional<R3> PointersInsertN(uint32_t vector, uint32_t where,
                                   uint32_t count, uint32_t value);
 
 // sub_825947D0 TextureProvider::Assign (std::vector<T*>::assign): emptied,
 // then `count` copies of `value`.
-std::optional<R3> PointersAssign(uint8_t* base, uint32_t vector, uint32_t count,
+std::optional<R3> PointersAssign(uint32_t vector, uint32_t count,
                                  uint32_t value);
 
 // sub_82590D68 TextureProvider::Clear (std::vector<T*>::clear): the end of
 // the elements put back to the first; returns the first (r3).
-uint32_t PointersClear(uint8_t* base, uint32_t vector);
+uint32_t PointersClear(uint32_t vector);
 
 // sub_82594850 TextureProvider::TextureProvider: the vtable, the vector
 // emptied, then reserved and assigned `count` nulls (-1: 64). Returns the
 // provider; nullopt where the original must run.
-std::optional<uint32_t> TextureProviderConstruct(uint8_t* base, uint32_t provider,
+std::optional<uint32_t> TextureProviderConstruct(uint32_t provider,
                                                  int32_t count);
 
 // sub_825943E0 TextureProvider::~TextureProvider: the vtable, the vector
 // cleared, its storage freed, its three words = 0. Returns r3 (the storage);
 // nullopt where the original must run.
-std::optional<uint32_t> TextureProviderDestruct(uint8_t* base, uint32_t provider);
+std::optional<uint32_t> TextureProviderDestruct(uint32_t provider);
 
 // --- The getters (the vtable's slots 3 and 5 to 10) ---
 
@@ -92,11 +92,11 @@ constexpr uint32_t kTextureProviderGet = 0x825946B8;  // slot 3, at vtable + 12
 // element `index` (+4 + 4 x index); nullopt for _Xran's path (no storage, or
 // the index not below the size: it throws, never seen in play), where the
 // caller runs the original.
-std::optional<uint32_t> PointersAt(uint8_t* base, uint32_t vector, uint32_t index);
+std::optional<uint32_t> PointersAt(uint32_t vector, uint32_t index);
 
 // sub_825946B8 TextureProvider::Get (slot 3): 0 when the vector has no
 // storage or `slot` isn't below its size, else the element (through At).
-uint32_t TextureProviderGet(uint8_t* base, uint32_t provider, uint32_t slot);
+uint32_t TextureProviderGet(uint32_t provider, uint32_t slot);
 
 // A guest call of `function` (r3, r4) from the frame at `frame` with the
 // return address `lr`; its r3.
@@ -108,13 +108,13 @@ using ProviderCall = std::function<uint64_t(uint32_t function, uint32_t frame, u
 // `call`); 0 gives 0, else XPR::GetTexture(it, `index`) (models::XprGetTexture;
 // its diagnostics' wrap left out: a leaf). `sp` is the caller's r1 (the
 // original's frame is 96 bytes below it).
-uint64_t TextureProviderXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+uint64_t TextureProviderXprTexture(uint32_t provider, uint32_t slot,
                                    uint32_t index, uint32_t sp, const ProviderCall& call);
 
 // sub_82594230 TextureProvider::FindXprTexture (slots 8 to 10, never seen in
 // play): the same with XPR::FindTexture(it, `name`) (sub_82596E88, recompiled,
 // through `call`).
-uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_t slot,
+uint64_t TextureProviderFindXprTexture(uint32_t provider, uint32_t slot,
                                        uint32_t name, uint32_t sp, const ProviderCall& call);
 
 // Native callers of the provider's slot 3 and slots 5 to 7, calling the
@@ -122,12 +122,12 @@ uint64_t TextureProviderFindXprTexture(uint8_t* base, uint32_t provider, uint32_
 // TextureProviderGet when --native_models is on and `provider`'s vtable slot
 // 3 holds it (as its adapter does), else nullopt (the caller makes its guest
 // call).
-std::optional<uint32_t> CallGet(uint8_t* base, uint32_t provider, uint32_t slot);
+std::optional<uint32_t> CallGet(uint32_t provider, uint32_t slot);
 // TextureProviderXprTexture when `function` (the slot's target) is
 // sub_825941D0 and --native_models is on (as its adapter does, `sp` the r1
 // the guest call would have had, `call` its inner guest calls), else nullopt.
 constexpr uint32_t kTextureProviderXprTexture = 0x825941D0;  // slots 5 to 7
-std::optional<uint64_t> CallXprTexture(uint8_t* base, uint32_t function, uint32_t provider,
+std::optional<uint64_t> CallXprTexture(uint32_t function, uint32_t provider,
                                        uint32_t slot, uint32_t index, uint32_t sp,
                                        const ProviderCall& call);
 

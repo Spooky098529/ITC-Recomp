@@ -74,59 +74,59 @@ using namespace track_route;
 // --- Lookups ---
 
 // r3 = the route, r4 = out, r5 = the position, r6 = the lane (r3 kept).
-ITC_TRACK_ROUTE(820F8668, LanePoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32))
-ITC_TRACK_ROUTE(820F8920, ctx.r3.u64 = LaneAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_TRACK_ROUTE(820F89F0, ctx.r3.s64 = Link(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_TRACK_ROUTE(820F8D38, ctx.r3.s64 = SpecialSection(base, ctx.r3.u32, ctx.r4.u32))
-ITC_TRACK_ROUTE(820F8DE8, ctx.r3.u64 = SliceTest(base, ctx.r3.u32, ctx.r4.u32))
+ITC_TRACK_ROUTE(820F8668, LanePoint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32))
+ITC_TRACK_ROUTE(820F8920, ctx.r3.u64 = LaneAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_TRACK_ROUTE(820F89F0, ctx.r3.s64 = Link(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_TRACK_ROUTE(820F8D38, ctx.r3.s64 = SpecialSection(ctx.r3.u32, ctx.r4.u32))
+ITC_TRACK_ROUTE(820F8DE8, ctx.r3.u64 = SliceTest(ctx.r3.u32, ctx.r4.u32))
 
 // --- Steps between sections ---
 
 // r5 = the masks or 0.
-ITC_TRACK_ROUTE(820F9FE8, ctx.r3.u64 = Normalize(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_TRACK_ROUTE(820F9FE8, ctx.r3.u64 = Normalize(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r5 = the path or 0, r6 = the masks or 0.
-ITC_TRACK_ROUTE(820FA0F8, ctx.r3.u64 = NormalizePath(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_TRACK_ROUTE(820FA0F8, ctx.r3.u64 = NormalizePath(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r6.u32))
 // r5 = the lane (a halfword, changed).
-ITC_TRACK_ROUTE(820FA210, ctx.r3.u64 = NormalizeLane(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+ITC_TRACK_ROUTE(820FA210, ctx.r3.u64 = NormalizeLane(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r6 = the masks.
-ITC_TRACK_ROUTE(820FA350, ctx.r3.u64 = NormalizeLaneMasked(base, ctx.r3.u32, ctx.r4.u32,
+ITC_TRACK_ROUTE(820FA350, ctx.r3.u64 = NormalizeLaneMasked(ctx.r3.u32, ctx.r4.u32,
                                                            ctx.r5.u32, ctx.r6.u32))
 
 // --- Points and slices ---
 
 // r4 = the point, r5 = the position (a tail call: LocateShoulder's frame
 // 112 bytes down).
-ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_TRACK_ROUTE(820FB888, ctx.r3.u64 = LocateAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                 ctx.r1.u32 - 112))
 // r4 = the position (changed), r5 = the flag; the copy in the original's
 // frame (144 bytes down).
-ITC_TRACK_ROUTE(820FA728, ctx.r3.u64 = ToMainRoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_TRACK_ROUTE(820FA728, ctx.r3.u64 = ToMainRoad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                   ctx.r1.u32 - 144))
 // r4 = the point, r5 = the position, r6 = the score or 0; the original's
 // frame (128 bytes down).
-ITC_TRACK_ROUTE(820FB1B8, ctx.r3.u64 = OnSlice(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_TRACK_ROUTE(820FB1B8, ctx.r3.u64 = OnSlice(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                ctx.r6.u32, ctx.r1.u32 - 128))
 
 // --- The linear index ---
 
 // r3 = out, r4 = the packed position; r3 the out (left as it came).
-ITC_TRACK_ROUTE(820F8420, ClampPosition(base, ctx.r3.u32, ctx.r4.u32))
+ITC_TRACK_ROUTE(820F8420, ClampPosition(ctx.r3.u32, ctx.r4.u32))
 
 // --- Distances ---
 
 // f1 the distance; r3 LinkDistance's answer for positions in different
 // sections, else the route (left as it came).
 ITC_TRACK_ROUTE(820F9278, bool linked = false;
-                const bool apart = schema::TrackRoutePosition(base, ctx.r4.u32).section() !=
-                                   schema::TrackRoutePosition(base, ctx.r5.u32).section();
-                ctx.f1.f64 = Distance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &linked);
+                const bool apart = schema::TrackRoutePosition(ctx.r4.u32).section() !=
+                                   schema::TrackRoutePosition(ctx.r5.u32).section();
+                ctx.f1.f64 = Distance(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &linked);
                 if (apart) { ctx.r3.u64 = linked ? 1 : 0; })
 
 // r4, r5 = the positions (packed), r6 = the path, r7 = its length; f1 the
 // distance; the original's frame (288 bytes down). r3 left as it came (no
 // caller reads it).
-ITC_TRACK_ROUTE(820FA9D0, ctx.f1.f64 = PathDistance(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+ITC_TRACK_ROUTE(820FA9D0, ctx.f1.f64 = PathDistance(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                     ctx.r6.u32, ctx.r7.s32, ctx.r1.u32 - 288))
 
 // --- Points of a slice ---
@@ -137,9 +137,9 @@ ITC_NATIVE_ENTRY_ALWAYS(820F9768) {
   
   if (ITC_FLAG(native_track_route)) {
     ctx.fpscr.disableFlushMode();
-    if (SlicePoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    if (SlicePoint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
       return;
     }
   }
-  lifted::original::c820F9768(ctx, base);
+  lifted::original::c820F9768(ctx);
 }

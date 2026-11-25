@@ -45,35 +45,35 @@ namespace vh = vehicle;
 
 ITC_REGS_STEP(VehicleMatrixFromRows) {
   ctx.fpscr.disableFlushMode();
-  vh::MatrixFromRows(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+  vh::MatrixFromRows(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
 ITC_REGS_STEP(VehicleTrackPositionCopy) {
   ctx.fpscr.disableFlushMode();
-  vh::TrackPositionCopy(base, ctx.r3.u32, ctx.r4.u32);
+  vh::TrackPositionCopy(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(VehicleCameraCurveLoad) {
   ctx.fpscr.disableFlushMode();
-  vh::CameraCurveLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  vh::CameraCurveLoad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(VehicleRoutePositionStep) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 =
-      vh::RoutePositionStep(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112);
+      vh::RoutePositionStep(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112);
 }
 
 ITC_REGS_STEP(VehicleUpdateTrackPositions) {
   ctx.fpscr.disableFlushMode();
-  vh::VehicleUpdateTrackPositions(base, ctx.r3.u32, ctx.r1.u32 - 112);
+  vh::VehicleUpdateTrackPositions(ctx.r3.u32, ctx.r1.u32 - 112);
 }
 
 ITC_REGS_STEP(VehicleLinkTrackPositions) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  if (!vh::VehicleLinkTrackPositions(base, ctx.r3.u32, &r3)) {
-    lifted::original::c820C1D08(ctx, base);
+  if (!vh::VehicleLinkTrackPositions(ctx.r3.u32, &r3)) {
+    lifted::original::c820C1D08(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -83,8 +83,8 @@ ITC_REGS_STEP(VehicleRefresh) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
-  if (!vh::VehicleRefresh(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &r3)) {
-    lifted::original::c820C0118(ctx, base);
+  if (!vh::VehicleRefresh(ctx.r3.u32, ctx.r1.u32 - 96, &f1, &r3)) {
+    lifted::original::c820C0118(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -94,8 +94,8 @@ ITC_REGS_STEP(VehicleRefresh) {
 ITC_REGS_STEP(VehicleRemoveFromWorld) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  if (!NativeHeapActive() || !vh::VehicleRemoveFromWorld(base, ctx.r3.u32, &r3)) {
-    lifted::original::c820C20E0(ctx, base);
+  if (!NativeHeapActive() || !vh::VehicleRemoveFromWorld(ctx.r3.u32, &r3)) {
+    lifted::original::c820C20E0(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -103,9 +103,9 @@ ITC_REGS_STEP(VehicleRemoveFromWorld) {
 
 ITC_REGS_STEP(VehiclesCreate) {
   ctx.fpscr.disableFlushMode();
-  const auto r3 = NativeHeapActive() ? vh::VehiclesCreate(base, ctx.r1.u32 - 112) : std::nullopt;
+  const auto r3 = NativeHeapActive() ? vh::VehiclesCreate(ctx.r1.u32 - 112) : std::nullopt;
   if (!r3) {
-    lifted::original::c820C3BD0(ctx, base);
+    lifted::original::c820C3BD0(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -113,8 +113,8 @@ ITC_REGS_STEP(VehiclesCreate) {
 
 ITC_REGS_STEP(VehiclesDestroy) {
   ctx.fpscr.disableFlushMode();
-  if (!NativeHeapActive() || !vh::VehiclesDestroy(base)) {
-    lifted::original::c820C3B78(ctx, base);
+  if (!NativeHeapActive() || !vh::VehiclesDestroy()) {
+    lifted::original::c820C3B78(ctx);
   }
   // r3 not set: the original leaves operator delete's (free's) there, or
   // its own r3 without a block; its callers don't read it.
@@ -133,55 +133,55 @@ ITC_REGS_STEP(VehicleApplyInput) {
     ctx.f3.f64 = f3;
     ctx.r4.u64 = left;
     ctx.r5.u64 = right;
-    lifted::original::c820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
-  if (!vh::VehicleApplyInput(base, vehicle, ctx.r4.u32, frame, steer)) {
-    lifted::original::c820BFD30(ctx, base);
+  if (!vh::VehicleApplyInput(vehicle, ctx.r4.u32, frame, steer)) {
+    lifted::original::c820BFD30(ctx);
     return;
   }
   ctx.r3.u64 = vehicle;
-  ctx.f1.f64 = double(schema::VehicleGlobals::step_seconds(base));
+  ctx.f1.f64 = double(schema::VehicleGlobals::step_seconds());
 }
 
 ITC_REGS_STEP(VehicleSlipWheelValue) {
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = vh::VehicleSlipWheelValue(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32 - 240);
+  ctx.f1.f64 = vh::VehicleSlipWheelValue(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32 - 240);
 }
 
 ITC_REGS_STEP(VehicleNearestHuman) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = vh::RacersNearestHumanVehicle(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 304);
+  ctx.r3.u64 = vh::RacersNearestHumanVehicle(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 304);
 }
 
 ITC_REGS_STEP(VehicleShiftPeak) {
   ctx.fpscr.disableFlushMode();
-  vh::PowerCurveShiftPeak(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  vh::PowerCurveShiftPeak(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(VehicleBuildCurve) {
   ctx.fpscr.disableFlushMode();
-  vh::PowerCurveBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
+  vh::PowerCurveBuild(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
 ITC_REGS_STEP(VehicleCurveFromEngine) {
   ctx.fpscr.disableFlushMode();
-  vh::PowerCurveFromEngine(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
+  vh::PowerCurveFromEngine(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
 ITC_REGS_STEP(VehicleStatusReset) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = vh::VehicleStatusReset(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1168);
+  ctx.r3.u64 = vh::VehicleStatusReset(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1168);
 }
 
 ITC_REGS_STEP(VehicleSurfaceGrip) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = vh::VehicleSetUpSurfaceGrip(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480);
+  ctx.r3.u64 = vh::VehicleSetUpSurfaceGrip(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480);
 }
 
-vehicle::CalleeOriginal VehicleSetUpOriginals(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
-  return [&ctx, base, frame](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5,
+vehicle::CalleeOriginal VehicleSetUpOriginals(lifted::Regs& ctx, uint32_t frame) {
+  return [&ctx, frame](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5,
                              uint64_t r6) {
     const uint64_t r1 = ctx.r1.u64;
     ctx.r1.u64 = frame;
@@ -191,16 +191,16 @@ vehicle::CalleeOriginal VehicleSetUpOriginals(lifted::Regs& ctx, uint8_t* base, 
     ctx.r6.u64 = r6;
     switch (address) {
       case 0x820C27E8:
-        lifted::original::c820C27E8(ctx, base);
+        lifted::original::c820C27E8(ctx);
         break;
       case 0x820B5B08:
-        lifted::original::c820B5B08(ctx, base);
+        lifted::original::c820B5B08(ctx);
         break;
       case 0x820B5670:
-        lifted::original::c820B5670(ctx, base);
+        lifted::original::c820B5670(ctx);
         break;
       default:
-        lifted::original::c820C1D08(ctx, base);
+        lifted::original::c820C1D08(ctx);
         break;
     }
     ctx.r1.u64 = r1;
@@ -210,35 +210,35 @@ vehicle::CalleeOriginal VehicleSetUpOriginals(lifted::Regs& ctx, uint8_t* base, 
 
 namespace {
 
-void SetUpStep(lifted::Regs& ctx, uint8_t* base, bool reset) {
+void SetUpStep(lifted::Regs& ctx, bool reset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 224;
   double f1 = 0.0;
-  ctx.r3.u64 = vh::VehicleSetUp(base, ctx.r3.u32, ctx.r4.u32, frame, reset, NativeHeapActive(),
-                                VehicleSetUpOriginals(ctx, base, frame), &f1);
+  ctx.r3.u64 = vh::VehicleSetUp(ctx.r3.u32, ctx.r4.u32, frame, reset, NativeHeapActive(),
+                                VehicleSetUpOriginals(ctx, frame), &f1);
   ctx.f1.f64 = f1;
 }
 
 }  // namespace
 
 ITC_REGS_STEP(VehicleSetUp) {
-  SetUpStep(ctx, base, false);
+  SetUpStep(ctx, false);
 }
 
 ITC_REGS_STEP(VehicleResetForCar) {
-  SetUpStep(ctx, base, true);
+  SetUpStep(ctx, true);
 }
 
 ITC_REGS_STEP(VehicleStatusUpdate) {
   ctx.fpscr.disableFlushMode();
-  if (!vh::VehicleStatusUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  if (!vh::VehicleStatusUpdate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                ctx.r1.u32 - 384)) {
-    lifted::original::c820C23E8(ctx, base);
+    lifted::original::c820C23E8(ctx);
   }
 }
 
-vehicle::GuestCall VehicleTickCalls(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
+vehicle::GuestCall VehicleTickCalls(lifted::Regs& ctx) {
+  return [&ctx](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
     const uint64_t saved = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = r.r3;
@@ -250,24 +250,24 @@ vehicle::GuestCall VehicleTickCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.f3.f64 = r.f3;
     switch (address) {
       case 0x820B5FD8:
-        lifted::original::c820B5FD8(ctx, base);
+        lifted::original::c820B5FD8(ctx);
         break;
       case 0x820BFD30:
-        lifted::original::c820BFD30(ctx, base);
+        lifted::original::c820BFD30(ctx);
         break;
       case 0x820B6498:
-        lifted::original::c820B6498(ctx, base);
+        lifted::original::c820B6498(ctx);
         break;
       case 0x820B18B8:
         ctx.lr = 0x820B6514;
-        lifted::original::c820B18B8(ctx, base);
+        lifted::original::c820B18B8(ctx);
         break;
       case 0x820B2100:
         ctx.lr = 0x820B6538;
-        lifted::original::c820B2100(ctx, base);
+        lifted::original::c820B2100(ctx);
         break;
       default:
-        lifted::original::c820C23E8(ctx, base);
+        lifted::original::c820C23E8(ctx);
         break;
     }
     ctx.r1.u64 = saved;
@@ -277,8 +277,8 @@ vehicle::GuestCall VehicleTickCalls(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(VehicleTick) {
   ctx.fpscr.disableFlushMode();
-  vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144,
-                  VehicleTickCalls(ctx, base));
+  vh::VehicleTick(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144,
+                  VehicleTickCalls(ctx));
 }
 
 ITC_REGS_STEP(VehiclePlaceOnRoute) {
@@ -290,16 +290,16 @@ ITC_REGS_STEP(VehiclePlaceOnRoute) {
     ctx.r4.u64 = r.r4;
     ctx.r5.u64 = r.r5;
     if (address == 0x820B7998) {
-      lifted::original::c820B7998(ctx, base);
+      lifted::original::c820B7998(ctx);
     } else {
-      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
   };
-  if (!vh::VehiclePlaceOnRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+  if (!vh::VehiclePlaceOnRoute(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
                                ctx.r6.s32, ctx.r7.u32, ctx.r1.u32 - 560, call)) {
-    lifted::original::c820C3608(ctx, base);
+    lifted::original::c820C3608(ctx);
   }
   // r3 not set: the original leaves SetAngularVelocity's there; no caller
   // reads it.
@@ -310,7 +310,7 @@ ITC_REGS_STEP(VehiclePlaceOnRoute) {
 // Defines an adapter: the flag, else the original.
 #define ITC_VEHICLE(address, step)      \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle)) { \
-    hooks::step(ctx, base);             \
+    hooks::step(ctx);             \
   }
 
 ITC_VEHICLE(820BFBB8, VehicleMatrixFromRows)

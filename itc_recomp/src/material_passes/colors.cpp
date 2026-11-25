@@ -16,22 +16,22 @@ namespace {
 
 using G = schema::MaterialPassesGlobals;
 
-uint64_t Load64(uint8_t* base, uint32_t a) {
-  return (uint64_t(guest::LoadU32(base, a)) << 32) | guest::LoadU32(base, a + 4);
+uint64_t Load64(uint32_t a) {
+  return (uint64_t(guest::LoadU32(a)) << 32) | guest::LoadU32(a + 4);
 }
-void Store64(uint8_t* base, uint32_t a, uint64_t value) {
-  guest::StoreU32(base, a, uint32_t(value >> 32));
-  guest::StoreU32(base, a + 4, uint32_t(value));
+void Store64(uint32_t a, uint64_t value) {
+  guest::StoreU32(a, uint32_t(value >> 32));
+  guest::StoreU32(a + 4, uint32_t(value));
 }
 
 }  // namespace
 
-void HsvToRgb(uint8_t* base, uint32_t out, uint32_t color, uint32_t sp) {
+void HsvToRgb(uint32_t out, uint32_t color, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D0D60 Color::HsvToRgb");
-  const schema::PaintRgb rgb(base, out);
-  const schema::HsvColor hsv(base, color);
+  const schema::PaintRgb rgb(out);
+  const schema::HsvColor hsv(color);
   const double saturation0 = double(hsv.saturation());
-  if (saturation0 == double(G::zero(base))) {
+  if (saturation0 == double(G::zero())) {
     rgb.set_red(float(double(hsv.value())));
     rgb.set_green(float(double(hsv.value())));
     rgb.set_blue(float(double(hsv.value())));
@@ -40,23 +40,23 @@ void HsvToRgb(uint8_t* base, uint32_t out, uint32_t color, uint32_t sp) {
   const uint32_t temp = sp - 16;
   const uint64_t hs = hsv.hue_saturation();
   const uint64_t va = hsv.value_w();
-  Store64(base, temp + 0, hs);
-  Store64(base, temp + 8, va);
-  const double hue = Lfs(base, temp + 0);
-  const double saturation = Lfs(base, temp + 4);
-  const double h = Fmuls(hue, double(G::sixtieth(base)));
-  const double v = Lfs(base, temp + 8);
-  const double one = double(G::one(base));
+  Store64(temp + 0, hs);
+  Store64(temp + 8, va);
+  const double hue = Lfs(temp + 0);
+  const double saturation = Lfs(temp + 4);
+  const double h = Fmuls(hue, double(G::sixtieth()));
+  const double v = Lfs(temp + 8);
+  const double one = double(G::one());
   double p = Fsubs(one, saturation);
-  guest::StoreU32(base, temp, uint32_t(Fctiwz(h)));
-  const int32_t whole = int32_t(guest::LoadU32(base, temp));
+  guest::StoreU32(temp, uint32_t(Fctiwz(h)));
+  const int32_t whole = int32_t(guest::LoadU32(temp));
   p = Fmuls(p, v);
   const int64_t sector64 = int64_t(int32_t(uint32_t(whole) - uint32_t(whole / 6) * 6u));
-  Store64(base, temp, uint64_t(sector64));
-  const double sector_float = Single(double(int64_t(Load64(base, temp))));
+  Store64(temp, uint64_t(sector64));
+  const double sector_float = Single(double(int64_t(Load64(temp))));
   const double f = Fsubs(h, sector_float);
-  guest::StoreU32(base, temp, uint32_t(Fctiwz(sector_float)));
-  const uint32_t sector = guest::LoadU32(base, temp);
+  guest::StoreU32(temp, uint32_t(Fctiwz(sector_float)));
+  const uint32_t sector = guest::LoadU32(temp);
   const double rest = Fsubs(one, f);
   double q = Fnmsubs(saturation, f, one);
   double t = Fnmsubs(rest, saturation, one);
@@ -99,10 +99,10 @@ void HsvToRgb(uint8_t* base, uint32_t out, uint32_t color, uint32_t sp) {
   rgb.set_alpha(float(one));
 }
 
-void HsvToRgb8(uint8_t* base, uint32_t out, uint32_t color) {
+void HsvToRgb8(uint32_t out, uint32_t color) {
   ITC_NATIVE_RUNNING("sub_820C9808 Color::HsvToRgb8");
-  const schema::PaintRgb rgb(base, out);
-  const schema::PackedHsv hsv(base, color);
+  const schema::PaintRgb rgb(out);
+  const schema::PackedHsv hsv(color);
   const uint32_t s = hsv.saturation();
   if (s == 0) {
     rgb.set_red8(hsv.value());

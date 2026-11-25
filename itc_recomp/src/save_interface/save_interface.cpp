@@ -20,13 +20,13 @@ using G = schema::SaveInterfaceGlobals;
 // The save slot (files-and-saves.toml's SaveSlot).
 using schema::SaveSlot;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
 
 // A byte copy with its terminator, as the request setters' loops.
-void CopyBytes(uint8_t* base, uint32_t destination, uint32_t source) {
+void CopyBytes(uint32_t destination, uint32_t source) {
   for (;;) {
-    const uint8_t c = guest::LoadU8(base, source++);
-    guest::StoreU8(base, destination++, c);
+    const uint8_t c = guest::LoadU8(source++);
+    guest::StoreU8(destination++, c);
     if (c == 0) {
       return;
     }
@@ -35,51 +35,51 @@ void CopyBytes(uint8_t* base, uint32_t destination, uint32_t source) {
 
 // The interface's save devices, through its +12 (nullopt where a target
 // isn't ours).
-std::optional<uint32_t> Devices(uint8_t* base) {
-  const uint32_t interface = G::interface<schema::View>(base).address;
-  if (VirtualTarget(base, interface, 12) != kAppDevices) {
+std::optional<uint32_t> Devices() {
+  const uint32_t interface = G::interface<schema::View>().address;
+  if (VirtualTarget(interface, 12) != kAppDevices) {
     return std::nullopt;
   }
-  return AppDevices(base, interface);
+  return AppDevices(interface);
 }
 
 // The save devices when their slot at `offset` is `target`.
-std::optional<uint32_t> DevicesWith(uint8_t* base, uint32_t offset, uint32_t target) {
-  const auto devices = Devices(base);
-  if (!devices || VirtualTarget(base, *devices, offset) != target) {
+std::optional<uint32_t> DevicesWith(uint32_t offset, uint32_t target) {
+  const auto devices = Devices();
+  if (!devices || VirtualTarget(*devices, offset) != target) {
     return std::nullopt;
   }
   return devices;
 }
 
 // The interface's users, through its +8.
-std::optional<uint32_t> Users(uint8_t* base) {
-  const uint32_t interface = G::interface<schema::View>(base).address;
-  if (VirtualTarget(base, interface, 8) != kAppUsers) {
+std::optional<uint32_t> Users() {
+  const uint32_t interface = G::interface<schema::View>().address;
+  if (VirtualTarget(interface, 8) != kAppUsers) {
     return std::nullopt;
   }
-  return AppUsers(base, interface);
+  return AppUsers(interface);
 }
 
 // The request setters' common part: the slot's base re-read from the
 // devices' +44 before every store, as the original does; `set_request` the
 // request word's setter (+968 the save's, +972 the load's).
-std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t slot,
+std::optional<uint64_t> RequestCommon(uint32_t devices, uint32_t slot,
                                       const Request& request, uint32_t thumbnail,
                                       uint32_t thumbnail_size,
                                       void (SaveSlot::*set_request)(uint32_t) const) {
-  if (VirtualTarget(base, devices, 28) != kSlotState) {
+  if (VirtualTarget(devices, 28) != kSlotState) {
     return std::nullopt;
   }
-  if (SlotState(base, devices, slot) != 3) {
+  if (SlotState(devices, slot) != 3) {
     return 0;
   }
   const uint32_t offset = slot * 1000;
-  const schema::SaveDevices d(base, devices);
-  const auto s = [&] { return SaveSlot(base, d.slots<schema::View>().address + offset); };
-  CopyDisplayName(base, s().display_name_address(), request.display_name);
-  CopyBytes(base, s().file_name_address(), request.file_name);
-  CopyBytes(base, s().file_path_address(), request.path);
+  const schema::SaveDevices d(devices);
+  const auto s = [&] { return SaveSlot(d.slots<schema::View>().address + offset); };
+  CopyDisplayName(s().display_name_address(), request.display_name);
+  CopyBytes(s().file_name_address(), request.file_name);
+  CopyBytes(s().file_path_address(), request.path);
   s().set_data(request.data);
   s().set_data_size(request.size);
   s().set_thumbnail(thumbnail);
@@ -90,92 +90,92 @@ std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t 
 
 }  // namespace
 
-uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
-  return Load(base, guest::VtableWord(base, object) + offset);
+uint32_t VirtualTarget(uint32_t object, uint32_t offset) {
+  return Load(guest::VtableWord(object) + offset);
 }
 
-std::optional<uint32_t> AppDevices(uint8_t* base, uint32_t interface) {
+std::optional<uint32_t> AppDevices(uint32_t interface) {
   const uint32_t object =
-      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
-  if (VirtualTarget(base, object, 40) != kFrameworkDevices) {
+      schema::AppInterface16(interface).framework_interface<schema::View>().address;
+  if (VirtualTarget(object, 40) != kFrameworkDevices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820943B0 App::SaveDevices");
-  return framework::Word88(base, object);
+  return framework::Word88(object);
 }
 
-std::optional<uint32_t> AppUsers(uint8_t* base, uint32_t interface) {
+std::optional<uint32_t> AppUsers(uint32_t interface) {
   const uint32_t object =
-      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
-  if (VirtualTarget(base, object, 36) != kFrameworkUsers) {
+      schema::AppInterface16(interface).framework_interface<schema::View>().address;
+  if (VirtualTarget(object, 36) != kFrameworkUsers) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820943C8 App::Users");
-  return FrameworkUsers(base, object);
+  return FrameworkUsers(object);
 }
 
-uint32_t FrameworkUsers(uint8_t* base, uint32_t object) {
+uint32_t FrameworkUsers(uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82493700 word +92");
-  return schema::FrameworkGetterSelf(base, object).word_92();  // the framework may be in host memory
+  return schema::FrameworkGetterSelf(object).word_92();  // the framework may be in host memory
 }
 
-uint32_t UsersCount(uint8_t* base, uint32_t users) {
+uint32_t UsersCount(uint32_t users) {
   ITC_NATIVE_RUNNING("sub_82490B08 word +216");
-  return schema::SignedInUsers(base, users).count();
+  return schema::SignedInUsers(users).count();
 }
 
-uint64_t UsersSignedIn(uint8_t* base, uint32_t users, uint32_t index) {
+uint64_t UsersSignedIn(uint32_t users, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820996D8 Users::SignedIn");
-  const schema::SignedInUsers u(base, users);
+  const schema::SignedInUsers u(users);
   if (index < u.count()) {
-    const uint32_t user = Load(base, u.order_address() + (index << 2));
-    if (Load(base, uint32_t(u.users_address() + uint64_t(user) * 40 + 8)) != 0) {
+    const uint32_t user = Load(u.order_address() + (index << 2));
+    if (Load(uint32_t(u.users_address() + uint64_t(user) * 40 + 8)) != 0) {
       return user;
     }
   }
   return ~uint64_t(0);
 }
 
-uint32_t SlotAddress(uint8_t* base, uint32_t devices, uint32_t slot) {
-  return schema::SaveDevices(base, devices).slots<schema::View>().address + slot * 1000;
+uint32_t SlotAddress(uint32_t devices, uint32_t slot) {
+  return schema::SaveDevices(devices).slots<schema::View>().address + slot * 1000;
 }
 
-void SlotRequestDevice(uint8_t* base, uint32_t devices, uint32_t slot) {
+void SlotRequestDevice(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5750 SaveSlot::RequestDevice");
-  SaveSlot(base, SlotAddress(base, devices, slot)).set_request_device_selector(1);
+  SaveSlot(SlotAddress(devices, slot)).set_request_device_selector(1);
 }
 
-uint32_t SlotDevice(uint8_t* base, uint32_t devices, uint32_t slot) {
+uint32_t SlotDevice(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5768 SaveSlot::Device");
-  return SaveSlot(base, SlotAddress(base, devices, slot)).device();
+  return SaveSlot(SlotAddress(devices, slot)).device();
 }
 
-uint64_t SlotFreeBytes(uint8_t* base, uint32_t devices, uint32_t slot) {
+uint64_t SlotFreeBytes(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5780 SaveSlot::FreeBytes");
   // Two word loads, as the original.
-  const uint32_t at = SaveSlot(base, SlotAddress(base, devices, slot)).device_free_bytes_address();
-  return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
+  const uint32_t at = SaveSlot(SlotAddress(devices, slot)).device_free_bytes_address();
+  return (uint64_t(Load(at)) << 32) | Load(at + 4);
 }
 
-uint32_t SlotSaveCount(uint8_t* base, uint32_t devices, uint32_t slot) {
+uint32_t SlotSaveCount(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5798 SaveSlot::SaveCount");
-  return SaveSlot(base, SlotAddress(base, devices, slot)).enumerated_saves();
+  return SaveSlot(SlotAddress(devices, slot)).enumerated_saves();
 }
 
-uint64_t SlotSaveAt(uint8_t* base, uint32_t devices, uint32_t slot, uint64_t index) {
+uint64_t SlotSaveAt(uint32_t devices, uint32_t slot, uint64_t index) {
   ITC_NATIVE_RUNNING("sub_820A57B0 SaveSlot::SaveAt");
-  return uint64_t(SaveSlot(base, SlotAddress(base, devices, slot)).enumeration_buffer()) +
+  return uint64_t(SaveSlot(SlotAddress(devices, slot)).enumeration_buffer()) +
          index * schema::XContentData::kSize;
 }
 
-uint32_t SlotState(uint8_t* base, uint32_t devices, uint32_t slot) {
+uint32_t SlotState(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A57F0 SaveSlot::State");
-  return SaveSlot(base, SlotAddress(base, devices, slot)).state();
+  return SaveSlot(SlotAddress(devices, slot)).state();
 }
 
-uint64_t SlotPending(uint8_t* base, uint32_t devices, uint32_t slot) {
+uint64_t SlotPending(uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5808 SaveSlot::Pending");
-  const SaveSlot s(base, SlotAddress(base, devices, slot));
+  const SaveSlot s(SlotAddress(devices, slot));
   uint64_t sum = 0;
   sum += s.request_device_selector();
   sum += s.request_enumeration();
@@ -186,13 +186,13 @@ uint64_t SlotPending(uint8_t* base, uint32_t devices, uint32_t slot) {
   return sum;
 }
 
-void SetRootName(uint8_t* base, uint32_t devices, uint32_t name) {
+void SetRootName(uint32_t devices, uint32_t name) {
   ITC_NATIVE_RUNNING("sub_820A5580 SaveDevices::SetRootName");
   // Byte by byte with the terminator, through the save devices' layout (in
   // host memory since E5 step 5).
-  const schema::SaveDevices d(base, devices);
+  const schema::SaveDevices d(devices);
   for (uint32_t i = 0;; i++) {
-    const uint8_t c = guest::LoadU8(base, name + i);
+    const uint8_t c = guest::LoadU8(name + i);
     d.store_at(d.root_name_address() - d.address + i, 1, c);
     if (c == 0) {
       return;
@@ -200,22 +200,22 @@ void SetRootName(uint8_t* base, uint32_t devices, uint32_t name) {
   }
 }
 
-std::optional<uint64_t> SlotRequestSave(uint8_t* base, uint32_t devices, uint32_t slot,
+std::optional<uint64_t> SlotRequestSave(uint32_t devices, uint32_t slot,
                                         const Request& request) {
   ITC_NATIVE_RUNNING("sub_820A52E0 SaveSlot::RequestSave");
-  return RequestCommon(base, devices, slot, request, request.thumbnail, request.thumbnail_size,
+  return RequestCommon(devices, slot, request, request.thumbnail, request.thumbnail_size,
                        &SaveSlot::set_request_save);
 }
 
-std::optional<uint64_t> SlotRequestLoad(uint8_t* base, uint32_t devices, uint32_t slot,
+std::optional<uint64_t> SlotRequestLoad(uint32_t devices, uint32_t slot,
                                         const Request& request) {
   ITC_NATIVE_RUNNING("sub_820A53E8 SaveSlot::RequestLoad");
-  return RequestCommon(base, devices, slot, request, 0, 0, &SaveSlot::set_request_load);
+  return RequestCommon(devices, slot, request, 0, 0, &SaveSlot::set_request_load);
 }
 
-void CopyDisplayName(uint8_t* base, uint32_t destination, uint32_t source) {
+void CopyDisplayName(uint32_t destination, uint32_t source) {
   ITC_NATIVE_RUNNING("sub_82295D48 the display name's copy");
-  c_runtime::Wcscpy(base, destination, source);
+  c_runtime::Wcscpy(destination, source);
 }
 
 uint64_t ContentSize(uint32_t bytes, uint32_t count) {
@@ -230,131 +230,131 @@ uint64_t ContentSize(uint32_t bytes, uint32_t count) {
   return (uint64_t(total) + 10) << 12;
 }
 
-std::optional<uint32_t> Init(uint8_t* base, uint32_t interface) {
-  if (VirtualTarget(base, interface, 12) != kAppDevices) {
+std::optional<uint32_t> Init(uint32_t interface) {
+  if (VirtualTarget(interface, 12) != kAppDevices) {
     return std::nullopt;
   }
   const uint32_t object =
-      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
-  if (VirtualTarget(base, object, 40) != kFrameworkDevices) {
+      schema::AppInterface16(interface).framework_interface<schema::View>().address;
+  if (VirtualTarget(object, 40) != kFrameworkDevices) {
     return std::nullopt;
   }
-  if (VirtualTarget(base, schema::FrameworkGetterSelf(base, object).word_88(), 56) !=
+  if (VirtualTarget(schema::FrameworkGetterSelf(object).word_88(), 56) !=
       kSetRootName) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8209FFB8 SaveInterface::Init");
-  G::set_interface(base, interface);
-  const uint32_t devices = *AppDevices(base, interface);
-  SetRootName(base, devices, G::root_name_address());
+  G::set_interface(interface);
+  const uint32_t devices = *AppDevices(interface);
+  SetRootName(devices, G::root_name_address());
   return devices;
 }
 
-std::optional<uint32_t> InterfaceSlotState(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 28, kSlotState);
+std::optional<uint32_t> InterfaceSlotState(uint32_t slot) {
+  const auto devices = DevicesWith(28, kSlotState);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0018 SaveInterface::SlotState");
-  const uint32_t state = SlotState(base, *devices, slot);
+  const uint32_t state = SlotState(*devices, slot);
   return state <= 9 ? state : 0;
 }
 
-std::optional<uint32_t> InterfaceRequestDevice(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 4, kSlotRequestDevice);
+std::optional<uint32_t> InterfaceRequestDevice(uint32_t slot) {
+  const auto devices = DevicesWith(4, kSlotRequestDevice);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0208 SaveInterface::RequestDevice");
-  SlotRequestDevice(base, *devices, slot);
+  SlotRequestDevice(*devices, slot);
   return devices;
 }
 
-std::optional<uint32_t> InterfaceSaveCount(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 16, kSlotSaveCount);
+std::optional<uint32_t> InterfaceSaveCount(uint32_t slot) {
+  const auto devices = DevicesWith(16, kSlotSaveCount);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A02C8 SaveInterface::SaveCount");
-  return SlotSaveCount(base, *devices, slot);
+  return SlotSaveCount(*devices, slot);
 }
 
-std::optional<uint32_t> InterfaceFreeBytes(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 12, kSlotFreeBytes);
+std::optional<uint32_t> InterfaceFreeBytes(uint32_t slot) {
+  const auto devices = DevicesWith(12, kSlotFreeBytes);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0320 SaveInterface::FreeBytes");
-  return uint32_t(SlotFreeBytes(base, *devices, slot));
+  return uint32_t(SlotFreeBytes(*devices, slot));
 }
 
-std::optional<uint64_t> InterfacePending(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 32, kSlotPending);
+std::optional<uint64_t> InterfacePending(uint32_t slot) {
+  const auto devices = DevicesWith(32, kSlotPending);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0378 SaveInterface::Pending");
-  return SlotPending(base, *devices, slot);
+  return SlotPending(*devices, slot);
 }
 
-std::optional<uint32_t> InterfaceDevice(uint8_t* base, uint32_t slot) {
-  const auto devices = DevicesWith(base, 8, kSlotDevice);
+std::optional<uint32_t> InterfaceDevice(uint32_t slot) {
+  const auto devices = DevicesWith(8, kSlotDevice);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A03D0 SaveInterface::Device");
-  return SlotDevice(base, *devices, slot);
+  return SlotDevice(*devices, slot);
 }
 
-std::optional<uint64_t> InterfaceSaveAt(uint8_t* base, uint32_t slot, uint64_t index) {
-  const auto devices = DevicesWith(base, 20, kSlotSaveAt);
+std::optional<uint64_t> InterfaceSaveAt(uint32_t slot, uint64_t index) {
+  const auto devices = DevicesWith(20, kSlotSaveAt);
   if (!devices) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0428 SaveInterface::SaveAt");
-  return SlotSaveAt(base, *devices, slot, index);
+  return SlotSaveAt(*devices, slot, index);
 }
 
-std::optional<uint64_t> InterfaceSave(uint8_t* base, uint32_t slot, const Request& request) {
-  const auto devices = DevicesWith(base, 60, kSlotRequestSave);
-  if (!devices || VirtualTarget(base, *devices, 28) != kSlotState) {
+std::optional<uint64_t> InterfaceSave(uint32_t slot, const Request& request) {
+  const auto devices = DevicesWith(60, kSlotRequestSave);
+  if (!devices || VirtualTarget(*devices, 28) != kSlotState) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0490 SaveInterface::Save");
-  return SlotRequestSave(base, *devices, slot, request);
+  return SlotRequestSave(*devices, slot, request);
 }
 
-std::optional<uint64_t> InterfaceLoad(uint8_t* base, uint32_t slot, const Request& request) {
-  const auto devices = DevicesWith(base, 64, kSlotRequestLoad);
-  if (!devices || VirtualTarget(base, *devices, 28) != kSlotState) {
+std::optional<uint64_t> InterfaceLoad(uint32_t slot, const Request& request) {
+  const auto devices = DevicesWith(64, kSlotRequestLoad);
+  if (!devices || VirtualTarget(*devices, 28) != kSlotState) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0510 SaveInterface::Load");
-  return SlotRequestLoad(base, *devices, slot, request);
+  return SlotRequestLoad(*devices, slot, request);
 }
 
-bool InterfaceRequestReady(uint8_t* base, bool load) {
+bool InterfaceRequestReady(bool load) {
   const auto devices =
-      DevicesWith(base, load ? 64 : 60, load ? kSlotRequestLoad : kSlotRequestSave);
-  return devices && VirtualTarget(base, *devices, 28) == kSlotState;
+      DevicesWith(load ? 64 : 60, load ? kSlotRequestLoad : kSlotRequestSave);
+  return devices && VirtualTarget(*devices, 28) == kSlotState;
 }
 
-std::optional<uint32_t> InterfaceUserCount(uint8_t* base) {
-  const auto users = Users(base);
-  if (!users || VirtualTarget(base, *users, 4) != kUsersCount) {
+std::optional<uint32_t> InterfaceUserCount() {
+  const auto users = Users();
+  if (!users || VirtualTarget(*users, 4) != kUsersCount) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A05D8 SaveInterface::UserCount");
-  return UsersCount(base, *users);
+  return UsersCount(*users);
 }
 
-std::optional<uint64_t> InterfaceUserAt(uint8_t* base, uint32_t index) {
-  const auto users = Users(base);
-  if (!users || VirtualTarget(base, *users, 8) != kUsersSignedIn) {
+std::optional<uint64_t> InterfaceUserAt(uint32_t index) {
+  const auto users = Users();
+  if (!users || VirtualTarget(*users, 8) != kUsersSignedIn) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A0620 SaveInterface::UserAt");
-  return UsersSignedIn(base, *users, index);
+  return UsersSignedIn(*users, index);
 }
 
 }  // namespace save_interface

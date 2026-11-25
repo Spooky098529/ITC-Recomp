@@ -49,15 +49,15 @@ constexpr uint64_t kSideWords64 =  // lis/addi: sign-extended
     0xFFFFFFFF00000000ull | schema::RaceWorldGlobals::start_object_address();
 constexpr uint32_t kCalculateReturn = 0x8210FA64;
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 // lfs: a guest float widened.
-double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
+double Lfs(uint32_t address) { return double(guest::LoadFloat(address)); }
 // lfs then stfs of one value: its bits (the translated code's float to
 // double and back folds away, signaling NaNs included).
-uint32_t Word(uint8_t* base, uint32_t address) { return Load(base, address); }
+uint32_t Word(uint32_t address) { return Load(address); }
 double Fmuls(double a, double b) { return double(float(a * b)); }
 double Fsubs(double a, double b) { return double(float(a - b)); }
 double Fmadds(double a, double b, double c) { return double(float(std::fma(a, b, c))); }
@@ -128,40 +128,40 @@ simde__m128 VectorMul(simde__m128 a, simde__m128 b) {
 
 }  // namespace
 
-uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle64, uint32_t sp,
+uint64_t Update3D(uint64_t sound64, uint64_t r4, uint64_t vehicle64, uint32_t sp,
                   const Update3DSaves& s, const x3daudio::TanCall& tan) {
   ITC_NATIVE_RUNNING("sub_8210F820 CarSound::Update3D");
   const uint32_t sound = uint32_t(sound64);
   const uint32_t vehicle = uint32_t(vehicle64);
-  const schema::CarSound cs(base, sound);
-  const schema::X3DAudioListener l(base, cs.listener_address());
-  const schema::X3DAudioEmitter e(base, cs.emitter_address());
-  const schema::X3DAudioDspSettings dsp(base, cs.dsp_address());
+  const schema::CarSound cs(sound);
+  const schema::X3DAudioListener l(cs.listener_address());
+  const schema::X3DAudioEmitter e(cs.emitter_address());
+  const schema::X3DAudioDspSettings dsp(cs.dsp_address());
   // The back chain of the original's 288-byte frame, below which
   // X3DAudioCalculate makes its own (E5 step 6: the prologue's saves, read
   // by nothing, are no longer stored; the frame's own slots, +80 to +136,
   // are values).
   const uint32_t frame = sp - 288;
-  Store(base, frame, sp);
+  Store(frame, sp);
 
   // The race data's kind and the viewports pick the camera pass.
-  const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+  const schema::RaceData race = schema::RaceStatesGlobals::race_data();
   const uint32_t kind = race.kind();
-  const schema::Viewports viewports = schema::CameraModesGlobals::viewports(base);
+  const schema::Viewports viewports = schema::CameraModesGlobals::viewports();
   uint64_t camera64 = 0xFFFFFFFF00000000ull | kCameraPasses;
   if (kind == 4 && viewports.split() != 0) {
     camera64 += 592;
   }
-  const schema::CameraPass camera(base, uint32_t(camera64));
+  const schema::CameraPass camera(uint32_t(camera64));
   const schema::Viewport viewport = viewports.first();
   const uint32_t emitter_at = cs.emitter_position_x_address();    // r24
   const uint32_t listener_at = cs.listener_position_x_address();  // r26
-  const double volume = Lfs(base, kVolume);  // f30
+  const double volume = Lfs(kVolume);  // f30
   const uint32_t view_mode = viewport.view_mode();  // r23
   const simde__m128 old_emitter = LoadLanesIn(cs, emitter_at);   // v127
   const simde__m128 old_listener = LoadLanesIn(cs, listener_at); // v126
-  const uint32_t zero_word = Word(base, kZero);
-  const double zero = Lfs(base, kZero);  // f31
+  const uint32_t zero_word = Word(kZero);
+  const double zero = Lfs(kZero);  // f31
   const uint32_t mode = race.race_mode();  // r29
   const bool own_view = int32_t(view_mode) == 1 && uint32_t(r4) == 1;
 
@@ -170,14 +170,14 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   // vehicle's +6148 (0x1 when it's set, 0x80 when it's 0).
   auto at_camera = [&] {
     if (mode == 8) {
-      const bool side_zero = schema::RaceWorldGlobals::human_flag(base) == 0;
+      const bool side_zero = schema::RaceWorldGlobals::human_flag() == 0;
       if (!own_view) {
         return false;
       }
-      if (!side_zero && (schema::Vehicle(base, vehicle).car_flags() & 0x1) != 0) {
+      if (!side_zero && (schema::Vehicle(vehicle).car_flags() & 0x1) != 0) {
         return true;
       }
-      return side_zero && ((schema::Vehicle(base, vehicle).car_flags() >> 7) & 1) != 0;
+      return side_zero && ((schema::Vehicle(vehicle).car_flags() >> 7) & 1) != 0;
     }
     return own_view;
   };
@@ -186,12 +186,12 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   // pass's eye, or the body's position (Vec4::Copy's x, y and z).
   uint32_t ex, ey, ez;
   if (at_camera()) {
-    ex = Word(base, camera.eye_x_address());
-    ey = Word(base, camera.eye_x_address() + 4);
-    ez = Word(base, camera.eye_x_address() + 8);
+    ex = Word(camera.eye_x_address());
+    ey = Word(camera.eye_x_address() + 4);
+    ez = Word(camera.eye_x_address() + 8);
   } else {
     const uint32_t body = cs.vehicle().body<schema::View>().address;
-    const schema::VectorLibVector position(base, vehicle_accessors::RigidBodyPosition(body));
+    const schema::VectorLibVector position(vehicle_accessors::RigidBodyPosition(body));
     ex = position.x_bits();
     ey = position.y_bits();
     ez = position.z_bits();
@@ -202,16 +202,16 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   StoreIn(cs, cs.emitter_position_z_address(), ez);
   StoreIn(cs, emitter_at, ex);
   StoreIn(cs, cs.emitter_position_y_address(), ey);
-  StoreIn(cs, listener_at, Word(base, camera.eye_x_address()));
-  StoreIn(cs, cs.listener_position_y_address(), Word(base, camera.eye_y_address()));
-  StoreIn(cs, cs.listener_position_z_address(), Word(base, camera.eye_z_address()));
+  StoreIn(cs, listener_at, Word(camera.eye_x_address()));
+  StoreIn(cs, cs.listener_position_y_address(), Word(camera.eye_y_address()));
+  StoreIn(cs, cs.listener_position_z_address(), Word(camera.eye_z_address()));
   const simde__m128 listener_moved = VectorSub(LoadLanesIn(cs, listener_at), old_listener);
   // The listener's front: the camera pass's +464 and +472, y 0.
-  StoreIn(cs, l.front_x_address(), Word(base, camera.forward_x_address()));
+  StoreIn(cs, l.front_x_address(), Word(camera.forward_x_address()));
   StoreIn(cs, l.front_y_address(), zero_word);
-  const uint32_t front_z = Word(base, camera.forward_z_address());
+  const uint32_t front_z = Word(camera.forward_z_address());
   // The factor splat from the frame's +80, as the original stored it there.
-  const uint32_t ticks = Word(base, kTicks);
+  const uint32_t ticks = Word(kTicks);
   StoreIn(cs, l.front_z_address(), front_z);
   const simde__m128 ticks_a = SplatLeft(ticks, frame + 80);
   const simde__m128 emitter_moved = VectorSub(LoadLanesIn(cs, emitter_at), old_emitter);
@@ -231,7 +231,7 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   // The velocities (listener +40, emitter +92; the original's frame +112
   // and +128, 16-byte aligned as the stack pointer is) times the second
   // factor.
-  const double scale = Lfs(base, kVelocityScale);
+  const double scale = Lfs(kVelocityScale);
   l.set_velocity_x(float(Fmuls(LaneSingle(listener_velocity, 0), scale)));
   l.set_velocity_y(float(Fmuls(LaneSingle(listener_velocity, 1), scale)));
   l.set_velocity_z(float(Fmuls(LaneSingle(listener_velocity, 2), scale)));
@@ -261,13 +261,13 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
                                        s.f29,
                                        DoubleBits(volume),
                                        DoubleBits(zero)};
-  const uint64_t r3 = x3daudio::Calculate(base, args, frame, saves, tan).value_or(0);
+  const uint64_t r3 = x3daudio::Calculate(args, frame, saves, tan).value_or(0);
 
   // The output map at +272: six {channel, gain} pairs, the matrix's
   // coefficients times the volume, or the fixed share for the car at the
   // camera.
   if (at_camera()) {
-    const double share = Fmuls(volume, Lfs(base, kOwnShare));
+    const double share = Fmuls(volume, Lfs(kOwnShare));
     for (uint32_t i = 0; i < 6; i++) {
       StfsIn(cs, cs.output_map_address() + 8 * i + 4, share);
       StoreU8In(cs, cs.output_map_address() + 8 * i, uint8_t(i));
@@ -276,7 +276,7 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
     for (uint32_t i = 0; i < 6; i++) {
       StoreU8In(cs, cs.output_map_address() + 8 * i, uint8_t(i));
       const uint32_t matrix = dsp.matrix().address;
-      StfsIn(cs, cs.output_map_address() + 8 * i + 4, Fmuls(Lfs(base, matrix + 4 * i), volume));
+      StfsIn(cs, cs.output_map_address() + 8 * i + 4, Fmuls(Lfs(matrix + 4 * i), volume));
     }
   }
   cs.set_output_map_pointer(cs.output_map_address());
@@ -307,14 +307,14 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
     const double dz = Fsubs(double(cs.listener_position_z()), ez2);
     double d2 = Fmuls(dy, dy);
     d2 = Fmadds(dx, dx, d2);
-    const double close = Lfs(base, kCloseSquared);
+    const double close = Lfs(kCloseSquared);
     d2 = Fmadds(dz, dz, d2);
     if (d2 < close) {
       const double last = double(cs.last_doppler());
       const double now = double(dsp.doppler_factor());
       const double fall = Fsubs(last, now);
-      if (fall > Lfs(base, kDopplerDrop)) {
-        const double one = Lfs(base, kDopplerOne);
+      if (fall > Lfs(kDopplerDrop)) {
+        const double one = Lfs(kDopplerOne);
         if (last > one && now < one) {
           cs.set_passed_close(1);
         }

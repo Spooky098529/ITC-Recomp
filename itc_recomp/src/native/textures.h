@@ -42,7 +42,7 @@ class TextureCache {
   // (--native_renderer_cache_texture_bindings), so Stats count only the
   // calls that weren't answered from it. Before the table, each fetch
   // constant's last answer (fetch_constant: its index, 0-31).
-  VkImageView GetView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type,
+  VkImageView GetView(const uint32_t fetch[6], VkImageViewType view_type,
                       uint32_t fetch_constant);
   VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   // The post-swizzle signedness of each component, 2 bits each (the
@@ -74,7 +74,7 @@ class TextureCache {
   // guest memory into the host format's bytes, uncompressed formats only.
   // With --readback_resolve=full, a resolve destination's memory holds what
   // the emulated GPU resolved.
-  static bool DecodeGuest(uint8_t* base, const uint32_t fetch[6], std::vector<uint8_t>& out,
+  static bool DecodeGuest(const uint32_t fetch[6], std::vector<uint8_t>& out,
                           VkFormat& format, uint32_t& width, uint32_t& height);
 
   // A debugging aid: makes GetView give nothing (so placeholders) for some
@@ -152,7 +152,7 @@ class TextureCache {
   struct State;
   // GetView and GetSampler worked out in full; `cacheable`: whether the
   // answer may be kept until the generation changes.
-  VkImageView LookUpView(uint8_t* base, const uint32_t fetch[6], VkImageViewType view_type,
+  VkImageView LookUpView(const uint32_t fetch[6], VkImageViewType view_type,
                          bool& cacheable);
   VkSampler LookUpSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   std::unique_ptr<State> state_;

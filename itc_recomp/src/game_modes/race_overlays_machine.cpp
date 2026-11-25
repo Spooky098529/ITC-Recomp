@@ -418,11 +418,11 @@ constexpr Step kSteps[] = {
 
 }  // namespace
 
-uint32_t RaceOverlaysMachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
+uint32_t RaceOverlaysMachineInit(uint32_t machine, uint32_t frame,
                                  bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8215E6C8 RaceOverlaysMachine::Init");
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -436,15 +436,15 @@ uint32_t RaceOverlaysMachineInit(uint8_t* base, uint32_t machine, uint32_t frame
   for (const Step& step : kSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }

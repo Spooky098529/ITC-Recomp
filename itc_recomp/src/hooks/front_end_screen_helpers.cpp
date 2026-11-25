@@ -52,7 +52,7 @@ namespace fe = front_end_screen_helpers;
 // r1 put back. The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -78,7 +78,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -98,9 +98,9 @@ bool Set(lifted::Regs& ctx, const std::optional<uint64_t>& r3) {
 
 using Release = std::optional<uint64_t> (*)(uint8_t*, uint32_t, uint32_t, const fe::Calls&);
 
-bool RunRelease(lifted::Regs& ctx, uint8_t* base, Release release) {
-  GuestCalls guest(ctx, base);
-  return Set(ctx, release(base, ctx.r3.u32, ctx.r1.u32, guest.calls()));
+bool RunRelease(lifted::Regs& ctx, Release release) {
+  GuestCalls guest(ctx);
+  return Set(ctx, release(ctx.r3.u32, ctx.r1.u32, guest.calls()));
 }
 
 void Varargs(const lifted::Regs& ctx, uint64_t varargs[7]) {
@@ -113,143 +113,143 @@ void Varargs(const lifted::Regs& ctx, uint64_t varargs[7]) {
 
 }  // namespace
 
-bool FrontEndModeType2Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType2Release);
+bool FrontEndModeType2Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType2Release);
 }
-bool FrontEndModeType4Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType4Release);
+bool FrontEndModeType4Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType4Release);
 }
-bool FrontEndModeType5Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType5Release);
+bool FrontEndModeType5Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType5Release);
 }
-bool FrontEndModeType9Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType9Release);
+bool FrontEndModeType9Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType9Release);
 }
-bool FrontEndModeType10Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType10Release);
+bool FrontEndModeType10Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType10Release);
 }
-bool FrontEndModeType12Release(lifted::Regs& ctx, uint8_t* base) {
-  return RunRelease(ctx, base, fe::ModeType12Release);
+bool FrontEndModeType12Release(lifted::Regs& ctx) {
+  return RunRelease(ctx, fe::ModeType12Release);
 }
 
 ITC_REGS_STEP(FrontEndSaveScreenSetText) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
-  ctx.r3.u64 = fe::SaveScreenSetText(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = fe::SaveScreenSetText(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenSetNote) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
-  ctx.r3.u64 = fe::SaveScreenSetNote(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = fe::SaveScreenSetNote(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenSetMessage) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
-  ctx.r3.u64 = fe::SaveScreenSetMessage(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+  ctx.r3.u64 = fe::SaveScreenSetMessage(ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetSaveDialogText) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
-      fe::OptionsSetDialogText(base, 13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+      fe::OptionsSetDialogText(13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetSaveDialogNote) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
-      fe::OptionsSetDialogNote(base, 13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+      fe::OptionsSetDialogNote(13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogText) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
-      fe::OptionsSetDialogText(base, 14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+      fe::OptionsSetDialogText(14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogNote) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
-      fe::OptionsSetDialogNote(base, 14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
+      fe::OptionsSetDialogNote(14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenShowNotice) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenShowNotice(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowNotice(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(FrontEndSaveScreenStartCheck) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenStartCheck(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenStartCheck(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenStart(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetUpSavePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 13, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(13, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsSetUpCategory6Page) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 14, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsSetUpDialogPage(14, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenShowMessage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 0, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(0, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenShowMessage3) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 1, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(1, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndSaveScreenShowMessage4) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::SaveScreenShowMessage(base, 2, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::SaveScreenShowMessage(2, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsShowSaveDialog) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::OptionsShowDialog(base, 13, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsShowDialog(13, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndOptionsShowCategory6Dialog) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::OptionsShowDialog(base, 14, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::OptionsShowDialog(14, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndCarCardsFillAll) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::CarCardsFillAll(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardsFillAll(ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(FrontEndCarCardFill) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::CarCardFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardFill(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndCarCardFillDetail) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::CarCardFillDetail(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarCardFillDetail(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(FrontEndCarDetailOpen) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = fe::CarDetailOpen(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = fe::CarDetailOpen(ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
 
 #define ITC_FRONT_END_HELPERS(address, step)              \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_front_end_screen_helpers)) { \
-    hooks::step(ctx, base);                               \
+    hooks::step(ctx);                               \
   }
 
 #define ITC_FRONT_END_RELEASE(address, step)                                         \
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                               \
     \
     if (!ITC_FLAG(native_front_end_screen_helpers) || !hooks::NativeHeapActive() ||  \
-        !hooks::step(ctx, base)) {                                                   \
-      lifted::original::c##address(ctx, base);                                               \
+        !hooks::step(ctx)) {                                                   \
+      lifted::original::c##address(ctx);                                               \
     }                                                                                \
   }
 

@@ -36,43 +36,43 @@ constexpr uint32_t kSetCar = 0x8217FD58;       // GarageStage::SetCar
 constexpr uint32_t kCarInit = 0x820CD5D8;      // Car::Init
 constexpr uint32_t kCarRefresh = 0x820C4998;   // Car::Refresh
 
-schema::Type2HubData Data(uint8_t* base) { return Globals::hub_data(base); }
-uint32_t Holder(uint8_t* base) { return schema::StandHolder(base, Load(base, kStandHolder)).stage_block_0(); }
+schema::Type2HubData Data() { return Globals::hub_data(); }
+uint32_t Holder() { return schema::StandHolder(Load(kStandHolder)).stage_block_0(); }
 
 }  // namespace
 
-uint64_t HubPutCarOnStand(uint8_t* base, uint32_t car, uint32_t sp, const Calls& calls) {
+uint64_t HubPutCarOnStand(uint32_t car, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218DB60 Type2Hub::PutCarOnStand");
-  const uint32_t frame = Frame(base, sp, 4000);
+  const uint32_t frame = Frame(sp, 4000);
   const uint32_t object = frame + 80;
   calls.Call(kCarInit, frame, 0x8218DB7C, object);
   calls.Call(kMemcpy, frame, 0x8218DB8C, object, car, 1884);
-  Store(base, frame + 3968, Load(base, frame + 3968) | 1);
+  Store(frame + 3968, Load(frame + 3968) | 1);
   calls.Call(kCarRefresh, frame, 0x8218DBA0, object);
-  return calls.Call(kSetCar, frame, 0x8218DBB8, Holder(base), object, kAll);
+  return calls.Call(kSetCar, frame, 0x8218DBB8, Holder(), object, kAll);
 }
 
-uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t HubUpdate(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821907F8 Type2Hub::Update");
-  const uint32_t frame = Frame(base, sp, 2208);
+  const uint32_t frame = Frame(sp, 2208);
   // The debug prints (the empty sub_82106540): the title, the menu's item
   // names and the cursor.
   calls.Call(kEmpty, frame, 0x8219081C, 100, 30, 0, kTitleFormat);
   for (uint32_t k = 0; k < 8; k++) {
     calls.CallArgs(kEmpty, frame, 0x8219084C,
-                   {150, 50 + 15 * k, 0, kItemFormat, Load(base, kItemNames + 4 * k), 0, 0, 0});
+                   {150, 50 + 15 * k, 0, kItemFormat, Load(kItemNames + 4 * k), 0, 0, 0});
   }
   calls.Call(kEmpty, frame, 0x82190888, 135,
-             uint64_t(Globals::hub_menu(base).cursor()) * 15 + 50, 0, kCursorFormat);
-  const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
-  Store(base, frame + 144, kHubTransitions[12]);
+             uint64_t(Globals::hub_menu().cursor()) * 15 + 50, 0, kCursorFormat);
+  const uint32_t movie = FindMovie(kHubMovie, frame + 80);
+  Store(frame + 144, kHubTransitions[12]);
   for (uint32_t i = 0; i < 12; i++) {
-    Store(base, frame + 96 + 4 * i, kHubTransitions[i]);
+    Store(frame + 96 + 4 * i, kHubTransitions[i]);
   }
   // The running transition: its handler from the table on the page
   // object's +24; a nonzero answer (or none below -1) starts the queued one
   // or, with none, the page becomes +4.
-  schema::PageObject pages = Globals::hub_pages(base);
+  schema::PageObject pages = Globals::hub_pages();
   const uint32_t running = pages.step();
   bool finished = false;
   if (running == kNone) {
@@ -81,8 +81,8 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
     }
   } else if (int32_t(running) >= 0) {
     const uint64_t r3 =
-        calls.Call(Load(base, frame + 96 + (running << 2)), frame, 0x82190974, pages.step_started_address());
-    pages.address = Globals::hub_pages(base).address;
+        calls.Call(Load(frame + 96 + (running << 2)), frame, 0x82190974, pages.step_started_address());
+    pages.address = Globals::hub_pages().address;
     finished = uint32_t(r3) != 0;
   } else {
     finished = true;
@@ -102,35 +102,35 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The stand: the busy marker shown while it's busy; unless the page is
   // 3, the stand drawn once its model is made, else the selected garage
   // car's model remade and, once made, the car put on it and preset 0.
-  const uint32_t holder = Holder(base);
+  const uint32_t holder = Holder();
   uint64_t r3 = calls.Call(kIsBusy, frame, 0x821909FC, holder);
   if (uint32_t(r3) != 0) {
-    if (Data(base).busy_shown() == 0) {
-      r3 = HubShowBusy(base, frame, calls);
-      Data(base).set_busy_shown(1);
+    if (Data().busy_shown() == 0) {
+      r3 = HubShowBusy(frame, calls);
+      Data().set_busy_shown(1);
     }
-  } else if (Data(base).busy_shown() != 0) {
-    r3 = HubHideBusy(base, frame, calls);
-    Data(base).set_busy_shown(0);
+  } else if (Data().busy_shown() != 0) {
+    r3 = HubHideBusy(frame, calls);
+    Data().set_busy_shown(0);
   }
-  if (Globals::hub_pages(base).page() == 3) {
+  if (Globals::hub_pages().page() == 3) {
     return r3;
   }
-  if (Data(base).stand_model() != 0) {
+  if (Data().stand_model() != 0) {
     return calls.Call(kStageDraw, frame, 0x82190A70, holder, 0, 1);
   }
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const uint32_t save = vehicle_accessors::SaveDataOf(0);
   const uint32_t car = frame + 160;
-  calls.Call(kMemcpy, frame, 0x82190AC8, car, SelectedGarageCar(base, save) + 212, 1968);
+  calls.Call(kMemcpy, frame, 0x82190AC8, car, SelectedGarageCar(save) + 212, 1968);
   const uint64_t block =
-      calls.Call(kBlockOf, frame, 0x82190AD0, schema::CarMakersCar(base, car).car_id());
+      calls.Call(kBlockOf, frame, 0x82190AD0, schema::CarMakersCar(car).car_id());
   r3 = calls.Call(kReloadModel, frame, 0x82190ADC, holder, block);
-  Data(base).set_stand_model(uint32_t(r3));
-  if (Data(base).stand_model() == 0) {
+  Data().set_stand_model(uint32_t(r3));
+  if (Data().stand_model() == 0) {
     return r3;
   }
-  HubPutCarOnStand(base, car, frame, calls);
-  return calls.Call(kStageCommand, frame, 0x82190B0C, Holder(base), 14);
+  HubPutCarOnStand(car, frame, calls);
+  return calls.Call(kStageCommand, frame, 0x82190B0C, Holder(), 14);
 }
 
 }  // namespace type2_screens

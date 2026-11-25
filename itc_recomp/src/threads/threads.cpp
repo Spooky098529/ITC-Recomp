@@ -145,9 +145,9 @@ std::shared_ptr<Thread> ByHandle(uint32_t handle) {
   return it == threads.by_handle.end() || it->second->closed ? nullptr : it->second;
 }
 
-void SetCpu(uint8_t* base, Thread& thread, uint8_t cpu) {
+void SetCpu(Thread& thread, uint8_t cpu) {
   thread.cpu = cpu;
-  guest::StoreU8(base, thread.pcr + kPcrCurrentCpu, cpu);
+  guest::StoreU8(thread.pcr + kPcrCurrentCpu, cpu);
 }
 
 // A thread of ours, made but not started.
@@ -161,7 +161,7 @@ struct Made {
 // Our blocks for a new thread (stack, thread object, per-thread block,
 // TLS slots), registered under a new handle; the creation flags' suspend
 // bit and CPU mask applied.
-Made Make(uint8_t* base, uint32_t stack_size, uint32_t flags) {
+Made Make(uint32_t stack_size, uint32_t flags) {
   const uint32_t size = std::max(kMinimumStack, (stack_size + 0xFFF) & ~0xFFFu);
   // In PC memory (E5 step 6): blobs, zero-filled, the guest's byte order.
   const uint32_t stack_limit = memory::NewBlob(size, "ThreadStack");
@@ -180,17 +180,17 @@ Made Make(uint8_t* base, uint32_t stack_size, uint32_t flags) {
   made.thread->suspend_count = (flags & kCreateSuspended) ? 1 : 0;
   threads.by_handle[made.thread->handle] = made.thread;
   threads.by_object[object] = made.thread;
-  guest::StoreU32(base, object + kThreadTls, tls);
-  guest::StoreU32(base, object + kThreadId, made.id);
-  guest::StoreU32(base, pcr + kPcrCurrentThread, object);
-  SetCpu(base, *made.thread, CpuFor(threads, uint8_t(flags >> 24)));
+  guest::StoreU32(object + kThreadTls, tls);
+  guest::StoreU32(object + kThreadId, made.id);
+  guest::StoreU32(pcr + kPcrCurrentThread, object);
+  SetCpu(*made.thread, CpuFor(threads, uint8_t(flags >> 24)));
   return made;
 }
 
 // The host thread: once resumed, `body` with r1 at the stack's top and r13
 // the per-thread block.
-std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args)> body) {
-  return std::thread([base, made, body = std::move(body)] {
+std::thread Run(const Made& made, std::function<void(lifted::Args)> body) {
+  return std::thread([made, body = std::move(body)] {
     {
       Threads& threads = All();
       std::unique_lock lock(threads.mutex);
@@ -211,7 +211,7 @@ std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args
 
 // ExCreateThread(handle out, stack size, thread ID out, XAPI start-up,
 // start routine, start context, creation flags).
-lifted::Result CreateThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result CreateThread(const lifted::Args& args) {
   const uint32_t handle_out = uint32_t(args.r[0]);
   const uint32_t stack_size = uint32_t(args.r[1]);
   const uint32_t id_out = uint32_t(args.r[2]);
@@ -220,39 +220,39 @@ lifted::Result CreateThread(uint8_t* base, const lifted::Args& args) {
   const uint32_t context = uint32_t(args.r[5]);
   const uint32_t flags = uint32_t(args.r[6]);
   const uint32_t creator_pcr = uint32_t(args.r13);
-  const uint32_t creator = guest::LoadU32(base, creator_pcr + kPcrCurrentThread);
+  const uint32_t creator = guest::LoadU32(creator_pcr + kPcrCurrentThread);
   if (flags & kCreateSystemThread) {
     LogOnce("ExCreateThread of a system thread, start", start);
-    return lifted::ImportFromSdk(base, __imp__ExCreateThread, args);
+    return lifted::ImportFromSdk(__imp__ExCreateThread, args);
   }
   // The SDK's threads put per-thread TLS data (__declspec(thread)) before
   // the slots; ours have none to copy, so a creator of the SDK's with some
   // is left to it. A creator of ours had none either.
   if (CurrentPcr() == 0 &&
-      guest::LoadU32(base, creator + kThreadTls) != guest::LoadU32(base, creator_pcr + kPcrTls)) {
+      guest::LoadU32(creator + kThreadTls) != guest::LoadU32(creator_pcr + kPcrTls)) {
     LogOnce("ExCreateThread with per-thread TLS data, start", start);
-    return lifted::ImportFromSdk(base, __imp__ExCreateThread, args);
+    return lifted::ImportFromSdk(__imp__ExCreateThread, args);
   }
   ITC_NATIVE_RUNNING("import ExCreateThread");
 
-  const Made made = Make(base, stack_size, flags);
+  const Made made = Make(stack_size, flags);
   if (handle_out) {
-    guest::StoreU32(base, handle_out, made.thread->handle);
+    guest::StoreU32(handle_out, made.thread->handle);
   }
   if (id_out) {
-    guest::StoreU32(base, id_out, made.id);
+    guest::StoreU32(id_out, made.id);
   }
   ITC_LOG_INFO("threads: thread {:08X} (ID {:X}) made: start {:08X}, context {:08X}{}, CPU {}",
                made.thread->handle, made.id, start, context,
                startup ? " through the XAPI start-up" : "", made.thread->cpu);
-  Run(base, made, [base, startup, start, context](lifted::Args call) {
+  Run(made, [startup, start, context](lifted::Args call) {
     if (startup) {
       call.r[0] = start;
       call.r[1] = context;
-      lifted::Call(base, startup, call);
+      lifted::Call(startup, call);
     } else {
       call.r[0] = context;
-      lifted::Call(base, start, call);
+      lifted::Call(start, call);
     }
   }).detach();
   return {kStatusSuccess, 0.0};
@@ -274,11 +274,11 @@ uint32_t Resume(Thread& thread) {
 }
 
 // NtResumeThread(handle, suspend count out).
-lifted::Result NtResumeThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result NtResumeThread(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   if (!ThreadHandle(handle)) {
     LogOnce("NtResumeThread on handle", handle);
-    return lifted::ImportFromSdk(base, __imp__NtResumeThread, args);
+    return lifted::ImportFromSdk(__imp__NtResumeThread, args);
   }
   ITC_NATIVE_RUNNING("import NtResumeThread");
   const std::shared_ptr<Thread> thread = ByHandle(handle);
@@ -287,18 +287,18 @@ lifted::Result NtResumeThread(uint8_t* base, const lifted::Args& args) {
   }
   const uint32_t previous = Resume(*thread);
   if (const uint32_t out = uint32_t(args.r[1])) {
-    guest::StoreU32(base, out, previous);
+    guest::StoreU32(out, previous);
   }
   return {kStatusSuccess, 0.0};
 }
 
 // KeResumeThread(thread object).
-lifted::Result KeResumeThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result KeResumeThread(const lifted::Args& args) {
   const uint32_t object = uint32_t(args.r[0]);
   const std::shared_ptr<Thread> thread = ByObject(object);
   if (!thread) {
     LogOnce("KeResumeThread on the thread object at", object);
-    return lifted::ImportFromSdk(base, __imp__KeResumeThread, args);
+    return lifted::ImportFromSdk(__imp__KeResumeThread, args);
   }
   ITC_NATIVE_RUNNING("import KeResumeThread");
   Resume(*thread);
@@ -307,12 +307,12 @@ lifted::Result KeResumeThread(uint8_t* base, const lifted::Args& args) {
 
 // KeSetBasePriorityThread(thread object, priority): the previous one
 // (plugged in: kept, not applied to the host thread).
-lifted::Result SetBasePriorityThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result SetBasePriorityThread(const lifted::Args& args) {
   const uint32_t object = uint32_t(args.r[0]);
   const std::shared_ptr<Thread> thread = ByObject(object);
   if (!thread) {
     LogOnce("KeSetBasePriorityThread on the thread object at", object);
-    return lifted::ImportFromSdk(base, __imp__KeSetBasePriorityThread, args);
+    return lifted::ImportFromSdk(__imp__KeSetBasePriorityThread, args);
   }
   ITC_NATIVE_RUNNING("import KeSetBasePriorityThread");
   std::lock_guard lock(All().mutex);
@@ -322,13 +322,13 @@ lifted::Result SetBasePriorityThread(uint8_t* base, const lifted::Args& args) {
 }
 
 // KeSetAffinityThread(thread object, affinity, previous affinity out).
-lifted::Result SetAffinityThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result SetAffinityThread(const lifted::Args& args) {
   const uint32_t object = uint32_t(args.r[0]);
   const uint32_t affinity = uint32_t(args.r[1]);
   const std::shared_ptr<Thread> thread = ByObject(object);
   if (!thread) {
     LogOnce("KeSetAffinityThread on the thread object at", object);
-    return lifted::ImportFromSdk(base, __imp__KeSetAffinityThread, args);
+    return lifted::ImportFromSdk(__imp__KeSetAffinityThread, args);
   }
   ITC_NATIVE_RUNNING("import KeSetAffinityThread");
   if (affinity == 0) {
@@ -337,19 +337,19 @@ lifted::Result SetAffinityThread(uint8_t* base, const lifted::Args& args) {
   Threads& threads = All();
   std::lock_guard lock(threads.mutex);
   if (const uint32_t out = uint32_t(args.r[2])) {
-    guest::StoreU32(base, out, 1u << thread->cpu);
+    guest::StoreU32(out, 1u << thread->cpu);
   }
-  SetCpu(base, *thread, CpuFor(threads, uint8_t(affinity)));
+  SetCpu(*thread, CpuFor(threads, uint8_t(affinity)));
   return {kStatusSuccess, 0.0};
 }
 
 // ObReferenceObjectByHandle(handle, type, object out): a thread's object
 // for one of ours (or the current thread's pseudo-handle on one of ours).
-lifted::Result ReferenceObjectByHandle(uint8_t* base, const lifted::Args& args) {
+lifted::Result ReferenceObjectByHandle(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   std::shared_ptr<Thread> thread;
   if (handle == kCurrentThreadHandle) {
-    thread = ByObject(guest::LoadU32(base, uint32_t(args.r13) + kPcrCurrentThread));
+    thread = ByObject(guest::LoadU32(uint32_t(args.r13) + kPcrCurrentThread));
   } else if (ThreadHandle(handle)) {
     thread = ByHandle(handle);
     if (!thread) {
@@ -358,21 +358,21 @@ lifted::Result ReferenceObjectByHandle(uint8_t* base, const lifted::Args& args) 
   }
   if (!thread) {
     LogOnce("ObReferenceObjectByHandle on handle", handle);
-    return lifted::ImportFromSdk(base, __imp__ObReferenceObjectByHandle, args);
+    return lifted::ImportFromSdk(__imp__ObReferenceObjectByHandle, args);
   }
   ITC_NATIVE_RUNNING("import ObReferenceObjectByHandle");
   if (const uint32_t out = uint32_t(args.r[2])) {
-    guest::StoreU32(base, out, thread->object);
+    guest::StoreU32(out, thread->object);
   }
   return {kStatusSuccess, 0.0};
 }
 
 // ObDereferenceObject(object): nothing to do for a thread of ours.
-lifted::Result DereferenceObject(uint8_t* base, const lifted::Args& args) {
+lifted::Result DereferenceObject(const lifted::Args& args) {
   const uint32_t object = uint32_t(args.r[0]);
   if (!ByObject(object)) {
     LogOnce("ObDereferenceObject on the object at", object);
-    return lifted::ImportFromSdk(base, __imp__ObDereferenceObject, args);
+    return lifted::ImportFromSdk(__imp__ObDereferenceObject, args);
   }
   ITC_NATIVE_RUNNING("import ObDereferenceObject");
   return {0, 0.0};
@@ -411,17 +411,17 @@ const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEnt
 
 }  // namespace
 
-std::thread StartThread(uint8_t* base, uint32_t stack_size, const char* name,
+std::thread StartThread(uint32_t stack_size, const char* name,
                         std::function<void(lifted::Args)> body) {
-  const Made made = Make(base, stack_size, 0);
+  const Made made = Make(stack_size, 0);
   ITC_LOG_INFO("threads: {} {:08X} (ID {:X}) made, CPU {}", name, made.thread->handle, made.id,
                made.thread->cpu);
-  return Run(base, made, std::move(body));
+  return Run(made, std::move(body));
 }
 
-std::thread StartMainThread(uint8_t* base, uint32_t stack_size, lifted::Entry entry) {
-  return StartThread(base, stack_size, "the main thread",
-                     [base, entry](lifted::Args call) { entry(base, call); });
+std::thread StartMainThread(uint32_t stack_size, lifted::Entry entry) {
+  return StartThread(stack_size, "the main thread",
+                     [entry](lifted::Args call) { entry(call); });
 }
 
 uint32_t CurrentPcr() {

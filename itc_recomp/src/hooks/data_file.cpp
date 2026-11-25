@@ -19,5 +19,5 @@ ITC_FLAG_BOOL(native_data_files, true, "ITC",
 // whether an entry whose first word is 0 counts as none; r3 = the entry or
 // 0. The original's scratch registers (r8 to r11) aren't read by its callers.
 ITC_NATIVE_ENTRY(82294730, ITC_FLAG(native_data_files)) {
-  ctx.r3.u64 = game_data::GetEntry(base, ctx.r3.u32, ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0);
+  ctx.r3.u64 = game_data::GetEntry(ctx.r3.u32, ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0);
 }

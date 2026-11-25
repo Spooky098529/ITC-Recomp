@@ -61,7 +61,7 @@ namespace tr = todays_result;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx) : ctx_(ctx), base_(), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -87,7 +87,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -100,11 +100,11 @@ class GuestCalls {
 // StateMachine::Add's r3: a new transition's address from the machine's
 // 64-bit r3, as the title screen's Inits.
 template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*)>
-void InitStatesStep(lifted::Regs& ctx, uint8_t* base) {
+void InitStatesStep(lifted::Regs& ctx) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = InitStates(base, machine, ctx.r1.u32 - tr::kInitStatesFrame, &replaced);
+  const uint32_t r3 = InitStates(machine, ctx.r1.u32 - tr::kInitStatesFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -113,16 +113,16 @@ void InitStatesStep(lifted::Regs& ctx, uint8_t* base) {
 bool TodaysResultNative() { return ITC_FLAG(native_todays_result); }
 
 ITC_REGS_STEP(ModeType9Init) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::ModeInit(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE9_DELEGATE(name)                                       \
-  void ModeType9##name(lifted::Regs& ctx, uint8_t* base) {                    \
+  void ModeType9##name(lifted::Regs& ctx) {                    \
     const uint64_t answer = ctx.r3.u64;                                     \
     {                                                                       \
-      GuestCalls guest(ctx, base);                                          \
-      tr::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());    \
+      GuestCalls guest(ctx);                                          \
+      tr::name(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());    \
     }                                                                       \
     ctx.r3.u64 = answer;                                                    \
   }
@@ -133,35 +133,35 @@ ITC_MODE_TYPE9_DELEGATE(WaitForShown)
 ITC_MODE_TYPE9_DELEGATE(Leaving)
 #undef ITC_MODE_TYPE9_DELEGATE
 ITC_REGS_STEP(ModeType9IsLoaded) {
-  ctx.r3.u64 = tr::IsLoaded(base, ctx.r3.u32);
+  ctx.r3.u64 = tr::IsLoaded(ctx.r3.u32);
 }
-ITC_REGS_STEP(ModeType9FindShown) { tr::FindShown(base, ctx.r3.u32); }
+ITC_REGS_STEP(ModeType9FindShown) { tr::FindShown(ctx.r3.u32); }
 ITC_REGS_STEP(TodaysEventKind) {
-  ctx.r3.u64 = tr::Kind(base, ctx.r1.u32);
+  ctx.r3.u64 = tr::Kind(ctx.r1.u32);
 }
 ITC_REGS_STEP(TodaysResultInitStates) {
-  InitStatesStep<tr::ResultInitStates>(ctx, base);
+  InitStatesStep<tr::ResultInitStates>(ctx);
 }
 ITC_REGS_STEP(TodaysEventInitStates) {
-  InitStatesStep<tr::EventInitStates>(ctx, base);
+  InitStatesStep<tr::EventInitStates>(ctx);
 }
 
 ITC_REGS_STEP(TodaysResultCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::ResultCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::ResultCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysResultOpenMovie) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   ctx.r3.u64 = tr::ResultOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
 ITC_REGS_STEP(TodaysResultWaitForMovie) {
-  ctx.r3.u64 = tr::ResultWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = tr::ResultWaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 // The handlers and helpers with no argument but the frame.
 #define ITC_TODAYS_RESULT_FRAME(name, function)                     \
   ITC_REGS_STEP(name) {                       \
-    GuestCalls guest(ctx, base);                                    \
-    ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
+    GuestCalls guest(ctx);                                    \
+    ctx.r3.u64 = tr::function(ctx.r1.u32, guest.calls());     \
   }
 ITC_TODAYS_RESULT_FRAME(TodaysResultStart, ResultStart)
 ITC_TODAYS_RESULT_FRAME(TodaysResultReadDay, ReadDay)
@@ -172,18 +172,18 @@ ITC_TODAYS_RESULT_FRAME(TodaysResultWaitPage, ResultWaitPage)
 ITC_TODAYS_RESULT_FRAME(TodaysResultQueueMovie, ResultQueueMovie)
 #undef ITC_TODAYS_RESULT_FRAME
 ITC_REGS_STEP(TodaysResultDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::ResultDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::ResultDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysResultLeavePage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::ResultLeavePage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::ResultLeavePage(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The transitions (r3 the started word).
 #define ITC_TODAYS_RESULT_TRANSITION(name, function)                           \
   ITC_REGS_STEP(name) {                                  \
-    GuestCalls guest(ctx, base);                                               \
-    ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
+    GuestCalls guest(ctx);                                               \
+    ctx.r3.u64 = tr::function(ctx.r3.u32, ctx.r1.u32, guest.calls());    \
   }
 ITC_TODAYS_RESULT_TRANSITION(TodaysResultIntro, ResultIntro)
 ITC_TODAYS_RESULT_TRANSITION(TodaysResultShowLoop, ResultShowLoop)
@@ -192,81 +192,81 @@ ITC_TODAYS_RESULT_TRANSITION(TodaysResultUnload, ResultUnload)
 ITC_TODAYS_RESULT_TRANSITION(TodaysResultDestroy, ResultDestroy)
 #undef ITC_TODAYS_RESULT_TRANSITION
 ITC_REGS_STEP(TodaysResultUnloaded) {
-  tr::ResultUnloaded(base, ctx.r3.u32);
+  tr::ResultUnloaded(ctx.r3.u32);
 }
 ITC_REGS_STEP(TodaysResultLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::ResultLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::ResultLeave(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(TodaysEventCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventCreate(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventMarkImages) {
-  ctx.r3.u64 = tr::MarkImages(base, ctx.r1.u32);
+  ctx.r3.u64 = tr::MarkImages(ctx.r1.u32);
 }
 ITC_REGS_STEP(TodaysEventOpenMovie) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventOpenMovie(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventOpenMovie(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventLoadImages) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::LoadImages(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::LoadImages(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventLoadImagePair) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::LoadImagePair(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::LoadImagePair(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventWaitForMovie) {
-  ctx.r3.u64 = tr::EventWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = tr::EventWaitForMovie(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(TodaysEventImagesLoadedA) {
-  ctx.r3.u64 = tr::ImagesLoadedA(base, ctx.r3.u32);
+  ctx.r3.u64 = tr::ImagesLoadedA(ctx.r3.u32);
 }
 ITC_REGS_STEP(TodaysEventImagesLoadedB) {
-  ctx.r3.u64 = tr::ImagesLoadedB(base, ctx.r3.u32);
+  ctx.r3.u64 = tr::ImagesLoadedB(ctx.r3.u32);
 }
 ITC_REGS_STEP(TodaysEventStart) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventStart(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventStart(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventSetUpTexts) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::SetUpTexts(base, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::SetUpTexts(ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventNextUnlockEntry) {
-  ctx.r3.u64 = tr::NextUnlockEntry(base, ctx.r1.u32);
+  ctx.r3.u64 = tr::NextUnlockEntry(ctx.r1.u32);
 }
 ITC_REGS_STEP(TodaysEventUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventUnload(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventUnloaded) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventUnloaded(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventLeave) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventLeave(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventDestroy) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventDestroy(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TodaysEventFreeImages) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::FreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::FreeImages(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 ITC_REGS_STEP(TodaysEventDraw) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EventDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EventDraw(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 #define ITC_TODAYS_EVENT_FRAME(name, function)                      \
   ITC_REGS_STEP(name) {                       \
-    GuestCalls guest(ctx, base);                                    \
-    ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
+    GuestCalls guest(ctx);                                    \
+    ctx.r3.u64 = tr::function(ctx.r1.u32, guest.calls());     \
   }
 ITC_TODAYS_EVENT_FRAME(TodaysEventUpdate, EventUpdate)
 ITC_TODAYS_EVENT_FRAME(TodaysEventEventPage, EventPage)
@@ -274,13 +274,13 @@ ITC_TODAYS_EVENT_FRAME(TodaysEventQueueEventMovies, QueueEventMovies)
 ITC_TODAYS_EVENT_FRAME(TodaysEventShowUnlock, ShowUnlock)
 #undef ITC_TODAYS_EVENT_FRAME
 ITC_REGS_STEP(TodaysEventEndPage) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tr::EndPage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tr::EndPage(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 #define ITC_TODAYS_EVENT_TRANSITION(name, function)                            \
   ITC_REGS_STEP(name) {                                  \
-    GuestCalls guest(ctx, base);                                               \
-    ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
+    GuestCalls guest(ctx);                                               \
+    ctx.r3.u64 = tr::function(ctx.r3.u32, ctx.r1.u32, guest.calls());    \
   }
 ITC_TODAYS_EVENT_TRANSITION(TodaysEventIntro, EventIntro)
 ITC_TODAYS_EVENT_TRANSITION(TodaysEventFadeOut, EventFadeOut)
@@ -288,14 +288,14 @@ ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextUnlock, NextUnlock)
 ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextPage, NextPage)
 #undef ITC_TODAYS_EVENT_TRANSITION
 ITC_REGS_STEP(TodaysEventShowImages) {
-  ctx.r3.u64 = tr::ShowImages(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = tr::ShowImages(ctx.r3.u32, ctx.r1.u32);
 }
 
 }  // namespace hooks
 
 #define ITC_TODAYS_RESULT(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_todays_result)) { \
-    hooks::step(ctx, base);                \
+    hooks::step(ctx);                \
   }
 
 // The mode: Init (vtable 0x82006CAC's slot 0, from Modes::Tick), the

@@ -17,17 +17,17 @@ namespace {
 
 using G = schema::LocationScreenGlobals;
 
-schema::LocationScreen Screen(uint8_t* base) { return G::screen(base); }
+schema::LocationScreen Screen() { return G::screen(); }
 
 // A float word through a float register and back (lfs, stfs).
-uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
-  return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, address))));
+uint32_t ThroughFloat(uint32_t address) {
+  return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(address))));
 }
 
-void StoreIdentity(uint8_t* base, uint32_t matrix) {
+void StoreIdentity(uint32_t matrix) {
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t column = 0; column < 4; column++) {
-      guest::StoreU32(base, matrix + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
+      guest::StoreU32(matrix + 16 * row + 4 * column, row == column ? 0x3F800000u : 0);
     }
   }
 }
@@ -41,9 +41,9 @@ constexpr std::array<uint32_t, 16> kPageHandlers = {
 
 }  // namespace
 
-void Reenter(uint8_t* base, uint32_t machine) {
+void Reenter(uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_822895E0 ScreenMachine::Reenter");
-  const schema::LocationScreenMachine m(base, machine);
+  const schema::LocationScreenMachine m(machine);
   m.set_state(m.loaded() != 0 ? 4 : 1);
 }
 
@@ -51,11 +51,11 @@ bool ResetNative(uint32_t screen) {
   return screen < 0xA0000000u - 800;
 }
 
-void ResetView(uint8_t* base, uint32_t view) {
+void ResetView(uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82227818 LocationScreen::ResetView");
-  const schema::LocationScreenView v(base, view);
-  const uint32_t zero = ThroughFloat(base, 0x82000A34);
-  const uint32_t one = ThroughFloat(base, 0x82000A30);
+  const schema::LocationScreenView v(view);
+  const uint32_t zero = ThroughFloat(0x82000A34);
+  const uint32_t one = ThroughFloat(0x82000A30);
   v.set_unknown_0(0);
   v.set_unknown_4(0);
   v.set_unknown_12(0);
@@ -64,30 +64,30 @@ void ResetView(uint8_t* base, uint32_t view) {
   // The four vectors (camera_vector_1, camera_vector_0, vector_64, vector_80).
   for (uint32_t at : {v.camera_vector_1_address(), v.camera_vector_0_address(),
                       v.vector_64_address(), v.vector_80_address()}) {
-    guest::StoreU32(base, at + 0, zero);
-    guest::StoreU32(base, at + 4, zero);
-    guest::StoreU32(base, at + 8, zero);
-    guest::StoreU32(base, at + 12, one);
+    guest::StoreU32(at + 0, zero);
+    guest::StoreU32(at + 4, zero);
+    guest::StoreU32(at + 8, zero);
+    guest::StoreU32(at + 12, one);
   }
   // The floats' bits as lfs and stfs leave them.
   for (uint32_t at : {v.unknown_96_address(), v.unknown_100_address(),
                       v.camera_float_0_address(), v.camera_float_1_address()}) {
-    guest::StoreU32(base, at, zero);
+    guest::StoreU32(at, zero);
   }
-  StoreIdentity(base, v.matrix0_address());
-  StoreIdentity(base, v.matrix1_address());
+  StoreIdentity(v.matrix0_address());
+  StoreIdentity(v.matrix1_address());
 }
 
-void Reset(uint8_t* base, uint32_t screen) {
+void Reset(uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_822279A8 LocationScreen::Reset");
-  const schema::LocationScreen s(base, screen);
+  const schema::LocationScreen s(screen);
   s.set_unknown_0(0);
   s.set_scenery(0u);
   s.set_picked_opponent(0);
   s.set_teardown_started(0);
   s.set_teardown_countdown(0);
   s.set_location(14);
-  ResetView(base, s.view_address());
+  ResetView(s.view_address());
   s.set_picture_count_a(0);
   s.set_picture_count_b(0);
   s.set_default_texture_a(0);
@@ -108,16 +108,16 @@ void Reset(uint8_t* base, uint32_t screen) {
   s.set_restart(0);
 }
 
-std::optional<uint32_t> ApplyQueuedPage(uint8_t* base, uint32_t sp) {
+std::optional<uint32_t> ApplyQueuedPage(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8222C9B0 LocationScreen::ApplyQueuedPage");
   std::optional<uint32_t> r3;
-  if (Screen(base).queued_page() == 0) {
-    r3 = HidePictures(base, sp - 96);
+  if (Screen().queued_page() == 0) {
+    r3 = HidePictures(sp - 96);
   }
-  const schema::LocationScreen screen = Screen(base);
+  const schema::LocationScreen screen = Screen();
   const uint32_t page = screen.queued_page();
   const uint32_t transition = screen.queued_transition();
-  const schema::PageObject pages = G::pages(base);
+  const schema::PageObject pages = G::pages();
   const uint32_t current = pages.page();
   if (page != current) {
     pages.set_previous_page(current);
@@ -131,12 +131,12 @@ std::optional<uint32_t> ApplyQueuedPage(uint8_t* base, uint32_t sp) {
     pages.set_next_page(page);
     pages.set_page(0xFFFFFFFFu);
   }
-  Screen(base).set_queued_page(0xFFFFFFFFu);
-  Screen(base).set_queued_transition(0xFFFFFFFFu);
+  Screen().set_queued_page(0xFFFFFFFFu);
+  Screen().set_queued_transition(0xFFFFFFFFu);
   return r3;
 }
 
-void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatcher,
+void UpdatePage(uint32_t sp, uint32_t machine, uint32_t dispatcher,
                 const PageCall& call) {
   ITC_NATIVE_RUNNING("sub_8222EC08 LocationScreen::UpdatePage");
   // The handlers' table: the original's 16 words at its 240-byte frame's
@@ -144,25 +144,25 @@ void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatche
   // reads the frame's word there, as the original (never seen: pages are
   // 0 to 15).
   const uint32_t frame = sp - 240;
-  const uint32_t start = G::pages(base).page();
+  const uint32_t start = G::pages().page();
   if (start != 0xFFFFFFFFu) {
     const uint32_t handler = start < kPageHandlers.size()
                                  ? kPageHandlers[start]
-                                 : guest::LoadU32(base, frame + 80 + (start << 2));
+                                 : guest::LoadU32(frame + 80 + (start << 2));
     call.call(call.user, handler, dispatcher, machine, 240, 0x8222ED08);
   }
-  const schema::LocationScreen screen = Screen(base);
-  const schema::LocationScreenView view(base, screen.view_address());
+  const schema::LocationScreen screen = Screen();
+  const schema::LocationScreenView view(screen.view_address());
   // The view's camera_vector_1 (its position, probably) copied.
   for (uint32_t k = 0; k < 16; k += 4) {
-    guest::StoreU32(base, G::view_copy_address() + k,
-                    guest::LoadU32(base, view.camera_vector_1_address() + k));
+    guest::StoreU32(G::view_copy_address() + k,
+                    guest::LoadU32(view.camera_vector_1_address() + k));
   }
   if (screen.restart() == 0) {
     return;
   }
   screen.set_restart(0);
-  const schema::PageObject pages = G::pages(base);
+  const schema::PageObject pages = G::pages();
   const uint32_t transition = pages.step();
   const uint32_t page = pages.page();
   if (transition != 0xFFFFFFFFu) {

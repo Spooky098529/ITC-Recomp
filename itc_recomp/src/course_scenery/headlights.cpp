@@ -70,22 +70,22 @@ void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); 
 // `r3`, the argument the original set), else `body` between
 // FrameStateDiff_Before and After, flush-to-zero off around it. Returns r3.
 template <typename Body>
-uint64_t Wrapped(uint8_t* base, uint32_t function, uint64_t r3, Body body) {
+uint64_t Wrapped(uint32_t function, uint64_t r3, Body body) {
   if (debug::IsHidden(function)) {
     return r3;
   }
-  debug::FrameStateDiff_Before(base);
+  debug::FrameStateDiff_Before();
   FlushOff();
   const uint64_t left = body();
   FlushOff();
-  debug::FrameStateDiff_After(base, "draw step part", function);
+  debug::FrameStateDiff_After("draw step part", function);
   return left;
 }
 
 class Recorder {
  public:
-  Recorder(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls, uint32_t f)
-      : base_(base), calls_(calls), f_(f) {}
+  Recorder(const car_scene_draw::SceneDrawCalls& calls, uint32_t f)
+      : base_(), calls_(calls), f_(f) {}
 
   uint64_t Run(uint32_t description);
 
@@ -352,12 +352,12 @@ uint64_t Recorder::Run(uint32_t description) {
 
 }  // namespace
 
-uint64_t RecordHeadlightProjectors(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+uint64_t RecordHeadlightProjectors(const car_scene_draw::SceneDrawCalls& calls,
                                    uint32_t stack, uint32_t description) {
   ITC_NATIVE_RUNNING("sub_820F34C8 Scenery::RecordHeadlightProjectors");
   const uint32_t f = stack - kFrame;
-  Store(base, f, stack);  // the back chain, as stwu
-  return Recorder(base, calls, f).Run(description);
+  Store(f, stack);  // the back chain, as stwu
+  return Recorder(calls, f).Run(description);
 }
 
 }  // namespace course_scenery

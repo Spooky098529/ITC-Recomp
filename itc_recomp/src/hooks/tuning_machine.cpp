@@ -60,8 +60,8 @@ namespace tm = tuning_machine;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(lifted::Regs& ctx, uint8_t* base, std::optional<double>* pending = nullptr)
-      : ctx_(ctx), base_(base), lr_(ctx.lr), pending_(pending) {}
+  GuestCalls(lifted::Regs& ctx, std::optional<double>* pending = nullptr)
+      : ctx_(ctx), base_(), lr_(ctx.lr), pending_(pending) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -92,7 +92,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -106,61 +106,61 @@ class GuestCalls {
 }  // namespace
 
 ITC_REGS_STEP(TuningMachineCreate) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::Create(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::Create(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineZeroRecord16) {
-  tm::ZeroRecord16(base, ctx.r4.u32);
+  tm::ZeroRecord16(ctx.r4.u32);
 }
 ITC_REGS_STEP(TuningMachineResetImages) {
-  tm::ResetImages(base, ctx.r3.u32);
+  tm::ResetImages(ctx.r3.u32);
 }
 ITC_REGS_STEP(TuningMachineOpenMovies) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::OpenMovies(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::OpenMovies(ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineWaitForMovies) {
-  ctx.r3.u64 = tm::WaitForMovies(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = tm::WaitForMovies(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(TuningMachineOnDialogClosed) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::OnDialogClosed(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::OnDialogClosed(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineOnDialogNo) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::OnDialogNo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::OnDialogNo(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineStickerDialogNo) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::StickerDialogNo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::StickerDialogNo(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineOnNoticeClosed) {
-  ctx.r3.u64 = tm::OnNoticeClosed(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = tm::OnNoticeClosed(ctx.r3.u64, ctx.r1.u32);
 }
 ITC_REGS_STEP(TuningMachineUnload) {
-  GuestCalls guest(ctx, base);
-  ctx.r3.u64 = tm::Unload(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+  GuestCalls guest(ctx);
+  ctx.r3.u64 = tm::Unload(ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 ITC_REGS_STEP(TuningMachineClose) {
-  tm::Close(base, ctx.r3.u32, ctx.r4.u32);
+  tm::Close(ctx.r3.u32, ctx.r4.u32);
 }
 ITC_REGS_STEP(TuningMachineDestroy) {
-  GuestCalls guest(ctx, base);
+  GuestCalls guest(ctx);
   if (!NativeHeapActive()) {
-    ctx.r3.u64 = tm::Destroy(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
+    ctx.r3.u64 = tm::Destroy(ctx.r3.u64, ctx.r1.u32, guest.calls());
     return;
   }
   // DecalImages::UnloadAll by its plain C++ (its adapter removed, B7 loop,
   // 2026-11-13), as the tuning pages' callers run it.
-  const tuning_screen::GuestCall call = StandModelsGuestCall(ctx, base);
+  const tuning_screen::GuestCall call = StandModelsGuestCall(ctx);
   const tm::UnloadAllNative unload{&call, ITC_FLAG(native_car_models)};
-  ctx.r3.u64 = tm::Destroy(base, ctx.r3.u64, ctx.r1.u32, guest.calls(), &unload);
+  ctx.r3.u64 = tm::Destroy(ctx.r3.u64, ctx.r1.u32, guest.calls(), &unload);
 }
 ITC_REGS_STEP(TuningMachineSavePlaceholders) {
-  ctx.r3.u64 = tm::SavePlaceholders(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = tm::SavePlaceholders(ctx.r3.u32, ctx.r1.u32);
 }
 ITC_REGS_STEP(TuningMachineSavePlaceholders14) {
-  ctx.r3.u64 = tm::SavePlaceholders14(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = tm::SavePlaceholders14(ctx.r3.u32, ctx.r1.u32);
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the garage screen's Init.
@@ -168,28 +168,28 @@ ITC_REGS_STEP(TuningMachineInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
-  const uint32_t r3 = tm::Init(base, machine, ctx.r1.u32 - tm::kInitFrame, &replaced);
+  const uint32_t r3 = tm::Init(machine, ctx.r1.u32 - tm::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 ITC_REGS_STEP(TuningMachineLoadInteriorSlots) {
-  tm::LoadInteriorSlots(base, ctx.r3.u32);
+  tm::LoadInteriorSlots(ctx.r3.u32);
 }
 // The vinyl angles' float math as the original's (no flush to zero).
 ITC_REGS_STEP(TuningMachineLoadCurrentChoices) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = tm::LoadCurrentChoices(base, ctx.r3.u32, ctx.r1.u64);
+  ctx.r3.u64 = tm::LoadCurrentChoices(ctx.r3.u32, ctx.r1.u64);
 }
 ITC_REGS_STEP(TuningMachineLoadOwnedParts) {
-  ctx.r3.u64 = tm::LoadOwnedParts(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = tm::LoadOwnedParts(ctx.r3.u32, ctx.r1.u32);
 }
 // The prices' float math as the original's (no flush to zero); r3 left.
 ITC_REGS_STEP(TuningMachineSetPrices) {
   ctx.fpscr.disableFlushMode();
-  tm::SetPrices(base, ctx.r3.u32, ctx.r1.u32);
+  tm::SetPrices(ctx.r3.u32, ctx.r1.u32);
 }
 // A leaf; r3 left.
 ITC_REGS_STEP(TuningMachineLoadUnlockedParts) {
-  tm::LoadUnlockedParts(base, ctx.r3.u32);
+  tm::LoadUnlockedParts(ctx.r3.u32);
 }
 // The callees' float math as the originals' (no flush to zero); r3 left
 // (the guest calls change ctx's, put back).
@@ -199,8 +199,8 @@ ITC_REGS_STEP(TuningMachineSetUp) {
   const bool native_specs = ITC_FLAG(native_car_specs);
   uint64_t out;
   {
-    GuestCalls guest(ctx, base);
-    out = tm::SetUp(base, r3, r1, native_specs, guest.calls());
+    GuestCalls guest(ctx);
+    out = tm::SetUp(r3, r1, native_specs, guest.calls());
   }
   ctx.r3.u64 = out;
 }
@@ -219,10 +219,10 @@ ITC_REGS_STEP(TuningMachineStart) {
   std::optional<double> f1;
   uint64_t out = 0;
   {
-    GuestCalls guest(ctx, base, &f1);
+    GuestCalls guest(ctx, &f1);
     const tm::Calls calls = guest.calls();
-    TuningWithRefreshStand(ctx, base, &f1, [&](const tuning_screen::StandCalls& stand) {
-      return out = tm::Start(base, stand, calls, r3, r1, &f1);
+    TuningWithRefreshStand(ctx, &f1, [&](const tuning_screen::StandCalls& stand) {
+      return out = tm::Start(stand, calls, r3, r1, &f1);
     });
   }
   ctx.r3.u64 = out;
@@ -232,7 +232,7 @@ ITC_REGS_STEP(TuningMachineStart) {
 
 #define ITC_TUNING_MACHINE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_tuning_machine)) { \
-    hooks::step(ctx, base);                  \
+    hooks::step(ctx);                  \
   }
 
 // The machine's handlers (functors the machine calls).
@@ -270,8 +270,8 @@ ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
 ITC_NATIVE_ENTRY_ALWAYS(821E7368) {
   
   if (!ITC_FLAG(native_tuning_machine) || !hooks::TuningMachineStartNative()) {
-    lifted::original::c821E7368(ctx, base);
+    lifted::original::c821E7368(ctx);
     return;
   }
-  hooks::TuningMachineStart(ctx, base);
+  hooks::TuningMachineStart(ctx);
 }

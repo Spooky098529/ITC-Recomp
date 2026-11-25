@@ -33,188 +33,188 @@ uint64_t Run(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie) {
 }
 // The selected cell's named animation: `first` + the selection x `per` +
 // the column (the data's +52).
-uint32_t Cell(uint8_t* base, uint32_t first, uint32_t per) {
-  const uint32_t selection = race_screens::ListSelection(base, Globals::plate_list(base).address);
-  return Globals::plate_data(base).column() + selection * per + first;
+uint32_t Cell(uint32_t first, uint32_t per) {
+  const uint32_t selection = race_screens::ListSelection(Globals::plate_list().address);
+  return Globals::plate_data().column() + selection * per + first;
 }
 // A node's +68 = the highlight float, through a single's double as the
 // original's lfs and stfs.
-void Highlight(uint8_t* base, uint32_t node) {
-  Node(base, node).set_alpha(float(double(guest::LoadFloat(base, kHighlight))));
+void Highlight(uint32_t node) {
+  Node(node).set_alpha(float(double(guest::LoadFloat(kHighlight))));
 }
 // The plate's bytes from `from` (the data's digits or chars) as `count`
 // words at `to`.
-void PlateWords(uint8_t* base, uint32_t (schema::PlateEditorData::*from)() const, uint32_t count,
+void PlateWords(uint32_t (schema::PlateEditorData::*from)() const, uint32_t count,
                 uint32_t to) {
-  const schema::PlateEditorData data = Globals::plate_data(base);
+  const schema::PlateEditorData data = Globals::plate_data();
   for (uint32_t i = 0; i < count; i++) {
-    Store(base, to + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, (data.*from)() + i)))));
+    Store(to + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8((data.*from)() + i)))));
   }
 }
 
 }  // namespace
 
-uint64_t PlateTransition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition0(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219A3A8 PlateEditor::Transition0");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
     Play(calls, frame, 0x8219A404, movie, 66);
-    PlateSetUpRegionMenu(base, frame, calls);
-    PlateShowPlate(base, Globals::plate_data(base).plate_address(), frame);
-    Store(base, step, 1);
+    PlateSetUpRegionMenu(frame, calls);
+    PlateShowPlate(Globals::plate_data().plate_address(), frame);
+    Store(step, 1);
   }
   return uint32_t(Run(calls, frame, 0x8219A42C, movie)) == 0 ? 1 : 0;
 }
 
-uint64_t PlateTransition1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition1(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198A40 PlateEditor::Transition1");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    const uint32_t cell = Cell(base, 2, 3);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    const uint32_t cell = Cell(2, 3);
     Play(calls, frame, 0x82198ABC, movie, cell);
     Loop(calls, frame, 0x82198AC8, movie, cell);
     Play(calls, frame, 0x82198AE4, movie, 0);
     Loop(calls, frame, 0x82198AF0, movie, 0);
     Play(calls, frame, 0x82198B0C, movie, 68);
     Loop(calls, frame, 0x82198B18, movie, 68);
-    Highlight(base, ui_movies::FindNode(base, movie, 3, 1));
-    Store(base, step, 1);
+    Highlight(ui_movies::FindNode(movie, 3, 1));
+    Store(step, 1);
   }
   Run(calls, frame, 0x82198B48, movie);
   return 1;
 }
 
-uint64_t PlateTransition4(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition4(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198C20 PlateEditor::Transition4");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    Finish(calls, frame, 0x82198C90, movie, Cell(base, 2, 3));
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    Finish(calls, frame, 0x82198C90, movie, Cell(2, 3));
     Finish(calls, frame, 0x82198C9C, movie, 0);
     Finish(calls, frame, 0x82198CA8, movie, 68);
     calls.Call(kFinishAll, frame, 0x82198CB0, movie);
     Play(calls, frame, 0x82198CCC, movie, 67);
-    Store(base, step, 1);
+    Store(step, 1);
   }
   return uint32_t(Run(calls, frame, 0x82198CE0, movie)) == 0 ? 1 : 0;
 }
 
-uint64_t PlateTransition5(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition5(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219A5E8 PlateEditor::Transition5");
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    PlateFinishRegionAnim(base, frame, calls);
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    PlateFinishRegionAnim(frame, calls);
     Play(calls, frame, 0x8219A640, movie, 69);
-    Globals::plate_data(base).set_edited(0);
-    PlateSetUpNumberMenu(base, frame, calls);
-    car_dealer::HelpLineSet(base, 569, frame, calls);
-    PlateWords(base, &schema::PlateEditorData::digits_address, 3, frame + 88);
-    PlateShowDigits(base, frame + 88, frame);
-    Store(base, step, 1);
+    Globals::plate_data().set_edited(0);
+    PlateSetUpNumberMenu(frame, calls);
+    car_dealer::HelpLineSet(569, frame, calls);
+    PlateWords(&schema::PlateEditorData::digits_address, 3, frame + 88);
+    PlateShowDigits(frame + 88, frame);
+    Store(step, 1);
   }
   return uint32_t(Run(calls, frame, 0x8219A6A4, movie)) == 0 ? 1 : 0;
 }
 
-uint64_t PlateTransition6(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition6(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198D00 PlateEditor::Transition6");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    const uint32_t cell = Cell(base, 15, 4);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    const uint32_t cell = Cell(15, 4);
     Play(calls, frame, 0x82198D7C, movie, cell);
     Loop(calls, frame, 0x82198D88, movie, cell);
-    Highlight(base, ui_movies::FindNode(base, movie, 4, 1));
-    Store(base, step, 1);
+    Highlight(ui_movies::FindNode(movie, 4, 1));
+    Store(step, 1);
   }
   Run(calls, frame, 0x82198DB8, movie);
   return 1;
 }
 
-uint64_t PlateTransition8(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition8(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219A820 PlateEditor::Transition8");
-  const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    Finish(calls, frame, 0x8219A888, movie, Cell(base, 15, 4));
-    PlateSetUpNumberMenu(base, frame, calls);
-    PlateWords(base, &schema::PlateEditorData::digits_address, 3, frame + 88);
-    PlateShowDigits(base, frame + 88, frame);
-    Store(base, step, 1);
+  const uint32_t frame = Frame(sp, 144);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    Finish(calls, frame, 0x8219A888, movie, Cell(15, 4));
+    PlateSetUpNumberMenu(frame, calls);
+    PlateWords(&schema::PlateEditorData::digits_address, 3, frame + 88);
+    PlateShowDigits(frame + 88, frame);
+    Store(step, 1);
   }
   Run(calls, frame, 0x8219A8D4, movie);
   return 1;
 }
 
-uint64_t PlateTransition10(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition10(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219AA00 PlateEditor::Transition10");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    PlateFinishDigitAnim(base, frame, calls);
-    Globals::plate_data(base).set_edited(0);
-    PlateSetUpCharsMenu(base, frame, calls);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    PlateFinishDigitAnim(frame, calls);
+    Globals::plate_data().set_edited(0);
+    PlateSetUpCharsMenu(frame, calls);
     Play(calls, frame, 0x8219AA6C, movie, 71);
-    car_dealer::HelpLineSet(base, 571, frame, calls);
-    Store(base, step, 1);
+    car_dealer::HelpLineSet(571, frame, calls);
+    Store(step, 1);
   }
   const uint32_t done = uint32_t(Run(calls, frame, 0x8219AA88, movie)) == 0 ? 1 : 0;
   if (done != 0) {
-    PlateShowCharLine(base, Globals::plate_data(base).char_line_kind(), frame);
+    PlateShowCharLine(Globals::plate_data().char_line_kind(), frame);
   }
   return done;
 }
 
-uint64_t PlateTransition11(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition11(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198DC8 PlateEditor::Transition11");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    const uint32_t cell = Cell(base, 27, 10);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    const uint32_t cell = Cell(27, 10);
     Play(calls, frame, 0x82198E44, movie, cell);
     Loop(calls, frame, 0x82198E50, movie, cell);
-    Store(base, step, 1);
+    Store(step, 1);
   }
   Run(calls, frame, 0x82198E64, movie);
   return 1;
 }
 
-uint64_t PlateTransition13(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition13(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219AC88 PlateEditor::Transition13");
-  const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    Finish(calls, frame, 0x8219ACF0, movie, Cell(base, 27, 10));
-    PlateSetUpCharsMenu(base, frame, calls);
-    const schema::PlateEditorData data = Globals::plate_data(base);
-    PlateWords(base, &schema::PlateEditorData::chars_address, 7, frame + 96);
-    data.set_char_line_kind(PlateCharLineKind(base, frame + 96));
-    PlateShowChars(base, frame + 96, frame);
-    PlateShowCharLine(base, Globals::plate_data(base).char_line_kind(), frame);
-    Store(base, step, 1);
+  const uint32_t frame = Frame(sp, 160);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    Finish(calls, frame, 0x8219ACF0, movie, Cell(27, 10));
+    PlateSetUpCharsMenu(frame, calls);
+    const schema::PlateEditorData data = Globals::plate_data();
+    PlateWords(&schema::PlateEditorData::chars_address, 7, frame + 96);
+    data.set_char_line_kind(PlateCharLineKind(frame + 96));
+    PlateShowChars(frame + 96, frame);
+    PlateShowCharLine(Globals::plate_data().char_line_kind(), frame);
+    Store(step, 1);
   }
   Run(calls, frame, 0x8219AD58, movie);
   return 1;
 }
 
-uint64_t PlateTransition19(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t PlateTransition19(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82198FB8 PlateEditor::Transition19");
-  const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  if (Load(base, step) == 0) {
-    race_screens::ListSelection(base, Globals::plate_list(base).address);
+  const uint32_t frame = Frame(sp, 160);
+  const uint32_t movie = FindMovie(kPlateMovie, frame + 80);
+  if (Load(step) == 0) {
+    race_screens::ListSelection(Globals::plate_list().address);
     calls.Call(kFinishAll, frame, 0x82199004, movie);
     uint32_t nodes[7];
     const uint32_t children[7] = {7, 6, 5, 3, 4, 8, 9};
     for (uint32_t i = 0; i < 7; i++) {
-      nodes[i] = ui_movies::FindNode(base, movie, kAll, children[i]);
+      nodes[i] = ui_movies::FindNode(movie, kAll, children[i]);
     }
     for (const uint32_t node : nodes) {
-      Node(base, node).set_visible(0);
+      Node(node).set_visible(0);
     }
-    Store(base, step, 1);
+    Store(step, 1);
   }
   Run(calls, frame, 0x821990C0, movie);
   return 1;

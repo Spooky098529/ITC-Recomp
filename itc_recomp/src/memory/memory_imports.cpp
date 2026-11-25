@@ -53,18 +53,18 @@ void LogOnce(const char* what, uint32_t value) {
 }
 
 // NtAllocateVirtualMemory(base in/out, size in/out, type, protection, 0).
-lifted::Result AllocateVirtualMemory(uint8_t* base, const lifted::Args& args) {
+lifted::Result AllocateVirtualMemory(const lifted::Args& args) {
   const uint32_t base_pointer = uint32_t(args.r[0]);
   const uint32_t size_pointer = uint32_t(args.r[1]);
   const uint32_t type = uint32_t(args.r[2]);
-  const uint32_t address = guest::LoadU32(base, base_pointer);
-  const uint32_t size = guest::LoadU32(base, size_pointer);
+  const uint32_t address = guest::LoadU32(base_pointer);
+  const uint32_t size = guest::LoadU32(size_pointer);
   if ((type & kMemReserve) && address == 0) {
     ITC_NATIVE_RUNNING("import NtAllocateVirtualMemory (reserve)");
     const uint32_t rounded = (size + kLargePageSize - 1) & ~(kLargePageSize - 1);
     const uint32_t pages = AllocPages(rounded, kLargePageSize);
-    guest::StoreU32(base, base_pointer, pages);
-    guest::StoreU32(base, size_pointer, rounded);
+    guest::StoreU32(base_pointer, pages);
+    guest::StoreU32(size_pointer, rounded);
     return {kStatusSuccess, 0.0};
   }
   if ((type & kMemCommit) && !(type & kMemReserve) && address != 0 && InRange(address) &&
@@ -72,12 +72,12 @@ lifted::Result AllocateVirtualMemory(uint8_t* base, const lifted::Args& args) {
     ITC_NATIVE_RUNNING("import NtAllocateVirtualMemory (commit)");
     const uint32_t start = address & ~(kPageSize - 1);
     const uint32_t end = (address + size + kPageSize - 1) & ~(kPageSize - 1);
-    guest::StoreU32(base, base_pointer, start);
-    guest::StoreU32(base, size_pointer, end - start);
+    guest::StoreU32(base_pointer, start);
+    guest::StoreU32(size_pointer, end - start);
     return {kStatusSuccess, 0.0};
   }
   LogOnce("NtAllocateVirtualMemory of type", type);
-  return lifted::ImportFromSdk(base, __imp__NtAllocateVirtualMemory, args);
+  return lifted::ImportFromSdk(__imp__NtAllocateVirtualMemory, args);
 }
 
 const imports::NativeImportEntry kEntries[] = {

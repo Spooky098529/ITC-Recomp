@@ -73,24 +73,24 @@ inline uint32_t PhysicalAddress(uint32_t address) {
 // position and generation kept at +12968 and +12972, and both written into
 // the progress block when the GPU hung (+10809 bit 1, +19980 0); the fence
 // +10780 advanced by 2. Returns position + 40.
-uint32_t WriteSegmentTail(uint8_t* base, uint32_t device, uint32_t position);
+uint32_t WriteSegmentTail(uint32_t device, uint32_t position);
 
 // Device::SaveSegment (sub_8229DBF0): the write position, the end, the
 // segment's start, the wrap cursor, the data cursor and the generation
 // copied to +13056..+13076.
-void SaveSegment(uint8_t* base, uint32_t device);
+void SaveSegment(uint32_t device);
 
 // Device::RestoreSegment (sub_8229E0C0): what SaveSegment saved put back
 // (the write position, the end, the segment's start, the wrap cursor, the
 // data cursor and the generation), the soft end +48 the end less 160. Only
 // from predicated tiling's end (src/graphics/predicated_tiling.h), when out
 // of space (never in play); no adapter.
-void RestoreSegment(uint8_t* base, uint32_t device);
+void RestoreSegment(uint32_t device);
 
 // CommandChain::Close (sub_8229DFB8): the current block's first word gets
 // where its content ends (the cursor, 0xC0000000 + its physical address),
 // the cursor the end marker 0xC0000000, and the block's end +12 is cleared.
-void CloseChain(uint8_t* base, uint32_t chain);
+void CloseChain(uint32_t chain);
 
 // The callback packets (sub_8229E9D0) at `position` (pre-increment): a
 // WAIT_UNTIL first unless `flags` has bits outside the CPUs (24-29); then
@@ -99,7 +99,7 @@ void CloseChain(uint8_t* base, uint32_t chain);
 // INTERRUPT our kick runs (src/native/gpu_link.cpp), CALLBACK_ACK, a
 // WAIT_REG_MEM for the callbacks done and CALLBACK_ADDRESS = 0BADF00D.
 // Returns the last word written.
-uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32_t flags,
+uint32_t WriteCallback(uint32_t device, uint32_t position, uint32_t flags,
                        uint32_t function, uint32_t argument);
 
 // The next space in the command buffer (sub_8229E100): `kind` bit 0 set,
@@ -114,7 +114,7 @@ uint32_t WriteCallback(uint8_t* base, uint32_t device, uint32_t position, uint32
 // left out: a wait (Dropped, the user's call on fence waits, 2026-10-24),
 // which passes at once in play (our kick writes the read position as it
 // kicks; its wait helpers never ran).
-uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t& size,
+uint32_t NextSpace(uint32_t device, uint32_t kind, uint32_t& size,
                    uint32_t alignment);
 
 // Device::AllocateFromCommandBuffer (sub_8229E308): `words` words of data
@@ -125,7 +125,7 @@ uint32_t NextSpace(uint8_t* base, uint32_t device, uint32_t kind, uint32_t& size
 // to the buffer's end unless the wrap cursor is at its start. With a
 // recording command buffer (+13160, never in play) its adapter runs the
 // original. The inline vertices' space (BeginVertices) comes from here.
-uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignment);
+uint32_t Reserve(uint32_t device, uint32_t words, uint32_t alignment);
 
 // Device::WriteDefaultDrawRegisters (sub_822AF978) without its packets
 // (the default vertex index range, clip, scissor-mode and viewport
@@ -135,7 +135,7 @@ uint32_t Reserve(uint8_t* base, uint32_t device, uint32_t words, uint32_t alignm
 // registers they overwrote marked dirty as the original does (+24
 // 0x400000, 0x200000 and 0x2000000, +16 0xE0, +32 0x80000), so the next
 // draw writes them from the shadow. Returns `position` (no words written).
-uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t position);
+uint32_t WriteDefaultDrawRegisters(uint32_t device, uint32_t position);
 
 // CommandChain::NewBlock (sub_8229EB10): a 4,224-byte block for `chain`
 // from the command buffer's data space (Reserve, 4,224 words asked at
@@ -147,17 +147,17 @@ uint32_t WriteDefaultDrawRegisters(uint8_t* base, uint32_t device, uint32_t posi
 // chain's block, cursor (block + 4) and end (block + 4,220) set; returns
 // the cursor. The original's data cache flush of the new block
 // (sub_822AC470) is left out (Dropped: no data cache to flush on PC).
-uint32_t NewBlock(uint8_t* base, uint32_t chain);
+uint32_t NewBlock(uint32_t chain);
 
 // CommandChain::Init (sub_8229ED60): the chain's device set, its block,
 // cursor and end cleared, a first block started (NewBlock) and kept at +0.
 // Returns NewBlock's cursor.
-uint32_t InitChain(uint8_t* base, uint32_t chain, uint32_t device);
+uint32_t InitChain(uint32_t chain, uint32_t device);
 
 // Whether `device` has a recording command buffer (+10808 bit 7, or the
 // object at +13160; never in play): the segment flow's adapters run the
 // originals whole then.
-bool Recording(uint8_t* base, uint32_t device);
+bool Recording(uint32_t device);
 
 // The kick a segment's end hands its words to: Device::DeferredKick
 // (sub_8229E848, overridden in src/native/gpu_link.cpp), a guest call, as
@@ -178,7 +178,7 @@ using Kick = std::function<uint32_t(uint32_t device, uint32_t result, uint32_t a
 // (+10809 bit 1), the segment's fence waited for and bit 1 set. Returns the
 // write position +40. The original's pending coherency flush block
 // (sub_8229E5D0, Dropped, answers none) is left out.
-uint32_t EndSegment(uint8_t* base, uint32_t device, const Kick& kick);
+uint32_t EndSegment(uint32_t device, const Kick& kick);
 
 // Device::KickSegment (sub_8229EDA8): the open segment (from +13528 to the
 // write position + 4) ended, unless out of space (+10809 bit 6): under
@@ -188,7 +188,7 @@ uint32_t EndSegment(uint8_t* base, uint32_t device, const Kick& kick);
 // Then the next segment: at the next 32-byte boundary when it's before the
 // soft end +48 (with +19980 set, the data cursor rounded up to 4 KB), else
 // a new one (NextSegment).
-uint32_t KickSegment(uint8_t* base, uint32_t device, const Kick& kick);
+uint32_t KickSegment(uint32_t device, const Kick& kick);
 
 // The next segment (sub_8229EC00) of at least `words` + 14 words (0: the
 // default), from NextSpace (32-byte aligned): its start +13528, the data
@@ -198,7 +198,7 @@ uint32_t KickSegment(uint8_t* base, uint32_t device, const Kick& kick);
 // 4,800 bytes). Then, unless it was already out of space, the frame
 // throttle: the last Swap's fence (+13540, or +13544 with +20440 bit 0)
 // waited for (WaitForFence, code 3) and cleared. Returns the segment, or 0.
-uint32_t NextSegment(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick);
+uint32_t NextSegment(uint32_t device, uint32_t words, const Kick& kick);
 
 // The fence wait (sub_8229E908): nothing for fence 0 or one the GPU is done
 // with (the progress block's +0 against the open fence +10780); a wait on
@@ -209,7 +209,7 @@ uint32_t NextSegment(uint8_t* base, uint32_t device, uint32_t words, const Kick&
 // fence waits, 2026-10-24), which never spins in play (our kick completes
 // every fence as it kicks; the helpers never ran). `code` only named the
 // wait for the helpers' time totals.
-uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t code,
+uint32_t WaitForFence(uint32_t device, uint32_t fence, uint32_t code,
                       const Kick& kick);
 
 // Reserves `words` words at the write position (sub_8229F148): when they
@@ -218,13 +218,13 @@ uint32_t WaitForFence(uint8_t* base, uint32_t device, uint32_t fence, uint32_t c
 // (NextSegment; 0 returned when none can be had). Returns the write
 // position +40 (the words go after it), or 0. The vertex shader patch's copy
 // (sub_822AEBF0) is made there.
-uint32_t ReserveWords(uint8_t* base, uint32_t device, uint32_t words, const Kick& kick);
+uint32_t ReserveWords(uint32_t device, uint32_t words, const Kick& kick);
 
 // Device::InsertCallback (sub_8229F228): the segment ended when past its
 // soft end (EndSegment), the callback's packets (WriteCallback: `flags`'
 // CPUs, `function`, `argument`) written at the write position, which moves
 // past them. Returns the new write position.
-uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t function,
+uint32_t InsertCallback(uint32_t device, uint32_t flags, uint32_t function,
                         uint32_t argument, const Kick& kick);
 
 // sub_8229F0E0 (only from Device::SetUpRing) without its packets: the
@@ -233,7 +233,7 @@ uint32_t InsertCallback(uint8_t* base, uint32_t device, uint32_t flags, uint32_t
 // register 0xD04 = 0 aren't written: packets nothing reads (our kick keeps
 // only the scratch registers' effects; the graphics rule, as
 // WriteDefaultDrawRegisters'). Returns the write position +40 (unmoved).
-uint32_t WriteIdlePackets(uint8_t* base, uint32_t device, const Kick& kick);
+uint32_t WriteIdlePackets(uint32_t device, const Kick& kick);
 
 // The full GPU wait (sub_8229F1B0) without its waits: the segment ended
 // when past its soft end, then the open fence waited for (WaitForFence,
@@ -243,6 +243,6 @@ uint32_t WriteIdlePackets(uint8_t* base, uint32_t device, const Kick& kick);
 // (always 0: the deferred kick's override never raises it; a wait on the
 // GPU, the user's call on fence waits, 2026-10-24) are left out. Returns
 // WaitForFence's r3.
-uint32_t WaitForIdle(uint8_t* base, uint32_t device, const Kick& kick);
+uint32_t WaitForIdle(uint32_t device, const Kick& kick);
 
 }  // namespace graphics::command_buffer

@@ -60,14 +60,14 @@ struct MainLoopCalls {
 // iterator stepped in key order. `frame` is the original's 128-byte frame
 // (the iterators and the functor stored there and in the caller's frame
 // above it). The functor stored at `result`; returns `result`.
-uint32_t ForEachTickHandler(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
+uint32_t ForEachTickHandler(uint32_t result, uint64_t first, uint64_t last,
                             uint64_t functor, uint32_t frame, const MainLoopCalls& calls);
 // sub_82099EE8 ForEachRequest (std::for_each over the request vector):
 // `first` and `last` the checked iterators (vector, element), 12-byte
 // steps; each request's type and key in r4 and its delegate in r5's high
 // word passed to the functor's function (r3 its object). `frame` is the
 // original's 128-byte frame. The functor stored at `result`; returns it.
-uint32_t ForEachRequest(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
+uint32_t ForEachRequest(uint32_t result, uint64_t first, uint64_t last,
                         uint64_t functor, uint32_t frame, const MainLoopCalls& calls);
 // sub_8209A760 App::Run: the framework's slot 1 (Framework::Init; 0
 // answers 0), slot 2 (Framework::Start), then each pass the tick handlers
@@ -76,18 +76,18 @@ uint32_t ForEachRequest(uint8_t* base, uint32_t result, uint64_t first, uint64_t
 // run loop's slot 7) or slot 4 (an event of 0, then slot 2 again), while
 // the tick handler map isn't empty; then slot 3. `frame` is the original's
 // 208-byte frame. Returns 0.
-uint32_t AppRun(uint8_t* base, uint32_t loop, uint32_t framework, uint32_t frame,
+uint32_t AppRun(uint32_t loop, uint32_t framework, uint32_t frame,
                 const MainLoopCalls& calls);
 // sub_8209ABE8: the run loop built at `frame` + 80 (the original's 160-byte
 // frame), App::Run with the framework, the run loop destroyed; App::Run's
 // answer.
-uint32_t RunFramework(uint8_t* base, uint32_t framework, uint32_t frame,
+uint32_t RunFramework(uint32_t framework, uint32_t frame,
                       const MainLoopCalls& calls);
 // sub_82090378: the framework at `holder`, run by sub_8209ABE8 (a tail
 // call: its frame directly below the caller's).
-uint32_t RunFrameworkAt(uint8_t* base, uint32_t holder, const MainLoopCalls& calls);
+uint32_t RunFrameworkAt(uint32_t holder, const MainLoopCalls& calls);
 // sub_82090108 main: the framework made into the holder at `frame` + 80
 // (the original's 112-byte frame), run, then deleted; the run's answer.
-uint32_t Main(uint8_t* base, uint32_t frame, const MainLoopCalls& calls);
+uint32_t Main(uint32_t frame, const MainLoopCalls& calls);
 
 }  // namespace framework

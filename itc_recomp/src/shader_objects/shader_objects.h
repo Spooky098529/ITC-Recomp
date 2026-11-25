@@ -23,7 +23,7 @@ constexpr uint32_t kPixelShaderBytes = 56;
 // the object's size (592 when the magic's low 6 bits are set, else 56) plus
 // the header size (the file's +4), the microcode (the file + the header
 // size) and its size (the file's +8). The record is cleared first.
-void ParseFile(uint8_t* base, uint32_t file, uint32_t record);
+void ParseFile(uint32_t file, uint32_t record);
 
 // sub_822A8740 VertexShader::Init: the 592 bytes cleared, +0 = 6, +4 = 1,
 // +20 = 0xFFFF0000, +24 = -1, +48 = the microcode; the header's fetch table
@@ -35,11 +35,11 @@ void ParseFile(uint8_t* base, uint32_t file, uint32_t record);
 // copies there for the renderer), a count over 32, or a table or a copy
 // whose bytes may share memory with the fields (the original's order would
 // then decide).
-bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode);
+bool VertexShaderInit(uint32_t object, uint32_t microcode);
 
 // sub_822A85B8 PixelShader::Init: the 56 bytes cleared, +0 = 7, +4 = 1,
 // +20 = 0xFFFF0000, +24 = the microcode.
-void PixelShaderInit(uint8_t* base, uint32_t object, uint32_t microcode);
+void PixelShaderInit(uint32_t object, uint32_t microcode);
 
 // sub_822A9FD8 VertexShader::CopyHeader and sub_822A9EA8
 // PixelShader::CopyHeader (probably): `record` is ParseFile's; the file's
@@ -47,8 +47,8 @@ void PixelShaderInit(uint8_t* base, uint32_t object, uint32_t microcode);
 // then the file's header copied after them (XMemCpy, sub_82295890). False,
 // with nothing written, where the original must run: the record inside the
 // cleared bytes, or a copy XMemCpy hands to the original.
-bool CopyVertexHeader(uint8_t* base, uint32_t object, uint32_t record);
-bool CopyPixelHeader(uint8_t* base, uint32_t object, uint32_t record);
+bool CopyVertexHeader(uint32_t object, uint32_t record);
+bool CopyPixelHeader(uint32_t object, uint32_t record);
 
 // What the creates call back where the native path hands back to the
 // original: VertexShader::Init's original (sub_822A8740, where
@@ -76,13 +76,13 @@ constexpr uint32_t kCreatedFlag = 0x00100000;
 // where the original must run: a header copy XMemCpy hands to the original,
 // or memcpy's copy that wouldn't be native (--native_memcpy off). Only over
 // the allocation layer (the adapter's condition).
-std::optional<uint32_t> VertexShaderCreate(uint8_t* base, uint32_t file, const CreateCalls& calls);
+std::optional<uint32_t> VertexShaderCreate(uint32_t file, const CreateCalls& calls);
 
 // sub_822A9EE8 PixelShader::Create: as VertexShaderCreate with 56 bytes
 // cleared, the header after them, and the fields set inline as
 // PixelShaderInit's (the 56 bytes cleared again, +24 = the microcode, +0 =
 // 7, +4 = 1, +20 = 0xFFFF0000), +0 |= kCreatedFlag.
-std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file);
+std::optional<uint32_t> PixelShaderCreate(uint32_t file);
 
 // sub_82594D20 Mesh::LoadShaders (models.md): `section` = the model file's
 // shader section: +0 the pair count (to the model's +420); none, nothing
@@ -100,7 +100,7 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file);
 // header copy XMemCpy hands to the original. Only over the allocation layer
 // with the memory blocks' host lock (the adapter's condition). Where
 // VertexShaderInit declines, `calls.init` (the original).
-bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCalls& calls);
+bool LoadShaders(uint32_t model, uint32_t section, const CreateCalls& calls);
 
 // sub_820A06D0 Shaders::OnPairLoaded (probably; models.md): Archive::Load's
 // callback for a shader pair's pixel file, `context` LoadPair's 12 bytes (+0
@@ -119,6 +119,6 @@ bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCa
 // Only over the allocation layer with the memory blocks' host lock (the
 // adapter's condition). Where VertexShaderInit declines, `calls.init` (the
 // original).
-std::optional<bool> PairLoaded(uint8_t* base, uint32_t context, const CreateCalls& calls);
+std::optional<bool> PairLoaded(uint32_t context, const CreateCalls& calls);
 
 }  // namespace shader_objects

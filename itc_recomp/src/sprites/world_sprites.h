@@ -20,7 +20,7 @@ namespace sprites {
 // +208 to +220 the texture coordinates, +224 a state word), r4 = the camera
 // pass (+144 its view-projection), r5 = the render queue's layer. From its
 // 272-byte frame below `sp`; returns the queue call's r3.
-uint64_t SpriteRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t sprite, uint32_t camera,
+uint64_t SpriteRecord(uint32_t sp, uint64_t r13, uint32_t sprite, uint32_t camera,
                       uint32_t layer);
 
 // SpriteList::Record (sub_82128750): r3 = the list (as a sprite, with up to
@@ -28,7 +28,7 @@ uint64_t SpriteRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t sprite,
 // + 64i, colors at +32080 + 64i, texture coordinate choices at +64080 + 4i
 // and +66080 + 4i), r4 = the camera pass, r5 = the layer. From its 368-byte
 // frame below `sp`; returns the queue call's r3.
-uint64_t SpriteListRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t list,
+uint64_t SpriteListRecord(uint32_t sp, uint64_t r13, uint32_t list,
                           uint32_t camera, uint32_t layer);
 
 }  // namespace sprites

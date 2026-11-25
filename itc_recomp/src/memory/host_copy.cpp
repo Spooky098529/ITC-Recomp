@@ -252,7 +252,7 @@ void OwnerStore(uint32_t address, uint32_t width, uint64_t value) {
   StoreOverlay(object, info.layout ? *info.layout : kNoLayout, info.offset, width, value);
 }
 
-bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
+bool CopyWithHandles(uint32_t destination, uint32_t source, uint32_t size) {
   const bool to_host = IsHandle(destination), from_host = IsHandle(source);
   if (!to_host && !from_host) {
     return false;
@@ -279,25 +279,24 @@ bool CopyWithHandles(uint8_t* base, uint32_t destination, uint32_t source, uint3
   }
   if (to_host) {
     const Span to = SpanOf(destination, size);
-    guest::ForEachHostPart(base, source, size, [&](uint8_t* host, uint32_t at, uint32_t n) {
+    guest::ForEachHostPart(source, size, [&](uint8_t* host, uint32_t at, uint32_t n) {
       std::memmove(to.bytes + at, host, n);
     });
     SwapFields(to.bytes, to.layout, to.offset, size, to.type, to.element);
     return true;
   }
   const Span from = SpanOf(source, size);
-  guest::ForEachHostPart(base, destination, size, [&](uint8_t* host, uint32_t at, uint32_t n) {
+  guest::ForEachHostPart(destination, size, [&](uint8_t* host, uint32_t at, uint32_t n) {
     std::memmove(host, from.bytes + at, n);
   });
   // Swapped in place in guest memory, field by field (a field split across
   // the 0xE0000000 views' change isn't handled: no host object copies there).
-  SwapFields(guest::Pointer(base, destination), from.layout, from.offset, size, from.type,
+  SwapFields(guest::Pointer(destination), from.layout, from.offset, size, from.type,
              from.element);
   return true;
 }
 
-bool FillWithHandles(uint8_t* base, uint32_t destination, uint8_t value, uint32_t size) {
-  (void)base;
+bool FillWithHandles(uint32_t destination, uint8_t value, uint32_t size) {
   if (!IsHandle(destination)) {
     return false;
   }

@@ -121,11 +121,11 @@ namespace hooks {
 namespace ts = tuning_screen;
 
 ITC_REGS_STEP(TuningCategoryItemCount) {
-  ctx.r3.u64 = ts::CategoryItemCount(base, ctx.r3.u32);
+  ctx.r3.u64 = ts::CategoryItemCount(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(TuningIsItemAvailable) {
-  ctx.r3.u64 = ts::IsItemAvailable(base, ctx.r3.u32, ctx.r4.u64);
+  ctx.r3.u64 = ts::IsItemAvailable(ctx.r3.u32, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(TuningWheelNumber) {
@@ -133,71 +133,71 @@ ITC_REGS_STEP(TuningWheelNumber) {
 }
 
 ITC_REGS_STEP(TuningGetPrice) {
-  ctx.r3.u64 = ts::GetPrice(base, ctx.r3.u32);
+  ctx.r3.u64 = ts::GetPrice(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(TuningGetCurrentChoice) {
-  ctx.r3.u64 = ts::GetCurrentChoice(base, ctx.r3.u32);
+  ctx.r3.u64 = ts::GetCurrentChoice(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(TuningGetChoiceFlag) {
-  ctx.r3.u64 = ts::GetChoiceFlag(base, ctx.r3.u32, ctx.r4.u64);
+  ctx.r3.u64 = ts::GetChoiceFlag(ctx.r3.u32, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(TuningDebugMainMenu) {
-  ctx.r3.u64 = ts::DebugMainMenu(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugMainMenu(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLevelSelect) {
-  ctx.r3.u64 = ts::DebugLevelSelect(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLevelSelect(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugTypeSelect) {
-  ctx.r3.u64 = ts::DebugTypeSelect(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugTypeSelect(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugOptionSelect) {
-  ctx.r3.u64 = ts::DebugOptionSelect(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugOptionSelect(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugConfirmBuy) {
-  ctx.r3.u64 = ts::DebugConfirmBuy(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugConfirmBuy(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugConfirmEquip) {
-  ctx.r3.u64 = ts::DebugConfirmEquip(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugConfirmEquip(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugCategoryMenu) {
-  ctx.r3.u64 = ts::DebugCategoryMenu(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugCategoryMenu(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugWheelPartSelect) {
-  ctx.r3.u64 = ts::DebugWheelPartSelect(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugWheelPartSelect(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugWheelKindSelect) {
-  ctx.r3.u64 = ts::DebugWheelKindSelect(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugWheelKindSelect(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugWheelInchSelect) {
-  ctx.r3.u64 = ts::DebugWheelInchSelect(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugWheelInchSelect(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugDecalTopMenu) {
-  ctx.r3.u64 = ts::DebugDecalTopMenu(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugDecalTopMenu(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLayerSelect) {
-  ctx.r3.u64 = ts::DebugLayerSelect(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLayerSelect(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLayerEdit) {
-  ctx.r3.u64 = ts::DebugLayerEdit(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLayerEdit(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLayerSet) {
-  ctx.r3.u64 = ts::DebugLayerSet(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLayerSet(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugEditPosition) {
@@ -209,75 +209,75 @@ ITC_REGS_STEP(TuningDebugEditView) {
 }
 
 ITC_REGS_STEP(TuningDebugPaintConfirm) {
-  ctx.r3.u64 = ts::DebugPaintConfirm(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugPaintConfirm(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugColorSelect) {
-  ctx.r3.u64 = ts::DebugColorSelect(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugColorSelect(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugWarnMoney) {
-  ctx.r3.u64 = ts::DebugWarnMoney(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugWarnMoney(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugReflectSet) {
-  ctx.r3.u64 = ts::DebugReflectSet(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugReflectSet(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugAnnulSet) {
-  ctx.r3.u64 = ts::DebugAnnulSet(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugAnnulSet(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugRemoveConfirm) {
-  ctx.r3.u64 = ts::DebugRemoveConfirm(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugRemoveConfirm(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugBodyColor) {
-  ctx.r3.u64 = ts::DebugBodyColor(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugBodyColor(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugNeonPart) {
-  ctx.r3.u64 = ts::DebugNeonPart(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugNeonPart(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugNeonKind) {
-  ctx.r3.u64 = ts::DebugNeonKind(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugNeonKind(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugNeonEdit) {
-  ctx.r3.u64 = ts::DebugNeonEdit(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugNeonEdit(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLedEdit) {
-  ctx.r3.u64 = ts::DebugLedEdit(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLedEdit(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugCockpitTop) {
-  ctx.r3.u64 = ts::DebugCockpitTop(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugCockpitTop(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugCockpitType) {
-  ctx.r3.u64 = ts::DebugCockpitType(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugCockpitType(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugCockpitColor) {
-  ctx.r3.u64 = ts::DebugCockpitColor(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugCockpitColor(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugMeterKind) {
-  ctx.r3.u64 = ts::DebugMeterKind(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugMeterKind(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugMeterPoint) {
-  ctx.r3.u64 = ts::DebugMeterPoint(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugMeterPoint(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLayerOperate) {
-  ctx.r3.u64 = ts::DebugLayerOperate(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLayerOperate(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugLayerOrder) {
-  ctx.r3.u64 = ts::DebugLayerOrder(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugLayerOrder(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugEditRotate) {
@@ -297,79 +297,79 @@ ITC_REGS_STEP(TuningDebugEditFlip) {
 }
 
 ITC_REGS_STEP(TuningDebugPaintCancelConfirm) {
-  ctx.r3.u64 = ts::DebugPaintCancelConfirm(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugPaintCancelConfirm(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningDebugPaintRemoveConfirm) {
-  ctx.r3.u64 = ts::DebugPaintRemoveConfirm(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::DebugPaintRemoveConfirm(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningStoreToGarageCar) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ts::StoreToGarageCar(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::StoreToGarageCar(ctx.r3.u64, ctx.r1.u32);
 }
 
-ITC_REGS_STEP(TuningEquipChoice) { ts::EquipChoice(base, ctx.r3.u32); }
+ITC_REGS_STEP(TuningEquipChoice) { ts::EquipChoice(ctx.r3.u32); }
 
 ITC_REGS_STEP(TuningAeroPartValue) {
-  ctx.r3.u64 = ts::AeroPartValue(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::AeroPartValue(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningHidePartMarks) {
-  ctx.r3.u64 = ts::HidePartMarks(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::HidePartMarks(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningShowPartMarks) {
   ctx.r3.u64 =
-      ts::ShowPartMarks(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, ctx.r1.u32);
+      ts::ShowPartMarks(ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningShowInteriorPicture) {
-  ctx.r3.u64 = ts::ShowInteriorPicture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::ShowInteriorPicture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningHideTireMarks) {
-  ctx.r3.u64 = ts::HideTireMarks(base, ctx.r1.u32);
+  ctx.r3.u64 = ts::HideTireMarks(ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningHideNode19) {
-  ctx.r3.u64 = ts::HideNode19(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::HideNode19(ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningShowTireMarks) {
-  ctx.r3.u64 = ts::ShowTireMarks(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::ShowTireMarks(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningUpdateListDots) {
-  ctx.r3.u64 = ts::UpdateListDots(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::UpdateListDots(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningShowOptionMarks) {
-  ctx.r3.u64 = ts::ShowOptionMarks(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::ShowOptionMarks(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningPlaceStateNodes) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ts::PlaceStateNodes(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::PlaceStateNodes(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningLayOutItems) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ts::LayOutItems(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::LayOutItems(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningShowItems) {
-  ctx.r3.u64 = ts::ShowItems(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::ShowItems(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 namespace {
 
 // A step with the guest calls (hooks::StandModelsGuestCall), lr put back.
 template <typename Body>
-void WithCalls(lifted::Regs& ctx, uint8_t* base, Body body) {
+void WithCalls(lifted::Regs& ctx, Body body) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const ts::GuestCall call = StandModelsGuestCall(ctx);
   const uint64_t r3 = body(call);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -378,10 +378,10 @@ void WithCalls(lifted::Regs& ctx, uint8_t* base, Body body) {
 }  // namespace
 
 #define ITC_TUNING_CALLS_STEP(Name)                                                    \
-  void Tuning##Name(lifted::Regs& ctx, uint8_t* base) {                                 \
+  void Tuning##Name(lifted::Regs& ctx) {                                 \
     const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;                              \
-    WithCalls(ctx, base,                                                              \
-              [&](const ts::GuestCall& call) { return ts::Name(base, call, screen, sp); }); \
+    WithCalls(ctx,                                                              \
+              [&](const ts::GuestCall& call) { return ts::Name(call, screen, sp); }); \
   }
 
 ITC_TUNING_CALLS_STEP(UpdateListCounter)
@@ -422,8 +422,8 @@ ITC_TUNING_CALLS_STEP(Command42)
 ITC_REGS_STEP(TuningMoveCategory) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::MoveCategory(base, call, screen, sp, native_slots);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::MoveCategory(call, screen, sp, native_slots);
   });
 }
 
@@ -431,8 +431,8 @@ ITC_REGS_STEP(TuningUpdateItems) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::UpdateItems(base, call, r3, sp, native_slots);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::UpdateItems(call, r3, sp, native_slots);
   });
   ctx.fpscr.disableFlushMode();
 }
@@ -440,8 +440,8 @@ ITC_REGS_STEP(TuningUpdateItems) {
 ITC_REGS_STEP(TuningShowTypes) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_specs = ITC_FLAG(native_car_specs);
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::ShowTypes(base, call, screen, sp, native_specs);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::ShowTypes(call, screen, sp, native_specs);
   });
   ctx.fpscr.disableFlushMode();
 }
@@ -449,8 +449,8 @@ ITC_REGS_STEP(TuningShowTypes) {
 ITC_REGS_STEP(TuningSetStateTexts) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::SetStateTexts(base, call, screen, sp, &f1);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::SetStateTexts(call, screen, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -459,19 +459,19 @@ ITC_REGS_STEP(TuningSetStateTexts) {
 }
 
 ITC_REGS_STEP(TuningFillPartRows) {
-  ctx.r3.u64 = ts::FillPartRows(base, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = ts::FillPartRows(ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(TuningCommand8) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) { return ts::Command8(base, call, r3, sp); });
+  WithCalls(ctx, [&](const ts::GuestCall& call) { return ts::Command8(call, r3, sp); });
 }
 
 ITC_REGS_STEP(TuningRefreshMenu) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+  WithCalls(ctx, [&](const ts::GuestCall& inner) {
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                                    uint32_t frame, uint32_t lr) {
       if (f1) {
@@ -480,7 +480,7 @@ ITC_REGS_STEP(TuningRefreshMenu) {
       }
       return inner(function, args, frame, lr);
     };
-    return ts::RefreshMenu(base, call, screen, sp, &f1);
+    return ts::RefreshMenu(call, screen, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -491,8 +491,8 @@ ITC_REGS_STEP(TuningRefreshMenu) {
 ITC_REGS_STEP(TuningCommand20) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const uint64_t a = ctx.r4.u64, b = ctx.r5.u64;
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::Command20(base, call, screen, sp, a, b);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::Command20(call, screen, sp, a, b);
   });
 }
 
@@ -500,21 +500,21 @@ ITC_REGS_STEP(TuningCommand21) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_pages = ITC_FLAG(native_tuning_pages);
-  WithCalls(ctx, base, [&](const ts::GuestCall& call) {
-    return ts::Command21(base, call, screen, sp, native_pages);
+  WithCalls(ctx, [&](const ts::GuestCall& call) {
+    return ts::Command21(call, screen, sp, native_pages);
   });
 }
 
 ITC_REGS_STEP(TuningCommand32Done) {
-  ctx.r3.u64 = ts::Command32Done(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = ts::Command32Done(ctx.r3.u32, ctx.r1.u32);
 }
 
-ITC_REGS_STEP(TuningCommand53) { ts::Command53(base, ctx.r3.u32); }
+ITC_REGS_STEP(TuningCommand53) { ts::Command53(ctx.r3.u32); }
 
 ITC_REGS_STEP(TuningCommand57) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+  WithCalls(ctx, [&](const ts::GuestCall& inner) {
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                                    uint32_t frame, uint32_t lr) {
       if (f1) {
@@ -523,7 +523,7 @@ ITC_REGS_STEP(TuningCommand57) {
       }
       return inner(function, args, frame, lr);
     };
-    return ts::Command57(base, call, screen, sp, &f1);
+    return ts::Command57(call, screen, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -534,7 +534,7 @@ ITC_REGS_STEP(TuningCommand57) {
 ITC_REGS_STEP(TuningRefreshMovie13) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithCalls(ctx, base, [&](const ts::GuestCall& inner) {
+  WithCalls(ctx, [&](const ts::GuestCall& inner) {
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                                    uint32_t frame, uint32_t lr) {
       if (f1) {
@@ -543,7 +543,7 @@ ITC_REGS_STEP(TuningRefreshMovie13) {
       }
       return inner(function, args, frame, lr);
     };
-    return ts::RefreshMovie13(base, call, screen, sp, &f1);
+    return ts::RefreshMovie13(call, screen, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -553,11 +553,11 @@ ITC_REGS_STEP(TuningRefreshMovie13) {
 
 // The same with r3 all 64 bits and r4 the update's dispatcher.
 #define ITC_TUNING_DISPATCH_STEP(Name)                                                \
-  void Tuning##Name(lifted::Regs& ctx, uint8_t* base) {                                \
+  void Tuning##Name(lifted::Regs& ctx) {                                \
     const uint64_t r3 = ctx.r3.u64;                                                  \
     const uint32_t dispatcher = ctx.r4.u32, sp = ctx.r1.u32;                         \
-    WithCalls(ctx, base, [&](const ts::GuestCall& call) {                            \
-      return ts::Name(base, call, r3, dispatcher, sp);                               \
+    WithCalls(ctx, [&](const ts::GuestCall& call) {                            \
+      return ts::Name(call, r3, dispatcher, sp);                               \
     });                                                                              \
   }
 
@@ -577,13 +577,13 @@ namespace {
 // A step onto the stand: the guest calls and the car makers' (with the load
 // poll's), lr put back, flush-to-zero off.
 template <typename Body>
-void WithStand(lifted::Regs& ctx, uint8_t* base, Body body) {
+void WithStand(lifted::Regs& ctx, Body body) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
-  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const ts::GuestCall call = StandModelsGuestCall(ctx);
   const ts::StandCalls stand{call, calls};
   const uint64_t r3 = body(stand);
   ctx.lr = lr;
@@ -595,9 +595,9 @@ void WithStand(lifted::Regs& ctx, uint8_t* base, Body body) {
 // the native code left put in f1 before each later guest call and at the
 // end.
 template <typename Body>
-void WithStandF1(lifted::Regs& ctx, uint8_t* base, Body body) {
+void WithStandF1(lifted::Regs& ctx, Body body) {
   std::optional<double> f1;
-  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+  WithStand(ctx, [&](const ts::StandCalls& inner) {
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                                    uint32_t frame, uint32_t lr) {
       if (f1) {
@@ -619,8 +619,8 @@ void WithStandF1(lifted::Regs& ctx, uint8_t* base, Body body) {
 ITC_REGS_STEP(TuningSetInteriorPair) {
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::SetInteriorPair(base, stand.call, r4, r5, sp);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::SetInteriorPair(stand.call, r4, r5, sp);
   });
 }
 
@@ -628,18 +628,18 @@ ITC_REGS_STEP(TuningFitSelectedCar) {
   const uint32_t holder = ctx.r3.u32, sp = ctx.r1.u32;
   const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64;
   double f1 = 0.0;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::FitSelectedCar(base, stand.calls, holder, r4, r5, sp, &f1);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::FitSelectedCar(stand.calls, holder, r4, r5, sp, &f1);
   });
   ctx.f1.f64 = f1;
 }
 
 #define ITC_TUNING_STAND_STEP(Name)                                             \
-  void Tuning##Name(lifted::Regs& ctx, uint8_t* base) {                          \
+  void Tuning##Name(lifted::Regs& ctx) {                          \
     const uint64_t r3 = ctx.r3.u64;                                            \
     const uint32_t sp = ctx.r1.u32;                                            \
-    WithStand(ctx, base,                                                       \
-              [&](const ts::StandCalls& stand) { return ts::Name(base, stand, r3, sp); }); \
+    WithStand(ctx,                                                       \
+              [&](const ts::StandCalls& stand) { return ts::Name(stand, r3, sp); }); \
   }
 
 ITC_TUNING_STAND_STEP(PickCameraPreset)
@@ -652,23 +652,23 @@ ITC_TUNING_STAND_STEP(ApplyAreaDecals)
 ITC_REGS_STEP(TuningApplyDecalWord) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStand(ctx, base,
-            [&](const ts::StandCalls& stand) { return ts::ApplyDecalWord(base, stand.call, r3, sp); });
+  WithStand(ctx,
+            [&](const ts::StandCalls& stand) { return ts::ApplyDecalWord(stand.call, r3, sp); });
 }
 
 ITC_REGS_STEP(TuningPreviewParts) {
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::PreviewParts(base, stand.call, r3, r4, sp);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::PreviewParts(stand.call, r3, r4, sp);
   });
 }
 
 ITC_REGS_STEP(TuningDecalCommand) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   double f1 = 0.0;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::DecalCommand(base, stand, screen, sp, &f1);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::DecalCommand(stand, screen, sp, &f1);
   });
   ctx.f1.f64 = f1;
 }
@@ -676,57 +676,57 @@ ITC_REGS_STEP(TuningDecalCommand) {
 ITC_REGS_STEP(TuningPreviewItem) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
-    return ts::PreviewItem(base, stand, r3, sp, f1);
+  WithStandF1(ctx, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::PreviewItem(stand, r3, sp, f1);
   });
 }
 
 ITC_REGS_STEP(TuningRestoreStand) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
-    return ts::RestoreStand(base, stand, r3, sp, f1);
+  WithStandF1(ctx, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::RestoreStand(stand, r3, sp, f1);
   });
 }
 
 ITC_REGS_STEP(TuningSetCaliper) {
   const uint32_t screen = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, sp = ctx.r1.u32;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::SetCaliper(base, stand, screen, r4, r5, sp);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::SetCaliper(stand, screen, r4, r5, sp);
   });
 }
 
 ITC_REGS_STEP(TuningSetAccessory) {
   const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32, sp = ctx.r1.u32;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::SetAccessory(base, stand.call, r4, r5, sp);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::SetAccessory(stand.call, r4, r5, sp);
   });
 }
 
 ITC_REGS_STEP(TuningRefitAxles) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
-  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
-    return ts::RefitAxles(base, stand, screen, sp, f1);
+  WithStandF1(ctx, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::RefitAxles(stand, screen, sp, f1);
   });
 }
 
 ITC_REGS_STEP(TuningPreviewInteriorChoices) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::PreviewInteriorChoices(base, stand.call, screen, sp);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::PreviewInteriorChoices(stand.call, screen, sp);
   });
 }
 
 ITC_REGS_STEP(TuningPreviewLightKit) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
-  WithStandF1(ctx, base, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
-    return ts::PreviewLightKit(base, stand, r3, sp, f1);
+  WithStandF1(ctx, [&](const ts::StandCalls& stand, std::optional<double>* f1) {
+    return ts::PreviewLightKit(stand, r3, sp, f1);
   });
 }
 
 ITC_REGS_STEP(TuningSetRgb) {
-  ts::SetRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+  ts::SetRgb(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
 // UpdateStand: its callees' plain C++ where their adapters would run it
@@ -740,26 +740,26 @@ bool TuningUpdateStandCalleesNative() {
 // `caller_r24`, handed to GarageStage::Draw's Floor::Draw (a diagnostic
 // word of its draws' recorder's context), isn't carried (the rewiring,
 // stage 3): 0.
-void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base) {
+void TuningUpdateStand(lifted::Regs& ctx) {
   // (the caller's r24: diagnostic only, not carried)
-  TuningUpdateStand(ctx, base, 0);
+  TuningUpdateStand(ctx, 0);
 }
-void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
+void TuningUpdateStand(lifted::Regs& ctx, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  SceneryDrawGuest guest{ctx, base};
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  SceneryDrawGuest guest{ctx};
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
   calls.draw = SceneryListsDrawCalls(&guest);
-  const ts::GuestCall call = StandModelsGuestCall(ctx, base);
+  const ts::GuestCall call = StandModelsGuestCall(ctx);
   const ts::StandCalls stand{call, calls};
   const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(caller_r24);
   // SceneModel::ApplyWheelPaint's plain C++ under StepSecondWheels with the
   // load poll's flags (as its adapter).
   load_poll::Calls* paint_poll =
       ITC_FLAG(native_load_poll) && LoadPollCalleesNative() ? &poll : nullptr;
-  const uint64_t r3 = ts::UpdateStand(base, stand, draw, paint_poll, ctx.r3.u32, ctx.r1.u32);
+  const uint64_t r3 = ts::UpdateStand(stand, draw, paint_poll, ctx.r3.u32, ctx.r1.u32);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -772,9 +772,9 @@ bool TuningCarStatsCalleesNative() {
 ITC_REGS_STEP(TuningSetCarStats) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   double f1 = 0.0;
-  const uint64_t r3 = ts::SetCarStats(base, calls, ctx.r3.u32, ctx.r1.u32, &f1);
+  const uint64_t r3 = ts::SetCarStats(calls, ctx.r3.u32, ctx.r1.u32, &f1);
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.f1.f64 = f1;
@@ -785,8 +785,8 @@ ITC_REGS_STEP(TuningPreviewWheels) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithStand(ctx, base, [&](const ts::StandCalls& stand) {
-    return ts::PreviewWheels(base, stand.call, r3, sp, &f1);
+  WithStand(ctx, [&](const ts::StandCalls& stand) {
+    return ts::PreviewWheels(stand.call, r3, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -797,7 +797,7 @@ ITC_REGS_STEP(TuningRefresh) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   std::optional<double> f1;
-  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+  WithStand(ctx, [&](const ts::StandCalls& inner) {
     // RefreshMenu's f1 wrapper: the f1 the native code left put in f1
     // before the next guest call.
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
@@ -809,7 +809,7 @@ ITC_REGS_STEP(TuningRefresh) {
       return inner.call(function, args, frame, lr);
     };
     const ts::StandCalls stand{call, inner.calls};
-    return ts::Refresh(base, stand, r3, sp, &f1);
+    return ts::Refresh(stand, r3, sp, &f1);
   });
   if (f1) {
     ctx.f1.f64 = *f1;
@@ -825,22 +825,22 @@ bool TuningUpdateCalleesNative() {
 // `caller_r24`, handed to GarageStage::Draw's Floor::Draw (a diagnostic
 // word of its draws' recorder's context), isn't carried (the rewiring,
 // stage 3): 0.
-void TuningUpdate(lifted::Regs& ctx, uint8_t* base) {
+void TuningUpdate(lifted::Regs& ctx) {
   // (the caller's r24: diagnostic only, not carried)
-  TuningUpdate(ctx, base, 0);
+  TuningUpdate(ctx, 0);
 }
-void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
+void TuningUpdate(lifted::Regs& ctx, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
   ctx.fpscr.disableFlushMode();
   std::optional<double> f1;
-  load_poll::Calls poll = LoadPollCalls(ctx, base);
-  SceneryDrawGuest guest{ctx, base};
-  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  load_poll::Calls poll = LoadPollCalls(ctx);
+  SceneryDrawGuest guest{ctx};
+  front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx);
   calls.poll = &poll;
   calls.draw = SceneryListsDrawCalls(&guest);
-  const ts::GuestCall inner = StandModelsGuestCall(ctx, base);
+  const ts::GuestCall inner = StandModelsGuestCall(ctx);
   // RefreshMenu's f1 wrapper: the f1 the native code left put in f1 before
   // the next guest call.
   const auto apply_f1 = [&] {
@@ -873,11 +873,11 @@ void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
         ctx.r1.u64 = frame;
         ctx.r3.u64 = screen;
         ctx.lr = 0x821E7318;
-        lifted::Enter(ctx, base, game::TuningScreen::DrawPowerGraph);
+        lifted::Enter(ctx, game::TuningScreen::DrawPowerGraph);
         ctx.r1.u64 = stack;
         ctx.fpscr.disableFlushMode();
       }};
-  const uint64_t answer = ts::Update(base, update, r3, r4, sp, &f1);
+  const uint64_t answer = ts::Update(update, r3, r4, sp, &f1);
   apply_f1();
   ctx.lr = lr;
   ctx.r3.u64 = answer;
@@ -885,9 +885,9 @@ void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
 }
 
 void TuningWithRefreshStand(
-    lifted::Regs& ctx, uint8_t* base, std::optional<double>* f1,
+    lifted::Regs& ctx, std::optional<double>* f1,
     const std::function<uint64_t(const ts::StandCalls&)>& body) {
-  WithStand(ctx, base, [&](const ts::StandCalls& inner) {
+  WithStand(ctx, [&](const ts::StandCalls& inner) {
     const ts::GuestCall call = [&](uint32_t function, std::initializer_list<uint64_t> args,
                                    uint32_t frame, uint32_t lr) {
       if (*f1) {
@@ -986,5 +986,5 @@ ITC_NATIVE_ENTRY_ALWAYS(821E6C50) {
     return;
   }
   // (the caller's r24: diagnostic only, not carried)
-  hooks::TuningUpdate(ctx, base, 0);
+  hooks::TuningUpdate(ctx, 0);
 }

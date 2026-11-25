@@ -59,16 +59,16 @@ ITC_NATIVE_ENTRY_ALWAYS(822952B8) {
 ITC_NATIVE_ENTRY_ALWAYS(82099828) {
   
   const uint32_t app = ctx.r3.u32;
-  const schema::SysUsers users(base, app);
+  const schema::SysUsers users(app);
   if (g_users_built || !users.listener()) {
     ctx.r3.u64 = 0;
     return;
   }
   g_users_built = true;
   users.set_users_changed(1);
-  InFrame(ctx, base, 112, 0x820998A0, [&](uint32_t) {
+  InFrame(ctx, 112, 0x820998A0, [&](uint32_t) {
     ctx.r3.u64 = app;
-    lifted::Enter(ctx, base, lifted::e82099600);
+    lifted::Enter(ctx, lifted::e82099600);
   });
 }
 
@@ -76,14 +76,14 @@ namespace {
 
 // Calls guest code at `function` with the link register the recompiled call
 // had.
-void CallAt(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t return_address) {
+void CallAt(lifted::Regs& ctx, uint32_t function, uint32_t return_address) {
   ctx.lr = return_address;
-  lifted::CallFromContext(ctx, base, function);
+  lifted::CallFromContext(ctx, function);
 }
 
 // An object's method: its vtable's word at `offset`.
-uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::VtableWord(base, object) + offset);
+uint32_t Method(uint32_t object, uint32_t offset) {
+  return guest::LoadU32(guest::VtableWord(object) + offset);
 }
 
 }  // namespace
@@ -101,28 +101,28 @@ uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
 ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
   
   if (ITC_FLAG(native_save_interface)) {
-    hooks::SaveDevicesUpdateSteps(ctx, base);
+    hooks::SaveDevicesUpdateSteps(ctx);
     return;
   }
   // The save devices (save-interface.toml's SaveDevices) and their slots
   // (files-and-saves.toml's SaveSlot).
-  const schema::SaveDevices devices(base, ctx.r3.u32);
+  const schema::SaveDevices devices(ctx.r3.u32);
   if (!devices.listener()) {
     return;
   }
   auto slot = [&](uint32_t i) {
-    return schema::SaveSlot(base, devices.slots<schema::View>().address + 1000 * i);
+    return schema::SaveSlot(devices.slots<schema::View>().address + 1000 * i);
   };
   auto count = [&] { return int32_t(devices.slot_count()); };
-  InFrame(ctx, base, 144, 0x820A4640, [&](uint32_t) {
+  InFrame(ctx, 144, 0x820A4640, [&](uint32_t) {
     const uint32_t source = devices.device_list();
     ctx.r3.u64 = source;  // r4 as the caller left it
-    CallAt(ctx, base, Method(base, source, 4), 0x820A4640);
+    CallAt(ctx, Method(source, 4), 0x820A4640);
     const uint32_t list = ctx.r3.u32;
     for (int32_t i = 0; i < count(); i++) {
       ctx.r3.u64 = list;
       ctx.r4.u64 = uint32_t(i);
-      CallAt(ctx, base, Method(base, list, 8), 0x820A4674);
+      CallAt(ctx, Method(list, 8), 0x820A4674);
       slot(i).set_user(ctx.r3.u32);
     }
     ctx.r3.u64 = 0;  // XNotifyGetNext's answer: nothing
@@ -131,7 +131,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
       if (state < 0 || state > 3) {
         ctx.r3.u64 = devices.address;
         ctx.r4.u64 = uint32_t(i);
-        CallAt(ctx, base, Method(base, devices.address, 28), 0x820A4758);
+        CallAt(ctx, Method(devices.address, 28), 0x820A4758);
         if (ctx.r3.u32 < 5) {
           // +36, +988, +984, +960, +964, +968, +972, in the original's order.
           slot(i).set_device(0);
@@ -150,7 +150,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
           devices.wait_for_user_address() - devices.address + 4 * s.state(), 4));
       ctx.r3.u64 = devices.address;
       ctx.r4.u64 = s.address;
-      CallAt(ctx, base, handler, 0x820A47D8);
+      CallAt(ctx, handler, 0x820A47D8);
       slot(i).set_state(ctx.r3.u32);
     }
   });

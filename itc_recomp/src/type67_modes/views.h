@@ -31,8 +31,8 @@ struct Screen0View {
   schema::Type7Screen0 t7;
   bool type7;
 
-  Screen0View(uint8_t* base, uint32_t screen, bool type7_)
-      : t6(base, screen), t7(base, screen), type7(type7_) {}
+  Screen0View(uint32_t screen, bool type7_)
+      : t6(screen), t7(screen), type7(type7_) {}
 
   uint32_t state() const { return type7 ? t7.state() : t6.state(); }
   void set_state(uint32_t v) const { type7 ? t7.set_state(v) : t6.set_state(v); }
@@ -57,8 +57,8 @@ struct ModeView {
   schema::Type7Mode t7;
   bool type7;
 
-  ModeView(uint8_t* base, uint32_t mode, bool type7_)
-      : t6(base, mode), t7(base, mode), type7(type7_) {}
+  ModeView(uint32_t mode, bool type7_)
+      : t6(mode), t7(mode), type7(type7_) {}
 
   // The block's address (Type6Screens or Type7Screens, type67-screens.toml).
   uint32_t block() const {
@@ -104,8 +104,8 @@ struct BlockView {
   schema::Type7Screens t7;
   bool type7;
 
-  BlockView(uint8_t* base, uint32_t block, bool type7_)
-      : t6(base, block), t7(base, block), type7(type7_) {}
+  BlockView(uint32_t block, bool type7_)
+      : t6(block), t7(block), type7(type7_) {}
 
   uint32_t phase() const { return type7 ? t7.phase() : t6.phase(); }
   void set_phase(uint32_t v) const { type7 ? t7.set_phase(v) : t6.set_phase(v); }

@@ -50,135 +50,135 @@ namespace {
 // A body with the guest call in a frame of `bytes` (0: the caller's stack
 // pointer, a tail call's), its result to r3.
 template <typename Body>
-void Framed(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, Body body) {
-  XAudioFramed(ctx, base, bytes, body);
+void Framed(lifted::Regs& ctx, uint32_t bytes, Body body) {
+  XAudioFramed(ctx, bytes, body);
 }
 
 }  // namespace
 
 ITC_REGS_STEP(XactTrackInstanceConstruct) {
-  xact::TrackInstanceConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  xact::TrackInstanceConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(XactTrackInstanceCheckDone) {
-  xact::TrackInstanceCheckDone(base, ctx.r3.u32);
+  xact::TrackInstanceCheckDone(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(XactTrackInstanceSetVolume) {
   ctx.fpscr.disableFlushMode();
   const uint32_t instance = ctx.r3.u32;
   const double f1 = ctx.f1.f64;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackInstanceSetVolume(base, instance, f1, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackInstanceSetVolume(instance, f1, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceIsBusy) {
   const uint32_t instance = ctx.r3.u32;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackInstanceIsBusy(base, instance, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackInstanceIsBusy(instance, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstancePause) {
   const uint32_t instance = ctx.r3.u32, pause = ctx.r4.u32;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackInstancePause(base, instance, pause, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackInstancePause(instance, pause, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackPause) {
   const uint32_t track = ctx.r3.u32, pause = ctx.r4.u32;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackPause(base, track, pause, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackPause(track, pause, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackIsBusy) {
   const uint32_t track = ctx.r3.u32;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackIsBusy(base, track, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackIsBusy(track, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactEventConstruct) {
-  xact::EventConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  xact::EventConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                        ctx.r8.u32);
 }
 
-ITC_REGS_STEP(XactEventDestruct) { xact::EventDestruct(base, ctx.r3.u32); }
+ITC_REGS_STEP(XactEventDestruct) { xact::EventDestruct(ctx.r3.u32); }
 
 ITC_REGS_STEP(XactEventFire) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::EventFire(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EventFire(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveConstruct) {
-  ctx.r3.u64 = xact::PlayWaveConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = xact::PlayWaveConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                        ctx.r7.u32, ctx.r8.u32);
 }
 
 ITC_REGS_STEP(XactPlayWaveSetQueued) {
-  xact::PlayWaveSetQueued(base, ctx.r3.u32, ctx.r4.u32);
+  xact::PlayWaveSetQueued(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XactPlayWaveGetLoopCount) {
-  ctx.r3.u64 = xact::PlayWaveGetLoopCount(base, ctx.r3.u32);
+  ctx.r3.u64 = xact::PlayWaveGetLoopCount(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(XactPlayWaveSetWave) {
-  xact::PlayWaveSetWave(base, ctx.r3.u32, ctx.r4.u32);
+  xact::PlayWaveSetWave(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XactWaveVariationSetWave) {
-  xact::WaveVariationSetWave(base, ctx.r3.u32, ctx.r4.u32);
+  xact::WaveVariationSetWave(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(XactPlayWaveGetVariationRecord) {
-  ctx.r3.u64 = xact::PlayWaveGetVariationRecord(base, ctx.r3.u32);
+  ctx.r3.u64 = xact::PlayWaveGetVariationRecord(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(XactPlayWaveForgetWave) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::PlayWaveForgetWave(base, event, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::PlayWaveForgetWave(event, sp, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveGetWaveBank) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveGetWaveBank(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveGetWaveBank(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveIsPrepared) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveIsPrepared(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveIsPrepared(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveIsPlaying) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveIsPlaying(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveIsPlaying(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveIsBusy) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveIsBusy(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveIsBusy(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWavePause) {
   const uint32_t event = ctx.r3.u32, pause = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWavePause(base, event, pause, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWavePause(event, pause, frame, call);
   });
 }
 
@@ -186,8 +186,8 @@ ITC_REGS_STEP(XactPlayWaveSetVolume) {
   ctx.fpscr.disableFlushMode();
   const uint32_t event = ctx.r3.u32;
   const double f1 = ctx.f1.f64;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveSetVolume(base, event, f1, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveSetVolume(event, f1, frame, call);
   });
 }
 
@@ -195,8 +195,8 @@ ITC_REGS_STEP(XactWaveSetVolume) {
   ctx.fpscr.disableFlushMode();
   const uint32_t wave = ctx.r3.u32;
   const double f1 = ctx.f1.f64;
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::WaveSetVolume(base, wave, f1, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::WaveSetVolume(wave, f1, sp, call);
   });
 }
 
@@ -205,15 +205,15 @@ ITC_REGS_STEP(XactTrackSetVolume) {
   const uint32_t track = ctx.r3.u32;
   const double f1 = ctx.f1.f64;
   bool declined = false;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    const auto r3 = xact::TrackSetVolume(base, track, f1, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    const auto r3 = xact::TrackSetVolume(track, f1, frame, call);
     declined = !r3;
     return r3.value_or(0);
   });
   if (declined) {
     ctx.r3.u64 = track;
     ctx.f1.f64 = f1;
-    lifted::original::c825D0BF8(ctx, base);
+    lifted::original::c825D0BF8(ctx);
   }
 }
 
@@ -221,139 +221,139 @@ ITC_REGS_STEP(XactTrackUpdateVolume) {
   ctx.fpscr.disableFlushMode();
   const uint32_t track = ctx.r3.u32;
   bool declined = false;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    const auto r3 = xact::TrackUpdateVolume(base, track, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    const auto r3 = xact::TrackUpdateVolume(track, frame, call);
     declined = !r3;
     return r3.value_or(0);
   });
   if (declined) {
     ctx.r3.u64 = track;
-    lifted::original::c825D0428(ctx, base);
+    lifted::original::c825D0428(ctx);
   }
 }
 
 ITC_REGS_STEP(XactTrackCreateRpcs) {
-  if (const auto r3 = xact::TrackCreateRpcs(base, ctx.r3.u32)) {
+  if (const auto r3 = xact::TrackCreateRpcs(ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c825D06B8(ctx, base);
+  lifted::original::c825D06B8(ctx);
 }
 
 ITC_REGS_STEP(XactTrackStartRpcs) {
-  if (const auto r3 = xact::TrackStartRpcs(base, ctx.r3.u32)) {
+  if (const auto r3 = xact::TrackStartRpcs(ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c825D0800(ctx, base);
+  lifted::original::c825D0800(ctx);
 }
 
 ITC_REGS_STEP(XactTrackConstruct) {
   ctx.fpscr.disableFlushMode();
   const uint32_t track = ctx.r3.u32, engine = ctx.r4.u32, sound = ctx.r5.u32,
                  record = ctx.r6.u32, index = ctx.r7.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackConstruct(base, track, engine, sound, record, index, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackConstruct(track, engine, sound, record, index, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackUpdate) {
   const uint32_t track = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackUpdate(base, track, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackUpdate(track, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackDestruct) {
   const uint32_t track = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackDestruct(base, track, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackDestruct(track, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackDeletingDestruct) {
   const uint32_t track = ctx.r3.u32, flags = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackDeletingDestruct(base, track, flags, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackDeletingDestruct(track, flags, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveDeletingDestruct) {
   const uint32_t event = ctx.r3.u32, flags = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveDeletingDestruct(base, event, flags, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveDeletingDestruct(event, flags, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveApplyVariation) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveApplyVariation(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveApplyVariation(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveGetDuration) {
   const uint32_t event = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveGetDuration(base, event, native_heap, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveGetDuration(event, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWavePrepare) {
   const uint32_t event = ctx.r3.u32, offset = ctx.r4.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWavePrepare(base, event, offset, native_heap, frame, call);
+  Framed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWavePrepare(event, offset, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstancePrepareSimple) {
   const uint32_t instance = ctx.r3.u32, record = ctx.r4.u32, offset = ctx.r5.u32;
-  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstancePrepareSimple(base, instance, record, offset, frame, call);
+  Framed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePrepareSimple(instance, record, offset, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackPrepareSimple) {
   const uint32_t track = ctx.r3.u32, record = ctx.r4.u32, offset = ctx.r5.u32;
-  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackPrepareSimple(base, track, record, offset, frame, call);
+  Framed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackPrepareSimple(track, record, offset, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceCancelEvents) {
   const uint32_t instance = ctx.r3.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstanceCancelEvents(base, instance, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceCancelEvents(instance, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceDestruct) {
   const uint32_t instance = ctx.r3.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstanceDestruct(base, instance, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceDestruct(instance, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceDeletingDestruct) {
   const uint32_t instance = ctx.r3.u32, flags = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstanceDeletingDestruct(base, instance, flags, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceDeletingDestruct(instance, flags, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceStop) {
   const uint32_t instance = ctx.r3.u32, immediate = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstanceStop(base, instance, immediate, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceStop(instance, immediate, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackStop) {
   const uint32_t track = ctx.r3.u32, immediate = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackStop(base, track, immediate, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackStop(track, immediate, frame, call);
   });
 }
 
@@ -361,65 +361,65 @@ ITC_REGS_STEP(XactEventCreate) {
   const uint32_t engine = ctx.r3.u32, instance = ctx.r4.u32, record = ctx.r5.u32,
                  previous = ctx.r6.u32, out = ctx.r7.u32;
   bool declined = false;
-  Framed(ctx, base, 144, [&](const xaudio::GuestCall& call, uint32_t) {
-    const auto r3 = xact::EventCreate(base, engine, instance, record, previous, out, call);
+  Framed(ctx, 144, [&](const xaudio::GuestCall& call, uint32_t) {
+    const auto r3 = xact::EventCreate(engine, instance, record, previous, out, call);
     declined = !r3;
     return r3.value_or(0);
   });
   if (declined) {
     ctx.r3.u64 = engine;
-    lifted::original::c825D0F00(ctx, base);
+    lifted::original::c825D0F00(ctx);
   }
 }
 
 ITC_REGS_STEP(XactTrackInstancePrepare) {
   const uint32_t instance = ctx.r3.u32, key = ctx.r4.u32, offset = ctx.r5.u32;
-  Framed(ctx, base, 192, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstancePrepare(base, instance, key, offset, frame, call);
+  Framed(ctx, 192, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePrepare(instance, key, offset, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackCreateInstance) {
   const uint32_t track = ctx.r3.u32, key = ctx.r4.u32, out = ctx.r5.u32, offset = ctx.r6.u32;
-  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackCreateInstance(base, track, key, out, offset, frame, call);
+  Framed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackCreateInstance(track, key, out, offset, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackPrepare) {
   const uint32_t track = ctx.r3.u32, key = ctx.r4.u32, offset = ctx.r5.u32;
-  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackPrepare(base, track, key, offset, frame, call);
+  Framed(ctx, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackPrepare(track, key, offset, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactSoundScheduleEvent) {
   const uint32_t sound = ctx.r3.u32, event = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::SoundScheduleEvent(base, sound, event, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::SoundScheduleEvent(sound, event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactEventSchedule) {
   const uint32_t event = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::EventSchedule(base, event, native_heap, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EventSchedule(event, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactEventDone) {
   const uint32_t event = ctx.r3.u32;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::EventDone(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EventDone(event, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactPlayWaveFire) {
   const uint32_t event = ctx.r3.u32;
   uint64_t r3 = 0;
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    r3 = xact::PlayWaveFire(base, event, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::PlayWaveFire(event, frame, call);
     return uint32_t(r3);
   });
   ctx.r3.u64 = r3;  // in full: the time sign-extended, as the original leaves it
@@ -427,40 +427,40 @@ ITC_REGS_STEP(XactPlayWaveFire) {
 
 ITC_REGS_STEP(XactPlayWaveStop) {
   const uint32_t event = ctx.r3.u32, immediate = ctx.r4.u32;
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveStop(base, event, immediate, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveStop(event, immediate, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstancePlay) {
   const uint32_t instance = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstancePlay(base, instance, native_heap, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePlay(instance, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackInstanceAudioUpdate) {
   const uint32_t instance = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackInstanceAudioUpdate(base, instance, native_heap, frame, call);
+  Framed(ctx, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceAudioUpdate(instance, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackAudioUpdate) {
   const uint32_t track = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::TrackAudioUpdate(base, track, native_heap, frame, call);
+  Framed(ctx, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackAudioUpdate(track, native_heap, frame, call);
   });
 }
 
 ITC_REGS_STEP(XactTrackPlay) {
   const uint32_t track = ctx.r3.u32;
   const bool native_heap = NativeHeapActive();
-  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
-    return xact::TrackPlay(base, track, native_heap, sp, call);
+  Framed(ctx, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackPlay(track, native_heap, sp, call);
   });
 }
 
@@ -469,7 +469,7 @@ ITC_REGS_STEP(XactTrackPlay) {
 // The flag's fallback, then the register step.
 #define ITC_XACT_TRACKS_ADAPTER(address, step) \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_xact_tracks)) { \
-    hooks::step(ctx, base);                    \
+    hooks::step(ctx);                    \
   }
 
 // The same for a function freeing through the native layer: the original
@@ -478,10 +478,10 @@ ITC_REGS_STEP(XactTrackPlay) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                 \
     \
     if (!ITC_FLAG(native_xact_tracks) || !hooks::NativeHeapActive()) { \
-      lifted::original::c##address(ctx, base);                    \
+      lifted::original::c##address(ctx);                    \
       return;                                                          \
     }                                                                  \
-    hooks::step(ctx, base);                                            \
+    hooks::step(ctx);                                            \
   }
 
 ITC_XACT_TRACKS_ADAPTER(825D57D0, XactTrackInstanceConstruct)

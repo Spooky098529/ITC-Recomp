@@ -80,38 +80,38 @@ void LeaveFlush(lifted::Regs& ctx, const lp::Calls& calls, bool was_on) {
 
 }  // namespace
 
-lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
+lp::Calls LoadPollCalls(lifted::Regs& ctx) {
   lp::Calls calls;
-  calls.find = SecondSetFindCalls(ctx, base);
-  calls.wheel = SecondSetWheelCalls(ctx, base);
-  calls.memcpy = [&ctx, base](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+  calls.find = SecondSetFindCalls(ctx);
+  calls.wheel = SecondSetWheelCalls(ctx);
+  calls.memcpy = [&ctx](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
                               uint32_t lr) {
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = bytes;
-      lifted::original::c825A7410(ctx, base);
+      lifted::original::c825A7410(ctx);
     });
   };
-  calls.cockpit_bind = [&ctx, base](uint32_t object, uint32_t sp, uint32_t lr) {
+  calls.cockpit_bind = [&ctx](uint32_t object, uint32_t sp, uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = object;
-      lifted::original::c820D6108(ctx, base);
+      lifted::original::c820D6108(ctx);
       r3 = ctx.r3.u64;
     });
     return r3;
   };
-  calls.traffic_bind = [&ctx, base](uint32_t object, uint32_t sp, uint32_t lr) {
+  calls.traffic_bind = [&ctx](uint32_t object, uint32_t sp, uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = object;
-      lifted::original::c820D7D38(ctx, base);
+      lifted::original::c820D7D38(ctx);
       r3 = ctx.r3.u64;
     });
     return r3;
   };
-  calls.set_materials = [&ctx, base](uint32_t model, const uint64_t regs[7], uint32_t sp,
+  calls.set_materials = [&ctx](uint32_t model, const uint64_t regs[7], uint32_t sp,
                                      uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
@@ -123,7 +123,7 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r8.u64 = regs[4];
       ctx.r9.u64 = regs[5];
       ctx.r10.u64 = regs[6];
-      lifted::original::c820D3318(ctx, base);
+      lifted::original::c820D3318(ctx);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -133,7 +133,7 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
 
 #define ITC_LOAD_POLL_ORIGINAL(address)   \
   if (!LoadPollCalleesNative()) {         \
-    lifted::original::c##address(ctx, base);      \
+    lifted::original::c##address(ctx);      \
     return;                               \
   }                                       \
   const bool was_on =                     \
@@ -143,63 +143,63 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(LoadPollWheelsSetRecord) {
   ITC_LOAD_POLL_ORIGINAL(820D8EC0)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::WheelsSetRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::WheelsSetRecord(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
 ITC_REGS_STEP(LoadPollWheelsSetCaliperTexture) {
   ITC_LOAD_POLL_ORIGINAL(820D8ED0)
-  ctx.r3.u64 = lp::WheelsSetCaliperTexture(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = lp::WheelsSetCaliperTexture(ctx.r3.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollCarModelIsReady) {
   ITC_LOAD_POLL_ORIGINAL(820D4048)
-  ctx.r3.u64 = lp::CarModelIsReady(base, ctx.r3.u32);
+  ctx.r3.u64 = lp::CarModelIsReady(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(LoadPollCarPartsSetVinylTextures) {
   ITC_LOAD_POLL_ORIGINAL(820D72D8)
-  ctx.r3.u64 = lp::CarPartsSetVinylTextures(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = lp::CarPartsSetVinylTextures(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollInteriorDialsSetBlock) {
   ITC_LOAD_POLL_ORIGINAL(820E3040)
-  ctx.r3.u64 = lp::InteriorDialsSetBlock(base, ctx.r3.u32, ctx.r4.u64);
+  ctx.r3.u64 = lp::InteriorDialsSetBlock(ctx.r3.u32, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(LoadPollInteriorMetersSetGauge) {
   ITC_LOAD_POLL_ORIGINAL(820E32E8)
-  ctx.r3.u64 = lp::InteriorMetersSetGauge(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
+  ctx.r3.u64 = lp::InteriorMetersSetGauge(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollSceneInteriorSetGauges) {
   ITC_LOAD_POLL_ORIGINAL(820E3938)
-  ctx.r3.u64 = lp::SceneInteriorSetGauges(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = lp::SceneInteriorSetGauges(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollSceneLightsFinish) {
   ITC_LOAD_POLL_ORIGINAL(820DDA60)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneLightsFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneLightsFinish(ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
 ITC_REGS_STEP(LoadPollSceneLightsSetRecord) {
   ITC_LOAD_POLL_ORIGINAL(820DCB70)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneLightsSetRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneLightsSetRecord(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
 ITC_REGS_STEP(LoadPollSceneLightsApplyRecord) {
   ITC_LOAD_POLL_ORIGINAL(820DCBC0)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneLightsApplyRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneLightsApplyRecord(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
 ITC_REGS_STEP(LoadPollSceneTrafficFinish) {
   ITC_LOAD_POLL_ORIGINAL(820E5A68)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneTrafficFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneTrafficFinish(ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
@@ -219,13 +219,13 @@ void PaintRegs(const lifted::Regs& ctx, uint64_t regs[7]) {
 
 ITC_REGS_STEP(LoadPollSceneModelApplyPaint) {
   ITC_LOAD_POLL_ORIGINAL(820D9B68)
-  ctx.r3.u64 = lp::SceneModelApplyPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = lp::SceneModelApplyPaint(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollSceneModelApplyWheelPaint) {
   ITC_LOAD_POLL_ORIGINAL(820D9C50)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneModelApplyWheelPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneModelApplyWheelPaint(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
 }
 
 #define ITC_LOAD_POLL_PAINT(address, call)  \
@@ -235,67 +235,67 @@ ITC_REGS_STEP(LoadPollSceneModelApplyWheelPaint) {
   ctx.r3.u64 = call;
 
 ITC_REGS_STEP(LoadPollScenePartsApplyPaint) {
-  ITC_LOAD_POLL_PAINT(820E0908, lp::ScenePartsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+  ITC_LOAD_POLL_PAINT(820E0908, lp::ScenePartsApplyPaint(ctx.r3.u32, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollSceneInteriorApplyPaint) {
-  ITC_LOAD_POLL_PAINT(820E4250, lp::SceneInteriorApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+  ITC_LOAD_POLL_PAINT(820E4250, lp::SceneInteriorApplyPaint(ctx.r3.u32, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollSceneCockpitApplyPaint) {
-  ITC_LOAD_POLL_PAINT(820DC138, lp::SceneCockpitApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+  ITC_LOAD_POLL_PAINT(820DC138, lp::SceneCockpitApplyPaint(ctx.r3.u32, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollSceneTrafficApplyPaint) {
-  ITC_LOAD_POLL_PAINT(820E61D0, lp::SceneTrafficApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+  ITC_LOAD_POLL_PAINT(820E61D0, lp::SceneTrafficApplyPaint(ctx.r3.u32, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollTrafficCarSetPaint) {
   ITC_LOAD_POLL_PAINT(820D7E18,
-                      lp::TrafficCarSetPaint(base, ctx.r3.u32, ctx.r3.u64, regs, ctx.r1.u32))
+                      lp::TrafficCarSetPaint(ctx.r3.u32, ctx.r3.u64, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollSceneWheelsApplyPaint) {
-  lp::Calls calls = LoadPollCalls(ctx, base);
+  lp::Calls calls = LoadPollCalls(ctx);
   ITC_LOAD_POLL_PAINT(820E8A00,
-                      lp::SceneWheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32, calls))
+                      lp::SceneWheelsApplyPaint(ctx.r3.u32, regs, ctx.r1.u32, calls))
 }
 
 ITC_REGS_STEP(LoadPollWheelsApplyPaint) {
-  ITC_LOAD_POLL_PAINT(820D91E0, lp::WheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+  ITC_LOAD_POLL_PAINT(820D91E0, lp::WheelsApplyPaint(ctx.r3.u32, regs, ctx.r1.u32))
 }
 
 ITC_REGS_STEP(LoadPollSceneInteriorFinish) {
   ITC_LOAD_POLL_ORIGINAL(820E4140)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneInteriorFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneInteriorFinish(ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
 ITC_REGS_STEP(LoadPollSceneWheelsSetUpPoints) {
   ITC_LOAD_POLL_ORIGINAL(820E8908)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneWheelsSetUpPoints(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneWheelsSetUpPoints(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
 ITC_REGS_STEP(LoadPollScenePartsSetSelectedTexture) {
   ITC_LOAD_POLL_ORIGINAL(820DF250)
-  ctx.r3.u64 = lp::ScenePartsSetSelectedTexture(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
+  ctx.r3.u64 = lp::ScenePartsSetSelectedTexture(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(LoadPollScenePartsBuild) {
   ITC_LOAD_POLL_ORIGINAL(820E05E0)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::ScenePartsBuild(base, ctx.r3.u32, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::ScenePartsBuild(ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
 #define ITC_LOAD_POLL_STEP(name, address, call)                \
-  void LoadPoll##name(lifted::Regs& ctx, uint8_t* base) {        \
+  void LoadPoll##name(lifted::Regs& ctx) {        \
     ITC_LOAD_POLL_ORIGINAL(address)                            \
-    lp::Calls calls = LoadPollCalls(ctx, base);                \
-    ctx.r3.u64 = lp::call(base, ctx.r3.u32, ctx.r1.u32, calls); \
+    lp::Calls calls = LoadPollCalls(ctx);                \
+    ctx.r3.u64 = lp::call(ctx.r3.u32, ctx.r1.u32, calls); \
     LeaveFlush(ctx, calls, was_on);                            \
   }
 ITC_LOAD_POLL_STEP(WheelsBindTextures, 820D9638, WheelsBindTextures)
@@ -308,8 +308,8 @@ ITC_LOAD_POLL_STEP(SceneModelPollLoad, 820DA318, SceneModelPollLoad)
 
 ITC_REGS_STEP(LoadPollSceneModelApplyPalettes) {
   ITC_LOAD_POLL_ORIGINAL(820D9EA0)
-  lp::Calls calls = LoadPollCalls(ctx, base);
-  ctx.r3.u64 = lp::SceneModelApplyPalettes(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
+  lp::Calls calls = LoadPollCalls(ctx);
+  ctx.r3.u64 = lp::SceneModelApplyPalettes(ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
 }
 
 #undef ITC_LOAD_POLL_PAINT
@@ -319,7 +319,7 @@ ITC_REGS_STEP(LoadPollSceneModelApplyPalettes) {
 
 #define ITC_LOAD_POLL(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_load_poll)) { \
-    hooks::step(ctx, base);             \
+    hooks::step(ctx);             \
   }
 
 // No adapters (only their callers here call them; the steps above are the

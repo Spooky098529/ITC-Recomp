@@ -121,7 +121,7 @@ constexpr uint32_t kDrawShapeDepthFrame = 160;
 // nothing done, where a recorder would decline (a vertex declaration the
 // plain C++ leaves to the original, more than 4 textures on a material, a
 // chunk open on another list, no room for every slot).
-std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+std::optional<Draw> ModelDraw(const Calls& calls, uint32_t stack, uint32_t model,
                               uint32_t view_projection, uint32_t world, uint32_t shape,
                               uint32_t depth_too, uint32_t caller_r24);
 
@@ -133,7 +133,7 @@ std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack,
 // matrix, the view-projection; its queue call returns to 0x82596E60); else
 // Model::Draw(model, r4, r5, shape, r6) (a tail call, the same `stack` and
 // `caller_r24`). nullopt, with nothing done, where the draw declines.
-std::optional<Draw> CarPartDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t part,
+std::optional<Draw> CarPartDraw(const Calls& calls, uint32_t stack, uint32_t part,
                                 uint32_t view_projection, uint32_t world, uint32_t r6,
                                 uint32_t r7, uint32_t caller_r24, uint32_t caller_r28);
 
@@ -145,7 +145,7 @@ std::optional<Draw> CarPartDraw(uint8_t* base, const Calls& calls, uint32_t stac
 // Newton step; a zero length leaves its zero dot product), stored at `stack`
 // - 16 and read back; d = -(n . p), dot = n . L + d L.w; out = dot I - (n,
 // d) (x) L, in the original's order and roundings.
-void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, uint32_t normal,
+void MatrixShadow(uint32_t out, uint32_t light, uint32_t point, uint32_t normal,
                   uint32_t stack);
 
 // CarLighting::Gather's frame.
@@ -160,7 +160,7 @@ constexpr uint32_t kGatherFrame = 864;
 // (`stack` + 20, + 36). Lights::FindNearest (its original where it declines,
 // return address 0x820C92F8), Vec4::Transform (debug::Vec4Transform) and cos
 // as plain C++. Returns r3 as the original leaves it (64 bits).
-uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t out,
+uint64_t CarLightingGather(const Calls& calls, uint32_t stack, uint64_t out,
                            uint32_t world, uint32_t flag);
 
 // --- The light kit's blink (blink.cpp) ---
@@ -177,7 +177,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // is below a or NaN compares fail as the original's; 0.0 when b is 0.0;
 // else the larger fade, the full level above 1.0, 0.0 below 0.0, else times
 // the full level.
-double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, double rate,
+double LightKitBlinkLevel(uint64_t counter, double a, double b, double rate,
                           uint32_t stack);
 
 // BlinkTimers::Advance (sub_820DC958, a leaf): r3 = a light kit's point
@@ -188,7 +188,7 @@ double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, d
 // record +16, +32, +48), each counter compared through `stack` - 16 as the
 // original. The skip on render-only passes (--per_tick_blink_timers) is the
 // caller's: hooks::CarDrawBlinkTimersHeld.
-void BlinkTimersAdvance(uint8_t* base, uint32_t block, uint32_t stack);
+void BlinkTimersAdvance(uint32_t block, uint32_t stack);
 
 // --- The height cull (car_draw.cpp) ---
 
@@ -203,7 +203,7 @@ constexpr uint32_t kNearPlayerHeightFrame = 192;
 // its matrix (+3312) copied into the frame's +96 (memcpy, return address
 // 0x820DAC1C), (0, 0, 0, 1) at +80 transformed by it (Vec4::Transform in
 // place); 0 when |its y - the position's y| is above [0x82002DF4], else 1.
-uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_t stack,
+uint32_t SceneModelIsNearPlayerHeight(const Calls& calls, uint32_t stack,
                                       uint32_t pass, uint32_t position);
 
 // --- The morph (morph.cpp) ---
@@ -220,7 +220,7 @@ constexpr uint32_t kXgVertexBufferHeaderFrame = 128;
 // 0x00400000 with bit 0x200), +4 = 1, +20 = 0xFFFF0000, +24 = offset | 3,
 // +28 = (length & 0x03FFFFFC) | (+28's bit 0x08000000, 0 after the clear) |
 // 0x10000000 | 2. Its frame's back chain. Returns r3: the header (memset's).
-uint32_t XgSetVertexBufferHeader(uint8_t* base, uint32_t length, uint32_t usage, uint32_t offset,
+uint32_t XgSetVertexBufferHeader(uint32_t length, uint32_t usage, uint32_t offset,
                                  uint32_t header, uint32_t stack);
 
 // WorkMem::AllocVertexBuffer's frame.
@@ -236,7 +236,7 @@ constexpr uint32_t kAllocVertexBufferFrame = 128;
 // Returns r3: the memory, the start plus the bytes used before. nullopt,
 // with nothing done, where the original would print a debug message
 // (WorkMemFits false; it returns the buffer's start then).
-std::optional<uint32_t> WorkMemAllocVertexBuffer(uint8_t* base, uint32_t header_out,
+std::optional<uint32_t> WorkMemAllocVertexBuffer(uint32_t header_out,
                                                  uint32_t bytes, uint32_t stack);
 
 // Model::QueueJobRelease's frame.
@@ -250,7 +250,7 @@ constexpr uint32_t kQueueJobReleaseFrame = 144;
 // 0x82594F4C) with the bucket [0x8296B904] and the key [0x82000A34]. r3 the
 // queue call's (in the context). nullopt, with nothing done, where the
 // list has no room for the four slots (or a chunk is open on another list).
-std::optional<Left> ModelQueueJobRelease(uint8_t* base, const Calls& calls, uint32_t job,
+std::optional<Left> ModelQueueJobRelease(const Calls& calls, uint32_t job,
                                          uint32_t stack);
 
 // Model::MorphShape's frame.
@@ -268,7 +268,7 @@ constexpr uint32_t kMorphShapeFrame = 128;
 // else its original returning to 0x825951CC) and [+408] + 20 = 0. Either
 // way +428 = 1. nullopt, with nothing done, where an allocation would print
 // its debug message or the release has no room.
-std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t model,
+std::optional<Left> ModelMorphShape(const Calls& calls, uint32_t model,
                                     uint32_t morph, uint64_t shape_index, uint32_t stack);
 
 // --- The light kit (light_kit.cpp) ---
@@ -295,7 +295,7 @@ enum class LightGroup { kFront, kSides, kRear };
 // + 16, r6, the block's +16, 0, 0) (its original where it declines,
 // returning after its call). `caller_r24` and `caller_r28` the registers
 // CarPart::Draw sees (its callers don't change them).
-Left LightPointsDrawNeon(uint8_t* base, const Calls& calls, LightGroup which, uint32_t stack,
+Left LightPointsDrawNeon(const Calls& calls, LightGroup which, uint32_t stack,
                          uint32_t group, uint64_t counter, uint32_t block,
                          uint32_t view_projection, uint32_t caller_r24, uint32_t caller_r28);
 
@@ -306,7 +306,7 @@ Left LightPointsDrawNeon(uint8_t* base, const Calls& calls, LightGroup which, ui
 // sub_820DD438, sub_820DD948); above, nothing. Each with the
 // view-projection copied (memcpy) into this frame (+208 the neon's, +80 the
 // LEDs', +144 the spots'). The LEDs and spots are guest calls.
-Left LightPointsDraw(uint8_t* base, const Calls& calls, LightGroup which, uint32_t stack,
+Left LightPointsDraw(const Calls& calls, LightGroup which, uint32_t stack,
                      uint32_t group, uint64_t counter, uint32_t block, uint32_t view_projection,
                      uint32_t caller_r24, uint32_t caller_r28);
 
@@ -323,7 +323,7 @@ Left LightPointsDraw(uint8_t* base, const Calls& calls, LightGroup which, uint32
 // hooks::CarDrawBlinkTimersHeld); [0x826C5104] flipped, the three groups
 // drawn (each with a fresh copy of the view-projection at +80) and it
 // flipped back.
-Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t kit,
+Left SceneLightsDraw(const Calls& calls, uint32_t stack, uint32_t kit,
                      uint32_t block, bool advance_blink, uint32_t caller_r24,
                      uint32_t caller_r28);
 
@@ -347,7 +347,7 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 // `r24` and r28 = `r28` during it, all 64 bits, for its Model::Draw's and the
 // depth pass's recorder contexts; the plain C++ takes their low words). What
 // it leaves in r3. The parts' draws share it.
-Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
+Left PartsDrawRecord(const Calls& calls, uint32_t frame, uint32_t part,
                      uint32_t view_projection, uint32_t world, uint32_t depth, uint64_t r24,
                      uint64_t r28, uint32_t lr);
 
@@ -360,51 +360,51 @@ constexpr uint32_t kPartsShadowFrame = 256;
 // PartsPoints::DrawFrontBumperLights (sub_820DE1C8, a 128-byte frame):
 // records 0, 1 (r6 0) or 2, by the block's bits 0x1, 0x2, 0x4 records 3, 4,
 // 5, then SetPair1002Alpha(record 6, the block's +636) and record 6.
-Left PartsDrawFrontBumperLights(uint8_t* base, const Calls& calls, uint32_t stack,
+Left PartsDrawFrontBumperLights(const Calls& calls, uint32_t stack,
                                 uint32_t group, uint32_t block, uint32_t pass, uint32_t r6,
                                 uint32_t caller_r24);
 // PartsPoints::DrawRearBumperLights (sub_820DE3C0, 128): record 0, by the
 // block's bits 0x1, 0x10, 0x2, 0x4 records 1, 2, 3, 4.
-Left PartsDrawRearBumperLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawRearBumperLights(const Calls& calls, uint32_t stack, uint32_t group,
                                uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawLeftDoorPanel (sub_820DE6E0, 128) and DrawRightDoorPanel
 // (sub_820DE8C8): nothing unless record 0 has a model; record 6 with the
 // door's matrix (+6016), then with the block's bit 0x2 (left) or 0x4
 // (right) record 7 + the parts record's (+6084) +28, the same matrix.
-Left PartsDrawDoorPanel(uint8_t* base, const Calls& calls, bool right, uint32_t stack,
+Left PartsDrawDoorPanel(const Calls& calls, bool right, uint32_t stack,
                         uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawDoorWindows02 (sub_820DE760, 112; records 2 and 3, the
 // block's +628) and DrawDoorWindows01 (sub_820DE948; records 4 and 5,
 // +632): nothing unless record 0 has a model; SetPair1002Alpha on both,
 // then both drawn with the door's matrix.
-Left PartsDrawDoorWindows(uint8_t* base, const Calls& calls, bool first, uint32_t stack,
+Left PartsDrawDoorWindows(const Calls& calls, bool first, uint32_t stack,
                           uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawDoorsBody (sub_820DEA88, 112): record 11, then record 12
 // + k where k, the parts record's (+5520) +12, is below 11 (signed).
-Left PartsDrawDoorsBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawDoorsBody(const Calls& calls, uint32_t stack, uint32_t group,
                         uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawDoorsWindows (sub_820DEAF0, 128): SetPair1002Alpha on
 // records 0 and 1 (the block's +632), records 0, 1, 2, then with bit 0x2
 // record 3 + k, with 0x4 record 7 + k (k the parts record's +28).
-Left PartsDrawDoorsWindows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawDoorsWindows(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawFendersBody (sub_820DED88, 112): records 5 and 6.
-Left PartsDrawFendersBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawFendersBody(const Calls& calls, uint32_t stack, uint32_t group,
                           uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawFenderLights (sub_820DEDD8, 128): records 0, 1 (r6 0) or
 // 2, by bits 0x2 and 0x4 records 3 and 4.
-Left PartsDrawFenderLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawFenderLights(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t r6, uint32_t caller_r24);
 // PartsPoints::DrawCabinWindow02 (sub_820DEF38, 112): with bit 0x8 record
 // 0; SetPair1002Alpha(record 3, +628), record 3.
-Left PartsDrawCabinWindow02(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawCabinWindow02(const Calls& calls, uint32_t stack, uint32_t group,
                             uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawCabinWindow01 (sub_820DEFA8, 128):
 // SetPair1002Alpha(record 2, +632), record 2, with bit 0x8 record 1.
-Left PartsDrawCabinWindow01(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawCabinWindow01(const Calls& calls, uint32_t stack, uint32_t group,
                             uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawEngine (sub_820DF070, 112): records 0 and 1.
-Left PartsDrawEngine(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawEngine(const Calls& calls, uint32_t stack, uint32_t group,
                      uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawFrontBumper (sub_820DF308, 112) and DrawRearBumper
 // (sub_820DF458): the body (record 7, or 5 at the rear), then the number
@@ -415,9 +415,9 @@ Left PartsDrawEngine(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 // record's (+2648) +3684, or record 6). The front draws no plate without
 // m; the rear still writes m's +456 and +432 (guest words 456 and 432
 // with no model), as the original.
-Left PartsDrawFrontBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawFrontBumper(const Calls& calls, uint32_t stack, uint32_t group,
                           uint32_t block, uint32_t pass, uint32_t caller_r24);
-Left PartsDrawRearBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawRearBumper(const Calls& calls, uint32_t stack, uint32_t group,
                          uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawBonnet (sub_820E0998, 528): nothing unless record 0 has
 // a model; in the front end (the scene's +4 0) the world opened about the
@@ -427,7 +427,7 @@ Left PartsDrawRearBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint
 // +416) and the block's world on the right (Matrix::Multiply and Copy,
 // noted for interpolation, the 1.0 w's written before each multiply as
 // the original); in a race the block's world. Then record 1 with it.
-Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawBonnet(const Calls& calls, uint32_t stack, uint32_t group,
                      uint32_t block, uint32_t pass, uint32_t caller_r24);
 // The doors' and the headlight body's frames.
 constexpr uint32_t kPartsDoorFrame = 720;
@@ -446,7 +446,7 @@ constexpr uint32_t kPartsHeadlightBodyFrame = 784;
 // (or 13 with +3688 set) and 14 + k (k the parts record's +12, below 11)
 // drawn with it, r28 = the pass. The multiplies and copies noted for
 // interpolation with the original's return addresses.
-Left PartsDrawDoor(uint8_t* base, const Calls& calls, bool right, uint32_t stack,
+Left PartsDrawDoor(const Calls& calls, bool right, uint32_t stack,
                    uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawHeadlightBody (sub_820E13E0, 784): nothing unless record
 // 0 has a model (r3 the group); the pop-up's matrix kept at the group's
@@ -455,7 +455,7 @@ Left PartsDrawDoor(uint8_t* base, const Calls& calls, bool right, uint32_t stack
 // bits 0x1 or 0x40; record 0's inverse x the identity turned by -angle
 // about x x its matrix x the block's world (the identity at +480 or +608
 // by the path). Record 12 drawn with it, r28 = the pass.
-Left PartsDrawHeadlightBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawHeadlightBody(const Calls& calls, uint32_t stack, uint32_t group,
                             uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawMirror (sub_820E1138, 256; `world` its r6) and
 // DrawWithShadow (sub_820E1260; `world` the block's +16): the record
@@ -466,7 +466,7 @@ Left PartsDrawHeadlightBody(uint8_t* base, const Calls& calls, uint32_t stack, u
 // [0x8296B8FC] and [0x8296B8F8] saved to its +76 and +80 and set to its
 // +56, the record drawn depth-only with it (r28 = the world for its
 // recorder's context) and the keys put back.
-Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t stack,
+Left PartsDrawShadowed(const Calls& calls, bool mirror, uint32_t stack,
                        uint32_t record, uint32_t pass, uint32_t world, uint32_t caller_r24);
 
 // --- The head and tail lights (lamps.cpp) ---
@@ -491,14 +491,14 @@ constexpr uint32_t kPartsHeadlightsFrame = 1552;
 // PartsPoints::DrawTailLights (sub_820DF8B0): r3 = the group (pb + 27680),
 // r4 = the block, r5 = the camera pass; `caller_r28` r28 at entry (the
 // lamps' CarPart::Draw sees it). See the row in car-draw.md.
-Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawTailLights(const Calls& calls, uint32_t stack, uint32_t group,
                          uint32_t block, uint32_t pass, uint32_t caller_r24,
                          uint32_t caller_r28);
 // PartsPoints::DrawHeadlights (sub_820E1690): r3 = the group (pb + 24480),
 // r4 = the block, r5 = the camera pass, r6 and r7 the color table's index
 // and sub-index (TableVector). Nothing when record 0 has no model (r3 the
 // group).
-Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawHeadlights(const Calls& calls, uint32_t stack, uint32_t group,
                          uint32_t block, uint32_t pass, uint64_t index, uint64_t sub,
                          uint32_t caller_r24);
 
@@ -526,7 +526,7 @@ constexpr uint32_t kPartsShadowsFrame = 1808;
 // 4i, the world times the light's shadow matrix (+1088 + 64i) into the
 // original's products. Outside a race the gathered words are the stack's,
 // read as the original reads them. r3 as the original leaves it.
-Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left PartsDrawShadows(const Calls& calls, uint32_t stack, uint32_t group,
                       uint32_t block);
 
 // --- The parts' top (parts.cpp) ---
@@ -546,19 +546,19 @@ constexpr uint32_t kPartsRaceFrame = 176;
 // = the block; every part with camera pass 0 (0x826BAC00); the mirrors'
 // worlds the doors' matrices memcpy'd to the frame's +80. See the row in
 // car-draw.md. r3 as the last draw (the headlights') leaves it.
-Left PartsDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left PartsDrawFrontEnd(const Calls& calls, uint32_t stack, uint32_t points,
                        uint32_t block, uint32_t caller_r24);
 // PartsPoints::DrawRace (sub_820E2760): r3 = the parts' point block, r4 =
 // the block; the camera pass the scene's current one ([[0x826C2E44] +
 // 5072], 0 when disabled), the shadows first. r3 as the last draw (the rear
 // bumper's lights') leaves it.
-Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left PartsDrawRace(const Calls& calls, uint32_t stack, uint32_t points,
                    uint32_t block, uint32_t caller_r24);
 // SceneParts::Draw (sub_820E2EE8, no frame: tail calls): r3 = the parts
 // object (`parts`, all 64 bits), r4 = the block: by its scene's ([r3 +
 // 37284]) +4, 0 the front end's list, 1 the race's (each with r3 + 176),
 // nothing above (r3 as it came).
-Left ScenePartsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t parts,
+Left ScenePartsDraw(const Calls& calls, uint32_t stack, uint64_t parts,
                     uint32_t block, uint32_t caller_r24);
 
 
@@ -587,13 +587,13 @@ constexpr uint32_t kInteriorRaceFrame = 144;
 // InteriorDials::DrawFaces (sub_820E3170, 112): the speedometer's face,
 // record 4 when the interior record's ([group]) +0 is 0, else 5; the
 // tachometer's by its +4: 0, 1, 2 records 6, 7, 8, else none.
-Left InteriorDrawDialFaces(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left InteriorDrawDialFaces(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24,
                            uint32_t caller_r28);
 // InteriorPoints::DrawRollCage (sub_820E3548, 112): by the interior
 // record's +104, 1 record 0, 2 record 1, else none; then record 2 when its
 // +108 is 0, else 3.
-Left InteriorDrawRollCage(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left InteriorDrawRollCage(const Calls& calls, uint32_t stack, uint32_t group,
                           uint32_t block, uint32_t pass, uint32_t caller_r24,
                           uint32_t caller_r28);
 // InteriorDials::DrawDigitalSpeed (sub_820E39F8, 160): the block's +696
@@ -602,13 +602,13 @@ Left InteriorDrawRollCage(uint8_t* base, const Calls& calls, uint32_t stack, uin
 // that model with n mod 10, n / 10 mod 10 and n / 100 (records 9, 10 and
 // 11's shapes); records 9, 10, 11 drawn (r28 the pass's view-projection);
 // the +48 put back.
-Left InteriorDrawDigitalSpeed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left InteriorDrawDigitalSpeed(const Calls& calls, uint32_t stack, uint32_t group,
                               uint32_t block, uint32_t pass, uint32_t caller_r24);
 // InteriorDials::DrawReadouts (sub_820E51D0, 112): Dash::PoseTachometer
 // (a guest call, returning to 0x820E51F8) when [group + 20] is set, then
 // DrawDigitalSpeed when [group + 2180] is. r3 the group (`group64`, all 64
 // bits) when neither.
-Left InteriorDrawReadouts(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t group64,
+Left InteriorDrawReadouts(const Calls& calls, uint32_t stack, uint64_t group64,
                           uint32_t block, uint32_t pass, uint32_t caller_r24,
                           uint32_t caller_r28);
 // InteriorMeters::DrawFaces (sub_820E3AD8, 128): the seven gauge faces by
@@ -617,7 +617,7 @@ Left InteriorDrawReadouts(uint8_t* base, const Calls& calls, uint32_t stack, uin
 // +5324); record 21 when any of gauges 4 to 6 was drawn (r28 1 from the
 // first of them on, 0 before). r3 the group (`group64`) when nothing is
 // drawn.
-Left InteriorDrawMeterFaces(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t group64,
+Left InteriorDrawMeterFaces(const Calls& calls, uint32_t stack, uint64_t group64,
                             uint32_t block, uint32_t pass, uint32_t caller_r24);
 // InteriorPoints::DrawSeats (sub_820E3CF0, 592): the two seat worlds (a
 // translation to each of [group + 4]'s two float4s, w + 1.0 by vaddfp,
@@ -627,7 +627,7 @@ Left InteriorDrawMeterFaces(uint8_t* base, const Calls& calls, uint32_t stack, u
 // +464), PartModel::SetTexture([group + 8], the record's +96, or 0 when
 // +100 and +96 are both 3, -1) and every shape of that model drawn through
 // Model::Draw at the first seat, then the second.
-Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left InteriorDrawSeats(const Calls& calls, uint32_t stack, uint32_t group,
                        uint32_t block, uint32_t pass, uint32_t caller_r24, uint32_t caller_r28);
 
 // InteriorPoints::DrawFrontEnd (sub_820E4078, 128): with camera pass 0
@@ -636,14 +636,14 @@ Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +5132 has bit 0x2, else 0), the dial and meter faces, the steering wheel
 // (+8512 + 16 + 240 x the interior record's +92), the seats and the roll
 // cage. r3 the roll cage's.
-Left InteriorDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left InteriorDrawFrontEnd(const Calls& calls, uint32_t stack, uint32_t points,
                           uint32_t block, uint32_t caller_r24);
 // InteriorPoints::DrawRace (sub_820E5220, 144): as DrawFrontEnd with the
 // scene's current camera pass ([[0x826C2E44] + 5072], 0 when disabled), the
 // readouts (DrawReadouts) and Dash::PoseDials (sub_820E45A8, a guest call
 // returning to 0x820E52E0) after the faces, and no steering wheel when the
 // point block's +11452 is set.
-Left InteriorDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left InteriorDrawRace(const Calls& calls, uint32_t stack, uint32_t points,
                       uint32_t block, uint32_t caller_r24);
 // SceneInterior::Draw (sub_820E53F0, 112): r3 = the interior (`interior`,
 // all 64 bits), r4 = the block. With +11616 set, the accessory: the
@@ -654,7 +654,7 @@ Left InteriorDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 // Accessory::Draw (a guest call returning to 0x820E54DC) with the scene's
 // current camera pass; above 1 nothing (r3 the set with +11616, else as it
 // came).
-Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t interior,
+Left SceneInteriorDraw(const Calls& calls, uint32_t stack, uint64_t interior,
                        uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
 
 // --- The cockpit (cockpit.cpp) ---
@@ -674,37 +674,37 @@ constexpr uint32_t kCockpitBodyFrame = 800;
 
 // CockpitPoints::DrawFenders (sub_820DB8C8, 112): r3 = the group (point
 // block +0), r4 = the block, r5 = the camera pass: records +240, +480, +0.
-Left CockpitDrawFenders(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left CockpitDrawFenders(const Calls& calls, uint32_t stack, uint32_t group,
                         uint32_t block, uint32_t pass, uint32_t caller_r24);
 // CockpitPoints::DrawCabinWindow (sub_820DB980, 112; the group point block
 // +720, its record +240) and DrawDoorWindow (sub_820DBA38, 112; the group
 // +1440, its record +0): nothing when the record's model is 0 (r3 0); else
 // SetPair1002Alpha(model, shape, the block's +628), the model's +440 = 1
 // around the record's draw.
-Left CockpitDrawCabinWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left CockpitDrawCabinWindow(const Calls& calls, uint32_t stack, uint32_t group,
                             uint32_t block, uint32_t pass, uint32_t caller_r24);
-Left CockpitDrawDoorWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left CockpitDrawDoorWindow(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24);
 // CockpitPoints::DrawHeadlights (sub_820DBB88, 112; the group +2160):
 // record +1200 with the block's bit 0x1, +1440 with 0x40, then +1680.
-Left CockpitDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left CockpitDrawHeadlights(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24);
 // CockpitPoints::Draw (sub_820DBD38, 128): r3 = the point block (cockpit +
 // 192), r4 = the block: +3120, +1200, the fenders, +720, +1680, +1920, the
 // headlights, the cabin's window, the door's window.
-Left CockpitPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left CockpitPointsDraw(const Calls& calls, uint32_t stack, uint32_t points,
                        uint32_t block, uint32_t caller_r24);
 // SceneCockpit::DrawBody (sub_820DC350, 800): r3 = the cockpit, r4 = the
 // block. In a race (its scene's, [+4316], +4 1) the record at the frame's
 // +80 (the ten matrices' w words 1.0) and CarLighting::Gather(it, the
 // block's +16, 0); then SceneInterior::Draw([+28], r4) and
 // CockpitPoints::Draw(+192, r4).
-Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t cockpit,
+Left SceneCockpitDrawBody(const Calls& calls, uint32_t stack, uint32_t cockpit,
                           uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
 // SceneCockpit::Draw (sub_820DC498, no frame: a tail call): r3 = the
 // cockpit (`cockpit`, all 64 bits), r4 = the block: nothing when its scene's
 // +4 is 2 or above (unsigned; r3 as it came), else DrawBody.
-Left SceneCockpitDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t cockpit,
+Left SceneCockpitDraw(const Calls& calls, uint32_t stack, uint64_t cockpit,
                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
 
 // --- The traffic body (traffic.cpp, lamps.cpp, shadows.cpp) ---
@@ -728,26 +728,26 @@ constexpr uint32_t kSceneTrafficFrame = 1248;
 // An identity's four rows stored at `at` as stvx stores them, and `bytes`
 // copied from `from` to `to` doubleword by doubleword (ld, std): the
 // originals' fresh matrices (lamps.cpp).
-void StoreIdentity(uint8_t* base, uint32_t at);
-void CopyDoublewords(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes);
+void StoreIdentity(uint32_t at);
+void CopyDoublewords(uint32_t to, uint32_t from, uint32_t bytes);
 
 // TrafficPoints::DrawBody (sub_820E55A0, 144): r3 = the body's records (the
 // point block + 16), r4 = the block, r5 = the camera pass: records 0 to 3
 // (r28 the pass at their draws); the plates (records 2 and 3) only with a
 // model, which gets +456 = the records' +1440 (or +1444) and +432 = 1 around
 // the draw, +432 = 0 after.
-Left TrafficDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+Left TrafficDrawBody(const Calls& calls, uint32_t stack, uint32_t records,
                      uint32_t block, uint32_t pass, uint32_t caller_r24);
 // TrafficPoints::DrawWindow (sub_820E5668, 128): SetPair1002Alpha(record 5's
 // model, its shape, the block's +632), then records 4 and 5 (r28 the block's
 // world).
-Left TrafficDrawWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+Left TrafficDrawWindow(const Calls& calls, uint32_t stack, uint32_t records,
                        uint32_t block, uint32_t pass, uint32_t caller_r24);
 // TrafficPoints::DrawTailLights (sub_820E5B08): r3 = the group (the point
 // block + 3152), r4 = the block, r5 = the pass: as PartsPoints::
 // DrawTailLights with bit 0x1 record 9, 0x8 record 10, the cover (11) with
 // no alpha call, the glows with bit 0x1 and not 0x20. `caller_r28` the lamps'.
-Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left TrafficDrawTailLights(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24,
                            uint32_t caller_r28);
 // TrafficPoints::DrawHeadlights (sub_820E61D8): r3 = the group (the point
@@ -755,7 +755,7 @@ Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // `caller_r28`), the cover (6, its alpha the block's +636; r28 the block's
 // world), the glows with bit 0x1 and not 0x20 in white at nodes 0 to 3 with
 // the block's world (Model::Draw's r24 0).
-Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left TrafficDrawHeadlights(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t block, uint32_t pass, uint32_t caller_r24,
                            uint32_t caller_r28);
 
@@ -764,7 +764,7 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // disabled; r28 = the point block + 16): the body, the headlights' body
 // (+2432) and the tail lights' (+5072), the window, the headlights, the tail
 // lights.
-Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left TrafficPointsDraw(const Calls& calls, uint32_t stack, uint32_t points,
                        uint32_t block, uint32_t caller_r24);
 // SceneTraffic::Draw (sub_820E6A40, 1,248; shadows.cpp): r3 = the traffic
 // body, r4 = the block. The record at +464 (the ten matrices' w words 1.0);
@@ -773,7 +773,7 @@ Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // times the block's world in place; then for each of the six part models
 // (+9768 + 4i) and each of its shapes (+412), Model::DrawShapeDepth under
 // the pass description's keys as PartsPoints::DrawShadows.
-Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t traffic,
+Left SceneTrafficDraw(const Calls& calls, uint32_t stack, uint32_t traffic,
                       uint32_t block, uint32_t caller_r24);
 
 // --- The wheels (wheels.cpp) ---
@@ -811,7 +811,7 @@ constexpr uint32_t kWheelsBrakesMorphedFrame = 2544;
 // +76 and +80 and set to its +32, record 0 drawn depth-only with it (and with
 // +592 the second matrix with the camera's), the keys put back. r24 = the
 // record and r28 = the block at every draw.
-Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawTire(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block);
 // WheelPoints::DrawTireMorphed (sub_820E9318): as DrawTire with no second
 // matrix (+592 not read), the frame's own offsets, and the tire morphed
@@ -821,7 +821,7 @@ Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // Model::MorphShape (its plain C++, else its original returning to
 // 0x820E94E8). r24 = the block's world (+16) at every draw, r28 `caller_r28`
 // at side 1's first, then 0xFFFFFFFF82970000.
-Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawTireMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r28);
 
 // WheelPoints::DrawRimA (sub_820E9A28): r3 = a set a rim group (the point
@@ -836,17 +836,17 @@ Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // records 2, 4, 5, 6 mirrored, FlipCulling again, record 0 turned. r24 is
 // `caller_r24` at the first three draws, then group + 1472; r28 the block at
 // side 1's draws, the side's R (block + 144 front, + 272 rear) at side 2's.
-Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimA(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 // WheelPoints::DrawRimAMorphed (sub_820EA148): as DrawRimA at its own frame
 // offsets (side 2's turned world at +1872), with two morphs first, each
-// Morph::SetUp(model = [+36], the frame's +2000, base, &target (the frame's
+// Morph::SetUp(model = [+36], the frame's +2000, &target (the frame's
 // +304), &weight (the group's +16 at the frame's +368), 1) and
 // Model::MorphShape (its plain C++, else its original returning to
 // 0x820EA270, 0x820EA2AC): record 0 (+260) toward record 1 (+500) when [+36]
 // isn't 0, record 2 (+740) toward record 3 (+980) regardless.
-Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimAMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 // WheelPoints::DrawRimB (sub_820EA950): r3 = a set b rim group (the point
@@ -863,7 +863,7 @@ Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // or 1 (rear) at every draw; r28 the camera at side 1's first, then with
 // +592 the look's record (else the camera), the side's S at side 2's. No
 // flips, no morph, no depth pass.
-Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawRimB(const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block);
 
 // WheelPoints::DrawBrakes (sub_820EB388): r3 = a brake group (the point
@@ -878,7 +878,7 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // (that word - [0x82002C34], 180.0) x pi / 180: side 2's Z' x S_1 x R_1 x T'
 // x world into +2400 and Z' x R_1 x T' x world into +2272 (the rear's S_3,
 // R_3). With the wheels record's +8 set (never in play), five morphs on
-// record 0's model ([+36]): Morph::SetUp(model, the frame's +288, base,
+// record 0's model ([+36]): Morph::SetUp(model, the frame's +288,
 // &target (the frame's +224), &weight (the group's +16 at the frame's +160),
 // 1) and Model::MorphShape (its plain C++, else its original from this
 // frame): records 0 toward 1, 2 toward 3, 8 toward 9, 4 toward 5, 6 toward 7.
@@ -888,7 +888,7 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // 1; PartModel::SetAlpha(record 10's model and shape, the block's float
 // +612 + 8 x rear, side 2's +616 + 8 x rear) and record 10 (+2432)
 // spinning. r24 `caller_r24` and r28 the block at every draw.
-Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawBrakes(const Calls& calls, uint32_t stack, uint32_t group,
                       uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 // WheelPoints::DrawBrakesMorphed (sub_820EBEB8): as DrawBrakes at its own
@@ -903,7 +903,7 @@ Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 // 0x820EC8E0 where MorphShape declines). Each side's three conditional
 // records as DrawBrakes'; no record 10, no SetAlpha. r24 `caller_r24` and
 // r28 side 1's R (the block's +80 front, +208 rear) at every draw.
-Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+Left WheelsDrawBrakesMorphed(const Calls& calls, uint32_t stack, uint32_t group,
                              uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 // The wheels' top. WheelPoints::Draw (sub_820ECA30): r3 = the wheels' point
@@ -915,18 +915,18 @@ Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, 
 // then the tires (+32, +1872). r24 `caller_r24` at the brakes and set a's
 // rims. r3 as the last tire's draw leaves it.
 constexpr uint32_t kWheelsPointsFrame = 128;
-Left WheelsPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left WheelsPointsDraw(const Calls& calls, uint32_t stack, uint32_t points,
                       uint32_t block, uint64_t caller_r24);
 // WheelPoints::DrawMorphed (sub_820ECB68): as Draw with the morphed brakes,
 // only in the front end (scene +4 0) set a's morphed rims (the copy made
 // regardless), the morphed tires (r28 0xFFFFFFFF826C0000 at their entry).
-Left WheelsPointsDrawMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+Left WheelsPointsDrawMorphed(const Calls& calls, uint32_t stack, uint32_t points,
                              uint32_t block, uint64_t caller_r24);
 // SceneWheels::Draw (sub_820ECE28): r3 = the wheels object (pool 5 of the
 // second set), r4 = the block: by the object's +40 (its wheels record's
 // +8), 0 WheelPoints::Draw(+192), else DrawMorphed(+192); no frame (tail
 // calls). Car::DrawUpdate's native body calls this with its r24.
-Left SceneWheelsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t wheels,
+Left SceneWheelsDraw(const Calls& calls, uint32_t stack, uint32_t wheels,
                      uint32_t block, uint64_t caller_r24);
 
 // --- The root (update.cpp) ---
@@ -962,7 +962,7 @@ constexpr uint32_t kCarDrawUpdateFrame = 304;
 // diagnostics' wrap's checks (--debug_hide, --find_per_frame_state). Returns
 // r3 as the original leaves it. Only with every callee's plain C++ native
 // (the adapter's check, hooks::CarDrawUpdateCalleesNative).
-Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
+Left CarDrawUpdate(const Calls& calls, load_poll::Calls& poll,
                    const second_set::ReleaseCalls& release, uint32_t stack, uint64_t model_r3,
                    uint64_t caller_r24, bool advance_blink);
 

@@ -21,24 +21,24 @@ constexpr uint32_t kPageTable[5] = {0x82194078, 0x821941A8, 0x82191DE0, 0x821920
 
 }  // namespace
 
-uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t CarListPage(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82194078 GarageScreen::CarListPage");
-  const uint32_t frame = Frame(base, sp, 96);
-  calls.Call(kListUpdate, frame, 0x82194094, List(base));
-  uint32_t list = List(base);
+  const uint32_t frame = Frame(sp, 96);
+  calls.Call(kListUpdate, frame, 0x82194094, List());
+  uint32_t list = List();
   uint32_t page;
   uint32_t sound;
-  if (MenuList(base, list).move() == 0 &&
-      MenuList(base, list).scroll() == MenuList(base, list).scroll_before()) {
+  if (MenuList(list).move() == 0 &&
+      MenuList(list).scroll() == MenuList(list).scroll_before()) {
     const uint64_t accepted = calls.Call(kListAccepted, frame, 0x821940B8, list);
-    list = List(base);
+    list = List();
     if (uint32_t(accepted) != 0) {
       // Into the car's menu: the selected car, transition 4 then 5, page 1.
-      const uint32_t selection = race_screens::ListSelection(base, list);
-      Data(base).set_selection(selection);
-      Data(base).set_scroll(ListView(base).scroll());
-      ReloadStandCar(base, frame, calls);
-      const PageObject pages = PagesOf(base);
+      const uint32_t selection = race_screens::ListSelection(list);
+      Data().set_selection(selection);
+      Data().set_scroll(ListView().scroll());
+      ReloadStandCar(frame, calls);
+      const PageObject pages = PagesOf();
       const uint32_t before = pages.page();
       if (before != 1) {
         pages.set_previous_page(before);
@@ -59,38 +59,38 @@ uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     page = 0;  // the list moved (transition 2)
     sound = 4;
   }
-  PagesGo(PagesOf(base), page, page == 4 ? 3 : 2, kNone);
+  PagesGo(PagesOf(), page, page == 4 ? 3 : 2, kNone);
   return calls.Call(kMenuSoundPlay, frame, 0x82194194, sound);
 }
 
-void LeavePage(uint8_t* base, uint32_t mode) {
+void LeavePage(uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82192C18 GarageScreen::LeavePage");
-  Stage(base).set_reflection(1);
-  Post(base, mode, 22);
+  Stage().set_reflection(1);
+  Post(mode, 22);
 }
 
-uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint32_t sp,
+uint64_t UpdatePage(uint64_t r3, uint64_t mode, uint64_t r5, uint32_t sp,
                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82194EA8 GarageScreen::UpdatePage");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, frame + 80 + 4 * i, kPageTable[i]);
+    Store(frame + 80 + 4 * i, kPageTable[i]);
   }
-  const uint32_t page = PagesOf(base).page();
+  const uint32_t page = PagesOf().page();
   if (page == kNone) {
     return r3;
   }
   // No bounds check, as the original: the word at the table's index. r6 to
   // r10 as the original leaves them (the table's build).
-  const uint32_t target = Load(base, frame + 80 + (page << 2));
+  const uint32_t target = Load(frame + 80 + (page << 2));
   // The pages' plain C++ by the word's address (all five native); a word
   // past the table through the guest.
   switch (target) {
-    case 0x82194078: return CarListPage(base, frame, calls);
-    case 0x821941A8: return ActionsPage(base, mode, frame, calls);
-    case 0x82191DE0: return ViewPage(base, mode, frame, calls);
-    case 0x82192030: return ViewOptionsPage(base, mode, frame, calls);
-    case 0x82192C18: LeavePage(base, uint32_t(mode)); return mode;
+    case 0x82194078: return CarListPage(frame, calls);
+    case 0x821941A8: return ActionsPage(mode, frame, calls);
+    case 0x82191DE0: return ViewPage(mode, frame, calls);
+    case 0x82192030: return ViewOptionsPage(mode, frame, calls);
+    case 0x82192C18: LeavePage(uint32_t(mode)); return mode;
     default: break;
   }
   return calls.CallArgs(target, frame, 0x82194F1C,

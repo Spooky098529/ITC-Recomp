@@ -160,7 +160,7 @@ ITC_NATIVE_ENTRY(825A8A50, ITC_FLAG(native_math)) {
   const bool done = c_runtime::Tan(x, &result);
   ctx.r3.u64 = CtrlFp(ctx, old, kRoundingMask);
   if (!done) {
-    lifted::original::c825A8A50(ctx, base);
+    lifted::original::c825A8A50(ctx);
     return;
   }
   ctx.r4.u64 = kRoundingMask;
@@ -174,7 +174,7 @@ ITC_NATIVE_ENTRY(825AAD20, ITC_FLAG(native_math)) {
   ctx.fpscr.disableFlushMode();
   double result;
   if (!c_runtime::Ldexp(ctx.f1.f64, ctx.r4.s32, &result)) {
-    lifted::original::c825AAD20(ctx, base);
+    lifted::original::c825AAD20(ctx);
     return;
   }
   const uint64_t old = CtrlFp(ctx, 0xF8, kRoundingMask);

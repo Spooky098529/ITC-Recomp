@@ -39,35 +39,35 @@ uint32_t Block(uint32_t size) {
 
 }  // namespace
 
-void BindKernelVariables(uint8_t* base) {
+void BindKernelVariables() {
   if (!ITC_FLAG(native_kernel_variables)) {
     return;
   }
   // The import table's page is writable in our mapping (memory/mapping.h:
   // no page protection).
   // VdGlobalDevice: a word the game writes itself (the device).
-  guest::StoreU32(base, kVdGlobalDevice, Block(16));
+  guest::StoreU32(kVdGlobalDevice, Block(16));
   // KeCertMonitorData and KeDebugMonitorData: no monitor, zeros (their
   // readers test the first word).
-  guest::StoreU32(base, kKeCertMonitorData, Block(64));
-  guest::StoreU32(base, kKeDebugMonitorData, Block(64));
+  guest::StoreU32(kKeCertMonitorData, Block(64));
+  guest::StoreU32(kKeDebugMonitorData, Block(64));
   // ExLoadedCommandLine: the command line GetCommandLineA answers.
   constexpr std::string_view kCommandLine = "\"default.xex\"";
   const uint32_t command_line = Block(64);
-  std::memcpy(guest::Pointer(base, command_line), kCommandLine.data(), kCommandLine.size());
-  guest::StoreU32(base, kExLoadedCommandLine, command_line);
+  std::memcpy(guest::Pointer(command_line), kCommandLine.data(), kCommandLine.size());
+  guest::StoreU32(kExLoadedCommandLine, command_line);
   // ExThreadObjectType: a type record only passed back to
   // ObReferenceObjectByHandle (which ours ignores); its tag as the SDK's.
   const uint32_t thread_type = Block(32);
-  std::memcpy(guest::Pointer(base, thread_type + 0x18), "Thrd", 4);
-  guest::StoreU32(base, kExThreadObjectType, thread_type);
+  std::memcpy(guest::Pointer(thread_type + 0x18), "Thrd", 4);
+  guest::StoreU32(kExThreadObjectType, thread_type);
   // XboxKrnlVersion: major, minor, build, QFE (16 bits each).
   const uint32_t version = Block(16);
-  guest::StoreU16(base, version + 0, 2);
-  guest::StoreU16(base, version + 2, 0xFFFF);
-  guest::StoreU16(base, version + 4, 0xFFFF);
-  guest::StoreU16(base, version + 6, 0x8000);
-  guest::StoreU32(base, kXboxKrnlVersion, version);
+  guest::StoreU16(version + 0, 2);
+  guest::StoreU16(version + 2, 0xFFFF);
+  guest::StoreU16(version + 4, 0xFFFF);
+  guest::StoreU16(version + 6, 0x8000);
+  guest::StoreU32(kXboxKrnlVersion, version);
   ITC_LOG_INFO("kernel variables: 6 bound to data of ours");
 }
 

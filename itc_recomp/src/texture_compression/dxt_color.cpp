@@ -66,16 +66,16 @@ uint32_t Rotl(uint32_t v, int n) {
 
 }  // namespace
 
-uint16_t PackR5G6B5(uint8_t* base, const float color[3]) {
+uint16_t PackR5G6B5(const float color[3]) {
   ITC_NATIVE_RUNNING("sub_824206E8 DxtColor::PackR5G6B5");
-  const double zero = Lfs(base, kZero);  // f13
-  const double one = Lfs(base, kOne);    // f11
+  const double zero = Lfs(kZero);  // f13
+  const double one = Lfs(kOne);    // f11
   const double r = Clamp(color[0], zero, one);  // f9
   const double g = Clamp(color[1], zero, one);  // f10
   const double b = Clamp(color[2], zero, one);  // f11
-  const double scale5 = Lfs(base, kScale5);
-  const double scale6 = Lfs(base, kScale6);
-  const double half = Lfs(base, kHalf);
+  const double scale5 = Lfs(kScale5);
+  const double scale6 = Lfs(kScale6);
+  const double half = Lfs(kHalf);
   const uint32_t ri = uint32_t(Fctiwz(Fmadds(r, scale5, half)));
   const uint32_t gi = uint32_t(Fctiwz(Fmadds(g, scale6, half)));
   const uint32_t bi = uint32_t(Fctiwz(Fmadds(b, scale5, half)));
@@ -111,16 +111,16 @@ uint64_t FitColorEndpointsStackReads() {
   return stack_reads.load(std::memory_order_relaxed);
 }
 
-void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors, uint32_t stack,
+void FitColorEndpoints(const float pixels[16][3], uint32_t colors, uint32_t stack,
                        float low[3], float high[3]) {
   ITC_NATIVE_RUNNING("sub_82420AB8 DxtColor::FitEndpoints");
   const uint32_t low_weights = colors == 3 ? kLowWeights3 : kLowWeights4;     // r30
   const uint32_t high_weights = colors == 3 ? kHighWeights3 : kHighWeights4;  // r29
-  const double zero = Lfs(base, kZero);  // f0
+  const double zero = Lfs(kZero);  // f0
 
   // The bounds: lo (f24, f26, f25) from the floats at 0x82649B10, hi (f21,
   // f23, f22) from 0.0; each pixel tested against both.
-  double lo[3] = {Lfs(base, kLowStart), Lfs(base, kLowStart + 4), Lfs(base, kLowStart + 8)};
+  double lo[3] = {Lfs(kLowStart), Lfs(kLowStart + 4), Lfs(kLowStart + 8)};
   double hi[3] = {zero, zero, zero};
   for (int i = 0; i < 16; i++) {
     const double x = pixels[i][0];
@@ -145,7 +145,7 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
   const double ez = Fsubs(hi[2], lo[2]);  // f12
   const double ex = Fsubs(hi[0], lo[0]);  // f6
   const double extent = Fmadds(ex, ex, Fmadds(ez, ez, Fmuls(ey, ey)));  // f31
-  if (extent < Lfs(base, kExtentMin)) {
+  if (extent < Lfs(kExtentMin)) {
     finish();
     return;
   }
@@ -153,10 +153,10 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
   // Which of the box's four diagonals the pixels follow best: the sums of
   // the squares of their projections on each, from the box's center (kept at
   // r1 - 272 to - 260).
-  const double half = Lfs(base, kHalf);  // f20
+  const double half = Lfs(kHalf);  // f20
   double sums[4] = {zero, zero, zero, zero};  // f10, f9, f8, f7
   {
-    const double inv = Fdivs(Lfs(base, kOne), extent);
+    const double inv = Fdivs(Lfs(kOne), extent);
     const double cx = Fmuls(Fadds(hi[0], lo[0]), half);  // f5
     const double cy = Fmuls(Fadds(hi[1], lo[1]), half);  // f4
     const double cz = Fmuls(Fadds(hi[2], lo[2]), half);  // f3
@@ -197,7 +197,7 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
   if (diagonal & 1) {
     std::swap(lo[2], hi[2]);
   }
-  const double length_min = Lfs(base, kLengthMin);  // f15
+  const double length_min = Lfs(kLengthMin);  // f15
   if (extent < length_min) {
     finish();
     return;
@@ -207,9 +207,9 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
   // pixel's nearest step, and a correction of each end from the weighted
   // differences.
   const uint32_t last = colors - 1;                  // r7
-  const double correction = Lfs(base, kCorrection);  // f17
-  const double weight_scale = Lfs(base, kWeightScale);  // f19
-  const double stop_min = Lfs(base, kStopMin);      // f16
+  const double correction = Lfs(kCorrection);  // f17
+  const double weight_scale = Lfs(kWeightScale);  // f19
+  const double stop_min = Lfs(kStopMin);      // f16
   const double last_f = IntToSingle(int64_t(last));  // f18 (fcfid of the zero-extended word)
   float points[4][3] = {};
   // The words the original leaves at r1 - 272 to - 260 while it fits (the
@@ -230,13 +230,13 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
     // Below r1 - 272 (or past the steps' values): never written by the
     // original, so what's there; r1 - 192 to r1 held its saved registers.
     NoteStackRead(index, address, address - (stack - 192) < 192 ? 2 : 1);
-    return guest::LoadU32(base, address);
+    return guest::LoadU32(address);
   };
 
   for (uint32_t pass = 0; pass < 8; pass++) {
     for (uint32_t k = 0; k < colors; k++) {
-      const double lw = Lfs(base, low_weights + 4 * k);
-      const double hw = Lfs(base, high_weights + 4 * k);
+      const double lw = Lfs(low_weights + 4 * k);
+      const double hw = Lfs(high_weights + 4 * k);
       const double l0 = Fmuls(lw, lo[0]);
       const double l1 = Fmuls(lw, lo[1]);
       const double l2 = Fmuls(lw, lo[2]);
@@ -273,8 +273,8 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
       scratch[0] = index;
       const uint32_t word_at = index << 2;   // r9
       const uint32_t point_at = index << 4;  // r10
-      const double lw = Lfs(base, word_at + low_weights);
-      const double hw = Lfs(base, word_at + high_weights);
+      const double lw = Lfs(word_at + low_weights);
+      const double hw = Lfs(word_at + high_weights);
       double qx;
       double qy;
       double qz;
@@ -408,7 +408,7 @@ void StoreU16(uint8_t* out, uint32_t v) {
 
 }  // namespace
 
-void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alpha, int32_t dither,
+void EncodeColorBlock(const float pixels[16][4], bool one_bit_alpha, int32_t dither,
                       uint32_t stack, uint8_t block[8]) {
   ITC_NATIVE_RUNNING("sub_82420F50 DxtColor::EncodeBlock");
   const uint32_t frame = stack - kColorFrameBytes;  // the original's r1
@@ -416,7 +416,7 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
   // DXT1's 1-bit alpha: the pixels below the reference (a NaN isn't).
   uint32_t colors = 4;
   if (one_bit_alpha) {
-    const double reference = Lfs(base, kAlphaReference);
+    const double reference = Lfs(kAlphaReference);
     uint32_t below = 0;
     for (int i = 0; i < 16; i++) {
       if (double(pixels[i][3]) < reference) {
@@ -432,21 +432,21 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
     colors = below != 0 ? 3 : 4;
   }
 
-  const double w[3] = {Lfs(base, kLowStart), Lfs(base, kLowStart + 4),
-                       Lfs(base, kLowStart + 8)};  // f27, f28, f29
-  const double scale5 = Lfs(base, kScale5);        // f8
-  const double scale6 = Lfs(base, kScale6);        // f7
-  const double step5 = Lfs(base, kStep5);          // f31
-  const double step6 = Lfs(base, kStep6);          // f30
-  const double half = Lfs(base, kHalf);            // f23
+  const double w[3] = {Lfs(kLowStart), Lfs(kLowStart + 4),
+                       Lfs(kLowStart + 8)};  // f27, f28, f29
+  const double scale5 = Lfs(kScale5);        // f8
+  const double scale6 = Lfs(kScale6);        // f7
+  const double step5 = Lfs(kStep5);          // f31
+  const double step6 = Lfs(kStep6);          // f30
+  const double half = Lfs(kHalf);            // f23
   // Each weighted pixel's fourth float (stfs of 1.0, read back as the
   // diffused error's factor).
-  const double weighted_alpha = double(float(Lfs(base, kOne)));
+  const double weighted_alpha = double(float(Lfs(kOne)));
   Diffusion diffusion;
-  diffusion.right = Lfs(base, kWeightRight);           // f22
-  diffusion.below_left = Lfs(base, kWeightBelowLeft);  // f21
-  diffusion.below = Lfs(base, kWeightBelow);           // f20
-  diffusion.below_right = Lfs(base, kWeightBelowRight);  // f19
+  diffusion.right = Lfs(kWeightRight);           // f22
+  diffusion.below_left = Lfs(kWeightBelowLeft);  // f21
+  diffusion.below = Lfs(kWeightBelow);           // f20
+  diffusion.below_right = Lfs(kWeightBelowRight);  // f19
 
   // The pixels quantized to 5:6:5 (with the error diffused so far) and
   // weighted, into r1 + 528.
@@ -478,16 +478,16 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
   // The ends (r1 + 96 and r1 + 240), unweighted and packed.
   float low[3];
   float high[3];
-  FitColorEndpoints(base, weighted, colors, frame, low, high);
-  const double inverse[3] = {Lfs(base, kInverseWeights), Lfs(base, kInverseWeights + 4),
-                             Lfs(base, kInverseWeights + 8)};
+  FitColorEndpoints(weighted, colors, frame, low, high);
+  const double inverse[3] = {Lfs(kInverseWeights), Lfs(kInverseWeights + 4),
+                             Lfs(kInverseWeights + 8)};
   const float low_color[3] = {float(Fmuls(inverse[0], low[0])), float(Fmuls(low[1], inverse[1])),
                               float(Fmuls(low[2], inverse[2]))};
   const float high_color[3] = {float(Fmuls(high[0], inverse[0])),
                                float(Fmuls(high[1], inverse[1])),
                                float(Fmuls(high[2], inverse[2]))};
-  const uint32_t c0 = PackR5G6B5(base, low_color);   // r7
-  const uint32_t c1 = PackR5G6B5(base, high_color);  // r11
+  const uint32_t c0 = PackR5G6B5(low_color);   // r7
+  const uint32_t c1 = PackR5G6B5(high_color);  // r11
   if (colors == 4 && c0 == c1) {  // sth c1 at +2, sth c0 at +0, stw 0 at +4
     StoreU16(block, c0);
     StoreU16(block + 2, c1);
@@ -519,8 +519,8 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
   if (colors == 3) {
     Lerp(palette[0], palette[1], float(half), palette[2]);
   } else {
-    Lerp(palette[0], palette[1], float(Lfs(base, kThird)), palette[2]);
-    Lerp(palette[0], palette[1], float(Lfs(base, kTwoThirds)), palette[3]);
+    Lerp(palette[0], palette[1], float(Lfs(kThird)), palette[2]);
+    Lerp(palette[0], palette[1], float(Lfs(kTwoThirds)), palette[3]);
   }
 
   // Each pixel's step along the palette's line.
@@ -529,13 +529,13 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
   const double dg = Fsubs(palette[1][1], p0[1]);                        // f12
   const double db = Fsubs(palette[1][2], p0[2]);                        // f11
   const double last = IntToSingle(int64_t(colors - 1));                 // f24
-  const double zero = Lfs(base, kZero);                                 // f28
+  const double zero = Lfs(kZero);                                 // f28
   const double scale = c0 == c1 ? zero : Fdivs(last, Fmadds(dr, dr, Fmadds(db, db, Fmuls(dg, dg))));
   const double sr = Fmuls(scale, dr);  // f31
   const double sg = Fmuls(scale, dg);  // f30
   const double sb = Fmuls(scale, db);  // f29
   const uint32_t indices = colors == 3 ? kIndices3 : kIndices4;  // r28
-  const double reference = Lfs(base, kAlphaReference);  // f7, through r1 + 256
+  const double reference = Lfs(kAlphaReference);  // f7, through r1 + 256
   if (dither != 0) {
     std::memset(diffusion.error, 0, sizeof(diffusion.error));
   }
@@ -560,7 +560,7 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
     } else if (!(t < last)) {
       index = 1;
     } else {
-      index = guest::LoadU32(base, (uint32_t(Fctiwz(Fadds(t, half))) << 2) + indices);
+      index = guest::LoadU32((uint32_t(Fctiwz(Fadds(t, half))) << 2) + indices);
     }
     bits = (bits >> 2) | ((index & 3) << 30);
     if (dither != 0) {
@@ -575,7 +575,7 @@ void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alp
           ITC_LOG_WARN("DxtColor::EncodeBlock: palette index {} of {} colors", index, colors);
         }
         const uint32_t at = frame + kPaletteInFrame + (index << 4);
-        for (uint32_t c = 0; c < 3; c++) entry[c] = guest::LoadFloat(base, at + 4 * c);
+        for (uint32_t c = 0; c < 3; c++) entry[c] = guest::LoadFloat(at + 4 * c);
       }
       const double e[3] = {Fmuls(Fsubs(r, entry[0]), weighted_alpha),
                            Fmuls(Fsubs(g, entry[1]), weighted_alpha),

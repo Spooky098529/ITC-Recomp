@@ -10,7 +10,7 @@
 
 namespace imports {
 
-using NativeImport = lifted::Result (*)(uint8_t* base, const lifted::Args& args);
+using NativeImport = lifted::Result (*)(const lifted::Args& args);
 
 struct NativeImportEntry {
   lifted::ImportFunction* function;

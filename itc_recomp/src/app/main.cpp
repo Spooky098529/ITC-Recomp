@@ -229,8 +229,8 @@ int main(int argc, char* argv[]) {
   // The image's data in guest memory (compiled in: src/image/image.h), the
   // kernel variables bound.
   uint8_t* base = memory::Base();
-  image::CopyInto(base);
-  memory::BindKernelVariables(base);
+  image::CopyInto();
+  memory::BindKernelVariables();
   native_audio::Start();
   // The game's main thread: one of our threads (E1, src/threads/) running
   // our start-up (src/app/start_up.cpp) with the image's stack size.
@@ -238,7 +238,7 @@ int main(int argc, char* argv[]) {
     app::Fail("--native_threads=false is no longer supported");
     return EXIT_FAILURE;
   }
-  std::thread main_thread = threads::StartMainThread(base, image::kStackSize, app::StartUp);
+  std::thread main_thread = threads::StartMainThread(image::kStackSize, app::StartUp);
   std::thread waiter([thread = std::move(main_thread)]() mutable {
     thread.join();
     ITC_LOG_INFO("Execution complete");

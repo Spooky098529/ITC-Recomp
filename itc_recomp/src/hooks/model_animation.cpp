@@ -48,7 +48,7 @@ bool NativeLifetime() {
 #define ITC_MODEL_ANIMATION_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                        \
   if (!ITC_FLAG(native_model_animation)) {    \
-    lifted::original::c##address(ctx, base);          \
+    lifted::original::c##address(ctx);          \
     return;                                   \
   }
 
@@ -60,7 +60,7 @@ bool NativeLifetime() {
 ITC_NATIVE_ENTRY_ALWAYS(825A1B70) {
   ITC_MODEL_ANIMATION_FALLBACK(825A1B70)
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = TrackSetConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = TrackSetConstruct(ctx.r3.u32);
 }
 
 // The release and set-ups: r3 = the set (r4 = the section).
@@ -73,78 +73,78 @@ ITC_NATIVE_ENTRY_ALWAYS(825A1B70) {
         return;                                      \
       }                                              \
     }                                                \
-    lifted::original::c##address(ctx, base);                 \
+    lifted::original::c##address(ctx);                 \
   }
 
-ITC_MODEL_ANIMATION_LIFETIME(825A11D0, TrackSetReleaseArray(base, ctx.r3.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825A1BA8, TrackSetRelease(base, ctx.r3.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825A1E08, TrackSetSetupFloat4(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825A1BE8, TrackSetSetupFloat(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825A1218, TrackSetSetup32(base, ctx.r3.u32, ctx.r4.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825A1A38, TrackSetSetup208(base, ctx.r3.u32, ctx.r4.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A11D0, TrackSetReleaseArray(ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A1BA8, TrackSetRelease(ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A1E08, TrackSetSetupFloat4(ctx.r3.u32, ctx.r4.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A1BE8, TrackSetSetupFloat(ctx.r3.u32, ctx.r4.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A1218, TrackSetSetup32(ctx.r3.u32, ctx.r4.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825A1A38, TrackSetSetup208(ctx.r3.u32, ctx.r4.u32))
 
 // The skeleton's destructors and frees: r3 = the skeleton.
-ITC_MODEL_ANIMATION_LIFETIME(8259A228, SkeletonBaseFree(base, ctx.r3.u32))
-ITC_MODEL_ANIMATION_LIFETIME(8259A9D0, SkeletonBaseDestruct(base, ctx.r3.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825999C8, SkeletonDestruct(base, ctx.r3.u32))
-ITC_MODEL_ANIMATION_LIFETIME(825997A0, SkeletonFreeNodeValues(base, ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(8259A228, SkeletonBaseFree(ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(8259A9D0, SkeletonBaseDestruct(ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825999C8, SkeletonDestruct(ctx.r3.u32))
+ITC_MODEL_ANIMATION_LIFETIME(825997A0, SkeletonFreeNodeValues(ctx.r3.u32))
 
 // The constructors: r3 = the object, returned.
 ITC_NATIVE_ENTRY_ALWAYS(8259A140) {
   ITC_MODEL_ANIMATION_FALLBACK(8259A140)
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = SkeletonBaseConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = SkeletonBaseConstruct(ctx.r3.u32);
 }
 ITC_NATIVE_ENTRY_ALWAYS(82599758) {
   ITC_MODEL_ANIMATION_FALLBACK(82599758)
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = SkeletonConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = SkeletonConstruct(ctx.r3.u32);
 }
 // PrimitiveDrawer::PrimitiveDrawer: operator new(4), so only over the
 // allocation layer; its error path is the original's.
 ITC_NATIVE_ENTRY_ALWAYS(825A1378) {
   
-  if (NativeLifetime() && PrimitiveDrawerConstruct(base, ctx.r3.u32)) {
+  if (NativeLifetime() && PrimitiveDrawerConstruct(ctx.r3.u32)) {
     return;  // r3: the drawer, as given
   }
-  lifted::original::c825A1378(ctx, base);
+  lifted::original::c825A1378(ctx);
 }
 
 // SkeletonCursor::Clear and sub_825A18D8: r3 = the cursor or record.
 ITC_NATIVE_ENTRY_ALWAYS(825A2068) {
   ITC_MODEL_ANIMATION_FALLBACK(825A2068)
   ctx.fpscr.disableFlushMode();
-  SkeletonCursorClear(base, ctx.r3.u32);
+  SkeletonCursorClear(ctx.r3.u32);
 }
 ITC_NATIVE_ENTRY_ALWAYS(825A18D8) {
   ITC_MODEL_ANIMATION_FALLBACK(825A18D8)
   ctx.fpscr.disableFlushMode();
-  RecordClear(base, ctx.r3.u32);
+  RecordClear(ctx.r3.u32);
 }
 
 // Skeleton::LoadNodeValues: r3 = the skeleton, r4 = the section.
 ITC_NATIVE_ENTRY_ALWAYS(825997E0) {
   ITC_MODEL_ANIMATION_FALLBACK(825997E0)
   ctx.fpscr.disableFlushMode();
-  SkeletonLoadNodeValues(base, ctx.r3.u32, ctx.r4.u32);
+  SkeletonLoadNodeValues(ctx.r3.u32, ctx.r4.u32);
 }
 // Skeleton::NodeCount: r3 = the skeleton; returns the count.
 ITC_NATIVE_ENTRY_ALWAYS(82599880) {
   ITC_MODEL_ANIMATION_FALLBACK(82599880)
-  ctx.r3.u64 = SkeletonNodeCount(base, ctx.r3.u32);
+  ctx.r3.u64 = SkeletonNodeCount(ctx.r3.u32);
 }
 // Skeleton::UpdateMatrices: r3 = the skeleton. Flush-to-zero is left on
 // after the multiplies, as the translated Matrix::Multiply leaves it.
 ITC_NATIVE_ENTRY_ALWAYS(825998A0) {
   ITC_MODEL_ANIMATION_FALLBACK(825998A0)
-  switch (SkeletonUpdateMatrices(base, ctx.r3.u32)) {
+  switch (SkeletonUpdateMatrices(ctx.r3.u32)) {
     case MatricesResult::kNothing:
       return;
     case MatricesResult::kMultiplied:
       ctx.fpscr.enableFlushMode();
       return;
     case MatricesResult::kOriginal:
-      lifted::original::c825998A0(ctx, base);
+      lifted::original::c825998A0(ctx);
       return;
   }
 }
@@ -152,5 +152,5 @@ ITC_NATIVE_ENTRY_ALWAYS(825998A0) {
 ITC_NATIVE_ENTRY_ALWAYS(825998B8) {
   ITC_MODEL_ANIMATION_FALLBACK(825998B8)
   ctx.fpscr.disableFlushMode();
-  SkeletonApplyAnimation(base, ctx.r3.u32);
+  SkeletonApplyAnimation(ctx.r3.u32);
 }

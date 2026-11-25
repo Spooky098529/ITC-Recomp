@@ -34,8 +34,8 @@ std::recursive_mutex& ExitMutex();
 // taken and given back. Each returns lock 8's critical section (its table
 // entry's word), the r3 the originals leave (their Rtl*CriticalSection
 // argument).
-uint32_t LockExit(uint8_t* base);
-uint32_t UnlockExit(uint8_t* base);
+uint32_t LockExit();
+uint32_t UnlockExit();
 
 // sub_825A6F60 _onexit: with the exit lock held, `function` stored at the
 // table's end, the table grown first when its block (_msize) has no room for
@@ -45,11 +45,11 @@ uint32_t UnlockExit(uint8_t* base);
 // with nothing changed, when the native _msize or realloc would take an
 // error path (a null table, a size the layer refuses): the caller runs the
 // original from the start, which takes it.
-std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function);
+std::optional<uint32_t> OnExit(uint32_t function);
 
 // sub_825A7068 atexit: _onexit, -1 when it gives 0, else 0; nullopt as
 // _onexit's.
-std::optional<int32_t> Atexit(uint8_t* base, uint32_t function);
+std::optional<int32_t> Atexit(uint32_t function);
 
 // sub_825A6F00 __onexitinit (probably; an initializer _cinit's _initterm_e
 // runs once at boot, reading r3): the table made by calloc(32, 4), begin and
@@ -57,7 +57,7 @@ std::optional<int32_t> Atexit(uint8_t* base, uint32_t function);
 // (_RT_ONEXIT) for a null table (begin and end then 0). nullopt, with
 // nothing done, when the native calloc would take its error path (the caller
 // runs the original from the start, which sets errno).
-std::optional<uint32_t> InitExitTable(uint8_t* base);
+std::optional<uint32_t> InitExitTable();
 
 // For native callers of atexit (the static set-ups, first uses): the game's
 // atexit for `function`, its r3, called when the native one can't (its
@@ -71,6 +71,6 @@ struct AtexitCall {
 
 // atexit for a native caller: natively, else through `call`; returns its r3
 // (0, or -1 when the table can't take the function).
-int32_t AtexitFrom(uint8_t* base, uint32_t function, const AtexitCall& call);
+int32_t AtexitFrom(uint32_t function, const AtexitCall& call);
 
 }  // namespace c_runtime

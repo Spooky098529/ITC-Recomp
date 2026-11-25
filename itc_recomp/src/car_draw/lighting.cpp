@@ -57,11 +57,11 @@ class FlushToZero {
   uint32_t csr_;
 };
 
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 // frsp.
 double Single(double value) {
@@ -72,26 +72,26 @@ double Neg(double value) {
   return std::bit_cast<double>(std::bit_cast<uint64_t>(value) ^ 0x8000000000000000ull);
 }
 
-void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t words) {
+void CopyWords(uint32_t to, uint32_t from, uint32_t words) {
   for (uint32_t i = 0; i < words; i++) {
-    guest::StoreU32(base, to + 4 * i, guest::LoadU32(base, from + 4 * i));
+    guest::StoreU32(to + 4 * i, guest::LoadU32(from + 4 * i));
   }
 }
 
 // A 16-byte guest vector (lvx: its aligned address) with word 0 in the top
 // lane, and back (stvx).
-simde__m128 VectorAt(uint8_t* base, uint32_t address) {
+simde__m128 VectorAt(uint32_t address) {
   address &= ~0xFu;
   return simde_mm_castsi128_ps(simde_mm_set_epi32(
-      int32_t(guest::LoadU32(base, address + 0)), int32_t(guest::LoadU32(base, address + 4)),
-      int32_t(guest::LoadU32(base, address + 8)), int32_t(guest::LoadU32(base, address + 12))));
+      int32_t(guest::LoadU32(address + 0)), int32_t(guest::LoadU32(address + 4)),
+      int32_t(guest::LoadU32(address + 8)), int32_t(guest::LoadU32(address + 12))));
 }
-void StoreVector(uint8_t* base, uint32_t address, simde__m128 v) {
+void StoreVector(uint32_t address, simde__m128 v) {
   address &= ~0xFu;
   alignas(16) uint32_t lanes[4];
   simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
   for (int i = 0; i < 4; i++) {
-    guest::StoreU32(base, address + 4 * i, lanes[3 - i]);
+    guest::StoreU32(address + 4 * i, lanes[3 - i]);
   }
 }
 
@@ -116,14 +116,14 @@ void WordsOf(simde__m128 v, uint32_t words[4]) {
   }
 }
 // Four host words stored at `to` in order (as CopyWords from the frame).
-void StoreWords(uint8_t* base, uint32_t to, const uint32_t words[4]) {
+void StoreWords(uint32_t to, const uint32_t words[4]) {
   for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, to + 4 * i, words[i]);
+    guest::StoreU32(to + 4 * i, words[i]);
   }
 }
-void LoadWords(uint8_t* base, uint32_t from, uint32_t words[4]) {
+void LoadWords(uint32_t from, uint32_t words[4]) {
   for (uint32_t i = 0; i < 4; i++) {
-    words[i] = guest::LoadU32(base, from + 4 * i);
+    words[i] = guest::LoadU32(from + 4 * i);
   }
 }
 
@@ -157,7 +157,7 @@ simde__m128 Normalize(simde__m128 v, simde__m128 half) {
 
 // --- Matrix::Shadow ---
 
-void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, uint32_t normal,
+void MatrixShadow(uint32_t out, uint32_t light, uint32_t point, uint32_t normal,
                   uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82597FE0 Matrix::Shadow");
   // The normalized normal, which the original stored at `stack` - 16 (below
@@ -167,7 +167,7 @@ void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, u
   const uint32_t n = stack - 16;
   const bool aligned = (n & 0xFu) == 0;
   // The loads before the normalized normal's store, in the original's order.
-  const schema::ShadowVector p(base, point), l(base, light);
+  const schema::ShadowVector p(point), l(light);
   const double py = double(p.y());
   const double lx = double(l.x());
   const double pz = double(p.z());
@@ -178,15 +178,15 @@ void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, u
   uint32_t normalized[4];
   {
     FlushToZero ftz;
-    const simde__m128 v = Normalize(VectorAt(base, normal), Half());
+    const simde__m128 v = Normalize(VectorAt(normal), Half());
     if (aligned) {
       WordsOf(v, normalized);
     } else {
-      StoreVector(base, n, v);
+      StoreVector(n, v);
     }
   }
   if (!aligned) {
-    LoadWords(base, n, normalized);
+    LoadWords(n, normalized);
   }
   const double ny = FloatOf(normalized[1]);
   double f12 = Single(py * ny);
@@ -200,7 +200,7 @@ void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, u
   f10 = Single(std::fma(lw, d, f10));
   const double dot = Single(f10 + f9);
   f9 = Single(dot - f9);
-  Stfs(base, out + 0, f9);
+  Stfs(out + 0, f9);
   // Each row: -L_j n_i, but the diagonal's dot - L_i n_i (fnmsubs), the
   // light's words read again for each.
   const double row[4] = {nx, ny, nz, d};
@@ -209,23 +209,23 @@ void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, u
       if (i == 0 && j == 0) {
         continue;
       }
-      const double l = Lfs(base, light + 4 * j);
+      const double l = Lfs(light + 4 * j);
       const double value = i == j ? Single(Neg(std::fma(l, row[i], Neg(dot))))
                                   : Neg(Single(l * row[i]));
-      Stfs(base, out + 16 * i + 4 * j, value);
+      Stfs(out + 16 * i + 4 * j, value);
     }
   }
 }
 
 // --- CarLighting::Gather ---
 
-uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t out_r3,
+uint64_t CarLightingGather(const Calls& calls, uint32_t stack, uint64_t out_r3,
                            uint32_t world, uint32_t flag) {
   ITC_NATIVE_RUNNING("sub_820C9170 CarLighting::Gather");
   const uint32_t out = uint32_t(out_r3);
   const uint32_t frame = stack - kGatherFrame;
-  guest::StoreU32(base, frame, stack);  // the back chain, as stwu
-  const schema::CarScene scene_at_entry = G::scene(base);
+  guest::StoreU32(frame, stack);  // the back chain, as stwu
+  const schema::CarScene scene_at_entry = G::scene();
   // The frame stays for the words handed to other code by address (the
   // point +112, the direction +144, the normal +176, the cone vectors +256
   // and +272, the lights' list +288; FindNearest's original and
@@ -234,43 +234,43 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
   // direction (+96), the colors (+192, +208), the shadow weights (+160);
   // the count's and index's spills (+80, +128) and r3 and r5 saved in the
   // caller's frame (+20, +36), which nothing read back, are left out.
-  const double f29 = Lfs(base, kZero);
-  const double f31 = Lfs(base, kOne);
+  const double f29 = Lfs(kZero);
+  const double f31 = Lfs(kOne);
   const double f24 = double(scene_at_entry.lighting_end());
-  Stfs(base, frame + 144, f29);
-  Stfs(base, frame + 148, f31);
-  Stfs(base, frame + 152, f29);
-  Stfs(base, frame + 156, f29);
+  Stfs(frame + 144, f29);
+  Stfs(frame + 148, f31);
+  Stfs(frame + 152, f29);
+  Stfs(frame + 156, f29);
   // The scene's lighting vectors (its lighting block's +96, +112, +240,
   // +256) into the frame.
   uint32_t vector_a[4], vector_b[4];  // the frame's +240 and +224
-  LoadWords(base, scene_at_entry.gather_vector_a_lo_address(), vector_a);
-  LoadWords(base, scene_at_entry.gather_vector_b_lo_address(), vector_b);
-  CopyWords(base, frame + 256, scene_at_entry.cone_a_lo_address(), 4);
-  CopyWords(base, frame + 272, scene_at_entry.cone_b_lo_address(), 4);
+  LoadWords(scene_at_entry.gather_vector_a_lo_address(), vector_a);
+  LoadWords(scene_at_entry.gather_vector_b_lo_address(), vector_b);
+  CopyWords(frame + 256, scene_at_entry.cone_a_lo_address(), 4);
+  CopyWords(frame + 272, scene_at_entry.cone_b_lo_address(), 4);
   for (uint32_t i = 0; i < 10; i++) {
-    guest::StoreU32(base, out + 4 * i, 0);
+    guest::StoreU32(out + 4 * i, 0);
   }
   // The point (0, 0, 0, 1) and the lights' list's w words.
-  Stfs(base, frame + 112, f29);
-  Stfs(base, frame + 116, f29);
-  Stfs(base, frame + 120, f29);
-  Stfs(base, frame + 124, f31);
+  Stfs(frame + 112, f29);
+  Stfs(frame + 116, f29);
+  Stfs(frame + 120, f29);
+  Stfs(frame + 124, f31);
   for (uint32_t i = 0; i < 10; i++) {
-    Stfs(base, frame + 300 + 32 * i, f31);
-    Stfs(base, frame + 316 + 32 * i, f31);
+    Stfs(frame + 300 + 32 * i, f31);
+    Stfs(frame + 316 + 32 * i, f31);
   }
   double f27 = f29, f26 = f29, f25 = f29;
-  const double f28 = Lfs(base, kMergeDistance);
+  const double f28 = Lfs(kMergeDistance);
   uint32_t weights[4] = {Bits(f28), 0, 0, 0};  // the frame's +160
-  debug::Vec4Transform(base, frame + 112, world, frame + 112);
+  debug::Vec4Transform(frame + 112, world, frame + 112);
   {
-    const double cone = Single(double(G::scene(base).cone_angle()) * Lfs(base, kConeScale));
+    const double cone = Single(double(G::scene().cone_angle()) * Lfs(kConeScale));
     const double least = Single(c_runtime::Cos(cone));
-    const uint32_t owner = schema::CourseSceneryGlobals::created(base).address;
-    const double farthest = Lfs(base, kFarthest);
+    const uint32_t owner = schema::CourseSceneryGlobals::created().address;
+    const double farthest = Lfs(kFarthest);
     uint64_t r3;
-    if (const auto found = lights::FindNearest(base, owner, frame + 288, frame + 112, 10,
+    if (const auto found = lights::FindNearest(owner, frame + 288, frame + 112, 10,
                                                frame + 144, f28, farthest, least)) {
       r3 = *found;
     } else {
@@ -282,23 +282,23 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
     }
     uint32_t count = uint32_t(r3);
     if (count != 0) {
-      schema::CarScene scene = G::scene(base);
+      schema::CarScene scene = G::scene();
       simde__m128 half;
       {
         FlushToZero ftz;
         half = Half();
       }
-      const double f30 = Lfs(base, kColorScale);
+      const double f30 = Lfs(kColorScale);
       uint32_t at = frame + 312;
       uint32_t next = 0;
       do {
         const uint32_t entry = at - 24;
         uint32_t direction[4];  // the frame's +96
-        direction[1] = Bits(Single(Lfs(base, at - 20) - Lfs(base, frame + 116)));
-        direction[2] = Bits(Single(Lfs(base, at - 16) - Lfs(base, frame + 120)));
-        direction[0] = Bits(Single(Lfs(base, entry) - Lfs(base, frame + 112)));
+        direction[1] = Bits(Single(Lfs(at - 20) - Lfs(frame + 116)));
+        direction[2] = Bits(Single(Lfs(at - 16) - Lfs(frame + 120)));
+        direction[0] = Bits(Single(Lfs(entry) - Lfs(frame + 112)));
         direction[3] = Bits(f31);
-        Stfs(base, at - 12, f31);
+        Stfs(at - 12, f31);
         const double angle = double(scene.cone_angle());
         {
           FlushToZero ftz;
@@ -312,7 +312,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
           if (y > cosine) {
             const double above = Single(y - cosine);
             const double range = Single(f31 - cosine);
-            guest::StoreU32(base, out + 4 * i, 1);
+            guest::StoreU32(out + 4 * i, 1);
             const double strength = Single(Single(std::sqrt(above)) / range);
             if (i < 1) {
               f27 = strength;
@@ -321,19 +321,19 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
             } else if (i < 3) {
               f25 = strength;
             }
-            Stfs(base, frame + 176, f29);
-            Stfs(base, frame + 180, f31);
-            Stfs(base, frame + 184, f29);
-            Stfs(base, frame + 188, f29);
+            Stfs(frame + 176, f29);
+            Stfs(frame + 180, f31);
+            Stfs(frame + 184, f29);
+            Stfs(frame + 188, f29);
             r3 = out_r3 + 64 * i + 48;
-            MatrixShadow(base, r3, entry, frame + 112, frame + 176, frame);
+            MatrixShadow(r3, entry, frame + 112, frame + 176, frame);
           }
         }
-        scene = G::scene(base);
+        scene = G::scene();
         if (scene.lighting_fixed() == 0 && int32_t(i) <= 1) {
-          const double cx = Single(Lfs(base, at - 8) * f30);
-          const double cy = Single(Lfs(base, at - 4) * f30);
-          const double cz = Single(Lfs(base, at + 0) * f30);
+          const double cx = Single(Lfs(at - 8) * f30);
+          const double cy = Single(Lfs(at - 4) * f30);
+          const double cz = Single(Lfs(at + 0) * f30);
           // The frame's +192 and +208.
           const uint32_t colors_a[4] = {Bits(Single(FloatOf(vector_a[0]) * cx)),
                                         Bits(Single(FloatOf(vector_a[1]) * cy)),
@@ -342,12 +342,12 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
                                         Bits(Single(FloatOf(vector_b[1]) * cy)),
                                         Bits(Single(FloatOf(vector_b[2]) * cz)), Bits(f31)};
           const uint32_t slot = 16 * i;
-          CopyWords(base, kLightDirections + slot, frame + 144, 4);
-          CopyWords(base, kLightPositions + slot, entry, 4);
-          StoreWords(base, kLightColorsA + slot, colors_a);
-          CopyWords(base, kLightBlock240 + slot, frame + 256, 4);
-          StoreWords(base, kLightColorsB + slot, colors_b);
-          CopyWords(base, kLightAmbient + slot, frame + 272, 4);
+          CopyWords(kLightDirections + slot, frame + 144, 4);
+          CopyWords(kLightPositions + slot, entry, 4);
+          StoreWords(kLightColorsA + slot, colors_a);
+          CopyWords(kLightBlock240 + slot, frame + 256, 4);
+          StoreWords(kLightColorsB + slot, colors_b);
+          CopyWords(kLightAmbient + slot, frame + 272, 4);
           // As the original's lis and addi leave it (sign-extended).
           r3 = uint64_t(int64_t(int32_t(kLightColorsA))) + slot;
         }
@@ -363,7 +363,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
       f0 = Single(f0 + f27);
       f0 = Single(f28 - f0);
       weights[0] = Bits(Single(f0 * f24));
-      StoreWords(base, kShadowWeights, weights);
+      StoreWords(kShadowWeights, weights);
     }
     return r3;
   }

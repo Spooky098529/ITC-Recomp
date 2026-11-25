@@ -257,7 +257,7 @@ const Image& FrameImage() {
 
 }  // namespace
 
-uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t item,
+uint64_t AeroPartValue(uint32_t screen, uint64_t type, uint64_t item,
                        uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821DE2D8 TuningScreen::AeroPartValue");
   // The original's frame below `sp`, its words read from the image; a read
@@ -281,10 +281,10 @@ uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t i
       if (const auto w = word(offset)) {
         return *w;
       }
-      return guest::LoadU32(base, address);
+      return guest::LoadU32(address);
     }
     if (offset >= kFrameBytes && offset <= 0xFFFFFFFCu) {  // no byte in the frame
-      return guest::LoadU32(base, address);
+      return guest::LoadU32(address);
     }
     // Unaligned, or across the frame's end: byte by byte (big-endian).
     uint32_t value = 0;
@@ -295,12 +295,12 @@ uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t i
         w = word(at & ~3u);
       }
       const uint8_t b = w ? uint8_t(*w >> (24 - 8 * (at & 3)))
-                          : guest::LoadU8(base, address + k);
+                          : guest::LoadU8(address + k);
       value = (value << 8) | b;
     }
     return value;
   };
-  const uint32_t id = schema::CarMakersCar(base, SelectedGarageCar(base, screen) + 212).car_id();
+  const uint32_t id = schema::CarMakersCar(SelectedGarageCar(screen) + 212).car_id();
   if (id > 22 || kGroups[id] == 0) {
     return ~uint64_t(0);
   }

@@ -619,13 +619,13 @@ constexpr Step kSteps[] = {
 
 }  // namespace
 
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t Init(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82160AE0 RaceFlow::Init");
-  const Flow flow(base, machine);
+  const Flow flow(machine);
   flow.set_state(1);
   flow.set_flags(0);
-  const uint32_t race = G::race_data(base);
-  if (RaceData(base, race).kind() == 6) {
+  const uint32_t race = G::race_data();
+  if (RaceData(race).kind() == 6) {
     flow.set_player_a(0);
     flow.set_player_b(0);
   } else {
@@ -633,7 +633,7 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
     flow.set_player_b(1);
   }
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -647,15 +647,15 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
   for (const Step& step : kSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }

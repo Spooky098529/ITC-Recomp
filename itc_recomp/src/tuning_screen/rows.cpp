@@ -23,13 +23,13 @@ namespace tuning_screen {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
-uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
-  Store(base, sp - bytes, sp);
+uint32_t Frame(uint32_t sp, uint32_t bytes) {
+  Store(sp - bytes, sp);
   return sp - bytes;
 }
 
@@ -38,10 +38,10 @@ constexpr uint32_t kNotPlaying = 0x82001BE0;   // -1.0: NamedAnimationTime's ans
 
 // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48): the node's
 // +80 set; the node.
-uint32_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
+uint32_t SetShown(uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  UiNode(base, node).set_visible(shown);
+  const uint32_t node = ui_movies::FindNode(movie, sub_scene, child);
+  UiNode(node).set_visible(shown);
   return node;
 }
 
@@ -56,61 +56,61 @@ uint64_t HelpText(const GuestCall& call, uint32_t frame, uint32_t movie, uint64_
 
 }  // namespace
 
-uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t sp,
+uint64_t SetStateTexts(const GuestCall& call, uint32_t screen, uint32_t sp,
                        std::optional<double>* f1) {
   ITC_NATIVE_RUNNING("sub_821F1DE0 TuningScreen::SetStateTexts");
-  const uint32_t frame = Frame(base, sp, 224);
-  const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const int32_t state = int32_t(TS(base, screen).state());
-  const uint32_t movie = Load(base, entry);
+  const uint32_t frame = Frame(sp, 224);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const int32_t state = int32_t(TS(screen).state());
+  const uint32_t movie = Load(entry);
   if (state == 17) {
     call(kResetTextScroll, {movie, 10, 0}, frame, 0x821F1E3C);
-    const uint64_t id = uint64_t(TS(base, screen).size_cursor()) + 785;
+    const uint64_t id = uint64_t(TS(screen).size_cursor()) + 785;
     call(kSetText, {movie, 10, 0, id, 0, 0, 0, 0}, frame, 0x821F1E54);
     call(kScrollText, {movie, 10, 0, 1}, frame, 0x821F1E68);
-    const bool first = TS(base, screen).part_group() == 0;
-    return SetShown(base, movie, uint32_t(kAllScenes), 17, first ? 0 : 1);
+    const bool first = TS(screen).part_group() == 0;
+    return SetShown(movie, uint32_t(kAllScenes), 17, first ? 0 : 1);
   }
   if (state == 16) {
     // The group tabs, when neither 1007 nor 62 plays and +9716 is 0.
-    const double none = camera_modes::steps::Lfs(base, kNotPlaying);
+    const double none = camera_modes::steps::Lfs(kNotPlaying);
     auto time = [&](uint32_t index) {
-      const double t = double(std::bit_cast<float>(ui_movies::NamedAnimationTime(base, movie, index)));
+      const double t = double(std::bit_cast<float>(ui_movies::NamedAnimationTime(movie, index)));
       *f1 = t;
       return t;
     };
-    if (time(1007) == none && time(62) == none && TS(base, screen).command_first_run() == 0) {
+    if (time(1007) == none && time(62) == none && TS(screen).command_first_run() == 0) {
       for (uint32_t i = 0; i < 10; i++) {
-        const uint32_t tab = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 9), i + 5);
-        UiNode(base, tab).set_visible(0);
+        const uint32_t tab = ui_movies::Child(ui_movies::FindNode(movie, 1, 9), i + 5);
+        UiNode(tab).set_visible(0);
       }
       const uint32_t table = frame + 96;
-      Store(base, table, 376);
+      Store(table, 376);
       for (uint32_t i = 1; i < 17; i++) {
-        Store(base, table + 4 * i, 1183 + i);
+        Store(table + 4 * i, 1183 + i);
       }
       for (uint32_t j = 0; j < 4; j++) {
-        const uint32_t tab = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 9), j + 5);
-        UiNode(base, tab).set_visible(1);
-        const uint32_t k = TS(base, screen).part_group() - TS(base, screen).tabs_row() + j;
-        const uint64_t id = Load(base, table + 4 * k);
+        const uint32_t tab = ui_movies::Child(ui_movies::FindNode(movie, 1, 9), j + 5);
+        UiNode(tab).set_visible(1);
+        const uint32_t k = TS(screen).part_group() - TS(screen).tabs_row() + j;
+        const uint64_t id = Load(table + 4 * k);
         call(kSetNodeText, {movie, tab, id, 0, 0, 0, 0, 0}, frame, 0x821F1F70);
       }
     }
-    SetShown(base, movie, 1, 26, 1);
-    SetShown(base, movie, 1, 27, 1);
-    const int32_t group = int32_t(TS(base, screen).part_group());
+    SetShown(movie, 1, 26, 1);
+    SetShown(movie, 1, 27, 1);
+    const int32_t group = int32_t(TS(screen).part_group());
     if (group == 0) {
-      SetShown(base, movie, 1, 26, 0);
+      SetShown(movie, 1, 26, 0);
     } else if (group == 16) {
-      SetShown(base, movie, 1, 27, 0);
+      SetShown(movie, 1, 27, 0);
     }
     return HelpText(call, frame, movie, 784, {0x821F1FE8, 0x821F2048, 0x821F205C});
   }
   if (state == 15) {
-    if (TS(base, screen).command_first_run() != 0) {
-      ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 3, 1), 6);
-      ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 3, 2), 30);
+    if (TS(screen).command_first_run() != 0) {
+      ui_movies::SetNodeTexture(ui_movies::FindNode(movie, 3, 1), 6);
+      ui_movies::SetNodeTexture(ui_movies::FindNode(movie, 3, 2), 30);
     }
     return HelpText(call, frame, movie, 637, {0x821F2034, 0x821F2048, 0x821F205C});
   }
@@ -127,29 +127,29 @@ namespace {
 // at +27856 + 152 G + 4 i, ShowPartMarks, the picture clamped to 0..206.
 // ShowPartMarks' r3.
 template <typename Index>
-uint64_t FillRow(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
+uint64_t FillRow(uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
                  const Index& index, const std::optional<uint32_t>* picture_number = nullptr) {
   const uint32_t screen = uint32_t(r3);
-  const uint32_t row = ui_movies::FindNode(base, movie, 1, node);
-  const uint32_t owned = ui_movies::Child(base, row, 1);
-  const uint32_t picture = ui_movies::Child(base, row, 2);
+  const uint32_t row = ui_movies::FindNode(movie, 1, node);
+  const uint32_t owned = ui_movies::Child(row, 1);
+  const uint32_t picture = ui_movies::Child(row, 2);
   if (picture_number == nullptr) {
-    const uint64_t brand = TS(base, screen).part_group();
-    UiNode(base, picture).set_texture_entry(uint32_t(WheelNumber(brand, index()) - 1));
+    const uint64_t brand = TS(screen).part_group();
+    UiNode(picture).set_texture_entry(uint32_t(WheelNumber(brand, index()) - 1));
   } else if (picture_number->has_value()) {
-    UiNode(base, picture).set_texture_entry(**picture_number);
+    UiNode(picture).set_texture_entry(**picture_number);
   }
-  const uint64_t group = TS(base, screen).part_group();
+  const uint64_t group = TS(screen).part_group();
   const uint32_t word = uint32_t(group * 38 + index() + 6964) * 4 + screen;
-  UiNode(base, owned).set_visible(Load(base, word) != 0 ? 1 : 0);
+  UiNode(owned).set_visible(Load(word) != 0 ? 1 : 0);
   const uint64_t marks_index = index();
   const uint64_t marks_r3 =
-      ShowPartMarks(base, r3, row, TS(base, screen).part_group(), marks_index, frame);
-  const int32_t number = int32_t(UiNode(base, picture).texture_entry());
+      ShowPartMarks(r3, row, TS(screen).part_group(), marks_index, frame);
+  const int32_t number = int32_t(UiNode(picture).texture_entry());
   if (number > 206) {
-    UiNode(base, picture).set_texture_entry(206);
+    UiNode(picture).set_texture_entry(206);
   } else if (number < 0) {
-    UiNode(base, picture).set_texture_entry(0);
+    UiNode(picture).set_texture_entry(0);
   }
   return marks_r3;
 }
@@ -160,62 +160,62 @@ struct CarSlot {
   uint32_t list;
   int16_t slot;
 };
-CarSlot SelectedCarSlot(uint8_t* base, uint32_t screen) {
-  const schema::SaveData save(base, TS(base, screen).save_data().address);
+CarSlot SelectedCarSlot(uint32_t screen) {
+  const schema::SaveData save(TS(screen).save_data().address);
   const uint32_t list = save.garage_address();
   uint32_t count = save.selected_car();
   uint32_t at =
-      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, list).head()))) * 4 + list;
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(list).head()))) * 4 + list;
   while (count != 0) {
-    at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
+    at = uint32_t(int32_t(int16_t(guest::LoadU16(at)))) * 4 + list;
     count--;
   }
-  return {list, int16_t(guest::LoadU16(base, at + 2))};
+  return {list, int16_t(guest::LoadU16(at + 2))};
 }
 // Its spec id: the word at list + 1,968 × slot + 224.
-uint32_t CarId(uint8_t* base, const CarSlot& car) {
-  return schema::CarMakersCar(base, uint32_t(int32_t(car.slot) * 1968) + car.list + 212).car_id();
+uint32_t CarId(const CarSlot& car) {
+  return schema::CarMakersCar(uint32_t(int32_t(car.slot) * 1968) + car.list + 212).car_id();
 }
 
 }  // namespace
 
-uint64_t FillPartRow(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
+uint64_t FillPartRow(uint64_t r3, uint32_t frame, uint32_t movie, uint32_t node,
                      const std::function<uint64_t()>& index) {
-  return FillRow(base, r3, frame, movie, node, index);
+  return FillRow(r3, frame, movie, node, index);
 }
 
-uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp) {
+uint64_t FillPartRows(uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F4BF8 TuningScreen::FillPartRows");
   const uint32_t screen = uint32_t(r3);
-  const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t entry = MovieEntry(base, frame, kMovieId);
-  const uint32_t movie = Load(base, entry);
-  const CarSlot car = SelectedCarSlot(base, screen);
-  const int32_t last = int32_t(TS(base, screen).list_last());
-  auto cursor = [&] { return uint64_t(TS(base, screen).list_cursor()); };
+  const uint32_t frame = Frame(sp, 176);
+  const uint32_t entry = MovieEntry(frame, kMovieId);
+  const uint32_t movie = Load(entry);
+  const CarSlot car = SelectedCarSlot(screen);
+  const int32_t last = int32_t(TS(screen).list_last());
+  auto cursor = [&] { return uint64_t(TS(screen).list_cursor()); };
   if (last == 0) {
-    HidePartMarks(base, frame);
-    if (TS(base, screen).part_group() != 0) {
-      return FillRow(base, r3, frame, movie, 15, cursor);
+    HidePartMarks(frame);
+    if (TS(screen).part_group() != 0) {
+      return FillRow(r3, frame, movie, 15, cursor);
     }
     // The car's picture (its piece sub_821F4CF0 for id 0, merged): 184 +
     // id for 0 to 21, 206 for 22, left above.
-    const uint32_t id = CarId(base, car);
+    const uint32_t id = CarId(car);
     std::optional<uint32_t> picture;
     if (id <= 21) {
       picture = 184 + id;
     } else if (id == 22) {
       picture = 206;
     }
-    return FillRow(base, r3, frame, movie, 15, cursor, &picture);
+    return FillRow(r3, frame, movie, 15, cursor, &picture);
   }
   if (last == 1) {
-    HidePartMarks(base, frame);
-    FillRow(base, r3, frame, movie, 15, cursor);
-    return FillRow(base, r3, frame, movie, 16, [&] { return cursor() + 1; });
+    HidePartMarks(frame);
+    FillRow(r3, frame, movie, 15, cursor);
+    return FillRow(r3, frame, movie, 16, [&] { return cursor() + 1; });
   }
   if (last == 2) {
-    HidePartMarks(base, frame);
+    HidePartMarks(frame);
     uint64_t marks_r3 = 0;
     for (uint64_t k = 0; k < 3; k++) {
       // c + k - 1 wrapped over 3.
@@ -230,19 +230,19 @@ uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp) {
         }
         return j;
       };
-      marks_r3 = FillRow(base, r3, frame, movie, uint32_t(14 + k), index);
+      marks_r3 = FillRow(r3, frame, movie, uint32_t(14 + k), index);
     }
     return marks_r3;
   }
   if (last < 4) {
     return entry;
   }
-  HidePartMarks(base, frame);
+  HidePartMarks(frame);
   uint64_t marks_r3 = 0;
   for (uint64_t k = 0; k < 5; k++) {
     // c + k - 1 wrapped over n + 1.
     auto index = [&] {
-      const uint64_t c = cursor(), n = TS(base, screen).list_last();
+      const uint64_t c = cursor(), n = TS(screen).list_last();
       const uint64_t j = c + k - 1;
       if (int32_t(j) >= int32_t(n + 1)) {
         return c - n + k - 2;
@@ -252,7 +252,7 @@ uint64_t FillPartRows(uint8_t* base, uint64_t r3, uint32_t sp) {
       }
       return j;
     };
-    marks_r3 = FillRow(base, r3, frame, movie, uint32_t(14 + k), index);
+    marks_r3 = FillRow(r3, frame, movie, uint32_t(14 + k), index);
   }
   return marks_r3;
 }

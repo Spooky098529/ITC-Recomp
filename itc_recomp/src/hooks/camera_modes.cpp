@@ -92,7 +92,7 @@ namespace cm = camera_modes;
 // harness) behind the flag.
 #define ITC_CAMERA_MODES(address)                       \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_camera_modes)) { \
-    hooks::CameraModesStep##address(ctx, base);         \
+    hooks::CameraModesStep##address(ctx);         \
   }
 
 // The views' camera constructors' stand-in while the SetMode harness asks
@@ -117,10 +117,10 @@ void hooks::SetCameraConstructStandIn(CameraConstructStandIn stand_in) {
       return;                                                                            \
     }                                                                                    \
     if (!ITC_FLAG(native_camera_modes)) {                                                \
-      lifted::original::c##address(ctx, base);                                      \
+      lifted::original::c##address(ctx);                                      \
       return;                                                                            \
     }                                                                                    \
-    hooks::CameraModesStep##address(ctx, base);                                          \
+    hooks::CameraModesStep##address(ctx);                                          \
   }
 
 namespace {
@@ -128,36 +128,36 @@ namespace {
 // memcpy (sub_825A7410) through the translated code, for a copy
 // c_runtime::Memcpy refuses: from a frame like the original's (`frame`
 // bytes) with its return address. r3 = the destination, as memcpy leaves it.
-void GuestMemcpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
+void GuestMemcpy(lifted::Regs& ctx, uint32_t frame, uint32_t return_address,
                  uint32_t destination, uint32_t source, uint32_t size) {
-  guest_call::InFrame(ctx, base, frame, return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, frame, return_address, [&](uint32_t) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
   });
 }
 
 // XMemCpy (sub_82295890) through the translated code, for a copy
 // c_runtime::XMemCpy refuses, as GuestMemcpy.
-void GuestXMemCpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
+void GuestXMemCpy(lifted::Regs& ctx, uint32_t frame, uint32_t return_address,
                   uint32_t destination, uint32_t source, uint32_t size) {
-  guest_call::InFrame(ctx, base, frame, return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, frame, return_address, [&](uint32_t) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    lifted::Enter(ctx, base, game::XMemCpy);
+    lifted::Enter(ctx, game::XMemCpy);
   });
 }
 
 // A guest call from the frame at `frame` (the calling original's r1,
 // `frame_bytes` below its caller's) with the return address `back`.
 template <typename Call>
-void CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+void CallFrom(lifted::Regs& ctx, uint32_t frame, uint32_t frame_bytes,
               uint32_t back, Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + frame_bytes;
-  guest_call::InFrame(ctx, base, frame_bytes, back, [&](uint32_t) { call(); });
+  guest_call::InFrame(ctx, frame_bytes, back, [&](uint32_t) { call(); });
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
 }
@@ -165,13 +165,13 @@ void CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t frame_b
 // CameraPath::Request (r3 the TV camera, r4 the buffer, r5 the index)
 // through its step from a TV camera function's frame at `frame`
 // (`frame_bytes`) with the return address `back`.
-void PathRequestFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+void PathRequestFrom(lifted::Regs& ctx, uint32_t frame, uint32_t frame_bytes,
                      uint32_t back, uint32_t camera, uint32_t buffer, uint32_t index) {
-  CallFrom(ctx, base, frame, frame_bytes, back, [&] {
+  CallFrom(ctx, frame, frame_bytes, back, [&] {
     ctx.r3.u64 = camera;
     ctx.r4.u64 = buffer;
     ctx.r5.u64 = index;
-    hooks::CameraModesStep82152E08(ctx, base);
+    hooks::CameraModesStep82152E08(ctx);
   });
 }
 
@@ -184,16 +184,16 @@ namespace hooks {
 // ToView4: r3 = the last racer record when the split screen ended (its
 // RacerRecords::At), else the director.
 ITC_REGS_STEP(CameraModesStep82152400) {
-  ctx.r3.u64 = cm::ToView4(base, ctx.r3.u32);
+  ctx.r3.u64 = cm::ToView4(ctx.r3.u32);
 }
 ITC_REGS_STEP(CameraModesStep821524B8) {
-  cm::ToView5(base, ctx.r3.u32);
+  cm::ToView5(ctx.r3.u32);
 }
 ITC_REGS_STEP(CameraModesStep821524D8) {
-  cm::ToView3(base);
+  cm::ToView3();
 }
 ITC_REGS_STEP(CameraModesStep82153160) {
-  cm::ToView3IfCourse(base, ctx.r3.u32);
+  cm::ToView3IfCourse(ctx.r3.u32);
 }
 
 // --- Small helpers ---
@@ -201,17 +201,17 @@ ITC_REGS_STEP(CameraModesStep82153160) {
 // Viewports::ResetRoll: r3 = viewport 1, as SetRoll leaves it.
 ITC_REGS_STEP(CameraModesStep821524F0) {
   ctx.fpscr.disableFlushMode();
-  cm::ResetRoll(base);
-  ctx.r3.u64 = schema::CameraModesGlobals::viewports(base).second().address;
+  cm::ResetRoll();
+  ctx.r3.u64 = schema::CameraModesGlobals::viewports().second().address;
 }
 
 // Camera::ZoomFromFov: f1 = degrees, f2 = the width; f1 = the zoom. Where
 // tan's native form can't stand in, the original runs.
 ITC_REGS_STEP(CameraModesStep82152548) {
   ctx.fpscr.disableFlushMode();
-  const auto zoom = cm::ZoomFromFov(base, ctx.f1.f64, ctx.f2.f64);
+  const auto zoom = cm::ZoomFromFov(ctx.f1.f64, ctx.f2.f64);
   if (!zoom) {
-    lifted::original::c82152548(ctx, base);
+    lifted::original::c82152548(ctx);
     return;
   }
   ctx.f1.f64 = *zoom;
@@ -221,7 +221,7 @@ ITC_REGS_STEP(CameraModesStep82152548) {
 // step kept for the harness): r3 = out, r4 = the quaternion, r5 = the vector.
 ITC_REGS_STEP(CameraModesStep821525F8) {
   ctx.fpscr.disableFlushMode();
-  cm::QuatRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  cm::QuatRotate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // Matrix::FromQuat (no adapter: only CameraTarget::Track's plain C++ calls it; the step kept
@@ -232,17 +232,17 @@ ITC_REGS_STEP(CameraModesStep821525F8) {
 // original).
 ITC_REGS_STEP(CameraModesStep82152698) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::original::c82152698(ctx, base);
+    lifted::original::c82152698(ctx);
     return;
   }
-  guest::StoreU32(base, ctx.r1.u32 + 32, uint32_t(ctx.r4.u64 >> 32));
-  guest::StoreU32(base, ctx.r1.u32 + 36, ctx.r4.u32);
-  guest::StoreU32(base, ctx.r1.u32 + 40, uint32_t(ctx.r5.u64 >> 32));
-  guest::StoreU32(base, ctx.r1.u32 + 44, ctx.r5.u32);
+  guest::StoreU32(ctx.r1.u32 + 32, uint32_t(ctx.r4.u64 >> 32));
+  guest::StoreU32(ctx.r1.u32 + 36, ctx.r4.u32);
+  guest::StoreU32(ctx.r1.u32 + 40, uint32_t(ctx.r5.u64 >> 32));
+  guest::StoreU32(ctx.r1.u32 + 44, ctx.r5.u32);
   const uint32_t q[4] = {uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32, uint32_t(ctx.r5.u64 >> 32),
                          ctx.r5.u32};
   ctx.fpscr.disableFlushMode();
-  cm::MatrixFromQuat(base, ctx.r3.u32, q, (ctx.r1.u32 - 16) & ~0xFu);
+  cm::MatrixFromQuat(ctx.r3.u32, q, (ctx.r1.u32 - 16) & ~0xFu);
 }
 
 // Matrix::FromFloats (no adapter: only TrackRoute::SplinePoint's and the
@@ -253,9 +253,9 @@ ITC_REGS_STEP(CameraModesStep82090000) {
   uint32_t from[16] = {ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                        ctx.r8.u32, ctx.r9.u32, ctx.r10.u32};
   for (uint32_t i = 7; i < 16; i++) {
-    from[i] = guest::LoadU32(base, ctx.r1.u32 + 84 + 8 * (i - 7));
+    from[i] = guest::LoadU32(ctx.r1.u32 + 84 + 8 * (i - 7));
   }
-  cm::MatrixFromFloats(base, ctx.r3.u32, from);
+  cm::MatrixFromFloats(ctx.r3.u32, from);
   // (r11 = the last pointer was a leftover for recompiled callers: none now)
 }
 
@@ -264,31 +264,31 @@ ITC_REGS_STEP(CameraModesStep82090000) {
 // List40::Link (no adapter: only List40::Insert's plain C++ calls it): r3 =
 // the list, r4 = the position; the step kept for the harness.
 ITC_REGS_STEP(CameraModesStep82153228) {
-  cm::List40Link(base, ctx.r3.u32, int16_t(ctx.r4.u16));
+  cm::List40Link(ctx.r3.u32, int16_t(ctx.r4.u16));
 }
 // List40::Insert: r4 = &the word, r5 = the position.
 ITC_REGS_STEP(CameraModesStep821544E0) {
-  cm::List40Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32), ctx.r5.u32);
+  cm::List40Insert(ctx.r3.u32, guest::LoadU32(ctx.r4.u32), ctx.r5.u32);
 }
 // List16::Insert20 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it; the
 // step kept for the harness).
 // List16::Insert20: r4 = the record, r5 = the position.
 ITC_REGS_STEP(CameraModesStep82154458) {
-  cm::List16Insert20(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  cm::List16Insert20(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 // List16::Insert32 and Insert608: r4 = the record, r5 = the position; r3 =
 // the record's slot (memcpy's).
 ITC_REGS_STEP(CameraModesStep82154378) {
   uint32_t to = 0;
-  if (!cm::List16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 32, &to)) {
-    GuestMemcpy(ctx, base, 112, 0x821543E0, to, ctx.r4.u32, 32);
+  if (!cm::List16Insert(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 32, &to)) {
+    GuestMemcpy(ctx, 112, 0x821543E0, to, ctx.r4.u32, 32);
   }
   ctx.r3.u64 = to;
 }
 ITC_REGS_STEP(CameraModesStep821543E8) {
   uint32_t to = 0;
-  if (!cm::List16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 608, &to)) {
-    GuestMemcpy(ctx, base, 112, 0x82154450, to, ctx.r4.u32, 608);
+  if (!cm::List16Insert(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 608, &to)) {
+    GuestMemcpy(ctx, 112, 0x82154450, to, ctx.r4.u32, 608);
   }
   ctx.r3.u64 = to;
 }
@@ -298,8 +298,8 @@ ITC_REGS_STEP(CameraModesStep821543E8) {
 ITC_REGS_STEP(CameraModesStep82154300) {
   const uint32_t out = ctx.r3.u32;
   uint32_t from = 0;
-  if (!cm::List16Copy32(base, out, ctx.r4.u32, ctx.r5.u32, &from)) {
-    GuestMemcpy(ctx, base, 96, 0x8215435C, out, from, 32);
+  if (!cm::List16Copy32(out, ctx.r4.u32, ctx.r5.u32, &from)) {
+    GuestMemcpy(ctx, 96, 0x8215435C, out, from, 32);
   }
   ctx.r3.u64 = out;
 }
@@ -307,11 +307,11 @@ ITC_REGS_STEP(CameraModesStep82154300) {
 // --- The camera animations' table ---
 
 ITC_REGS_STEP(CameraModesStep82150078) {
-  cm::AnimsClear(base);
+  cm::AnimsClear();
 }
 // CameraAnims::Find: r3 = the asset id; r3 = its objects or 0.
 ITC_REGS_STEP(CameraModesStep82150300) {
-  ctx.r3.u64 = cm::AnimsFind(base, ctx.r3.u32);
+  ctx.r3.u64 = cm::AnimsFind(ctx.r3.u32);
 }
 
 // --- The color filter and the fade cues ---
@@ -321,8 +321,8 @@ ITC_REGS_STEP(CameraModesStep82150300) {
 // filter's slots aren't its own functions.
 ITC_REGS_STEP(CameraModesStep82152108) {
   ctx.fpscr.disableFlushMode();
-  if (!cm::ColorFilterSetStyle(base, ctx.r3.u32)) {
-    lifted::original::c82152108(ctx, base);
+  if (!cm::ColorFilterSetStyle(ctx.r3.u32)) {
+    lifted::original::c82152108(ctx);
   }
 }
 
@@ -331,7 +331,7 @@ ITC_REGS_STEP(CameraModesStep82152108) {
 // FadeCue::Step: r3 = the cue (its caller, CutsceneShot::Step, doesn't read
 // r3 after it).
 ITC_REGS_STEP(CameraModesStep82152290) {
-  cm::FadeCueStep(base, ctx.r3.u32);
+  cm::FadeCueStep(ctx.r3.u32);
 }
 
 // --- The camera animations' files ---
@@ -340,10 +340,10 @@ ITC_REGS_STEP(CameraModesStep82152290) {
 // leaves it). The original without --native_heap or the archive's queue.
 ITC_REGS_STEP(CameraModesStep82150B10) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    lifted::original::c82150B10(ctx, base);
+    lifted::original::c82150B10(ctx);
     return;
   }
-  hooks::SetArchiveSerial(ctx, cm::AnimsLoad(base, ctx.r3.u32, hooks::NativeArchiveLoad(base)));
+  hooks::SetArchiveSerial(ctx, cm::AnimsLoad(ctx.r3.u32, hooks::NativeArchiveLoad()));
 }
 
 // CameraAnims::OnLoaded (the archive's callback): r4 = the data, r6 = the
@@ -353,21 +353,20 @@ ITC_REGS_STEP(CameraModesStep82150B10) {
 // frame below it, 0x821502B8).
 ITC_REGS_STEP(CameraModesStep82150878) {
   if (!hooks::NativeHeapActive()) {
-    lifted::original::c82150878(ctx, base);
+    lifted::original::c82150878(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 672;
-  const bool done = cm::AnimsOnLoaded(
-      base, ctx.r4.u32, ctx.r6.u32, frame,
+  const bool done = cm::AnimsOnLoaded(ctx.r4.u32, ctx.r6.u32, frame,
       [&](uint32_t to, uint32_t from, uint32_t size) {
-        GuestMemcpy(ctx, base, 672, to == frame + 84 ? 0x821508F4 : 0x8215092C, to, from, size);
+        GuestMemcpy(ctx, 672, to == frame + 84 ? 0x821508F4 : 0x8215092C, to, from, size);
       },
       [&](uint32_t to, uint32_t from, uint32_t size) {
-        GuestXMemCpy(ctx, base, 672 + 144, 0x821502B8, to, from, size);
+        GuestXMemCpy(ctx, 672 + 144, 0x821502B8, to, from, size);
       });
   if (!done) {
-    lifted::original::c82150878(ctx, base);
+    lifted::original::c82150878(ctx);
     return;
   }
   ctx.r3.u64 = 1;
@@ -376,11 +375,11 @@ ITC_REGS_STEP(CameraModesStep82150878) {
 // CameraAnims::FreeAll: no arguments; r3 as the original leaves it (1, its
 // memcpy's frame + 80, or unchanged).
 ITC_REGS_STEP(CameraModesStep821507D8) {
-  if (!hooks::NativeHeapActive() || !cm::AnimsFreeable(base)) {
-    lifted::original::c821507D8(ctx, base);
+  if (!hooks::NativeHeapActive() || !cm::AnimsFreeable()) {
+    lifted::original::c821507D8(ctx);
     return;
   }
-  if (const auto r3 = cm::AnimsFreeAll(base, ctx.r1.u32 - 384 + 80)) {
+  if (const auto r3 = cm::AnimsFreeAll(ctx.r1.u32 - 384 + 80)) {
     ctx.r3.u64 = *r3;
   }
 }
@@ -393,15 +392,14 @@ ITC_REGS_STEP(CameraModesStep82150960) {
   ctx.fpscr.disableFlushMode();
   const uint32_t out = ctx.r3.u32, time = ctx.r5.u32;
   std::optional<double> f1;
-  const uint32_t r3 = cm::AnimsEvaluate(
-      base, out, ctx.r4.u32, time,
+  const uint32_t r3 = cm::AnimsEvaluate(out, ctx.r4.u32, time,
       [&](uint32_t object) {
-        guest_call::InFrame(ctx, base, 144, 0x821509C4, [&](uint32_t) {
+        guest_call::InFrame(ctx, 144, 0x821509C4, [&](uint32_t) {
           ctx.r3.u64 = object;
           ctx.r4.u64 = object;
           ctx.r5.u64 = out;
           ctx.r6.u64 = time;
-          lifted::original::c82150350(ctx, base);
+          lifted::original::c82150350(ctx);
         });
         ctx.fpscr.disableFlushMode();
       },
@@ -419,7 +417,7 @@ ITC_REGS_STEP(CameraModesStep82150960) {
 ITC_REGS_STEP(CameraModesStep82150A98) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  ctx.f1.f64 = cm::AnimsDuration(base, ctx.r3.u32, &r3);
+  ctx.f1.f64 = cm::AnimsDuration(ctx.r3.u32, &r3);
   ctx.r3.u64 = r3;
 }
 
@@ -428,14 +426,13 @@ ITC_REGS_STEP(CameraModesStep82150A98) {
 // stack pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82150A10) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::original::c82150A10(ctx, base);
+    lifted::original::c82150A10(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cm::AnimsObjectMatrix(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 96 - 320,
+  ctx.r3.u64 = cm::AnimsObjectMatrix(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 96 - 320,
       [&](uint32_t to, uint32_t from, uint32_t size) {
-        GuestMemcpy(ctx, base, 96 + 320, 0x82150600, to, from, size);
+        GuestMemcpy(ctx, 96 + 320, 0x82150600, to, from, size);
       });
 }
 
@@ -446,12 +443,12 @@ ITC_REGS_STEP(CameraModesStep82150A10) {
 // --native_heap, the archive's queue, or a block the layer didn't give.
 ITC_REGS_STEP(CameraModesStep82152E08) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
-      !game_modes::Buffer28Freeable(base, ctx.r4.u32)) {
-    lifted::original::c82152E08(ctx, base);
+      !game_modes::Buffer28Freeable(ctx.r4.u32)) {
+    lifted::original::c82152E08(ctx);
     return;
   }
   if (const auto serial =
-          cm::PathRequest(base, ctx.r4.u32, ctx.r5.u32, hooks::NativeArchiveLoad(base))) {
+          cm::PathRequest(ctx.r4.u32, ctx.r5.u32, hooks::NativeArchiveLoad())) {
     hooks::SetArchiveSerial(ctx, *serial);
   }
 }
@@ -459,24 +456,24 @@ ITC_REGS_STEP(CameraModesStep82152E08) {
 // CameraPath::OnLoaded (the archive's callback): r4 = the data, r6 = the
 // buffer.
 ITC_REGS_STEP(CameraModesStep82152078) {
-  cm::PathOnLoaded(base, ctx.r4.u32, ctx.r6.u32);
+  cm::PathOnLoaded(ctx.r4.u32, ctx.r6.u32);
 }
 
 // --- The rival logo ---
 
 // RivalLogo::RivalLogo: r3 = the entry (its caller sets r3 again after).
 ITC_REGS_STEP(CameraModesStep82211848) {
-  cm::RivalLogoConstruct(base, ctx.r3.u32);
+  cm::RivalLogoConstruct(ctx.r3.u32);
 }
 
 // RivalLogo::Play: r3 = the entry; r3 as the original leaves it. With
 // --log_pause_movie the original runs (PlayNamed's override logs it).
 ITC_REGS_STEP(CameraModesStep82211AB0) {
   if (ITC_FLAG(log_pause_movie)) {
-    lifted::original::c82211AB0(ctx, base);
+    lifted::original::c82211AB0(ctx);
     return;
   }
-  ctx.r3.u64 = cm::RivalLogoPlay(base, ctx.r3.u32, ctx.r1.u32 - 144 + 80);
+  ctx.r3.u64 = cm::RivalLogoPlay(ctx.r3.u32, ctx.r1.u32 - 144 + 80);
 }
 
 // --- The views ---
@@ -487,14 +484,14 @@ ITC_REGS_STEP(CameraModesStep82211AB0) {
 // pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82153290) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::original::c82153290(ctx, base);
+    lifted::original::c82153290(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t tracker = ctx.r3.u32, vehicle = ctx.r4.u32;
-  cm::TargetTrack(base, tracker, vehicle, ctx.r1.u32 - 256);
+  cm::TargetTrack(tracker, vehicle, ctx.r1.u32 - 256);
   if (vehicle != 0) {
-    ctx.r3.u64 = schema::CameraTarget(base, tracker).track_position_address();
+    ctx.r3.u64 = schema::CameraTarget(tracker).track_position_address();
   }
 }
 
@@ -504,8 +501,8 @@ ITC_REGS_STEP(CameraModesStep82153290) {
 ITC_REGS_STEP(CameraModesStep82152CD8) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
-  cm::Shake(base, camera, ctx.r1.u32 - 96);
-  ctx.r3.u64 = schema::ChaseCamera(base, camera).viewport().address;
+  cm::Shake(camera, ctx.r1.u32 - 96);
+  ctx.r3.u64 = schema::ChaseCamera(camera).viewport().address;
 }
 
 // Viewport::PullBack (no adapter: only ChaseCamera::Update's plain C++ calls
@@ -513,14 +510,14 @@ ITC_REGS_STEP(CameraModesStep82152CD8) {
 // the offset.
 ITC_REGS_STEP(CameraModesStep82152788) {
   ctx.fpscr.disableFlushMode();
-  cm::ViewportPullBack(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32, ctx.r1.u32);
+  cm::ViewportPullBack(ctx.r3.u32, ctx.f1.f64, ctx.r5.u32, ctx.r1.u32);
 }
 
 // IntroCamera::StepShot (no adapter: only IntroCamera::Update's plain C++
 // calls it; the step kept for the harness): r3 = the shot; r3 = 0 or 1.
 ITC_REGS_STEP(CameraModesStep82152E78) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cm::IntroStepShot(base, ctx.r3.u32, ctx.r1.u32 - 272);
+  ctx.r3.u64 = cm::IntroStepShot(ctx.r3.u32, ctx.r1.u32 - 272);
 }
 
 }  // namespace hooks
@@ -540,7 +537,7 @@ struct MakeShotAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = function == 0x825DB150 ? 0x82154214 : 0x8215425C;
     call.ctx.r3.u64 = function;
-    lifted::original::c825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -557,20 +554,19 @@ namespace hooks {
 // The original without native atexit.
 ITC_REGS_STEP(CameraModesStep82158F70) {
   if (!hooks::NativeAtexit()) {
-    lifted::original::c82158F70(ctx, base);
+    lifted::original::c82158F70(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 368;
-  MakeShotAtexit atexit{ctx, base, frame - 192};
-  ctx.r3.u64 = cm::IntroConstruct(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+  MakeShotAtexit atexit{ctx, frame - 192};
+  ctx.r3.u64 = cm::IntroConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
       [&](uint32_t out, uint32_t stages, uint32_t stage) {
-        guest_call::InFrame(ctx, base, 368, 0x82159078, [&](uint32_t) {
+        guest_call::InFrame(ctx, 368, 0x82159078, [&](uint32_t) {
           ctx.r3.u64 = out;
           ctx.r4.u64 = stages;
           ctx.r5.u64 = stage;
-          lifted::original::c820FFD88(ctx, base);
+          lifted::original::c820FFD88(ctx);
         });
         ctx.fpscr.disableFlushMode();
       },
@@ -582,16 +578,16 @@ ITC_REGS_STEP(CameraModesStep82158F70) {
 // original's (144 bytes), else its original.
 ITC_REGS_STEP(CameraModesStep82152338) {
   ctx.fpscr.disableFlushMode();
-  cm::DirectorStart(base, ctx.r3.u32, [&] {
-    guest_call::InFrame(ctx, base, 144, 0x82152358, [&](uint32_t) {
+  cm::DirectorStart(ctx.r3.u32, [&] {
+    guest_call::InFrame(ctx, 144, 0x82152358, [&](uint32_t) {
       std::optional<uint32_t> viewport;
       if (hooks::NativeHeapActive() && hooks::NativeAtexit()) {
-        viewport = hooks::ViewportsInit(ctx, base);
+        viewport = hooks::ViewportsInit(ctx);
       }
       if (viewport) {
         ctx.r3.u64 = *viewport;
       } else {
-        lifted::original::c820AB358(ctx, base);
+        lifted::original::c820AB358(ctx);
       }
     });
     ctx.fpscr.disableFlushMode();
@@ -604,26 +600,25 @@ ITC_REGS_STEP(CameraModesStep82152338) {
 // else their originals from a frame like the original's (96 bytes).
 ITC_REGS_STEP(CameraModesStep82153098) {
   ctx.fpscr.disableFlushMode();
-  cm::DirectorRelease(
-      base, ctx.r3.u32,
+  cm::DirectorRelease(ctx.r3.u32,
       [&] {
-        if (hooks::NativeHeapActive() && cm::AnimsFreeable(base)) {
-          if (const auto r3 = cm::AnimsFreeAll(base, ctx.r1.u32 - 96 - 384 + 80)) {
+        if (hooks::NativeHeapActive() && cm::AnimsFreeable()) {
+          if (const auto r3 = cm::AnimsFreeAll(ctx.r1.u32 - 96 - 384 + 80)) {
             ctx.r3.u64 = *r3;
           }
           return;
         }
-        guest_call::InFrame(ctx, base, 96, 0x821530B0,
-                            [&](uint32_t) { lifted::original::c821507D8(ctx, base); });
+        guest_call::InFrame(ctx, 96, 0x821530B0,
+                            [&](uint32_t) { lifted::original::c821507D8(ctx); });
         ctx.fpscr.disableFlushMode();
       },
       [&] {
-        if (hooks::NativeHeapActive() && cameras::ReleaseViewports(base)) {
+        if (hooks::NativeHeapActive() && cameras::ReleaseViewports()) {
           ctx.r3.u64 = 1;
           return;
         }
-        guest_call::InFrame(ctx, base, 96, 0x82153138,
-                            [&](uint32_t) { lifted::original::c820AA430(ctx, base); });
+        guest_call::InFrame(ctx, 96, 0x82153138,
+                            [&](uint32_t) { lifted::original::c820AA430(ctx); });
         ctx.fpscr.disableFlushMode();
       });
 }
@@ -638,26 +633,26 @@ namespace {
 // Insert32's frames below Init's (192 bytes); CameraAnims::Load natively
 // where its adapter would (--native_heap, the archive's queue), else its
 // original.
-cm::CutsceneCalls ShotInitCalls(lifted::Regs& ctx, uint8_t* base) {
+cm::CutsceneCalls ShotInitCalls(lifted::Regs& ctx) {
   cm::CutsceneCalls calls;
-  calls.copy32 = [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
-    guest_call::InFrame(ctx, base, 192, 0x82156C90, [&](uint32_t) {
-      GuestMemcpy(ctx, base, 96, 0x8215435C, to, from, size);
+  calls.copy32 = [&ctx](uint32_t to, uint32_t from, uint32_t size) {
+    guest_call::InFrame(ctx, 192, 0x82156C90, [&](uint32_t) {
+      GuestMemcpy(ctx, 96, 0x8215435C, to, from, size);
     });
   };
-  calls.insert32 = [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
-    guest_call::InFrame(ctx, base, 192, 0x82156CA0, [&](uint32_t) {
-      GuestMemcpy(ctx, base, 112, 0x821543E0, to, from, size);
+  calls.insert32 = [&ctx](uint32_t to, uint32_t from, uint32_t size) {
+    guest_call::InFrame(ctx, 192, 0x82156CA0, [&](uint32_t) {
+      GuestMemcpy(ctx, 112, 0x821543E0, to, from, size);
     });
   };
-  calls.load = [&ctx, base](uint32_t id) {
+  calls.load = [&ctx](uint32_t id) {
     if (hooks::NativeHeapActive() && hooks::NativeArchiveQueue()) {
-      hooks::SetArchiveSerial(ctx, cm::AnimsLoad(base, id, hooks::NativeArchiveLoad(base)));
+      hooks::SetArchiveSerial(ctx, cm::AnimsLoad(id, hooks::NativeArchiveLoad()));
       return;
     }
-    guest_call::InFrame(ctx, base, 192, 0x82156CB8, [&](uint32_t) {
+    guest_call::InFrame(ctx, 192, 0x82156CB8, [&](uint32_t) {
       ctx.r3.u64 = id;
-      lifted::original::c82150B10(ctx, base);
+      lifted::original::c82150B10(ctx);
     });
   };
   return calls;
@@ -671,7 +666,7 @@ namespace hooks {
 // CameraAnims::Load leaves it (the serial). Its calls: ShotInitCalls.
 ITC_REGS_STEP(CameraModesStep82156B68) {
   ctx.fpscr.disableFlushMode();
-  cm::CutsceneInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, ShotInitCalls(ctx, base));
+  cm::CutsceneInit(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, ShotInitCalls(ctx));
 }
 
 }  // namespace hooks
@@ -682,18 +677,18 @@ namespace {
 // frame at `frame`: the original's r1, 304 bytes) where its native form
 // can't: from frames like Step's and Evaluate's (144 bytes). f1 as it
 // leaves it.
-void ShotCameraOriginal(lifted::Regs& ctx, uint8_t* base, uint32_t shot, uint32_t frame,
+void ShotCameraOriginal(lifted::Regs& ctx, uint32_t shot, uint32_t frame,
                         uint32_t object) {
-  const uint32_t time = schema::CutsceneShot(base, shot).time();
+  const uint32_t time = schema::CutsceneShot(shot).time();
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + 304;
-  guest_call::InFrame(ctx, base, 304, 0x82155834, [&](uint32_t) {
-    guest_call::InFrame(ctx, base, 144, 0x821509C4, [&](uint32_t) {
+  guest_call::InFrame(ctx, 304, 0x82155834, [&](uint32_t) {
+    guest_call::InFrame(ctx, 144, 0x821509C4, [&](uint32_t) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = object;
       ctx.r5.u64 = frame + 144;
       ctx.r6.u64 = time;
-      lifted::original::c82150350(ctx, base);
+      lifted::original::c82150350(ctx);
     });
   });
   ctx.r1.u64 = stack;
@@ -712,10 +707,9 @@ ITC_REGS_STEP(CameraModesStep82155800) {
   const uint32_t shot = ctx.r3.u32;
   const uint32_t frame = ctx.r1.u32 - 304;
   double f1 = ctx.f1.f64;
-  const uint32_t r3 = cm::CutsceneStep(
-      base, shot, ctx.r4.u32, frame,
+  const uint32_t r3 = cm::CutsceneStep(shot, ctx.r4.u32, frame,
       [&](uint32_t object) {
-        ShotCameraOriginal(ctx, base, shot, frame, object);
+        ShotCameraOriginal(ctx, shot, frame, object);
         f1 = ctx.f1.f64;
       },
       &f1);
@@ -743,7 +737,7 @@ struct SplineAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = 0x820ABB20;
     call.ctx.r3.u64 = function;
-    lifted::original::c825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -758,7 +752,7 @@ namespace hooks {
 // the step kept for the harness): r3 = the range, r4 = &the position; r3 = the
 // slices counted (0x82603274's word) or -1.
 ITC_REGS_STEP(CameraModesStep820FE830) {
-  ctx.r3.s64 = cm::RangeCameraAt(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.s64 = cm::RangeCameraAt(ctx.r3.u32, ctx.r4.u32);
 }
 
 // TrackRoute::SliceFraction (no adapter: only TvCamera::Step's plain C++
@@ -766,7 +760,7 @@ ITC_REGS_STEP(CameraModesStep820FE830) {
 // fraction. Its caller doesn't read r3.
 ITC_REGS_STEP(CameraModesStep820F9B48) {
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = cm::SliceFraction(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.f1.f64 = cm::SliceFraction(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 // TvCamera::Track: r3 = the TV camera, r4 = &the position (its caller
@@ -777,8 +771,8 @@ ITC_REGS_STEP(CameraModesStep82156980) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
   const uint32_t frame = ctx.r1.u32 - 496;
-  cm::TvTrack(base, camera, ctx.r4.u32, frame, [&](uint32_t buffer, uint32_t index) {
-    PathRequestFrom(ctx, base, frame, 496, 0x82156B54, camera, buffer, index);
+  cm::TvTrack(camera, ctx.r4.u32, frame, [&](uint32_t buffer, uint32_t index) {
+    PathRequestFrom(ctx, frame, 496, 0x82156B54, camera, buffer, index);
   });
 }
 
@@ -790,12 +784,12 @@ ITC_REGS_STEP(CameraModesStep82156980) {
 // bytes below).
 ITC_REGS_STEP(CameraModesStep820AC248) {
   if (!hooks::NativeAtexit()) {
-    lifted::original::c820AC248(ctx, base);
+    lifted::original::c820AC248(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  SplineAtexit atexit{ctx, base, ctx.r1.u32 - 272 - 208 - 720};
-  cm::PathEvaluate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
+  SplineAtexit atexit{ctx, ctx.r1.u32 - 272 - 208 - 720};
+  cm::PathEvaluate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
                    ctx.r1.u32, atexit.Call());
 }
 
@@ -810,27 +804,27 @@ namespace {
 // two slot calls (`[0x8266D088]`'s slot 7, then that object's slot 3, as
 // Viewport::Init's adapter makes them) with the original's return
 // addresses. Returns the video output.
-uint32_t VideoOutputFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t back) {
+uint32_t VideoOutputFrom(lifted::Regs& ctx, uint32_t frame, uint32_t back) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
-  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app().address;
   ctx.lr = back;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
-  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
-  if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    lifted::CallFromContext(ctx, base, slot7);
+  const uint32_t slot7 = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 28);
+  if (!hooks::DirectSlotCall(ctx, slot7)) {
+    lifted::CallFromContext(ctx, slot7);
   }
-  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 12);
   ctx.lr = back + 16;
-  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+  lifted::CallFromContext(ctx, ctx.ctr.u32);
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u32;
 }
 
-cm::VideoOutputCall VideoOutput(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t frame, uint32_t back) {
-    return VideoOutputFrom(ctx, base, frame, back);
+cm::VideoOutputCall VideoOutput(lifted::Regs& ctx) {
+  return [&ctx](uint32_t frame, uint32_t back) {
+    return VideoOutputFrom(ctx, frame, back);
   };
 }
 
@@ -847,7 +841,7 @@ struct ChaseAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = function == 0x825DB100 ? 0x821546D4 : 0x8215471C;
     call.ctx.r3.u64 = function;
-    lifted::original::c825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -879,7 +873,7 @@ struct ViewAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = back;
     call.ctx.r3.u64 = function;
-    lifted::original::c825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -889,8 +883,8 @@ struct ViewAtexit {
 // Whether the chase camera's plain C++ can stand in: a 16-byte aligned
 // stack pointer (CameraTarget::Track's and the vector loads' frames) and
 // ZoomFromFov's tan.
-bool ChaseNative(lifted::Regs& ctx, uint8_t* base) {
-  return (ctx.r1.u32 & 0xF) == 0 && cm::ChaseReady(base);
+bool ChaseNative(lifted::Regs& ctx) {
+  return (ctx.r1.u32 & 0xF) == 0 && cm::ChaseReady();
 }
 
 }  // namespace
@@ -902,11 +896,11 @@ namespace hooks {
 // four vectors. A stack pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82153478) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::original::c82153478(ctx, base);
+    lifted::original::c82153478(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::ChasePlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  cm::ChasePlace(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                  ctx.r1.u32 - 112);
 }
 
@@ -915,54 +909,54 @@ ITC_REGS_STEP(CameraModesStep82153478) {
 // camera, f1 = the rate, f2 = the least. The original where ChaseNative
 // says no.
 ITC_REGS_STEP(CameraModesStep82153640) {
-  if (!ChaseNative(ctx, base)) {
-    lifted::original::c82153640(ctx, base);
+  if (!ChaseNative(ctx)) {
+    lifted::original::c82153640(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::ChaseFollow(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 320,
-                  VideoOutput(ctx, base));
+  cm::ChaseFollow(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 320,
+                  VideoOutput(ctx));
 }
 
 // ChaseCamera::ChaseCamera: r3 = the camera, r4 = the viewport, r5 = the
 // vehicle; r3 = the camera. The original where ChaseNative says no or
 // without native atexit.
 ITC_REGS_STEP(CameraModesStep82154548) {
-  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::original::c82154548(ctx, base);
+  if (!ChaseNative(ctx) || !hooks::NativeAtexit()) {
+    lifted::original::c82154548(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 224;
-  ChaseAtexit atexit{ctx, base, frame};
-  ctx.r3.u64 = cm::ChaseConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
-                                  VideoOutput(ctx, base), atexit.Call());
+  ChaseAtexit atexit{ctx, frame};
+  ctx.r3.u64 = cm::ChaseConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                                  VideoOutput(ctx), atexit.Call());
 }
 
 // ChaseCamera::Update (vtable slot 0; its caller reads neither r3 nor f1
 // after): r3 = the camera. The original where ChaseNative says no.
 ITC_REGS_STEP(CameraModesStep82154808) {
-  if (!ChaseNative(ctx, base)) {
-    lifted::original::c82154808(ctx, base);
+  if (!ChaseNative(ctx)) {
+    lifted::original::c82154808(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::ChaseUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144, VideoOutput(ctx, base));
+  cm::ChaseUpdate(ctx.r3.u32, ctx.r1.u32 - 144, VideoOutput(ctx));
 }
 
 // TvCamera::TvCamera: r3 = the camera, r4 = the viewport, r5 = the vehicle;
 // r3 = the camera. The original where ChaseNative says no or without native
 // atexit (the fallback chase camera's statics).
 ITC_REGS_STEP(CameraModesStep82155288) {
-  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::original::c82155288(ctx, base);
+  if (!ChaseNative(ctx) || !hooks::NativeAtexit()) {
+    lifted::original::c82155288(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 160;
-  ChaseAtexit atexit{ctx, base, frame - 224};
-  ctx.r3.u64 = cm::TvConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
-                               VideoOutput(ctx, base), atexit.Call());
+  ChaseAtexit atexit{ctx, frame - 224};
+  ctx.r3.u64 = cm::TvConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                               VideoOutput(ctx), atexit.Call());
 }
 
 }  // namespace hooks
@@ -974,46 +968,46 @@ namespace hooks {
 // r4 = the viewport, r5 = the vehicle; r3 = the camera. The original where
 // ChaseNative says no or without native atexit.
 ITC_REGS_STEP(CameraModesStep82154A48) {
-  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::original::c82154A48(ctx, base);
+  if (!ChaseNative(ctx) || !hooks::NativeAtexit()) {
+    lifted::original::c82154A48(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 192;
-  ViewAtexit atexit{ctx, base, frame};
-  ctx.r3.u64 = cm::View1Construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
-                                  VideoOutput(ctx, base), atexit.Call());
+  ViewAtexit atexit{ctx, frame};
+  ctx.r3.u64 = cm::View1Construct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                                  VideoOutput(ctx), atexit.Call());
 }
 ITC_REGS_STEP(CameraModesStep82154D38) {
-  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::original::c82154D38(ctx, base);
+  if (!ChaseNative(ctx) || !hooks::NativeAtexit()) {
+    lifted::original::c82154D38(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 192;
-  ViewAtexit atexit{ctx, base, frame};
-  ctx.r3.u64 = cm::View2Construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
-                                  VideoOutput(ctx, base), atexit.Call());
+  ViewAtexit atexit{ctx, frame};
+  ctx.r3.u64 = cm::View2Construct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                                  VideoOutput(ctx), atexit.Call());
 }
 
 // ViewCamera1::Update and ViewCamera2::Update (vtable slot 0; their caller
 // reads neither r3 nor f1 after): r3 = the camera. The original where
 // ChaseNative says no.
 ITC_REGS_STEP(CameraModesStep82153A50) {
-  if (!ChaseNative(ctx, base)) {
-    lifted::original::c82153A50(ctx, base);
+  if (!ChaseNative(ctx)) {
+    lifted::original::c82153A50(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::View1Update(base, ctx.r3.u32, ctx.r1.u32 - 352, VideoOutput(ctx, base));
+  cm::View1Update(ctx.r3.u32, ctx.r1.u32 - 352, VideoOutput(ctx));
 }
 ITC_REGS_STEP(CameraModesStep82153E58) {
-  if (!ChaseNative(ctx, base)) {
-    lifted::original::c82153E58(ctx, base);
+  if (!ChaseNative(ctx)) {
+    lifted::original::c82153E58(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::View2Update(base, ctx.r3.u32, ctx.r1.u32 - 240, VideoOutput(ctx, base));
+  cm::View2Update(ctx.r3.u32, ctx.r1.u32 - 240, VideoOutput(ctx));
 }
 
 }  // namespace hooks
@@ -1025,11 +1019,11 @@ namespace hooks {
 // original (CameraTarget::Track's frame).
 ITC_REGS_STEP(CameraModesStep82155E58) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::original::c82155E58(ctx, base);
+    lifted::original::c82155E58(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  cm::IntroUpdate(base, ctx.r3.u32, ctx.r1.u32 - 320);
+  cm::IntroUpdate(ctx.r3.u32, ctx.r1.u32 - 320);
 }
 
 }  // namespace hooks
@@ -1081,25 +1075,25 @@ struct RivalLogoOpenCalls {
   std::function<uint32_t(uint32_t, uint32_t)> open;
   std::function<uint32_t(uint32_t, uint32_t)> load_xpr;
 };
-RivalLogoOpenCalls RivalLogoOpenCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+RivalLogoOpenCalls RivalLogoOpenCallsAt(lifted::Regs& ctx, uint32_t sp) {
   RivalLogoOpenCalls calls;
-  calls.open = [&ctx, base, sp](uint32_t id, uint32_t asset) -> uint32_t {
+  calls.open = [&ctx, sp](uint32_t id, uint32_t asset) -> uint32_t {
     if (ui_movies_game_hooks::OpenNative()) {
-      return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
-                                  ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+      return ui_movies::OpenMovie(id, asset, sp - 128, hooks::NativeArchiveLoad(),
+                                  ui_movies_game_hooks::OpenCalls(ctx, sp));
     }
-    CallFrom(ctx, base, sp, 112, 0x8221195C, [&] {
+    CallFrom(ctx, sp, 112, 0x8221195C, [&] {
       ctx.r3.u64 = id;
       ctx.r4.u64 = asset;
-      lifted::Enter(ctx, base, game::UiMovies::Open);
+      lifted::Enter(ctx, game::UiMovies::Open);
     });
     return ctx.r3.u32;
   };
-  calls.load_xpr = [&ctx, base, sp](uint32_t holder, uint32_t id) -> uint32_t {
-    CallFrom(ctx, base, sp, 112, 0x82211978, [&] {
+  calls.load_xpr = [&ctx, sp](uint32_t holder, uint32_t id) -> uint32_t {
+    CallFrom(ctx, sp, 112, 0x82211978, [&] {
       ctx.r3.u64 = holder;
       ctx.r4.u64 = id;
-      lifted::Enter(ctx, base, lifted::e82211878);
+      lifted::Enter(ctx, lifted::e82211878);
     });
     return ctx.r3.u32;
   };
@@ -1113,8 +1107,8 @@ namespace hooks {
 // RivalLogo::Open: r3 = the entry, r4 = the logo, r5 = the texture; r3 as
 // the original leaves it. Its calls: RivalLogoOpenCallsAt.
 ITC_REGS_STEP(CameraModesStep822118E0) {
-  const RivalLogoOpenCalls calls = RivalLogoOpenCallsAt(ctx, base, ctx.r1.u32 - 112);
-  ctx.r3.u64 = cm::RivalLogoOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, calls.open,
+  const RivalLogoOpenCalls calls = RivalLogoOpenCallsAt(ctx, ctx.r1.u32 - 112);
+  ctx.r3.u64 = cm::RivalLogoOpen(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, calls.open,
                                  calls.load_xpr);
 }
 
@@ -1127,13 +1121,13 @@ namespace {
 // (never run in play) through the translated code, UiMovies::Delete
 // natively where its adapter would, else its adapter, from frames like the
 // original's.
-cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
-  auto call = [&ctx, base, sp](uint32_t back, uint32_t function, uint32_t r3) {
+cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint32_t sp) {
+  auto call = [&ctx, sp](uint32_t back, uint32_t function, uint32_t r3) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp + 128;
-    guest_call::InFrame(ctx, base, 128, back, [&](uint32_t) {
+    guest_call::InFrame(ctx, 128, back, [&](uint32_t) {
       ctx.r3.u64 = r3;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
     });
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
@@ -1141,10 +1135,10 @@ cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint8_t* base, 
   cm::RivalLogoCloseCalls calls;
   calls.finish_all = [call](uint32_t movie) { call(0x822119C0, 0x8211DFF8, movie); };
   calls.release_xpr = [call](uint32_t holder) { call(0x822119F8, 0x82211768, holder); };
-  calls.remove = [&ctx, base, sp, call](uint32_t id) -> uint32_t {
+  calls.remove = [&ctx, sp, call](uint32_t id) -> uint32_t {
     if (ui_movies_game_hooks::DeleteNative()) {
-      return ui_movies::DeleteMovie(base, id, sp - 128,
-                                    ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+      return ui_movies::DeleteMovie(id, sp - 128,
+                                    ui_movies_game_hooks::DeleteCalls(ctx, sp));
     }
     return call(0x82211A00, 0x8211E258, id);
   };
@@ -1156,24 +1150,24 @@ cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint8_t* base, 
 // 128; RivalLogo::Play's original with --log_pause_movie (as its adapter);
 // RivalLogo::Draw through its override (sub_82211A28, which frame
 // interpolation's --redraw_rival_logo notes) with Step's return address.
-cm::CutsceneTickCalls CutsceneTickCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
+cm::CutsceneTickCalls CutsceneTickCallsAt(lifted::Regs& ctx, uint32_t frame) {
   cm::CutsceneTickCalls calls;
-  calls.camera_original = [&ctx, base, frame](uint32_t shot, uint32_t object) {
-    ShotCameraOriginal(ctx, base, shot, frame - 304, object);
+  calls.camera_original = [&ctx, frame](uint32_t shot, uint32_t object) {
+    ShotCameraOriginal(ctx, shot, frame - 304, object);
   };
-  calls.close = RivalLogoCloseCallsAt(ctx, base, frame - 128);
+  calls.close = RivalLogoCloseCallsAt(ctx, frame - 128);
   if (ITC_FLAG(log_pause_movie)) {
-    calls.play_original = [&ctx, base, frame](uint32_t entry) {
-      CallFrom(ctx, base, frame, 192, 0x82155A64, [&] {
+    calls.play_original = [&ctx, frame](uint32_t entry) {
+      CallFrom(ctx, frame, 192, 0x82155A64, [&] {
         ctx.r3.u64 = entry;
-        lifted::original::c82211AB0(ctx, base);
+        lifted::original::c82211AB0(ctx);
       });
     };
   }
-  calls.draw = [&ctx, base, frame](uint32_t entry) {
-    CallFrom(ctx, base, frame, 192, 0x82155BE0, [&] {
+  calls.draw = [&ctx, frame](uint32_t entry) {
+    CallFrom(ctx, frame, 192, 0x82155BE0, [&] {
       ctx.r3.u64 = entry;
-      lifted::Enter(ctx, base, game::RivalLogo::Draw);
+      lifted::Enter(ctx, game::RivalLogo::Draw);
     });
   };
   return calls;
@@ -1186,7 +1180,7 @@ namespace hooks {
 // RivalLogo::Close: r3 = the entry; r3 as the original leaves it.
 ITC_REGS_STEP(CameraModesStep82211980) {
   const uint32_t sp = ctx.r1.u32 - 128;
-  ctx.r3.u64 = cm::RivalLogoClose(base, ctx.r3.u32, sp, RivalLogoCloseCallsAt(ctx, base, sp));
+  ctx.r3.u64 = cm::RivalLogoClose(ctx.r3.u32, sp, RivalLogoCloseCallsAt(ctx, sp));
 }
 
 // Cutscene::Step: r3 = the cutscene; r3 = 1 while running, 0 at its last
@@ -1197,7 +1191,7 @@ ITC_REGS_STEP(CameraModesStep82155A28) {
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 192;
   const uint32_t cutscene = ctx.r3.u32;
-  ctx.r3.u64 = cm::CutsceneTick(base, cutscene, frame, CutsceneTickCallsAt(ctx, base, frame));
+  ctx.r3.u64 = cm::CutsceneTick(cutscene, frame, CutsceneTickCallsAt(ctx, frame));
   ctx.lr = lr;
 }
 
@@ -1210,7 +1204,7 @@ ITC_REGS_STEP(CameraModesStep821561F8) {
   const uint32_t frame = ctx.r1.u32 - 96;
   const uint32_t cutscene = ctx.r3.u32;
   ctx.r3.u64 =
-      cm::CutsceneUpdate(base, cutscene, frame, CutsceneTickCallsAt(ctx, base, frame - 192));
+      cm::CutsceneUpdate(cutscene, frame, CutsceneTickCallsAt(ctx, frame - 192));
   ctx.lr = lr;
 }
 
@@ -1223,19 +1217,19 @@ ITC_CAMERA_MODES(821561F8)
 namespace {
 
 // TvCamera::Step's guest calls from its frame at `frame` (720 bytes).
-cm::TvStepCalls TvStepCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
+cm::TvStepCalls TvStepCallsAt(lifted::Regs& ctx, uint32_t frame,
                               uint32_t camera) {
   cm::TvStepCalls calls;
-  calls.copy = [&ctx, base, frame](uint32_t to, uint32_t from, uint32_t size) {
-    CallFrom(ctx, base, frame, 720, 0x8215634C, [&] {
+  calls.copy = [&ctx, frame](uint32_t to, uint32_t from, uint32_t size) {
+    CallFrom(ctx, frame, 720, 0x8215634C, [&] {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      lifted::Enter(ctx, base, game::memcpy_825A7410);
+      lifted::Enter(ctx, game::memcpy_825A7410);
     });
   };
-  calls.request = [&ctx, base, frame, camera](uint32_t buffer, uint32_t index, uint32_t back) {
-    PathRequestFrom(ctx, base, frame, 720, back, camera, buffer, index);
+  calls.request = [&ctx, frame, camera](uint32_t buffer, uint32_t index, uint32_t back) {
+    PathRequestFrom(ctx, frame, 720, back, camera, buffer, index);
   };
   return calls;
 }
@@ -1251,15 +1245,15 @@ namespace hooks {
 // from SplinePoint's frame, 272 + 208 + 720 bytes below Step's).
 ITC_REGS_STEP(CameraModesStep821562F8) {
   if ((ctx.r1.u32 & 0xF) != 0 || !hooks::NativeAtexit()) {
-    lifted::original::c821562F8(ctx, base);
+    lifted::original::c821562F8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 720;
   const uint32_t camera = ctx.r3.u32;
-  SplineAtexit atexit{ctx, base, frame - 272 - 208 - 720};
-  cm::TvStep(base, camera, frame, TvStepCallsAt(ctx, base, frame, camera), atexit.Call());
+  SplineAtexit atexit{ctx, frame - 272 - 208 - 720};
+  cm::TvStep(camera, frame, TvStepCallsAt(ctx, frame, camera), atexit.Call());
   ctx.lr = lr;
 }
 
@@ -1269,31 +1263,31 @@ ITC_REGS_STEP(CameraModesStep821562F8) {
 // its slot 0 through the translated code; Step's frame 720 bytes below.
 // The original where ChaseNative says no or without native atexit.
 ITC_REGS_STEP(CameraModesStep821593D8) {
-  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::original::c821593D8(ctx, base);
+  if (!ChaseNative(ctx) || !hooks::NativeAtexit()) {
+    lifted::original::c821593D8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 128;
   const uint32_t camera = ctx.r3.u32;
-  SplineAtexit atexit{ctx, base, frame - 720 - 272 - 208 - 720};
+  SplineAtexit atexit{ctx, frame - 720 - 272 - 208 - 720};
   cm::TvUpdateCalls calls;
-  calls.step = TvStepCallsAt(ctx, base, frame - 720, camera);
-  calls.video_output = VideoOutput(ctx, base);
-  calls.slot0 = [&ctx, base, frame](uint32_t function, uint32_t chase) {
-    CallFrom(ctx, base, frame, 128, 0x82159408, [&] {
+  calls.step = TvStepCallsAt(ctx, frame - 720, camera);
+  calls.video_output = VideoOutput(ctx);
+  calls.slot0 = [&ctx, frame](uint32_t function, uint32_t chase) {
+    CallFrom(ctx, frame, 128, 0x82159408, [&] {
       ctx.r3.u64 = chase;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
     });
   };
-  calls.set_style_original = [&ctx, base, frame](uint32_t style) {
-    CallFrom(ctx, base, frame, 128, 0x821594A0, [&] {
+  calls.set_style_original = [&ctx, frame](uint32_t style) {
+    CallFrom(ctx, frame, 128, 0x821594A0, [&] {
       ctx.r3.u64 = style;
-      lifted::original::c82152108(ctx, base);
+      lifted::original::c82152108(ctx);
     });
   };
-  cm::TvUpdate(base, camera, frame, calls, atexit.Call());
+  cm::TvUpdate(camera, frame, calls, atexit.Call());
   ctx.lr = lr;
 }
 
@@ -1310,12 +1304,12 @@ namespace hooks {
 // from the machine's 64-bit r3, src/hooks/game_modes.cpp).
 ITC_REGS_STEP(CameraModesStep82159950) {
   ctx.fpscr.disableFlushMode();
-  const uint32_t machine_offset = schema::CameraDirector(base, 0).machine_address();
+  const uint32_t machine_offset = schema::CameraDirector(0).machine_address();
   const uint64_t machine_r3 = ctx.r3.u64 + machine_offset;
   const uint32_t machine = ctx.r3.u32 + machine_offset;
   bool replaced = false;
   const uint32_t r3 =
-      cm::DirectorInitStates(base, ctx.r3.u32, ctx.r1.u32 - cm::kInitStatesFrame, &replaced);
+      cm::DirectorInitStates(ctx.r3.u32, ctx.r1.u32 - cm::kInitStatesFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
@@ -1324,9 +1318,9 @@ ITC_REGS_STEP(CameraModesStep82159950) {
 // 176 bytes): the view's camera object made through its adapter's step
 // (which falls back to its original itself) with the call site's return
 // address, or the harness's stand-in.
-cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
+cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint32_t frame) {
   cm::SetModeCalls calls;
-  calls.construct = [&ctx, base, frame](uint32_t view, uint32_t object, uint32_t viewport,
+  calls.construct = [&ctx, frame](uint32_t view, uint32_t object, uint32_t viewport,
                                         uint32_t vehicle, uint32_t back) -> uint32_t {
     static constexpr void (*kSteps[6])(lifted::Regs&, uint8_t*) = {
         ITC_REGS_FN(CameraModesStep82154548), ITC_REGS_FN(CameraModesStep82154A48), ITC_REGS_FN(CameraModesStep82154D38),
@@ -1342,7 +1336,7 @@ cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame
     ctx.r4.u64 = viewport;
     ctx.r5.u64 = vehicle;
     ctx.lr = back;
-    kSteps[view](ctx, base);
+    kSteps[view](ctx);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;
@@ -1351,24 +1345,24 @@ cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame
 }
 
 // SetMode natively from a handler's frame at `frame` (its 176 bytes below).
-std::function<void(uint32_t)> SetModeFrom(lifted::Regs& ctx, uint8_t* base, uint32_t director,
+std::function<void(uint32_t)> SetModeFrom(lifted::Regs& ctx, uint32_t director,
                                           uint32_t frame) {
-  return [&ctx, base, director, frame](uint32_t view) {
-    cm::DirectorSetMode(base, director, view, frame - 176,
-                        SetModeCallsAt(ctx, base, frame - 176));
+  return [&ctx, director, frame](uint32_t view) {
+    cm::DirectorSetMode(director, view, frame - 176,
+                        SetModeCallsAt(ctx, frame - 176));
   };
 }
 
 // Stages::Copy's original from a handler's frame (`frame_bytes`) with the
 // return address `back`, where its plain C++ refuses.
-cm::StagesCopyCall StagesCopyFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
+cm::StagesCopyCall StagesCopyFrom(lifted::Regs& ctx, uint32_t frame,
                                   uint32_t frame_bytes, uint32_t back) {
-  return [&ctx, base, frame, frame_bytes, back](uint32_t out, uint32_t stages, uint32_t stage) {
-    CallFrom(ctx, base, frame, frame_bytes, back, [&] {
+  return [&ctx, frame, frame_bytes, back](uint32_t out, uint32_t stages, uint32_t stage) {
+    CallFrom(ctx, frame, frame_bytes, back, [&] {
       ctx.r3.u64 = out;
       ctx.r4.u64 = stages;
       ctx.r5.u64 = int64_t(int32_t(stage));
-      lifted::original::c820FFD88(ctx, base);
+      lifted::original::c820FFD88(ctx);
     });
   };
 }
@@ -1380,7 +1374,7 @@ ITC_REGS_STEP(CameraModesStep821591F0) {
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 176;
   ctx.r3.u64 =
-      cm::DirectorSetMode(base, ctx.r3.u32, ctx.r4.u32, frame, SetModeCallsAt(ctx, base, frame));
+      cm::DirectorSetMode(ctx.r3.u32, ctx.r4.u32, frame, SetModeCallsAt(ctx, frame));
   ctx.lr = lr;
 }
 
@@ -1392,9 +1386,9 @@ ITC_REGS_STEP(CameraModesStep821596B0) {
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 224;
   const uint32_t director = ctx.r3.u32;
-  cm::DirectorOnRaceStart(base, director, frame,
-                          StagesCopyFrom(ctx, base, frame, 224, 0x82159730),
-                          SetModeFrom(ctx, base, director, frame));
+  cm::DirectorOnRaceStart(director, frame,
+                          StagesCopyFrom(ctx, frame, 224, 0x82159730),
+                          SetModeFrom(ctx, director, frame));
   ctx.lr = lr;
 }
 
@@ -1402,16 +1396,16 @@ ITC_REGS_STEP(CameraModesStep821596B0) {
 // director; lr put back. The original where the color filter's slots aren't
 // the ones done natively.
 ITC_REGS_STEP(CameraModesStep821597F0) {
-  if (!cm::DirectorResumeReady(base)) {
-    lifted::original::c821597F0(ctx, base);
+  if (!cm::DirectorResumeReady()) {
+    lifted::original::c821597F0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 240;
   const uint32_t director = ctx.r3.u32;
-  cm::DirectorResume(base, director, frame, StagesCopyFrom(ctx, base, frame, 240, 0x82159848),
-                     SetModeFrom(ctx, base, director, frame));
+  cm::DirectorResume(director, frame, StagesCopyFrom(ctx, frame, 240, 0x82159848),
+                     SetModeFrom(ctx, director, frame));
   ctx.lr = lr;
 }
 
@@ -1427,23 +1421,23 @@ ITC_REGS_STEP(CameraModesStep821594B8) {
   const uint32_t frame = ctx.r1.u32 - 176;
   const uint32_t director = ctx.r3.u32;
   cm::DirectorUpdateCalls calls;
-  calls.track = [&ctx, base, frame](uint32_t camera, uint32_t position) {
-    CallFrom(ctx, base, frame, 176, 0x82159594, [&] {
+  calls.track = [&ctx, frame](uint32_t camera, uint32_t position) {
+    CallFrom(ctx, frame, 176, 0x82159594, [&] {
       ctx.r3.u64 = camera;
       ctx.r4.u64 = position;
-      CameraModesStep82156980(ctx, base);
+      CameraModesStep82156980(ctx);
     });
   };
-  calls.set_mode = SetModeFrom(ctx, base, director, frame);
-  calls.slot0 = [&ctx, base, frame](uint32_t camera, uint32_t which) {
+  calls.set_mode = SetModeFrom(ctx, director, frame);
+  calls.slot0 = [&ctx, frame](uint32_t camera, uint32_t which) {
     const uint32_t back = which == 0 ? 0x82159614 : 0x82159648;
-    CallFrom(ctx, base, frame, 176, back, [&] {
+    CallFrom(ctx, frame, 176, back, [&] {
       ctx.r3.u64 = camera;
-      ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, camera));
-      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+      ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(camera));
+      lifted::CallFromContext(ctx, ctx.ctr.u32);
     });
   };
-  cm::DirectorUpdate(base, director, frame, calls);
+  cm::DirectorUpdate(director, frame, calls);
   ctx.lr = lr;
 }
 
@@ -1451,10 +1445,10 @@ ITC_REGS_STEP(CameraModesStep821594B8) {
 // passes: natively with --native_camera_modes, else the original.
 ITC_REGS_STEP(CameraModesUpdate) {
   if (!ITC_FLAG(native_camera_modes)) {
-    lifted::original::c821594B8(ctx, base);
+    lifted::original::c821594B8(ctx);
     return;
   }
-  CameraModesStep821594B8(ctx, base);
+  CameraModesStep821594B8(ctx);
 }
 
 }  // namespace hooks
@@ -1477,42 +1471,42 @@ namespace hooks {
 // pointer not 16-byte aligned (the vector loads and stores on its frame) or
 // where tan's native form can't stand in.
 ITC_REGS_STEP(CameraModesStep8217BE98) {
-  if ((ctx.r1.u32 & 0xF) != 0 || !cm::GarageReady(base, ctx.r3.u32)) {
-    lifted::original::c8217BE98(ctx, base);
+  if ((ctx.r1.u32 & 0xF) != 0 || !cm::GarageReady(ctx.r3.u32)) {
+    lifted::original::c8217BE98(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 272;
   cm::GarageCalls calls;
-  calls.queue_and_list = [&ctx, base](uint32_t f) {
+  calls.queue_and_list = [&ctx](uint32_t f) {
     std::pair<uint32_t, uint32_t> answer;
-    CallFrom(ctx, base, f, 272, 0x8217BEC8, [&] {
+    CallFrom(ctx, f, 272, 0x8217BEC8, [&] {
       const auto slot = [&](uint32_t object, uint32_t offset, uint32_t back) {
         ctx.r3.u64 = object;
-        ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+        ctx.ctr.u64 = guest::LoadU32(guest::LoadU32(object) + offset);
         ctx.lr = back;
         // (The render manager's slot 8 by its plain C++ where it's the
         // game's, hooks::DirectSlotCall.)
-        if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
-          lifted::CallFromContext(ctx, base, ctx.ctr.u32);
+        if (!hooks::DirectSlotCall(ctx, ctx.ctr.u32)) {
+          lifted::CallFromContext(ctx, ctx.ctr.u32);
         }
         return ctx.r3.u32;
       };
-      const uint32_t scene = slot(schema::AppStartUpGlobals::render_app(base).address, 32, 0x8217BEC8);
+      const uint32_t scene = slot(schema::AppStartUpGlobals::render_app().address, 32, 0x8217BEC8);
       answer.first = slot(scene, 8, 0x8217BED8);
-      const uint32_t again = slot(schema::AppStartUpGlobals::render_app(base).address, 32, 0x8217BEF4);
+      const uint32_t again = slot(schema::AppStartUpGlobals::render_app().address, 32, 0x8217BEF4);
       answer.second = slot(again, 4, 0x8217BF04);
     });
     return answer;
   };
-  calls.pass_update = [&ctx, base](uint32_t pass, uint32_t f) {
-    CallFrom(ctx, base, f - 112, 112, 0x820AA534, [&] {
+  calls.pass_update = [&ctx](uint32_t pass, uint32_t f) {
+    CallFrom(ctx, f - 112, 112, 0x820AA534, [&] {
       ctx.r3.u64 = pass;
-      lifted::Enter(ctx, base, game::CameraPass::Update);
+      lifted::Enter(ctx, game::CameraPass::Update);
     });
   };
-  cm::GarageUpdate(base, ctx.r3.u32, frame, calls);
+  cm::GarageUpdate(ctx.r3.u32, frame, calls);
   ctx.r3.u64 = schema::CamerasGlobals::passes_address();
   ctx.lr = lr;
 }
@@ -1539,40 +1533,40 @@ namespace hooks {
 // its frame (RivalLogoOpenCallsAt). The original where ChaseNative says no
 // (CameraTarget::Track's frame, ZoomFromFov's tan of the same angle).
 ITC_REGS_STEP(CameraModesStep82156CC0) {
-  if (!ChaseNative(ctx, base)) {
-    lifted::original::c82156CC0(ctx, base);
+  if (!ChaseNative(ctx)) {
+    lifted::original::c82156CC0(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - cm::kCutsceneFrame;
-  auto from_frame = [&ctx, base, frame](uint32_t back, const std::function<void()>& call) {
-    CallFrom(ctx, base, frame, cm::kCutsceneFrame, back, call);
+  auto from_frame = [&ctx, frame](uint32_t back, const std::function<void()>& call) {
+    CallFrom(ctx, frame, cm::kCutsceneFrame, back, call);
   };
-  const cm::CutsceneCalls shot = ShotInitCalls(ctx, base);
-  const RivalLogoOpenCalls logo = RivalLogoOpenCallsAt(ctx, base, frame - 112);
+  const cm::CutsceneCalls shot = ShotInitCalls(ctx);
+  const RivalLogoOpenCalls logo = RivalLogoOpenCallsAt(ctx, frame - 112);
   cm::CutsceneConstructCalls calls;
-  calls.video_output = VideoOutput(ctx, base);
+  calls.video_output = VideoOutput(ctx);
   calls.free_all = [&] {
-    if (hooks::NativeHeapActive() && cm::AnimsFreeable(base)) {
-      cm::AnimsFreeAll(base, frame - 384 + 80);
+    if (hooks::NativeHeapActive() && cm::AnimsFreeable()) {
+      cm::AnimsFreeAll(frame - 384 + 80);
       return;
     }
-    from_frame(0x82156E6C, [&] { lifted::original::c821507D8(ctx, base); });
+    from_frame(0x82156E6C, [&] { lifted::original::c821507D8(ctx); });
   };
   calls.stages_copy = [&](uint32_t out, uint32_t stages, uint32_t stage) {
     from_frame(0x82156ED0, [&] {
       ctx.r3.u64 = out;
       ctx.r4.u64 = stages;
       ctx.r5.u64 = stage;
-      lifted::original::c820FFD88(ctx, base);
+      lifted::original::c820FFD88(ctx);
     });
   };
   calls.scripts.insert32 = [&](uint32_t to, uint32_t from, uint32_t size, uint32_t back) {
-    from_frame(back, [&] { GuestMemcpy(ctx, base, 112, 0x821543E0, to, from, size); });
+    from_frame(back, [&] { GuestMemcpy(ctx, 112, 0x821543E0, to, from, size); });
   };
   calls.scripts.insert608 = [&](uint32_t to, uint32_t from, uint32_t size, uint32_t back) {
-    from_frame(back, [&] { GuestMemcpy(ctx, base, 112, 0x82154450, to, from, size); });
+    from_frame(back, [&] { GuestMemcpy(ctx, 112, 0x82154450, to, from, size); });
   };
   calls.scripts.shot.copy32 = [&](uint32_t to, uint32_t from, uint32_t size) {
     from_frame(0x82158B38, [&] { shot.copy32(to, from, size); });
@@ -1593,7 +1587,7 @@ ITC_REGS_STEP(CameraModesStep82156CC0) {
     from_frame(0x82158F5C, [&] { r3 = logo.load_xpr(holder, id); });
     return r3;
   };
-  ctx.r3.u64 = cm::CutsceneConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, calls);
+  ctx.r3.u64 = cm::CutsceneConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, calls);
   ctx.lr = lr;
 }
 

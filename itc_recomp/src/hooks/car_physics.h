@@ -12,6 +12,6 @@ namespace hooks {
 // The guest calls CollisionWorld::Update's plain C++ makes (the originals
 // where a native callee refuses, and the queries' targets other than the
 // track's), as its adapter runs them.
-car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx, uint8_t* base);
+car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx);
 
 }  // namespace hooks

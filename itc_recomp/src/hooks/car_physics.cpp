@@ -64,26 +64,26 @@ using namespace car_physics;
 
 // r4 = the quaternion; r3 comes back as +336 (UpdateOrigin's).
 ITC_CAR_PHYSICS(820B71E8,
-                RigidBodySetOrientation(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96);
+                RigidBodySetOrientation(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96);
                 ctx.r3.u64 = ctx.r3.u32 + 336)
 // RigidBody::SetCenterOfMassPosition (sub_820B71B0) has no adapter: its
 // callers in play, Vehicle::Unflip and CollisionWorld::SolvePairs, are
 // native.
 // r4 = the position; r3 comes back as +16.
-ITC_CAR_PHYSICS(820B6710, RigidBodySetPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192);
+ITC_CAR_PHYSICS(820B6710, RigidBodySetPosition(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192);
                 ctx.r3.u64 = ctx.r3.u32 + 16)
 // r4 = the velocity.
-ITC_CAR_PHYSICS(820B7238, ctx.r3.u64 = RigidBodySetVelocity(base, ctx.r3.u32, ctx.r4.u32,
+ITC_CAR_PHYSICS(820B7238, ctx.r3.u64 = RigidBodySetVelocity(ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r1.u32 - 112))
 // r4 = the angular velocity; r3 comes back as +96.
 ITC_CAR_PHYSICS(820B7500,
-                ctx.f1.f64 = RigidBodySetAngularVelocity(base, ctx.r3.u32, ctx.r4.u32,
+                ctx.f1.f64 = RigidBodySetAngularVelocity(ctx.r3.u32, ctx.r4.u32,
                                                          ctx.r1.u32 - 160);
                 ctx.r3.u64 = ctx.r3.u32 + 96)
 // RigidBody::ApplyImpulses (sub_820B75B8) has no adapter: its callers in
 // play, CollisionObject::Respond and CollisionWorld::Update, are native.
 // f1 = dt; r3 comes back as the body when it's fixed, else +336.
-ITC_CAR_PHYSICS(820B7658, ctx.r3.u64 = RigidBodyIntegrate(base, ctx.r3.u32, ctx.f1.f64,
+ITC_CAR_PHYSICS(820B7658, ctx.r3.u64 = RigidBodyIntegrate(ctx.r3.u32, ctx.f1.f64,
                                                           ctx.r1.u32 - 208))
 // RigidBody::EffectiveMassAt (sub_820B6A38) has no adapter: its only
 // caller, CarData::Derive, is native.
@@ -97,9 +97,9 @@ ITC_NATIVE_ENTRY(820B72C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
-  if (!RigidBodyContactImpulseWith(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  if (!RigidBodyContactImpulseWith(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    ctx.r1.u32 - 272, &f1, &r3)) {
-    lifted::original::c820B72C8(ctx, base);
+    lifted::original::c820B72C8(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -131,44 +131,44 @@ ITC_NATIVE_ENTRY(820B72C8, ITC_FLAG(native_car_physics)) {
 // f1 = x; f1 = the torque. The original passes the curve's index through
 // its r1 - 16.
 ITC_CAR_PHYSICS(820B00C8,
-                ctx.f1.f64 = VehicleEngineTorque(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
+                ctx.f1.f64 = VehicleEngineTorque(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32))
 // Tire::MagicFormula (sub_820B09C8) has no adapter: its callers in play
 // are native.
 // Vehicle::SetGearValues, AxleReactionTorque and UpdateFreeAxle
 // (sub_820B3C90, sub_820B3130, sub_820B3010) have no adapters: their
 // callers in play are native.
 // f1 = the value; f1 comes back clamped.
-ITC_CAR_PHYSICS(820B3E08, ctx.f1.f64 = VehicleSetBrake(base, ctx.r3.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820B3E38, ctx.f1.f64 = VehicleSetHandbrake(base, ctx.r3.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820B3E68, ctx.f1.f64 = VehicleSetThrottle(base, ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3E08, ctx.f1.f64 = VehicleSetBrake(ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3E38, ctx.f1.f64 = VehicleSetHandbrake(ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3E68, ctx.f1.f64 = VehicleSetThrottle(ctx.r3.u32, ctx.f1.f64))
 // r4 = the byte, f1 = time.
 ITC_CAR_PHYSICS(820B0478,
-                VehicleRampReverseThrottle(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820B04C0, VehicleRampHandbrake(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+                VehicleRampReverseThrottle(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B04C0, VehicleRampHandbrake(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
 // f1 = the value, r4 = the byte.
-ITC_CAR_PHYSICS(820B3C20, VehicleSetValue2388(base, ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B3C20, VehicleSetValue2388(ctx.r3.u32, ctx.f1.f64, ctx.r4.u32))
 
 // --- The physics step's updates ---
 
 // r3 = out, r4 = the matrix; r3 comes back as out.
-ITC_CAR_PHYSICS(820AFB78, MatrixCopyRows(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820AFB78, MatrixCopyRows(ctx.r3.u32, ctx.r4.u32))
 // r3 = out, r4 = the matrix, r5 = the vector; Matrix::Multiply leaves
 // flush-to-zero on.
-ITC_CAR_PHYSICS_VECTOR(820B0D68, MatrixMultiplyTranslation(base, ctx.r3.u32, ctx.r4.u32,
+ITC_CAR_PHYSICS_VECTOR(820B0D68, MatrixMultiplyTranslation(ctx.r3.u32, ctx.r4.u32,
                                                            ctx.r5.u32, ctx.r1.u32 - 192))
 
 // --- The vehicle's state from its body, its copies ---
 
 // f1 comes back as 0.5 (the midpoints' scale), r3 as +2016.
 ITC_CAR_PHYSICS(820B13C8,
-                ctx.f1.f64 = VehicleSyncFromBody(base, ctx.r3.u32, ctx.r1.u32 - 368);
+                ctx.f1.f64 = VehicleSyncFromBody(ctx.r3.u32, ctx.r1.u32 - 368);
                 ctx.r3.u64 = ctx.r3.u32 + 2016)
 // r3 = out, r4 = the record; r3 comes back as out.
-ITC_CAR_PHYSICS(820B0A50, WheelCopy(base, ctx.r3.u32, ctx.r4.u32))
-ITC_CAR_PHYSICS(820B0CC0, WheelRecord2Copy(base, ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0A50, WheelCopy(ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS(820B0CC0, WheelRecord2Copy(ctx.r3.u32, ctx.r4.u32))
 
 // f1 = the input; f1 comes back as the second sin's.
-ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(ctx.r3.u32, ctx.f1.f64))
 // SteerRecord::Fill and SteerRecord::Curve (sub_820B0668, sub_820B3E98) have
 // no adapters: their caller in play, SteerTowards, is native.
 // f1 = the target, f2 = dt, f3, r4 and r5 = the bytes; f1 comes back as the
@@ -177,14 +177,14 @@ ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.
 ITC_NATIVE_ENTRY_ALWAYS(820B5FD8) {
   
   if (!ITC_FLAG(native_car_physics)) {
-    lifted::original::c820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
-  if (!VehicleSteerTowards(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r4.u32,
+  if (!VehicleSteerTowards(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r4.u32,
                            ctx.r5.u32, &f1)) {
-    lifted::original::c820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -215,19 +215,19 @@ ITC_NATIVE_ENTRY_ALWAYS(820B5FD8) {
 // (sub_820B7AE8, with CollisionShape::Init, sub_820BAA78) have no adapters:
 // their callers in play, CollisionWorld::Setup and Create, are native.
 // r4 = the point, r5 = the force; r3 comes back as +176.
-ITC_CAR_PHYSICS(820B7DF8, ctx.r3.u64 = CollisionObjectAccumulateForce(base, ctx.r3.u32,
+ITC_CAR_PHYSICS(820B7DF8, ctx.r3.u64 = CollisionObjectAccumulateForce(ctx.r3.u32,
                                                                       ctx.r4.u32, ctx.r5.u32,
                                                                       ctx.r1.u32 - 160))
 // CollisionObject::Translate (sub_820B7B60) has no adapter: its caller in
 // play, CollisionObject::Respond, is native.
 // r3 comes back as the contact, or 0.
-ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(base, ctx.r3.u32))
+ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(ctx.r3.u32))
 // CollisionRecords::Merge (sub_820B7ED0) has no adapter: its caller in
 // play, CollisionObject::Respond, is native.
 // CollisionWorld::RemovePair (sub_820B8A88) has no adapter: its callers in
 // play, RemovePairsOf and RemovePairsByGroups, are native.
 // r3 comes back as 0x826C2E30 (ResetSurfaces').
-ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
+ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset())
 // CollisionWorld::RemovePairsOf and RemovePairsByGroups (sub_820B8BA8,
 // sub_820B8AF8) have no adapters: their only callers, RemoveObject and
 // CollisionObject::RemoveGroups, are native. Where a pair's removal can't be
@@ -237,10 +237,10 @@ ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
 ITC_NATIVE_ENTRY(820B9448, ITC_FLAG(native_car_physics)) {
   const uint32_t object = ctx.r3.u32;
   uint32_t r3 = 0;
-  if (!CollisionWorldRemoveObject(base, object, &r3)) {
+  if (!CollisionWorldRemoveObject(object, &r3)) {
     ctx.r3.u64 = object;
     ctx.r1.u64 = ctx.r1.u32 - 112;
-    lifted::original::c820B8BA8(ctx, base);
+    lifted::original::c820B8BA8(ctx);
     ctx.r1.u64 = ctx.r1.u32 + 112;
     return;
   }
@@ -252,7 +252,7 @@ ITC_NATIVE_ENTRY(820B9448, ITC_FLAG(native_car_physics)) {
 // CarData::SetDefaults (sub_820AECB8) has no adapter: its caller in play,
 // CarData::CarData, is native.
 // r3 = the car data (left as it is).
-ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(ctx.r3.u32, ctx.r1.u32 - 96))
 // CarData::FillAxle, ConvertUnits and Derive, sub_820C05C8
 // (CarData::ApplySettings) and Vehicle::ApplyTuning (sub_820AEE98,
 // sub_820AF018, sub_820AF1C0, sub_820C05C8, sub_820C0D28) have no adapters:
@@ -264,13 +264,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820C27E8) {
   
   const uint32_t frame = ctx.r1.u32 - 368;
   if (!ITC_FLAG(native_car_physics)) {
-    lifted::original::c820C27E8(ctx, base);
+    lifted::original::c820C27E8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
-  if (!VehicleSetupFromCar(base, ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
-    lifted::original::c820C27E8(ctx, base);
+  if (!VehicleSetupFromCar(ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
+    lifted::original::c820C27E8(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -280,7 +280,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C27E8) {
 ITC_NATIVE_ENTRY(820B42C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
-  VehicleConstruct(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1);
+  VehicleConstruct(ctx.r3.u32, ctx.r1.u32 - 112, &f1);
   ctx.f1.f64 = f1;
 }
 
@@ -307,13 +307,13 @@ bool NativeLifetime() {
 ITC_NATIVE_ENTRY_ALWAYS(820B7998) {
   
   if (!ITC_FLAG(native_car_physics)) {
-    lifted::original::c820B7998(ctx, base);
+    lifted::original::c820B7998(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t object = ctx.r3.u32;
-  if (!CollisionObjectResetTransform(base, object, ctx.r1.u32 - 112)) {
-    lifted::original::c820B7998(ctx, base);
+  if (!CollisionObjectResetTransform(object, ctx.r1.u32 - 112)) {
+    lifted::original::c820B7998(ctx);
     return;
   }
   ctx.r3.u64 = object + 32;
@@ -322,13 +322,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820B7998) {
 ITC_NATIVE_ENTRY_ALWAYS(820B0E70) {
   
   if (!NativeLifetime()) {
-    lifted::original::c820B0E70(ctx, base);
+    lifted::original::c820B0E70(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  if (!VehicleDestroyPhysics(base, ctx.r3.u32, &r3)) {
-    lifted::original::c820B0E70(ctx, base);
+  if (!VehicleDestroyPhysics(ctx.r3.u32, &r3)) {
+    lifted::original::c820B0E70(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -336,12 +336,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820B0E70) {
 // r3 = the vehicle; r3 comes back as UpdateWheelAxes'.
 ITC_NATIVE_ENTRY_ALWAYS(820B62E8) {
   
-  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    lifted::original::c820B62E8(ctx, base);
+  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown()) {
+    lifted::original::c820B62E8(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = VehicleRefreshFromBody(base, ctx.r3.u32, ctx.r1.u32 - 96);
+  ctx.r3.u64 = VehicleRefreshFromBody(ctx.r3.u32, ctx.r1.u32 - 96);
 }
 // r3 = the vehicle, f1 = dt; r3 comes back as Unflip's. A callback other
 // than the ground's: the original. Where UpdateSteering or
@@ -349,8 +349,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820B62E8) {
 // the step's frame), as the recompiled step's calls to their adapters.
 ITC_NATIVE_ENTRY_ALWAYS(820B6498) {
   
-  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    lifted::original::c820B6498(ctx, base);
+  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown()) {
+    lifted::original::c820B6498(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -362,15 +362,15 @@ ITC_NATIVE_ENTRY_ALWAYS(820B6498) {
     ctx.r3.u64 = vehicle;
     if (address == 0x820B18B8) {
       ctx.lr = 0x820B6514;
-      lifted::original::c820B18B8(ctx, base);
+      lifted::original::c820B18B8(ctx);
     } else {
       ctx.lr = 0x820B6538;
-      lifted::original::c820B2100(ctx, base);
+      lifted::original::c820B2100(ctx);
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
-  ctx.r3.u64 = VehiclePhysicsStep(base, vehicle, ctx.f1.f64, frame, original);
+  ctx.r3.u64 = VehiclePhysicsStep(vehicle, ctx.f1.f64, frame, original);
 }
 // r3 = the vehicle, r4 = the car data, r5 = the byte, r6 = the groups; f1
 // and r3 come back as ProbeGround's. Where a step wouldn't be native, the
@@ -378,15 +378,15 @@ ITC_NATIVE_ENTRY_ALWAYS(820B6498) {
 ITC_NATIVE_ENTRY_ALWAYS(820B5670) {
   
   if (!NativeLifetime()) {
-    lifted::original::c820B5670(ctx, base);
+    lifted::original::c820B5670(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
-  if (!VehicleSetUpPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  if (!VehicleSetUpPhysics(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                            ctx.r1.u32 - 208, &f1, &r3)) {
-    lifted::original::c820B5670(ctx, base);
+    lifted::original::c820B5670(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -396,15 +396,15 @@ ITC_NATIVE_ENTRY_ALWAYS(820B5670) {
 ITC_NATIVE_ENTRY_ALWAYS(820B5B08) {
   
   if (!NativeLifetime()) {
-    lifted::original::c820B5B08(ctx, base);
+    lifted::original::c820B5B08(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
-  if (!VehicleResetPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 208, &f1,
+  if (!VehicleResetPhysics(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 208, &f1,
                            &r3)) {
-    lifted::original::c820B5B08(ctx, base);
+    lifted::original::c820B5B08(ctx);
     return;
   }
   ctx.f1.f64 = f1;
@@ -416,13 +416,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820B5B08) {
 ITC_NATIVE_ENTRY_ALWAYS(820FF250) {
   
   if (!NativeLifetime()) {
-    lifted::original::c820FF250(ctx, base);
+    lifted::original::c820FF250(ctx);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  if (!CollisionWorldSetup(base, &r3)) {
-    lifted::original::c820FF250(ctx, base);
+  if (!CollisionWorldSetup(&r3)) {
+    lifted::original::c820FF250(ctx);
     return;
   }
   ctx.r3.u64 = r3;
@@ -435,8 +435,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820FF250) {
 // Respond), and the queries' targets other than WallHits and GroundHits.
 namespace hooks {
 
-car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
+car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx) {
+  return [&ctx](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
                       uint32_t r1, uint32_t lr) -> uint32_t {
     const uint64_t stack = ctx.r1.u64;
     ctx.r3.u64 = r3;
@@ -447,16 +447,16 @@ car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx, uin
     ctx.lr = lr;
     switch (address) {
       case 0x820BB758:
-        lifted::original::c820BB758(ctx, base);
+        lifted::original::c820BB758(ctx);
         break;
       case 0x820BBE30:
-        lifted::original::c820BBE30(ctx, base);
+        lifted::original::c820BBE30(ctx);
         break;
       case 0x820B81C8:
-        lifted::original::c820B81C8(ctx, base);
+        lifted::original::c820B81C8(ctx);
         break;
       default:
-        lifted::CallFromContext(ctx, base, address);
+        lifted::CallFromContext(ctx, address);
         break;
     }
     ctx.r1.u64 = stack;
@@ -469,6 +469,6 @@ car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx, uin
 
 ITC_NATIVE_ENTRY(820B92C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32,
-                                    hooks::CollisionWorldUpdateCalls(ctx, base));
+  ctx.r3.u64 = CollisionWorldUpdate(ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32,
+                                    hooks::CollisionWorldUpdateCalls(ctx));
 }

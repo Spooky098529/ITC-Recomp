@@ -31,9 +31,9 @@ constexpr uint32_t kSign = 0x1, kSignSpace = 0x2, kLeft = 0x4, kLeadZero = 0x8, 
 // says whether the real run needs nothing native code can't do.
 class WideOutput {
  public:
-  WideOutput(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+  WideOutput(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
              bool dry)
-      : base_(base), out_(buffer), format_(format), args_(args), frame_(frame), dry_(dry) {}
+      : base_(), out_(buffer), format_(format), args_(args), frame_(frame), dry_(dry) {}
 
   // False (dry runs only) where the original must run. `*count` the
   // characters written, or -1.
@@ -416,24 +416,24 @@ bool WideOutput::Run(int32_t* result) {
 
 }  // namespace
 
-bool Vswprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+bool Vswprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
                int32_t* count) {
   if (buffer == 0 || format == 0) {
     return false;  // EINVAL through _invalid_parameter: the original
   }
   {
-    WideOutput dry(base, buffer, format, args, frame, true);
+    WideOutput dry(buffer, format, args, frame, true);
     int32_t ignored;
     if (!dry.Run(&ignored) || dry.room() < 2) {
       return false;
     }
   }
   ITC_NATIVE_RUNNING("sub_825A9980 _vswprintf_l");
-  WideOutput output(base, buffer, format, args, frame, false);
+  WideOutput output(buffer, format, args, frame, false);
   output.Run(count);
   // _vswprintf_l's terminator: two bytes through the stream's putc.
-  guest::StoreU8(base, output.pointer(), 0);
-  guest::StoreU8(base, output.pointer() + 1, 0);
+  guest::StoreU8(output.pointer(), 0);
+  guest::StoreU8(output.pointer() + 1, 0);
   return true;
 }
 

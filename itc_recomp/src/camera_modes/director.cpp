@@ -513,10 +513,10 @@ constexpr Step kInitSteps[] = {
 
 }  // namespace
 
-uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bool* replaced) {
+uint32_t DirectorInitStates(uint32_t director, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82159950 CameraDirector::InitStates");
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kDirector:
@@ -530,18 +530,18 @@ uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bo
   for (const Step& step : kInitSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.b), guest::LoadU32(base, at(step.a)));
+        guest::StoreU32(at(step.b), guest::LoadU32(at(step.a)));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, Director(base, director).machine_address(),
+        r3 = game_modes::StateMachineAdd(Director(director).machine_address(),
                                          at(step.a), at(step.b), replaced);
         break;
     }
@@ -549,29 +549,29 @@ uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bo
   return r3;
 }
 
-uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32_t frame,
+uint32_t DirectorSetMode(uint32_t director, uint32_t view, uint32_t frame,
                          const SetModeCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821591F0 CameraDirector::SetMode");
-  const uint32_t first_vehicle = track_zones::RacersVehicle(base, 0);
-  guest::StoreU32(base, frame + 80, first_vehicle);
-  const uint32_t second_vehicle = track_zones::RacersVehicle(base, 1);
-  const schema::Viewports viewports = G::viewports(base);
-  guest::StoreU32(base, frame + 84, second_vehicle);
+  const uint32_t first_vehicle = track_zones::RacersVehicle(0);
+  guest::StoreU32(frame + 80, first_vehicle);
+  const uint32_t second_vehicle = track_zones::RacersVehicle(1);
+  const schema::Viewports viewports = G::viewports();
+  guest::StoreU32(frame + 84, second_vehicle);
   const schema::Viewport first = viewports.first();
   const schema::Viewport second = viewports.second();
-  const Director d(base, director);
+  const Director d(director);
   d.set_view(view);
   first.set_view_mode(view);
   second.set_view_mode(d.view());
-  ResetRoll(base);
+  ResetRoll();
   // ResetRoll's r3: viewport 1 (its adapter's), what a view past 5 leaves.
-  uint32_t r3 = G::viewports(base).second().address;
+  uint32_t r3 = G::viewports().second().address;
   const uint32_t mode = d.view();
   d.set_camera(0);
   d.set_camera2(0);
   // The followed player's vehicle from the two kept in the frame (a player
   // past 1 reads the frame's next words, as the original does).
-  auto followed = [&] { return guest::LoadU32(base, frame + 80 + 4 * d.followed()); };
+  auto followed = [&] { return guest::LoadU32(frame + 80 + 4 * d.followed()); };
   // The view's object made in place; 0 where its address is 0 (never in play).
   auto make = [&](uint32_t view_index, uint32_t offset, uint32_t viewport, uint32_t vehicle,
                   uint32_t back) -> uint32_t {
@@ -585,7 +585,7 @@ uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32
     uint32_t offset;
     uint32_t back;
   };
-  const Director at0(base, 0);
+  const Director at0(0);
   const View views[6] = {
       {at0.view0_camera_address(), 0x821593C0}, {at0.view1_camera_address(), 0x8215939C},
       {at0.view2_camera_address(), 0x82159378}, {at0.intro_camera_address(), 0x82159300},
@@ -593,7 +593,7 @@ uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32
   if (mode > 5) {
     return r3;
   }
-  if (mode == 2 && G::viewports(base).split() != 0) {
+  if (mode == 2 && G::viewports().split() != 0) {
     // Split screen: player 0's and player 1's in-car views.
     r3 = make(2, at0.view2_camera_address(), first.address, first_vehicle, 0x82159328);
     d.set_camera(r3);
@@ -614,40 +614,40 @@ namespace {
 // kind 6 and the current stage's copy's first word (Stages::Copy of stage
 // -1 into `frame` + 80) not 1, 1 when [0x826C7824] is 0, else 0; nullopt
 // where the original leaves them.
-std::optional<uint32_t> Followed(uint8_t* base, uint32_t frame, const StagesCopyCall& stages_copy) {
-  const uint32_t race = G::race_data(base);
-  if (int32_t(schema::RaceData(base, race).kind()) != 6) {
+std::optional<uint32_t> Followed(uint32_t frame, const StagesCopyCall& stages_copy) {
+  const uint32_t race = G::race_data();
+  if (int32_t(schema::RaceData(race).kind()) != 6) {
     return std::nullopt;
   }
-  const uint32_t stages = schema::RaceData(base, race).stages_address();
-  if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFF)) {
+  const uint32_t stages = schema::RaceData(race).stages_address();
+  if (!vehicle_accessors::StagesCopy(frame + 80, stages, 0xFFFFFFFF)) {
     stages_copy(frame + 80, stages, 0xFFFFFFFF);
   }
-  if (int32_t(schema::StageCopy(base, frame + 80).first()) == 1) {
+  if (int32_t(schema::StageCopy(frame + 80).first()) == 1) {
     return std::nullopt;
   }
-  return G::two_player(base) == 0 ? 1u : 0u;
+  return G::two_player() == 0 ? 1u : 0u;
 }
 
 }  // namespace
 
-void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
+void DirectorOnRaceStart(uint32_t director, uint32_t frame,
                          const StagesCopyCall& stages_copy,
                          const std::function<void(uint32_t view)>& set_mode) {
   ITC_NATIVE_RUNNING("sub_821596B0 CameraDirector::OnRaceStart");
-  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewports holder = G::viewports();
   const schema::Viewport first = holder.first();
   const schema::Viewport second = holder.second();
-  const Director d(base, director);
-  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
-  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
-    G::viewports(base).set_split(1);
+  const Director d(director);
+  const schema::SaveData save(vehicle_accessors::SaveDataOf(0));
+  if (int32_t(schema::RaceData(G::race_data()).kind()) == 4) {
+    G::viewports().set_split(1);
   }
-  if (const auto followed = Followed(base, frame, stages_copy)) {
+  if (const auto followed = Followed(frame, stages_copy)) {
     d.set_followed(*followed);
     d.set_followed_input(*followed);
   }
-  if (G::viewports(base).split() == 0) {
+  if (G::viewports().split() == 0) {
     d.set_start_view(0);
     const uint32_t setting = save.camera_view();
     if (setting == 0) {
@@ -667,67 +667,67 @@ void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
   d.set_view_kept(d.start_view());
 }
 
-bool DirectorResumeReady(uint8_t* base) {
-  const uint32_t filter = post_effects::Get(base, 2);
+bool DirectorResumeReady() {
+  const uint32_t filter = post_effects::Get(2);
   if (filter == 0) {
     return true;
   }
   // Its slots 4, 6 and 7: ColorFilter::SetColor0, Set8112 and Set8116.
-  const uint32_t vtable = guest::LoadU32(base, filter);
-  return guest::LoadU32(base, vtable + 16) == 0x821350F8 &&
-         guest::LoadU32(base, vtable + 24) == 0x82135138 &&
-         guest::LoadU32(base, vtable + 28) == 0x82135140;
+  const uint32_t vtable = guest::LoadU32(filter);
+  return guest::LoadU32(vtable + 16) == 0x821350F8 &&
+         guest::LoadU32(vtable + 24) == 0x82135138 &&
+         guest::LoadU32(vtable + 28) == 0x82135140;
 }
 
-void DirectorResume(uint8_t* base, uint32_t director, uint32_t frame,
+void DirectorResume(uint32_t director, uint32_t frame,
                     const StagesCopyCall& stages_copy,
                     const std::function<void(uint32_t view)>& set_mode) {
   ITC_NATIVE_RUNNING("sub_821597F0 CameraDirector::Resume");
-  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewports holder = G::viewports();
   const schema::Viewport first = holder.first();
   const schema::Viewport second = holder.second();
-  const Director d(base, director);
-  const uint32_t followed = Followed(base, frame, stages_copy).value_or(0);
+  const Director d(director);
+  const uint32_t followed = Followed(frame, stages_copy).value_or(0);
   // Without the kind 6 path, or with [0x826C7824] set, both are 0.
   d.set_followed(followed);
   d.set_followed_input(followed);
-  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
-    G::viewports(base).set_split(1);
+  if (int32_t(schema::RaceData(G::race_data()).kind()) == 4) {
+    G::viewports().set_split(1);
     first.set_view_mode(2);
     second.set_view_mode(2);
     set_mode(2);
   } else {
     first.set_view_mode(d.view_kept());
   }
-  const uint32_t filter = post_effects::Get(base, 2);
+  const uint32_t filter = post_effects::Get(2);
   if (filter == 0) {
     return;
   }
-  const double zero = G::zero(base);
-  post_effects::ColorFilterSet(base, filter, 8112, zero);
-  const double one = G::one(base);
-  post_effects::ColorFilterSetColor0(base, filter, one, one, one);
-  post_effects::ColorFilterSet(base, filter, 8116, zero);
+  const double zero = G::zero();
+  post_effects::ColorFilterSet(filter, 8112, zero);
+  const double one = G::one();
+  post_effects::ColorFilterSetColor0(filter, one, one, one);
+  post_effects::ColorFilterSet(filter, 8116, zero);
 }
 
-void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
+void DirectorUpdate(uint32_t director, uint32_t frame,
                     const DirectorUpdateCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821594B8 CameraDirector::Update");
-  const schema::Viewports holder = G::viewports(base);
+  const schema::Viewports holder = G::viewports();
   const schema::Viewport first = holder.first();
-  const Director d(base, director);
+  const Director d(director);
   // The followed player's car input record (0x826C5B30 + 4 x its low byte):
   // five words copied into the frame at +96.
   const uint32_t player = d.followed_input() & 0xFF;
-  const uint32_t input = guest::LoadU32(base, G::input_records_address() + 4 * player);
+  const uint32_t input = guest::LoadU32(G::input_records_address() + 4 * player);
   // A host record (E5 step 4) is copied with each field swapped.
-  if (!memory::CopyWithHandles(base, frame + 96, input, 20)) {
+  if (!memory::CopyWithHandles(frame + 96, input, 20)) {
     for (uint32_t i = 0; i < 5; i++) {
-      guest::StoreU32(base, frame + 96 + 4 * i, guest::LoadU32(base, input + 4 * i));
+      guest::StoreU32(frame + 96 + 4 * i, guest::LoadU32(input + 4 * i));
     }
   }
-  const uint32_t buttons = guest::LoadU32(base, frame + 96);
-  auto tv_flag = [&] { return (schema::RaceData(base, G::race_data(base)).flags() >> 7) & 1; };
+  const uint32_t buttons = guest::LoadU32(frame + 96);
+  auto tv_flag = [&] { return (schema::RaceData(G::race_data()).flags() >> 7) & 1; };
   if (buttons & 0x40) {
     // The camera button: viewport 0's view mode cycles.
     const uint32_t mode = first.view_mode();
@@ -762,24 +762,24 @@ void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
   if (d.view() == 1) {
     // The input's +12 halfword (the camera stick, probably), as a
     // doubleword at +80 and then a float.
-    const int64_t stick = int16_t(guest::LoadU16(base, frame + 108));
-    guest::StoreU32(base, frame + 80, uint32_t(uint64_t(stick) >> 32));
-    guest::StoreU32(base, frame + 84, uint32_t(stick));
+    const int64_t stick = int16_t(guest::LoadU16(frame + 108));
+    guest::StoreU32(frame + 80, uint32_t(uint64_t(stick) >> 32));
+    guest::StoreU32(frame + 84, uint32_t(stick));
     const double value = Single(double(stick));
     d.set_view1_look_angle(
-        float(Fmuls(Fmuls(value, Lfs(base, 0x82002BD4)), Lfs(base, 0x820093CC))));
+        float(Fmuls(Fmuls(value, Lfs(0x82002BD4)), Lfs(0x820093CC))));
   }
   calls.slot0(d.camera(), 0);
-  if (G::viewports(base).split() != 0) {
+  if (G::viewports().split() != 0) {
     const uint32_t second = d.camera2();
     if (second != 0) {
       calls.slot0(second, 1);
     }
   }
-  cameras::ViewportUpdate(base, first.address);
-  const schema::Viewports again = G::viewports(base);
+  cameras::ViewportUpdate(first.address);
+  const schema::Viewports again = G::viewports();
   if (again.split() != 0) {
-    cameras::ViewportUpdate(base, again.second().address);
+    cameras::ViewportUpdate(again.second().address);
   }
 }
 

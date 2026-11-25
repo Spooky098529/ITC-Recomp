@@ -39,10 +39,10 @@ struct Step {
 
 #include "todays_result/init_tables.h"
 
-uint32_t Replay(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced,
+uint32_t Replay(uint32_t machine, uint32_t frame, bool* replaced,
                 std::span<const Step> steps) {
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kObject:
@@ -52,19 +52,19 @@ uint32_t Replay(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced,
     }
     return frame + v.value;
   };
-  guest::StoreU32(base, frame, frame + kInitStatesFrame);
+  guest::StoreU32(frame, frame + kInitStatesFrame);
   uint32_t r3 = machine;
   *replaced = false;
   for (const Step& step : steps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy:
-        guest::StoreU32(base, at(step.a), guest::LoadU32(base, at(step.b)));
+        guest::StoreU32(at(step.a), guest::LoadU32(at(step.b)));
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, at(step.c), at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(at(step.c), at(step.a), at(step.b), replaced);
         break;
     }
   }
@@ -73,14 +73,14 @@ uint32_t Replay(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced,
 
 }  // namespace
 
-uint32_t ResultInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t ResultInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8225B358 TodaysResult::InitStates");
-  return Replay(base, machine, frame, replaced, k8225B358);
+  return Replay(machine, frame, replaced, k8225B358);
 }
 
-uint32_t EventInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+uint32_t EventInitStates(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_8225CF30 TodaysEvent::InitStates");
-  return Replay(base, machine, frame, replaced, k8225CF30);
+  return Replay(machine, frame, replaced, k8225CF30);
 }
 
 }  // namespace todays_result

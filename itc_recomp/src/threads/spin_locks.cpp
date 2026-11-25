@@ -23,16 +23,16 @@ namespace threads {
 
 namespace {
 
-std::atomic_ref<uint32_t> LockWord(uint8_t* base, uint64_t address) {
-  return std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(guest::Pointer(base, uint32_t(address))));
+std::atomic_ref<uint32_t> LockWord(uint64_t address) {
+  return std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(guest::Pointer(uint32_t(address))));
 }
 
 uint32_t Owner(const lifted::Args& args) {
   return std::byteswap(uint32_t(args.r13));
 }
 
-void Acquire(uint8_t* base, const lifted::Args& args) {
-  auto word = LockWord(base, args.r[0]);
+void Acquire(const lifted::Args& args) {
+  auto word = LockWord(args.r[0]);
   const uint32_t self = Owner(args);
   for (;;) {
     uint32_t expected = 0;
@@ -43,8 +43,8 @@ void Acquire(uint8_t* base, const lifted::Args& args) {
   }
 }
 
-void Release(uint8_t* base, const lifted::Args& args) {
-  LockWord(base, args.r[0]).store(0, std::memory_order_release);
+void Release(const lifted::Args& args) {
+  LockWord(args.r[0]).store(0, std::memory_order_release);
 }
 
 // KeRaiseIrqlToDpcLevel(): the old IRQL, plugged in.
@@ -60,39 +60,39 @@ lifted::Result LowerIrql(uint8_t*, const lifted::Args&) {
 }
 
 // KeAcquireSpinLockAtRaisedIrql(lock).
-lifted::Result AcquireSpinLockAtRaisedIrql(uint8_t* base, const lifted::Args& args) {
+lifted::Result AcquireSpinLockAtRaisedIrql(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeAcquireSpinLockAtRaisedIrql");
-  Acquire(base, args);
+  Acquire(args);
   return {0, 0.0};
 }
 
 // KeReleaseSpinLockFromRaisedIrql(lock).
-lifted::Result ReleaseSpinLockFromRaisedIrql(uint8_t* base, const lifted::Args& args) {
+lifted::Result ReleaseSpinLockFromRaisedIrql(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeReleaseSpinLockFromRaisedIrql");
-  Release(base, args);
+  Release(args);
   return {0, 0.0};
 }
 
 // KeTryToAcquireSpinLockAtRaisedIrql(lock): 1 when taken, else 0.
-lifted::Result TryToAcquireSpinLockAtRaisedIrql(uint8_t* base, const lifted::Args& args) {
+lifted::Result TryToAcquireSpinLockAtRaisedIrql(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeTryToAcquireSpinLockAtRaisedIrql");
   uint32_t expected = 0;
-  const bool taken = LockWord(base, args.r[0])
+  const bool taken = LockWord(args.r[0])
                          .compare_exchange_strong(expected, Owner(args), std::memory_order_acquire);
   return {taken ? 1u : 0u, 0.0};
 }
 
 // KfAcquireSpinLock(lock): the old IRQL (plugged in, 0).
-lifted::Result AcquireSpinLock(uint8_t* base, const lifted::Args& args) {
+lifted::Result AcquireSpinLock(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KfAcquireSpinLock");
-  Acquire(base, args);
+  Acquire(args);
   return {0, 0.0};
 }
 
 // KfReleaseSpinLock(lock, old IRQL).
-lifted::Result ReleaseSpinLock(uint8_t* base, const lifted::Args& args) {
+lifted::Result ReleaseSpinLock(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KfReleaseSpinLock");
-  Release(base, args);
+  Release(args);
   return {0, 0.0};
 }
 

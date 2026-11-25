@@ -16,10 +16,10 @@ namespace data_load {
 
 // sub_820CCD10 Bits224::Fill: the 7 words at `set` cleared, then bits 0-198
 // set.
-void Bits224Fill(uint8_t* base, uint32_t set);
+void Bits224Fill(uint32_t set);
 // sub_820CCD68 Bits480::Fill: the 15 words at `set` cleared, then bits 0-453
 // set.
-void Bits480Fill(uint8_t* base, uint32_t set);
+void Bits480Fill(uint32_t set);
 // sub_820CCDC0 Defaults::Init: the save defaults' bit sets filled (each
 // cleared first, so what they hold after doesn't depend on before): the
 // table at 0x826C3044, 0x826C3C24 (bits 0-60), 0x826C50E4 (Bits224::Fill),
@@ -28,24 +28,24 @@ void Bits480Fill(uint8_t* base, uint32_t set);
 // Bits480::Fill, cleared again: it ends 0). `frame` is the original's
 // 128-byte frame: its +80 to +96 get the five set indices (17, 35, 38, 41,
 // 47), as the original leaves them. Returns 0x826C4064 (the original's r3).
-uint32_t DefaultsInit(uint8_t* base, uint32_t frame);
+uint32_t DefaultsInit(uint32_t frame);
 
 // --- The 5,232-byte records ---
 
 constexpr uint32_t kRecordBytes = 5232;
 
 // sub_821042A0 Part464::Part464: 0.0 into its float fields. Returns `part`.
-uint32_t Part464Construct(uint8_t* base, uint32_t part);
+uint32_t Part464Construct(uint32_t part);
 // sub_82104690 Member4080::Member4080: Part464 on +16 and +480, then 0.0
 // into +956, +972, +1068, +1084, +1116 and +1148. Returns `member`.
-uint32_t Member4080Construct(uint8_t* base, uint32_t member);
+uint32_t Member4080Construct(uint32_t member);
 // sub_82102888 Member1136::Member1136: 0.0 into its float fields. Returns
 // `member` (r3 as the original leaves it).
-uint32_t Member1136Construct(uint8_t* base, uint32_t member);
+uint32_t Member1136Construct(uint32_t member);
 // sub_82104C20 Record5232::Record5232: 1.0 into +156 to +204 and four rows'
 // four words (+252 to +588), 0.0 into fourteen words from +636 to +1116,
 // then Member1136 (+1136) and Member4080 (+4080). Returns `record`.
-uint32_t Record5232Construct(uint8_t* base, uint32_t record);
+uint32_t Record5232Construct(uint32_t record);
 
 // --- The session's objects ---
 
@@ -56,27 +56,27 @@ constexpr uint32_t kRaceDataBytes = 0xA3B00;
 // or 0, into 0x826C5B2C. Returns it (r3 as the original leaves it), or
 // nullopt where operator new's plain C++ can't answer (the original runs;
 // nothing written yet).
-std::optional<uint32_t> RaceDataCreate(uint8_t* base);
+std::optional<uint32_t> RaceDataCreate();
 
 constexpr uint32_t kInputRecordingsBytes = 0x2225C0;
 constexpr uint32_t kReplayBytes = 0x13C8F0;
 
 // sub_821054A8 InputRecordings::InputRecordings: Record5232 on seven records
 // from +0x20FE90 and seven from +0x2196A0. Returns `block`.
-uint32_t InputRecordingsConstruct(uint8_t* base, uint32_t block);
+uint32_t InputRecordingsConstruct(uint32_t block);
 // sub_82105508 InputRecordings::Create: 0x2225C0 bytes (operator new's plain
 // C++), InputRecordings::InputRecordings when not null; the block, or 0, into
 // 0x826C5B4C, then the word at block + 0x2225B0 = 0 (at 0x2225B0 when the
 // allocation failed, as the original). Returns the block (r3), or nullopt
 // where operator new's plain C++ can't answer (the original runs; nothing
 // written yet).
-std::optional<uint32_t> InputRecordingsCreate(uint8_t* base);
+std::optional<uint32_t> InputRecordingsCreate();
 // sub_82105560 Replay::Create: 0x13C8F0 bytes, Record5232 on seven records
 // from +0x2BF10 when not null; the block, or 0, into 0x826C5B50, then the
 // word at block + 0x2B600 = 1 (at 0x2B600 when the allocation failed).
 // Returns r3 as the original leaves it (the last record, or 0), or nullopt
 // where operator new's plain C++ can't answer.
-std::optional<uint32_t> ReplayCreate(uint8_t* base);
+std::optional<uint32_t> ReplayCreate();
 
 // The two static objects with Replay::Create's layout (C runtime static
 // set-ups, no direct callers: _cinit's initializer tables, once at boot).
@@ -88,8 +88,8 @@ constexpr uint32_t kStaticReplayBExit = 0x825DB1B0;
 // clean-up registered with atexit (natively, else through `call`). Return
 // atexit's r3. The frame's saved words (the link register, r30 and r31 below
 // r1) aren't written.
-int32_t StaticReplayAInit(uint8_t* base, const c_runtime::AtexitCall& call);
-int32_t StaticReplayBInit(uint8_t* base, const c_runtime::AtexitCall& call);
+int32_t StaticReplayAInit(const c_runtime::AtexitCall& call);
+int32_t StaticReplayBInit(const c_runtime::AtexitCall& call);
 
 // --- The two UI movie sets (the loading screen's and another) ---
 
@@ -112,19 +112,19 @@ struct MovieCalls {
 // +64 up by one). Returns UiMovie::Load's serial (r3), or nullopt where
 // operator new's plain C++ can't answer (nothing written yet: the original
 // runs).
-std::optional<int64_t> LoadingScreenAddMovie(uint8_t* base, uint32_t id, const MovieCalls& calls);
-std::optional<int64_t> OtherMoviesAdd(uint8_t* base, uint32_t id, const MovieCalls& calls);
+std::optional<int64_t> LoadingScreenAddMovie(uint32_t id, const MovieCalls& calls);
+std::optional<int64_t> OtherMoviesAdd(uint32_t id, const MovieCalls& calls);
 // `add` for a set's caller: MovieListAdd, or the original where it hands back.
 using MovieAdd = std::function<int64_t(uint32_t id)>;
 // sub_82247B98 LoadingScreen::Load: the loading screen's count (+64) and
 // shown flag (0x82815E60) = 0, then `add` with assets 22575, 22574 and
 // 22576. Returns the last serial (r3).
-int64_t LoadingScreenLoad(uint8_t* base, const MovieAdd& add);
+int64_t LoadingScreenLoad(const MovieAdd& add);
 // sub_82291328: `add` with the three ids at 0x82638134, nine words at
 // 0x828165D0, 0x82816600 and 0x82638130 = 0, then UiMovie::SetRenderer(the
 // renderer, the command list) (ui_movies' plain C++). Returns r3 as the
 // original leaves it (the renderer: SetRenderer leaves it).
-uint32_t OtherMoviesLoad(uint8_t* base, const MovieAdd& add,
+uint32_t OtherMoviesLoad(const MovieAdd& add,
                          const std::function<uint32_t(int which)>& render_object);
 
 // --- The load ---
@@ -137,7 +137,7 @@ using BootCall = std::function<uint32_t(uint32_t target, std::optional<uint32_t>
 // RaceData::ResetGlobal, Defaults::Init, InputRecordings::Create,
 // Replay::Create, DataTables::Init and DataTables::Load, each through `call`.
 // Returns the last one's r3.
-uint32_t CreateObjects(uint8_t* base, const BootCall& call);
+uint32_t CreateObjects(const BootCall& call);
 // sub_82106618 BootData::Load: once (0x826C5B8C 0, then 1): Shaders::LoadAll,
 // Text::Load, BootData::CreateObjects, LoadingScreen::Load, sub_82291328,
 // Params::Init and Params::Load, each through `call`; both GlobalMemoryStatus
@@ -145,6 +145,6 @@ uint32_t CreateObjects(uint8_t* base, const BootCall& call);
 // left out. `frame` is the original's 128-byte frame. Returns r3 as the
 // original leaves it (`frame` + 80), or nullopt when the flag was set (nothing
 // done; r3 as it came).
-std::optional<uint32_t> BootDataLoad(uint8_t* base, uint32_t frame, const BootCall& call);
+std::optional<uint32_t> BootDataLoad(uint32_t frame, const BootCall& call);
 
 }  // namespace data_load

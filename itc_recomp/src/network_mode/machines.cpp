@@ -213,9 +213,9 @@ struct Field {
   uint32_t offset;
   uint32_t value;
 };
-void Fields(uint8_t* base, uint32_t block, std::initializer_list<Field> fields) {
+void Fields(uint32_t block, std::initializer_list<Field> fields) {
   for (const Field& f : fields) {
-    Store(base, block + f.offset, f.value);
+    Store(block + f.offset, f.value);
   }
 }
 
@@ -240,8 +240,8 @@ uint64_t Alloc(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t bytes) 
 // The page object's stores (the step and +20 -1, the rest 0) in the usual
 // order: the next page, the page, the page before, +20, the step, its
 // started word.
-void Pages(uint8_t* base, uint32_t pages) {
-  Apply(PageObject(base, pages), {{&PageObject::set_next_page, 0},
+void Pages(uint32_t pages) {
+  Apply(PageObject(pages), {{&PageObject::set_next_page, 0},
                                   {&PageObject::set_page, 0},
                                   {&PageObject::set_previous_page, 0},
                                   {&PageObject::set_unknown_20, kNone},
@@ -251,8 +251,8 @@ void Pages(uint8_t* base, uint32_t pages) {
 
 // A menu's stores after its head (`Apply`'s): the wrapped flag, the visible
 // and previous rows, the side, the player and the three step words, 0.
-void MenuTail(uint8_t* base, uint32_t menu) {
-  const FrontEndMenu m(base, menu);
+void MenuTail(uint32_t menu) {
+  const FrontEndMenu m(menu);
   m.set_wrapped(0);
   m.set_visible_row(0);
   m.set_previous_row(0);
@@ -264,41 +264,41 @@ void MenuTail(uint8_t* base, uint32_t menu) {
 }
 // The usual head: the first item 0, the last `count`, wraps `flag`, the
 // cursor, the one before and moved 0.
-void MenuCountFirst(uint8_t* base, uint32_t menu, uint32_t count, uint32_t flag) {
-  Apply(FrontEndMenu(base, menu), {{&FrontEndMenu::set_first_item, 0},
+void MenuCountFirst(uint32_t menu, uint32_t count, uint32_t flag) {
+  Apply(FrontEndMenu(menu), {{&FrontEndMenu::set_first_item, 0},
                                    {&FrontEndMenu::set_last_item, count},
                                    {&FrontEndMenu::set_wraps, flag},
                                    {&FrontEndMenu::set_cursor, 0},
                                    {&FrontEndMenu::set_previous, 0},
                                    {&FrontEndMenu::set_moved, 0}});
-  MenuTail(base, menu);
+  MenuTail(menu);
 }
 // The first item 0, wraps `flag`, the cursor and the one before 0, the last
 // item `count`, moved 0.
-void MenuCountAfter4(uint8_t* base, uint32_t menu, uint32_t count, uint32_t flag) {
-  Apply(FrontEndMenu(base, menu), {{&FrontEndMenu::set_first_item, 0},
+void MenuCountAfter4(uint32_t menu, uint32_t count, uint32_t flag) {
+  Apply(FrontEndMenu(menu), {{&FrontEndMenu::set_first_item, 0},
                                    {&FrontEndMenu::set_wraps, flag},
                                    {&FrontEndMenu::set_cursor, 0},
                                    {&FrontEndMenu::set_previous, 0},
                                    {&FrontEndMenu::set_last_item, count},
                                    {&FrontEndMenu::set_moved, 0}});
-  MenuTail(base, menu);
+  MenuTail(menu);
 }
 
 // The machine's state once set up: 1 when it opens on its own message
 // (reenter), else 9.
-void Opened(uint8_t* base, uint32_t machine) {
-  const NetMachine m(base, machine);
+void Opened(uint32_t machine) {
+  const NetMachine m(machine);
   m.set_state(m.reenter() != 0 ? 1 : 9);
 }
 // Once its movie is loaded: 9 (its open message) or 4.
-void Loaded(uint8_t* base, uint32_t machine) {
-  const NetMachine m(base, machine);
+void Loaded(uint32_t machine) {
+  const NetMachine m(machine);
   m.set_state(m.reenter() != 0 ? 9 : 4);
 }
 // The three exit words (back, the race, the mode again) 0.
-void ClearExits(uint8_t* base, uint32_t machine) {
-  const NetMachine m(base, machine);
+void ClearExits(uint32_t machine) {
+  const NetMachine m(machine);
   m.set_back(0);
   m.set_race(0);
   m.set_again(0);
@@ -306,13 +306,13 @@ void ClearExits(uint8_t* base, uint32_t machine) {
 
 // UiMovies::Find for movie `id` with the id stored at `key` (the original's
 // frame word): the movie in the pair's value.
-uint32_t FindMovie(uint8_t* base, uint32_t key, uint32_t id) {
-  Store(base, key, id);
-  return Load(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key));
+uint32_t FindMovie(uint32_t key, uint32_t id) {
+  Store(key, id);
+  return Load(ui_movies::PairsFind(ui_movies::kMovieTable, key));
 }
 // UiMovie::FinishAll on movie `id` when found.
-void Finish(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr, uint32_t id) {
-  const uint32_t movie = FindMovie(base, frame + 80, id);
+void Finish(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t id) {
+  const uint32_t movie = FindMovie(frame + 80, id);
   if (movie != 0) {
     calls.Call(kFinishAll, frame, lr, movie);
   }
@@ -327,121 +327,121 @@ uint64_t OpenMovieOf(uint32_t sp, uint32_t lr, const Calls& calls) {
   return calls.Call(kMoviesOpen, sp, lr, s.movie, s.asset);
 }
 // Type12Screen1's: both its movies, from its 96-byte frame.
-uint64_t Screen1OpenMovie(uint8_t* base, uint32_t sp, uint32_t, const Calls& calls) {
+uint64_t Screen1OpenMovie(uint32_t sp, uint32_t, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82271D18 Type12Screen1::OpenMovie");
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   calls.Call(kMoviesOpen, frame, 0x82271D30, 33, 22580);
   return calls.Call(kMoviesOpen, frame, 0x82271D3C, 34, 22589);
 }
 
 template <size_t I>
-uint64_t WaitForMovieOf(uint8_t* base, uint64_t r3, uint32_t sp) {
+uint64_t WaitForMovieOf(uint64_t r3, uint32_t sp) {
   constexpr const Spec& s = kSpecs[I];
   ITC_NATIVE_RUNNING(s.wait_name);
   const uint32_t machine = uint32_t(r3);
-  Frame(base, sp, s.wait_frame);
+  Frame(sp, s.wait_frame);
   if (s.wait == WaitKind::kEach) {
-    r3 = ui_movies::IsLoaded(base, s.wait_movie);
-    NetMachine(base, machine).set_loaded(uint32_t(r3));
+    r3 = ui_movies::IsLoaded(s.wait_movie);
+    NetMachine(machine).set_loaded(uint32_t(r3));
     if (s.print_r3 != 0) {
       r3 = s.print_r3;  // the print's first argument
     }
-    if (NetMachine(base, machine).loaded() != 0) {
-      Loaded(base, machine);
+    if (NetMachine(machine).loaded() != 0) {
+      Loaded(machine);
     }
     return r3;
   }
-  if (NetMachine(base, machine).loaded() == 0) {
-    r3 = ui_movies::IsLoaded(base, s.wait_movie);
+  if (NetMachine(machine).loaded() == 0) {
+    r3 = ui_movies::IsLoaded(s.wait_movie);
     if (uint32_t(r3) != 0 && s.wait_movie2 != kNoMovie) {
-      r3 = ui_movies::IsLoaded(base, s.wait_movie2);
+      r3 = ui_movies::IsLoaded(s.wait_movie2);
     }
     if (uint32_t(r3) != 0) {
-      NetMachine(base, machine).set_loaded(1);
+      NetMachine(machine).set_loaded(1);
     }
   }
   if (s.counter != 0) {
     // The print when the counter over 15 is even.
-    if (((Load(base, s.counter) / 15) & 1) == 0) {
+    if (((Load(s.counter) / 15) & 1) == 0) {
       r3 = s.print_r3;
     }
-    Store(base, s.counter, Load(base, s.counter) + 1);
+    Store(s.counter, Load(s.counter) + 1);
   }
-  if (NetMachine(base, machine).loaded() != 0) {
-    Loaded(base, machine);
+  if (NetMachine(machine).loaded() != 0) {
+    Loaded(machine);
   }
   return r3;
 }
 
 // Type12Screen1's Leave: its two movies, the data's three pointer lists
 // (+20, +280, +540, each count at +256 from it) emptied from the end.
-uint64_t Screen1Leave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t Screen1Leave(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822727E0 Type12Screen1::Leave");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_state(7);
-  Finish(base, calls, frame, 0x82272828, 33);
-  Finish(base, calls, frame, 0x8227284C, 34);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_state(7);
+  Finish(calls, frame, 0x82272828, 33);
+  Finish(calls, frame, 0x8227284C, 34);
   for (const auto& [list, lr] : {std::pair{20u, 0x82272880u}, std::pair{280u, 0x822728B8u},
                                   std::pair{540u, 0x822728F0u}}) {
     for (;;) {
-      const uint32_t at = G::screen1_data(base).address + list;
-      const uint32_t count = Load(base, at + 256);
+      const uint32_t at = G::screen1_data().address + list;
+      const uint32_t count = Load(at + 256);
       if (count == 0) {
         break;
       }
-      Store(base, at + 256, count - 1);
-      calls.Call(kVirtualFree, frame, lr, Load(base, at + 4 * (count - 1)), 0, kMemRelease);
+      Store(at + 256, count - 1);
+      calls.Call(kVirtualFree, frame, lr, Load(at + 4 * (count - 1)), 0, kMemRelease);
     }
   }
   calls.Call(kMoviesDelete, frame, 0x82272908, 33);
   const uint64_t r3 = calls.Call(kMoviesDelete, frame, 0x82272910, 34);
-  PostRing(base, dispatcher, 4);
+  PostRing(dispatcher, 4);
   return r3;
 }
 
 template <size_t I>
-uint64_t LeaveOf(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t LeaveOf(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                  const Calls& calls) {
   constexpr const Spec& s = kSpecs[I];
   ITC_NATIVE_RUNNING(s.leave_name);
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   uint64_t r3;
   if (s.leave == LeaveKind::kStateFirst) {
-    NetMachine(base, machine).set_state(7);
-    Finish(base, calls, frame, s.leave_at + 0x48, s.movie);
+    NetMachine(machine).set_state(7);
+    Finish(calls, frame, s.leave_at + 0x48, s.movie);
     r3 = calls.Call(kMoviesDelete, frame, s.leave_at + 0x50, s.movie);
   } else {
-    Finish(base, calls, frame, s.leave_at + 0x44, s.movie);
+    Finish(calls, frame, s.leave_at + 0x44, s.movie);
     r3 = calls.Call(kMoviesDelete, frame, s.leave_at + 0x4C, s.movie);
-    NetMachine(base, machine).set_loaded(0);
-    NetMachine(base, machine).set_state(7);
+    NetMachine(machine).set_loaded(0);
+    NetMachine(machine).set_state(7);
   }
-  PostRing(base, dispatcher, 4);
+  PostRing(dispatcher, 4);
   return r3;
 }
 
 template <size_t I>
-uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t DestroyOf(uint32_t machine, uint32_t sp, const Calls& calls) {
   constexpr const Spec& s = kSpecs[I];
   ITC_NATIVE_RUNNING(s.destroy_name);
-  const uint32_t frame = Frame(base, sp, s.destroy_frame);
-  const NetMachine m(base, machine);
+  const uint32_t frame = Frame(sp, s.destroy_frame);
+  const NetMachine m(machine);
   auto state = [&](uint32_t value) { m.set_state(value); };
   switch (s.end) {
     case EndKind::kDataBack:
     case EndKind::kDataBackChecked: {
-      const uint32_t data = Load(base, s.data);
+      const uint32_t data = Load(s.data);
       // The mode select's data is a host object (E5 step 3): its +4
       // through the view.
       uint32_t back;
       if constexpr (I == 0) {
-        back = schema::NetModeSelectData(base, data).back();
+        back = schema::NetModeSelectData(data).back();
       } else if constexpr (I == 3) {
         // The ranking's data is a host object (E5 step 4).
-        back = schema::NetRankingData(base, data).back();
+        back = schema::NetRankingData(data).back();
       } else {
-        back = (s.end == EndKind::kDataBack || data != 0) ? Load(base, data + 4) : 0;
+        back = (s.end == EndKind::kDataBack || data != 0) ? Load(data + 4) : 0;
       }
       if ((s.end == EndKind::kDataBack || data != 0) && back != 0) {
         state(14);
@@ -481,7 +481,7 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
       if (s.frees[i].global == G::select_data_address()) {
         // The host data (Create): the original's VirtualFree at
         // 0x8227C540, which returned 1.
-        G::select_data(base).Delete();
+        G::select_data().Delete();
         r3 = 1;
         continue;
       }
@@ -490,7 +490,7 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
       if (s.frees[i].global == G::ranking_data_address()) {
         // The host data (RankingCreate): the original's VirtualFree at
         // 0x822825A4, which returned 1.
-        G::ranking_data(base).Delete();
+        G::ranking_data().Delete();
         r3 = 1;
         continue;
       }
@@ -499,16 +499,16 @@ uint64_t DestroyOf(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& ca
       if (s.frees[i].global == G::screen7_data_address()) {
         // The host data (Screen7Create): the original's VirtualFree at
         // 0x82268F54, which returned 1.
-        schema::NetScreen7Data(base, Load(base, s.frees[i].global)).Delete();
+        schema::NetScreen7Data(Load(s.frees[i].global)).Delete();
         r3 = 1;
         continue;
       }
     }
-    r3 = calls.Call(kVirtualFree, frame, s.frees[i].lr, Load(base, s.frees[i].global), 0,
+    r3 = calls.Call(kVirtualFree, frame, s.frees[i].lr, Load(s.frees[i].global), 0,
                     kMemRelease);
   }
   for (uint32_t i = 0; i < s.count; i++) {
-    Store(base, s.cleared[i], 0);
+    Store(s.cleared[i], 0);
   }
   return r3;
 }
@@ -540,22 +540,22 @@ constexpr auto kTables = MakeTables(std::make_index_sequence<kSpecCount>());
 
 // --- The Creates ---
 
-uint64_t ModeSelectCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t ModeSelectCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8227C398 NetModeSelect::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_loaded(0);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_loaded(0);
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x8227C3C4, 28));
-  G::set_select_pages(base, pages);
-  Pages(base, pages);
+  G::set_select_pages(pages);
+  Pages(pages);
   const uint32_t menu = uint32_t(Alloc(calls, frame, 0x8227C400, 68));
-  G::set_select_menu(base, menu);
-  MenuCountFirst(base, menu, 1, 1);
+  G::set_select_menu(menu);
+  MenuCountFirst(menu, 1, 1);
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(36) at 0x8227C45C; the global holds its handle.
   using D = schema::NetModeSelectData;
-  const D data = D::New(base);
+  const D data = D::New();
   const uint64_t r3 = data.address;
-  G::set_select_data(base, data);
+  G::set_select_data(data);
   Apply(data, {{&D::set_shown_before, 0},
                         {&D::set_back, 0},
                         {&D::set_dialog_page, kNone},
@@ -565,18 +565,18 @@ uint64_t ModeSelectCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Ca
                         {&D::set_privilege_dialog, 0},
                         {&D::set_sign_in_ticks, 0},
                         {&D::set_sign_in_continues, 1}});
-  ClearExits(base, machine);
-  Opened(base, machine);
+  ClearExits(machine);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Screen1Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen1Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822720A8 Type12Screen1::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_loaded(0);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_loaded(0);
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x822720D4, 28));
-  G::set_screen1_pages(base, pages);
-  Apply(PageObject(base, pages), {{&PageObject::set_next_page, 0},
+  G::set_screen1_pages(pages);
+  Apply(PageObject(pages), {{&PageObject::set_next_page, 0},
                                   {&PageObject::set_page, 0},
                                   {&PageObject::set_previous_page, 0},
                                   {&PageObject::set_step_started, 0},
@@ -590,45 +590,45 @@ uint64_t Screen1Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
                             MenuSpec{G::screen1_menu2_address(), 0x822721C8, 1},
                             MenuSpec{G::screen1_menu3_address(), 0x82272220, 1}}) {
     const uint32_t menu = uint32_t(Alloc(calls, frame, m.lr, 68));
-    Store(base, m.global, menu);
-    MenuCountFirst(base, menu, m.count, 1);
+    Store(m.global, menu);
+    MenuCountFirst(menu, m.count, 1);
   }
   const uint32_t data = uint32_t(Alloc(calls, frame, 0x82272274, 2820));
-  G::set_screen1_data(base, data);
-  const uint64_t r3 = Screen1ResetData(base, data, frame, calls);
-  ClearExits(base, machine);
-  Opened(base, machine);
+  G::set_screen1_data(data);
+  const uint64_t r3 = Screen1ResetData(data, frame, calls);
+  ClearExits(machine);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Screen3Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen3Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225DFE8 Type12Screen3::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_loaded(0);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_loaded(0);
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x8225E014, 28));
-  G::set_screen3_pages(base, pages);
-  Pages(base, pages);
+  G::set_screen3_pages(pages);
+  Pages(pages);
   const uint32_t menu = uint32_t(Alloc(calls, frame, 0x8225E050, 68));
-  G::set_screen3_menu(base, menu);
-  MenuCountAfter4(base, menu, 3, 1);
+  G::set_screen3_menu(menu);
+  MenuCountAfter4(menu, 3, 1);
   const uint64_t r3 = Alloc(calls, frame, 0x8225E0B0, 24);
   const uint32_t data = uint32_t(r3);
-  G::set_screen3_data(base, data);
-  Fields(base, data, {{0, 0}, {4, 0}, {8, kNone}, {12, kNone}, {16, 0}, {20, 0}});
-  ClearExits(base, machine);
-  Opened(base, machine);
+  G::set_screen3_data(data);
+  Fields(data, {{0, 0}, {4, 0}, {8, kNone}, {12, kNone}, {16, 0}, {20, 0}});
+  ClearExits(machine);
+  Opened(machine);
   return r3;
 }
 
-uint64_t RankingCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t RankingCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82282358 NetRanking::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_loaded(0);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_loaded(0);
   // The data lives in host memory (E5 step 4): the original's
   // VirtualAlloc(108) at 0x82282384; the global holds its handle.
   using D = schema::NetRankingData;
-  const D data = D::New(base);
-  G::set_ranking_data(base, data);
+  const D data = D::New();
+  G::set_ranking_data(data);
   Apply(data, {{&D::set_unknown_0, 0},     {&D::set_back, 0},
              {&D::set_unknown_8, 0},     {&D::set_unknown_48, kNone},
              {&D::set_row_limit, 0},     {&D::set_unknown_52, 0},
@@ -641,94 +641,94 @@ uint64_t RankingCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
              {&D::set_unknown_40, 1},    {&D::set_unknown_44, 0},
              {&D::set_row_count, kNone}, {&D::set_unknown_16, 0}});
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x82282404, 28));
-  G::set_ranking_pages(base, pages);
-  Pages(base, pages);
+  G::set_ranking_pages(pages);
+  Pages(pages);
   const uint32_t menu = uint32_t(Alloc(calls, frame, 0x8228243C, 68));
-  G::set_ranking_menu(base, menu);
-  MenuCountAfter4(base, menu, 7, 1);
+  G::set_ranking_menu(menu);
+  MenuCountAfter4(menu, 7, 1);
   const uint64_t r3 = Alloc(calls, frame, 0x82282498, 68);
-  G::set_ranking_menu2(base, uint32_t(r3));
-  MenuCountFirst(base, uint32_t(r3), 1, 0);
-  ClearExits(base, machine);
-  Opened(base, machine);
+  G::set_ranking_menu2(uint32_t(r3));
+  MenuCountFirst(uint32_t(r3), 1, 0);
+  ClearExits(machine);
+  Opened(machine);
   return r3;
 }
 
-uint64_t TaCourseCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t TaCourseCreate(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8227FD40 NetTaCourse::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  NetMachine(base, machine).set_loaded(0);
+  const uint32_t frame = Frame(sp, 128);
+  NetMachine(machine).set_loaded(0);
   const uint32_t data = uint32_t(Alloc(calls, frame, 0x8227FD6C, 48));
-  G::set_ta_course_data(base, data);
-  Fields(base, data,
+  G::set_ta_course_data(data);
+  Fields(data,
          {{0, 0}, {4, 0}, {8, 0}, {20, 1}, {24, 0}, {12, 0}, {16, 0}, {28, 0}, {32, 0},
           {40, kNone}, {44, kNone}});
   const uint32_t pages = uint32_t(Alloc(calls, frame, 0x8227FDC0, 28));
-  G::set_ta_course_pages(base, pages);
-  Pages(base, pages);
+  G::set_ta_course_pages(pages);
+  Pages(pages);
   const uint64_t r3 = Alloc(calls, frame, 0x8227FDF8, 68);
-  G::set_ta_course_menu(base, uint32_t(r3));
-  MenuCountAfter4(base, uint32_t(r3), 7, 1);
-  ClearExits(base, machine);
-  Opened(base, machine);
+  G::set_ta_course_menu(uint32_t(r3));
+  MenuCountAfter4(uint32_t(r3), 7, 1);
+  ClearExits(machine);
+  Opened(machine);
   return r3;
 }
 
 // Screen 6 and the dialogs: the page object and the menu allocated first,
 // then set up through their globals.
-uint64_t PagesAndMenu(uint8_t* base, uint32_t machine, uint32_t frame, const Calls& calls,
+uint64_t PagesAndMenu(uint32_t machine, uint32_t frame, const Calls& calls,
                       uint32_t pages_global, uint32_t pages_lr, uint32_t menu_lr, uint32_t count,
                       uint32_t flag) {
-  NetMachine(base, machine).set_loaded(0);
-  Store(base, pages_global, uint32_t(Alloc(calls, frame, pages_lr, 28)));
+  NetMachine(machine).set_loaded(0);
+  Store(pages_global, uint32_t(Alloc(calls, frame, pages_lr, 28)));
   const uint64_t r3 = Alloc(calls, frame, menu_lr, 68);
-  Store(base, pages_global + 4, uint32_t(r3));
-  Pages(base, Load(base, pages_global));
-  MenuCountFirst(base, Load(base, pages_global + 4), count, flag);
+  Store(pages_global + 4, uint32_t(r3));
+  Pages(Load(pages_global));
+  MenuCountFirst(Load(pages_global + 4), count, flag);
   return r3;
 }
 
-uint64_t Screen6Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen6Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82265A88 Type12Screen6::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint64_t r3 =
-      PagesAndMenu(base, machine, frame, calls, G::screen6_pages_address(), 0x82265AB4,
+      PagesAndMenu(machine, frame, calls, G::screen6_pages_address(), 0x82265AB4,
                    0x82265AD0, 2, 1);
-  G::set_screen6_word(base, 0);
-  NetMachine(base, machine).set_unknown_9656(0);
-  Opened(base, machine);
+  G::set_screen6_word(0);
+  NetMachine(machine).set_unknown_9656(0);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Screen7Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen7Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82268D18 Type12Screen7::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  Store(base, sp + 20, machine);
-  NetMachine(base, machine).set_loaded(0);
-  G::set_screen7_pages(base, uint32_t(Alloc(calls, frame, 0x82268D50, 28)));
-  G::set_screen7_menu(base, uint32_t(Alloc(calls, frame, 0x82268D6C, 68)));
-  Store(base, frame + 88, kGlobalsPage);
+  const uint32_t frame = Frame(sp, 128);
+  Store(sp + 20, machine);
+  NetMachine(machine).set_loaded(0);
+  G::set_screen7_pages(uint32_t(Alloc(calls, frame, 0x82268D50, 28)));
+  G::set_screen7_menu(uint32_t(Alloc(calls, frame, 0x82268D6C, 68)));
+  Store(frame + 88, kGlobalsPage);
   // The data lives in host memory (E5 step 3): the original's
   // VirtualAlloc(8) at 0x82268D8C; the global holds its handle.
-  const uint64_t r3 = schema::NetScreen7Data::New(base).address;
-  const uint32_t pages = G::screen7_pages(base).address;
-  Store(base, frame + 80, 0);
-  Store(base, frame + 92, kGlobalsPage);
-  Store(base, frame + 84, kNone);
-  G::set_screen7_data(base, uint32_t(r3));
-  Apply(PageObject(base, pages), {{&PageObject::set_step, kNone},
+  const uint64_t r3 = schema::NetScreen7Data::New().address;
+  const uint32_t pages = G::screen7_pages().address;
+  Store(frame + 80, 0);
+  Store(frame + 92, kGlobalsPage);
+  Store(frame + 84, kNone);
+  G::set_screen7_data(uint32_t(r3));
+  Apply(PageObject(pages), {{&PageObject::set_step, kNone},
                                   {&PageObject::set_next_page, 0},
                                   {&PageObject::set_page, 0},
                                   {&PageObject::set_previous_page, 0},
                                   {&PageObject::set_unknown_20, kNone},
                                   {&PageObject::set_step_started, 0}});
-  MenuCountFirst(base, Load(base, Load(base, frame + 88) + 0x6164), 3, 1);
-  const schema::NetScreen7Data data(base, Load(base, Load(base, frame + 92) + 0x6168));
+  MenuCountFirst(Load(Load(frame + 88) + 0x6164), 3, 1);
+  const schema::NetScreen7Data data(Load(Load(frame + 92) + 0x6168));
   data.set_unknown_0(0);
   data.set_unknown_4(0);
-  const uint32_t m = Load(base, sp + 20);
+  const uint32_t m = Load(sp + 20);
   using M = NetMachine;
-  Apply(M(base, m), {{&M::set_unknown_9720, 0}, {&M::set_unknown_9656, 0},
+  Apply(M(m), {{&M::set_unknown_9720, 0}, {&M::set_unknown_9656, 0},
                      {&M::set_unknown_9660, 0}, {&M::set_unknown_9664, 0},
                      {&M::set_unknown_9668, 0}, {&M::set_unknown_9672, 0},
                      {&M::set_unknown_9676, 0}, {&M::set_unknown_9680, 0},
@@ -741,69 +741,69 @@ uint64_t Screen7Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
                      {&M::set_unknown_9716, 0}, {&M::set_unknown_9724, 1},
                      {&M::set_back, 0},         {&M::set_race, 0},
                      {&M::set_interrupted, 0},  {&M::set_unknown_9728, 0}});
-  Opened(base, m);
+  Opened(m);
   return r3;
 }
 
-uint64_t Screen8Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen8Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82261030 Type12Screen8::Create");
-  const uint32_t frame = Frame(base, sp, 128);
-  Store(base, sp + 20, machine);
-  NetMachine(base, machine).set_loaded(0);
-  G::set_screen8_pages(base, uint32_t(Alloc(calls, frame, 0x82261068, 28)));
+  const uint32_t frame = Frame(sp, 128);
+  Store(sp + 20, machine);
+  NetMachine(machine).set_loaded(0);
+  G::set_screen8_pages(uint32_t(Alloc(calls, frame, 0x82261068, 28)));
   const uint64_t r3 = Alloc(calls, frame, 0x82261084, 68);
-  const uint32_t pages = G::screen8_pages(base).address;
-  Store(base, frame + 80, 0);
-  Store(base, frame + 84, kNone);
-  Store(base, frame + 88, kNone);
-  Store(base, frame + 92, kGlobalsPage);
-  G::set_screen8_menu(base, uint32_t(r3));
-  Apply(PageObject(base, pages), {{&PageObject::set_next_page, 0},
+  const uint32_t pages = G::screen8_pages().address;
+  Store(frame + 80, 0);
+  Store(frame + 84, kNone);
+  Store(frame + 88, kNone);
+  Store(frame + 92, kGlobalsPage);
+  G::set_screen8_menu(uint32_t(r3));
+  Apply(PageObject(pages), {{&PageObject::set_next_page, 0},
                                   {&PageObject::set_page, 0},
                                   {&PageObject::set_step_started, 0},
                                   {&PageObject::set_previous_page, 0},
-                                  {&PageObject::set_unknown_20, Load(base, frame + 84)},
-                                  {&PageObject::set_step, Load(base, frame + 88)}});
-  MenuCountFirst(base, Load(base, Load(base, frame + 92) + 0x6148), 0, 1);
-  const uint32_t m = Load(base, sp + 20);
+                                  {&PageObject::set_unknown_20, Load(frame + 84)},
+                                  {&PageObject::set_step, Load(frame + 88)}});
+  MenuCountFirst(Load(Load(frame + 92) + 0x6148), 0, 1);
+  const uint32_t m = Load(sp + 20);
   using M = NetMachine;
-  Apply(M(base, m), {{&M::set_unknown_9640, 0}, {&M::set_unknown_9644, 0},
+  Apply(M(m), {{&M::set_unknown_9640, 0}, {&M::set_unknown_9644, 0},
                      {&M::set_back, 0},         {&M::set_race, 0},
                      {&M::set_again, 0},        {&M::set_unknown_9660, 1},
                      {&M::set_unknown_9664, 1}, {&M::set_unknown_9656, 0},
                      {&M::set_unknown_9648, 0}, {&M::set_unknown_9652, 0}});
-  Opened(base, m);
+  Opened(m);
   return r3;
 }
 
-uint64_t Screen9Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Screen9Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822630C0 Type12Screen9::Create");
-  const uint32_t frame = Frame(base, sp, 144);
-  Store(base, sp + 20, machine);
-  NetMachine(base, machine).set_loaded(0);
-  G::set_screen9_pages(base, uint32_t(Alloc(calls, frame, 0x822630F8, 28)));
+  const uint32_t frame = Frame(sp, 144);
+  Store(sp + 20, machine);
+  NetMachine(machine).set_loaded(0);
+  G::set_screen9_pages(uint32_t(Alloc(calls, frame, 0x822630F8, 28)));
   const uint64_t r3 = Alloc(calls, frame, 0x82263114, 68);
-  const uint32_t pages = G::screen9_pages(base).address;
-  Fields(base, frame, {{80, 0}, {92, 0}, {100, 0}, {84, kNone}, {88, kNone}, {104, 0},
+  const uint32_t pages = G::screen9_pages().address;
+  Fields(frame, {{80, 0}, {92, 0}, {100, 0}, {84, kNone}, {88, kNone}, {104, 0},
                        {96, kGlobalsPage}});
-  G::set_screen9_menu(base, uint32_t(r3));
-  Apply(PageObject(base, pages), {{&PageObject::set_next_page, 0},
+  G::set_screen9_menu(uint32_t(r3));
+  Apply(PageObject(pages), {{&PageObject::set_next_page, 0},
                                   {&PageObject::set_page, 0},
                                   {&PageObject::set_previous_page, 0},
-                                  {&PageObject::set_unknown_20, Load(base, frame + 84)},
-                                  {&PageObject::set_step, Load(base, frame + 88)},
+                                  {&PageObject::set_unknown_20, Load(frame + 84)},
+                                  {&PageObject::set_step, Load(frame + 88)},
                                   {&PageObject::set_step_started, 0}});
-  const uint32_t menu = Load(base, Load(base, frame + 96) + 0x6150);
-  Apply(FrontEndMenu(base, menu), {{&FrontEndMenu::set_first_item, 0},
+  const uint32_t menu = Load(Load(frame + 96) + 0x6150);
+  Apply(FrontEndMenu(menu), {{&FrontEndMenu::set_first_item, 0},
                                    {&FrontEndMenu::set_wraps, 1},
                                    {&FrontEndMenu::set_last_item, 0},
                                    {&FrontEndMenu::set_cursor, 0},
                                    {&FrontEndMenu::set_previous, 0},
                                    {&FrontEndMenu::set_moved, 0}});
-  MenuTail(base, menu);
-  const uint32_t m = Load(base, sp + 20);
+  MenuTail(menu);
+  const uint32_t m = Load(sp + 20);
   using M = NetMachine;
-  Apply(M(base, m), {{&M::set_unknown_9640, 1}, {&M::set_unknown_9644, 1},
+  Apply(M(m), {{&M::set_unknown_9640, 1}, {&M::set_unknown_9644, 1},
                      {&M::set_unknown_9648, 0}, {&M::set_unknown_9652, 0},
                      {&M::set_unknown_9656, 0}, {&M::set_unknown_9660, 0},
                      {&M::set_unknown_9664, 0}, {&M::set_unknown_9668, 0},
@@ -812,58 +812,58 @@ uint64_t Screen9Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
                      {&M::set_again, 0},        {&M::set_unknown_9680, 1},
                      {&M::set_unknown_9684, 0}, {&M::set_unknown_9688, 1},
                      {&M::set_unknown_9692, 0}});
-  Opened(base, m);
+  Opened(m);
   return r3;
 }
 
-uint64_t Dialog10Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Dialog10Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82287DD8 Type12Dialog10::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint64_t r3 =
-      PagesAndMenu(base, machine, frame, calls, G::dialog10_pages_address(), 0x82287E04,
+      PagesAndMenu(machine, frame, calls, G::dialog10_pages_address(), 0x82287E04,
                    0x82287E20, 0, 1);
-  NetMachine(base, machine).set_unknown_9644(0);
-  NetMachine(base, machine).set_unknown_9640(0);
-  G::set_dialog10_word(base, 0);
-  Opened(base, machine);
+  NetMachine(machine).set_unknown_9644(0);
+  NetMachine(machine).set_unknown_9640(0);
+  G::set_dialog10_word(0);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Dialog11Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Dialog11Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82276E60 Type12Dialog11::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint64_t r3 =
-      PagesAndMenu(base, machine, frame, calls, G::dialog11_pages_address(), 0x82276E8C,
+      PagesAndMenu(machine, frame, calls, G::dialog11_pages_address(), 0x82276E8C,
                    0x82276EA8, 1, 1);
-  NetMachine(base, machine).set_back(0);
-  NetMachine(base, machine).set_race(0);
-  NetMachine(base, machine).set_unknown_9640(0);
-  Opened(base, machine);
+  NetMachine(machine).set_back(0);
+  NetMachine(machine).set_race(0);
+  NetMachine(machine).set_unknown_9640(0);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Dialog12Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Dialog12Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8227ED58 Type12Dialog12::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint64_t r3 =
-      PagesAndMenu(base, machine, frame, calls, G::dialog12_pages_address(), 0x8227ED84,
+      PagesAndMenu(machine, frame, calls, G::dialog12_pages_address(), 0x8227ED84,
                    0x8227EDA0, 0, 1);
-  NetMachine(base, machine).set_unknown_9640(0);
-  NetMachine(base, machine).set_unknown_9644(0);
-  G::set_dialog12_reason(base, 0);
-  Opened(base, machine);
+  NetMachine(machine).set_unknown_9640(0);
+  NetMachine(machine).set_unknown_9644(0);
+  G::set_dialog12_reason(0);
+  Opened(machine);
   return r3;
 }
 
-uint64_t Dialog13Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t Dialog13Create(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8227DED0 Type12Dialog13::Create");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint64_t r3 =
-      PagesAndMenu(base, machine, frame, calls, G::dialog13_pages_address(), 0x8227DEFC,
+      PagesAndMenu(machine, frame, calls, G::dialog13_pages_address(), 0x8227DEFC,
                    0x8227DF18, 0, 1);
-  NetMachine(base, machine).set_unknown_9640(0);
-  G::set_dialog13_reason(base, 0);
-  Opened(base, machine);
+  NetMachine(machine).set_unknown_9640(0);
+  G::set_dialog13_reason(0);
+  Opened(machine);
   return r3;
 }
 
@@ -877,36 +877,36 @@ static_assert(std::size(kCreates) == kSpecCount);
 
 }  // namespace
 
-uint64_t MachineCreate(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+uint64_t MachineCreate(uint32_t index, uint32_t machine, uint32_t sp,
                        const Calls& calls) {
-  return kCreates[SlotOf(index)](base, machine, sp, calls);
+  return kCreates[SlotOf(index)](machine, sp, calls);
 }
 
-uint64_t MachineOpenMovie(uint8_t* base, uint32_t index, uint32_t sp, uint32_t lr,
+uint64_t MachineOpenMovie(uint32_t index, uint32_t sp, uint32_t lr,
                           const Calls& calls) {
-  return kTables.open[SlotOf(index)](base, sp, lr, calls);
+  return kTables.open[SlotOf(index)](sp, lr, calls);
 }
 
-uint64_t MachineWaitForMovie(uint8_t* base, uint32_t index, uint64_t r3, uint32_t sp) {
-  return kTables.wait[SlotOf(index)](base, r3, sp);
+uint64_t MachineWaitForMovie(uint32_t index, uint64_t r3, uint32_t sp) {
+  return kTables.wait[SlotOf(index)](r3, sp);
 }
 
-uint64_t MachineLeave(uint8_t* base, uint32_t index, uint32_t machine, uint32_t dispatcher,
+uint64_t MachineLeave(uint32_t index, uint32_t machine, uint32_t dispatcher,
                       uint32_t sp, const Calls& calls) {
-  return kTables.leave[SlotOf(index)](base, machine, dispatcher, sp, calls);
+  return kTables.leave[SlotOf(index)](machine, dispatcher, sp, calls);
 }
 
-uint64_t MachineDestroy(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+uint64_t MachineDestroy(uint32_t index, uint32_t machine, uint32_t sp,
                         const Calls& calls) {
-  return kTables.destroy[SlotOf(index)](base, machine, sp, calls);
+  return kTables.destroy[SlotOf(index)](machine, sp, calls);
 }
 
-uint64_t Screen1ResetData(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls) {
+uint64_t Screen1ResetData(uint32_t data, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82272030 Type12Screen1::ResetData");
-  const uint32_t frame = Frame(base, sp, 112);
-  Fields(base, data, {{0, 0}, {4, 0}, {8, 1}, {16, 0}, {820, 1}});
+  const uint32_t frame = Frame(sp, 112);
+  Fields(data, {{0, 0}, {4, 0}, {8, 1}, {16, 0}, {820, 1}});
   const uint64_t r3 = calls.Call(kGarageCarReset, frame, 0x82272064, data + 832);
-  Fields(base, data,
+  Fields(data,
          {{824, 0}, {828, 0}, {800, 0}, {804, 0}, {12, 0}, {2800, 1}, {808, 0}, {812, 0},
           {2804, kNone}, {2808, kNone}, {816, 0}, {2812, 0}, {2816, 0}});
   return r3;

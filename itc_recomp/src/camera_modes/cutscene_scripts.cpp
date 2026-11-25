@@ -436,30 +436,30 @@ constexpr std::span<const Step> kScripts[30] = {
 
 }  // namespace
 
-uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint32_t vehicle,
+uint32_t CutsceneScripts(uint32_t cutscene, uint32_t script, uint32_t vehicle,
                          uint32_t frame, const CutsceneScriptCalls& calls) {
   const uint32_t f = frame;
   const uint32_t cues = f + 120;
-  const uint32_t shots = schema::Cutscene(base, cutscene).shots_address();
+  const uint32_t shots = schema::Cutscene(cutscene).shots_address();
   for (const Step& step : kScripts[script]) {
     switch (step.kind) {
       case Kind::kWord:
-        guest::StoreU32(base, f + step.at, step.value);
+        guest::StoreU32(f + step.at, step.value);
         break;
       case Kind::kHalf:
-        guest::StoreU16(base, f + step.at, uint16_t(step.value));
+        guest::StoreU16(f + step.at, uint16_t(step.value));
         break;
       case Kind::kVehicle:
-        guest::StoreU32(base, f + step.at, vehicle);
+        guest::StoreU32(f + step.at, vehicle);
         break;
       case Kind::kRacer:
-        guest::StoreU32(base, f + step.at,
-                        guest::LoadU32(base, f + kCutsceneRecords + 8 * step.value + 4));
+        guest::StoreU32(f + step.at,
+                        guest::LoadU32(f + kCutsceneRecords + 8 * step.value + 4));
         break;
       case Kind::kReset:
         for (uint32_t i = 0; i < 16; i++) {
-          guest::StoreU16(base, f + step.at + 4 * i + 2, uint16_t(i));
-          guest::StoreU16(base, f + step.at + 4 * i + 0, uint16_t(i + 1));
+          guest::StoreU16(f + step.at + 4 * i + 2, uint16_t(i));
+          guest::StoreU16(f + step.at + 4 * i + 0, uint16_t(i + 1));
         }
         break;
       case Kind::kCueFirst:
@@ -467,21 +467,21 @@ uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint
         const uint32_t position =
             step.kind == Kind::kCueFirst
                 ? 0
-                : uint32_t(int32_t(int16_t(schema::List16(base, cues).count())));
+                : uint32_t(int32_t(int16_t(schema::List16(cues).count())));
         uint32_t to = 0;
-        if (!List16Insert(base, cues, f + 80, position, 32, &to)) {
+        if (!List16Insert(cues, f + 80, position, 32, &to)) {
           calls.insert32(to, f + 80, 32, step.value);
         }
         break;
       }
       case Kind::kShot:
         // From its frame 192 bytes below this one (its stwu).
-        CutsceneInit(base, f + 784, f + 112, f - 192, calls.shot);
+        CutsceneInit(f + 784, f + 112, f - 192, calls.shot);
         break;
       case Kind::kAddShot: {
-        const uint32_t position = uint32_t(int32_t(int16_t(schema::List16(base, shots).count())));
+        const uint32_t position = uint32_t(int32_t(int16_t(schema::List16(shots).count())));
         uint32_t to = 0;
-        if (!List16Insert(base, shots, f + 784, position, 608, &to)) {
+        if (!List16Insert(shots, f + 784, position, 608, &to)) {
           calls.insert608(to, f + 784, 608, step.value);
         }
         break;
@@ -491,7 +491,7 @@ uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint
   // Scripts 4, 5 and 19 read the cutscene back from the frame's +1652 (their
   // r23 held a cue's tick); the others keep it.
   if (script == 4 || script == 5 || script == 19) {
-    return guest::LoadU32(base, f + 1652);
+    return guest::LoadU32(f + 1652);
   }
   return cutscene;
 }

@@ -110,7 +110,7 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 #define NATIVE_OR_ORIGINAL(address)          \
   if (!ITC_FLAG(native_ui_movies_game)) {    \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                  \
   }
 
@@ -119,15 +119,15 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 ITC_NATIVE_ENTRY_ALWAYS(8211A578) {
   
   NATIVE_OR_ORIGINAL(8211A578);
-  ctx.r3.u64 = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ui_movies::FindNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // UiMovie::SetNodeColor: the lookup, then color r6; returns the node.
 ITC_NATIVE_ENTRY_ALWAYS(8211A5B8) {
   
   NATIVE_OR_ORIGINAL(8211A5B8);
-  const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ui_movies::SetColor(base, node, ctx.r6.u32);
+  const uint32_t node = ui_movies::FindNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ui_movies::SetColor(node, ctx.r6.u32);
   ctx.r3.u64 = node;
 }
 
@@ -135,22 +135,22 @@ ITC_NATIVE_ENTRY_ALWAYS(8211A5B8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211A630) {
   
   NATIVE_OR_ORIGINAL(8211A630);
-  ui_movies::SetColor(base, ctx.r4.u32, ctx.r5.u32);
+  ui_movies::SetColor(ctx.r4.u32, ctx.r5.u32);
 }
 
 // sub_8211A6C0: r3 = movie (left).
 ITC_NATIVE_ENTRY_ALWAYS(8211A6C0) {
   
   NATIVE_OR_ORIGINAL(8211A6C0);
-  ui_movies::ClearTextIds(base, ctx.r3.u32);
+  ui_movies::ClearTextIds(ctx.r3.u32);
 }
 
 // UiMovie::SetNodeTexture: the lookup, then r6; returns the node.
 ITC_NATIVE_ENTRY_ALWAYS(8211A708) {
   
   NATIVE_OR_ORIGINAL(8211A708);
-  const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.r3.u64 = ui_movies::SetNodeTexture(base, node, ctx.r6.u32);
+  const uint32_t node = ui_movies::FindNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ui_movies::SetNodeTexture(node, ctx.r6.u32);
 }
 
 // UiMovie::ShowNode and HideNode: the lookup, then +80 = 1 or 0; return the
@@ -158,16 +158,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8211A708) {
 ITC_NATIVE_ENTRY_ALWAYS(8211AC00) {
   
   NATIVE_OR_ORIGINAL(8211AC00);
-  const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  schema::UiMovieNode(base, node).set_visible(1);
+  const uint32_t node = ui_movies::FindNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  schema::UiMovieNode(node).set_visible(1);
   ctx.r3.u64 = node;
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211AC48) {
   
   NATIVE_OR_ORIGINAL(8211AC48);
-  const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  schema::UiMovieNode(base, node).set_visible(0);
+  const uint32_t node = ui_movies::FindNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  schema::UiMovieNode(node).set_visible(0);
   ctx.r3.u64 = node;
 }
 
@@ -177,8 +177,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AAA8) {
   
   NATIVE_OR_ORIGINAL(8211AAA8);
   const uint32_t movie = ctx.r3.u32;
-  const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
-  const schema::UiMovieWord slot(base, ui_movies::PictureTextureSlot(base, movie, picture));
+  const uint32_t picture = ui_movies::FindNode(movie, ctx.r4.u32, ctx.r5.u32);
+  const schema::UiMovieWord slot(ui_movies::PictureTextureSlot(movie, picture));
   const uint32_t old = slot.value();
   slot.set_value(ctx.r6.u32);
   ctx.r3.u64 = old;
@@ -192,7 +192,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AAA8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211AB90) {
   
   NATIVE_OR_ORIGINAL(8211AB90);
-  ctx.r3.u64 = ui_movies::SwapTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ui_movies::SwapTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 namespace {
@@ -209,10 +209,10 @@ bool NativeRestorePose() {
 ITC_NATIVE_ENTRY_ALWAYS(8211ABA8) {
   
   if (!NativeRestorePose()) {
-    lifted::original::c8211ABA8(ctx, base);
+    lifted::original::c8211ABA8(ctx);
     return;
   }
-  ctx.r3.u64 = ui_movies::ResetPose(base, ctx.r3.u32);
+  ctx.r3.u64 = ui_movies::ResetPose(ctx.r3.u32);
 }
 
 // UiMovie::ResetNode: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
@@ -220,38 +220,38 @@ ITC_NATIVE_ENTRY_ALWAYS(8211ABA8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211A1E0) {
   
   if (!NativeRestorePose()) {
-    lifted::original::c8211A1E0(ctx, base);
+    lifted::original::c8211A1E0(ctx);
     return;
   }
-  ctx.r3.u64 = ui_movies::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ctx.r3.u64 = ui_movies::ResetNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // Quad::Quad: r3 = the quad; returns it.
 ITC_NATIVE_ENTRY_ALWAYS(8211A948) {
   
   NATIVE_OR_ORIGINAL(8211A948);
-  ctx.r3.u64 = ui_movies::MakeQuad(base, ctx.r3.u32);
+  ctx.r3.u64 = ui_movies::MakeQuad(ctx.r3.u32);
 }
 
 // TextItem::TextItem: r3 = the item; returns it.
 ITC_NATIVE_ENTRY_ALWAYS(8211A818) {
   
   NATIVE_OR_ORIGINAL(8211A818);
-  ctx.r3.u64 = ui_movies::MakeTextItem(base, ctx.r3.u32);
+  ctx.r3.u64 = ui_movies::MakeTextItem(ctx.r3.u32);
 }
 
 // TextItem::~TextItem: r3 = the item; r3 left at item + 16.
 ITC_NATIVE_ENTRY_ALWAYS(8211A8C8) {
   
   NATIVE_OR_ORIGINAL(8211A8C8);
-  ctx.r3.u64 = ui_movies::ClearTextItem(base, ctx.r3.u32);
+  ctx.r3.u64 = ui_movies::ClearTextItem(ctx.r3.u32);
 }
 
 // sub_8211AED0: r3 = destination, r4 = a text item; returns r3.
 ITC_NATIVE_ENTRY_ALWAYS(8211AED0) {
   
-  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::CopyTextItem(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c8211AED0(ctx, base);
+  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::CopyTextItem(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c8211AED0(ctx);
   }
 }
 
@@ -259,23 +259,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AED0) {
 ITC_NATIVE_ENTRY_ALWAYS(8211A9E8) {
   
   NATIVE_OR_ORIGINAL(8211A9E8);
-  ui_movies::InitAnimationLists(base, ctx.r3.u32);
+  ui_movies::InitAnimationLists(ctx.r3.u32);
 }
 
 namespace {
 // The 40-byte slot copies: the host's where the two can't share memory,
 // else the game's memcpy (sub_825A7410) from a frame like the original's.
-void CopySlot(lifted::Regs& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32_t frame_bytes,
+void CopySlot(lifted::Regs& ctx, uint32_t to, uint32_t from, uint32_t frame_bytes,
               uint32_t return_address) {
-  if (c_runtime::Memcpy(base, to, from, 40)) {
+  if (c_runtime::Memcpy(to, from, 40)) {
     return;
   }
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, frame_bytes, return_address, [&](uint32_t) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = 40;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
   });
   ctx.lr = lr;
 }
@@ -286,7 +286,7 @@ void CopySlot(lifted::Regs& ctx, uint8_t* base, uint32_t to, uint32_t from, uint
 ITC_NATIVE_ENTRY_ALWAYS(8211BA00) {
   
   NATIVE_OR_ORIGINAL(8211BA00);
-  const uint32_t time = ui_movies::AnimationTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  const uint32_t time = ui_movies::AnimationTime(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(std::bit_cast<float>(time));
 }
@@ -296,7 +296,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BA00) {
 ITC_NATIVE_ENTRY_ALWAYS(8211BB18) {
   
   NATIVE_OR_ORIGINAL(8211BB18);
-  const uint32_t time = ui_movies::NamedAnimationTime(base, ctx.r3.u32, ctx.r4.u32);
+  const uint32_t time = ui_movies::NamedAnimationTime(ctx.r3.u32, ctx.r4.u32);
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(std::bit_cast<float>(time));
 }
@@ -308,7 +308,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BB18) {
 ITC_NATIVE_ENTRY_ALWAYS(8211B310) {
   
   NATIVE_OR_ORIGINAL(8211B310);
-  ctx.r3.u64 = ui_movies::TextMapFind(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ui_movies::TextMapFind(ctx.r3.u32, ctx.r4.u32);
 }
 
 // TextMap::Set: r3 = the texts (left), r4 = an id's address, r5 = a text's
@@ -316,14 +316,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B310) {
 ITC_NATIVE_ENTRY_ALWAYS(8211B370) {
   
   NATIVE_OR_ORIGINAL(8211B370);
-  ui_movies::TextMapSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  ui_movies::TextMapSet(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // UiMovies::Find: r3 = a vector of pairs, r4 = the key's address.
 ITC_NATIVE_ENTRY_ALWAYS(8211B3F0) {
   
   NATIVE_OR_ORIGINAL(8211B3F0);
-  ctx.r3.u64 = ui_movies::PairsFind(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ui_movies::PairsFind(ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_8211AD00: the renderer and command list from the object at
@@ -338,30 +338,30 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AD00) {
   }
   NATIVE_OR_ORIGINAL(8211AD00);
   constexpr uint32_t kScene = schema::AppStartUpGlobals::render_app_address();
-  ui_movies::ClearScreenFlag(base);
+  ui_movies::ClearScreenFlag();
   const uint64_t lr = ctx.lr;
   uint32_t list = 0, renderer = 0;
   // A call through slot `slot` of r3's vtable (the render manager's slot 8
   // by its plain C++ where it's the game's, hooks::DirectSlotCall).
   auto call = [&](uint32_t slot, uint32_t return_address) {
     ctx.lr = return_address;
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
-    if (!hooks::DirectSlotCall(ctx, base, function)) {
-      lifted::CallFromContext(ctx, base, function);
+    const uint32_t function = guest::LoadU32(guest::LoadU32(ctx.r3.u32) + 4 * slot);
+    if (!hooks::DirectSlotCall(ctx, function)) {
+      lifted::CallFromContext(ctx, function);
     }
   };
-  guest_call::InFrame(ctx, base, 96, 0x8211AD34, [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+  guest_call::InFrame(ctx, 96, 0x8211AD34, [&](uint32_t) {
+    ctx.r3.u64 = guest::LoadU32(kScene);
     call(8, 0x8211AD34);
     call(1, 0x8211AD44);
     list = ctx.r3.u32;
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = guest::LoadU32(kScene);
     call(8, 0x8211AD60);
     call(2, 0x8211AD70);
     renderer = ctx.r3.u32;
   });
   ctx.lr = lr;
-  ui_movies::ResetMovieTable(base, renderer, list);
+  ui_movies::ResetMovieTable(renderer, list);
   ctx.r3.u64 = renderer;
 }
 
@@ -369,11 +369,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AD00) {
 // = 1 to number by bucket.
 ITC_NATIVE_ENTRY_ALWAYS(8211BD10) {
   
-  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::LayersFit(base, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::original::c8211BD10(ctx, base);
+  if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::LayersFit(ctx.r4.u32, ctx.r5.u32)) {
+    lifted::original::c8211BD10(ctx);
     return;
   }
-  ctx.r3.u64 = ui_movies::AssignLayers(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  ctx.r3.u64 = ui_movies::AssignLayers(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                        ctx.r6.u32, ctx.r7.u32 != 0);
 }
 
@@ -381,14 +381,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BD10) {
 ITC_NATIVE_ENTRY_ALWAYS(8211BE98) {
   
   NATIVE_OR_ORIGINAL(8211BE98);
-  ctx.r3.u64 = ui_movies::IsLoaded(base, ctx.r3.u32);
+  ctx.r3.u64 = ui_movies::IsLoaded(ctx.r3.u32);
 }
 
 // UiMovie::TextString: r3 = movie, r4 = a text id; the text's buffer.
 ITC_NATIVE_ENTRY_ALWAYS(8211B720) {
   
   NATIVE_OR_ORIGINAL(8211B720);
-  ctx.r3.u64 = ui_movies::TextString(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ui_movies::TextString(ctx.r3.u32, ctx.r4.u32);
 }
 
 // The text's +20: r3 = movie, r4 = a text id. (Its +24 and +4,
@@ -397,7 +397,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B720) {
 ITC_NATIVE_ENTRY_ALWAYS(8211B770) {
   
   NATIVE_OR_ORIGINAL(8211B770);
-  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 20);
+  ctx.r3.u64 = ui_movies::TextField(ctx.r3.u32, ctx.r4.u32, 20);
 }
 
 namespace {
@@ -420,7 +420,7 @@ uint64_t MovedR3(const ui_movies::Moved& moved, uint32_t r1, uint32_t movie) {
 
 #define NATIVE_UNWATCHED_OR_ORIGINAL(address) \
   if (!NativeUnwatched()) {                   \
-    lifted::original::c##address(ctx, base); \
+    lifted::original::c##address(ctx); \
     return;                                   \
   }
 
@@ -431,7 +431,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DBE0) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DBE0);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(
-      ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32 != 0),
+      ui_movies::MoveAnimation(movie, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32 != 0),
       ctx.r1.u32, movie);
 }
 
@@ -444,7 +444,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DDE0) {
   
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE0);
   const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, true), ctx.r1.u32,
+  ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(movie, ctx.r4.u32, true), ctx.r1.u32,
                        movie);
 }
 
@@ -455,7 +455,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DE30) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE30);
   ctx.r5.s64 = 0;
   const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::UnloopNamed(base, movie, ctx.r4.u32), ctx.r1.u32, movie);
+  ctx.r3.u64 = MovedR3(ui_movies::UnloopNamed(movie, ctx.r4.u32), ctx.r1.u32, movie);
 }
 
 // UiMovie::Unloop (not seen in play): sub_8211DBE0 with r6 = 0 (a tail
@@ -466,7 +466,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DE28) {
   ITC_NATIVE_RUNNING("sub_8211DE28 UiMovie::Unloop");
   ctx.r6.s64 = 0;
   const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, false),
+  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(movie, ctx.r4.u32, ctx.r5.u32, false),
                        ctx.r1.u32, movie);
 }
 
@@ -476,33 +476,33 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DDE8) {
   
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE8);
   const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::LoopLast(base, movie), ctx.r1.u32, movie);
+  ctx.r3.u64 = MovedR3(ui_movies::LoopLast(movie), ctx.r1.u32, movie);
 }
 
 namespace ui_movies_game_hooks {
 ITC_REGS_STEP(Insert) {
   NATIVE_OR_ORIGINAL(8211B4D0);
   const uint32_t list = ctx.r3.u32, from = ctx.r4.u32, position = ctx.r5.u32;
-  ui_movies::LinkFree(base, list, int16_t(uint16_t(position)));
-  const uint32_t to = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, position));
-  CopySlot(ctx, base, to, from, 112, 0x8211B538);
+  ui_movies::LinkFree(list, int16_t(uint16_t(position)));
+  const uint32_t to = ui_movies::SlotOf(list, ui_movies::LinkAt(list, position));
+  CopySlot(ctx, to, from, 112, 0x8211B538);
   ctx.r3.u64 = to;
 }
 
 ITC_REGS_STEP(RemoveAt) {
   NATIVE_OR_ORIGINAL(8211B080);
-  ui_movies::RemoveAt(base, ctx.r3.u32, ctx.r4.u32);
+  ui_movies::RemoveAt(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(Play) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211D978);
-  ctx.r3.u64 = ui_movies::Play(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+  ctx.r3.u64 = ui_movies::Play(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                                ctx.r8.u32, ctx.r9.u32);
 }
 
 ITC_REGS_STEP(PlayNamed) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DAC8);
-  ctx.r3.u64 = ui_movies::PlayNamed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = ui_movies::PlayNamed(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                     ctx.r7.u32, ctx.r8.u32);
 }
 
@@ -510,31 +510,31 @@ ITC_REGS_STEP(DrawTexts) {
   NATIVE_OR_ORIGINAL(8211CD90);
   const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
   const bool draw_only = ctx.r5.u32 != 0;
-  const schema::UiMovieDrawTextList texts(base, list);
+  const schema::UiMovieDrawTextList texts(list);
   if (texts.count() == 0) {
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, ui_movies::kDrawTextsFrame, 0x8211CE30, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, ui_movies::kDrawTextsFrame, 0x8211CE30, [&](uint32_t frame) {
     const uint32_t item = frame + ui_movies::kDrawTextsItem;
     do {
-      const uint32_t from = ui_movies::DrawTextsPop(base, frame, list);
-      if (!ui_movies::CopyTextItem(base, item, from)) {
+      const uint32_t from = ui_movies::DrawTextsPop(frame, list);
+      if (!ui_movies::CopyTextItem(item, from)) {
         ctx.r3.u64 = item;
         ctx.r4.u64 = from;
         ctx.lr = 0x8211CE30;
-        lifted::original::c8211AED0(ctx, base);
+        lifted::original::c8211AED0(ctx);
       }
-      ui_movies::DrawTextsItem(base, frame, movie, draw_only);
+      ui_movies::DrawTextsItem(frame, movie, draw_only);
       // Text::Draw (its adapter: the render queue's guest call).
-      ctx.r3.u64 = guest::LoadU32(base, schema::StringsAndFontGlobals::strings_address());
+      ctx.r3.u64 = guest::LoadU32(schema::StringsAndFontGlobals::strings_address());
       ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
       ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
       ctx.lr = 0x8211D190;
-      lifted::Enter(ctx, base, game::Text::Draw);
+      lifted::Enter(ctx, game::Text::Draw);
       ctx.fpscr.disableFlushMode();
-      ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
+      ctx.r3.u64 = ui_movies::ClearTextItem(item);
     } while (texts.count() != 0);
   });
   ctx.lr = lr;
@@ -543,7 +543,7 @@ ITC_REGS_STEP(DrawTexts) {
 ITC_REGS_STEP(Loop) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDD8);
   const uint32_t movie = ctx.r3.u32;
-  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, true),
+  ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(movie, ctx.r4.u32, ctx.r5.u32, true),
                        ctx.r1.u32, movie);
 }
 
@@ -554,25 +554,25 @@ ITC_REGS_STEP(Loop) {
 // as the original leaves it: the move's, or the queue after the removal.
 namespace {
 template <typename Move, typename Find>
-void FinishIn(lifted::Regs& ctx, uint8_t* base, uint32_t movie, uint32_t frame_bytes,
+void FinishIn(lifted::Regs& ctx, uint32_t movie, uint32_t frame_bytes,
               uint32_t move_return, uint32_t apply_return, Move move, Find find) {
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, frame_bytes, move_return, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, frame_bytes, move_return, [&](uint32_t frame) {
     ctx.r3.u64 = MovedR3(move(), frame, movie);
     const std::optional<ui_movies::Finishing> found = find();
     if (!found) {
       return;
     }
-    const schema::UiMovieAnimationSlot slot(base, found->slot);
+    const schema::UiMovieAnimationSlot slot(found->slot);
     ctx.r3.u64 = slot.scene();
     ctx.r4.u64 = slot.animation();
     ctx.r6.u64 = 0;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(found->time));
     ctx.lr = apply_return;
-    lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
-    const uint32_t queue = schema::UiMovie(base, movie).queue_address();
-    ui_movies::RemoveAt(base, queue, found->position);
+    lifted::Enter(ctx, game::UiMovie::ApplyAnimation);
+    const uint32_t queue = schema::UiMovie(movie).queue_address();
+    ui_movies::RemoveAt(queue, found->position);
     ctx.r3.u64 = queue;
   });
   ctx.lr = lr;
@@ -583,18 +583,18 @@ ITC_REGS_STEP(Finish) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE38);
   const uint32_t movie = ctx.r3.u32, sub_scene = ctx.r4.u32, index = ctx.r5.u32;
   FinishIn(
-      ctx, base, movie, 128, 0x8211DE58, 0x8211DF08,
-      [&] { return ui_movies::MoveAnimation(base, movie, sub_scene, index, false); },
-      [&] { return ui_movies::FindFinishing(base, movie, sub_scene, index); });
+      ctx, movie, 128, 0x8211DE58, 0x8211DF08,
+      [&] { return ui_movies::MoveAnimation(movie, sub_scene, index, false); },
+      [&] { return ui_movies::FindFinishing(movie, sub_scene, index); });
 }
 
 ITC_REGS_STEP(FinishNamed) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DF20);
   const uint32_t movie = ctx.r3.u32, named = ctx.r4.u32;
   FinishIn(
-      ctx, base, movie, 112, 0x8211DF3C, 0x8211DFE0,
-      [&] { return ui_movies::MoveNamedAnimation(base, movie, named, false); },
-      [&] { return ui_movies::FindFinishingNamed(base, movie, named); });
+      ctx, movie, 112, 0x8211DF3C, 0x8211DFE0,
+      [&] { return ui_movies::MoveNamedAnimation(movie, named, false); },
+      [&] { return ui_movies::FindFinishingNamed(movie, named); });
 }
 }  // namespace ui_movies_game_hooks
 
@@ -608,33 +608,33 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D280) {
   NATIVE_OR_ORIGINAL(8211D280);
   ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
   const uint32_t movie = ctx.r3.u32;
-  const schema::UiMovie m(base, movie);
+  const schema::UiMovie m(movie);
   const uint64_t lr = ctx.lr;
-  guest_call::InFrame(ctx, base, 112, 0x8211D2A4, [&](uint32_t) {
+  guest_call::InFrame(ctx, 112, 0x8211D2A4, [&](uint32_t) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = m.saved_scene();
     ctx.r5.u64 = m.live_scene();
     ctx.r6.u64 = 0;
     ctx.r7.u64 = 0;
     ctx.lr = 0x8211D2A4;
-    lifted::Enter(ctx, base, game::UiMovie::RestorePose);
+    lifted::Enter(ctx, game::UiMovie::RestorePose);
     ctx.r3.u64 = m.draw_context_address();
     ctx.r4.u64 = m.live_scene();
     ctx.r5.u64 = m.textures_address();
     ctx.r6.u64 = m.text_items_address();
     ctx.r7.s64 = -1;
     ctx.lr = 0x8211D2C4;
-    lifted::Enter(ctx, base, game::UiMovie::Draw_8259FA00);
+    lifted::Enter(ctx, game::UiMovie::Draw_8259FA00);
     ctx.r3.u64 = movie;
     ctx.r4.u64 = m.text_items_address();
     ctx.r5.u64 = 0;
     ctx.lr = 0x8211D2D4;
-    lifted::Enter(ctx, base, game::UiMovie::DrawTexts);
+    lifted::Enter(ctx, game::UiMovie::DrawTexts);
     for (uint32_t k = 0; k < 2; k++) {
       ctx.r3.u64 = m.draw_context_address();
       ctx.r4.u64 = k == 0 ? 678 : 148;
       ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
-      lifted::Enter(ctx, base, lifted::entry::e8259DAC0);
+      lifted::Enter(ctx, lifted::entry::e8259DAC0);
     }
   });
   ctx.lr = lr;
@@ -648,7 +648,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E1B8) {
   
   NATIVE_OR_ORIGINAL(8211E1B8);
   ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
-  lifted::Enter(ctx, base, game::UiMovie::Update);
+  lifted::Enter(ctx, game::UiMovie::Update);
 }
 
 // UiMovie::FinishAll (sub_8211DFF8): r3 = movie. Every looping slot moved
@@ -665,24 +665,24 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
   ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
   const uint32_t movie = ctx.r3.u32;
-  const uint32_t queue = schema::UiMovie(base, movie).queue_address();
-  const uint32_t looping = schema::UiMovie(base, movie).looping_address();
+  const uint32_t queue = schema::UiMovie(movie).queue_address();
+  const uint32_t looping = schema::UiMovie(movie).looping_address();
   const uint64_t lr = ctx.lr;
   auto count = [&](uint32_t list) {
-    return uint32_t(int32_t(int16_t(schema::UiMovieAnimationList(base, list).count())));
+    return uint32_t(int32_t(int16_t(schema::UiMovieAnimationList(list).count())));
   };
-  guest_call::InFrame(ctx, base, 176, 0x8211E05C, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, 176, 0x8211E05C, [&](uint32_t frame) {
     const uint32_t copy = frame + 80;
     // The list's first slot copied to the frame (memcpy, r3 its
     // destination).
     auto copy_first = [&](uint32_t list, uint32_t return_address) {
-      const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, 0));
-      if (!c_runtime::Memcpy(base, copy, from, 40)) {
+      const uint32_t from = ui_movies::SlotOf(list, ui_movies::LinkAt(list, 0));
+      if (!c_runtime::Memcpy(copy, from, 40)) {
         ctx.r3.u64 = copy;
         ctx.r4.u64 = from;
         ctx.r5.u64 = 40;
         ctx.lr = return_address;
-        lifted::Enter(ctx, base, game::memcpy_825A7410);
+        lifted::Enter(ctx, game::memcpy_825A7410);
       }
       ctx.r3.u64 = copy;
     };
@@ -690,27 +690,27 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
     if (n != 0) {
       do {
         copy_first(looping, 0x8211E05C);
-        ui_movies::UnlinkQueueFirst(base, looping);
+        ui_movies::UnlinkQueueFirst(looping);
         ctx.r3.u64 = queue;
         ctx.r4.u64 = copy;
         ctx.r5.s64 = int32_t(count(queue));
         ctx.lr = 0x8211E0A0;
-        lifted::Enter(ctx, base, game::AnimationList::Insert);
+        lifted::Enter(ctx, game::AnimationList::Insert);
       } while (--n != 0);
     }
     n = count(queue);
     if (n != 0) {
       do {
         copy_first(queue, 0x8211E0F0);
-        const schema::UiMovieAnimationSlot slot(base, copy);
+        const schema::UiMovieAnimationSlot slot(copy);
         ctx.r3.u64 = slot.scene();
         ctx.r4.u64 = slot.animation();
         ctx.r6.u64 = 0;
         ctx.fpscr.disableFlushMode();
-        ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
+        ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(copy)));
         ctx.lr = 0x8211E118;
-        lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
-        ui_movies::UnlinkQueueFirst(base, queue);
+        lifted::Enter(ctx, game::UiMovie::ApplyAnimation);
+        ui_movies::UnlinkQueueFirst(queue);
       } while (--n != 0);
     }
   });
@@ -738,12 +738,12 @@ bool NativeHeap() {
       return;                                  \
     }                                          \
   }                                            \
-  lifted::original::c##address(ctx, base);
+  lifted::original::c##address(ctx);
 
 // sub_8211B0E8: r3 = a vector of pairs; returned.
 ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211B0E8, ui_movies::MakePairs(base, ctx.r3.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211B0E8, ui_movies::MakePairs(ctx.r3.u32));
 }
 
 // sub_8211C168: r3 = a vector of pairs, r4 = the key's address, r5 = the
@@ -751,53 +751,53 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
 ITC_NATIVE_ENTRY_ALWAYS(8211C168) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C168,
-                          ui_movies::PairsSet(base, ctx.r3.u32,
-                                              schema::UiMovieWord(base, ctx.r4.u32).value(),
-                                              schema::UiMovieWord(base, ctx.r5.u32).value()));
+                          ui_movies::PairsSet(ctx.r3.u32,
+                                              schema::UiMovieWord(ctx.r4.u32).value(),
+                                              schema::UiMovieWord(ctx.r5.u32).value()));
 }
 
 // sub_8211AE68: r3 = a vector of words, r4 = the word's address.
 ITC_NATIVE_ENTRY_ALWAYS(8211AE68) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211AE68,
-                          ui_movies::WordsAppend(base, ctx.r3.u32,
-                                                 schema::UiMovieWord(base, ctx.r4.u32).value()));
+                          ui_movies::WordsAppend(ctx.r3.u32,
+                                                 schema::UiMovieWord(ctx.r4.u32).value()));
 }
 
 // UiMovie::UiMovie: r3 = movie; returned.
 ITC_NATIVE_ENTRY_ALWAYS(8211E1C0) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211E1C0, ui_movies::ConstructMovie(base, ctx.r3.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211E1C0, ui_movies::ConstructMovie(ctx.r3.u32));
 }
 
 // UiMovie::~UiMovie: r3 = movie.
 ITC_NATIVE_ENTRY_ALWAYS(8211E160) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211E160, ui_movies::DestroyMovie(base, ctx.r3.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211E160, ui_movies::DestroyMovie(ctx.r3.u32));
 }
 
 // sub_8211AC90: r3 = movie.
 ITC_NATIVE_ENTRY_ALWAYS(8211AC90) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(base, ctx.r3.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(ctx.r3.u32));
 }
 
 // UiMovie::GetText: r3 = movie, r4 = the address of a TXT node's id; the
 // text record.
 ITC_NATIVE_ENTRY_ALWAYS(8211B660) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211B660, ui_movies::GetText(base, ctx.r3.u32, ctx.r4.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211B660, ui_movies::GetText(ctx.r3.u32, ctx.r4.u32));
 }
 
 // sub_8211E378: r3 = movie, r4 = a scene; its temporaries in a frame like
 // the original's below r1.
 ITC_NATIVE_ENTRY_ALWAYS(8211E378) {
   
-  if (!NativeHeap() || !ui_movies::CanAllocate(base, 0)) {
-    lifted::original::c8211E378(ctx, base);
+  if (!NativeHeap() || !ui_movies::CanAllocate(0)) {
+    lifted::original::c8211E378(ctx);
     return;
   }
-  ctx.r3.u64 = ui_movies::AddNamedAnimations(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = ui_movies::AddNamedAnimations(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_8211BEE8: r3 = a primitive node. The quad built natively in a frame
@@ -810,20 +810,20 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
   const uint32_t primitive = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
-  guest_call::InFrame(ctx, base, ui_movies::kEffectFrame, 0x8211BF9C, [&](uint32_t frame) {
-    ui_movies::EffectBegin(base, frame);
+  guest_call::InFrame(ctx, ui_movies::kEffectFrame, 0x8211BF9C, [&](uint32_t frame) {
+    ui_movies::EffectBegin(frame);
     ctx.r3.u64 = 0;
     ctx.lr = 0x8211BF9C;
-    lifted::Enter(ctx, base, game::CameraPasses::RenderTarget);
+    lifted::Enter(ctx, game::CameraPasses::RenderTarget);
     const uint32_t texture = ctx.r3.u32;
     ctx.fpscr.disableFlushMode();
-    const double depth = ui_movies::EffectQuad(base, frame, primitive, texture);
+    const double depth = ui_movies::EffectQuad(frame, primitive, texture);
     ctx.r3.u64 = frame + ui_movies::kEffectQuad;
     ctx.r4.u64 = ui_movies::kEffectKey;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = depth;
     ctx.lr = 0x8211C154;
-    lifted::Enter(ctx, base, lifted::entry::e8259EBE8);
+    lifted::Enter(ctx, lifted::entry::e8259EBE8);
   });
   ctx.lr = lr;
 }
@@ -837,26 +837,26 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C470) {
     return;  // a harness's (the race HUD object's)
   }
   NATIVE_HEAP_OR_ORIGINAL(8211C470,
-                          ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::ClearText(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211C4F0) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C4F0,
-                          ui_movies::SetTextScrollSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                          ui_movies::SetTextScrollSpeed(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r6.u32, ctx.f1.f64));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211C570) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211C570, ui_movies::ScrollText(base, ctx.r3.u32, ctx.r4.u32,
+  NATIVE_HEAP_OR_ORIGINAL(8211C570, ui_movies::ScrollText(ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211C5F8) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C5F8,
-                          ui_movies::ResetTextScroll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::ResetTextScroll(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // The text helpers given a node (docs/functions/build-screen.md):
@@ -866,38 +866,38 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C5F8) {
 // ResetNodeTextScroll (r4 = the node).
 ITC_NATIVE_ENTRY_ALWAYS(8211C370) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211C370, ui_movies::SetFirstLine(base, ctx.r3.u32, ctx.r4.u32,
+  NATIVE_HEAP_OR_ORIGINAL(8211C370, ui_movies::SetFirstLine(ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r6.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211C3F8) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211C3F8,
-                          ui_movies::FirstLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::FirstLine(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211C680) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211C680, ui_movies::LineCount(base, ctx.r1.u32, ctx.r3.u32,
+  NATIVE_HEAP_OR_ORIGINAL(8211C680, ui_movies::LineCount(ctx.r1.u32, ctx.r3.u32,
                                                          ctx.r4.u32, ctx.r5.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211CCC0) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211CCC0,
-                          ui_movies::ScrollNodeText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::ScrollNodeText(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // UiMovie::ClearNodeText: r3 = movie, r4 = the node.
 ITC_NATIVE_ENTRY_ALWAYS(8211CC50) {
   
-  NATIVE_HEAP_OR_ORIGINAL(8211CC50, ui_movies::ClearNodeText(base, ctx.r3.u32, ctx.r4.u32));
+  NATIVE_HEAP_OR_ORIGINAL(8211CC50, ui_movies::ClearNodeText(ctx.r3.u32, ctx.r4.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211CD28) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211CD28,
-                          ui_movies::ResetNodeTextScroll(base, ctx.r3.u32, ctx.r4.u32));
+                          ui_movies::ResetNodeTextScroll(ctx.r3.u32, ctx.r4.u32));
 }
 
 // UiMovie::SetText: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
@@ -911,9 +911,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C1F8) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
+    hooks::FormatGuestCalls calls(ctx);
     const uint64_t varargs[4] = {ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
-    const auto r3 = ui_movies::SetText(base, calls.get(), ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+    const auto r3 = ui_movies::SetText(calls.get(), ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                        ctx.r5.u32, ctx.r6.u32, varargs);
     ctx.lr = lr;
     if (r3) {
@@ -921,7 +921,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C1F8) {
       return;
     }
   }
-  lifted::original::c8211C1F8(ctx, base);
+  lifted::original::c8211C1F8(ctx);
 }
 
 namespace ui_movies_game_hooks {
@@ -932,9 +932,9 @@ ITC_REGS_STEP(SetNodeText) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
+    hooks::FormatGuestCalls calls(ctx);
     const uint64_t varargs[5] = {ctx.r6.u64, ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
-    const auto r3 = ui_movies::SetNodeText(base, calls.get(), ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+    const auto r3 = ui_movies::SetNodeText(calls.get(), ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                            ctx.r5.u32, varargs);
     ctx.lr = lr;
     if (r3) {
@@ -942,7 +942,7 @@ ITC_REGS_STEP(SetNodeText) {
       return;
     }
   }
-  lifted::original::c8211C7E8(ctx, base);
+  lifted::original::c8211C7E8(ctx);
 }
 }  // namespace ui_movies_game_hooks
 
@@ -953,8 +953,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C740) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
-    const auto r3 = ui_movies::SetNumberText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+    hooks::FormatGuestCalls calls(ctx);
+    const auto r3 = ui_movies::SetNumberText(calls.get(), ctx.r1.u32, ctx.r3.u32,
                                              ctx.r4.u32, ctx.r5.u32, ctx.r6.u64);
     ctx.lr = lr;
     if (r3) {
@@ -962,7 +962,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C740) {
       return;
     }
   }
-  lifted::original::c8211C740(ctx, base);
+  lifted::original::c8211C740(ctx);
 }
 
 // UiMovie::SetNodeNumberText: r3 = movie, r4 = the node, r5 = the value;
@@ -972,8 +972,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211CA18) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
-    const auto r3 = ui_movies::SetNodeNumberText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+    hooks::FormatGuestCalls calls(ctx);
+    const auto r3 = ui_movies::SetNodeNumberText(calls.get(), ctx.r1.u32, ctx.r3.u32,
                                                  ctx.r4.u32, ctx.r5.u64);
     ctx.lr = lr;
     if (r3) {
@@ -981,7 +981,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211CA18) {
       return;
     }
   }
-  lifted::original::c8211CA18(ctx, base);
+  lifted::original::c8211CA18(ctx);
 }
 
 // UiMovie::SetNodeTextV: r3 = movie, r4 = the node, r5 = the string id, r6
@@ -991,8 +991,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211CBD8) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
-    const auto r3 = ui_movies::SetNodeTextV(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+    hooks::FormatGuestCalls calls(ctx);
+    const auto r3 = ui_movies::SetNodeTextV(calls.get(), ctx.r1.u32, ctx.r3.u32,
                                             ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
     ctx.lr = lr;
     if (r3) {
@@ -1000,7 +1000,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211CBD8) {
       return;
     }
   }
-  lifted::original::c8211CBD8(ctx, base);
+  lifted::original::c8211CBD8(ctx);
 }
 
 // UiMovie::SetNodeCharText: r3 = movie, r4 = the node, r5 = an 8-bit
@@ -1010,8 +1010,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C8A0) {
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
-    const auto r3 = ui_movies::SetNodeCharText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+    hooks::FormatGuestCalls calls(ctx);
+    const auto r3 = ui_movies::SetNodeCharText(calls.get(), ctx.r1.u32, ctx.r3.u32,
                                                ctx.r4.u32, ctx.r5.u32);
     ctx.lr = lr;
     if (r3) {
@@ -1019,7 +1019,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C8A0) {
       return;
     }
   }
-  lifted::original::c8211C8A0(ctx, base);
+  lifted::original::c8211C8A0(ctx);
 }
 
 // UiMovie::SetChildNameText: r3 = movie, r4 = a sub-scene's index or -1,
@@ -1031,8 +1031,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D930) {
   if (NativeHeap() && !ITC_FLAG(log_pause_movie)) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
-    hooks::FormatGuestCalls calls(ctx, base);
-    const auto r3 = ui_movies::SetChildNameText(base, calls.get(), ctx.r1.u32, ctx.r3.u32,
+    hooks::FormatGuestCalls calls(ctx);
+    const auto r3 = ui_movies::SetChildNameText(calls.get(), ctx.r1.u32, ctx.r3.u32,
                                                 ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
     ctx.lr = lr;
     if (r3) {
@@ -1040,20 +1040,20 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D930) {
       return;
     }
   }
-  lifted::original::c8211D930(ctx, base);
+  lifted::original::c8211D930(ctx);
 }
 
 // UiMovie::RevealText and sub_8211D8D8: 1 or 0.
 ITC_NATIVE_ENTRY_ALWAYS(8211D880) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211D880,
-                          ui_movies::RevealText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::RevealText(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211D8D8) {
   
   NATIVE_HEAP_OR_ORIGINAL(8211D8D8,
-                          ui_movies::HasMoreText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+                          ui_movies::HasMoreText(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // UiMovie::Load: r3 = the movie, r4 = the asset id; r3 the serial.
@@ -1061,11 +1061,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E798) {
   
   if (!ITC_FLAG(native_ui_movies_game) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
-    lifted::original::c8211E798(ctx, base);
+    lifted::original::c8211E798(ctx);
     return;
   }
   hooks::SetArchiveSerial(
-      ctx, ui_movies::MovieLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base)));
+      ctx, ui_movies::MovieLoad(ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad()));
 }
 
 // --- The movie table's open and delete (src/ui_movies/objects.cpp) ---
@@ -1084,15 +1084,15 @@ void AtStack(lifted::Regs& ctx, uint32_t sp, Call call) {
 
 // A recompiled function called with r3 (and r4, r5) from a frame of
 // `bytes` below `sp`, returning to `back`; r3 after it.
-uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, uint32_t back,
+uint32_t CallFrom(lifted::Regs& ctx, uint32_t sp, uint32_t bytes, uint32_t back,
                   void (*function)(lifted::Regs&, uint8_t*), uint32_t r3, uint32_t r4 = 0,
                   uint32_t r5 = 0) {
   AtStack(ctx, sp, [&] {
-    guest_call::InFrame(ctx, base, bytes, back, [&](uint32_t) {
+    guest_call::InFrame(ctx, bytes, back, [&](uint32_t) {
       ctx.r3.u64 = r3;
       ctx.r4.u64 = r4;
       ctx.r5.u64 = r5;
-      function(ctx, base);
+      function(ctx);
     });
   });
   return ctx.r3.u32;
@@ -1100,14 +1100,14 @@ uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes,
 
 // sub_8211C168 on the movie table, natively where PairsSet can, else the
 // original from the caller's frame; r3 as it leaves it.
-uint32_t SetPair(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t back,
+uint32_t SetPair(lifted::Regs& ctx, uint32_t sp, uint32_t back,
                  uint32_t key_address, uint32_t value_address) {
-  if (const auto r3 = ui_movies::PairsSet(base, ui_movies::kMovieTable,
-                                          schema::UiMovieWord(base, key_address).value(),
-                                          schema::UiMovieWord(base, value_address).value())) {
+  if (const auto r3 = ui_movies::PairsSet(ui_movies::kMovieTable,
+                                          schema::UiMovieWord(key_address).value(),
+                                          schema::UiMovieWord(value_address).value())) {
     return *r3;
   }
-  return CallFrom(ctx, base, sp, 128, back, ITC_REGS_FN(lifted::original::c8211C168), ui_movies::kMovieTable,
+  return CallFrom(ctx, sp, 128, back, ITC_REGS_FN(lifted::original::c8211C168), ui_movies::kMovieTable,
                   key_address, value_address);
 }
 
@@ -1127,33 +1127,33 @@ bool OpenNative() {
   return NativeHeap() && hooks::NativeArchiveQueue();
 }
 
-ui_movies::OpenCalls OpenCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::OpenCalls OpenCalls(lifted::Regs& ctx, uint32_t sp) {
   ui_movies::OpenCalls calls;
-  calls.make = [&ctx, base, sp]() -> uint32_t {
+  calls.make = [&ctx, sp]() -> uint32_t {
     // In host memory (E5 step 5), where the original's operator new
     // returned at 0x8211E854.
-    uint32_t movie = schema::UiMovie::New(base).address;
+    uint32_t movie = schema::UiMovie::New().address;
     if (movie == 0) {
       return 0;
     }
-    if (!ui_movies::ConstructMovie(base, movie)) {
-      CallFrom(ctx, base, sp, 128, 0x8211E860, ITC_REGS_FN(lifted::original::c8211E1C0), movie);
+    if (!ui_movies::ConstructMovie(movie)) {
+      CallFrom(ctx, sp, 128, 0x8211E860, ITC_REGS_FN(lifted::original::c8211E1C0), movie);
     }
     return movie;
   };
-  calls.set = [&ctx, base, sp](uint32_t key_address, uint32_t value_address) {
-    SetPair(ctx, base, sp, 0x8211E898, key_address, value_address);
+  calls.set = [&ctx, sp](uint32_t key_address, uint32_t value_address) {
+    SetPair(ctx, sp, 0x8211E898, key_address, value_address);
   };
   return calls;
 }
 
-ui_movies::DeleteCalls DeleteCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::DeleteCalls DeleteCalls(lifted::Regs& ctx, uint32_t sp) {
   ui_movies::DeleteCalls calls;
   // Unload's frame (240 bytes) below Delete's (128), called from 0x8211E294.
   const uint32_t unload_sp = sp - 128;
-  auto from_unload = [&ctx, base, unload_sp](uint32_t back, auto function,
+  auto from_unload = [&ctx, unload_sp](uint32_t back, auto function,
                                              uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
-    return CallFrom(ctx, base, unload_sp, 240, back, function, r3, r4, r5);
+    return CallFrom(ctx, unload_sp, 240, back, function, r3, r4, r5);
   };
   calls.unload.virtual_free = [from_unload](uint32_t which, uint32_t address) {
     static constexpr uint32_t kBack[3] = {0x8211B568, 0x8211B578, 0x8211B588};
@@ -1166,128 +1166,128 @@ ui_movies::DeleteCalls DeleteCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp
       from_unload(0x8211B5D8, ITC_REGS_FN(lifted::original::c825A70E8), block);
     }
   };
-  calls.unload.copy_item = [from_unload, base](uint32_t to, uint32_t from) {
-    if (!ui_movies::CopyTextItem(base, to, from)) {
+  calls.unload.copy_item = [from_unload](uint32_t to, uint32_t from) {
+    if (!ui_movies::CopyTextItem(to, from)) {
       from_unload(0x8211B614, ITC_REGS_FN(lifted::original::c8211AED0), to, from);
     }
   };
-  calls.unload.release_xpr = [from_unload, base](uint32_t slot) {
+  calls.unload.release_xpr = [from_unload](uint32_t slot) {
     if (ITC_FLAG(native_strings_and_font) && hooks::ModelsNativeLifetime() &&
-        strings_and_font::ReleaseXprSlot(base, slot)) {
+        strings_and_font::ReleaseXprSlot(slot)) {
       return;
     }
     from_unload(0x8211B640, ITC_REGS_FN(lifted::original::c82108860), slot);
   };
-  calls.unload.free_texts = [from_unload, base](uint32_t movie) -> uint32_t {
-    if (const auto r3 = ui_movies::FreeTexts(base, movie)) {
+  calls.unload.free_texts = [from_unload](uint32_t movie) -> uint32_t {
+    if (const auto r3 = ui_movies::FreeTexts(movie)) {
       return *r3;
     }
     return from_unload(0x8211B658, ITC_REGS_FN(lifted::original::c8211AC90), movie);
   };
-  calls.destroy = [&ctx, base, sp](uint32_t movie) {
-    if (!ui_movies::DestroyMovie(base, movie)) {
-      CallFrom(ctx, base, sp, 128, 0x8211E29C, ITC_REGS_FN(lifted::original::c8211E160), movie);
+  calls.destroy = [&ctx, sp](uint32_t movie) {
+    if (!ui_movies::DestroyMovie(movie)) {
+      CallFrom(ctx, sp, 128, 0x8211E29C, ITC_REGS_FN(lifted::original::c8211E160), movie);
     }
   };
-  calls.free = [&ctx, base, sp](uint32_t movie) {
+  calls.free = [&ctx, sp](uint32_t movie) {
     if (!memory::crt::OperatorDelete(movie)) {
-      CallFrom(ctx, base, sp, 128, 0x8211E2A4, ITC_REGS_FN(lifted::original::c825A70E8), movie);
+      CallFrom(ctx, sp, 128, 0x8211E2A4, ITC_REGS_FN(lifted::original::c825A70E8), movie);
     }
   };
-  calls.set = [&ctx, base, sp](uint32_t key_address, uint32_t value_address) {
-    return SetPair(ctx, base, sp, 0x8211E2C0, key_address, value_address);
+  calls.set = [&ctx, sp](uint32_t key_address, uint32_t value_address) {
+    return SetPair(ctx, sp, 0x8211E2C0, key_address, value_address);
   };
   return calls;
 }
 
-ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint32_t sp) {
   ui_movies::OnLoadedCalls calls;
   // Each callee's original (or override) from OnLoaded's 192-byte frame
   // below `sp`, returning to `back`.
-  const auto call = [&ctx, base, sp](uint32_t back, auto function,
+  const auto call = [&ctx, sp](uint32_t back, auto function,
                                      uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
-    return CallFrom(ctx, base, sp, 192, back, function, r3, r4, r5);
+    return CallFrom(ctx, sp, 192, back, function, r3, r4, r5);
   };
-  calls.copy = [call, base](uint32_t which, uint32_t to, uint32_t from, uint32_t size) {
+  calls.copy = [call](uint32_t which, uint32_t to, uint32_t from, uint32_t size) {
     static constexpr uint32_t kBack[3] = {0x8211E5AC, 0x8211E5BC, 0x8211E5CC};
-    if (!native::Buffers_Memcpy(base, to, from, size, kBack[which])) {
+    if (!native::Buffers_Memcpy(to, from, size, kBack[which])) {
       call(kBack[which],
-           +[](lifted::Regs& ctx, uint8_t* base) {
-             lifted::Enter(ctx, base, game::memcpy_825A7410);
+           +[](lifted::Regs& ctx) {
+             lifted::Enter(ctx, game::memcpy_825A7410);
            },
            to, from, size);
     }
   };
-  calls.layers = [&ctx, base, sp](uint32_t which, uint32_t movie, uint32_t scene) {
+  calls.layers = [&ctx, sp](uint32_t which, uint32_t movie, uint32_t scene) {
     static constexpr uint32_t kBack[3] = {0x8211E62C, 0x8211E644, 0x8211E65C};
-    if (ITC_FLAG(native_ui_movies_game) && ui_movies::LayersFit(base, scene, scene)) {
-      ui_movies::AssignLayers(base, sp - 192, movie, scene, scene, 0, true);
+    if (ITC_FLAG(native_ui_movies_game) && ui_movies::LayersFit(scene, scene)) {
+      ui_movies::AssignLayers(sp - 192, movie, scene, scene, 0, true);
       return;
     }
     AtStack(ctx, sp, [&] {
-      guest_call::InFrame(ctx, base, 192, kBack[which], [&](uint32_t) {
+      guest_call::InFrame(ctx, 192, kBack[which], [&](uint32_t) {
         ctx.r3.u64 = movie;
         ctx.r4.u64 = scene;
         ctx.r5.u64 = scene;
         ctx.r6.u64 = 0;
         ctx.r7.u64 = 1;
-        lifted::original::c8211BD10(ctx, base);
+        lifted::original::c8211BD10(ctx);
       });
     });
   };
-  calls.free_texts = [call, base](uint32_t movie) {
-    if (!ui_movies::FreeTexts(base, movie)) {
+  calls.free_texts = [call](uint32_t movie) {
+    if (!ui_movies::FreeTexts(movie)) {
       call(0x8211E668, ITC_REGS_FN(lifted::original::c8211AC90), movie);
     }
   };
-  calls.add_named = [call, base, sp](uint32_t movie, uint32_t scene) {
-    if (ui_movies::CanAllocate(base, 0)) {
-      ui_movies::AddNamedAnimations(base, sp - 192, movie, scene);
+  calls.add_named = [call, sp](uint32_t movie, uint32_t scene) {
+    if (ui_movies::CanAllocate(0)) {
+      ui_movies::AddNamedAnimations(sp - 192, movie, scene);
       return;
     }
     call(0x8211E684, ITC_REGS_FN(lifted::original::c8211E378), movie, scene);
   };
-  calls.get_size = [call, base](uint32_t archive) -> uint32_t {
+  calls.get_size = [call](uint32_t archive) -> uint32_t {
     if (ITC_FLAG(native_file_layer)) {
-      return file_layer::FileGetSize(base, archive);
+      return file_layer::FileGetSize(archive);
     }
     return call(0x8211E68C, ITC_REGS_FN(lifted::original::c822B80D8), archive);
   };
-  calls.make = [call, base](uint32_t which, uint32_t size) -> uint32_t {
-    if (const auto block = memory::crt::OperatorNew(base, size)) {
+  calls.make = [call](uint32_t which, uint32_t size) -> uint32_t {
+    if (const auto block = memory::crt::OperatorNew(size)) {
       return *block;
     }
     return call(which == 0 ? 0x8211E6B0 : 0x8211E6FC, ITC_REGS_FN(lifted::original::c825A6880), size);
   };
-  calls.xpr_construct = [call, base](uint32_t xpr) {
+  calls.xpr_construct = [call](uint32_t xpr) {
     if (ITC_FLAG(native_models)) {
-      models::XprConstruct(base, xpr);
+      models::XprConstruct(xpr);
       return;
     }
     call(0x8211E6BC, ITC_REGS_FN(lifted::original::c82596E68), xpr);
   };
-  calls.xpr_create = [call, base](uint32_t xpr, uint32_t file) {
-    if (hooks::ModelsNativeLifetime() && models::XprCreate(base, xpr, file)) {
+  calls.xpr_create = [call](uint32_t xpr, uint32_t file) {
+    if (hooks::ModelsNativeLifetime() && models::XprCreate(xpr, file)) {
       return;
     }
     call(0x8211E6E4, ITC_REGS_FN(lifted::original::c82596F68), xpr, file);
   };
-  calls.get_texture = [&ctx, call, base](uint32_t xpr, uint32_t index) -> uint64_t {
+  calls.get_texture = [&ctx, call](uint32_t xpr, uint32_t index) -> uint64_t {
     if (ITC_FLAG(native_models)) {
-      return models::XprGetTexture(base, xpr, index);
+      return models::XprGetTexture(xpr, index);
     }
     call(0x8211E72C, ITC_REGS_FN(lifted::original::c82597118), xpr, index);
     return ctx.r3.u64;
   };
-  calls.level_desc = [call, base](uint32_t texture, uint32_t desc) {
+  calls.level_desc = [call](uint32_t texture, uint32_t desc) {
     if (ITC_FLAG(native_graphics_resources)) {
-      graphics::TextureLevelDesc(base, texture, 0, desc);
+      graphics::TextureLevelDesc(texture, 0, desc);
       return;
     }
     call(0x8211E740, ITC_REGS_FN(lifted::original::c822A5B78), texture, 0, desc);
   };
-  calls.append = [call, base](uint32_t vector, uint32_t word_address) {
-    if (!ui_movies::WordsAppend(base, vector, schema::UiMovieWord(base, word_address).value())) {
+  calls.append = [call](uint32_t vector, uint32_t word_address) {
+    if (!ui_movies::WordsAppend(vector, schema::UiMovieWord(word_address).value())) {
       call(0x8211E75C, ITC_REGS_FN(lifted::original::c8211AE68), vector, word_address);
     }
   };
@@ -1309,14 +1309,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E808) {
     return;  // a harness's (the race HUD object's)
   }
   if (!ui_movies_game_hooks::OpenNative()) {
-    lifted::original::c8211E808(ctx, base);
+    lifted::original::c8211E808(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = ui_movies::OpenMovie(base, ctx.r3.u32, ctx.r4.u32, sp - 128,
-                                    hooks::NativeArchiveLoad(base),
-                                    ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+  ctx.r3.u64 = ui_movies::OpenMovie(ctx.r3.u32, ctx.r4.u32, sp - 128,
+                                    hooks::NativeArchiveLoad(),
+                                    ui_movies_game_hooks::OpenCalls(ctx, sp));
   ctx.lr = lr;
 }
 
@@ -1327,13 +1327,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E258) {
     return;  // a harness's (the options screen's)
   }
   if (!ui_movies_game_hooks::DeleteNative()) {
-    lifted::original::c8211E258(ctx, base);
+    lifted::original::c8211E258(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = ui_movies::DeleteMovie(base, ctx.r3.u32, sp - 128,
-                                      ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+  ctx.r3.u64 = ui_movies::DeleteMovie(ctx.r3.u32, sp - 128,
+                                      ui_movies_game_hooks::DeleteCalls(ctx, sp));
   ctx.lr = lr;
 }
 
@@ -1342,14 +1342,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E258) {
 ITC_NATIVE_ENTRY_ALWAYS(8211E500) {
   
   if (!ui_movies_game_hooks::OnLoadedNative()) {
-    lifted::original::c8211E500(ctx, base);
+    lifted::original::c8211E500(ctx);
     return;
   }
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ui_movies::OnLoaded(base, ctx.r4.u32, ctx.r6.u32, sp - 192,
-                                   ui_movies_game_hooks::OnLoadedCalls(ctx, base, sp));
+  ctx.r3.u64 = ui_movies::OnLoaded(ctx.r4.u32, ctx.r6.u32, sp - 192,
+                                   ui_movies_game_hooks::OnLoadedCalls(ctx, sp));
   ctx.lr = lr;
 }
 
@@ -1361,7 +1361,7 @@ namespace {
 ITC_REGS_STEP(DeleteAllSteps) {
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32 - 112;
-  ctx.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(ctx, base, sp),
+  ctx.r3.u64 = ui_movies::DeleteAll(sp, ui_movies_game_hooks::DeleteCalls(ctx, sp),
                                     ctx.r3.u32);
   ctx.lr = lr;
 }
@@ -1370,9 +1370,9 @@ ITC_REGS_STEP(DeleteAllSteps) {
 ITC_NATIVE_ENTRY_ALWAYS(8211E370) {
   
   if (!ui_movies_game_hooks::DeleteNative()) {
-    lifted::original::c8211E370(ctx, base);
+    lifted::original::c8211E370(ctx);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8211E370 UiMovies::DeleteAll's jump");
-  DeleteAllSteps(ctx, base);
+  DeleteAllSteps(ctx);
 }

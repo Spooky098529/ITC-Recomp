@@ -27,7 +27,7 @@ constexpr uint32_t kOnDecalLoadedFrameBytes = 144;
 // sub_820D3C80 Vinyl::ClearCorner: the sheet's bottom left corner
 // ([0x82602578] pixels wide, [0x8260257C] rows, the sheet's size at
 // 0x82602570) cleared (memset) row by row.
-void ClearCorner(uint8_t* base, uint32_t car);
+void ClearCorner(uint32_t car);
 
 // sub_820D4078 Vinyl::DrawDecals: for each slot that arrived (state other
 // than 0, 1, 2), its TGA decoded (TGA::CreateImage into the frame), its file
@@ -37,7 +37,7 @@ void ClearCorner(uint8_t* base, uint32_t car);
 // region, mirrored by its +4; the pixels freed (VirtualFree). `stack` is the
 // guest r1 at entry. Returns 1. Every slot it draws must have passed
 // DecalsNative.
-uint32_t DrawDecals(uint8_t* base, uint32_t car, uint32_t stack);
+uint32_t DrawDecals(uint32_t car, uint32_t stack);
 
 // Vinyl::Compress's call, made by the adapter from OnDecalLoaded's frame
 // (its guest calls need the context): the size, where the sheet's header
@@ -51,7 +51,7 @@ using CompressCall = std::function<uint32_t(uint32_t width, uint32_t height,
 // LoadSlot::ReleaseBuffer frees natively (no two the same pages), and, when
 // the sheet would be compressed, its header 0 or the layer's
 // (TextureFreeable).
-bool DecalsNative(uint8_t* base, uint32_t request, uint32_t car);
+bool DecalsNative(uint32_t request, uint32_t car);
 
 // sub_820D5750 CarModel::OnDecalLoaded (Archive::Load's callback; r3 the
 // request, r6 the car model): the first layer slot, else sticker slot, whose
@@ -60,7 +60,7 @@ bool DecalsNative(uint8_t* base, uint32_t request, uint32_t car);
 // (state 2), the corner cleared (ClearCorner), the sheet compressed
 // (`compress`) and +4088 = 3. `stack` is the guest r1 at entry. Returns the
 // original's r3: the request, the slot, or Vinyl::Compress's.
-uint32_t OnDecalLoaded(uint8_t* base, uint32_t request, uint32_t car, uint32_t stack,
+uint32_t OnDecalLoaded(uint32_t request, uint32_t car, uint32_t stack,
                        const CompressCall& compress);
 
 }  // namespace car_models

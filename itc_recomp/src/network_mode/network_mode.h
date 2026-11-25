@@ -83,40 +83,40 @@ constexpr uint32_t kDialog11InitFrame = 464;     // sub_82277B18, 5
 constexpr uint32_t kDialog12InitFrame = 528;     // sub_8227F6C8, 6
 constexpr uint32_t kDialog13InitFrame = 464;     // sub_8227EA50, 5
 constexpr uint32_t kPowerGraphInitFrame = 848;   // sub_821B96B8, 11
-uint32_t ModeSelectInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen1InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen3InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t RankingInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t TaCourseInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen6InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen7InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen8InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Screen9InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Dialog10InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Dialog11InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Dialog12InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t Dialog13InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
-uint32_t PowerGraphInitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t ModeSelectInitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen1InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen3InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t RankingInitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t TaCourseInitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen6InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen7InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen8InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Screen9InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Dialog10InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Dialog11InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Dialog12InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t Dialog13InitStates(uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t PowerGraphInitStates(uint32_t machine, uint32_t frame, bool* replaced);
 
 // The eight base Inits (r3 the machine, r4 the functors' object: the
 // machine itself in play): the ten common transitions, as the InitStates
 // above. 784-byte frames, r27 to r31 saved.
 constexpr uint32_t kInitBaseFrame = 784;
-uint32_t Screen6InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Screen6InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                          bool* replaced);  // sub_82278C20
-uint32_t Screen7InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Screen7InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                          bool* replaced);  // sub_82279118
-uint32_t Screen8InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Screen8InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                          bool* replaced);  // sub_8227A000
-uint32_t Screen9InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Screen9InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                          bool* replaced);  // sub_8227A4F8
-uint32_t Dialog10InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Dialog10InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                           bool* replaced);  // sub_82279610
-uint32_t Dialog11InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Dialog11InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                           bool* replaced);  // sub_82279B08
-uint32_t Dialog12InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Dialog12InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                           bool* replaced);  // sub_8227A9F0
-uint32_t Dialog13InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint32_t frame,
+uint32_t Dialog13InitBase(uint32_t machine, uint32_t object, uint32_t frame,
                           bool* replaced);  // sub_8227AEE8
 
 // sub_8227B3E0 NetScreen::InitBase (r3 the machine, r4 the index, r5 the
@@ -125,7 +125,7 @@ uint32_t Dialog13InitBase(uint8_t* base, uint32_t machine, uint32_t object, uint
 // sub_8227B41C), its frame below `sp` (the caller's r1); other indexes
 // (above 13 or below 6, unsigned) return at once. Whether one ran; `r3`
 // its last Add's (untouched when none ran).
-bool InitBase(uint8_t* base, uint32_t machine, uint32_t index, uint32_t object, uint32_t sp,
+bool InitBase(uint32_t machine, uint32_t index, uint32_t object, uint32_t sp,
               bool* replaced, uint32_t* r3);
 
 // --- The mode's Init (mode.cpp) ---
@@ -134,7 +134,7 @@ bool InitBase(uint8_t* base, uint32_t machine, uint32_t index, uint32_t object, 
 // InitStates as plain C++, the other callees through their overrides. The
 // second FadeIn's r3. 224-byte frame (and the caller's +20 = the mode).
 constexpr uint32_t kInitFrame = 224;
-uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t ModeInit(uint32_t mode, uint32_t sp, const Calls& calls);
 
 // --- The mode's delegate functions and block helpers (mode.cpp) ---
 
@@ -148,45 +148,45 @@ uint32_t Machine(uint32_t block, uint32_t index);
 // sub_82277FF0 ModeType12::FindShown: the first machine (0 to 14) in state
 // 5 or 4 becomes the shown one (+0x2100C); none: kept. The last index it
 // looked at (Machine's r3 the original leaves: the one found, else 14).
-uint32_t FindShown(uint8_t* base, uint32_t block);
+uint32_t FindShown(uint32_t block);
 // sub_82277EE0 ModeType12::AllLoaded: 1 when all fourteen machines' movies
 // are loaded (+9608), else 0.
-uint32_t AllLoaded(uint8_t* base, uint32_t block);
+uint32_t AllLoaded(uint32_t block);
 
 // The delegate functions (r3 the 8-byte answer, r4 the mode; `sp` the
 // caller's r1): sub_8227B440 WaitForLoads (176-byte frame), sub_8227B930
 // NextMode (4,112, the time attack's car in it), sub_8227B868 LeaveScreen
 // (128), sub_8227B770 WaitForShown (112), sub_8227BE10 Teardown (144).
-void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
-void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForLoads(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void NextMode(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void LeaveScreen(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void WaitForShown(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
+void Teardown(uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls);
 
 // The +32 vtable's slots (r3 the mode + 32): sub_822788D8 ForceExit
 // (240-byte frame) and sub_82278B98 Resume (96). r3 as the originals leave
 // it (the shown machine).
-uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& calls);
-uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp);
+uint64_t ForceExit(uint32_t object, uint32_t sp, const Calls& calls);
+uint32_t Resume(uint32_t object, uint32_t sp);
 
 // sub_82292710 Session::Free: with a session ([0x82816E3C]), its buffers
 // released (sub_82291670 Session::Release: the session's +0x13CD34 through
 // operator delete and [0x826C6AD4] through operator delete[], each cleared)
 // and the session's pages freed (VirtualFree), the global cleared. 96-byte
 // frames. r3 as the original leaves it.
-uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SessionFree(uint32_t sp, const Calls& calls);
 
 // sub_822926B8 Session::Make (the mode select's menu page, the time
 // attack): with no session ([0x82816E3C]), its pages VirtualAlloc'ed (a
 // guest call through the override) into the global and set up by
 // Session::Init. Not an Xbox Live call: the game's own memory. 96-byte
 // frame below `sp`. r3: Init's, or `r3` as it came with a session there.
-uint64_t SessionMake(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t SessionMake(uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_822915C0 Session::Init (r3 the session, VirtualAlloc's 64 bits): its
 // words, the session state and buffer globals cleared, +248 to +503
 // cleared with XMemSet's plain C++. 112-byte frame below `sp`. r3 the
 // session + 248.
-uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp);
+uint64_t SessionInit(uint64_t session_r3, uint32_t sp);
 
 // --- The machines' set-up and teardown handlers (machines.cpp) ---
 
@@ -201,19 +201,19 @@ uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp);
 // message 4 posted) and (7, 4) Destroy (the next state, its globals freed
 // and cleared). The addresses and frames are in the rows; `sp` the caller's
 // r1.
-uint64_t MachineCreate(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+uint64_t MachineCreate(uint32_t index, uint32_t machine, uint32_t sp,
                        const Calls& calls);
-uint64_t MachineOpenMovie(uint8_t* base, uint32_t index, uint32_t sp, uint32_t lr,
+uint64_t MachineOpenMovie(uint32_t index, uint32_t sp, uint32_t lr,
                           const Calls& calls);
-uint64_t MachineWaitForMovie(uint8_t* base, uint32_t index, uint64_t r3, uint32_t sp);
-uint64_t MachineLeave(uint8_t* base, uint32_t index, uint32_t machine, uint32_t dispatcher,
+uint64_t MachineWaitForMovie(uint32_t index, uint64_t r3, uint32_t sp);
+uint64_t MachineLeave(uint32_t index, uint32_t machine, uint32_t dispatcher,
                       uint32_t sp, const Calls& calls);
-uint64_t MachineDestroy(uint8_t* base, uint32_t index, uint32_t machine, uint32_t sp,
+uint64_t MachineDestroy(uint32_t index, uint32_t machine, uint32_t sp,
                         const Calls& calls);
 // sub_82272030 Type12Screen1::ResetData (r3 the 2,820-byte data): its
 // words, GarageCar::Reset(+832) through the guest. 112-byte frame below
 // `sp`. GarageCar::Reset's r3.
-uint64_t Screen1ResetData(uint8_t* base, uint32_t data, uint32_t sp, const Calls& calls);
+uint64_t Screen1ResetData(uint32_t data, uint32_t sp, const Calls& calls);
 
 // --- The mode select's running screen (mode_select.cpp) ---
 
@@ -242,57 +242,57 @@ constexpr uint32_t kPrivilege = 0;
 // (4, 1) Start (sub_8227D300; 96-byte frame): SetUp, the data's +28 = 0,
 // the page object reset to Intro then ShowCursor over the menu page. r3
 // SetUp's.
-uint64_t SelectStart(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SelectStart(uint32_t sp, const Calls& calls);
 // sub_8227CCE0 SetUp (128): movie 35's pose reset, the menu reset, its
 // texts and nodes, the data's +0 = 1, +4 = 0, +32 = 1. r3 the last
 // HideNode's.
-uint64_t SelectSetUp(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SelectSetUp(uint32_t sp, const Calls& calls);
 // (9, 5) Open (sub_8227C5C8, a leaf): the reopen's pages, state 4; or state
 // 1 (the movie not loaded).
-void SelectOpen(uint8_t* base, uint32_t machine);
+void SelectOpen(uint32_t machine);
 // (5, 1) Draw (sub_8227D248; 160): the page's function from its table on
 // the frame through the guest (r3 the dispatcher, r4 the machine). r3 the
 // page's, or `r3` with no page.
-uint64_t SelectDraw(uint8_t* base, uint64_t r3, uint64_t dispatcher, uint32_t sp,
+uint64_t SelectDraw(uint64_t r3, uint64_t dispatcher, uint32_t sp,
                     const Calls& calls);
 // (5, 0) Update (sub_8227D4E8; 160): the debug prints (the empty
 // sub_82106540) left out; the running transition through the guest from
 // its table, or the movie run. r3 as the original leaves it.
-uint64_t SelectUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SelectUpdate(uint32_t sp, const Calls& calls);
 // The pages (r3 the dispatcher; 112-byte frames for the first three, 96
 // for the sign-in pages): MenuPage sub_8227C658, BattlePage sub_8227C9F0,
 // TimeAttackPage sub_8227CB38, SignInPage sub_8227C088 and SignInPage2
 // sub_8227C210 (`r3` as it came, returned with the system UI up); the
 // leaves LeavePage sub_8227C970 and BackPage sub_8227CC78.
-uint64_t SelectMenuPage(uint8_t* base, uint32_t sp, const Calls& calls);
-void SelectLeavePage(uint8_t* base, uint32_t dispatcher);
-uint64_t SelectBattlePage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
-uint64_t SelectTimeAttackPage(uint8_t* base, uint32_t dispatcher, uint32_t sp,
+uint64_t SelectMenuPage(uint32_t sp, const Calls& calls);
+void SelectLeavePage(uint32_t dispatcher);
+uint64_t SelectBattlePage(uint32_t dispatcher, uint32_t sp, const Calls& calls);
+uint64_t SelectTimeAttackPage(uint32_t dispatcher, uint32_t sp,
                               const Calls& calls);
-uint64_t SelectSignInPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
-uint64_t SelectSignInPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
-void SelectBackPage(uint8_t* base, uint32_t dispatcher);
+uint64_t SelectSignInPage(uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t SelectSignInPage2(uint64_t r3, uint32_t sp, const Calls& calls);
+void SelectBackPage(uint32_t dispatcher);
 // The transitions (r3 the started word): Intro sub_8227CE50 (128),
 // ShowCursor sub_8227D138 (112), MoveCursor sub_8227D380 (144), FadeOut
 // sub_8227D088 (112), FadeIn sub_8227CFA8 (128). 1 when done, else 0.
-uint64_t SelectIntro(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
-uint64_t SelectShowCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
-uint64_t SelectMoveCursor(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
-uint64_t SelectFadeOut(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
-uint64_t SelectFadeIn(uint8_t* base, uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectIntro(uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectShowCursor(uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectMoveCursor(uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectFadeOut(uint32_t started, uint32_t sp, const Calls& calls);
+uint64_t SelectFadeIn(uint32_t started, uint32_t sp, const Calls& calls);
 // sub_8227D1D8 SetCursorY (112): movie 35's node (4, 0)'s +16 = `y` (r3's
 // low word, unsigned) as a float, through the frame's +80. r3 the node.
-uint32_t SelectSetCursorY(uint8_t* base, uint32_t y, uint32_t sp);
+uint32_t SelectSetCursorY(uint32_t y, uint32_t sp);
 // The dialogs' replies (leaves): OnNo sub_8227BF80, OnYes sub_8227BFB8,
 // OnDialogClosed sub_8227BFD8.
-void SelectOnNo(uint8_t* base);
-void SelectOnYes(uint8_t* base);
-void SelectOnDialogClosed(uint8_t* base);
+void SelectOnNo();
+void SelectOnYes();
+void SelectOnDialogClosed();
 // (5, 20) Unload (sub_8227C7A8; 112): movie 35 finished, deleted with
 // +9616 set. r3 as the original leaves it. (8, 3) Unloaded (sub_8227C810,
 // a leaf; r4 the dispatcher; `sp` the caller's r1: above item 1, the word
 // at sp - 16 is posted, as the original).
-uint64_t SelectUnload(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
-void SelectUnloaded(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp);
+uint64_t SelectUnload(uint32_t machine, uint32_t sp, const Calls& calls);
+void SelectUnloaded(uint32_t machine, uint32_t dispatcher, uint32_t sp);
 
 }  // namespace network_mode

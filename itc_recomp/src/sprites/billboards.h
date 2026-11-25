@@ -18,11 +18,11 @@ namespace sprites {
 
 // BillboardMaterial::Init (sub_8209F5A0): alpha mode +0 = 1, blend mode
 // +4 = 1, +8, +12 (texture), +16, +32 (light count) and +36 (lights) = 0.
-void InitBillboardMaterial(uint8_t* base, uint32_t material);
+void InitBillboardMaterial(uint32_t material);
 
 // BillboardMaterial::SetLights (sub_8209F5C8): +32 = count, +36 = lights,
 // unless count is 0.
-void SetBillboardLights(uint8_t* base, uint32_t material, uint32_t count, uint32_t lights);
+void SetBillboardLights(uint32_t material, uint32_t count, uint32_t lights);
 
 // Allocates `count` 16-byte slots on the command list being built; returns
 // the first (0 when the list is full). `return_address` is the original
@@ -48,7 +48,7 @@ struct SlotAllocator {
 // adds that count to the ring's and returns it. `set` + 0 is the camera
 // pass. The vector steps run flushing denormals to zero, as the
 // translated code's do.
-uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
+uint32_t BuildBillboardVertices(uint32_t set, uint32_t material,
                                 const SlotAllocator& slots);
 
 // The recording (src/sprites/billboard_record.cpp). Each takes `stack`, the
@@ -65,18 +65,18 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
 // on its 368-byte frame (both multiplies noted for frame interpolation), the
 // shaders at 0x826A50A0 and 0x826A50A4, the texture (+12) in stage 0 or none
 // in stages 0 to 3. Returns the last slot (the original's r3).
-uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+uint32_t RecordBillboardState(const car_scene_draw::SceneDrawCalls& calls,
                               uint32_t stack, uint32_t set, uint32_t list, uint32_t material);
 // Billboards::Record (sub_8209CC38): a chunk on the render manager's command
 // list with RecordState's states, the vertices (BuildVertices inside frame
 // interpolation's camera blend), three render states and command 36,
 // handed to the render queue (layer `set` + 4, depth 0.0) when any vertex
 // was counted. Returns the original's r3 (the list, or the queue call's).
-uint64_t RecordBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+uint64_t RecordBillboards(const car_scene_draw::SceneDrawCalls& calls,
                           uint32_t stack, uint32_t set, uint32_t material);
 // Billboards::Draw (sub_8209CDB0): 0 when the material has no lights (+32),
 // else Record (inside its wrap's checks) and 1.
-uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+uint64_t DrawBillboards(const car_scene_draw::SceneDrawCalls& calls,
                         uint32_t stack, uint32_t set, uint32_t material);
 
 // The light groups' draw (sub_82148658, LightGroups::Draw): for each of the
@@ -86,7 +86,7 @@ uint64_t DrawBillboards(uint8_t* base, const car_scene_draw::SceneDrawCalls& cal
 // blend mode 2 (0x40) or 4; with `xpr`, the texture from the XPR by the id or
 // its animation's current frame in `animations`; Draw. Returns the last
 // Draw's r3 (`set` with no groups).
-uint64_t DrawLightGroups(uint8_t* base, const car_scene_draw::SceneDrawCalls& calls,
+uint64_t DrawLightGroups(const car_scene_draw::SceneDrawCalls& calls,
                          uint32_t stack, uint32_t set, uint32_t groups, uint32_t xpr,
                          uint32_t animations);
 

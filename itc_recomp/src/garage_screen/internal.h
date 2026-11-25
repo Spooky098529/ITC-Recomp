@@ -31,15 +31,15 @@ using MenuList = schema::MenuList;
 using SaveData = schema::SaveData;
 using Node = schema::UiMovieNode;
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The original's frame below `sp`, its back chain written.
-inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
+  Store(frame, sp);
   return frame;
 }
 
@@ -47,47 +47,47 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // it. `key` is the frame word the original stored the id at for the find;
 // only the find read it, so it's a value now (E5 step 6) and the word isn't
 // written (the argument is left for the callers, unused).
-inline uint32_t FindPair(uint8_t* base, uint32_t id, [[maybe_unused]] uint32_t key) {
-  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
+inline uint32_t FindPair(uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(ui_movies::kMovieTable, id);
 }
-inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  return Load(base, FindPair(base, id, key));
+inline uint32_t FindMovie(uint32_t id, uint32_t key) {
+  return Load(FindPair(id, key));
 }
 
 // The screen's data ([0x826D842C]).
-inline ScreenData Data(uint8_t* base) { return G::data(base); }
+inline ScreenData Data() { return G::data(); }
 // The page object ([0x826D8420]).
-inline PageObject PagesOf(uint8_t* base) { return G::pages(base); }
+inline PageObject PagesOf() { return G::pages(); }
 // The two menu lists' addresses ([0x826D8424], [0x826D8428]).
-inline uint32_t List(uint8_t* base) { return G::list(base).address; }
-inline uint32_t List2(uint8_t* base) { return G::list2(base).address; }
+inline uint32_t List() { return G::list().address; }
+inline uint32_t List2() { return G::list2().address; }
 // The two menu lists as race-screens' MenuList.
-inline MenuList ListView(uint8_t* base) { return G::list(base); }
-inline MenuList List2View(uint8_t* base) { return G::list2(base); }
+inline MenuList ListView() { return G::list(); }
+inline MenuList List2View() { return G::list2(); }
 // The screen's save data (the data's +36).
-inline SaveData Save(uint8_t* base) { return Data(base).save(); }
+inline SaveData Save() { return Data().save(); }
 
 // The garage car record at `index` in the save's garage (+6120): the list
 // walked from its head (the halfword +204) `index` times through each
 // node's halfword +0 (nodes at the garage + 4 × the index), then the slot
 // (the node's halfword +2); the record at the garage + 1,968 × the slot
 // (the car itself at its +212). As the originals walk it inline.
-inline uint32_t GarageRecord(uint8_t* base, const SaveData& save, uint32_t index) {
-  const schema::CareerGarageList list(base, save.garage_address());
+inline uint32_t GarageRecord(const SaveData& save, uint32_t index) {
+  const schema::CareerGarageList list(save.garage_address());
   const uint32_t garage = list.address;
   uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(list.head())));
   while (index != 0) {
-    link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
+    link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(link))));
     index -= 1;
   }
-  const int32_t slot = int16_t(guest::LoadU16(base, link + 2));
+  const int32_t slot = int16_t(guest::LoadU16(link + 2));
   return garage + 1968 * uint32_t(slot);
 }
 
 // Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
 // start +604, 50 slots of 12 bytes), as the handlers do inline.
-inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const schema::GarageScreenMode m(base, mode);
+inline void Post(uint32_t mode, uint32_t id) {
+  const schema::GarageScreenMode m(mode);
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
@@ -98,10 +98,10 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
 }
 
 // The garage stage's holder ([[0x826D83E0]]).
-inline uint32_t Holder(uint8_t* base) { return G::stand_holder(base).stage_block_0(); }
+inline uint32_t Holder() { return G::stand_holder().stage_block_0(); }
 // The garage stage (the holder's +0).
-inline schema::GarageStage Stage(uint8_t* base) {
-  return schema::GarageStage(base, Load(base, Holder(base)));
+inline schema::GarageStage Stage() {
+  return schema::GarageStage(Load(Holder()));
 }
 
 // The page object's moves the pages make inline: to `page` after
@@ -119,23 +119,23 @@ inline void PagesGo(const PageObject& pages, uint32_t page, uint32_t transition,
 }
 
 // A float word read as the translated lfs does (a double of the float).
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(std::bit_cast<float>(Load(base, address)));
+inline double Lfs(uint32_t address) {
+  return double(std::bit_cast<float>(Load(address)));
 }
 // A double stored as the translated stfs does (rounded to a float).
-inline void Stfs(uint8_t* base, uint32_t address, double value) {
-  Store(base, address, std::bit_cast<uint32_t>(float(value)));
+inline void Stfs(uint32_t address, double value) {
+  Store(address, std::bit_cast<uint32_t>(float(value)));
 }
 // A doubleword at `address` (two words, high first).
-inline void Store64(uint8_t* base, uint32_t address, uint64_t value) {
-  Store(base, address, uint32_t(value >> 32));
-  Store(base, address + 4, uint32_t(value));
+inline void Store64(uint32_t address, uint64_t value) {
+  Store(address, uint32_t(value >> 32));
+  Store(address + 4, uint32_t(value));
 }
-inline uint64_t Load64(uint8_t* base, uint32_t address) {
-  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+inline uint64_t Load64(uint32_t address) {
+  return (uint64_t(Load(address)) << 32) | Load(address + 4);
 }
-inline double Lfd(uint8_t* base, uint32_t address) {
-  return std::bit_cast<double>(Load64(base, address));
+inline double Lfd(uint32_t address) {
+  return std::bit_cast<double>(Load64(address));
 }
 
 // fctiwz as the translated code does it: NaN 0x80000000, at or above
@@ -158,7 +158,7 @@ inline uint32_t Fctiwz(double d) {
 // The float as a double. Only the conversion read the frame's doubleword, so
 // it's a value now (E5 step 6) and `at` isn't written (left for the callers,
 // unused).
-inline double IntToFloat([[maybe_unused]] uint8_t* base, [[maybe_unused]] uint32_t at,
+inline double IntToFloat([[maybe_unused]] uint32_t at,
                          uint32_t word) {
   const int64_t wide = int64_t(int32_t(word));
   return double(float(double(wide)));
@@ -166,9 +166,9 @@ inline double IntToFloat([[maybe_unused]] uint8_t* base, [[maybe_unused]] uint32
 
 // The garage stage's holder's command (GarageStage::Command through its
 // override) from `frame` returning to `lr`.
-inline uint64_t StageCommand(uint8_t* base, uint32_t command, uint32_t frame, uint32_t lr,
+inline uint64_t StageCommand(uint32_t command, uint32_t frame, uint32_t lr,
                              const Calls& calls) {
-  return calls.Call(kStageCommand, frame, lr, Holder(base), command);
+  return calls.Call(kStageCommand, frame, lr, Holder(), command);
 }
 
 // UiMovie::SetText with r3 to r7 given and r8 to r10 0 (the varargs the
@@ -182,9 +182,9 @@ inline uint64_t SetText(const Calls& calls, uint32_t frame, uint32_t lr, uint32_
 
 // memcpy: native::Buffers_Memcpy, else the guest call from `frame` with
 // `lr`. The destination (memcpy's r3).
-inline uint64_t Memcpy(uint8_t* base, const Calls& calls, uint64_t to, uint32_t from,
+inline uint64_t Memcpy(const Calls& calls, uint64_t to, uint32_t from,
                        uint32_t bytes, uint32_t frame, uint32_t lr) {
-  if (!native::Buffers_Memcpy(base, uint32_t(to), from, bytes, lr)) {
+  if (!native::Buffers_Memcpy(uint32_t(to), from, bytes, lr)) {
     return calls.Call(0x825A7410, frame, lr, to, from, bytes);
   }
   return to;

@@ -53,20 +53,20 @@ inline double Fma(double a, double b, double c) { return double(float(std::fma(a
 
 // lvx, lvlx and stvx (aligned down, the words byte-swapped, the lanes in the
 // translated code's order).
-inline Vec Lvx(uint8_t* base, uint32_t address) {
+inline Vec Lvx(uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(address & ~0xFu))),
       simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL)));
 }
-inline Vec Lvlx(uint8_t* base, uint32_t address) {
+inline Vec Lvlx(uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(address & ~0xFu))),
       simde_mm_load_si128(
           reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16])));
 }
-inline void Stvx(uint8_t* base, uint32_t address, Vec value) {
+inline void Stvx(uint32_t address, Vec value) {
   simde_mm_store_si128(
-      reinterpret_cast<Vec*>(guest::Pointer(base, address & ~0xFu)),
+      reinterpret_cast<Vec*>(guest::Pointer(address & ~0xFu)),
       simde_mm_shuffle_epi8(value,
                             simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
 }

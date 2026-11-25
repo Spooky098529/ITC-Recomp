@@ -8,9 +8,9 @@
 
 namespace race_hud {
 
-HudMovie RunMovie(uint8_t* base, uint32_t hud_address) {
+HudMovie RunMovie(uint32_t hud_address) {
   ITC_NATIVE_RUNNING("sub_822141E8 RaceHud::RunMovie");
-  const schema::RaceHud hud(base, hud_address);
+  const schema::RaceHud hud(hud_address);
   switch (hud.mode()) {
     case 0:
       return {hud.any_bar_low() != 0 ? HudCall::kRun : HudCall::kDraw,
@@ -27,18 +27,18 @@ HudMovie RunMovie(uint8_t* base, uint32_t hud_address) {
   }
 }
 
-std::optional<uint32_t> RivalLogoMovie(uint8_t* base, uint32_t entry_address, uint32_t frame) {
+std::optional<uint32_t> RivalLogoMovie(uint32_t entry_address, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82211A28 RivalLogo::Draw");
-  const schema::RivalLogo entry(base, entry_address);
+  const schema::RivalLogo entry(entry_address);
   if ((entry.flags() & 8) == 0) {
     return std::nullopt;
   }
-  guest::StoreU32(base, frame + 80, entry.movie());
-  return guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  guest::StoreU32(frame + 80, entry.movie());
+  return guest::LoadU32(ui_movies::PairsFind(ui_movies::kMovieTable, frame + 80));
 }
 
-void RivalLogoFinished(uint8_t* base, uint32_t entry_address) {
-  const schema::RivalLogo entry(base, entry_address);
+void RivalLogoFinished(uint32_t entry_address) {
+  const schema::RivalLogo entry(entry_address);
   entry.set_flags(entry.flags() | 16);
 }
 

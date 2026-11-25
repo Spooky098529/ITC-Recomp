@@ -1156,7 +1156,7 @@ constexpr Step kSteps[] = {
 
 }  // namespace
 
-std::optional<uint32_t> Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
+std::optional<uint32_t> Init(uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82169920 RaceStates::Init");
   // RaceProgress::Reset's frame is below this one: whether its copies are
   // native, and then Create (which refuses with nothing done), before
@@ -1165,14 +1165,14 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t machine, uint32_t frame, bo
   if (!ProgressResetNative(reset_frame)) {
     return std::nullopt;
   }
-  if (!ProgressCreate(base)) {
+  if (!ProgressCreate()) {
     return std::nullopt;
   }
-  const uint32_t progress = schema::RaceStatesGlobals::progress(base).address;
-  schema::RaceStates(base, machine).set_progress(progress);
-  ProgressReset(base, progress, reset_frame);
+  const uint32_t progress = schema::RaceStatesGlobals::progress().address;
+  schema::RaceStates(machine).set_progress(progress);
+  ProgressReset(progress, reset_frame);
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -1186,15 +1186,15 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t machine, uint32_t frame, bo
   for (const Step& step : kSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }

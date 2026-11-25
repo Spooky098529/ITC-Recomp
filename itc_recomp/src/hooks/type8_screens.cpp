@@ -88,166 +88,166 @@ namespace t8 = type8_screens;
 
 #define ITC_T8_STEP(name, expression)                          \
   ITC_REGS_STEP(name) {                  \
-    const t8::Calls calls = Type67ScreensCalls(ctx, base);     \
+    const t8::Calls calls = Type67ScreensCalls(ctx);     \
     (void)calls;                                               \
     const uint32_t sp = ctx.r1.u32;                            \
     (void)sp;                                                  \
     ctx.r3.u64 = (expression);                                 \
   }
 
-ITC_T8_STEP(Type8PanelGroupConstruct, t8::PanelGroup8Construct(base, ctx.r3.u64, ctx.r4.u32, sp))
+ITC_T8_STEP(Type8PanelGroupConstruct, t8::PanelGroup8Construct(ctx.r3.u64, ctx.r4.u32, sp))
 ITC_T8_STEP(Type8Panel8FConstruct,
-            t8::Panel8FConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
+            t8::Panel8FConstruct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
 ITC_T8_STEP(Type8Panel8EConstruct,
-            t8::Panel8EConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
+            t8::Panel8EConstruct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
 ITC_T8_STEP(Type8Panel8CConstruct,
-            t8::Panel8CConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
+            t8::Panel8CConstruct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
 ITC_T8_STEP(Type8Panel8DConstruct,
-            t8::Panel8DConstruct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
+            t8::Panel8DConstruct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
 ITC_T8_STEP(Type8ConfirmPanelConstruct,
-            t8::ConfirmPanel8Construct(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
+            t8::ConfirmPanel8Construct(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, sp))
 ITC_T8_STEP(Type8PanelGroupDeletingDestruct,
-            t8::PanelGroup8DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::PanelGroup8DeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8Panel8CDeletingDestruct,
-            t8::Panel8CDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::Panel8CDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8Panel8CSetStats,
-            t8::Panel8CSetStats(base, ctx.r3.u64, ctx.r4.u32, sp, t8::CarListCalls(calls)))
+            t8::Panel8CSetStats(ctx.r3.u64, ctx.r4.u32, sp, t8::CarListCalls(calls)))
 ITC_T8_STEP(Type8Panel8CShowArrows,
-            t8::Panel8CShowArrows(base, ctx.r3.u64, ctx.r4.u64, sp, t8::CarListCalls(calls)))
+            t8::Panel8CShowArrows(ctx.r3.u64, ctx.r4.u64, sp, t8::CarListCalls(calls)))
 
-ITC_T8_STEP(Type8InitWords, t8::InitWords(base, ctx.r3.u64))
-ITC_T8_STEP(Type8IsLoaded, t8::IsLoaded(base))
+ITC_T8_STEP(Type8InitWords, t8::InitWords(ctx.r3.u64))
+ITC_T8_STEP(Type8IsLoaded, t8::IsLoaded())
 ITC_T8_STEP(Type8OpenMovies, t8::OpenMovies(sp, uint32_t(ctx.lr), calls))
 ITC_T8_STEP(Type8DeleteMovies, t8::DeleteMovies(sp, uint32_t(ctx.lr), calls))
-ITC_T8_STEP(Type8OnMessage2, t8::SetWord(base, ctx.r3.u64, 0x82238458))
-ITC_T8_STEP(Type8OnSaveLoaded, t8::SetWord(base, ctx.r3.u64, 0x82238530))
-ITC_T8_STEP(Type8OnAnswer0, t8::SetWord(base, ctx.r3.u64, 0x82238540))
-ITC_T8_STEP(Type8OnAnswer1, t8::SetWord(base, ctx.r3.u64, 0x82238550))
-ITC_T8_STEP(Type8OnAnswer2, t8::SetWord(base, ctx.r3.u64, 0x82238560))
-ITC_T8_STEP(Type8Leave, t8::Leave(base, ctx.r3.u64, ctx.r4.u64))
-ITC_T8_STEP(Type8FadeInGroup, t8::FadeInGroup(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8UpdateOpening, t8::UpdateOpening(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8Show, t8::Show(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8Draw, t8::Draw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8OnDialogClosed, t8::OnDialogClosed(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8Construct, t8::Construct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8Destruct, t8::Destruct(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8DeletingDestruct, t8::DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8PickCar, t8::PickCar(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8OnMessage2, t8::SetWord(ctx.r3.u64, 0x82238458))
+ITC_T8_STEP(Type8OnSaveLoaded, t8::SetWord(ctx.r3.u64, 0x82238530))
+ITC_T8_STEP(Type8OnAnswer0, t8::SetWord(ctx.r3.u64, 0x82238540))
+ITC_T8_STEP(Type8OnAnswer1, t8::SetWord(ctx.r3.u64, 0x82238550))
+ITC_T8_STEP(Type8OnAnswer2, t8::SetWord(ctx.r3.u64, 0x82238560))
+ITC_T8_STEP(Type8Leave, t8::Leave(ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8FadeInGroup, t8::FadeInGroup(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8UpdateOpening, t8::UpdateOpening(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8Show, t8::Show(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8Draw, t8::Draw(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8OnDialogClosed, t8::OnDialogClosed(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8Construct, t8::Construct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8Destruct, t8::Destruct(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8DeletingDestruct, t8::DeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PickCar, t8::PickCar(ctx.r3.u64, sp, calls))
 
-ITC_T8_STEP(Type8BlockConstruct, t8::PlayerBlockConstruct(base, ctx.r3.u64, ctx.r4.u64))
-ITC_T8_STEP(Type8BlockSetUp, t8::PlayerBlockSetUp(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8BlockPlayOpening, t8::PlayerBlockPlayOpening(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8BlockConstruct, t8::PlayerBlockConstruct(ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8BlockSetUp, t8::PlayerBlockSetUp(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockPlayOpening, t8::PlayerBlockPlayOpening(ctx.r3.u64, ctx.r4.u64, sp))
 ITC_T8_STEP(Type8BlockShowMenuMove,
-            t8::PlayerBlockShowMenuMove(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8BlockPlayReady, t8::PlayerBlockPlayReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::PlayerBlockShowMenuMove(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockPlayReady, t8::PlayerBlockPlayReady(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8BlockPlaceCursor,
-            t8::PlayerBlockPlaceCursor(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+            t8::PlayerBlockPlaceCursor(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
 ITC_T8_STEP(Type8BlockShowSelections,
-            t8::PlayerBlockShowSelections(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::PlayerBlockShowSelections(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8BlockWhileReady,
-            t8::PlayerBlockWhileReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8BlockInput, t8::PlayerBlockInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::PlayerBlockWhileReady(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8BlockInput, t8::PlayerBlockInput(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8BlockUpdateSetting,
-            t8::PlayerBlockUpdateSetting(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::PlayerBlockUpdateSetting(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8BlockSettingMoved,
-            t8::PlayerBlockSettingMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListInnerConstruct, t8::ListInnerConstruct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ListPartConstruct, t8::ListPartConstruct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ListInnerDestruct, t8::ListInnerDestruct(base, ctx.r3.u64, sp, calls))
+            t8::PlayerBlockSettingMoved(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerConstruct, t8::ListInnerConstruct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListPartConstruct, t8::ListPartConstruct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListInnerDestruct, t8::ListInnerDestruct(ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListInnerDeletingDestruct,
-            t8::ListInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListPartDestruct, t8::ListPartDestruct(base, ctx.r3.u64, sp, calls))
+            t8::ListInnerDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListPartDestruct, t8::ListPartDestruct(ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListPartDeletingDestruct,
-            t8::ListPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListInnerOpen, t8::ListInnerOpen(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListInnerPick, t8::ListInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp,
+            t8::ListPartDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerOpen, t8::ListInnerOpen(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerPick, t8::ListInnerPick(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp,
                                                   uint32_t(ctx.lr), calls))
-ITC_T8_STEP(Type8ListInnerInput, t8::ListInnerInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListInnerStep0, t8::ListInnerStep0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListInnerPage0, t8::ListInnerPage0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8PartInnerStep1, t8::PartInnerStep1(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8PartInnerPage1, t8::PartInnerPage1(base, ctx.r3.u64))
-ITC_T8_STEP(Type8PartInnerPage2, t8::PartInnerPage2(base, ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ListInnerInput, t8::ListInnerInput(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerStep0, t8::ListInnerStep0(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListInnerPage0, t8::ListInnerPage0(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PartInnerStep1, t8::PartInnerStep1(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8PartInnerPage1, t8::PartInnerPage1(ctx.r3.u64))
+ITC_T8_STEP(Type8PartInnerPage2, t8::PartInnerPage2(ctx.r3.u64, ctx.r4.u64, sp))
 
-ITC_T8_STEP(Type8ColorBlockConstruct, t8::ColorBlockConstruct(base, ctx.r3.u64, ctx.r4.u64))
-ITC_T8_STEP(Type8ColorBlockSetUp, t8::ColorBlockSetUp(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockPlaceCursorA, t8::ColorBlockPlaceCursorA(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
-ITC_T8_STEP(Type8ColorBlockPlaceCursorB, t8::ColorBlockPlaceCursorB(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_T8_STEP(Type8ColorBlockPlaceCursorC, t8::ColorBlockPlaceCursorC(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
-ITC_T8_STEP(Type8ColorBlockPlayOpening, t8::ColorBlockPlayOpening(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_T8_STEP(Type8ColorBlockShowSelections, t8::ColorBlockShowSelections(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockShowMenuMove, t8::ColorBlockShowMenuMove(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockPlayReady, t8::ColorBlockPlayReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockSecondMoved, t8::ColorBlockSecondMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockUpdateSecond, t8::ColorBlockUpdateSecond(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockThirdMoved, t8::ColorBlockThirdMoved(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockUpdateThird, t8::ColorBlockUpdateThird(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockWhileReady, t8::ColorBlockWhileReady(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorBlockInput, t8::ColorBlockInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerConstruct, t8::ColorInnerConstruct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ColorPartConstruct, t8::ColorPartConstruct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ColorInnerDestruct, t8::ColorInnerDestruct(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerDeletingDestruct, t8::ColorInnerDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorPartDestruct, t8::ColorPartDestruct(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ColorPartDeletingDestruct, t8::ColorPartDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerIsFirstChoice, t8::ColorInnerIsFirstChoice(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_T8_STEP(Type8ColorPartIsFirstChoice, t8::ColorPartIsFirstChoice(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_T8_STEP(Type8ColorPartThirdChoice, t8::ColorPartThirdChoice(base, ctx.r3.u64, ctx.r4.u64))
-ITC_T8_STEP(Type8ColorInnerOpen, t8::ColorInnerOpen(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerPick, t8::ColorInnerPick(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
-ITC_T8_STEP(Type8ColorInnerInput, t8::ColorInnerInput(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerStep0, t8::ColorInnerStep0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorInnerPage0, t8::ColorInnerPage0(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockConstruct, t8::ColorBlockConstruct(ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8ColorBlockSetUp, t8::ColorBlockSetUp(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorA, t8::ColorBlockPlaceCursorA(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorB, t8::ColorBlockPlaceCursorB(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlaceCursorC, t8::ColorBlockPlaceCursorC(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp))
+ITC_T8_STEP(Type8ColorBlockPlayOpening, t8::ColorBlockPlayOpening(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorBlockShowSelections, t8::ColorBlockShowSelections(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockShowMenuMove, t8::ColorBlockShowMenuMove(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockPlayReady, t8::ColorBlockPlayReady(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockSecondMoved, t8::ColorBlockSecondMoved(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockUpdateSecond, t8::ColorBlockUpdateSecond(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockThirdMoved, t8::ColorBlockThirdMoved(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockUpdateThird, t8::ColorBlockUpdateThird(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockWhileReady, t8::ColorBlockWhileReady(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorBlockInput, t8::ColorBlockInput(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerConstruct, t8::ColorInnerConstruct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorPartConstruct, t8::ColorPartConstruct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorInnerDestruct, t8::ColorInnerDestruct(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerDeletingDestruct, t8::ColorInnerDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorPartDestruct, t8::ColorPartDestruct(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorPartDeletingDestruct, t8::ColorPartDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerIsFirstChoice, t8::ColorInnerIsFirstChoice(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorPartIsFirstChoice, t8::ColorPartIsFirstChoice(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ColorPartThirdChoice, t8::ColorPartThirdChoice(ctx.r3.u64, ctx.r4.u64))
+ITC_T8_STEP(Type8ColorInnerOpen, t8::ColorInnerOpen(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerPick, t8::ColorInnerPick(ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ColorInnerInput, t8::ColorInnerInput(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerStep0, t8::ColorInnerStep0(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorInnerPage0, t8::ColorInnerPage0(ctx.r3.u64, ctx.r4.u64, sp, calls))
 
-ITC_T8_STEP(Type8ListBaseConstruct, t8::ListBaseConstruct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ListScreenConstruct, t8::ListScreen8Construct(base, ctx.r3.u64, sp))
-ITC_T8_STEP(Type8ListBaseDestruct, t8::ListBaseDestruct(base, ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListBaseConstruct, t8::ListBaseConstruct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListScreenConstruct, t8::ListScreen8Construct(ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ListBaseDestruct, t8::ListBaseDestruct(ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListBaseDeletingDestruct,
-            t8::ListBaseDeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::ListBaseDeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ListScreenDeletingDestruct,
-            t8::ListScreen8DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListIsLoaded, t8::ListScreen8IsLoaded(base, ctx.r3.u64))
-ITC_T8_STEP(Type8ListOpenMovie, t8::ListScreen8OpenMovie(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
-ITC_T8_STEP(Type8ListRelease, t8::ListScreen8Release(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+            t8::ListScreen8DeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListIsLoaded, t8::ListScreen8IsLoaded(ctx.r3.u64))
+ITC_T8_STEP(Type8ListOpenMovie, t8::ListScreen8OpenMovie(ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+ITC_T8_STEP(Type8ListRelease, t8::ListScreen8Release(ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
 ITC_T8_STEP(Type8ListSetItemTexts,
-            t8::ListScreen8SetItemTexts(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListItemInfo, t8::ListScreen8ItemInfo(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
-ITC_T8_STEP(Type8ListShowMarks, t8::ListScreen8ShowMarks(base, ctx.r3.u64, ctx.r4.u64, sp))
-ITC_T8_STEP(Type8ListSetLabels, t8::ListScreen8SetLabels(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListSetUpMenus, t8::ListScreen8SetUpMenus(base, ctx.r3.u64, sp, calls))
+            t8::ListScreen8SetItemTexts(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListItemInfo, t8::ListScreen8ItemInfo(ctx.r3.u64, ctx.r4.u64, ctx.r5.u32))
+ITC_T8_STEP(Type8ListShowMarks, t8::ListScreen8ShowMarks(ctx.r3.u64, ctx.r4.u64, sp))
+ITC_T8_STEP(Type8ListSetLabels, t8::ListScreen8SetLabels(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListSetUpMenus, t8::ListScreen8SetUpMenus(ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ListSetUpRace,
-            t8::ListScreen8SetUpRace(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListDraw, t8::ListBaseDraw(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListUpdate, t8::ListBaseUpdate(base, ctx.r3.u64, ctx.r5.u64, sp, calls))
-ITC_T8_STEP(Type8ListPage2, t8::ListBasePage2(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListPage3, t8::ListBasePage3(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListPage4, t8::ListBasePage4(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListPage5, t8::ListBasePage5(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ListPage6, t8::ListBasePage6(base, ctx.r3.u64))
-ITC_T8_STEP(Type8ListPage8, t8::ListBasePage8(base, ctx.r3.u64))
-ITC_T8_STEP(Type8ListStep0, t8::ListBaseStep0(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListStep1, t8::ListBaseStep1(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListStep2, t8::ListBaseStep2(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ListStep3, t8::ListBaseStep3(base, ctx.r3.u64, sp, calls))
+            t8::ListScreen8SetUpRace(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListDraw, t8::ListBaseDraw(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListUpdate, t8::ListBaseUpdate(ctx.r3.u64, ctx.r5.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage2, t8::ListBasePage2(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage3, t8::ListBasePage3(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage4, t8::ListBasePage4(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage5, t8::ListBasePage5(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ListPage6, t8::ListBasePage6(ctx.r3.u64))
+ITC_T8_STEP(Type8ListPage8, t8::ListBasePage8(ctx.r3.u64))
+ITC_T8_STEP(Type8ListStep0, t8::ListBaseStep0(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep1, t8::ListBaseStep1(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep2, t8::ListBaseStep2(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ListStep3, t8::ListBaseStep3(ctx.r3.u64, sp, calls))
 
-ITC_T8_STEP(Type8ColorListConstruct, t8::ColorList8Construct(base, ctx.r3.u64, sp))
+ITC_T8_STEP(Type8ColorListConstruct, t8::ColorList8Construct(ctx.r3.u64, sp))
 ITC_T8_STEP(Type8ColorListDeletingDestruct,
-            t8::ColorList8DeletingDestruct(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::ColorList8DeletingDestruct(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListOpenMovie,
-            t8::ColorList8OpenMovie(base, ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
+            t8::ColorList8OpenMovie(ctx.r3.u64, sp, uint32_t(ctx.lr), calls))
 ITC_T8_STEP(Type8ColorListItemInfo,
-            t8::ColorList8ItemInfo(base, ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
+            t8::ColorList8ItemInfo(ctx.r4.u64, ctx.r5.u64, sp, uint32_t(ctx.lr), calls))
 ITC_T8_STEP(Type8ColorListSetItemText,
-            t8::ColorList8SetItemText(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::ColorList8SetItemText(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListClearItemText,
-            t8::ColorList8ClearItemText(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::ColorList8ClearItemText(ctx.r3.u64, ctx.r4.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListSetDetails,
-            t8::ColorList8SetDetails(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
-ITC_T8_STEP(Type8ColorListSetLabels, t8::ColorList8SetLabels(base, ctx.r3.u64, sp, calls))
-ITC_T8_STEP(Type8ColorListSetUpMenus, t8::ColorList8SetUpMenus(base, ctx.r3.u64, sp, calls))
+            t8::ColorList8SetDetails(ctx.r3.u64, ctx.r4.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetLabels, t8::ColorList8SetLabels(ctx.r3.u64, sp, calls))
+ITC_T8_STEP(Type8ColorListSetUpMenus, t8::ColorList8SetUpMenus(ctx.r3.u64, sp, calls))
 ITC_T8_STEP(Type8ColorListSetUpRace,
-            t8::ColorList8SetUpRace(base, ctx.r3.u64, ctx.r4.u64, sp, calls))
+            t8::ColorList8SetUpRace(ctx.r3.u64, ctx.r4.u64, sp, calls))
 
 #undef ITC_T8_STEP
 
@@ -255,7 +255,7 @@ ITC_REGS_STEP(Type8InitMachine) {
   const uint64_t object_r3 = ctx.r3.u64;
   uint32_t machine = 0;
   bool replaced = false;
-  const uint32_t r3 = t8::InitMachine(base, ctx.r3.u32, ctx.r1.u32 - t8::kInitMachineFrame,
+  const uint32_t r3 = t8::InitMachine(ctx.r3.u32, ctx.r1.u32 - t8::kInitMachineFrame,
                                       &machine, &replaced);
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
   // transition's address from the machine's 64-bit r3.
@@ -267,8 +267,7 @@ ITC_REGS_STEP(Type8ColorListInitMachine) {
   const uint64_t object_r3 = ctx.r3.u64;
   uint32_t machine = 0;
   bool replaced = false;
-  const uint32_t r3 = t8::ColorList8InitMachine(
-      base, ctx.r3.u32, ctx.r1.u32 - t8::kColorListInitMachineFrame, &machine, &replaced);
+  const uint32_t r3 = t8::ColorList8InitMachine(ctx.r3.u32, ctx.r1.u32 - t8::kColorListInitMachineFrame, &machine, &replaced);
   const uint64_t machine_r3 = object_r3 + (machine - ctx.r3.u32);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
@@ -277,7 +276,7 @@ ITC_REGS_STEP(Type8ColorListInitMachine) {
 
 #define ITC_TYPE8_SCREENS(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type8_screens)) { \
-    hooks::step(ctx, base);                 \
+    hooks::step(ctx);                 \
   }
 
 // The panels' and the group's constructors (from the screen's constructor,

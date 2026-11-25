@@ -69,18 +69,18 @@ constexpr uint32_t kStagesCopy = 0x820FFD88;
 void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); }
 
 // The identity's rows at `at` (the vupkd3d128 shuffles' words).
-void Identity(uint8_t* base, uint32_t at) {
+void Identity(uint32_t at) {
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t col = 0; col < 4; col++) {
-      Store(base, at + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
+      Store(at + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
     }
   }
 }
 
 class Drawer {
  public:
-  Drawer(uint8_t* base, const DrawCalls& calls, uint32_t f, uint32_t caller_r24)
-      : base_(base), calls_(calls), f_(f), caller_r24_(caller_r24) {}
+  Drawer(const DrawCalls& calls, uint32_t f, uint32_t caller_r24)
+      : base_(), calls_(calls), f_(f), caller_r24_(caller_r24) {}
   void Run(uint32_t manager, uint32_t description);
 
  private:
@@ -468,12 +468,12 @@ void Drawer::CarMarkers(uint32_t pass) {
 
 }  // namespace
 
-void Draw(uint8_t* base, const DrawCalls& calls, uint32_t stack, uint32_t manager,
+void Draw(const DrawCalls& calls, uint32_t stack, uint32_t manager,
           uint32_t description, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820F5740 Minimap::Draw");
   const uint32_t f = stack - kFrame;
-  Store(base, f, stack);  // the back chain, as stwu (its stack probe left out)
-  Drawer(base, calls, f, caller_r24).Run(manager, description);
+  Store(f, stack);  // the back chain, as stwu (its stack probe left out)
+  Drawer(calls, f, caller_r24).Run(manager, description);
 }
 
 }  // namespace minimap

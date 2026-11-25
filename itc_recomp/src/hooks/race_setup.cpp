@@ -51,39 +51,39 @@ namespace rs = race_setup;
 
 ITC_REGS_STEP(RaceSetupResetDecals40) {
   ctx.fpscr.disableFlushMode();
-  rs::ResetDecals40(base, ctx.r3.u32);
+  rs::ResetDecals40(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupResetDecals6) {
   ctx.fpscr.disableFlushMode();
-  rs::ResetDecals6(base, ctx.r3.u32);
+  rs::ResetDecals6(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupResetSettings) {
-  rs::ResetSettings(base, ctx.r3.u32);
+  rs::ResetSettings(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupReset1568) {
-  rs::Reset1568(base, ctx.r3.u32);
+  rs::Reset1568(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupTuningReset) {
-  rs::TuningReset(base, ctx.r3.u32, ctx.r4.u32);
+  rs::TuningReset(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceSetupDecalFromBuild) {
   ctx.fpscr.disableFlushMode();
-  rs::DecalFromBuild(base, ctx.r3.u32, ctx.r4.u32);
+  rs::DecalFromBuild(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceSetupCarClear) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::CarClear(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::CarClear(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupCarInit) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::CarInit(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::CarInit(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupSetupVehicle) {
@@ -91,7 +91,7 @@ ITC_REGS_STEP(RaceSetupSetupVehicle) {
   double f1 = 0.0;
   if (ITC_FLAG(native_car_physics)) {
     ctx.fpscr.disableFlushMode();
-    if (rs::CarSetupVehicle(base, ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
+    if (rs::CarSetupVehicle(ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
       ctx.f1.f64 = f1;
       ctx.r3.u64 = frame - 1008 + 352;
       return;
@@ -102,17 +102,17 @@ ITC_REGS_STEP(RaceSetupSetupVehicle) {
   // original doesn't read it)
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = car;
-  lifted::original::c820C27E8(ctx, base);
+  lifted::original::c820C27E8(ctx);
 }
 
 ITC_REGS_STEP(RaceSetupSetModel) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::SetModel(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = rs::SetModel(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceSetupFromBuild) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::FromBuild(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = rs::FromBuild(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRivalLocation) {
@@ -120,25 +120,25 @@ ITC_REGS_STEP(RaceSetupRivalLocation) {
 }
 
 ITC_REGS_STEP(RaceSetupAddStage) {
-  rs::AddStage(base, ctx.r3.u32);
+  rs::AddStage(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupStagesAddRacer) {
-  rs::StagesAddRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
+  rs::StagesAddRacer(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
 }
 
 ITC_REGS_STEP(RaceSetupRaceDataConstruct) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::RaceDataConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::RaceDataConstruct(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupLapRecordReset) {
-  rs::LapRecordReset(base, ctx.r3.u32);
+  rs::LapRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRunningMeanAdd) {
   ctx.fpscr.disableFlushMode();
-  rs::RunningMeanAdd(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32);
+  rs::RunningMeanAdd(ctx.r3.u32, ctx.f1.f64, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(RaceSetupTimePack) {
@@ -146,41 +146,41 @@ ITC_REGS_STEP(RaceSetupTimePack) {
 }
 
 ITC_REGS_STEP(RaceSetupCountRace) {
-  rs::CountRace(base, ctx.r3.u32, ctx.r4.u32);
+  rs::CountRace(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(RaceSetupEventFirstOwned) {
-  ctx.r3.s64 = rs::EventFirstOwned(base, ctx.r3.u32);
+  ctx.r3.s64 = rs::EventFirstOwned(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupEventCurrentFirstOwned) {
-  ctx.r3.s64 = rs::EventCurrentFirstOwned(base);
+  ctx.r3.s64 = rs::EventCurrentFirstOwned();
 }
 
 ITC_REGS_STEP(RaceSetupEntryReset) {
   ctx.fpscr.disableFlushMode();
-  rs::EntryReset(base, ctx.r3.u32);
+  rs::EntryReset(ctx.r3.u32);
   ctx.r3.u64 = ctx.r1.u64 - 144 + 80;
-  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero());
 }
 
 ITC_REGS_STEP(RaceSetupCourseRecordReset) {
-  ctx.r3.u64 = rs::CourseRecordReset(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::CourseRecordReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupEventCurrent) {
-  ctx.r3.u64 = rs::EventCurrent(base);
+  ctx.r3.u64 = rs::EventCurrent();
 }
 
 ITC_REGS_STEP(RaceSetupEventCount) {
-  ctx.r3.u64 = rs::EventCount(base);
+  ctx.r3.u64 = rs::EventCount();
 }
 
 ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
   ctx.fpscr.disableFlushMode();
   uint32_t source = 0;
   uint64_t result = 0;
-  if (!rs::CourseRoutesGet(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - rs::kRoutesFrameBytes,
+  if (!rs::CourseRoutesGet(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - rs::kRoutesFrameBytes,
                            &source, &result)) {
     // memcpy's override (its original copy, or its records) from the
     // original's frame.
@@ -190,7 +190,7 @@ ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = rs::kRouteBytes;
     ctx.lr = 0x82101624;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);
+    lifted::Enter(ctx, game::memcpy_825A7410);
     ctx.r1.u64 = r1;
   }
   ctx.r3.u64 = result;
@@ -198,23 +198,23 @@ ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
 
 ITC_REGS_STEP(RaceSetupRaceDataEntryConstruct) {
   ctx.fpscr.disableFlushMode();
-  rs::RaceDataEntryConstruct(base, ctx.r3.u32);
+  rs::RaceDataEntryConstruct(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupStagesReset) {
-  ctx.r3.u64 = rs::StagesReset(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::StagesReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRacerRecordInit) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::RacerRecordInit(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::RacerRecordInit(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRouteSet) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::RouteSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+  if (!rs::RouteSet(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                     ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::original::c82101A10(ctx, base);
+    lifted::original::c82101A10(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -222,8 +222,8 @@ ITC_REGS_STEP(RaceSetupRouteSet) {
 
 ITC_REGS_STEP(RaceSetupRouteReset) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::RouteReset(base, ctx.r3.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::original::c82101990(ctx, base);
+  if (!rs::RouteReset(ctx.r3.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
+    lifted::original::c82101990(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -232,8 +232,8 @@ ITC_REGS_STEP(RaceSetupRouteReset) {
 ITC_REGS_STEP(RaceSetupStartPosition) {
   ctx.fpscr.disableFlushMode();
   uint32_t result = 0;
-  if (!rs::StartPosition(base, ctx.r3.u32, ctx.r1.u32 - rs::kStartFrameBytes, &result)) {
-    lifted::original::c82101A98(ctx, base);
+  if (!rs::StartPosition(ctx.r3.u32, ctx.r1.u32 - rs::kStartFrameBytes, &result)) {
+    lifted::original::c82101A98(ctx);
     return;
   }
   ctx.r3.u64 = result;
@@ -241,44 +241,44 @@ ITC_REGS_STEP(RaceSetupStartPosition) {
 
 ITC_REGS_STEP(RaceSetupRacersReset) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = rs::RacersReset(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::RacersReset(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRacersAdd) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::RacersAddNative(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::original::c820FF860(ctx, base);
+  if (!rs::RacersAddNative(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820FF860(ctx);
     return;
   }
-  ctx.r3.s64 = rs::RacersAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
+  ctx.r3.s64 = rs::RacersAdd(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
 }
 
 ITC_REGS_STEP(RaceSetupAddRacer) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::AddRacerNative(base, ctx.r3.u32)) {
-    lifted::original::c821017C0(ctx, base);
+  if (!rs::AddRacerNative(ctx.r3.u32)) {
+    lifted::original::c821017C0(ctx);
     return;
   }
-  ctx.r3.s64 = rs::AddRacer(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64, ctx.r6.u32);
+  ctx.r3.s64 = rs::AddRacer(ctx.r3.u32, ctx.r5.u32, ctx.f1.f64, ctx.r6.u32);
 }
 
 ITC_REGS_STEP(RaceSetupRecordReset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
-  if (!rs::RecordReset(base, ctx.r3.u32, frame)) {
-    lifted::original::c82101F68(ctx, base);
+  if (!rs::RecordReset(ctx.r3.u32, frame)) {
+    lifted::original::c82101F68(ctx);
     return;
   }
   // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
   // it (0.0).
   ctx.r3.u64 = ctx.r1.u64 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero());
 }
 
 ITC_REGS_STEP(RaceSetupRaceSetRoute) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::RaceSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::original::c82101D38(ctx, base);
+  if (!rs::RaceSetRoute(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
+    lifted::original::c82101D38(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -286,9 +286,9 @@ ITC_REGS_STEP(RaceSetupRaceSetRoute) {
 
 ITC_REGS_STEP(RaceSetupStagesSetRoute) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::StagesSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  if (!rs::StagesSetRoute(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                           ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::original::c82101E90(ctx, base);
+    lifted::original::c82101E90(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -296,13 +296,13 @@ ITC_REGS_STEP(RaceSetupStagesSetRoute) {
 
 ITC_REGS_STEP(RaceSetupRaceDataReset) {
   ctx.fpscr.disableFlushMode();
-  if (!rs::RaceDataReset(base, ctx.r1.u32 - 112)) {
-    lifted::original::c821020F0(ctx, base);
+  if (!rs::RaceDataReset(ctx.r1.u32 - 112)) {
+    lifted::original::c821020F0(ctx);
     return;
   }
   // The last sub_82101F68's r3 (its Route::Reset's frame + 80) and f1.
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero());
 }
 
 ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
@@ -310,12 +310,12 @@ ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  if (!rs::RaceDataResetGlobal(base, ctx.r1.u32 - 112)) {
-    lifted::original::c821021A8(ctx, base);
+  if (!rs::RaceDataResetGlobal(ctx.r1.u32 - 112)) {
+    lifted::original::c821021A8(ctx);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero());
 }
 
 namespace {
@@ -336,7 +336,7 @@ void GuestRefresh(void* user, uint32_t car) {
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
   ctx.lr = call.lr;
-  lifted::Enter(ctx, call.base, game::Car::Refresh);
+  lifted::Enter(ctx, game::Car::Refresh);
   ctx.r1.u64 = r1;
 }
 
@@ -345,34 +345,34 @@ void GuestRefresh(void* user, uint32_t car) {
 ITC_REGS_STEP(RaceSetupSetStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4096;
-  if (!rs::SetStartNative(base, ctx.r3.u32, ctx.r4.u32, frame)) {
-    lifted::original::c82101D50(ctx, base);
+  if (!rs::SetStartNative(ctx.r3.u32, ctx.r4.u32, frame)) {
+    lifted::original::c82101D50(ctx);
     return;
   }
-  RefreshCall call{&ctx, base, frame, 0x82101DC8};
-  ctx.r3.u64 = rs::SetStart(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
+  RefreshCall call{&ctx, frame, 0x82101DC8};
+  ctx.r3.u64 = rs::SetStart(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
 ITC_REGS_STEP(RaceSetupPlaceRacers) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
-  if (!rs::PlaceRacersNative(base, frame)) {
-    lifted::original::c82102048(ctx, base);
+  if (!rs::PlaceRacersNative(frame)) {
+    lifted::original::c82102048(ctx);
     return;
   }
-  RefreshCall call{&ctx, base, frame - 4096, 0x82101DC8};
-  ctx.r3.u64 = rs::PlaceRacers(base, frame, GuestRefresh, &call);
+  RefreshCall call{&ctx, frame - 4096, 0x82101DC8};
+  ctx.r3.u64 = rs::PlaceRacers(frame, GuestRefresh, &call);
 }
 
 ITC_REGS_STEP(RaceSetupSetUpRival) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4112;
-  if (!rs::SetUpRivalNative(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame)) {
-    lifted::original::c82112DB0(ctx, base);
+  if (!rs::SetUpRivalNative(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame)) {
+    lifted::original::c82112DB0(ctx);
     return;
   }
-  RefreshCall call{&ctx, base, frame, 0x82112EC4};
-  ctx.r3.u64 = rs::SetUpRival(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
+  RefreshCall call{&ctx, frame, 0x82112EC4};
+  ctx.r3.u64 = rs::SetUpRival(ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
 namespace {
@@ -397,22 +397,22 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
   ctx.lr = lr;
   switch (function) {
     case 0x820C4998:
-      lifted::Enter(ctx, call.base, game::Car::Refresh);
+      lifted::Enter(ctx, game::Car::Refresh);
       break;
     case 0x82112DB0:
-      lifted::Enter(ctx, call.base, game::Race::SetUpRival);
+      lifted::Enter(ctx, game::Race::SetUpRival);
       break;
     case 0x82102048:
-      lifted::Enter(ctx, call.base, game::Race::PlaceRacers);
+      lifted::Enter(ctx, game::Race::PlaceRacers);
       break;
     case 0x821017C0:
-      lifted::Enter(ctx, call.base, game::Race::AddRacer);
+      lifted::Enter(ctx, game::Race::AddRacer);
       break;
     case 0x821021A8:
-      lifted::Enter(ctx, call.base, game::RaceData::ResetGlobal);
+      lifted::Enter(ctx, game::RaceData::ResetGlobal);
       break;
     case 0x82101D38:
-      lifted::Enter(ctx, call.base, game::Race::SetRoute);
+      lifted::Enter(ctx, game::Race::SetRoute);
       break;
     default:
       ITC_LOG_ERROR("race_setup: no guest call for {:08X}", function);
@@ -430,18 +430,18 @@ ITC_REGS_STEP(RaceSetupSetUp) {
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 11984;
-  if (!rs::SetUpNative(base, ctx.r3.u32, frame)) {
-    lifted::original::c82115D98(ctx, base);
+  if (!rs::SetUpNative(ctx.r3.u32, frame)) {
+    lifted::original::c82115D98(ctx);
     return;
   }
-  SetUpCall call{&ctx, base};
+  SetUpCall call{&ctx};
   const uint64_t save = ctx.r3.u64;
-  rs::SetUp(base, ctx.r3.u32, ctx.r4.u64, frame, SetUpGuestCall, &call);
+  rs::SetUp(ctx.r3.u32, ctx.r4.u64, frame, SetUpGuestCall, &call);
   ctx.r3.u64 = save + 48;
 }
 
 ITC_REGS_STEP(RaceSetupStagesClear) {
-  ctx.r3.u64 = rs::StagesClear(base, ctx.r3.u32);
+  ctx.r3.u64 = rs::StagesClear(ctx.r3.u32);
 }
 
 }  // namespace hooks
@@ -465,7 +465,7 @@ ITC_REGS_STEP(RaceSetupStagesClear) {
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_setup)) { \
-    hooks::step(ctx, base);               \
+    hooks::step(ctx);               \
   }
 
 ITC_RACE_SETUP(820CD7F0, RaceSetupCarClear)

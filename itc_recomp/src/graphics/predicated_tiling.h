@@ -48,7 +48,7 @@ struct GuestCalls {
 // +12448), which isn't written: nothing reads it (our kick doesn't act on it;
 // the graphics rule). Returns the write position +40 (unmoved; the
 // original's r3 is the packet's last word).
-uint32_t SetPredication(uint8_t* base, uint32_t device, uint32_t select, const GuestCalls& calls);
+uint32_t SetPredication(uint32_t device, uint32_t select, const GuestCalls& calls);
 
 // Device::BeginTiledSegments (sub_822B6AD8): the segment ended, the segment
 // saved (SaveSegment), the tiling's limit +12960 and generation +12964 from
@@ -62,7 +62,7 @@ uint32_t SetPredication(uint8_t* base, uint32_t device, uint32_t select, const G
 // only the worker's job reads it (sub_822B6780), which never runs (our kick
 // skips the worker's wake). Returns the header's address + 16 (the
 // original's memcpy's r3).
-uint32_t BeginTiledSegments(uint8_t* base, uint32_t device, const GuestCalls& calls);
+uint32_t BeginTiledSegments(uint32_t device, const GuestCalls& calls);
 
 // Device::EndTiledSegments (sub_822B6BF8), r4 the tile count, r5 the CPUs
 // (the callback's flags): 100 words of data (Reserve, 32-byte aligned) with
@@ -75,7 +75,7 @@ uint32_t BeginTiledSegments(uint8_t* base, uint32_t device, const GuestCalls& ca
 // with 1 interrupt to come (2 with more than one tile) and the list +13036;
 // returns 0. The original's coherency flush block (sub_8229E5D0, Dropped
 // in src/hooks/command_buffer.cpp: none) and its kick are left out.
-uint32_t EndTiledSegments(uint8_t* base, uint32_t device, uint32_t tiles, uint32_t cpus,
+uint32_t EndTiledSegments(uint32_t device, uint32_t tiles, uint32_t cpus,
                           const GuestCalls& calls);
 
 // --- The library's worker threads ---
@@ -119,7 +119,7 @@ struct WorkerCalls {
 // with +12's low bits to +24's address, which only WaitForWorkers
 // sub_822B64A0 reads, never run) isn't written: the graphics rule. Returns
 // 1, or 0 when a thread wasn't made (ExCreateThread's r3 negative).
-uint32_t CreateWorkers(uint8_t* base, uint32_t device, const WorkerCalls& calls);
+uint32_t CreateWorkers(uint32_t device, const WorkerCalls& calls);
 
 constexpr uint32_t kVdGlobalDeviceImport = 0x820007B0;  // [[it]]: the device
 
@@ -149,7 +149,7 @@ struct WorkerLoopCalls {
 // sets it) the present; then the wait again. Woken: KeResetEvent; the
 // shared state's +4 (+10816) 0 ends the thread, else the job and the wait
 // again. Returns the last KeResetEvent's r3 (the original's r3 at its end).
-uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
+uint32_t WorkerThread(uint32_t block, uint32_t timeout,
                       const WorkerLoopCalls& calls);
 
 // Device::WakeWorker (sub_822B6A78), the callback the GPU raises at the
@@ -159,7 +159,7 @@ uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
 // CPU's worker's event; `set_event`, the import, as the original's tail
 // call). Returns KeSetEvent's r3. Never seen in play: our kick skips it
 // (Interrupt in src/native/gpu_link.cpp).
-uint32_t WakeWorker(uint8_t* base, uint32_t argument, uint32_t cpu,
+uint32_t WakeWorker(uint32_t argument, uint32_t cpu,
                     const std::function<uint32_t(uint32_t event, uint32_t increment,
                                                  uint32_t wait)>& set_event);
 

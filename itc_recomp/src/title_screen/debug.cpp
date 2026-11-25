@@ -54,43 +54,42 @@ constexpr DebugStepSpec kSteps[12] = {
 
 namespace {
 
-uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t DebugPage(uint32_t which, uint64_t r3, uint32_t sp, const Calls& calls) {
   const DebugPageSpec& spec = kPages[which];
-  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t frame = Frame(sp, 96);
   // Player 0's mapper entry (racer-controllers' PlayerMapperEntry).
-  const schema::PlayerMapperEntry entry(
-      base, G::mapper_entries_address() + (Load(base, G::controllers_address()) << 3));
+  const schema::PlayerMapperEntry entry(G::mapper_entries_address() + (Load(G::controllers_address()) << 3));
   if (int32_t(entry.unread()) == 1) {
     return r3;
   }
   const schema::ActionMapper mapper = entry.mapper();
-  r3 = calls.Call(Load(base, mapper.vtable() + kPressedSlot), frame, spec.lr, mapper.address, 159);
+  r3 = calls.Call(Load(mapper.vtable() + kPressedSlot), frame, spec.lr, mapper.address, 159);
   if ((r3 & 0xFF) != 0) {
-    G::load_block(base).set_transition(spec.transition);
-    G::load_block(base).set_page(kNone);
-    G::load_block(base).set_transition_started(0);
+    G::load_block().set_transition(spec.transition);
+    G::load_block().set_page(kNone);
+    G::load_block().set_transition_started(0);
   }
   return r3;
 }
 
-uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp) {
+uint64_t DebugStep(uint32_t which, uint32_t started, uint32_t sp) {
   const DebugStepSpec& spec = kSteps[which];
   (void)sp;  // no guest frame (E5 step 6): nothing here calls guest code
   // `started` is the load block's +16 (Update's only caller): the block is
   // in host memory (E5 step 3), so the word is read through its view.
   (void)started;
-  if (G::load_block(base).transition_started() == 0) {
-    G::load_block(base).set_tick_count(0);
-    G::load_block(base).set_transition_started(1);
+  if (G::load_block().transition_started() == 0) {
+    G::load_block().set_tick_count(0);
+    G::load_block().set_transition_started(1);
   }
-  const auto block = G::load_block(base);
+  const auto block = G::load_block();
   block.set_tick_count(block.tick_count() + 1);
-  const auto now = G::load_block(base);
+  const auto now = G::load_block();
   if (int32_t(now.tick_count()) > spec.limit) {
     now.set_transition(spec.transition);
-    G::load_block(base).set_page(spec.page);
+    G::load_block().set_page(spec.page);
     if (spec.reset) {
-      G::load_block(base).set_transition_started(0);
+      G::load_block().set_transition_started(0);
     }
   }
   // The original's r3: the debug print's first argument.
@@ -100,7 +99,7 @@ uint64_t DebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp)
 }  // namespace
 
 // Each page and step with its own print.
-uint64_t LoadDebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp,
+uint64_t LoadDebugPage(uint32_t which, uint64_t r3, uint32_t sp,
                        const Calls& calls) {
   switch (which) {
     case 0: ITC_NATIVE_RUNNING("sub_82220CD8 TitleLoad::DebugPage0"); break;
@@ -108,10 +107,10 @@ uint64_t LoadDebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp,
     case 2: ITC_NATIVE_RUNNING("sub_82220DE8 TitleLoad::DebugPage2"); break;
     default: ITC_NATIVE_RUNNING("sub_82220E70 TitleLoad::DebugPage3"); break;
   }
-  return DebugPage(base, which, r3, sp, calls);
+  return DebugPage(which, r3, sp, calls);
 }
 
-uint64_t LoadDebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t sp) {
+uint64_t LoadDebugStep(uint32_t which, uint32_t started, uint32_t sp) {
   switch (which) {
     case 0: ITC_NATIVE_RUNNING("sub_822204F8 TitleLoad::DebugStep0"); break;
     case 1: ITC_NATIVE_RUNNING("sub_82220580 TitleLoad::DebugStep1"); break;
@@ -126,7 +125,7 @@ uint64_t LoadDebugStep(uint8_t* base, uint32_t which, uint32_t started, uint32_t
     case 10: ITC_NATIVE_RUNNING("sub_82220A80 TitleLoad::DebugStep10"); break;
     default: ITC_NATIVE_RUNNING("sub_82220B10 TitleLoad::DebugStep11"); break;
   }
-  return DebugStep(base, which, started, sp);
+  return DebugStep(which, started, sp);
 }
 
 }  // namespace title_screen

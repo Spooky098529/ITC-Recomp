@@ -42,7 +42,7 @@ struct Context {
   uint32_t movie;    // r30: movie 2
   std::optional<double>* f1;
 
-  schema::TuningScreen Screen() const { return schema::TuningScreen(base, screen); }
+  schema::TuningScreen Screen() const { return schema::TuningScreen(screen); }
   int32_t State() const { return int32_t(Screen().state()); }
   int32_t Category() const { return int32_t(Screen().category()); }
   uint32_t Item() const { return uint32_t(Screen().item()); }

@@ -25,13 +25,13 @@ namespace scene_target {
 // command 24 with its +0 (the items' unread words left as they were).
 // Returns the last slot (the original's r3); nullopt where the list hasn't
 // room for the 7 slots.
-std::optional<uint32_t> RecordTargets(uint8_t* base, uint32_t scene, uint32_t list);
+std::optional<uint32_t> RecordTargets(uint32_t scene, uint32_t list);
 // sub_8209AF40 SceneTarget::RecordTileTargets: the same with +12 and +8
 // (the tile-sized pair).
-std::optional<uint32_t> RecordTileTargets(uint8_t* base, uint32_t scene, uint32_t list);
+std::optional<uint32_t> RecordTileTargets(uint32_t scene, uint32_t list);
 // sub_8209B058 SceneTarget::RecordBoundTargets: RecordTargets on
 // the scene target [0x8266D08C] (schema::SceneTargetGlobals).
-std::optional<uint32_t> RecordBoundTargets(uint8_t* base, uint32_t list);
+std::optional<uint32_t> RecordBoundTargets(uint32_t list);
 
 // TexturedRect::RecordFlat's frame (its r1 less this, below its caller's).
 constexpr uint32_t kRecordFlatFrame = 272;
@@ -45,7 +45,7 @@ constexpr uint32_t kRecordFlatFrame = 272;
 // chunk's first slot, which the adapter hands to the render queue at
 // [0x826D83D0] (its slot 4); nullopt, with nothing done, where the
 // original's command list calls would print a message.
-std::optional<uint32_t> TexturedRectRecordFlat(uint8_t* base, uint32_t rect, uint32_t frame);
+std::optional<uint32_t> TexturedRectRecordFlat(uint32_t rect, uint32_t frame);
 
 // SceneTarget::RecordPasses's frame (its r1 less this, below its caller's).
 constexpr uint32_t kRecordPassesFrame = 656;
@@ -73,7 +73,7 @@ struct PassCalls {
 // as the original builds them. False, with nothing done, where the list
 // hasn't room for all its slots or a chunk is open (the original's
 // messages): the original runs then.
-bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t list, uint32_t bucket5,
+bool RecordPasses(uint32_t frame, uint32_t scene, uint32_t list, uint32_t bucket5,
                   uint32_t bucket6, uint32_t bucket7, const PassCalls& calls);
 
 }  // namespace scene_target

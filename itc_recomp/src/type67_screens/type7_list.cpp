@@ -68,12 +68,12 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 // MenuList::Init on `list` with the ids at the frame's +84 and +92 written
 // first (the original's stack arguments): its plain C++ where it frees the
 // old block natively, else a guest call.
-void InitList(uint8_t* base, const Calls& calls, uint32_t list, uint32_t frame, uint32_t lr,
+void InitList(const Calls& calls, uint32_t list, uint32_t frame, uint32_t lr,
               const save_data::MenuListArgs& a) {
-  StoreU32(base, frame + 92, a.id6);
-  StoreU32(base, frame + 84, a.id5);
-  if (calls.native_heap && save_data::MenuListInitNative(base, list)) {
-    save_data::MenuListInit(base, list, a);
+  StoreU32(frame + 92, a.id6);
+  StoreU32(frame + 84, a.id5);
+  if (calls.native_heap && save_data::MenuListInitNative(list)) {
+    save_data::MenuListInit(list, a);
     return;
   }
   const uint64_t args[8] = {list, a.count, a.shown, a.r6, a.r7, a.r8, a.r9, a.r10};
@@ -99,24 +99,24 @@ void RefreshThrough(void* user, uint32_t car) {
 
 }  // namespace
 
-uint64_t Type7ListScreenSetItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t Type7ListScreenSetItemText(uint64_t r3, uint64_t r4, uint32_t sp,
                                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82243238 Type7ListScreen::SetItemText");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieOf(uint32_t(r3), frame);
   const uint32_t texts = (uint32_t(r4) << 2) + kItemTexts;
   uint64_t result = 0;
   for (uint32_t i = 0; i < 4; i++) {
-    result = calls.set_text(frame, 0x82243290, movie, 21, 5 + i, LoadU32(base, texts + 4 * i));
+    result = calls.set_text(frame, 0x82243290, movie, 21, 5 + i, LoadU32(texts + 4 * i));
   }
   return result;
 }
 
-uint64_t Type7ListScreenClearItemText(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t Type7ListScreenClearItemText(uint64_t r3, uint64_t r4, uint32_t sp,
                                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822432A8 Type7ListScreen::ClearItemText");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieOf(uint32_t(r3), frame);
   uint64_t result = 0;
   for (int32_t i = 0; i < 3; i++) {
     if (i == int32_t(uint32_t(r4))) continue;
@@ -125,35 +125,35 @@ uint64_t Type7ListScreenClearItemText(uint8_t* base, uint64_t r3, uint64_t r4, u
   return result;
 }
 
-uint64_t Type7ListScreenSetTitle(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type7ListScreenSetTitle(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822433D8 Type7ListScreen::SetTitle");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieOf(uint32_t(r3), frame);
   uint64_t result = 0;
   for (uint32_t i = 0; i < 3; i++) {
     result =
-        calls.set_text(frame, 0x82243428, movie, 20, 5 + i, LoadU32(base, kTitleTexts + 4 * i));
+        calls.set_text(frame, 0x82243428, movie, 20, 5 + i, LoadU32(kTitleTexts + 4 * i));
   }
   return result;
 }
 
-uint64_t Type7ListScreenSetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t Type7ListScreenSetDetails(uint64_t r3, uint64_t r4, uint32_t sp,
                                    const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82243308 Type7ListScreen::SetDetails");
-  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 160);
-  StoreU32(base, frame + 96, T7LS(base, screen).movie());
+  const uint32_t screen = uint32_t(r3), frame = Frame(sp, 160);
+  StoreU32(frame + 96, T7LS(screen).movie());
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 96));
-  const schema::Type7ItemInfo record(base, uint32_t(r4 * 28) + kItemRecords);
+      LoadU32(ui_movies::PairsFind(ui_movies::kMovieTable, frame + 96));
+  const schema::Type7ItemInfo record(uint32_t(r4 * 28) + kItemRecords);
   const uint32_t count = record.color_count();
-  InitList(base, calls, screen + 10216, frame, 0x82243384,
+  InitList(calls, screen + 10216, frame, 0x82243384,
            {count, 2, 1, 154, 153, 155, 156, 159, 158});
   uint64_t result = 0;
   for (int32_t i = 0; i < 2; i++) {
     if (i < int32_t(count)) {
-      const uint32_t index = LoadU32(base, record.detail_a_address() + 4 * uint32_t(i));
+      const uint32_t index = LoadU32(record.detail_a_address() + 4 * uint32_t(i));
       result = calls.set_text(frame, 0x822433B8, movie, 9, uint32_t(5 + i),
-                              LoadU32(base, (index << 2) + kDetailTexts));
+                              LoadU32((index << 2) + kDetailTexts));
     } else {
       result = ClearText(calls, movie, 9, uint32_t(5 + i), frame, 0x822433C0);
     }
@@ -161,89 +161,89 @@ uint64_t Type7ListScreenSetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint
   return result;
 }
 
-uint64_t Type7ListScreenShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp) {
+uint64_t Type7ListScreenShowMarks(uint64_t r3, uint64_t r4, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82243448 Type7ListScreen::ShowMarks");
-  const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
+  const uint32_t frame = Frame(sp, 128);
+  const uint32_t movie = MovieOf(uint32_t(r3), frame);
   const uint32_t which = uint32_t(r4);
-  uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 18);
-  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
-  node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 19);
-  schema::UiMovieNode(base, node).set_visible(which + 3 - 9 != 0 ? 1 : 0);
+  uint32_t node = ui_movies::FindNode(movie, 0xFFFFFFFFu, 18);
+  schema::UiMovieNode(node).set_visible(which != 0 ? 1 : 0);
+  node = ui_movies::FindNode(movie, 0xFFFFFFFFu, 19);
+  schema::UiMovieNode(node).set_visible(which + 3 - 9 != 0 ? 1 : 0);
   return node;
 }
 
-uint64_t Type7ListScreenItemInfo(uint8_t* base, uint64_t r4, uint64_t r5, uint32_t sp,
+uint64_t Type7ListScreenItemInfo(uint64_t r4, uint64_t r5, uint32_t sp,
                                  uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82242FA0 Type7ListScreen::ItemInfo");
   const uint32_t item = uint32_t(r4);
   if (item > 8) return r5;
   // memcpy(r5, the item's record, 28), a tail call.
   const uint32_t from = uint32_t(r4 * 28) + kItemRecords;
-  if (native::Buffers_Memcpy(base, uint32_t(r5), from, 28, lr)) {
+  if (native::Buffers_Memcpy(uint32_t(r5), from, 28, lr)) {
     return r5;
   }
   const uint64_t args[6] = {r5, from, 28, 0, 0, 0};
   return calls.call_set(kMemcpy, args, 3, sp, lr);
 }
 
-uint64_t Type7ListScreenSetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type7ListScreenSetUpMenus(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82243588 Type7ListScreen::SetUpMenus");
-  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, 144);
-  InitList(base, calls, screen + 10144, frame, 0x822435D0, {9, 3, 1, 154, 153, 155, 156, 159, 158});
-  InitList(base, calls, screen + 10288, frame, 0x82243600, {2, 2, 1, 156, 155, 154, 153, 159, 158});
-  race_screens::ListSetSelection(base, screen + 10288, 1);
-  InitList(base, calls, screen + 10360, frame, 0x8224363C, {3, 3, 1, 154, 153, 155, 156, 159, 158});
-  race_screens::ListSetSelection(base, screen + 10360, 0);
-  InitList(base, calls, screen + 10216, frame, 0x82243674, {2, 2, 1, 154, 153, 155, 156, 159, 158});
-  Type7ListScreenSetTitle(base, r3, frame, calls);
-  const uint32_t selection = race_screens::ListSelection(base, screen + 10144);
-  return ColorListScreenLoadItem(base, r3, selection, ~uint64_t(0), frame, calls);
+  const uint32_t screen = uint32_t(r3), frame = Frame(sp, 144);
+  InitList(calls, screen + 10144, frame, 0x822435D0, {9, 3, 1, 154, 153, 155, 156, 159, 158});
+  InitList(calls, screen + 10288, frame, 0x82243600, {2, 2, 1, 156, 155, 154, 153, 159, 158});
+  race_screens::ListSetSelection(screen + 10288, 1);
+  InitList(calls, screen + 10360, frame, 0x8224363C, {3, 3, 1, 154, 153, 155, 156, 159, 158});
+  race_screens::ListSetSelection(screen + 10360, 0);
+  InitList(calls, screen + 10216, frame, 0x82243674, {2, 2, 1, 154, 153, 155, 156, 159, 158});
+  Type7ListScreenSetTitle(r3, frame, calls);
+  const uint32_t selection = race_screens::ListSelection(screen + 10144);
+  return ColorListScreenLoadItem(r3, selection, ~uint64_t(0), frame, calls);
 }
 
-uint64_t Type7ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+uint64_t Type7ListScreenBack(uint64_t r3, uint64_t r4, uint32_t sp,
                              const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822434C8 Type7ListScreen::Back");
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   const uint32_t dispatcher = uint32_t(r4);
-  T7LS(base, uint32_t(r3)).set_state(9);
+  T7LS(uint32_t(r3)).set_state(9);
   // r6 as the post leaves it (the ring's start plus its count before, 64-bit),
   // passed on to the slot below.
-  const schema::ModeDispatcher d(base, dispatcher);
+  const schema::ModeDispatcher d(dispatcher);
   const uint64_t r6 = uint64_t(d.ring_start()) + uint64_t(d.ring_count());
-  Post(base, dispatcher, 5);
+  Post(dispatcher, 5);
   // The music: bank 1's cue 0 stopped (the sound manager's slot 13), bank 1's
   // cue 2 played (Sound::Play), the indexes in the frame.
-  StoreU32(base, frame + 80, 0);
-  StoreU32(base, frame + 84, 1);
-  const auto manager = schema::MenuSoundsGlobals::sound_manager(base);
+  StoreU32(frame + 80, 0);
+  StoreU32(frame + 84, 1);
+  const auto manager = schema::MenuSoundsGlobals::sound_manager();
   const uint64_t args[6] = {manager.address, frame + 84, frame + 80, r6, 0, 0};
   calls.call_set(manager.vtable().stop_cue(), args, 6, frame, 0x82243558);
-  StoreU32(base, frame + 92, 1);
-  StoreU32(base, frame + 88, 2);
-  return menu_sounds::PlaySound(base, frame + 92, frame + 88, frame,
+  StoreU32(frame + 92, 1);
+  StoreU32(frame + 88, 2);
+  return menu_sounds::PlaySound(frame + 92, frame + 88, frame,
                                 {const_cast<Calls*>(&calls), &SoundThunk});
 }
 
-uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type7ListScreenSetUpRace(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82243018 Type7ListScreen::SetUpRace");
   namespace rs = race_setup;
-  const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, kSetUpRaceFrame);
-  auto data = [base] { return schema::RaceStatesGlobals::race_data(base).address; };
-  if (!rs::RaceDataResetGlobal(base, frame - 112)) {
+  const uint32_t screen = uint32_t(r3), frame = Frame(sp, kSetUpRaceFrame);
+  auto data = [] { return schema::RaceStatesGlobals::race_data().address; };
+  if (!rs::RaceDataResetGlobal(frame - 112)) {
     Call1(calls, kResetGlobal, r3, frame, 0x8224302C);
   }
-  rs::StagesClear(base, data() + rs::kStageList);
-  vehicle_accessors::RaceDataSetWord32(base, race_screens::ListSelection(base, screen + 10360));
-  schema::RaceStatesGlobals::race_data(base).set_kind(3);
-  schema::RaceStatesGlobals::race_data(base).set_race_mode(6);
+  rs::StagesClear(data() + rs::kStageList);
+  vehicle_accessors::RaceDataSetWord32(race_screens::ListSelection(screen + 10360));
+  schema::RaceStatesGlobals::race_data().set_kind(3);
+  schema::RaceStatesGlobals::race_data().set_race_mode(6);
   // The route (the merged switch piece Type7ListScreen::AddRacers
   // sub_822430BC is its case 0): by the item list's +4 plus its selection,
   // 0 to 14 (else 0), the color list's selection plus 0, 2, 4, 8 or 10, or
   // 6, 7 and 12 to 19.
   const uint32_t index =
-      T7LS(base, screen).course_list_scroll() + race_screens::ListSelection(base, screen + 10144);
-  auto colors = [&] { return uint64_t(race_screens::ListSelection(base, screen + 10216)); };
+      T7LS(screen).course_list_scroll() + race_screens::ListSelection(screen + 10144);
+  auto colors = [&] { return uint64_t(race_screens::ListSelection(screen + 10216)); };
   uint64_t route = 0;
   switch (index) {
     case 0:
@@ -271,63 +271,62 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
       if (index <= 14) route = index + 5;
       break;
   }
-  if (!rs::RaceSetRoute(base, 0, uint32_t(route), frame - rs::kRouteFrameBytes)) {
+  if (!rs::RaceSetRoute(0, uint32_t(route), frame - rs::kRouteFrameBytes)) {
     const uint64_t args[6] = {0, route, 0, 0, 0, 0};
     calls.call_set(kRaceSetRoute, args, 2, frame, 0x82243164);
   }
-  vehicle_accessors::RaceDataSetWord59618(
-      base, race_screens::ListSelection(base, screen + 10288) == 0 ? 4 : 0);
-  vehicle_accessors::RaceDataSetWord5961C(base, 0);
-  const uint32_t answer = uint32_t(Slot(base, T7LS(base, screen).list_part().address, 20,
+  vehicle_accessors::RaceDataSetWord59618(race_screens::ListSelection(screen + 10288) == 0 ? 4 : 0);
+  vehicle_accessors::RaceDataSetWord5961C(0);
+  const uint32_t answer = uint32_t(Slot(T7LS(screen).list_part().address, 20,
                                         std::nullopt, frame, 0x82243198, calls));
   // The player's racer record at the frame's +80: the type 7 car.
   const uint32_t record = frame + 80;
-  rs::RacerRecordInit(base, record);
-  rs::SetModel(base, record, schema::Car(base, kType7Car).car_id());
-  StoreU32(base, frame + 3972, answer);
-  if (!native::Buffers_Memcpy(base, record, kType7Car, 1884, 0x822431CC)) {
+  rs::RacerRecordInit(record);
+  rs::SetModel(record, schema::Car(kType7Car).car_id());
+  StoreU32(frame + 3972, answer);
+  if (!native::Buffers_Memcpy(record, kType7Car, 1884, 0x822431CC)) {
     const uint64_t args[6] = {record, kType7Car, 1884, 0, 0, 0};
     calls.call_set(kMemcpy, args, 3, frame, 0x822431CC);
   }
   uint32_t refreshed = 0;
-  if (!car_specs::CarRefresh(base, record, &refreshed)) {
+  if (!car_specs::CarRefresh(record, &refreshed)) {
     Call1(calls, kCarRefresh, record, frame, 0x822431D4);
   }
-  const double zero = double(std::bit_cast<float>(schema::MenuSoundsGlobals::zero(base)));
-  if (rs::AddRacerNative(base, record)) {
-    rs::AddRacer(base, record, 0, zero, 0);
+  const double zero = double(std::bit_cast<float>(schema::MenuSoundsGlobals::zero()));
+  if (rs::AddRacerNative(record)) {
+    rs::AddRacer(record, 0, zero, 0);
   } else {
     const uint64_t args[4] = {record, 0, 0, 0};
     calls.call_f1(kAddRacer, args, zero, frame, 0x822431EC);
   }
-  rs::StagesAddRacer(base, data() + rs::kStageList, 0, 2, -1);
-  schema::SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).set_profile_option(answer);
-  rs::AddStage(base, 4);
+  rs::StagesAddRacer(data() + rs::kStageList, 0, 2, -1);
+  schema::SaveData(vehicle_accessors::SaveDataOf(0)).set_profile_option(answer);
+  rs::AddStage(4);
   uint64_t result;
-  if (rs::PlaceRacersNative(base, frame - 128)) {
+  if (rs::PlaceRacersNative(frame - 128)) {
     Refresh refresh{&calls, frame - 128 - 4096};
-    result = rs::PlaceRacers(base, frame - 128, RefreshThrough, &refresh);
+    result = rs::PlaceRacers(frame - 128, RefreshThrough, &refresh);
   } else {
     const uint64_t args[6] = {4, 0, 0, 0, 0, 0};
     result = calls.call_set(kPlaceRacers, args, 1, frame, 0x82243228);
   }
-  T7LS(base, screen).set_state(10);
+  T7LS(screen).set_state(10);
   return result;
 }
 
-uint64_t Type7ListScreenDestruct(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
+uint64_t Type7ListScreenDestruct(uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82242EC8 Type7ListScreen::~Type7ListScreen");
-  const uint32_t frame = Frame(base, sp, 96);
-  T7LS(base, uint32_t(r3)).set_vtable(kType7ListScreenVtable);
-  ListPartDestruct(base, r3 + 11040, frame, calls);
-  return ColorListScreenDestruct(base, r3, frame, calls);
+  const uint32_t frame = Frame(sp, 96);
+  T7LS(uint32_t(r3)).set_vtable(kType7ListScreenVtable);
+  ListPartDestruct(r3 + 11040, frame, calls);
+  return ColorListScreenDestruct(r3, frame, calls);
 }
 
-uint64_t Type7ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, uint32_t sp,
+uint64_t Type7ListScreenDeletingDestruct(uint64_t r3, uint64_t flags, uint32_t sp,
                                          const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82242FC8 Type7ListScreen::DeletingDestructor");
-  const uint32_t frame = Frame(base, sp, 112);
-  Type7ListScreenDestruct(base, r3, frame, calls);
+  const uint32_t frame = Frame(sp, 112);
+  Type7ListScreenDestruct(r3, frame, calls);
   if ((flags & 1) != 0) {
     // operator delete, r4 as the destructor left it.
     Call1(calls, car_list::kOperatorDelete, r3, frame, 0x82242FF8);

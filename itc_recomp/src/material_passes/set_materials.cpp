@@ -18,39 +18,39 @@ using namespace camera_modes::steps;
 
 namespace {
 
-uint64_t Load64(uint8_t* base, uint32_t a) {
-  return (uint64_t(guest::LoadU32(base, a)) << 32) | guest::LoadU32(base, a + 4);
+uint64_t Load64(uint32_t a) {
+  return (uint64_t(guest::LoadU32(a)) << 32) | guest::LoadU32(a + 4);
 }
-void Store64(uint8_t* base, uint32_t a, uint64_t value) {
-  guest::StoreU32(base, a, uint32_t(value >> 32));
-  guest::StoreU32(base, a + 4, uint32_t(value));
+void Store64(uint32_t a, uint64_t value) {
+  guest::StoreU32(a, uint32_t(value >> 32));
+  guest::StoreU32(a + 4, uint32_t(value));
 }
-int32_t LoadS(uint8_t* base, uint32_t address) {
-  return int32_t(guest::LoadU32(base, address));
+int32_t LoadS(uint32_t address) {
+  return int32_t(guest::LoadU32(address));
 }
 
 using Material = schema::MaterialRecord;
 
 }  // namespace
 
-uint32_t MaterialTotal(uint8_t* base, uint32_t model, uint64_t shape) {
+uint32_t MaterialTotal(uint32_t model, uint64_t shape) {
   ITC_NATIVE_RUNNING("sub_82594AC0 Model::MaterialTotal");
-  const uint32_t shapes = schema::Model(base, model).shapes().address;
+  const uint32_t shapes = schema::Model(model).shapes().address;
   const uint32_t block =
-      schema::ModelShape(base, uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
-  return schema::MaterialBlock(base, block).record_count();
+      schema::ModelShape(uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
+  return schema::MaterialBlock(block).record_count();
 }
 
-uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t index) {
+uint64_t MaterialAt(uint32_t model, uint64_t shape, uint64_t index) {
   ITC_NATIVE_RUNNING("sub_82594B00 Model::MaterialAt");
   const uint64_t offset = uint32_t(index << 9) & 0xFFFFFE00u;
-  const uint32_t shapes = schema::Model(base, model).shapes().address;
+  const uint32_t shapes = schema::Model(model).shapes().address;
   const uint64_t block =
-      schema::ModelShape(base, uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
+      schema::ModelShape(uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
   return block + offset + 16;
 }
 
-void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
+void SetMaterialFields(uint32_t material, const uint64_t args[8],
                        const uint32_t copied[6]) {
   ITC_NATIVE_RUNNING("sub_820D3250 PartModel::SetMaterialFields");
   // The original's homes in its caller's frame (args at +16, +24, +32, +48
@@ -62,7 +62,7 @@ void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
   const auto low = [](uint64_t v) { return int32_t(uint32_t(v)); };
   const auto word64 = [&](int i) { return (uint64_t(copied[i]) << 32) | copied[i + 1]; };
   const auto single = [&](int i) { return double(std::bit_cast<float>(copied[i])); };
-  const Material m(base, material);
+  const Material m(material);
   if (high(args[0]) != 0) {
     m.set_color_xy(args[3]);
     m.set_color_zw(args[4]);
@@ -86,7 +86,7 @@ void SetMaterialFields(uint8_t* base, uint32_t material, const uint64_t args[8],
   }
 }
 
-bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
+bool SetMaterials(uint32_t model, const uint64_t regs[7], uint32_t sp,
                   std::optional<uint64_t>* r3) {
   ITC_NATIVE_RUNNING("sub_820D3318 PartModel::SetMaterials");
   // The original's 256-byte frame left out (E5 step 6): the material (+116),
@@ -94,26 +94,26 @@ bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_
   // homes (+16 to +80) were read by it and SetMaterialFields alone (values
   // here). The caller's frame (its stack arguments, above `sp`) stays.
   for (int i = 0; i < 4; i++) {
-    Store64(base, sp + 64 + 8 * i, regs[3 + i]);  // r7 to r10 in the caller's frame
+    Store64(sp + 64 + 8 * i, regs[3 + i]);  // r7 to r10 in the caller's frame
   }
-  if (model == 0 || LoadS(base, sp + 132) != -1) {
+  if (model == 0 || LoadS(sp + 132) != -1) {
     return true;
   }
-  const int32_t shapes = int32_t(schema::PartModel(base, model).shape_count());
+  const int32_t shapes = int32_t(schema::PartModel(model).shape_count());
   if (shapes <= 0) {
     return true;
   }
-  const int32_t pair = LoadS(base, sp + 148);
-  const int32_t category = LoadS(base, sp + 140);
-  const uint64_t third = Load64(base, sp + 96);
+  const int32_t pair = LoadS(sp + 148);
+  const int32_t category = LoadS(sp + 140);
+  const uint64_t third = Load64(sp + 96);
   for (int32_t shape = 0; shape < shapes; shape++) {
-    const int32_t count = int32_t(MaterialTotal(base, model, uint64_t(int64_t(shape))));
+    const int32_t count = int32_t(MaterialTotal(model, uint64_t(int64_t(shape))));
     *r3 = uint32_t(count);
     for (int32_t i = 0; i < count; i++) {
-      const uint64_t at = MaterialAt(base, model, uint64_t(int64_t(shape)), uint64_t(int64_t(i)));
+      const uint64_t at = MaterialAt(model, uint64_t(int64_t(shape)), uint64_t(int64_t(i)));
       *r3 = at;
       const uint32_t material = uint32_t(at);
-      const Material m(base, material);
+      const Material m(material);
       bool pick;
       if (category >= 0 && category == int32_t(m.category())) {
         pick = true;
@@ -128,11 +128,11 @@ bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_
       // memcpy's 24 bytes from the caller's frame (+104), as words.
       uint32_t copied[6];
       for (uint32_t w = 0; w < 6; w++) {
-        copied[w] = guest::LoadU32(base, sp + 104 + 4 * w);
+        copied[w] = guest::LoadU32(sp + 104 + 4 * w);
       }
       const uint64_t args[8] = {regs[0], regs[1], regs[2], regs[3],
                                 regs[4], regs[5], regs[6], third};
-      SetMaterialFields(base, material, args, copied);
+      SetMaterialFields(material, args, copied);
       *r3 = regs[0];
     }
   }

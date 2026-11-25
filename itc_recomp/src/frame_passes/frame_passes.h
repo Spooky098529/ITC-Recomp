@@ -22,28 +22,28 @@ namespace frame_passes {
 // sub_82589A78 WorkMem::Flip: the work memory's current buffer
 // [0x8296B780] ^= 1, then the new one's (i) [0x8296B784 + 4i], headers used
 // [0x8296B798 + 4i] and bytes used [0x8296B7A0 + 4i] = 0.
-void WorkMemFlip(uint8_t* base);
+void WorkMemFlip();
 // sub_82096218 FramePasses::FlipWorkMem (slot 2, tick handler 20): a tail
 // call to WorkMem::Flip.
-void FlipWorkMem(uint8_t* base);
+void FlipWorkMem();
 
 // sub_82096350: a delegate's target, the object's vtable slot 2 (a tail
 // call): the target.
-uint32_t DelegateSlot2Target(uint8_t* base, uint32_t object);
+uint32_t DelegateSlot2Target(uint32_t object);
 
 // sub_82096360 FramePasses::RecordConstants (slot 5): on `list`, command 7
 // with vertex constant c86 (0x00015601) from the 16 bytes at 0x8265ED20,
 // command 7 with pixel constant c76 (0x01014C01) from 0x8265ED30. Returns
 // the last slot (the original's r3); nullopt where the list hasn't room for
 // the 4 slots.
-std::optional<uint32_t> RecordConstants(uint8_t* base, uint32_t list);
+std::optional<uint32_t> RecordConstants(uint32_t list);
 
 // sub_82096030 FramePasses::RecordSamplers (slot 6): on `list`, command 2
 // with samplers 0-3's address U and V = 2, command 2 with their min and mag
 // filters = 0 and mip filter = 2, command 1 with render state 324 = 0 (24
 // slots, the words the original doesn't write left as they were). Returns
 // the last slot (the original's r3); nullopt where the list hasn't room.
-std::optional<uint32_t> RecordSamplers(uint8_t* base, uint32_t list);
+std::optional<uint32_t> RecordSamplers(uint32_t list);
 
 // RecordPrimitiveReset's frame (its r1 less this, below its caller's).
 constexpr uint32_t kRecordPrimitiveResetFrame = 128;
@@ -53,13 +53,13 @@ constexpr uint32_t kRecordPrimitiveResetFrame = 128;
 // 0xFFFF) and command 36. Returns the chunk, which the adapter hands to the
 // render queue at [0x8296B91C] (its slot 4, bucket 0, f1 = 0.0); nullopt,
 // with nothing done, where a chunk is open or the list hasn't room.
-std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base);
+std::optional<uint32_t> RecordPrimitiveReset();
 
 // sub_82094B10 Job::Wait: when the job's byte +18 is set (posted,
 // probably), `wait(object)` with the object at its +20 (the original calls
 // that object's slot 1 with r4 = the job: the pool's wait, probably), then
 // +18 = 0. Whether it waited.
-bool JobWait(uint8_t* base, uint32_t job, const std::function<void(uint32_t object)>& wait);
+bool JobWait(uint32_t job, const std::function<void(uint32_t object)>& wait);
 
 // Boot's frame (its r1 less this, below its caller's).
 constexpr uint32_t kBootFrame = 112;
@@ -78,7 +78,7 @@ struct BootCalls {
 // into the frame's +80), PostEffects::InitBoot with the device, the device
 // unlocked with the frame's word. Returns the video output (r3 as the
 // native UnlockDevice leaves it).
-uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& calls);
+uint32_t Boot(uint32_t passes, uint32_t frame, const BootCalls& calls);
 
 // The constructor's frame (its r1 less this, below its caller's).
 constexpr uint32_t kConstructFrame = 224;
@@ -105,7 +105,7 @@ struct ConstructCalls {
 // for event 8, each a member delegate built in the frame as the original
 // builds them (+80 the key, +88, +104 and +120 the delegates). Returns
 // `passes`.
-uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t frame,
+uint32_t Construct(uint32_t passes, uint32_t block, uint32_t frame,
                    uint32_t stack_word, const ConstructCalls& calls);
 
 // Record's frame (its r1 less this, below its caller's).
@@ -135,6 +135,6 @@ struct RecordCalls {
 // primitive reset. False (nothing done but the three getters: the original
 // runs then) where a chunk is open, the list hasn't room for its 359
 // slots, or this's slots 5 and 6 aren't RecordConstants and RecordSamplers.
-bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& calls);
+bool Record(uint32_t passes, uint32_t frame, const RecordCalls& calls);
 
 }  // namespace frame_passes

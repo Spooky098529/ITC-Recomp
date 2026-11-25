@@ -21,7 +21,7 @@ constexpr uint32_t kSpriteCorners = 4;
 // w = 1.0 at +12, +28, +44 and +60), +64, +68 and +72 cleared, and w = 1.0 in
 // each corner (16 bytes apart from +80, the float at +92), whatever the
 // count will be.
-void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners);
+void ResetSprites(uint32_t sprite, uint32_t corners);
 
 // Overlay::LayerFor (sub_82126630): the render queue layer the overlays
 // submit their sprites with for a camera pass index: 2 -> 491, 3 -> 53,
@@ -47,6 +47,6 @@ int32_t TurnSide(const float a[4], const float b[4], float zero);
 // caller then submits to the render queue; nothing is done (nullopt) where
 // the original's command list calls would print a message (another chunk
 // open, the list full), which the caller leaves to the original.
-std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t rect);
+std::optional<uint32_t> RecordScreenRect(uint32_t list, uint32_t rect);
 
 }  // namespace sprites

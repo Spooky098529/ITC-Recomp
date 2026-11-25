@@ -29,10 +29,10 @@ namespace {
 
 constexpr uint32_t kClosed = 0xFFFFFFFF;
 
-std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
+std::string GuestString(uint32_t address, uint32_t max = 260) {
   std::string s;
   for (uint32_t i = 0; address && i < max; i++) {
-    char c = char(guest::LoadU8(base, address + i));
+    char c = char(guest::LoadU8(address + i));
     if (!c) {
       break;
     }
@@ -43,8 +43,8 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
 
 // The read error report (sub_8209AC78), as the recompiled class calls it
 // (from its own frame).
-void ReportError(lifted::Regs& ctx, uint8_t* base, uint32_t return_address) {
-  InFrame(ctx, base, 112, return_address, [&](uint32_t) { lifted::Enter(ctx, base, lifted::e8209AC78); });
+void ReportError(lifted::Regs& ctx, uint32_t return_address) {
+  InFrame(ctx, 112, return_address, [&](uint32_t) { lifted::Enter(ctx, lifted::e8209AC78); });
 }
 
 }  // namespace
@@ -54,17 +54,17 @@ void ReportError(lifted::Regs& ctx, uint8_t* base, uint32_t return_address) {
 // (the low word, as GetFileSize gave), 1.
 ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
   
-  const File file(base, ctx.r3.u32);
-  const std::string path = GuestString(base, ctx.r4.u32);
+  const File file(ctx.r3.u32);
+  const std::string path = GuestString(ctx.r4.u32);
   auto relative = game_data::RelativePath(path);
   if (!relative) {
     ITC_LOG_WARN("file class: \"{}\" isn't game data: opened by the recompiled File::OpenRead",
                  path);
-    lifted::original::c8258C688(ctx, base);
+    lifted::original::c8258C688(ctx);
     return;
   }
   if (file.handle() != kClosed) {
-    ReportError(ctx, base, 0x8258C700);
+    ReportError(ctx, 0x8258C700);
     ctx.r3.u64 = 0;
     return;
   }
@@ -72,7 +72,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
   if (!handle) {
     ITC_LOG_WARN("file class: no file \"{}\"", path);
     file.set_handle(kClosed);
-    ReportError(ctx, base, 0x8258C700);
+    ReportError(ctx, 0x8258C700);
     ctx.r3.u64 = 0;
     return;
   }
@@ -86,14 +86,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
 // report and 0 when the read fails.
 ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
   
-  const File file(base, ctx.r3.u32);
+  const File file(ctx.r3.u32);
   const uint32_t buffer = ctx.r4.u32;
   const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
-    lifted::original::c8258C820(ctx, base);
+    lifted::original::c8258C820(ctx);
     return;
   }
-  const uint32_t size = schema::FileSizeArg(base, ctx.r5.u32).size();
+  const uint32_t size = schema::FileSizeArg(ctx.r5.u32).size();
   // A blob (E5 step 5: a file's data in PC memory) ends at its size, its host
   // block's end, where guest memory went on: bytes past it are read and
   // dropped (logged), so the position and the count are the original's.
@@ -106,7 +106,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
   }
   uint32_t total = 0;
   bool failed = false;
-  guest::ForEachHostPart(base, buffer, room, [&](uint8_t* host, uint32_t, uint32_t bytes) {
+  guest::ForEachHostPart(buffer, room, [&](uint8_t* host, uint32_t, uint32_t bytes) {
     if (failed) {
       return;
     }
@@ -121,7 +121,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
     total += read.value_or(0);
   }
   if (failed) {
-    ReportError(ctx, base, 0x8258C880);
+    ReportError(ctx, 0x8258C880);
     ctx.r3.u64 = 0;
     return;
   }
@@ -135,16 +135,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
 // and 2, as the recompiled one does. The error report and 0 when it fails.
 ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
   
-  const File file(base, ctx.r3.u32);
+  const File file(ctx.r3.u32);
   const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
-    lifted::original::c8258C768(ctx, base);
+    lifted::original::c8258C768(ctx);
     return;
   }
-  const int32_t offset = schema::FileSeekOffsetArg(base, ctx.r4.u32).offset();
-  const uint32_t method = schema::FileSeekMethodArg(base, ctx.r5.u32).method();
+  const int32_t offset = schema::FileSeekOffsetArg(ctx.r4.u32).offset();
+  const uint32_t method = schema::FileSeekMethodArg(ctx.r5.u32).method();
   if (!game_data::Seek(handle, offset, method > 2 ? 0 : method)) {
-    ReportError(ctx, base, 0x8258C810);
+    ReportError(ctx, 0x8258C810);
     ctx.r3.u64 = 0;
     return;
   }
@@ -159,10 +159,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
 // File::Close: r3 = file. Closes the handle (+4 = -1) and clears +8 and +12.
 ITC_NATIVE_ENTRY_ALWAYS(8258C718) {
   
-  const File file(base, ctx.r3.u32);
+  const File file(ctx.r3.u32);
   const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
-    lifted::original::c8258C718(ctx, base);
+    lifted::original::c8258C718(ctx);
     return;
   }
   game_data::Close(handle);

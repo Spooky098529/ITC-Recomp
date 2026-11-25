@@ -30,7 +30,7 @@ namespace graphics::shader_patch {
 // (memcpy's copy, 12 bytes each, through `copy`). Returns r3 as the original
 // leaves it: the last instruction's address, or the shader with no fetches.
 using Copy = void (*)(void* context, uint32_t destination, uint32_t source, uint32_t size);
-uint32_t PatchVertexShader(uint8_t* base, uint32_t shader, uint32_t microcode,
+uint32_t PatchVertexShader(uint32_t shader, uint32_t microcode,
                            uint32_t declaration, uint32_t streams, uint32_t sp, Copy copy,
                            void* context);
 

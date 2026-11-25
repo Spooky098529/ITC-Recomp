@@ -26,25 +26,25 @@ constexpr uint32_t kHeapBytes = 0x100000;
 // sub_82297C08's work: makes the heap once (sub_822997B0, kept at G::heap)
 // with a 48-byte attributes block (its size, then zeros), in a frame like
 // the original's. True when the heap exists.
-bool MakeHeap(lifted::Regs& ctx, uint8_t* base) {
-  if (!G::heap(base)) {
-    InFrame(ctx, base, 160, 0x82297CB0, [&](uint32_t frame) {
+bool MakeHeap(lifted::Regs& ctx) {
+  if (!G::heap()) {
+    InFrame(ctx, 160, 0x82297CB0, [&](uint32_t frame) {
       const uint32_t attributes = frame + 80;
       for (uint32_t i = 0; i < 48; i += 4) {
-        guest::StoreU32(base, attributes + i, 0);
+        guest::StoreU32(attributes + i, 0);
       }
-      guest::StoreU32(base, attributes, 48);
+      guest::StoreU32(attributes, 48);
       ctx.r3.u64 = 2;
       ctx.r4.u64 = 0;
       ctx.r5.u64 = kHeapBytes;
       ctx.r6.u64 = 4096;
       ctx.r7.u64 = 0;
       ctx.r8.u64 = attributes;
-      lifted::Enter(ctx, base, lifted::e822997B0);
-      G::set_heap(base, ctx.r3.u32);
+      lifted::Enter(ctx, lifted::e822997B0);
+      G::set_heap(ctx.r3.u32);
     });
   }
-  return G::heap(base) != 0;
+  return G::heap() != 0;
 }
 
 }  // namespace
@@ -61,7 +61,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296AB0) {
 // returns 1 when it exists.
 ITC_NATIVE_ENTRY_ALWAYS(82297C08) {
   
-  ctx.r3.u64 = MakeHeap(ctx, base) ? 1 : 0;
+  ctx.r3.u64 = MakeHeap(ctx) ? 1 : 0;
 }
 
 // The heap check: the game can't run without the heap, so the original
@@ -69,7 +69,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82297C08) {
 // exiting); ours exits.
 ITC_NATIVE_ENTRY_ALWAYS(82297CE0) {
   
-  if (!MakeHeap(ctx, base)) {
+  if (!MakeHeap(ctx)) {
     ITC_LOG_ERROR("The game's heap couldn't be made");
     std::exit(EXIT_FAILURE);
   }

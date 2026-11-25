@@ -35,14 +35,14 @@ constexpr uint32_t kCallback = 0x8258E9B8;            // 28
 // Single::InlineVertices (sub_8258E8E8, 5): the drawer's state +12 = the
 // slot + 16 (the vertices), +16 = the slot's +4 (their count). Returns the
 // slots the vertices take, (count x 24 + 15) >> 4 (in 32 bits).
-uint32_t InlineVertices(uint8_t* base, uint32_t slot);
+uint32_t InlineVertices(uint32_t slot);
 
 // Single::SetUpDrawer (sub_8258E958, 13 and 14), in its 96-byte frame below
 // `sp`: the drawer's state +0, +4, +8 = the slot's +4 (the primitive type),
 // +8 and +12 (the shaders' indices); then the drawer's vtable slot 2
 // (PrimitiveDrawer::SetShaders) with r4 = the device, r5 and r6 the indices.
 // Returns 0.
-uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+uint32_t SetUpDrawer(uint32_t slot, uint32_t sp, const GuestCall& call);
 
 // Single::SetShaderConstants (sub_8258F0F0, 7), in its 224-byte frame: the
 // slot's +4 the shader (0 vertex, 1 pixel; another returns 0), +8 the type
@@ -53,7 +53,7 @@ uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall&
 // (src/graphics/device_state.h), OutputDebugStringA helpers::DebugOutput;
 // the loop constant setters and the vertex shader's bool setter (not seen in
 // play) guest calls. Returns byte +13.
-uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call);
 
 // Single::DrawerDraw (sub_8258F5C0, 15), in its 112-byte frame: nothing
 // when the drawer's state +16 (the vertex count) is 0. Else the viewport
@@ -65,12 +65,12 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
 // would fence on a full fence list). Returns 0. Its callers mark it as
 // command 15 (native::g_current_command) around it, for the renderer's
 // inline draw (src/native/replay_hooks.cpp).
-uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call);
+uint32_t DrawerDraw(uint32_t sp, const GuestCall& call);
 
 // Single::Callback (sub_8258E9B8, 28), in its 96-byte frame: the slot's +4
 // an object, whose vtable slot 0 is called (a guest call) with r4 = the
 // device. In play the movie (Movie::RenderFrame, overridden: our renderer
 // draws the movie's frame there). Returns 0.
-uint32_t Callback(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& call);
+uint32_t Callback(uint32_t slot, uint32_t sp, const GuestCall& call);
 
 }  // namespace graphics::single_commands

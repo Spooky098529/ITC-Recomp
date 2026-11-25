@@ -34,36 +34,36 @@ bool SlotDiagnostics() {
 
 // CommandList::CommandList: r3 = list.
 ITC_NATIVE_ENTRY(8258C960, ITC_FLAG(native_command_list)) {
-  command_list::Construct(base, ctx.r3.u32);
+  command_list::Construct(ctx.r3.u32);
 }
 
 // CommandList::Flip: r3 = list.
 ITC_NATIVE_ENTRY(8258C9C0, ITC_FLAG(native_command_list)) {
-  command_list::Flip(base, ctx.r3.u32);
+  command_list::Flip(ctx.r3.u32);
 }
 
 // CommandList::BeginTick: r3 = list.
 ITC_NATIVE_ENTRY(8258C998, ITC_FLAG(native_command_list)) {
-  command_list::BeginTick(base, ctx.r3.u32);
+  command_list::BeginTick(ctx.r3.u32);
 }
 
 // CommandList::OpenChunk: r3 = list.
 ITC_NATIVE_ENTRY_ALWAYS(8258C9D0) {
   
   if (!ITC_FLAG(native_command_list) ||
-      command_list::OpenChunk(base, ctx.r3.u32) == command_list::OpenResult::kNested) {
-    lifted::original::c8258C9D0(ctx, base);
+      command_list::OpenChunk(ctx.r3.u32) == command_list::OpenResult::kNested) {
+    lifted::original::c8258C9D0(ctx);
   }
 }
 
 // CommandList::CloseChunk: r3 = list.
 ITC_NATIVE_ENTRY(8258CA50, ITC_FLAG(native_command_list)) {
-  command_list::CloseChunk(base, ctx.r3.u32);
+  command_list::CloseChunk(ctx.r3.u32);
 }
 
 // CommandList::ChunkSlots: r3 = list; returns the last chunk's slots.
 ITC_NATIVE_ENTRY(8258CA88, ITC_FLAG(native_command_list)) {
-  ctx.r3.s64 = command_list::ChunkSlots(base, ctx.r3.u32);
+  ctx.r3.s64 = command_list::ChunkSlots(ctx.r3.u32);
 }
 
 // CommandList::AllocateVertices: r3 = list, r4 = vertex count, r5 (byte) =
@@ -73,10 +73,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CB08) {
   const bool header = (ctx.r5.u32 & 0xFF) != 0;
   uint32_t first = 0;
   if (ITC_FLAG(native_command_list) && !(header && SlotDiagnostics())) {
-    first = command_list::AllocateVertices(base, ctx.r3.u32, ctx.r4.u32, header);
+    first = command_list::AllocateVertices(ctx.r3.u32, ctx.r4.u32, header);
   }
   if (first == 0) {
-    lifted::original::c8258CB08(ctx, base);
+    lifted::original::c8258CB08(ctx);
     return;
   }
   ctx.r3.u64 = first;
@@ -89,10 +89,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CB98) {
   const bool header = (ctx.r5.u32 & 0xFF) != 0;
   uint32_t first = 0;
   if (ITC_FLAG(native_command_list) && !(header && SlotDiagnostics())) {
-    first = command_list::AllocateBytes(base, ctx.r3.u32, ctx.r4.u32, header);
+    first = command_list::AllocateBytes(ctx.r3.u32, ctx.r4.u32, header);
   }
   if (first == 0) {
-    lifted::original::c8258CB98(ctx, base);
+    lifted::original::c8258CB98(ctx);
     return;
   }
   ctx.r3.u64 = first;
@@ -105,10 +105,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CC30) {
   const bool header = (ctx.r4.u32 & 0xFF) != 0;
   uint32_t first = 0;
   if (ITC_FLAG(native_command_list) && !(header && SlotDiagnostics())) {
-    first = command_list::AllocateResolve(base, ctx.r3.u32, header);
+    first = command_list::AllocateResolve(ctx.r3.u32, header);
   }
   if (first == 0) {
-    lifted::original::c8258CC30(ctx, base);
+    lifted::original::c8258CC30(ctx);
     return;
   }
   ctx.r3.u64 = first;

@@ -26,20 +26,20 @@ constexpr uint32_t kProgressBytes = 0x1D52C;  // what Progress::Clear clears
 // sub_821056C0 Stats::Stats: r3 = the stats record (save data + 48). The
 // float 0.0 (0x82000A34) to +4892, 0 to +4896; 15 pairs {float, 0} at +4960 +
 // 48i; nine pairs at +5880 + 8i.
-void StatsConstruct(uint8_t* base, uint32_t stats);
+void StatsConstruct(uint32_t stats);
 // sub_821136D8 Stats::ResetRecords: 15 records of 48 bytes from `records` +
 // 4 ({0, 0, 0.0, 0, 0, -1, -1, -1, 0, 0, (+40 left), 0}), then +0 = 0.
-void StatsResetRecords(uint8_t* base, uint32_t records);
+void StatsResetRecords(uint32_t records);
 // sub_82113730 Stats::Reset: the record cleared and given its starting
 // values (with Stats::ResetRecords at +4948). Returns r3 as the original
 // leaves it: the record + 4948.
-uint32_t StatsReset(uint8_t* base, uint32_t stats);
+uint32_t StatsReset(uint32_t stats);
 // sub_82113BD8 Progress::Clear: 0x1D52C bytes cleared, then the progress's
 // starting values (with Stats::Reset at +48). Returns r3 as the original
 // leaves it: Stats::Reset's.
-uint32_t ProgressClear(uint8_t* base, uint32_t save);
+uint32_t ProgressClear(uint32_t save);
 // sub_821133A8 BitSet400::SetAll: 13 words cleared, then bits 0 to 399 set.
-void BitSet400SetAll(uint8_t* base, uint32_t set);
+void BitSet400SetAll(uint32_t set);
 
 // sub_82113E60 Progress::SetDefaults: a new game's progress (Progress::Clear,
 // the default tables copied, the unlock bits, the play time). The copies
@@ -48,23 +48,23 @@ void BitSet400SetAll(uint8_t* base, uint32_t set);
 // original from the start). Returns r3 as the original leaves it: the
 // unlock set (+0x1ACE4).
 bool SetDefaultsNative(uint32_t save);
-uint32_t ProgressSetDefaults(uint8_t* base, uint32_t save);
+uint32_t ProgressSetDefaults(uint32_t save);
 
 // sub_821058A8 ControlMap::SetDefault: the 15 default control numbers.
-void ControlMapSetDefault(uint8_t* base, uint32_t map);
+void ControlMapSetDefault(uint32_t map);
 // sub_82105940 Options::SetDefaults: the settings, then the four control
 // maps (+44, +104, +164, +224). Returns r3 as the original leaves it: the
 // last map (+224).
-uint32_t OptionsSetDefaults(uint8_t* base, uint32_t options);
+uint32_t OptionsSetDefaults(uint32_t options);
 // sub_82105D08 CourseRecords::Reset: the header, then 22 course records of
 // 408 bytes from +20 (CourseRecord::Reset's plain C++). Returns r3 as the
 // original leaves it: the last CourseRecord::Reset's.
-uint32_t CourseRecordsReset(uint8_t* base, uint32_t records);
+uint32_t CourseRecordsReset(uint32_t records);
 
 // sub_82105BF8 CourseRecords::Of: the record of a pair of words at `pair`
 // {course, traffic}: `records` + 20 + 408 x (course x 2 + traffic), in the
 // original's 64-bit arithmetic (r3 both halves). A leaf.
-uint64_t CourseRecordsOf(uint8_t* base, uint64_t records, uint32_t pair);
+uint64_t CourseRecordsOf(uint64_t records, uint32_t pair);
 
 // The players' save data slots (SaveData::Of reads them).
 constexpr uint32_t kSlots = 0x826C5B58;
@@ -73,7 +73,7 @@ constexpr uint32_t Slot(uint32_t player) { return kSlots + (player << 2); }
 // plain C++, nothing for 0), the slot 0. Returns r3 as the original leaves
 // it with operator delete's adapter native (the block). nullopt, with
 // nothing done, where the original must run: a block the layer didn't give.
-std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player);
+std::optional<uint32_t> SaveDataDelete(uint32_t player);
 
 // sub_821057C8 SaveData::Create: a player's save data made (operator new's
 // plain C++), Stats::Stats when not 0, the slot set, then the course
@@ -83,11 +83,11 @@ std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player);
 // run: operator new's error paths (it never answers 0 natively, so the
 // original's set-ups on a null block run only there).
 bool CreateNative();
-std::optional<uint32_t> SaveDataCreate(uint8_t* base, uint32_t player);
+std::optional<uint32_t> SaveDataCreate(uint32_t player);
 
 // sub_8209F5E0 Players::ResetControllers: the player-to-controller table
 // (0x826BABA4) 0 to 3, the profile read asked for (0x826C7938 = 1).
-void PlayersResetControllers(uint8_t* base);
+void PlayersResetControllers();
 
 // sub_8220BAC0 MenuList::Init: a front-end menu list's counts and text ids
 // (r7 to r10, then the caller's stack words +84 and +92 as `id5` and
@@ -98,8 +98,8 @@ void PlayersResetControllers(uint8_t* base);
 struct MenuListArgs {
   uint32_t count, shown, r6, r7, r8, r9, r10, id5, id6;
 };
-bool MenuListInitNative(uint8_t* base, uint32_t list);
-uint32_t MenuListInit(uint8_t* base, uint32_t list, const MenuListArgs& args);
+bool MenuListInitNative(uint32_t list);
+uint32_t MenuListInit(uint32_t list, const MenuListArgs& args);
 
 // sub_82221D00 TitleScreen::ResetPlayer: the title's one-item list
 // (MenuList::Init on [0x82814E30]), its idle ticks ([0x82814E34] + 36) 0,
@@ -115,8 +115,8 @@ constexpr uint32_t kTitleScreen = 0x82814E34;
 constexpr uint32_t kModeChecks = 0x826BAB40;
 constexpr uint32_t kControllers = 0x826BABA4;
 constexpr uint32_t kProfileReadAsked = 0x826C7938;
-bool ResetPlayerNative(uint8_t* base);
-std::optional<uint32_t> TitleScreenResetPlayer(uint8_t* base);
+bool ResetPlayerNative();
+std::optional<uint32_t> TitleScreenResetPlayer();
 
 // The default tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0,
 // sub_820CCCF0, sub_820CCD00.
@@ -130,7 +130,7 @@ uint32_t DefaultsTable50E4();
 // players' save block (player 1's slot; 0x3AB74 bytes, a player's half
 // 0x1D52C). A leaf.
 constexpr uint32_t kTwoPlayerBlock = 0x826C5B5C;
-uint32_t TwoPlayerBlock(uint8_t* base);
+uint32_t TwoPlayerBlock();
 // sub_82105740 SaveData::CreateTwoPlayerBlock (probably): 0x3AB74 bytes from
 // operator new's plain C++, Stats::Stats at +48 and +48 + 0x1D52C when not
 // 0, the block into [0x826C5B5C], then Progress::SetDefaults on the word
@@ -140,6 +140,6 @@ uint32_t TwoPlayerBlock(uint8_t* base);
 // (operator new's error paths, memcpy not native: as SaveData::Create).
 // No adapter: only ModeType8::Init's plain C++ calls it.
 constexpr uint32_t kTwoPlayerBlockBytes = 0x3AB74;
-std::optional<uint32_t> CreateTwoPlayerBlock(uint8_t* base);
+std::optional<uint32_t> CreateTwoPlayerBlock();
 
 }  // namespace save_data

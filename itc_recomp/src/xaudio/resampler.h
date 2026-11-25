@@ -30,20 +30,20 @@ namespace xaudio {
 // +80 set it's cleared; the kernel called (ours for the
 // six below, else the translated one through `call` at `frame`, the
 // original's 128-byte frame); returns the frames of input used, in full.
-uint64_t ResamplerProcess(uint8_t* base, uint32_t state, uint32_t frame, const GuestCall& call);
+uint64_t ResamplerProcess(uint32_t state, uint32_t frame, const GuestCall& call);
 
 // The kernels (each takes the state in r3; returns r3 as it leaves it).
 // sub_8247E188 (entry 81: any ratio, 16-bit, mono) and sub_8247E260 (entry
 // 82: stereo): the vector path (sub_8246E208, sub_8246E4C8) when the output
 // is 16-byte aligned, its frames a multiple of 8 and the input lasts, else
 // the scalar one (sub_82473E48, sub_82474188: entries 6 and 7).
-uint64_t ResampleMono(uint8_t* base, uint32_t state, uint32_t sp);
-uint64_t ResampleStereo(uint8_t* base, uint32_t state, uint32_t sp);
-uint64_t ResampleMonoScalar(uint8_t* base, uint32_t state, uint32_t sp);
-uint64_t ResampleStereoScalar(uint8_t* base, uint32_t state, uint32_t sp);
+uint64_t ResampleMono(uint32_t state, uint32_t sp);
+uint64_t ResampleStereo(uint32_t state, uint32_t sp);
+uint64_t ResampleMonoScalar(uint32_t state, uint32_t sp);
+uint64_t ResampleStereoScalar(uint32_t state, uint32_t sp);
 // sub_8247F558 (entry 107: equal rates, 16-bit, stereo): a vector copy with
 // the volume ramp when aligned, else sub_82478E60 (entry 32).
-uint64_t CopyStereo(uint8_t* base, uint32_t state, uint32_t sp);
-uint64_t CopyStereoScalar(uint8_t* base, uint32_t state, uint32_t sp);
+uint64_t CopyStereo(uint32_t state, uint32_t sp);
+uint64_t CopyStereoScalar(uint32_t state, uint32_t sp);
 
 }  // namespace xaudio

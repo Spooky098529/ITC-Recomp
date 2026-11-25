@@ -126,42 +126,42 @@ uint32_t AnalogPicture(uint32_t index);
 // `sp` (sp - 48 or sp - 32, as the leaves leave them); 1 when another item
 // holds the same value as item `item` (read from those words as the
 // original does, any item), else 0.
-uint32_t IsButtonTaken(uint8_t* base, uint32_t item, uint32_t sp);
-uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp);
+uint32_t IsButtonTaken(uint32_t item, uint32_t sp);
+uint32_t IsAnalogTaken(uint32_t item, uint32_t sp);
 
 // sub_821BA890 Options::HasButtonClash and sub_821BAC78
 // Options::HasAnalogClash (leaves, never seen in play, ported with their
 // callers): the edits copied below `sp` as the taken checks copy them; 1
 // when two items hold the same word, else 0.
-uint32_t HasButtonClash(uint8_t* base, uint32_t sp);
-uint32_t HasAnalogClash(uint8_t* base, uint32_t sp);
+uint32_t HasButtonClash(uint32_t sp);
+uint32_t HasAnalogClash(uint32_t sp);
 
 // sub_821BA550 Options::StepButtons and sub_821BABD8 Options::StepAnalog:
 // the settings' side word (+668 or +676) = the menu's side (+36) when it's
 // -1 or 1, else 0; with a side, 1 on the items before the last (12 or 6),
 // and on the last the OK/Default word +660 toggled (left on 1, right on 0)
 // and 1, else 0.
-uint32_t StepButtons(uint8_t* base);
-uint32_t StepAnalog(uint8_t* base);
+uint32_t StepButtons();
+uint32_t StepAnalog();
 
 // sub_821BE5F8 Options::StepSound (a leaf): by the menu's side (-1 or 1)
 // and cursor: 0 and 1 the volume edits +252, +256 stepped within 0 to 15
 // (past a bound: the bound stored, 0), 2 the OK/Default word +660 (left on
 // a 1, right on a 0), 3 the track +688 stepped, wrapping within 0 to 16.
 // 1 when something changed.
-uint32_t StepSound(uint8_t* base);
+uint32_t StepSound();
 // sub_821BEAC8 Options::StepSliders: node (7, 0)'s children 4 to 6 looked up
 // (unused); cursor 0 to 2 the slider edits +260 to +268 stepped within -10
 // to 10 (none at a bound), 3 the OK/Default word. Its 112-byte frame. 1
 // when something changed.
-uint32_t StepSliders(uint8_t* base, uint32_t sp);
+uint32_t StepSliders(uint32_t sp);
 
 // sub_821B9DB8 Settings::Reset: r3 = the settings (716 bytes): +0 = 0, the
 // three 192-byte blocks (+44, +236, +428) and +12 (32 bytes) cleared
 // (memset), then the words its row lists. Its 112-byte frame's back chain
 // at sp - 112. Returns r3 as the original leaves it (memset's last
 // destination, `settings` + 12).
-uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp);
+uint32_t SettingsReset(uint32_t settings, uint32_t sp);
 
 // --- The settings' read and write (settings.cpp) ---
 
@@ -173,12 +173,12 @@ uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp);
 // SetMusicVolume (through `calls`). Its 272-byte frame below `sp` (+80 the
 // globals' base 0x826E0000, +84 the table, +144 the last record). r3
 // SetMusicVolume's.
-uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SettingsRead(uint32_t sp, const Calls& calls);
 // sub_821BAE10 Settings::Write: the settings back into player 0's save
 // data (its row; the analog slot 4's word 8 kept as the original writes
 // it). Its 176-byte frame below `sp` (+80 the record). r3 the last
 // memcpy's (the last record's address).
-uint64_t SettingsWrite(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SettingsWrite(uint32_t sp, const Calls& calls);
 
 // --- The machine's handlers (handlers.cpp) ---
 
@@ -186,11 +186,11 @@ uint64_t SettingsWrite(uint8_t* base, uint32_t sp, const Calls& calls);
 // blocks allocated (the allocation layer's pages: the adapter runs it only
 // over the layer) and set up, Settings::Reset on the settings, +9604 = 1 or
 // 9 by +9612. Its 128-byte frame below `sp`. r3 the last block.
-uint32_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp);
+uint32_t OnEnter(uint32_t machine, uint32_t sp);
 // sub_821BBBA0 Options::WaitForMovie: r3 = the machine: while +9608 is 0,
 // it = 1 once UiMovies::IsLoaded(7); then +9604 = 9 or 4 by +9612. Its
 // 96-byte frame. r3 IsLoaded's when asked, else the machine (`r3`).
-uint64_t WaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp);
+uint64_t WaitForMovie(uint64_t r3, uint32_t sp);
 // sub_821B9F88 Options::OpenMovie: UiMovies::Open(7, 22553), a tail call
 // (`sp` and `lr` the caller's). Its r3.
 uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
@@ -198,36 +198,36 @@ uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
 // Settings::Write (from its 112-byte frame), message 6 (types 2, 6, 8), 5
 // (type 7) or 8 (type 4) queued in the dispatcher's ring (+204), +9604 = 9.
 // r3 Settings::Write's.
-uint64_t OnClosed(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t OnClosed(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
 
 // A message (three words: `message`, 0, 0) queued in a dispatcher's ring
 // (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
 // no overflow check, as the handlers do it inline.
-void Post(uint8_t* base, uint32_t dispatcher, uint32_t message);
+void Post(uint32_t dispatcher, uint32_t message);
 
 // `m`: UI movie 7 (UiMovies::Find on the id stored at frame + 80, as the
 // originals do), the movie table's value or the word at 0x826C5CDC.
-uint32_t FindMovie(uint8_t* base, uint32_t frame);
+uint32_t FindMovie(uint32_t frame);
 
 // sub_821BCD28 Options::Close: r3 the machine, r4 the dispatcher: FinishAll(m),
 // with +9616 set UiMovies::Delete(7) and +9608 = 0, then the mode's suspend
 // message posted (2 15, 4 11, 6 28, 7 25, 8 24). Its 112-byte frame; r3 the
 // last call's.
-uint64_t Close(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t Close(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                const Calls& calls);
 // sub_821BCF08 Options::Leave: +9604 = 7; with `m`, FinishAll and
 // UiMovies::Delete(7); message 4 (types 2, 4, 6, 8) or 3 (7) posted. Its
 // 112-byte frame; r3 Delete's, else `m` (0).
-uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t sp,
+uint64_t Leave(uint32_t machine, uint32_t dispatcher, uint32_t sp,
                const Calls& calls);
 // sub_821BD330 Options::ClosePage: r3 the dispatcher: by the mode type 2 13,
 // 4 9, 6 25, 7 and 8 22 posted. A leaf; r3 left.
-uint64_t ClosePage(uint8_t* base, uint64_t dispatcher);
+uint64_t ClosePage(uint64_t dispatcher);
 // sub_821BD3C8 Options::Wait (step 0): r3 the step word: first pass the
 // settings' +684 = 0 and the word 1; UiMovie::Run(m, 0); +684 up by one; 1
 // once it's 10 or more, else 0. Its 112-byte frame.
-uint64_t Wait(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t Wait(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The steps on the movie (steps.cpp) ---
 //
@@ -239,24 +239,24 @@ uint64_t Wait(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD468 Options::OpenCategories (step 4): sub-scene 23's animation
 // 1, 16's or 17's 0 by the context (1, or 0 and 2 to 4; none from 5), and
 // 21's cursor + 2, each played and looped. A 128-byte frame.
-uint64_t OpenCategories(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t OpenCategories(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD5B0 Options::ReturnToCategories (step 5): 23's 1 and 21's cursor
 // + 2. A 128-byte frame.
-uint64_t ReturnToCategories(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ReturnToCategories(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD728 Options::EnterHud (step 9): 5's cursor + 4 below 4, else 2
 // (OK/Default +660 1) or 1. A 128-byte frame.
-uint64_t EnterHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t EnterHud(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD800 Options::ChangeHudValue (step 11): on the last row (cursor 4)
 // 5's 2 or 1 finished and the other played and looped. A 112-byte frame.
-uint64_t ChangeHudValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeHudValue(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD908 Options::EnterSound (step 13): 6's 1 played, LoopLast. 112.
-uint64_t EnterSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t EnterSound(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BD9A0 Options::EnterSliders (step 17): named 226. 112.
-uint64_t EnterSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t EnterSliders(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821BDAD0 Options::EnterButtons (step 25): named 407, then the button
 // picture's (423 + 2 x the settings' +284, from the 17-word table at the
 // frame's +96, read as the original does for any value). A 208-byte frame.
-uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t EnterButtons(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The node helpers on the movie (nodes.cpp) ---
 //
@@ -266,164 +266,164 @@ uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
 
 // sub_821BE218 Options::SetCategoryArrow: node (-1, 21)'s child 0's +16 =
 // `value` as a float. 112-byte frame. The child.
-uint32_t SetCategoryArrow(uint8_t* base, uint64_t value, uint32_t sp);
+uint32_t SetCategoryArrow(uint64_t value, uint32_t sp);
 // sub_821BE518 Options::ShowVolumeNumber: SetNodeText(m, the node's child 2,
 // 8, volume), then children 4 to 18's +80 = 1 for the volume's (1 to 15).
 // 128-byte frame. The last child.
-uint64_t ShowVolumeNumber(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+uint64_t ShowVolumeNumber(uint32_t node, uint64_t volume, uint32_t sp,
                           const Calls& calls);
 // sub_821BE930 Options::ShowMusicName: SetText(m, 6, 8, 501 + value).
 // 112-byte frame. SetText's r3.
-uint64_t ShowMusicName(uint8_t* base, uint64_t value, uint32_t sp, const Calls& calls);
+uint64_t ShowMusicName(uint64_t value, uint32_t sp, const Calls& calls);
 // sub_821BE988 Options::ShowSlider: SetNodeText(m, child 0, 8, value), child
 // 2's +12 = 16 - trunc((value + 10) x [0x8200A6AC]) as a float. 128-byte
 // frame. Child 2.
-uint32_t ShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp,
+uint32_t ShowSlider(uint32_t slider, uint64_t value, uint32_t sp,
                     const Calls& calls);
 // sub_821BEA48 Options::ShowSliderMark: child 3's +12 as ShowSlider's child
 // 2's. 112-byte frame. Child 3.
-uint32_t ShowSliderMark(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp);
+uint32_t ShowSliderMark(uint32_t slider, uint64_t value, uint32_t sp);
 // sub_821BF0F0 Options::ShowButtonPicture and sub_821BF630
 // ShowAnalogPicture: nodes (9, 6) to (9, 22), or (11, 6) to (11, 16), +80 =
 // 1 for child 6 + `shown`, else 0. 128-byte frames. The last node.
-uint32_t ShowButtonPicture(uint8_t* base, uint32_t shown, uint32_t sp);
-uint32_t ShowAnalogPicture(uint8_t* base, uint32_t shown, uint32_t sp);
+uint32_t ShowButtonPicture(uint32_t shown, uint32_t sp);
+uint32_t ShowAnalogPicture(uint32_t shown, uint32_t sp);
 // sub_821BFA68 Options::ResetNode: child `child` (under `group` unless -1)
 // of the file, live and saved scenes; UiMovie::RestorePose on the live and
 // the saved against the file's. 128-byte frame. The second RestorePose's r3.
-uint64_t ResetNode(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+uint64_t ResetNode(uint32_t group, uint32_t child, uint32_t sp,
                    const Calls& calls);
 
 // sub_821BE5A8 Options::ShowVolumeBar: children 22 to 36 of `node` +80 = 1
 // for child 21 + i with i <= the volume, else 0 (no movie lookup). 112-byte
 // frame. The last child.
-uint32_t ShowVolumeBar(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp);
+uint32_t ShowVolumeBar(uint32_t node, uint64_t volume, uint32_t sp);
 // sub_821BE820 Options::ShowVolumeNumbers: ShowVolumeNumber on nodes (6, 6)
 // and (6, 7) with the edits +252 and +256. 112-byte frame. The second's r3.
-uint64_t ShowVolumeNumbers(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowVolumeNumbers(uint32_t sp, const Calls& calls);
 // sub_821BECA8 Options::ShowSliderNumbers and sub_821BED38 ShowSliderMarks:
 // the edits +260 to +268 copied to the frame's +88, ShowSlider (or
 // ShowSliderMark) on node (7, 0)'s children 4 to 6. 144-byte frames. The
 // last call's r3.
-uint64_t ShowSliderNumbers(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t ShowSliderMarks(uint8_t* base, uint32_t sp);
+uint64_t ShowSliderNumbers(uint32_t sp, const Calls& calls);
+uint64_t ShowSliderMarks(uint32_t sp);
 // sub_821BE290 Options::ShowHudValues: the HUD edits +236 to +248 and +660
 // copied to the frame's +96; for each of node (5, 2)'s +104 rows the left
 // and right choices' frame (child 0 +108) and shown (child 2 +80) words by
 // the value (1: the left lit). 208-byte frame. The last child, or the node.
-uint64_t ShowHudValues(uint8_t* base, uint32_t sp);
+uint64_t ShowHudValues(uint32_t sp);
 // sub_821BEFE8 Options::ShowButtonList and sub_821BF520 ShowAnalogList: the
 // edits in menu order copied to the frame (+96, or +128 with the names at
 // +96); on node (9, 5) or (11, 5) each item's name (SetNodeText, strings
 // 348 to 359, or 351 to 355 and 359; its unset varargs 0) and picture
 // (child 1 +108 = the edit). 208-byte frames. The last picture node.
-uint32_t ShowButtonList(uint8_t* base, uint32_t sp, const Calls& calls);
-uint32_t ShowAnalogList(uint8_t* base, uint32_t sp, const Calls& calls);
+uint32_t ShowButtonList(uint32_t sp, const Calls& calls);
+uint32_t ShowAnalogList(uint32_t sp, const Calls& calls);
 // sub_821BF158 Options::ShowButtonClashes and sub_821BF698
 // ShowAnalogClashes: per item, the taken (358 + 4i, or 609 + 4i) or free
 // (357 + 4i, or 608 + 4i) animation by IsButtonTaken (IsAnalogTaken),
 // PlayNamed(m, it, 1) then FinishNamed. 256-byte frames (two 13-word tables
 // at +96 and +160). The last FinishNamed's r3.
-uint64_t ShowButtonClashes(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t ShowAnalogClashes(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowButtonClashes(uint32_t sp, const Calls& calls);
+uint64_t ShowAnalogClashes(uint32_t sp, const Calls& calls);
 
 // The second migration's steps (steps.cpp; r3 the step word, the frame
 // below `sp`):
 // sub_821BDE88 Options::EnterAnalog (step 33): named 658, then the analog
 // picture's (674 + 2 x AnalogPicture(+380), from the 11-word table at the
 // frame's +96). A 176-byte frame. 1.
-uint64_t EnterAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t EnterAnalog(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821C09B0 Options::MoveSaveDialogCursor (step 45) and sub_821C0B50
 // MoveCategory6DialogCursor (step 48): the dialog menu's (+4) before
 // finished, its (+0) played and looped (or finished), from 843 (or 859).
 // 128-byte frames. 1.
-uint64_t MoveSaveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t MoveCategory6DialogCursor(uint8_t* base, uint32_t step, uint32_t sp,
+uint64_t MoveSaveDialogCursor(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveCategory6DialogCursor(uint32_t step, uint32_t sp,
                                    const Calls& calls);
 // sub_821C08B0 Options::ChangeSaveDialog (step 44) and sub_821C0A50
 // ChangeCategory6Dialog (step 47): first pass MenuSound::Play(5) and the
 // dialog's animations by the state +620 (or +640); 1 once UiMovie::Run
 // answers 0 (the state = +624, or +644), else 0. 128-byte frames.
-uint64_t ChangeSaveDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeSaveDialog(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeCategory6Dialog(uint32_t step, uint32_t sp, const Calls& calls);
 // --- The machine's dispatch and the page helpers (pages.cpp) ---
 
 // sub_821C80F0 Options::Draw: the 15 pages' handlers at its 224-byte
 // frame's +80; the page p +0's (not -1, no bounds check) called with r3 =
 // r4 = the dispatcher and the original's leftovers in r5 to r10. Its r3, or
 // 0x821C2388 (the original's last table register) with no page.
-uint64_t Draw(uint8_t* base, uint64_t dispatcher, uint32_t sp, const Calls& calls);
+uint64_t Draw(uint64_t dispatcher, uint32_t sp, const Calls& calls);
 // sub_821C81E8 Options::Update: the 49 steps at its 480-byte frame's +128
 // (+80 to +112 the spilled 0x821C0000); the step p +12: -1 UiMovie::Run(m,
 // 0) unless the page is 14; >= 0 called (r3 = p + 24, r4 to r10 the
 // original's leftovers) and, when it answers nonzero, the step ended (the
 // queued one, or the page after); other negatives ended at once. Its r3:
 // the step's, Run's or `m`.
-uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Update(uint32_t sp, const Calls& calls);
 // sub_821C6F58 Options::SavePage (page 9) and sub_821BD228 Category6Page
 // (page 10): the dialog's cancel to step 41 (42) with page 9 (10) after and
 // the sub-pages' block ([0x826D847C] or [0x826D8488]) to 5; its sub-page
 // called from the 7-entry (6-entry) table at the frame's +80 (r3 as it
 // came; r4 too for page 10; the leftovers); page 9 then Menu::Pressed(menu,
 // 158). 128- and 112-byte frames. r3: Pressed's; the handler's or `r3`.
-uint64_t SavePage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
-uint64_t Category6Page(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
+uint64_t SavePage(uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t Category6Page(uint64_t r3, uint64_t r4, uint32_t sp, const Calls& calls);
 // sub_821BE3E0 Options::StepHud: the five values' addresses at the frame's
 // +80; by the menu's side, left on a 0 -> 1, right on a 1 -> 0, then
 // ShowHudValues, 1; else 0. 112-byte frame.
-uint64_t StepHud(uint8_t* base, uint32_t sp);
+uint64_t StepHud(uint32_t sp);
 // sub_821BE8A8 Options::ShowVolumeBars: ShowVolumeBar on (6, 6) and (6, 7)
 // with +252 and +256. 112-byte frame. The second's r3.
-uint64_t ShowVolumeBars(uint8_t* base, uint32_t sp);
+uint64_t ShowVolumeBars(uint32_t sp);
 // sub_821C1068 Options::ShowPrompts: `values` r3 to r8 (three prompts'
 // first and second frames) at the frame's +88 and +104; prompt i's node (1,
 // i) shown with its two choices' +108 set when neither is -1, else hidden.
 // 176-byte frame. The last second choice's node.
-uint64_t ShowPrompts(uint8_t* base, const uint64_t (&values)[6], uint32_t sp);
+uint64_t ShowPrompts(const uint64_t (&values)[6], uint32_t sp);
 // sub_821C0FF0 Settings::Reload: by the context, 1 ShowCareerInfo (the
 // original) and PlayTime::Mark on player 0's save data, 2 and 3 a word -1;
 // then Settings::Read. 96-byte frame. Read's r3.
-uint64_t SettingsReload(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SettingsReload(uint32_t sp, const Calls& calls);
 // sub_821B9E70 Options::OnLeft: the sound manager's StopCue(2, 0) and
 // ReleaseBank(2) (slots 13 and 5), the seven blocks freed (the allocation
 // layer's pages, else VirtualFree) and the globals 0. 160-byte frame. The
 // last free's answer.
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t OnLeft(uint32_t sp, const Calls& calls);
 // sub_821BC670 Options::CategoryPage (page 0): Menu::Step; moved -> step 6
 // and sound 4; accept (159) -> the category +664, step 7, sound 0; back
 // (158) -> sound 2, step 8 with page 14 after (type 4: [0x826364EC] = 0).
 // 96-byte frame. The last call's r3.
-uint64_t CategoryPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t CategoryPage(uint32_t sp, const Calls& calls);
 // sub_821BCFF0 Options::SetUpMovie: ResetPose, the panels by the context
 // (type 2's career info texts), the prompts' frames, the menu music's cue
 // (+704), +692 = -1, +0 = 1. 160-byte frame. The last slot 14's r3.
-uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpMovie(uint32_t sp, const Calls& calls);
 // sub_821C1158 Options::Show: Settings::Read, the cursor +664 = 0,
 // SetUpMovie, the page block (steps 3 then 4) and the controller pages'
 // open message posted. 112-byte frame. SetUpMovie's r3.
-uint64_t Show(uint8_t* base, uint32_t dispatcher, uint32_t sp, const Calls& calls);
+uint64_t Show(uint32_t dispatcher, uint32_t sp, const Calls& calls);
 // The cursor steps (steps.cpp; r3 the step word, 1): sub_821C2BE0
 // Options::MoveCategoryCursor (step 6, 160-byte frame), sub_821C2E28
 // MoveHudCursor (step 10, 160), sub_821C3008 MoveSoundCursor (step 14,
 // 144), sub_821C3278 ChangeSoundValue (step 15, 128), sub_821C3398
 // MoveSlidersCursor (step 18, 144). Their help lines' SetText unset varargs
 // passed as 0.
-uint64_t MoveCategoryCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveCategoryCursor(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveHudCursor(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveSoundCursor(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeSoundValue(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveSlidersCursor(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821C35F0 Options::ChangeSlidersValue (step 19, 112-byte frame): on
 // the last row the OK/Default animations (229, 230), else
 // ShowSliderNumbers. 1.
-uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t ChangeSlidersValue(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821C2778 Options::LeaveButtons (step 1, 336-byte frame) and
 // sub_821C2A10 LeaveAnalog (step 2, 240): their tables written each pass;
 // first pass +684 = 0, the cursor's animations finished (or the last
 // row's), the edits put back (memcpy), the list and clashes shown; then
 // UiMovie::Run and +684 up by one: 1 from 10.
-uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t LeaveButtons(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t LeaveAnalog(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The type 2 and 4 modes' Inits (inits.cpp) ---
 
@@ -452,7 +452,7 @@ extern const InitInfo kInits[kInitCount];
 // adapters: only ModeType8::Init's plain C++ calls them) (r3 the machine, `object`): their frames'
 // stores and copies below `sp` (the back chain too) and their
 // StateMachine::Add calls (plain C++) in their order.
-InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp);
+InitResult RunInit(uint32_t address, uint32_t object, uint32_t sp);
 
 // --- The category pages (category_pages.cpp) ---
 //
@@ -461,24 +461,24 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t sp
 // the cursor sent to the last row) or back, by their rows. From their
 // frames below `sp`; r3 the last call's.
 // sub_821C1270 Options::HudPage (96-byte frame).
-uint64_t HudPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t HudPage(uint32_t sp, const Calls& calls);
 // sub_821C1888 Options::SlidersPage (96).
-uint64_t SlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SlidersPage(uint32_t sp, const Calls& calls);
 // sub_821C1D08 Options::ButtonsPage (112).
-uint64_t ButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ButtonsPage(uint32_t sp, const Calls& calls);
 // sub_821C21A8 Options::AnalogPage (96).
-uint64_t AnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t AnalogPage(uint32_t sp, const Calls& calls);
 // sub_821C1498 Options::SoundPage (160): the volumes heard on a change
 // (SoundOptions::SetEffectsVolume and SetMusicVolume through their
 // overrides), the track's row stopping the menu music and going to page 11
 // or 12, OK and back leaving through page 13.
-uint64_t SoundPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SoundPage(uint32_t sp, const Calls& calls);
 // sub_821BA380 Options::LeaveSoundPage (page 13, 160): by the settings'
 // +700, the preview stopped, bank 2 released, the menu music started again
 // (Sound::Play through its override) and the sound page's close queued;
 // the sound manager's slots through `calls`. `r3` returned as it came for
 // another +700.
-uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t LeaveSoundPage(uint64_t r3, uint32_t sp, const Calls& calls);
 
 // The set-ups (category_pages.cpp; no arguments, from their frames below
 // `sp`, the movie's text calls through their overrides with their unset
@@ -486,17 +486,17 @@ uint64_t LeaveSoundPage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
 // sub_821C4BE0 Options::SetUpCategoryPage (144): the menu over the
 // context's categories, nodes 28 and 29's frame, the names and help line,
 // ShowPrompts(0, 0, 1, 1, -1, -1). ShowPrompts' r3.
-uint64_t SetUpCategoryPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpCategoryPage(uint32_t sp, const Calls& calls);
 // sub_821C4DB0 SetUpHudPage (144), sub_821C4FD0 SetUpSoundPage (128),
 // sub_821C51D0 SetUpSlidersPage (128), sub_821C5580 SetUpButtonsPage (128),
 // sub_821C57D0 SetUpAnalogPage (128): the menu, the edits copied from the
 // current settings, the page's node reset, its texts and values shown. The
 // last call's r3.
-uint64_t SetUpHudPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SetUpSoundPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SetUpSlidersPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SetUpButtonsPage(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SetUpAnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t SetUpHudPage(uint32_t sp, const Calls& calls);
+uint64_t SetUpSoundPage(uint32_t sp, const Calls& calls);
+uint64_t SetUpSlidersPage(uint32_t sp, const Calls& calls);
+uint64_t SetUpButtonsPage(uint32_t sp, const Calls& calls);
+uint64_t SetUpAnalogPage(uint32_t sp, const Calls& calls);
 
 // The third migration's steps (steps.cpp; r3 the step word, 112-byte
 // frames below `sp`):
@@ -504,18 +504,18 @@ uint64_t SetUpAnalogPage(uint8_t* base, uint32_t sp, const Calls& calls);
 // animations 1 and 0 played, 0 looped, ScreenFades::FadeIn([0x82001BEC],
 // black, layer 0) and SetUpCategoryPage; 1 once UiMovie::Run answers 0 and
 // layer 0's fade counts are 0, else 0.
-uint64_t FadeIn(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t FadeIn(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821C75E0 Options::CloseHud (step 12), sub_821C7710 CloseSound (16),
 // sub_821C7868 CloseSliders (20), sub_821C7B08 CloseButtons (28),
 // sub_821C7D18 CloseAnalog (36): first pass the cursor's animation finished
 // (none for the buttons and analog pages), the help line cleared, the
 // page's close played, SetUpCategoryPage; once UiMovie::Run answers 0, step
 // 5 with the categories after and the step word 0. 0.
-uint64_t CloseHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t CloseSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t CloseSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t CloseButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t CloseAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseHud(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseSound(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseSliders(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseButtons(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseAnalog(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The load and save pages (load_save.cpp; docs/functions/
 // options-load-save.md): category 5 (page 9) loads the game data, category 6
@@ -549,15 +549,15 @@ constexpr uint32_t kGameDataBytes = 0x1F978;
 // options' page block to step 44 then 43 (47 then 46) with page 9 (10)
 // after, 2 those in the other order with the sub-page 3; for those the
 // settings' +624 (+644) = `next`; always +628 (+648) = `kind`. r3 `kind`.
-uint64_t LoadPageSetDialog(uint8_t* base, uint64_t kind, uint64_t next);
-uint64_t SavePageSetDialog(uint8_t* base, uint64_t kind, uint64_t next);
+uint64_t LoadPageSetDialog(uint64_t kind, uint64_t next);
+uint64_t SavePageSetDialog(uint64_t kind, uint64_t next);
 // sub_821B9FB0 LoadPage::Close and sub_821BA508 SavePage::Close (sub-page 4,
 // leaves): the page block to step 41 (42), the settings' +712 = 1.
-void LoadPageClose(uint8_t* base);
-void SavePageClose(uint8_t* base);
+void LoadPageClose();
+void SavePageClose();
 // sub_821B9FF8 OptionsSavePages::Cancel (sub-page 5 of both, a leaf, never
 // seen in play): the settings' +712 = 1.
-void SavePagesCancel(uint8_t* base);
+void SavePagesCancel();
 // The sub-pages (r3 not read; from their frames below `sp`; r3 as the
 // originals leave it): sub_821BBC10 LoadPage::CheckDevice and sub_821BBCC0
 // SavePage::CheckDevice (0, 96 bytes), sub_821BC7B0 LoadPage::Answer (1, 112)
@@ -565,22 +565,22 @@ void SavePagesCancel(uint8_t* base);
 // sub_821BCC10 SavePage::Note (2, 112), sub_821C2620 LoadPage::Wait and
 // sub_821BBD18 SavePage::Wait (3, 96), sub_821BBC68 LoadPage::DeviceAnswer (6,
 // 96, never seen in play).
-uint64_t LoadPageCheckDevice(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SavePageCheckDevice(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t LoadPageAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SavePageAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t LoadPageNote(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SavePageNote(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t LoadPageWait(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t SavePageWait(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t LoadPageDeviceAnswer(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t LoadPageCheckDevice(uint32_t sp, const Calls& calls);
+uint64_t SavePageCheckDevice(uint32_t sp, const Calls& calls);
+uint64_t LoadPageAnswer(uint32_t sp, const Calls& calls);
+uint64_t SavePageAnswer(uint32_t sp, const Calls& calls);
+uint64_t LoadPageNote(uint32_t sp, const Calls& calls);
+uint64_t SavePageNote(uint32_t sp, const Calls& calls);
+uint64_t LoadPageWait(uint32_t sp, const Calls& calls);
+uint64_t SavePageWait(uint32_t sp, const Calls& calls);
+uint64_t LoadPageDeviceAnswer(uint32_t sp, const Calls& calls);
 // sub_821C6468 LoadPage::Leave (step 41) and sub_821C6550 SavePage::Leave
 // (step 42): r3 the step word; first pass the dialog's animations finished
 // (841 and 843 + the cursor, or 857 and 859 + it), the close (10 or 11)
 // played, Options::SetUpCategoryPage; every pass UiMovie::Run, and once it
 // answers 0 step 5 with the categories after and SaveBuffers::Destroy.
 // 128-byte frames. 0.
-uint64_t LoadPageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
-uint64_t SavePageLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t LoadPageLeave(uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t SavePageLeave(uint32_t step, uint32_t sp, const Calls& calls);
 
 }  // namespace options_screen

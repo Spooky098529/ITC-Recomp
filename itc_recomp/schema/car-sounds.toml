@@ -21,7 +21,7 @@ size = 1264
 origin = "allocated"
 storage = "host"
 fields = [
-  { name = "array_count", offset = -16, type = "bytes", count = 4, note = "the first element only: CarSoundArray's count (7), read as the array's count (no member: outside the sound; CarSoundArray(base, array_count_address()).count())" },
+  { name = "array_count", offset = -16, type = "bytes", count = 4, note = "the first element only: CarSoundArray's count (7), read as the array's count (no member: outside the sound; CarSoundArray(array_count_address()).count())" },
   { name = "tunnel_reverb", offset = 0, type = "u32", note = "the submix's reverb state: 1 the block 0x826166F8 set (the vehicle's +5314 bit 1, probably a tunnel), 0 the block 0x82616638" },
   { name = "listener", offset = 4, type = "bytes", count = 48, note = "an X3DAudioListener; its cone pointer is the emitter's +0 (+52). Not an embed (the emitter's cone would be a second layout entry at +52): its floats below, which X3DAudioListener's dual view reads" },
   { name = "x3d_listener_front_x", offset = 4, type = "f32" },

@@ -306,21 +306,21 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
 class Renderer {
  public:
   // Render thread. Returns false if the renderer can't run.
-  bool Init(uint8_t* base);
+  bool Init();
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
-  void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
-  void TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+  void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
+  void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+  void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                     uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
                     uint32_t tile, uint32_t tiles) {
-    passes_.TiledResolve(BeginFrame(), base, device, flags, rect, destination, point, clear_color,
+    passes_.TiledResolve(BeginFrame(), device, flags, rect, destination, point, clear_color,
                          clear_z, tile, tiles);
   }
-  void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
-    passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
+  void FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
+    passes_.FrontBufferResolve(BeginFrame(), device, front_buffer);
   }
-  void DrawMovie(uint8_t* base, uint32_t device, const Passes::MoviePlanes& planes) {
-    passes_.DrawMovie(BeginFrame(), base, device, planes);
+  void DrawMovie(uint32_t device, const Passes::MoviePlanes& planes) {
+    passes_.DrawMovie(BeginFrame(), device, planes);
   }
   void EndFrame();
 
@@ -658,9 +658,9 @@ void Renderer::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool Renderer::Init(uint8_t* base) {
+bool Renderer::Init() {
   if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, base, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
+      !passes_.Init(context_, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
     return false;
   }
   passes_.set_mirror_by_tick(ITC_FLAG(native_renderer_mirror_by_tick));
@@ -765,24 +765,24 @@ VkCommandBuffer Renderer::BeginFrame() {
   return frame.commands;
 }
 
-void Renderer::InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                           uint32_t data) {
-  passes_.InlineDraw(BeginFrame(), base, type, count, stride, data);
+  passes_.InlineDraw(BeginFrame(), type, count, stride, data);
 }
 
-void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
+void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
   // Commands 15 and 19 draw inline vertices, drawn at the library's End
   // (Renderer_InlineDraw).
   if (IsDraw(id) && id != 15 && id != 19) {
-    passes_.AfterDraw(BeginFrame(), base, id, payload, arg1);
+    passes_.AfterDraw(BeginFrame(), id, payload, arg1);
   } else if (id == 25) {
-    passes_.AfterResolve(BeginFrame(), base, payload, arg1);
+    passes_.AfterResolve(BeginFrame(), payload, arg1);
   } else if (id == 26) {
-    passes_.AfterClear(BeginFrame(), base, payload, arg1);
+    passes_.AfterClear(BeginFrame(), payload, arg1);
   } else if (id == 32) {
     // One item of 16 bytes per tiling begun.
     for (uint32_t i = 0; i < arg1; i++) {
-      passes_.BeginTiling(BeginFrame(), base, payload + 16 * i);
+      passes_.BeginTiling(BeginFrame(), payload + 16 * i);
     }
   } else if (id == 33) {
     passes_.EndTiling();
@@ -1226,53 +1226,53 @@ Renderer* GetRenderer() {
 
 }  // namespace
 
-void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                         uint32_t arg2) {
   g_base = base;
-  Buffers_OnCommand(base, id, payload, arg1);
+  Buffers_OnCommand(id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
   }
 }
 
-void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
+void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
   if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterCommand(base, id, payload, arg1);
+    renderer->AfterCommand(id, payload, arg1);
   }
 }
 
-void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
+void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                          uint32_t data) {
   if (Renderer* renderer = GetRenderer()) {
-    renderer->InlineDraw(base, type, count, stride, data);
+    renderer->InlineDraw(type, count, stride, data);
   }
 }
 
-void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
+void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                            uint32_t destination, uint32_t point, uint32_t clear_color,
                            float clear_z, uint32_t tile, uint32_t tiles) {
   if (Renderer* renderer = GetRenderer()) {
-    renderer->TiledResolve(base, device, flags, rect, destination, point, clear_color, clear_z,
+    renderer->TiledResolve(device, flags, rect, destination, point, clear_color, clear_z,
                            tile, tiles);
   }
 }
 
-void Renderer_FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
+void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
   g_base = base;
   if (Renderer* renderer = GetRenderer()) {
-    renderer->FrontBufferResolve(base, device, front_buffer);
+    renderer->FrontBufferResolve(device, front_buffer);
   }
 }
 
-void Renderer_DrawMovie(uint8_t* base, uint32_t device, uint32_t width, uint32_t height,
+void Renderer_DrawMovie(uint32_t device, uint32_t width, uint32_t height,
                         const uint8_t* y, const uint8_t* u, const uint8_t* v) {
   g_base = base;
   if (Renderer* renderer = GetRenderer()) {
-    renderer->DrawMovie(base, device, {width, height, y, u, v});
+    renderer->DrawMovie(device, {width, height, y, u, v});
   }
 }
 

@@ -70,15 +70,15 @@ struct Object {
   uint32_t address;  // the guest object, or 0
   HostEvent* event;  // the host event, or null
 
-  uint8_t Type() const { return event ? event->type : guest::LoadU8(base, address); }
+  uint8_t Type() const { return event ? event->type : guest::LoadU8(address); }
   int32_t Signal() const {
-    return event ? event->state : int32_t(guest::LoadU32(base, address + kSignalState));
+    return event ? event->state : int32_t(guest::LoadU32(address + kSignalState));
   }
   void SetSignal(int32_t value) {
     if (event) {
       event->state = value;
     } else {
-      guest::StoreU32(base, address + kSignalState, uint32_t(value));
+      guest::StoreU32(address + kSignalState, uint32_t(value));
     }
   }
   bool Signaled() const { return Signal() > 0; }
@@ -111,13 +111,13 @@ void LogFallbackOnce(const char* what, uint32_t value) {
 // The deadline from a wait's timeout pointer (0: none, wait for ever): a
 // big-endian count of 100 ns, negative relative, positive absolute (system
 // time, from 1601), 0 a poll.
-std::optional<std::chrono::steady_clock::time_point> Deadline(uint8_t* base, uint32_t pointer) {
+std::optional<std::chrono::steady_clock::time_point> Deadline(uint32_t pointer) {
   const auto now = std::chrono::steady_clock::now();
   if (pointer == 0) {
     return std::nullopt;
   }
-  const int64_t value = int64_t((uint64_t(guest::LoadU32(base, pointer)) << 32) |
-                                guest::LoadU32(base, pointer + 4));
+  const int64_t value = int64_t((uint64_t(guest::LoadU32(pointer)) << 32) |
+                                guest::LoadU32(pointer + 4));
   using Ticks = std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>;
   if (value <= 0) {
     return now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(Ticks(-value));
@@ -170,11 +170,11 @@ uint32_t Wait(std::vector<Object>& objects, bool all,
 }
 
 // A guest object of ours at `address`, else nothing.
-std::optional<Object> GuestObject(uint8_t* base, uint32_t address) {
-  if (address == 0 || !OurType(guest::LoadU8(base, address))) {
+std::optional<Object> GuestObject(uint32_t address) {
+  if (address == 0 || !OurType(guest::LoadU8(address))) {
     return std::nullopt;
   }
-  return Object{base, address, nullptr};
+  return Object{address, nullptr};
 }
 
 void Notify() {
@@ -182,9 +182,9 @@ void Notify() {
 }
 
 // KeSetEvent(event, increment, wait): the previous state.
-lifted::Result SetEvent(uint8_t* base, const lifted::Args& args) {
+lifted::Result SetEvent(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeSetEvent");
-  Object object{base, uint32_t(args.r[0]), nullptr};
+  Object object{uint32_t(args.r[0]), nullptr};
   int32_t previous;
   {
     std::lock_guard lock(Get().mutex);
@@ -196,9 +196,9 @@ lifted::Result SetEvent(uint8_t* base, const lifted::Args& args) {
 }
 
 // KeResetEvent(event): the previous state.
-lifted::Result ResetEvent(uint8_t* base, const lifted::Args& args) {
+lifted::Result ResetEvent(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeResetEvent");
-  Object object{base, uint32_t(args.r[0]), nullptr};
+  Object object{uint32_t(args.r[0]), nullptr};
   std::lock_guard lock(Get().mutex);
   const int32_t previous = object.Signal();
   object.SetSignal(0);
@@ -206,28 +206,28 @@ lifted::Result ResetEvent(uint8_t* base, const lifted::Args& args) {
 }
 
 // KeInitializeSemaphore(semaphore, count, limit).
-lifted::Result InitializeSemaphore(uint8_t* base, const lifted::Args& args) {
+lifted::Result InitializeSemaphore(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeInitializeSemaphore");
   const uint32_t address = uint32_t(args.r[0]);
   std::lock_guard lock(Get().mutex);
-  guest::StoreU8(base, address, kSemaphore);
-  guest::StoreU32(base, address + kSignalState, uint32_t(args.r[1]));
-  guest::StoreU32(base, address + kSemaphoreLimit, uint32_t(args.r[2]));
+  guest::StoreU8(address, kSemaphore);
+  guest::StoreU32(address + kSignalState, uint32_t(args.r[1]));
+  guest::StoreU32(address + kSemaphoreLimit, uint32_t(args.r[2]));
   return {0, 0.0};
 }
 
 // KeReleaseSemaphore(semaphore, increment, adjustment, wait): the previous
 // count; past the limit nothing changes (as the SDK).
-lifted::Result ReleaseSemaphore(uint8_t* base, const lifted::Args& args) {
+lifted::Result ReleaseSemaphore(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeReleaseSemaphore");
   const uint32_t address = uint32_t(args.r[0]);
   const int32_t adjustment = int32_t(uint32_t(args.r[2]));
-  Object object{base, address, nullptr};
+  Object object{address, nullptr};
   int32_t previous;
   {
     std::lock_guard lock(Get().mutex);
     previous = object.Signal();
-    const int32_t limit = int32_t(guest::LoadU32(base, address + kSemaphoreLimit));
+    const int32_t limit = int32_t(guest::LoadU32(address + kSemaphoreLimit));
     if (adjustment > 0 && int64_t(previous) + adjustment <= limit) {
       object.SetSignal(previous + adjustment);
     } else {
@@ -240,44 +240,44 @@ lifted::Result ReleaseSemaphore(uint8_t* base, const lifted::Args& args) {
 }
 
 // KeWaitForSingleObject(object, reason, mode, alertable, timeout).
-lifted::Result WaitForSingleObject(uint8_t* base, const lifted::Args& args) {
+lifted::Result WaitForSingleObject(const lifted::Args& args) {
   const uint32_t address = uint32_t(args.r[0]);
-  std::optional<Object> object = GuestObject(base, address);
+  std::optional<Object> object = GuestObject(address);
   if (!object) {
     LogFallbackOnce("KeWaitForSingleObject on the object at", address);
-    return lifted::ImportFromSdk(base, __imp__KeWaitForSingleObject, args);
+    return lifted::ImportFromSdk(__imp__KeWaitForSingleObject, args);
   }
   ITC_NATIVE_RUNNING("import KeWaitForSingleObject");
   std::vector<Object> objects{*object};
-  return {Wait(objects, true, Deadline(base, uint32_t(args.r[4]))), 0.0};
+  return {Wait(objects, true, Deadline(uint32_t(args.r[4]))), 0.0};
 }
 
 // KeWaitForMultipleObjects(count, objects, type (0 all, 1 any), reason,
 // mode, alertable, timeout, wait blocks).
-lifted::Result WaitForMultipleObjects(uint8_t* base, const lifted::Args& args) {
+lifted::Result WaitForMultipleObjects(const lifted::Args& args) {
   const uint32_t count = uint32_t(args.r[0]);
   const uint32_t list = uint32_t(args.r[1]);
   std::vector<Object> objects;
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t address = guest::LoadU32(base, list + 4 * i);
-    std::optional<Object> object = GuestObject(base, address);
+    const uint32_t address = guest::LoadU32(list + 4 * i);
+    std::optional<Object> object = GuestObject(address);
     if (!object) {
       LogFallbackOnce("KeWaitForMultipleObjects on the object at", address);
-      return lifted::ImportFromSdk(base, __imp__KeWaitForMultipleObjects, args);
+      return lifted::ImportFromSdk(__imp__KeWaitForMultipleObjects, args);
     }
     objects.push_back(*object);
   }
   ITC_NATIVE_RUNNING("import KeWaitForMultipleObjects");
-  return {Wait(objects, uint32_t(args.r[2]) == 0, Deadline(base, uint32_t(args.r[6]))), 0.0};
+  return {Wait(objects, uint32_t(args.r[2]) == 0, Deadline(uint32_t(args.r[6]))), 0.0};
 }
 
 // NtCreateEvent(handle out, attributes, type, initial state): named events
 // (the attributes' name) are the SDK's.
-lifted::Result CreateEvent(uint8_t* base, const lifted::Args& args) {
+lifted::Result CreateEvent(const lifted::Args& args) {
   const uint32_t attributes = uint32_t(args.r[1]);
-  if (attributes != 0 && guest::LoadU32(base, attributes + 4) != 0) {
+  if (attributes != 0 && guest::LoadU32(attributes + 4) != 0) {
     LogFallbackOnce("NtCreateEvent of a named event, attributes", attributes);
-    return lifted::ImportFromSdk(base, __imp__NtCreateEvent, args);
+    return lifted::ImportFromSdk(__imp__NtCreateEvent, args);
   }
   ITC_NATIVE_RUNNING("import NtCreateEvent");
   State& state = Get();
@@ -291,7 +291,7 @@ lifted::Result CreateEvent(uint8_t* base, const lifted::Args& args) {
                   uint32_t(args.r[3]) != 0 ? 1 : 0};
   }
   if (const uint32_t out = uint32_t(args.r[0])) {
-    guest::StoreU32(base, out, handle);
+    guest::StoreU32(out, handle);
   }
   return {kStatusSuccess, 0.0};
 }
@@ -303,11 +303,11 @@ HostEvent* FindEvent(uint32_t handle) {
 }
 
 // NtSetEvent(handle, previous state out).
-lifted::Result NtSetEvent(uint8_t* base, const lifted::Args& args) {
+lifted::Result NtSetEvent(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   if (!OurHandle(handle)) {
     LogFallbackOnce("NtSetEvent on handle", handle);
-    return lifted::ImportFromSdk(base, __imp__NtSetEvent, args);
+    return lifted::ImportFromSdk(__imp__NtSetEvent, args);
   }
   ITC_NATIVE_RUNNING("import NtSetEvent");
   int32_t previous;
@@ -322,17 +322,17 @@ lifted::Result NtSetEvent(uint8_t* base, const lifted::Args& args) {
   }
   Notify();
   if (const uint32_t out = uint32_t(args.r[1])) {
-    guest::StoreU32(base, out, uint32_t(previous));
+    guest::StoreU32(out, uint32_t(previous));
   }
   return {kStatusSuccess, 0.0};
 }
 
 // NtClearEvent(handle).
-lifted::Result NtClearEvent(uint8_t* base, const lifted::Args& args) {
+lifted::Result NtClearEvent(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   if (!OurHandle(handle)) {
     LogFallbackOnce("NtClearEvent on handle", handle);
-    return lifted::ImportFromSdk(base, __imp__NtClearEvent, args);
+    return lifted::ImportFromSdk(__imp__NtClearEvent, args);
   }
   ITC_NATIVE_RUNNING("import NtClearEvent");
   std::lock_guard lock(Get().mutex);
@@ -345,11 +345,11 @@ lifted::Result NtClearEvent(uint8_t* base, const lifted::Args& args) {
 }
 
 // NtWaitForSingleObjectEx(handle, mode, alertable, timeout).
-lifted::Result NtWaitForSingleObjectEx(uint8_t* base, const lifted::Args& args) {
+lifted::Result NtWaitForSingleObjectEx(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   if (!OurHandle(handle)) {
     LogFallbackOnce("NtWaitForSingleObjectEx on handle", handle);
-    return lifted::ImportFromSdk(base, __imp__NtWaitForSingleObjectEx, args);
+    return lifted::ImportFromSdk(__imp__NtWaitForSingleObjectEx, args);
   }
   ITC_NATIVE_RUNNING("import NtWaitForSingleObjectEx");
   HostEvent* event;
@@ -361,15 +361,15 @@ lifted::Result NtWaitForSingleObjectEx(uint8_t* base, const lifted::Args& args) 
     ITC_LOG_ERROR("threads: NtWaitForSingleObjectEx on {:08X}, not an event of ours", handle);
     return {kStatusInvalidHandle, 0.0};
   }
-  std::vector<Object> objects{Object{base, 0, event}};
-  return {Wait(objects, true, Deadline(base, uint32_t(args.r[3]))), 0.0};
+  std::vector<Object> objects{Object{0, event}};
+  return {Wait(objects, true, Deadline(uint32_t(args.r[3]))), 0.0};
 }
 
 // NtClose(handle): ours forgotten, others the SDK's.
-lifted::Result NtClose(uint8_t* base, const lifted::Args& args) {
+lifted::Result NtClose(const lifted::Args& args) {
   const uint32_t handle = uint32_t(args.r[0]);
   if (!OurHandle(handle)) {
-    return lifted::ImportFromSdk(base, __imp__NtClose, args);
+    return lifted::ImportFromSdk(__imp__NtClose, args);
   }
   ITC_NATIVE_RUNNING("import NtClose");
   if (ThreadHandle(handle)) {
@@ -380,9 +380,9 @@ lifted::Result NtClose(uint8_t* base, const lifted::Args& args) {
 }
 
 // KeDelayExecutionThread(mode, alertable, interval): a sleep (no APCs).
-lifted::Result DelayExecutionThread(uint8_t* base, const lifted::Args& args) {
+lifted::Result DelayExecutionThread(const lifted::Args& args) {
   ITC_NATIVE_RUNNING("import KeDelayExecutionThread");
-  const auto deadline = Deadline(base, uint32_t(args.r[2]));
+  const auto deadline = Deadline(uint32_t(args.r[2]));
   if (deadline) {
     std::this_thread::sleep_until(*deadline);
   }

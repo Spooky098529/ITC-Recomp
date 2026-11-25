@@ -14,41 +14,41 @@
 namespace hooks {
 
 // sub_8228F0A0 LocationScreen::SceneryConfig: r3, r4; r3.
-void LocationScreenSceneryConfig(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenSceneryConfig(lifted::Regs& ctx);
 // sub_82227690 LocationScreen::KindText: r3 = the kind, r4 = an index; r3.
-void LocationScreenKindText(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenKindText(lifted::Regs& ctx);
 // sub_822291E8 LocationScreen::IsPictureQueued, sub_82229108 PictureA,
 // sub_82229158 PictureB: r3 = a picture id; r3.
-void LocationScreenIsPictureQueued(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenPictureA(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenPictureB(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenIsPictureQueued(lifted::Regs& ctx);
+void LocationScreenPictureA(lifted::Regs& ctx);
+void LocationScreenPictureB(lifted::Regs& ctx);
 // sub_82227158 LocationScreen::OnMessage14: r3 left.
-void LocationScreenOnMessage14(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenOnMessage14(lifted::Regs& ctx);
 // sub_822281D8 HasMoreUnlocks, sub_82227618 NextUnlockEntry: r3 = 0 or 1.
-void LocationScreenHasMoreUnlocks(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenNextUnlockEntry(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenHasMoreUnlocks(lifted::Regs& ctx);
+void LocationScreenNextUnlockEntry(lifted::Regs& ctx);
 // sub_82227708 OpponentHasCard, sub_822271F8 NextResultText: r3 = 0 or 1
 // (the original where the item's copy can't be native).
-void LocationScreenOpponentHasCard(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenNextResultText(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenOpponentHasCard(lifted::Regs& ctx);
+void LocationScreenNextResultText(lifted::Regs& ctx);
 
 // The movies' helpers (r3 the node the original leaves): sub_8222A060
 // ShowPictures, sub_8222A150 HidePictures, sub_8222AC18 SetCarColor,
 // sub_8222BFE8 SetCursor and sub_8222C058 ListNode (r3 = the value),
 // sub_8222C0C8 ShowArrows.
-void LocationScreenShowPictures(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenHidePictures(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenSetCarColor(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenSetCursor(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenListNode(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenShowArrows(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenShowPictures(lifted::Regs& ctx);
+void LocationScreenHidePictures(lifted::Regs& ctx);
+void LocationScreenSetCarColor(lifted::Regs& ctx);
+void LocationScreenSetCursor(lifted::Regs& ctx);
+void LocationScreenListNode(lifted::Regs& ctx);
+void LocationScreenShowArrows(lifted::Regs& ctx);
 // UiMovie::Run's callers, through its override from frames like the
 // originals' (lr put back): sub_822291A8 RunCardMovie (r3 Run's),
 // sub_8222AD50 Transition1 and sub_8222BE60 Transition18 (r3 = the step's
 // address; r3 = 1 when done, else 0).
-void LocationScreenRunCardMovie(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition1(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition18(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenRunCardMovie(lifted::Regs& ctx);
+void LocationScreenTransition1(lifted::Regs& ctx);
+void LocationScreenTransition18(lifted::Regs& ctx);
 
 // sub_822895E0 ScreenMachine::Reenter (r3 = a machine; r3 left),
 // sub_822279A8 Reset and sub_82227818 ResetView (r3 = the screen, the view;
@@ -56,15 +56,15 @@ void LocationScreenTransition18(lifted::Regs& ctx, uint8_t* base);
 // Reset's plain C++ calls it: the harness's step), sub_8222C9B0 ApplyQueuedPage
 // (r3 HidePictures' or as it came), sub_8222EC08 UpdatePage (r3 = the
 // machine, r4 = the dispatcher; the page's handler through ctx).
-void LocationScreenReenter(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenReset(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenResetView(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenApplyQueuedPage(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenUpdatePage(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenReenter(lifted::Regs& ctx);
+void LocationScreenReset(lifted::Regs& ctx);
+void LocationScreenResetView(lifted::Regs& ctx);
+void LocationScreenApplyQueuedPage(lifted::Regs& ctx);
+void LocationScreenUpdatePage(lifted::Regs& ctx);
 
 // sub_8222F258 InitStates: r3 = the machine; r3 as the last
 // StateMachine::Add leaves it.
-void LocationScreenInitStates(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenInitStates(lifted::Regs& ctx);
 
 // The second migration's guest calls (location_screen::Calls) through
 // `ctx`: Career::EventQuery and Race::SetUp through their register steps
@@ -75,7 +75,7 @@ class RaceEventGuest;
 class FormatGuestCalls;
 class LocationScreenCalls {
  public:
-  LocationScreenCalls(lifted::Regs& ctx, uint8_t* base);
+  LocationScreenCalls(lifted::Regs& ctx);
   ~LocationScreenCalls();
   LocationScreenCalls(const LocationScreenCalls&) = delete;
   LocationScreenCalls& operator=(const LocationScreenCalls&) = delete;
@@ -97,65 +97,65 @@ class LocationScreenCalls {
 // sub_8222C270 LoadPicture (r3 = the screen, r4 = the id, r5 = the list),
 // sub_82228438 Picture::Free (r3 = the picture), sub_82228498 FreePictures
 // (r3 = the screen).
-void LocationScreenPage9(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenPage11(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenNextOpponentText(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenLoadPicture(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenPictureFree(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenFreePictures(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenPage9(lifted::Regs& ctx);
+void LocationScreenPage11(lifted::Regs& ctx);
+void LocationScreenNextOpponentText(lifted::Regs& ctx);
+void LocationScreenLoadPicture(lifted::Regs& ctx);
+void LocationScreenPictureFree(lifted::Regs& ctx);
+void LocationScreenFreePictures(lifted::Regs& ctx);
 // sub_82228E88 OnPictureLoadedA and sub_82228FC8 OnPictureLoadedB (r4 = the
 // buffer, r6 = the screen; the archive's callbacks).
-void LocationScreenOnPictureLoadedA(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenOnPictureLoadedB(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenOnPictureLoadedA(lifted::Regs& ctx);
+void LocationScreenOnPictureLoadedB(lifted::Regs& ctx);
 
 // Whether the texts' functions run natively: the UI movies' text setters'
 // conditions (--native_ui_movies_game, --native_c_runtime_heap,
 // --native_heap) and the process heap made. The originals otherwise.
-bool LocationScreenTextsNative(uint8_t* base);
+bool LocationScreenTextsNative();
 // sub_8222CD60 ResetMovie, sub_8222A978 ShowUnlockEntry, sub_8222B048
 // ShowListEntry (r3 not read); sub_8222CFF0 Transition29, sub_8222D1A8
 // Transition25, sub_8222D610 Transition2, sub_8222E6E0 Transition14,
 // sub_8222E8D8 Transition16 (r3 = the step's address).
-void LocationScreenResetMovie(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenShowUnlockEntry(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenShowListEntry(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition29(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition25(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition2(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition14(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition16(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenResetMovie(lifted::Regs& ctx);
+void LocationScreenShowUnlockEntry(lifted::Regs& ctx);
+void LocationScreenShowListEntry(lifted::Regs& ctx);
+void LocationScreenTransition29(lifted::Regs& ctx);
+void LocationScreenTransition25(lifted::Regs& ctx);
+void LocationScreenTransition2(lifted::Regs& ctx);
+void LocationScreenTransition14(lifted::Regs& ctx);
+void LocationScreenTransition16(lifted::Regs& ctx);
 // sub_8222A470 Transition23, sub_8222A718 Transition33, sub_8222AE00
 // Transition7 (r3 = the step's address; the texts' check), sub_8222B200
 // ShowOpponentPictures and sub_82227E20 UpdateView (no arguments).
-void LocationScreenTransition23(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition33(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition7(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenShowOpponentPictures(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenPollLoad(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenUpdateView(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenTransition23(lifted::Regs& ctx);
+void LocationScreenTransition33(lifted::Regs& ctx);
+void LocationScreenTransition7(lifted::Regs& ctx);
+void LocationScreenShowOpponentPictures(lifted::Regs& ctx);
+void LocationScreenPollLoad(lifted::Regs& ctx);
+void LocationScreenUpdateView(lifted::Regs& ctx);
 // sub_8222B438 ShowOpponentInfo, sub_8222BBD0 ShowCard (no arguments);
 // sub_8222B8A8 Transition12 and sub_8222EAD0 Transition17 (r3 = the step's
 // address). The texts' check.
-void LocationScreenShowOpponentInfo(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition12(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenShowCard(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition17(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenShowOpponentInfo(lifted::Regs& ctx);
+void LocationScreenTransition12(lifted::Regs& ctx);
+void LocationScreenShowCard(lifted::Regs& ctx);
+void LocationScreenTransition17(lifted::Regs& ctx);
 // sub_8222D828 Transition4, sub_8222DA10 Transition5, sub_8222DC08
 // Transition8, sub_8222D2E8 Transition24, sub_8222D108 Transition34 (r3 =
 // the step's address) and sub_8222F0B0 Start (r3 not read). The texts'
 // check.
-void LocationScreenTransition4(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition5(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition8(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition24(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition34(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenStart(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenTransition4(lifted::Regs& ctx);
+void LocationScreenTransition5(lifted::Regs& ctx);
+void LocationScreenTransition8(lifted::Regs& ctx);
+void LocationScreenTransition24(lifted::Regs& ctx);
+void LocationScreenTransition34(lifted::Regs& ctx);
+void LocationScreenStart(lifted::Regs& ctx);
 // sub_82228588 PoseCar: r3 = the model + 4288, r4 = the index; r3 = r3 +
 // 272 (as the last Matrix::RotateZ's adapter leaves it), flush-to-zero on.
-void LocationScreenPoseCar(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenPoseCar(lifted::Regs& ctx);
 // sub_8222C188 ShowOpponentSpecs (no arguments) and sub_8222DEE0
 // Transition9 (r3 = the step's address). The texts' check.
-void LocationScreenShowOpponentSpecs(lifted::Regs& ctx, uint8_t* base);
-void LocationScreenTransition9(lifted::Regs& ctx, uint8_t* base);
+void LocationScreenShowOpponentSpecs(lifted::Regs& ctx);
+void LocationScreenTransition9(lifted::Regs& ctx);
 
 }  // namespace hooks

@@ -11,12 +11,12 @@
 namespace hooks {
 
 // MenuSound::Play sub_821103F0: r3 = the cue.
-void MenuSoundPlay(lifted::Regs& ctx, uint8_t* base);
+void MenuSoundPlay(lifted::Regs& ctx);
 // Sound::Play sub_82175850: r3, r4 = the bank and cue indexes' addresses.
-void SoundPlay(lifted::Regs& ctx, uint8_t* base);
+void SoundPlay(lifted::Regs& ctx);
 // SoundOptions::SetEffectsVolume sub_821B9C20 and SetMusicVolume
 // sub_821B9CF0: r3 = the setting (its low byte).
-void SoundOptionsSetEffectsVolume(lifted::Regs& ctx, uint8_t* base);
-void SoundOptionsSetMusicVolume(lifted::Regs& ctx, uint8_t* base);
+void SoundOptionsSetEffectsVolume(lifted::Regs& ctx);
+void SoundOptionsSetMusicVolume(lifted::Regs& ctx);
 
 }  // namespace hooks

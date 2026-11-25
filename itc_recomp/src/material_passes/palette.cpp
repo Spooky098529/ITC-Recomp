@@ -110,27 +110,27 @@ constexpr SceneSet kSceneSet[3] = {
     {14, 2, k0_600000024},  // else 0.503125
 };
 
-void Move(uint8_t* base, uint32_t to, uint32_t from) { Stfs(base, to, Lfs(base, from)); }
+void Move(uint32_t to, uint32_t from) { Stfs(to, Lfs(from)); }
 
 }  // namespace
 
-std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
+std::optional<uint64_t> PaintPaletteInit(uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D2330 PaintPalette::Init");
   // The original's 1,184-byte frame left out (E5 step 6): the scene (+24),
   // its constants and the image's base (+16 to +108), the colors built
   // (Entry::built) and the loop's index (+40) were read by it alone.
   (void)sp;
-  const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
+  const uint32_t scene = schema::CarDrawGlobals::scene().address;
   if (scene == 0) {
     return std::nullopt;
   }
-  const bool set = int32_t(schema::CarScene(base, scene).model_set()) != 0;
+  const bool set = int32_t(schema::CarScene(scene).model_set()) != 0;
   for (uint32_t e = 0; e < 16; e++) {
     const Entry& entry = kEntries[e];
-    const schema::PaintPaletteEntry at(base, G::paint_palette_address() + 64 * e);
+    const schema::PaintPaletteEntry at(G::paint_palette_address() + 64 * e);
     for (uint32_t c = 0; c < 3; c++) {
       for (uint32_t i = 0; i < 4; i++) {
-        Move(base, at.color_a_address() + 16 * c + 4 * i, entry.colors[c][i]);
+        Move(at.color_a_address() + 16 * c + 4 * i, entry.colors[c][i]);
       }
     }
     for (uint32_t i = 0; i < 3; i++) {
@@ -140,14 +140,14 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
           constant = s.constant;
         }
       }
-      Move(base, at.float_0_address() + 4 * i, constant);
+      Move(at.float_0_address() + 4 * i, constant);
     }
   }
   // r3 as left: the last case's ld of its third color's first doubleword
   // (entry 15's +32, the same bits as the frame's copy at +864).
-  const schema::PaintPaletteEntry last(base, G::paint_palette_address() + 64 * 15);
-  return (uint64_t(guest::LoadU32(base, last.color_a_address() + 32)) << 32) |
-         guest::LoadU32(base, last.color_a_address() + 36);
+  const schema::PaintPaletteEntry last(G::paint_palette_address() + 64 * 15);
+  return (uint64_t(guest::LoadU32(last.color_a_address() + 32)) << 32) |
+         guest::LoadU32(last.color_a_address() + 36);
 }
 
 }  // namespace material_passes

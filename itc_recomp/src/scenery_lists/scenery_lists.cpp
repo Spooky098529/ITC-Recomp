@@ -30,9 +30,9 @@ uint32_t Node(uint32_t nodes, int16_t index) {
 
 }  // namespace
 
-uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& calls) {
+uint32_t ModelListRelease(uint32_t list, const ReleaseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82147FB8 ModelList::Release");
-  const schema::ModelList l(base, list);
+  const schema::ModelList l(list);
   uint32_t r3 = list;
   if (int32_t(l.count()) <= 0) {
     return r3;
@@ -42,10 +42,10 @@ uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& call
   do {
     uint32_t node = Node(nodes, int16_t(l.head()));
     for (uint32_t steps = uint32_t(i); steps != 0; steps--) {
-      node = Node(nodes, int16_t(guest::LoadU16(base, node)));
+      node = Node(nodes, int16_t(guest::LoadU16(node)));
     }
-    const int32_t slot = int16_t(guest::LoadU16(base, node + 2));
-    const uint32_t model = guest::LoadU32(base, uint32_t((slot + 67) << 2) + nodes);
+    const int32_t slot = int16_t(guest::LoadU16(node + 2));
+    const uint32_t model = guest::LoadU32(uint32_t((slot + 67) << 2) + nodes);
     r3 = calls.release(calls.user, model);
     if (model != 0) {
       r3 = calls.destroy(calls.user, model);
@@ -55,19 +55,19 @@ uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& call
   return r3;
 }
 
-uint32_t ModelListLoad(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+uint32_t ModelListLoad(uint32_t list, uint32_t container, uint32_t frame,
                        const LoadCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82148428 ModelList::Load");
-  const schema::ModelList l(base, list);
+  const schema::ModelList l(list);
   const uint32_t nodes = list + 4;
   const int32_t count =
-      int32_t(__builtin_bswap32(schema::SceneryListContainer(base, container).count_le()));
+      int32_t(__builtin_bswap32(schema::SceneryListContainer(container).count_le()));
   // The List64 made empty: node i's data slot i and next i + 1 (node 63's
   // then -1), as the original's loop and stores.
   for (int32_t i = 0; i < 64; i++) {
     const uint32_t node = nodes + 4 * uint32_t(i);
-    guest::StoreU16(base, node + 2, uint16_t(i));
-    guest::StoreU16(base, node + 0, uint16_t(i + 1));
+    guest::StoreU16(node + 2, uint16_t(i));
+    guest::StoreU16(node + 0, uint16_t(i + 1));
   }
   l.set_free_head(0);
   l.set_list_count(0);
@@ -77,40 +77,40 @@ uint32_t ModelListLoad(uint8_t* base, uint32_t list, uint32_t container, uint32_
   l.set_list_258(0xFFFF);
   uint32_t r3 = list;
   for (int32_t i = 0; i < count; i++) {
-    const auto block = memory::crt::OperatorNew(base, kSceneryModelBytes);
+    const auto block = memory::crt::OperatorNew(kSceneryModelBytes);
     const uint32_t model = block ? *block : calls.allocate(calls.user, kSceneryModelBytes);
     if (model != 0) {
-      if (!models::ModelConstruct(base, model)) {
+      if (!models::ModelConstruct(model)) {
         calls.construct(calls.user, model);
       }
-      schema::SceneryModel(base, model).set_vtable(kSceneryModelVtable);
+      schema::SceneryModel(model).set_vtable(kSceneryModelVtable);
     }
-    guest::StoreU32(base, frame + 80, model);
-    const uint32_t entry = game_data::GetEntry(base, container, uint32_t(i), false);
-    if (model == 0 || !models::ModelLoad(base, model, entry, 0, calls.model_load)) {
+    guest::StoreU32(frame + 80, model);
+    const uint32_t entry = game_data::GetEntry(container, uint32_t(i), false);
+    if (model == 0 || !models::ModelLoad(model, entry, 0, calls.model_load)) {
       calls.load(calls.user, model, entry);
     }
-    track_zones::List64Insert(base, nodes, model, uint32_t(int32_t(int16_t(l.list_count()))));
+    track_zones::List64Insert(nodes, model, uint32_t(int32_t(int16_t(l.list_count()))));
     r3 = nodes;
   }
   l.set_count(uint32_t(count));
   return r3;
 }
 
-uint32_t ModelListLoadPoints(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+uint32_t ModelListLoadPoints(uint32_t list, uint32_t container, uint32_t frame,
                              const LoadCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82148528 ModelList::LoadPoints");
   const uint32_t load_frame = frame - 160;
-  guest::StoreU32(base, load_frame, frame);
-  ModelListLoad(base, list, container, load_frame, calls);
-  const schema::ModelList l(base, list);
+  guest::StoreU32(load_frame, frame);
+  ModelListLoad(list, container, load_frame, calls);
+  const schema::ModelList l(list);
   constexpr uint32_t kPoints = G::point_groups_address();
   // The original's store order: +528, +532, +608, then +536 to +604.
   l.set_point_group_0(kPoints);
   l.set_point_group_1(kPoints + 256);
   l.set_animations(0);
   for (uint32_t i = 2; i < 20; i++) {
-    guest::StoreU32(base, l.point_groups_address() + 4 * i, kPoints + 256 * i);
+    guest::StoreU32(l.point_groups_address() + 4 * i, kPoints + 256 * i);
   }
   l.set_texture_provider(0);
   l.set_first_group(0);
@@ -118,21 +118,21 @@ uint32_t ModelListLoadPoints(uint8_t* base, uint32_t list, uint32_t container, u
   return kPoints + 256 * 8;
 }
 
-void ResetDrawState(uint8_t* base, uint32_t model) {
+void ResetDrawState(uint32_t model) {
   ITC_NATIVE_RUNNING("sub_82146AA8 SceneryModel::ResetDrawState");
-  const schema::SceneryModel m(base, model);
+  const schema::SceneryModel m(model);
   m.set_animations(0);
   m.set_sampler_state_24(1);
   m.set_unknown_440(0);
 }
 
-uint32_t AnimationCurrentFrame(uint8_t* base, uint32_t set, uint32_t index) {
+uint32_t AnimationCurrentFrame(uint32_t set, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82146B80 AnimationSet::CurrentFrame");
-  const schema::AnimationSet s(base, set);
+  const schema::AnimationSet s(set);
   // The offsets' table, indexed from first_offset.
-  const uint32_t offset = guest::LoadU32(base, s.first_offset_address() + (index << 2));
+  const uint32_t offset = guest::LoadU32(s.first_offset_address() + (index << 2));
   const uint32_t animation = offset + ((s.count() + 1) << 2) + set;
-  const schema::Animation a(base, animation);
+  const schema::Animation a(animation);
   const uint32_t current = a.frame();
   const uint32_t count = a.frame_count();
   if (int32_t(current) >= int32_t(count)) {
@@ -141,11 +141,11 @@ uint32_t AnimationCurrentFrame(uint8_t* base, uint32_t set, uint32_t index) {
   return ((((current + 2) << 1) + count) << 2) + animation;
 }
 
-uint32_t IsBEntryOn(uint8_t* base, int32_t entry) {
+uint32_t IsBEntryOn(int32_t entry) {
   ITC_NATIVE_RUNNING("sub_82147850 ModelList::IsBEntryOn");
   // The flag's entry, bit by bit from 0x1.
   static constexpr int32_t kEntries[12] = {3, 4, 5, 6, 7, 0, 1, 2, 8, 9, 10, 11};
-  const uint32_t flags = schema::RaceData(base, G::race_data(base)).drawn_entries();
+  const uint32_t flags = schema::RaceData(G::race_data()).drawn_entries();
   uint32_t on = 0;
   for (int bit = 0; bit < 12; bit++) {
     if ((flags >> bit & 1) != 0 && entry == kEntries[bit]) {
@@ -155,9 +155,9 @@ uint32_t IsBEntryOn(uint8_t* base, int32_t entry) {
   return on;
 }
 
-int32_t CourseLayout(uint8_t* base) {
+int32_t CourseLayout() {
   ITC_NATIVE_RUNNING("sub_8228F408 Race::CourseLayout");
-  const schema::RaceData race(base, G::race_data(base));
+  const schema::RaceData race(G::race_data());
   if (!race) {
     return -1;
   }
@@ -165,7 +165,7 @@ int32_t CourseLayout(uint8_t* base) {
   const uint32_t flags = race.branch_flags();
   const int32_t mode = int32_t(race.race_mode());
   const int32_t stage_type =
-      int32_t(vehicle_accessors::StagesType(base, race.stages_address(), 0xFFFFFFFFu));
+      int32_t(vehicle_accessors::StagesType(race.stages_address(), 0xFFFFFFFFu));
   if (mode == 8) {
     // The switch's table at 0x82011E58.
     static constexpr int32_t kLayouts[8] = {16, 17, 18, 19, 23, 23, 22, 23};
@@ -190,22 +190,22 @@ int32_t CourseLayout(uint8_t* base) {
   return (flags & 0x10) != 0 ? 1 : 0;
 }
 
-uint32_t IsCEntryOn(uint8_t* base, uint32_t entry) {
+uint32_t IsCEntryOn(uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82147958 ModelList::IsCEntryOn");
-  const schema::RaceData race(base, G::race_data(base));
+  const schema::RaceData race(G::race_data());
   const int32_t kind = int32_t(race.kind());
   if (kind == 5) {
     return 0;
   }
   if (kind == 3 ||
-      (kind == 4 && vehicle_accessors::StagesType(base, race.stages_address(), 0xFFFFFFFFu) == 0)) {
+      (kind == 4 && vehicle_accessors::StagesType(race.stages_address(), 0xFFFFFFFFu) == 0)) {
     return entry == 24 ? 1 : 0;
   }
-  const int32_t layout = CourseLayout(base);
+  const int32_t layout = CourseLayout();
   if (layout == -1) {
     return 0;
   }
-  const schema::RaceData again(base, G::race_data(base));
+  const schema::RaceData again(G::race_data());
   if ((again.flags() & 0x80) != 0) {
     return 0;
   }
@@ -228,9 +228,9 @@ uint32_t IsCEntryOn(uint8_t* base, uint32_t entry) {
   return on;
 }
 
-uint32_t PointListIsEntryOn(uint8_t* base, int32_t entry) {
+uint32_t PointListIsEntryOn(int32_t entry) {
   ITC_NATIVE_RUNNING("sub_82147B18 PointList::IsEntryOn");
-  const schema::RaceData race(base, G::race_data(base));
+  const schema::RaceData race(G::race_data());
   if (!race) {
     return 0;
   }
@@ -254,34 +254,34 @@ uint32_t PointListIsEntryOn(uint8_t* base, int32_t entry) {
   return entry >= 8 && entry <= 19 && course == kCourses[entry - 8] ? 1 : 0;
 }
 
-void SetBillboardPass(uint8_t* base, uint32_t description, uint32_t pass, uint32_t word28) {
+void SetBillboardPass(uint32_t description, uint32_t pass, uint32_t word28) {
   ITC_NATIVE_RUNNING("sub_82148650 PassDescription::SetBillboardPass");
-  const schema::BillboardPass d(base, description);
+  const schema::BillboardPass d(description);
   d.set_camera_pass(pass);
   d.set_layer(word28);
 }
 
-uint32_t DepthVertexDeclaration(uint8_t* base, int32_t stream_type) {
+uint32_t DepthVertexDeclaration(int32_t stream_type) {
   ITC_NATIVE_RUNNING("sub_82589970 VertexDeclarations::ForDepth");
-  return stream_type == 11 ? G::depth_declaration_type11(base) : G::depth_declaration(base);
+  return stream_type == 11 ? G::depth_declaration_type11() : G::depth_declaration();
 }
 
-void TextureProviderClearAll(uint8_t* base, uint32_t provider) {
+void TextureProviderClearAll(uint32_t provider) {
   ITC_NATIVE_RUNNING("sub_82594328 TextureProvider::ClearAll");
-  const schema::TextureProvider p(base, provider);
+  const schema::TextureProvider p(provider);
   uint32_t slot = p.first().address;
   if (slot == p.last().address) {
     return;
   }
   do {
-    schema::TextureSlot(base, slot).set_texture(0);
+    schema::TextureSlot(slot).set_texture(0);
     slot += 4;
   } while (slot != p.last().address);
 }
 
-bool TextureProviderSet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_t value) {
+bool TextureProviderSet(uint32_t provider, uint32_t slot, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82594718 TextureProvider::Set");
-  const schema::TexturePointerVector vector(base, schema::TextureProvider(base, provider).vector_address());
+  const schema::TexturePointerVector vector(schema::TextureProvider(provider).vector_address());
   const uint32_t first = vector.first().address;
   if (first == 0) {
     return false;
@@ -294,7 +294,7 @@ bool TextureProviderSet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_
   if (size <= slot) {
     return false;
   }
-  schema::TextureSlot(base, (slot << 2) + vector.first().address).set_texture(value);
+  schema::TextureSlot((slot << 2) + vector.first().address).set_texture(value);
   return true;
 }
 

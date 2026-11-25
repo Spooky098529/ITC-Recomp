@@ -96,18 +96,18 @@ struct Calls {
 // `lr`. Each returns r3 as the slot leaves it (the object, for ours). ---
 
 // sub_820A43A8 Movies::Play: slot 1 with the path of movie `id`.
-uint64_t MoviesPlay(uint8_t* base, uint32_t id, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesPlay(uint32_t id, uint32_t sp, uint32_t lr, const Calls& calls);
 // sub_820A43D8 Start (slot 2), sub_820A43F0 Stop (3), sub_820A4408 Pause
 // (4), sub_820A4420 Resume (5), sub_820A4438 Release (7).
-uint64_t MoviesStart(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
-uint64_t MoviesStop(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
-uint64_t MoviesPause(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
-uint64_t MoviesResume(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
-uint64_t MoviesRelease(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesStart(uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesStop(uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesPause(uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesResume(uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t MoviesRelease(uint32_t sp, uint32_t lr, const Calls& calls);
 // sub_820A4450 Movies::State: slot 6's answer, 0 to 3 kept, anything above
 // the word at its frame's +80 (`frame`: its r1 after its stwu, the slot
 // called from there); 1 at once when calls.finished_early says so.
-uint64_t MoviesState(uint8_t* base, uint32_t frame, const Calls& calls);
+uint64_t MoviesState(uint32_t frame, const Calls& calls);
 
 // --- The boot machine's handlers (r3 the machine, r4 the dispatcher) ---
 
@@ -115,50 +115,50 @@ uint64_t MoviesState(uint8_t* base, uint32_t frame, const Calls& calls);
 // last error it clears), Movies::Play(the table's next id), the index plus
 // one, ScreenFades::FadeIn([0x82001BEC], 0, 0, 0, 0). Returns r3 (FadeIn's,
 // the passes word).
-uint64_t StartMovie(uint8_t* base, uint32_t frame, const Calls& calls);
+uint64_t StartMovie(uint32_t frame, const Calls& calls);
 // sub_82107C58 Boot::WaitForMovie: see the row. Returns r3.
-uint64_t WaitForMovie(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
+uint64_t WaitForMovie(uint32_t machine, uint32_t dispatcher, uint32_t frame,
                       const Calls& calls);
 // sub_82107BF8 Boot::EndMovie: Movies::Stop and Release, then XMP's playback
 // handed back (Dropped: the last error cleared, its answer 0). Returns r3 (0).
-uint64_t EndMovie(uint8_t* base, uint32_t frame, const Calls& calls);
+uint64_t EndMovie(uint32_t frame, const Calls& calls);
 
 // sub_82107DD0 BootMachine::Init: the boot machine's three transitions, built
 // in the original's frame at `frame`; returns the last StateMachine::Add's
 // answer (`replaced`: the index, else the new transition).
-uint32_t MachineInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+uint32_t MachineInit(uint32_t machine, uint32_t frame, bool* replaced);
 // sub_82107F68 BootMode::Init: BootMachine::Init on +848 (its frame below
 // `frame`), +848 added to the dispatcher, the delegate at +8 set, the mode
 // asked for 13 and the movie not paused. Returns BootMachine::Init's answer.
-uint32_t Init(uint8_t* base, uint32_t mode, uint32_t frame, bool* replaced);
+uint32_t Init(uint32_t mode, uint32_t frame, bool* replaced);
 // sub_82108018 BootMode::NextMode: see the row; `answer` the 8-byte answer.
-void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t frame, const Calls& calls);
+void NextMode(uint32_t answer, uint32_t mode, uint32_t frame, const Calls& calls);
 
 // sub_82106D08 BootMode::~BootMode: the vtables put back (the empty
 // sub_82106540 on +848 left out), then the base's.
-void Destruct(uint8_t* base, uint32_t mode);
+void Destruct(uint32_t mode);
 // sub_82106D68 BootMode::DeletingDestructor: ~BootMode, then operator delete
 // (a guest call from `frame`) when bit 0 of `flags` is set.
-void DeletingDestructor(uint8_t* base, uint32_t mode, uint32_t flags, uint32_t frame,
+void DeletingDestructor(uint32_t mode, uint32_t flags, uint32_t frame,
                         const Calls& calls);
 // sub_82106E38 Mode::DeletingDestructor: the base's vtables, then operator
 // delete when bit 0 of `flags` is set.
-void ModeDeletingDestructor(uint8_t* base, uint32_t mode, uint32_t flags, uint32_t frame,
+void ModeDeletingDestructor(uint32_t mode, uint32_t flags, uint32_t frame,
                             const Calls& calls);
 
 // sub_82235C08 Mode::NextModeThunk: the mode's slot 6 (BootMode::NextMode's
 // plain C++ for the boot mode's, from `sp` less its frame; else a guest call
 // from `sp`). Returns r3.
-uint64_t NextModeThunk(uint8_t* base, uint64_t answer, uint64_t mode, uint32_t sp, uint32_t lr,
+uint64_t NextModeThunk(uint64_t answer, uint64_t mode, uint32_t sp, uint32_t lr,
                        const Calls& calls);
 // sub_8223D440 ModeDelegate::Invoke: the delegate's function on (an answer at
 // `frame` + 80, the object plus its adjustment), Mode::NextModeThunk's plain
 // C++ where it holds it, then the 8 bytes copied to `answer`.
-void ModeDelegateInvoke(uint8_t* base, uint32_t answer, uint32_t delegate, uint32_t frame,
+void ModeDelegateInvoke(uint32_t answer, uint32_t delegate, uint32_t frame,
                         const Calls& calls);
 
 // sub_82107358 ScreenMachine::ScreenMachine: StateMachine::StateMachine, then
 // +9600 to +9636 = 0.
-void ScreenMachineConstruct(uint8_t* base, uint32_t machine);
+void ScreenMachineConstruct(uint32_t machine);
 
 }  // namespace boot_mode

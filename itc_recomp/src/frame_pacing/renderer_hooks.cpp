@@ -142,30 +142,30 @@ constexpr uint32_t kInfiniteTimeout = 0xFFFFFFFF;
 
 // Waits for a game event; the timeout is in milliseconds (sub_82297D38
 // converts it for NtWaitForSingleObjectEx). Returns whether it was set.
-bool Event_Wait(lifted::Regs& ctx, uint8_t* base, uint32_t event,
+bool Event_Wait(lifted::Regs& ctx, uint32_t event,
                 uint32_t timeout_ms = kInfiniteTimeout) {
   guest::StackFrame frame(ctx, 96);
   uint32_t timeout = frame.Local(80);
-  guest::StoreU32(base, timeout, timeout_ms);
+  guest::StoreU32(timeout, timeout_ms);
   ctx.r3.u64 = event;
   ctx.r4.u64 = timeout;
-  lifted::Enter(ctx, base, lifted::e8258DD90);
+  lifted::Enter(ctx, lifted::e8258DD90);
   return ctx.r3.u32 != 0;
 }
 
-void Event_Signal(lifted::Regs& ctx, uint8_t* base, uint32_t event) {
+void Event_Signal(lifted::Regs& ctx, uint32_t event) {
   ctx.r3.u64 = event;
-  lifted::Enter(ctx, base, lifted::e8258DD78);
+  lifted::Enter(ctx, lifted::e8258DD78);
 }
 
-void Renderer_DrawFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) {
+void Renderer_DrawFrame(lifted::Regs& ctx, uint32_t renderer) {
   bool timing = ITC_FLAG(log_frame_times);
   auto start = FrameTimes::Clock::now();
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
-  hooks::FrameDriverDrawFrame(ctx, base);  // FrameDriver::DrawFrame (src/frame_driver/)
+  hooks::FrameDriverDrawFrame(ctx);  // FrameDriver::DrawFrame (src/frame_driver/)
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
   if (timing) {
@@ -174,23 +174,23 @@ void Renderer_DrawFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) {
   }
 }
 
-bool Renderer_IsRunning(uint8_t* base, uint32_t renderer) {
-  return guest::LoadU8(base, renderer + kRendererRunningOffset) != 0;
+bool Renderer_IsRunning(uint32_t renderer) {
+  return guest::LoadU8(renderer + kRendererRunningOffset) != 0;
 }
 
 // Render thread: one frame per request from the main thread.
-void Renderer_ThreadLoop(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) {
-  while (Renderer_IsRunning(base, renderer)) {
-    Event_Wait(ctx, base, renderer + kRendererTickDoneEventOffset);
-    debug::StateCapture_OnTickDone(base);
-    Renderer_DrawFrame(ctx, base, renderer);
-    Event_Signal(ctx, base, renderer + kRendererFrameDoneEventOffset);
+void Renderer_ThreadLoop(lifted::Regs& ctx, uint32_t renderer) {
+  while (Renderer_IsRunning(renderer)) {
+    Event_Wait(ctx, renderer + kRendererTickDoneEventOffset);
+    debug::StateCapture_OnTickDone();
+    Renderer_DrawFrame(ctx, renderer);
+    Event_Signal(ctx, renderer + kRendererFrameDoneEventOffset);
   }
 }
 
 // Main thread, once per main-loop pass: the game's own wait for the frame in
 // flight (and its deferred work), then pacing for the coming pass.
-void Renderer_WaitForFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) {
+void Renderer_WaitForFrame(lifted::Regs& ctx, uint32_t renderer) {
   bool timing = ITC_FLAG(log_frame_times);
   FrameTimes& times = GetFrameTimes();
   auto wait_start = FrameTimes::Clock::now();
@@ -198,10 +198,10 @@ void Renderer_WaitForFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) 
     times.Add(times.pass_render_only ? FrameTimes::kRenderOnlyWork : FrameTimes::kLogicWork,
               wait_start - times.pass_start);
   }
-  debug::ImageDump_OnPass(base);
+  debug::ImageDump_OnPass();
   native::Renderer_OnListHandedOver(!frame_pacing::GameMessages_IsRenderOnlyPass());
   ctx.r3.u64 = renderer;
-  lifted::original::c820920D8(ctx, base);
+  lifted::original::c820920D8(ctx);
   auto pacing_start = FrameTimes::Clock::now();
 
   auto& pacer = GetFramePacer();
@@ -235,17 +235,17 @@ void Renderer_WaitForFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) 
     times.MaybeLog();
   }
   frame_pacing::GameMessages_SetRenderOnlyPass(render_only);
-  debug::FrameStateDiff_OnPassStart(base, render_only);
-  debug::IdleTimerScan_OnPassStart(base, render_only, frame_pacing::GameMessages_InRace());
-  debug::MenuSelectionScan_OnPassStart(base, render_only, frame_pacing::GameMessages_Paused(),
+  debug::FrameStateDiff_OnPassStart(render_only);
+  debug::IdleTimerScan_OnPassStart(render_only, frame_pacing::GameMessages_InRace());
+  debug::MenuSelectionScan_OnPassStart(render_only, frame_pacing::GameMessages_Paused(),
                                        frame_pacing::GameMessages_InputListener0());
 }
 
-void VideoOutput_WaitForVblank(lifted::Regs& ctx, uint8_t* base, uint32_t video_output) {
+void VideoOutput_WaitForVblank(lifted::Regs& ctx, uint32_t video_output) {
   // Keep the graphics device call that precedes the wait; drop the wait
   // itself, which held each frame for the game's 2-vblank interval.
-  ctx.r3.u64 = guest::LoadU32(base, video_output + kVideoOutputDeviceOffset);
-  lifted::Enter(ctx, base, lifted::e822A0718);
+  ctx.r3.u64 = guest::LoadU32(video_output + kVideoOutputDeviceOffset);
+  lifted::Enter(ctx, lifted::e822A0718);
 }
 
 }  // namespace
@@ -257,7 +257,7 @@ void VideoOutput_WaitForVblank(lifted::Regs& ctx, uint8_t* base, uint32_t video_
 ITC_NATIVE_ENTRY_ALWAYS(82091EF8) {
   
   uint32_t r1 = ctx.r1.u32;
-  Renderer_ThreadLoop(ctx, base, ctx.r3.u32);
+  Renderer_ThreadLoop(ctx, ctx.r3.u32);
   ctx.r1.u32 = r1;
   ctx.r3.u64 = 0;
 }
@@ -266,7 +266,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091EF8) {
 ITC_NATIVE_ENTRY_ALWAYS(820920D8) {
   
   uint32_t r1 = ctx.r1.u32;
-  Renderer_WaitForFrame(ctx, base, ctx.r3.u32);
+  Renderer_WaitForFrame(ctx, ctx.r3.u32);
   ctx.r1.u32 = r1;
 }
 
@@ -275,16 +275,16 @@ ITC_NATIVE_ENTRY_ALWAYS(820920D8) {
 // play); timed for --log_frame_times.
 ITC_NATIVE_ENTRY_ALWAYS(82091A60) {
   if (!ITC_FLAG(log_frame_times)) {
-    lifted::original::c82091A60(ctx, base);
+    lifted::original::c82091A60(ctx);
     return;
   }
   auto start = FrameTimes::Clock::now();
-  lifted::original::c82091A60(ctx, base);
+  lifted::original::c82091A60(ctx);
   GetFrameTimes().Add(FrameTimes::kPresent, FrameTimes::Clock::now() - start);
 }
 
 // VideoOutput_WaitForVblank: r3 = video output.
 ITC_NATIVE_ENTRY_ALWAYS(8258DAA8) {
   
-  VideoOutput_WaitForVblank(ctx, base, ctx.r3.u32);
+  VideoOutput_WaitForVblank(ctx, ctx.r3.u32);
 }

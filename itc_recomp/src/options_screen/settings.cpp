@@ -20,13 +20,13 @@ using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
 using SaveData = schema::SaveData;
 
-S Settings(uint8_t* base) { return G::settings(base); }
+S Settings() { return G::settings(); }
 
 // memcpy(destination, source, 60) from `frame` returning to `lr`: its plain
 // C++ where it takes it, else the guest's.
-void Copy60(uint8_t* base, uint32_t destination, uint32_t source, uint32_t frame, uint32_t lr,
+void Copy60(uint32_t destination, uint32_t source, uint32_t frame, uint32_t lr,
             const Calls& calls) {
-  if (!native::Buffers_Memcpy(base, destination, source, 60, lr)) {
+  if (!native::Buffers_Memcpy(destination, source, 60, lr)) {
     calls.Call(kMemcpy, frame, lr, destination, source, 60);
   }
 }
@@ -51,49 +51,49 @@ constexpr Pair kAnalogWrite224[6] = {{5, 0}, {6, 4}, {7, 8}, {8, 16}, {9, 12}, {
 
 }  // namespace
 
-uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t SettingsRead(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BBF00 Settings::Read");
   const uint32_t frame = sp - 272;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   // The frame's +80 (0x826E0000) and +84 (the defaults' 13-word table): the
   // original's slots nothing reads back, dropped (E5 step 6); the record at
   // +144 stays on the stack (memcpy's target and source).
-  switch (int32_t(G::mode_type(base))) {
-    case 2: Settings(base).set_context(1); break;
-    case 4: Settings(base).set_context(0); break;
-    case 6: Settings(base).set_context(2); break;
-    case 7: Settings(base).set_context(3); break;
-    case 8: Settings(base).set_context(4); break;
+  switch (int32_t(G::mode_type())) {
+    case 2: Settings().set_context(1); break;
+    case 4: Settings().set_context(0); break;
+    case 6: Settings().set_context(2); break;
+    case 7: Settings().set_context(3); break;
+    case 8: Settings().set_context(4); break;
     default: break;
   }
   const uint32_t shown =
-      (SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).stages() >> 5) & 1;
-  Settings(base).set_music_preview_shown(
-      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).shown_items() | shown);
+      (SaveData(vehicle_accessors::SaveDataOf(0)).stages() >> 5) & 1;
+  Settings().set_music_preview_shown(
+      SaveData(vehicle_accessors::SaveDataOf(0)).shown_items() | shown);
   const uint32_t options =
-      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).options_address();
+      SaveData(vehicle_accessors::SaveDataOf(0)).options_address();
   for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, Settings(base).current_hud_0_address() + 4 * i, LoadU32(base, options + 4 * i));
+    StoreU32(Settings().current_hud_0_address() + 4 * i, LoadU32(options + 4 * i));
   }
   // The volumes and sliders: bytes, sign-extended.
   const auto byte = [&](uint32_t at) {
-    return uint32_t(int32_t(int8_t(guest::LoadU8(base, options + at))));
+    return uint32_t(int32_t(int8_t(guest::LoadU8(options + at))));
   };
-  Settings(base).set_current_music_volume(byte(28));
-  Settings(base).set_current_effects_volume(byte(29));
+  Settings().set_current_music_volume(byte(28));
+  Settings().set_current_effects_volume(byte(29));
   // The sliders and player 1's, six words from current_slider_0.
   for (uint32_t i = 0; i < 6; i++) {
-    StoreU32(base, Settings(base).current_slider_0_address() + 4 * i, byte(36 + i));
+    StoreU32(Settings().current_slider_0_address() + 4 * i, byte(36 + i));
   }
   const uint32_t record = frame + 144;
   const auto read = [&](uint32_t from, uint32_t (S::*slots)() const, const Pair* pairs,
                         uint32_t count, uint32_t lr, bool buttons) {
-    Copy60(base, record, options + from, frame, lr, calls);
+    Copy60(record, options + from, frame, lr, calls);
     for (uint32_t i = 0; i < count; i++) {
-      const uint32_t code = LoadU32(base, record + 4 * pairs[i].word);
+      const uint32_t code = LoadU32(record + 4 * pairs[i].word);
       const uint32_t index = buttons ? ButtonIndex(code) : AnalogIndex(code);
-      const S o = Settings(base);
-      StoreU32(base, (o.*slots)() + pairs[i].slot, index);
+      const S o = Settings();
+      StoreU32((o.*slots)() + pairs[i].slot, index);
     }
   };
   read(44, &S::current_button_0_address, kButtons, 12, 0x821BC084, true);
@@ -109,52 +109,52 @@ uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
       // default_analog_0 to _5 and default_p1_analog_0 to _5
       5, 17, 18, 2, 3, 4, 5, 17, 18, 2, 3, 4};
   for (uint32_t i = 0; i < sizeof(kDefaults) / 4; i++) {
-    StoreU32(base, Settings(base).default_hud_0_address() + 4 * i, kDefaults[i]);
+    StoreU32(Settings().default_hud_0_address() + 4 * i, kDefaults[i]);
   }
-  const S o = Settings(base);
+  const S o = Settings();
   if (int32_t(o.context()) == 1) {
-    const SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+    const SaveData save(vehicle_accessors::SaveDataOf(0));
     const int32_t day = int32_t(save.day());
     for (uint32_t i = 0; i < 5; i++) {
-      StoreU32(base, o.name_0_address() + 4 * i, LoadU32(base, save.pick_head_address() + 4 * i));
+      StoreU32(o.name_0_address() + 4 * i, LoadU32(save.pick_head_address() + 4 * i));
     }
     o.set_money(save.money());
     o.set_day_of_week(uint32_t(day - (day / 7) * 7));
     o.set_day(uint32_t(day > 999 ? 999 : day));
   }
   const auto setting = [&](uint32_t (S::*field)() const) {
-    return uint64_t(int64_t(int8_t((Settings(base).*field)() & 0xFF)));
+    return uint64_t(int64_t(int8_t((Settings().*field)() & 0xFF)));
   };
   calls.Call(kSetEffectsVolume, frame, 0x821BC648, setting(&S::current_effects_volume));
   return calls.Call(kSetMusicVolume, frame, 0x821BC658, setting(&S::current_music_volume));
 }
 
-uint64_t SettingsWrite(uint8_t* base, uint32_t sp, const Calls& calls) {
+uint64_t SettingsWrite(uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BAE10 Settings::Write");
   const uint32_t frame = sp - 176;
-  StoreU32(base, frame, sp);
+  StoreU32(frame, sp);
   const uint32_t options =
-      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).options_address();
+      SaveData(vehicle_accessors::SaveDataOf(0)).options_address();
   for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, options + 4 * i, LoadU32(base, Settings(base).current_hud_0_address() + 4 * i));
+    StoreU32(options + 4 * i, LoadU32(Settings().current_hud_0_address() + 4 * i));
   }
-  guest::StoreU8(base, options + 28, uint8_t(Settings(base).current_music_volume()));
-  guest::StoreU8(base, options + 29, uint8_t(Settings(base).current_effects_volume()));
+  guest::StoreU8(options + 28, uint8_t(Settings().current_music_volume()));
+  guest::StoreU8(options + 29, uint8_t(Settings().current_effects_volume()));
   for (uint32_t i = 0; i < 6; i++) {
-    guest::StoreU8(base, options + 36 + i,
-                   uint8_t(LoadU32(base, Settings(base).current_slider_0_address() + 4 * i)));
+    guest::StoreU8(options + 36 + i,
+                   uint8_t(LoadU32(Settings().current_slider_0_address() + 4 * i)));
   }
   const uint32_t record = frame + 80;
   // Each record: copied to the frame, its words replaced, copied back.
   const auto write = [&](uint32_t to, uint32_t (S::*slots)() const, const Pair* pairs,
                          uint32_t count, uint32_t lr_in, uint32_t lr_out) {
-    Copy60(base, record, options + to, frame, lr_in, calls);
-    const S o = Settings(base);
+    Copy60(record, options + to, frame, lr_in, calls);
+    const S o = Settings();
     for (uint32_t i = 0; i < count; i++) {
-      StoreU32(base, record + 4 * pairs[i].word,
-               ButtonCode(LoadU32(base, (o.*slots)() + pairs[i].slot)));
+      StoreU32(record + 4 * pairs[i].word,
+               ButtonCode(LoadU32((o.*slots)() + pairs[i].slot)));
     }
-    Copy60(base, options + to, record, frame, lr_out, calls);
+    Copy60(options + to, record, frame, lr_out, calls);
   };
   write(44, &S::current_button_0_address, kButtons, 12, 0x821BAED8, 0x821BAF7C);
   write(164, &S::current_p1_button_0_address, kButtons, 12, 0x821BAF90, 0x821BB034);

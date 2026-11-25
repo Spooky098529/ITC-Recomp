@@ -15,17 +15,17 @@ constexpr uint32_t kSetUpEvent = 0x82114268;  // Career::SetUpEvent, through its
 constexpr uint32_t kRaceSetUp = 0x82115D98;   // Race::SetUp, through its override
 
 // Both fades' counts 0.
-bool FadesDone(uint8_t* base) { return (G::fade_out_counts(base) | G::fade_in_counts(base)) == 0; }
+bool FadesDone() { return (G::fade_out_counts() | G::fade_in_counts()) == 0; }
 
 }  // namespace
 
-uint64_t StartEvent(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
+uint64_t StartEvent(uint32_t machine, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82188CE8 RaceMenu::StartEvent");
-  const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t type = EventAt(base, machine, Machine(base, machine).event_cursor()).type();
+  const uint32_t frame = Frame(sp, 112);
+  const uint32_t type = EventAt(machine, Machine(machine).event_cursor()).type();
   // The location by the event's type (case 0 the piece sub_82188D44's).
   uint64_t location = 0;
-  auto variant = [&](uint32_t plus) { return uint64_t(Machine(base, machine).variant()) + plus; };
+  auto variant = [&](uint32_t plus) { return uint64_t(Machine(machine).variant()) + plus; };
   switch (type) {
     case 0: location = variant(0); break;
     case 1: location = variant(2); break;
@@ -39,93 +39,93 @@ uint64_t StartEvent(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& c
       location = type <= 14 ? type + 5 : 0;  // 8 to 14 -> 13 to 19
       break;
   }
-  uint64_t r3 = calls.Call(kSetUpEvent, frame, 0x82188DD8, Machine(base, machine).save(),
-                           Machine(base, machine).race_mode(), location);
+  uint64_t r3 = calls.Call(kSetUpEvent, frame, 0x82188DD8, Machine(machine).save(),
+                           Machine(machine).race_mode(), location);
   if (uint32_t(location - 14) <= 5) {
-    Machine(base, machine).set_race_set_up(0);
+    Machine(machine).set_race_set_up(0);
     return r3;
   }
-  const uint32_t save = Machine(base, machine).save();
-  Machine(base, machine).set_race_set_up(1);
+  const uint32_t save = Machine(machine).save();
+  Machine(machine).set_race_set_up(1);
   return calls.Call(kRaceSetUp, frame, 0x82188E04, save, ~0ull);
 }
 
-uint64_t StartPage(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& calls) {
+uint64_t StartPage(uint64_t machine_r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218BB18 RaceMenu::StartPage");
   const uint32_t machine = uint32_t(machine_r3);
-  const uint32_t frame = Frame(base, sp, 96);
-  if (!FadesDone(base)) {
+  const uint32_t frame = Frame(sp, 96);
+  if (!FadesDone()) {
     return machine_r3;
   }
-  const uint64_t r3 = StartEvent(base, machine, frame, calls);
-  Machine(base, machine).set_state(10);
+  const uint64_t r3 = StartEvent(machine, frame, calls);
+  Machine(machine).set_state(10);
   return r3;
 }
 
-uint64_t LeavePage(uint8_t* base, uint64_t machine_r3, uint32_t mode, uint32_t sp,
+uint64_t LeavePage(uint64_t machine_r3, uint32_t mode, uint32_t sp,
                    const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218B9F0 RaceMenu::LeavePage");
   const uint32_t machine = uint32_t(machine_r3);
-  const uint32_t frame = Frame(base, sp, 176);
-  if (!FadesDone(base)) {
+  const uint32_t frame = Frame(sp, 176);
+  if (!FadesDone()) {
     return machine_r3;
   }
   // Cue 0 of bank 1 stopped when it plays; cue 2 of bank 1 played unless it
   // plays.
-  Store(base, frame + 80, 0);
-  Store(base, frame + 84, 1);
-  uint64_t r3 = CallSlot(base, calls, kIsCuePlayingSlot, frame, 0x8218BA4C, frame + 84, frame + 80);
+  Store(frame + 80, 0);
+  Store(frame + 84, 1);
+  uint64_t r3 = CallSlot(calls, kIsCuePlayingSlot, frame, 0x8218BA4C, frame + 84, frame + 80);
   if (uint8_t(r3) != 0) {
-    Store(base, frame + 88, 0);
-    Store(base, frame + 92, 1);
-    r3 = CallSlot(base, calls, kStopCueSlot, frame, 0x8218BA78, frame + 92, frame + 88);
+    Store(frame + 88, 0);
+    Store(frame + 92, 1);
+    r3 = CallSlot(calls, kStopCueSlot, frame, 0x8218BA78, frame + 92, frame + 88);
   }
-  Store(base, frame + 100, 1);
-  Store(base, frame + 96, 2);
-  r3 = CallSlot(base, calls, kIsCuePlayingSlot, frame, 0x8218BAA0, frame + 100, frame + 96);
+  Store(frame + 100, 1);
+  Store(frame + 96, 2);
+  r3 = CallSlot(calls, kIsCuePlayingSlot, frame, 0x8218BAA0, frame + 100, frame + 96);
   if (uint8_t(r3) == 0) {
-    Store(base, frame + 104, 2);
-    Store(base, frame + 108, 1);
+    Store(frame + 104, 2);
+    Store(frame + 108, 1);
     r3 = calls.Call(kSoundPlay, frame, 0x8218BABC, frame + 108, frame + 104);
   }
-  Post(base, mode, 7);
-  Machine(base, machine).set_leave_message(6);
+  Post(mode, 7);
+  Machine(machine).set_leave_message(6);
   return r3;
 }
 
-uint64_t Draw(uint8_t* base, uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
+uint64_t Draw(uint64_t machine_r3, uint64_t mode_r4, uint32_t sp,
               const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218C578 RaceMenu::Draw");
   const uint32_t machine = uint32_t(machine_r3);
-  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t frame = Frame(sp, 112);
   uint64_t r3 = machine_r3;
-  if (Machine(base, machine).takes_input() == 0) {
+  if (Machine(machine).takes_input() == 0) {
     return r3;
   }
-  switch (G::pages(base).page()) {
+  switch (G::pages().page()) {
     case 3:  // the piece sub_8218C5DC's
-      r3 = KindPage(base, machine, frame, calls);
+      r3 = KindPage(machine, frame, calls);
       break;
     case 4:
-      r3 = EventPage(base, machine, uint32_t(mode_r4), frame, calls);
+      r3 = EventPage(machine, uint32_t(mode_r4), frame, calls);
       break;
     case 5:
-      r3 = VariantPage(base, machine, frame, calls);
+      r3 = VariantPage(machine, frame, calls);
       break;
     case 7:
-      Back(base, machine);
+      Back(machine);
       break;
     case 9:
-      r3 = LeavePage(base, machine_r3, uint32_t(mode_r4), frame, calls);
+      r3 = LeavePage(machine_r3, uint32_t(mode_r4), frame, calls);
       break;
     case 10:
-      r3 = StartPage(base, machine_r3, frame, calls);
+      r3 = StartPage(machine_r3, frame, calls);
       break;
     default:
       break;
   }
-  if (G::pages2(base).page() == 7) {
-    Back(base, machine);
+  if (G::pages2().page() == 7) {
+    Back(machine);
     r3 = machine_r3;
   }
   return r3;

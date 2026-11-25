@@ -43,16 +43,16 @@ bool BootModeNative() {
   return ITC_FLAG(native_boot_mode);
 }
 
-bm::Calls BootModeCalls(lifted::Regs& ctx, uint8_t* base, std::function<bool()> finished_early) {
+bm::Calls BootModeCalls(lifted::Regs& ctx, std::function<bool()> finished_early) {
   bm::Calls calls;
-  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
+  calls.call = [&ctx](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
                             uint64_t r4) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    lifted::CallFromContext(ctx, base, target);
+    lifted::CallFromContext(ctx, target);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -76,7 +76,7 @@ uint64_t AddR3(uint64_t machine_r3, uint32_t machine, uint32_t r3, bool replaced
 ITC_REGS_STEP(BootModeInit) {
   const uint64_t machine_r3 = ctx.r3.u64 + bm::kMachine;
   bool replaced = false;
-  const uint32_t r3 = bm::Init(base, ctx.r3.u32, ctx.r1.u32 - bm::kInitFrame, &replaced);
+  const uint32_t r3 = bm::Init(ctx.r3.u32, ctx.r1.u32 - bm::kInitFrame, &replaced);
   ctx.r3.u64 = AddR3(machine_r3, uint32_t(machine_r3), r3, replaced);
 }
 
@@ -84,74 +84,74 @@ ITC_REGS_STEP(BootMachineInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   bool replaced = false;
   const uint32_t r3 =
-      bm::MachineInit(base, ctx.r3.u32, ctx.r1.u32 - bm::kMachineInitFrame, &replaced);
+      bm::MachineInit(ctx.r3.u32, ctx.r1.u32 - bm::kMachineInitFrame, &replaced);
   ctx.r3.u64 = AddR3(machine_r3, ctx.r3.u32, r3, replaced);
 }
 
 ITC_REGS_STEP(BootStartMovie) {
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  ctx.r3.u64 = bm::StartMovie(base, ctx.r1.u32 - bm::kStartMovieFrame, calls);
+  const bm::Calls calls = BootModeCalls(ctx);
+  ctx.r3.u64 = bm::StartMovie(ctx.r1.u32 - bm::kStartMovieFrame, calls);
 }
 
-void BootWaitForMovie(lifted::Regs& ctx, uint8_t* base, std::function<bool()> finished_early) {
-  const bm::Calls calls = BootModeCalls(ctx, base, std::move(finished_early));
-  ctx.r3.u64 = bm::WaitForMovie(base, ctx.r3.u32, ctx.r4.u32,
+void BootWaitForMovie(lifted::Regs& ctx, std::function<bool()> finished_early) {
+  const bm::Calls calls = BootModeCalls(ctx, std::move(finished_early));
+  ctx.r3.u64 = bm::WaitForMovie(ctx.r3.u32, ctx.r4.u32,
                                 ctx.r1.u32 - bm::kWaitForMovieFrame, calls);
 }
 
 ITC_REGS_STEP(BootEndMovie) {
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  ctx.r3.u64 = bm::EndMovie(base, ctx.r1.u32 - bm::kEndMovieFrame, calls);
+  const bm::Calls calls = BootModeCalls(ctx);
+  ctx.r3.u64 = bm::EndMovie(ctx.r1.u32 - bm::kEndMovieFrame, calls);
 }
 
-void BootMoviesState(lifted::Regs& ctx, uint8_t* base, std::function<bool()> finished_early) {
-  const bm::Calls calls = BootModeCalls(ctx, base, std::move(finished_early));
-  ctx.r3.u64 = bm::MoviesState(base, ctx.r1.u32 - bm::kStateFrame, calls);
+void BootMoviesState(lifted::Regs& ctx, std::function<bool()> finished_early) {
+  const bm::Calls calls = BootModeCalls(ctx, std::move(finished_early));
+  ctx.r3.u64 = bm::MoviesState(ctx.r1.u32 - bm::kStateFrame, calls);
 }
 
 ITC_REGS_STEP(BootModeNextMode) {
   const uint64_t r3 = ctx.r3.u64;  // the answer (the guest calls change r3)
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  bm::NextMode(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - bm::kNextModeFrame, calls);
+  const bm::Calls calls = BootModeCalls(ctx);
+  bm::NextMode(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - bm::kNextModeFrame, calls);
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(BootModeDestruct) {
-  bm::Destruct(base, ctx.r3.u32);
+  bm::Destruct(ctx.r3.u32);
   ctx.r3.u64 = ctx.r3.u64 + bm::kMachine;
 }
 
 ITC_REGS_STEP(BootModeDeletingDestructor) {
   const uint64_t r3 = ctx.r3.u64;
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  bm::DeletingDestructor(base, ctx.r3.u32, ctx.r4.u32,
+  const bm::Calls calls = BootModeCalls(ctx);
+  bm::DeletingDestructor(ctx.r3.u32, ctx.r4.u32,
                          ctx.r1.u32 - bm::kDeletingDestructorFrame, calls);
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(ModeDeletingDestructor) {
   const uint64_t r3 = ctx.r3.u64;
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  bm::ModeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32,
+  const bm::Calls calls = BootModeCalls(ctx);
+  bm::ModeDeletingDestructor(ctx.r3.u32, ctx.r4.u32,
                              ctx.r1.u32 - bm::kModeDeletingDestructorFrame, calls);
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(ModeNextModeThunk) {
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  ctx.r3.u64 = bm::NextModeThunk(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr),
+  const bm::Calls calls = BootModeCalls(ctx);
+  ctx.r3.u64 = bm::NextModeThunk(ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr),
                                  calls);
 }
 
 ITC_REGS_STEP(ModeDelegateInvoke) {
   const uint64_t r3 = ctx.r3.u64;
-  const bm::Calls calls = BootModeCalls(ctx, base);
-  bm::ModeDelegateInvoke(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - bm::kInvokeFrame, calls);
+  const bm::Calls calls = BootModeCalls(ctx);
+  bm::ModeDelegateInvoke(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - bm::kInvokeFrame, calls);
   ctx.r3.u64 = r3;
 }
 
 ITC_REGS_STEP(ScreenMachineConstruct) {
-  bm::ScreenMachineConstruct(base, ctx.r3.u32);
+  bm::ScreenMachineConstruct(ctx.r3.u32);
 }
 
 }  // namespace hooks
@@ -159,7 +159,7 @@ ITC_REGS_STEP(ScreenMachineConstruct) {
 // Defines an adapter: the flag, else the original.
 #define ITC_BOOT_MODE(address, step)    \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_boot_mode)) { \
-    hooks::step(ctx, base);             \
+    hooks::step(ctx);             \
   }
 
 // The mode's slots 0, 6 and 7, the delegate's slot 0 and the function it

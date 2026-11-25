@@ -34,38 +34,38 @@ namespace {
 // The calls RaceReplay's functions' callees make where their plain C++
 // refuses, as the callees' adapters make them; `frame` is the caller's
 // (ResetVehicles' frame 224 bytes below it, Vehicle::SetUp's below that).
-replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
+replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint32_t frame) {
   replay_snapshots::ReplayCalls calls;
-  calls.list = RaceWorldListRacersOriginal(ctx, base);
-  calls.setup = VehicleSetUpOriginals(ctx, base, frame - 224 - 224);
-  calls.callee = [&ctx, base](uint32_t address, uint32_t sp, uint32_t r3) {
+  calls.list = RaceWorldListRacersOriginal(ctx);
+  calls.setup = VehicleSetUpOriginals(ctx, frame - 224 - 224);
+  calls.callee = [&ctx](uint32_t address, uint32_t sp, uint32_t r3) {
     const uint64_t r1 = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.r3.u64 = r3;
     if (address == 0x820C1D08) {
-      lifted::original::c820C1D08(ctx, base);
+      lifted::original::c820C1D08(ctx);
     } else {
-      lifted::original::c820B7998(ctx, base);
+      lifted::original::c820B7998(ctx);
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
   // As Vehicle::PlaceOnRoute's adapter (src/hooks/vehicle_native.cpp).
-  calls.place = [&ctx, base](uint32_t address, uint32_t r1, const vehicle::GuestRegisters& r) {
+  calls.place = [&ctx](uint32_t address, uint32_t r1, const vehicle::GuestRegisters& r) {
     const uint64_t saved = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = r.r3;
     ctx.r4.u64 = r.r4;
     ctx.r5.u64 = r.r5;
     if (address == 0x820B7998) {
-      lifted::original::c820B7998(ctx, base);
+      lifted::original::c820B7998(ctx);
     } else {
-      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
   };
-  calls.place_original = [&ctx, base](uint32_t sp, uint32_t vehicle, uint32_t position,
+  calls.place_original = [&ctx](uint32_t sp, uint32_t vehicle, uint32_t position,
                                       double speed, double offset, uint32_t lane,
                                       uint32_t direction) {
     const uint64_t r1 = ctx.r1.u64;
@@ -76,7 +76,7 @@ replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint8_t* base, uint
     ctx.f2.f64 = offset;
     ctx.r6.u64 = lane;
     ctx.r7.u64 = direction;
-    lifted::original::c820C3608(ctx, base);
+    lifted::original::c820C3608(ctx);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
@@ -87,15 +87,14 @@ replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint8_t* base, uint
 
 ITC_REGS_STEP(ReplayKeep) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = replay_snapshots::ReplayKeep(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 272,
-      [&ctx, base](uint32_t out, uint32_t stages, uint32_t stage, uint32_t sp) {
+  ctx.r3.u64 = replay_snapshots::ReplayKeep(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 272,
+      [&ctx](uint32_t out, uint32_t stages, uint32_t stage, uint32_t sp) {
         const uint64_t r1 = ctx.r1.u64;
         ctx.r1.u64 = sp;
         ctx.r3.u64 = out;
         ctx.r4.u64 = stages;
         ctx.r5.u64 = int64_t(int32_t(stage));
-        lifted::original::c820FFD88(ctx, base);
+        lifted::original::c820FFD88(ctx);
         ctx.r1.u64 = r1;
         ctx.fpscr.disableFlushMode();
       });
@@ -104,27 +103,27 @@ ITC_REGS_STEP(ReplayKeep) {
 ITC_REGS_STEP(RaceReplaySaveStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 144;
-  const auto calls = ReplayCalls(ctx, base, frame);
-  ctx.r3.u64 = replay_snapshots::RaceReplaySaveStart(base, frame, calls);
+  const auto calls = ReplayCalls(ctx, frame);
+  ctx.r3.u64 = replay_snapshots::RaceReplaySaveStart(frame, calls);
 }
 
 ITC_REGS_STEP(RaceReplaySaveEnd) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = replay_snapshots::RaceReplaySaveEnd(base);
+  ctx.r3.u64 = replay_snapshots::RaceReplaySaveEnd();
 }
 
 ITC_REGS_STEP(RaceReplayRestoreStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 144;
-  const auto calls = ReplayCalls(ctx, base, frame);
-  ctx.r3.u64 = replay_snapshots::RaceReplayRestoreStart(base, frame, calls);
+  const auto calls = ReplayCalls(ctx, frame);
+  ctx.r3.u64 = replay_snapshots::RaceReplayRestoreStart(frame, calls);
 }
 
 ITC_REGS_STEP(RaceReplayRestoreEnd) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 160;
-  const auto calls = ReplayCalls(ctx, base, frame);
-  ctx.r3.u64 = replay_snapshots::RaceReplayRestoreEnd(base, frame, calls);
+  const auto calls = ReplayCalls(ctx, frame);
+  ctx.r3.u64 = replay_snapshots::RaceReplayRestoreEnd(frame, calls);
 }
 
 }  // namespace hooks
@@ -156,10 +155,10 @@ bool Native() {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                          \
     \
     if (!Native() || ((heap) && !hooks::NativeHeapActive())) {  \
-      lifted::original::c##address(ctx, base);                          \
+      lifted::original::c##address(ctx);                          \
       return;                                                   \
     }                                                           \
-    hooks::step(ctx, base);                                     \
+    hooks::step(ctx);                                     \
   }
 ITC_RACE_REPLAY(82104D40, RaceReplaySaveStart, true)
 ITC_RACE_REPLAY(82104E68, RaceReplaySaveEnd, false)

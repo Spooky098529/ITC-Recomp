@@ -36,19 +36,19 @@ constexpr uint32_t kClosed = 0xFFFFFFFF;
 constexpr uint32_t kFileNotFound = 0x80070002;  // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)
 constexpr uint32_t kReadFault = 0x8007001E;     // HRESULT_FROM_WIN32(ERROR_READ_FAULT)
 
-uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return uint64_t(guest::LoadU32(base, address)) << 32 | guest::LoadU32(base, address + 4);
+uint64_t LoadU64(uint32_t address) {
+  return uint64_t(guest::LoadU32(address)) << 32 | guest::LoadU32(address + 4);
 }
 
-void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
-  guest::StoreU32(base, address, uint32_t(value >> 32));
-  guest::StoreU32(base, address + 4, uint32_t(value));
+void StoreU64(uint32_t address, uint64_t value) {
+  guest::StoreU32(address, uint32_t(value >> 32));
+  guest::StoreU32(address + 4, uint32_t(value));
 }
 
-std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
+std::string GuestString(uint32_t address, uint32_t max = 260) {
   std::string s;
   for (uint32_t i = 0; address && i < max; i++) {
-    char c = char(guest::LoadU8(base, address + i));
+    char c = char(guest::LoadU8(address + i));
     if (!c) {
       break;
     }
@@ -57,16 +57,16 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
   return s;
 }
 
-bool Ours(uint8_t* base, uint32_t source) {
-  return game_data::IsHandle(MovieSource(base, source).handle());
+bool Ours(uint32_t source) {
+  return game_data::IsHandle(MovieSource(source).handle());
 }
 
 // The source's Reset (sub_82487BF8, its vtable +112): closed, at the end,
 // every other field 0.
-void Reset(uint8_t* base, uint32_t address) {
-  const MovieSource source(base, address);
+void Reset(uint32_t address) {
+  const MovieSource source(address);
   for (uint32_t at = source.at_end_address(); at < address + MovieSource::kSize; at += 4) {
-    guest::StoreU32(base, at, 0);
+    guest::StoreU32(at, 0);
   }
   source.set_handle(kClosed);
   source.set_at_end(1);
@@ -78,13 +78,13 @@ void Reset(uint8_t* base, uint32_t address) {
 // the end). 0, or an error when the file can't be read. The looping Read
 // differs only in reading ahead past the end from the start.
 ITC_REGS_STEP(Read) {
-  const MovieSource source(base, ctx.r3.u32);
+  const MovieSource source(ctx.r3.u32);
   const uint32_t destination = ctx.r4.u32, size = ctx.r5.u32, read_out = ctx.r6.u32;
   const uint32_t handle = source.handle();
   source.set_at_end(0);
-  guest::StoreU32(base, read_out, 0);
-  const uint64_t position = LoadU64(base, source.position_address());
-  const uint64_t end = LoadU64(base, source.start_address()) + LoadU64(base, source.size_address());
+  guest::StoreU32(read_out, 0);
+  const uint64_t position = LoadU64(source.position_address());
+  const uint64_t end = LoadU64(source.start_address()) + LoadU64(source.size_address());
   ctx.r3.u64 = 0;
   if (position >= end) {
     source.set_at_end(1);
@@ -93,7 +93,7 @@ ITC_REGS_STEP(Read) {
   const uint32_t want = end - position < size ? uint32_t(end - position) : size;
   uint32_t total = 0;
   bool failed = false;
-  guest::ForEachHostPart(base, destination, want, [&](uint8_t* host, uint32_t offset,
+  guest::ForEachHostPart(destination, want, [&](uint8_t* host, uint32_t offset,
                                                       uint32_t bytes) {
     if (failed) {
       return;
@@ -102,8 +102,8 @@ ITC_REGS_STEP(Read) {
     failed = !read || *read != bytes;
     total += read.value_or(0);
   });
-  StoreU64(base, source.position_address(), position + total);
-  guest::StoreU32(base, read_out, total);
+  StoreU64(source.position_address(), position + total);
+  guest::StoreU32(read_out, total);
   if (total < size) {
     source.set_at_end(1);
   }
@@ -123,20 +123,20 @@ ITC_REGS_STEP(Read) {
 // failure gave through the source's +32), +44 = -1.
 ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   
-  const MovieSource source(base, ctx.r3.u32);
-  const std::string path = GuestString(base, ctx.r4.u32);
+  const MovieSource source(ctx.r3.u32);
+  const std::string path = GuestString(ctx.r4.u32);
   if (ITC_FLAG(log_file_opens)) {
     ITC_LOG_INFO("movie open: source {:08X} \"{}\" from {:08X}", source.address, path, ctx.lr);
   }
   auto relative = game_data::RelativePath(path);
   if (!relative) {
     ITC_LOG_WARN("movie source: \"{}\" isn't game data: opened by the recompiled OpenFile", path);
-    lifted::original::c82487C48(ctx, base);
+    lifted::original::c82487C48(ctx);
     return;
   }
   const uint32_t blocks = ctx.r6.u32, block_size = ctx.r7.u32, count = ctx.r8.u32,
                  ahead = ctx.r9.u32;
-  lifted::Enter(ctx, base, game::MovieSource::Close);
+  lifted::Enter(ctx, game::MovieSource::Close);
   if (ctx.r3.s32 < 0) {
     return;
   }
@@ -148,13 +148,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
     return;
   }
   source.set_handle(*handle);
-  StoreU64(base, source.size_address(), game_data::Size(*handle).value_or(0));
+  StoreU64(source.size_address(), game_data::Size(*handle).value_or(0));
   ctx.r3.u64 = source.address;
   ctx.r4.u64 = blocks;
   ctx.r5.u64 = block_size;
   ctx.r6.u64 = count;
   ctx.r7.u64 = ahead;
-  lifted::Enter(ctx, base, game::MovieSource::SetUpBlocks);
+  lifted::Enter(ctx, game::MovieSource::SetUpBlocks);
 }
 
 // The set-up (vtable +116): r3 = source, r4 = the blocks' memory (0: allocate
@@ -165,9 +165,9 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
 // ahead (1 for 0); no blocks (+108, +124 and +132 stay 0). 0.
 ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
   
-  const MovieSource source(base, ctx.r3.u32);
-  if (!Ours(base, source.address)) {
-    lifted::original::c82487F68(ctx, base);
+  const MovieSource source(ctx.r3.u32);
+  if (!Ours(source.address)) {
+    lifted::original::c82487F68(ctx);
     return;
   }
   source.set_at_end(0);
@@ -182,37 +182,37 @@ ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
 // the recompiled one does; one on another handle, or with blocks, goes to it.
 ITC_NATIVE_ENTRY_ALWAYS(824880D8) {
   
-  const MovieSource source(base, ctx.r3.u32);
+  const MovieSource source(ctx.r3.u32);
   const uint32_t handle = source.handle();
   const bool no_blocks = !source.blocks_memory() && !source.block_list();
   if (!(game_data::IsHandle(handle) || handle == kClosed) || !no_blocks) {
-    lifted::original::c824880D8(ctx, base);
+    lifted::original::c824880D8(ctx);
     return;
   }
   if (handle != kClosed && !(source.flags() & 4)) {
     game_data::Close(handle);
   }
-  Reset(base, source.address);
+  Reset(source.address);
   ctx.r3.u64 = 0;
 }
 
 // Read (vtable +60).
 ITC_NATIVE_ENTRY_ALWAYS(82488598) {
   
-  if (!Ours(base, ctx.r3.u32)) {
-    lifted::original::c82488598(ctx, base);
+  if (!Ours(ctx.r3.u32)) {
+    lifted::original::c82488598(ctx);
     return;
   }
-  Read(ctx, base);
+  Read(ctx);
 }
 
 // The looping Read (vtable +128, from Read when flag 8 is set; never in
 // play).
 ITC_NATIVE_ENTRY_ALWAYS(82488A10) {
   
-  if (!Ours(base, ctx.r3.u32)) {
-    lifted::original::c82488A10(ctx, base);
+  if (!Ours(ctx.r3.u32)) {
+    lifted::original::c82488A10(ctx);
     return;
   }
-  Read(ctx, base);
+  Read(ctx);
 }

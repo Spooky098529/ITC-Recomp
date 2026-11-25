@@ -19,13 +19,13 @@ constexpr uint32_t kAlphaOffset = 12;
 // (tables 0x8203EA90 and 0x8203EA78 for 6, 0x8203EA58 and 0x8203EA38 for
 // 8), then clamped to 0-1. `steps` is 6 or 8 (the adapter hands any other
 // count to the original).
-void FitAlphaEndpoints(uint8_t* base, const float values[16], uint32_t steps, float* low,
+void FitAlphaEndpoints(const float values[16], uint32_t steps, float* low,
                        float* high);
 
 // sub_82422178 DxtAlpha::EncodeBlock: the 16 alphas (pixel +12) into the 8
 // bytes at `block` (the guest's bytes, in order), with Floyd-Steinberg error
 // diffusion over the 4 x 4 block when `dither` is nonzero. The original
 // returns 0.
-void EncodeAlphaBlock(uint8_t* base, const float alphas[16], int32_t dither, uint8_t block[8]);
+void EncodeAlphaBlock(const float alphas[16], int32_t dither, uint8_t block[8]);
 
 }  // namespace texture_compression

@@ -25,13 +25,13 @@ namespace input {
 
 // LogicalPad::LogicalPad (sub_82591B38): vtable 0x8206CBEC, the four
 // bindings (+4 to +35) cleared.
-void LogicalPadConstruct(uint8_t* base, uint32_t pad);
+void LogicalPadConstruct(uint32_t pad);
 // PhysicalPad::PhysicalPad (sub_82591B68): vtable 0x8206CBF4, +4 = 0, the
 // two records at +168 and +180 cleared (sub_825A18D8).
-void PhysicalPadConstruct(uint8_t* base, uint32_t pad);
+void PhysicalPadConstruct(uint32_t pad);
 // LogicalPad::Bind (sub_825918F0): binding `index` enabled (the byte at
 // +4 + 8 x index = 1) with `device` (+8 + 8 x index).
-void LogicalPadBind(uint8_t* base, uint32_t pad, uint32_t index, uint32_t device);
+void LogicalPadBind(uint32_t pad, uint32_t index, uint32_t device);
 // LogicalPad::Values and PhysicalPad::Values (sub_82591B30, sub_820988B8,
 // their vtables' slot 1): the pad's 40 values, +36 or +8.
 uint32_t LogicalPadValues(uint32_t pad);
@@ -42,23 +42,23 @@ uint32_t PhysicalPadValues(uint32_t pad);
 // InputProcessorBase::InputProcessorBase (sub_825920D0): vtable 0x8206CC00,
 // the dead zones (0.5, 0.5, 0, 0), the six vectors' w 1.0, the button words
 // 0, the repeat delay 20 and period 4, the 32 counters cleared.
-void InputProcessorBaseConstruct(uint8_t* base, uint32_t processor);
+void InputProcessorBaseConstruct(uint32_t processor);
 // InputProcessor::InputProcessor (sub_8258CE60): the base's, then vtable
 // 0x8206C0C4.
-void InputProcessorConstruct(uint8_t* base, uint32_t processor);
+void InputProcessorConstruct(uint32_t processor);
 // InputProcessor::Assign (sub_82098D60): `source`'s +16 to +411 copied into
 // `destination` (+128 to +263 as floats, the rest as words).
-void InputProcessorAssign(uint8_t* base, uint32_t destination, uint32_t source);
+void InputProcessorAssign(uint32_t destination, uint32_t source);
 // InputProcessor::AnyPressed (sub_82592500): whether any bit of `mask` is set
 // in the pressed word (+264).
-uint32_t InputProcessorAnyPressed(uint8_t* base, uint32_t processor, uint32_t mask);
+uint32_t InputProcessorAnyPressed(uint32_t processor, uint32_t mask);
 // InputProcessor::PressedOrRepeat (sub_82592520): for `mask`'s lowest set
 // bit, whether it's held (+272) on its first tick or at the repeat delay.
-uint32_t InputProcessorPressedOrRepeat(uint8_t* base, uint32_t processor, uint32_t mask);
+uint32_t InputProcessorPressedOrRepeat(uint32_t processor, uint32_t mask);
 // InputProcessor::TestPressed and TestRepeat (sub_8258CEB0, sub_8258CEE0):
 // the two above with the mask read from its address.
-uint32_t InputProcessorTestPressed(uint8_t* base, uint32_t processor, uint32_t mask_address);
-uint32_t InputProcessorTestRepeat(uint8_t* base, uint32_t processor, uint32_t mask_address);
+uint32_t InputProcessorTestPressed(uint32_t processor, uint32_t mask_address);
+uint32_t InputProcessorTestRepeat(uint32_t processor, uint32_t mask_address);
 
 // --- The manager's slots (vtable 0x82000F48) ---
 
@@ -78,20 +78,20 @@ uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index);
 // Input::Create's allocation (sub_820993E8): the manager's 3,984 bytes from
 // operator new. nullopt where the original must run (operator new's error
 // paths).
-std::optional<uint32_t> ManagerAllocate(uint8_t* base);
+std::optional<uint32_t> ManagerAllocate();
 // InputManager::InputManager (sub_820991E0) up to its handlers: vtable
 // 0x82000F48, the five logical pads, four physical pads, five processors and
 // five listener lists made, +4 = the argument block's +4. False, with
 // nothing done, when the lists' head nodes can't be allocated natively.
-bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block);
+bool ManagerConstructMembers(uint32_t manager, uint32_t block);
 // The rest, after the handlers: logical pad i (0-3) bound (binding 0) to
 // physical pad i, and the "any pad" (4) bindings 0-3 to logical pads 0-3.
-void ManagerBindPads(uint8_t* base, uint32_t manager);
+void ManagerBindPads(uint32_t manager);
 // InputManager::AddListener (sub_82099430, the vtable's slot 3): `listener`
 // pushed at the end of pad `index`'s list and processor `index` copied into
 // it (Assign). False, with nothing done, when the list isn't empty (the
 // original resets its last listener first, sub_82592400, never seen in play)
 // or the node can't be allocated natively.
-bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_t listener);
+bool ManagerAddListener(uint32_t manager, uint32_t index, uint32_t listener);
 
 }  // namespace input

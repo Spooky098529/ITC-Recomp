@@ -18,36 +18,36 @@ ITC_NATIVE_ENTRY_ALWAYS(822B0910) {
   display::GammaRamp ramp;
   for (int c = 0; c < 3; c++) {
     for (int i = 0; i < 256; i++) {
-      ramp[c][i] = guest::LoadU16(base, in + 512 * c + 2 * i);
+      ramp[c][i] = guest::LoadU16(in + 512 * c + 2 * i);
     }
   }
   const display::GammaRamp result = display::ApplyGammaCurve(
       display::MakeGammaCurve(display::kGamma, ctx.r5.u32 != 0), ramp);
   for (int c = 0; c < 3; c++) {
     for (int i = 0; i < 256; i++) {
-      guest::StoreU16(base, out + 512 * c + 2 * i, result[c][i]);
+      guest::StoreU16(out + 512 * c + 2 * i, result[c][i]);
     }
   }
 }
 
 // The 128-entry piecewise-linear ramp: r3 = out, r4 = in (three channels
-// of 128 (base, delta) pairs), r5 = inverse.
+// of 128 (delta) pairs), r5 = inverse.
 ITC_NATIVE_ENTRY_ALWAYS(822B0AB0) {
   
   const uint32_t out = ctx.r3.u32, in = ctx.r4.u32;
   display::GammaRampPwl ramp;
   for (int c = 0; c < 3; c++) {
     for (int i = 0; i < 128; i++) {
-      ramp[c][i].base = guest::LoadU16(base, in + 512 * c + 4 * i);
-      ramp[c][i].delta = guest::LoadU16(base, in + 512 * c + 4 * i + 2);
+      ramp[c][i].base = guest::LoadU16(in + 512 * c + 4 * i);
+      ramp[c][i].delta = guest::LoadU16(in + 512 * c + 4 * i + 2);
     }
   }
   const display::GammaRampPwl result = display::ApplyGammaCurve(
       display::MakeGammaCurve(display::kGamma, ctx.r5.u32 != 0), ramp);
   for (int c = 0; c < 3; c++) {
     for (int i = 0; i < 128; i++) {
-      guest::StoreU16(base, out + 512 * c + 4 * i, result[c][i].base);
-      guest::StoreU16(base, out + 512 * c + 4 * i + 2, result[c][i].delta);
+      guest::StoreU16(out + 512 * c + 4 * i, result[c][i].base);
+      guest::StoreU16(out + 512 * c + 4 * i + 2, result[c][i].delta);
     }
   }
 }

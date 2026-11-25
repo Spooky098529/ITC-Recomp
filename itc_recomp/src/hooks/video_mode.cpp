@@ -52,18 +52,18 @@ constexpr float kAspect16x9 = 16.0f / 9.0f;
 ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
   
   const uint32_t object = ctx.r3.u32, interval = ctx.r6.u32;
-  const schema::VideoOutput vo(base, object);
+  const schema::VideoOutput vo(object);
   for (uint32_t i = 0; i < 48; i += 4) {
-    guest::StoreU32(base, vo.video_mode_address() + i, 0);
+    guest::StoreU32(vo.video_mode_address() + i, 0);
   }
   const uint32_t parameters = vo.params_width_address();
   uint32_t result = 0;
-  InFrame(ctx, base, 192, 0x8258D5B8, [&](uint32_t frame) {
+  InFrame(ctx, 192, 0x8258D5B8, [&](uint32_t frame) {
     ctx.r3.u64 = parameters;
     ctx.r4.u64 = 0;
     ctx.r5.u64 = 124;
     ctx.lr = 0x8258D5B8;
-    lifted::Enter(ctx, base, game::memset);  // memset
+    lifted::Enter(ctx, game::memset);  // memset
     // The parameters (see Device::SetUpDisplay in graphics_device.cpp).
     vo.set_params_width(display::kWidth);
     vo.set_params_height(display::kHeight);
@@ -91,7 +91,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
       ctx.r6.u64 = 0;
       ctx.r7.u64 = protection;
       ctx.lr = return_address;
-      lifted::Enter(ctx, base, game::XPhysicalAllocEx);  // physical memory
+      lifted::Enter(ctx, game::XPhysicalAllocEx);  // physical memory
       return ctx.r3.u32;
     };
     const uint32_t small = allocate(65536, 0x404, 0x8258D660);
@@ -109,7 +109,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
     ctx.r7.u64 = parameters;
     ctx.r8.u64 = vo.device_address();
     ctx.lr = 0x8258D6C8;
-    lifted::Enter(ctx, base, lifted::e8229DB38);  // makes the device (Device::Init)
+    lifted::Enter(ctx, lifted::e8229DB38);  // makes the device (Device::Init)
     if (ctx.r3.s32 < 0) {
       vo.set_device(0u);
       return;
@@ -127,7 +127,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = 3;
       ctx.lr = return_address;
-      lifted::Enter(ctx, base, game::Device::CreateTexture);  // probably creates a texture
+      lifted::Enter(ctx, game::Device::CreateTexture);  // probably creates a texture
       return ctx.r3.u32;
     };
     vo.set_front_buffer_0(front_buffer(0x8258D718));
@@ -136,16 +136,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
       ctx.r3.u64 = vo.device<schema::View>().address;
       ctx.r4.u64 = value;
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, function);
+      lifted::CallFromContext(ctx, function);
     };
     on_device(6, 0x8258D754, 0x822A1950);  // the Z function
     const uint32_t viewport = frame + 112;
-    guest::StoreU32(base, viewport, 0);
-    guest::StoreU32(base, viewport + 4, 0);
-    guest::StoreU32(base, viewport + 8, width);
-    guest::StoreU32(base, viewport + 12, height);
-    guest::StoreFloat(base, viewport + 16, kMinZ);
-    guest::StoreFloat(base, viewport + 20, kMaxZ);
+    guest::StoreU32(viewport, 0);
+    guest::StoreU32(viewport + 4, 0);
+    guest::StoreU32(viewport + 8, width);
+    guest::StoreU32(viewport + 12, height);
+    guest::StoreFloat(viewport + 16, kMinZ);
+    guest::StoreFloat(viewport + 20, kMaxZ);
     on_device(viewport, 0x8258D788, 0x822A3518);  // SetViewport
     on_device(1, 0x8258D794, 0x822A2480);  // the render targets' format switches
     on_device(1, 0x8258D7A0, 0x822A2530);
@@ -177,10 +177,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
 ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
   
   const uint32_t object = ctx.r3.u32;
-  const schema::MovieLib82482B18R3 self(base, object);
+  const schema::MovieLib82482B18R3 self(object);
   // The device's copy of the presentation parameters (+0 width, +4 height).
-  const schema::VideoPresentParameters parameters(
-      base, schema::Device(base, self.unknown_56()).presentation_parameters_address());
+  const schema::VideoPresentParameters parameters(schema::Device(self.unknown_56()).presentation_parameters_address());
   const float width = float(parameters.width());
   const float height = float(parameters.height());
   self.set_unknown_132(width);
@@ -188,13 +187,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
   const float display_aspect = display::kWidescreen ? kAspect16x9 : kAspect4x3;
   self.set_unknown_140(display_aspect / (width / height));
   uint32_t result = kOutOfMemory;
-  InFrame(ctx, base, 192, 0x82482BE4, [&](uint32_t) {
+  InFrame(ctx, 192, 0x82482BE4, [&](uint32_t) {
     ctx.r3.u64 = 12;
     ctx.r4.u64 = 0;
     ctx.r5.u64 = 1;
     ctx.r6.u64 = 0;
     ctx.lr = 0x82482BE4;
-    lifted::Enter(ctx, base, game::Device::CreateIndexBuffer);  // probably CreateIndexBuffer
+    lifted::Enter(ctx, game::Device::CreateIndexBuffer);  // probably CreateIndexBuffer
     const uint32_t indices = ctx.r3.u32;
     self.set_unknown_60(indices);
     if (!indices) {
@@ -205,26 +204,26 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     ctx.r5.u64 = 0;
     ctx.r6.u64 = 0;
     ctx.lr = 0x82482C10;
-    lifted::Enter(ctx, base, game::IndexBuffer::Lock);  // probably Lock
+    lifted::Enter(ctx, game::IndexBuffer::Lock);  // probably Lock
     const uint32_t data = ctx.r3.u32;
     for (uint16_t i = 0; i < 6; i++) {
-      guest::StoreU16(base, data + 2 * i, i);
+      guest::StoreU16(data + 2 * i, i);
     }
     ctx.r3.u64 = self.unknown_60();
     ctx.lr = 0x82482C44;
-    lifted::Enter(ctx, base, game::IndexBuffer::Unlock);  // probably Unlock
+    lifted::Enter(ctx, game::IndexBuffer::Unlock);  // probably Unlock
     ctx.r3.u64 = 120;
     ctx.r4.u64 = 0;
     ctx.r5.u64 = 0;
     ctx.lr = 0x82482C54;
-    lifted::Enter(ctx, base, game::Device::CreateVertexBuffer);  // probably CreateVertexBuffer
+    lifted::Enter(ctx, game::Device::CreateVertexBuffer);  // probably CreateVertexBuffer
     self.set_unknown_64(ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;
     }
     ctx.r3.u64 = 0x8264D550;  // the declaration's elements
     ctx.lr = 0x82482C6C;
-    lifted::Enter(ctx, base, game::CreateVertexDeclaration);  // probably CreateVertexDeclaration
+    lifted::Enter(ctx, game::CreateVertexDeclaration);  // probably CreateVertexDeclaration
     self.set_unknown_68(ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;
@@ -232,7 +231,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     const uint32_t vtable = self.unknown_0();
     ctx.r3.u64 = object;
     ctx.lr = 0x82482C8C;
-    lifted::CallFromContext(ctx, base, schema::MovieLib82482B18R3At0(base, vtable).unknown_96());
+    lifted::CallFromContext(ctx, schema::MovieLib82482B18R3At0(vtable).unknown_96());
     result = ctx.r3.u32;
   });
   ctx.r3.u64 = result;

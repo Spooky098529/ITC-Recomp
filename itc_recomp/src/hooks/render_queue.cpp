@@ -30,8 +30,8 @@ ITC_FLAG_BOOL(native_render_queue, true, "ITC",
 
 namespace rq = graphics::render_queue;
 
-rq::GuestCall hooks::RenderQueueCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address, int count,
+rq::GuestCall hooks::RenderQueueCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t sp, uint32_t return_address, int count,
                       uint64_t r3, uint64_t r4, uint64_t r5) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -39,26 +39,26 @@ rq::GuestCall hooks::RenderQueueCall(lifted::Regs& ctx, uint8_t* base) {
     if (count > 1) ctx.r4.u64 = r4;
     if (count > 2) ctx.r5.u64 = r5;
     ctx.lr = return_address;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return rq::CallResult{ctx.r3.u64, ctx.f1.f64};
   };
 }
 
-void hooks::NativeRenderQueueClearRecording(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = rq::ClearRecording(base, ctx.r3.u32, ctx.r1.u32, RenderQueueCall(ctx, base));
+void hooks::NativeRenderQueueClearRecording(lifted::Regs& ctx) {
+  ctx.r3.u64 = rq::ClearRecording(ctx.r3.u32, ctx.r1.u32, RenderQueueCall(ctx));
 }
 
-void hooks::NativeRenderQueueInit(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = rq::Init(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, RenderQueueCall(ctx, base));
+void hooks::NativeRenderQueueInit(lifted::Regs& ctx) {
+  ctx.r3.u64 = rq::Init(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, RenderQueueCall(ctx));
 }
 
-void hooks::NativeRenderQueueAdd(lifted::Regs& ctx, uint8_t* base) {
-  const auto r3 = rq::Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32,
-                          RenderQueueCall(ctx, base));
+void hooks::NativeRenderQueueAdd(lifted::Regs& ctx) {
+  const auto r3 = rq::Add(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32,
+                          RenderQueueCall(ctx));
   if (!r3) {
-    lifted::original::c8258EDC8(ctx, base);
+    lifted::original::c8258EDC8(ctx);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -68,7 +68,7 @@ void hooks::NativeRenderQueueAdd(lifted::Regs& ctx, uint8_t* base) {
 // PassList::Add (sub_8258EB88) has no adapter: only Add calls it.
 ITC_NATIVE_ENTRY(8258EDC8, ITC_FLAG(native_render_queue)) {
   ctx.fpscr.disableFlushMode();
-  hooks::NativeRenderQueueAdd(ctx, base);
+  hooks::NativeRenderQueueAdd(ctx);
 }
 
 // PtrVector::PushBack: r3 = the vector, r4 = the value's address. Insert
@@ -76,18 +76,18 @@ ITC_NATIVE_ENTRY(8258EDC8, ITC_FLAG(native_render_queue)) {
 ITC_NATIVE_ENTRY_ALWAYS(82591540) {
   
   if (ITC_FLAG(native_render_queue)) {
-    if (const auto r3 = rq::PushBack(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+    if (const auto r3 = rq::PushBack(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
                                      hooks::ModelsNativeLifetime())) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82591540(ctx, base);
+  lifted::original::c82591540(ctx);
 }
 
-void hooks::NativeRenderQueueReplay(lifted::Regs& ctx, uint8_t* base) {
-  rq::Replay(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, RenderQueueCall(ctx, base),
-             SingleCommands(ctx, base));
+void hooks::NativeRenderQueueReplay(lifted::Regs& ctx) {
+  rq::Replay(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, RenderQueueCall(ctx),
+             SingleCommands(ctx));
 }
 
 // Replay: r3 = the queue, r4 = the device, r5 = the video output. Its
@@ -96,50 +96,50 @@ void hooks::NativeRenderQueueReplay(lifted::Regs& ctx, uint8_t* base) {
 // sub_8258E868) have no adapters: only Replay calls them.
 ITC_NATIVE_ENTRY(82591238, ITC_FLAG(native_render_queue)) {
   ctx.fpscr.disableFlushMode();
-  hooks::NativeRenderQueueReplay(ctx, base);
+  hooks::NativeRenderQueueReplay(ctx);
 }
 
 // Init: r3 = the queue, r4 = the device.
 ITC_NATIVE_ENTRY(8258ED00, ITC_FLAG(native_render_queue)) {
-  hooks::NativeRenderQueueInit(ctx, base);
+  hooks::NativeRenderQueueInit(ctx);
 }
 
 // ClearRecording: r3 = the queue.
 ITC_NATIVE_ENTRY_ALWAYS(8258ED78) {
   
-  debug::MenuSelectionScan_Before(base);
+  debug::MenuSelectionScan_Before();
   if (ITC_FLAG(native_render_queue)) {
     ctx.fpscr.disableFlushMode();
-    hooks::NativeRenderQueueClearRecording(ctx, base);
+    hooks::NativeRenderQueueClearRecording(ctx);
   } else {
-    lifted::original::c8258ED78(ctx, base);
+    lifted::original::c8258ED78(ctx);
   }
-  debug::MenuSelectionScan_After(base, "call", 0x8258ED78);
+  debug::MenuSelectionScan_After("call", 0x8258ED78);
 }
 
 // Flip: r3 = the queue, left as given.
 ITC_NATIVE_ENTRY_ALWAYS(8258E5E0) {
   
-  debug::MenuSelectionScan_Before(base);
+  debug::MenuSelectionScan_Before();
   if (ITC_FLAG(native_render_queue)) {
-    rq::Flip(base, ctx.r3.u32);
+    rq::Flip(ctx.r3.u32);
   } else {
-    lifted::original::c8258E5E0(ctx, base);
+    lifted::original::c8258E5E0(ctx);
   }
-  debug::MenuSelectionScan_After(base, "call", 0x8258E5E0);
+  debug::MenuSelectionScan_After("call", 0x8258E5E0);
 }
 
 // Recording and Replaying: r3 = the queue; r3 = the list.
 ITC_NATIVE_ENTRY(8258E5F8, ITC_FLAG(native_render_queue)) {
-  ctx.r3.u64 = rq::Recording(base, ctx.r3.u32);
+  ctx.r3.u64 = rq::Recording(ctx.r3.u32);
 }
 
 ITC_NATIVE_ENTRY(8258E618, ITC_FLAG(native_render_queue)) {
-  ctx.r3.u64 = rq::Replaying(base, ctx.r3.u32);
+  ctx.r3.u64 = rq::Replaying(ctx.r3.u32);
 }
 
 // QueueEntry::Sequence: r3 = the entry; f1 = the float at +8.
 ITC_NATIVE_ENTRY(8258E5C0, ITC_FLAG(native_render_queue)) {
   ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = double(rq::Sequence(base, ctx.r3.u32));
+  ctx.f1.f64 = double(rq::Sequence(ctx.r3.u32));
 }

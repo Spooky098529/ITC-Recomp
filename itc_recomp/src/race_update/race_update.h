@@ -27,20 +27,20 @@ constexpr uint32_t kLightsFrame = 112;
 // the vehicle index and the racer's +16 (`pick`), then the car's +1568
 // bytes it varies by it (+1580 only when the car's word +12 is 64).
 // Returns nothing: r3 is the car, as the original leaves it.
-void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_t pick);
+void VaryCar(uint32_t car, int32_t racer, int32_t vehicle, int32_t pick);
 
 // sub_8215C698 RaceLights::UploadDirectional (probably): `entry`'s +16
 // normalized into light_directions + 16 n, +32 into light_second + 16 n and
 // +48 into light_third + 16 n (in that order: the arrays overlap past slot 2). `stack` is
 // its r1, unused since E5 step 6 (the original also leaves the normalized
 // vector at stack - 16, over a 1.0 at stack - 4: read by nothing else).
-void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack);
+void UploadDirectional(uint32_t entry, uint32_t n, uint32_t stack);
 
 // sub_8215D008 RaceLights::Update (probably): light_origin = (0, 0, 0, 1) (the
 // original also leaves it at its frame's +80; not since E5 step 6), then each of the 11 entries (+16 + 96 i) of kind
 // 1 through UploadDirectional with n counting them. `frame` is its r1 less
 // kLightsFrame. Returns n.
-uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame);
+uint32_t LightsUpdate(uint32_t set, uint32_t frame);
 
 // sub_8215B790 RaceScene::LoadScenery: Scenery::Create, the scene's +0 =
 // the manager ([0x826C551C]); the 44-byte configuration at its frame's +80
@@ -51,7 +51,7 @@ uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame);
 // original leaves it: the B7 call of no behavior change). Then
 // Scenery::Setup and StartLoad (their plain C++ with `calls`). Returns
 // StartLoad's r3. Only where hooks::CourseScenerySetUpNative.
-uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t stack,
+uint32_t LoadScenery(const course_scenery::Calls& calls, uint32_t stack,
                      uint32_t scene);
 
 // A guest call the plain C++ makes: `function` with r3 up set to `args` (64
@@ -73,7 +73,7 @@ using GuestCall = std::function<uint64_t(uint32_t function, std::initializer_lis
 // or 7 gets +592 = 1. Returns 1. PollLoad, ReleaseB, FromCar and SetUpB
 // through `call` (their adapters, inside their diagnostics' wraps) from its
 // 208-byte frame below `stack` (its back chain written).
-uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t scene,
+uint32_t RemakeCarModel(const GuestCall& call, uint32_t stack, uint32_t scene,
                         uint32_t slot, uint32_t car, uint64_t pick);
 
 // sub_8215C780 Car::TickUpdate: `slots` the race scene's car slots (scene +
@@ -96,7 +96,7 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
 // their diagnostics' wraps), Stages::Copy and memcpy where they refuse
 // through `call`; RemakeCarModel's callees as it makes them. Returns r3 as
 // the original leaves it.
-uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32_t slots);
+uint64_t TickUpdate(const GuestCall& call, uint32_t stack, uint32_t slots);
 
 // The guest calls RaceScene::Update makes besides `call`'s: a call with r3
 // and f1 (the post effect's vtable slot 24, Glow::SetFromSpeed, and
@@ -122,6 +122,6 @@ struct UpdateCalls {
 // speed / 300). Its 144-byte frame below `stack` (its back chain written;
 // its register and f30/f31 saves not). Returns r3 as the original leaves
 // it.
-uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_t scene);
+uint64_t Update(const UpdateCalls& calls, uint32_t stack, uint32_t scene);
 
 }  // namespace race_update

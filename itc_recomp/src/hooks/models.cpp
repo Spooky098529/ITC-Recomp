@@ -127,16 +127,16 @@ bool NativeLifetime() { return hooks::ModelsNativeLifetime(); }
 ITC_NATIVE_ENTRY_ALWAYS(8258E580) {
   
   if (ctx.r4.u32 == models::kMemoryBlocksLock && hooks::ModelsHostLock()) {
-    models::ScopedLockEnter(base, ctx.r3.u32, ctx.r4.u32);
+    models::ScopedLockEnter(ctx.r3.u32, ctx.r4.u32);
     return;
   }
   // The movie wrapper's critical section, when the native constructor made
   // it (app_start_up/start_up.h): its host mutex.
   if (app_start_up::IsMovieWrapperLock(ctx.r4.u32)) {
-    app_start_up::MovieWrapperLockEnter(base, ctx.r3.u32, ctx.r4.u32);
+    app_start_up::MovieWrapperLockEnter(ctx.r3.u32, ctx.r4.u32);
     return;
   }
-  lifted::original::c8258E580(ctx, base);
+  lifted::original::c8258E580(ctx);
 }
 
 // ScopedLock::~ScopedLock: r3 = the lock word; r3 = the critical section (the
@@ -144,22 +144,22 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E580) {
 ITC_NATIVE_ENTRY_ALWAYS(8258E5B8) {
   
   if (hooks::ModelsHostLock() &&
-      guest::LoadU32(base, ctx.r3.u32) == models::kMemoryBlocksLock) {
-    ctx.r3.u64 = models::ScopedLockLeave(base, ctx.r3.u32);
+      guest::LoadU32(ctx.r3.u32) == models::kMemoryBlocksLock) {
+    ctx.r3.u64 = models::ScopedLockLeave(ctx.r3.u32);
     return;
   }
-  if (app_start_up::IsMovieWrapperLock(guest::LoadU32(base, ctx.r3.u32))) {
-    ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(base, ctx.r3.u32);
+  if (app_start_up::IsMovieWrapperLock(guest::LoadU32(ctx.r3.u32))) {
+    ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(ctx.r3.u32);
     return;
   }
-  lifted::original::c8258E5B8(ctx, base);
+  lifted::original::c8258E5B8(ctx);
 }
 
 // --- The XPR object ---
 
 // XPR::XPR: r3 = the object (left).
 ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
-  models::XprConstruct(base, ctx.r3.u32);
+  models::XprConstruct(ctx.r3.u32);
 }
 
 // XPR::Release and XPR::~XPR: r3 = the object; r3 as the original leaves it.
@@ -167,12 +167,12 @@ ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                               \
     \
     if (NativeLifetime()) {                                          \
-      if (const auto r3 = models::function(base, ctx.r3.u32)) {      \
+      if (const auto r3 = models::function(ctx.r3.u32)) {      \
         ctx.r3.u64 = *r3;                                            \
         return;                                                      \
       }                                                              \
     }                                                                \
-    lifted::original::c##address(ctx, base);                                 \
+    lifted::original::c##address(ctx);                                 \
   }
 
 ITC_MODELS_LIFETIME(825970A8, XprRelease)
@@ -200,34 +200,34 @@ void SetR3(lifted::Regs& ctx, const models::R3& r3) {
 ITC_NATIVE_ENTRY_ALWAYS(82590EF0) {
   
   if (NativeLifetime()) {
-    const uint32_t value = schema::TextureSlot(base, ctx.r6.u32).texture();
-    if (const auto r3 = models::PointersInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, value)) {
+    const uint32_t value = schema::TextureSlot(ctx.r6.u32).texture();
+    if (const auto r3 = models::PointersInsertN(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, value)) {
       SetR3(ctx, *r3);
       return;
     }
   }
-  lifted::original::c82590EF0(ctx, base);
+  lifted::original::c82590EF0(ctx);
 }
 
 // TextureProvider::Clear: r3 = the vector; r3 = its first element.
 ITC_NATIVE_ENTRY(82590D68, ITC_FLAG(native_models)) {
-  ctx.r3.u64 = models::PointersClear(base, ctx.r3.u32);
+  ctx.r3.u64 = models::PointersClear(ctx.r3.u32);
 }
 
 // The provider's getters (vtable slots). TextureProvider::At (sub_82594648)
 // has no adapter: only Get calls it.
 namespace {
 
-models::ProviderCall ProviderGuestCall(lifted::Regs& ctx, uint8_t* base) {
-  return [&ctx, base](uint32_t function, uint32_t frame, uint32_t lr, uint64_t r3,
+models::ProviderCall ProviderGuestCall(lifted::Regs& ctx) {
+  return [&ctx](uint32_t function, uint32_t frame, uint32_t lr, uint64_t r3,
                       uint64_t r4) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
-    guest::StoreU32(base, frame, ctx.r1.u32);
+    guest::StoreU32(frame, ctx.r1.u32);
     ctx.r1.u64 = frame;
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   };
@@ -237,27 +237,27 @@ models::ProviderCall ProviderGuestCall(lifted::Regs& ctx, uint8_t* base) {
 
 // TextureProvider::Get: r3 = the provider, r4 = the slot; r3 the texture set.
 ITC_NATIVE_ENTRY(825946B8, ITC_FLAG(native_models)) {
-  ctx.r3.u64 = models::TextureProviderGet(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = models::TextureProviderGet(ctx.r3.u32, ctx.r4.u32);
 }
 
 // Slots 5 to 7 and 8 to 10: r3 = the provider, r4 = the slot, r5 = the
 // index (or the name).
 ITC_NATIVE_ENTRY(825941D0, ITC_FLAG(native_models)) {
-  ctx.r3.u64 = models::TextureProviderXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                 ctx.r1.u32, ProviderGuestCall(ctx, base));
+  ctx.r3.u64 = models::TextureProviderXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                 ctx.r1.u32, ProviderGuestCall(ctx));
 }
 
 ITC_NATIVE_ENTRY(82594230, ITC_FLAG(native_models)) {
-  ctx.r3.u64 = models::TextureProviderFindXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                     ctx.r1.u32, ProviderGuestCall(ctx, base));
+  ctx.r3.u64 = models::TextureProviderFindXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                     ctx.r1.u32, ProviderGuestCall(ctx));
 }
 
 // TextureProvider::TextureProvider: r3 = the provider (left), r4 = the slot
 // count (-1: 64).
 ITC_NATIVE_ENTRY_ALWAYS(82594850) {
   
-  if (!NativeLifetime() || !models::TextureProviderConstruct(base, ctx.r3.u32, ctx.r4.s32)) {
-    lifted::original::c82594850(ctx, base);
+  if (!NativeLifetime() || !models::TextureProviderConstruct(ctx.r3.u32, ctx.r4.s32)) {
+    lifted::original::c82594850(ctx);
   }
 }
 
@@ -271,11 +271,11 @@ ITC_NATIVE_ENTRY_ALWAYS(825948C0) {
   
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
-    if (models::ModelConstruct(base, ctx.r3.u32)) {
+    if (models::ModelConstruct(ctx.r3.u32)) {
       return;
     }
   }
-  lifted::original::c825948C0(ctx, base);
+  lifted::original::c825948C0(ctx);
 }
 
 // Model::Release and Model::~Model: r3 = the model; r3 as the original
@@ -290,11 +290,11 @@ ITC_NATIVE_ENTRY_ALWAYS(820CE928) {
   
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();  // as Model::Model's adapter
-    if (models::PartModelConstruct(base, ctx.r3.u32)) {
+    if (models::PartModelConstruct(ctx.r3.u32)) {
       return;
     }
   }
-  lifted::original::c820CE928(ctx, base);
+  lifted::original::c820CE928(ctx);
 }
 
 // The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
@@ -302,18 +302,18 @@ ITC_MODELS_LIFETIME(820CE990, PartModelDestruct)
 
 // sub_820CE9C8: r3 = the model (left).
 ITC_NATIVE_ENTRY(820CE9C8, ITC_FLAG(native_models)) {
-  models::PartModelClear(base, ctx.r3.u32);
+  models::PartModelClear(ctx.r3.u32);
 }
 
 // Model::SetVinylTextures: r3 = the part model, r4 and r5 the words.
 ITC_NATIVE_ENTRY(820CE9F8, ITC_FLAG(native_models)) {
-  models::PartModelSetVinylTextures(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  models::PartModelSetVinylTextures(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // Skeleton::ResetPose: r3 = the skeleton (left). Flush-to-zero off after
 // Skeleton::ApplyAnimation, as its adapter leaves it.
 ITC_NATIVE_ENTRY(82599AF0, ITC_FLAG(native_models)) {
-  if (model_animation::SkeletonResetPose(base, ctx.r3.u32)) {
+  if (model_animation::SkeletonResetPose(ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
   }
 }
@@ -324,7 +324,7 @@ ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
   // The float mode is the host's (MXCSR): read and put back through ours.
   const uint32_t mode = ::base::FloatMode::getcsr();
   ctx.fpscr.disableFlushMode();
-  if (!model_animation::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32)) {
+  if (!model_animation::SkeletonLocalMatrices(ctx.r3.u32, ctx.r1.u32)) {
     ::base::FloatMode::restoreGuestBits(mode);  // no float work: the mode as it came
   }
 }
@@ -334,36 +334,36 @@ ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
 namespace hooks {
 
 ITC_REGS_STEP(ModelsMaterialCount) {
-  ctx.r3.u64 = models::MaterialCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
+  ctx.r3.u64 = models::MaterialCount(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
 }
 
 ITC_REGS_STEP(ModelsMaterial) {
-  ctx.r3.u64 = models::Material(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
+  ctx.r3.u64 = models::Material(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
 }
 
 ITC_REGS_STEP(ModelsSharedVertexShader) {
-  ctx.r3.u64 = models::SharedVertexShader(base, ctx.r3.u32);
+  ctx.r3.u64 = models::SharedVertexShader(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(ModelsSetSharedShaders) {
-  models::SetSharedShaders(base, ctx.r3.u32, ctx.r4.u32);
+  models::SetSharedShaders(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(ModelsSharedPixelShader) {
-  ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
+  ctx.r3.u64 = models::SharedPixelShader(ctx.r3.u32);
 }
 
-bool TextureProviderSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function) {
+bool TextureProviderSlotDirect(lifted::Regs& ctx, uint32_t function) {
   if (!ITC_FLAG(native_models)) {
     return false;
   }
   if (function == models::kTextureProviderGet) {
-    ctx.r3.u64 = models::TextureProviderGet(base, ctx.r3.u32, ctx.r4.u32);
+    ctx.r3.u64 = models::TextureProviderGet(ctx.r3.u32, ctx.r4.u32);
     return true;
   }
   if (function == models::kTextureProviderXprTexture) {
-    ctx.r3.u64 = models::TextureProviderXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                   ctx.r1.u32, ProviderGuestCall(ctx, base));
+    ctx.r3.u64 = models::TextureProviderXprTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r1.u32, ProviderGuestCall(ctx));
     return true;
   }
   return false;
@@ -373,7 +373,7 @@ bool TextureProviderSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t functi
 
 #define ITC_MODELS_ACCESSOR(address, steps)  \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_models)) { \
-    hooks::steps(ctx, base);                 \
+    hooks::steps(ctx);                 \
   }
 
 ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
@@ -392,7 +392,7 @@ ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
 // Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
 // original leaves it.
 ITC_NATIVE_ENTRY(8235A9F8, ITC_FLAG(native_models)) {
-  ctx.r3.u64 = models::RelocateResource(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = models::RelocateResource(ctx.r3.u32, ctx.r4.u32);
 }
 
 // XPR::Create: r3 = the XPR object, r4 = the XPR2 file; returns 0 or
@@ -400,12 +400,12 @@ ITC_NATIVE_ENTRY(8235A9F8, ITC_FLAG(native_models)) {
 ITC_NATIVE_ENTRY_ALWAYS(82596F68) {
   
   if (NativeLifetime()) {
-    if (const auto r3 = models::XprCreate(base, ctx.r3.u32, ctx.r4.u32)) {
+    if (const auto r3 = models::XprCreate(ctx.r3.u32, ctx.r4.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  lifted::original::c82596F68(ctx, base);
+  lifted::original::c82596F68(ctx);
 }
 
 // SkeletonBase::SetUp: r3 = the skeleton, r4 = the node file, r5 = the
@@ -415,22 +415,22 @@ ITC_NATIVE_ENTRY_ALWAYS(8259A9E0) {
   
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
-    if (model_animation::SkeletonSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+    if (model_animation::SkeletonSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
       return;
     }
   }
-  lifted::original::c8259A9E0(ctx, base);
+  lifted::original::c8259A9E0(ctx);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82599A20) {
   
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
-    if (model_animation::SkeletonBind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    if (model_animation::SkeletonBind(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
       return;
     }
   }
-  lifted::original::c82599A20(ctx, base);
+  lifted::original::c82599A20(ctx);
 }
 
 namespace {
@@ -439,10 +439,10 @@ namespace {
 // from a frame below the adapter's (room for the original's own frames).
 void ModelLoadInit(void* user, uint32_t object, uint32_t microcode) {
   auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
-  guest_call::InFrame(c.ctx, c.base, 512, 0x82594DEC, [&](uint32_t) {
+  guest_call::InFrame(c.ctx, 512, 0x82594DEC, [&](uint32_t) {
     c.ctx.r3.u64 = object;
     c.ctx.r4.u64 = microcode;
-    lifted::original::c822A8740(c.ctx, c.base);
+    lifted::original::c822A8740(c.ctx);
   });
 }
 void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
@@ -450,11 +450,11 @@ void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint
   auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
   lifted::Regs& ctx = c.ctx;
   uint8_t* base = c.base;
-  guest_call::InFrame(ctx, base, 512, return_address, [&](uint32_t) {
+  guest_call::InFrame(ctx, 512, return_address, [&](uint32_t) {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
-    lifted::CallFromContext(ctx, base, function);
+    lifted::CallFromContext(ctx, function);
   });
 }
 
@@ -477,18 +477,18 @@ ITC_NATIVE_ENTRY_ALWAYS(82596920) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
     const uint32_t model = ctx.r3.u32, file = ctx.r4.u32, xpr = ctx.r5.u32;
-    hooks::ModelLoadGuest guest{ctx, base};
-    const bool done = models::ModelLoad(base, model, file, xpr, guest.Calls());
+    hooks::ModelLoadGuest guest{ctx};
+    const bool done = models::ModelLoad(model, file, xpr, guest.Calls());
     ctx.lr = lr;
     if (done) {
-      ctx.r3.u64 = schema::Model(base, model).shape_count();
+      ctx.r3.u64 = schema::Model(model).shape_count();
       return;
     }
     ctx.r3.u64 = model;
     ctx.r4.u64 = file;
     ctx.r5.u64 = xpr;
   }
-  lifted::original::c82596920(ctx, base);
+  lifted::original::c82596920(ctx);
 }
 
 // Shaders::LoadAll: no arguments; r3 as the original leaves it (the vertex
@@ -501,19 +501,19 @@ ITC_NATIVE_ENTRY_ALWAYS(820A08A0) {
     return;
   }
   if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    lifted::original::c820A08A0(ctx, base);
+    lifted::original::c820A08A0(ctx);
     return;
   }
-  const archive::LoadCall load = hooks::NativeArchiveLoad(base);
-  const uint32_t r3 = models::ShadersLoadAll(base, [&](uint32_t asset, uint32_t pair) {
-    if (models::ShadersLoadPair(base, asset, pair, load)) {
+  const archive::LoadCall load = hooks::NativeArchiveLoad();
+  const uint32_t r3 = models::ShadersLoadAll([&](uint32_t asset, uint32_t pair) {
+    if (models::ShadersLoadPair(asset, pair, load)) {
       return;
     }
     const uint32_t at = pair < 1000 ? 0x820A08D4 : pair < 2000 ? 0x820A08F8 : 0x820A091C;
-    guest_call::InFrame(ctx, base, 112, at, [&](uint32_t) {
+    guest_call::InFrame(ctx, 112, at, [&](uint32_t) {
       ctx.r3.u64 = asset;
       ctx.r4.u64 = pair;
-      lifted::original::c820A07F0(ctx, base);
+      lifted::original::c820A07F0(ctx);
     });
   });
   ctx.r3.s64 = int32_t(r3);
@@ -527,10 +527,10 @@ struct PairLoadedCalls {
   uint8_t* base;
   static void Init(void* user, uint32_t object, uint32_t microcode) {
     auto& c = *static_cast<PairLoadedCalls*>(user);
-    guest_call::InFrame(c.ctx, c.base, 144, 0x820A0760, [&](uint32_t) {
+    guest_call::InFrame(c.ctx, 144, 0x820A0760, [&](uint32_t) {
       c.ctx.r3.u64 = object;
       c.ctx.r4.u64 = microcode;
-      lifted::original::c822A8740(c.ctx, c.base);
+      lifted::original::c822A8740(c.ctx);
     });
   }
 };
@@ -546,23 +546,23 @@ ITC_NATIVE_ENTRY_ALWAYS(820A06D0) {
     const uint64_t lr = ctx.lr;
     const uint64_t r6 = ctx.r6.u64;
     const uint32_t context = ctx.r6.u32;
-    PairLoadedCalls guest{ctx, base};
+    PairLoadedCalls guest{ctx};
     shader_objects::CreateCalls calls;
     calls.init = &PairLoadedCalls::Init;
     calls.user = &guest;
-    const auto freed = shader_objects::PairLoaded(base, context, calls);
+    const auto freed = shader_objects::PairLoaded(context, calls);
     ctx.lr = lr;
     if (freed) {
       ctx.r3.u64 = r6;
       if (!*freed) {
-        guest_call::InFrame(ctx, base, 144, 0x820A07E4, [&](uint32_t) {
+        guest_call::InFrame(ctx, 144, 0x820A07E4, [&](uint32_t) {
           ctx.r3.u64 = r6;
-          lifted::original::c825A70E8(ctx, base);
+          lifted::original::c825A70E8(ctx);
         });
         ctx.lr = lr;
       }
       return;
     }
   }
-  lifted::original::c820A06D0(ctx, base);
+  lifted::original::c820A06D0(ctx);
 }

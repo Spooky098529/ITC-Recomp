@@ -43,7 +43,7 @@ struct ReleaseCalls {
 // slot +268 + 4 x slot), Model::Release, then, when not null, its vtable
 // slot 0. The count is read again after each model. Returns the r3 the
 // original leaves: `list` when there are no models, else the last call's.
-uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& calls);
+uint32_t ModelListRelease(uint32_t list, const ReleaseCalls& calls);
 
 // The guest calls ModelList::Load makes where a callee's plain C++ declines
 // (the originals, by the original's return addresses): operator new (r3 =
@@ -73,64 +73,64 @@ constexpr uint32_t kSceneryModelBytes = 448;
 // the original leaves (the list's +4 after a model, else the list). Only
 // over the allocation layer with the memory blocks' host lock (the
 // adapter's condition, as Model::Load's).
-uint32_t ModelListLoad(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+uint32_t ModelListLoad(uint32_t list, uint32_t container, uint32_t frame,
                        const LoadCalls& calls);
 
 // ModelList::LoadPoints (sub_82148528): ModelList::Load (its frame 160
 // bytes below `frame`, the back chain written), then +528 to +604 = the 20
 // point groups 0x82617750 + 256 x i, +608 to +616 = 0, +620 = 20. Returns
 // the r3 the original leaves (0x82617F50, the eighth group).
-uint32_t ModelListLoadPoints(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+uint32_t ModelListLoadPoints(uint32_t list, uint32_t container, uint32_t frame,
                              const LoadCalls& calls);
 
 // SceneryModel::ResetDrawState (sub_82146AA8, probably): +436 = 0, +432 = 1,
 // +440 = 0.
-void ResetDrawState(uint8_t* base, uint32_t model);
+void ResetDrawState(uint32_t model);
 
 // AnimationSet::CurrentFrame (sub_82146B80): the current frame's 8-byte
 // entry of animation `index` in `set`, or 0 when the current frame isn't
 // below the frame count (signed).
-uint32_t AnimationCurrentFrame(uint8_t* base, uint32_t set, uint32_t index);
+uint32_t AnimationCurrentFrame(uint32_t set, uint32_t index);
 
 // --- The race's picks ---
 
 // ModelList::IsBEntryOn (sub_82147850, probably): 1 when the race data's
 // +24 flag for `entry` is set, else 0.
-uint32_t IsBEntryOn(uint8_t* base, int32_t entry);
+uint32_t IsBEntryOn(int32_t entry);
 
 // Race::CourseLayout (sub_8228F408, with the part the recompiler split off,
 // sub_8228F484): -1 without race data, else by the race mode, the course,
 // the flags and the current stage's type (Stages::Type).
-int32_t CourseLayout(uint8_t* base);
+int32_t CourseLayout();
 
 // ModelList::IsCEntryOn (sub_82147958, probably, with the switch case the
 // recompiler split off, sub_82147A20): by the race kind and mode, the
 // current stage's type and the course's layout.
-uint32_t IsCEntryOn(uint8_t* base, uint32_t entry);
+uint32_t IsCEntryOn(uint32_t entry);
 
 // PointList::IsEntryOn (sub_82147B18, probably): by the race data's flags,
 // kind, mode and course.
-uint32_t PointListIsEntryOn(uint8_t* base, int32_t entry);
+uint32_t PointListIsEntryOn(int32_t entry);
 
 // PassDescription::SetBillboardPass (sub_82148650, probably), with its tail
 // call sub_8209BD40 merged: +0 = `pass`, +4 = `word28`.
-void SetBillboardPass(uint8_t* base, uint32_t description, uint32_t pass, uint32_t word28);
+void SetBillboardPass(uint32_t description, uint32_t pass, uint32_t word28);
 
 // VertexDeclarations::ForDepth (sub_82589970, probably): [0x8296B8D0] for
 // stream type 11, else [0x8296B8CC].
-uint32_t DepthVertexDeclaration(uint8_t* base, int32_t stream_type);
+uint32_t DepthVertexDeclaration(int32_t stream_type);
 
 // --- The texture provider (vtable 0x8206CCB4) ---
 
 // TextureProvider::ClearAll (sub_82594328, slot 2): every slot from the
 // vector's first (+8) up to its end (+12, read again after each store) = 0.
-void TextureProviderClearAll(uint8_t* base, uint32_t provider);
+void TextureProviderClearAll(uint32_t provider);
 
 // TextureProvider::Set (sub_82594718, slot 4): the slot = `value` when the
 // vector has storage and the slot is below its capacity and its size (the
 // only path seen in play). False, with nothing written, otherwise: the
 // original's reserve, debug prints and resize (never ran) run there.
-bool TextureProviderSet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_t value);
+bool TextureProviderSet(uint32_t provider, uint32_t slot, uint32_t value);
 
 // --- The model draws (model_draws.cpp, built with strict floats) ---
 //
@@ -151,7 +151,7 @@ constexpr uint32_t kRenderQueue = 0x8296B91C;
 // and divided by w, counted against the near plane and the floats at
 // 0x82002B90 and 0x8206CDC4 as the translation's vector and scalar steps;
 // 0 when all eight are past one plane, else 1.
-uint32_t IsShapeVisible(uint8_t* base, uint32_t model, uint32_t view_projection, uint32_t world,
+uint32_t IsShapeVisible(uint32_t model, uint32_t view_projection, uint32_t world,
                         uint32_t shape, uint32_t product);
 
 // Recorder::RecordObject (sub_825953D0): the header (7, 9, 0x00010009),
@@ -161,25 +161,25 @@ uint32_t IsShapeVisible(uint8_t* base, uint32_t model, uint32_t view_projection,
 // the chunk closed. Returns the header slot. The interpolation's hooks
 // around it (BlendState_BeforeRecordObject and After, the caller's
 // context) are its adapter's.
-std::optional<uint32_t> RecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
+std::optional<uint32_t> RecordObject(uint32_t view_projection, uint32_t world);
 
 // Recorder::RecordSceneLights (sub_82595490, probably): the header (7, 63,
 // 0x0101003F), c0-c3 the view at 0x8265ECA0 (Matrix::Copy, noted), c4 the
 // 16 bytes at 0x8265ECE0, c5-c39 SceneLightsRecordDirections, c40-c62
 // SceneLightsRecordProjectors, command 36, the chunk closed. Returns the
 // header slot.
-std::optional<uint32_t> RecordSceneLights(uint8_t* base);
+std::optional<uint32_t> RecordSceneLights();
 
 // SceneLights::RecordDirections (sub_8258B980, probably): at `out`, 3
 // vectors from 0x8296B950 normalized (the translation's estimate and Newton
 // step; a zero length gives its zero dot product), 8 from 0x8296B9E0 and 8
 // from 0x8296BA60 copied, 8 from 0x8296BBE0 normalized, 8 from 0x8296BC60
 // copied.
-void SceneLightsRecordDirections(uint8_t* base, uint32_t out);
+void SceneLightsRecordDirections(uint32_t out);
 // SceneLights::RecordProjectors (sub_82589B58, probably): at `out`, the
 // x, y, z at 0x8265ED00 with w 1.0, 12 floats from 0x8296B980, 12 from
 // 0x8296B9B0, 32 from 0x8296BAE0 and 32 from 0x8296BB60 (lfs and stfs).
-void SceneLightsRecordProjectors(uint8_t* base, uint32_t out);
+void SceneLightsRecordProjectors(uint32_t out);
 
 // Model::RecordShapeDepth (sub_825960D0, probably): the depth-only record
 // of shape `shape`'s `group` materials: command 10, the depth vertex
@@ -192,7 +192,7 @@ void SceneLightsRecordProjectors(uint8_t* base, uint32_t out);
 // unless `with_flagged`'s low byte is; command 36, the chunk closed.
 // Returns the chunk's first slot, or 0 (nothing recorded) when the group
 // has no materials (the count +8 or +12 of the shape's +396 block).
-std::optional<uint32_t> RecordShapeDepth(uint8_t* base, uint32_t model, uint32_t shape,
+std::optional<uint32_t> RecordShapeDepth(uint32_t model, uint32_t shape,
                                          int32_t group, uint32_t mask, uint32_t with_flagged);
 
 // What Model::DrawShapeDepth leaves for its adapter: r3 as the original
@@ -216,7 +216,7 @@ struct DepthDraw {
 // +72, when the group (`group`'s low byte: 0 or 1) has materials. nullopt,
 // with nothing done, where a recorder would decline (a chunk open on
 // another list, or no room for all the slots).
-std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t view_projection,
+std::optional<DepthDraw> DrawShapeDepth(uint32_t model, uint32_t view_projection,
                                         uint32_t world, uint32_t shape, uint32_t group,
                                         uint32_t mask, uint32_t with_flagged, uint32_t frame,
                                         const std::array<uint32_t, 9>& context);
@@ -249,7 +249,7 @@ constexpr uint32_t kRecordShapeFrame = 304;
 // run: a vertex declaration the plain C++ leaves to it, a material
 // animation (+396 not -1, never seen in play), more than 4 textures on a
 // material, a chunk open on another list, or no room for its slots.
-std::optional<uint32_t> SceneryRecordShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+std::optional<uint32_t> SceneryRecordShape(const DrawCalls& calls, uint32_t frame,
                                            uint32_t model, uint32_t shape, int32_t group,
                                            uint32_t set_shaders, uint32_t c76, uint32_t range,
                                            uint32_t pair_offset);
@@ -274,7 +274,7 @@ struct SceneryDraw {
   bool queued = false;  // r3 is the last queue call's (also in `r3`)
   uint32_t r3 = 0;
 };
-std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,
+std::optional<SceneryDraw> SceneryDrawShape(const DrawCalls& calls,
                                             uint32_t frame, uint32_t model,
                                             uint32_t view_projection, uint32_t world,
                                             uint32_t shape, uint32_t depth_too, uint32_t c76,
@@ -303,7 +303,7 @@ constexpr uint32_t kModelRecordShapeFrame = 304;
 // the original must run: a vertex declaration the plain C++ leaves to it,
 // a material animation (+396 not -1), more than 4 textures on a material,
 // a chunk open on another list, or no room for its slots.
-std::optional<uint32_t> ModelRecordShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+std::optional<uint32_t> ModelRecordShape(const DrawCalls& calls, uint32_t frame,
                                          uint32_t model, uint32_t shape, int32_t group,
                                          uint32_t set_shaders, uint32_t c76, uint32_t range);
 
@@ -319,7 +319,7 @@ constexpr uint32_t kModelDrawShapeFrame = 208;
 // the lights' header when no group has materials, or the command list after
 // the depth entry's chunk when group 0 has none. nullopt, with nothing done,
 // where a recorder would decline.
-std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+std::optional<SceneryDraw> ModelDrawShape(const DrawCalls& calls, uint32_t frame,
                                           uint32_t model, uint32_t view_projection,
                                           uint32_t world, uint32_t shape, uint32_t depth_too,
                                           uint32_t c76, uint32_t range, uint32_t caller_r24);
@@ -346,7 +346,7 @@ constexpr uint32_t kModelRecordMaterialsFrame = 288;
 // done, where the original must run: a vertex declaration the plain C++
 // leaves to it, more than 4 textures on a material, a chunk open on
 // another list, or no room for its slots.
-std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& calls,
+std::optional<uint32_t> ModelRecordMaterials(const DrawCalls& calls,
                                              uint32_t frame, uint32_t model, uint32_t shape,
                                              int32_t group, uint32_t set_shaders);
 
@@ -356,12 +356,12 @@ std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& cal
 // slots RecordShapeDepth takes (0 when it records nothing), and the command
 // list's checks before a recorder (its chunk open or none open on any list,
 // and room for `slots`).
-std::optional<uint32_t> ModelRecordMaterialsSlotCount(uint8_t* base, uint32_t model,
+std::optional<uint32_t> ModelRecordMaterialsSlotCount(uint32_t model,
                                                       uint32_t shape, int32_t group,
                                                       uint32_t set_shaders);
-uint32_t RecordShapeDepthSlotCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group,
+uint32_t RecordShapeDepthSlotCount(uint32_t model, uint32_t shape, int32_t group,
                                    uint32_t mask, uint32_t with_flagged);
-bool CommandListHasRoom(uint8_t* base, uint32_t list, uint32_t slots);
+bool CommandListHasRoom(uint32_t list, uint32_t slots);
 
 // PointList::Draw's frame.
 constexpr uint32_t kPointListDrawFrame = 464;
@@ -380,7 +380,7 @@ constexpr uint32_t kPointListDrawFrame = 464;
 // groups are skipped). Returns the r3 the original leaves; nullopt, with
 // nothing done, where the memcpy can't be made natively or a draw would
 // decline (then the original runs).
-std::optional<uint32_t> PointListDraw(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+std::optional<uint32_t> PointListDraw(const DrawCalls& calls, uint32_t frame,
                                       uint32_t list, uint32_t entry, uint32_t pass,
                                       uint32_t caller_r24, uint32_t r3);
 

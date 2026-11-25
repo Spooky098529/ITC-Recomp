@@ -54,39 +54,39 @@ std::recursive_mutex& MemoryBlocksMutex();
 // sub_8258E580 ScopedLock::ScopedLock, for the critical section at
 // 0x8296BD38: the lock word (+0) = the critical section, then the mutex
 // taken.
-void ScopedLockEnter(uint8_t* base, uint32_t lock, uint32_t critical_section);
+void ScopedLockEnter(uint32_t lock, uint32_t critical_section);
 // sub_8258E5B8 ScopedLock::~ScopedLock, for a lock word holding 0x8296BD38:
 // the mutex given back. Returns the word (the original's r3 before its
 // LeaveCriticalSection).
-uint32_t ScopedLockLeave(uint8_t* base, uint32_t lock);
+uint32_t ScopedLockLeave(uint32_t lock);
 
 // sub_8258E2F8 PendingFrees::IncSize (std::list's _Incsize): the size (+8)
 // up by `count`. False, with nothing done, when 0x3FFFFFFF minus the size is
 // below `count` (the original's length_error).
-bool PendingFreesIncSize(uint8_t* base, uint32_t list, uint32_t count);
+bool PendingFreesIncSize(uint32_t list, uint32_t count);
 
 // Whether PendingFreesInsert can run natively on `list` (a node allocatable,
 // the size below the limit).
-bool PendingFreesCanInsert(uint8_t* base, uint32_t list);
+bool PendingFreesCanInsert(uint32_t list);
 
 // sub_8258E398 PendingFrees::Insert (std::list's _Insert): a node holding
 // `value` linked in before the node `where`, the size up by one. False, with
 // nothing done, where the original must run.
-bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value);
+bool PendingFreesInsert(uint32_t list, uint32_t where, uint32_t value);
 
 // For native callers checking before they put blocks off: whether the
 // pending frees take `count` more nodes natively (a process heap, the size
 // limit), read under the lock.
-bool PendingFreesHaveRoom(uint8_t* base, uint32_t count);
+bool PendingFreesHaveRoom(uint32_t count);
 
 // sub_8258E410 Memory::FreeLater: under the lock, a block (not null, its
 // header starting `XLMM`) put at the end of the pending frees. False, with
 // nothing done, where the original must run.
-bool FreeLater(uint8_t* base, uint32_t block);
+bool FreeLater(uint32_t block);
 
 // sub_8258E498 Memory::FreePhysicalLater: as FreeLater, with `attributes`
 // at the header's +12 first.
-bool FreePhysicalLater(uint8_t* base, uint32_t block, uint32_t attributes);
+bool FreePhysicalLater(uint32_t block, uint32_t attributes);
 
 // The memory blocks' makers (docs/functions/shader-objects.md): under the
 // lock, the block's pages, `bytes` + the header rounded up to 4 KiB
@@ -98,14 +98,14 @@ bool FreePhysicalLater(uint8_t* base, uint32_t block, uint32_t attributes);
 //
 // sub_8258DFF0 Memory::AllocVirtual: kind 0, VirtualAlloc(0, size,
 // MEM_COMMIT | MEM_NOZERO, PAGE_READWRITE) (the layer's pages).
-uint32_t AllocVirtual(uint8_t* base, uint32_t bytes);
+uint32_t AllocVirtual(uint32_t bytes);
 // sub_8258E098 Memory::AllocPhysicalEx: kind 1, XPhysicalAllocEx(size,
 // `low`, `high`, `alignment`, `protection`).
-uint32_t AllocPhysicalEx(uint8_t* base, uint32_t bytes, uint32_t low, uint32_t high,
+uint32_t AllocPhysicalEx(uint32_t bytes, uint32_t low, uint32_t high,
                          uint32_t alignment, uint32_t protection);
 // sub_8258E138 Memory::AllocPhysical (probably): kind 2, XMemAlloc(size,
 // `attributes`).
-uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes);
+uint32_t AllocPhysical(uint32_t bytes, uint32_t attributes);
 
 // E5 step 7: Memory::AllocPhysicalEx for a native caller whose block holds
 // data only the game's code reads (never the renderer, never by a physical
@@ -117,7 +117,7 @@ uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes);
 // releases the blob). 0 when the blob can't be made. In the models' own
 // code nothing uses it: their physical blocks (XPR::Create's texture data,
 // Model::Load's vertex data, the shaders' microcode) are the renderer's.
-uint32_t AllocPhysicalExBlob(uint8_t* base, uint32_t bytes, const char* type);
+uint32_t AllocPhysicalExBlob(uint32_t bytes, const char* type);
 
 // sub_8258E1D8 PendingFrees::FreeDue: under the lock, the pending frees
 // walked from the first node; a header whose +8 is 0 has its +0 cleared and
@@ -127,6 +127,6 @@ uint32_t AllocPhysicalExBlob(uint8_t* base, uint32_t bytes, const char* type);
 // with nothing done, where the original must run: a due header the layer
 // can't free natively (kind 0 not the layer's pages, kind 2 not physical and
 // not a heap block), a node not a heap block, or a header queued twice.
-bool FreeDue(uint8_t* base);
+bool FreeDue();
 
 }  // namespace models

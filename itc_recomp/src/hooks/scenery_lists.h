@@ -28,7 +28,7 @@ bool SceneryListsSlotDiagnostics();
 
 // ModelList::Release (sub_82147FB8): r3 = the list; the guest calls from a
 // 128-byte frame like the original's.
-void SceneryListsModelListRelease(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsModelListRelease(lifted::Regs& ctx);
 // ModelList::Load (sub_82148428): r3 = the list, r4 = the container;
 // ModelList::LoadPoints (sub_82148528): the same. No adapters (the
 // harness's steps; CourseSet::Parse's plain C++ calls them). Natively only where
@@ -36,83 +36,83 @@ void SceneryListsModelListRelease(lifted::Regs& ctx, uint8_t* base);
 // the callees' originals, where their plain C++ declines, guest calls from
 // 512 bytes below r1 with the original's return addresses. Flush-to-zero
 // off, as Model::Load leaves it.
-void SceneryListsModelListLoad(lifted::Regs& ctx, uint8_t* base);
-void SceneryListsModelListLoadPoints(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsModelListLoad(lifted::Regs& ctx);
+void SceneryListsModelListLoadPoints(lifted::Regs& ctx);
 // SceneryModel::ResetDrawState (sub_82146AA8): r3 = the model (left).
-void SceneryListsResetDrawState(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsResetDrawState(lifted::Regs& ctx);
 // AnimationSet::CurrentFrame (sub_82146B80): r3 = the set, r4 = the index.
-void SceneryListsAnimationCurrentFrame(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsAnimationCurrentFrame(lifted::Regs& ctx);
 // ModelList::IsBEntryOn, IsCEntryOn, PointList::IsEntryOn (sub_82147850,
 // sub_82147958, sub_82147B18): r4 = the entry.
-void SceneryListsIsBEntryOn(lifted::Regs& ctx, uint8_t* base);
-void SceneryListsIsCEntryOn(lifted::Regs& ctx, uint8_t* base);
-void SceneryListsPointListIsEntryOn(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsIsBEntryOn(lifted::Regs& ctx);
+void SceneryListsIsCEntryOn(lifted::Regs& ctx);
+void SceneryListsPointListIsEntryOn(lifted::Regs& ctx);
 // Race::CourseLayout (sub_8228F408): r3 = the layout (sign-extended).
-void SceneryListsCourseLayout(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsCourseLayout(lifted::Regs& ctx);
 // PassDescription::SetBillboardPass (sub_82148650): r3 = the description, r4
 // and r6 its words (r3 left).
-void SceneryListsSetBillboardPass(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsSetBillboardPass(lifted::Regs& ctx);
 // VertexDeclarations::ForDepth (sub_82589970): r3 = the stream type. No
 // adapter (the harness's steps).
-void SceneryListsDepthVertexDeclaration(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsDepthVertexDeclaration(lifted::Regs& ctx);
 // TextureProvider::ClearAll and Set (sub_82594328, sub_82594718): r3 = the
 // provider (left); Set's r4 = the slot, r5 = the value.
-void SceneryListsTextureProviderClearAll(lifted::Regs& ctx, uint8_t* base);
-void SceneryListsTextureProviderSet(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsTextureProviderClearAll(lifted::Regs& ctx);
+void SceneryListsTextureProviderSet(lifted::Regs& ctx);
 
 // Model::IsShapeVisible (sub_825951E0): r3 = the model, r4 = the
 // view-projection, r5 = the world matrix, r6 = the shape; the product in a
 // 192-byte frame like the original's (at r1 - 96).
-void SceneryListsIsShapeVisible(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsIsShapeVisible(lifted::Regs& ctx);
 // Recorder::RecordObject (sub_825953D0): r4 = the view-projection, r5 = the
 // world matrix; r3 = the header slot. False, with nothing done, where the
 // original must run (--native_scenery_lists off, the command list's
 // diagnostics on, or the plain C++ declines). Called from its wrapper
 // (src/interpolation/blend_state.cpp), inside the interpolation's hooks.
-bool SceneryListsRecordObject(lifted::Regs& ctx, uint8_t* base);
+bool SceneryListsRecordObject(lifted::Regs& ctx);
 // The same without the flag (the harness's steps): the original runs where
 // the plain C++ declines.
-void SceneryListsRecordObjectSteps(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsRecordObjectSteps(lifted::Regs& ctx);
 // Recorder::RecordSceneLights (sub_82595490): r3 = the header slot.
-void SceneryListsRecordSceneLights(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsRecordSceneLights(lifted::Regs& ctx);
 
 // Model::RecordShapeDepth (sub_825960D0): r3 = the model, r4 = the shape,
 // r5 = the group, r7 = the mask, r8 = the byte; r3 = the chunk's first slot
 // or 0.
-void SceneryListsRecordShapeDepth(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsRecordShapeDepth(lifted::Regs& ctx);
 // Model::DrawShapeDepth (sub_82596D48): r3 = the model, r4 = the
 // view-projection, r5 = the world matrix, r6 = the shape, r7 = the group,
 // r8 = the mask, r9 = the byte; the render queue's slot 4 a guest call from
 // a 160-byte frame like the original's.
-void SceneryListsDrawShapeDepth(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsDrawShapeDepth(lifted::Regs& ctx);
 
 // SceneryModel::RecordShape (sub_82146BD0): r3 = the model, r4 = the
 // shape, r5 = the group, r6 = whether to set the shaders, r7 = pixel c76,
 // r8 = the range, r9 = the shared pair's offset; the guest calls from a
 // 304-byte frame like the original's.
-void SceneryListsRecordShape(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsRecordShape(lifted::Regs& ctx);
 // SceneryModel::DrawShape (sub_82147D88): r3 = the model, r4 = the
 // view-projection, r5 = the world matrix, r6 = the shape, r7 = the depth
 // pass too, r8 = pixel c76, r9 = the range, r10 = the pair offset; from a
 // 208-byte frame.
-void SceneryListsDrawShape(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsDrawShape(lifted::Regs& ctx);
 
 // Model::RecordShape (sub_82595550, behind --native_models): r3 = the
 // model, r4 = the shape, r5 = the group, r6 = whether to set the shaders,
 // r7 = pixel c76, r8 = the range; the guest calls from a 304-byte frame like
 // the original's.
-void SceneryListsModelRecordShape(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsModelRecordShape(lifted::Regs& ctx);
 // Model::RecordMaterials (sub_820CECA0, behind --native_models): r3 = the
 // model, r4 = the shape, r5 = the group, r6 = whether to set the shaders;
 // the guest calls from a 288-byte frame like the original's.
-void SceneryListsModelRecordMaterials(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsModelRecordMaterials(lifted::Regs& ctx);
 // Model::DrawShape (sub_82596B18): r3 = the model, r4 = the view-projection,
 // r5 = the world matrix, r6 = the shape, r7 = the depth pass too, r8 =
 // pixel c76, r9 = the range; from a 208-byte frame.
-void SceneryListsModelDrawShape(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsModelDrawShape(lifted::Regs& ctx);
 
 // PointList::Draw (sub_82148058): r3 = the list, r4 = the entry, r5 = the
 // camera pass; from a 464-byte frame.
-void SceneryListsPointListDraw(lifted::Regs& ctx, uint8_t* base);
+void SceneryListsPointListDraw(lifted::Regs& ctx);
 
 }  // namespace hooks

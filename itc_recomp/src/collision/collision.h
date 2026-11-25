@@ -28,7 +28,7 @@ constexpr uint32_t kBoxVtable = 0x82002B30;
 constexpr uint32_t kShapeVtable = 0x82002AA8;
 
 // Whether `shape`'s vtable is the box's.
-bool IsBox(uint8_t* base, uint32_t shape);
+bool IsBox(uint32_t shape);
 
 // --- The box's methods (vtable slots) and accessors ---
 
@@ -44,34 +44,34 @@ uint32_t BoxFace(uint32_t box, uint32_t i);
 // BoxShape::EdgeStart and EdgeEnd (sub_820B9F98, sub_820B9FB0) and
 // BoxEdges::Start and End (sub_820B9FC8, sub_820B9FE0): the edge's corner
 // indices, words of the tables 0x82600D54 and 0x82600D84.
-uint32_t BoxEdgeStart(uint8_t* base, uint32_t edge);
-uint32_t BoxEdgeEnd(uint8_t* base, uint32_t edge);
-uint32_t BoxEdgesStart(uint8_t* base, uint32_t edge);
-uint32_t BoxEdgesEnd(uint8_t* base, uint32_t edge);
+uint32_t BoxEdgeStart(uint32_t edge);
+uint32_t BoxEdgeEnd(uint32_t edge);
+uint32_t BoxEdgesStart(uint32_t edge);
+uint32_t BoxEdgesEnd(uint32_t edge);
 // BoxShape::SetCacheWord (sub_820BA668) and CacheWord (sub_820BA678): the
 // word +160 + 4i. BoxShape::CopyCache (sub_820BAA50): the four words +160
 // copied from `from`.
-void BoxSetCacheWord(uint8_t* base, uint32_t box, uint32_t i, uint32_t value);
-uint32_t BoxCacheWord(uint8_t* base, uint32_t box, uint32_t i);
-void BoxCopyCache(uint8_t* base, uint32_t box, uint32_t from);
+void BoxSetCacheWord(uint32_t box, uint32_t i, uint32_t value);
+uint32_t BoxCacheWord(uint32_t box, uint32_t i);
+void BoxCopyCache(uint32_t box, uint32_t from);
 // Shape::Radius (sub_820BAB40): the float +32.
-double ShapeRadius(uint8_t* base, uint32_t shape);
+double ShapeRadius(uint32_t shape);
 // BoxShape::LowerCorner (sub_820BA368): corner k (word i of 0x82002B0C) or
 // k ^ 2, whichever has the smaller y (k when equal or NaN); its address.
-uint32_t BoxLowerCorner(uint8_t* base, uint32_t box, uint32_t i);
+uint32_t BoxLowerCorner(uint32_t box, uint32_t i);
 // BoxShape::FaceDistance (sub_820BA3B0): dot(face i's normal, the point) -
 // its distance. `r3`: what the original leaves there (the normal).
-double BoxFaceDistance(uint8_t* base, uint32_t box, uint32_t i, uint32_t point, uint32_t* r3);
+double BoxFaceDistance(uint32_t box, uint32_t i, uint32_t point, uint32_t* r3);
 // BoxShape::FaceDirection (sub_820B9F00): the factors (entry i of
 // 0x82600DC0) applied to the face normals +320, +352, +384, copied into the
 // static vector 0x826C2DE0; returns it. `frame`: the original's 208 bytes.
-uint32_t BoxFaceDirection(uint8_t* base, uint32_t box, uint32_t i, uint32_t frame);
+uint32_t BoxFaceDirection(uint32_t box, uint32_t i, uint32_t frame);
 // BoxShape::Translate (sub_820BA2F0): the corners and the center += the
 // offset, each face's distance += dot(normal, offset). Returns what the
 // original leaves in f1 (the last dot product); r3 is the box + 48.
-double BoxTranslate(uint8_t* base, uint32_t box, uint32_t offset);
+double BoxTranslate(uint32_t box, uint32_t offset);
 // sub_822BE2C8 (an accessor shared between classes): the word +8.
-uint32_t WordAt8(uint8_t* base, uint32_t object);
+uint32_t WordAt8(uint32_t object);
 
 // --- The box's and the base class's constructors and placement ---
 
@@ -80,32 +80,32 @@ uint32_t WordAt8(uint8_t* base, uint32_t object);
 // 0.5 (0x82001BE4), +24 = [0x82002968], +28 = [0x82002204]; +64, +80, +96
 // the identity rows (through `frame` + 80 to + 127, the original's 176
 // bytes); halfwords +112, +114 = 0.
-void ShapeConstruct(uint8_t* base, uint32_t shape, uint32_t frame);
+void ShapeConstruct(uint32_t shape, uint32_t frame);
 // Shape::Shape(const&) (sub_820BAB48) and BoxShape::BoxShape(const&)
 // (sub_820BB688): the copies (the latter's 128 bytes of corners and 192 of
 // faces, and the former's 48 at +64, by memcpy). False, with nothing done,
 // where those memcpys can't be done natively (src/c_runtime/strings.h:
 // ranges that may share memory, or in the physical views).
-bool ShapeCopyConstruct(uint8_t* base, uint32_t shape, uint32_t from);
-bool BoxCopyConstruct(uint8_t* base, uint32_t box, uint32_t from);
+bool ShapeCopyConstruct(uint32_t shape, uint32_t from);
+bool BoxCopyConstruct(uint32_t box, uint32_t from);
 // Whether BoxCopyConstruct copies `from` into `box` natively.
 bool BoxCopyFits(uint32_t box, uint32_t from);
 // BoxShape::SetCorners (sub_820B99D0): the center, radius, half extents and
 // their inverses, the 8 corners, the 6 faces, the cache words zeroed and
 // the identity axes from the two corners. `frame`: the original's 224
 // bytes. Returns what the original leaves in f1 (the last face's distance).
-double BoxSetCorners(uint8_t* base, uint32_t box, uint32_t min_corner, uint32_t max_corner,
+double BoxSetCorners(uint32_t box, uint32_t min_corner, uint32_t max_corner,
                      uint32_t frame);
 // BoxShape::BoxShape (sub_820BB188): Shape::Shape (its frame below
 // `frame`, the original's 112 bytes), the vtable 0x82002B30, the w of +140,
 // +156, the corners and the faces' normals 0.0, then SetCorners.
-void BoxConstruct(uint8_t* base, uint32_t box, uint32_t min_corner, uint32_t max_corner,
+void BoxConstruct(uint32_t box, uint32_t min_corner, uint32_t max_corner,
                   uint32_t frame);
 // BoxShape::Place (sub_820B9C40): the box placed from the template box by
 // the matrix (the center and corners through it, the faces' normals its
 // rows, the axes its rows). False, with nothing done, for a template that
 // isn't a box. `frame`: the original's 288 bytes.
-bool BoxPlace(uint8_t* base, uint32_t box, uint32_t matrix, uint32_t source, uint32_t frame);
+bool BoxPlace(uint32_t box, uint32_t matrix, uint32_t source, uint32_t frame);
 
 // --- The shapes' lifetime: operator new and delete through the C runtime's
 // heap over the allocation layer (src/memory/c_runtime_heap.h), so the
@@ -119,13 +119,13 @@ bool Deletable(uint32_t block);
 // vtable 0x82002AA8, and with bit 0 of `flags` the shape freed (operator
 // delete). Returns the shape in the original's r3. False, with nothing
 // done, where the shape isn't Deletable.
-bool ShapeDeletingDestructor(uint8_t* base, uint32_t shape, uint32_t flags);
+bool ShapeDeletingDestructor(uint32_t shape, uint32_t flags);
 // BoxShape::Clone (sub_820BB218, slot 5): a box from `box`'s corners (+288,
 // +176) built in `memory`, or in 496 bytes from operator new when 0;
 // `copy` = it (0 when the allocation gave 0). False, with nothing done,
 // where operator new would take its error path. `frame`: the original's 96
 // bytes.
-bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint32_t* copy);
+bool BoxClone(uint32_t box, uint32_t memory, uint32_t frame, uint32_t* copy);
 
 // --- The shape record (a collision object's +32: +0 the template shape,
 // +4 the previous placed copy, +8 the current one) ---
@@ -139,44 +139,44 @@ bool BoxClone(uint8_t* base, uint32_t box, uint32_t memory, uint32_t frame, uint
 // Both false, with nothing done, where a copy isn't a box the layer gave
 // (or the two are one block), the template isn't a box, or the clones'
 // allocation would fail. `frame`: SetUp's 128 bytes.
-bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3);
+bool CollisionShapeDestroy(uint32_t record, uint32_t* r3);
 // Whether CollisionShapeDestroy runs natively for the record (its copies
 // boxes the layer gave, or 0, and not one block).
-bool CollisionShapeDestroyable(uint8_t* base, uint32_t record);
-bool CollisionShapeSetUp(uint8_t* base, uint32_t record, uint32_t shape, uint32_t matrix,
+bool CollisionShapeDestroyable(uint32_t record);
+bool CollisionShapeSetUp(uint32_t record, uint32_t shape, uint32_t matrix,
                          uint32_t memory, uint32_t frame);
 // CollisionShape::CurrentCenter (sub_820BAB20) and PreviousCenter
 // (sub_820BAB30): [+8] + 48 and [+4] + 48.
-uint32_t CollisionShapeCurrentCenter(uint8_t* base, uint32_t record);
-uint32_t CollisionShapePreviousCenter(uint8_t* base, uint32_t record);
+uint32_t CollisionShapeCurrentCenter(uint32_t record);
+uint32_t CollisionShapePreviousCenter(uint32_t record);
 // CollisionShape::Type (sub_820BACB8): the template's type (its slot 4: 2
 // for a box). CollisionShape::Previous (sub_820BADF8) and Current
 // (sub_820BAE38): the template's type asked for (the answer dropped), then
 // +4 or +8. False for a template that isn't a box.
-bool CollisionShapeType(uint8_t* base, uint32_t record, uint32_t* type);
-bool CollisionShapePrevious(uint8_t* base, uint32_t record, uint32_t* copy);
-bool CollisionShapeCurrent(uint8_t* base, uint32_t record, uint32_t* copy);
+bool CollisionShapeType(uint32_t record, uint32_t* type);
+bool CollisionShapePrevious(uint32_t record, uint32_t* copy);
+bool CollisionShapeCurrent(uint32_t record, uint32_t* copy);
 
 // CollisionShape::UpdateBounds (sub_820BAC00): +16..+24 = per axis the
 // smaller of the two copies' centers minus the template's radius, +32..+40
 // the larger plus it (`blt`: ties and NaNs take the current copy's).
-void CollisionShapeUpdateBounds(uint8_t* base, uint32_t record);
+void CollisionShapeUpdateBounds(uint32_t record);
 // CollisionShape::UpdateMotion (sub_820BAE78): the motion from the previous
 // copy to the current one into the matrix +48 (the axes' dot products, and
 // the row +96). `frame`: the original's 240 bytes.
-void CollisionShapeUpdateMotion(uint8_t* base, uint32_t record, uint32_t frame);
+void CollisionShapeUpdateMotion(uint32_t record, uint32_t frame);
 // CollisionShape::Place (sub_820BB758): the copies swapped, the new current
 // one placed by the matrix (from the template, or from a copy of it on the
 // stack with its bottom lowered by +112), its cache words from the
 // previous one, then UpdateMotion and UpdateBounds. False, with nothing
 // done, where a copy or the template isn't a box or the stack copy's
 // memcpys can't be native. `frame`: the original's 608 bytes.
-bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32_t frame);
+bool CollisionShapePlace(uint32_t record, uint32_t matrix, uint32_t frame);
 // CollisionShape::Translate (sub_820BACD0): the current copy moved by the
 // offset (BoxShape::Translate), the motion's row +96 worked out again, then
 // UpdateBounds. False, with nothing done, where the current copy isn't a
 // box. `frame`: the original's 192 bytes.
-bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, uint32_t frame);
+bool CollisionShapeTranslate(uint32_t record, uint32_t offset, uint32_t frame);
 
 // --- The box-box separation tests (src/collision/box_box.cpp). A block
 // (336 bytes, four of them in the query at +112, +448, +784, +1120, their
@@ -188,45 +188,45 @@ bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, ui
 // block (its center +48 and its 3x3). BoxShape::RelativeCenter
 // (sub_820BA5D8): the center only. They return what the original leaves in
 // r3 (B + 384, B + 48).
-uint32_t BoxRelativePlacement(uint8_t* base, uint32_t a, uint32_t block, uint32_t b);
-uint32_t BoxRelativeCenter(uint8_t* base, uint32_t a, uint32_t block, uint32_t b);
+uint32_t BoxRelativePlacement(uint32_t a, uint32_t block, uint32_t b);
+uint32_t BoxRelativeCenter(uint32_t a, uint32_t block, uint32_t b);
 // BoxBox::Outcode (sub_820BD0C8): the block's outcode (bits 1, 2 for x
 // beyond +1 or -1 with its reach, 4, 8 for y, 16, 32 for z).
-uint32_t BoxBoxOutcode(uint8_t* base, uint32_t block);
+uint32_t BoxBoxOutcode(uint32_t block);
 // BoxBox::BlockCorners (sub_820BC978): the block's 8 corners and their
 // outcodes. `frame`: the original's 320 bytes.
-void BoxBoxBlockCorners(uint8_t* base, uint32_t block, uint32_t frame);
+void BoxBoxBlockCorners(uint32_t block, uint32_t frame);
 // BoxBox::MoveCorners (sub_820BCCE8; its r3 the block's corners, +80):
 // the block's 8 corners moved by the offset, their outcodes again.
-void BoxBoxMoveCorners(uint8_t* base, uint32_t block, uint32_t offset);
+void BoxBoxMoveCorners(uint32_t block, uint32_t offset);
 // BoxBox::FaceSeparates (sub_820BB300): 1 when box B lies wholly outside
 // the face at both placements (the faces of A's previous and current
 // copies, B's previous and current copies), else 0.
-uint32_t BoxBoxFaceSeparates(uint8_t* base, uint32_t previous_face, uint32_t current_face,
+uint32_t BoxBoxFaceSeparates(uint32_t previous_face, uint32_t current_face,
                              uint32_t previous_box, uint32_t current_box);
 // BoxBox::Separated (sub_820BD280): the cached face (`cache`, the pair's
 // +24) or a face of either box separating them at both placements: 1, the
 // cache set; else 0, the cache 0 and the blocks' corners. False, with
 // nothing done, where a record's template or a copy isn't a box. `frame`:
 // the original's 160 bytes.
-bool BoxBoxSeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t frame,
+bool BoxBoxSeparated(uint32_t query, uint32_t cache, uint32_t frame,
                      uint32_t* result);
 // BoxBox::SeparatedAfterMove (sub_820BD578): the current blocks' centers
 // again; 1 when one's outcode shares a bit with the previous one's, else 0
 // with the current blocks' corners moved. False as Separated. `frame`: the
 // original's 240 bytes.
-bool BoxBoxSeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* result);
+bool BoxBoxSeparatedAfterMove(uint32_t query, uint32_t frame, uint32_t* result);
 // Query::Separated (sub_820BD508) and Query::SeparatedAfterMove
 // (sub_820BD6E0): the box-box tests for two boxes; false (the original
 // runs) for any other shapes. `frame`: the original's 112 and 96 bytes.
-bool QuerySeparated(uint8_t* base, uint32_t query, uint32_t cache, uint32_t frame,
+bool QuerySeparated(uint32_t query, uint32_t cache, uint32_t frame,
                     uint32_t* result);
-bool QuerySeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* result);
+bool QuerySeparatedAfterMove(uint32_t query, uint32_t frame, uint32_t* result);
 // CollisionPair::NextCheckTime (sub_820BBB20): the clock (0x826C2D80) plus
 // the time until the objects' bounding spheres could touch at the bodies'
 // speeds, or plus the step (0x826C2D84). `r3`: what the original leaves
 // there. `frame`: the original's 160 bytes.
-double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* r3);
+double CollisionPairNextCheckTime(uint32_t pair, uint32_t frame, uint32_t* r3);
 
 // --- The impacts (src/collision/impacts.cpp): the query's +32 its contact
 // (+84 the impact time, +80 the depth), +96 the push direction. ---
@@ -236,22 +236,22 @@ double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, 
 // BoxBox::SwapForPushOut (sub_820BEBF0): the direction +96 x -1.0, the
 // contact flipped, A and B swapped and the blocks +12 with +20. Both return
 // what the original leaves in r3 (the query + 64).
-uint32_t BoxBoxSwapForImpact(uint8_t* base, uint32_t query);
-uint32_t BoxBoxSwapForPushOut(uint8_t* base, uint32_t query);
+uint32_t BoxBoxSwapForImpact(uint32_t query);
+uint32_t BoxBoxSwapForPushOut(uint32_t query);
 // BoxBox::CornerImpacts (sub_820BECA0): A's corners crossing a face of B's
 // unit box between the placements, the earliest under the time so far (+84)
 // set as the contact. False, with nothing done, where a record's template or
 // current copy isn't a box. `r3`: what the original leaves there.
-bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3);
+bool BoxBoxCornerImpacts(uint32_t query, uint32_t* r3);
 // BoxBox::FindImpact (sub_820BF038): CornerImpacts both ways round (swapped
 // and back). False as CornerImpacts.
-bool BoxBoxFindImpact(uint8_t* base, uint32_t query);
+bool BoxBoxFindImpact(uint32_t query);
 // Query::FindImpact (sub_820BCE80): +80 = 0.0, +84 = +88 = 2.0, the impact
 // test for the shapes' types (box-box: BoxBox::FindImpact), then 1 when
 // the time +84 is under [0x82002B90]. False, with nothing done, where the
 // shapes aren't boxes or the table's box-box entry isn't
 // BoxBox::FindImpact.
-bool QueryFindImpact(uint8_t* base, uint32_t query, uint32_t* result);
+bool QueryFindImpact(uint32_t query, uint32_t* result);
 
 // --- The push-outs (src/collision/impacts.cpp): along the query's
 // direction (+96), the contact with the largest depth (+80) found. Each
@@ -262,29 +262,29 @@ bool QueryFindImpact(uint8_t* base, uint32_t query, uint32_t* result);
 // block's box, its word of `out` 1 when its ends' outcodes share no bit,
 // aren't both 0 and differ, and it passes through a face of the unit box;
 // else 0. Returns 1 when any did.
-uint32_t BoxBoxEdgesCrossing(uint8_t* base, uint32_t out, uint32_t block);
+uint32_t BoxBoxEdgesCrossing(uint32_t out, uint32_t block);
 // BoxBox::PushOutEdges (sub_820BF320): A's edges crossing B's unit box
 // against B's crossing A's: the normal of each pair (their cross product,
 // turned away from B's edge's outward direction), the shallowest depth
 // along the direction under [0x82002B94] and above +80 made the contact (B's
 // edge's middle). `frame`: the original's 544 bytes.
-bool BoxBoxPushOutEdges(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+bool BoxBoxPushOutEdges(uint32_t query, uint32_t frame, uint32_t* r3);
 // BoxBox::PushOutCorners (sub_820BE150): A's corners inside B (outcode 0
 // in block +20): the farthest way out along the direction in B's unit box
 // (sub_820BE0D8's work per axis), its length in world units above +80 made
 // the contact (A's corner, B's face's normal: sub_820BC8A8's work). Both
 // callees never ran in play. `frame`: the original's 304 bytes.
-bool BoxBoxPushOutCorners(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+bool BoxBoxPushOutCorners(uint32_t query, uint32_t frame, uint32_t* r3);
 // BoxBox::FindPushOut (sub_820BFB28): unless a current block's outcode is
 // set, PushOutCorners both ways round (swapped and back), then with no
 // depth found PushOutEdges. `frame`: the original's 96 bytes.
-bool BoxBoxFindPushOut(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* r3);
+bool BoxBoxFindPushOut(uint32_t query, uint32_t frame, uint32_t* r3);
 // Query::FindPushOut (sub_820BCDD0): +96 = the direction, +80 = 0.0, +84 =
 // +88 = 2.0, the push-out test for the shapes' types (box-box:
 // BoxBox::FindPushOut), then 1 when the depth +80 is above 0.0. False,
 // with nothing done, where the shapes aren't boxes or the table's box-box
 // entry isn't BoxBox::FindPushOut. `frame`: the original's 112 bytes.
-bool QueryFindPushOut(uint8_t* base, uint32_t query, uint32_t direction, uint32_t frame,
+bool QueryFindPushOut(uint32_t query, uint32_t direction, uint32_t frame,
                       uint32_t* result);
 
 // --- The pair (src/collision/pairs.cpp): +16 and +20 the collision
@@ -295,7 +295,7 @@ bool QueryFindPushOut(uint8_t* base, uint32_t query, uint32_t direction, uint32_
 // (CollisionObject::Translate), and neither body fixed (byte +0 = 1) when
 // the impulse applies (RigidBody::ContactImpulseWith runs the original
 // for a fixed body).
-bool CollisionPairRespondNative(uint8_t* base, uint32_t a, uint32_t b);
+bool CollisionPairRespondNative(uint32_t a, uint32_t b);
 // CollisionPair::Respond (sub_820BB868): the contact (+0 the point, +16
 // the normal, +32 the push direction, +48 the depth) answered: the objects
 // pushed apart by their mass shares (CollisionObject::Translate) when
@@ -304,29 +304,29 @@ bool CollisionPairRespondNative(uint8_t* base, uint32_t a, uint32_t b);
 // their +256 does, and a contact added to each. Only where
 // CollisionPairRespondNative. `r3`: what the original leaves there.
 // `frame`: the original's 240 bytes.
-void CollisionPairRespond(uint8_t* base, uint32_t a, uint32_t b, uint32_t contact,
+void CollisionPairRespond(uint32_t a, uint32_t b, uint32_t contact,
                           uint32_t frame, uint32_t* r3);
 // CollisionPair::Solve (sub_820BBE30): the query on the stack (`frame` +
 // 128): 0 when a face separates the boxes, else up to 10 impacts and up to
 // 3 push-outs, each answered (Respond); 1 when any was. False, with nothing
 // done, where a record's template or copies aren't boxes or Respond can't
 // be native. `frame`: the original's 1,632 bytes.
-bool CollisionPairSolve(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* result);
+bool CollisionPairSolve(uint32_t pair, uint32_t frame, uint32_t* result);
 
 // --- The query (on CollisionPair::Solve's stack) and its contact (+32) ---
 
 // Query::Query (sub_820BD1C8): the w of +32, +48, +64, +96 and of the 8
 // corners of each of the four blocks 0.0; +0, +4 = 0; +8 to +20 the blocks
 // at +112, +448, +784, +1120.
-void QueryConstruct(uint8_t* base, uint32_t query);
+void QueryConstruct(uint32_t query);
 // Query::SetShapes (sub_820BC848): +0 = a, +4 = b.
-void QuerySetShapes(uint8_t* base, uint32_t query, uint32_t a, uint32_t b);
+void QuerySetShapes(uint32_t query, uint32_t a, uint32_t b);
 // Contact::Set (sub_820BC908): +0 = the point, +16 and +32 = the normal,
 // +48 = depth, +52 = time.
-void ContactSet(uint8_t* base, uint32_t contact, uint32_t point, uint32_t normal, double depth,
+void ContactSet(uint32_t contact, uint32_t point, uint32_t normal, double depth,
                 double time);
 // Contact::Flip (sub_820BC858): +16 and +32 x -1.0. Returns the -1.0 (the
 // original's f1).
-double ContactFlip(uint8_t* base, uint32_t contact);
+double ContactFlip(uint32_t contact);
 
 }  // namespace collision

@@ -13,19 +13,19 @@
 
 namespace c_runtime {
 
-uint32_t Wcslen(uint8_t* base, uint32_t string) {
+uint32_t Wcslen(uint32_t string) {
   ITC_NATIVE_RUNNING("sub_825A9958 wcslen");
   uint32_t n = 0;
-  while (guest::LoadU16(base, string + 2 * n) != 0) {
+  while (guest::LoadU16(string + 2 * n) != 0) {
     n++;
   }
   return n;
 }
 
-void Wcscpy(uint8_t* base, uint32_t destination, uint32_t source) {
+void Wcscpy(uint32_t destination, uint32_t source) {
   for (;;) {
-    const uint16_t unit = guest::LoadU16(base, source);
-    guest::StoreU16(base, destination, unit);
+    const uint16_t unit = guest::LoadU16(source);
+    guest::StoreU16(destination, unit);
     if (unit == 0) {
       return;
     }
@@ -34,18 +34,18 @@ void Wcscpy(uint8_t* base, uint32_t destination, uint32_t source) {
   }
 }
 
-void Wcscat(uint8_t* base, uint32_t destination, uint32_t source) {
-  while (guest::LoadU16(base, destination) != 0) {
+void Wcscat(uint32_t destination, uint32_t source) {
+  while (guest::LoadU16(destination) != 0) {
     destination += 2;
   }
-  Wcscpy(base, destination, source);
+  Wcscpy(destination, source);
 }
 
-int32_t Wcscmp(uint8_t* base, uint32_t a, uint32_t b) {
+int32_t Wcscmp(uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_825A7EB0 wcscmp");
   for (;;) {
-    const uint16_t x = guest::LoadU16(base, a);
-    const uint16_t y = guest::LoadU16(base, b);
+    const uint16_t x = guest::LoadU16(a);
+    const uint16_t y = guest::LoadU16(b);
     if (x != y) {
       return x < y ? -1 : 1;
     }
@@ -57,25 +57,25 @@ int32_t Wcscmp(uint8_t* base, uint32_t a, uint32_t b) {
   }
 }
 
-int32_t Mbtowc(uint8_t* base, uint32_t wide, uint32_t bytes, uint32_t count) {
+int32_t Mbtowc(uint32_t wide, uint32_t bytes, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825B7EC8 mbtowc");
   if (bytes == 0 || count == 0) {
     return 0;
   }
-  const uint8_t byte = guest::LoadU8(base, bytes);
+  const uint8_t byte = guest::LoadU8(bytes);
   if (wide != 0) {
-    guest::StoreU16(base, wide, byte);
+    guest::StoreU16(wide, byte);
   }
   return byte != 0 ? 1 : 0;
 }
 
-void Strncpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t count) {
+void Strncpy(uint32_t destination, uint32_t source, uint32_t count) {
   if (count == 0) {
     return;
   }
   for (;;) {
-    const uint8_t byte = guest::LoadU8(base, source++);
-    guest::StoreU8(base, destination++, byte);
+    const uint8_t byte = guest::LoadU8(source++);
+    guest::StoreU8(destination++, byte);
     if (byte == 0) {
       break;
     }
@@ -85,17 +85,17 @@ void Strncpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t coun
   }
   // The terminator took one of the bytes left.
   for (uint32_t i = 1; i < count; i++) {
-    guest::StoreU8(base, destination++, 0);
+    guest::StoreU8(destination++, 0);
   }
 }
 
-bool StrcpyS(uint8_t* base, uint32_t destination, uint32_t size, uint32_t source) {
+bool StrcpyS(uint32_t destination, uint32_t size, uint32_t source) {
   ITC_NATIVE_RUNNING("sub_825A9DD8 strcpy_s");
   if (destination == 0 || size == 0 || source == 0) {
     return false;
   }
   uint32_t length = 0;  // fits when the terminator is within the first `size` bytes
-  while (guest::LoadU8(base, source + length) != 0) {
+  while (guest::LoadU8(source + length) != 0) {
     if (++length == size) {
       return false;
     }
@@ -104,18 +104,18 @@ bool StrcpyS(uint8_t* base, uint32_t destination, uint32_t size, uint32_t source
     return false;
   }
   for (uint32_t i = 0; i <= length; i++) {
-    guest::StoreU8(base, destination + i, guest::LoadU8(base, source + i));
+    guest::StoreU8(destination + i, guest::LoadU8(source + i));
   }
   return true;
 }
 
-int32_t Strncmp(uint8_t* base, uint32_t a, uint32_t b, int32_t count) {
+int32_t Strncmp(uint32_t a, uint32_t b, int32_t count) {
   if (count <= 0) {
     return 0;
   }
   for (uint32_t left = uint32_t(count);; a++, b++) {
-    const uint8_t x = guest::LoadU8(base, a);
-    const int32_t difference = int32_t(x) - int32_t(guest::LoadU8(base, b));
+    const uint8_t x = guest::LoadU8(a);
+    const int32_t difference = int32_t(x) - int32_t(guest::LoadU8(b));
     if (--left == 0 || x == 0 || difference != 0) {
       return difference;
     }
@@ -130,10 +130,10 @@ int32_t FoldAscii(int32_t c) {
 
 }  // namespace
 
-int32_t Stricmp(uint8_t* base, uint32_t a, uint32_t b) {
+int32_t Stricmp(uint32_t a, uint32_t b) {
   for (;; a++, b++) {
-    const int32_t y = guest::LoadU8(base, b);
-    const int32_t x = guest::LoadU8(base, a);
+    const int32_t y = guest::LoadU8(b);
+    const int32_t x = guest::LoadU8(a);
     if (y == 0) {
       return x - y;
     }
@@ -147,58 +147,58 @@ int32_t Stricmp(uint8_t* base, uint32_t a, uint32_t b) {
   }
 }
 
-int32_t AsciiStrnicmp(uint8_t* base, uint32_t a, uint32_t b, uint32_t count) {
+int32_t AsciiStrnicmp(uint32_t a, uint32_t b, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825AC6B0 __ascii_strnicmp");
   if (count == 0) {
     return 0;
   }
   for (;; a++, b++) {
-    const int32_t x = FoldAscii(guest::LoadU8(base, a));
-    const int32_t y = FoldAscii(guest::LoadU8(base, b));
+    const int32_t x = FoldAscii(guest::LoadU8(a));
+    const int32_t y = FoldAscii(guest::LoadU8(b));
     if (--count == 0 || x == 0 || x != y) {
       return x - y;
     }
   }
 }
 
-int64_t Strstr(uint8_t* base, uint32_t string, uint32_t find) {
-  if (guest::LoadU8(base, find) == 0) {
+int64_t Strstr(uint32_t string, uint32_t find) {
+  if (guest::LoadU8(find) == 0) {
     return 0;
   }
-  for (uint32_t at = 0; guest::LoadU8(base, string + at) != 0; at++) {
+  for (uint32_t at = 0; guest::LoadU8(string + at) != 0; at++) {
     uint32_t k = 0;
-    while (guest::LoadU8(base, find + k) != 0 &&
-           guest::LoadU8(base, string + at + k) == guest::LoadU8(base, find + k)) {
+    while (guest::LoadU8(find + k) != 0 &&
+           guest::LoadU8(string + at + k) == guest::LoadU8(find + k)) {
       k++;
-      if (guest::LoadU8(base, string + at + k) == 0) {
+      if (guest::LoadU8(string + at + k) == 0) {
         break;
       }
     }
-    if (guest::LoadU8(base, find + k) == 0) {
+    if (guest::LoadU8(find + k) == 0) {
       return at;
     }
   }
   return -1;
 }
 
-void CopyForward(uint8_t* base, uint32_t destination, uint32_t source, uint32_t count) {
-  if (memory::CopyWithHandles(base, destination, source, count)) {
+void CopyForward(uint32_t destination, uint32_t source, uint32_t count) {
+  if (memory::CopyWithHandles(destination, source, count)) {
     return;
   }
   while (count != 0 && (destination & 3) != 0) {
-    guest::StoreU8(base, destination++, guest::LoadU8(base, source++));
+    guest::StoreU8(destination++, guest::LoadU8(source++));
     count--;
   }
   for (uint32_t words = count >> 2; words != 0; words--) {
     // Read whole before it's written, as the original's word (or four
     // bytes, from an unaligned source) is.
-    const uint32_t word = guest::LoadU32(base, source);
-    guest::StoreU32(base, destination, word);
+    const uint32_t word = guest::LoadU32(source);
+    guest::StoreU32(destination, word);
     source += 4;
     destination += 4;
   }
   for (uint32_t rest = count & 3; rest != 0; rest--) {
-    guest::StoreU8(base, destination++, guest::LoadU8(base, source++));
+    guest::StoreU8(destination++, guest::LoadU8(source++));
   }
 }
 
@@ -210,28 +210,28 @@ int32_t ToLowerStep(int32_t c) {
   return uint32_t(c - 'A') <= 25 ? 32 : 0;
 }
 
-uint32_t CTypeC(uint8_t* base, uint32_t c, uint32_t mask) {
+uint32_t CTypeC(uint32_t c, uint32_t mask) {
   const uint32_t table =
-      schema::Locale(base, schema::CRuntimeGlobals::c_locale_address()).ctype_table();
-  return guest::LoadU16(base, table + 2 * c) & mask;
+      schema::Locale(schema::CRuntimeGlobals::c_locale_address()).ctype_table();
+  return guest::LoadU16(table + 2 * c) & mask;
 }
 
-uint32_t IsLeadByte(uint8_t* base, uint32_t c) {
-  const uint32_t table = schema::CRuntimeGlobals::current_locale(base).ctype_table();
-  return guest::LoadU16(base, table + 2 * (c & 0xFF)) & 0x8000;
+uint32_t IsLeadByte(uint32_t c) {
+  const uint32_t table = schema::CRuntimeGlobals::current_locale().ctype_table();
+  return guest::LoadU16(table + 2 * (c & 0xFF)) & 0x8000;
 }
 
-bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool want_end,
+bool StrToXl(uint32_t string, int32_t radix, uint32_t flags, bool want_end,
              uint32_t* end, uint64_t* result) {
   ITC_NATIVE_RUNNING("sub_825A82C8 strtoxl");
   if (string == 0 || (radix != 0 && (radix < 2 || radix > 36))) {
     return false;
   }
-  const schema::Locale locale = schema::CRuntimeGlobals::current_locale(base);
+  const schema::Locale locale = schema::CRuntimeGlobals::current_locale();
   const uint32_t table = locale.ctype_table();
-  auto type = [&](uint8_t c) { return guest::LoadU16(base, table + 2 * uint32_t(c)); };
+  auto type = [&](uint8_t c) { return guest::LoadU16(table + 2 * uint32_t(c)); };
   uint32_t next = string + 1;  // the byte after `c`
-  uint8_t c = guest::LoadU8(base, string);
+  uint8_t c = guest::LoadU8(string);
   for (;;) {
     if (locale.mb_cur_max() > 1) {
       return false;  // multibyte: sub_825AFD98, never seen in play
@@ -239,20 +239,20 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
     if ((type(c) & 8) == 0) {
       break;
     }
-    c = guest::LoadU8(base, next++);
+    c = guest::LoadU8(next++);
   }
   if (c == '-') {
     flags |= 2;
-    c = guest::LoadU8(base, next++);
+    c = guest::LoadU8(next++);
   } else if (c == '+') {
-    c = guest::LoadU8(base, next++);
+    c = guest::LoadU8(next++);
   }
   bool check_prefix = false;
   if (radix == 0) {
     if (c != '0') {
       radix = 10;
     } else {
-      const uint8_t x = guest::LoadU8(base, next);
+      const uint8_t x = guest::LoadU8(next);
       if (x == 'x' || x == 'X') {
         radix = 16;
         check_prefix = true;
@@ -264,9 +264,9 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
     check_prefix = true;
   }
   if (check_prefix && c == '0') {
-    const uint8_t x = guest::LoadU8(base, next);
+    const uint8_t x = guest::LoadU8(next);
     if (x == 'x' || x == 'X') {
-      c = guest::LoadU8(base, next + 1);
+      c = guest::LoadU8(next + 1);
       next += 2;
     }
   }
@@ -300,7 +300,7 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
         break;
       }
     }
-    c = guest::LoadU8(base, next++);
+    c = guest::LoadU8(next++);
   }
   next--;
   if ((flags & 8) == 0) {
@@ -371,8 +371,8 @@ bool MayShare(uint32_t a, uint32_t a_size, uint32_t b, uint32_t b_size) {
   return from_a < from_b + b_size && from_b < from_a + a_size;
 }
 
-bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
-  if (memory::CopyWithHandles(base, destination, source, size)) {
+bool Memcpy(uint32_t destination, uint32_t source, uint32_t size) {
+  if (memory::CopyWithHandles(destination, source, size)) {
     return true;  // a host object on either side
   }
   if (size == 0) {
@@ -385,39 +385,39 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
   if (to < from + size && from < to + size) {
     return false;  // overlapping: the original's loop order decides
   }
-  std::memcpy(guest::Pointer(base, destination), guest::Pointer(base, source), size);
+  std::memcpy(guest::Pointer(destination), guest::Pointer(source), size);
   return true;
 }
 
-void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes) {
-  if (memory::FillWithHandles(base, destination, uint8_t(value), bytes)) {
+void XMemSet(uint32_t destination, uint32_t value, uint32_t bytes) {
+  if (memory::FillWithHandles(destination, uint8_t(value), bytes)) {
     return;
   }
   ITC_NATIVE_RUNNING("sub_822962B0 XMemSet");
   const uint8_t byte = uint8_t(value);
   if (bytes < 16) {
     for (uint32_t i = 0; i < bytes; i++) {
-      guest::StoreU8(base, destination + i, byte);
+      guest::StoreU8(destination + i, byte);
     }
     return;
   }
-  const uint32_t stride = schema::CRuntimeGlobals::xmemset_stride(base);
+  const uint32_t stride = schema::CRuntimeGlobals::xmemset_stride();
   if (stride == 16) {
-    guest::ForEachHostPart(base, destination, bytes, [&](uint8_t* host, uint32_t, uint32_t n) {
+    guest::ForEachHostPart(destination, bytes, [&](uint8_t* host, uint32_t, uint32_t n) {
       std::memset(host, byte, n);
     });
     return;
   }
   // The translated code's steps (docs/functions/c-runtime.md).
-  auto store16 = [&](uint32_t at) { std::memset(guest::Pointer(base, at & ~15u), byte, 16); };
-  auto clear_line = [&](uint32_t at) { std::memset(guest::Pointer(base, at & ~127u), 0, 128); };
+  auto store16 = [&](uint32_t at) { std::memset(guest::Pointer(at & ~15u), byte, 16); };
+  auto clear_line = [&](uint32_t at) { std::memset(guest::Pointer(at & ~127u), 0, 128); };
   uint32_t p = destination;
   uint32_t left = bytes;
   const uint32_t head = (0u - destination) & 15;
   uint32_t to_line = ((0u - destination) >> 4) & 7;
   if (head) {  // stvlx: up to the next 16-byte boundary
     for (uint32_t i = 0; i < head; i++) {
-      guest::StoreU8(base, destination + i, byte);
+      guest::StoreU8(destination + i, byte);
     }
     left -= head;
     p = destination + head;
@@ -461,11 +461,11 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
   }
   const uint32_t end = p + rest;  // stvrx: the bytes below `end` in its 16
   for (uint32_t i = 0; i < (end & 15); i++) {
-    guest::StoreU8(base, end - i - 1, byte);
+    guest::StoreU8(end - i - 1, byte);
   }
 }
 
-std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t bytes) {
+std::optional<uint32_t> XMemCpyBytes(uint32_t source, uint32_t bytes) {
   if (bytes >= 16) {
     return bytes;
   }
@@ -482,7 +482,7 @@ std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t by
     left &= 3;
   }
   if (left != 0) {
-    const uint32_t step = schema::CRuntimeGlobals::xmemcpy_step(base);
+    const uint32_t step = schema::CRuntimeGlobals::xmemcpy_step();
     if (step == 0 || left % step != 0) {
       return std::nullopt;
     }
@@ -491,22 +491,22 @@ std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t by
   return at + left;
 }
 
-bool XMemCpyFits(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes) {
-  const auto copied = XMemCpyBytes(base, source, bytes);
+bool XMemCpyFits(uint32_t destination, uint32_t source, uint32_t bytes) {
+  const auto copied = XMemCpyBytes(source, bytes);
   return copied && (*copied == 0 || !MayShare(destination, *copied, source, *copied));
 }
 
-bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes) {
-  if (memory::CopyWithHandles(base, destination, source, bytes)) {
+bool XMemCpy(uint32_t destination, uint32_t source, uint32_t bytes) {
+  if (memory::CopyWithHandles(destination, source, bytes)) {
     return true;
   }
   ITC_NATIVE_RUNNING("sub_82295890 XMemCpy");
-  const auto copied = XMemCpyBytes(base, source, bytes);
-  return copied && Memcpy(base, destination, source, *copied);
+  const auto copied = XMemCpyBytes(source, bytes);
+  return copied && Memcpy(destination, source, *copied);
 }
 
-bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
-  if (memory::CopyWithHandles(base, destination, source, size)) {
+bool MemmoveDown(uint32_t destination, uint32_t source, uint32_t size) {
+  if (memory::CopyWithHandles(destination, source, size)) {
     return true;
   }
   if (size == 0) {
@@ -523,14 +523,14 @@ bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t 
     }
     // One view: the guest's order is the host's, and the original's backward
     // copy gives what memmove does.
-    std::memmove(guest::Pointer(base, destination), guest::Pointer(base, source), size);
+    std::memmove(guest::Pointer(destination), guest::Pointer(source), size);
     return true;
   }
-  std::memcpy(guest::Pointer(base, destination), guest::Pointer(base, source), size);
+  std::memcpy(guest::Pointer(destination), guest::Pointer(source), size);
   return true;
 }
 
-std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t size,
+std::optional<uint32_t> MemmoveS(uint32_t destination, uint32_t size,
                                  uint32_t source, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_825A7348 memmove_s");
   if (count == 0) {
@@ -543,12 +543,12 @@ std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t s
     return 0;
   }
   if (int32_t(destination) < int32_t(source)) {
-    if (destination >= 0xA0000000u || !Memcpy(base, destination, source, count)) {
+    if (destination >= 0xA0000000u || !Memcpy(destination, source, count)) {
       return std::nullopt;
     }
     return 0;
   }
-  if (!MemmoveDown(base, destination, source, count)) {
+  if (!MemmoveDown(destination, source, count)) {
     return std::nullopt;
   }
   return 0;

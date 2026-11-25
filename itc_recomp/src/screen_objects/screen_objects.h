@@ -31,7 +31,7 @@ constexpr uint32_t kRingPoints = 20 * 36 * 2;
 // temporary column's freed head for a new column, else the frame's iterator
 // out at +80 or +112); nullopt, with nothing done, where the original must
 // run (no process heap, a map or column at its size limit).
-std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, double y, double u, double v,
+std::optional<uint32_t> AddRingPoint(uint32_t object, double x, double y, double u, double v,
                   uint32_t stack);
 
 // ScreenObject::BuildRings (sub_821329B8): 20 rings of 36 points at radii
@@ -41,13 +41,13 @@ std::optional<uint32_t> AddRingPoint(uint8_t* base, uint32_t object, double x, d
 // the last AddRingPoint's r3 (as the original leaves it); nullopt, with
 // nothing done, unless the object's map is empty (as it is at set-up, the
 // only call) and nodes can be allocated.
-std::optional<uint32_t> BuildRings(uint8_t* base, uint32_t object, uint32_t stack);
+std::optional<uint32_t> BuildRings(uint32_t object, uint32_t stack);
 
 // ScreenObject::SetSpeed (sub_8212FCC8): +27 = 1, +76 = the strength clamped
 // to [0.0, 1.0] (the floats at 0x82000A34 and 0x82000A30). False, with
 // nothing done, when the object is running (+24: the original calls
 // sub_8212F778 first, never seen in play).
-bool SetSpeed(uint8_t* base, uint32_t object, double strength);
+bool SetSpeed(uint32_t object, double strength);
 
 // The guest calls ScreenObject::Release makes: the video output (the
 // object at [0x8266D088]'s slot 7, then that one's slot 3; `which` 0 before
@@ -61,12 +61,12 @@ struct ReleaseCalls {
 // (VideoOutput::LockDevice, its word at `frame` + 80, the original's local),
 // Resource::Release on the vertex declaration +0 and the texture +4, both
 // then 0; the lock given back. Returns the video output (r3 as left).
-uint32_t Release(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCalls& calls);
+uint32_t Release(uint32_t object, uint32_t frame, const ReleaseCalls& calls);
 
 // ScreenObject::~ScreenObject (sub_82132FC8): Release (its frame 128 bytes
 // below `frame`, this one's), then UvMap::~UvMap on +76124. Returns r3 as the original leaves it (the
 // map's head, freed).
-uint32_t Destroy(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCalls& calls);
+uint32_t Destroy(uint32_t object, uint32_t frame, const ReleaseCalls& calls);
 
 // ScreenObject::Record (sub_82130978): r3 the screen object. Returns at
 // once while it isn't running (+24 clear); else the frame resolved into its
@@ -75,7 +75,7 @@ uint32_t Destroy(uint8_t* base, uint32_t object, uint32_t frame, const ReleaseCa
 // generated/ (record.cpp): r1 the stack pointer, r4 to r10 and f1 the
 // caller's (the calls through vtables pass them on); returns r3 and f1 as
 // the original leaves them.
-lifted::Result Record(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4,
+lifted::Result Record(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4,
                       uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9,
                       uint64_t r10, double f1);
 

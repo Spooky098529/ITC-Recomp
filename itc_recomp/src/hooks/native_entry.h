@@ -4,7 +4,7 @@
 // it did) made from a call's arguments, without the SDK's context.
 //
 //   ITC_NATIVE_ENTRY(820B8CE0, ITC_FLAG(native_vehicle_accessors)) {
-//     ctx.r3.u64 = uint32_t(ContactOtherObject(base, ctx.r3.u32));
+//     ctx.r3.u64 = uint32_t(ContactOtherObject(ctx.r3.u32));
 //   }
 //
 // defines the entry and registers it under the address. The flag that once
@@ -24,20 +24,19 @@
 // registered under its address for calls through pointers and vtables.
 #define ITC_NATIVE_ENTRY_DEFINE(address, enabled)                                        \
   namespace lifted::entry {                                                              \
-  lifted::Result e##address(uint8_t* base, const lifted::Args& args);                    \
+  lifted::Result e##address(const lifted::Args& args);                    \
   }                                                                                      \
-  static void itc_entry_body_##address(lifted::Regs& ctx, uint8_t* base);                \
-  lifted::Result lifted::entry::e##address(uint8_t* base, const lifted::Args& args) {    \
+  static void itc_entry_body_##address(lifted::Regs& ctx);                \
+  lifted::Result lifted::entry::e##address(const lifted::Args& args) {    \
     lifted::Regs ctx(args);                                                              \
-    itc_entry_body_##address(ctx, base);                                                 \
+    itc_entry_body_##address(ctx);                                                 \
     return ctx.result();                                                                 \
   }                                                                                      \
   [[maybe_unused]] static const bool itc_entry_registered_##address =                    \
       lifted::RegisterEntry(0x##address, lifted::entry::e##address, (enabled));
 
 #define ITC_NATIVE_ENTRY_BODY(address)                                                   \
-  static void itc_entry_body_##address([[maybe_unused]] lifted::Regs& ctx,               \
-                                       [[maybe_unused]] uint8_t* base)
+  static void itc_entry_body_##address([[maybe_unused]] lifted::Regs& ctx)
 
 #define ITC_NATIVE_ENTRY(address, flag)                                                  \
   ITC_NATIVE_ENTRY_DEFINE(address, &(flag))                                              \
@@ -57,11 +56,11 @@
 #define ITC_KERNEL_ENTRY_ALWAYS(address) ITC_NATIVE_ENTRY_ALWAYS(address)
 
 // A step on our register view (an adapter's body split out):
-// `name(lifted::Regs&, uint8_t*)`. Followed by the body. (It once also
+// `name(lifted::Regs&)`. Followed by the body. (It once also
 // defined a form on the SDK's context for the harnesses: gone in E4.)
 #define ITC_REGS_STEP(name) \
-  void name([[maybe_unused]] lifted::Regs& ctx, [[maybe_unused]] uint8_t* base)
+  void name([[maybe_unused]] lifted::Regs& ctx)
 
 // A step or an original named as a value (a table, a ternary, a
 // std::function): its form on our register view.
-#define ITC_REGS_FN(name) static_cast<void (*)(lifted::Regs&, uint8_t*)>(&name)
+#define ITC_REGS_FN(name) static_cast<void (*)(lifted::Regs&)>(&name)

@@ -15,7 +15,7 @@ namespace frame_passes {
 
 namespace record {
 
-uint32_t Recorder::Slot() const { return command_list::AllocateSlots(base, list, 1); }
+uint32_t Recorder::Slot() const { return command_list::AllocateSlots(list, 1); }
 
 uint32_t Recorder::Slot3(uint32_t a, uint32_t b, uint32_t c) const {
   const uint32_t s = Slot();
@@ -40,18 +40,18 @@ uint32_t Recorder::Slot1(uint32_t a) const {
 
 uint32_t Recorder::Head() {
   const uint32_t s = Slot();
-  guest::StoreU16(base, s + 2, 5);
+  guest::StoreU16(s + 2, 5);
   Store(s + 4, 0);
   heads.push_back(s);
   return s;
 }
 
 uint32_t Recorder::Bytes(uint32_t bytes) const {
-  return command_list::AllocateBytes(base, list, bytes, false);
+  return command_list::AllocateBytes(list, bytes, false);
 }
 
-void Recorder::Constants() const { RecordConstants(base, list); }
-void Recorder::Samplers() const { RecordSamplers(base, list); }
+void Recorder::Constants() const { RecordConstants(list); }
+void Recorder::Samplers() const { RecordSamplers(list); }
 
 }  // namespace record
 
@@ -88,17 +88,17 @@ constexpr Add kAdds[] = {
 
 }  // namespace
 
-bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& calls) {
+bool Record(uint32_t passes, uint32_t frame, const RecordCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82096418 FramePasses::Record");
-  const schema::FramePasses p(base, passes);
+  const schema::FramePasses p(passes);
   const uint32_t scene = calls.vcall(p.services().address, 12, 0x82096440);
   const uint32_t list = calls.vcall(scene, 4, 0x82096454);
   const uint32_t queue = calls.vcall(scene, 8, 0x8209646C);
   // Declined (the original then) where a chunk is open, the list hasn't
   // room for every slot, or this's slots 5 and 6 aren't the recorders.
   const auto vtable = p.vtable();
-  const schema::CommandList l(base, list);
-  if (l.chunk_open() != 0 || schema::CommandListGlobals::open_chunks(base) != 0 ||
+  const schema::CommandList l(list);
+  if (l.chunk_open() != 0 || schema::CommandListGlobals::open_chunks() != 0 ||
       uint64_t(l.used()) + record::kSlots >= l.capacity() ||
       vtable.slot_5_record_constants() != kRecordConstants ||
       vtable.slot_6_record_samplers() != kRecordSamplers) {
@@ -106,16 +106,16 @@ bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& c
   }
   // The render queue's sort keys.
   using G = schema::FramePassesGlobals;
-  G::set_sort_key_group0(base, 168);
-  G::set_sort_key_group1(base, 270);
-  G::set_sort_key_depth(base, 163);
-  command_list::OpenChunk(base, list);
-  record::Recorder r{base, list, passes, frame, {}};
+  G::set_sort_key_group0(168);
+  G::set_sort_key_group1(270);
+  G::set_sort_key_depth(163);
+  command_list::OpenChunk(list);
+  record::Recorder r{list, passes, frame, {}};
   r.heads.reserve(18);
   record::RecordPart1(r);
   record::RecordPart2(r);
   record::RecordPart3(r);
-  command_list::CloseChunk(base, list);
+  command_list::CloseChunk(list);
   for (const Add& add : kAdds) {
     calls.add(queue, add.head < r.heads.size() ? r.heads[add.head] : 0, add.bucket, add.lr);
   }

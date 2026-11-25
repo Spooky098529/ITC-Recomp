@@ -41,9 +41,9 @@ class HostSemaphore {
 
   // Semaphore::Wait (sub_82592670): waits while the count is 0 or less, then
   // takes one.
-  void Wait(uint8_t* base);
+  void Wait();
   // Semaphore::Signal (sub_825926E8): the count up by one, a waiter woken.
-  void Signal(uint8_t* base);
+  void Signal();
   // The count (what the game reads at +32).
   int32_t Count() const { return count_.load(std::memory_order_acquire); }
   // How many threads are blocked in Wait (for the harness: the loader thread
@@ -51,9 +51,9 @@ class HostSemaphore {
   int Waiters() const { return waiters_.load(std::memory_order_acquire); }
   bool Used() const { return used_.load(std::memory_order_acquire); }
   // Sets the count (the harness's test semaphores), mirrored.
-  void SetCount(uint8_t* base, int32_t count);
+  void SetCount(int32_t count);
   // Writes the count to the mirror.
-  void Mirror(uint8_t* base);
+  void Mirror();
 
  private:
   mutable std::mutex mutex_;
@@ -73,7 +73,7 @@ struct Semaphores {
 
   // The one at a guest Semaphore's address, or null.
   HostSemaphore* At(uint32_t address);
-  void MirrorAll(uint8_t* base);
+  void MirrorAll();
   // Whether any of them was waited on or signaled (the live ones: whether
   // the game's code takes them, --native_archive at start-up).
   bool Used() const;
@@ -96,7 +96,7 @@ Semaphores* TestSemaphores();
 // Semaphores then).
 class ScopedTestSemaphores {
  public:
-  explicit ScopedTestSemaphores(uint8_t* base);
+  explicit ScopedTestSemaphores();
   ~ScopedTestSemaphores();
   Semaphores& Set() { return set_; }
 

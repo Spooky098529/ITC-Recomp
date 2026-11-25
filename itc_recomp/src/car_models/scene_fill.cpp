@@ -20,22 +20,22 @@ namespace car_models {
 
 namespace {
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 using G = schema::CarModelsGlobals;
 
 }  // namespace
 
-uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5, uint32_t sp,
+uint32_t SceneSetUp(uint32_t scene, uint32_t record, uint32_t r5, uint32_t sp,
                     uint32_t pcr, const archive::LoadCall& load,
                     const scene_loaders::CreateCalls& create) {
   ITC_NATIVE_RUNNING("sub_820C8DE8 CarScene::SetUp");
   const uint32_t frame = sp - kSceneSetUpFrame;
-  Store(base, frame, sp);
-  const schema::CarSceneSetUpRecord rec(base, record);
-  const schema::CarScene s(base, scene);
+  Store(frame, sp);
+  const schema::CarSceneSetUpRecord rec(record);
+  const schema::CarScene s(scene);
   s.set_set_up_r5(r5);
   s.set_state(3);
   s.set_model_set(rec.model_set());
@@ -49,16 +49,16 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
   s.set_traffic_count(rec.traffic());
   s.set_own_load_buffer(rec.load_buffer());
   s.set_own_load_buffer_size(rec.load_buffer_size());
-  material_passes::PaintPaletteInit(base, frame);
+  material_passes::PaintPaletteInit(frame);
   if (rec.load_buffer() == 0) {
-    s.set_load_buffer(G::archive_buffer(base));
-    s.set_load_buffer_size(G::archive_buffer_size(base));
+    s.set_load_buffer(G::archive_buffer());
+    s.set_load_buffer_size(G::archive_buffer_size());
   } else {
     const uint32_t buffer = s.own_load_buffer(), size = s.own_load_buffer_size();
     s.set_load_buffer(buffer);
     s.set_load_buffer_size(size);
   }
-  scene::LoadAssets(base, scene, pcr, load);
+  scene::LoadAssets(scene, pcr, load);
   // The counts in the scene, by pool.
   using Count = uint32_t (schema::CarScene::*)() const;
   static constexpr Count kCounts[8] = {
@@ -82,41 +82,41 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
       uint32_t object;
       switch (pool) {
         case 0:
-          object = schema::SceneCarModel::New(base).address;
+          object = schema::SceneCarModel::New().address;
           break;
         case 1:
-          object = schema::SceneParts::New(base).address;
+          object = schema::SceneParts::New().address;
           break;
         case 2:
-          object = schema::SceneCockpit::New(base).address;
+          object = schema::SceneCockpit::New().address;
           break;
         case 3:
-          object = schema::SceneInterior::New(base).address;
+          object = schema::SceneInterior::New().address;
           break;
         case 6:
-          object = schema::SceneTraffic::New(base).address;
+          object = schema::SceneTraffic::New().address;
           break;
         case 5:
           // The wheels (E5 step 5): a handle, freed by DestroyB's VirtualFree
           // as the others.
-          object = schema::SceneWheels::New(base).address;
+          object = schema::SceneWheels::New().address;
           break;
         case 7:
           // The scene models (E5 step 5): handles, freed by DestroyB's
           // VirtualFree as the others.
-          object = schema::SceneModel::New(base).address;
+          object = schema::SceneModel::New().address;
           break;
         default:
           object = memory::AllocPages(kSecondSetBytes[pool], 4096);
           break;
       }
       if (object != 0) {
-        kConstructs[pool](base, object, s.car_models_first_address() + 12 * pool, frame);
+        kConstructs[pool](object, s.car_models_first_address() + 12 * pool, frame);
       }
-      schema::PoolNode(base, object).set_index(uint32_t(i));
+      schema::PoolNode(object).set_index(uint32_t(i));
     }
   }
-  return scene_loaders::CreateA(base, s.first_set(), record, create);
+  return scene_loaders::CreateA(s.first_set(), record, create);
 }
 
 }  // namespace car_models

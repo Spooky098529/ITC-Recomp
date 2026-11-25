@@ -35,39 +35,39 @@ using Type2G = schema::Type2ScreensGlobals;
 using Node = schema::UiMovieNode;
 using Swatch = schema::CarDealerSwatch;
 
-inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+inline uint32_t Load(uint32_t address) { return guest::LoadU32(address); }
+inline void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // The original's frame below `sp`, its back chain written.
-inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+inline uint32_t Frame(uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
-  Store(base, frame, sp);
+  Store(frame, sp);
   return frame;
 }
 
 // UiMovies::Find with the id the original stores at `key` (its frame word,
 // read only by the find): the pair's value's address. The id is a value
 // since E5 step 6; `key` names the slot the original used and isn't written.
-inline uint32_t FindPair(uint8_t* base, uint32_t id, [[maybe_unused]] uint32_t key) {
-  return ui_movies::PairsFindKey(base, ui_movies::kMovieTable, id);
+inline uint32_t FindPair(uint32_t id, [[maybe_unused]] uint32_t key) {
+  return ui_movies::PairsFindKey(ui_movies::kMovieTable, id);
 }
-inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
-  return Load(base, FindPair(base, id, key));
+inline uint32_t FindMovie(uint32_t id, uint32_t key) {
+  return Load(FindPair(id, key));
 }
 
 // The selected car's entry: the shown list's entry at the data's car_scroll
 // + car_selection.
-inline Entry SelectedEntry(uint8_t* base) {
-  const Data data = G::data(base);
+inline Entry SelectedEntry() {
+  const Data data = G::data();
   const uint32_t index = (data.car_scroll() + data.car_selection()) << 2;
-  return Entry(base, uint32_t(data.shown_list().load_at(index, 4)));
+  return Entry(uint32_t(data.shown_list().load_at(index, 4)));
 }
 
 // The stand's garage stage: the holder's +0.
-inline uint32_t Stage(uint8_t* base) {
-  return schema::StandHolder(base, G::stand_holder(base).address).stage_block_0();
+inline uint32_t Stage() {
+  return schema::StandHolder(G::stand_holder().address).stage_block_0();
 }
 
 }  // namespace car_dealer

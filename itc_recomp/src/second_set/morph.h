@@ -19,10 +19,10 @@ namespace second_set {
 // `shape` (544 bytes each at [model + 40]). Model::StreamData
 // (sub_82594A60), StreamSize (sub_82594A78), StreamData2 (sub_82594A90),
 // StreamSize2 (sub_82594AA8).
-uint32_t ModelStreamData(uint8_t* base, uint32_t model, uint32_t shape);
-uint32_t ModelStreamSize(uint8_t* base, uint32_t model, uint32_t shape);
-uint32_t ModelStreamData2(uint8_t* base, uint32_t model, uint32_t shape);
-uint32_t ModelStreamSize2(uint8_t* base, uint32_t model, uint32_t shape);
+uint32_t ModelStreamData(uint32_t model, uint32_t shape);
+uint32_t ModelStreamSize(uint32_t model, uint32_t shape);
+uint32_t ModelStreamData2(uint32_t model, uint32_t shape);
+uint32_t ModelStreamSize2(uint32_t model, uint32_t shape);
 
 // What the flush mode is left as: unchanged, or set (the vector work's) or
 // cleared (the scalar work's) by the last step that ran.
@@ -37,7 +37,7 @@ enum class Flush { kUnchanged, kOn, kOff };
 // target whose counts differ from the base's gets the original's debug
 // message (DebugPrintf, which the retail game drops), logged. r3 is left the
 // model.
-Flush MorphSetUp(uint8_t* base, uint32_t model, uint32_t morph, uint32_t shape,
+Flush MorphSetUp(uint32_t model, uint32_t morph, uint32_t shape,
                  uint32_t indices, uint32_t weights, uint32_t count);
 
 // Morph::Blend (sub_8258BD28) by the record's +120: 6 Morph::Blend6
@@ -56,10 +56,10 @@ struct BlendResult {
   uint64_t r3;
   Flush flush;
 };
-std::optional<BlendResult> MorphBlend(uint8_t* base, uint32_t morph, uint32_t stack);
+std::optional<BlendResult> MorphBlend(uint32_t morph, uint32_t stack);
 // Morph::Run (sub_82594D10): +8 and +12 = the two outputs, then Morph::Blend
 // (a tail call, the same r1).
-std::optional<BlendResult> MorphRun(uint8_t* base, uint32_t morph, uint32_t out1, uint32_t out2,
+std::optional<BlendResult> MorphRun(uint32_t morph, uint32_t out1, uint32_t out2,
                                     uint32_t stack);
 
 // sub_820E6F28: r3 = a tire group + 12 (12 entries of 24 bytes), `index`,
@@ -69,7 +69,7 @@ std::optional<BlendResult> MorphRun(uint8_t* base, uint32_t morph, uint32_t out1
 // the entry index - 12, its +16, +12, +8 and +4 from the entry's index (+ 12)
 // and the constants [0x82002D0C], [0x82001BE4], [0x82002A0C]. The
 // original's red-zone word at r1 - 16 is a C++ value (`stack` unused).
-void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t value, double f1,
+void TireFillEntries(uint32_t entries, uint32_t index, uint32_t value, double f1,
                      uint32_t stack);
 // sub_820E7010: from entry `index` - 12 of `entries`: a float4 at `out4`
 // (index - 12 x [0x82002A88], the entry's +0 and +8 against [0x82006630] and
@@ -77,7 +77,7 @@ void TireFillEntries(uint8_t* base, uint32_t entries, uint32_t index, uint32_t v
 // `out1`, and (the entry's +0 - [0x82006630]) x [0x82001BE4] x [0x820029D8]
 // at `out2`. The original's red-zone word at r1 - 16 is a C++ value
 // (`stack` unused).
-void TireReadEntry(uint8_t* base, uint32_t index, uint32_t entries, uint32_t out4, uint32_t out1,
+void TireReadEntry(uint32_t index, uint32_t entries, uint32_t out4, uint32_t out1,
                    uint32_t out2, uint32_t stack);
 
 }  // namespace second_set

@@ -23,12 +23,12 @@ ITC_FLAG_STRING(dump_shader_compiles, "", "ITC",
 
 namespace {
 
-std::string LoadString(uint8_t* base, uint32_t address) {
+std::string LoadString(uint32_t address) {
   std::string s;
   if (address == 0) {
     return s;
   }
-  for (uint8_t c; (c = guest::LoadU8(base, address)) != 0; address++) {
+  for (uint8_t c; (c = guest::LoadU8(address)) != 0; address++) {
     s.push_back(static_cast<char>(c));
   }
   return s;
@@ -36,17 +36,17 @@ std::string LoadString(uint8_t* base, uint32_t address) {
 
 // An ID3DXBuffer's bytes, through its vtable: slot 3 GetBufferPointer, slot
 // 4 GetBufferSize (the callers release it through slot 2).
-std::vector<uint8_t> LoadBuffer(lifted::Regs& ctx, uint8_t* base, uint32_t buffer) {
-  uint32_t vtable = guest::LoadU32(base, buffer);
+std::vector<uint8_t> LoadBuffer(lifted::Regs& ctx, uint32_t buffer) {
+  uint32_t vtable = guest::LoadU32(buffer);
   ctx.r3.u64 = buffer;
-  lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 12));
+  lifted::CallFromContext(ctx, guest::LoadU32(vtable + 12));
   uint32_t data = ctx.r3.u32;
   ctx.r3.u64 = buffer;
-  lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 16));
+  lifted::CallFromContext(ctx, guest::LoadU32(vtable + 16));
   uint32_t size = ctx.r3.u32;
   std::vector<uint8_t> bytes(size);
   for (uint32_t i = 0; i < size; i++) {
-    bytes[i] = guest::LoadU8(base, data + i);
+    bytes[i] = guest::LoadU8(data + i);
   }
   return bytes;
 }
@@ -69,40 +69,40 @@ bool debug::ShaderCompileDump_Active() { return !ITC_FLAG(dump_shader_compiles).
 // include handler, r7 the entry point, r8 the profile, r9 the flags, r10
 // where the shader buffer goes; the caller's stack words +84 and +92 where
 // the errors and the constant table go.
-void debug::ShaderCompileDump_Compile(lifted::Regs& ctx, uint8_t* base) {
+void debug::ShaderCompileDump_Compile(lifted::Regs& ctx) {
   std::string dir = ITC_FLAG(dump_shader_compiles);
   uint32_t caller = ctx.lr;
   uint32_t source = ctx.r3.u32;
   uint32_t length = ctx.r4.u32;
   uint32_t defines = ctx.r5.u32;
   uint32_t include = ctx.r6.u32;
-  std::string entry = LoadString(base, ctx.r7.u32);
-  std::string profile = LoadString(base, ctx.r8.u32);
+  std::string entry = LoadString(ctx.r7.u32);
+  std::string profile = LoadString(ctx.r8.u32);
   uint32_t flags = ctx.r9.u32;
   uint32_t shader_out = ctx.r10.u32;
-  uint32_t errors_out = guest::LoadU32(base, ctx.r1.u32 + 84);
-  uint32_t table_out = guest::LoadU32(base, ctx.r1.u32 + 92);
+  uint32_t errors_out = guest::LoadU32(ctx.r1.u32 + 84);
+  uint32_t table_out = guest::LoadU32(ctx.r1.u32 + 92);
   std::vector<uint8_t> source_bytes(length);
   for (uint32_t i = 0; i < length; i++) {
-    source_bytes[i] = guest::LoadU8(base, source + i);
+    source_bytes[i] = guest::LoadU8(source + i);
   }
 
-  lifted::original::c822B8F10(ctx, base);
+  lifted::original::c822B8F10(ctx);
   uint32_t result = ctx.r3.u32;
 
   std::filesystem::create_directories(dir);
   std::string name = std::format("shader_{:08X}_{}", source, profile);
-  uint32_t shader = shader_out ? guest::LoadU32(base, shader_out) : 0;
+  uint32_t shader = shader_out ? guest::LoadU32(shader_out) : 0;
   std::vector<uint8_t> shader_bytes;
   if (shader) {
-    shader_bytes = LoadBuffer(ctx, base, shader);
+    shader_bytes = LoadBuffer(ctx, shader);
     WriteFile(std::filesystem::path(dir) / (name + ".bin"), shader_bytes);
   }
-  uint32_t table = table_out ? guest::LoadU32(base, table_out) : 0;
-  uint32_t errors = errors_out ? guest::LoadU32(base, errors_out) : 0;
+  uint32_t table = table_out ? guest::LoadU32(table_out) : 0;
+  uint32_t errors = errors_out ? guest::LoadU32(errors_out) : 0;
   std::string error_text;
   if (errors) {
-    std::vector<uint8_t> bytes = LoadBuffer(ctx, base, errors);
+    std::vector<uint8_t> bytes = LoadBuffer(ctx, errors);
     error_text.assign(bytes.begin(), bytes.end());
     while (!error_text.empty() && (error_text.back() == '\0' || error_text.back() == '\n')) {
       error_text.pop_back();
@@ -115,7 +115,7 @@ void debug::ShaderCompileDump_Compile(lifted::Regs& ctx, uint8_t* base) {
       caller, source, length, base::Hash64(source_bytes.data(), source_bytes.size()), entry,
       profile, flags, defines, include, result, shader, shader_bytes.size(),
       base::Hash64(shader_bytes.data(), shader_bytes.size()),
-      shader ? guest::LoadU32(base, shader) : 0, table_out != 0, table, errors,
+      shader ? guest::LoadU32(shader) : 0, table_out != 0, table, errors,
       error_text);
   ctx.r3.u64 = result;
 }

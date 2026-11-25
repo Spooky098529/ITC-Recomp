@@ -46,31 +46,31 @@ constexpr uint32_t kNoFunctor = 0x820069BC;
 struct StateKey {
   uint32_t words[4];
 };
-StateKey LoadStateKey(uint8_t* base, uint32_t address);
+StateKey LoadStateKey(uint32_t address);
 
 // sub_82106040 StateKey::Equals: whether the 16-byte key at `a` and `b` have
 // the same four words.
-bool StateKeyEquals(uint8_t* base, uint32_t a, const StateKey& b);
+bool StateKeyEquals(uint32_t a, const StateKey& b);
 // sub_821060A0 StateMachine::IndexOf: the first transition whose key matches,
 // or -1.
-int32_t StateMachineIndexOf(uint8_t* base, uint32_t machine, const StateKey& key);
+int32_t StateMachineIndexOf(uint32_t machine, const StateKey& key);
 // sub_82106158 StateMachine::Add: the key's transition given the functor
 // part's functor and next state, or a new transition made (no bound check,
 // as the original); the index (`replaced` true) or the new transition.
-uint32_t StateMachineAdd(uint8_t* base, uint32_t machine, uint32_t key, uint32_t functor,
+uint32_t StateMachineAdd(uint32_t machine, uint32_t key, uint32_t functor,
                          bool* replaced);
 // sub_821061F0 StateMachine::Find: the key's transition's functor part (+16),
 // or the static default (made on the first call; `found` false). The
 // original's r3 for the default is the address sign-extended, and for a
 // transition the machine's r3 plus the offset (the adapters' r3).
 // The default: schema::GameModesGlobals::default_transition.
-uint32_t StateMachineFind(uint8_t* base, uint32_t machine, const StateKey& key, bool* found);
+uint32_t StateMachineFind(uint32_t machine, const StateKey& key, bool* found);
 // sub_82106280 StateMachine::Handle: the functor part for the current state
 // and the 12-byte message at `message`; the state moved to the transition's
 // next one when that isn't 0.
-uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, bool* found);
+uint32_t StateMachineHandle(uint32_t machine, uint32_t message, bool* found);
 // sub_82107108 StateMachine::StateMachine: the 200 transitions emptied.
-void StateMachineConstruct(uint8_t* base, uint32_t machine);
+void StateMachineConstruct(uint32_t machine);
 
 // --- The mode holder (Modes::) ---
 
@@ -78,12 +78,12 @@ void StateMachineConstruct(uint8_t* base, uint32_t machine);
 // mode's type: its vtable, no mode yet, the type at 0x826032DC and
 // 0x826032E0, the data load's flag and the play time frame counter 0, and
 // the sign-in watch's state, checks and 0x826BAB70 0 (mode-tick.md).
-void ModesConstruct(uint8_t* base, uint32_t holder, uint32_t type);
+void ModesConstruct(uint32_t holder, uint32_t type);
 
 // --- The modes (Mode::) ---
 
 // sub_82106C20 Mode::Mode: the base's vtables and default delegate.
-void ModeConstruct(uint8_t* base, uint32_t mode);
+void ModeConstruct(uint32_t mode);
 
 // --- The race overlays' state machine's message handlers ---
 
@@ -92,21 +92,21 @@ void ModeConstruct(uint8_t* base, uint32_t mode);
 constexpr uint32_t kOverlaySlots = 25;
 
 // sub_8215DD58: each overlay's +820 and +824 = 1.
-void OverlaysSetFlags(uint8_t* base, uint32_t machine);
+void OverlaysSetFlags(uint32_t machine);
 // sub_8215DD90: each overlay's +820, +824 and +828 = 0.
-void OverlaysClearFlags(uint8_t* base, uint32_t machine);
+void OverlaysClearFlags(uint32_t machine);
 // sub_8215DDD0: each overlay's +820 = 1, +824 = 0.
-void OverlaysSetFlag820(uint8_t* base, uint32_t machine);
+void OverlaysSetFlag820(uint32_t machine);
 // sub_8215DE10: each overlay's slot 3 (`reset(overlay, target)`, a guest
 // call: CarOverlays::Reset in races), then its +828 = 1.
-void OverlaysReset(uint8_t* base, uint32_t machine,
+void OverlaysReset(uint32_t machine,
                    const std::function<void(uint32_t overlay, uint32_t target)>& reset);
 
 // sub_8215E6C8 RaceOverlaysMachine::Init: the race overlays' state
 // machine's state = 0 and its 33 transitions added, built in the original's
 // stack frame at `frame` (its r1 less 2,272: see race_overlays_machine.cpp);
 // returns the last StateMachine::Add's answer.
-uint32_t RaceOverlaysMachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
+uint32_t RaceOverlaysMachineInit(uint32_t machine, uint32_t frame,
                                  bool* replaced);
 constexpr uint32_t kRaceOverlaysMachineInitFrame = 2272;
 
@@ -115,38 +115,38 @@ constexpr uint32_t kRaceOverlaysMachineInitFrame = 2272;
 
 // sub_82155D90: the object at the member's +67760 set up (its vtable, 1.0s
 // in its w words, 16 linked halfword pairs).
-void Member67760Construct(uint8_t* base, uint32_t object);
+void Member67760Construct(uint32_t object);
 
 // sub_82155118: the object at the member's +13360 set up (its vtable, 1.0s,
 // four 28-byte buffers at +43016 made and reset, an object at +43136);
 // returns it.
-void Member13360Construct(uint8_t* base, uint32_t object);
+void Member13360Construct(uint32_t object);
 
 // A 28-byte camera path buffer (schema::CameraPathBuffer, vtable
 // 0x82009390) holding a block at +20 from VirtualAlloc. Freeing goes over the allocation layer only (the callers'
 // adapters check hooks::NativeHeapActive): Buffer28Freeable says whether the
 // block is the layer's pages (or none), else the originals run.
-bool Buffer28Freeable(uint8_t* base, uint32_t buffer);
+bool Buffer28Freeable(uint32_t buffer);
 // sub_82152028 Buffer28::Free: the block freed (VirtualFree, MEM_RELEASE)
 // and +20 = 0; returns r3 as the original leaves it (0 without a block, else
 // whether it was freed).
-uint32_t Buffer28Free(uint8_t* base, uint32_t buffer);
+uint32_t Buffer28Free(uint32_t buffer);
 // sub_82152D38 Buffer28::Reset: freed, then +12 and +16 = -1, +20 and +24 =
 // 0; r3 as Free's.
-uint32_t Buffer28Reset(uint8_t* base, uint32_t buffer);
+uint32_t Buffer28Reset(uint32_t buffer);
 // sub_82152D28 Buffer28::~Buffer28: the vtable put back, then freed; r3 as
 // Free's.
-uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer);
+uint32_t Buffer28Destroy(uint32_t buffer);
 // sub_82106A00: the four buffers at +43100 down to +43016 destroyed; r3 as
 // the last Free's. Only when each is Buffer28Freeable.
 constexpr uint32_t kBuffers28 = 43016;
-bool Buffers28Freeable(uint8_t* base, uint32_t object);
-uint32_t Buffers28Destroy(uint8_t* base, uint32_t object);
+bool Buffers28Freeable(uint32_t object);
+uint32_t Buffers28Destroy(uint32_t object);
 
 // sub_821067A0 XprHolder::XprHolder: an object holding an XPR at +4
 // (XPR::XPR, models/xpr.h) and two 12-byte records at +32, cleared. The
 // race mode's member has one at +67676.
-void XprHolderConstruct(uint8_t* base, uint32_t object);
+void XprHolderConstruct(uint32_t object);
 
 // sub_82106AF0 RaceModeMember::~RaceModeMember: the member at the race mode's
 // +10512 torn down: its vtable put back, the XPR holder's two records (+67720,
@@ -157,12 +157,12 @@ void XprHolderConstruct(uint8_t* base, uint32_t object);
 // the allocation layer's). Over the allocation layer and the memory blocks'
 // host lock only (the adapter's condition).
 constexpr uint32_t kRaceModeMemberXprHolder = 67676;
-std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member);
+std::optional<uint32_t> RaceModeMemberDestruct(uint32_t member);
 
 // sub_82106A50 Member56896::Member56896: the object at the race mode's
 // member's +56896 set up (its vtable, 1.0s in its w words, the XPR holder at
 // +10780).
-void Member56896Construct(uint8_t* base, uint32_t object);
+void Member56896Construct(uint32_t object);
 
 // sub_82107168 RaceModeMember::RaceModeMember: the member at the race mode's
 // +10512 (77,392 bytes) set up: its state machine at +16, its vtable, three
@@ -170,7 +170,7 @@ void Member56896Construct(uint8_t* base, uint32_t object);
 // objects at +13360, +56896 and +67760 (Member13360, Member56896,
 // Member67760), eight more records' 1.0s from +69628, and +77376 to +77388.
 constexpr uint32_t kRaceModeMemberBytes = 77392;
-void RaceModeMemberConstruct(uint8_t* base, uint32_t member);
+void RaceModeMemberConstruct(uint32_t member);
 
 // sub_821073B8 RaceMode::RaceMode: the race mode (167,264 bytes) set up: the
 // base (Mode::Mode), the dispatcher at +36 emptied, its vtables, the ten
@@ -178,7 +178,7 @@ void RaceModeMemberConstruct(uint8_t* base, uint32_t member);
 // XPR at +147892 (XPR::XPR) and the race overlays' list at +157552
 // (RaceOverlays::Clear).
 constexpr uint32_t kRaceModeBytes = 167264;
-void RaceModeConstruct(uint8_t* base, uint32_t mode);
+void RaceModeConstruct(uint32_t mode);
 
 // The other modes' constructors: the base (Mode::Mode), the dispatcher at +36
 // emptied, the type's vtables at +0 and +32 (852 bytes; type 3's 10,460, with
@@ -187,10 +187,10 @@ void RaceModeConstruct(uint8_t* base, uint32_t mode);
 // sub_82246340, 9 sub_82107008, 10 sub_82107088, 12 sub_82106F88.
 constexpr uint32_t kModeBytes = 852;
 constexpr uint32_t kMode3Bytes = 10460;
-void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode);
+void ModeTypeConstruct(uint32_t type, uint32_t mode);
 // sub_82108160 MachineMember::MachineMember: StateMachine::StateMachine, then
 // its count and state = 0.
-void MachineMemberConstruct(uint8_t* base, uint32_t machine);
+void MachineMemberConstruct(uint32_t machine);
 // The bytes Mode::Create allocates for a type (1 to 12), 0 for none (11).
 uint32_t ModeBytes(uint32_t type);
 
@@ -199,6 +199,6 @@ uint32_t ModeBytes(uint32_t type);
 // with nothing done, where the original must run: type 8 (sub_82107670,
 // never seen in play) and an allocation operator new's plain C++ leaves to
 // the original.
-std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type);
+std::optional<uint32_t> ModeCreate(uint32_t type);
 
 }  // namespace game_modes

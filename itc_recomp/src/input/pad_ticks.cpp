@@ -194,7 +194,7 @@ void PadTicks_OnRaceStarted() {
   // would otherwise move with the load times. Recording and playback alike.
   if (g_playing || g_record) {
     constexpr uint32_t kGameRandSeed = 0x82638188;  // race-overlays.toml's rand_seed
-    guest::StoreU32(memory::Base(), kGameRandSeed, 0x1234567u + uint32_t(n));
+    guest::StoreU32(kGameRandSeed, 0x1234567u + uint32_t(n));
   }
 }
 

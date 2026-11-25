@@ -58,85 +58,85 @@ namespace hooks {
 
 namespace cr = career;
 
-ITC_REGS_STEP(CareerPlayTimeMark) { cr::PlayTimeMark(base, ctx.r3.u32); }
+ITC_REGS_STEP(CareerPlayTimeMark) { cr::PlayTimeMark(ctx.r3.u32); }
 
 ITC_REGS_STEP(CareerDayBlockWinStreak) {
-  ctx.r3.u64 = cr::DayBlockWinStreak(base, ctx.r3.u32);
+  ctx.r3.u64 = cr::DayBlockWinStreak(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CareerDayBlockAddWord4832) {
-  cr::DayBlockAddWord4832(base, ctx.r3.u32, ctx.r4.u64);
+  cr::DayBlockAddWord4832(ctx.r3.u32, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(CareerDayBlockWord4832) {
-  ctx.r3.u64 = cr::DayBlockWord4832(base, ctx.r3.u32);
+  ctx.r3.u64 = cr::DayBlockWord4832(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CareerStatsWinStreak) {
-  ctx.r3.u64 = cr::StatsWinStreak(base, ctx.r3.u32);
+  ctx.r3.u64 = cr::StatsWinStreak(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CareerStatsAddPoints) {
-  cr::StatsAddPoints(base, ctx.r3.u32, ctx.r4.u64);
+  cr::StatsAddPoints(ctx.r3.u32, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(CareerItemFlagsSet) {
-  cr::ItemFlagsSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  cr::ItemFlagsSet(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 ITC_REGS_STEP(CareerCarSpecWord744) {
-  ctx.r3.u64 = cr::CarSpecWord744(base, ctx.r3.u32);
+  ctx.r3.u64 = cr::CarSpecWord744(ctx.r3.u32);
 }
 
-ITC_REGS_STEP(CareerPickFromCar) { cr::PickFromCar(base, ctx.r3.u32); }
+ITC_REGS_STEP(CareerPickFromCar) { cr::PickFromCar(ctx.r3.u32); }
 
 ITC_REGS_STEP(CareerRunningMeanMerge) {
   ctx.fpscr.disableFlushMode();
-  cr::RunningMeanMerge(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
+  cr::RunningMeanMerge(ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CareerStageOf) {
-  ctx.r3.u64 = cr::StageOf(base, ctx.r3.u32);
+  ctx.r3.u64 = cr::StageOf(ctx.r3.u32);
 }
 
 ITC_REGS_STEP(CareerEntry56Allows) {
-  ctx.r3.u64 = cr::Entry56Allows(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+  ctx.r3.u64 = cr::Entry56Allows(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                  ctx.r7.u32);
 }
 
 ITC_REGS_STEP(CareerAnyWonKind3Stage1) {
-  ctx.r3.u64 = cr::AnyWonKind3Stage1(base);
+  ctx.r3.u64 = cr::AnyWonKind3Stage1();
 }
 
 ITC_REGS_STEP(CareerItemRecordsAddWin) {
-  ctx.r3.u64 = cr::ItemRecordsAddWin(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cr::ItemRecordsAddWin(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CareerItemRecordsAddLoss) {
-  ctx.r3.u64 = cr::ItemRecordsAddLoss(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cr::ItemRecordsAddLoss(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CareerResultsPush) {
   if (!cr::ResultsPushNative(ctx.r3.u32)) {
-    lifted::original::c82111FC8(ctx, base);
+    lifted::original::c82111FC8(ctx);
     return;
   }
-  ctx.r3.u64 = cr::ResultsPush(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = cr::ResultsPush(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(CareerStatsStartDay) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cr::StatsStartDay(base, ctx.r3.u32, ctx.r4.u32);
+  ctx.r3.u64 = cr::StatsStartDay(ctx.r3.u32, ctx.r4.u32);
 }
 
 ITC_REGS_STEP(CareerGarageInsertCar) {
   const uint32_t car = ctx.r4.u32;
   uint32_t destination = 0;
-  if (!cr::GarageInsertCar(base, ctx.r3.u32, car, ctx.r5.u32, &destination)) {
+  if (!cr::GarageInsertCar(ctx.r3.u32, car, ctx.r5.u32, &destination)) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
+    lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
     return;
   }
   ctx.r3.u64 = destination;
@@ -144,48 +144,48 @@ ITC_REGS_STEP(CareerGarageInsertCar) {
 
 ITC_REGS_STEP(CareerConditionTest) {
   if (const auto r3 =
-          cr::ConditionTest(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32)) {
+          cr::ConditionTest(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::original::c82112950(ctx, base);
+  lifted::original::c82112950(ctx);
 }
 
 ITC_REGS_STEP(CareerRewardsGrant) {
-  ctx.r3.u64 = cr::RewardsGrant(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  ctx.r3.u64 = cr::RewardsGrant(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
 ITC_REGS_STEP(CareerAddRaceResult) {
   ctx.fpscr.disableFlushMode();
-  if (!cr::AddRaceResultNative(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
-    lifted::original::c82115190(ctx, base);
+  if (!cr::AddRaceResultNative(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
+    lifted::original::c82115190(ctx);
     return;
   }
-  ctx.r3.u64 = cr::StatsAddRaceResult(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cr::StatsAddRaceResult(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 ITC_REGS_STEP(CareerPickNext) {
-  if (!cr::PickNextSkips(base, ctx.r3.u32)) {
-    lifted::original::c821159B0(ctx, base);
+  if (!cr::PickNextSkips(ctx.r3.u32)) {
+    lifted::original::c821159B0(ctx);
   }
 }
 
 ITC_REGS_STEP(CareerAfterRace) {
   ctx.fpscr.disableFlushMode();
-  if (!cr::AfterRaceNative(base, ctx.r1.u32)) {
-    lifted::original::c82116588(ctx, base);
+  if (!cr::AfterRaceNative(ctx.r1.u32)) {
+    lifted::original::c82116588(ctx);
     return;
   }
-  ctx.r3.s64 = int32_t(cr::ProgressAfterRace(base, ctx.r3.u32, ctx.r1.u32));
+  ctx.r3.s64 = int32_t(cr::ProgressAfterRace(ctx.r3.u32, ctx.r1.u32));
 }
 
 ITC_REGS_STEP(CareerCheckUnlocks) {
   ctx.fpscr.disableFlushMode();
-  if (!cr::CheckUnlocksNative(base, ctx.r1.u32)) {
-    lifted::original::c821162B0(ctx, base);
+  if (!cr::CheckUnlocksNative(ctx.r1.u32)) {
+    lifted::original::c821162B0(ctx);
     return;
   }
-  ctx.r3.u64 = cr::ProgressCheckUnlocks(base, ctx.r3.u32, ctx.r1.u32);
+  ctx.r3.u64 = cr::ProgressCheckUnlocks(ctx.r3.u32, ctx.r1.u32);
 }
 
 namespace {
@@ -200,10 +200,10 @@ struct GuestPickNext {
 void PickNextThrough(void* user, uint32_t save) {
   auto& guest = *static_cast<GuestPickNext*>(user);
   lifted::Regs& ctx = guest.ctx;
-  guest_call::InFrame(ctx, guest.base, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
+  guest_call::InFrame(ctx, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
     ctx.r3.u64 = save;
     ctx.r4.u64 = 0;
-    lifted::Enter(ctx, guest.base, game::Career::PickNext);
+    lifted::Enter(ctx, game::Career::PickNext);
   });
 }
 
@@ -211,10 +211,10 @@ void PickNextThrough(void* user, uint32_t save) {
 
 ITC_REGS_STEP(CareerNextDay) {
   ctx.fpscr.disableFlushMode();
-  GuestPickNext guest{ctx, base};
+  GuestPickNext guest{ctx};
   const uint32_t save = ctx.r3.u32;
   const uint32_t sp = ctx.r1.u32;
-  ctx.r3.u64 = cr::CareerNextDay(base, save, sp, PickNextThrough, &guest);
+  ctx.r3.u64 = cr::CareerNextDay(save, sp, PickNextThrough, &guest);
 }
 
 ITC_REGS_STEP(CareerEventQuery) {
@@ -223,15 +223,15 @@ ITC_REGS_STEP(CareerEventQuery) {
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t flag = ctx.r4.u32;
-  RaceEventGuest guest(ctx, base);
-  ctx.r3.u64 = cr::EventQuery(base, flag, guest.get());
+  RaceEventGuest guest(ctx);
+  ctx.r3.u64 = cr::EventQuery(flag, guest.get());
 }
 
 ITC_REGS_STEP(CareerEventLocation) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32;
-  RaceEventGuest guest(ctx, base);
-  cr::EventLocation(base, save, guest.get());
+  RaceEventGuest guest(ctx);
+  cr::EventLocation(save, guest.get());
 }
 
 namespace {
@@ -248,11 +248,11 @@ struct GuestMake {
 uint64_t MakeThrough(void* user, uint32_t) {
   auto& guest = *static_cast<GuestMake*>(user);
   lifted::Regs& ctx = guest.ctx;
-  guest_call::InFrame(ctx, guest.base, cr::kSetUpEventFrame, 0x82114A7C, [&](uint32_t frame) {
+  guest_call::InFrame(ctx, cr::kSetUpEventFrame, 0x82114A7C, [&](uint32_t frame) {
     ctx.r3.u64 = guest.sp + 28;
     ctx.r4.u64 = guest.sp + 36;
     ctx.r5.u64 = frame + 80;
-    lifted::Sdk(ctx, guest.base, lifted::original::c82144E58);
+    lifted::Sdk(ctx, lifted::original::c82144E58);
   });
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -264,18 +264,18 @@ ITC_REGS_STEP(CareerSetUpEvent) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32, mode = ctx.r4.u32, location = ctx.r5.u32;
   const uint32_t sp = ctx.r1.u32;
-  if (!cr::SetUpEventNative(base, sp)) {
-    lifted::original::c82114268(ctx, base);
+  if (!cr::SetUpEventNative(sp)) {
+    lifted::original::c82114268(ctx);
     return;
   }
-  RaceEventGuest guest(ctx, base);
-  GuestMake make{ctx, base, sp};
-  ctx.r3.u64 = cr::SetUpEvent(base, save, mode, location, sp, guest.get(), MakeThrough, &make);
+  RaceEventGuest guest(ctx);
+  GuestMake make{ctx, sp};
+  ctx.r3.u64 = cr::SetUpEvent(save, mode, location, sp, guest.get(), MakeThrough, &make);
 }
 
 ITC_REGS_STEP(CareerCarSetModelAndClass) {
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cr::CarSetModelAndClass(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.r3.u64 = cr::CarSetModelAndClass(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 namespace {
@@ -290,11 +290,11 @@ struct GuestCopy {
 void CopyThrough(void* user, uint32_t destination, uint32_t car) {
   auto& guest = *static_cast<GuestCopy*>(user);
   lifted::Regs& ctx = guest.ctx;
-  guest_call::InFrame(ctx, guest.base, cr::kGarageAddFrame + 112, 0x82115548, [&](uint32_t) {
+  guest_call::InFrame(ctx, cr::kGarageAddFrame + 112, 0x82115548, [&](uint32_t) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    lifted::Enter(ctx, guest.base, game::memcpy_825A7410);  // memcpy
+    lifted::Enter(ctx, game::memcpy_825A7410);  // memcpy
   });
   ctx.fpscr.disableFlushMode();
 }
@@ -304,15 +304,15 @@ void CopyThrough(void* user, uint32_t destination, uint32_t car) {
 ITC_REGS_STEP(CareerGarageAdd) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32, car = ctx.r4.u32, sp = ctx.r1.u32;
-  GuestCopy copy{ctx, base};
-  ctx.r3.u64 = cr::GarageAdd(base, save, car, sp, CopyThrough, &copy);
+  GuestCopy copy{ctx};
+  ctx.r3.u64 = cr::GarageAdd(save, car, sp, CopyThrough, &copy);
 }
 
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_career)) { \
-    hooks::step(ctx, base);             \
+    hooks::step(ctx);             \
   }
 
 CAREER_ADAPTER(82111628, CareerPlayTimeMark)
@@ -344,10 +344,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82116AF0) {
     return;
   }
   if (!ITC_FLAG(native_career)) {
-    lifted::original::c82116AF0(ctx, base);
+    lifted::original::c82116AF0(ctx);
     return;
   }
-  hooks::CareerNextDay(ctx, base);
+  hooks::CareerNextDay(ctx);
 }
 CAREER_ADAPTER(82111638, CareerEventQuery)
 // Career::EventLocation has no adapter (removed, B7 loop, 2026-11-12): its

@@ -63,32 +63,32 @@ using Desc = schema::SceneryPassDesc;
 using Shape = schema::SceneryModel;
 
 // The camera pass `index` (592 bytes each from 0x826BAC00).
-Pass PassAt(uint8_t* base, uint32_t index) {
-  return Pass(base, index * Pass::kSize + schema::CamerasGlobals::passes_address());
+Pass PassAt(uint32_t index) {
+  return Pass(index * Pass::kSize + schema::CamerasGlobals::passes_address());
 }
 // The pass table's entry `entry` (G::pass_table).
-Entry EntryAt(uint8_t* base, uint32_t entry) {
-  return Entry(base, G::pass_table_address() + Entry::kSize * entry);
+Entry EntryAt(uint32_t entry) {
+  return Entry(G::pass_table_address() + Entry::kSize * entry);
 }
 
 }  // namespace
 
-void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
+void Draw(const scenery_lists::DrawCalls& draws,
           const car_scene_draw::SceneDrawCalls& calls, const DrawSteps& steps, uint32_t stack,
           uint32_t manager) {
   ITC_NATIVE_RUNNING("sub_820F6068 Scenery::Draw");
   const uint32_t f = stack - kFrame;
-  Store(base, f, stack);  // the back chain, as stwu
+  Store(f, stack);  // the back chain, as stwu
   const uint32_t description = f + 80;
-  const Desc desc(base, description);
-  const Manager m(base, manager);
+  const Desc desc(description);
+  const Manager m(manager);
   const uint32_t provider = m.texture_provider_address();  // r27
   const schema::CourseSet s = m.course_set();              // r15
   const uint32_t set = s.address;
   const uint32_t textures = s.xpr_address();  // r18
   // The visible areas (the manager's +216, r16): area `a`.
   auto area_at = [&](uint32_t a) {
-    return VisibleArea(base, m.visible_areas().address + VisibleArea::kSize * a);
+    return VisibleArea(m.visible_areas().address + VisibleArea::kSize * a);
   };
 
   auto guest_call = [&](uint32_t function, std::initializer_list<uint32_t> args, uint32_t lr) {
@@ -100,7 +100,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   auto provider_clear = [&](uint32_t lr) {
     const uint32_t function = m.texture_provider().clear_all();
     if (function == kProviderClearAll) {
-      scenery_lists::TextureProviderClearAll(base, provider);
+      scenery_lists::TextureProviderClearAll(provider);
     } else {
       guest_call(function, {provider}, lr);
     }
@@ -108,38 +108,38 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   auto provider_set = [&](uint32_t slot, uint32_t lr) {
     const uint32_t function = m.texture_provider().set();
     if (function != kProviderSet ||
-        !scenery_lists::TextureProviderSet(base, provider, slot, textures)) {
+        !scenery_lists::TextureProviderSet(provider, slot, textures)) {
       guest_call(function, {provider, slot, textures}, lr);
     }
   };
   // The description's +12 to +32 from table entry `entry`, word by word.
   auto describe = [&](uint32_t entry) {
-    const uint32_t at = EntryAt(base, entry).address;
+    const uint32_t at = EntryAt(entry).address;
     for (uint32_t i = 0; i < 6; i++) {
-      Store(base, desc.player_address() + 4 * i, Load(base, at + 4 * i));
+      Store(desc.player_address() + 4 * i, Load(at + 4 * i));
     }
   };
   auto enabled = [&](uint32_t entry) {
-    return PassAt(base, EntryAt(base, entry).camera_pass()).enabled() != 0;
+    return PassAt(EntryAt(entry).camera_pass()).enabled() != 0;
   };
   auto copy = [&](uint32_t to, uint32_t from, uint32_t lr) {
-    matrix_math::Copy(base, to, from);
-    interpolation::BlendState_OnCopy(base, to, from, lr);
+    matrix_math::Copy(to, from);
+    interpolation::BlendState_OnCopy(to, from, lr);
     FlushOff();
   };
   // The identity at +128 and its copy at `world` (ld and std).
   auto identity = [&](uint32_t world) {
     for (uint32_t row = 0; row < 4; row++) {
       for (uint32_t col = 0; col < 4; col++) {
-        Store(base, f + 128 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
+        Store(f + 128 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
       }
     }
     for (uint32_t at = 0; at < 64; at += 4) {
-      Store(base, world + at, Load(base, f + 128 + at));
+      Store(world + at, Load(f + 128 + at));
     }
   };
   auto headlights = [&]() {
-    RecordHeadlightProjectors(base, calls, f, description);
+    RecordHeadlightProjectors(calls, f, description);
     FlushOff();
   };
 
@@ -157,9 +157,9 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       }
       for (uint32_t n = 0; n < area.model_count(); n++) {
         const uint32_t model =
-            schema::AreaModel(base, Load(base, area.models_address() + 4 * n)).model().address;
+            schema::AreaModel(Load(area.models_address() + 4 * n)).model().address;
         if (steps.native_model_animation) {
-          model_animation::ModelAnimate(base, model);
+          model_animation::ModelAnimate(model);
         } else {
           guest_call(kModelAnimate, {model}, 0x820F60F4);
         }
@@ -169,19 +169,19 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   }
   provider_set(0, 0x820F613C);
 
-  const double one = double(G::one(base));  // f31
+  const double one = double(G::one());  // f31
   // The course set's model (+96) with the eye's translation, +196's 0x10.
   if ((m.mask() & 0x10) != 0) {
-    const double zero = double(G::zero(base));  // f30
-    const double range_y = double(G::range_y(base));  // f28
-    const double range_x = double(G::range_x(base));  // f29
+    const double zero = double(G::zero());  // f30
+    const double range_y = double(G::range_y());  // f28
+    const double range_x = double(G::range_x());  // f29
     for (uint32_t entry = 0; entry < 3; entry++) {
       if (!enabled(entry)) {
         continue;
       }
-      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
+      const Pass pass = PassAt(EntryAt(entry).camera_pass());
       for (uint32_t at : {220u, 236u, 252u, 268u, 348u, 364u, 380u, 396u}) {
-        Stfs(base, f + at, one);
+        Stfs(f + at, one);
       }
       const uint32_t model = s.model_address();  // r29
       if (model == 0) {
@@ -191,30 +191,30 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       headlights();
       const uint32_t world = f + 208, view_projection = f + 336;
       identity(world);
-      Stfs(base, f + 256, double(pass.eye_x()));
-      Stfs(base, f + 260, double(pass.eye_y()));
-      Stfs(base, f + 264, double(pass.eye_z()));
+      Stfs(f + 256, double(pass.eye_x()));
+      Stfs(f + 260, double(pass.eye_y()));
+      Stfs(f + 264, double(pass.eye_z()));
       copy(view_projection, pass.view_projection_address(), 0x820F628C);
       provider_set(1, 0x820F62A8);
-      G::set_key_a(base, desc.key_a());
-      G::set_key_b(base, desc.key_b());
+      G::set_key_a(desc.key_a());
+      G::set_key_b(desc.key_b());
       copy(kViewCopy, pass.view_address(), 0x820F62C4);
-      schema::Model(base, model).set_texture_provider(provider);
-      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(base, model).shape_count()); i++) {
+      schema::Model(model).set_texture_provider(provider);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(model).shape_count()); i++) {
         const uint32_t range = f + 192;
-        Stfs(base, range + 0, range_x);
-        Stfs(base, range + 4, range_y);
-        Stfs(base, range + 8, zero);
-        Stfs(base, range + 12, zero);
+        Stfs(range + 0, range_x);
+        Stfs(range + 4, range_y);
+        Stfs(range + 8, zero);
+        Stfs(range + 12, zero);
         const uint32_t frame = f - scenery_lists::kModelDrawShapeFrame;
-        const uint32_t chain = Load(base, frame);
-        Store(base, frame, f);
-        const auto drawn = scenery_lists::ModelDrawShape(base, draws, frame, model,
+        const uint32_t chain = Load(frame);
+        Store(frame, f);
+        const auto drawn = scenery_lists::ModelDrawShape(draws, frame, model,
                                                          view_projection, world, i, 0, 0, range,
                                                          kViewCopy);
         FlushOff();
         if (!drawn) {
-          Store(base, frame, chain);
+          Store(frame, chain);
           guest_call(kModelDrawShape, {model, view_projection, world, i, 0, 0, range},
                      0x820F6308);
         }
@@ -229,9 +229,9 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       if (!enabled(entry)) {
         continue;
       }
-      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
+      const Pass pass = PassAt(EntryAt(entry).camera_pass());
       for (uint32_t at : {284u, 300u, 316u, 332u, 412u, 428u, 444u, 460u}) {
-        Stfs(base, f + at, one);
+        Stfs(f + at, one);
       }
       const uint32_t list = s.list_a_address();  // r26
       if (list == 0) {
@@ -243,30 +243,28 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       identity(world);
       copy(view_projection, pass.view_projection_address(), 0x820F6424);
       provider_set(1, 0x820F6440);
-      G::set_key_a(base, desc.key_a());
-      G::set_key_b(base, desc.key_b());
+      G::set_key_a(desc.key_a());
+      G::set_key_b(desc.key_b());
       copy(kViewCopy, pass.view_address(), 0x820F645C);
-      const Entry row = EntryAt(base, entry);
-      for (uint32_t i = 0; int32_t(i) < int32_t(schema::ModelList(base, list).count()); i++) {
-        const uint32_t model = ListModel(base, list + 4, i);
-        scenery_lists::ResetDrawState(base, model);
-        const schema::ViewportEntry viewport(
-            base, Load(base, schema::CamerasGlobals::viewports(base).first_address() +
+      const Entry row = EntryAt(entry);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::ModelList(list).count()); i++) {
+        const uint32_t model = ListModel(list + 4, i);
+        scenery_lists::ResetDrawState(model);
+        const schema::ViewportEntry viewport(Load(schema::CamerasGlobals::viewports().first_address() +
                                  4 * row.player()) +
                       schema::ViewportEntry::kSize * row.viewport_entry());
         // The model's first shape's +236 (not in models.toml's ModelShape).
-        if (Lfs(base, Shape(base, model).shapes().address + 236) > double(viewport.far())) {
+        if (Lfs(Shape(model).shapes().address + 236) > double(viewport.far())) {
           continue;
         }
-        Shape(base, model).set_texture_provider(provider);
+        Shape(model).set_texture_provider(provider);
         const uint32_t frame = f - scenery_lists::kSceneryDrawShapeFrame;
-        const uint32_t chain = Load(base, frame);
-        Store(base, frame, f);
-        const auto drawn = scenery_lists::SceneryDrawShape(
-            base, draws, frame, model, view_projection, world, 0, 0, 0, 0, 0, kViewCopy);
+        const uint32_t chain = Load(frame);
+        Store(frame, f);
+        const auto drawn = scenery_lists::SceneryDrawShape(draws, frame, model, view_projection, world, 0, 0, 0, 0, 0, kViewCopy);
         FlushOff();
         if (!drawn) {
-          Store(base, frame, chain);
+          Store(frame, chain);
           guest_call(kDrawShape, {model, view_projection, world, 0, 0, 0, 0, 0}, 0x820F650C);
         }
       }
@@ -278,7 +276,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   for (const auto& [first, count] : {std::pair{6u, 10u}, std::pair{16u, 3u}}) {
     for (uint32_t a = 0; a < m.visible_count(); a++) {
       const uint32_t area = area_at(a).address;
-      if (VisibleArea(base, area).model_count() == 0) {
+      if (VisibleArea(area).model_count() == 0) {
         continue;
       }
       for (uint32_t entry = first; entry < first + count; entry++) {
@@ -286,8 +284,8 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
           continue;
         }
         describe(entry);
-        steps.set_r24(PassAt(base, desc.camera_pass()).address);
-        DrawArea(base, draws, calls, f, manager, description, area, VisibleArea::kSize * a);
+        steps.set_r24(PassAt(desc.camera_pass()).address);
+        DrawArea(draws, calls, f, manager, description, area, VisibleArea::kSize * a);
         steps.set_r24(kViewCopy);
         FlushOff();
       }
@@ -300,8 +298,8 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       continue;
     }
     describe(entry);
-    steps.set_r24(DrawSetListsViewProjection(base, description));
-    DrawSetLists(base, draws, f, manager, description);
+    steps.set_r24(DrawSetListsViewProjection(description));
+    DrawSetLists(draws, f, manager, description);
     steps.set_r24(kViewCopy);
     FlushOff();
   }
@@ -310,7 +308,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // passes, +196's 0x400.
   if ((m.mask() & 0x400) != 0) {
     for (uint32_t entry = 16; entry < 19; entry++) {
-      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
+      const Pass pass = PassAt(EntryAt(entry).camera_pass());
       if (pass.enabled() == 0 || ShadowPass(int32_t(pass.type()))) {
         continue;
       }
@@ -320,12 +318,12 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       }
       describe(entry);
       headlights();
-      scenery_lists::SetBillboardPass(base, description, desc.camera_pass_object(), desc.key_b());
-      for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(base, lights).count());
+      scenery_lists::SetBillboardPass(description, desc.camera_pass_object(), desc.key_b());
+      for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(lights).count());
            i++) {
         const uint32_t animations = s.texture_animations().address;
-        const uint32_t groups = game_data::GetEntry(base, lights, i, false);
-        sprites::DrawLightGroups(base, calls, f, description, groups, textures, animations);
+        const uint32_t groups = game_data::GetEntry(lights, i, false);
+        sprites::DrawLightGroups(calls, f, description, groups, textures, animations);
         FlushOff();
       }
     }
@@ -334,7 +332,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // The minimap's pass (entry 19): its clear, the headlights, the minimap
   // (inside its per-frame wrap).
   if (enabled(19)) {
-    steps.record_clear(f, 103, 49, PassAt(base, 19).clear_color(), PassAt(base, 19).clear_depth());
+    steps.record_clear(f, 103, 49, PassAt(19).clear_color(), PassAt(19).clear_depth());
     FlushOff();
     describe(19);
     headlights();

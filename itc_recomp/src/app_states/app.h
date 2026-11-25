@@ -49,19 +49,19 @@ struct AppCalls {
 };
 
 // The target of `object`'s vtable slot at byte `offset`.
-uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset);
+uint32_t VirtualTarget(uint32_t object, uint32_t offset);
 
 // sub_820AE1A0 AppStates::IsEmpty (the stack's slot 3): the root layer's
 // state (+4) slot 11 as a tail call; its r3.
-uint32_t StatesIsEmpty(uint8_t* base, uint32_t states, const AppCalls& calls);
+uint32_t StatesIsEmpty(uint32_t states, const AppCalls& calls);
 // sub_82092928 App::IsRunning (the +20 interface's slot +44): 1 while the
 // state stack's slot 3 answers 0 (in its low byte), else 0; the call from
 // a 96-byte frame.
-uint32_t AppIsRunning(uint8_t* base, uint32_t interface, const AppCalls& calls);
+uint32_t AppIsRunning(uint32_t interface, const AppCalls& calls);
 // sub_82094AB0 App::SendMessage (the +20 interface's slot +40): the word at
 // `message` pushed on the message vector (interface + 56). Whether it took
 // Insert, or nullopt where MessageVector::PushBack hands back.
-std::optional<bool> AppSendMessage(uint8_t* base, uint32_t interface, uint32_t message);
+std::optional<bool> AppSendMessage(uint32_t interface, uint32_t message);
 
 // The functors App::Update and DeliverMessage hand the walks.
 constexpr uint32_t kRunHandler = 0x82092968;
@@ -80,34 +80,34 @@ constexpr uint32_t kApplyRequest = 0x82093BE0;
 // functor's 16 bytes stored at `result`. Where the original traps (a
 // checked iterator's tw 22, which the recompiled code only logs), this logs
 // a warning and goes on the same way.
-void HandlerMapForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
+void HandlerMapForEach(uint32_t result, uint64_t first, uint64_t last,
                        uint64_t functor, uint64_t adjust, uint32_t frame, const AppCalls& calls);
 // sub_82092CD0 App::ForEachMessage and sub_82091C48 App::ForEachRequest
 // (std::for_each over the message vector, 4-byte steps, and the request
 // vector, 12-byte steps): r4 each word (or each request's type and key, its
 // delegate in r5's high word), r3 the object plus the adjustment; r28 to r31
 // as the original keeps them. `frame` is the original's 128-byte frame.
-void ForEachMessage(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
+void ForEachMessage(uint32_t result, uint64_t first, uint64_t last,
                     uint64_t functor, uint64_t adjust, uint32_t frame, const AppCalls& calls);
-void ForEachRequest(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
+void ForEachRequest(uint32_t result, uint64_t first, uint64_t last,
                     uint64_t functor, uint64_t adjust, uint32_t frame, const AppCalls& calls);
 // sub_82092968 App::RunHandler and sub_820929B0 App::RunListener: the
 // delegate (`entry`'s low word) gets its slot 1 with r4 = the app's +20
 // interface (0 for no app) and, for a listener, r5 = the app + 92, from a
 // 96-byte frame (`entry` stored at the caller's r1 + 24). Its r3.
-uint32_t RunHandler(uint8_t* base, uint32_t app, uint64_t entry, bool listener, uint32_t frame,
+uint32_t RunHandler(uint32_t app, uint64_t entry, bool listener, uint32_t frame,
                     const AppCalls& calls);
 // sub_82092D50 App::DeliverMessage: the app + 92 = `message`, then
 // HandlerMapForEach over the listener map (+64) with App::RunListener, from
 // the original's 128-byte frame (its words stored there as it does).
-void DeliverMessage(uint8_t* base, uint32_t app, uint32_t message, uint32_t frame,
+void DeliverMessage(uint32_t app, uint32_t message, uint32_t frame,
                     const AppCalls& calls);
 // sub_82093BE0 App::ApplyRequest: types 0, 2, 4 and 6 insert the delegate
 // under the key in the maps +28, +40, +52, +64 (HandlerMap::Insert; the
 // split-off type 0 piece sub_82093C2C merged); others above 7 do nothing.
 // Whether it inserted, or nullopt for the odd types (a removal, never seen
 // in play) or an insert handed back.
-std::optional<bool> AppApplyRequest(uint8_t* base, uint32_t app, uint32_t type, uint32_t key,
+std::optional<bool> AppApplyRequest(uint32_t app, uint32_t type, uint32_t key,
                                     uint32_t delegate);
 // sub_82094830 App::AddHandler (type 0), sub_820948D0 AddToggledHandler
 // (2), sub_82094970 AddAlwaysHandler (4), sub_82094A10 AddListener (6), the
@@ -116,7 +116,7 @@ std::optional<bool> AppApplyRequest(uint8_t* base, uint32_t app, uint32_t type, 
 // the request vector (interface + 76). Whether PushBack took Insert, or
 // nullopt when it hands back (the request is then built: the caller runs
 // the original PushBack on it).
-std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t type, uint32_t key,
+std::optional<bool> AppAddRequest(uint32_t interface, uint32_t type, uint32_t key,
                                   uint32_t delegate, uint32_t request, uint32_t clone_return,
                                   const AppCalls& calls);
 
@@ -130,6 +130,6 @@ std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t ty
 // original's 144-byte frame (its words stored as the original stores them;
 // r29 to r31 as it keeps them). Whether the request vector's clear was ours
 // (its r3 then in its frame, `frame` - 16; else the original's).
-bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& calls);
+bool AppUpdate(uint32_t app, uint32_t frame, const AppCalls& calls);
 
 }  // namespace app_states

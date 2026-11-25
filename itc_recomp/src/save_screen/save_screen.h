@@ -109,7 +109,7 @@ constexpr int kInitCount = 4;
 extern const InitInfo kInits[kInitCount];
 // The Init at `address` (one of kInits) on `object`, its frame at `frame`
 // (its back chain written).
-InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t frame);
+InitResult RunInit(uint32_t address, uint32_t object, uint32_t frame);
 
 // --- The machine's handlers (handlers.cpp): r3 the machine, r4 the mode ---
 
@@ -117,42 +117,42 @@ InitResult RunInit(uint8_t* base, uint32_t address, uint32_t object, uint32_t fr
 // bytes), the menu list (72) and the data (68) made by VirtualAlloc
 // (MEM_COMMIT, PAGE_READWRITE) into their globals, their words set; +9604 =
 // 1 when +9612 is set, else 9. The data's VirtualAlloc r3. 112-byte frame.
-uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls);
+uint64_t OnEnter(uint32_t machine, uint32_t sp, const Calls& calls);
 // sub_821A1D10 SaveScreen::OpenMovie (1, 1): a tail call of
 // UiMovies::Open(44, 22588) on the caller's frame with its lr.
-uint64_t OpenMovie(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls);
+uint64_t OpenMovie(uint32_t sp, uint32_t lr, const Calls& calls);
 // sub_821A26F0 SaveScreen::WaitMovie (2, 1): +9608 = 1 once UiMovies::IsLoaded(44)
 // (its plain C++); then +9604 = 9 or 4 by +9612. IsLoaded's r3, or the
 // machine. 96-byte frame.
-uint64_t WaitMovie(uint8_t* base, uint64_t machine, uint32_t sp);
+uint64_t WaitMovie(uint64_t machine, uint32_t sp);
 // The open messages' handlers: the data's +36 = `kind`; +9604 = 4 when the
 // movie is loaded, else 1. sub_821A2760 OpenKind0, sub_821A2790 OpenKind1,
 // sub_821A2820 OpenKind2, sub_821A27F0 OpenKind3, sub_821A2850 OpenKind4,
 // sub_821A2880 OpenKind5, sub_821A27C0 OpenKind6, sub_821A28B0 OpenKind7.
-void OpenKind(uint8_t* base, uint32_t machine, uint32_t kind);
+void OpenKind(uint32_t machine, uint32_t kind);
 // sub_821A6608 SaveScreen::Show (4, 1), with its case 0 sub_821A6650
 // (ShowCheck) done here: by the data's +36, SaveBuffers::Create (kinds 0, 1
 // and 6), StartCheck's and Start's plain C++ (src/front_end_screen_helpers/),
 // ShowKind2's and ShowKind7's, the kinds 3 to 6's originals. The last
 // call's r3, or `r3` above 7. 96-byte frame.
-uint64_t Show(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+uint64_t Show(uint64_t r3, uint32_t sp, const Calls& calls);
 // sub_821A1D38 SaveScreen::ShowKind2 and sub_821A2138 ShowKind7: the data's
 // dialog set (message 2 with the note, page 13 by step 4; message 0, page 24
 // by step 6), MenuList::Init([0x826D8450], 1, 1, 0, 154, 153, 155, 156, 159,
 // 158; the last two on the frame's +84 and +92). Init's r3. 128-byte frames.
-uint64_t ShowKind2(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t ShowKind7(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t ShowKind2(uint32_t sp, const Calls& calls);
+uint64_t ShowKind7(uint32_t sp, const Calls& calls);
 // sub_821A1D20 SaveScreen::Cancel: the data's +28 = 1.
-void Cancel(uint8_t* base);
+void Cancel();
 // sub_821A4C58 SaveScreen::Leave (5, 4) and (9, 4): +9604 = 7, movie 44's
 // animations finished (UiMovie::FinishAll) and the movie deleted
 // (UiMovies::Delete); with the mode type 2, 4, 6, 8 or 10, message 4 posted
 // on the mode's ring. Delete's r3. 112-byte frame.
-uint64_t Leave(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t Leave(uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
 // sub_821A1CA0 SaveScreen::OnLeft (7, 4): MenuList::Release, the three
 // blocks freed (VirtualFree, MEM_RELEASE) and their globals 0. The last
 // VirtualFree's r3. 112-byte frame.
-uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t OnLeft(uint32_t sp, const Calls& calls);
 
 // --- The machine's Update and Draw (update.cpp) ---
 
@@ -166,7 +166,7 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls);
 // +4, +12 = -1), then +24 = 0; with none running and the dialog shown (the
 // data's +16 not -1), UiMovie::Run(movie, 0). The last call's r3 (the
 // movie with none). 144-byte frame.
-uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
+uint64_t Update(uint32_t sp, const Calls& calls);
 // sub_821A6AF0 SaveScreen::Draw (5, 1): r3 the machine and r4 the mode
 // stored in the caller's area (sp + 20, sp + 28); the cancel (the data's +28,
 // unless a step runs or the page is an end page) turned into the kind's end
@@ -176,7 +176,7 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls);
 // the original leaves them); then with the data's +32 not 21 the machine's
 // +9604 = it, +32 = 21 and, for the kinds 0 and 1, SaveBuffers::Destroy.
 // The last call's r3 (0x821A2C98 with none). 368-byte frame.
-uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
+uint64_t Draw(uint32_t machine, uint32_t mode, uint32_t sp, const Calls& calls);
 
 // --- The dialog steps (steps.cpp): `step` the started word ---
 
@@ -184,49 +184,49 @@ uint64_t Draw(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, const
 // selection's named animation (Selection + 2) played and looped after the
 // previous one's (GetPreviousSelection + 2) finished, the word 1; every
 // call UiMovie::Run(movie 44, 0). 1. 128-byte frame.
-uint64_t MoveSelection(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t MoveSelection(uint32_t step, uint32_t sp, const Calls& calls);
 // sub_821A5038 SaveScreen::CloseDialog (step 2): first call by the data's
 // +16 (unsigned) the dialog's close (0: the selection's finished and 14
 // played; 1: 15; 2: 0 finished and 15), MenuSound::Play(5), the word 1;
 // every call Run; when it answers 0 the data's +16 = its +20. Whether Run
 // answered 0. 128-byte frame.
-uint64_t CloseDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t CloseDialog(uint32_t step, uint32_t sp, const Calls& calls);
 
 // --- The pages (pages.cpp, pages_load.cpp, pages_replays.cpp): `mode` r3 ---
 
 // sub_821A28E0 SaveScreen::Page0: kind 0's questions. 128-byte frame.
-uint64_t Page0(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page0(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A2AF8 SaveScreen::Page1: kind 0's notes. 96-byte frame.
-uint64_t Page1(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page1(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A2C98 SaveScreen::Page2: kind 0's wait. 96-byte frame.
-uint64_t Page2(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page2(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A2EE8 SaveScreen::Page3: kind 0's device wait. 96-byte frame.
-uint64_t Page3(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page3(uint64_t mode, uint32_t sp, const Calls& calls);
 // The end pages (leaves): the result posted on the mode's ring by the mode
 // type, the data's +32 = 9. sub_821A4D30 Page4 (kind 0), sub_821A4DE0
 // Page9 (kind 1), sub_821A4E60 Page16 (the replays), sub_821A4FD8 Page25
 // (kind 7).
-uint64_t Page4(uint8_t* base, uint64_t mode);
+uint64_t Page4(uint64_t mode);
 // sub_821A32C0 SaveScreen::Page6: kind 1's note. 96-byte frame.
-uint64_t Page6(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page6(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A33E8 SaveScreen::Page7: kind 1's load and save wait (the loaded
 // game data copied into player 0's save data). 96-byte frame.
-uint64_t Page7(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page7(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A3728 SaveScreen::Page8: kind 1's device wait. 96-byte frame.
-uint64_t Page8(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page8(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A3A08 SaveScreen::Page12: the replays' question. 128-byte frame.
-uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page12(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A3C60 SaveScreen::Page13: the replays' note. 96-byte frame.
-uint64_t Page13(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page13(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A67E8 SaveScreen::Page14: the replays' wait (the list built, a
 // replay loaded). 96-byte frame.
-uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page14(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A3DE8 SaveScreen::Page15: the replays' device wait. 96-byte frame.
-uint64_t Page15(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page15(uint64_t mode, uint32_t sp, const Calls& calls);
 // sub_821A4AC0 SaveScreen::Page24: kind 7's controller pick (the players'
 // mappers' slot 10, ActionMapper::Pressed, through their vtables). 128-byte
 // frame.
-uint64_t Page24(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
+uint64_t Page24(uint64_t mode, uint32_t sp, const Calls& calls);
 
 // sub_821A24B0 SaveScreen::StoreSettings: once (the data's +60), the
 // profile's results into player 0's save data (+0x1F85C: +20, +24, the
@@ -234,9 +234,9 @@ uint64_t Page24(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls);
 // swapped). With the profile's +672 3 or more, +24 the frame's +80 as the
 // caller left it (copied as the original leaves it). 1, or 0 while the
 // profile's read is pending. 224-byte frame.
-uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls);
-uint64_t Page9(uint8_t* base, uint64_t mode);
-uint64_t Page16(uint8_t* base, uint64_t mode);
-uint64_t Page25(uint8_t* base, uint64_t mode);
+uint64_t StoreSettings(uint32_t sp, const Calls& calls);
+uint64_t Page9(uint64_t mode);
+uint64_t Page16(uint64_t mode);
+uint64_t Page25(uint64_t mode);
 
 }  // namespace save_screen

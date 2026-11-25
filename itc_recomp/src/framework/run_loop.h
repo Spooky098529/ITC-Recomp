@@ -50,55 +50,55 @@ struct InsertResult {
 };
 
 // Whether nodes can be allocated natively (a process heap for operator new).
-bool CanAllocate(uint8_t* base);
+bool CanAllocate();
 
 // sub_82099B18: the map iterator's operator++ (in key order); false, with
 // the iterator unchanged, where the original traps (a null map, or at the
 // end).
-bool MapIncrement(uint8_t* base, Iterator& it);
+bool MapIncrement(Iterator& it);
 // sub_82091AE8: operator--; false where the original traps (a null map, or
 // the end of an empty map).
-bool MapDecrement(uint8_t* base, Iterator& it);
+bool MapDecrement(Iterator& it);
 // sub_82092B10 (_Lrotate) and sub_82092A00 (_Rrotate): `node` rotated
 // left (its right child up) or right (its left child up).
-void MapRotateLeft(uint8_t* base, uint32_t map, uint32_t node);
-void MapRotateRight(uint8_t* base, uint32_t map, uint32_t node);
+void MapRotateLeft(uint32_t map, uint32_t node);
+void MapRotateRight(uint32_t map, uint32_t node);
 // sub_82099C80: operator new(count x 24); nullopt where the original throws
 // bad_alloc (count over 0xFFFFFFFF / 24) or operator new fails.
-std::optional<uint32_t> MapAllocateNodes(uint8_t* base, uint32_t count);
+std::optional<uint32_t> MapAllocateNodes(uint32_t count);
 // sub_82099E88: the head node (links 0, black, not nil yet).
-uint32_t MapNewHead(uint8_t* base);
+uint32_t MapNewHead();
 // sub_82099FB0 HandlerMap::HandlerMap: the head made, nil, linked to
 // itself; size 0. Returns the head (r3 as the original leaves it).
-uint32_t MapConstruct(uint8_t* base, uint32_t map);
+uint32_t MapConstruct(uint32_t map);
 // sub_82099E20 (_Buynode): a node with the links, the key and delegate at
 // `value` and the color.
-uint32_t MapNewNode(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right, uint32_t value,
+uint32_t MapNewNode(uint32_t left, uint32_t parent, uint32_t right, uint32_t value,
                     uint8_t color);
-uint32_t MapNewNodeOf(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right, uint32_t key,
+uint32_t MapNewNodeOf(uint32_t left, uint32_t parent, uint32_t right, uint32_t key,
                       uint32_t delegate, uint8_t color);
 // sub_82093400 (_Insert): a node for the 8-byte value at `value` linked
 // under `where` (on its left when `add_left`) and the tree rebalanced.
 // nullopt, with nothing done, at the size limit (the original's
 // length_error) or without a heap.
-std::optional<Iterator> MapInsert(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
+std::optional<Iterator> MapInsert(uint32_t map, bool add_left, uint32_t where,
                                   uint32_t value);
-std::optional<Iterator> MapInsertOf(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
+std::optional<Iterator> MapInsertOf(uint32_t map, bool add_left, uint32_t where,
                                     uint32_t key, uint32_t delegate);
 // sub_82093740 HandlerMap::Insert (std::map::insert): the value at `value`
 // (its key first) added unless its key is there. nullopt, with nothing done,
 // where the original would throw or trap.
-std::optional<InsertResult> MapInsertUnique(uint8_t* base, uint32_t map, uint32_t value);
-std::optional<InsertResult> MapInsertUniqueOf(uint8_t* base, uint32_t map, uint32_t key,
+std::optional<InsertResult> MapInsertUnique(uint32_t map, uint32_t value);
+std::optional<InsertResult> MapInsertUniqueOf(uint32_t map, uint32_t key,
                                               uint32_t delegate);
 
 // sub_82092EF8: the vector's erase(first, last), 12-byte elements: the
 // elements after the range moved down, last set. false where the original
 // traps (a null or mismatched iterator).
-bool RequestsErase(uint8_t* base, uint32_t vector, Iterator first, Iterator last);
+bool RequestsErase(uint32_t vector, Iterator first, Iterator last);
 // sub_8209A080 RequestVector::Clear: erase(first, last) over everything.
 // false where the original traps (first past last).
-bool RequestsClear(uint8_t* base, uint32_t vector);
+bool RequestsClear(uint32_t vector);
 
 // sub_8209A0E8 RequestVector::InsertN (_Insert_n): `count` copies of the
 // request at `value` inserted before `where` (a reallocation through
@@ -106,28 +106,28 @@ bool RequestsClear(uint8_t* base, uint32_t vector);
 // old block freed). false, with nothing done, for the length_error, an
 // allocation the heap can't give, and a tail at least `count` long (its
 // copy_backward, sub_82091CD0, never seen in play).
-bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
+bool RequestsInsertN(uint32_t vector, uint32_t where, uint32_t count,
                      uint32_t value);
 // sub_8209A600 RequestVector::Insert (insert(where, value)): InsertN of one,
 // then the iterator at the inserted request. nullopt where the original
 // traps or InsertN hands back.
-std::optional<Iterator> RequestsInsert(uint8_t* base, uint32_t vector, Iterator where,
+std::optional<Iterator> RequestsInsert(uint32_t vector, Iterator where,
                                        uint32_t value);
 // sub_8209A930 RequestVector::PushBack: the request at `value` copied to
 // the end, or Insert at the end when full. Whether it took Insert (the
 // original's r3 differs), or nullopt where it traps or Insert hands back.
-std::optional<bool> RequestsPushBack(uint8_t* base, uint32_t vector, uint32_t value);
+std::optional<bool> RequestsPushBack(uint32_t vector, uint32_t value);
 
 // sub_8209A9F0 RunLoop::RunLoop: the vtable, the two maps
 // (HandlerMap::HandlerMap), the request vector empty, +48 to +50 cleared.
 // Returns the run loop.
-uint32_t RunLoopConstruct(uint8_t* base, uint32_t loop);
+uint32_t RunLoopConstruct(uint32_t loop);
 // sub_8209A458 RunLoop::ApplyRequest: type 0 inserts the delegate under the
 // key in the tick handler map, 2 in the listener map (HandlerMap::Insert);
 // other types but 1 and 3 do nothing. Whether it inserted (the original's r3
 // differs), or nullopt for 1 and 3 (a removal, never seen in play) or an
 // insert handed back.
-std::optional<bool> RunLoopApplyRequest(uint8_t* base, uint32_t loop, uint32_t type, uint32_t key,
+std::optional<bool> RunLoopApplyRequest(uint32_t loop, uint32_t type, uint32_t key,
                                         uint32_t delegate);
 
 }  // namespace framework

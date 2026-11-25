@@ -9,72 +9,72 @@
 
 namespace file_layer {
 
-uint32_t FileGetSize(uint8_t* base, uint32_t file) {
+uint32_t FileGetSize(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_822B80D8 File::GetSize");
-  return schema::File(base, file).size();
+  return schema::File(file).size();
 }
 
-void FileConstruct(uint8_t* base, uint32_t file) {
+void FileConstruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8258C938 File::File");
-  const schema::File f(base, file);
+  const schema::File f(file);
   f.set_position(0);
   f.set_vtable(kFileVtable);
   f.set_handle(0xFFFFFFFFu);
   f.set_size(0);
 }
 
-void FileDestruct(uint8_t* base, uint32_t file) {
+void FileDestruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8258C5F8 File::~File");
-  schema::File(base, file).set_vtable(kStreamVtable);
+  schema::File(file).set_vtable(kStreamVtable);
 }
 
-void AsyncFileConstruct(uint8_t* base, uint32_t file) {
+void AsyncFileConstruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_82593AC0 AsyncFile::AsyncFile");
-  FileConstruct(base, file);
-  schema::GameFile(base, file).set_vtable(kAsyncFileVtable);
+  FileConstruct(file);
+  schema::GameFile(file).set_vtable(kAsyncFileVtable);
 }
 
-void AsyncFileDestruct(uint8_t* base, uint32_t file) {
+void AsyncFileDestruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_82593B00 AsyncFile::~AsyncFile");
-  schema::GameFile(base, file).set_vtable(kAsyncFileVtable);
-  FileDestruct(base, file);
+  schema::GameFile(file).set_vtable(kAsyncFileVtable);
+  FileDestruct(file);
 }
 
-void GameFileConstruct(uint8_t* base, uint32_t file) {
+void GameFileConstruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_820A6A00 GameFile::GameFile");
-  AsyncFileConstruct(base, file);
-  schema::GameFile(base, file).set_vtable(kGameFileVtable);
+  AsyncFileConstruct(file);
+  schema::GameFile(file).set_vtable(kGameFileVtable);
 }
 
-void GameFileDestruct(uint8_t* base, uint32_t file) {
+void GameFileDestruct(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_820A6A40 GameFile::~GameFile");
-  schema::GameFile(base, file).set_vtable(kGameFileVtable);
-  AsyncFileDestruct(base, file);
+  schema::GameFile(file).set_vtable(kGameFileVtable);
+  AsyncFileDestruct(file);
 }
 
-void PathConstruct(uint8_t* base, uint32_t path) {
+void PathConstruct(uint32_t path) {
   ITC_NATIVE_RUNNING("sub_82593C28 Path::Path");
-  const schema::Path p(base, path);
+  const schema::Path p(path);
   p.set_text(0);
   p.set_vtable(kPathVtable);
 }
 
-void PathDestruct(uint8_t* base, uint32_t path) {
+void PathDestruct(uint32_t path) {
   ITC_NATIVE_RUNNING("sub_82593C48 Path::~Path");
-  schema::Path(base, path).set_vtable(kPathVtable);
+  schema::Path(path).set_vtable(kPathVtable);
 }
 
-void GamePathConstruct(uint8_t* base, uint32_t path) {
+void GamePathConstruct(uint32_t path) {
   ITC_NATIVE_RUNNING("sub_820A6BE0 GamePath::GamePath");
-  schema::GamePath(base, path).set_vtable(kGamePathVtable);
+  schema::GamePath(path).set_vtable(kGamePathVtable);
 }
 
 namespace {
 
 // A std::string's text (std-string.md: in place at +4 under 16 bytes of
 // capacity, +24, else the block at +4).
-uint32_t StringText(uint8_t* base, uint32_t string) {
-  const schema::StdString s(base, string);
+uint32_t StringText(uint32_t string) {
+  const schema::StdString s(string);
   return s.capacity() < 16 ? s.text_address() : s.block();
 }
 
@@ -84,7 +84,7 @@ constexpr uint32_t kFormats[3] = {Globals::format_kind0_address(), Globals::form
 
 }  // namespace
 
-bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint32_t stack,
+bool PathBuild(uint32_t path, uint32_t kind, uint32_t name, uint32_t stack,
                uint32_t* result) {
   if (name == 0) {
     ITC_NATIVE_RUNNING("sub_82593CA0 Path::Build");
@@ -99,54 +99,54 @@ bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint3
     uint32_t args[3];
     uint32_t count = 0;
     if (kind == 2) {
-      args[count++] = StringText(base, Globals::prefix_string_address());
-      args[count++] = StringText(base, Globals::project_string_address());
+      args[count++] = StringText(Globals::prefix_string_address());
+      args[count++] = StringText(Globals::project_string_address());
     }
     args[count++] = name;
     for (uint32_t i = 0; i < count; i++) {
-      guest::StoreU32(base, frame + 32 + 8 * i, 0);
-      guest::StoreU32(base, frame + 36 + 8 * i, args[i]);
+      guest::StoreU32(frame + 32 + 8 * i, 0);
+      guest::StoreU32(frame + 36 + 8 * i, args[i]);
     }
     int32_t written;
-    if (!c_runtime::Sprintf(base, schema::Path(base, path).text_address(), kFormats[kind], frame + 32, frame - 144 - 1328,
+    if (!c_runtime::Sprintf(schema::Path(path).text_address(), kFormats[kind], frame + 32, frame - 144 - 1328,
                             &written)) {
       return false;
     }
   }
   ITC_NATIVE_RUNNING("sub_82593CA0 Path::Build");
-  *result = schema::Path(base, path).text_address();
+  *result = schema::Path(path).text_address();
   return true;
 }
 
-bool GamePathSetGame(uint8_t* base, uint32_t game_path, uint32_t name, uint32_t stack,
+bool GamePathSetGame(uint32_t game_path, uint32_t name, uint32_t stack,
                      uint32_t* result) {
   const uint32_t frame = stack - 624;
   const uint32_t path = frame + 80;
-  PathConstruct(base, path);
+  PathConstruct(path);
   uint32_t text;
-  if (!PathBuild(base, path, 0, name, frame, &text)) {
+  if (!PathBuild(path, 0, name, frame, &text)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820A6BF0 GamePath::SetGame");
-  uint32_t out = schema::GamePath(base, game_path).text_address();
+  uint32_t out = schema::GamePath(game_path).text_address();
   for (;;) {
-    const uint8_t c = guest::LoadU8(base, text++);
-    guest::StoreU8(base, out++, c);
+    const uint8_t c = guest::LoadU8(text++);
+    guest::StoreU8(out++, c);
     if (c == 0) break;
   }
-  PathDestruct(base, path);
-  *result = schema::GamePath(base, game_path).text_address();
+  PathDestruct(path);
+  *result = schema::GamePath(game_path).text_address();
   return true;
 }
 
-bool OpenPathBuild(uint8_t* base, uint32_t name, uint32_t stack, uint32_t* text) {
+bool OpenPathBuild(uint32_t name, uint32_t stack, uint32_t* text) {
   const uint32_t frame = stack - kOpenFrameBytes;
-  PathConstruct(base, frame + 80);
-  return PathBuild(base, frame + 80, 0, name, frame, text);
+  PathConstruct(frame + 80);
+  return PathBuild(frame + 80, 0, name, frame, text);
 }
 
-void OpenPathRelease(uint8_t* base, uint32_t stack) {
-  PathDestruct(base, stack - kOpenFrameBytes + 80);
+void OpenPathRelease(uint32_t stack) {
+  PathDestruct(stack - kOpenFrameBytes + 80);
 }
 
 }  // namespace file_layer

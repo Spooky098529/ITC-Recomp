@@ -21,11 +21,11 @@ namespace camera_modes::steps {
 using Fpscr = ::base::FloatMode;
 
 // lfs and stfs.
-inline double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+inline double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
-inline void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+inline void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 inline uint32_t Bits(double value) { return std::bit_cast<uint32_t>(float(value)); }
 
@@ -73,10 +73,10 @@ inline uint32_t WordOf(simde__m128 v, int i) {
   return lanes[3 - i];
 }
 // stvx: to the aligned 16 bytes holding `address`.
-inline void Stvx(uint8_t* base, uint32_t address, simde__m128 v) {
+inline void Stvx(uint32_t address, simde__m128 v) {
   const uint32_t at = address & ~0xFu;
   for (int i = 0; i < 4; i++) {
-    guest::StoreU32(base, at + 4 * i, WordOf(v, i));
+    guest::StoreU32(at + 4 * i, WordOf(v, i));
   }
 }
 

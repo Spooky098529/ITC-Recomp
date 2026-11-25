@@ -14,45 +14,45 @@ namespace hooks {
 
 // The modes' releases (r3 the mode): false, with nothing done, where the
 // mode's block isn't the allocation layer's pages (the original must run).
-bool FrontEndModeType2Release(lifted::Regs& ctx, uint8_t* base);
-bool FrontEndModeType4Release(lifted::Regs& ctx, uint8_t* base);
-bool FrontEndModeType5Release(lifted::Regs& ctx, uint8_t* base);
-bool FrontEndModeType9Release(lifted::Regs& ctx, uint8_t* base);
-bool FrontEndModeType10Release(lifted::Regs& ctx, uint8_t* base);
-bool FrontEndModeType12Release(lifted::Regs& ctx, uint8_t* base);
+bool FrontEndModeType2Release(lifted::Regs& ctx);
+bool FrontEndModeType4Release(lifted::Regs& ctx);
+bool FrontEndModeType5Release(lifted::Regs& ctx);
+bool FrontEndModeType9Release(lifted::Regs& ctx);
+bool FrontEndModeType10Release(lifted::Regs& ctx);
+bool FrontEndModeType12Release(lifted::Regs& ctx);
 
 // The dialogs' text setters (r3 the string id, r4 to r10 the varargs).
-void FrontEndSaveScreenSetText(lifted::Regs& ctx, uint8_t* base);
-void FrontEndSaveScreenSetNote(lifted::Regs& ctx, uint8_t* base);
-void FrontEndSaveScreenSetMessage(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetSaveDialogText(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetSaveDialogNote(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetCategory6DialogText(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetCategory6DialogNote(lifted::Regs& ctx, uint8_t* base);
+void FrontEndSaveScreenSetText(lifted::Regs& ctx);
+void FrontEndSaveScreenSetNote(lifted::Regs& ctx);
+void FrontEndSaveScreenSetMessage(lifted::Regs& ctx);
+void FrontEndOptionsSetSaveDialogText(lifted::Regs& ctx);
+void FrontEndOptionsSetSaveDialogNote(lifted::Regs& ctx);
+void FrontEndOptionsSetCategory6DialogText(lifted::Regs& ctx);
+void FrontEndOptionsSetCategory6DialogNote(lifted::Regs& ctx);
 // SaveScreen::ShowNotice (r3 the step word).
-void FrontEndSaveScreenShowNotice(lifted::Regs& ctx, uint8_t* base);
+void FrontEndSaveScreenShowNotice(lifted::Regs& ctx);
 
 // SaveScreen::StartCheck and Start, Options::SetUpSavePage and
 // SetUpCategory6Page (no arguments).
-void FrontEndSaveScreenStartCheck(lifted::Regs& ctx, uint8_t* base);
-void FrontEndSaveScreenStart(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetUpSavePage(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsSetUpCategory6Page(lifted::Regs& ctx, uint8_t* base);
+void FrontEndSaveScreenStartCheck(lifted::Regs& ctx);
+void FrontEndSaveScreenStart(lifted::Regs& ctx);
+void FrontEndOptionsSetUpSavePage(lifted::Regs& ctx);
+void FrontEndOptionsSetUpCategory6Page(lifted::Regs& ctx);
 // The dialogs' steps (r3 the step word): SaveScreen::ShowMessage,
 // ShowMessage3 and ShowMessage4, Options::ShowSaveDialog and
 // ShowCategory6Dialog.
-void FrontEndSaveScreenShowMessage(lifted::Regs& ctx, uint8_t* base);
-void FrontEndSaveScreenShowMessage3(lifted::Regs& ctx, uint8_t* base);
-void FrontEndSaveScreenShowMessage4(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsShowSaveDialog(lifted::Regs& ctx, uint8_t* base);
-void FrontEndOptionsShowCategory6Dialog(lifted::Regs& ctx, uint8_t* base);
+void FrontEndSaveScreenShowMessage(lifted::Regs& ctx);
+void FrontEndSaveScreenShowMessage3(lifted::Regs& ctx);
+void FrontEndSaveScreenShowMessage4(lifted::Regs& ctx);
+void FrontEndOptionsShowSaveDialog(lifted::Regs& ctx);
+void FrontEndOptionsShowCategory6Dialog(lifted::Regs& ctx);
 // CarCards::FillAll (no arguments).
-void FrontEndCarCardsFillAll(lifted::Regs& ctx, uint8_t* base);
+void FrontEndCarCardsFillAll(lifted::Regs& ctx);
 
 // The car cards: CarCard::Fill (r3 the node, r4 the entry),
 // CarCard::FillDetail, CarDetail::Open (r4 the mode).
-void FrontEndCarCardFill(lifted::Regs& ctx, uint8_t* base);
-void FrontEndCarCardFillDetail(lifted::Regs& ctx, uint8_t* base);
-void FrontEndCarDetailOpen(lifted::Regs& ctx, uint8_t* base);
+void FrontEndCarCardFill(lifted::Regs& ctx);
+void FrontEndCarCardFillDetail(lifted::Regs& ctx);
+void FrontEndCarDetailOpen(lifted::Regs& ctx);
 
 }  // namespace hooks

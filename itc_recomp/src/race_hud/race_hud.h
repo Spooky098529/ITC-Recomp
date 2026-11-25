@@ -23,16 +23,16 @@ struct HudMovie {
   HudCall call = HudCall::kNone;
   uint32_t movie = 0;
 };
-HudMovie RunMovie(uint8_t* base, uint32_t hud);
+HudMovie RunMovie(uint32_t hud);
 
 // sub_82211A28 (RivalLogo::Draw, probably; r3 = the logo's entry: +4 flags,
 // bit 8 shown, bit 16 finished; +8 the movie's id): while shown, the movie
 // found by its id in the movie table (UiMovies::Find, the id stored at the
 // original's frame + 80 (`frame`) for the lookup, as the original does).
 // Nothing when not shown.
-std::optional<uint32_t> RivalLogoMovie(uint8_t* base, uint32_t entry, uint32_t frame);
+std::optional<uint32_t> RivalLogoMovie(uint32_t entry, uint32_t frame);
 // Once UiMovie::Run returns 0 (the movie ended) and UiMovie::FinishNamed has
 // run: the entry's finished flag (16) set.
-void RivalLogoFinished(uint8_t* base, uint32_t entry);
+void RivalLogoFinished(uint32_t entry);
 
 }  // namespace race_hud

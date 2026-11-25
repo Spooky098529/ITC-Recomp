@@ -31,15 +31,15 @@ using G = schema::MatrixMathGlobals;
 
 // --- Scalar steps, as the translated code's doubles ---
 
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
+double Lfs(uint32_t address) {
+  return double(guest::LoadFloat(address));
 }
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
+void Stfs(uint32_t address, double value) {
+  guest::StoreFloat(address, float(value));
 }
 // lfs then stfs of one word: its bits.
-void CopyWord(uint8_t* base, uint32_t from, uint32_t to) {
-  guest::StoreU32(base, to, guest::LoadU32(base, from));
+void CopyWord(uint32_t from, uint32_t to) {
+  guest::StoreU32(to, guest::LoadU32(from));
 }
 double Fmuls(double a, double b) {
   return double(float(a * b));
@@ -70,9 +70,9 @@ simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
   return simde_mm_castsi128_ps(
       simde_mm_set_epi32(int32_t(w0), int32_t(w1), int32_t(w2), int32_t(w3)));
 }
-simde__m128 VectorAt(uint8_t* base, uint32_t address) {
-  return VectorOf(guest::LoadU32(base, address + 0), guest::LoadU32(base, address + 4),
-                  guest::LoadU32(base, address + 8), guest::LoadU32(base, address + 12));
+simde__m128 VectorAt(uint32_t address) {
+  return VectorOf(guest::LoadU32(address + 0), guest::LoadU32(address + 4),
+                  guest::LoadU32(address + 8), guest::LoadU32(address + 12));
 }
 // Word i (0 the top lane).
 uint32_t WordOf(simde__m128 v, int i) {
@@ -80,9 +80,9 @@ uint32_t WordOf(simde__m128 v, int i) {
   simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
   return lanes[3 - i];
 }
-void StoreVector(uint8_t* base, uint32_t address, simde__m128 v) {
+void StoreVector(uint32_t address, simde__m128 v) {
   for (int i = 0; i < 4; i++) {
-    guest::StoreU32(base, address + 4 * i, WordOf(v, i));
+    guest::StoreU32(address + 4 * i, WordOf(v, i));
   }
 }
 simde__m128i I(simde__m128 v) {
@@ -107,10 +107,10 @@ struct Words {
   uint32_t w[16];
 };
 
-Words LoadWords(uint8_t* base, uint32_t address) {
+Words LoadWords(uint32_t address) {
   Words m;
   for (uint32_t i = 0; i < 16; i++) {
-    m.w[i] = guest::LoadU32(base, address + 4 * i);
+    m.w[i] = guest::LoadU32(address + 4 * i);
   }
   return m;
 }
@@ -141,17 +141,17 @@ Words Product(const Words& a, const Words& b) {
 enum class Axis { kX, kY, kZ };
 
 template <Axis kAxis>
-void Rotate(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+void Rotate(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
   // The angle into [-pi, pi]: pi with the angle's sign (its bits ORed into
   // 0x40490FDB, from the stored float), added, times 1 / (2 pi), truncated
   // (fctiwz: NaN gives INT_MIN, INT_MAX and above INT_MAX), that many 2 pi
   // taken off (fnmsubs).
-  double x = double(MatrixMathFloat(base, angle).value());
-  const double two_pi = double(G::two_pi(base));
-  const uint32_t one = std::bit_cast<uint32_t>(G::one(base));
+  double x = double(MatrixMathFloat(angle).value());
+  const double two_pi = double(G::two_pi());
+  const uint32_t one = std::bit_cast<uint32_t>(G::one());
   const uint32_t stored = std::bit_cast<uint32_t>(float(x));
   const double pi = double(std::bit_cast<float>((stored & 0x80000000u) | 0x40490FDBu));
-  const double turns = Fmuls(Fadds(pi, x), double(G::inverse_two_pi(base)));
+  const double turns = Fmuls(Fadds(pi, x), double(G::inverse_two_pi()));
   int32_t n;
   if (std::isnan(turns)) {
     n = INT32_MIN;
@@ -165,12 +165,12 @@ void Rotate(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t t
   const double x3 = Fmuls(x2, x);
   // The polynomials: (1, x, x^2, x^3) and its powers dotted with the
   // coefficients at 0x820009C0-0x82000A1F (vector unit, flush-to-zero on).
-  const simde__m128 c9c0 = VectorAt(base, G::turn_polynomials_address() + 0);
-  const simde__m128 c9d0 = VectorAt(base, G::turn_polynomials_address() + 16);
-  const simde__m128 c9e0 = VectorAt(base, G::turn_polynomials_address() + 32);
-  const simde__m128 c9f0 = VectorAt(base, G::turn_polynomials_address() + 48);
-  const simde__m128 ca00 = VectorAt(base, G::turn_polynomials_address() + 64);
-  const simde__m128 ca10 = VectorAt(base, G::turn_polynomials_address() + 80);
+  const simde__m128 c9c0 = VectorAt(G::turn_polynomials_address() + 0);
+  const simde__m128 c9d0 = VectorAt(G::turn_polynomials_address() + 16);
+  const simde__m128 c9e0 = VectorAt(G::turn_polynomials_address() + 32);
+  const simde__m128 c9f0 = VectorAt(G::turn_polynomials_address() + 48);
+  const simde__m128 ca00 = VectorAt(G::turn_polynomials_address() + 64);
+  const simde__m128 ca10 = VectorAt(G::turn_polynomials_address() + 80);
   simde__m128 v0, v3, v4, v9, v10, v11, v12, v13, d112;
   {
     FlushToZero flush;
@@ -200,7 +200,7 @@ void Rotate(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t t
     d112b = simde_mm_dp_ps(v0, c9e0, 0xFF);
   }
   auto word0 = [](simde__m128 v) { return double(std::bit_cast<float>(WordOf(v, 0))); };
-  const uint32_t zero = std::bit_cast<uint32_t>(G::zero(base));
+  const uint32_t zero = std::bit_cast<uint32_t>(G::zero());
   const double cosine = Fadds(f13, word0(d112));
   const double sine = Fadds(Fadds(word0(d112b), word0(v9)), word0(v11));
   const uint32_t c = std::bit_cast<uint32_t>(float(cosine));
@@ -227,22 +227,22 @@ void Rotate(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t t
   rows[3] = simde_mm_shuffle_epi32(k, 0x54);
   const uint32_t at = turn & ~0xFu;
   for (uint32_t i = 0; i < 4; i++) {
-    StoreVector(base, at + 16 * i, F(rows[i]));
+    StoreVector(at + 16 * i, F(rows[i]));
   }
   // out = in * the turn, noted for interpolation as the original's call.
-  Multiply(base, out, in, turn);
+  Multiply(out, in, turn);
   constexpr uint32_t kReturn = kAxis == Axis::kZ   ? 0x820A2F28
                                : kAxis == Axis::kX ? 0x820A67E8
                                                    : 0x820A69F0;
-  interpolation::BlendState_OnMultiply(base, out, in, turn, kReturn);
+  interpolation::BlendState_OnMultiply(out, in, turn, kReturn);
 }
 
 }  // namespace
 
-void Multiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void Multiply(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_8209BD50 Matrix::Multiply");
-  const Words bw = LoadWords(base, b);
-  const Words aw = LoadWords(base, a);
+  const Words bw = LoadWords(b);
+  const Words aw = LoadWords(a);
   Words product;
   {
     FlushToZero flush;
@@ -250,33 +250,33 @@ void Multiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   }
   const uint32_t at = out & ~0xFu;
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU32(base, at + 4 * i, product.w[i]);
+    guest::StoreU32(at + 4 * i, product.w[i]);
   }
 }
 
-void Copy(uint8_t* base, uint32_t dst, uint32_t src) {
+void Copy(uint32_t dst, uint32_t src) {
   ITC_NATIVE_RUNNING("sub_820A0AC0 Matrix::Copy");
   // Twice a word at a time, once eight bytes at a time (both words read
   // before either is written), then twice a word at a time again.
   for (int pass = 0; pass < 2; pass++) {
     for (uint32_t i = 0; i < 64; i += 4) {
-      CopyWord(base, src + i, dst + i);
+      CopyWord(src + i, dst + i);
     }
   }
   for (uint32_t i = 0; i < 64; i += 8) {
-    const uint32_t w0 = guest::LoadU32(base, src + i);
-    const uint32_t w1 = guest::LoadU32(base, src + i + 4);
-    guest::StoreU32(base, dst + i, w0);
-    guest::StoreU32(base, dst + i + 4, w1);
+    const uint32_t w0 = guest::LoadU32(src + i);
+    const uint32_t w1 = guest::LoadU32(src + i + 4);
+    guest::StoreU32(dst + i, w0);
+    guest::StoreU32(dst + i + 4, w1);
   }
   for (int pass = 0; pass < 2; pass++) {
     for (uint32_t i = 0; i < 64; i += 4) {
-      CopyWord(base, src + i, dst + i);
+      CopyWord(src + i, dst + i);
     }
   }
 }
 
-void Inverse(uint8_t* base, uint32_t out, uint32_t in) {
+void Inverse(uint32_t out, uint32_t in) {
   ITC_NATIVE_RUNNING("sub_820A9988 Matrix::Inverse");
   // The translated code's steps on its vector registers, one statement each
   // (the names are the registers'); D3DX's inverse by cofactors. The
@@ -284,7 +284,7 @@ void Inverse(uint8_t* base, uint32_t out, uint32_t in) {
   // only scratch: the rows are read here once.
   simde__m128 rows[4];
   for (uint32_t i = 0; i < 4; i++) {
-    rows[i] = VectorAt(base, in + 16 * i);
+    rows[i] = VectorAt(in + 16 * i);
   }
   const simde__m128 sign = simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)));
   simde__m128 v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13;
@@ -406,34 +406,34 @@ void Inverse(uint8_t* base, uint32_t out, uint32_t in) {
   }
   const uint32_t at = out & ~0xFu;
   for (uint32_t i = 0; i < 4; i++) {
-    StoreVector(base, at + 16 * i, result[i]);
+    StoreVector(at + 16 * i, result[i]);
   }
 }
 
-void RotateX(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+void RotateX(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
   ITC_NATIVE_RUNNING("sub_820A65F0 Matrix::RotateX");
-  Rotate<Axis::kX>(base, out, in, angle, turn);
+  Rotate<Axis::kX>(out, in, angle, turn);
 }
 
-void RotateY(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+void RotateY(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
   ITC_NATIVE_RUNNING("sub_820A67F8 Matrix::RotateY");
-  Rotate<Axis::kY>(base, out, in, angle, turn);
+  Rotate<Axis::kY>(out, in, angle, turn);
 }
 
-void RotateZ(uint8_t* base, uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
+void RotateZ(uint32_t out, uint32_t in, uint32_t angle, uint32_t turn) {
   ITC_NATIVE_RUNNING("sub_820A2D30 Matrix::RotateZ");
-  Rotate<Axis::kZ>(base, out, in, angle, turn);
+  Rotate<Axis::kZ>(out, in, angle, turn);
 }
 
-void ObjectInverse(uint8_t* base, uint32_t object) {
+void ObjectInverse(uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820A9BC8 ObjectInverse");
-  Inverse(base, object + 560, object + 208);
+  Inverse(object + 560, object + 208);
 }
 
-void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+void Vec4Transform(uint32_t out, uint32_t m, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_820AB560 Vec4::Transform");
-  const Words mw = LoadWords(base, m);
-  const simde__m128 vector = VectorAt(base, v & ~0xFu);
+  const Words mw = LoadWords(m);
+  const simde__m128 vector = VectorAt(v & ~0xFu);
   uint32_t result[4];
   {
     FlushToZero flush;
@@ -443,92 +443,92 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
   }
   const uint32_t at = out & ~0xFu;
   for (uint32_t j = 0; j < 4; j++) {
-    guest::StoreU32(base, at + 4 * j, result[j]);
+    guest::StoreU32(at + 4 * j, result[j]);
   }
 }
 
-void Vec3SwapXZ(uint8_t* base, uint32_t v) {
+void Vec3SwapXZ(uint32_t v) {
   ITC_NATIVE_RUNNING("sub_820AB688 Vec3::SwapXZ");
-  const VectorLibVector vector(base, v);
+  const VectorLibVector vector(v);
   const uint32_t x = vector.x_bits();
   const uint32_t z = vector.z_bits();
   vector.set_z_bits(x);
   vector.set_x_bits(z);
 }
 
-void SetWsToOne(uint8_t* base, uint32_t m) {
+void SetWsToOne(uint32_t m) {
   ITC_NATIVE_RUNNING("sub_8209B038 SetWsToOne");
-  const uint32_t one = guest::LoadU32(base, G::one_address());
-  const Matrix matrix(base, m);
-  guest::StoreU32(base, matrix.m03_address(), one);
-  guest::StoreU32(base, matrix.m13_address(), one);
-  guest::StoreU32(base, matrix.m23_address(), one);
-  guest::StoreU32(base, matrix.m33_address(), one);
+  const uint32_t one = guest::LoadU32(G::one_address());
+  const Matrix matrix(m);
+  guest::StoreU32(matrix.m03_address(), one);
+  guest::StoreU32(matrix.m13_address(), one);
+  guest::StoreU32(matrix.m23_address(), one);
+  guest::StoreU32(matrix.m33_address(), one);
 }
 
-void MultiplyUnaligned(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void MultiplyUnaligned(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822B8F78 Matrix::MultiplyUnaligned");
-  const Words bw = LoadWords(base, b);
-  const Words aw = LoadWords(base, a);
+  const Words bw = LoadWords(b);
+  const Words aw = LoadWords(a);
   Words product;
   {
     FlushToZero flush;
     product = Product(aw, bw);
   }
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU32(base, out + 4 * i, product.w[i]);
+    guest::StoreU32(out + 4 * i, product.w[i]);
   }
 }
 
-void MultiplyReversed(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void MultiplyReversed(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82293988 Matrix::MultiplyReversed");
-  MultiplyUnaligned(base, out, b, a);
+  MultiplyUnaligned(out, b, a);
 }
 
-void InverseRotate(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+void InverseRotate(uint32_t out, uint32_t m, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_82293998 Matrix::InverseRotate");
   // The transpose first (all of m read before anything is written); t(i, j)
   // is the transpose's row i, column j: m's row j, column i.
-  const Words mw = LoadWords(base, m);
+  const Words mw = LoadWords(m);
   auto t = [&mw](int i, int j) { return double(std::bit_cast<float>(mw.w[4 * j + i])); };
-  const MatrixMathVector3 vector(base, v);
+  const MatrixMathVector3 vector(v);
   const double vy = double(vector.y());
   const double vz = double(vector.z());
   const double t20z = Fmuls(vz, t(2, 0));
   const double t22z = Fmuls(vz, t(2, 2));
-  const VectorLibVector result(base, out);
-  CopyWord(base, G::zero_address(), result.w_address());
+  const VectorLibVector result(out);
+  CopyWord(G::zero_address(), result.w_address());
   const double t11y = Fmuls(vy, t(1, 1));
   const double vx = double(vector.x());
   const double x0 = Fmadds(vx, t(0, 0), t20z);
   const double y0 = Fmadds(vz, t(2, 1), t11y);
   const double z0 = Fmadds(vx, t(0, 2), t22z);
-  Stfs(base, result.x_address(), Fmadds(vy, t(1, 0), x0));
-  Stfs(base, result.y_address(), Fmadds(vx, t(0, 1), y0));
-  Stfs(base, result.z_address(), Fmadds(vy, t(1, 2), z0));
+  Stfs(result.x_address(), Fmadds(vy, t(1, 0), x0));
+  Stfs(result.y_address(), Fmadds(vx, t(0, 1), y0));
+  Stfs(result.z_address(), Fmadds(vy, t(1, 2), z0));
 }
 
-void Set(uint8_t* base, uint32_t out, uint32_t in) {
+void Set(uint32_t out, uint32_t in) {
   ITC_NATIVE_RUNNING("sub_822935A0 Matrix::Set");
   for (uint32_t row = 0; row < 64; row += 16) {
-    vector_library::Vec4Copy(base, out + row, in + row);
+    vector_library::Vec4Copy(out + row, in + row);
   }
 }
 
-void SetIdentity(uint8_t* base, uint32_t out) {
+void SetIdentity(uint32_t out) {
   ITC_NATIVE_RUNNING("sub_822936E0 Matrix::SetIdentity");
-  Set(base, out, G::identity_address());
+  Set(out, G::identity_address());
 }
 
-void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q) {
+void FromQuaternion(uint32_t out, uint32_t q) {
   ITC_NATIVE_RUNNING("sub_822936F0 Matrix::FromQuaternion");
-  const double length_squared = double(QuaternionLengthSquared(base, q));
-  const Quaternion quaternion(base, q);
+  const double length_squared = double(QuaternionLengthSquared(q));
+  const Quaternion quaternion(q);
   const double y = double(quaternion.y());
   const double z = double(quaternion.z());
   const double x = double(quaternion.x());
   const double w = double(quaternion.w());
-  const double s = Fdivs(double(G::two(base)), length_squared);
+  const double s = Fdivs(double(G::two()), length_squared);
   const double ys = Fmuls(y, s);
   const double zs = Fmuls(z, s);
   const double xs = Fmuls(x, s);
@@ -544,11 +544,11 @@ void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q) {
   const double yy_zz = Fadds(zzs, yys);
   const double xx_zz = Fadds(zzs, xxs);
   const double xx_yy = Fadds(yys, xxs);
-  const Matrix matrix(base, out);
+  const Matrix matrix(out);
   matrix.set_m01(float(Fadds(xys, wzs)));
   matrix.set_m02(float(Fsubs(xzs, wys)));
   matrix.set_m20(float(Fadds(xzs, wys)));
-  const double one = double(G::one(base));
+  const double one = double(G::one());
   matrix.set_m10(float(Fsubs(xys, wzs)));
   const double yz_wx = Fadds(yzs, wxs);
   matrix.set_m00(float(Fsubs(one, yy_zz)));
@@ -561,29 +561,29 @@ void FromQuaternion(uint8_t* base, uint32_t out, uint32_t q) {
   matrix.set_m22(float(m22));
 }
 
-void FromQuaternionAndRow(uint8_t* base, uint32_t out, uint32_t q) {
+void FromQuaternionAndRow(uint32_t out, uint32_t q) {
   ITC_NATIVE_RUNNING("sub_822937D8 Matrix::FromQuaternionAndRow");
-  FromQuaternion(base, out, q);
-  vector_library::Vec4Copy(base, Matrix(base, out).m30_address(), G::fourth_row_address());
+  FromQuaternion(out, q);
+  vector_library::Vec4Copy(Matrix(out).m30_address(), G::fourth_row_address());
 }
 
-void QuaternionXAxis(uint8_t* base, uint32_t out, uint32_t q, uint32_t scratch) {
+void QuaternionXAxis(uint32_t out, uint32_t q, uint32_t scratch) {
   ITC_NATIVE_RUNNING("sub_82293DF0 Quaternion::XAxis");
-  const Quaternion axis(base, out);
-  const double one = double(G::one(base));
+  const Quaternion axis(out);
+  const double one = double(G::one());
   axis.set_x(float(one));
-  const double zero = double(G::zero(base));
+  const double zero = double(G::zero());
   axis.set_y(float(zero));
   axis.set_z(float(zero));
   axis.set_w(float(one));
-  SetIdentity(base, scratch);
-  FromQuaternionAndRow(base, scratch, q);
-  ProjectPoint(base, out, scratch, out);
+  SetIdentity(scratch);
+  FromQuaternionAndRow(scratch, q);
+  ProjectPoint(out, scratch, out);
 }
 
-float QuaternionLengthSquared(uint8_t* base, uint32_t q) {
+float QuaternionLengthSquared(uint32_t q) {
   ITC_NATIVE_RUNNING("sub_82293CB0 Quaternion::LengthSquared");
-  const Quaternion quaternion(base, q);
+  const Quaternion quaternion(q);
   const double y = double(quaternion.y());
   const double yy = Fmuls(y, y);
   const double x = double(quaternion.x());
@@ -593,12 +593,12 @@ float QuaternionLengthSquared(uint8_t* base, uint32_t q) {
   return float(Fmadds(w, w, sum));
 }
 
-void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
+void ProjectPoint(uint32_t out, uint32_t m, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_82293600 Matrix::ProjectPoint");
-  const Matrix matrix(base, m);
-  const VectorLibVector point(base, p);
-  const VectorLibVector result(base, out);
-  const double py = Lfs(base, point.y_address());
+  const Matrix matrix(m);
+  const VectorLibVector point(p);
+  const VectorLibVector result(out);
+  const double py = Lfs(point.y_address());
   const double m28 = double(matrix.m13());
   const double w0 = Fmuls(m28, py);
   const double m20 = double(matrix.m11());
@@ -606,13 +606,13 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double y0 = Fmuls(m20, py);
   const double m16 = double(matrix.m10());
   const double z0 = Fmuls(m24, py);
-  const double px = Lfs(base, point.x_address());
+  const double px = Lfs(point.x_address());
   const double x0 = Fmuls(py, m16);
   const double m12 = double(matrix.m03());
   const double m4 = double(matrix.m01());
   const double m8 = double(matrix.m02());
   const double m0 = double(matrix.m00());
-  const double pz = Lfs(base, point.z_address());
+  const double pz = Lfs(point.z_address());
   const double m44 = double(matrix.m23());
   const double w1 = Fmadds(m12, px, w0);
   const double m36 = double(matrix.m21());
@@ -624,9 +624,9 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double m40 = double(matrix.m22());
   const double m52 = double(matrix.m31());
   const double m48 = double(matrix.m30());
-  const double one = double(G::one(base));
+  const double one = double(G::one());
   const double m56 = double(matrix.m32());
-  Stfs(base, result.w_address(), one);
+  Stfs(result.w_address(), one);
   const double w2 = Fmadds(m44, pz, w1);
   const double y2 = Fmadds(m36, pz, y1);
   const double z2 = Fmadds(m40, pz, z1);
@@ -636,23 +636,23 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double z = Fadds(z2, m56);
   const double x = Fadds(x2, m48);
   const double inverse = Fdivs(one, w);
-  Stfs(base, result.x_address(), Fmuls(x, inverse));
-  Stfs(base, result.y_address(), Fmuls(inverse, y));
-  Stfs(base, result.z_address(), Fmuls(inverse, z));
+  Stfs(result.x_address(), Fmuls(x, inverse));
+  Stfs(result.y_address(), Fmuls(inverse, y));
+  Stfs(result.z_address(), Fmuls(inverse, z));
 }
 
-void QuaternionFromMatrix(uint8_t* base, uint32_t out, uint32_t m) {
+void QuaternionFromMatrix(uint32_t out, uint32_t m) {
   ITC_NATIVE_RUNNING("sub_82293AD8 Quaternion::FromMatrix");
-  const Matrix matrix(base, m);
-  const Quaternion quaternion(base, out);
+  const Matrix matrix(m);
+  const Quaternion quaternion(out);
   const double m22 = double(matrix.m22());
   const double m00 = double(matrix.m00());
   const double m11 = double(matrix.m11());
   const double trace = Fadds(Fadds(m00, m22), m11);
-  const double zero = double(G::zero(base));
+  const double zero = double(G::zero());
   if (trace > zero) {
-    const double s = double(vector_library::Sqrtf(Fadds(trace, double(G::one(base)))));
-    const double half = double(G::half(base));
+    const double s = double(vector_library::Sqrtf(Fadds(trace, double(G::one()))));
+    const double half = double(G::half());
     quaternion.set_w(float(Fmuls(s, half)));
     const double m21 = double(matrix.m21());
     const double t = Fdivs(half, s);
@@ -673,44 +673,44 @@ void QuaternionFromMatrix(uint8_t* base, uint32_t out, uint32_t m) {
   if (m11 > m00) {
     i = 1;
   }
-  if (m22 > Lfs(base, m + 20 * uint32_t(i))) {
+  if (m22 > Lfs(m + 20 * uint32_t(i))) {
     i = 2;
   }
   const int j = int(q[i]);
   const int k = int(q[j]);
   auto at = [m](int row, int column) { return m + uint32_t(16 * row + 4 * column); };
-  const double mii = Lfs(base, at(i, i));
-  const double mjj = Lfs(base, at(j, j));
-  const double mkk = Lfs(base, at(k, k));
+  const double mii = Lfs(at(i, i));
+  const double mjj = Lfs(at(j, j));
+  const double mkk = Lfs(at(k, k));
   const double r = Fsubs(mii, Fadds(mkk, mjj));
-  double s = double(vector_library::Sqrtf(Fadds(r, double(G::one(base)))));
+  double s = double(vector_library::Sqrtf(Fadds(r, double(G::one()))));
   const bool s_zero = s == zero;
-  const double half = double(G::half(base));
+  const double half = double(G::half());
   q[i] = std::bit_cast<uint32_t>(float(Fmuls(s, half)));
   if (!s_zero) {
     s = Fdivs(half, s);
   }
-  const double mjk = Lfs(base, at(j, k));
-  const double mkj = Lfs(base, at(k, j));
+  const double mjk = Lfs(at(j, k));
+  const double mkj = Lfs(at(k, j));
   quaternion.set_w(float(Fmuls(Fsubs(mjk, mkj), s)));
-  const double mij = Lfs(base, at(i, j));
-  const double mji = Lfs(base, at(j, i));
+  const double mij = Lfs(at(i, j));
+  const double mji = Lfs(at(j, i));
   const double sum_ij = Fadds(mji, mij);
-  const double mki = Lfs(base, at(k, i));
-  const double mik = Lfs(base, at(i, k));
+  const double mki = Lfs(at(k, i));
+  const double mik = Lfs(at(i, k));
   const double sum_ik = Fadds(mki, mik);
   q[j] = std::bit_cast<uint32_t>(float(Fmuls(sum_ij, s)));
   q[k] = std::bit_cast<uint32_t>(float(Fmuls(sum_ik, s)));
-  guest::StoreU32(base, quaternion.x_address(), q[0]);
-  guest::StoreU32(base, quaternion.y_address(), q[1]);
-  guest::StoreU32(base, quaternion.z_address(), q[2]);
+  guest::StoreU32(quaternion.x_address(), q[0]);
+  guest::StoreU32(quaternion.y_address(), q[1]);
+  guest::StoreU32(quaternion.z_address(), q[2]);
 }
 
-void QuaternionMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
+void QuaternionMultiply(uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82293D78 Quaternion::Multiply");
-  const Quaternion qa(base, a);
-  const Quaternion qb(base, b);
-  const Quaternion product(base, out);
+  const Quaternion qa(a);
+  const Quaternion qb(b);
+  const Quaternion product(out);
   const double aw = double(qa.w());
   const double by = double(qb.y());
   const double bw = double(qb.w());
@@ -737,34 +737,34 @@ void QuaternionMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   product.set_w(float(Fnmsubs(az, bz, f5)));
 }
 
-double QuaternionFromAxisAngle(uint8_t* base, uint32_t out, uint32_t axis, double angle,
+double QuaternionFromAxisAngle(uint32_t out, uint32_t axis, double angle,
                                uint32_t scratch) {
   ITC_NATIVE_RUNNING("sub_82293E68 Quaternion::FromAxisAngle");
-  const Quaternion quaternion(base, out);
-  const MatrixMathVector3 axis_vector(base, axis);
-  const double zero = double(G::zero(base));
+  const Quaternion quaternion(out);
+  const MatrixMathVector3 axis_vector(axis);
+  const double zero = double(G::zero());
   if (angle == zero) {
     quaternion.set_x(float(zero));
     quaternion.set_y(float(zero));
     quaternion.set_z(float(zero));
-    quaternion.set_w(float(double(G::one(base))));
+    quaternion.set_w(float(double(G::one())));
     return angle;
   }
-  const double cosine = SinCos(base, Fmuls(angle, double(G::half(base))), scratch, scratch + 4);
-  const double s = Lfs(base, scratch);
+  const double cosine = SinCos(Fmuls(angle, double(G::half())), scratch, scratch + 4);
+  const double s = Lfs(scratch);
   quaternion.set_x(float(Fmuls(double(axis_vector.x()), s)));
   quaternion.set_y(float(Fmuls(double(axis_vector.y()), s)));
   const double z = double(axis_vector.z());
-  const double c = Lfs(base, scratch + 4);
+  const double c = Lfs(scratch + 4);
   const double zs = Fmuls(z, s);
   quaternion.set_w(float(c));
   quaternion.set_z(float(zs));
   return cosine;
 }
 
-void QuaternionNormalizeSelf(uint8_t* base, uint32_t q) {
+void QuaternionNormalizeSelf(uint32_t q) {
   ITC_NATIVE_RUNNING("sub_82293F10 Quaternion::NormalizeSelf");
-  const Quaternion quaternion(base, q);
+  const Quaternion quaternion(q);
   const double y = double(quaternion.y());
   const double yy = Fmuls(y, y);
   const double x = double(quaternion.x());
@@ -772,32 +772,32 @@ void QuaternionNormalizeSelf(uint8_t* base, uint32_t q) {
   const double w = double(quaternion.w());
   const double sum = Fmadds(w, w, Fmadds(z, z, Fmadds(x, x, yy)));
   const double length = double(float(std::sqrt(sum)));
-  const double inverse = Fdivs(double(G::one(base)), length);
+  const double inverse = Fdivs(double(G::one()), length);
   quaternion.set_x(float(Fmuls(x, inverse)));
   quaternion.set_w(float(Fmuls(w, inverse)));
   quaternion.set_y(float(Fmuls(y, inverse)));
   quaternion.set_z(float(Fmuls(z, inverse)));
 }
 
-double SinCos(uint8_t* base, double angle, uint32_t sine, uint32_t cosine) {
+double SinCos(double angle, uint32_t sine, uint32_t cosine) {
   ITC_NATIVE_RUNNING("sub_820B0E10 SinCos");
-  MatrixMathFloat(base, sine).set_value(float(c_runtime::Sin(angle)));
+  MatrixMathFloat(sine).set_value(float(c_runtime::Sin(angle)));
   const double c = c_runtime::Cos(angle);
-  MatrixMathFloat(base, cosine).set_value(float(c));
+  MatrixMathFloat(cosine).set_value(float(c));
   return c;
 }
 
 namespace {
 
 // The static set-ups' body: `diagonal` the word on the diagonal.
-int32_t StaticMatrixInit(uint8_t* base, uint32_t sp, uint32_t matrix, uint32_t diagonal,
+int32_t StaticMatrixInit(uint32_t sp, uint32_t matrix, uint32_t diagonal,
                          uint32_t exit_function, const c_runtime::AtexitCall& call) {
   const uint32_t f = sp - 304;
   for (uint32_t i = 0; i < 16; i++) {
     // lfs then stfs: the bits as the translated code keeps them.
     const bool on_diagonal = i % 5 == 0;
-    guest::StoreU32(base, f + 160 + 4 * i,
-                    guest::LoadU32(base, on_diagonal ? diagonal : G::zero_address()));
+    guest::StoreU32(f + 160 + 4 * i,
+                    guest::LoadU32(on_diagonal ? diagonal : G::zero_address()));
   }
   uint32_t from[16];
   for (uint32_t i = 0; i < 16; i++) {
@@ -805,22 +805,22 @@ int32_t StaticMatrixInit(uint8_t* base, uint32_t sp, uint32_t matrix, uint32_t d
   }
   // The arguments past r10 (the 8th to the 16th pointers) at +84 to +148.
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, f + 84 + 8 * i, from[7 + i]);
+    guest::StoreU32(f + 84 + 8 * i, from[7 + i]);
   }
-  camera_modes::MatrixFromFloats(base, matrix, from);
-  return c_runtime::AtexitFrom(base, exit_function, call);
+  camera_modes::MatrixFromFloats(matrix, from);
+  return c_runtime::AtexitFrom(exit_function, call);
 }
 
 }  // namespace
 
-int32_t ZeroMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call) {
+int32_t ZeroMatrixStaticInit(uint32_t sp, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D8F88 ZeroMatrix::StaticInit");
-  return StaticMatrixInit(base, sp, G::zero_matrix_address(), G::zero_address(), 0x825DACA0, call);
+  return StaticMatrixInit(sp, G::zero_matrix_address(), G::zero_address(), 0x825DACA0, call);
 }
 
-int32_t IdentityMatrixStaticInit(uint8_t* base, uint32_t sp, const c_runtime::AtexitCall& call) {
+int32_t IdentityMatrixStaticInit(uint32_t sp, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D9060 IdentityMatrix::StaticInit");
-  return StaticMatrixInit(base, sp, G::identity_matrix_address(), G::one_address(), 0x825DAC98,
+  return StaticMatrixInit(sp, G::identity_matrix_address(), G::one_address(), 0x825DAC98,
                           call);
 }
 

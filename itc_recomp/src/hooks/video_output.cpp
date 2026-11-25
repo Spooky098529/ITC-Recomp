@@ -32,8 +32,8 @@ namespace vo = graphics::video_output;
   }
 
 ITC_VIDEO_OUTPUT(825B9A60, ctx.r3.u64 = vo::CurrentThreadId())
-ITC_VIDEO_OUTPUT(8229D9D0, ctx.r3.u64 = vo::AcquireThreadOwnership(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8229DA10, vo::ReleaseThreadOwnership(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258DB18, ctx.r3.u64 = vo::Construct(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258D8C8, ctx.r3.u64 = vo::LockDevice(base, ctx.r3.u32))
-ITC_VIDEO_OUTPUT(8258D908, vo::UnlockDevice(base, ctx.r3.u32, ctx.r4.u32))
+ITC_VIDEO_OUTPUT(8229D9D0, ctx.r3.u64 = vo::AcquireThreadOwnership(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8229DA10, vo::ReleaseThreadOwnership(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258DB18, ctx.r3.u64 = vo::Construct(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258D8C8, ctx.r3.u64 = vo::LockDevice(ctx.r3.u32))
+ITC_VIDEO_OUTPUT(8258D908, vo::UnlockDevice(ctx.r3.u32, ctx.r4.u32))

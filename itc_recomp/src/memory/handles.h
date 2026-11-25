@@ -7,11 +7,10 @@
 // and registers unchanged.
 //
 // Handles come from a guest range nothing allocates in (0x60000000 to
-// 0x7EFFFFFF), made inaccessible when guest memory is mapped: a load or
-// store the tools couldn't type, reaching a moved object through its
-// handle, faults there, and the fault handler logs the object's type and
-// the offset into it, and stops the program. Each object's handles span
-// its size (rounded up to 4 KB), so `handle + offset` names the object too.
+// 0x7EFFFFFF). A load or store reaching a moved object through its handle
+// goes through guest.h, which finds the object (memory/host_copy.h) and
+// logs code still in guest shape. Each object's handles span its size
+// (rounded up to 4 KB), so `handle + offset` names the object too.
 
 #pragma once
 
@@ -25,8 +24,9 @@ constexpr uint32_t kHandlesStart = 0x60000000;
 constexpr uint32_t kHandlesEnd = 0x7F000000;
 constexpr uint32_t kHandleGranule = 0x1000;
 
-// Called by MapGuest: the range made inaccessible, the fault handler set.
-bool ProtectHandles(uint8_t* base);
+// Called by MapGuest: the handles' table made (E5 step 10: no fault
+// handler; an address in no block stops the program in guest.h).
+bool SetUpHandles();
 
 // A handle for `object` (`size` bytes, of the schema type `type`, a string
 // that outlives it). Logs and aborts when the range is full.

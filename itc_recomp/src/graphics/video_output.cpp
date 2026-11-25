@@ -97,25 +97,25 @@ uint32_t CurrentThreadId() {
   return 0;
 }
 
-uint32_t AcquireThreadOwnership(uint8_t* base, uint32_t device) {
+uint32_t AcquireThreadOwnership(uint32_t device) {
   ITC_NATIVE_RUNNING("sub_8229D9D0 Device::AcquireThreadOwnership");
   // The original reads the thread id once more first when the word was
   // already set, and drops it (a leaf load: nothing to do).
   const uint32_t thread = CurrentThreadId();
-  schema::Device(base, device).set_owning_thread(thread);
+  schema::Device(device).set_owning_thread(thread);
   return thread;
 }
 
-void ReleaseThreadOwnership(uint8_t* base, uint32_t device) {
+void ReleaseThreadOwnership(uint32_t device) {
   ITC_NATIVE_RUNNING("sub_8229DA10 Device::ReleaseThreadOwnership");
   // The original's eieio: the device's stores before this one.
   std::atomic_thread_fence(std::memory_order_release);
-  schema::Device(base, device).set_owning_thread(0);
+  schema::Device(device).set_owning_thread(0);
 }
 
-uint32_t Construct(uint8_t* base, uint32_t video_output) {
+uint32_t Construct(uint32_t video_output) {
   ITC_NATIVE_RUNNING("sub_8258DB18 VideoOutput::VideoOutput");
-  const schema::VideoOutput vo(base, video_output);
+  const schema::VideoOutput vo(video_output);
   vo.set_vtable(kVtable);
   // In place of Semaphore::Init on +224 (whose 40 bytes are left as they are).
   Register(video_output, true);
@@ -134,25 +134,25 @@ uint32_t Construct(uint8_t* base, uint32_t video_output) {
   vo.set_unknown_267(255);
   vo.set_display_width(0);
   vo.set_display_height(0);
-  Globals::set_vblank_count(base, 0);
+  Globals::set_vblank_count(0);
   vo.set_unknown_292(0);
   return video_output;
 }
 
-uint32_t LockDevice(uint8_t* base, uint32_t video_output) {
+uint32_t LockDevice(uint32_t video_output) {
   ITC_NATIVE_RUNNING("sub_8258D8C8 VideoOutput::LockDevice");
   Lock& lock = LockOf(video_output);
   lock.semaphore.acquire();
   lock.held.fetch_add(1, std::memory_order_relaxed);
-  const schema::VideoOutput vo(base, video_output);
-  AcquireThreadOwnership(base, vo.device<schema::View>().address);
+  const schema::VideoOutput vo(video_output);
+  AcquireThreadOwnership(vo.device<schema::View>().address);
   return vo.device<schema::View>().address;
 }
 
-void UnlockDevice(uint8_t* base, uint32_t video_output, uint32_t local) {
+void UnlockDevice(uint32_t video_output, uint32_t local) {
   ITC_NATIVE_RUNNING("sub_8258D908 VideoOutput::UnlockDevice");
-  const schema::VideoOutputDeviceHolder holder(base, local);
-  ReleaseThreadOwnership(base, holder.device<schema::View>().address);
+  const schema::VideoOutputDeviceHolder holder(local);
+  ReleaseThreadOwnership(holder.device<schema::View>().address);
   holder.set_device(0u);
   Lock& lock = LockOf(video_output);
   if (lock.held.fetch_sub(1, std::memory_order_relaxed) <= 0) {
@@ -169,18 +169,18 @@ void UnlockDevice(uint8_t* base, uint32_t video_output, uint32_t local) {
   lock.semaphore.release();
 }
 
-uint32_t ResolveFrontBuffer(uint8_t* base, uint32_t video_output, uint32_t sp,
+uint32_t ResolveFrontBuffer(uint32_t video_output, uint32_t sp,
                             const replay_commands::GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258D998 VideoOutput::ResolveFrontBuffer");
   const uint32_t frame = sp - 112;
-  guest::StoreU32(base, frame, sp);
-  const schema::VideoOutput vo(base, video_output);
+  guest::StoreU32(frame, sp);
+  const schema::VideoOutput vo(video_output);
   const uint32_t front = vo.front_buffer_index();
   const uint32_t device = vo.device<schema::View>().address;
-  guest::StoreU32(base, frame + 100, 0);
-  guest::StoreU32(base, frame + 92, 0);
-  const double z = double(Globals::resolve_z(base));
-  const uint32_t texture = guest::LoadU32(base, vo.front_buffer_0_address() + 4 * front);
+  guest::StoreU32(frame + 100, 0);
+  guest::StoreU32(frame + 92, 0);
+  const double z = double(Globals::resolve_z());
+  const uint32_t texture = guest::LoadU32(vo.front_buffer_0_address() + 4 * front);
   return uint32_t(call(0x822AFA58, frame, 0x8258D9E8, {device, 0, 0, texture, 0, 0, 0, 0}, z));
 }
 

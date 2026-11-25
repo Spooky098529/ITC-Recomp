@@ -22,30 +22,30 @@ using List = schema::ArchiveList;
 
 namespace {
 
-List QueueList(uint8_t* base) {
-  return List(base, G::queue_address());
+List QueueList() {
+  return List(G::queue_address());
 }
 
 }  // namespace
 
-uint32_t Toc(uint8_t* base, uint32_t id) {
+uint32_t Toc(uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8209D868 Archive::Toc");
-  return (id < kFirstCrsId ? G::build_toc(base) : G::crs_toc(base)).address;
+  return (id < kFirstCrsId ? G::build_toc() : G::crs_toc()).address;
 }
 
-uint32_t AssetSize(uint8_t* base, uint32_t id) {
+uint32_t AssetSize(uint32_t id) {
   ITC_NATIVE_RUNNING("sub_820A0678 Archive::AssetSize");
   const uint32_t index = id < kFirstCrsId ? id : id - kFirstCrsId;
-  const schema::ArchiveTocEntry entry(base, Toc(base, id) + ((index + 1) << 4));
+  const schema::ArchiveTocEntry entry(Toc(id) + ((index + 1) << 4));
   const uint32_t unpacked = entry.unpacked_size();
   return unpacked != 0 ? unpacked : entry.stored_size();
 }
 
 // --- The request queue's list and slots ---
 
-void ListConstruct(uint8_t* base, uint32_t list, uint32_t deletes) {
+void ListConstruct(uint32_t list, uint32_t deletes) {
   ITC_NATIVE_RUNNING("sub_82294B80 List::List");
-  const List l(base, list);
+  const List l(list);
   l.set_deletes_nodes(deletes);
   l.set_vtable(List::kVtable);
   l.set_count(0);
@@ -53,43 +53,43 @@ void ListConstruct(uint8_t* base, uint32_t list, uint32_t deletes) {
   l.set_tail(0u);
 }
 
-uint32_t ListAppend(uint8_t* base, uint32_t list, uint32_t node) {
+uint32_t ListAppend(uint32_t list, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_82294BA8 List::Append");
   if (node == 0) {
     return 0;
   }
-  const List l(base, list);
+  const List l(list);
   if (const Slot tail = l.tail()) {
     tail.set_link(node);
   } else {
     l.set_head(node);
   }
-  Slot(base, node).set_link(0u);
+  Slot(node).set_link(0u);
   l.set_tail(node);
   l.set_count(l.count() + 1);
   return 1;
 }
 
-uint32_t ListRemove(uint8_t* base, uint32_t list, uint32_t node) {
+uint32_t ListRemove(uint32_t list, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_82294C00 List::Remove");
   if (node == 0) {
     return 0;
   }
-  const List l(base, list);
+  const List l(list);
   uint32_t previous = 0;
   uint32_t at = l.head().address;
   while (at != 0 && at != node) {
     previous = at;
-    at = Slot(base, at).link().address;
+    at = Slot(at).link().address;
   }
   if (at == 0) {
     return 0;
   }
   if (previous != 0) {
-    Slot(base, previous).set_link(Slot(base, at).link().address);
+    Slot(previous).set_link(Slot(at).link().address);
   }
   if (l.head().address == at) {
-    l.set_head(Slot(base, at).link().address);
+    l.set_head(Slot(at).link().address);
   }
   if (l.tail().address == at) {
     l.set_tail(previous);
@@ -98,22 +98,22 @@ uint32_t ListRemove(uint8_t* base, uint32_t list, uint32_t node) {
   return 1;
 }
 
-void NodeConstruct(uint8_t* base, uint32_t node, uint32_t link) {
+void NodeConstruct(uint32_t node, uint32_t link) {
   ITC_NATIVE_RUNNING("sub_82294B68 ListNode::ListNode");
-  const schema::ArchiveListNode n(base, node);
+  const schema::ArchiveListNode n(node);
   n.set_link(link);
   n.set_vtable(schema::ArchiveListNode::kVtable);
 }
 
-void NodeDestruct(uint8_t* base, uint32_t node) {
+void NodeDestruct(uint32_t node) {
   ITC_NATIVE_RUNNING("sub_8224FB10 ListNode::~ListNode");
-  schema::ArchiveListNode(base, node).set_vtable(schema::ArchiveListNode::kVtable);
+  schema::ArchiveListNode(node).set_vtable(schema::ArchiveListNode::kVtable);
 }
 
-uint32_t FindSlot(uint8_t* base, uint32_t serial) {
+uint32_t FindSlot(uint32_t serial) {
   ITC_NATIVE_RUNNING("sub_8209D818 Archive::FindSlot");
   for (uint32_t i = 0; i < kSlotCount; i++) {
-    const Slot slot(base, G::slots_address() + i * Slot::kSize);
+    const Slot slot(G::slots_address() + i * Slot::kSize);
     if (slot.serial() == serial) {
       return slot.address;
     }
@@ -121,30 +121,29 @@ uint32_t FindSlot(uint8_t* base, uint32_t serial) {
   return 0;
 }
 
-int32_t QueueStaticInit(uint8_t* base, const c_runtime::AtexitCall& call) {
+int32_t QueueStaticInit(const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D9160 RequestQueue::StaticInit");
-  ListConstruct(base, G::queue_address(), 0);
-  QueueList(base).set_vtable(kQueueVtable);
-  return c_runtime::AtexitFrom(base, kQueueCleanUp, call);
+  ListConstruct(G::queue_address(), 0);
+  QueueList().set_vtable(kQueueVtable);
+  return c_runtime::AtexitFrom(kQueueCleanUp, call);
 }
 
-int32_t SlotsStaticInit(uint8_t* base, const c_runtime::AtexitCall& call) {
+int32_t SlotsStaticInit(const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D91B0 RequestSlots::StaticInit");
   for (uint32_t i = 0; i < kSlotCount; i++) {
-    const Slot slot(base, G::slots_address() + i * Slot::kSize);
-    NodeConstruct(base, slot.address, 0);
+    const Slot slot(G::slots_address() + i * Slot::kSize);
+    NodeConstruct(slot.address, 0);
     slot.set_vtable(Slot::kVtable);
   }
-  return c_runtime::AtexitFrom(base, kSlotsCleanUp, call);
+  return c_runtime::AtexitFrom(kSlotsCleanUp, call);
 }
 
 // --- The loose files ---
 
-uint32_t FindLooseFile(uint8_t* base, uint32_t id) {
+uint32_t FindLooseFile(uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8209D8D8 Archive::FindLooseFile");
   for (uint32_t step = 0;; step++) {
-    const schema::ArchiveLooseFile entry(
-        base, (step < kFirstCrsId ? G::loose_files_address() : G::crs_loose_files_address()) +
+    const schema::ArchiveLooseFile entry((step < kFirstCrsId ? G::loose_files_address() : G::crs_loose_files_address()) +
                   schema::ArchiveLooseFile::kSize * step);
     const uint32_t path = entry.path().address;
     if (path == 0) {
@@ -158,18 +157,18 @@ uint32_t FindLooseFile(uint8_t* base, uint32_t id) {
 
 // --- The loader thread's pieces ---
 
-std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request,
+std::optional<uint32_t> FinishRequest(uint32_t request,
                                       const FinishCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209D688 Archive::FinishRequest");
-  const Slot r(base, request);
+  const Slot r(request);
   uint32_t flags = r.flags();
   if ((flags & 0x100) && !(flags & 0x8)) {
-    G::set_staging_in_use(base, r.data());
+    G::set_staging_in_use(r.data());
     r.set_data(r.unpack_destination());
   }
   if (r.flags() & 0x2000) {
     const uint32_t serial = r.serial();
-    G::set_callback_serial(base, serial);
+    G::set_callback_serial(serial);
     calls.callback(calls.user, r.callback(), serial, r.data(), r.size(), r.context());
   }
   flags = r.flags();
@@ -188,9 +187,9 @@ std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request,
   return std::nullopt;
 }
 
-uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor) {
+uint32_t LoaderFunctorTarget(uint32_t functor) {
   ITC_NATIVE_RUNNING("sub_8209DD80 LoaderFunctor::Invoke");
-  return schema::LoaderFunctor(base, functor).target();
+  return schema::LoaderFunctor(functor).target();
 }
 
 // --- The queue and the loader under the four semaphores ---
@@ -203,23 +202,22 @@ HostSemaphore& Lock() {
 
 // A request taken off the queue and its slot freed (the picker's and the
 // cancels' steps).
-void Unqueue(uint8_t* base, uint32_t request) {
-  ListRemove(base, G::queue_address(), request);
-  Slot(base, request).set_serial(0xFFFFFFFFu);
+void Unqueue(uint32_t request) {
+  ListRemove(G::queue_address(), request);
+  Slot(request).set_serial(0xFFFFFFFFu);
 }
 
 }  // namespace
 
-LoadRequest BuildLoad(uint8_t* base, uint32_t id, uint32_t destination, uint32_t callback,
+LoadRequest BuildLoad(uint32_t id, uint32_t destination, uint32_t callback,
                       uint32_t context, uint32_t r7, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_8209DE48 Archive::Load");
   const uint32_t index = id < kFirstCrsId ? id : id - kFirstCrsId;
-  const schema::ArchiveTocEntry entry(
-      base, (id < kFirstCrsId ? G::build_toc(base) : G::crs_toc(base)).address +
+  const schema::ArchiveTocEntry entry((id < kFirstCrsId ? G::build_toc() : G::crs_toc()).address +
                 ((index + 1) << 4));
   const uint32_t unpacked = entry.unpacked_size();
   uint32_t flags = unpacked != 0 ? 0x4124 : 0x4024;
-  const uint32_t loose = FindLooseFile(base, id);
+  const uint32_t loose = FindLooseFile(id);
   uint32_t words[10];
   words[1] = id;
   words[2] = loose;
@@ -252,103 +250,103 @@ LoadRequest BuildLoad(uint8_t* base, uint32_t id, uint32_t destination, uint32_t
   return request;
 }
 
-int64_t Queue(uint8_t* base, const LoadRequest& request) {
+int64_t Queue(const LoadRequest& request) {
   ITC_NATIVE_RUNNING("sub_8209DC18 Archive::Queue");
   Semaphores& semaphores = CurrentSemaphores();
-  semaphores.queue_lock.Wait(base);
+  semaphores.queue_lock.Wait();
   int64_t serial = -1;
-  if (const uint32_t found = FindSlot(base, 0xFFFFFFFFu)) {
-    const Slot slot(base, found);
-    if (QueueList(base).head().address == 0 && semaphores.work.Count() == 0) {
-      semaphores.work.Signal(base);
+  if (const uint32_t found = FindSlot(0xFFFFFFFFu)) {
+    const Slot slot(found);
+    if (QueueList().head().address == 0 && semaphores.work.Count() == 0) {
+      semaphores.work.Signal();
     }
-    const uint32_t next = G::serial(base);
+    const uint32_t next = G::serial();
     serial = next;
     slot.set_serial(next);
     // The request, copied to its fields (+12 to +48) as the original's bytes.
     for (uint32_t i = 0; i < 40; i++) {
-      guest::StoreU8(base, slot.flags_address() + i, request[i]);
+      guest::StoreU8(slot.flags_address() + i, request[i]);
     }
     for (uint32_t at = slot.state_address(); at <= slot.unpack_destination_address(); at += 4) {
-      StoreU32(base, at, 0);
+      StoreU32(at, 0);
     }
-    const uint32_t after = G::serial(base) + 1;
-    G::set_serial(base, int32_t(after) < 0x7FFFFFFF ? after : 0);
-    ListAppend(base, G::queue_address(), slot.address);
+    const uint32_t after = G::serial() + 1;
+    G::set_serial(int32_t(after) < 0x7FFFFFFF ? after : 0);
+    ListAppend(G::queue_address(), slot.address);
   }
-  semaphores.queue_lock.Signal(base);
+  semaphores.queue_lock.Signal();
   return serial;
 }
 
-void WaitIdle(uint8_t* base) {
+void WaitIdle() {
   ITC_NATIVE_RUNNING("sub_8209D730 Archive::WaitIdle");
   Semaphores& semaphores = CurrentSemaphores();
-  semaphores.queue_lock.Wait(base);
-  if (QueueList(base).count() != 0) {
-    G::set_idle_wanted(base, 1);
+  semaphores.queue_lock.Wait();
+  if (QueueList().count() != 0) {
+    G::set_idle_wanted(1);
   }
-  semaphores.queue_lock.Signal(base);
-  if (G::idle_wanted(base) != 0) {
-    semaphores.idle.Wait(base);
+  semaphores.queue_lock.Signal();
+  if (G::idle_wanted() != 0) {
+    semaphores.idle.Wait();
   }
 }
 
-uint32_t QueueLength(uint8_t* base) {
+uint32_t QueueLength() {
   ITC_NATIVE_RUNNING("sub_8209D7B0 Archive::QueueLength");
-  Lock().Wait(base);
-  const uint32_t count = QueueList(base).count();
-  Lock().Signal(base);
+  Lock().Wait();
+  const uint32_t count = QueueList().count();
+  Lock().Signal();
   return count;
 }
 
-void CancelQueued(uint8_t* base, bool wait) {
+void CancelQueued(bool wait) {
   ITC_NATIVE_RUNNING("sub_8209DB90 Archive::CancelQueued");
-  Lock().Wait(base);
-  for (Slot at = QueueList(base).head(); at; at = at.link()) {
+  Lock().Wait();
+  for (Slot at = QueueList().head(); at; at = at.link()) {
     if (at.state() == 0 && (at.flags() & 0x4000)) {
-      Unqueue(base, at.address);
+      Unqueue(at.address);
     }
   }
-  Lock().Signal(base);
+  Lock().Signal();
   if (wait) {
-    WaitIdle(base);
+    WaitIdle();
   }
 }
 
-uint32_t Cancel(uint8_t* base, uint32_t serial) {
+uint32_t Cancel(uint32_t serial) {
   ITC_NATIVE_RUNNING("sub_8209DB20 Archive::Cancel");
-  Lock().Wait(base);
+  Lock().Wait();
   uint32_t r3 = 1;
-  if (const uint32_t slot = FindSlot(base, serial)) {
-    if (Slot(base, slot).state() == 0) {
-      Unqueue(base, slot);
+  if (const uint32_t slot = FindSlot(serial)) {
+    if (Slot(slot).state() == 0) {
+      Unqueue(slot);
     } else {
       r3 = 0;
     }
   }
-  Lock().Signal(base);
+  Lock().Signal();
   return r3;
 }
 
-uint32_t PickNext(uint8_t* base, uint32_t current, uint32_t finished_chained,
+uint32_t PickNext(uint32_t current, uint32_t finished_chained,
                   uint32_t finished_current) {
   ITC_NATIVE_RUNNING("sub_8209D950 Archive::PickNext");
   Semaphores& semaphores = CurrentSemaphores();
-  semaphores.queue_lock.Wait(base);
+  semaphores.queue_lock.Wait();
   auto compressed = [&](uint32_t flags) { return (flags & 0x100) && !(flags & 0x8); };
-  auto slot = [base](uint32_t at) { return Slot(base, at); };
+  auto slot = [](uint32_t at) { return Slot(at); };
   uint32_t chained = 0;
   if (current != 0 && compressed(slot(current).flags())) {
     chained = current;
   }
   for (uint32_t finished : {finished_chained, finished_current}) {
     if (finished != 0) {
-      Unqueue(base, finished);
+      Unqueue(finished);
       slot(finished).set_state(0);
       slot(finished).set_flags(0);
     }
   }
-  const uint32_t head = QueueList(base).head().address;
+  const uint32_t head = QueueList().head().address;
   uint32_t next = current != 0 ? slot(current).link().address : head;
   if (next != 0) {
     if (slot(next).serial() == 0xFFFFFFFFu) {
@@ -387,19 +385,19 @@ uint32_t PickNext(uint8_t* base, uint32_t current, uint32_t finished_chained,
     slot(chained).set_state(2);
   }
   if (next != 0 && semaphores.work.Count() != 0) {
-    semaphores.work.Wait(base);
+    semaphores.work.Wait();
   }
-  semaphores.queue_lock.Signal(base);
+  semaphores.queue_lock.Signal();
   return next;
 }
 
-void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls) {
+void SetUp(uint32_t request, const SetUpCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209D490 Archive::SetUp");
-  const Slot r(base, request);
+  const Slot r(request);
   if (request == 0 || r.state() != 1) {
     return;
   }
-  Lock().Wait(base);
+  Lock().Wait();
   uint32_t flags = r.flags();
   int32_t state = 0;
   const bool f10 = flags & 0x10, f20 = flags & 0x20;
@@ -423,7 +421,7 @@ void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls) {
   if (state != 0) {
     r.set_state(uint32_t(state));
   }
-  Lock().Signal(base);
+  Lock().Signal();
   flags = r.flags();
   if (flags & 0x800) {
     r.set_read_offset(r.byte_offset());
@@ -451,7 +449,7 @@ void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls) {
     }
     // The caller's word the allocation is written to.
     if (const uint32_t word = r.destination()) {
-      StoreU32(base, word, data);
+      StoreU32(word, data);
     }
     r.set_data(data);
   }
@@ -461,45 +459,45 @@ void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls) {
   }
   if ((flags & 0x100) && !(flags & 0x8)) {
     r.set_unpack_destination(r.data());
-    const uint32_t count = G::staging_count(base);
-    r.set_data(LoadU32(base, G::staging_halves_address() + ((count << 2) & 4)));
-    G::set_staging_count(base, G::staging_count(base) + 1);
+    const uint32_t count = G::staging_count();
+    r.set_data(LoadU32(G::staging_halves_address() + ((count << 2) & 4)));
+    G::set_staging_count(G::staging_count() + 1);
   }
 }
 
-uint32_t NextRequest(uint8_t* base, uint32_t current, const LoaderCalls& calls) {
+uint32_t NextRequest(uint32_t current, const LoaderCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209DD98 Archive::NextRequest");
   uint32_t finished_chained = 0, finished_current = 0;
   bool keep = false;
   if (current != 0) {
-    if (const uint32_t chained = Slot(base, current).chained().address) {
+    if (const uint32_t chained = Slot(current).chained().address) {
       finished_chained = chained;
-      FinishRequest(base, chained, calls.finish);
+      FinishRequest(chained, calls.finish);
       if (current == chained) {
         current = 0;
       } else {
-        Slot(base, current).set_chained(0u);
+        Slot(current).set_chained(0u);
       }
     }
     if (current != 0) {
-      const uint32_t flags = Slot(base, current).flags();
+      const uint32_t flags = Slot(current).flags();
       keep = (flags & 0x100) && !(flags & 0x8);
     }
   }
   if (current != 0 && !keep) {
     finished_current = current;
-    FinishRequest(base, current, calls.finish);
+    FinishRequest(current, calls.finish);
   }
-  const uint32_t next = PickNext(base, current, finished_chained, finished_current);
+  const uint32_t next = PickNext(current, finished_chained, finished_current);
   if (next != 0) {
-    SetUp(base, next, calls.set_up);
+    SetUp(next, calls.set_up);
   }
   return next;
 }
 
 // --- Ucl::Unpack ---
 
-UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t dst) {
+UclBlockResult UclBlock(uint32_t src, uint32_t src_len, uint32_t dst) {
   ITC_NATIVE_RUNNING("sub_822947F8 Ucl::UnpackBlock");
   uint32_t ilen = 0, olen = 0, last_m_off = 1;
   uint32_t bits = 0, count = 0;
@@ -509,17 +507,17 @@ UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t 
       return (bits >> count) & 1;
     }
     const uint32_t at = src + ilen;
-    bits = uint32_t(guest::LoadU8(base, at)) | uint32_t(guest::LoadU8(base, at + 1)) << 8 |
-           uint32_t(guest::LoadU8(base, at + 2)) << 16 |
-           uint32_t(guest::LoadU8(base, at + 3)) << 24;
+    bits = uint32_t(guest::LoadU8(at)) | uint32_t(guest::LoadU8(at + 1)) << 8 |
+           uint32_t(guest::LoadU8(at + 2)) << 16 |
+           uint32_t(guest::LoadU8(at + 3)) << 24;
     ilen += 4;
     count = 31;
     return bits >> 31;
   };
-  auto byte = [&]() -> uint32_t { return guest::LoadU8(base, src + ilen++); };
+  auto byte = [&]() -> uint32_t { return guest::LoadU8(src + ilen++); };
   for (;;) {
     while (bit()) {
-      guest::StoreU8(base, dst + olen++, uint8_t(byte()));
+      guest::StoreU8(dst + olen++, uint8_t(byte()));
     }
     uint32_t m_off = 1;
     do {
@@ -543,26 +541,26 @@ UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t 
     }
     m_len += last_m_off > 0xD00 ? 1 : 0;
     uint32_t from = dst + olen - last_m_off;
-    guest::StoreU8(base, dst + olen++, guest::LoadU8(base, from++));
+    guest::StoreU8(dst + olen++, guest::LoadU8(from++));
     do {
-      guest::StoreU8(base, dst + olen++, guest::LoadU8(base, from++));
+      guest::StoreU8(dst + olen++, guest::LoadU8(from++));
     } while (--m_len != 0);
   }
   const int32_t r3 = ilen == src_len ? 0 : (ilen < src_len ? -205 : -201);
   return {r3, olen, ilen};
 }
 
-uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expected,
+uint32_t UclUnpack(uint32_t dst, uint32_t stream, uint32_t expected,
                    const UclCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82294610 Ucl::Unpack");
   uint32_t written = 0;
   uint32_t at = 22;  // the first block's stored size
-  uint32_t size = LoadU32(base, stream + 18);
+  uint32_t size = LoadU32(stream + 18);
   while (size != 0) {
-    const uint32_t stored = LoadU32(base, stream + at);
+    const uint32_t stored = LoadU32(stream + at);
     const uint32_t data = at + 4;
     if (stored < size) {
-      UclBlock(base, stream + data, stored, dst + written);
+      UclBlock(stream + data, stored, dst + written);
       written += size;
       if (expected < written) {
         return 0;
@@ -571,13 +569,13 @@ uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expect
       if (expected < stored + written) {
         return 0;
       }
-      if (!native::Buffers_Memcpy(base, dst + written, stream + data, stored, 0x822946E4)) {
+      if (!native::Buffers_Memcpy(dst + written, stream + data, stored, 0x822946E4)) {
         calls.guest_memcpy(calls.user, dst + written, stream + data, stored);
       }
       written += stored;
     }
     at = data + stored;
-    size = LoadU32(base, stream + at);
+    size = LoadU32(stream + at);
     at += 4;
   }
   return written == expected ? 1 : 0;

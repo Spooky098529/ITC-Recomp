@@ -15,9 +15,9 @@ namespace hooks {
 // them from recompiled code): Open sub_82211390 (r3 the screen, r4 the
 // player, r5 the kind), Update sub_82211458 (r3, r4 passed to the pages),
 // Draw sub_82211590 (r3 the screen).
-void RaceScreensUnseenPause4Open(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4Update(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4Draw(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenPause4Open(lifted::Regs& ctx);
+void RaceScreensUnseenPause4Update(lifted::Regs& ctx);
+void RaceScreensUnseenPause4Draw(lifted::Regs& ctx);
 // Without adapters (only the native Open, Update and Draw reach them): the
 // pages MainPage sub_8220FD48, VolumePage sub_82210E58, ConfirmPage
 // sub_8220FF30 (r4), AnswerPage sub_82210910; the helpers StepVolume
@@ -31,33 +31,33 @@ void RaceScreensUnseenPause4Draw(lifted::Regs& ctx, uint8_t* base);
 // sub_82210228, CloseMain sub_82210170, OpenVolume sub_822114D8,
 // ShowVolumeRow sub_822102D8, MoveVolume sub_82210940, SetVolume
 // sub_82210B08, CloseVolume sub_82211138.
-void RaceScreensUnseenPause4MainPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4VolumePage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ConfirmPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4AnswerPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4StepVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4LoadVolumes(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4SaveVolumes(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4SetUpMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowItems(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ColorItems(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4SetUpVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4RestoreNodes(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowVolumes(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowVolumesB(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4SetArrow(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4RunTen(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4OpenMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4BackToMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4MoveMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4CloseMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4OpenVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4ShowVolumeRow(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4MoveVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4SetVolume(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenPause4CloseVolume(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenPause4MainPage(lifted::Regs& ctx);
+void RaceScreensUnseenPause4VolumePage(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ConfirmPage(lifted::Regs& ctx);
+void RaceScreensUnseenPause4AnswerPage(lifted::Regs& ctx);
+void RaceScreensUnseenPause4StepVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4LoadVolumes(lifted::Regs& ctx);
+void RaceScreensUnseenPause4SaveVolumes(lifted::Regs& ctx);
+void RaceScreensUnseenPause4SetUpMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowItems(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ColorItems(lifted::Regs& ctx);
+void RaceScreensUnseenPause4SetUpVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4RestoreNodes(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowVolumes(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowVolumesB(lifted::Regs& ctx);
+void RaceScreensUnseenPause4SetArrow(lifted::Regs& ctx);
+void RaceScreensUnseenPause4RunTen(lifted::Regs& ctx);
+void RaceScreensUnseenPause4OpenMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4BackToMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4MoveMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4CloseMain(lifted::Regs& ctx);
+void RaceScreensUnseenPause4OpenVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4ShowVolumeRow(lifted::Regs& ctx);
+void RaceScreensUnseenPause4MoveVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4SetVolume(lifted::Regs& ctx);
+void RaceScreensUnseenPause4CloseVolume(lifted::Regs& ctx);
 
 // The results at +1028 and +1032. Adapters (the race HUD machine's
 // handlers reach them from recompiled code): RaceResults::Open sub_8221F990
@@ -70,23 +70,23 @@ void RaceScreensUnseenPause4CloseVolume(lifted::Regs& ctx, uint8_t* base);
 // RaceResults' Intro sub_8221F428, Show sub_8221F4B0 and Close
 // sub_8221F580, and SplitResults' Intro sub_8221FAC8, Show sub_8221FBE8 and
 // Close sub_8221FD98.
-void RaceScreensUnseenRaceResultsOpen(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsUpdate(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsDraw(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenRaceResultsOpen(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsUpdate(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsDraw(lifted::Regs& ctx);
 // SplitResults::Draw sub_822200E0 (r3 the screen): an adapter (the race HUD
 // machine's recompiled ResultsDraw reaches it).
-void RaceScreensUnseenSplitResultsDraw(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsSetTexts(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsMainPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsIntro(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsShow(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenRaceResultsClose(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsOpen(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsUpdate(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsMainPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsIntro(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsShow(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenSplitResultsClose(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenSplitResultsDraw(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsSetTexts(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsMainPage(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsIntro(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsShow(lifted::Regs& ctx);
+void RaceScreensUnseenRaceResultsClose(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsOpen(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsUpdate(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsMainPage(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsIntro(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsShow(lifted::Regs& ctx);
+void RaceScreensUnseenSplitResultsClose(lifted::Regs& ctx);
 
 // Kind 6's screen after the race. Adapters (recompiled code reaches them):
 // Close sub_8221C168 (the race HUD machine's CloseResults fallback), Open
@@ -102,33 +102,33 @@ void RaceScreensUnseenSplitResultsClose(lifted::Regs& ctx, uint8_t* base);
 // sub_8221DD78, OpenQuestion sub_8221C6C8, CloseQuestion sub_8221C7D8,
 // MoveQuestion sub_8221C888, OpenMessage sub_8221CAB8, CloseMessage
 // sub_8221CB50, OpenWaiting sub_8221C920, CloseWaiting sub_8221CA20.
-void RaceScreensUnseenKind6Close(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6Open(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6Draw(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowPanelA(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SetUpList(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SetUpTexts(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowCourse(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowHelp(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6HidePanels(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SetCursorX(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowList(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowReplay(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6Intro(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6Show(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6RunToEnd(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MoveMain(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6BackToQuit(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6OpenList(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CloseList(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MoveList(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6OpenQuestion(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CloseQuestion(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MoveQuestion(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6OpenMessage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CloseMessage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6OpenWaiting(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CloseWaiting(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Close(lifted::Regs& ctx);
+void RaceScreensUnseenKind6Open(lifted::Regs& ctx);
+void RaceScreensUnseenKind6Draw(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowPanelA(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SetUpList(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SetUpTexts(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowCourse(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowHelp(lifted::Regs& ctx);
+void RaceScreensUnseenKind6HidePanels(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SetCursorX(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowList(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowReplay(lifted::Regs& ctx);
+void RaceScreensUnseenKind6Intro(lifted::Regs& ctx);
+void RaceScreensUnseenKind6Show(lifted::Regs& ctx);
+void RaceScreensUnseenKind6RunToEnd(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MoveMain(lifted::Regs& ctx);
+void RaceScreensUnseenKind6BackToQuit(lifted::Regs& ctx);
+void RaceScreensUnseenKind6OpenList(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CloseList(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MoveList(lifted::Regs& ctx);
+void RaceScreensUnseenKind6OpenQuestion(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CloseQuestion(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MoveQuestion(lifted::Regs& ctx);
+void RaceScreensUnseenKind6OpenMessage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CloseMessage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6OpenWaiting(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CloseWaiting(lifted::Regs& ctx);
 
 
 // Kind 6's update: an adapter for Update sub_8221F1E8 (r3 the screen, r4
@@ -146,44 +146,44 @@ void RaceScreensUnseenKind6CloseWaiting(lifted::Regs& ctx, uint8_t* base);
 // row, r4 to r6 the out words), and the network manager's sub_822914A8
 // (Rank), sub_8225FFC8 (CarLogo, r3 the car) and sub_822927B0 (NetState, r3
 // the state).
-void RaceScreensUnseenKind6Update(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MainPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6AnswerPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SlotPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SavePage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6OverwritePage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6SavingPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6QuitPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CheckRecordPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6RankingReadPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6UploadPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MenuBackPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6UploadResultPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6RankingPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MessageBackPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6QuestionPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6QuestionAnswerPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6MessagePage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6WaitingPage(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowPanelB(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowTimeOnly(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ShowRanking(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6RankingTime(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6Rank(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenKind6Update(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MainPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6AnswerPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SlotPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SavePage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6OverwritePage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6SavingPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6QuitPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CheckRecordPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6RankingReadPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6UploadPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MenuBackPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6UploadResultPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6RankingPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MessageBackPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6QuestionPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6QuestionAnswerPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6MessagePage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6WaitingPage(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowPanelB(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowTimeOnly(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ShowRanking(lifted::Regs& ctx);
+void RaceScreensUnseenKind6RankingTime(lifted::Regs& ctx);
+void RaceScreensUnseenKind6Rank(lifted::Regs& ctx);
+void RaceScreensUnseenKind6CarLogo(lifted::Regs& ctx);
 // The leaderboard read sub_82292CC0 (r3 the session; answered as no Live)
 // and its spec's set-up sub_82292648 (no arguments, r3 kept): adapters.
-void RaceScreensUnseenKind6LeaderboardRead(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6ReadSpecSetUp(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenKind6LeaderboardRead(lifted::Regs& ctx);
+void RaceScreensUnseenKind6ReadSpecSetUp(lifted::Regs& ctx);
 // Kind6Menu::SaveReplay sub_8221D678 (a step for the harness),
 // RaceDialog::AskSlot sub_82219058 (r3 the slot, r4 the record, r5 the
 // replay; an adapter), StoreReplay sub_82218FF8 (r3 the record, r4 the
 // replay; a step) and Replay::CopyFrom sub_821A66A8 (r3, r4 the replays; an
 // adapter).
-void RaceScreensUnseenKind6SaveReplay(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenAskSlot(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenStoreReplay(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenReplayCopyFrom(lifted::Regs& ctx, uint8_t* base);
-void RaceScreensUnseenKind6NetState(lifted::Regs& ctx, uint8_t* base);
+void RaceScreensUnseenKind6SaveReplay(lifted::Regs& ctx);
+void RaceScreensUnseenAskSlot(lifted::Regs& ctx);
+void RaceScreensUnseenStoreReplay(lifted::Regs& ctx);
+void RaceScreensUnseenReplayCopyFrom(lifted::Regs& ctx);
+void RaceScreensUnseenKind6NetState(lifted::Regs& ctx);
 
 }  // namespace hooks

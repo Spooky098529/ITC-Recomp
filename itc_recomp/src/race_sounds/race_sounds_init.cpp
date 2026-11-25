@@ -695,48 +695,48 @@ constexpr Step kSteps[] = {
 constexpr uint32_t kBuffer1Bytes = 0x6B080;
 constexpr uint32_t kBuffer0Bytes = 0x5D2D0;
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+void Store(uint32_t address, uint32_t value) {
+  guest::StoreU32(address, value);
 }
 
 // memset (sub_825A71D0) with 0, as its adapter does it.
-void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
-  guest::ForEachHostPart(base, address, bytes,
+void Clear(uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(address, bytes,
                          [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
 }  // namespace
 
-uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, bool* replaced) {
+uint32_t Init(uint32_t machine, uint32_t sp, const Calls& calls, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82177378 RaceSounds::Init");
   const uint32_t frame = sp - kInitFrame;
-  Store(base, frame, sp);
-  Sounds(base, machine).set_kind(RaceStates::race_data(base).kind());
+  Store(frame, sp);
+  Sounds(machine).set_kind(RaceStates::race_data().kind());
   uint64_t last = 0;
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
-    Store(base, Globals::slot_arrived_address() + 4 * i, 0);
-    Store(base, Globals::slot_asked_address() + 4 * i, 0);
-    guest::StoreU8(base, Globals::slot_files_arrived_address() + i, 0);
-    Store(base, Globals::slot_contexts_address() + 4 * i, i);
-    Store(base, Globals::slot_buffers_1_address() + 4 * i, 0);
-    Store(base, Globals::slot_buffers_0_address() + 4 * i, 0);
+    Store(Globals::slot_arrived_address() + 4 * i, 0);
+    Store(Globals::slot_asked_address() + 4 * i, 0);
+    guest::StoreU8(Globals::slot_files_arrived_address() + i, 0);
+    Store(Globals::slot_contexts_address() + 4 * i, i);
+    Store(Globals::slot_buffers_1_address() + 4 * i, 0);
+    Store(Globals::slot_buffers_0_address() + 4 * i, 0);
     // Blobs in PC memory (E5 step 7) where the original called XPhysicalAlloc
     // (size, -1, 2048, 4; returning at 0x82177410 and 0x82177430): the car's
     // two wave banks, read whole by Archive::Load (SceneModel::SetUp), read by
     // the car sounds' views and our FFmpeg (hooks/xma.cpp, guest::Pointer),
     // never by the renderer; freed by Unload's XPhysicalFree (the handles').
-    const uint64_t buffer1 = schema::CarSoundWaveBank::New(base, kBuffer1Bytes).address;
-    Store(base, Globals::slot_buffers_1_address() + 4 * i, uint32_t(buffer1));
-    last = schema::CarSoundWaveBank::New(base, kBuffer0Bytes).address;
-    Store(base, Globals::slot_buffers_0_address() + 4 * i, uint32_t(last));
-    Clear(base, uint32_t(last), kBuffer0Bytes);
-    last = guest::LoadU32(base, Globals::slot_buffers_1_address() + 4 * i);
-    Clear(base, uint32_t(last), kBuffer1Bytes);
+    const uint64_t buffer1 = schema::CarSoundWaveBank::New(kBuffer1Bytes).address;
+    Store(Globals::slot_buffers_1_address() + 4 * i, uint32_t(buffer1));
+    last = schema::CarSoundWaveBank::New(kBuffer0Bytes).address;
+    Store(Globals::slot_buffers_0_address() + 4 * i, uint32_t(last));
+    Clear(uint32_t(last), kBuffer0Bytes);
+    last = guest::LoadU32(Globals::slot_buffers_1_address() + 4 * i);
+    Clear(uint32_t(last), kBuffer1Bytes);
   }
   // CarSounds::Init with memset's r3 to r5 left.
   calls.Call(kCarSoundsInit, frame, 0x8217746C, 3, last, 0, kBuffer1Bytes);
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -748,20 +748,20 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, 
   };
   uint32_t r3 = 0;
   for (const Step& step : kSteps) {
-    if (!(step.kinds & KindClass(Sounds(base, machine).kind()))) {
+    if (!(step.kinds & KindClass(Sounds(machine).kind()))) {
       continue;
     }
     switch (step.op) {
       case Op::kStore:
-        Store(base, at(step.a), at(step.b));
+        Store(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          Store(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          Store(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }

@@ -31,7 +31,7 @@ namespace graphics::resolve {
 // the level, r9 the slice, r10 the clear color (4 floats, 0: zeros), f1 the
 // clear depth; the stack's +92 and +100 (sp the caller's frame) the clear
 // helpers' arguments. r3 not kept (no caller reads it).
-void Resolve(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t device, uint32_t flags,
+void Resolve(uint32_t sp, uint64_t r13, uint32_t device, uint32_t flags,
              uint32_t rect, uint32_t texture, uint32_t point, uint32_t level, uint32_t slice,
              uint32_t color, double clear_depth);
 

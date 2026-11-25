@@ -18,9 +18,9 @@ extern GuestStandIn g_text_draw_stand_in;
 // Strings::FormatV (sub_8210A990)'s register steps without the flag (the
 // adapter's and the harness's): r3 = the table, r4 = the output, r5 = the
 // id, r6 = the va_list; r3 the output.
-void StringsFormatVSteps(lifted::Regs& ctx, uint8_t* base);
+void StringsFormatVSteps(lifted::Regs& ctx);
 // Strings::Format (sub_8210ABC0)'s: the same with r6 to r10 the varargs.
-void StringsFormatSteps(lifted::Regs& ctx, uint8_t* base);
+void StringsFormatSteps(lifted::Regs& ctx);
 
 // Strings::FormatV's guest calls (swprintf's adapter and FormatGrouped's
 // original where their plain C++ declines, the font's number) through `ctx`,
@@ -28,7 +28,7 @@ void StringsFormatSteps(lifted::Regs& ctx, uint8_t* base);
 // lr, r1 and r3 to r5 as each call leaves them.
 class FormatGuestCalls {
  public:
-  FormatGuestCalls(lifted::Regs& ctx, uint8_t* base);
+  FormatGuestCalls(lifted::Regs& ctx);
   const strings_and_font::FormatCalls& get() const { return calls_; }
 
  private:
@@ -41,6 +41,6 @@ class FormatGuestCalls {
 
 // Text::Load (sub_8210ADF8) without its flag: the loads through the
 // archive's queue (needs --native_heap and hooks::NativeArchiveQueue()).
-void TextLoadSteps(lifted::Regs& ctx, uint8_t* base);
+void TextLoadSteps(lifted::Regs& ctx);
 
 }  // namespace hooks

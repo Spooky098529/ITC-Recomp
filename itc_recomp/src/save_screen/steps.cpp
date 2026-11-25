@@ -6,31 +6,31 @@
 
 namespace save_screen {
 
-uint64_t MoveSelection(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t MoveSelection(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A5118 SaveScreen::MoveSelection");
-  Fn f(base, sp, 128, calls);
-  const uint32_t movie = FindMovie(base, 44, f.frame + 80);
-  if (int32_t(Load(base, step)) == 0) {
-    const uint64_t selection = f.Call(kMenuListSelection, 0x821A515C, List(base));
-    const uint64_t previous = f.Call(kMenuListPrevious, 0x821A5168, List(base));
+  Fn f(sp, 128, calls);
+  const uint32_t movie = FindMovie(44, f.frame + 80);
+  if (int32_t(Load(step)) == 0) {
+    const uint64_t selection = f.Call(kMenuListSelection, 0x821A515C, List());
+    const uint64_t previous = f.Call(kMenuListPrevious, 0x821A5168, List());
     f.Call(kFinishNamed, 0x821A5178, movie, previous + 2);
     const uint64_t named = selection + 2;
     f.Call(kPlayNamed, 0x821A5198, movie, named, 0, 0);
     f.Call(kLoopNamed, 0x821A51A4, movie, named);
-    Store(base, step, 1);
+    Store(step, 1);
   }
   f.Call(kRun, 0x821A51B8, movie, 0);
   return 1;
 }
 
-uint64_t CloseDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+uint64_t CloseDialog(uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A5038 SaveScreen::CloseDialog");
-  Fn f(base, sp, 128, calls);
-  const uint32_t movie = FindMovie(base, 44, f.frame + 80);
-  if (int32_t(Load(base, step)) == 0) {
-    const uint32_t state = Data(base).dialog_state();
+  Fn f(sp, 128, calls);
+  const uint32_t movie = FindMovie(44, f.frame + 80);
+  if (int32_t(Load(step)) == 0) {
+    const uint32_t state = Data().dialog_state();
     if (state == 0) {
-      const uint64_t selection = f.Call(kMenuListSelection, 0x821A50B0, List(base));
+      const uint64_t selection = f.Call(kMenuListSelection, 0x821A50B0, List());
       f.Call(kFinishNamed, 0x821A50C0, movie, selection + 2);
       f.Call(kPlayNamed, 0x821A50DC, movie, 14, 0, 0);
     } else if (state < 3) {
@@ -40,11 +40,11 @@ uint64_t CloseDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
       f.Call(kPlayNamed, 0x821A50DC, movie, 15, 0, 0);
     }
     f.Call(kMenuSoundPlay, 0x821A50E4, 5);
-    Store(base, step, 1);
+    Store(step, 1);
   }
   const bool done = uint32_t(f.Call(kRun, 0x821A50F8, movie, 0)) == 0;
   if (done) {
-    const auto data = Data(base);
+    const auto data = Data();
     data.set_dialog_state(data.state_after_close());
   }
   return done ? 1 : 0;

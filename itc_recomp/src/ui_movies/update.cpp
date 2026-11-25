@@ -17,73 +17,73 @@ constexpr uint32_t kStep = 0x820021E8;  // the time a frame (f30)
 constexpr uint32_t kZero = 0x82000A34;  // 0.0 (f31)
 }  // namespace
 
-void UpdateBegin(uint8_t* base, uint32_t local) {
+void UpdateBegin(uint32_t local) {
   ITC_NATIVE_RUNNING("sub_8211D2F8 UiMovie::Update");
   for (uint32_t k = 0; k < 32; k++) {
-    guest::StoreU16(base, local + 4 * k + 2, uint16_t(k));
-    guest::StoreU16(base, local + 4 * k, uint16_t(k + 1));
+    guest::StoreU16(local + 4 * k + 2, uint16_t(k));
+    guest::StoreU16(local + 4 * k, uint16_t(k + 1));
   }
-  guest::StoreU16(base, local + 128, 0);
-  guest::StoreU16(base, local + 136, 0);
-  guest::StoreU16(base, local + 124, 0xFFFF);
-  guest::StoreU16(base, local + 132, 0xFFFF);
-  guest::StoreU16(base, local + 134, 0xFFFF);
-  guest::StoreU16(base, local + 130, 0xFFFF);
+  guest::StoreU16(local + 128, 0);
+  guest::StoreU16(local + 136, 0);
+  guest::StoreU16(local + 124, 0xFFFF);
+  guest::StoreU16(local + 132, 0xFFFF);
+  guest::StoreU16(local + 134, 0xFFFF);
+  guest::StoreU16(local + 130, 0xFFFF);
 }
 
-void StepQueuedTime(uint8_t* base, uint32_t slot) {
-  const bool reversed = guest::LoadU32(base, slot + 28) != 0;
-  double time = Lfs(base, slot + 20);
-  const double step = Lfs(base, kStep), zero = Lfs(base, kZero);
+void StepQueuedTime(uint32_t slot) {
+  const bool reversed = guest::LoadU32(slot + 28) != 0;
+  double time = Lfs(slot + 20);
+  const double step = Lfs(kStep), zero = Lfs(kZero);
   time = reversed ? Single(time - step) : Single(time + step);
   if (time < zero) {
     time = zero;
   } else {
-    const double length = Lfs(base, guest::LoadU32(base, slot + 16) + 12);
+    const double length = Lfs(guest::LoadU32(slot + 16) + 12);
     if (time > length) {
       time = length;
     }
   }
-  Stfs(base, slot + 20, time);
+  Stfs(slot + 20, time);
 }
 
-void StepLoopingTime(uint8_t* base, uint32_t slot) {
-  const double step = Lfs(base, kStep), zero = Lfs(base, kZero);
-  double time = Single(Lfs(base, slot + 20) + step);
-  const uint32_t animation = guest::LoadU32(base, slot + 16);
+void StepLoopingTime(uint32_t slot) {
+  const double step = Lfs(kStep), zero = Lfs(kZero);
+  double time = Single(Lfs(slot + 20) + step);
+  const uint32_t animation = guest::LoadU32(slot + 16);
   if (time < zero) {
-    time = Lfs(base, animation + 12);
+    time = Lfs(animation + 12);
   } else {
-    const double length = Lfs(base, animation + 12);
+    const double length = Lfs(animation + 12);
     if (time > length) {
       time = zero;
     }
   }
-  Stfs(base, slot + 20, time);
+  Stfs(slot + 20, time);
 }
 
-void UnlinkQueueFirst(uint8_t* base, uint32_t list) {
-  const uint16_t first = guest::LoadU16(base, list + 132);
+void UnlinkQueueFirst(uint32_t list) {
+  const uint16_t first = guest::LoadU16(list + 132);
   const uint32_t link = list + (uint32_t(int32_t(int16_t(first))) << 2);
-  const uint16_t next = guest::LoadU16(base, link);
-  guest::StoreU16(base, link, first);
-  guest::StoreU16(base, list + 132, next);
-  const uint16_t unlinked = guest::LoadU16(base, link);
-  const uint16_t free = guest::LoadU16(base, list + 128);
-  guest::StoreU16(base, list + 128, unlinked);
-  guest::StoreU16(base, link, free);
-  guest::StoreU16(base, list + 136, uint16_t(guest::LoadU16(base, list + 136) - 1));
+  const uint16_t next = guest::LoadU16(link);
+  guest::StoreU16(link, first);
+  guest::StoreU16(list + 132, next);
+  const uint16_t unlinked = guest::LoadU16(link);
+  const uint16_t free = guest::LoadU16(list + 128);
+  guest::StoreU16(list + 128, unlinked);
+  guest::StoreU16(link, free);
+  guest::StoreU16(list + 136, uint16_t(guest::LoadU16(list + 136) - 1));
 }
 
-void UnlinkLocalFirst(uint8_t* base, uint32_t list, uint32_t link, uint16_t first) {
-  const uint16_t next = guest::LoadU16(base, link);
-  guest::StoreU16(base, link, first);
-  const uint16_t free = guest::LoadU16(base, list + 128);
-  guest::StoreU16(base, list + 132, next);
-  const uint16_t unlinked = guest::LoadU16(base, link);
-  guest::StoreU16(base, list + 128, unlinked);
-  guest::StoreU16(base, link, free);
-  guest::StoreU16(base, list + 136, uint16_t(guest::LoadU16(base, list + 136) - 1));
+void UnlinkLocalFirst(uint32_t list, uint32_t link, uint16_t first) {
+  const uint16_t next = guest::LoadU16(link);
+  guest::StoreU16(link, first);
+  const uint16_t free = guest::LoadU16(list + 128);
+  guest::StoreU16(list + 132, next);
+  const uint16_t unlinked = guest::LoadU16(link);
+  guest::StoreU16(list + 128, unlinked);
+  guest::StoreU16(link, free);
+  guest::StoreU16(list + 136, uint16_t(guest::LoadU16(list + 136) - 1));
 }
 
 }  // namespace ui_movies

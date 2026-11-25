@@ -179,14 +179,14 @@ constexpr Step kSteps[] = {
 
 }  // namespace
 
-std::optional<uint32_t> MachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
+std::optional<uint32_t> MachineInit(uint32_t machine, uint32_t frame,
                                     bool* replaced) {
-  if (!SceneCreate(base)) {
+  if (!SceneCreate()) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8215D808 RaceSceneMachine::Init");
   auto at = [&](const Value& v) {
-    switch (v.base) {
+    switch () {
       case Value::kConst:
         return v.value;
       case Value::kMachine:
@@ -200,15 +200,15 @@ std::optional<uint32_t> MachineInit(uint8_t* base, uint32_t machine, uint32_t fr
   for (const Step& step : kSteps) {
     switch (step.op) {
       case Op::kStore:
-        guest::StoreU32(base, at(step.a), at(step.b));
+        guest::StoreU32(at(step.a), at(step.b));
         break;
       case Op::kCopy6:
         for (uint32_t i = 0; i < 6; i++) {
-          guest::StoreU32(base, at(step.b) + 4 * i, guest::LoadU32(base, at(step.a) + 4 * i));
+          guest::StoreU32(at(step.b) + 4 * i, guest::LoadU32(at(step.a) + 4 * i));
         }
         break;
       case Op::kAdd:
-        r3 = game_modes::StateMachineAdd(base, machine, at(step.a), at(step.b), replaced);
+        r3 = game_modes::StateMachineAdd(machine, at(step.a), at(step.b), replaced);
         break;
     }
   }

@@ -53,7 +53,7 @@ constexpr uint32_t kDeviceVertexFloatConstants = 1792, kDevicePixelFloatConstant
 // before the first call) are copied: the rest of regs is as it was. Zero
 // regs once before the first call (clearing all 80 KB every draw was ~10%
 // of the render thread).
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs);
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs);
 
 // What ReadRegisters is to copy next (render thread). The library marks
 // what its setters write in the shadow as dirty in three masks of the
@@ -77,7 +77,7 @@ struct RegisterReadStats {
   uint64_t calls = 0, calls_changed = 0, words = 0, words_copied = 0, words_changed = 0;
   uint64_t blocks_changed[kRegisterReadBlocks] = {};
 };
-void ReadRegisters(uint8_t* base, uint32_t device, rex::graphics::RegisterFile& regs,
+void ReadRegisters(uint32_t device, rex::graphics::RegisterFile& regs,
                    RegisterReadStats& stats);
 
 // The GPU's physical address for a guest address, as the graphics library
@@ -91,7 +91,7 @@ inline uint32_t GpuPhysicalAddress(uint32_t address) {
 constexpr uint64_t kPhysicalMemoryOffset = 0x100000000ull;
 constexpr uint32_t kPhysicalMemorySize = 0x20000000u;
 
-inline uint8_t* PhysicalHostAddress(uint8_t* base, uint32_t physical) {
+inline uint8_t* PhysicalHostAddress(uint32_t physical) {
   (void)base;  // the physical memory is mapped on its own (E5 step 7)
   return memory::g_physical + physical;
 }
