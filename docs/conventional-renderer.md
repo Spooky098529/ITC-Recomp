@@ -1,5 +1,9 @@
 # A conventional renderer (a plan, not started)
 
+**Superseded (2026-11-26):** this first attempt is a dead end (the user's
+call); the plan now is `docs/pc-renderer.md`. Its research (sections 2 and
+3) is still cited there.
+
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
 the docs named in each section and from reading `src/` and `generated/`
