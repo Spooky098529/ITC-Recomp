@@ -1,228 +1,67 @@
-// The GPU packets the graphics library writes for each indexed draw (see
-// "The library's packets" in docs/native-renderer.md). In exclusive mode
-// nothing reads them but our kick, which only looks for fences and
-// interrupts, so the draw (sub_825BE708) is replaced by one that keeps what
-// isn't a packet: the shader load (sub_822AED18: SQ_PROGRAM_CNTL and other
-// shadow fields, vertex shader patching, shader fences) and the dirty masks
-// cleared; the bound shaders' fences are cleared first, so vertex shaders
-// are patched in place rather than copied into the command buffer.
-// Predicated draws (tiling) still take the library's path, since
-// EndTiling works from the packets they record.
-//
-// --native_renderer_check_draw_writes keeps the library's draw and logs,
-// every 5 s, the device fields each packet-writing helper and the draw
-// itself change besides the command buffer pointer: what skipping them
-// would lose.
-//
-// --native_renderer_library_packets turns the replacement off.
+// The graphics library's indexed draw without its GPU packets
+// (docs/pc-renderer.md, step 3): no GPU runs the command buffer, so the
+// draw (sub_825BE708) keeps only what isn't a packet: the shader load
+// (sub_822AED18: SQ_PROGRAM_CNTL and the other shadow fields the renderer
+// reads, the vertex shader's patch for the bound declaration) and the
+// dirty masks cleared. The packet writers the original draw calls write
+// only packets and the command buffer's position: their work is Dropped
+// (the graphics rule; "The indexed draw without its packets" in
+// docs/native-renderer.md found no other device field changed). Tiled
+// draws (predicated tiling) take the same path: their packets went into
+// chains only the tiling worker's job reads, which never runs.
 
-#include <format>
-#include "lifted/functions.h"
-#include "lifted/originals.h"
 #include "draw_packets.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
-#include "renderer.h"
 #include "state.h"
 
-#include "base/flags.h"
 #include "base/log.h"
 #include "hooks/command_buffer.h"
-
-#include <array>
-#include <chrono>
-#include <cstring>
-#include <map>
-#include <mutex>
-#include <string>
-#include <vector>
-#include "lifted/sdk.h"
-
-ITC_FLAG_BOOL(native_renderer_check_draw_writes, false, "ITC",
-              "Log the device fields the graphics library's draw and its packet-writing "
-              "helpers change besides the command buffer (a debugging aid for the native "
-              "renderer's exclusive mode; keeps the library's draw)");
-ITC_FLAG_BOOL(native_draw_packets, true, "ITC",
-              "Drop the work of the draw's packet writers (sub_822AE1D0, sub_822ADE30, "
-              "sub_822ADEF0, sub_822AE070, sub_822ADC08: GPU packets into the command buffer, "
-              "which nothing reads), keeping the native renderer's marks; checked by frame "
-              "dumps (src/native/draw_packets.cpp)");
-ITC_FLAG_BOOL(native_renderer_library_packets, false, "ITC",
-              "In exclusive mode, let the graphics library write its GPU packets for "
-              "indexed draws as before (nothing reads them)");
 
 namespace native {
 namespace {
 
-using Clock = std::chrono::steady_clock;
-
 // Device fields (see "The library's packets").
-constexpr uint32_t kDeviceSize = 16384;  // past the last field known (+15156)
 constexpr uint32_t kDeviceVertexConstantsDirty = 0;
 constexpr uint32_t kDevicePixelConstantsDirty = 8;
 constexpr uint32_t kDeviceShaderStateDirty = 16;
 constexpr uint32_t kDeviceRenderStateDirty = 24;
 constexpr uint32_t kDeviceOtherStateDirty = 32;
-constexpr uint32_t kDeviceCommandPointer = 40;
-constexpr uint32_t kDeviceTilingFlags = 10808;  // bit 1 (0x2): predicated draws
-constexpr uint32_t kDeviceHizState = 11584;     // set when render state bit 1 is dirty
-constexpr uint32_t kShaderFence = 8;  // in a shader object
+constexpr uint32_t kDeviceHizState = 11584;  // set when render state bit 1 is dirty
+constexpr uint32_t kShaderFence = 8;         // in a shader object
 // Shader state dirty bits 49-52 (vertex and pixel shaders): sub_822AED18.
 constexpr uint64_t kShaderBits = 0xFull << 49;
-
-enum Helper { kConstants, kRegisters, kRegisters2, kFetchConstants, kHiz, kDraw, kHelpers };
-const char* const kHelperNames[kHelpers] = {
-    "constants (sub_822AE1D0)",     "register blocks (sub_822ADE30)",
-    "register blocks 2 (sub_822ADEF0)", "fetch constants (sub_822AE070)",
-    "sub_822ADC08",                 "the draw without the shader load (sub_825BE708)",
-};
-
-struct HelperStats {
-  uint64_t calls = 0, segment_ends = 0;
-  std::map<uint32_t, uint64_t> changed;  // device offset: calls changing it
-};
-struct CheckStats {
-  std::array<HelperStats, kHelpers> helpers;
-  uint64_t draws = 0, predicated = 0, shader_loads = 0;
-};
-CheckStats g_check;
-std::mutex g_mutex;
-Clock::time_point g_last_log = Clock::now();
-thread_local uint32_t t_segment_ends = 0;  // sub_8229EF48 calls
-
-bool Checking() {
-  return ITC_FLAG(native_renderer_check_draw_writes);
-}
-
-uint8_t* DevicePointer(uint32_t device) {
-  return guest::Pointer(device);
-}
-
-// Runs `call` and records which device words it changed (the command
-// buffer pointer aside), and whether it ended a command segment (which
-// kicks, moving fences and positions).
-template <typename Call>
-void Checked(Helper helper, uint32_t device, Call call) {
-  std::vector<uint8_t> before(DevicePointer(device),
-                              DevicePointer(device) + kDeviceSize);
-  uint32_t segment_ends = t_segment_ends;
-  call();
-  const uint8_t* after = DevicePointer(device);
-  std::lock_guard lock(g_mutex);
-  HelperStats& s = g_check.helpers[helper];
-  s.calls++;
-  if (t_segment_ends != segment_ends) {
-    s.segment_ends++;
-    return;  // the kick's changes would hide the helper's
-  }
-  for (uint32_t offset = 0; offset < kDeviceSize; offset += 4) {
-    if (offset != kDeviceCommandPointer && std::memcmp(&before[offset], after + offset, 4)) {
-      s.changed[offset]++;
-    }
-  }
-}
-
-void LogCheck() {
-  CheckStats& c = g_check;
-  ITC_LOG_INFO("native renderer: draw writes: {} indexed draws ({} predicated, {} with a shader "
-               "load)",
-               c.draws, c.predicated, c.shader_loads);
-  for (int i = 0; i < kHelpers; i++) {
-    HelperStats& s = c.helpers[i];
-    std::string changed;
-    for (auto& [offset, count] : s.changed) {
-      changed += std::format(" +{}={}", offset, count);
-    }
-    ITC_LOG_INFO("native renderer: draw writes: {}: {} calls ({} ending a segment, not "
-                 "compared); device fields changed:{}",
-                 kHelperNames[i], s.calls, s.segment_ends, changed.empty() ? " none" : changed);
-  }
-  c = {};
-}
 
 }  // namespace
 }  // namespace native
 
-// The draw's packet writers, r3 the device: shader constants into packets
-// (sub_822AE1D0), register blocks from the shadow (sub_822ADE30,
-// sub_822ADEF0), fetch constants (sub_822AE070), and the HiZ / surface
-// set-up (sub_822ADC08). Their work is Dropped with --native_draw_packets
-// (the graphics rule, as the device's setters' packets in
-// docs/functions/device-state.md): they write only GPU packets into the
-// command buffer, its write position (+40) and, when it's full, the segment's
-// end (sub_8229EF48), which nothing reads since the emulated GPU went (our
-// kick looks only for fences and interrupts; --native_renderer_check_draw_writes
-// found no other device field changed, "The indexed draw without its
-// packets" in docs/native-renderer.md). r3 is left as the device (their
-// recompiled callers don't read it), sub_822ADC08's is its mask with bit 8
-// cleared, as the original returns. With the check flag, or the drop flag
-// off, the originals run.
-#define NATIVE_CHECKED_HELPER(address, helper, dropped)                                   \
-  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                    \
-    if (!native::Checking()) {                                                            \
-      if (ITC_FLAG(native_draw_packets)) {                                                \
-        dropped;                                                                          \
-        return;                                                                           \
-      }                                                                                   \
-      lifted::original::c##address(ctx);                                       \
-      return;                                                                             \
-    }                                                                                     \
-    native::Checked(helper, ctx.r3.u32,                                             \
-                    [&] { lifted::original::c##address(ctx); });               \
-  }
-
-NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
-NATIVE_CHECKED_HELPER(822ADE30, native::kRegisters,
-                      ITC_NATIVE_RUNNING("sub_822ADE30 (dropped)"))
-NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, ITC_NATIVE_RUNNING("sub_822ADEF0 (dropped)"))
-NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants,
-                      ITC_NATIVE_RUNNING("sub_822AE070 (dropped)"))
-// sub_822ADC08 writes register 0x2203 (r5) itself; it returns its mask (r4)
-// without bit 8.
-NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, {
+// The draw's packet writers, r3 the device: shader constants (sub_822AE1D0),
+// register blocks from the shadow (sub_822ADE30, sub_822ADEF0), fetch
+// constants (sub_822AE070), and the HiZ / surface set-up (sub_822ADC08).
+// Dropped: r3 left as the device (their callers don't read it);
+// sub_822ADC08's is its mask (r4) with bit 8 cleared, as the original's.
+ITC_NATIVE_ENTRY_ALWAYS(822AE1D0) { ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"); }
+ITC_NATIVE_ENTRY_ALWAYS(822ADE30) { ITC_NATIVE_RUNNING("sub_822ADE30 (dropped)"); }
+ITC_NATIVE_ENTRY_ALWAYS(822ADEF0) { ITC_NATIVE_RUNNING("sub_822ADEF0 (dropped)"); }
+ITC_NATIVE_ENTRY_ALWAYS(822AE070) { ITC_NATIVE_RUNNING("sub_822AE070 (dropped)"); }
+ITC_NATIVE_ENTRY_ALWAYS(822ADC08) {
   ITC_NATIVE_RUNNING("sub_822ADC08 (dropped)");
   ctx.r3.u64 = ctx.r4.u64 & ~0x100ull;
-})
+}
 
-// Ends the command segment when the buffer is full (kicking it); counted
-// so the check can leave those calls out. The work is the command buffer's
-// (native with --native_command_buffer, src/hooks/command_buffer.cpp).
+// Ends the command segment when the buffer is full: the command buffer's
+// plain C++ (src/hooks/command_buffer.cpp).
 ITC_NATIVE_ENTRY_ALWAYS(8229EF48) {
-  
-  native::t_segment_ends++;
   hooks::EndCommandSegment(ctx);
 }
 
 // DrawIndexedVertices (sub_825BE708, wrapped in replay_hooks.cpp): r3
 // device, r4 primitive type, r5 base vertex, r6 start index, r7 index
-// count. Writes the dirty state's packets (five masks at device +0..+32)
-// and DRAW_INDX.
+// count. The original writes the dirty state's packets (five masks at
+// device +0..+32) and DRAW_INDX.
 void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
   uint32_t device = ctx.r3.u32;
-  bool predicated = guest::LoadU8(device + kDeviceTilingFlags) & 0x2;
-  if (Checking()) {
-    bool shader_load = guest::LoadU64(device + kDeviceShaderStateDirty) & kShaderBits;
-    {
-      std::lock_guard lock(g_mutex);
-      g_check.draws++;
-      g_check.predicated += predicated;
-      g_check.shader_loads += shader_load;
-      if (auto now = Clock::now(); now - g_last_log >= std::chrono::seconds(5)) {
-        g_last_log = now;
-        LogCheck();
-      }
-    }
-    if (shader_load) {
-      lifted::original::c825BE708(ctx);  // its writes are expected
-    } else {
-      Checked(kDraw, device, [&] { lifted::original::c825BE708(ctx); });
-    }
-    return;
-  }
-  if (ITC_FLAG(native_renderer_library_packets) || predicated) {
-    lifted::original::c825BE708(ctx);
-    return;
-  }
   guest::StoreU64(device + kDeviceVertexConstantsDirty, 0);
   guest::StoreU64(device + kDevicePixelConstantsDirty, 0);
   uint64_t shader_state = guest::LoadU64(device + kDeviceShaderStateDirty);
@@ -240,8 +79,6 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
     lifted::Enter(ctx, lifted::e822AED18);
-    // The mask with the bits for what it wrote in the shadow.
-    shader_state |= ctx.r3.u64;
     ctx = saved;
   }
   guest::StoreU64(device + kDeviceShaderStateDirty, 0);

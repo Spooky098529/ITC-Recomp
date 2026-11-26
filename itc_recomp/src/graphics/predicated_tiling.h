@@ -5,9 +5,9 @@
 // src/hooks/predicated_tiling.cpp (--native_predicated_tiling).
 //
 // Our renderer draws the tiles from the render command replay and the
-// device's register shadow, not from packets, and our kick runs the end's
-// callback block at once without waking the library's worker
-// (no kick runs them since pc-renderer step 3, src/hooks/command_buffer.cpp). So, by the graphics rule (the user's, 2026-10-24;
+// device's register shadow, not from packets, and no GPU runs the command
+// buffer (nothing is kicked since docs/pc-renderer.md's step 3), so the
+// end's callback never wakes the library's worker. So, by the graphics rule (the user's, 2026-10-24;
 // as the device state's and the command buffer's): the device fields, the
 // chains the segment flow and the draws append to, the tiling's limit +12960
 // the segment flow reads and the kicks are kept; the packets nothing reads

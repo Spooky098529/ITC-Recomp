@@ -405,6 +405,15 @@ and resolve on one 256x144 target in turn, then the main view draws on
   Checked: attract races and the pad replay (menus, loading screens, both
   races) with 0 error lines, the tick replay's digests the same.
 
+- **No draw packets (third part, 2026-11-26).** The indexed draw always
+  takes our path (the shader load and the dirty masks cleared, no
+  packets), tiled draws too (their packets went into chains only the
+  never-run tiling worker reads); the draw's five packet writers are plain
+  drops. Gone: the check machinery and `--native_renderer_check_draw_writes`,
+  `--native_draw_packets`, `--native_renderer_library_packets`. Checked:
+  the pad replay (the tiled menus' 3D views, loading screens, both races),
+  an attract race, the tick replay.
+
 Left for step 3: the handlers calling our interface instead of the game's
 Direct3D, which ends the shadow on the render path.
 
