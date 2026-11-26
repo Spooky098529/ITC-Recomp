@@ -449,8 +449,21 @@ address 0 since E5 step 2's swarm (`body_row1_address() * i` for
 `vehicle + 16 * i`), which since E5 step 10 stops the program: the pad
 replay stopped there once.
 
-Left for step 5: the physical block shrunk to what's left in it, step 0's
-measures again, and the one profile.
+Step 0's measures again (2026-11-26, the pad replay, `itc_6025`):
+
+| | Step 0 | Now |
+|---|---|---|
+| The process's resident set | ~510-645 MB | ~350-450 MB (menus ~400, a race ~450) |
+| of which the physical block (touched pages) | ~205-255 MB | ~13-64 MB |
+| GTT, whole card | ~1,690 MB | ~530 MB (the idle desktop's ~350 included) |
+| The renderer's host-visible buffers in it | 1,344 MB | ~128 MB (texture and arena staging 96, constants 32) |
+| The renderer's GPU memory | ~300 MB | ~600 MB: the arena 224, textures 100, targets 119, resolve destinations 33 |
+
+So the game's system memory went from about **1.9 GB to about 0.6 GB**;
+the GPU's own memory grew by the vertex arena (device-local, in VRAM).
+
+Left for step 5: the physical block shrunk to what's left in it, and the
+one profile.
 
 ## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
 
