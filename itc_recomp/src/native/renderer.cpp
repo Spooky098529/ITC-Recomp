@@ -32,11 +32,16 @@
 #include <vector>
 #include "base/log.h"
 #include "base/flags.h"
+#include "memory/mapping.h"
 
 ITC_FLAG_BOOL(log_gpu_memory, false, "ITC",
               "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
               "and its counts of views, samplers, descriptor pools and pipelines (to find "
               "what grows from race to race)");
+ITC_FLAG_BOOL(log_memory_use, false, "ITC",
+              "Log every 5 s the resident memory by block (the heap, the image, the "
+              "physical memory: touched pages) and the process's resident set, with the "
+              "renderer's GPU memory (docs/pc-renderer.md, step 0)");
 ITC_FLAG_BOOL(native_renderer_validation, false, "ITC",
               "Enable the Vulkan validation layer for the native renderer, if installed");
 ITC_FLAG_INT32(native_renderer_show_resolve, -1, "ITC",
@@ -1012,8 +1017,11 @@ void Renderer::LogStats() {
     }
     ITC_LOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
   }
-  if (ITC_FLAG(log_gpu_memory)) {
+  if (ITC_FLAG(log_gpu_memory) || ITC_FLAG(log_memory_use)) {
     ITC_LOG_INFO("native renderer: GPU memory: {}", gpu_memory::Describe());
+  }
+  if (ITC_FLAG(log_memory_use)) {
+    ITC_LOG_INFO("memory use: {}", memory::DescribeResident());
   }
   if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
     uint64_t missing, most;

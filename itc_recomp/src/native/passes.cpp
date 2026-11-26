@@ -1344,6 +1344,18 @@ bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
     return false;
   }
   gpu_memory::Allocated(gpu_memory::Kind::kMirror, alloc.allocationSize);
+  {
+    // Where the mirror lives (docs/pc-renderer.md step 0): without the
+    // device-local bit, system memory the driver pins (not in the process's
+    // resident set).
+    VkMemoryPropertyFlags flags =
+        memory_properties.memoryTypes[alloc.memoryTypeIndex].propertyFlags;
+    ITC_LOG_INFO("native renderer: guest memory mirror of {} MB in memory type {} ({}device-local, "
+                 "heap {})",
+                 alloc.allocationSize >> 20, alloc.memoryTypeIndex,
+                 (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "" : "not ",
+                 memory_properties.memoryTypes[alloc.memoryTypeIndex].heapIndex);
+  }
   if (vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) != VK_SUCCESS ||
       vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
                       reinterpret_cast<void**>(&mirror.mapped)) != VK_SUCCESS) {

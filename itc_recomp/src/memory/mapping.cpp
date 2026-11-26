@@ -23,10 +23,15 @@
 #include "base/log.h"
 
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>
+#include <format>
+#include <fstream>
+#include <string>
+#include <vector>
 #include <mutex>
 
 namespace memory {
@@ -79,6 +84,68 @@ void NoBlock(uint32_t address) {
                 address < 0x10000 ? "a null pointer" : "not the heap, the image, the physical memory "
                                                        "or a handle's object");
   std::abort();
+}
+
+namespace {
+
+// Bytes of [block, block + bytes) backed by pages now.
+uint64_t ResidentBytes(const uint8_t* block, uint64_t bytes) {
+  if (!block) {
+    return 0;
+  }
+  const uint64_t page = uint64_t(sysconf(_SC_PAGESIZE));
+  std::vector<unsigned char> pages((bytes + page - 1) / page);
+  if (mincore(const_cast<uint8_t*>(block), bytes, pages.data()) != 0) {
+    return 0;
+  }
+  uint64_t resident = 0;
+  for (unsigned char p : pages) {
+    resident += p & 1;
+  }
+  return resident * page;
+}
+
+// A "Name:   1234 kB" line of /proc/self/status, in bytes (0 if missing).
+uint64_t StatusBytes(const std::string& status, const char* name) {
+  size_t at = status.find(name);
+  if (at == std::string::npos) {
+    return 0;
+  }
+  return std::strtoull(status.c_str() + at + std::strlen(name), nullptr, 10) * 1024;
+}
+
+}  // namespace
+
+// The GPU driver's own counters (amdgpu's sysfs files; empty elsewhere):
+// VRAM and GTT (system memory the driver pins for the GPU) in use, by every
+// process on the card, not this one alone.
+std::string DriverMemory() {
+  constexpr double kMB = 1048576.0;
+  for (int card = 0; card < 8; card++) {
+    std::string dir = std::format("/sys/class/drm/card{}/device/", card);
+    std::ifstream vram(dir + "mem_info_vram_used");
+    std::ifstream gtt(dir + "mem_info_gtt_used");
+    uint64_t vram_bytes = 0;
+    uint64_t gtt_bytes = 0;
+    if (vram >> vram_bytes && gtt >> gtt_bytes) {
+      return std::format("; driver (whole card{}) VRAM {:.1f} MB, GTT {:.1f} MB", card,
+                         vram_bytes / kMB, gtt_bytes / kMB);
+    }
+  }
+  return {};
+}
+
+std::string DescribeResident() {
+  constexpr double kMB = 1048576.0;
+  std::ifstream file("/proc/self/status");
+  std::string status((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  return std::format(
+      "heap {:.1f} MB; image {:.1f} MB; physical {:.1f} MB; process {:.1f} MB (anon {:.1f}, "
+      "file {:.1f}, shmem {:.1f}){}",
+      ResidentBytes(g_heap, kHeapBytes) / kMB, ResidentBytes(g_image, kImageBytes) / kMB,
+      ResidentBytes(g_physical, kPhysicalBytes + 0x1000) / kMB,
+      StatusBytes(status, "VmRSS:") / kMB, StatusBytes(status, "RssAnon:") / kMB,
+      StatusBytes(status, "RssFile:") / kMB, StatusBytes(status, "RssShmem:") / kMB, DriverMemory());
 }
 
 }  // namespace memory

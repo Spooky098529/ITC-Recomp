@@ -1,4 +1,4 @@
-# A PC renderer (a plan, not started)
+# A PC renderer (a plan; step 0 done)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -226,6 +226,41 @@ the user before the next. No profiles until the end.
 | **4** | **Passes into their textures.** The resolves classified and replaced (above); render targets as textures | The EDRAM allocator, resolve copies but grab passes, the tiling machinery | Medium |
 | **5** | **Clean-up.** The SDK translator and the `rexglue-sdk/` submodule out of the build; the physical block shrunk to what's left in it; step 0's measures again, and the one profile | ReXGlue entirely | Small |
 | later | MSAA as a player option; a second backend; tick replay (`docs/tick-replay.md`) | | |
+
+## Step 0's measures (2026-11-26)
+
+`--log_memory_use` (new; `memory::DescribeResident`, logged by the
+renderer every 5 s with the GPU memory line): each block's touched pages
+(`mincore`), the process's resident set (`/proc/self/status`), and on
+amdgpu the driver's VRAM and GTT in use (sysfs, the whole card). GTT is
+system memory the driver pins for the GPU: it isn't in the process's
+resident set, which is why the mirrors never showed there. The renderer
+also logs which memory type each mirror got.
+
+On this PC (amdgpu; idle before the runs: VRAM 3,017 MB, GTT 346 MB),
+attract races `itc_5953` (60 s) and the pad replay `itc_5954` (menus, then a
+race, 126 s):
+
+| | Menus | Race |
+|---|---|---|
+| The process's resident set | ~510-580 MB | ~530-645 MB |
+| of which the physical block (touched pages) | ~205-211 MB | ~220-255 MB |
+| of which the heap | 70 MB | 71-84 MB |
+| GTT, whole card (idle 346 MB) | ~1,690 MB | ~1,690 MB |
+| The renderer's host-visible buffers in it | 1,344 MB: the two mirrors (2 × 544 MB, memory type 2, not device-local), texture staging (128 MB), the constant rings (128 MB) | the same |
+| The renderer's device memory | textures 63-82 MB, resolve destinations 25 MB, images (targets) 208 MB | the same |
+
+So the game holds about **1.9 GB of system memory**: ~0.6 GB resident in the
+process and ~1.35 GB pinned by the driver, against ~0.3 GB of GPU memory.
+The mirrors are 1.09 GB of it, and the physical block's ~250 MB is mostly
+GPU data the CPU never reads again. The physical block's pages stay
+resident after its data is freed (its allocator doesn't give pages back).
+The other host-visible buffers (staging, constants, 256 MB) are sized
+generously and can shrink with the steps.
+
+The frame dump baseline is an attract race's dump (`--native_renderer_dump`,
+10 s in), kept locally in `itc_recomp/out/pc-renderer-baseline/`: 2,390
+draws, 24 resolves.
 
 ## Open questions
 

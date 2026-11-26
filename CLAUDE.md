@@ -98,6 +98,12 @@ new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
+`docs/pc-renderer.md` is the plan for a regular PC-style renderer (on
+`pc-renderer`, since 2026-11-26): no EDRAM, GPU data in GPU memory, the
+game's shaders as GLSL with PC inputs (from SBX-Recomp's tool, with its
+author's OK); `docs/conventional-renderer.md`, the first attempt, is a dead
+end kept for its research. Step 0 (`--log_memory_use`) measured ~1.9 GB of
+system memory, 1.09 GB of it the renderer's two mirrors.
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core
