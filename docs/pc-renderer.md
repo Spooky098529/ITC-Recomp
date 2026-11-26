@@ -220,7 +220,7 @@ the user before the next. No profiles until the end.
 | Step | What | Removes | Size |
 |---|---|---|---|
 | **0** | **Measure.** Log resident memory by source (the physical block's touched pages, the two copies, texture staging) and the renderer's GPU memory, in a race and the menus; a frame dump baseline | Nothing | Small |
-| **1** | **The shaders.** Bring in SBX's tool (license first, below); run it over our `BUILD_OUT` and course archives and the boot shaders, and compare hashes with their table; take their hand-written GLSL and give it PC inputs (vertex attributes, constants by name, plain textures). In this step the renderer binds the 512 MB copy itself as the vertex buffer with each stream's guest address as the offset, so the shaders change before the buffers do | The SDK translator on the draw path, the shader patch, `xe_vfetch` | Large |
+| **1** | **The shaders.** Bring in SBX's tool (its author's OK given, below); run it over our `BUILD_OUT` and course archives and the boot shaders, and compare hashes with their table; take their hand-written GLSL and give it PC inputs (vertex attributes, constants by name, plain textures). In this step the renderer binds the 512 MB copy itself as the vertex buffer with each stream's guest address as the offset, so the shaders change before the buffers do | The SDK translator on the draw path, the shader patch, `xe_vfetch` | Large |
 | **2** | **Resources by handle.** Textures and buffers made, filled and freed where the game does it; device-local, uploaded once; bound by handle. CPU-read data keeps its system copy and its writers announce changes | The 512 MB copies, memcpy's tracking, texture reloads by overlap; most GPU data in the physical block | Medium |
 | **3** | **The handlers call our interface.** The 33 handlers and the singles in play call `render/` directly | The register shadow on the render path, `ReadRegisters`, the dirty masks, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp`, the packets, the lifted shader load | Large |
 | **4** | **Passes into their textures.** The resolves classified and replaced (above); render targets as textures | The EDRAM allocator, resolve copies but grab passes, the tiling machinery | Medium |
@@ -229,9 +229,10 @@ the user before the next. No profiles until the end.
 
 ## Open questions
 
-1. **SBX-Recomp's license.** Its repository has no license file. If it
-   isn't the user's, copying its tool and GLSL needs its author's OK;
-   otherwise we take the approach and write our own.
+1. **SBX-Recomp's license.** Answered 2026-11-26: its author is OK with
+   the user using its code. Files taken from it say so in a header comment
+   (where they came from, at which SBX-Recomp commit), as
+   `src/lifted/vector_helpers.h` does for the SDK's.
 2. **Whether our shaders are SBX's.** Their doc says SBX's graphics library
    is a different revision from ours, and the Japanese release's data may
    differ: step 1 starts by running their tool over our files.
