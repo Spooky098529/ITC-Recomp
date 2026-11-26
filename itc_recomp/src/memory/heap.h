@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace memory {
 
@@ -70,5 +71,18 @@ void FreePhysical(uint32_t address);
 // AllocPhysical; 0
 // (logged once) for an address it didn't give. The user's call, 2026-11-06.
 uint32_t PhysicalSize(uint32_t address);
+
+// What the physical memory holds, by who asked (docs/pc-renderer.md, step
+// 2b): a tag set for the calling thread while a loader allocates
+// (PhysicalTag), counted per live block; "models 120.3 MB (812), ..." for
+// the memory log.
+class PhysicalTag {
+ public:
+  explicit PhysicalTag(const char* name);
+  ~PhysicalTag();
+ private:
+  const char* previous_;
+};
+std::string DescribePhysical();
 
 }  // namespace memory

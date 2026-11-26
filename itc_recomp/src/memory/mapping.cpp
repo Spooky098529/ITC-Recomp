@@ -18,6 +18,7 @@
 
 #include "memory/mapping.h"
 #include "memory/handles.h"
+#include "memory/heap.h"
 #include "guest.h"
 
 #include "base/log.h"
@@ -140,10 +141,10 @@ std::string DescribeResident() {
   std::ifstream file("/proc/self/status");
   std::string status((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   return std::format(
-      "heap {:.1f} MB; image {:.1f} MB; physical {:.1f} MB; process {:.1f} MB (anon {:.1f}, "
+      "heap {:.1f} MB; image {:.1f} MB; physical {:.1f} MB (live: {}); process {:.1f} MB (anon {:.1f}, "
       "file {:.1f}, shmem {:.1f}){}",
       ResidentBytes(g_heap, kHeapBytes) / kMB, ResidentBytes(g_image, kImageBytes) / kMB,
-      ResidentBytes(g_physical, kPhysicalBytes + 0x1000) / kMB,
+      ResidentBytes(g_physical, kPhysicalBytes + 0x1000) / kMB, DescribePhysical(),
       StatusBytes(status, "VmRSS:") / kMB, StatusBytes(status, "RssAnon:") / kMB,
       StatusBytes(status, "RssFile:") / kMB, StatusBytes(status, "RssShmem:") / kMB, DriverMemory());
 }

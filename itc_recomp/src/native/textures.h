@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -122,6 +123,8 @@ class TextureCache {
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
   VkCommandBuffer EndUploads();
+  // XPR files' events, at the frame's start (TextureCache_XprLoaded).
+  void ProcessXprs();
 
   struct Stats {
     uint64_t loaded = 0, reloaded = 0, loaded_bytes = 0, unsupported = 0, mismatched = 0,
@@ -172,5 +175,12 @@ class TextureCache {
 // The game left a race (main thread): the texture cache frees its loaded
 // textures at its next frame.
 void TextureCache_RaceLeft();
+// An XPR file loaded (its data block, guest address and size, and each
+// texture's fetch constant as its header has it), and released: its
+// textures are uploaded at a frame's start and its data's pages given back
+// (docs/pc-renderer.md, step 2b). Any thread.
+void TextureCache_XprLoaded(uint32_t data, uint32_t size,
+                            std::vector<std::array<uint32_t, 6>> fetches);
+void TextureCache_XprReleased(uint32_t data);
 
 }  // namespace native

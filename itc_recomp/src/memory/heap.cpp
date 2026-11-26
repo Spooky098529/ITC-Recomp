@@ -6,6 +6,8 @@
 
 #include "base/log.h"
 
+#include <sys/mman.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
@@ -13,6 +15,8 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#include <string>
+#include <format>
 #include <set>
 #include <unordered_map>
 
@@ -40,6 +44,9 @@ std::unordered_map<uint32_t, Block> blocks;
 // Physical blocks' allocated sizes (the size rounded to their page size), by
 // address: what MmQueryAllocationSize answers for them.
 std::unordered_map<uint32_t, uint32_t> physical_sizes;
+// Who asked for each block (PhysicalTag; "other" when no tag was set).
+std::unordered_map<uint32_t, const char*> physical_tags;
+thread_local const char* g_physical_tag = "other";
 std::set<uint64_t> seen;  // what's been logged once: kind << 32 | value
 
 enum Seen : uint64_t {
@@ -449,6 +456,7 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
     address = view->base + (physical - view->offset);
     // What MmQueryAllocationSize answers.
     physical_sizes[address] = rounded_size;
+    physical_tags[address] = g_physical_tag;
   }
   return address;
 }
@@ -469,8 +477,44 @@ void FreePhysical(uint32_t address) {
     return;
   }
   const PhysicalView& view = ViewOf(address);
-  Give(physical_free, address - view.base + view.offset, it->second);
+  const uint32_t offset = address - view.base + view.offset;
+  Give(physical_free, offset, it->second);
+  // Its pages back to the system (docs/pc-renderer.md, step 2b): a freed
+  // block's GPU data stayed resident until something else took the space
+  // (~94 MB in a pad replay). Whole 4 KB pages; read again they're zeros.
+  const uint32_t first = (offset + 0xFFF) & ~0xFFFu;
+  const uint32_t end = (offset + it->second) & ~0xFFFu;
+  if (end > first) {
+    madvise(g_physical + first, end - first, MADV_DONTNEED);
+  }
   physical_sizes.erase(it);
+  physical_tags.erase(address);
+}
+
+PhysicalTag::PhysicalTag(const char* name) : previous_(g_physical_tag) {
+  g_physical_tag = name;
+}
+
+PhysicalTag::~PhysicalTag() {
+  g_physical_tag = previous_;
+}
+
+std::string DescribePhysical() {
+  std::map<std::string, std::pair<uint64_t, uint32_t>> by_tag;
+  {
+    std::lock_guard lock(mutex);
+    for (const auto& [address, size] : physical_sizes) {
+      auto& t = by_tag[physical_tags[address]];
+      t.first += size;
+      t.second++;
+    }
+  }
+  std::string out;
+  for (const auto& [tag, t] : by_tag) {
+    out += std::format("{}{} {:.1f} MB ({})", out.empty() ? "" : ", ", tag,
+                       t.first / 1048576.0, t.second);
+  }
+  return out;
 }
 
 uint32_t PhysicalSize(uint32_t address) {

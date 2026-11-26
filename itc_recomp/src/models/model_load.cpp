@@ -1,6 +1,7 @@
 // The model's load (see model_load.h), load for load and store for store as
 // the recompiled functions.
 
+#include "memory/heap.h"
 #include "models/model_load.h"
 
 #include "base/log.h"
@@ -230,7 +231,10 @@ void MeshParse(uint32_t model, uint32_t file, const LoadCalls& calls) {
   }
   // The vertex data in physical memory, the shapes' buffers relocated to it.
   const uint32_t vertices = file + f.vertex_data_offset();
-  const uint32_t data = AllocPhysicalEx(f.vertex_data_size(), 0, 0xFFFFFFFFu, 4, 0x404);
+  const uint32_t data = [&] {
+    memory::PhysicalTag tag("model vertices");
+    return AllocPhysicalEx(f.vertex_data_size(), 0, 0xFFFFFFFFu, 4, 0x404);
+  }();
   m.set_vertex_data(data);
   if (data == 0) {
     ITC_LOG_WARN("Mesh::Parse: the game's debug message: {}", Message(0x8206CDC8));

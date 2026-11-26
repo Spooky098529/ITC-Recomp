@@ -14,6 +14,8 @@
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <mutex>
+#include <sys/mman.h>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -28,6 +30,9 @@
 #include <tmmintrin.h>
 #endif
 
+ITC_FLAG_BOOL(give_back_xpr_data, false, "ITC",
+              "Upload XPR files' textures at load and give their data's pages back "
+              "(docs/pc-renderer.md, step 2b; off: the menus' 2D elements read zeros)");
 ITC_FLAG_BOOL(native_renderer_log_texture_writes, false, "ITC",
               "Log which code writes textures' memory: on first load and when a texture "
               "is found changed, what the library's memcpy wrote there (a debugging aid; "
@@ -43,6 +48,16 @@ namespace native {
 namespace {
 // Races left (TextureCache_RaceLeft), counted on the main thread.
 std::atomic<uint64_t> g_races_left{0};
+
+// XPR files loaded and released (TextureCache_XprLoaded, _XprReleased),
+// from the threads that load them, for the render thread's frame start.
+struct XprEvent {
+  bool loaded;
+  uint32_t data, size;
+  std::vector<std::array<uint32_t, 6>> fetches;
+};
+std::mutex g_xpr_mutex;
+std::vector<XprEvent> g_xpr_events;
 }  // namespace
 
 namespace xenos = rex::graphics::xenos;
@@ -502,6 +517,26 @@ class BindingTable {
 }  // namespace
 
 struct TextureCache::State {
+  // XPR files' data blocks (by physical address): their textures, uploaded
+  // at a frame's start; once all are on the GPU, the block's pages are
+  // given back (`dropped`).
+  struct Xpr {
+    uint32_t size = 0;
+    std::vector<std::array<uint32_t, 6>> fetches;
+    bool dropped = false;
+    uint32_t frames_waited = 0;
+  };
+  std::map<uint32_t, Xpr> xprs;
+  uint64_t xpr_dropped_bytes = 0;
+  bool logged_dropped_miss = false;
+  bool InDroppedXpr(uint32_t start, uint32_t end) const {
+    auto it = xprs.upper_bound(start);
+    if (it == xprs.begin()) {
+      return false;
+    }
+    --it;
+    return it->second.dropped && start < it->first + it->second.size && end > it->first;
+  }
   uint64_t mismatched_total = 0;
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
@@ -532,6 +567,10 @@ struct TextureCache::State {
     uint32_t last_drawn_s = 0;
     uint32_t levels = 0;
     bool loaded = false;
+    // An XPR file's texture whose data's pages were given back once it was
+    // on the GPU (docs/pc-renderer.md, step 2b): kept through race ends,
+    // retired when the XPR is released.
+    bool kept = false;
     // The library's memcpy wrote its memory since it was loaded: reload.
     bool changed = false;
     // With verify_every_frame_: its memory's hash when loaded or last
@@ -1024,6 +1063,107 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
     generation_++;
     events_.marked_frames++;
   }
+  ProcessXprs();
+}
+
+void TextureCache_XprLoaded(uint32_t data, uint32_t size,
+                            std::vector<std::array<uint32_t, 6>> fetches) {
+  std::lock_guard lock(g_xpr_mutex);
+  g_xpr_events.push_back({true, data, size, std::move(fetches)});
+}
+
+void TextureCache_XprReleased(uint32_t data) {
+  std::lock_guard lock(g_xpr_mutex);
+  g_xpr_events.push_back({false, data, 0, {}});
+}
+
+void TextureCache::ProcessXprs() {
+  State& s = *state_;
+  std::vector<XprEvent> events;
+  {
+    std::lock_guard lock(g_xpr_mutex);
+    events.swap(g_xpr_events);
+  }
+  // Off by default: the menus' 2D elements draw XPR data with fetch
+  // constants unlike the files' headers, which then read zeros (2026-11-26).
+  if (!ITC_FLAG(give_back_xpr_data)) {
+    return;
+  }
+  for (XprEvent& e : events) {
+    uint32_t data = GpuPhysicalAddress(e.data);
+    if (e.loaded) {
+      State::Xpr& x = s.xprs[data];
+      x = {};
+      x.size = e.size;
+      x.fetches = std::move(e.fetches);
+      continue;
+    }
+    auto it = s.xprs.find(data);
+    if (it == s.xprs.end()) {
+      continue;
+    }
+    // Released: its textures leave (their data is gone or about to be).
+    for (const auto& fetch : it->second.fetches) {
+      auto t = s.textures.find(KeyOf(fetch.data()));
+      if (t == s.textures.end() || !t->second.kept) {
+        continue;
+      }
+      t->second.kept = false;
+      t->second.changed = true;  // so RetireOverwritten takes it for what replaces it
+      s.RetireOverwritten(t->second);
+    }
+    if (it->second.dropped) {
+      s.xpr_dropped_bytes -= it->second.size;
+    }
+    s.xprs.erase(it);
+    generation_++;
+  }
+  // Each XPR not yet given back: its textures uploaded (as a draw would;
+  // one that doesn't fit this frame's staging waits for the next), then its
+  // pages given back.
+  for (auto& [data, x] : s.xprs) {
+    if (x.dropped) {
+      continue;
+    }
+    bool all = true;
+    for (const auto& fetch : x.fetches) {
+      xenos::xe_gpu_texture_fetch_t f = ToFetch(fetch.data());
+      VkImageViewType natural = f.dimension == xenos::DataDimension::kCube
+                                    ? VK_IMAGE_VIEW_TYPE_CUBE
+                                    : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+      bool cacheable = false;
+      LookUpView(fetch.data(), natural, cacheable);
+      auto t = s.textures.find(KeyOf(fetch.data()));
+      if (t == s.textures.end()) {
+        continue;  // a format we can't draw: nothing to keep
+      }
+      if (!t->second.loaded) {
+        all = false;
+      }
+    }
+    if (!all && ++x.frames_waited < 600) {
+      continue;
+    }
+    if (!all) {
+      // Left as is (its data stays) after 600 frames of trying.
+      x.dropped = false;
+      x.fetches.clear();
+      continue;
+    }
+    for (const auto& fetch : x.fetches) {
+      if (auto t = s.textures.find(KeyOf(fetch.data())); t != s.textures.end()) {
+        t->second.kept = true;
+      }
+    }
+    uint8_t* host = PhysicalHostAddress(data);
+    uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
+    uintptr_t end = (reinterpret_cast<uintptr_t>(host) + x.size) & ~uintptr_t(0xFFF);
+    if (end > first) {
+      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+    }
+    x.dropped = true;
+    s.xpr_dropped_bytes += x.size;
+  }
 }
 
 // The textures already held that a new one's memory overlaps: the game
@@ -1090,7 +1230,14 @@ void TextureCache_RaceLeft() {
 // Called before this frame's draws, so only earlier frames can use them.
 void TextureCache::State::RetireLoaded() {
   VkDeviceSize bytes = 0;
+  // XPR textures whose data's pages were given back stay: they can't be
+  // loaded again (they leave when their XPR is released).
+  std::vector<TextureKey> kept_keys;
   for (auto& [key, t] : textures) {
+    if (t.kept) {
+      kept_keys.push_back(key);
+      continue;
+    }
     bytes += t.memory_size;
     Retire(t);
   }
@@ -1098,9 +1245,17 @@ void TextureCache::State::RetireLoaded() {
     ITC_LOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
                  bytes / 1048576.0);
   }
-  textures.clear();
+  std::erase_if(textures, [](const auto& entry) { return !entry.second.kept; });
   by_address.clear();
   longest_range = 0;
+  for (auto& [key, t] : textures) {
+    for (const auto& [address, size] : t.ranges) {
+      if (size) {
+        by_address.emplace(address, std::make_pair(size, &t));
+        longest_range = std::max(longest_range, size);
+      }
+    }
+  }
   write_snapshots.clear();
 }
 
@@ -1353,6 +1508,35 @@ VkImageView TextureCache::LookUpView(const uint32_t fetch_words[6],
       return VK_NULL_HANDLE;
     }
     t.endian = fetch.endianness;
+    if (!s.logged_dropped_miss) {
+      uint32_t start = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+      if (s.InDroppedXpr(start, start + 1)) {
+        s.logged_dropped_miss = true;
+        std::string header;
+        for (const auto& [data, x] : s.xprs) {
+          if (start < data || start >= data + x.size) {
+            continue;
+          }
+          header += std::format(" (in XPR data {:08X}-{:08X}:", data, data + x.size);
+          for (const auto& f : x.fetches) {
+            header += std::format(" [{:08X} {:08X} {:08X} {:08X} {:08X} {:08X}]", f[0], f[1], f[2],
+                                  f[3], f[4], f[5]);
+          }
+          header += ")";
+        }
+        const uint8_t* bytes = PhysicalHostAddress(start);
+        uint32_t nonzero = 0;
+        for (uint32_t i = 0; i < 65536; i++) {
+          nonzero += bytes[i] != 0;
+        }
+        ITC_LOG_ERROR("native renderer: a texture at {:08X} (format {}, {}x{}) asked for from an "
+                      "XPR whose data was given back ({} of its first 64 KB not zero); fetch "
+                      "{:08X} {:08X} {:08X} {:08X} {:08X} {:08X}{}",
+                      start, uint32_t(fetch.format), t.layout.width, t.layout.height, nonzero,
+                      fetch_words[0], fetch_words[1], fetch_words[2], fetch_words[3],
+                      fetch_words[4], fetch_words[5], header);
+      }
+    }
     if (!s.CreateTexture(t)) {
       return VK_NULL_HANDLE;
     }

@@ -1,5 +1,9 @@
 // The XPR object (see xpr.h), store for store as the recompiled functions.
 
+#include <array>
+#include <vector>
+#include "memory/heap.h"
+#include "native/textures.h"
 #include "models/xpr.h"
 
 #include "base/log.h"
@@ -55,6 +59,7 @@ std::optional<uint32_t> XprRelease(uint32_t xpr) {
   x.set_header_size(0u);
   uint32_t r3 = data;
   if (data != 0) {
+    native::TextureCache_XprReleased(data);
     Require(FreePhysicalLater(data, kXprDataAttributes), "Memory::FreePhysicalLater");
     r3 = kMemoryBlocksLock;
   }
@@ -157,7 +162,10 @@ std::optional<uint32_t> XprCreate(uint32_t xpr, uint32_t file) {
   const uint32_t header_bytes = x.header_size();
   x.set_data_size(data_bytes);
   x.set_header_block(AllocVirtual(header_bytes));
-  const uint32_t data = AllocPhysical(x.data_size(), kXprDataAllocation);
+  const uint32_t data = [&] {
+    memory::PhysicalTag tag("XPR textures");
+    return AllocPhysical(x.data_size(), kXprDataAllocation);
+  }();
   x.set_data_block(data);
   if (data == 0) {
     DebugMessage(0x8206CDFC);
@@ -172,14 +180,29 @@ std::optional<uint32_t> XprCreate(uint32_t xpr, uint32_t file) {
   // which joins the block with its records).
   x.set_record_count(schema::XprRecord(header).type());
   x.set_records(header + 4);
+  // Each texture's fetch constant (its header's +28, six words), for the
+  // renderer, which uploads them and gives the data's pages back
+  // (docs/pc-renderer.md, step 2b): only when every record is a texture.
+  std::vector<std::array<uint32_t, 6>> fetches;
+  bool textures_only = true;
   for (uint32_t i = 0; i < x.record_count(); i++) {
     schema::XprRecord record(x.records().address + schema::XprRecord::kSize * i);
     record.set_name(record.name() + x.header_block());
     record = schema::XprRecord(x.records().address + schema::XprRecord::kSize * i);
     if ((record.type() & 0xFFFF0000u) == kTextureTag) {
       const uint32_t to = x.data_block();
-      RelocateTexture(record.header_offset() + x.header_block(), to, to);
+      const uint32_t texture = record.header_offset() + x.header_block();
+      RelocateTexture(texture, to, to);
+      std::array<uint32_t, 6>& fetch = fetches.emplace_back();
+      for (uint32_t w = 0; w < 6; w++) {
+        fetch[w] = guest::LoadU32(texture + 28 + 4 * w);
+      }
+    } else {
+      textures_only = false;
     }
+  }
+  if (textures_only && !fetches.empty() && x.data_block() != 0) {
+    native::TextureCache_XprLoaded(x.data_block(), x.data_size(), std::move(fetches));
   }
   return 0;
 }
