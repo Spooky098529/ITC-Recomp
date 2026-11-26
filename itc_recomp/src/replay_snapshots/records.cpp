@@ -139,7 +139,7 @@ void Member1136Restore(uint32_t part, uint32_t vehicle) {
   const schema::Vehicle to(vehicle);
   const Physics p(part);
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(to.body_row1_address() * i, p.body_row0_address() + 16 * i);
+    Vec4(to.body_row0_address() + 16 * i, p.body_row0_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
     FloatWord(to.speed_address() + 4 * i, p.speed_address() + 4 * i);
@@ -390,7 +390,7 @@ void Member1136Save(uint32_t part, uint32_t vehicle) {
   const schema::Vehicle from(vehicle);
   const Physics p(part);
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(p.body_row0_address() + 16 * i, from.body_row1_address() * i);
+    Vec4(p.body_row0_address() + 16 * i, from.body_row0_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
     FloatWord(p.speed_address() + 4 * i, from.speed_address() + 4 * i);
