@@ -103,7 +103,9 @@ Vulkan 1.3, and why not OpenGL.
 game's shaders as GLSL with PC inputs (from SBX-Recomp's tool, with its
 author's OK); `docs/conventional-renderer.md`, the first attempt, is a dead
 end kept for its research. Step 0 (`--log_memory_use`) measured ~1.9 GB of
-system memory, 1.09 GB of it the renderer's two mirrors.
+system memory, 1.09 GB of it the renderer's two mirrors; step 1 replaced
+the mirrors with a device-local vertex arena (`src/native/vertex_arena.*`):
+GTT ~1,690 -> ~630 MB.
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core
@@ -930,7 +932,6 @@ cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share \
   $B/itc --native_audio=true \
-  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
@@ -941,10 +942,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   (`itc.toml`'s settings and the defaults; the flags it spells out are on
   by default now): always `--native_audio=true` (without it the SDK's
   Audio Worker spins on a core and frame rates come out lower than players
-  get) and the mirrors updated once a frame
-  (`--native_renderer_mirror_by_tick=true
-  --native_renderer_mirror_to_both=true`; `=false` on the first for the
-  old per-draw mirror). `profile_render_thread.sh` does the same.
+  get). `profile_render_thread.sh` does the same. (The mirror flags,
+  `--native_renderer_mirror_by_tick` and `_to_both`, went with the mirrors
+  on `pc-renderer`, 2026-11-26: the game rejects them now.)
 - For logs to read (frame rate, where each frame's time goes, each busy
   thread's CPU use), add `--log_level=info --log_fps=true
   --log_frame_times=true --log_thread_cpu=true`.

@@ -1,4 +1,4 @@
-# A PC renderer (a plan; step 0 done)
+# A PC renderer (a plan; steps 0 and 1 done)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -220,8 +220,9 @@ the user before the next. No profiles until the end.
 | Step | What | Removes | Size |
 |---|---|---|---|
 | **0** | **Measure.** Log resident memory by source (the physical block's touched pages, the two copies, texture staging) and the renderer's GPU memory, in a race and the menus; a frame dump baseline | Nothing | Small |
-| **1** | **The shaders.** Bring in SBX's tool (its author's OK given, below); run it over our `BUILD_OUT` and course archives and the boot shaders, and compare hashes with their table; take their hand-written GLSL and give it PC inputs (vertex attributes, constants by name, plain textures). In this step the renderer binds the 512 MB copy itself as the vertex buffer with each stream's guest address as the offset, so the shaders change before the buffers do | The SDK translator on the draw path, the shader patch, `xe_vfetch` | Large |
-| **2** | **Resources by handle.** Textures and buffers made, filled and freed where the game does it; device-local, uploaded once; bound by handle. CPU-read data keeps its system copy and its writers announce changes | The 512 MB copies, memcpy's tracking, texture reloads by overlap; most GPU data in the physical block | Medium |
+| **1** | **The vertex arena** (done 2026-11-26, below; moved ahead of the shaders: the translated shaders read each stream at its fetch constant's address, which a draw can point anywhere). One device-local buffer holding the ranges draws use, copied from physical memory at their first draw and again after memcpy writes them | The 512 MB mirrors, their diagnostics and flags | Medium |
+| **2** | **The shaders.** Bring in SBX's tool (its author's OK given, below); run it over our `BUILD_OUT` and course archives and the boot shaders, and compare hashes with their table; take their hand-written GLSL and give it PC inputs (vertex attributes, constants by name, plain textures), with the vertex data byte-swapped and its components in PC order where it's uploaded | The SDK translator on the draw path, the shader patch, `xe_vfetch` | Large |
+| **2b** | **Resources by handle.** Textures and buffers made, filled and freed where the game does it; uploaded once into GPU memory, bound by handle; the GPU data written into the physical block only where the CPU reads it | memcpy's tracking, texture reloads by overlap; most GPU data in the physical block | Medium |
 | **3** | **The handlers call our interface.** The 33 handlers and the singles in play call `render/` directly | The register shadow on the render path, `ReadRegisters`, the dirty masks, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp`, the packets, the lifted shader load | Large |
 | **4** | **Passes into their textures.** The resolves classified and replaced (above); render targets as textures | The EDRAM allocator, resolve copies but grab passes, the tiling machinery | Medium |
 | **5** | **Clean-up.** The SDK translator and the `rexglue-sdk/` submodule out of the build; the physical block shrunk to what's left in it; step 0's measures again, and the one profile | ReXGlue entirely | Small |
@@ -261,6 +262,42 @@ generously and can shrink with the steps.
 The frame dump baseline is an attract race's dump (`--native_renderer_dump`,
 10 s in), kept locally in `itc_recomp/out/pc-renderer-baseline/`: 2,390
 draws, 24 resolves.
+
+## Step 1: the vertex arena (2026-11-26)
+
+`src/native/vertex_arena.{h,cpp}`. One device-local buffer (224 MB: the
+built-in index lists for rectangle and quad lists, 16 MB of inline vertices
+a frame slot, 192 MB of ranges) in place of the two 544 MB host-visible
+mirrors:
+
+- A draw places each stream its vertex shader reads, by its fetch
+  constant's address and size (no draw reads past the size: checked with
+  the old per-draw mirror's overrun count, none in an attract race), and
+  its index range; the fetch constants handed to the shaders get the
+  arena offsets in place of the addresses, and the index buffer is bound
+  at its range's offset. Inline draws copy their vertices into this frame's
+  slot.
+- Copies go through per-frame staging (16 MB, more chunks while a load
+  needs them) and a command buffer submitted after the texture uploads,
+  before the frame; it starts with a barrier on earlier frames' reads, so
+  a range copied again in place waits for the draws still reading it.
+- memcpy's writes into physical memory (`Buffers_TakeMirrorWrites`, at each
+  frame's start) mark the ranges they overlap; those are copied again at
+  their next draw. Ranges not drawn for 900 frames are given back (once no
+  frame in flight can read them), sooner when it's full.
+- Gone with the mirrors: `--native_renderer_mirror_by_tick`, `_to_both`,
+  `_verify_mirror`, `_check_mirror`, `_copy_all`, `_check_late_writes`,
+  `_check_clobbers`, `_cache_index_ranges`, `_log_index_ranges` (the run
+  scripts and CLAUDE.md no longer pass the first two).
+
+Checked: attract races (`itc_5957`, 60 s; 0 error lines, 0 draws left
+out), the pad replay (`itc_5959`, menus and a race, 126 s, 0 error
+lines), a frame dump against step 0's (`draws.txt` the same length, 2,390
+draws; the shown frame 0.08% of pixels off by more than 0.02, within runs'
+spread; a resolve identical). The arena holds ~14-25 MB of ranges in ~1,500.
+**GTT ~1,690 -> ~630 MB** (whole card; idle 346 MB): the game's pinned
+system memory from ~1,345 to ~285 MB (texture staging 128 MB, the constant
+rings 128 MB, the arena's staging 32 MB).
 
 ## Open questions
 

@@ -1,5 +1,6 @@
 #include <format>
 #include "passes.h"
+#include "vertex_arena.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -183,23 +184,10 @@ constexpr uint32_t kFloatConstantsRange = 256 * 16;
 constexpr uint32_t kBoolLoopConstantsRange = 40 * 4;
 constexpr uint32_t kFetchConstantsRange = 32 * 6 * 4;
 
-// Past guest memory, each mirror holds data of ours that the translated
-// shaders and draws read like guest memory: built-in index buffers, then
-// the frame's inline vertices (an inline draw's vertex fetch constant
-// points there; the translator doesn't mask the address).
-constexpr uint32_t kBuiltinPrimitives = 4096;
-// Rectangle lists as two-triangle strips (the translator's
-// kRectangleListAsTriangleStrip): 32-bit, rectangle << 2 | corner, with
-// restarts between rectangles, as the plugin's built-in index buffer.
-constexpr uint32_t kRectangleIndices = kPhysicalMemorySize;
-constexpr uint32_t RectangleIndexCount(uint32_t rectangles) {
-  return 4 * rectangles + (std::max(rectangles, 1u) - 1);
-}
-// Quad lists as triangle lists, 32-bit: (v0, v1, v2), (v0, v2, v3) a quad.
-constexpr uint32_t kQuadIndices = kRectangleIndices + 4 * RectangleIndexCount(kBuiltinPrimitives);
-constexpr uint32_t kInlineVertices = kQuadIndices + 4 * 6 * kBuiltinPrimitives;
-constexpr uint32_t kInlineVerticesSize = 32u << 20;
-constexpr VkDeviceSize kMirrorSize = VkDeviceSize(kInlineVertices) + kInlineVerticesSize;
+// The built-in index lists (rectangle and quad lists) live in the vertex
+// arena (vertex_arena.h), with the frame's inline vertices.
+constexpr uint32_t kRectangleIndices = VertexArena::kRectangleIndices;
+constexpr uint32_t kQuadIndices = VertexArena::kQuadIndices;
 
 // An inline draw's vertices: vertex fetch constant 95 (stream 0), as the
 // library's BeginVertices (sub_825BD8F0) writes it into the command buffer
@@ -213,7 +201,7 @@ struct DrawCall {
   // Command 18: the item's base vertex << 16 | start index, and its
   // primitive count.
   uint32_t base_start = 0, primitive_count = 0;
-  // Inline vertices: their count, copied to vertex_address in the mirror.
+  // Inline vertices: their count, and their offset in the vertex arena.
   bool inline_vertices = false;
   uint32_t vertex_count = 0, vertex_address = 0;
 };
@@ -667,56 +655,11 @@ struct Passes::State {
   VkExtent2D shown_extent{kShownWidth, kShownHeight};
   VkExtent2D main_view_extent{kMainViewWidth, kMainViewHeight};
 
-  // Mirrors of guest physical memory at the same offsets: the shaders'
-  // storage buffer (set 0) and the index buffer. The driver won't import
-  // guest memory itself (a shared memory-file mapping), so each draw's
-  // index and vertex ranges are copied in, once a frame. One per frame in
-  // flight: with one shared, the next frame's copies overwrote vertices the
-  // GPU was still drawing (buildings showing a rainbow texture).
-  struct GuestMirror {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    uint8_t* mapped = nullptr;
-    VkDescriptorSet set = VK_NULL_HANDLE;
-    // Each range copied in (address << 32 | size): the memcpy write
-    // sequence (Buffers_Sequence) when it was copied.
-    std::unordered_map<uint64_t, uint64_t> copied;
-  };
-  std::vector<GuestMirror> mirrors;
-  // With mirror_by_tick (two mirrors; "Hypothesis to test: the mirrors
-  // updated once a tick" in docs/native-renderer.md): draws read the front
-  // mirror, swapped only as a logic pass's list starts replaying; memcpy's
-  // writes are applied at frame starts to the other mirror, which no frame
-  // in flight reads, and each mirror keeps the writes it hasn't had yet.
-  // Inline vertices get a part of their region per frame slot.
-  bool mirror_by_tick = false, mirror_to_both = false;
-  uint32_t front_mirror = 0;
-  std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
-  // The writes the front mirror hasn't had, sorted by start, to count drawn
-  // ranges it's missing data of (memcpy being the only writer).
-  std::vector<std::pair<uint32_t, uint32_t>> front_missing;
-  uint32_t front_missing_longest = 0;
-  struct MirrorByTickStats {
-    uint64_t frames = 0, swaps = 0, writes = 0, bytes = 0;
-    uint64_t stale[2] = {}, stale_bytes[2] = {};  // [render-only list]
-    uint64_t stale_lines = 200;
-  } by_tick;
-  // The mirror this frame's draws read.
-  GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
-  // Whether draws work out their vertex and index ranges and pass them to
-  // Mirror: always, except with mirror_by_tick and none of the mirror's
-  // diagnostics (then the mirror needs nothing from draws).
-  bool MirrorPerDraw() const {
-    return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
-           check_clobbers || verify_mirror || log_index_ranges ||
-           Buffers_Logging() || Buffers_LogPhysicalWrites();
-  }
-  uint32_t inline_slot_size() const {
-    return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
-  }
-  void MirrorByTickFrameStart();
-  std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
-  uint32_t inline_offset = 0;  // this frame's inline vertices so far
+  // The vertex and index data draws read (set 0 and the index buffer):
+  // device-local, the ranges draws use copied in (docs/pc-renderer.md
+  // step 1).
+  VertexArena arena;
+  VkDescriptorSet arena_set = VK_NULL_HANDLE;
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
@@ -836,12 +779,6 @@ struct Passes::State {
   bool cache_index_ranges = true;
   // IndexRange's result for the draw's indices, from index_cache when it
   // holds.
-  // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
-  // index range (kNewestUnknown if it didn't ask), for Mirror.
-  uint64_t draw_index_newest = kNewestUnknown;
-  std::pair<uint32_t, uint32_t> DrawIndexRange(uint32_t address, uint32_t count,
-                                               bool index_32bit, uint32_t endian,
-                                               bool skip_restart);
   // With log_index_ranges: each draw's index range (address, count and
   // format) as last scanned, to see how often a scan could be reused (the
   // range not written by memcpy since) and whether the reused result would
@@ -862,8 +799,6 @@ struct Passes::State {
     uint64_t frame_sequence = 0;  // Buffers_Sequence at the frame's start
     uint32_t mismatch_sample[6] = {};  // address, count, cached low/high, scanned low/high
   } index_range_counts;
-  void CountIndexRange(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
-                       bool skip_restart, uint32_t low, uint32_t high);
   // With log_texture_bindings: how much of texture binding repeats, to
   // judge caching it (TakeTextureBindings describes it). A binding repeats
   // its fetch constant's last when the words (and view type, or filter
@@ -1210,14 +1145,6 @@ struct Passes::State {
   bool CreateMovieResources(VkExtent2D extent);
   VkPipeline GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples);
   void EndRendering(VkCommandBuffer commands);
-  bool CreateGuestMemoryMirror();
-  bool CreateGuestMemoryMirror(GuestMirror& mirror);
-  // `newest`: Buffers_NewestWrite's answer for exactly this range if the
-  // caller has just asked it (kNewestUnknown otherwise), to not ask twice.
-  static constexpr uint64_t kNewestUnknown = ~uint64_t(0);
-  void Mirror(uint32_t address, uint32_t size, bool index,
-              uint64_t newest = kNewestUnknown);
-  void CheckClobbers(uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
   bool CreateTexturePool(Ring& ring);
@@ -1304,366 +1231,6 @@ bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType vi
   view.format = format;
   view.subresourceRange = {aspect, 0, 1, 0, layers};
   return vk::vkCreateImageView(device, &view, nullptr, &out.view) == VK_SUCCESS;
-}
-
-bool Passes::State::CreateGuestMemoryMirror() {
-  mirrors.resize(frames_in_flight);
-  for (GuestMirror& mirror : mirrors) {
-    if (!CreateGuestMemoryMirror(mirror)) {
-      return false;
-    }
-  }
-  ITC_LOG_INFO("native renderer: {} guest memory mirrors of {} MB", mirrors.size(),
-               kPhysicalMemorySize >> 20);
-  return true;
-}
-
-bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
-  VkDevice device = context.device;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = kMirrorSize;
-  info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &mirror.buffer) != VK_SUCCESS) {
-    return false;
-  }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, mirror.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX) {
-    ITC_LOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
-    return false;
-  }
-  if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &mirror.memory);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
-    return false;
-  }
-  gpu_memory::Allocated(gpu_memory::Kind::kMirror, alloc.allocationSize);
-  {
-    // Where the mirror lives (docs/pc-renderer.md step 0): without the
-    // device-local bit, system memory the driver pins (not in the process's
-    // resident set).
-    VkMemoryPropertyFlags flags =
-        memory_properties.memoryTypes[alloc.memoryTypeIndex].propertyFlags;
-    ITC_LOG_INFO("native renderer: guest memory mirror of {} MB in memory type {} ({}device-local, "
-                 "heap {})",
-                 alloc.allocationSize >> 20, alloc.memoryTypeIndex,
-                 (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "" : "not ",
-                 memory_properties.memoryTypes[alloc.memoryTypeIndex].heapIndex);
-  }
-  if (vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&mirror.mapped)) != VK_SUCCESS) {
-    return false;
-  }
-  // The built-in index buffers.
-  uint32_t* rectangles = reinterpret_cast<uint32_t*>(mirror.mapped + kRectangleIndices);
-  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
-    if (i) {
-      *rectangles++ = UINT32_MAX;
-    }
-    for (uint32_t j = 0; j < 4; j++) {
-      *rectangles++ = i << 2 | j;
-    }
-  }
-  uint32_t* quads = reinterpret_cast<uint32_t*>(mirror.mapped + kQuadIndices);
-  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
-    for (uint32_t j : {0u, 1u, 2u, 0u, 2u, 3u}) {
-      *quads++ = 4 * i + j;
-    }
-  }
-  return true;
-}
-
-void Passes::State::Mirror(uint32_t address, uint32_t size, bool index,
-                           uint64_t newest) {
-  if (!size || address >= kPhysicalMemorySize) {
-    return;
-  }
-  if (size > kPhysicalMemorySize - address) {
-    size = kPhysicalMemorySize - address;
-    newest = kNewestUnknown;  // asked of a larger range
-  }
-  uint64_t key = (uint64_t(address) << 32) | size;
-  if (check_mirror) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
-    auto [it, added] = mirrored_hashes.try_emplace(key, hash);
-    if (!added && it->second != hash) {
-      it->second = hash;
-      stats.mirror_rewritten++;
-      stats.mirror_rewritten_bytes += size;
-      if (!stats.mirror_rewritten_sample_size) {
-        stats.mirror_rewritten_sample_address = address;
-        stats.mirror_rewritten_sample_size = size;
-      }
-    }
-  }
-  if (log_index_ranges) {
-    index_range_counts.mirror_calls++;
-  }
-  if (!mirrored.insert(key).second) {
-    if (log_index_ranges) {
-      index_range_counts.mirror_repeats++;
-    }
-    return;  // already copied this frame
-  }
-  if (Buffers_Logging()) {
-    Buffers_OnMirror(address, size, index);
-  }
-  if (Buffers_LogPhysicalWrites()) {
-    Buffers_OnDrawnRange(address, size, index);
-  }
-  if (check_late_writes) {
-    // Hashed again at the end of the frame.
-    copied_ranges.push_back({address, size, base::Hash64(PhysicalHostAddress(address), size),
-                             index, current_vertex_shader});
-  }
-  if (check_clobbers) {
-    CheckClobbers(address, size, index);
-  }
-  if (check_mirror_frames) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
-    auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
-    if (added) {
-      mirror_new_bytes += size;
-    } else if (it->second.hash != hash) {
-      it->second.hash = hash;
-      it->second.changes++;
-      mirror_changed_bytes += size;
-    }
-    if (!index) {
-      mirror_vertex_bytes += size;
-    }
-  }
-  if (mirror_by_tick) {
-    // The mirror has memcpy's writes as of the last logic pass's list (or,
-    // with mirror_to_both, as of this frame's start). With verify_mirror,
-    // the drawn ranges it misses a write of (memcpy being the only writer;
-    // comparing with guest memory slows frames below the tick).
-    if (!verify_mirror) {
-      return;
-    }
-    stats.mirror_checked++;
-    uint32_t end = address + size;
-    auto it = std::lower_bound(
-        front_missing.begin(), front_missing.end(),
-        std::make_pair(address > front_missing_longest ? address - front_missing_longest : 0, 0u));
-    for (; it != front_missing.end() && it->first < end; ++it) {
-      if (it->second <= address) {
-        continue;
-      }
-      bool render_only = !Renderer_ReplayingLogicList();
-      by_tick.stale[render_only]++;
-      by_tick.stale_bytes[render_only] += size;
-      stats.mirror_stale++;
-      stats.mirror_stale_bytes += size;
-      if (by_tick.stale_lines) {
-        by_tick.stale_lines--;
-        ITC_LOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
-                     "bytes) misses a write to {:08X}-{:08X}",
-                     by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
-                     index ? "index" : "vertex", address, size, it->first, it->second);
-      }
-      break;
-    }
-    return;
-  }
-  // Only what memcpy has written since this mirror last got the range (see
-  // "Buffers" in docs/native-renderer.md): vertex and index data is
-  // written by the library's memcpy and nothing else.
-  GuestMirror& mirror = mirrors[frame];
-  if (!copy_all) {
-    auto [it, added] = mirror.copied.try_emplace(key, 0);
-    if (log_index_ranges && !added) {
-      // No write taken since the copy (Buffers_NewestWrite takes the
-      // pending ones): the answer is known without the lookup.
-      index_range_counts.newest_asked++;
-      Buffers_NewestWrite(address, size);
-      if (Buffers_Sequence() == it->second) {
-        index_range_counts.nothing_taken++;
-      }
-    }
-    if (!added && (newest != kNewestUnknown ? newest : Buffers_NewestWrite(address, size)) <=
-                      it->second) {
-      stats.mirror_skipped_bytes += size;
-      // Slow (the mirror is uncached memory: ~20 fps in a race), but
-      // checks every range every frame.
-      if (verify_mirror &&
-          (stats.mirror_checked++,
-           std::memcmp(mirror.mapped + address, PhysicalHostAddress(address), size))) {
-        stats.mirror_stale++;
-        stats.mirror_stale_bytes += size;
-        if (!stats.mirror_stale_sample_size) {
-          stats.mirror_stale_sample_address = address;
-          stats.mirror_stale_sample_size = size;
-          stats.mirror_stale_sample_index = index;
-        }
-      }
-      return;
-    }
-    it->second = Buffers_Sequence();
-  }
-  std::memcpy(mirror.mapped + address, PhysicalHostAddress(address), size);
-  stats.mirrored_bytes += size;
-}
-
-void Passes::State::MirrorByTickFrameStart() {
-  by_tick.frames++;
-  mirror_taken.clear();
-  Buffers_TakeMirrorWrites(mirror_taken);
-  for (auto& pending : mirror_pending) {
-    pending.insert(pending.end(), mirror_taken.begin(), mirror_taken.end());
-  }
-  // The back mirror: no frame in flight reads it. It was last read by the
-  // frame before it stopped being the front, which, with two frames in
-  // flight, is done by now (this frame slot's fence has been waited on) as
-  // long as the front changed in an earlier frame than this one.
-  uint32_t back = front_mirror ^ 1;
-  auto apply = [&](uint32_t m) {
-    for (auto [start, end] : mirror_pending[m]) {
-      end = std::min(end, kPhysicalMemorySize);
-      if (start < end) {
-        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(start), end - start);
-        by_tick.writes++;
-        by_tick.bytes += end - start;
-      }
-    }
-    mirror_pending[m].clear();
-  };
-  apply(back);
-  // With mirror_to_both, the front too: frames in flight read it, but no
-  // write has been seen landing in data a frame drew around it
-  // (--native_renderer_log_physical_writes).
-  if (mirror_to_both) {
-    apply(front_mirror);
-  }
-  if (Renderer_ReplayingLogicList()) {
-    front_mirror = back;
-    by_tick.swaps++;
-  }
-  front_missing.clear();
-  front_missing_longest = 0;
-  for (auto [start, end] : verify_mirror ? mirror_pending[front_mirror]
-                                          : std::vector<std::pair<uint32_t, uint32_t>>{}) {
-    end = std::min(end, kPhysicalMemorySize);
-    if (start < end) {
-      front_missing.emplace_back(start, end);
-      front_missing_longest = std::max(front_missing_longest, end - start);
-    }
-  }
-  std::sort(front_missing.begin(), front_missing.end());
-}
-
-std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint32_t address,
-                                                            uint32_t count, bool index_32bit,
-                                                            uint32_t endian, bool skip_restart) {
-  if (!cache_index_ranges) {
-    return IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
-                      skip_restart);
-  }
-  uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
-  IndexRangeCache::Entry& entry = index_cache.Find(key);
-  std::pair<uint32_t, uint32_t> range;
-  if (entry.key && entry.frame != mirror_frames) {
-    draw_index_newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
-  }
-  if (entry.key && (entry.frame == mirror_frames || draw_index_newest <= entry.sequence)) {
-    entry.frame = mirror_frames;
-    range = {entry.low, entry.high};
-    return range;
-  }
-  // Writes not yet taken get later sequences, so the entry is scanned again
-  // once they are.
-  uint64_t sequence = Buffers_Sequence();
-  range = IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
-                     skip_restart);
-  if (!entry.key) {
-    index_cache.Added();
-  }
-  entry = {key, sequence, mirror_frames, range.first, range.second};
-  return range;
-}
-
-void Passes::State::CountIndexRange(uint32_t address, uint32_t count, bool index_32bit,
-                                    uint32_t endian, bool skip_restart, uint32_t low,
-                                    uint32_t high) {
-  IndexRangeCounts& c = index_range_counts;
-  c.scans++;
-  c.indices += count;
-  // A draw's count is far below 2^28, leaving room for the format.
-  uint64_t key = (uint64_t(address) << 32) | (count & 0x0FFFFFFFu) |
-                 (uint64_t(index_32bit) << 28) | (uint64_t(endian & 3) << 29) |
-                 (uint64_t(skip_restart) << 31);
-  uint64_t newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
-  auto [it, added] = index_ranges_seen.try_emplace(
-      key, IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames});
-  if (added) {
-    c.first++;
-    c.distinct++;
-    return;
-  }
-  IndexRangeSeen& seen = it->second;
-  if (seen.frame == mirror_frames) {
-    c.same_frame++;
-  } else {
-    c.distinct++;
-  }
-  if (newest > seen.sequence) {
-    c.written++;
-  } else {
-    c.unchanged++;
-    c.unchanged_indices += count;
-    if (seen.low != low || seen.high != high) {
-      if (!c.mismatched++) {
-        uint32_t sample[] = {address, count, seen.low, seen.high, low, high};
-        std::copy(std::begin(sample), std::end(sample), c.mismatch_sample);
-      }
-    }
-  }
-  seen = IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames};
-}
-
-void Passes::State::CheckClobbers(uint32_t address, uint32_t size, bool index) {
-  // Earlier ranges overlapping this one: the mirror holds what their draws
-  // copied (the last copy of each byte); bytes differing from guest memory
-  // now are about to be replaced under them.
-  clobber_copies++;
-  uint32_t end = address + size;
-  uint32_t from = address > clobber_longest ? address - clobber_longest : 0;
-  const uint8_t* mirror = draw_mirror().mapped;
-  const uint8_t* guest = PhysicalHostAddress(0);
-  for (auto it = clobber_ranges.lower_bound(from);
-       it != clobber_ranges.end() && it->first < end; ++it) {
-    uint32_t lo = std::max(address, it->first), hi = std::min(end, it->second.end);
-    if (lo >= hi || !std::memcmp(mirror + lo, guest + lo, hi - lo)) {
-      continue;
-    }
-    uint32_t differing = 0, first = 0;
-    for (uint32_t a = lo; a < hi; a++) {
-      if (mirror[a] != guest[a]) {
-        first = differing++ ? first : a;
-      }
-    }
-    clobbers++;
-    clobbered_bytes += differing;
-    clobbers_by_shaders[{it->second.vertex_shader, it->second.pixel_shader, current_vertex_shader,
-                         current_pixel_shader}]++;
-    if (clobber_sample.empty()) {
-      clobber_sample = std::format(
-          "{} {:08X}-{:08X} of vs {:016X} ps {:016X} by {} {:08X}-{:08X} of vs {:016X} ps "
-          "{:016X}: {} bytes differ from {:08X}",
-          it->second.index ? "index" : "vertex", it->first, it->second.end,
-          it->second.vertex_shader, it->second.pixel_shader, index ? "index" : "vertex", address,
-          end, current_vertex_shader, current_pixel_shader, differing, first);
-    }
-  }
-  clobber_ranges.insert({address, {end, index, current_vertex_shader, current_pixel_shader}});
-  clobber_longest = std::max(clobber_longest, size);
 }
 
 bool Passes::State::CreateRings() {
@@ -1799,13 +1366,13 @@ bool Passes::State::CreateDescriptors() {
   alloc.descriptorPool = pool;
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &shared_memory_layout;
-  for (GuestMirror& mirror : mirrors) {
-    if (vk::vkAllocateDescriptorSets(device, &alloc, &mirror.set) != VK_SUCCESS) {
-      return false;
-    }
-    VkDescriptorBufferInfo shared_buffer{mirror.buffer, 0, VK_WHOLE_SIZE};
+  if (vk::vkAllocateDescriptorSets(device, &alloc, &arena_set) != VK_SUCCESS) {
+    return false;
+  }
+  {
+    VkDescriptorBufferInfo shared_buffer{arena.buffer(), 0, VK_WHOLE_SIZE};
     VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write.dstSet = mirror.set;
+    write.dstSet = arena_set;
     write.dstBinding = 0;
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -3181,7 +2748,7 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
-  if (!s.CreateGuestMemoryMirror()) {
+  if (!s.arena.Init(context, frames_in_flight)) {
     return false;
   }
   const std::string& gamma = ITC_FLAG(xbox_gamma);
@@ -3304,13 +2871,8 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.main_view = nullptr;
   s.front = nullptr;
   s.frame_resolves.clear();
-  s.mirrored.clear();
-  s.used_mirrored.clear();
-  s.mirror_frames++;
-  if (s.mirror_by_tick) {
-    Buffers_KeepSegments(s.MirrorPerDraw());
-    s.MirrorByTickFrameStart();
-  }
+  Buffers_KeepSegments(false);
+  s.arena.BeginFrame(frame_index);
   if (Buffers_LogPhysicalWrites()) {
     Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
   }
@@ -3320,19 +2882,6 @@ void Passes::BeginFrame(uint32_t frame_index) {
   if (s.log_shader_lookups) {
     s.lookup_counts.frames++;
   }
-  if (s.log_index_ranges) {
-    // Writes taken since the last frame's start (memcpy's, into the
-    // physical views).
-    Buffers_NewestWrite(0, 0);
-    State::IndexRangeCounts& c = s.index_range_counts;
-    c.frames++;
-    c.writes += Buffers_Sequence() - c.frame_sequence;
-    c.frame_sequence = Buffers_Sequence();
-  }
-  s.inline_offset = 0;
-  s.mirrored_hashes.clear();
-  s.clobber_ranges.clear();
-  s.clobber_longest = 0;
   s.id_draws.clear();
   s.id_drawn = false;
   s.watched_this_frame.clear();
@@ -3352,6 +2901,14 @@ void Passes::BeginFrame(uint32_t frame_index) {
 
 VkCommandBuffer Passes::EndUploads() {
   return state_->textures.EndUploads();
+}
+
+VkCommandBuffer Passes::EndBufferUploads() {
+  return state_->arena.EndUploads();
+}
+
+std::string Passes::TakeArenaStats() {
+  return state_->arena.TakeStats();
 }
 
 void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
@@ -3611,23 +3168,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (log_glow && pixel && pixel->hash == kGlowCrossFade) {
     glow_frame.cross_fades++;
     glow_frame.constants.clear();
-    if (call.inline_vertices) {
-      // Its weight: the vertices' color alpha (the shader outputs the
-      // history times the color, and the color's alpha).
-      // In the mirror past guest memory, in the guest's byte order.
-      const uint8_t* vertices = draw_mirror().mapped;
-      auto vertex_float = [vertices](uint32_t address) {
-        uint32_t v;
-        std::memcpy(&v, vertices + address, 4);
-        return std::bit_cast<float>(__builtin_bswap32(v));
-      };
-      glow_frame.constants += std::format(
-          "vertex color {:.4g} {:.4g} {:.4g} {:.4g}; ",
-          vertex_float(call.vertex_address + 16),
-          vertex_float(call.vertex_address + 20),
-          vertex_float(call.vertex_address + 24),
-          vertex_float(call.vertex_address + 28));
-    }
     for (uint32_t c = 0; c < 256; c++) {
       if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
         uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
@@ -3702,42 +3242,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
 
   uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
-  s.draw_index_newest = State::kNewestUnknown;
   if (call.inline_vertices) {
     min_vertex = 0;
     max_vertex = call.vertex_count - 1;
-  }
-  bool mirror_per_draw = s.MirrorPerDraw();
-  if (!call.inline_vertices && index_count && mirror_per_draw) {
-    bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
-    auto [low, high] = s.DrawIndexRange(index_address, index_count, index_32bit,
-                                        index_endian, skip_restart);
-    if (s.log_index_ranges) {
-      s.CountIndexRange(index_address, index_count, index_32bit, index_endian, skip_restart, low,
-                        high);
-    }
-    if (low <= high) {
-      // After the base vertex, as the GPU reads them. Adding it to the
-      // extremes keeps their order unless the sum wraps (a negative base
-      // vertex under some index), where each index is taken again.
-      int64_t low_sum = int64_t(int32_t(low)) + base_vertex;
-      int64_t high_sum = int64_t(int32_t(high)) + base_vertex;
-      if (low_sum >= 0 && high_sum <= INT32_MAX && int32_t(low) >= 0 && int32_t(high) >= 0) {
-        min_vertex = uint32_t(low_sum);
-        max_vertex = uint32_t(high_sum);
-      } else {
-        for (uint32_t i = 0; i < index_count; i++) {
-          auto [index, unused] = IndexRange(PhysicalHostAddress(index_address) +
-                                                (index_32bit ? 4 : 2) * i,
-                                            1, index_32bit, index_endian, skip_restart);
-          if (index == UINT32_MAX && !unused) {
-            continue;  // the restart index
-          }
-          max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
-          min_vertex = std::min(min_vertex, uint32_t(int32_t(index) + base_vertex));
-        }
-      }
-    }
   }
   // System constants (as the plugin's UpdateSystemConstantValues, for what
   // these draws use).
@@ -3851,7 +3358,37 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   // Why the fetch block changed (log_constant_changes): in the fetch
   // constants the shaders read (textures, vertices), or only in others.
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  // The draw's vertex streams and indices in the vertex arena: each stream
+  // the vertex shader reads gets its range's arena offset in place of the
+  // address (word 0, low 2 bits the type; word 1 bits 2-25 the size in
+  // words). An inline draw's stream points into the arena already.
+  uint32_t arena_fetch[kFetchConstantsRange / 4];
+  std::memcpy(arena_fetch, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0],
+              kFetchConstantsRange);
+  uint32_t index_offset = 0;
+  if (!call.inline_vertices) {
+    for (uint32_t k = 0; k < 96; k++) {
+      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+        continue;
+      }
+      uint32_t word0 = arena_fetch[2 * k];
+      uint32_t size = ((arena_fetch[2 * k + 1] >> 2) & 0xFFFFFFu) * 4;
+      uint32_t offset = s.arena.Place(word0 & 0x1FFFFFFCu, size);
+      if (offset == UINT32_MAX) {
+        s.stats.failed++;
+        s.stats.failed_by[7]++;
+        return;
+      }
+      arena_fetch[2 * k] = offset | (word0 & 3);
+    }
+    index_offset = s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2));
+    if (index_offset == UINT32_MAX) {
+      s.stats.failed++;
+      s.stats.failed_by[7]++;
+      return;
+    }
+  }
+  const uint32_t* fetch = arena_fetch;
   if (s.log_constant_changes && s.last_constants.valid[4] &&
       s.last_constants.sizes[4] == kFetchConstantsRange) {
     const uint32_t* last = reinterpret_cast<const uint32_t*>(s.last_constants.bytes[4]);
@@ -3971,60 +3508,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     return;
   }
 
-  // The draw's indices and vertex buffers, into the mirror (an inline
-  // draw's vertices are there already). A vertex fetch constant is two
-  // words: the address (word 0, low 2 bits the type) and the size in words
-  // (word 1, bits 2-25).
-  if (!call.inline_vertices && mirror_per_draw) {
-    s.Mirror(index_address, index_count * (index_32bit ? 4 : 2), true,
-             s.draw_index_newest);
-  }
-  // The highest vertex the draw uses (indices as the GPU reads them, after
-  // the base vertex): a vertex buffer is copied up to it even past the size
-  // its fetch constant gives, as the GPU reads whatever is there.
-  for (uint32_t k = 0; k < 96 && !call.inline_vertices && mirror_per_draw; k++) {
-    if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-      continue;
-    }
-    uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
-    uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
-    uint32_t size = ((word1 >> 2) & 0xFFFFFFu) * 4;
-    for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
-      uint64_t needed = (uint64_t(max_vertex) + 1) * stride_words * 4;
-      if (fetch_constant == k && needed > size && needed < (64u << 20)) {
-        s.stats.vertex_overruns++;
-        if (!s.stats.vertex_overrun_sample[1]) {
-          s.stats.vertex_overrun_sample = {word0 & 0x1FFFFFFCu, size, uint32_t(needed),
-                                           max_vertex, stride_words};
-        }
-        size = uint32_t(needed);
-      }
-    }
-    if (s.check_mirror_frames) {
-      // The bytes this draw's vertices span in this buffer.
-      uint64_t begin = UINT64_MAX, end = 0;
-      for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
-        if (fetch_constant == k && min_vertex <= max_vertex) {
-          begin = std::min(begin, uint64_t(min_vertex) * stride_words * 4);
-          end = std::max(end, (uint64_t(max_vertex) + 1) * stride_words * 4);
-        }
-      }
-      if (begin >= end) {
-        begin = 0;
-        end = size;  // stride unknown: the whole buffer
-      }
-      end = std::min<uint64_t>(end, size);
-      if (begin < end) {
-        uint32_t address = (word0 & 0x1FFFFFFCu) + uint32_t(begin);
-        uint32_t length = uint32_t(end - begin);
-        if (s.used_mirrored.insert((uint64_t(address) << 32) | length).second) {
-          s.used_vertex_bytes += length;
-        }
-      }
-    }
-    s.Mirror(word0 & 0x1FFFFFFCu, size, false);
-  }
-
   // Draw.
   s.BeginRendering(commands, color, depth);
   if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
@@ -4071,7 +3554,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
   std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
-  VkDescriptorSet sets[4] = {s.draw_mirror().set, s.constant_block().set,
+  VkDescriptorSet sets[4] = {s.arena_set, s.constant_block().set,
                              vertex_textures, pixel_textures};
 
   // The state this draw needs. Indexed draws bind the mirror at offset 0
@@ -4089,13 +3572,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = rectangle_list || quad_list || !call.inline_vertices;
-  now.index_buffer = s.draw_mirror().buffer;
+  now.index_buffer = s.arena.buffer();
   now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
                                                               : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
   uint64_t index_start = rectangle_list ? kRectangleIndices
                          : quad_list    ? kQuadIndices
-                                        : index_address;
+                                        : index_offset;
   uint32_t first_index = 0;
   if (s.skip_repeated_state && index_start % index_bytes == 0) {
     first_index = uint32_t(index_start / index_bytes);
@@ -4350,7 +3833,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
                                 draw.sets, 5, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
-    vk::vkCmdBindIndexBuffer(commands, draw_mirror().buffer, draw.index_offset, draw.index_type);
+    vk::vkCmdBindIndexBuffer(commands, arena.buffer(), draw.index_offset, draw.index_type);
     vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
   }
   vk::vkCmdEndRendering(commands);
@@ -4384,20 +3867,17 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                         uint32_t stride, uint32_t data) {
   State& s = *state_;
   uint32_t size = count * stride;
-  uint32_t offset = (s.inline_offset + 15) & ~15u;
-  if (!count || !stride || offset + size > s.inline_slot_size()) {
+  uint32_t offset = count && stride ? s.arena.PlaceInline(guest::Pointer(data), size) : UINT32_MAX;
+  if (offset == UINT32_MAX) {
     s.stats.failed++;
     s.stats.failed_by[7]++;
     return;
   }
-  s.inline_offset = offset + size;
   DrawCall call;
   call.type = type;
   call.inline_vertices = true;
   call.vertex_count = count;
-  call.vertex_address =
-      kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, guest::Pointer(data), size);
+  call.vertex_address = offset;
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
@@ -4735,43 +4215,6 @@ void Passes::set_log_register_reads(bool log) {
   state_->log_register_reads = log;
 }
 
-void Passes::set_cache_index_ranges(bool cache) {
-  state_->cache_index_ranges = cache;
-}
-
-void Passes::set_log_index_ranges(bool log) {
-  state_->log_index_ranges = log;
-}
-
-std::string Passes::TakeIndexRanges() {
-  State::IndexRangeCounts& c = state_->index_range_counts;
-  double frames = double(std::max<uint64_t>(c.frames, 1));
-  double scans = double(std::max<uint64_t>(c.scans, 1));
-  double asked = double(std::max<uint64_t>(c.newest_asked, 1));
-  std::string text = std::format(
-      "index ranges: {:.1f} scans a frame ({:.0f} indices), {:.1f} distinct; of the scans, "
-      "first seen {:.1f}%, seen earlier this frame {:.1f}%, written by memcpy since last "
-      "scanned {:.1f}%, unchanged {:.1f}% ({:.0f} indices a frame), unchanged with another "
-      "result {}; memcpy writes taken {:.1f} a frame; mirror: {:.1f} calls a frame, {:.1f}% "
-      "already copied this frame, {:.1f} asked whether written, {:.1f}% of those with no "
-      "write taken since the copy; {} ranges known",
-      c.scans / frames, c.indices / frames, c.distinct / frames, 100.0 * c.first / scans,
-      100.0 * c.same_frame / scans, 100.0 * c.written / scans, 100.0 * c.unchanged / scans,
-      c.unchanged_indices / frames, c.mismatched, c.writes / frames, c.mirror_calls / frames,
-      100.0 * c.mirror_repeats / double(std::max<uint64_t>(c.mirror_calls, 1)),
-      c.newest_asked / frames, 100.0 * c.nothing_taken / asked,
-      state_->index_ranges_seen.size());
-  if (c.mismatched) {
-    const uint32_t* m = c.mismatch_sample;
-    text += std::format(" (e.g. {:08X} x{}: {}-{} kept, {}-{} scanned)", m[0], m[1], m[2], m[3],
-                        m[4], m[5]);
-  }
-  uint64_t frame_sequence = c.frame_sequence;
-  c = {};
-  c.frame_sequence = frame_sequence;
-  return text;
-}
-
 void Passes::set_reuse_texture_sets(bool reuse) {
   state_->reuse_texture_sets = reuse;
 }
@@ -4845,83 +4288,6 @@ std::string Passes::TakeShaderLookups() {
   }
   c = {};
   c.patches = g_vertex_shader_patches;
-  return text;
-}
-
-void Passes::set_copy_all(bool copy_all) {
-  state_->copy_all = copy_all;
-}
-
-void Passes::set_mirror_to_both(bool to_both) {
-  state_->mirror_to_both = to_both;
-}
-
-void Passes::set_mirror_by_tick(bool by_tick) {
-  State& s = *state_;
-  if (by_tick && s.mirrors.size() != 2) {
-    ITC_LOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
-                 s.mirrors.size());
-    return;
-  }
-  s.mirror_by_tick = by_tick;
-  if (by_tick) {
-    Buffers_CollectMirrorWrites();
-  }
-}
-
-std::string Passes::TakeMirrorByTick() {
-  State& s = *state_;
-  if (!s.mirror_by_tick) {
-    return {};
-  }
-  State::MirrorByTickStats& b = s.by_tick;
-  std::string text = std::format(
-      "{} frames, {} swaps; {} writes applied ({:.1f} MB); drawn ranges missing a write: {} in "
-      "logic passes' lists ({:.2f} MB), {} in render-only passes' ({:.2f} MB)",
-      b.frames, b.swaps, b.writes, b.bytes / 1048576.0, b.stale[0], b.stale_bytes[0] / 1048576.0,
-      b.stale[1], b.stale_bytes[1] / 1048576.0);
-  b.frames = b.swaps = b.writes = b.bytes = 0;
-  b.stale[0] = b.stale[1] = b.stale_bytes[0] = b.stale_bytes[1] = 0;
-  return text;
-}
-
-void Passes::set_verify_mirror(bool verify) {
-  state_->verify_mirror = verify;
-}
-
-void Passes::set_check_mirror_frames(bool check) {
-  state_->check_mirror_frames = check;
-}
-
-std::string Passes::TakeMirrorChanges() {
-  State& s = *state_;
-  // The ranges that changed, the most changed first.
-  std::vector<std::pair<uint64_t, State::RangeHistory>> changed;
-  uint64_t bytes = 0;
-  for (auto& [key, history] : s.range_history) {
-    if (history.changes) {
-      changed.emplace_back(key, history);
-      bytes += key & 0xFFFFFFFF;
-      history.changes = 0;
-    }
-  }
-  std::sort(changed.begin(), changed.end(),
-            [](const auto& a, const auto& b) { return a.second.changes > b.second.changes; });
-  double frames = double(std::max<uint64_t>(s.mirror_frames, 1));
-  std::string text = std::format(
-      "per frame {:.2f} MB copied with changed contents, {:.2f} MB of ranges new, vertex "
-      "buffers {:.2f} MB copied but {:.2f} MB within the draws' vertices; {} of {} ranges "
-      "changed ({:.1f} MB)",
-      s.mirror_changed_bytes / 1048576.0 / frames, s.mirror_new_bytes / 1048576.0 / frames,
-      s.mirror_vertex_bytes / 1048576.0 / frames, s.used_vertex_bytes / 1048576.0 / frames,
-      changed.size(), s.range_history.size(), bytes / 1048576.0);
-  s.mirror_frames = s.mirror_changed_bytes = s.mirror_new_bytes = s.mirror_vertex_bytes =
-      s.used_vertex_bytes = 0;
-  for (size_t i = 0; i < changed.size() && i < 12; i++) {
-    text += std::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
-                        uint32_t(changed[i].first >> 32), uint32_t(changed[i].first),
-                        changed[i].second.changes);
-  }
   return text;
 }
 
@@ -5073,61 +4439,8 @@ std::vector<std::string> Passes::TakeWatchLines(uint64_t& changes, uint64_t& dra
   return std::exchange(s.watch_lines, {});
 }
 
-void Passes::set_check_late_writes(bool check) {
-  state_->check_late_writes = check;
-}
-
-std::string Passes::TakeLateWrites() {
-  State& s = *state_;
-  std::string text = std::format("{} of {} copied ranges changed by the end of the frame",
-                                 s.late_written, s.late_checked);
-  if (!s.late_sample.empty()) {
-    text += ", e.g. " + s.late_sample + "; by vertex shader:";
-    for (const auto& [shader, count] : s.late_by_shader) {
-      text += std::format(" {:016X} x{}", shader, count);
-    }
-  }
-  s.late_written = s.late_checked = 0;
-  s.late_by_shader.clear();
-  s.late_sample.clear();
-  return text;
-}
-
-void Passes::set_check_clobbers(bool check) {
-  state_->check_clobbers = check;
-}
-
 std::vector<std::string> Passes::TakeDeclarationLines() {
   return std::exchange(state_->declaration_lines, {});
-}
-
-std::string Passes::TakeClobbers() {
-  State& s = *state_;
-  std::string text =
-      std::format("{} of {} copies changed bytes an earlier copy this frame put in the mirror "
-                  "({} bytes)",
-                  s.clobbers, s.clobber_copies, s.clobbered_bytes);
-  if (!s.clobber_sample.empty()) {
-    text += ", e.g. " + s.clobber_sample + "; by shaders (earlier vs/ps, then vs/ps):";
-    std::vector<std::pair<uint64_t, std::array<uint64_t, 4>>> pairs;
-    for (const auto& [shaders, count] : s.clobbers_by_shaders) {
-      pairs.push_back({count, shaders});
-    }
-    std::sort(pairs.rbegin(), pairs.rend());
-    for (size_t i = 0; i < std::min<size_t>(pairs.size(), 12); i++) {
-      const auto& [count, k] = pairs[i];
-      text += std::format(" {:08X}/{:08X} by {:08X}/{:08X} x{};", k[0] >> 32, k[1] >> 32,
-                          k[2] >> 32, k[3] >> 32, count);
-    }
-  }
-  s.clobbers = s.clobbered_bytes = s.clobber_copies = 0;
-  s.clobbers_by_shaders.clear();
-  s.clobber_sample.clear();
-  return text;
-}
-
-void Passes::set_check_mirror(bool check) {
-  state_->check_mirror = check;
 }
 
 void Passes::set_debug_hide(TextureCache::Hide hide, uint32_t value) {
