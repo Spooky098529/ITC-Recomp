@@ -1,5 +1,6 @@
 #include <format>
 #include "passes.h"
+#include <cstdlib>
 #include "vertex_arena.h"
 #include "shader_ports.h"
 #include "frame_costs.h"
@@ -84,7 +85,6 @@ constexpr uint32_t kShownWidth = 1280, kShownHeight = 720;
 constexpr VkFormat kShownFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
 // EDRAM: 2048 tiles of 80x16 samples at 32 bits a sample.
-constexpr uint32_t kEdramTiles = 2048;
 
 // Device fields: the bound surfaces (render targets 0-3, then depth).
 constexpr uint32_t kDeviceDepthStencil = 12200;
@@ -93,13 +93,19 @@ constexpr uint32_t kDeviceDepthStencil = 12200;
 // +24 RB_SURFACE_INFO (pitch in bits 0-13, MSAA in bits 16-17), +28
 // RB_COLOR_INFO or RB_DEPTH_INFO (EDRAM base in bits 0-11, format in bits
 // 16-19).
+// A render target as the game made it (graphics::CreateSurface): +24 the
+// pitch and samples, +28 the format (and its EDRAM base, which we don't
+// use: docs/pc-renderer.md, step 4), +36 the size (width - 1 from bit 18,
+// height - 1 from bit 3).
 struct Surface {
-  uint32_t pitch, msaa, edram_base, format;
+  uint32_t pitch, msaa, edram_base, format, width, height;
 };
 Surface ReadSurface(uint32_t object) {
   uint32_t surface_info = guest::LoadU32(object + 24);
   uint32_t info = guest::LoadU32(object + 28);
-  return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF};
+  uint32_t size = guest::LoadU32(object + 36);
+  return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF,
+          (size >> 18) + 1, ((size >> 3) & 0x7FFF) + 1};
 }
 
 // How a color format is drawn. 7e3 and its high-precision blending
@@ -133,18 +139,6 @@ VkFormat ColorFormat(uint32_t format) {
 VkSampleCountFlagBits SampleCount(uint32_t msaa) {
   return msaa == 2 ? VK_SAMPLE_COUNT_4_BIT : msaa == 1 ? VK_SAMPLE_COUNT_2_BIT
                                                        : VK_SAMPLE_COUNT_1_BIT;
-}
-
-// Each surface gets an image of its pitch, as tall as the EDRAM from its
-// base holds (2x MSAA doubles the samples down, 4x also across).
-VkExtent2D SurfaceExtent(const Surface& surface, bool depth) {
-  uint32_t samples_x = surface.msaa == 2 ? 2 : 1, samples_y = surface.msaa ? 2 : 1;
-  bool wide = !depth && xenos::IsColorRenderTargetFormat64bpp(
-                            xenos::ColorRenderTargetFormat(surface.format));
-  uint32_t tiles_across = std::max((surface.pitch * samples_x + 79) / 80, 1u) * (wide ? 2 : 1);
-  uint32_t tile_rows = (kEdramTiles - std::min(surface.edram_base, kEdramTiles - 1)) / tiles_across;
-  uint32_t height = tile_rows * 16 / samples_y;
-  return {std::max(surface.pitch, 1u), std::clamp(height, 16u, 4096u)};
 }
 
 constexpr VkAccessFlags kAllAccess = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
@@ -913,7 +907,7 @@ struct Passes::State {
 
   // Targets by surface (color or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
-  std::map<std::array<uint32_t, 6>, Target> targets;
+  std::map<std::array<uint32_t, 7>, Target> targets;
   Target* bound_color = nullptr;
   Target* bound_depth = nullptr;
   VkExtent2D render_extent{};
@@ -2066,10 +2060,11 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
     return nullptr;
   }
-  // Surfaces drawn while tiling get targets of their own, as large as the
-  // tiles together (their EDRAM wouldn't hold them).
-  std::array<uint32_t, 6> key{uint32_t(depth), surface.edram_base, surface.pitch, surface.msaa,
-                              uint32_t(format), tiling ? 1u : 0u};
+  // A target an image, by the surface object the game made it as, its size,
+  // samples and format. Surfaces drawn while tiling get targets of their
+  // own, as large as the tiles together.
+  std::array<uint32_t, 7> key{uint32_t(depth), object, surface.width, surface.height,
+                              surface.msaa, uint32_t(format), tiling ? 1u : 0u};
   auto [it, added] = targets.try_emplace(key);
   Target& t = it->second;
   if (!added) {
@@ -2079,7 +2074,7 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   t.surface = surface;
   t.format = format;
   t.samples = SampleCount(surface.msaa);
-  t.guest_extent = SurfaceExtent(surface, depth);
+  t.guest_extent = {std::clamp(surface.width, 1u, 8192u), std::clamp(surface.height, 1u, 8192u)};
   if (tiling) {
     t.guest_extent = {std::max(t.guest_extent.width, tiling_extent.width),
                       std::max(t.guest_extent.height, tiling_extent.height)};
@@ -2106,9 +2101,9 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
     view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
   }
-  ITC_LOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
+  ITC_LOG_INFO("native renderer: {} target: surface {:08X}, pitch {}, MSAA {}, format {}; {}x{}{} "
                "({}x{} drawn)",
-               depth ? "depth" : "color", surface.edram_base, surface.pitch, surface.msaa,
+               depth ? "depth" : "color", object, surface.pitch, surface.msaa,
                surface.format, t.guest_extent.width, t.guest_extent.height,
                tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;

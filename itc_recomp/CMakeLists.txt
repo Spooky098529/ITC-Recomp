@@ -376,7 +376,6 @@ set(ITC_SOURCES
     src/track_zones/track_zones.cpp
     src/hooks/graphics_resources.cpp
     src/graphics/resources.cpp
-    src/graphics/edram.cpp
     src/hooks/video_output.cpp
     src/graphics/video_output.cpp
     src/hooks/command_buffer.cpp

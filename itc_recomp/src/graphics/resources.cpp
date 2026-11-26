@@ -6,7 +6,6 @@
 #include "guest.h"
 
 #include "base/log.h"
-#include "graphics/edram.h"
 #include "memory/c_runtime_heap.h"
 #include "c_runtime/strings.h"
 #include "native/refcount.h"
@@ -854,28 +853,14 @@ uint32_t CreateSurface(uint32_t width, uint32_t height, uint32_t format,
       SetSurfaceHeader(width, height, format, multisample, parameters, header);
   const SurfaceHeader h(header);
   h.set_common(h.common() | 0x00100000);
-  if (parameters != 0) {
-    return header;
-  }
-  const uint32_t low = h.format() & 0x3F;
-  const bool depth = low == 22 || low == 23;
-  const std::optional<edram::Allocation> allocation = edram::Alloc(sizes.tiles);
-  if (!allocation || !allocation->ok) {
-    memory::crt::XMemFree(header, kHeaderFreeAttributes);
-    return 0;
-  }
-  const uint32_t edram_base = allocation->base;
-  if (edram_base + sizes.tiles > 2048) {
-    edram::Free(edram_base, sizes.tiles);
-    memory::crt::XMemFree(header, kHeaderFreeAttributes);
-    return 0;
-  }
-  h.set_common(h.common() | 0x80000000);
-  h.set_edram((h.edram() & 0xFFFFF000) | (edram_base & 0xFFF));
-  if (depth && G::hi_z_taken() == 0) {
-    G::set_hi_z_taken(1);
-    h.set_hi_z(h.hi_z() & 0x1FFFF);
-  }
+  // No EDRAM is taken (docs/pc-renderer.md, step 4): our renderer gives each
+  // surface an image of its own, keyed by the surface object, and never
+  // reads the base. The original took tiles from the EDRAM allocator
+  // (graphics/edram.h, removed with it) when no `parameters` fixed the base, failing when
+  // none fit, and gave the first depth surface the hi-z; the base stays 0
+  // (or the parameters'), +0 bit 0x80000000 unset, so DestroySurface frees
+  // none.
+  (void)sizes;
   return header;
 }
 
@@ -1294,11 +1279,8 @@ uint32_t LockIndexBuffer(uint32_t buffer, uint32_t offset, uint32_t size,
 uint32_t DestroySurface(uint32_t surface, uint32_t common) {
   ITC_NATIVE_RUNNING("sub_822A6268 Resource::DestroySurface");
   if (!(common & 0x40000000)) {
-    if (common & 0x80000000) {
-      const SurfaceHeader s(surface);
-      const uint32_t tiles = s.edram_bytes() / 5120;
-      edram::Free(s.edram() & 0xFFF, tiles);
-    }
+    // (Its EDRAM, +0 bit 0x80000000, was freed here: surfaces take none
+    // since docs/pc-renderer.md step 4.)
     if (SurfaceHeader(surface).hi_z() & 1) {
       G::set_hi_z_taken(0);
     }

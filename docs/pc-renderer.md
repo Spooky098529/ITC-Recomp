@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0 and 1 done, step 2 in progress)
+# A PC renderer (a plan; steps 0 and 1 done, 2 and 4 in progress)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -322,6 +322,55 @@ dispatch entry"; `--check_call_targets`).
 Left: the PC-style inputs (vertex attributes, constants by name, plain
 textures), with step 3, where the draw state stops coming from the
 registers.
+
+**The order from here (2026-11-26).** The faked GPU (`gpu_link.cpp`) only
+makes fences in play now (~3,000 a second, two a kick; no memory writes,
+interrupts or callbacks in a race), and it goes with step 3, when the
+handlers stop calling the game's Direct3D and so stop writing packets: an
+interim for the fences alone would be thrown away. So step 4 (the render
+targets, the EDRAM part of the goal) comes next, then step 3, then 2b and 5.
+Step 4's approach:
+
+- Targets keyed by the game's surface object instead of its EDRAM base
+  (the renderer stops knowing EDRAM).
+- A resolve that is a plain copy hands the target's image to the
+  destination texture (the pass has drawn into the texture: no copy). A
+  target drawn into again without a clear first (a grab pass, the main
+  view after its first resolve) gets the image copied back once.
+- MSAA resolves, format changes and the exponent bias (-3 on the main
+  view's and the glow's copies) stay copies, as PC renderers do them.
+
+## Step 4: render targets (first part done 2026-11-26)
+
+- **Targets keyed by the surface object.** `Passes::State::GetTarget` keys
+  an image by the game's surface object, its size (the object's +36:
+  width - 1 from bit 18, height - 1 from bit 3), samples and format; the
+  EDRAM base and the "as tall as the EDRAM left" height are gone from the
+  renderer.
+- **Surfaces take no EDRAM.** `graphics::CreateSurface` no longer calls the
+  EDRAM allocator (base 0, or the parameters'), `DestroySurface` frees
+  none, and `graphics/edram.{h,cpp}` are removed.
+- **Explained difference:** the camera pass of type 20 (resolve 6 in
+  `conventional-renderer.md`'s table: depth only, into `[0x826BABC4]`,
+  use unknown) has its own depth surface sharing EDRAM with the shadow
+  map's (type 10); on the 360 it starts with the shadow map's depth, and
+  its 4 draws in an attract race write nothing. It now starts from its own
+  image (cleared: all 1.0), as the no-EDRAM rule has it. The shown frame
+  doesn't change (an attract race's dump: 0.30% of pixels off by more
+  than 0.02, as step 2's).
+- **What stays:** the ~25 resolves a race frame are copies, because none
+  is a plain copy: each changes format, averages MSAA samples or applies
+  the exponent bias (the old table's "What a resolve does"), as a PC
+  renderer's StretchRect or MSAA resolve does. Handing images over instead
+  of copying would save no copy today. Drawing passes straight into their
+  destinations needs the bias moved into the readers and a pass plan (the
+  old branch's 3a), for later.
+
+Order of a race frame's passes (one frame traced, 2026-11-26): each camera
+pass draws, then resolves (the shadow map's 66 draws, then its depth
+resolve); the main view draws, is resolved twice, the glow's steps draw
+and resolve on one 256x144 target in turn, then the main view draws on
+(the grab pass) and is resolved for the scene target, then the front.
 
 ## Open questions
 
