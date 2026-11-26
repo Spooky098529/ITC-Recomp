@@ -29,7 +29,17 @@ def entry_lines(e):
     lines.append("   {{%s}}, %d," % (", ".join(textures), len(textures)))
     samplers = ["{%d, %d, %d, %d, %d}" % (s["fetch_constant"], s["mag"], s["min"], s["mip"], s["aniso"])
                 for s in e["samplers"]]
-    lines.append("   {{%s}}, %d}," % (", ".join(samplers), len(samplers)))
+    lines.append("   {{%s}}, %d," % (", ".join(samplers), len(samplers)))
+    # The float constants read (all 256 when addressed relative to the loop
+    # index), the interpolators written (vertex) or read (pixel: as many as
+    # its registers, up to 16), and the color targets written.
+    floats = [0, 0, 0, 0]
+    for r in (range(256) if e["relative_constants"] else e["float_constants"]):
+        floats[r >> 6] |= 1 << (r & 63)
+    interpolators = sum(1 << i for i in e["interpolators"] if i < 16)
+    targets = sum(1 << t for t in e["color_targets"])
+    lines.append("   {{%s}}, 0x%X, 0x%X}," % (", ".join("0x%016Xull" % f for f in floats),
+                                            interpolators, targets))
     return lines
 
 def main():

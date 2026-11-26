@@ -31,10 +31,12 @@ renderer's table and fitting (`src/native/shader_ports.*`,
   here), the AO normals (`STREAM_NORMAL_REG`: interpolator 15, read by
   nothing here), `--motion_blur_quality` and `--bloom_quality` (always 1,
   the game's).
-- `--native_shaders` (on) and `--native_shaders_off=<hashes>` as SBX has
-  them; a shader with no GLSL is translated and logged once
+- Every shader is drawn from its GLSL; the SDK's translator isn't used
+  (since 2026-11-26, `docs/pc-renderer.md`, step 3): a shader with no GLSL,
+  or a draw its GLSL can't make (point sprites), stops the program, named
   (`ITC_DUMP_UNPORTED=<dir>` in the environment writes its microcode
-  there, a debugging aid).
+  there, for `tools/shader_port`). `--native_shaders` and
+  `--native_shaders_off` went with the translator.
 
 To remake the SPIR-V after changing the GLSL: `cd itc_recomp/src/native/glsl
 && python3 compile_game.py` (glslangValidator and spirv-opt).
@@ -173,8 +175,8 @@ sprites' generated coordinates (`param_gen_point`) aren't made either.
 ## In the renderer
 
 `src/native/shader_ports.cpp` finds a shader's port and fits it to the draw;
-`ShaderCache::Get` (`shaders.cpp`) uses it in place of a translation with
-`--native_shaders`:
+`ShaderCache::Get` (`shaders.cpp`) uses it (there is no translation since
+2026-11-26):
 
 - A pixel shader's port is found by its microcode hash, a vertex shader's by
   the layout-free hash (the table, `game_shader_ports.h`, is written by
@@ -186,16 +188,22 @@ sprites' generated coordinates (`param_gen_point`) aren't made either.
   locations (an interpolator in the mask goes at its index among the
   mask's, the translator's locations; one that isn't goes at 16 + n, where
   nothing reads it). So the pipeline needs no VkSpecializationInfo.
-- The constants and vertex buffers a shader reads still come from the
-  microcode's analysis; the texture and sampler lists from the table.
-- Ported vertex shaders read guest memory as one buffer, as the translator
-  does when the device allows a 512 MB storage buffer; on a device that
-  doesn't, vertex shaders are translated.
-- `--native_shaders_off=<hash>,<hash>` keeps the listed shaders translated
-  (the hash at run time or the port's), to find which port a difference
-  comes from. Ports aren't written to the disk cache.
-- `SystemConstants`' offsets the ports read are `static_assert`ed in
-  `shaders.cpp`.
+- What a shader reads comes from the table (`table_from_json.py` from
+  `shaders.json`): the float constants, the interpolators it writes or
+  reads and the color targets it writes, besides the textures and
+  samplers. The vertex fetch constants are read from the patched
+  microcode's fetches (the files all say 95; the game patches each for the
+  declaration). Checked against the translator's analysis for every
+  shader and interface of an attract race and the pad replay before it
+  went (2026-11-26): no difference.
+- How a vertex and a pixel shader connect: the vertex shader's written
+  interpolators and the pixel shader's first registers' worth (up to 16),
+  less the generated parameter's (SQ_PROGRAM_CNTL bit 18, SQ_CONTEXT_MISC
+  bits 8-15).
+- Ported vertex shaders read the vertex arena as one storage buffer (the
+  arena checks it fits the device's limit at start-up).
+- The system constants are ours (`system_constants.h`), at the offsets the
+  ports read.
 
 ## Hand-written shaders
 

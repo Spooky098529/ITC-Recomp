@@ -414,6 +414,19 @@ and resolve on one 256x144 target in turn, then the main view draws on
   the pad replay (the tiled menus' 3D views, loading screens, both races),
   an attract race, the tick replay.
 
+- **No translator on the shader path (2026-11-26).** What the renderer
+  took from the SDK translator's analysis (each shader's float constants,
+  vertex fetch constants, interpolators and color targets) comes from the
+  table (`game_shader_ports.h`, the vertex fetch constants from the patched
+  microcode); checked against the analysis for every shader and interface
+  of an attract race and the pad replay first (no difference). The
+  translator's fallback, its disk cache (`shaders.bin`), the system
+  constants' struct (now `native/system_constants.h`) and
+  `--native_shaders`, `--native_shaders_off`,
+  `--native_renderer_log_shader_ucode` are gone; a shader the table lacks
+  stops the program, named. The translator is still linked for `xenos.h`'s
+  types and the texture code (`textures.cpp`).
+
 Left for step 3: the handlers calling our interface instead of the game's
 Direct3D, which ends the shadow on the render path.
 

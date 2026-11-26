@@ -51,6 +51,12 @@ struct GamePort {
   uint32_t texture_count;
   std::array<GamePortSampler, 16> samplers;
   uint32_t sampler_count;
+  // The float constants read (a bit each, c0-c255), the interpolators
+  // written (vertex shaders) or read (pixel shaders), and the color targets
+  // written: what the renderer took from the SDK translator's analysis.
+  std::array<uint64_t, 4> float_constants;
+  uint32_t interpolators;
+  uint32_t color_targets;
 };
 
 // The port of this microcode (as in guest memory, big-endian words), or

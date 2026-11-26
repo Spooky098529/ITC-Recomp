@@ -22,6 +22,7 @@
 #include "shaders.h"
 #include "state.h"
 #include "draw_registers.h"
+#include "system_constants.h"
 
 #include <algorithm>
 #include <array>
@@ -35,7 +36,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <rex/graphics/pipeline/shader/spirv_translator.h>
 #include <rex/graphics/xenos.h>
 #include "base/flags.h"
 #include "base/hash.h"
@@ -53,7 +53,6 @@ namespace native {
 
 namespace graphics = rex::graphics;
 namespace xenos = rex::graphics::xenos;
-using Translator = graphics::SpirvShaderTranslator;
 
 namespace {
 
@@ -1285,7 +1284,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
     return false;
   }
-  const uint32_t ranges[5] = {uint32_t(sizeof(Translator::SystemConstants)),
+  const uint32_t ranges[5] = {uint32_t(sizeof(SystemConstants)),
                               kFloatConstantsRange, kFloatConstantsRange,
                               kBoolLoopConstantsRange, kFetchConstantsRange};
   VkDescriptorBufferInfo buffers[5];
@@ -1937,7 +1936,7 @@ bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data)
 
 bool Passes::State::ReserveDrawConstants() {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
-  constexpr VkDeviceSize kDrawConstants = sizeof(Translator::SystemConstants) +
+  constexpr VkDeviceSize kDrawConstants = sizeof(SystemConstants) +
                                           2 * kFloatConstantsRange + kBoolLoopConstantsRange +
                                           kFetchConstantsRange;
   if (ring_offset + kDrawConstants + 5 * alignment <= kConstantBlockSize) {
@@ -2745,14 +2744,8 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
-  ShaderFeatures features;
-  features.max_storage_buffer_range = context.max_storage_buffer_range;
-  features.clip_distance = context.clip_distance;
-  features.cull_distance = context.cull_distance;
-  features.demote_to_helper_invocation = context.demote_to_helper_invocation;
-  s.shaders = std::make_unique<ShaderCache>(features);
+  s.shaders = std::make_unique<ShaderCache>();
   if (std::filesystem::path directory = DiskCacheDirectory(); !directory.empty()) {
-    s.shaders->OpenDiskCache(directory / "shaders.bin");
     s.pipeline_cache_file = directory / "pipelines.bin";
   }
   s.OpenPipelineCache();
@@ -3015,11 +3008,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     ShaderLookup r;
     r.vertex_hash = MicrocodeHash(vertex_ucode, vertex_size);
     r.pixel_hash = pixel_ucode ? MicrocodeHash(pixel_ucode, pixel_size) : 0;
-    r.interface = s.shaders->GetInterface(vertex_ucode, vertex_size, r.vertex_hash, pixel_ucode,
-                                          pixel_size, r.pixel_hash, program_control,
-                                          context_misc);
-    r.interface.param_gen_point = type == 1;  // point list
-    r.interface.rectangle_list = rectangle_list;
     // The file's microcode and the patched fetches' fields, for its GLSL
     // (shader_ports.h): the object keeps its fetches' records (+60, +64)
     // and original instructions (+192).
@@ -3034,11 +3022,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       remapped = RemapVertexFetches(vertex_ucode, vertex_size, fetch_count, records,
                                     guest::Pointer(vertex_object + 192), remap);
     }
+    r.interface = s.shaders->GetInterface(vertex_ucode, vertex_size, r.vertex_hash, pixel_ucode,
+                                          pixel_size, r.pixel_hash, program_control,
+                                          context_misc, remapped ? &remap : nullptr);
+    r.interface.param_gen_point = type == 1;  // point list
+    r.interface.rectangle_list = rectangle_list;
     r.vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size, r.vertex_hash,
-                              program_control & 0x3F, r.interface, remapped ? &remap : nullptr);
+                              r.interface, remapped ? &remap : nullptr);
     if (pixel_object) {
       r.pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, r.pixel_hash,
-                               (program_control >> 8) & 0x3F, r.interface);
+                               r.interface);
     }
     return r;
   };
@@ -3246,26 +3239,26 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   // System constants (as the plugin's UpdateSystemConstantValues, for what
   // these draws use).
-  Translator::SystemConstants system{};
+  SystemConstants system{};
   uint32_t flags = 0;
   if (regs.viewport_enabled(8)) {
-    flags |= Translator::kSysFlag_XYDividedByW;
+    flags |= kFlagXYDividedByW;
   }
   if (regs.viewport_enabled(9)) {
-    flags |= Translator::kSysFlag_ZDividedByW;
+    flags |= kFlagZDividedByW;
   }
   if (regs.viewport_enabled(10)) {
-    flags |= Translator::kSysFlag_WNotReciprocal;
+    flags |= kFlagWNotReciprocal;
   }
   if (primitive.polygonal) {
-    flags |= Translator::kSysFlag_PrimitivePolygonal;
+    flags |= kFlagPrimitivePolygonal;
   } else if (type == 2 || type == 3) {
-    flags |= Translator::kSysFlag_PrimitiveLine;
+    flags |= kFlagPrimitiveLine;
   }
   uint32_t alpha_function = regs.alpha_test() ? regs.alpha_func() : 7;  // 7: always
-  flags |= alpha_function << Translator::kSysFlag_AlphaPassIfLess_Shift;
+  flags |= alpha_function << kFlagAlphaTestShift;
   system.flags = flags;
-  system.vertex_index_endian = xenos::Endian(index_endian);
+  system.vertex_index_endian = index_endian;
   system.vertex_base_index = base_vertex;
   system.vertex_index_min = regs.vertex_index_min;
   system.vertex_index_max = regs.vertex_index_max;
@@ -4338,7 +4331,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
       watched_this_frame[{vertex->hash, ps, index_address, primitive_count}]++;
   WatchedDraw now;
   now.frame = frames;
-  now.system.assign(system, system + sizeof(Translator::SystemConstants) / 4);
+  now.system.assign(system, system + sizeof(SystemConstants) / 4);
   std::vector<uint32_t> vertex_registers = FloatRegisters(vertex);
   std::vector<uint32_t> pixel_registers = FloatRegisters(pixel);
   now.vertex_floats.assign(vertex_floats, vertex_floats + 4 * vertex_registers.size());
@@ -4807,9 +4800,6 @@ VkImage Passes::shown() const {
 Passes::Stats Passes::TakeStats() {
   Stats stats = state_->stats;
   stats.textures = state_->textures.TakeStats();
-  stats.shaders_translated = state_->shaders->translated();
-  stats.shaders_failed = state_->shaders->failed();
-  stats.shaders_from_disk = state_->shaders->from_disk();
   stats.shaders_ported = state_->shaders->ported();
   uint32_t pipelines = state_->stats.pipelines, targets = state_->stats.targets;
   state_->stats = {};

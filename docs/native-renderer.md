@@ -892,8 +892,8 @@ memory).
   `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
   a clear and which of them write that texture back, and the cross-fade's
   pixel constants and vertex color (see the bloom under Known issues).
-- `--native_renderer_log_shader_ucode=<hash>`: log a shader's microcode
-  disassembly when it's first used.
+- (`--native_renderer_log_shader_ucode` went with the translator on
+  `pc-renderer`, 2026-11-26.)
 - `--native_renderer_watch_draws`: log what changes in the main view's
   draws' inputs between frames (with the camera still, only flickering
   draws should change). Ignores float changes under 0.1% and compares only
