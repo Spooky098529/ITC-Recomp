@@ -1,5 +1,5 @@
 // Predicated tiling's adapters' register steps (src/hooks/predicated_tiling.cpp),
-// shared with the wraps in src/native/gpu_link.cpp and the harness
+// shared with the entries in src/hooks/predicated_tiling.cpp and the harness
 // (src/harnesses/predicated_tiling.cpp).
 
 #pragma once
@@ -17,7 +17,7 @@ graphics::predicated_tiling::GuestCalls PredicatedTilingCalls(lifted::Regs& ctx)
 
 // Device::EndTiledSegments (sub_822B6BF8): the plain C++ with
 // --native_predicated_tiling (the original with it off, or with a recording
-// command buffer). For its wrap in src/native/gpu_link.cpp, which logs.
+// command buffer). For its entry in src/hooks/predicated_tiling.cpp.
 void EndTiledSegments(lifted::Regs& ctx);
 
 // The worker threads' guest calls through `ctx` (the kernel's imports).

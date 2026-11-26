@@ -770,7 +770,6 @@ set(ITC_SOURCES
     src/native/buffers.cpp
     src/native/disk_cache.cpp
     src/native/draw_packets.cpp
-    src/native/gpu_link.cpp
     src/native/passes.cpp
     src/native/vertex_arena.cpp
     src/native/shader_ports.cpp

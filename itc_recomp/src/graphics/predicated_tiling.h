@@ -7,7 +7,7 @@
 // Our renderer draws the tiles from the render command replay and the
 // device's register shadow, not from packets, and our kick runs the end's
 // callback block at once without waking the library's worker
-// (src/native/gpu_link.cpp). So, by the graphics rule (the user's, 2026-10-24;
+// (no kick runs them since pc-renderer step 3, src/hooks/command_buffer.cpp). So, by the graphics rule (the user's, 2026-10-24;
 // as the device state's and the command buffer's): the device fields, the
 // chains the segment flow and the draws append to, the tiling's limit +12960
 // the segment flow reads and the kicks are kept; the packets nothing reads
@@ -36,7 +36,7 @@ struct GuestCalls {
   // counts the calls (src/native/draw_packets.cpp) and runs the command
   // buffer's plain C++.
   std::function<void(uint32_t device)> end_segment;
-  // Device::DeferredKick (sub_8229E848, overridden in src/native/gpu_link.cpp).
+  // Device::DeferredKick (sub_8229E848, a no-op in src/hooks/command_buffer.cpp).
   command_buffer::Kick kick;
 };
 
@@ -131,7 +131,7 @@ struct WorkerLoopCalls {
       wait;
   // KeResetEvent(event): its r3.
   std::function<uint32_t(uint32_t event)> reset_event;
-  // The worker's job (sub_822B6780, Wrapped in src/native/gpu_link.cpp).
+  // The worker's job (sub_822B6780, its entry in src/hooks/predicated_tiling.cpp).
   std::function<void(uint32_t block)> job;
   // The present callback (sub_822A0718) and Device::Swap's present
   // (sub_822A08A0, overridden) with the header at +13444: the last frame
@@ -158,7 +158,7 @@ uint32_t WorkerThread(uint32_t block, uint32_t timeout,
 // state's +80) = `argument`, then KeSetEvent(+11244 + 56 x `cpu`, 1, 0) (the
 // CPU's worker's event; `set_event`, the import, as the original's tail
 // call). Returns KeSetEvent's r3. Never seen in play: our kick skips it
-// (Interrupt in src/native/gpu_link.cpp).
+// (nothing raises it: no GPU runs the command buffer).
 uint32_t WakeWorker(uint32_t argument, uint32_t cpu,
                     const std::function<uint32_t(uint32_t event, uint32_t increment,
                                                  uint32_t wait)>& set_event);

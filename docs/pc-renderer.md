@@ -393,9 +393,20 @@ and resolve on one 256x144 target in turn, then the main view draws on
   (menus, both races) with 0 error lines, a menu frame the same as the build
   before's on the same schedule.
 
-Left for step 3: the faked GPU (the segment tails' fences, the kick,
-`gpu_link.cpp`), then the handlers calling our interface instead of the
-game's Direct3D, which ends the shadow on the render path.
+- **No GPU kick (second part, 2026-11-26).** In play the kicked buffers
+  only carried the segment tails' fences and read positions (and, at a
+  predicated tiling's end, a worker wake our kick already skipped).
+  `WriteSegmentTail` now writes both into the progress block at once (the
+  library's own hung-GPU path) and leaves its packets out; `Device::Kick`
+  and `Device::DeferredKick` do nothing (`src/hooks/command_buffer.cpp`).
+  `src/native/gpu_link.cpp` (the buffer walk: fences, memory writes,
+  scratch registers, interrupts) is gone with `--native_renderer_log_gpu`;
+  the tiling worker's entries moved to `src/hooks/predicated_tiling.cpp`.
+  Checked: attract races and the pad replay (menus, loading screens, both
+  races) with 0 error lines, the tick replay's digests the same.
+
+Left for step 3: the handlers calling our interface instead of the game's
+Direct3D, which ends the shadow on the render path.
 
 ## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
 

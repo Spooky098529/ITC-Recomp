@@ -210,7 +210,7 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(ctx.r3.u32, ctx.r4.u
 // Device::SetScreenScissor (sub_822A0F80): Dropped. It only wrote the window
 // scissor (or one per tile, and the binning packets) into the command
 // buffer, which nothing reads since the emulated GPU went (the kick only
-// looks for fences and interrupts, src/native/gpu_link.cpp); our renderer
+// was removed in pc-renderer step 3); our renderer
 // takes the scissor from +11600 and +12416. Its recompiled callers
 // (Device::DirtyAllState, sub_8229F680, Device::Resolve) don't read r3 after
 // it. The original runs with the flag off.

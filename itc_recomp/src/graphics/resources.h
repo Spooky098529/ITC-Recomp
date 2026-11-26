@@ -259,7 +259,7 @@ StreamSource GetStreamSource(uint32_t device, uint32_t stream);
 // call, 2026-10-24): the fence waits (sub_8229E908, which pass at once),
 // Lock's cache flush packet into the device's command buffer (with
 // sub_8229EF48, sub_8229DDD8 and the thread check sub_825B9A60 between
-// them; the renderer skips coherency packets, src/native/gpu_link.cpp) and
+// them; no GPU runs the packets) and
 // Unlock's data cache flush (sub_822AC470: a PC has none). The lock count
 // (+0, 256 a lock), the locked ranges (+20 the base data's, +24 the mips',
 // in 128-byte units: start << 16 | end, 0xFFFF0000 for none) and the

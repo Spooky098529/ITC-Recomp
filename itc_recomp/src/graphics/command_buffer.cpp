@@ -13,8 +13,6 @@ namespace graphics::command_buffer {
 
 namespace {
 
-constexpr uint32_t kInvalidateState = 0xC0003B00u;  // INVALIDATE_STATE, one word
-constexpr uint32_t kEventWriteShd = 0xC0025800u;    // EVENT_WRITE_SHD, three words
 constexpr uint32_t kEndMarker = 0xC0000000u;
 constexpr uint32_t kWaitRegMem = 0xC0043C01u;  // WAIT_REG_MEM, five words
 constexpr uint32_t kInterrupt = 0xC0005401u;   // INTERRUPT, one word
@@ -27,25 +25,16 @@ uint32_t WriteSegmentTail(uint32_t device, uint32_t position) {
   const uint32_t generation = d.wrap_generation();
   const uint32_t write = d.write_position();
   const uint32_t fence = d.fence();
-  const uint32_t progress = d.progress_block().address;
   const uint32_t read_position = (generation & 3) | write;
   d.set_tail_generation(generation);
   d.set_tail_position(write);
-  // The stores in the original's order.
-  guest::StoreU32(position + 12, 3);
-  guest::StoreU32(position + 28, 3);
-  guest::StoreU32(position + 0, kInvalidateState);
-  guest::StoreU32(position + 4, 0x7FFF);
-  guest::StoreU32(position + 8, kEventWriteShd);
-  guest::StoreU32(position + 24, kEventWriteShd);
-  guest::StoreU32(position + 20, read_position);
-  guest::StoreU32(position + 36, fence);
-  guest::StoreU32(position + 32, PhysicalAddress(progress) | 2);
-  guest::StoreU32(position + 16, PhysicalAddress(progress + 4) | 2);
-  if (d.tap().address == 0 && (d.flags() & 0x2)) {
-    d.progress_block().set_fence_done(fence);
-    d.progress_block().set_read_position(read_position);
-  }
+  // The segment is done at once (docs/pc-renderer.md, step 3): its read
+  // position and fence go straight into the progress block, as the
+  // original does for a hung GPU, and the tail's packets (the invalidate and
+  // the two EVENT_WRITE_SHD the GPU would make those writes with) are left
+  // out: nothing reads the command buffer. Its 40 bytes stay reserved.
+  d.progress_block().set_fence_done(fence);
+  d.progress_block().set_read_position(read_position);
   d.set_fence(fence + 2);
   return position + 40;
 }

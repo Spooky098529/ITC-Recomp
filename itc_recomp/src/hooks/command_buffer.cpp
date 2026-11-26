@@ -12,6 +12,7 @@
 #include "hooks/command_buffer.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "graphics/command_buffer.h"
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
@@ -146,7 +147,7 @@ ITC_COMMAND_BUFFER(822AF978,
 // Device::WriteFlushPackets (sub_8229E5D0): Dropped. Its block only made the
 // GPU flush caches for memory the CPU wrote (COHER_* registers and a
 // WAIT_REG_MEM on them), which our kick doesn't act on
-// (src/native/gpu_link.cpp: waits have no effect, and those registers are
+// (no GPU runs them: waits have no effect, and those registers are
 // read by nothing); the graphics rule on cache flushes (2026-10-24,
 // graphics-resources.md). Answers "no block" (r5's word 0, r4's left
 // alone), as the original does when there's nothing to flush, so its callers
@@ -165,4 +166,27 @@ ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
   if (!ITC_FLAG(native_command_buffer)) {
     lifted::original::c822AC470(ctx);
   }
+}
+
+// Device::Kick (sub_8229E3F0): r3 the device, r4 pairs of (size in words,
+// address), r5 the pair count. The original writes an INDIRECT_BUFFER per
+// pair into the primary ring and CP_RB_WPTR for the GPU to run them. No GPU
+// runs them (our renderer draws from the command list replay), and what a
+// segment's tail had the GPU write (its fence and read position) is written
+// at once (graphics::command_buffer::WriteSegmentTail): nothing to do.
+// (Until step 3 of docs/pc-renderer.md, src/native/gpu_link.cpp walked the
+// buffers here and made their fences, memory writes and interrupts.)
+ITC_NATIVE_ENTRY_ALWAYS(8229E3F0) {
+  ITC_NATIVE_RUNNING("sub_8229E3F0 Device::Kick (dropped)");
+}
+
+// Device::DeferredKick (sub_8229E848): r3 the device, r4 returned as is, r5
+// the address, r6 the size in words, r7 the interrupts the buffer will
+// raise, r8 the list of deferred kicks (+13036). While interrupts are
+// outstanding (+10868) the original queues the buffer for the worker thread
+// to kick once the GPU reaches them; otherwise it adds r7 and kicks. With no
+// GPU, nothing is outstanding or kicked: r4 back, the count left at 0.
+ITC_NATIVE_ENTRY_ALWAYS(8229E848) {
+  ITC_NATIVE_RUNNING("sub_8229E848 Device::DeferredKick (dropped)");
+  ctx.r3.u64 = ctx.r4.u32;
 }
