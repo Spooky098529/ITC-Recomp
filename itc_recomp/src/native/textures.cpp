@@ -51,7 +51,11 @@ namespace {
 
 // Per frame in flight: texture data on its way into images. A frame that
 // needs more defers the rest to the next frames (placeholders meanwhile).
-constexpr VkDeviceSize kStagingSize = 64u << 20;
+// Per frame in flight (host-visible: pinned system memory on a discrete
+// GPU); a texture that doesn't fit waits for the next frame. 32 MB since
+// docs/pc-renderer.md (64 before): the largest texture with its mips is
+// ~21 MB.
+constexpr VkDeviceSize kStagingSize = 32u << 20;
 
 uint32_t Log2Ceil(uint32_t v) {
   return v <= 1 ? 0 : 32 - std::countl_zero(v - 1);

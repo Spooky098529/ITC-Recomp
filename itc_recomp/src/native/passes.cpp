@@ -170,9 +170,10 @@ constexpr VkImageAspectFlags kDepthStencilAspects =
 constexpr uint32_t kResolvesPerFrame = 256;
 
 // Per frame in flight: the draws' constants, in blocks of this size (about
-// 7,000 draws each); a frame that fills its blocks gets another, kept for
-// later frames.
-constexpr VkDeviceSize kConstantBlockSize = 64u << 20;
+// 1,750 draws each, fewer reused); a frame that fills its blocks gets
+// another, kept for later frames. Host-visible, so pinned system memory on
+// a discrete GPU: 16 MB since docs/pc-renderer.md (64 before).
+constexpr VkDeviceSize kConstantBlockSize = 16u << 20;
 // Fixed descriptor ranges of the constant buffers (set 1), so one set per
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
