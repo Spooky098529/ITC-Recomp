@@ -30,9 +30,9 @@
 #include <tmmintrin.h>
 #endif
 
-ITC_FLAG_BOOL(give_back_xpr_data, false, "ITC",
-              "Upload XPR files' textures at load and give their data's pages back "
-              "(docs/pc-renderer.md, step 2b; off: the menus' 2D elements read zeros)");
+ITC_FLAG_BOOL(give_back_xpr_data, true, "ITC",
+              "Upload XPR files' textures at load and give their data's pages back to the "
+              "system (docs/pc-renderer.md, step 2b)");
 ITC_FLAG_BOOL(native_renderer_log_texture_writes, false, "ITC",
               "Log which code writes textures' memory: on first load and when a texture "
               "is found changed, what the library's memcpy wrote there (a debugging aid; "
@@ -528,7 +528,8 @@ struct TextureCache::State {
   };
   std::map<uint32_t, Xpr> xprs;
   uint64_t xpr_dropped_bytes = 0;
-  bool logged_dropped_miss = false;
+  uint32_t logged_dropped_misses = 0;
+  uint32_t logged_dropped_writes = 0;
   bool InDroppedXpr(uint32_t start, uint32_t end) const {
     auto it = xprs.upper_bound(start);
     if (it == xprs.begin()) {
@@ -1084,8 +1085,6 @@ void TextureCache::ProcessXprs() {
     std::lock_guard lock(g_xpr_mutex);
     events.swap(g_xpr_events);
   }
-  // Off by default: the menus' 2D elements draw XPR data with fetch
-  // constants unlike the files' headers, which then read zeros (2026-11-26).
   if (!ITC_FLAG(give_back_xpr_data)) {
     return;
   }
@@ -1096,6 +1095,20 @@ void TextureCache::ProcessXprs() {
       x = {};
       x.size = e.size;
       x.fetches = std::move(e.fetches);
+      // The headers' base and mip addresses (words 1 and 5, 4 KB units) are
+      // the CPU's view of the physical memory (0xE0000000, 4 KB back), as
+      // RelocateTexture writes them; SetTexture binds the GPU's address. As
+      // the draws will have them, or each texture is uploaded under a key no
+      // draw asks for and the draws read the given-back pages' zeros (the
+      // menus' 2D elements and much of a race, 2026-11-26). The sampler
+      // fields set at binding aren't in the key (KeyOf).
+      for (auto& fetch : x.fetches) {
+        for (uint32_t w : {1u, 5u}) {
+          if (fetch[w] & 0xFFFFF000u) {
+            fetch[w] = GpuPhysicalAddress(fetch[w] & 0xFFFFF000u) | (fetch[w] & 0xFFFu);
+          }
+        }
+      }
       continue;
     }
     auto it = s.xprs.find(data);
@@ -1399,6 +1412,13 @@ void TextureCache::State::MarkWritten() {
   ScopedCost cost(g_frame_costs.mark_ns);
   stats.writes += new_writes.size();
   for (const auto& [start, end] : new_writes) {
+    // Not expected (none in an attract race or the pad replay): a texture
+    // reloaded from there would read zeros around the write.
+    if (logged_dropped_writes < 20 && InDroppedXpr(start, end)) {
+      logged_dropped_writes++;
+      ITC_LOG_ERROR("native renderer: memcpy wrote {:08X}-{:08X}, in an XPR's data whose pages "
+                    "were given back (--give_back_xpr_data)", start, end);
+    }
     auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
     for (; it != by_address.end() && it->first < end; ++it) {
       auto& [size, texture] = it->second;
@@ -1508,10 +1528,10 @@ VkImageView TextureCache::LookUpView(const uint32_t fetch_words[6],
       return VK_NULL_HANDLE;
     }
     t.endian = fetch.endianness;
-    if (!s.logged_dropped_miss) {
+    if (s.logged_dropped_misses < 40) {
       uint32_t start = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
       if (s.InDroppedXpr(start, start + 1)) {
-        s.logged_dropped_miss = true;
+        s.logged_dropped_misses++;
         std::string header;
         for (const auto& [data, x] : s.xprs) {
           if (start < data || start >= data + x.size) {

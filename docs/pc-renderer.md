@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0 and 1 done, 2 and 4 in progress)
+# A PC renderer (a plan; steps 0 and 1 done, 2, 2b and 4 in progress)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -371,6 +371,47 @@ pass draws, then resolves (the shadow map's 66 draws, then its depth
 resolve); the main view draws, is resolved twice, the glow's steps draw
 and resolve on one 256x144 target in turn, then the main view draws on
 (the grab pass) and is resolved for the scene target, then the front.
+
+## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
+
+`--log_memory_use` now also lists the physical memory's live blocks by who
+asked (`memory::PhysicalTag`): in the pad replay's menus, XPR textures
+109.4 MB (53 files), model vertices 9.5 MB, the rest 42.9 MB; the XPR
+files are where the GPU data is.
+
+- **XPR textures uploaded at load, their pages given back**
+  (`--give_back_xpr_data`, on): `XPR::Create` hands the renderer its data
+  block and each texture's fetch constant (`TextureCache_XprLoaded`); at
+  the next frame's start each is uploaded as a draw would, and once all are
+  on the GPU the block's pages are `madvise(MADV_DONTNEED)`d. Those
+  textures stay through race ends (they can't be loaded again) and leave
+  when `XPR::Release` says so (`TextureCache_XprReleased`). Only files whose
+  records are all textures.
+- **Freed physical blocks' pages given back** (`memory::FreePhysical`,
+  always): a freed block's data stayed resident until something else took
+  the space.
+- **The fault found on the way:** the headers' base and mip addresses
+  (fetch words 1 and 5) are the CPU's view of the physical memory
+  (`0xE0000000`, 4 KB back), as `RelocateTexture` writes them, and
+  `SetTexture` binds the GPU's. Uploaded under the headers' words, no draw
+  found them, and draws read the given-back zeros (the menus' 2D elements
+  and much of a race, the user's report). They're translated
+  (`GpuPhysicalAddress`) before the upload. The sampler fields `SetTexture`
+  merges in (clamps, filters, LOD) aren't in the texture's key (`KeyOf`),
+  so every variant shares the one image. A draw reaching a given-back XPR
+  with a key not uploaded, and memcpy writing into one, are logged as
+  errors: none in the checks.
+
+Checked: an attract race's frame against step 0's (2,390 draws, 0.08% of
+pixels off by more than 0.02), attract races (0 error lines), the tick
+replay (both races' digests match), and the pad replay (menus, the garage,
+the tuning shop, both races with their HUD, the pause menu, the return to
+the garage: frames right, 0 error lines). **The physical block's resident
+pages: ~205 -> ~33 MB in the menus, ~250 -> ~64 MB in a race; the process's
+resident set ~510-645 -> ~400-490 MB.**
+
+Left for 2b: the model vertices and indices (~10-40 MB) by handle, which
+waits on step 3 (draws find their streams by address until then).
 
 ## Open questions
 
