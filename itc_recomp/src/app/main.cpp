@@ -207,6 +207,9 @@ void RequestQuit() {
 
 }  // namespace app
 
+ITC_FLAG_BOOL(trim_memory, true, "ITC",
+              "Give memory the C library keeps after freeing back to the system every 10 s "
+              "(docs/pc-renderer.md)");
 ITC_FLAG_STRING(check_call_targets, "", "ITC",
                 "A file of addresses (hex, a line each; itc_recomp/tools/call_targets.py "
                 "writes it): log those with no entry in the dispatch table, and exit");
@@ -245,6 +248,9 @@ int main(int argc, char* argv[]) {
   if (!memory::MapGuest()) {
     app::Fail("Failed to map guest memory");
     return EXIT_FAILURE;
+  }
+  if (ITC_FLAG(trim_memory)) {
+    memory::StartTrimming();
   }
   if (!app::SetUpSdl() || !app::CheckGameData(paths)) {
     return EXIT_FAILURE;

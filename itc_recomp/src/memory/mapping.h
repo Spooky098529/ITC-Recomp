@@ -23,4 +23,8 @@ bool MapGuest();
 // 3100.2 MB, GTT 1420.0 MB" (the driver part on amdgpu only).
 std::string DescribeResident();
 
+// Starts a thread giving freed memory back to the system every 10 s
+// (malloc_trim; --trim_memory).
+void StartTrimming();
+
 }  // namespace memory

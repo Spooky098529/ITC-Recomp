@@ -22,6 +22,7 @@
 
 #include "base/log.h"
 
+#include <malloc.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -33,6 +34,8 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <chrono>
+#include <thread>
 
 namespace memory {
 
@@ -137,6 +140,7 @@ std::string DriverMemory() {
 
 std::string DescribeResident() {
   constexpr double kMB = 1048576.0;
+
   std::ifstream file("/proc/self/status");
   std::string status((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   return std::format(
@@ -146,6 +150,19 @@ std::string DescribeResident() {
       ResidentBytes(g_physical, kPhysicalBytes + 0x1000) / kMB,
       StatusBytes(status, "VmRSS:") / kMB, StatusBytes(status, "RssAnon:") / kMB,
       StatusBytes(status, "RssFile:") / kMB, StatusBytes(status, "RssShmem:") / kMB, DriverMemory());
+}
+
+void StartTrimming() {
+  // glibc keeps freed memory in its arenas: after loads (the shader
+  // compiles, a race's set-up) ~90 MB of it stayed resident in a pad replay
+  // (docs/pc-renderer.md). A thread of its own gives it back every 10 s,
+  // off the render and main threads (a trim takes a few ms).
+  std::thread([] {
+    for (;;) {
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      malloc_trim(0);
+    }
+  }).detach();
 }
 
 }  // namespace memory
