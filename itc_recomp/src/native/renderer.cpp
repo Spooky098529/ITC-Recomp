@@ -60,9 +60,6 @@ ITC_FLAG_BOOL(native_renderer_reuse_constants, true, "ITC",
 ITC_FLAG_BOOL(native_renderer_log_constant_changes, false, "ITC",
               "Log why draws' constants aren't reused: what differs in the fetch block, "
               "and which blocks' offsets differ when the descriptor sets repeat");
-ITC_FLAG_BOOL(native_renderer_log_register_reads, false, "ITC",
-              "Log how often the device's register shadow is read a frame, how many words "
-              "are copied (those marked dirty) and what changed since the last read");
 ITC_FLAG_BOOL(native_renderer_log_texture_bindings, false, "ITC",
               "Log how often draws' texture bindings repeat the last ones (fetch constants, "
               "views, samplers, descriptor sets) and what would empty a cache of them");
@@ -712,7 +709,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_skip_repeated_state(ITC_FLAG(native_renderer_skip_repeated_state));
     passes_.set_reuse_constants(ITC_FLAG(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(ITC_FLAG(native_renderer_log_constant_changes));
-    passes_.set_log_register_reads(ITC_FLAG(native_renderer_log_register_reads));
     passes_.set_log_texture_bindings(ITC_FLAG(native_renderer_log_texture_bindings));
     passes_.set_log_shader_lookups(ITC_FLAG(native_renderer_log_shader_lookups));
     passes_.set_cache_shader_lookups(ITC_FLAG(native_renderer_cache_shader_lookups));
@@ -1060,18 +1056,6 @@ void Renderer::LogStats() {
                    share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
                    share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
     }
-  }
-  if (const RegisterReadStats& r = view.register_reads; r.calls) {
-    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(r.calls); };
-    const auto& b = r.blocks_changed;
-    ITC_LOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
-                 "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
-                 "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
-                 "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
-                 double(r.calls) / frames, double(r.words) / frames,
-                 double(r.words_copied) / frames, double(r.words_changed) / frames,
-                 share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
-                 share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
   }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;

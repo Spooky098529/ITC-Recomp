@@ -103,7 +103,6 @@ class Passes {
   // Counts why constants aren't reused (Stats::fetch_changed and
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
-  void set_log_register_reads(bool log);
   // A diagnostic: how much of texture binding repeats from draw to draw
   // (to judge caching it); TakeTextureBindings describes it since it was
   // last called.
@@ -239,8 +238,6 @@ class Passes {
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
-    // With log_register_reads.
-    RegisterReadStats register_reads;
     TextureCache::Stats textures;
   };
   Stats TakeStats();

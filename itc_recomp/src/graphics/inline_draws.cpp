@@ -44,65 +44,29 @@ void Store64(uint32_t address, uint64_t value) {
   guest::StoreU32(address + 4, uint32_t(value));
 }
 
-// The dirty state's flush every draw begins with. The packet writers it
-// calls are Dropped (src/native/draw_packets.cpp: sub_822AE1D0,
-// sub_822ADE30, sub_822ADEF0, sub_822AE070, sub_822ADC08); what their
-// overrides keep, the native renderer's dirty marks, is made here with
-// the same masks and first registers.
+// The dirty state's flush every draw begins with: the masks cleared, the
+// shaders loaded and the hi-Z state reset. The packet writers it calls are
+// Dropped (sub_822AE1D0, sub_822ADE30, sub_822ADEF0, sub_822AE070,
+// sub_822ADC08); the renderer reads the device's shadow at the draw
+// (src/native/draw_registers.h), so nothing is marked for it.
 void Flush(uint32_t frame, uint64_t r13, uint32_t device) {
-  const uint64_t other = Load64(device + kOtherStateDirty);
-  const uint64_t render = Load64(device + kRenderStateDirty);
-  uint64_t shader = Load64(device + kShaderStateDirty);
-  // +0 and +8: the constants' packets (sub_822AE1D0), nothing marked.
+  // +0 and +8: the constants' packets (sub_822AE1D0).
   Store64(device + kVertexConstantsDirty, 0);
   Store64(device + kPixelConstantsDirty, 0);
-  if (shader != 0) {
+  if (const uint64_t shader = Load64(device + kShaderStateDirty); shader != 0) {
     if (shader & (0xFull << 49)) {
-      shader = lifted_call::Call(kLoadShaders, frame, r13, {device, shader}).r3;
-    }
-    if (shader & 0xFFF) {
-      if (shader & 0x100) {
-        native::MarkRegistersDirty(0x2203, 1ull << 63);  // sub_822ADC08
-        shader &= ~0x100ull;
-      }
-      if (shader & 0xFFF) {
-        native::MarkRegistersDirty(8704, shader << 52);
-      }
-    }
-    if (shader & 0x00000FFFFFFFF000ull) {
-      native::MarkFetchConstantsDirty((shader << 20) & 0xFFFFFFFF00000000ull);
-    }
-    if (shader & (31ull << 44)) {
-      native::MarkRegistersDirty(8576, (shader << 15) & 0xF800000000000000ull);
+      lifted_call::Call(kLoadShaders, frame, r13, {device, shader});
     }
     Store64(device + kShaderStateDirty, 0);
   }
-  if (render != 0) {
+  if (const uint64_t render = Load64(device + kRenderStateDirty); render != 0) {
     if (render & 0x2) {
       Store64(device + kHizState, 0xFFFFFFFFFF000000ull);
-      native::MarkRegistersDirty(18688, 0xFFFFFFFFFF000000ull);
-    }
-    if (render & 0x007FFFFCull) {
-      native::MarkRegistersDirty(8448, (render << 41) & 0xFFFFF80000000000ull);
-    }
-    if (render & 0x0000007FFF800000ull) {
-      native::MarkRegistersDirty(8192, (render << 25) & 0xFFFF000000000000ull);
-    }
-    if (render & 0x0FFFFF8000000000ull) {
-      native::MarkRegistersDirty(8832, (render << 4) & 0xFFFFF80000000000ull);
     }
     Store64(device + kRenderStateDirty, 0);
   }
-  if (other != 0) {
-    if (other & 0x0000003FFFFFFFFFull) {
-      native::MarkRegistersDirty(8960, (other << 26) & 0xFFFFFFFFFC000000ull);
-    }
-    if (other & 0x00003FC000000000ull) {
-      native::MarkRegistersDirty(9088, (other << 18) & 0xFF00000000000000ull);
-    }
-    // 0x007E000000000000: sub_822ADEF0's register blocks, nothing marked.
-    Store64(device + kOtherStateDirty, 0);
-  }
+  // sub_822ADEF0's register blocks and the rest of the other state: packets.
+  Store64(device + kOtherStateDirty, 0);
 }
 
 // The inline stride set for the flush (the shader load patches the vertex

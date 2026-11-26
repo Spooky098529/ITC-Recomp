@@ -779,7 +779,7 @@ set(ITC_SOURCES
     src/native/renderer.cpp
     src/native/replay_hooks.cpp
     src/native/shaders.cpp
-    src/native/state.cpp
+    src/native/draw_registers.cpp
     src/native/textures.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp

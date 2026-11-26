@@ -155,15 +155,10 @@ void LogCheck() {
 // found no other device field changed, "The indexed draw without its
 // packets" in docs/native-renderer.md). r3 is left as the device (their
 // recompiled callers don't read it), sub_822ADC08's is its mask with bit 8
-// cleared, as the original returns. The register blocks' and fetch
-// constants' masks (r4; r5 the first register) are still marked for the
-// native renderer to read again (draws other than the indexed draw in
-// exclusive mode flush with them). With the check flag, or the drop flag
+// cleared, as the original returns. With the check flag, or the drop flag
 // off, the originals run.
-#define NATIVE_CHECKED_HELPER(address, helper, mark, dropped)                             \
+#define NATIVE_CHECKED_HELPER(address, helper, dropped)                                   \
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                    \
-    \
-    mark;                                                                                 \
     if (!native::Checking()) {                                                            \
       if (ITC_FLAG(native_draw_packets)) {                                                \
         dropped;                                                                          \
@@ -176,17 +171,15 @@ void LogCheck() {
                     [&] { lifted::original::c##address(ctx); });               \
   }
 
-NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, , ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
+NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
 NATIVE_CHECKED_HELPER(822ADE30, native::kRegisters,
-                      native::MarkRegistersDirty(ctx.r5.u32, ctx.r4.u64),
                       ITC_NATIVE_RUNNING("sub_822ADE30 (dropped)"))
-NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, , ITC_NATIVE_RUNNING("sub_822ADEF0 (dropped)"))
+NATIVE_CHECKED_HELPER(822ADEF0, native::kRegisters2, ITC_NATIVE_RUNNING("sub_822ADEF0 (dropped)"))
 NATIVE_CHECKED_HELPER(822AE070, native::kFetchConstants,
-                      native::MarkFetchConstantsDirty(ctx.r4.u64),
                       ITC_NATIVE_RUNNING("sub_822AE070 (dropped)"))
 // sub_822ADC08 writes register 0x2203 (r5) itself; it returns its mask (r4)
 // without bit 8.
-NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203, 1ull << 63), {
+NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, {
   ITC_NATIVE_RUNNING("sub_822ADC08 (dropped)");
   ctx.r3.u64 = ctx.r4.u64 & ~0x100ull;
 })
@@ -251,9 +244,6 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
     shader_state |= ctx.r3.u64;
     ctx = saved;
   }
-  // What the library's draw would have flushed: read again.
-  MarkDeviceDirty(shader_state, guest::LoadU64(device + kDeviceRenderStateDirty),
-                  guest::LoadU64(device + kDeviceOtherStateDirty));
   guest::StoreU64(device + kDeviceShaderStateDirty, 0);
   if (guest::LoadU64(device + kDeviceRenderStateDirty) & 0x2) {
     guest::StoreU64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std

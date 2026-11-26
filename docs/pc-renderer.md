@@ -372,6 +372,31 @@ resolve); the main view draws, is resolved twice, the glow's steps draw
 and resolve on one 256x144 target in turn, then the main view draws on
 (the grab pass) and is resolved for the scene target, then the front.
 
+## Step 3: the draw state (first part done 2026-11-26)
+
+- **The draw reads the device's shadow directly**
+  (`src/native/draw_registers.{h,cpp}`, `DrawRegisters::Read`): the fetch
+  and bool/loop constants copied in host order, and the ~20 registers the
+  draw decodes, with our own decoding (the depth and color mask
+  normalization, the depth bias, the host viewport: the SDK's `draw_util`
+  for this renderer's arguments). Gone: the SDK's `RegisterFile` and
+  `draw_util` in the renderer, `ReadRegisters` and the dirty masks it
+  followed (`native/state.cpp`; `MarkRegistersDirty`,
+  `MarkFetchConstantsDirty`, `MarkDeviceDirty` and their calls in the
+  inline draws' flush, the resolve and the draw's packet writers), and
+  `--native_renderer_log_register_reads`. Every writer of the shadow is
+  the game's Direct3D, which keeps it current, so reading it whole at the
+  draw is the same as the copy of its dirty words.
+- Checked: an attract race's per-draw records (`draws.txt`: shaders,
+  render state words, fetch constants) the same as the build before's,
+  line for line; the shown frame within the runs' spread; the pad replay
+  (menus, both races) with 0 error lines, a menu frame the same as the build
+  before's on the same schedule.
+
+Left for step 3: the faked GPU (the segment tails' fences, the kick,
+`gpu_link.cpp`), then the handlers calling our interface instead of the
+game's Direct3D, which ends the shadow on the render path.
+
 ## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
 
 `--log_memory_use` now also lists the physical memory's live blocks by who

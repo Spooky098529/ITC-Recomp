@@ -21,6 +21,7 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "state.h"
+#include "draw_registers.h"
 
 #include <algorithm>
 #include <array>
@@ -35,9 +36,6 @@
 #include <unordered_set>
 #include <vector>
 #include <rex/graphics/pipeline/shader/spirv_translator.h>
-#include <rex/graphics/register_file.h>
-#include <rex/graphics/registers.h>
-#include <rex/graphics/util/draw.h>
 #include <rex/graphics/xenos.h>
 #include "base/flags.h"
 #include "base/hash.h"
@@ -54,18 +52,8 @@ ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
 namespace native {
 
 namespace graphics = rex::graphics;
-namespace reg = rex::graphics::reg;
 namespace xenos = rex::graphics::xenos;
-namespace draw_util = rex::graphics::draw_util;
 using Translator = graphics::SpirvShaderTranslator;
-using graphics::XE_GPU_REG_RB_ALPHA_REF;
-using graphics::XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031;
-using graphics::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0;
-using graphics::XE_GPU_REG_SQ_CONTEXT_MISC;
-using graphics::XE_GPU_REG_SQ_PROGRAM_CNTL;
-using graphics::XE_GPU_REG_VGT_INDX_OFFSET;
-using graphics::XE_GPU_REG_VGT_MAX_VTX_INDX;
-using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
 
 namespace {
 
@@ -1053,7 +1041,8 @@ struct Passes::State {
   std::chrono::steady_clock::time_point pipeline_cache_saved;
   void OpenPipelineCache();
   void MaybeSavePipelineCache();
-  rex::graphics::RegisterFile regs;
+  // The draw's state, from the device's shadow (ReadState).
+  DrawRegisters regs;
   Stats stats;
   // The state the last draw recorded into the frame's command buffer, to
   // count the state calls that repeat it (stats.state_repeated). Forgotten
@@ -1087,15 +1076,7 @@ struct Passes::State {
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
-  bool log_register_reads = false;
-  // ReadRegisters into regs, counted with log_register_reads.
-  void ReadState(uint32_t device) {
-    if (log_register_reads) {
-      ReadRegisters(device, regs, stats.register_reads);
-    } else {
-      ReadRegisters(device, regs);
-    }
-  }
+  void ReadState(uint32_t device) { regs.Read(device); }
   // Points offset at a copy of the block's size bytes in the constant
   // block in use: the last one written if the same (and reuse_constants),
   // or a new one, reserving range bytes. With copied, the bytes are
@@ -1521,7 +1502,7 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
 VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
                                                VkDescriptorSetLayout layout, uint32_t stage) {
   LastTextureSet& last = last_texture_sets[stage];
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  const uint32_t* fetch = regs.fetch;
   uint64_t generation = textures.generation();
   uint64_t sampler_generation = textures.sampler_generation();
   if (reuse_texture_sets && last.set && last.shader == shader && last.layout == layout &&
@@ -1571,7 +1552,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
   for (size_t i = 0; i < texture_count; i++) {
     const ShaderTexture& texture = shader->textures[i];
     const uint32_t* fetch =
-        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant];
+        &regs.fetch[6 * texture.fetch_constant];
     // The signed binding gets the same (unsigned) view: it's read only for
     // components whose sign is signed, which this game's textures don't
     // have (logged if they do).
@@ -1628,7 +1609,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
   for (size_t i = 0; i < sampler_count; i++) {
     const ShaderSampler& binding = shader->samplers[i];
     const uint32_t* fetch =
-        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * binding.fetch_constant];
+        &regs.fetch[6 * binding.fetch_constant];
     if (log_texture_bindings) {
       uint32_t extra[4] = {binding.mag_filter, binding.min_filter, binding.mip_filter,
                            binding.aniso_filter};
@@ -1774,7 +1755,7 @@ void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t ha
 void Passes::State::CountDrawBindings(const TranslatedShader* vertex,
                                       const TranslatedShader* pixel) {
   TextureBindingCounts& c = binding_counts;
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  const uint32_t* fetch = regs.fetch;
   uint64_t generation = textures.generation();
   LastDraw& last = last_draw;
   // Whether a stage's shader and the fetch constants it reads are as at the
@@ -2723,9 +2704,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   s.stats.movie_draws++;
 }
 
-Passes::Passes() : state_(std::make_unique<State>()) {
-  std::memset(state_->regs.values, 0, sizeof(state_->regs.values));  // see ReadRegisters
-}
+Passes::Passes() : state_(std::make_unique<State>()) {}
 Passes::~Passes() = default;
 
 bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
@@ -2969,7 +2948,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // plugin takes it (the item's upper half is the library's argument, which
   // it may already have applied to the vertex buffers' addresses).
   int32_t item_base_vertex = int32_t(base_start) >> 16;
-  int32_t base_vertex = int32_t(regs.values[XE_GPU_REG_VGT_INDX_OFFSET]);
+  int32_t base_vertex = regs.vertex_index_offset;
   if (!call.inline_vertices && base_vertex != item_base_vertex) {
     s.stats.base_vertex_differs++;
     if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
@@ -2983,7 +2962,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                                               : primitive_count * primitive.a + primitive.b;
 
   // Shaders, read through physical memory as the GPU reads them.
-  uint32_t program_control = regs.values[XE_GPU_REG_SQ_PROGRAM_CNTL];
+  uint32_t program_control = regs.program_control;
   uint32_t vertex_object = guest::LoadU32(device + kDeviceVertexShader);
   uint32_t pixel_object = guest::LoadU32(device + kDevicePixelShader);
   if (!vertex_object) {
@@ -3028,7 +3007,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   const uint8_t* pixel_ucode =
       pixel_object ? PhysicalHostAddress(GpuPhysicalAddress(pixel_address)) : nullptr;
   uint32_t pixel_size = pixel_object ? guest::LoadU32(pixel_object + 64) : 0;
-  uint32_t context_misc = regs.values[XE_GPU_REG_SQ_CONTEXT_MISC];
+  uint32_t context_misc = regs.context_misc;
   // The lookup in full: each microcode hashed once (the cache's lookups take
   // the hash), which interpolators connect them (an unconnected one the
   // pixel shader reads would be undefined), and the translations.
@@ -3155,14 +3134,20 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     r.inline_vertices = call.inline_vertices;
     for (uint32_t k = 0; k < 96; k++) {
       if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
-        r.vertex_fetches.push_back({k, regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k],
-                                    regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1]});
+        r.vertex_fetches.push_back({k, regs.fetch[2 * k],
+                                    regs.fetch[2 * k + 1]});
       }
     }
-    r.render_state = {regs.values[0x2200], regs.values[0x2201], regs.values[0x2202],
-                      regs.values[0x2208], regs.values[0x2104], regs.values[0x2105],
-                      regs.values[0x2106], regs.values[0x2107], regs.values[0x2108],
-                      regs.values[0x210E]};
+    r.render_state = {regs.depth_control,
+                      regs.blend_control[0],
+                      regs.color_control,
+                      regs.edram_mode,
+                      regs.color_mask,
+                      std::bit_cast<uint32_t>(regs.blend_constants[0]),
+                      std::bit_cast<uint32_t>(regs.blend_constants[1]),
+                      std::bit_cast<uint32_t>(regs.blend_constants[2]),
+                      std::bit_cast<uint32_t>(regs.blend_constants[3]),
+                      std::bit_cast<uint32_t>(regs.alpha_ref)};
     for (const TranslatedShader* shader : {vertex, pixel}) {
       for (size_t i = 0; shader && i < shader->textures.size(); i++) {
         const ShaderTexture& texture = shader->textures[i];
@@ -3170,7 +3155,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
         t.pixel = shader == pixel;
         t.texture = texture;
         std::memcpy(t.fetch,
-                    &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant],
+                    &regs.fetch[6 * texture.fetch_constant],
                     sizeof(t.fetch));
       }
     }
@@ -3190,7 +3175,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
     for (const ShaderTexture& texture : pixel->textures) {
       glow_frame.cross_fade_texture =
-          regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant + 1] &
+          regs.fetch[6 * texture.fetch_constant + 1] &
           0x1FFFF000u;
       break;
     }
@@ -3218,15 +3203,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
 
   // Viewport and scissor.
-  reg::RB_DEPTHCONTROL depth_control = draw_util::GetNormalizedDepthControl(regs);
-  draw_util::ViewportInfo viewport_info;
-  draw_util::GetHostViewportInfo(regs, 1, 1, false, 8192, 8192, true, depth_control, false,
-                                 false, false, viewport_info);
+  bool z_enable = false, z_write = false;
+  uint32_t z_func = 0;
+  regs.NormalizedDepth(z_enable, z_write, z_func);
+  const DrawRegisters::Viewport viewport_info = regs.HostViewport();
   // Scissor: the window scissor registers aren't in the shadow's flushed
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
   // SetScissorRect; otherwise the whole target.
-  draw_util::Scissor scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
+  struct {
+    uint32_t offset[2], extent[2];
+  } scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
   if (guest::LoadU32(device + kDeviceScissorEnable)) {
     int32_t left = int32_t(guest::LoadU32(device + kDeviceScissorRect));
     int32_t top = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4));
@@ -3239,12 +3226,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], guest_extent.width);
   uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], guest_extent.height);
-  if (!viewport_info.xy_extent[0] || !viewport_info.xy_extent[1] ||
+  if (!viewport_info.extent[0] || !viewport_info.extent[1] ||
       scissor.offset[0] >= scissor_right || scissor.offset[1] >= scissor_bottom) {
     s.stats.invisible++;
     if (!s.stats.invisible_sample[0]) {  // one example per log line
-      s.stats.invisible_sample = {viewport_info.xy_offset[0], viewport_info.xy_offset[1],
-                                  viewport_info.xy_extent[0], viewport_info.xy_extent[1],
+      s.stats.invisible_sample = {viewport_info.offset[0], viewport_info.offset[1],
+                                  viewport_info.extent[0], viewport_info.extent[1],
                                   scissor.offset[0], scissor.offset[1], scissor.extent[0],
                                   scissor.extent[1]};
       s.stats.invisible_sample[0] |= 0x80000000u;  // mark as set
@@ -3261,14 +3248,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // these draws use).
   Translator::SystemConstants system{};
   uint32_t flags = 0;
-  auto vte = regs.Get<reg::PA_CL_VTE_CNTL>();
-  if (vte.vtx_xy_fmt) {
+  if (regs.viewport_enabled(8)) {
     flags |= Translator::kSysFlag_XYDividedByW;
   }
-  if (vte.vtx_z_fmt) {
+  if (regs.viewport_enabled(9)) {
     flags |= Translator::kSysFlag_ZDividedByW;
   }
-  if (vte.vtx_w0_fmt) {
+  if (regs.viewport_enabled(10)) {
     flags |= Translator::kSysFlag_WNotReciprocal;
   }
   if (primitive.polygonal) {
@@ -3276,15 +3262,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   } else if (type == 2 || type == 3) {
     flags |= Translator::kSysFlag_PrimitiveLine;
   }
-  auto color_control = regs.Get<reg::RB_COLORCONTROL>();
-  uint32_t alpha_function = color_control.alpha_test_enable ? uint32_t(color_control.alpha_func)
-                                                            : 7;  // always
+  uint32_t alpha_function = regs.alpha_test() ? regs.alpha_func() : 7;  // 7: always
   flags |= alpha_function << Translator::kSysFlag_AlphaPassIfLess_Shift;
   system.flags = flags;
   system.vertex_index_endian = xenos::Endian(index_endian);
   system.vertex_base_index = base_vertex;
-  system.vertex_index_min = regs.values[XE_GPU_REG_VGT_MIN_VTX_INDX];
-  system.vertex_index_max = regs.values[XE_GPU_REG_VGT_MAX_VTX_INDX];
+  system.vertex_index_min = regs.vertex_index_min;
+  system.vertex_index_max = regs.vertex_index_max;
   if (system.vertex_index_max <= system.vertex_index_min || call.inline_vertices) {
     system.vertex_index_min = 0;
     system.vertex_index_max = xenos::kVertexIndexMask;
@@ -3306,7 +3290,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     system.ndc_scale[i] = viewport_info.ndc_scale[i];
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
   }
-  system.alpha_test_reference = regs.Get<float>(XE_GPU_REG_RB_ALPHA_REF);
+  system.alpha_test_reference = regs.alpha_ref;
   // Each sampled texture's post-swizzle signs, a byte per fetch constant.
   for (const TranslatedShader* shader : {vertex, pixel}) {
     if (!shader) {
@@ -3315,13 +3299,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     for (const ShaderTexture& texture : shader->textures) {
       uint32_t index = texture.fetch_constant;
       uint8_t signs = TextureCache::SwizzledSigns(
-          &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * index]);
+          &regs.fetch[6 * index]);
       system.texture_swizzled_signs[index >> 2] |= uint32_t(signs) << (8 * (index & 3));
     }
   }
   for (uint32_t i = 0; i < 4; i++) {
-    auto info = regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[i]);
-    int32_t bias = info.color_exp_bias;
+    int32_t bias = regs.color_exp_bias(i);
     uint32_t scale_bits = uint32_t(0x3F800000 + (bias << 23));
     std::memcpy(&system.color_exp_bias[i], &scale_bits, 4);
   }
@@ -3374,7 +3357,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // address (word 0, low 2 bits the type; word 1 bits 2-25 the size in
   // words). An inline draw's stream points into the arena already.
   uint32_t arena_fetch[kFetchConstantsRange / 4];
-  std::memcpy(arena_fetch, &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0],
+  std::memcpy(arena_fetch, regs.fetch,
               kFetchConstantsRange);
   uint32_t index_offset = 0;
   if (!call.inline_vertices) {
@@ -3436,7 +3419,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       s.stats.fetch_changed_unread += !texture_differs && !vertex_differs;
     }
   }
-  if (!s.PlaceConstants(3, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
+  if (!s.PlaceConstants(3, regs.bool_loop,
                         kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
       !s.PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
     s.stats.failed++;
@@ -3469,26 +3452,27 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.pixel = s.GetModule(pixel);
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
-  auto mode = regs.Get<reg::PA_SU_SC_MODE_CNTL>();
-  key.primitive_restart = (primitive.strip && mode.multi_prim_ib_ena) || rectangle_list;
-  key.cull_mode = (mode.cull_front ? VK_CULL_MODE_FRONT_BIT : 0) |
-                  (mode.cull_back ? VK_CULL_MODE_BACK_BIT : 0);
-  key.front_clockwise = mode.face != 0;
+  key.primitive_restart = (primitive.strip && regs.primitive_restart()) || rectangle_list;
+  key.cull_mode = (regs.cull_front() ? VK_CULL_MODE_FRONT_BIT : 0) |
+                  (regs.cull_back() ? VK_CULL_MODE_BACK_BIT : 0);
+  key.front_clockwise = regs.front_clockwise();
   if (depth) {
-    key.z_enable = depth_control.z_enable;
-    key.z_write = depth_control.z_write_enable;
-    key.z_func = uint32_t(depth_control.zfunc);
+    key.z_enable = z_enable;
+    key.z_write = z_write;
+    key.z_func = z_func;
   }
   key.color_format = color ? color->format : VK_FORMAT_UNDEFINED;
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
-  auto blend = regs.Get<reg::RB_BLENDCONTROL>(reg::RB_BLENDCONTROL::rt_register_indices[0]);
-  key.src_color = BlendFactor(uint32_t(blend.color_srcblend));
-  key.dst_color = BlendFactor(uint32_t(blend.color_destblend));
-  key.color_op = BlendOp(uint32_t(blend.color_comb_fcn));
-  key.src_alpha = BlendFactor(uint32_t(blend.alpha_srcblend));
-  key.dst_alpha = BlendFactor(uint32_t(blend.alpha_destblend));
-  key.alpha_op = BlendOp(uint32_t(blend.alpha_comb_fcn));
+  // RB_BLENDCONTROL: source, op, destination for color (bits 0, 5, 8) and
+  // alpha (16, 21, 24).
+  const uint32_t blend = regs.blend_control[0];
+  key.src_color = BlendFactor(blend & 0x1F);
+  key.dst_color = BlendFactor(blend >> 8 & 0x1F);
+  key.color_op = BlendOp(blend >> 5 & 7);
+  key.src_alpha = BlendFactor(blend >> 16 & 0x1F);
+  key.dst_alpha = BlendFactor(blend >> 24 & 0x1F);
+  key.alpha_op = BlendOp(blend >> 21 & 7);
   key.blend_enable =
       !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
         key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
@@ -3499,7 +3483,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // the rainbow effect on buildings, from ~230 main view draws a frame
   // without a pixel shader.)
   key.write_mask =
-      draw_util::GetNormalizedColorMask(regs, pixel ? pixel->writes_color_targets : 0) & 0xF;
+      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0) & 0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
     return;
@@ -3511,8 +3495,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[0]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[1]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[2]),
-                &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
-                &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0]);
+                regs.bool_loop,
+                regs.fetch);
   }
   if (!pipeline) {
     s.stats.failed++;
@@ -3529,10 +3513,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // ratios, unchanged), by the targets' scale (color and depth share one:
   // the main view's surfaces are both scaled alike).
   float draw_scale = color ? color->scale : depth->scale;
-  VkViewport viewport{float(viewport_info.xy_offset[0]) * draw_scale,
-                      float(viewport_info.xy_offset[1]) * draw_scale,
-                      float(viewport_info.xy_extent[0]) * draw_scale,
-                      float(viewport_info.xy_extent[1]) * draw_scale,
+  VkViewport viewport{float(viewport_info.offset[0]) * draw_scale,
+                      float(viewport_info.offset[1]) * draw_scale,
+                      float(viewport_info.extent[0]) * draw_scale,
+                      float(viewport_info.extent[1]) * draw_scale,
                       viewport_info.z_min,
                       viewport_info.z_max};
   uint32_t scissor_left = State::ScaledBy(scissor.offset[0], draw_scale);
@@ -3548,10 +3532,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (depth) {
     // As the plugin sets it for its host render targets: the guest's depth
     // is float24 (24_8_FLOAT) or unorm24, the slope in 1/16 pixels.
-    draw_util::GetPreferredFacePolygonOffset(regs, primitive.polygonal, slope, constant);
-    constant *= depth->surface.format == uint32_t(xenos::DepthRenderTargetFormat::kD24S8)
-                    ? draw_util::kD3D10PolygonOffsetFactorUnorm24
-                    : draw_util::kD3D10PolygonOffsetFactorFloat24;
+    regs.PolygonOffset(primitive.polygonal, slope, constant);
+    // D3D10's factors: 2^24 - 1 for unorm24 (D24S8, format 0), 2^24 for float24.
+    constant *= depth->surface.format == 0 ? float((1u << 24) - 1) : float(1u << 24);
     // Per pixel: scaled pixels are smaller, so the slope (as the plugin
     // scales it).
     slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(draw_scale, 1.0f);
@@ -3564,7 +3547,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
-  std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
+  std::memcpy(blend_constants, regs.blend_constants, sizeof(blend_constants));
   VkDescriptorSet sets[4] = {s.arena_set, s.constant_block().set,
                              vertex_textures, pixel_textures};
 
@@ -3893,7 +3876,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
   // What BeginVertices wrote to the GPU instead of the shadow.
-  uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  uint32_t* fetch = s.regs.fetch;
   fetch[2 * (kInlineFetchConstant - 2)] = 1;
   fetch[2 * (kInlineFetchConstant - 2) + 1] = 0;
   fetch[2 * (kInlineFetchConstant - 1)] = 1;
@@ -3901,12 +3884,8 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
-  s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
+  s.regs.vertex_index_offset = 0;
   s.Draw(commands, device, call);
-  // Read them from the shadow again next time.
-  static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);
-  MarkFetchConstantsDirty(1ull << (63 - kInlineFetchConstant / 3));
-  MarkRegistersDirty(XE_GPU_REG_VGT_INDX_OFFSET, 1ull << 63);
 }
 
 void Passes::AfterClear(VkCommandBuffer commands, uint32_t payload,
@@ -4220,10 +4199,6 @@ void Passes::set_reuse_constants(bool reuse) {
 
 void Passes::set_log_constant_changes(bool log) {
   state_->log_constant_changes = log;
-}
-
-void Passes::set_log_register_reads(bool log) {
-  state_->log_register_reads = log;
 }
 
 void Passes::set_reuse_texture_sets(bool reuse) {

@@ -250,44 +250,34 @@ void Resolve(uint32_t sp, uint64_t r13, uint32_t device, uint32_t flags,
   // rectangle is outside the scissor (+10308, +10312): left out, and its
   // second call after the copy too.
 
-  // The dirty masks' flush, the shader and render state first.
-  if (const uint64_t shader = Load64(device + kShaderStateDirty); shader != 0) {
-    if (shader & 0x100) {
-      // sub_822ADC08 (Dropped: its override marks 0x2203 and returns the mask
-      // without bit 8, which the original ors back in: +16 as it was).
-      native::MarkRegistersDirty(0x2203, 1ull << 63);
-    }
+  // The dirty masks' flush (their packets Dropped), the shader and render
+  // state first. Bit 8 of the shader state (sub_822ADC08's, Dropped) stays.
+  if (Load64(device + kShaderStateDirty) != 0) {
     uint64_t s = Load64(device + kShaderStateDirty);
     if (s & 0xFFF) {
-      native::MarkRegistersDirty(8704, s << 52);
       Store64(device + kShaderStateDirty, Load64(device + kShaderStateDirty) & ~0xFFFull);
     }
     s = Load64(device + kShaderStateDirty);
     if (s & (31ull << 44)) {
-      native::MarkRegistersDirty(8576, (s << 15) & 0xF800000000000000ull);
       And64(device + kShaderStateDirty, ~(31ull << 44));
     }
   }
   if (Load64(device + kRenderStateDirty) != 0) {
     uint64_t r = Load64(device + kRenderStateDirty);
     if (r & Mask(9, 29)) {
-      native::MarkRegistersDirty(8448, (r << 41) & 0xFFFFF80000000000ull);
       And64(device + kRenderStateDirty, 0xFFFFFFFFFF800003ull);
     }
     r = Load64(device + kRenderStateDirty);
     if (r & 0x0000007FFF800000ull) {
-      native::MarkRegistersDirty(8192, (r << 25) & 0xFFFF000000000000ull);
       And64(device + kRenderStateDirty, ~0x0000007FFF800000ull);
     }
     r = Load64(device + kRenderStateDirty);
     if (r & 0x0FFFFF8000000000ull) {
-      native::MarkRegistersDirty(8832, (r << 4) & 0xFFFFF80000000000ull);
       And64(device + kRenderStateDirty, ~0x0FFFFF8000000000ull);
     }
   }
   if (const uint64_t o = Load64(device + kOtherStateDirty);
       o != 0 && (o & 0x0000003FFFFFFFFFull) != 0) {
-    native::MarkRegistersDirty(8960, (o << 26) & 0xFFFFFFFFFC000000ull);
     And64(device + kOtherStateDirty, 0xFFFFFFC000000000ull);
   }
 
@@ -333,7 +323,6 @@ void Resolve(uint32_t sp, uint64_t r13, uint32_t device, uint32_t flags,
     Or64(device + kShaderStateDirty, 1ull << 49);
   }
   Store(device + kWritePosition, p);
-  native::MarkRegistersDirty(0x2203, 1ull << 63);  // sub_822ADC08 (Dropped)
   p = position();
   p = uint32_t(call(kDefaultDrawRegisters, {device, p}));
   Store(device + kWritePosition, p);
