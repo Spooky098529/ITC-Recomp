@@ -37,6 +37,9 @@ struct ShaderSampler {
 struct TranslatedShader {
   ShaderStage stage;
   uint64_t hash = 0;
+  // Made from its GLSL (docs/shaders.md): the hash it's found by (for vertex
+  // shaders the layout-free one, glsl/game/shaders.json's lookup_hash), else 0.
+  uint64_t port_hash = 0;
   std::vector<uint32_t> spirv;
   // The float constants the shader reads, one bit per register (c0-c255).
   // The translated shader takes only these, packed in order.
@@ -97,13 +100,18 @@ class ShaderCache {
   // ucode: the microcode as in guest memory (big-endian words). num_reg is
   // the stage's register count from SQ_PROGRAM_CNTL (value minus 1).
   // Returns null if the shader can't be translated. hash: MicrocodeHash.
+  // remap: a vertex shader's file microcode and fetch fields as its GLSL is
+  // found and fitted by (shader_ports.h), else null.
   TranslatedShader* Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
-                        uint64_t hash, uint32_t num_reg, const Interface& interface);
+                        uint64_t hash, uint32_t num_reg, const Interface& interface,
+                        const struct VertexFetchRemap* remap = nullptr);
 
   uint32_t translated() const { return translated_; }
   uint32_t failed() const { return failed_; }
   // Translations taken from the disk cache instead of translated.
   uint32_t from_disk() const { return from_disk_; }
+  // Shaders made from their GLSL (--native_shaders) instead of translated.
+  uint32_t ported() const { return ported_; }
 
   // Loads earlier sessions' translations and interfaces from `file` and
   // appends new ones to it (see disk_cache.h).
@@ -112,7 +120,7 @@ class ShaderCache {
  private:
   struct State;
   std::unique_ptr<State> state_;
-  uint32_t translated_ = 0, failed_ = 0, from_disk_ = 0;
+  uint32_t translated_ = 0, failed_ = 0, from_disk_ = 0, ported_ = 0;
 };
 
 }  // namespace native

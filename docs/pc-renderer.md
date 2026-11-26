@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0 and 1 done)
+# A PC renderer (a plan; steps 0 and 1 done, step 2 in progress)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -298,6 +298,30 @@ spread; a resolve identical). The arena holds ~14-25 MB of ranges in ~1,500.
 **GTT ~1,690 -> ~630 MB** (whole card; idle 346 MB): the game's pinned
 system memory from ~1,345 to ~285 MB (texture staging 128 MB, the constant
 rings 128 MB, the arena's staging 32 MB).
+
+## Step 2: the shaders (in progress)
+
+**Part 1 (2026-11-26): every shader drawn from GLSL.** SBX-Recomp's tool,
+ports, hand-written shaders and renderer code brought in
+(`docs/shaders.md` says what came and what differs here). In an attract
+race all 74 shaders used come from GLSL and none is translated; the
+translator now runs only for a shader with no GLSL (logged). Our graphics
+library's vertex fetch patch differs from SBX's (sorted, merged into
+mini-fetches, swizzles rewritten), so `RemapVertexFetches` rebuilds each
+vertex shader's file microcode and fetch fields from its object
+(`shader_ports.h`), and a new swizzle constant gives the declaration's
+component order. Checked: attract races (0 error lines), a frame dump
+against step 0's (0.27% of pixels off by more than 0.02: GLSL's arithmetic
+against the console's), and a race frame from the pad replay with the
+colors right.
+
+Found on the way and fixed: two calls by address from lifted code to hand
+ports with no dispatch entry (`known-issues.md`, "Calls by address with no
+dispatch entry"; `--check_call_targets`).
+
+Left: the PC-style inputs (vertex attributes, constants by name, plain
+textures), with step 3, where the draw state stops coming from the
+registers.
 
 ## Open questions
 

@@ -12,6 +12,8 @@
 // don't need (their window, ImGui overlays, achievement toasts, the GPU
 // plugin) is left out.
 
+#include "lifted/lifted.h"
+#include <fstream>
 #include "app/app.h"
 #include "threads/threads.h"
 #include "memory/kernel_variables.h"
@@ -205,6 +207,10 @@ void RequestQuit() {
 
 }  // namespace app
 
+ITC_FLAG_STRING(check_call_targets, "", "ITC",
+                "A file of addresses (hex, a line each; itc_recomp/tools/call_targets.py "
+                "writes it): log those with no entry in the dispatch table, and exit");
+
 int main(int argc, char* argv[]) {
   // The flags: the command line, then itc.toml for what it didn't set (so
   // itc.toml may set game_data_root too).
@@ -213,6 +219,27 @@ int main(int argc, char* argv[]) {
   base::flags::LoadConfig(exe_dir / "itc.toml");
   const app::Paths paths = app::ResolvePaths(exe_dir);
   app::SetUpLogging(exe_dir, paths, others);
+  // --check_call_targets: every address our code calls by a constant, as
+  // itc_recomp/tools/call_targets.py lists them, looked up in the dispatch
+  // table; the ones with no entry are logged, and the program ends.
+  if (const std::string& list = ITC_FLAG(check_call_targets); !list.empty()) {
+    std::ifstream in(list);
+    std::string line;
+    int missing = 0, checked = 0;
+    while (std::getline(in, line)) {
+      if (line.empty() || line[0] == '#') {
+        continue;
+      }
+      uint32_t address = uint32_t(std::strtoul(line.c_str(), nullptr, 16));
+      checked++;
+      if (!lifted::Find(address)) {
+        missing++;
+        ITC_LOG_ERROR("check_call_targets: {} has no entry in the dispatch table", line);
+      }
+    }
+    ITC_LOG_INFO("check_call_targets: {} of {} addresses have no entry", missing, checked);
+    return missing ? EXIT_FAILURE : EXIT_SUCCESS;
+  }
   // Guest memory (ours: src/memory/mapping.h), before anything that
   // allocates in it.
   if (!memory::MapGuest()) {

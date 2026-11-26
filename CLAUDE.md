@@ -105,7 +105,9 @@ author's OK); `docs/conventional-renderer.md`, the first attempt, is a dead
 end kept for its research. Step 0 (`--log_memory_use`) measured ~1.9 GB of
 system memory, 1.09 GB of it the renderer's two mirrors; step 1 replaced
 the mirrors with a device-local vertex arena (`src/native/vertex_arena.*`):
-GTT ~1,690 -> ~630 MB.
+GTT ~1,690 -> ~630 MB; step 2's first part draws every shader from GLSL
+(SBX-Recomp's ports and hand-written shaders, `docs/shaders.md`;
+`--native_shaders`).
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core

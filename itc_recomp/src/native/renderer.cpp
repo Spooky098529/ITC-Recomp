@@ -959,13 +959,14 @@ void Renderer::LogStats() {
   ITC_LOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
                "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
                "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
-               "translated {}, failed {}, from the disk cache {}",
+               "from their GLSL {}, translated {}, failed {}, from the disk cache {}",
                frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
                double(draws_) / frames, double(view.drawn) / frames,
                double(view.unsupported) / frames, double(view.failed) / frames,
                view.mirrored_bytes / 1048576.0 / frames,
                view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
-               view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
+               view.shaders_ported, view.shaders_translated, view.shaders_failed,
+               view.shaders_from_disk);
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",

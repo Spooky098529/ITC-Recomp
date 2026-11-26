@@ -1,6 +1,14 @@
 #include "shaders.h"
+#include <format>
+#include <cstdlib>
+#include <cstddef>
+#include <unordered_set>
+#include <string>
+#include <sstream>
+#include <algorithm>
 #include "disk_cache.h"
 #include "frame_costs.h"
+#include "shader_ports.h"
 
 #include <cstdio>
 #include <cstring>
@@ -22,6 +30,13 @@ std::string& FLAGS_dump_shaders_storage_() {
   return dump_shaders;
 }
 
+ITC_FLAG_BOOL(native_shaders, true, "ITC",
+              "Draw with the game's shaders written as GLSL (src/native/glsl: ports from "
+              "the microcode and hand-written ones, from SBX-Recomp; docs/shaders.md) instead "
+              "of translating their microcode, where one exists");
+ITC_FLAG_STRING(native_shaders_off, "", "ITC",
+                "Shaders (microcode hashes in hex, comma-separated) to keep translating with "
+                "--native_shaders: to find which shader a difference comes from");
 ITC_FLAG_STRING(native_renderer_log_shader_ucode, "", "ITC",
                 "Log the microcode disassembly of this shader (hash in hex) when first "
                 "used (a debugging aid)");
@@ -30,7 +45,45 @@ namespace native {
 
 namespace graphics = rex::graphics;
 
+// The GLSL shaders read the system constants at these offsets
+// (glsl/game/xe_interface.glsl). If the SDK's struct changes, the
+// interface changes with it.
+using TranslatorSystemConstants = graphics::SpirvShaderTranslator::SystemConstants;
+static_assert(offsetof(TranslatorSystemConstants, flags) == 0);
+static_assert(offsetof(TranslatorSystemConstants, vertex_index_load_address) == 4);
+static_assert(offsetof(TranslatorSystemConstants, vertex_index_endian) == 8);
+static_assert(offsetof(TranslatorSystemConstants, line_loop_closing_index) == 12);
+static_assert(offsetof(TranslatorSystemConstants, vertex_base_index) == 16);
+static_assert(offsetof(TranslatorSystemConstants, ndc_scale) == 124);
+static_assert(offsetof(TranslatorSystemConstants, point_vertex_diameter_min) == 136);
+static_assert(offsetof(TranslatorSystemConstants, ndc_offset) == 140);
+static_assert(offsetof(TranslatorSystemConstants, texture_swizzled_signs) == 176);
+static_assert(offsetof(TranslatorSystemConstants, alpha_test_reference) == 272);
+static_assert(offsetof(TranslatorSystemConstants, color_exp_bias) == 288);
+static_assert(offsetof(TranslatorSystemConstants, vertex_index_min) == 496);
+static_assert(offsetof(TranslatorSystemConstants, vertex_index_max) == 500);
+static_assert(graphics::SpirvShaderTranslator::kSysFlag_ComputeOrPrimitiveVertexIndexLoad == 1u << 1);
+static_assert(graphics::SpirvShaderTranslator::kSysFlag_XYDividedByW == 1u << 8);
+static_assert(graphics::SpirvShaderTranslator::kSysFlag_AlphaPassIfLess_Shift == 16);
+static_assert(graphics::SpirvShaderTranslator::kSysFlag_ConvertColor0ToGamma == 1u << 19);
+
 namespace {
+
+// --native_shaders_off, parsed once.
+bool PortTurnedOff(uint64_t hash) {
+  static const std::vector<uint64_t> off = [] {
+    std::vector<uint64_t> hashes;
+    std::stringstream list(ITC_FLAG(native_shaders_off));
+    std::string item;
+    while (std::getline(list, item, ',')) {
+      if (!item.empty()) {
+        hashes.push_back(std::strtoull(item.c_str(), nullptr, 16));
+      }
+    }
+    return hashes;
+  }();
+  return std::find(off.begin(), off.end(), hash) != off.end();
+}
 
 graphics::SpirvShaderTranslator::Features TranslatorFeatures(const ShaderFeatures& ours) {
   // Only what our device enables; the rest is off (no memory export, no
@@ -223,6 +276,7 @@ struct ShaderCache::State {
   graphics::SpirvShaderTranslator translator;
   rex::string::StringBuffer disassembly;
   bool ucode_logged = false;  // --native_renderer_log_shader_ucode
+  std::unordered_set<uint64_t> unported;  // logged once each
   // Keyed by stage, microcode hash, register count and interface (the
   // modification depends on them).
   std::unordered_map<TranslationKey, std::unique_ptr<TranslatedShader>, TranslationKeyHash>
@@ -428,7 +482,8 @@ ShaderCache::Interface ShaderCache::GetInterface(const uint8_t* vertex_ucode,
 }
 
 TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint32_t size_bytes,
-                                   uint64_t hash, uint32_t num_reg, const Interface& interface) {
+                                   uint64_t hash, uint32_t num_reg, const Interface& interface,
+                                   const VertexFetchRemap* remap) {
   auto key = std::make_tuple(stage, hash, num_reg, interface.interpolator_mask,
                              interface.param_gen_interpolator, interface.param_gen_point,
                              stage == ShaderStage::kVertex && interface.rectangle_list);
@@ -441,6 +496,61 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
     state_->ucode_logged = true;
     ITC_LOG_INFO("native renderer: shader {:016X}'s microcode:\n{}", hash,
                  state_->Analyzed(stage, ucode, size_bytes, hash)->ucode_disassembly());
+  }
+  // The shader's GLSL (docs/shaders.md), with --native_shaders. It isn't
+  // stored in the disk cache: fitting one to a draw is quick. The vertex
+  // shaders read the vertex arena as one buffer (as the translator does
+  // when the device allows one buffer of 512 MB), and none makes point
+  // sprites' coordinates.
+  if (ITC_FLAG(native_shaders) && !interface.param_gen_point &&
+      (stage == ShaderStage::kPixel ||
+       graphics::SpirvShaderTranslator::GetSharedMemoryStorageBufferCountLog2(
+           state_->features.max_storage_buffer_range) == 0)) {
+    const uint8_t* port_ucode = remap ? remap->ucode.data() : ucode;
+    if (const GamePort* port = FindGamePort(stage, port_ucode, size_bytes, hash);
+        port && !PortTurnedOff(hash) && !PortTurnedOff(port->hash)) {
+      auto shader = std::make_unique<TranslatedShader>();
+      shader->stage = stage;
+      shader->hash = hash;
+      shader->port_hash = port->hash;
+      if (MakeFromPort(*port, port_ucode, size_bytes, interface.interpolator_mask,
+                       interface.param_gen_interpolator,
+                       stage == ShaderStage::kVertex && interface.rectangle_list, *shader, {},
+                       remap ? &remap->swizzles : nullptr)) {
+        // What the microcode reads, from its analysis as for a translation.
+        graphics::SpirvShader* analyzed = state_->Analyzed(stage, ucode, size_bytes, hash);
+        const auto& constants = analyzed->constant_register_map();
+        for (uint32_t i = 0; i < 4; i++) {
+          shader->float_constants[i] = constants.float_bitmap[i];
+        }
+        for (uint32_t i = 0; i < 3; i++) {
+          shader->vertex_fetch_constants[i] = constants.vertex_fetch_bitmap[i];
+        }
+        for (const auto& binding : analyzed->vertex_bindings()) {
+          shader->vertex_strides.emplace_back(binding.fetch_constant, binding.stride_words);
+        }
+        shader->writes_color_targets = analyzed->writes_color_targets();
+        ported_++;
+        ITC_LOG_DEBUG("native renderer: {} shader {:016X} from its GLSL ({})",
+                      stage == ShaderStage::kVertex ? "vertex" : "pixel", hash, port->found_in);
+        auto& result = state_->translations[key];
+        result = std::move(shader);
+        return result.get();
+      }
+      ITC_LOG_WARN("native renderer: couldn't fit the GLSL of shader {:016X}; translating", hash);
+    } else if (ITC_FLAG(native_shaders) && !port && state_->unported.insert(hash).second) {
+      ITC_LOG_WARN("native renderer: {} shader {:016X} has no GLSL; translating its microcode{}",
+                   stage == ShaderStage::kVertex ? "vertex" : "pixel", hash,
+                   stage == ShaderStage::kVertex && !remap ? " (its fetches couldn't be matched)" : "");
+      if (const char* dir = std::getenv("ITC_DUMP_UNPORTED"); dir && *dir) {
+        std::string path = std::format("{}/{}_{:016X}.bin", dir,
+                                       stage == ShaderStage::kVertex ? "vs" : "ps", hash);
+        if (std::FILE* out = std::fopen(path.c_str(), "wb")) {
+          std::fwrite(remap ? remap->ucode.data() : ucode, 1, size_bytes, out);
+          std::fclose(out);
+        }
+      }
+    }
   }
   // From an earlier session (disk_cache.h).
   if (auto it = state_->stored.find(key); it != state_->stored.end()) {

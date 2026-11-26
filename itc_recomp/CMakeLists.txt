@@ -774,6 +774,8 @@ set(ITC_SOURCES
     src/native/gpu_link.cpp
     src/native/passes.cpp
     src/native/vertex_arena.cpp
+    src/native/shader_ports.cpp
+    src/native/port_spirv.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp

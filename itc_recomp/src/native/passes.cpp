@@ -1,6 +1,7 @@
 #include <format>
 #include "passes.h"
 #include "vertex_arena.h"
+#include "shader_ports.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -3044,8 +3045,22 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                                           context_misc);
     r.interface.param_gen_point = type == 1;  // point list
     r.interface.rectangle_list = rectangle_list;
+    // The file's microcode and the patched fetches' fields, for its GLSL
+    // (shader_ports.h): the object keeps its fetches' records (+60, +64)
+    // and original instructions (+192).
+    VertexFetchRemap remap;
+    uint32_t fetch_count = guest::LoadU32(vertex_object + 60);
+    bool remapped = false;
+    if (fetch_count <= 32) {
+      uint32_t records[32];
+      for (uint32_t j = 0; j < fetch_count; j++) {
+        records[j] = guest::LoadU32(vertex_object + 64 + 4 * j);
+      }
+      remapped = RemapVertexFetches(vertex_ucode, vertex_size, fetch_count, records,
+                                    guest::Pointer(vertex_object + 192), remap);
+    }
     r.vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size, r.vertex_hash,
-                              program_control & 0x3F, r.interface);
+                              program_control & 0x3F, r.interface, remapped ? &remap : nullptr);
     if (pixel_object) {
       r.pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, r.pixel_hash,
                                (program_control >> 8) & 0x3F, r.interface);
@@ -4824,6 +4839,7 @@ Passes::Stats Passes::TakeStats() {
   stats.shaders_translated = state_->shaders->translated();
   stats.shaders_failed = state_->shaders->failed();
   stats.shaders_from_disk = state_->shaders->from_disk();
+  stats.shaders_ported = state_->shaders->ported();
   uint32_t pipelines = state_->stats.pipelines, targets = state_->stats.targets;
   state_->stats = {};
   state_->stats.pipelines = pipelines;

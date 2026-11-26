@@ -359,6 +359,10 @@ ITC_REGS_STEP(BuildScreenChangeCategory) {
   }
 
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
+// For lifted callers: the original InitBuildList (lifted::original, where a
+// caller falls back to it) calls it by address; a pad replay took that path
+// and stopped on the missing entry (2026-11-26).
+ITC_BUILD_SCREEN(8219BB80, BuildScreenRestoreBuildList)
 ITC_BUILD_SCREEN(8217D0C8, GarageStageSetDark)
 ITC_BUILD_SCREEN(8219C528, BuildScreenHighlightGroupsA)
 ITC_BUILD_SCREEN(8219C6D0, BuildScreenHighlightGroupsB)
