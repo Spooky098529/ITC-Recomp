@@ -2,14 +2,11 @@
 
 A native port of Import Tuner Challenge (Xbox 360), started as a static
 recompilation on ReXGlue. Since E4's step 5 (2026-11-16) the SDK isn't part
-of our build: the `rexglue-sdk/` submodule is only the source of its shader
-translator, a static dependency (`itc_recomp/cmake/xenos_translator.cmake`,
-its logging and flags through `itc_recomp/src/translator_shims/`), and the
-third-party libraries are our own submodules in `itc_recomp/thirdparty/`
-(SDL, Vulkan-Headers, simde, glslang, fmt, FFmpeg, xxHash). Act as if the
-SDK were deleted (the user's call). Our patches to the SDK
-(`patches/rexglue-sdk/`) were removed in E4's step 7: the submodule stays
-clean at its pinned commit.
+of our build, and since the PC renderer's steps 3 and 5 (2026-11-26, on
+`pc-renderer`) nothing of it is: its shader translator (the last piece) is
+gone with the `rexglue-sdk` submodule, every shader comes from its GLSL,
+and the third-party libraries are our own submodules in
+`itc_recomp/thirdparty/` (SDL, Vulkan-Headers, simde, FFmpeg, xxHash).
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
 (`functions.md` holds the rows not yet moved, `system-services.md` B5's,
@@ -106,8 +103,9 @@ end kept for its research. Step 0 (`--log_memory_use`) measured ~1.9 GB of
 system memory, 1.09 GB of it the renderer's two mirrors; step 1 replaced
 the mirrors with a device-local vertex arena (`src/native/vertex_arena.*`):
 GTT ~1,690 -> ~630 MB; step 2's first part draws every shader from GLSL
-(SBX-Recomp's ports and hand-written shaders, `docs/shaders.md`;
-`--native_shaders`).
+(SBX-Recomp's ports and hand-written shaders, `docs/shaders.md`); later steps took the
+draw state off the SDK's register file, removed the GPU kick and the draw
+packets, and the SDK itself (`docs/pc-renderer.md`, steps 3 and 5).
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core

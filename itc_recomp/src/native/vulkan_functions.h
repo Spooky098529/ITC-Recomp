@@ -3,10 +3,13 @@
 
 #pragma once
 
-// Through the SDK's Vulkan header, so every Vulkan include in the build
-// agrees on its defines (no prototypes, beta extensions, the Wayland and XCB
-// platforms): the shader translator's headers use the C++ bindings.
-#include <rex/ui/vulkan/api.h>
+// Our own Vulkan-Headers (itc_vulkan_headers), without prototypes: every
+// function is loaded below. The surface comes from SDL, so no platform's
+// defines are needed.
+#ifndef VK_NO_PROTOTYPES
+#define VK_NO_PROTOTYPES
+#endif
+#include <vulkan/vulkan.h>
 
 // Functions by the level they're loaded at.
 #define NATIVE_VK_GLOBAL_FUNCTIONS(X) \

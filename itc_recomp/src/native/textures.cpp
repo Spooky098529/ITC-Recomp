@@ -20,7 +20,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <rex/graphics/xenos.h>
+#include "xenos_types.h"
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -60,7 +60,6 @@ std::mutex g_xpr_mutex;
 std::vector<XprEvent> g_xpr_events;
 }  // namespace
 
-namespace xenos = rex::graphics::xenos;
 
 namespace {
 
@@ -1889,7 +1888,7 @@ VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
 }
 
 uint8_t TextureCache::SwizzledSigns(const uint32_t fetch_words[6]) {
-  // As the SDK's texture_util::SwizzleSigns: each result component's sign
+  // As the SDK's xenos::SwizzleSigns: each result component's sign
   // after the swizzle; constant components take signed only if everything
   // else is signed.
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);

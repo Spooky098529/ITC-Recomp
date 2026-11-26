@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0 and 1 done, 2, 2b and 4 in progress)
+# A PC renderer (a plan; steps 0 and 1 done, 2, 2b, 3, 4 and 5 in progress)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -424,11 +424,33 @@ and resolve on one 256x144 target in turn, then the main view draws on
   constants' struct (now `native/system_constants.h`) and
   `--native_shaders`, `--native_shaders_off`,
   `--native_renderer_log_shader_ucode` are gone; a shader the table lacks
-  stops the program, named. The translator is still linked for `xenos.h`'s
-  types and the texture code (`textures.cpp`).
+  stops the program, named.
 
 Left for step 3: the handlers calling our interface instead of the game's
 Direct3D, which ends the shadow on the render path.
+
+## Step 5: the SDK out (first part done 2026-11-26)
+
+Done ahead of the clean-up, once nothing used it: the texture fetch
+constant's fields and the formats the renderer reads are our own
+(`src/native/xenos_types.h`, with `SwizzleSigns`), the Vulkan header is
+our own Vulkan-Headers' (`vulkan_functions.h`), and the shader translator's
+static library (`cmake/xenos_translator.cmake`), its shims
+(`src/translator_shims/`), glslang and fmt left the build; the
+`rexglue-sdk`, `glslang` and `fmt` submodules are removed (CI no longer
+fetches them; the Windows build's case links no longer scan the SDK).
+Nothing of the ReXGlue SDK is built, linked or checked out.
+`tools/shader_port/check` (the ports against the SDK's translation) takes
+an SDK checkout's folder as its argument and still works from one.
+
+Found on the way and fixed (`c6b578c1`): `Member1136::Save` and `Restore`
+(the race snapshot at a standing start) read and wrote the body's row 0 at
+address 0 since E5 step 2's swarm (`body_row1_address() * i` for
+`vehicle + 16 * i`), which since E5 step 10 stops the program: the pad
+replay stopped there once.
+
+Left for step 5: the physical block shrunk to what's left in it, step 0's
+measures again, and the one profile.
 
 ## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
 

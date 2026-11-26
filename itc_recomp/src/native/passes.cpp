@@ -36,7 +36,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <rex/graphics/xenos.h>
+#include "xenos_types.h"
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -51,8 +51,6 @@ ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
 
 namespace native {
 
-namespace graphics = rex::graphics;
-namespace xenos = rex::graphics::xenos;
 
 namespace {
 

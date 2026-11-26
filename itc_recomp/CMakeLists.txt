@@ -1,8 +1,8 @@
 # itc - Import Tuner Challenge, native
 #
-# Our own build: no ReXGlue SDK in it but its shader translator, a static
-# dependency (cmake/xenos_translator.cmake; E4 in docs/rexglue-removal.md);
-# the third-party libraries are our own copies (cmake/thirdparty.cmake).
+# Our own build: no ReXGlue SDK in it (its shader translator, the last
+# piece, went with docs/pc-renderer.md's step 5, 2026-11-26); the third-party
+# libraries are our own copies (cmake/thirdparty.cmake).
 # generated/ (the recompiled code) stays in the repo, out of the build.
 
 cmake_minimum_required(VERSION 3.25)
@@ -28,7 +28,6 @@ if(WIN32 AND ITC_WIN_LTO)
 endif()
 
 include(cmake/thirdparty.cmake)
-include(cmake/xenos_translator.cmake)
 include(cmake/version.cmake)
 include(cmake/ffmpeg.cmake)
 
@@ -966,7 +965,7 @@ function(itc_add_executable name)
     # included with their folder (<xxHash/xxhash.h>).
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_avutil
         SDL3::SDL3-static itc_vulkan_headers itc_simde)
 
     # The flags the SDK's target set-up gave us (rexglue_apply_target_settings),
