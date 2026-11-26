@@ -2,6 +2,7 @@
 // Every kept read and write is the originals', in their order; the masks
 // and shifts are their rldicr and rlwinm on the dirty words.
 
+#include "hooks/shader_load.h"
 #include "graphics/inline_draws.h"
 
 #include "guest.h"
@@ -14,7 +15,6 @@ namespace graphics::inline_draws {
 
 namespace {
 
-constexpr uint32_t kLoadShaders = 0x822AED18;  // Device::LoadShaders (Lifted)
 constexpr uint32_t kEndSegment = 0x8229EF48;   // Device::EndSegment (its override)
 constexpr uint32_t kReserve = 0x8229E308;      // Device::AllocateFromCommandBuffer
 constexpr uint32_t kTypeCounts = 0x82000950;   // a primitive type's multiplier and addend
@@ -55,7 +55,7 @@ void Flush(uint32_t frame, uint64_t r13, uint32_t device) {
   Store64(device + kPixelConstantsDirty, 0);
   if (const uint64_t shader = Load64(device + kShaderStateDirty); shader != 0) {
     if (shader & (0xFull << 49)) {
-      lifted_call::Call(kLoadShaders, frame, r13, {device, shader});
+      hooks::LoadShaders(device, shader, frame, r13);
     }
     Store64(device + kShaderStateDirty, 0);
   }

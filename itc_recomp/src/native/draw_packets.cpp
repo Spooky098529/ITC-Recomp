@@ -11,13 +11,13 @@
 // chains only the tiling worker's job reads, which never runs.
 
 #include "draw_packets.h"
-#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
 #include "state.h"
 
 #include "base/log.h"
 #include "hooks/command_buffer.h"
+#include "hooks/shader_load.h"
 
 namespace native {
 namespace {
@@ -75,11 +75,7 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx) {
         guest::StoreU32(shader + kShaderFence, 0);
       }
     }
-    lifted::Regs saved = ctx;
-    ctx.r3.u64 = device;
-    ctx.r4.u64 = shader_state;
-    lifted::Enter(ctx, lifted::e822AED18);
-    ctx = saved;
+    hooks::LoadShaders(device, shader_state, ctx.r1.u32, ctx.r13.u64);
   }
   guest::StoreU64(device + kDeviceShaderStateDirty, 0);
   if (guest::LoadU64(device + kDeviceRenderStateDirty) & 0x2) {

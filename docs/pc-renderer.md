@@ -426,6 +426,22 @@ and resolve on one 256x144 target in turn, then the main view draws on
   `--native_renderer_log_shader_ucode` are gone; a shader the table lacks
   stops the program, named.
 
+- **The shader load natively, without packets (2026-11-26).**
+  `Device::LoadShaders` (`sub_822AED18`, lifted until now) is plain C++
+  (`src/graphics/shader_load.{h,cpp}`, its adapter `src/hooks/shader_load.cpp`),
+  from a reading of the lifted body and its copy path (`sub_822AEBF0`): the
+  register fields the draw and the renderer read (SQ_PROGRAM_CNTL,
+  SQ_CONTEXT_MISC, SQ_INTERPOLATOR_CNTL, RB_HIZCONTROL, RB_MODECONTROL, the
+  tiling's last EDRAM mode), the flags, the loaded strides and the vertex
+  shader's patch for the declaration (in place, recording what it's patched
+  for and giving the declaration its id; or in a copy, now in a heap buffer
+  of ours instead of the command buffer, with the exports remapped by the
+  lifted `sub_822AEAA0` when the shaders' interpolators differ: never seen).
+  Left out: the IM_LOAD packets, the shaders' fences and fence list (no GPU
+  reads the shaders, so the original's "in use: copy" never applies), the
+  HiZ event and the tiling's register packets. Checked: per-draw records the
+  same, the pad replay clean, the tick replay matching.
+
 Left for step 3: the handlers calling our interface instead of the game's
 Direct3D, which ends the shadow on the render path.
 
