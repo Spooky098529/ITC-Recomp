@@ -61,6 +61,9 @@ class Backend {
   virtual uint64_t MemorySize(const Image* image) const = 0;
   // Recorded in the frame: the image is next used for `usage`.
   virtual void Use(Image* image, Usage usage) = 0;
+  // A view for sampling (null if it can't be made), destroyed at once.
+  virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
+  virtual void DestroyView(View* view) = 0;
 };
 
 }  // namespace gpu

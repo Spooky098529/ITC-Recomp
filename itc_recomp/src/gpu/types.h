@@ -162,8 +162,19 @@ enum class Usage : uint8_t {
   kStorage,
 };
 
+// A view of all of an image's levels and layers, its components from
+// `swizzle` (the image's R, G, B or A, or a constant).
+enum class Swizzle : uint8_t { kR, kG, kB, kA, kZero, kOne };
+struct ViewDesc {
+  ImageType type = ImageType::k2D;
+  Swizzle swizzle[4] = {Swizzle::kR, Swizzle::kG, Swizzle::kB, Swizzle::kA};
+  // A depth image's depth alone.
+  bool depth_only = false;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
 struct Sampler;
 struct Image;
+struct View;
 
 }  // namespace gpu

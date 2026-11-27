@@ -638,6 +638,38 @@ void Backend::DestroyImage(Image* image) {
   delete o;
 }
 
+View* Backend::CreateView(Image* image, const ViewDesc& desc) {
+  const ImageObject& o = Object(image);
+  auto component = [](Swizzle swizzle) {
+    switch (swizzle) {
+      case Swizzle::kZero: return VK_COMPONENT_SWIZZLE_ZERO;
+      case Swizzle::kOne: return VK_COMPONENT_SWIZZLE_ONE;
+      default: return VkComponentSwizzle(VK_COMPONENT_SWIZZLE_R + uint32_t(swizzle));
+    }
+  };
+  VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+  info.image = o.image;
+  info.viewType = desc.type == ImageType::k3D        ? VK_IMAGE_VIEW_TYPE_3D
+                  : desc.type == ImageType::kCube    ? VK_IMAGE_VIEW_TYPE_CUBE
+                  : desc.type == ImageType::k2DArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                                     : VK_IMAGE_VIEW_TYPE_2D;
+  info.format = o.format;
+  info.components = {component(desc.swizzle[0]), component(desc.swizzle[1]),
+                     component(desc.swizzle[2]), component(desc.swizzle[3])};
+  info.subresourceRange = {desc.depth_only ? VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT)
+                                           : o.aspects,
+                           0, o.desc.levels, 0, o.desc.layers};
+  VkImageView view;
+  if (vk::vkCreateImageView(device_, &info, nullptr, &view) != VK_SUCCESS) {
+    return nullptr;
+  }
+  return reinterpret_cast<View*>(view);
+}
+
+void Backend::DestroyView(View* view) {
+  vk::vkDestroyImageView(device_, Handle(view), nullptr);
+}
+
 void Backend::Use(Image* image, Usage usage) {
   ImageObject& o = Object(image);
   const VkImageLayout wanted = vk_types::Layout(usage);

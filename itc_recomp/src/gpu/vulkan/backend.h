@@ -59,6 +59,9 @@ class Backend final : public gpu::Backend {
   const ImageDesc& Describe(const Image* image) const override { return Object(image).desc; }
   uint64_t MemorySize(const Image* image) const override { return Object(image).memory_size; }
   void Use(Image* image, Usage usage) override;
+  View* CreateView(Image* image, const ViewDesc& desc) override;
+  void DestroyView(View* view) override;
+  static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
   static ImageObject& Object(Image* image) { return *reinterpret_cast<ImageObject*>(image); }
   static const ImageObject& Object(const Image* image) {
     return *reinterpret_cast<const ImageObject*>(image);

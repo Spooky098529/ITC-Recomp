@@ -1393,7 +1393,7 @@ void TextureCache::State::DestroyRetired() {
   });
   for (Retired& r : std::span(retired.begin(), due)) {
     for (VkImageView view : r.views) {
-      vk::vkDestroyImageView(context.device, view, nullptr);
+      backend->DestroyView(reinterpret_cast<gpu::View*>(view));
     }
     gpu_memory::Created(gpu_memory::Object::kImageView, -int64_t(r.views.size()));
     if (r.object) {
@@ -1679,23 +1679,22 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
         select ^= 2;
       }
       if (select == 4) {
-        return VK_COMPONENT_SWIZZLE_ZERO;
+        return gpu::Swizzle::kZero;
       }
       if (select >= 5) {
-        return VK_COMPONENT_SWIZZLE_ONE;
+        return gpu::Swizzle::kOne;
       }
-      return VkComponentSwizzle(VK_COMPONENT_SWIZZLE_R +
-                                std::min(select, t.format.components - 1));
+      return gpu::Swizzle(std::min(select, t.format.components - 1));
     };
-    VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    info.image = t.image;
-    info.viewType = natural;
-    info.format = t.format.format;
-    info.components = {component(0), component(1), component(2), component(3)};
-    info.subresourceRange = {t.aspect, 0, t.levels, 0, t.layout.layers};
-    if (vk::vkCreateImageView(context.device, &info, nullptr, &view) != VK_SUCCESS) {
-      view = VK_NULL_HANDLE;
-    } else {
+    gpu::ViewDesc desc;
+    desc.type = natural == VK_IMAGE_VIEW_TYPE_CUBE ? gpu::ImageType::kCube
+                                                   : gpu::ImageType::k2DArray;
+    for (uint32_t i = 0; i < 4; i++) {
+      desc.swizzle[i] = component(i);
+    }
+    desc.depth_only = t.aspect == VK_IMAGE_ASPECT_DEPTH_BIT;
+    view = gpu::vulkan::Backend::Handle(backend->CreateView(t.object, desc));
+    if (view) {
       gpu_memory::Created(gpu_memory::Object::kImageView);
     }
   }

@@ -216,6 +216,11 @@ each backend.
   the object's layout after (until uploads move); the swizzled views are
   still the cache's own Vulkan views. Checked: the dump identical, the tick
   replay, the pad replay (no errors).
+- **Views (2026-11-27).** `gpu::ViewDesc` (a view type, a swizzle of the
+  image's components or constants, a depth image's depth alone) and
+  `Backend::CreateView` and `DestroyView`: the texture cache's swizzled
+  views are made and destroyed through them. Checked: the dump identical,
+  the pad replay without errors.
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
@@ -232,3 +237,8 @@ each backend.
    cut index), rectangle lists (drawn as instances already), the depth
    formats, sampling a depth image.
 3. **DXVK-native for Linux tests** (step 5).
+4. **View swizzles.** D3D11's shader resource views have no component
+   swizzle, which the texture cache's views carry (the fetch constant's
+   swizzle, red and blue exchanged for handed images). With D3D11 the
+   shaders must apply it (a per-texture constant), and then perhaps with
+   Vulkan too, so both draw alike: decided at step 4 or 5.
