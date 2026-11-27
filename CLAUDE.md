@@ -109,10 +109,9 @@ packets, and the SDK itself (`docs/pc-renderer.md`, steps 3 and 5).
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core
-removed last. In progress on the long-lived branch
-`rexglue-removal-project`: the plan's steps are merged into it, while
-`main` keeps the game in its current playable state with bug fixes
-(graphics and the like). A0, A5 and B1 are done: game input no longer
+removed last (done: the SDK left the build on `pc-renderer`, merged into
+`main`; the branch it was worked on, `rexglue-removal-project`, is history
+and no longer relevant). A0, A5 and B1 are done: game input no longer
 goes through the SDK, and the input path from SDL to the processors is
 our own C++ (`src/input/`); the action mappers above it are read but
 recompiled. B6 (pure helpers) is done for now (merged from
@@ -842,9 +841,7 @@ once after each migration (the user's call, 2026-10-28), with
 user's calls, 2026-10-30, 2026-10-31 and 2026-11-07).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
-`docs/rexglue-removal.md`. Plan steps are done on their
-own branches and merged into `rexglue-removal-project` (no force pushes:
-GitHub refuses them on that branch).
+`docs/rexglue-removal.md`.
 `docs/coverage.md` is which recompiled functions actually run (the
 `itc_coverage` build, `itc_recomp/coverage/seen_in_play.txt`) and how that
 measures B7; functions not seen in play still get rows, marked "Not seen in play"
