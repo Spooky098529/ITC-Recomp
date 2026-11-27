@@ -14,12 +14,6 @@ Built with AI assistance (Claude Code).
 - **Frame interpolation in races.** Game logic still runs at its original
   30 Hz, and frames are blended between ticks, so races play smoothly at an uncapped FPS (`--max_fps=0`), or with a cap set in `itc.toml` (`max_fps`). `interpolate_draw_state = false` and `max_fps = 30` there give the original
   30 fps game. Be aware that the internal game logic is still expecting a consistent 30hz update rate, if your machine cannot keep up, the game will run in slow motion.
-  
-## In progress: removing ReXGlue
-
-See [`rexglue-removal-project`](https://github.com/Spooky098529/ITC-Recomp/tree/rexglue-removal-project).
-
-The above branch contains the most up to date functions reference, and is where work on mapping out all of the game's code will go from now on.
 
 ## Requirements
 
