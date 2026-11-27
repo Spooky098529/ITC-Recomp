@@ -3,11 +3,14 @@
 #include <SDL3/SDL_vulkan.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <format>
 #include <memory>
 
 #include "base/log.h"
+#include "native/disk_cache.h"
 #include "native/vulkan_types.h"
 
 namespace gpu::vulkan {
@@ -484,6 +487,83 @@ bool Backend::EndFrame(Image* shown, Extent2D size) {
 }
 
 void Backend::WaitIdle() { vk::vkQueueWaitIdle(queue_); }
+
+void Backend::OpenDiskCache(const std::filesystem::path& directory) {
+  if (!directory.empty()) {
+    pipeline_cache_file_ = directory / "pipelines.bin";
+  }
+  std::vector<uint8_t> data;
+  if (!pipeline_cache_file_.empty()) {
+    if (std::FILE* in = native::OpenFile(pipeline_cache_file_, "rb")) {
+      uint8_t buffer[65536];
+      while (size_t n = std::fread(buffer, 1, sizeof(buffer), in)) {
+        data.insert(data.end(), buffer, buffer + n);
+      }
+      std::fclose(in);
+    }
+  }
+  // Only this device and driver's data (the header says whose it is).
+  VkPipelineCacheHeaderVersionOne header{};
+  bool matches = data.size() >= sizeof(header);
+  if (matches) {
+    std::memcpy(&header, data.data(), sizeof(header));
+    matches = header.headerSize >= sizeof(header) &&
+              header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE &&
+              header.vendorID == context_.vendor_id && header.deviceID == context_.device_id &&
+              std::equal(std::begin(header.pipelineCacheUUID), std::end(header.pipelineCacheUUID),
+                         context_.pipeline_cache_uuid.begin());
+  }
+  VkPipelineCacheCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
+  if (matches) {
+    info.initialDataSize = data.size();
+    info.pInitialData = data.data();
+  }
+  if (vk::vkCreatePipelineCache(device_, &info, nullptr, &pipeline_cache_) != VK_SUCCESS) {
+    pipeline_cache_ = VK_NULL_HANDLE;
+  }
+  pipeline_cache_saved_ = std::chrono::steady_clock::now();
+  if (!pipeline_cache_file_.empty()) {
+    ITC_LOG_INFO("native renderer: pipeline disk cache {}: {}", pipeline_cache_file_.string(),
+                 matches        ? std::format("{} KB loaded", data.size() / 1024)
+                 : data.empty() ? std::string("new")
+                               : std::string("another device's or driver's; starting over"));
+  }
+}
+
+void Backend::MaybeSaveDiskCache(size_t made) {
+  auto now = std::chrono::steady_clock::now();
+  if (!pipeline_cache_ || pipeline_cache_file_.empty() || made == pipeline_cache_saved_pipelines_ ||
+      now - pipeline_cache_saved_ < std::chrono::seconds(10)) {
+    return;
+  }
+  pipeline_cache_saved_pipelines_ = made;
+  pipeline_cache_saved_ = now;
+  size_t size = 0;
+  if (vk::vkGetPipelineCacheData(device_, pipeline_cache_, &size, nullptr) != VK_SUCCESS) {
+    return;
+  }
+  std::vector<uint8_t> data(size);
+  if (vk::vkGetPipelineCacheData(device_, pipeline_cache_, &size, data.data()) !=
+      VK_SUCCESS) {
+    return;
+  }
+  // Written aside and renamed over, so an exit mid-write leaves the old file.
+  std::filesystem::path temporary = pipeline_cache_file_;
+  temporary += ".tmp";
+  std::FILE* out = native::OpenFile(temporary, "wb");
+  bool written = out && std::fwrite(data.data(), 1, size, out) == size;
+  if (out) {
+    written = std::fclose(out) == 0 && written;
+  }
+  std::error_code error;
+  if (written) {
+    std::filesystem::rename(temporary, pipeline_cache_file_, error);
+  }
+  if (!written || error) {
+    ITC_LOG_WARN("native renderer: pipeline disk cache: couldn't write {}",
+                 pipeline_cache_file_.string());
+  }
+}
 
 template <typename Record>
 bool Backend::RunNow(Record record) {

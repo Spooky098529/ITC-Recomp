@@ -6,6 +6,8 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <cstdint>
@@ -73,6 +75,10 @@ class Backend final : public gpu::Backend {
   uint32_t BeginFrame() override;
   bool EndFrame(Image* shown, Extent2D size) override;
   void WaitIdle() override;
+  void OpenDiskCache(const std::filesystem::path& directory) override;
+  // Saved at most every 10 s, when `made` (pipelines made so far) grew.
+  void MaybeSaveDiskCache(size_t made);
+  VkPipelineCache pipeline_cache() const { return pipeline_cache_; }
   Sampler* CreateSampler(const SamplerDesc& desc) override;
   static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
   Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) override;
@@ -152,6 +158,10 @@ class Backend final : public gpu::Backend {
   // first frame, to the frame's end), and hold buffer uploads.
   bool uploading_ = false, uploaded_buffers_ = false;
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts_;
+  VkPipelineCache pipeline_cache_ = VK_NULL_HANDLE;
+  std::filesystem::path pipeline_cache_file_;
+  size_t pipeline_cache_saved_pipelines_ = 0;
+  std::chrono::steady_clock::time_point pipeline_cache_saved_;
 };
 
 }  // namespace gpu::vulkan

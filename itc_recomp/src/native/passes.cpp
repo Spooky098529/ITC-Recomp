@@ -1068,11 +1068,6 @@ struct Passes::State {
   // The driver's compiled pipelines, kept in the disk cache (disk_cache.h):
   // loaded at start and saved at most every 10 s after new pipelines.
   VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
-  std::filesystem::path pipeline_cache_file;
-  size_t pipeline_cache_saved_pipelines = 0;
-  std::chrono::steady_clock::time_point pipeline_cache_saved;
-  void OpenPipelineCache();
-  void MaybeSavePipelineCache();
   // The draw's state, from the device's shadow (ReadState).
   DrawRegisters regs;
   Stats stats;
@@ -2765,91 +2760,15 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
                s.depth_filterable ? "can be" : "can't be",
                s.depth_filterable ? "supported" : "not supported");
   s.shaders = std::make_unique<ShaderCache>();
-  if (std::filesystem::path directory = DiskCacheDirectory(); !directory.empty()) {
-    s.pipeline_cache_file = directory / "pipelines.bin";
-  }
-  s.OpenPipelineCache();
+  backend.OpenDiskCache(DiskCacheDirectory());
+  s.pipeline_cache = backend.pipeline_cache();
   return true;
-}
-
-void Passes::State::OpenPipelineCache() {
-  std::vector<uint8_t> data;
-  if (!pipeline_cache_file.empty()) {
-    if (std::FILE* in = OpenFile(pipeline_cache_file, "rb")) {
-      uint8_t buffer[65536];
-      while (size_t n = std::fread(buffer, 1, sizeof(buffer), in)) {
-        data.insert(data.end(), buffer, buffer + n);
-      }
-      std::fclose(in);
-    }
-  }
-  // Only this device and driver's data (the header says whose it is).
-  VkPipelineCacheHeaderVersionOne header{};
-  bool matches = data.size() >= sizeof(header);
-  if (matches) {
-    std::memcpy(&header, data.data(), sizeof(header));
-    matches = header.headerSize >= sizeof(header) &&
-              header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE &&
-              header.vendorID == context.vendor_id && header.deviceID == context.device_id &&
-              std::equal(std::begin(header.pipelineCacheUUID), std::end(header.pipelineCacheUUID),
-                         context.pipeline_cache_uuid.begin());
-  }
-  VkPipelineCacheCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
-  if (matches) {
-    info.initialDataSize = data.size();
-    info.pInitialData = data.data();
-  }
-  if (vk::vkCreatePipelineCache(context.device, &info, nullptr, &pipeline_cache) != VK_SUCCESS) {
-    pipeline_cache = VK_NULL_HANDLE;
-  }
-  pipeline_cache_saved = std::chrono::steady_clock::now();
-  if (!pipeline_cache_file.empty()) {
-    ITC_LOG_INFO("native renderer: pipeline disk cache {}: {}", pipeline_cache_file.string(),
-                 matches        ? std::format("{} KB loaded", data.size() / 1024)
-                 : data.empty() ? std::string("new")
-                               : std::string("another device's or driver's; starting over"));
-  }
-}
-
-void Passes::State::MaybeSavePipelineCache() {
-  size_t made = pipelines.size() + resolve_pipelines.size() + id_pipelines.size();
-  auto now = std::chrono::steady_clock::now();
-  if (!pipeline_cache || pipeline_cache_file.empty() || made == pipeline_cache_saved_pipelines ||
-      now - pipeline_cache_saved < std::chrono::seconds(10)) {
-    return;
-  }
-  pipeline_cache_saved_pipelines = made;
-  pipeline_cache_saved = now;
-  size_t size = 0;
-  if (vk::vkGetPipelineCacheData(context.device, pipeline_cache, &size, nullptr) != VK_SUCCESS) {
-    return;
-  }
-  std::vector<uint8_t> data(size);
-  if (vk::vkGetPipelineCacheData(context.device, pipeline_cache, &size, data.data()) !=
-      VK_SUCCESS) {
-    return;
-  }
-  // Written aside and renamed over, so an exit mid-write leaves the old file.
-  std::filesystem::path temporary = pipeline_cache_file;
-  temporary += ".tmp";
-  std::FILE* out = OpenFile(temporary, "wb");
-  bool written = out && std::fwrite(data.data(), 1, size, out) == size;
-  if (out) {
-    written = std::fclose(out) == 0 && written;
-  }
-  std::error_code error;
-  if (written) {
-    std::filesystem::rename(temporary, pipeline_cache_file, error);
-  }
-  if (!written || error) {
-    ITC_LOG_WARN("native renderer: pipeline disk cache: couldn't write {}",
-                 pipeline_cache_file.string());
-  }
 }
 
 void Passes::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
-  s.MaybeSavePipelineCache();
+  s.backend->MaybeSaveDiskCache(s.pipelines.size() + s.resolve_pipelines.size() +
+                                s.id_pipelines.size());
   s.frame = frame_index;
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;

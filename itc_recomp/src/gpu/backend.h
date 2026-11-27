@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 
 #include <SDL3/SDL.h>
@@ -30,6 +31,9 @@ class Backend {
   virtual std::string AttachWindow(SDL_Window* window) = 0;
   // The device and swapchain. False if the backend can't run.
   virtual bool Init() = 0;
+  // Where it keeps what it makes once for this device and driver (Vulkan's
+  // pipeline cache; empty: nowhere): read now, written as it grows.
+  virtual void OpenDiskCache(const std::filesystem::path& directory) = 0;
 
   // The swapchain's size (the window's, in pixels).
   virtual Extent2D OutputSize() const = 0;

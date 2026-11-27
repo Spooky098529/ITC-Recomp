@@ -255,6 +255,13 @@ each backend.
   resolve, movie, gamma and ID pass shaders are still `passes.cpp`'s own
   modules. Checked: the dump identical, the tick replay, the pad replay
   without errors.
+- **The pipeline disk cache (2026-11-27).** `Backend::OpenDiskCache`
+  (where the backend keeps what it makes once for this device and driver);
+  the Vulkan backend's `VkPipelineCache` and `cache/pipelines.bin`, read at
+  start and saved at most every 10 s as it grows, moved from `passes.cpp`
+  unchanged (`MaybeSaveDiskCache` is told the pipelines made until the
+  backend makes them itself). Checked: the dump identical, the cache loaded
+  and written.
 - **Next:** pipelines from a description (`PipelineDesc`: the shaders and
   the fixed-function state of today's `PipelineKey`; the backend makes the
   pipeline layout from the shaders and keeps the pipeline disk cache), then
