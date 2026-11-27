@@ -760,7 +760,7 @@ the GPU's own memory grew by the vertex arena (device-local, in VRAM).
 Left for step 5: the physical block shrunk to what's left in it, and the
 one profile.
 
-## Step 2b: XPR textures held by the GPU (first part done 2026-11-26)
+## Step 2b: XPR textures and the course's models held by the GPU (2026-11-26 and 27)
 
 `--log_memory_use` now also lists the physical memory's live blocks by who
 asked (`memory::PhysicalTag`): in the pad replay's menus, XPR textures
@@ -804,8 +804,37 @@ resident set ~510-645 -> ~400-490 MB.**
   memory reused). Its textures were then stale; now such an XPR is taken
   as released (its kept textures retired), logged once a run at info.
 
-Left for 2b: the model vertices and indices (~10-40 MB) by handle, which
-waits on step 3 (draws find their streams by address until then).
+- **The course's and the scenery's model buffers held by object
+  (2026-11-27).** `--log_memory_use` now names the model vertex blocks by
+  loader; in a race the course's (CourseSet, AreaModel) held 10.7-16.8 MB
+  and the scenery lists' 18.7 MB, the car parts 0.5-0.8, traffic 1.3, the
+  scene's objects 1.5-1.9, and Model::Load's callers through its adapter
+  5-9 MB (the garage's cars among them). The course's and the scenery
+  lists' models are never read by the CPU after loading, so their loaders
+  hand them over after `Model::Load` (`VertexArena_GpuOnlyModel`): each
+  buffer (`models::ModelBuffers`: the shapes' vertex buffers, the
+  materials' index buffers) is copied into the vertex arena at the next
+  frame's start in the host's byte order, a place of its own (buffers of
+  the same range share one), and the data's pages are given back (not the
+  memory block's header page in front of it, which the game reads when it
+  frees the block). Draws bind them by their objects (`render::Bindings`
+  keeps each stream's buffer object; the arena's place for the bound object
+  at the fetch's address, else a range placed by address as before). They
+  go when the data's physical block is freed
+  (`memory::SetPhysicalFreeListener`, whatever path frees it). A memcpy
+  into a held block's data is logged as an error (none seen).
+  Checked: attract races, the tick replay with dumps (both races' course
+  and scenery right, the digests matching, every held buffer let go on the
+  return to the garage), the pad replay (0 error lines). ~32 MB held in
+  ~1,200 buffers of ~105 models in a race; **the physical block's resident
+  pages in the pad replay peak at 37.7 MB (63.9 before).**
+
+Left for 2b: the other loaders' models stay placed by address, with
+memcpy's tracking: the wheels' (tire, rim and brake models), which the
+morphs read and write on the CPU, are among the car parts' and the
+garage's, and those blocks are small (~2-10 MB together). Textures other
+than XPR files' (the render targets' destinations, the vinyl sheet's)
+are found by address too.
 
 ## Open questions
 
