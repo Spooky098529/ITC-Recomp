@@ -303,13 +303,19 @@ each backend.
   reset at the slot's frame start. `passes.cpp` keeps the last-set reuse by
   fetch constants and generations (the renderer's logic). Checked: the dump
   identical, the tick replay, the pad replay without errors.
-- **Next:** binding the sets (the texture sets and the constant blocks by
-  offset: `BindResources`), then the resolve, movie,
-  gamma and ID passes' own pipelines, shaders and binds; then the dumps.
+- **Binding the sets (2026-11-27).** `Backend::DescribeConstants` (a
+  uniform buffer as the four constant blocks, their ranges given once) and
+  `BindResources` (the pipeline's texture sets and constant blocks at their
+  offsets): set 0's empty set and each block's set 1 are the backend's.
+  Checked: the dump identical, the tick replay, the pad replay without
+  errors.
+- **Next:** the resolve, movie, gamma and ID passes' own pipelines,
+  shaders and binds (their `vkCmd*` calls are `passes.cpp`'s last but the
+  dumps'); then the dumps.
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
-- **Dump runs:** a run lands on one of at least three moments (2,654,
-  2,381 and 2,338 draws seen): take runs until one has the reference's
+- **Dump runs:** a run lands on one of at least four moments (2,654,
+  2,669, 2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
   runs of one build.
 

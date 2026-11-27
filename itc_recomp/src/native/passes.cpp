@@ -951,19 +951,16 @@ struct Passes::State {
     gpu::Buffer* object = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
-    VkDescriptorPool pool = VK_NULL_HANDLE;
-    VkDescriptorSet set = VK_NULL_HANDLE;
+    VkDescriptorSet set = VK_NULL_HANDLE;  // the backend's (for the ID pass)
   };
   struct Ring {
     std::vector<ConstantBlock> blocks;
     size_t block = 0;  // the one in use this frame
-    // This frame's texture descriptor sets, reset with the frame.
   };
   std::vector<Ring> rings;
   uint32_t frame = 0;
   VkDeviceSize ring_offset = 0;  // in the block in use
 
-  VkDescriptorPool pool = VK_NULL_HANDLE;
   VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
   VkDescriptorSetLayout constants_layout = VK_NULL_HANDLE;
 
@@ -1160,64 +1157,24 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   block.buffer = gpu::vulkan::Backend::Handle(block.object);
   block.mapped = backend->Mapped(block.object);
   gpu_memory::Allocated(gpu_memory::Kind::kConstants, backend->MemorySize(block.object));
-  VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5};
-  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = 1;
-  pool_info.poolSizeCount = 1;
-  pool_info.pPoolSizes = &size;
-  if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &block.pool) != VK_SUCCESS) {
-    return false;
-  }
-  gpu_memory::Created(gpu_memory::Object::kDescriptorPool);
-  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  set_alloc.descriptorPool = block.pool;
-  set_alloc.descriptorSetCount = 1;
-  set_alloc.pSetLayouts = &constants_layout;
-  if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
-    return false;
-  }
   const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(DrawConstants)),
                                             kFloatConstantsRange, kFloatConstantsRange,
                                             kBoolLoopConstantsRange};
-  VkDescriptorBufferInfo buffers[kConstantBlocks];
-  VkWriteDescriptorSet writes[kConstantBlocks];
-  for (uint32_t i = 0; i < kConstantBlocks; i++) {
-    buffers[i] = {block.buffer, 0, ranges[i]};
-    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    writes[i].dstSet = block.set;
-    writes[i].dstBinding = i;
-    writes[i].descriptorCount = 1;
-    writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    writes[i].pBufferInfo = &buffers[i];
+  if (!backend->DescribeConstants(block.object, ranges)) {
+    return false;
   }
-  vk::vkUpdateDescriptorSets(device, kConstantBlocks, writes, 0, nullptr);
+  block.set = backend->constants_set(block.object);
   ring.blocks.push_back(block);
   return true;
 }
 
 bool Passes::State::CreateDescriptors() {
   VkDevice device = context.device;
-  VkDescriptorPoolSize sizes[] = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames_in_flight},
-  };
-  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = frames_in_flight;
-  pool_info.poolSizeCount = 1;
-  pool_info.pPoolSizes = sizes;
-  if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
-    return false;
-  }
   // Sets 0 (empty) and 1 (the constant blocks) are the backend's.
   shared_memory_layout = backend->empty_layout();
   constants_layout = backend->constants_layout();
 
-  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc.descriptorPool = pool;
-  alloc.descriptorSetCount = 1;
-  alloc.pSetLayouts = &shared_memory_layout;
-  if (vk::vkAllocateDescriptorSets(device, &alloc, &arena_set) != VK_SUCCESS) {
-    return false;
-  }
+  arena_set = backend->empty_set();
 
   for (Ring& ring : rings) {
     if (!CreateConstantBlock(ring)) {
@@ -3196,8 +3153,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     backend.BindPipeline(pipeline_object);
   }
   if (!(skip && repeated[8])) {
-    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 4, sets,
-                                kConstantBlocks, offsets);
+    backend.BindResources(pipeline_object, reinterpret_cast<gpu::TextureSet*>(vertex_textures),
+                          reinterpret_cast<gpu::TextureSet*>(pixel_textures),
+                          s.constant_block().object, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
     backend.BindIndexBuffer(s.arena.object(), now.index_offset,

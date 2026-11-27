@@ -123,6 +123,12 @@ class Backend final : public gpu::Backend {
                              uint32_t view_count, Sampler* const* samplers, uint32_t sampler_count,
                              bool* found = nullptr) override;
   static VkDescriptorSet Handle(TextureSet* set) { return reinterpret_cast<VkDescriptorSet>(set); }
+  bool DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) override;
+  void BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel, Buffer* constants,
+                     const uint32_t offsets[4]) override;
+  // Set 0's (empty) and a constant buffer's set 1 (for the ID pass's binds).
+  VkDescriptorSet empty_set() const { return empty_set_; }
+  VkDescriptorSet constants_set(Buffer* buffer) const { return constants_sets_.at(buffer); }
   void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
   void SetViewport(const Viewport& viewport) override;
   void SetScissor(const Rect& scissor) override;
@@ -214,6 +220,8 @@ class Backend final : public gpu::Backend {
   std::vector<VkDescriptorImageInfo> set_infos_;
   std::vector<VkWriteDescriptorSet> set_writes_;
   VkDescriptorSetLayout empty_layout_ = VK_NULL_HANDLE, constants_layout_ = VK_NULL_HANDLE;
+  VkDescriptorSet empty_set_ = VK_NULL_HANDLE;
+  std::unordered_map<Buffer*, VkDescriptorSet> constants_sets_;
   struct DescHash {
     size_t operator()(const PipelineDesc& desc) const;
   };

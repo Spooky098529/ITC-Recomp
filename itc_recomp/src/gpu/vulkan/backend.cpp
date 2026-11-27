@@ -343,8 +343,25 @@ bool Backend::CreateDevice() {
   }
   layout_info.bindingCount = 4;
   layout_info.pBindings = constants;
-  return vk::vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &constants_layout_) ==
-         VK_SUCCESS;
+  if (vk::vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &constants_layout_) !=
+      VK_SUCCESS) {
+    return false;
+  }
+  // Set 0's one set.
+  VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1};
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = 1;
+  pool_info.poolSizeCount = 1;
+  pool_info.pPoolSizes = &size;
+  VkDescriptorPool pool;
+  if (vk::vkCreateDescriptorPool(device_, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  set_alloc.descriptorPool = pool;
+  set_alloc.descriptorSetCount = 1;
+  set_alloc.pSetLayouts = &empty_layout_;
+  return vk::vkAllocateDescriptorSets(device_, &set_alloc, &empty_set_) == VK_SUCCESS;
 }
 
 bool Backend::CreateSwapchain() {
@@ -1244,6 +1261,49 @@ TextureSet* Backend::MakeTextureSet(Shader* shader, ShaderStage stage, View* con
     vk::vkUpdateDescriptorSets(device_, uint32_t(writes.size()), writes.data(), 0, nullptr);
   }
   return reinterpret_cast<TextureSet*>(*set);
+}
+
+bool Backend::DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) {
+  VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5};
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = 1;
+  pool_info.poolSizeCount = 1;
+  pool_info.pPoolSizes = &size;
+  VkDescriptorPool pool;
+  if (vk::vkCreateDescriptorPool(device_, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+    return false;
+  }
+  native::gpu_memory::Created(native::gpu_memory::Object::kDescriptorPool);
+  VkDescriptorSet set;
+  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  set_alloc.descriptorPool = pool;
+  set_alloc.descriptorSetCount = 1;
+  set_alloc.pSetLayouts = &constants_layout_;
+  if (vk::vkAllocateDescriptorSets(device_, &set_alloc, &set) != VK_SUCCESS) {
+    return false;
+  }
+  VkDescriptorBufferInfo buffers[4];
+  VkWriteDescriptorSet writes[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    buffers[i] = {Handle(buffer), 0, ranges[i]};
+    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[i].dstSet = set;
+    writes[i].dstBinding = i;
+    writes[i].descriptorCount = 1;
+    writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    writes[i].pBufferInfo = &buffers[i];
+  }
+  vk::vkUpdateDescriptorSets(device_, 4, writes, 0, nullptr);
+  constants_sets_[buffer] = set;
+  return true;
+}
+
+void Backend::BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel,
+                            Buffer* constants, const uint32_t offsets[4]) {
+  VkDescriptorSet sets[4] = {empty_set_, constants_sets_[constants], Handle(vertex),
+                             Handle(pixel)};
+  vk::vkCmdBindDescriptorSets(commands(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              Object(pipeline).layout, 0, 4, sets, 4, offsets);
 }
 
 void Backend::BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) {

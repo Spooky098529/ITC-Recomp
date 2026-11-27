@@ -94,6 +94,14 @@ class Backend {
                                      uint32_t view_count, Sampler* const* samplers,
                                      uint32_t sampler_count, bool* found = nullptr) = 0;
 
+  // `buffer` (a host-visible uniform buffer) as the draws' four constant
+  // blocks (system, vertex floats, pixel floats, bool/loop), each
+  // `ranges[i]` bytes at the offsets BindResources gives. Once a buffer.
+  virtual bool DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) = 0;
+  // In a pass: the draw's texture sets and constant blocks, for `pipeline`.
+  virtual void BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel,
+                             Buffer* constants, const uint32_t offsets[4]) = 0;
+
   // A pass drawing into `color` and `depth` (either may have no image)
   // within `area`, until EndPass. Copies, clears, uploads and Use aren't
   // made inside one.
