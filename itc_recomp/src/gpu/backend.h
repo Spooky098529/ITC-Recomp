@@ -1,7 +1,7 @@
 // The graphics API under the renderer (docs/d3d11-backend.md, "The design"):
 // what the renderer's logic asks of Vulkan or Direct3D 11. Built up in
-// pieces (step 3); so far the window's device, the swapchain, the frames and
-// samplers.
+// pieces (step 3); so far the window's device, the swapchain, the frames,
+// samplers and images.
 // Render thread only, but where a call says otherwise.
 
 #pragma once
@@ -49,6 +49,18 @@ class Backend {
 
   // A sampler, kept for the backend's life (null if it can't be made).
   virtual Sampler* CreateSampler(const SamplerDesc& desc) = 0;
+
+  // An image (null if it can't be made). `initial`: its texels to start
+  // with, every layer's first level tightly packed one after another (then
+  // ready to sample); without, its contents are undefined.
+  virtual Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) = 0;
+  // At once: the caller keeps it until the GPU is done with it.
+  virtual void DestroyImage(Image* image) = 0;
+  virtual const ImageDesc& Describe(const Image* image) const = 0;
+  // The device memory it holds, in bytes.
+  virtual uint64_t MemorySize(const Image* image) const = 0;
+  // Recorded in the frame: the image is next used for `usage`.
+  virtual void Use(Image* image, Usage usage) = 0;
 };
 
 }  // namespace gpu

@@ -77,4 +77,60 @@ inline VkBorderColor BorderColor(gpu::BorderColor color) {
                                                  : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 }
 
+inline VkFormat Format(gpu::Format format) {
+  using F = gpu::Format;
+  switch (format) {
+    case F::kUndefined: return VK_FORMAT_UNDEFINED;
+    case F::kR8Unorm: return VK_FORMAT_R8_UNORM;
+    case F::kR8G8Unorm: return VK_FORMAT_R8G8_UNORM;
+    case F::kR8G8B8A8Unorm: return VK_FORMAT_R8G8B8A8_UNORM;
+    case F::kA2B10G10R10Unorm: return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+    case F::kR16Unorm: return VK_FORMAT_R16_UNORM;
+    case F::kR16G16Unorm: return VK_FORMAT_R16G16_UNORM;
+    case F::kR16G16B16A16Unorm: return VK_FORMAT_R16G16B16A16_UNORM;
+    case F::kR16Float: return VK_FORMAT_R16_SFLOAT;
+    case F::kR16G16Float: return VK_FORMAT_R16G16_SFLOAT;
+    case F::kR16G16B16A16Float: return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case F::kR32Float: return VK_FORMAT_R32_SFLOAT;
+    case F::kR32G32Float: return VK_FORMAT_R32G32_SFLOAT;
+    case F::kR32G32B32A32Float: return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case F::kR32Uint: return VK_FORMAT_R32_UINT;
+    case F::kR32G32Uint: return VK_FORMAT_R32G32_UINT;
+    case F::kR32G32B32Uint: return VK_FORMAT_R32G32B32_UINT;
+    case F::kR32G32B32A32Uint: return VK_FORMAT_R32G32B32A32_UINT;
+    case F::kD32FloatS8Uint: return VK_FORMAT_D32_SFLOAT_S8_UINT;
+    case F::kBC1: return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    case F::kBC2: return VK_FORMAT_BC2_UNORM_BLOCK;
+    case F::kBC3: return VK_FORMAT_BC3_UNORM_BLOCK;
+    case F::kBC5: return VK_FORMAT_BC5_UNORM_BLOCK;
+  }
+  return VK_FORMAT_UNDEFINED;
+}
+
+// The renderer's format for a Vulkan one (kUndefined for one it lacks): for
+// the code still holding Vulkan's formats while it moves.
+inline gpu::Format FormatFrom(VkFormat format) {
+  for (uint32_t i = 0; i <= uint32_t(gpu::Format::kBC5); i++) {
+    if (Format(gpu::Format(i)) == format) {
+      return gpu::Format(i);
+    }
+  }
+  return gpu::Format::kUndefined;
+}
+
+inline VkImageLayout Layout(gpu::Usage usage) {
+  using U = gpu::Usage;
+  switch (usage) {
+    case U::kUndefined: return VK_IMAGE_LAYOUT_UNDEFINED;
+    case U::kSampled: return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    case U::kDepthSampled: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case U::kColorTarget: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    case U::kDepthTarget: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case U::kCopySource: return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    case U::kCopyDest: return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    case U::kStorage: return VK_IMAGE_LAYOUT_GENERAL;
+  }
+  return VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
 }  // namespace vk_types

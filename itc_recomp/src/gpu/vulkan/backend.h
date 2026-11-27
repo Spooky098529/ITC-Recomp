@@ -16,6 +16,22 @@
 
 namespace gpu::vulkan {
 
+// An image as this backend holds it (behind gpu::Image).
+struct ImageObject {
+  ImageDesc desc;
+  VkImage image = VK_NULL_HANDLE;
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDeviceSize memory_size = 0;
+  VkFormat format = VK_FORMAT_UNDEFINED;
+  VkImageAspectFlags aspects = 0;  // color, or depth and stencil
+  // All of it (both aspects of a depth image), and a depth image's depth
+  // alone (for sampling it).
+  VkImageView view = VK_NULL_HANDLE;
+  VkImageView depth_view = VK_NULL_HANDLE;
+  // Its layout as the frame's commands leave it.
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+};
+
 class Backend final : public gpu::Backend {
  public:
   struct Options {
@@ -38,6 +54,15 @@ class Backend final : public gpu::Backend {
   void WaitIdle() override;
   Sampler* CreateSampler(const SamplerDesc& desc) override;
   static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
+  Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) override;
+  void DestroyImage(Image* image) override;
+  const ImageDesc& Describe(const Image* image) const override { return Object(image).desc; }
+  uint64_t MemorySize(const Image* image) const override { return Object(image).memory_size; }
+  void Use(Image* image, Usage usage) override;
+  static ImageObject& Object(Image* image) { return *reinterpret_cast<ImageObject*>(image); }
+  static const ImageObject& Object(const Image* image) {
+    return *reinterpret_cast<const ImageObject*>(image);
+  }
 
   // Not yet moved (the plan's "In between").
   const native::DeviceContext& context() const { return context_; }
@@ -55,6 +80,9 @@ class Backend final : public gpu::Backend {
 
  private:
   bool CreateDevice();
+  // Records `commands` with `record` and runs them now, waiting for them.
+  template <typename Record>
+  bool RunNow(Record record);
   bool CreateSwapchain();
   void DestroySwapchain();
 
@@ -85,6 +113,7 @@ class Backend final : public gpu::Backend {
   uint32_t frame_index_ = 0;
 
   native::DeviceContext context_{};
+  VkPhysicalDeviceMemoryProperties memory_properties_{};
   VkImage shown_ = VK_NULL_HANDLE;
   std::vector<VkCommandBuffer> before_;
 };

@@ -95,7 +95,73 @@ struct SamplerDesc {
   BorderColor border = BorderColor::kTransparentBlack;
 };
 
+// Image and vertex formats, by their components' order in memory.
+enum class Format : uint8_t {
+  kUndefined,
+  kR8Unorm,
+  kR8G8Unorm,
+  kR8G8B8A8Unorm,
+  kA2B10G10R10Unorm,  // packed in 32 bits, R in the low bits
+  kR16Unorm,
+  kR16G16Unorm,
+  kR16G16B16A16Unorm,
+  kR16Float,
+  kR16G16Float,
+  kR16G16B16A16Float,
+  kR32Float,
+  kR32G32Float,
+  kR32G32B32A32Float,
+  kR32Uint,
+  kR32G32Uint,
+  kR32G32B32Uint,
+  kR32G32B32A32Uint,
+  kD32FloatS8Uint,
+  kBC1,  // RGBA
+  kBC2,
+  kBC3,
+  kBC5,
+};
+
+enum class ImageType : uint8_t {
+  k2D,
+  k2DArray,  // a 2D image viewed as an array (of `layers`)
+  k3D,
+  kCube,  // 6 layers
+};
+
+// What an image may be used for (bits).
+enum ImageUsageBits : uint32_t {
+  kImageSampled = 1,
+  kImageColorTarget = 2,
+  kImageDepthTarget = 4,
+  kImageCopySource = 8,
+  kImageCopyDest = 16,
+  kImageStorage = 32,
+};
+
+struct ImageDesc {
+  ImageType type = ImageType::k2D;
+  Format format = Format::kUndefined;
+  uint32_t width = 1, height = 1, depth = 1;
+  uint32_t layers = 1, levels = 1, samples = 1;
+  uint32_t usage = 0;  // ImageUsageBits
+};
+
+// What an image is about to be used for (docs/d3d11-backend.md, "Usage, not
+// layouts"): Vulkan changes its layout when it differs from the last use.
+enum class Usage : uint8_t {
+  kUndefined,  // its contents may be dropped
+  kSampled,
+  kDepthSampled,  // a depth image sampled as depth
+  kColorTarget,
+  kDepthTarget,
+  kCopySource,
+  kCopyDest,
+  kStorage,
+};
+
 // The backends' objects: opaque, each backend's own behind them.
 struct Sampler;
+struct Image;
 
 }  // namespace gpu

@@ -3,7 +3,9 @@
 #include <SDL3/SDL_vulkan.h>
 
 #include <algorithm>
+#include <cstring>
 #include <format>
+#include <memory>
 
 #include "base/log.h"
 #include "native/vulkan_types.h"
@@ -26,6 +28,37 @@ VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
   VkOffset3D start{int32_t((target.width - width) / 2), int32_t((target.height - height) / 2), 0};
   end = {start.x + int32_t(width), start.y + int32_t(height), 1};
   return start;
+}
+
+uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint32_t type_bits,
+                        VkMemoryPropertyFlags wanted) {
+  for (uint32_t i = 0; i < properties.memoryTypeCount; i++) {
+    if ((type_bits & (1u << i)) &&
+        (properties.memoryTypes[i].propertyFlags & wanted) == wanted) {
+      return i;
+    }
+  }
+  return UINT32_MAX;
+}
+
+// Bytes a texel (a 4x4 block for the compressed formats).
+uint32_t TexelBytes(Format format) {
+  switch (format) {
+    case Format::kR8Unorm: return 1;
+    case Format::kR8G8Unorm: case Format::kR16Unorm: case Format::kR16Float: return 2;
+    case Format::kR16G16B16A16Unorm: case Format::kR16G16B16A16Float: case Format::kR32G32Float:
+    case Format::kR32G32Uint: case Format::kD32FloatS8Uint: case Format::kBC1: return 8;
+    case Format::kR32G32B32Uint: return 12;
+    case Format::kR32G32B32A32Float: case Format::kR32G32B32A32Uint: case Format::kBC2:
+    case Format::kBC3: case Format::kBC5: return 16;
+    case Format::kUndefined: return 0;
+    default: return 4;
+  }
+}
+
+bool IsCompressed(Format format) {
+  return format == Format::kBC1 || format == Format::kBC2 || format == Format::kBC3 ||
+         format == Format::kBC5;
 }
 
 }  // namespace
@@ -169,6 +202,7 @@ bool Backend::CreateDevice() {
     return false;
   }
   vk::vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
+  vk::vkGetPhysicalDeviceMemoryProperties(physical_device_, &memory_properties_);
 
   context_.physical_device = physical_device_;
   context_.device = device_;
@@ -422,6 +456,210 @@ bool Backend::EndFrame(Extent2D size) {
 }
 
 void Backend::WaitIdle() { vk::vkQueueWaitIdle(queue_); }
+
+template <typename Record>
+bool Backend::RunNow(Record record) {
+  VkCommandPool pool;
+  VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+  pool_info.queueFamilyIndex = queue_family_;
+  if (vk::vkCreateCommandPool(device_, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+    return false;
+  }
+  VkCommandBuffer commands;
+  VkCommandBufferAllocateInfo alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  alloc.commandPool = pool;
+  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc.commandBufferCount = 1;
+  vk::vkAllocateCommandBuffers(device_, &alloc, &commands);
+  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vk::vkBeginCommandBuffer(commands, &begin);
+  record(commands);
+  vk::vkEndCommandBuffer(commands);
+  VkFence fence;
+  VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+  vk::vkCreateFence(device_, &fence_info, nullptr, &fence);
+  VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  submit.commandBufferCount = 1;
+  submit.pCommandBuffers = &commands;
+  vk::vkQueueSubmit(queue_, 1, &submit, fence);
+  vk::vkWaitForFences(device_, 1, &fence, VK_TRUE, UINT64_MAX);
+  vk::vkDestroyFence(device_, fence, nullptr);
+  vk::vkDestroyCommandPool(device_, pool, nullptr);
+  return true;
+}
+
+Image* Backend::CreateImage(const ImageDesc& desc, const void* initial) {
+  auto object = std::make_unique<ImageObject>();
+  ImageObject& o = *object;
+  o.desc = desc;
+  o.format = vk_types::Format(desc.format);
+  const bool depth = desc.format == Format::kD32FloatS8Uint;
+  o.aspects = depth ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+                    : VK_IMAGE_ASPECT_COLOR_BIT;
+  const uint32_t layers = desc.type == ImageType::kCube ? 6 : desc.layers;
+  VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+  info.flags = desc.type == ImageType::kCube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
+  info.imageType = desc.type == ImageType::k3D ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
+  info.format = o.format;
+  info.extent = {desc.width, desc.height, desc.type == ImageType::k3D ? desc.depth : 1};
+  info.mipLevels = desc.levels;
+  info.arrayLayers = layers;
+  info.samples = VkSampleCountFlagBits(desc.samples);
+  info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  info.usage = ((desc.usage & kImageSampled) ? VK_IMAGE_USAGE_SAMPLED_BIT : 0) |
+               ((desc.usage & kImageColorTarget) ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0) |
+               ((desc.usage & kImageDepthTarget) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                                 : 0) |
+               ((desc.usage & kImageCopySource) ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0) |
+               ((desc.usage & kImageCopyDest) || initial ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0) |
+               ((desc.usage & kImageStorage) ? VK_IMAGE_USAGE_STORAGE_BIT : 0);
+  info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  if (vk::vkCreateImage(device_, &info, nullptr, &o.image) != VK_SUCCESS) {
+    return nullptr;
+  }
+  VkMemoryRequirements requirements;
+  vk::vkGetImageMemoryRequirements(device_, o.image, &requirements);
+  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  alloc.allocationSize = requirements.size;
+  alloc.memoryTypeIndex = FindMemoryType(memory_properties_, requirements.memoryTypeBits,
+                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (alloc.memoryTypeIndex == UINT32_MAX ||
+      vk::vkAllocateMemory(device_, &alloc, nullptr, &o.memory) != VK_SUCCESS) {
+    vk::vkDestroyImage(device_, o.image, nullptr);
+    return nullptr;
+  }
+  o.memory_size = alloc.allocationSize;
+  VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+  view.image = o.image;
+  view.viewType = desc.type == ImageType::k3D        ? VK_IMAGE_VIEW_TYPE_3D
+                  : desc.type == ImageType::kCube    ? VK_IMAGE_VIEW_TYPE_CUBE
+                  : desc.type == ImageType::k2DArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                                     : VK_IMAGE_VIEW_TYPE_2D;
+  view.format = o.format;
+  view.subresourceRange = {o.aspects, 0, desc.levels, 0, layers};
+  if (vk::vkBindImageMemory(device_, o.image, o.memory, 0) != VK_SUCCESS ||
+      vk::vkCreateImageView(device_, &view, nullptr, &o.view) != VK_SUCCESS) {
+    DestroyImage(reinterpret_cast<Image*>(object.release()));
+    return nullptr;
+  }
+  if (depth) {
+    view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (vk::vkCreateImageView(device_, &view, nullptr, &o.depth_view) != VK_SUCCESS) {
+      DestroyImage(reinterpret_cast<Image*>(object.release()));
+      return nullptr;
+    }
+  }
+  if (initial) {
+    // Through a staging buffer, then left ready to sample.
+    const uint32_t blocks_wide = IsCompressed(desc.format) ? (desc.width + 3) / 4 : desc.width;
+    const uint32_t blocks_high = IsCompressed(desc.format) ? (desc.height + 3) / 4 : desc.height;
+    const VkDeviceSize layer_bytes = VkDeviceSize(blocks_wide) * blocks_high *
+                                     (desc.type == ImageType::k3D ? desc.depth : 1) *
+                                     TexelBytes(desc.format);
+    VkBufferCreateInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    buffer_info.size = layer_bytes * layers;
+    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    VkBuffer staging = VK_NULL_HANDLE;
+    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+    void* mapped = nullptr;
+    bool ok = vk::vkCreateBuffer(device_, &buffer_info, nullptr, &staging) == VK_SUCCESS;
+    if (ok) {
+      vk::vkGetBufferMemoryRequirements(device_, staging, &requirements);
+      alloc.allocationSize = requirements.size;
+      alloc.memoryTypeIndex = FindMemoryType(
+          memory_properties_, requirements.memoryTypeBits,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      ok = alloc.memoryTypeIndex != UINT32_MAX &&
+           vk::vkAllocateMemory(device_, &alloc, nullptr, &staging_memory) == VK_SUCCESS &&
+           vk::vkBindBufferMemory(device_, staging, staging_memory, 0) == VK_SUCCESS &&
+           vk::vkMapMemory(device_, staging_memory, 0, VK_WHOLE_SIZE, 0, &mapped) == VK_SUCCESS;
+    }
+    if (ok) {
+      std::memcpy(mapped, initial, size_t(layer_bytes * layers));
+      ok = RunNow([&](VkCommandBuffer commands) {
+        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = o.image;
+        barrier.subresourceRange = {o.aspects, 0, desc.levels, 0, layers};
+        vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                                 &barrier);
+        VkBufferImageCopy copy{};
+        copy.imageSubresource = {o.aspects, 0, 0, layers};
+        copy.imageExtent = info.extent;
+        vk::vkCmdCopyBufferToImage(commands, staging, o.image,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+      });
+    }
+    if (staging) {
+      vk::vkDestroyBuffer(device_, staging, nullptr);
+    }
+    if (staging_memory) {
+      vk::vkFreeMemory(device_, staging_memory, nullptr);
+    }
+    if (!ok) {
+      DestroyImage(reinterpret_cast<Image*>(object.release()));
+      return nullptr;
+    }
+    o.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  }
+  return reinterpret_cast<Image*>(object.release());
+}
+
+void Backend::DestroyImage(Image* image) {
+  if (!image) {
+    return;
+  }
+  ImageObject* o = &Object(image);
+  if (o->depth_view) {
+    vk::vkDestroyImageView(device_, o->depth_view, nullptr);
+  }
+  if (o->view) {
+    vk::vkDestroyImageView(device_, o->view, nullptr);
+  }
+  if (o->image) {
+    vk::vkDestroyImage(device_, o->image, nullptr);
+  }
+  if (o->memory) {
+    vk::vkFreeMemory(device_, o->memory, nullptr);
+  }
+  delete o;
+}
+
+void Backend::Use(Image* image, Usage usage) {
+  ImageObject& o = Object(image);
+  const VkImageLayout wanted = vk_types::Layout(usage);
+  if (o.layout == wanted) {
+    return;
+  }
+  // Waiting for everything before.
+  constexpr VkAccessFlags kAllAccess = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+  barrier.srcAccessMask = kAllAccess;
+  barrier.dstAccessMask = kAllAccess;
+  barrier.oldLayout = o.layout;
+  barrier.newLayout = wanted;
+  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = o.image;
+  barrier.subresourceRange = {o.aspects, 0, VK_REMAINING_MIP_LEVELS, 0,
+                              VK_REMAINING_ARRAY_LAYERS};
+  vk::vkCmdPipelineBarrier(commands(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                           &barrier);
+  o.layout = wanted;
+}
 
 Sampler* Backend::CreateSampler(const SamplerDesc& desc) {
   VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};

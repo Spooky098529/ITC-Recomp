@@ -1042,11 +1042,15 @@ struct Passes::State {
   // Textures, and white 1x1 placeholders of each declared type for what
   // can't be had yet.
   TextureCache textures;
-  Image dummy_2d_array, dummy_3d, dummy_cube;
+  gpu::Image* dummy_2d_array = nullptr;
+  gpu::Image* dummy_3d = nullptr;
+  gpu::Image* dummy_cube = nullptr;
   // Zero (transparent black) ones for a texture of another dimension than
   // the shader declares: the plugin binds a null descriptor, which reads
   // as zero.
-  Image zero_2d_array, zero_3d, zero_cube;
+  gpu::Image* zero_2d_array = nullptr;
+  gpu::Image* zero_3d = nullptr;
+  gpu::Image* zero_cube = nullptr;
   VkSampler sampler = VK_NULL_HANDLE;
   // Texture set layouts by the shader's bindings; this frame's sets by
   // their contents.
@@ -1140,6 +1144,17 @@ struct Passes::State {
   bool PlaceConstants(uint32_t block, const void* bytes, uint32_t size, uint32_t range,
                       uint32_t& offset, bool copied = false, bool same = false);
 
+  // An image from the backend, its memory counted (gpu_memory.h).
+  gpu::Image* NewImage(const gpu::ImageDesc& desc, const void* initial = nullptr) {
+    gpu::Image* image = backend->CreateImage(desc, initial);
+    if (image) {
+      gpu_memory::Allocated(gpu_memory::Kind::kImage, backend->MemorySize(image));
+    }
+    return image;
+  }
+  static VkImageView View(gpu::Image* image) {
+    return gpu::vulkan::Backend::Object(image).view;
+  }
   bool CreateImage(Image& out, VkImageType type, VkImageViewType view_type, VkFormat format,
                    VkExtent3D extent, uint32_t layers, VkImageUsageFlags usage,
                    VkImageAspectFlags aspect, VkImageCreateFlags flags = 0,
@@ -1415,82 +1430,28 @@ bool Passes::State::CreateDescriptors() {
 }
 
 bool Passes::State::CreateDummyTextures() {
-  constexpr VkImageUsageFlags kUsage =
-      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  for (auto* set : {&dummy_2d_array, &zero_2d_array}) {
-    Image& array = set[0];
-    Image& volume = set == &dummy_2d_array ? dummy_3d : zero_3d;
-    Image& cube = set == &dummy_2d_array ? dummy_cube : zero_cube;
-    if (!CreateImage(array, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-                     VK_FORMAT_R8G8B8A8_UNORM, {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
-        !CreateImage(volume, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D, VK_FORMAT_R8G8B8A8_UNORM,
-                     {1, 1, 1}, 1, kUsage, VK_IMAGE_ASPECT_COLOR_BIT) ||
-        !CreateImage(cube, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_CUBE, VK_FORMAT_R8G8B8A8_UNORM,
-                     {1, 1, 1}, 6, kUsage, VK_IMAGE_ASPECT_COLOR_BIT,
-                     VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)) {
+  // White or zero, ready to sample.
+  const uint8_t white[6][4] = {{255, 255, 255, 255}, {255, 255, 255, 255}, {255, 255, 255, 255},
+                               {255, 255, 255, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}};
+  const uint8_t zero[6][4] = {};
+  for (bool is_white : {true, false}) {
+    const void* texels = is_white ? &white : &zero;
+    gpu::ImageDesc desc;
+    desc.format = gpu::Format::kR8G8B8A8Unorm;
+    desc.usage = gpu::kImageSampled | gpu::kImageCopyDest;
+    desc.type = gpu::ImageType::k2DArray;
+    gpu::Image* array = NewImage(desc, texels);
+    desc.type = gpu::ImageType::k3D;
+    gpu::Image* volume = NewImage(desc, texels);
+    desc.type = gpu::ImageType::kCube;
+    gpu::Image* cube = NewImage(desc, texels);
+    if (!array || !volume || !cube) {
       return false;
     }
+    (is_white ? dummy_2d_array : zero_2d_array) = array;
+    (is_white ? dummy_3d : zero_3d) = volume;
+    (is_white ? dummy_cube : zero_cube) = cube;
   }
-  // Clear them to white or zero once, and leave them readable.
-  VkDevice device = context.device;
-  VkCommandPool command_pool;
-  VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool_info.queueFamilyIndex = context.queue_family;
-  if (vk::vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) != VK_SUCCESS) {
-    return false;
-  }
-  VkCommandBuffer commands;
-  VkCommandBufferAllocateInfo alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  alloc.commandPool = command_pool;
-  alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc.commandBufferCount = 1;
-  vk::vkAllocateCommandBuffers(device, &alloc, &commands);
-  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vk::vkBeginCommandBuffer(commands, &begin);
-  VkClearColorValue white{{1.0f, 1.0f, 1.0f, 1.0f}}, zero{};
-  struct ToClear {
-    VkImage image;
-    uint32_t layers;
-    const VkClearColorValue* value;
-  };
-  for (auto [image, layers, value] :
-       {ToClear{dummy_2d_array.image, 1, &white}, ToClear{dummy_3d.image, 1, &white},
-        ToClear{dummy_cube.image, 6, &white}, ToClear{zero_2d_array.image, 1, &zero},
-        ToClear{zero_3d.image, 1, &zero}, ToClear{zero_cube.image, 6, &zero}}) {
-    VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers};
-    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange = range;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
-    vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, value, 1,
-                             &range);
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
-  }
-  vk::vkEndCommandBuffer(commands);
-  VkFence fence;
-  VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-  vk::vkCreateFence(device, &fence_info, nullptr, &fence);
-  VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-  submit.commandBufferCount = 1;
-  submit.pCommandBuffers = &commands;
-  vk::vkQueueSubmit(context.queue, 1, &submit, fence);
-  vk::vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-  vk::vkDestroyFence(device, fence, nullptr);
-  vk::vkDestroyCommandPool(device, command_pool, nullptr);
   return true;
 }
 
@@ -1621,13 +1582,13 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
       }
     }
     if (!view && mismatched) {
-      view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? zero_3d.view
-             : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? zero_cube.view
-                                                            : zero_2d_array.view;
+      view = View(texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? zero_3d
+                  : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? zero_cube
+                                                                 : zero_2d_array);
     } else if (!view) {
-      view = texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d.view
-             : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube.view
-                                                            : dummy_2d_array.view;
+      view = View(texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d
+                  : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube
+                                                                 : dummy_2d_array);
     }
     infos[i] = {VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
   }
