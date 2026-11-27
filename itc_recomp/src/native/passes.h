@@ -184,9 +184,6 @@ class Passes {
     // and an example: address, size, size needed, highest vertex, stride
     // in words.
     uint64_t vertex_overruns = 0;
-    // Draws whose item's base vertex differs from VGT_INDX_OFFSET, and an
-    // example (item's, register's).
-    uint64_t base_vertex_differs = 0;
     uint64_t param_gen_draws = 0;
     // Inline vertex draws drawn (also counted in drawn), and by primitive
     // type (4, 6, 8 rectangle list, 13 quad list).
@@ -215,7 +212,6 @@ class Passes {
     uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
     uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
              fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
-    std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
     uint64_t clears = 0, clear_rects = 0;
     // Resolves done; skipped (no source or destination, a level or slice

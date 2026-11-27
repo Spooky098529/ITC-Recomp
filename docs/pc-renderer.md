@@ -590,8 +590,17 @@ and resolve on one 256x144 target in turn, then the main view draws on
   replay), then frames right. The descriptor words stay until the shaders
   take plain textures and the cache binds by handle (2b).
 
+- **The draw without the shadow (2026-11-27).** With the base vertex taken
+  from the draw command's own item (the runs comparing it with
+  VGT_INDX_OFFSET never saw another) and the targets' color formats from
+  their surfaces, nothing the draw uses comes from the device's register
+  shadow: it's read only for the diagnostics that compare with it or
+  describe it (`--native_renderer_check_render_states`, a dump's draw
+  records). The base vertex comparison and its log line are gone.
+
 Left for step 3: clears and draws through the interface, then the game's
-setters out of the handlers, which ends the shadow on the render path.
+setters out of the handlers (only game code outside the replay that reads
+the Direct3D state keeps what it needs), and `replay_hooks.cpp`.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

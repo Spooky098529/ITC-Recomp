@@ -1083,12 +1083,6 @@ void Renderer::LogStats() {
                    share(view.fetch_changed_unread));
     }
   }
-  if (view.base_vertex_differs) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
-                 "than VGT_INDX_OFFSET, e.g. {} and {}",
-                 double(view.base_vertex_differs) / frames, int32_t(view.base_vertex_sample[0]),
-                 int32_t(view.base_vertex_sample[1]));
-  }
   if (view.vertex_overruns) {
     const auto& v = view.vertex_overrun_sample;
     ITC_LOG_INFO("native renderer: {:.1f} draws a frame read vertices past their fetch "

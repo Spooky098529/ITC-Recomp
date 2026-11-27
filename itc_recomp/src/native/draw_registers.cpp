@@ -92,7 +92,8 @@ void DrawRegisters::Read(uint32_t device) {
 
 uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets,
                                             const uint32_t color_write[4],
-                                            bool has_pixel_shader) const {
+                                            bool has_pixel_shader,
+                                            const uint32_t formats[4]) const {
   if (!has_pixel_shader) {
     return 0;
   }
@@ -101,7 +102,7 @@ uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets
     if (!(pixel_shader_writes_targets & (1u << i))) {
       continue;
     }
-    uint32_t components = (1u << ComponentCount(color_format(i))) - 1;
+    uint32_t components = (1u << ComponentCount(formats[i])) - 1;
     uint32_t target = color_write[i] & components;
     if (target) {
       mask |= (target | (0xF & ~components)) << (4 * i);

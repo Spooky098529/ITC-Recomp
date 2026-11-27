@@ -1153,8 +1153,11 @@ struct Passes::State {
   // --native_renderer_check_render_states.
   uint32_t shadow_fetch[kFetchConstantWords] = {};
   void ReadState(uint32_t device) {
-    regs.Read(device);
-    if (check_render_states) {
+    // The device's shadow only for the diagnostics that compare with it or
+    // describe it (the render state check, a dump's draw records): nothing
+    // the draw uses comes from it.
+    if (check_render_states || record_draws) {
+      regs.Read(device);
       std::memcpy(shadow_fetch, regs.fetch, sizeof(shadow_fetch));
     }
     // The fetch constants from the renderer's own state (render/state.h):
@@ -3142,17 +3145,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     s.stats.unsupported++;
     return;
   }
-  // The base vertex the GPU adds to each index: VGT_INDX_OFFSET, as the
-  // plugin takes it (the item's upper half is the library's argument, which
-  // it may already have applied to the vertex buffers' addresses).
-  int32_t item_base_vertex = int32_t(base_start) >> 16;
-  int32_t base_vertex = regs.vertex_index_offset;
-  if (!call.inline_vertices && base_vertex != item_base_vertex) {
-    s.stats.base_vertex_differs++;
-    if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
-      s.stats.base_vertex_sample = {uint32_t(item_base_vertex), uint32_t(base_vertex)};
-    }
-  }
+  // The base vertex added to each index: the draw's own (the item's upper
+  // half, as the library's DrawIndexedVertices puts it in VGT_INDX_OFFSET:
+  // never another in the runs that compared them); 0 for inline draws.
+  int32_t base_vertex = call.inline_vertices ? 0 : int32_t(base_start) >> 16;
   uint32_t start_index = base_start & 0xFFFF;
   // Inline draws: the vertices in order (indices only to expand rectangle
   // and quad lists).
@@ -3690,6 +3686,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
         key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
         key.dst_alpha == VK_BLEND_FACTOR_ZERO && key.alpha_op == VK_BLEND_OP_ADD);
+  // Each bound target's color format, from its surface's color info.
+  uint32_t target_formats[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    uint32_t surface = render::BoundTargets().color[i];
+    target_formats[i] = surface ? guest::LoadU32(surface + 28) >> 16 & 0xF : 0;
+  }
   // As the plugin normalizes it: nothing without a pixel shader, for a
   // target the pixel shader doesn't write, or in depth-only EDRAM mode.
   // (With the raw mask, those draws wrote Vulkan's undefined fragment output:
@@ -3697,7 +3699,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // without a pixel shader.)
   key.write_mask =
       regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write,
-                               pixel_object != 0) &
+                               pixel_object != 0, target_formats) &
       0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
