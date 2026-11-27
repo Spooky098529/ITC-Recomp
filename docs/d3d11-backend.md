@@ -296,9 +296,15 @@ each backend.
   draws record through them (the repeated-state skipping stays in
   `passes.cpp`, comparing what it asks for). Checked: the dump identical,
   the tick replay, the pad replay without errors.
-- **Next:** the descriptor sets (the texture sets from views and samplers,
-  with `passes.cpp`'s per-frame set cache and last-set reuse moving into
-  the backend; the constant blocks by offset), then the resolve, movie,
+- **Texture sets (2026-11-27).** `Backend::MakeTextureSet` (a stage's
+  views and samplers for a shader, one set per distinct contents a frame):
+  the per-frame set cache (`FrameSetCache`, keyed as before) and the
+  frames' descriptor pools moved from `passes.cpp` into the Vulkan backend,
+  reset at the slot's frame start. `passes.cpp` keeps the last-set reuse by
+  fetch constants and generations (the renderer's logic). Checked: the dump
+  identical, the tick replay, the pad replay without errors.
+- **Next:** binding the sets (the texture sets and the constant blocks by
+  offset: `BindResources`), then the resolve, movie,
   gamma and ID passes' own pipelines, shaders and binds; then the dumps.
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*

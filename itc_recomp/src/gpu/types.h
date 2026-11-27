@@ -285,6 +285,7 @@ struct Viewport {
 };
 
 // The backends' objects: opaque, each backend's own behind them.
+struct TextureSet;
 struct Pipeline;
 struct Buffer;
 struct Sampler;

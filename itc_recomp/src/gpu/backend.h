@@ -87,6 +87,13 @@ class Backend {
   // kept; null if it can't be made.
   virtual Pipeline* GetPipeline(const PipelineDesc& desc, bool* made = nullptr) = 0;
 
+  // A stage's texture set for this frame: `shader`'s views (in its
+  // textures' order) and samplers (null shader: none). The same contents
+  // give the same set within a frame (`found` set then).
+  virtual TextureSet* MakeTextureSet(Shader* shader, ShaderStage stage, View* const* views,
+                                     uint32_t view_count, Sampler* const* samplers,
+                                     uint32_t sampler_count, bool* found = nullptr) = 0;
+
   // A pass drawing into `color` and `depth` (either may have no image)
   // within `area`, until EndPass. Copies, clears, uploads and Use aren't
   // made inside one.

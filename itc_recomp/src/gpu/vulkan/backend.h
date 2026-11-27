@@ -119,6 +119,10 @@ class Backend final : public gpu::Backend {
   // floats, bool/loop; dynamic uniform buffers).
   VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
   VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
+  TextureSet* MakeTextureSet(Shader* shader, ShaderStage stage, View* const* views,
+                             uint32_t view_count, Sampler* const* samplers, uint32_t sampler_count,
+                             bool* found = nullptr) override;
+  static VkDescriptorSet Handle(TextureSet* set) { return reinterpret_cast<VkDescriptorSet>(set); }
   void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
   void SetViewport(const Viewport& viewport) override;
   void SetScissor(const Rect& scissor) override;
@@ -189,7 +193,11 @@ class Backend final : public gpu::Backend {
     // Uploads, submitted before the frame's commands.
     VkCommandPool upload_pool = VK_NULL_HANDLE;
     VkCommandBuffer uploads = VK_NULL_HANDLE;
+    // Texture sets: pools, kept for later frames, and the one in use.
+    std::vector<VkDescriptorPool> texture_pools;
+    size_t texture_pool = 0;
   };
+  bool AddTexturePool(Frame& frame);
   std::vector<Frame> frames_;
   uint32_t frame_index_ = 0;
 
@@ -200,6 +208,11 @@ class Backend final : public gpu::Backend {
   // first frame, to the frame's end), and hold buffer uploads.
   bool uploading_ = false, uploaded_buffers_ = false;
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts_;
+  // This frame's texture sets by their contents (backend.cpp).
+  std::unique_ptr<class FrameSetCache> texture_sets_;
+  std::vector<uint64_t> set_key_;
+  std::vector<VkDescriptorImageInfo> set_infos_;
+  std::vector<VkWriteDescriptorSet> set_writes_;
   VkDescriptorSetLayout empty_layout_ = VK_NULL_HANDLE, constants_layout_ = VK_NULL_HANDLE;
   struct DescHash {
     size_t operator()(const PipelineDesc& desc) const;

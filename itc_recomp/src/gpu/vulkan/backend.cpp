@@ -69,7 +69,74 @@ bool IsCompressed(Format format) {
 
 }  // namespace
 
-Backend::Backend(const Options& options) : options_(options) {
+// Texture descriptor sets (sets 2 and 3) in each of a frame's texture
+// pools, and their descriptors; a frame that fills its pools gets another,
+// kept for later frames.
+constexpr uint32_t kTextureSetsPerPool = 8192;
+constexpr uint32_t kTextureDescriptorsPerPool = 32768;
+
+// This frame's texture descriptor sets by their contents: an open-addressed
+// table of indices into the entries, the keys' words in one buffer, all
+// kept between frames (the string-keyed map it replaced allocated a node
+// and a key per set, and hashed and compared bytes: ~3% of the render
+// thread with the pipelines' keys).
+class FrameSetCache {
+ public:
+  // Returns the set slot for the key (words), and whether it was added.
+  std::pair<VkDescriptorSet*, bool> FindOrAdd(const uint64_t* words, uint32_t count) {
+    if (entries_.size() * 2 >= table_.size()) {
+      Grow();
+    }
+    uint64_t hash = base::Hash64(words, count * sizeof(uint64_t));
+    size_t mask = table_.size() - 1;
+    for (size_t i = size_t(hash) & mask;; i = (i + 1) & mask) {
+      int32_t index = table_[i];
+      if (index < 0) {
+        table_[i] = int32_t(entries_.size());
+        entries_.push_back({hash, uint32_t(words_.size()), count, VK_NULL_HANDLE});
+        words_.insert(words_.end(), words, words + count);
+        return {&entries_.back().set, true};
+      }
+      Entry& e = entries_[index];
+      if (e.hash == hash && e.count == count &&
+          std::equal(words, words + count, words_.begin() + e.offset)) {
+        return {&e.set, false};
+      }
+    }
+  }
+
+  void Clear() {
+    entries_.clear();
+    words_.clear();
+    std::fill(table_.begin(), table_.end(), -1);
+  }
+
+ private:
+  struct Entry {
+    uint64_t hash;
+    uint32_t offset, count;
+    VkDescriptorSet set;
+  };
+
+  void Grow() {
+    table_.assign(std::max<size_t>(table_.size() * 2, 8192), -1);
+    size_t mask = table_.size() - 1;
+    for (size_t k = 0; k < entries_.size(); k++) {
+      size_t i = size_t(entries_[k].hash) & mask;
+      while (table_[i] >= 0) {
+        i = (i + 1) & mask;
+      }
+      table_[i] = int32_t(k);
+    }
+  }
+
+  std::vector<int32_t> table_;
+  std::vector<Entry> entries_;
+  std::vector<uint64_t> words_;
+};
+
+Backend::Backend(const Options& options)
+    : options_(options), texture_sets_(std::make_unique<FrameSetCache>()) {
   frames_.resize(options.frames_in_flight);
 }
 
@@ -256,7 +323,8 @@ bool Backend::CreateDevice() {
       return false;
     }
     alloc.commandPool = frame.upload_pool;
-    if (vk::vkAllocateCommandBuffers(device_, &alloc, &frame.uploads) != VK_SUCCESS) {
+    if (vk::vkAllocateCommandBuffers(device_, &alloc, &frame.uploads) != VK_SUCCESS ||
+        !AddTexturePool(frame)) {
       return false;
     }
   }
@@ -382,6 +450,11 @@ uint32_t Backend::BeginFrame() {
     // (Uploads asked for before the first frame stay for it.)
     vk::vkResetCommandPool(device_, frame.upload_pool, 0);
   }
+  texture_sets_->Clear();
+  for (size_t i = 0; i <= frame.texture_pool && i < frame.texture_pools.size(); i++) {
+    vk::vkResetDescriptorPool(device_, frame.texture_pools[i], 0);
+  }
+  frame.texture_pool = 0;
   vk::vkResetCommandBuffer(frame.commands, 0);
   VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -1083,6 +1156,94 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   }
   it->second = std::move(object);
   return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
+}
+
+bool Backend::AddTexturePool(Frame& frame) {
+  VkDescriptorPoolSize sizes[] = {
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kTextureDescriptorsPerPool},
+      {VK_DESCRIPTOR_TYPE_SAMPLER, kTextureDescriptorsPerPool},
+  };
+  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  pool_info.maxSets = kTextureSetsPerPool;
+  pool_info.poolSizeCount = 2;
+  pool_info.pPoolSizes = sizes;
+  VkDescriptorPool pool;
+  if (vk::vkCreateDescriptorPool(device_, &pool_info, nullptr, &pool) != VK_SUCCESS) {
+    return false;
+  }
+  native::gpu_memory::Created(native::gpu_memory::Object::kDescriptorPool);
+  frame.texture_pools.push_back(pool);
+  return true;
+}
+
+TextureSet* Backend::MakeTextureSet(Shader* shader, ShaderStage stage, View* const* views,
+                                    uint32_t view_count, Sampler* const* samplers,
+                                    uint32_t sampler_count, bool* found) {
+  VkDescriptorSetLayout layout = TexturesLayout(shader, stage);
+  std::vector<VkDescriptorImageInfo>& infos = set_infos_;
+  infos.resize(view_count + sampler_count);
+  for (uint32_t i = 0; i < view_count; i++) {
+    infos[i] = {VK_NULL_HANDLE, Handle(views[i]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+  }
+  for (uint32_t i = 0; i < sampler_count; i++) {
+    infos[view_count + i] = {Handle(samplers[i]), VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
+  }
+  // One set per distinct contents a frame, keyed by the layout and each
+  // binding's sampler, view and layout (the fields, not the structs' bytes,
+  // which have padding).
+  std::vector<uint64_t>& key = set_key_;
+  key.clear();
+  key.push_back(uint64_t(reinterpret_cast<uintptr_t>(layout)));
+  for (const VkDescriptorImageInfo& info : infos) {
+    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.sampler)));
+    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.imageView)));
+    key.push_back(uint64_t(info.imageLayout));
+  }
+  auto [set, added] = texture_sets_->FindOrAdd(key.data(), uint32_t(key.size()));
+  if (found) {
+    *found = !added;
+  }
+  if (!added) {
+    return reinterpret_cast<TextureSet*>(*set);
+  }
+  Frame& frame = frames_[frame_index_];
+  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  alloc.descriptorPool = frame.texture_pools[frame.texture_pool];
+  alloc.descriptorSetCount = 1;
+  alloc.pSetLayouts = &layout;
+  if (vk::vkAllocateDescriptorSets(device_, &alloc, set) != VK_SUCCESS) {
+    // The pool in use is full: on to the next, made if needed.
+    *set = VK_NULL_HANDLE;
+    frame.texture_pool++;
+    if (frame.texture_pool == frame.texture_pools.size()) {
+      if (!AddTexturePool(frame)) {
+        frame.texture_pool--;
+        return nullptr;
+      }
+      ITC_LOG_INFO("native renderer: frame {} texture sets: pool {} added ({} sets each)",
+                   frame_index_, frame.texture_pools.size(), kTextureSetsPerPool);
+    }
+    alloc.descriptorPool = frame.texture_pools[frame.texture_pool];
+    if (vk::vkAllocateDescriptorSets(device_, &alloc, set) != VK_SUCCESS) {
+      *set = VK_NULL_HANDLE;
+      return nullptr;
+    }
+  }
+  std::vector<VkWriteDescriptorSet>& writes = set_writes_;
+  writes.assign(infos.size(), {});
+  for (size_t i = 0; i < infos.size(); i++) {
+    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[i].dstSet = *set;
+    writes[i].dstBinding = uint32_t(i);
+    writes[i].descriptorCount = 1;
+    writes[i].descriptorType =
+        i < view_count ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
+    writes[i].pImageInfo = &infos[i];
+  }
+  if (!writes.empty()) {
+    vk::vkUpdateDescriptorSets(device_, uint32_t(writes.size()), writes.data(), 0, nullptr);
+  }
+  return reinterpret_cast<TextureSet*>(*set);
 }
 
 void Backend::BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) {

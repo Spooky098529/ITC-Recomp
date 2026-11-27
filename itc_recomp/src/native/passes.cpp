@@ -315,65 +315,7 @@ struct PipelineKeyHash {
   }
 };
 
-// This frame's texture descriptor sets by their contents: an open-addressed
-// table of indices into the entries, the keys' words in one buffer, all
-// kept between frames (the string-keyed map it replaced allocated a node
-// and a key per set, and hashed and compared bytes: ~3% of the render
-// thread with the pipelines' keys).
-class FrameSetCache {
- public:
-  // Returns the set slot for the key (words), and whether it was added.
-  std::pair<VkDescriptorSet*, bool> FindOrAdd(const uint64_t* words, uint32_t count) {
-    if (entries_.size() * 2 >= table_.size()) {
-      Grow();
-    }
-    uint64_t hash = base::Hash64(words, count * sizeof(uint64_t));
-    size_t mask = table_.size() - 1;
-    for (size_t i = size_t(hash) & mask;; i = (i + 1) & mask) {
-      int32_t index = table_[i];
-      if (index < 0) {
-        table_[i] = int32_t(entries_.size());
-        entries_.push_back({hash, uint32_t(words_.size()), count, VK_NULL_HANDLE});
-        words_.insert(words_.end(), words, words + count);
-        return {&entries_.back().set, true};
-      }
-      Entry& e = entries_[index];
-      if (e.hash == hash && e.count == count &&
-          std::equal(words, words + count, words_.begin() + e.offset)) {
-        return {&e.set, false};
-      }
-    }
-  }
 
-  void Clear() {
-    entries_.clear();
-    words_.clear();
-    std::fill(table_.begin(), table_.end(), -1);
-  }
-
- private:
-  struct Entry {
-    uint64_t hash;
-    uint32_t offset, count;
-    VkDescriptorSet set;
-  };
-
-  void Grow() {
-    table_.assign(std::max<size_t>(table_.size() * 2, 8192), -1);
-    size_t mask = table_.size() - 1;
-    for (size_t k = 0; k < entries_.size(); k++) {
-      size_t i = size_t(entries_[k].hash) & mask;
-      while (table_[i] >= 0) {
-        i = (i + 1) & mask;
-      }
-      table_[i] = int32_t(k);
-    }
-  }
-
-  std::vector<int32_t> table_;
-  std::vector<Entry> entries_;
-  std::vector<uint64_t> words_;
-};
 
 // A surface's image: what's drawn while it's bound, and resolved from.
 struct Target {
@@ -406,11 +348,6 @@ struct Target {
   }
 };
 
-// Texture descriptor sets (sets 2 and 3) in each of a frame's texture
-// pools, and their descriptors; a frame that fills its pools gets another,
-// kept for later frames.
-constexpr uint32_t kTextureSetsPerPool = 8192;
-constexpr uint32_t kTextureDescriptorsPerPool = 32768;
 
 // The lowest and highest of `count` indices as the GPU reads them, leaving
 // out the restart index (all ones) when `skip_restart`; {UINT32_MAX, 0} if
@@ -1021,8 +958,6 @@ struct Passes::State {
     std::vector<ConstantBlock> blocks;
     size_t block = 0;  // the one in use this frame
     // This frame's texture descriptor sets, reset with the frame.
-    std::vector<VkDescriptorPool> texture_pools;
-    size_t texture_pool = 0;  // the one in use this frame
   };
   std::vector<Ring> rings;
   uint32_t frame = 0;
@@ -1046,11 +981,10 @@ struct Passes::State {
   gpu::Image* zero_cube = nullptr;
   VkSampler sampler = VK_NULL_HANDLE;
   // This frame's texture sets by their contents.
-  FrameSetCache texture_sets;
   // GetTextureSet's buffers, kept to save allocating them every draw.
   std::vector<VkDescriptorImageInfo> set_infos;
-  std::vector<uint64_t> set_key;
-  std::vector<VkWriteDescriptorSet> set_writes;
+  std::vector<gpu::View*> set_views;
+  std::vector<gpu::Sampler*> set_samplers;
 
   std::unique_ptr<ShaderCache> shaders;
   // The driver's compiled pipelines, kept in the disk cache (disk_cache.h):
@@ -1165,7 +1099,6 @@ struct Passes::State {
   void EndRendering(VkCommandBuffer commands);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
-  bool CreateTexturePool(Ring& ring);
   // Makes room for a draw's constants in one block, moving to the next
   // block (made if needed) when the one in use can't hold them.
   bool ReserveDrawConstants();
@@ -1180,7 +1113,7 @@ struct Passes::State {
   // BuildTextureSet's.
   VkDescriptorSet GetTextureSet(const TranslatedShader* shader,
                                 VkDescriptorSetLayout layout, uint32_t stage);
-  VkDescriptorSet BuildTextureSet(const TranslatedShader* shader,
+  VkDescriptorSet BuildTextureSet(const TranslatedShader* shader, uint32_t stage,
                                   VkDescriptorSetLayout layout);
   // Each stage's last texture set and what it was built from: the shader,
   // the layout, the fetch constants the shader reads (a bit each, and their
@@ -1213,29 +1146,6 @@ struct Passes::State {
 
 bool Passes::State::CreateRings() {
   rings.resize(frames_in_flight);
-  for (Ring& ring : rings) {
-    if (!CreateTexturePool(ring)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool Passes::State::CreateTexturePool(Ring& ring) {
-  VkDescriptorPoolSize sizes[] = {
-      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kTextureDescriptorsPerPool},
-      {VK_DESCRIPTOR_TYPE_SAMPLER, kTextureDescriptorsPerPool},
-  };
-  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = kTextureSetsPerPool;
-  pool_info.poolSizeCount = 2;
-  pool_info.pPoolSizes = sizes;
-  VkDescriptorPool pool;
-  if (vk::vkCreateDescriptorPool(context.device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
-    return false;
-  }
-  gpu_memory::Created(gpu_memory::Object::kDescriptorPool);
-  ring.texture_pools.push_back(pool);
   return true;
 }
 
@@ -1374,7 +1284,7 @@ VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
     }
   }
   uint64_t unkept = textures.unkept_answers();
-  VkDescriptorSet set = BuildTextureSet(shader, layout);
+  VkDescriptorSet set = BuildTextureSet(shader, stage, layout);
   if (shader != last.shader) {
     last.shader = shader;
     last.fetch_mask = 0;
@@ -1398,7 +1308,7 @@ VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
   return set;
 }
 
-VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
+VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, uint32_t stage,
                                                  VkDescriptorSetLayout layout) {
   // The views and samplers for the shader's bindings, from the current
   // fetch constants; placeholders for what can't be had.
@@ -1461,63 +1371,26 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
                                 VK_IMAGE_LAYOUT_UNDEFINED};
   }
 
-  // One set per distinct contents a frame, keyed by the layout and each
-  // binding's sampler, view and layout (the fields, not the structs' bytes,
-  // which have padding).
-  std::vector<uint64_t>& key = set_key;
-  key.clear();
-  key.push_back(uint64_t(reinterpret_cast<uintptr_t>(layout)));
-  for (const VkDescriptorImageInfo& info : infos) {
-    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.sampler)));
-    key.push_back(uint64_t(reinterpret_cast<uintptr_t>(info.imageView)));
-    key.push_back(uint64_t(info.imageLayout));
+  // The backend's set of them (one per distinct contents a frame).
+  std::vector<gpu::View*>& views = set_views;
+  std::vector<gpu::Sampler*>& samplers = set_samplers;
+  views.resize(texture_count);
+  samplers.resize(sampler_count);
+  for (size_t i = 0; i < texture_count; i++) {
+    views[i] = reinterpret_cast<gpu::View*>(infos[i].imageView);
   }
-  auto [set, added] = texture_sets.FindOrAdd(key.data(), uint32_t(key.size()));
+  for (size_t i = 0; i < sampler_count; i++) {
+    samplers[i] = reinterpret_cast<gpu::Sampler*>(infos[texture_count + i].sampler);
+  }
+  bool found = false;
+  gpu::TextureSet* set = backend->MakeTextureSet(
+      GetShader(shader), stage == 0 ? gpu::ShaderStage::kVertex : gpu::ShaderStage::kPixel,
+      views.data(), uint32_t(texture_count), samplers.data(), uint32_t(sampler_count), &found);
   if (log_texture_bindings) {
     binding_counts.sets++;
-    binding_counts.sets_found += !added;
+    binding_counts.sets_found += found;
   }
-  if (!added) {
-    return *set;
-  }
-  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  Ring& ring = rings[frame];
-  alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
-  alloc.descriptorSetCount = 1;
-  alloc.pSetLayouts = &layout;
-  if (vk::vkAllocateDescriptorSets(context.device, &alloc, set) != VK_SUCCESS) {
-    // The pool in use is full: on to the next, made if needed.
-    *set = VK_NULL_HANDLE;
-    ring.texture_pool++;
-    if (ring.texture_pool == ring.texture_pools.size()) {
-      if (!CreateTexturePool(ring)) {
-        ring.texture_pool--;
-        return VK_NULL_HANDLE;
-      }
-      ITC_LOG_INFO("native renderer: frame {} texture sets: pool {} added ({} sets each)",
-                   frame, ring.texture_pools.size(), kTextureSetsPerPool);
-    }
-    alloc.descriptorPool = ring.texture_pools[ring.texture_pool];
-    if (vk::vkAllocateDescriptorSets(context.device, &alloc, set) != VK_SUCCESS) {
-      *set = VK_NULL_HANDLE;
-      return VK_NULL_HANDLE;
-    }
-  }
-  std::vector<VkWriteDescriptorSet>& writes = set_writes;
-  writes.assign(infos.size(), {});
-  for (size_t i = 0; i < infos.size(); i++) {
-    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    writes[i].dstSet = *set;
-    writes[i].dstBinding = uint32_t(i);
-    writes[i].descriptorCount = 1;
-    writes[i].descriptorType =
-        i < texture_count ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
-    writes[i].pImageInfo = &infos[i];
-  }
-  if (!writes.empty()) {
-    vk::vkUpdateDescriptorSets(context.device, uint32_t(writes.size()), writes.data(), 0, nullptr);
-  }
-  return *set;
+  return gpu::vulkan::Backend::Handle(set);
 }
 
 void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch,
@@ -2550,15 +2423,9 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.id_drawn = false;
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
-  s.texture_sets.Clear();
   for (State::LastTextureSet& last : s.last_texture_sets) {
     last.set = VK_NULL_HANDLE;
   }
-  auto& ring = s.rings[frame_index];
-  for (size_t i = 0; i <= ring.texture_pool && i < ring.texture_pools.size(); i++) {
-    vk::vkResetDescriptorPool(s.context.device, ring.texture_pools[i], 0);
-  }
-  ring.texture_pool = 0;
   vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
   s.textures.BeginFrame(frame_index);
 }
