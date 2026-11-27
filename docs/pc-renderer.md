@@ -719,10 +719,21 @@ and resolve on one 256x144 target in turn, then the main view draws on
   for command counting and the front buffer; its inline draw hook (for
   commands 15 and 19, which now draw through `render::DrawUP`) is gone.
 
+- **The surface setters out of the handlers (2026-11-27).** Nothing outside
+  the replay reads what the device's render target and depth surface
+  setters write: the device's bound surfaces are read (logged across the
+  pad replay) only by `CameraPass::SetUpSurfaces` for the main view's
+  passes and `RenderQueue::Init`, once each at boot, before the replay's
+  first `SetRenderTarget` (they get the device's own surfaces, which stay
+  bound); the device's viewport only by command 34. So commands 23, 24 and
+  29 call `render::` alone, and 34 and 35 keep their saved set from
+  `render::`'s bound surfaces, taking the same references
+  `Device::GetRenderTarget` and `GetDepthStencilSurface` took (the setters
+  take none). Checked: the tick replay with dumps (both races match), the
+  pad replay with dumps (the tuning shop's tiled view, the menus).
+
 Left for step 3: the vertex shader setter (it keeps the shader's
-reference count: kept) and the render target and depth surface setters
-(kept until it's clear nothing outside the replay reads the device's
-bound surfaces).
+reference count: kept).
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

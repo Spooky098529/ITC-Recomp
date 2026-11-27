@@ -8,6 +8,7 @@
 #include "graphics/device_state.h"
 #include "graphics/resources.h"
 #include "helpers/debug_output.h"
+#include "native/refcount.h"
 #include "render/state.h"
 
 #include <algorithm>
@@ -357,9 +358,7 @@ uint32_t DeferRelease(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetRenderTargets(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590428 Command::SetRenderTargets");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t surface = guest::LoadU32(item + 4);
-    ds::SetRenderTargetExternal(Device(), guest::LoadU32(item), surface);
-    render::SetRenderTarget(guest::LoadU32(item), surface);
+    render::SetRenderTarget(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -367,7 +366,6 @@ uint32_t SetRenderTargets(uint32_t items, uint32_t count) {
 uint32_t SetDepthStencilSurfaces(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590478 Command::SetDepthStencilSurfaces");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    ds::SetDepthStencilSurface(Device(), guest::LoadU32(item));
     render::SetDepthTarget(guest::LoadU32(item));
   }
   return count;
@@ -496,14 +494,11 @@ uint32_t RestoreSurfaces(uint32_t items, uint32_t count) {
     for (uint32_t target = 0; target < 4; target++) {
       if (guest::LoadU32(item) & (1u << target)) {
         const uint32_t set = guest::LoadU32(kRestoreSet);
-        ds::SetRenderTargetExternal(Device(), target,
-                                    guest::LoadU32(set + 4 * target));
         render::SetRenderTarget(target, guest::LoadU32(set + 4 * target));
       }
     }
     if (guest::LoadU32(item) & 0x80) {
       const uint32_t set = guest::LoadU32(kRestoreSet);
-      ds::SetDepthStencilSurface(Device(), guest::LoadU32(set + 16));
       render::SetDepthTarget(guest::LoadU32(set + 16));
     }
   }
@@ -593,34 +588,32 @@ uint32_t EndTiling(uint32_t items, uint32_t count, uint32_t sp,
 
 uint32_t SaveSurfaces(uint32_t count, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590A68 Command::SaveSurfaces");
-  const uint32_t frame = Frame(sp, 128);
+  (void)sp;
+  (void)call;
+  // The bound targets kept in the saved set, each with a reference taken as
+  // Device::GetRenderTarget and GetDepthStencilSurface take them (the
+  // render::'s bound surfaces: the replay no longer binds them on the
+  // device, whose bound surfaces only the boot reads; docs/pc-renderer.md,
+  // step 3). The device's viewport, which only 35 read, isn't saved.
   const uint32_t saved = kSavedSurfaces;
-  {
-    const uint32_t device = guest::LoadU32(saved + 48);
-    if (!ds::GetViewport(device, saved)) {
-      call(0x822A3740, frame, 0x82590A8C, {device, saved}, std::nullopt);
-    }
-  }
+  const render::Targets& bound = render::BoundTargets();
   for (uint32_t target = 0; target < 4; target++) {
-    const uint32_t surface = GetRenderTarget(guest::LoadU32(saved + 48), target);
+    const uint32_t surface = bound.color[target];
+    if (surface != 0) {
+      refcount::AddRef(surface);
+    }
     guest::StoreU32(saved + 24 + 4 * target, surface);
   }
-  guest::StoreU32(saved + 40,
-                  GetDepthStencilSurface(guest::LoadU32(saved + 48)));
+  if (bound.depth != 0) {
+    refcount::AddRef(bound.depth);
+  }
+  guest::StoreU32(saved + 40, bound.depth);
   render::SaveTargets();
   return count;
 }
 
 uint32_t RestoreSavedSurfaces(uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590AD0 Command::RestoreSavedSurfaces");
-  const uint32_t saved = kSavedSurfaces;
-  for (uint32_t target = 0; target < 4; target++) {
-    const uint32_t surface = guest::LoadU32(saved + 24 + 4 * target);
-    ds::SetRenderTargetExternal(guest::LoadU32(saved + 48), target, surface);
-  }
-  ds::SetDepthStencilSurface(guest::LoadU32(saved + 48),
-                             guest::LoadU32(saved + 40));
-  ds::SetViewport(guest::LoadU32(saved + 48), saved);
   render::RestoreTargets();
   return count;
 }
