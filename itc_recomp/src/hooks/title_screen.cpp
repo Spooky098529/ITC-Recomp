@@ -38,8 +38,9 @@ ITC_FLAG_INT32(attract_after_s, 0, "ITC",
                "(0 = the game's 20)");
 ITC_FLAG_INT32(attract_seed, -1, "ITC",
                "Testing: the game's random seed set to this when the attract race is "
-               "about to be set up, so its course, cars and camera come out the same "
-               "every run (frame dumps compared between builds); -1 leaves it");
+               "about to be set up and again when a race starts, so the attract race "
+               "comes out the same every run (with --max_fps=30 and no interpolation: "
+               "frame dumps compared between builds); -1 leaves it");
 
 namespace {
 
@@ -69,6 +70,12 @@ bool TitleScreen_SkipTickWait(bool in_race) {
     g_first_race_started = true;
   }
   return ITC_FLAG(skip_intro) && !g_first_race_started;
+}
+
+void TitleScreen_RaceStarted() {
+  if (int32_t seed = ITC_FLAG(attract_seed); seed >= 0) {
+    schema::RaceOverlaysGlobals::set_rand_seed(uint32_t(seed));
+  }
 }
 
 }  // namespace hooks

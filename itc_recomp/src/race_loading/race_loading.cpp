@@ -10,6 +10,7 @@
 #include "data_tables/data_tables.h"
 #include "debug/state_digest.h"
 #include "game_modes/game_modes.h"
+#include "hooks/title_screen.h"
 #include "input/pad_ticks.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/boot_mode.h"
@@ -170,6 +171,7 @@ uint64_t WaitDraw(uint64_t r3, uint32_t dispatcher, uint32_t sp,
     // docs/pad-replay.md "By tick").
     input::PadTicks_OnRaceStarted();
     debug::StateDigest_OnRaceStarted();
+    hooks::TitleScreen_RaceStarted();  // --attract_seed
     m.set_unknown_9608(0);
     m.set_draw_step(0);
     return r3;
