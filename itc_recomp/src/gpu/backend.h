@@ -93,6 +93,24 @@ class Backend {
   virtual void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) = 0;
   virtual void EndPass() = 0;
 
+  // In the frame, outside passes, the images in their copy usages (the
+  // cleared one copy destination). Level 0, layer 0.
+  // A color image cleared to `bits` (four floats or integers).
+  virtual void ClearColor(Image* image, const uint32_t bits[4]) = 0;
+  // A depth image's depth and/or stencil cleared.
+  virtual void ClearDepthStencil(Image* image, float depth, uint32_t stencil, bool clear_depth,
+                                 bool clear_stencil) = 0;
+  // The top-left `width` x `height` copied as is (all aspects).
+  virtual void CopyImage(Image* source, Image* dest, uint32_t width, uint32_t height) = 0;
+  // `from` scaled into `to` with `filter` (color).
+  virtual void BlitImage(Image* source, const Rect& from, Image* dest, const Rect& to,
+                         Filter filter) = 0;
+  // A multisampled image's top-left `width` x `height` averaged into `dest`.
+  virtual void ResolveImage(Image* source, Image* dest, uint32_t width, uint32_t height) = 0;
+  // As UploadImage, but here in the frame (the image a copy destination).
+  virtual void CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
+                                 uint32_t count) = 0;
+
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
   virtual void DestroyView(View* view) = 0;

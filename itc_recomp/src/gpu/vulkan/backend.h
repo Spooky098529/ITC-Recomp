@@ -120,6 +120,15 @@ class Backend final : public gpu::Backend {
   VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
   VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
   void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
+  void ClearColor(Image* image, const uint32_t bits[4]) override;
+  void ClearDepthStencil(Image* image, float depth, uint32_t stencil, bool clear_depth,
+                         bool clear_stencil) override;
+  void CopyImage(Image* source, Image* dest, uint32_t width, uint32_t height) override;
+  void BlitImage(Image* source, const Rect& from, Image* dest, const Rect& to,
+                 Filter filter) override;
+  void ResolveImage(Image* source, Image* dest, uint32_t width, uint32_t height) override;
+  void CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
+                         uint32_t count) override;
   void EndPass() override;
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;

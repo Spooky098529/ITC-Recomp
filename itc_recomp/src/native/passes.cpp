@@ -1813,12 +1813,7 @@ void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
   // The destination keeps its image ready to sample.
   backend->Use(handed, gpu::Usage::kCopySource);
   backend->Use(t.image, gpu::Usage::kCopyDest);
-  VkImageCopy region{};
-  region.srcSubresource = {t.aspects(), 0, 0, 1};
-  region.dstSubresource = region.srcSubresource;
-  region.extent = {t.extent.width, t.extent.height, 1};
-  vk::vkCmdCopyImage(commands, source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, t.vk(),
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  backend->CopyImage(handed, t.image, t.extent.width, t.extent.height);
   backend->Use(handed, gpu::Usage::kSampled);
   recorded.valid = false;
   stats.resolves_copied_back++;
@@ -1836,14 +1831,13 @@ void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
     target.handed_image = nullptr;  // all of it cleared
   }
   backend->Use(target.image, gpu::Usage::kCopyDest);
-  VkImageSubresourceRange range{aspects ? aspects : target.aspects(), 0, 1, 0, 1};
+  const VkImageAspectFlags cleared = aspects ? aspects : target.aspects();
   if (target.depth) {
-    vk::vkCmdClearDepthStencilImage(commands, target.vk(),
-                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value.depthStencil, 1,
-                                    &range);
+    backend->ClearDepthStencil(target.image, value.depthStencil.depth, value.depthStencil.stencil,
+                               (cleared & VK_IMAGE_ASPECT_DEPTH_BIT) != 0,
+                               (cleared & VK_IMAGE_ASPECT_STENCIL_BIT) != 0);
   } else {
-    vk::vkCmdClearColorImage(commands, target.vk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             &value.color, 1, &range);
+    backend->ClearColor(target.image, value.color.uint32);
   }
 }
 
@@ -2436,13 +2430,11 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   s.EndRendering(commands);
   for (uint32_t i = 0; i < 3; i++) {
     s.backend->Use(upload.planes[i], gpu::Usage::kCopyDest);
-    VkBufferImageCopy copy{};
-    copy.bufferOffset = offsets[i];
-    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    copy.imageExtent = {sizes[i].width, sizes[i].height, 1};
-    vk::vkCmdCopyBufferToImage(commands, upload.staging,
-                               gpu::vulkan::Backend::Object(upload.planes[i]).image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    gpu::ImageUpload copy;
+    copy.offset = offsets[i];
+    copy.width = sizes[i].width;
+    copy.height = sizes[i].height;
+    s.backend->CopyBufferToImage(upload.staging_object, upload.planes[i], &copy, 1);
     s.backend->Use(upload.planes[i], gpu::Usage::kSampled);
   }
   // The library's rectangle: the target's top-left 1280x720 guest pixels.
@@ -4126,38 +4118,23 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     extent = {std::min({front_extent.width, front->extent.width, s.shown_extent.width}),
               std::min({front_extent.height, front->extent.height, s.shown_extent.height})};
     if (front->samples == VK_SAMPLE_COUNT_1_BIT) {
-      VkImageBlit blit{};
-      blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-      blit.srcOffsets[1] = {int32_t(extent.width), int32_t(extent.height), 1};
-      blit.dstSubresource = blit.srcSubresource;
-      blit.dstOffsets[1] = blit.srcOffsets[1];
-      vk::vkCmdBlitImage(commands, front->vk(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+      const gpu::Rect all{0, 0, extent.width, extent.height};
+      s.backend->BlitImage(front->image, all, s.shown, all, gpu::Filter::kNearest);
     } else if (front->format == kShownFormat) {  // a resolve doesn't convert
-      VkImageResolve region{};
-      region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-      region.dstSubresource = region.srcSubresource;
-      region.extent = {extent.width, extent.height, 1};
-      vk::vkCmdResolveImage(commands, front->vk(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+      s.backend->ResolveImage(front->image, s.shown, extent.width, extent.height);
     }
   } else if (Target* main = s.main_view) {
     // The main view's drawn part, its samples averaged.
     s.backend->Use(main->image, gpu::Usage::kCopySource);
     extent = {std::min(s.main_view_extent.width, main->extent.width),
               std::min(s.main_view_extent.height, main->extent.height)};
-    VkImageResolve region{};
-    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.dstSubresource = region.srcSubresource;
-    region.extent = {extent.width, extent.height, 1};
-    vk::vkCmdResolveImage(commands, main->vk(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    s.backend->ResolveImage(main->image, s.shown, extent.width, extent.height);
   } else {
     // No main view this frame (menus): dark blue.
-    VkClearColorValue color{{0.0f, 0.05f, 0.15f, 1.0f}};
-    VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::vkCmdClearColorImage(commands, shown, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1,
-                             &range);
+    const float color[4] = {0.0f, 0.05f, 0.15f, 1.0f};
+    uint32_t bits[4];
+    std::memcpy(bits, color, sizeof(bits));
+    s.backend->ClearColor(s.shown, bits);
   }
   if (s.gamma_pipeline) {
     s.ApplyGamma(commands);

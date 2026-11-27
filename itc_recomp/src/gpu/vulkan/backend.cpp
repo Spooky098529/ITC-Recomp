@@ -1120,6 +1120,77 @@ void Backend::BeginPass(const PassTarget& color, const PassTarget& depth, const 
 
 void Backend::EndPass() { vk::vkCmdEndRendering(commands()); }
 
+void Backend::ClearColor(Image* image, const uint32_t bits[4]) {
+  const ImageObject& o = Object(image);
+  VkClearColorValue value;
+  std::memcpy(value.uint32, bits, sizeof(value.uint32));
+  VkImageSubresourceRange range{o.aspects, 0, 1, 0, 1};
+  vk::vkCmdClearColorImage(commands(), o.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1,
+                           &range);
+}
+
+void Backend::ClearDepthStencil(Image* image, float depth, uint32_t stencil, bool clear_depth,
+                                bool clear_stencil) {
+  const ImageObject& o = Object(image);
+  VkClearDepthStencilValue value{depth, stencil};
+  VkImageSubresourceRange range{
+      VkImageAspectFlags((clear_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+                         (clear_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0)),
+      0, 1, 0, 1};
+  vk::vkCmdClearDepthStencilImage(commands(), o.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                  &value, 1, &range);
+}
+
+void Backend::CopyImage(Image* source, Image* dest, uint32_t width, uint32_t height) {
+  const ImageObject& from = Object(source);
+  VkImageCopy region{};
+  region.srcSubresource = {from.aspects, 0, 0, 1};
+  region.dstSubresource = region.srcSubresource;
+  region.extent = {width, height, 1};
+  vk::vkCmdCopyImage(commands(), from.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     Object(dest).image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
+void Backend::BlitImage(Image* source, const Rect& from, Image* dest, const Rect& to,
+                        Filter filter) {
+  VkImageBlit blit{};
+  blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  blit.srcOffsets[0] = {from.x, from.y, 0};
+  blit.srcOffsets[1] = {from.x + int32_t(from.width), from.y + int32_t(from.height), 1};
+  blit.dstSubresource = blit.srcSubresource;
+  blit.dstOffsets[0] = {to.x, to.y, 0};
+  blit.dstOffsets[1] = {to.x + int32_t(to.width), to.y + int32_t(to.height), 1};
+  vk::vkCmdBlitImage(commands(), Object(source).image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     Object(dest).image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+                     vk_types::Filter(filter));
+}
+
+void Backend::ResolveImage(Image* source, Image* dest, uint32_t width, uint32_t height) {
+  VkImageResolve region{};
+  region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.dstSubresource = region.srcSubresource;
+  region.extent = {width, height, 1};
+  vk::vkCmdResolveImage(commands(), Object(source).image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        Object(dest).image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
+void Backend::CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
+                                uint32_t count) {
+  const ImageObject& o = Object(image);
+  std::vector<VkBufferImageCopy> copies(count);
+  for (uint32_t i = 0; i < count; i++) {
+    const ImageUpload& r = regions[i];
+    copies[i] = {};
+    copies[i].bufferOffset = r.offset;
+    copies[i].bufferRowLength = r.row_texels;
+    copies[i].bufferImageHeight = r.rows;
+    copies[i].imageSubresource = {o.aspects, r.level, r.layer, 1};
+    copies[i].imageExtent = {r.width, r.height, 1};
+  }
+  vk::vkCmdCopyBufferToImage(commands(), Handle(buffer), o.image,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, copies.data());
+}
+
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   const ImageObject& o = Object(image);
   auto component = [](Swizzle swizzle) {

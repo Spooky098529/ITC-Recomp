@@ -280,7 +280,16 @@ each backend.
   movie's and the ID pass's (`vkCmdBeginRendering` and `vkCmdEndRendering`
   are the backend's alone). Checked: the dump identical (the ID pass's
   image too), the tick replay, the pad replay, the boot movie drawn.
-- **Next:** binding and recording (step 3's largest piece): clears, binds (pipeline, the texture sets from views
+- **Copies and clears in the frame (2026-11-27).** `Backend::ClearColor`,
+  `ClearDepthStencil` (depth and/or stencil), `CopyImage`, `BlitImage`,
+  `ResolveImage` (MSAA) and `CopyBufferToImage` (in the frame, unlike the
+  uploads): the targets' clears, the copy back of a handed image, the
+  movie planes' copies, and what's shown made from the front buffer or the
+  main view (or cleared). Left for the dumps piece: the two debugging aids'
+  (`--native_renderer_show_resolve`'s blit and the dump's read-back).
+  Checked: the dump identical, the tick replay, the pad replay, the boot
+  movie without errors.
+- **Next:** binding and recording (step 3's largest piece): binds (pipeline, the texture sets from views
   and samplers, the constant blocks by offset, vertex and index buffers),
   draws, copies and resolves in the frame (the movie planes' copies too);
   then the resolve, movie, gamma and ID passes' own pipelines and shaders;
