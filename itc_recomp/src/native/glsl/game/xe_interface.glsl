@@ -36,6 +36,11 @@ layout(set = 1, binding = 0, scalar) uniform XeSystemConstants {
   layout(offset = 176) uint texture_swizzled_signs[8];
   layout(offset = 272) float alpha_test_reference;
   layout(offset = 288) vec4 color_exp_bias;
+  // Each texture fetch constant's reader scale: 0 nothing; above 0 times it
+  // and clamped to 0-1; below 0 times its negation (a pass's image handed to
+  // its texture: what the resolve's exponent bias and a normalized format
+  // did, docs/pc-renderer.md, step 4).
+  layout(offset = 304) float texture_scale[32];
   layout(offset = 496) uint vertex_index_min;
   layout(offset = 500) uint vertex_index_max;
 } xe_sys;
@@ -188,6 +193,12 @@ vec3 xe_linear_to_gamma(vec3 linear) {
 // x * 2 - 1, or gamma), then the exponent bias. The fetch constant's
 // swizzle is in the image views.
 vec4 xe_texture_result(vec4 unsigned_sample, vec4 signed_sample, uint fetch_constant) {
+  float reader_scale = xe_sys.texture_scale[fetch_constant & 31u];
+  if (reader_scale > 0.0) {
+    unsigned_sample = clamp(unsigned_sample * reader_scale, 0.0, 1.0);
+  } else if (reader_scale < 0.0) {
+    unsigned_sample = unsigned_sample * -reader_scale;
+  }
   uint signs = xe_sys.texture_swizzled_signs[fetch_constant >> 2u] >> (8u * (fetch_constant & 3u));
   // The translator takes the exponent from the fetch constant's word 4,
   // bits 13-18 (the hardware's is in word 3); kept for the same result.

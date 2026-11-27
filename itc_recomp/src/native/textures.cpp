@@ -587,6 +587,16 @@ struct TextureCache::State {
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
+    // A resolve destination holding a pass's image (HandOver): its format
+    // (format.format is the image's), and what readers apply.
+    bool handed = false;
+    VkFormat native_format = VK_FORMAT_UNDEFINED;
+    bool swap_red_blue = false;
+    float reader_scale = 0.0f;
+    bool copied = false;  // a resolve copied into it (never handed images then)
+    // A handed depth image: its views' aspect, and its depth-only view.
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkImageView depth_view = VK_NULL_HANDLE;
     // A resolve destination's last resolve (GetResolveDestination).
     std::chrono::steady_clock::time_point last_resolved{};
   };
@@ -1288,6 +1298,9 @@ void TextureCache::State::Retire(const Texture& t) {
   if (t.attachment_view) {
     r.views.push_back(t.attachment_view);
   }
+  if (t.depth_view && t.depth_view != t.attachment_view) {
+    r.views.push_back(t.depth_view);
+  }
   retired.push_back(std::move(r));
 }
 
@@ -1654,6 +1667,11 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   if (!view) {
     auto component = [&](uint32_t i) {
       uint32_t select = (swizzle >> (3 * i)) & 7;
+      // A handed pass's image isn't red and blue exchanged as a resolve's
+      // copy is: the swizzle's X and Z exchanged instead.
+      if (t.swap_red_blue && (select == 0 || select == 2)) {
+        select ^= 2;
+      }
       if (select == 4) {
         return VK_COMPONENT_SWIZZLE_ZERO;
       }
@@ -1668,7 +1686,7 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
     info.viewType = natural;
     info.format = t.format.format;
     info.components = {component(0), component(1), component(2), component(3)};
-    info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, t.levels, 0, t.layout.layers};
+    info.subresourceRange = {t.aspect, 0, t.levels, 0, t.layout.layers};
     if (vk::vkCreateImageView(context.device, &info, nullptr, &view) != VK_SUCCESS) {
       view = VK_NULL_HANDLE;
     } else {
@@ -1709,6 +1727,7 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                t.format.conversion != Conversion::kNone) {
       return false;
     }
+    t.native_format = t.format.format;
     t.layout.width = width;
     t.layout.height = height;
     t.scale = scale;
@@ -1738,10 +1757,124 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
     generation_++;
     events_.resolve_changes++;
   }
-  out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
-         t.host_height, t.scale,           !t.loaded};
+  out = {t.image,         t.attachment_view, t.format.format, width,     height,
+         t.host_width,    t.host_height,     t.scale,         !t.loaded, t.handed,
+         t.native_format, t.copied};
   t.loaded = true;  // written by the caller
   return true;
+}
+
+TextureCache::HandedImage TextureCache::HandOver(const uint32_t fetch_words[6], float scale,
+                                                 const HandedImage& image, bool swap_red_blue,
+                                                 float reader_scale) {
+  State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  uint32_t page = fetch.base_address & 0x1FFFF;
+  auto it = s.resolved.find(State::ResolveKey(page, scale));
+  if (it == s.resolved.end()) {
+    return {};
+  }
+  State::Texture& t = it->second;
+  VkDevice device = s.context.device;
+  auto size_of = [&](VkImage i) {
+    VkMemoryRequirements requirements;
+    vk::vkGetImageMemoryRequirements(device, i, &requirements);
+    return requirements.size;
+  };
+  // The views of the image it held go once no frame in flight can use them
+  // (this frame's earlier draws may have sampled it).
+  State::Retired views{s.frame_number, gpu_memory::Kind::kResolved, VK_NULL_HANDLE,
+                       VK_NULL_HANDLE, 0, {}};
+  for (const auto& [swizzle, view] : t.views) {
+    if (view) {
+      views.views.push_back(view);
+    }
+  }
+  t.views.clear();
+  HandedImage back;
+  if (t.handed && t.format.format == image.format) {
+    // A pass's image before: back to drawing (its views for sampling go).
+    back = {t.image, t.memory, t.attachment_view, t.format.format, t.aspect, t.depth_view};
+    gpu_memory::Freed(gpu_memory::Kind::kResolved, t.memory_size);
+    gpu_memory::Allocated(gpu_memory::Kind::kImage, t.memory_size);
+  } else {
+    views.image = t.image;
+    views.memory = t.memory;
+    views.memory_size = t.memory_size;
+    if (t.attachment_view) {
+      views.views.push_back(t.attachment_view);
+    }
+    if (t.depth_view && t.depth_view != t.attachment_view) {
+      views.views.push_back(t.depth_view);
+    }
+  }
+  s.retired.push_back(std::move(views));
+  t.image = image.image;
+  t.memory = image.memory;
+  t.attachment_view = image.view;
+  t.aspect = image.aspect;
+  t.depth_view = image.depth_view;
+  t.memory_size = size_of(image.image);
+  gpu_memory::Freed(gpu_memory::Kind::kImage, t.memory_size);
+  gpu_memory::Allocated(gpu_memory::Kind::kResolved, t.memory_size);
+  t.format.format = image.format;
+  t.handed = true;
+  t.swap_red_blue = swap_red_blue;
+  t.reader_scale = reader_scale;
+  t.loaded = true;
+  s.current[page] = &t;
+  generation_++;  // answers and last texture sets hold the old views
+  events_.resolve_changes++;
+  return back;
+}
+
+bool TextureCache::RestoreResolveDestination(const uint32_t fetch_words[6], float scale,
+                                             ResolveDestination& out) {
+  State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  uint32_t page = fetch.base_address & 0x1FFFF;
+  auto it = s.resolved.find(State::ResolveKey(page, scale));
+  if (it == s.resolved.end()) {
+    return false;
+  }
+  State::Texture& t = it->second;
+  t.copied = true;
+  if (t.handed) {
+    s.Retire(t);
+    t.image = VK_NULL_HANDLE;
+    t.memory = VK_NULL_HANDLE;
+    t.attachment_view = VK_NULL_HANDLE;
+    t.depth_view = VK_NULL_HANDLE;
+    t.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    t.views.clear();
+    t.format.format = t.native_format;
+    t.handed = false;
+    t.swap_red_blue = false;
+    t.reader_scale = 0.0f;
+    t.loaded = false;
+    if (!s.CreateTexture(t)) {
+      return false;
+    }
+    generation_++;
+  }
+  return GetResolveDestination(fetch_words, scale, out);
+}
+
+bool TextureCache::HoldsHanded(const uint32_t fetch_words[6], float scale, VkImage image) const {
+  const State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  auto it = s.resolved.find(State::ResolveKey(fetch.base_address & 0x1FFFF, scale));
+  return it != s.resolved.end() && it->second.handed && it->second.image == image;
+}
+
+float TextureCache::ReaderScale(const uint32_t fetch_words[6]) const {
+  const State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  auto r = s.current.find(fetch.base_address & 0x1FFFF);
+  if (r == s.current.end() || !r->second->loaded || !r->second->handed) {
+    return 0.0f;
+  }
+  return r->second->reader_scale;
 }
 
 uint64_t TextureCache::mismatched_total() const {

@@ -26,7 +26,10 @@ struct SystemConstants {
   float alpha_test_reference;          // 272
   uint32_t unused_276[3];
   float color_exp_bias[4];             // 288
-  uint32_t unused_304[48];
+  // 304: a texture fetch constant's reader scale (TextureCache::ReaderScale:
+  // a pass's image handed to its destination, docs/pc-renderer.md, step 4).
+  float texture_scale[32];
+  uint32_t unused_432[16];
   uint32_t vertex_index_min;           // 496
   uint32_t vertex_index_max;           // 500
 };
@@ -36,6 +39,7 @@ static_assert(offsetof(SystemConstants, ndc_offset) == 140);
 static_assert(offsetof(SystemConstants, texture_swizzled_signs) == 176);
 static_assert(offsetof(SystemConstants, alpha_test_reference) == 272);
 static_assert(offsetof(SystemConstants, color_exp_bias) == 288);
+static_assert(offsetof(SystemConstants, texture_scale) == 304);
 static_assert(offsetof(SystemConstants, vertex_index_min) == 496);
 static_assert(sizeof(SystemConstants) == 504);
 

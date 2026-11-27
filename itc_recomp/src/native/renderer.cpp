@@ -72,6 +72,10 @@ ITC_FLAG_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
 ITC_FLAG_BOOL(native_renderer_watch_draws, false, "ITC",
               "Log what changes in the main view's draws' inputs between frames: with the "
               "camera still, only flickering draws should (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_hand_over_resolves, true, "ITC",
+              "Hand a pass's image to its resolve's destination texture when the resolve is a "
+              "whole-image copy from a single-sample target, instead of copying "
+              "(docs/pc-renderer.md, step 4)");
 ITC_FLAG_BOOL(native_renderer_hide_cubes, false, "ITC",
               "Give cube maps the white placeholder (a debugging aid)");
 ITC_FLAG_STRING(native_renderer_cycle, "", "ITC",
@@ -719,6 +723,7 @@ VkCommandBuffer Renderer::BeginFrame() {
         ITC_FLAG(native_renderer_watch_draws),
         std::strtoull(ITC_FLAG(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(ITC_FLAG(native_renderer_hide_cubes));
+    passes_.set_hand_over_resolves(ITC_FLAG(native_renderer_hand_over_resolves));
     passes_.set_base_level_only(ITC_FLAG(native_renderer_base_level_only));
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
@@ -984,11 +989,13 @@ void Renderer::LogStats() {
   }
   ITC_LOG_INFO("native renderer: {}", passes_.TakeArenaStats());
   ITC_LOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
-               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
+               "resolves ({:.1f} handed over, {:.1f} targets copied back), {:.1f} skipped; {:.1f} "
+               "draws with targets 1-3 bound, {:.1f} with "
                "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
                "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
                view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
-               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
+               double(view.resolves) / frames, double(view.resolves_handed) / frames,
+               double(view.resolves_copied_back) / frames, double(view.resolves_skipped) / frames,
                double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
                double(view.depth_biased) / frames, double(view.depth_equal) / frames,
                view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,

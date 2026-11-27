@@ -66,8 +66,48 @@ class TextureCache {
     uint32_t host_width, host_height;  // the image's (scaled)
     float scale;                       // the scale it was made at
     bool fresh;
+    // It holds a pass's image handed over (HandOver), not its own.
+    bool handed;
+    VkFormat native_format;  // its own image's format
+    // A resolve has copied into it (RestoreResolveDestination): it isn't
+    // handed images (a partial copy keeps what's outside its rectangle).
+    bool copied;
   };
   bool GetResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
+
+  // A pass's image handed to a resolve destination in place of a copy
+  // (docs/pc-renderer.md, step 4): the pass has drawn into its texture.
+  // The image, its memory and its view (all of it, in `format`) become the
+  // destination's (GetResolveDestination made it first), left in
+  // SHADER_READ_ONLY_OPTIMAL by the caller. What the copy did is left to
+  // the readers: red and blue exchanged by the views' swizzle
+  // (swap_red_blue), and reader_scale (ReaderScale). Returns the image the
+  // destination held when it's of `format` (a pass's image handed over
+  // before: the target draws into it next), else retires it and returns
+  // none.
+  struct HandedImage {
+    VkImage image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    // A depth target's (its depth sampled, as the resolve's 24_8 copy
+    // holds): the aspect its views take, and its depth-only view.
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkImageView depth_view = VK_NULL_HANDLE;
+  };
+  HandedImage HandOver(const uint32_t fetch[6], float scale, const HandedImage& image,
+                       bool swap_red_blue, float reader_scale);
+  // Before a resolve copies into the destination: marked as copied into
+  // from now on, and if it holds a handed image, made its own again (a new
+  // image of its format); `out` as from GetResolveDestination.
+  bool RestoreResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
+  // Whether the destination still holds `image` (handed over).
+  bool HoldsHanded(const uint32_t fetch[6], float scale, VkImage image) const;
+  // What a draw's sampling of the texture applies (xe_interface.glsl's
+  // xe_texture_result): 0 nothing; above 0 times it, clamped to 0-1 (what
+  // the resolve's exponent bias and a normalized destination did); below 0
+  // times its negation.
+  float ReaderScale(const uint32_t fetch[6]) const;
 
   // Diagnostics: whether [start, end) (physical) overlaps a texture held.
   bool Holds(uint32_t start, uint32_t end) const;

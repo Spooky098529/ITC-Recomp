@@ -31,6 +31,7 @@
   X(vkGetPhysicalDeviceFeatures2)              \
   X(vkGetPhysicalDeviceProperties2)            \
   X(vkGetPhysicalDeviceMemoryProperties)       \
+  X(vkGetPhysicalDeviceFormatProperties)       \
   X(vkEnumerateDeviceExtensionProperties)
 
 #define NATIVE_VK_DEVICE_FUNCTIONS(X) \
@@ -98,6 +99,7 @@
   X(vkCmdSetBlendConstants)            \
   X(vkCmdBlitImage)                    \
   X(vkCmdCopyBuffer)                   \
+  X(vkCmdCopyImage)                    \
   X(vkCmdCopyBufferToImage)            \
   X(vkCmdCopyImageToBuffer)            \
   X(vkQueueWaitIdle)                   \

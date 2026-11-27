@@ -120,6 +120,10 @@ class Passes {
   void set_watch_draws(bool watch, uint64_t pixel_shader = 0);
   // A debugging aid: cube maps get the white placeholder.
   void set_hide_cubes(bool hide);
+  // Hand a pass's image to its resolve's destination texture when the
+  // resolve is a whole-image copy (on by default; docs/pc-renderer.md,
+  // step 4).
+  void set_hand_over_resolves(bool hand_over);
   // Which pixel shaders got PsParamGen, and with which interpolators.
   std::string TakeInterfaces();
   void set_base_level_only(bool base_only);
@@ -213,6 +217,10 @@ class Passes {
     // other than 0, a destination format we can't draw into); flags with
     // bits we don't know, and an example.
     uint64_t resolves = 0, resolves_skipped = 0, resolve_unknown_flags = 0;
+    // Of the resolves done, those that handed the target's image over, and
+    // targets whose contents were copied back from a handed image (drawn
+    // into or read again without a clear).
+    uint64_t resolves_handed = 0, resolves_copied_back = 0;
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;

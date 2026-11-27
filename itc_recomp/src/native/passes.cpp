@@ -122,6 +122,45 @@ VkFormat ColorFormat(uint32_t format) {
   }
 }
 
+// The components a color format has (0 for others).
+uint32_t FormatComponents(VkFormat format) {
+  switch (format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R16_UNORM:
+    case VK_FORMAT_R16_SFLOAT:
+    case VK_FORMAT_R32_SFLOAT:
+      return 1;
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16G16_UNORM:
+    case VK_FORMAT_R16G16_SFLOAT:
+    case VK_FORMAT_R32G32_SFLOAT:
+      return 2;
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+    case VK_FORMAT_R16G16B16A16_UNORM:
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+bool IsUnorm(VkFormat format) {
+  switch (format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R16_UNORM:
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16G16_UNORM:
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+    case VK_FORMAT_R16G16B16A16_UNORM:
+      return true;
+    default:
+      return false;
+  }
+}
+
 VkSampleCountFlagBits SampleCount(uint32_t msaa) {
   return msaa == 2 ? VK_SAMPLE_COUNT_4_BIT : msaa == 1 ? VK_SAMPLE_COUNT_2_BIT
                                                        : VK_SAMPLE_COUNT_1_BIT;
@@ -398,6 +437,13 @@ struct Target {
   Image image;               // view: for drawing (depth and stencil)
   VkImageView sample_view;   // for resolving (depth only, for depth)
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  // Its image was handed to a resolve destination (HandOver) and it hasn't
+  // been cleared since: what it held is in that image, copied back before
+  // it's drawn into or read (RestoreContents) while the destination holds
+  // it.
+  VkImage handed_image = VK_NULL_HANDLE;
+  uint32_t handed_fetch[6] = {};
+  float handed_scale = 1.0f;
   VkImageAspectFlags aspects() const {
     return depth ? kDepthStencilAspects : VK_IMAGE_ASPECT_COLOR_BIT;
   }
@@ -838,6 +884,17 @@ struct Passes::State {
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
   bool skip_motion_blur = false;  // --motion_blur=false
+  // A resolve that is a whole-image copy from a single-sample color target
+  // hands the target's image to the destination texture instead
+  // (docs/pc-renderer.md, step 4; --native_renderer_hand_over_resolves).
+  bool hand_over_resolves = true;
+  // The depth format can be sampled with linear filtering (the depth
+  // resolves' readers' samplers may ask for it).
+  bool depth_filterable = false;
+  uint32_t logged_new_target_images = 0;
+  std::unordered_set<uint64_t> logged_copy_backs;
+  bool CreateTargetImage(Target& t);
+  void RestoreContents(VkCommandBuffer commands, Target& t);
   bool record_draws = false;
   // With log_glow: per frame, the glow history's cross-fade draws (pixel
   // shader kGlowCrossFade) and the texture they read, and 256x144 resolves
@@ -916,8 +973,17 @@ struct Passes::State {
     uint32_t address, format, flags;
     VkFormat host_format;
     uint32_t fetch[6];  // the destination's fetch constant, addresses physical
+    // A target's image handed over (at the target's scale): held by the
+    // destination only until a later hand-over gives it back to a target.
+    bool handed = false;
+    float scale = 1.0f;
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
   };
   std::vector<Resolved> frame_resolves;
+  // The resolve's image still in SHADER_READ_ONLY_OPTIMAL as its texture's.
+  bool Held(const Resolved& r) const {
+    return !r.handed || textures.HoldsHanded(r.fetch, r.scale, r.image);
+  }
   uint64_t frames = 0;  // for logging the resolve list now and then
   size_t last_frame_resolves = 0;
 
@@ -1968,6 +2034,12 @@ void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Targ
     return;
   }
   EndRendering(commands);
+  if (color) {
+    RestoreContents(commands, *color);
+  }
+  if (depth) {
+    RestoreContents(commands, *depth);
+  }
   VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
@@ -2032,25 +2104,11 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   }
   t.scale = IsMainViewSurface(surface) ? main_view_scale : scale;
   t.extent = ScaledBy(t.guest_extent, t.scale);
-  VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                                   : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-  if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, format,
-                   {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
+  if (!CreateTargetImage(t)) {
     ITC_LOG_ERROR("native renderer: couldn't create a {}x{} target", t.extent.width,
                   t.extent.height);
     t.image = {};
     return nullptr;
-  }
-  t.sample_view = t.image.view;
-  if (depth) {
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view.image = t.image.image;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = format;
-    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-    vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
   }
   ITC_LOG_INFO("native renderer: {} target: surface {:08X}, pitch {}, MSAA {}, format {}; {}x{}{} "
                "({}x{} drawn)",
@@ -2067,9 +2125,65 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   return &t;
 }
 
+bool Passes::State::CreateTargetImage(Target& t) {
+  VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            (t.depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                     : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, t.format,
+                   {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
+    return false;
+  }
+  t.sample_view = t.image.view;
+  if (t.depth) {
+    // Its depth alone, for resolving and sampling.
+    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    view.image = t.image.image;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = t.format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
+  }
+  return true;
+}
+
+void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
+  if (!t.handed_image) {
+    return;
+  }
+  VkImage source = t.handed_image;
+  t.handed_image = VK_NULL_HANDLE;
+  if (!textures.HoldsHanded(t.handed_fetch, t.handed_scale, source)) {
+    return;  // gone (a race's end): as after a clear
+  }
+  EndRendering(commands);
+  // The destination keeps its image in SHADER_READ_ONLY_OPTIMAL.
+  VkImageLayout source_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  Transition(commands, source, t.aspects(), source_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  Transition(commands, t.image.image, t.aspects(), t.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkImageCopy region{};
+  region.srcSubresource = {t.aspects(), 0, 0, 1};
+  region.dstSubresource = region.srcSubresource;
+  region.extent = {t.extent.width, t.extent.height, 1};
+  vk::vkCmdCopyImage(commands, source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, t.image.image,
+                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  Transition(commands, source, t.aspects(), source_layout,
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  recorded.valid = false;
+  stats.resolves_copied_back++;
+  if (logged_copy_backs.insert(uint64_t(t.surface.pitch) << 32 | t.handed_fetch[1]).second) {
+    ITC_LOG_INFO("native renderer: target (pitch {}, format {}) drawn or read again without a "
+                 "clear after handing its image to {:08X}: copied back",
+                 t.surface.pitch, t.surface.format, t.handed_fetch[1] & 0xFFFFF000u);
+  }
+}
+
 void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
                                 const VkClearValue& value, VkImageAspectFlags aspects) {
   EndRendering(commands);
+  if (!aspects || aspects == target.aspects()) {
+    target.handed_image = VK_NULL_HANDLE;  // all of it cleared
+  }
   Transition(commands, target.image.image, target.aspects(), target.layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   VkImageSubresourceRange range{aspects ? aspects : target.aspects(), 0, 1, 0, 1};
@@ -2340,6 +2454,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
+  RestoreContents(commands, source);
   TextureCache::ResolveDestination dest;
   if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
     return false;
@@ -2385,6 +2500,93 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
                 ScaledBy(top + height, source_scale) - host_top,
                 int32_t(dest.host_height) - host_y, int32_t(source.extent.height) - host_top});
   if (host_width <= 0 || host_height <= 0) {
+    return false;
+  }
+  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
+  // copy_dest_swap: when the destination's swizzle takes X from another
+  // component than the first (bits 1-3 of fetch word 3), so sampling it
+  // through the swizzle swaps them back.
+  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
+  // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
+  // on the main view's HDR copies).
+  int32_t bias = int32_t(flags) >> 26;
+  // A whole-image copy from a single-sample color target: the pass has drawn
+  // into its texture. The target's image is handed to the destination, and
+  // what the copy did is left to the readers (the views' swizzle, the
+  // reader scale); the target draws next into the image the destination
+  // held (or a new one).
+  bool whole = host_x == 0 && host_y == 0 && host_left == 0 && host_top == 0 &&
+               uint32_t(host_width) == dest.host_width &&
+               uint32_t(host_height) == dest.host_height &&
+               dest.host_width == source.extent.width && dest.host_height == source.extent.height;
+  // A depth target's image is sampled as depth (the copy is the depth as
+  // is, into an R32F texture), where its format can be filtered.
+  bool color_hand_over = !source.depth &&
+                         FormatComponents(source.format) == FormatComponents(dest.native_format) &&
+                         FormatComponents(source.format) != 0;
+  bool depth_hand_over = source.depth && dest.native_format == VK_FORMAT_R32_SFLOAT &&
+                         bias == 0 && depth_filterable;
+  if (hand_over_resolves && whole && !dest.copied && source.samples == VK_SAMPLE_COUNT_1_BIT &&
+      (color_hand_over || depth_hand_over)) {
+    float reader_scale = 0.0f;
+    float factor = std::ldexp(1.0f, bias);
+    if (IsUnorm(dest.native_format)) {
+      // What the normalized format kept: 0-1 (nothing to do for a
+      // normalized target and no bias).
+      if (bias != 0 || !IsUnorm(source.format)) {
+        reader_scale = factor;
+      }
+    } else if (bias != 0) {
+      reader_scale = -factor;
+    }
+    EndRendering(commands);
+    Transition(commands, source.image.image, source.aspects(), source.layout,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    TextureCache::HandedImage handed{source.image.image, source.image.memory, source.image.view,
+                                     source.format};
+    if (source.depth) {
+      handed.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+      handed.depth_view = source.sample_view;
+    }
+    TextureCache::HandedImage back =
+        textures.HandOver(fetch, source.scale, handed, swap, reader_scale);
+    if (back.image) {
+      source.image = {back.image, back.memory, back.view};
+      source.sample_view = source.depth ? back.depth_view : back.view;
+      source.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    } else {
+      if (logged_new_target_images < 40) {
+        logged_new_target_images++;
+        ITC_LOG_INFO("native renderer: hand-over to {:08X} ({}x{}, held its own {} format {}) "
+                     "from target {:08X} format {}: a new target image",
+                     fetch[1] & 0xFFFFF000u, dest.host_width, dest.host_height,
+                     dest.handed ? "no:" : "yes:", int(dest.format), source.surface.pitch,
+                     int(source.format));
+      }
+      source.image = {};
+      source.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      if (!CreateTargetImage(source)) {
+        ITC_LOG_ERROR("native renderer: couldn't create a {}x{} target", source.extent.width,
+                      source.extent.height);
+      }
+      stats.targets++;
+    }
+    source.handed_image = handed.image;
+    std::copy(fetch, fetch + 6, source.handed_fetch);
+    source.handed_scale = source.scale;
+    recorded.valid = false;
+    stats.resolves_handed++;
+    Resolved& resolved = frame_resolves.emplace_back();
+    resolved = {handed.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
+                fetch[1] & 0x3F, flags,
+                source.depth ? VK_FORMAT_R32_SFLOAT : source.format};
+    std::copy(fetch, fetch + 6, resolved.fetch);
+    resolved.handed = true;
+    resolved.scale = source.scale;
+    resolved.aspect = source.depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    return true;
+  }
+  if (!dest.copied && !textures.RestoreResolveDestination(fetch, source.scale, dest)) {
     return false;
   }
   VkPipeline pipeline = GetResolvePipeline(dest.format, source.samples != VK_SAMPLE_COUNT_1_BIT);
@@ -2434,13 +2636,6 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout, 0, 1,
                               &set, 0, nullptr);
-  // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
-  // on the main view's HDR copies).
-  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
-  // copy_dest_swap: when the destination's swizzle takes X from another
-  // component than the first (bits 1-3 of fetch word 3), so sampling it
-  // through the swizzle swaps them back.
-  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
   struct {
     int32_t offset[2];
     int32_t samples;
@@ -2448,7 +2643,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
     int32_t swap_red_blue;
   } constants{{host_left - host_x, host_top - host_y},
               source.depth ? 1 : int32_t(source.samples),
-              std::ldexp(1.0f, int32_t(flags) >> 26), swap ? 1 : 0};
+              std::ldexp(1.0f, bias), swap ? 1 : 0};
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
@@ -2644,6 +2839,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   if (width <= 0 || height <= 0) {
     return;
   }
+  s.RestoreContents(commands, *target);
   Transition(commands, target->image.image, target->aspects(), target->layout,
              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   VkRect2D area{{0, 0}, {uint32_t(width), uint32_t(height)}};
@@ -2714,6 +2910,15 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
+  VkFormatProperties depth_properties{};
+  vk::vkGetPhysicalDeviceFormatProperties(context.physical_device, kDepthFormat,
+                                          &depth_properties);
+  s.depth_filterable = depth_properties.optimalTilingFeatures &
+                       VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+  ITC_LOG_INFO("native renderer: depth targets {} handed to their resolves' textures (linear "
+               "filtering of the depth format {})",
+               s.depth_filterable ? "can be" : "can't be",
+               s.depth_filterable ? "supported" : "not supported");
   s.shaders = std::make_unique<ShaderCache>();
   if (std::filesystem::path directory = DiskCacheDirectory(); !directory.empty()) {
     s.pipeline_cache_file = directory / "pipelines.bin";
@@ -3231,6 +3436,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       uint8_t signs = TextureCache::SwizzledSigns(
           &regs.fetch[6 * index]);
       system.texture_swizzled_signs[index >> 2] |= uint32_t(signs) << (8 * (index & 3));
+      system.texture_scale[index & 31] = s.textures.ReaderScale(&regs.fetch[6 * index]);
     }
   }
   for (uint32_t i = 0; i < 4; i++) {
@@ -4348,6 +4554,10 @@ std::string Passes::TakeInterfaces() {
 }
 
 
+void Passes::set_hand_over_resolves(bool hand_over) {
+  state_->hand_over_resolves = hand_over;
+}
+
 void Passes::set_hide_cubes(bool hide) {
   state_->hide_cubes = hide;
 }
@@ -4420,7 +4630,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   VkExtent2D extent = s.main_view_extent;
-  if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size()) {
+  if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size() &&
+      s.Held(s.frame_resolves[show_resolve]) &&
+      s.frame_resolves[show_resolve].aspect == VK_IMAGE_ASPECT_COLOR_BIT) {
     // A resolve destination, as is.
     const State::Resolved& resolved = s.frame_resolves[show_resolve];
     extent = {std::min(resolved.extent.width, s.shown_extent.width),
@@ -4440,6 +4652,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   } else if (Target* front = s.front) {
     // The frame as the game resolves it to the front buffer.
     s.EndRendering(commands);
+    s.RestoreContents(commands, *front);
     Transition(commands, front->image.image, front->aspects(), front->layout,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     VkExtent2D front_extent = s.Scaled(s.front_extent);
@@ -4590,16 +4803,22 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   };
   add(prefix, kShownFormat, shown_extent);
   std::vector<VkImage> images = {shown.image};
+  std::vector<VkImageAspectFlags> aspects = {VK_IMAGE_ASPECT_COLOR_BIT};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
+    if (!Held(r)) {
+      continue;  // a handed image back with its target since
+    }
     add(std::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);
     images.push_back(r.image);
+    aspects.push_back(r.aspect);
   }
   size_t resolve_end = images.size();
   if (id_drawn) {
     add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
     images.push_back(id_image.image);
+    aspects.push_back(VK_IMAGE_ASPECT_COLOR_BIT);
   }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = size;
@@ -4624,18 +4843,21 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     VkImage image = images[i];
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     bool resolve = i && i < resolve_end;  // in SHADER_READ_ONLY_OPTIMAL
+    // A depth image's both aspects change layout; its depth is copied.
+    VkImageAspectFlags transition_aspects =
+        aspects[i] == VK_IMAGE_ASPECT_DEPTH_BIT ? kDepthStencilAspects : aspects[i];
     if (resolve) {
-      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+      Transition(commands, image, transition_aspects, layout,
                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     }
     VkBufferImageCopy copy{};
     copy.bufferOffset = dumped[i].offset;
-    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy.imageSubresource = {aspects[i], 0, 0, 1};
     copy.imageExtent = {dumped[i].extent.width, dumped[i].extent.height, 1};
     vk::vkCmdCopyImageToBuffer(commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dump_buffer,
                                1, &copy);
     if (resolve) {
-      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+      Transition(commands, image, transition_aspects, layout,
                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
   }

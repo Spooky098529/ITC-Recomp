@@ -404,13 +404,41 @@ Step 4's approach:
   image (cleared: all 1.0), as the no-EDRAM rule has it. The shown frame
   doesn't change (an attract race's dump: 0.30% of pixels off by more
   than 0.02, as step 2's).
-- **What stays:** the ~25 resolves a race frame are copies, because none
-  is a plain copy: each changes format, averages MSAA samples or applies
-  the exponent bias (the old table's "What a resolve does"), as a PC
-  renderer's StretchRect or MSAA resolve does. Handing images over instead
-  of copying would save no copy today. Drawing passes straight into their
-  destinations needs the bias moved into the readers and a pass plan (the
-  old branch's 3a), for later.
+- **What stayed after the first part:** the ~25 resolves a race frame were
+  copies, because none was a plain copy: each changes format, averages
+  MSAA samples or applies the exponent bias (the old table's "What a
+  resolve does"). The second part (below) moves the format, swap and bias
+  into the readers so the single-sample ones hand their images over.
+
+- **Passes into their textures (second part, 2026-11-27).** A resolve that
+  is a whole-image copy from a single-sample color target hands the
+  target's image to the destination texture instead of copying
+  (`TextureCache::HandOver`; `--native_renderer_hand_over_resolves`, on):
+  the pass has drawn into its texture. What the copy did is left to the
+  readers: the red and blue exchange (the copy's `copy_dest_swap`) goes
+  into the views' swizzle, and the exponent bias with the normalized
+  destination's clamp into a reader scale (a system constant a fetch
+  constant, `texture_scale`, applied in `xe_texture_result`:
+  `clamp(x * 2^bias, 0, 1)` for a normalized destination, `x * 2^bias`
+  otherwise, nothing for a normalized target without a bias). The glow's
+  −3 is what fits its HDR steps into a `16_16_16_16` (unorm) texture: its
+  steps now draw into float images their readers scale. The target draws
+  next into the image the destination held (a pass's image from the frame
+  before), so a target resolved every frame alternates between two
+  images; a target drawn into or read again without a clear first gets its
+  contents copied back once (`RestoreContents`). A destination a resolve
+  ever copies into (the MSAA ones, the main view's partial rectangle into
+  `1ECC2000`) stays a copy destination. The two depth resolves (the
+  shadow map's and the type 20 pass's, `24_8_FLOAT` copied as the depth
+  as is into R32F) hand the depth image over too, its depth sampled
+  through a depth-aspect view (where the depth format can be filtered
+  linearly; logged at start-up). In an attract race: 19 of the 25
+  resolves a frame handed over, 5 targets copied back (logged once each:
+  the type 20 depth pass, drawn every frame without a clear; the glow's
+  target after its last step, `15CCB000`; the boot filter's 512x512
+  target between its blur passes). Still copies: the MSAA resolves (the
+  mirror, the reflection map, the minimap, the main view twice and its
+  partial copy for the upscale).
 
 Order of a race frame's passes (one frame traced, 2026-11-26): each camera
 pass draws, then resolves (the shadow map's 66 draws, then its depth
@@ -578,8 +606,10 @@ waits on step 3 (draws find their streams by address until then).
    is a different revision from ours, and the Japanese release's data may
    differ: step 1 starts by running their tool over our files.
 3. **The exponent bias** on the main view's and the glow's copies (−3):
-   folded into the readers' sampling (a uniform), or a float target with
-   the bias applied where it's read. Decided in step 4.
+   decided in step 4 (2026-11-27): where a pass's image is handed to its
+   texture, the readers apply it (with the normalized destination's clamp)
+   as a reader scale; the main view's copies are MSAA resolves and keep it
+   in the copy.
 4. **The upscale draw and the 1280x720 `1ECB9000` texture** (the main
    view's partial-rect resolve): drawn into that region, or the frame
    composed natively (`docs/unlocked-res.md`, "Later"). Decided in step 4.
