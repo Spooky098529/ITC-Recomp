@@ -65,6 +65,10 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
 // XPhysicalFree (sub_822965C8): MmFreePhysicalMemory's release; logged once
 // for an address AllocPhysical didn't give.
 void FreePhysical(uint32_t address);
+// Called after a physical block is freed (its address and size), from the
+// freeing thread: the renderer lets go of what it holds of it
+// (docs/pc-renderer.md, step 2b). One listener; set once at start-up.
+void SetPhysicalFreeListener(void (*listener)(uint32_t address, uint32_t size));
 // XPhysicalSize (sub_822965C0, MmQueryAllocationSize's wrapper): the block's
 // allocated size, as the SDK's import answers it (the size AllocPhysical
 // asked for rounded up to its page size, one page for 0), recorded by
@@ -78,7 +82,9 @@ uint32_t PhysicalSize(uint32_t address);
 // the memory log.
 class PhysicalTag {
  public:
-  explicit PhysicalTag(const char* name);
+  // keep_outer: an outer tag already set (not "other") is kept (a loader
+  // naming what its model's vertices are for, around Model::Load's own).
+  explicit PhysicalTag(const char* name, bool keep_outer = false);
   ~PhysicalTag();
  private:
   const char* previous_;

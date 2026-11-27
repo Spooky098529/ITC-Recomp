@@ -421,6 +421,7 @@ std::optional<uint32_t> InteriorOnPartLoaded(uint32_t request, uint32_t interior
     }
     const uint32_t model = in.part_models_address() + kPartModelBytes * i;
     const uint32_t file = schema::LoadSlot(slot).buffer();
+    memory::PhysicalTag tag("model vertices: scene objects");
     if (!models::ModelLoad(model, file, 0, calls.model_load)) {
       calls.load(calls.user, model, file);
     }

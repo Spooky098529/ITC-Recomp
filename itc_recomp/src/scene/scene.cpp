@@ -887,6 +887,7 @@ std::optional<uint64_t> FileLoaded(uint32_t request, uint32_t data,
     case Kind::kTexture: {
       const uint32_t model = assets + branch->a;
       const uint32_t file = LoadSlot(assets + branch->b).buffer();
+      memory::PhysicalTag tag("model vertices: scene");
       if (!models::ModelLoad(model, file, data, calls.model_load)) {
         calls.model_load_original(model, file, data);
       }

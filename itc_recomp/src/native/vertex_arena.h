@@ -59,6 +59,11 @@ class VertexArena {
   // arena, swapped from `endian` as Place does; UINT32_MAX if it's full.
   uint32_t PlaceInline(const void* data, uint32_t size, uint32_t endian);
 
+  // A buffer held by its object (VertexArena_GpuOnlyModel, below): the arena
+  // offset of `address` (the GPU's) in it, as `endian` has it; UINT32_MAX if
+  // the object holds no buffer there (the draw places it by address).
+  uint32_t HeldBuffer(uint32_t object, uint32_t address, uint32_t endian) const;
+
   VkBuffer buffer() const;
   // This frame's copies, ended, to be submitted before its drawing; null if
   // there were none.
@@ -72,5 +77,14 @@ class VertexArena {
   struct State;
   std::unique_ptr<State> state_;
 };
+
+// Buffers held by their objects (docs/pc-renderer.md, step 2b): a model
+// whose vertex data only the GPU reads (the course's and the scenery lists'
+// models) has its buffers (models::ModelBuffers) copied into the arena once,
+// at the next frame's start, in the host's byte order, and its data's pages
+// given back; draws bind them by their objects from then on. They go when
+// the model's data block is freed (memory::FreePhysical). Any thread, after
+// Model::Load.
+void VertexArena_GpuOnlyModel(uint32_t model);
 
 }  // namespace native

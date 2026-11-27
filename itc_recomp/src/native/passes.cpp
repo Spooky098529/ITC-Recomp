@@ -3530,8 +3530,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       }
       uint32_t word0 = arena_fetch[2 * k];
       uint32_t size = ((arena_fetch[2 * k + 1] >> 2) & 0xFFFFFFu) * 4;
-      // In the host's byte order (the fetch constant's endian mode).
-      uint32_t offset = s.arena.Place(word0 & 0x1FFFFFFCu, size, arena_fetch[2 * k + 1] & 3);
+      // A buffer the arena holds by its object, else placed by address, in
+      // the host's byte order (the fetch constant's endian mode).
+      uint32_t offset = UINT32_MAX;
+      if (k >= 80) {
+        if (uint32_t object = bound.stream_buffer[95 - k]) {
+          offset = s.arena.HeldBuffer(object, word0 & 0x1FFFFFFCu, arena_fetch[2 * k + 1] & 3);
+        }
+      }
+      if (offset == UINT32_MAX) {
+        offset = s.arena.Place(word0 & 0x1FFFFFFCu, size, arena_fetch[2 * k + 1] & 3);
+      }
       if (offset == UINT32_MAX) {
         s.stats.failed++;
         s.stats.failed_by[7]++;
@@ -3539,9 +3548,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       }
       arena_fetch[2 * k] = offset | (word0 & 3);
     }
-    // In the host's byte order, as the vertex input fetches by them.
-    index_offset =
-        s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2), index_endian);
+    // In the host's byte order, as the vertex input fetches by them: held by
+    // its object, else placed by address.
+    index_offset = s.arena.HeldBuffer(bound.index_buffer, index_address, index_endian);
+    if (index_offset == UINT32_MAX) {
+      index_offset =
+          s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2), index_endian);
+    }
     if (index_offset == UINT32_MAX) {
       s.stats.failed++;
       s.stats.failed_by[7]++;

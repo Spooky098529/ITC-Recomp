@@ -109,6 +109,9 @@ struct Bindings {
   uint64_t declaration_hash = 0;
   uint32_t stream_fetch[16][2] = {};
   uint8_t strides[16] = {};
+  // Each stream's buffer object (the vertex buffer header): the renderer
+  // binds a buffer it holds by its object (docs/pc-renderer.md, step 2b).
+  uint32_t stream_buffer[16] = {};
 };
 
 // Commands 8, 9, 10 and the drawer's shaders (13, 14) and declaration (15,

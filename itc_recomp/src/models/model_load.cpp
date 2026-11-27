@@ -232,7 +232,7 @@ void MeshParse(uint32_t model, uint32_t file, const LoadCalls& calls) {
   // The vertex data in physical memory, the shapes' buffers relocated to it.
   const uint32_t vertices = file + f.vertex_data_offset();
   const uint32_t data = [&] {
-    memory::PhysicalTag tag("model vertices");
+    memory::PhysicalTag tag("model vertices", true);
     return AllocPhysicalEx(f.vertex_data_size(), 0, 0xFFFFFFFFu, 4, 0x404);
   }();
   m.set_vertex_data(data);
@@ -268,6 +268,24 @@ void MeshParse(uint32_t model, uint32_t file, const LoadCalls& calls) {
       }
     }
   }
+}
+
+std::vector<ModelBuffer> ModelBuffers(uint32_t model) {
+  std::vector<ModelBuffer> buffers;
+  const schema::Model m(model);
+  for (int32_t i = 0; i < int32_t(m.shape_count()); i++) {
+    const schema::ModelShape shape(m.shapes().address + kShapeBytes * uint32_t(i));
+    buffers.push_back({shape.vertex_buffer0_address(), false});
+    if (shape.skinned() != 1) {
+      buffers.push_back({shape.vertex_buffer1_address(), false});
+      buffers.push_back({shape.vertex_buffer2_address(), false});
+    }
+    for (int32_t j = 0; j < int32_t(shape.materials().record_count()); j++) {
+      buffers.push_back(
+          {shape.materials().records_address() + kMaterialBytes * uint32_t(j) + 352, true});
+    }
+  }
+  return buffers;
 }
 
 bool ModelLoad(uint32_t model, uint32_t file, uint32_t xpr,

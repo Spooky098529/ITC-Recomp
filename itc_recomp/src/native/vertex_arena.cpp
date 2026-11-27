@@ -6,13 +6,21 @@
 #include <cstring>
 #include <format>
 #include <map>
+#include <mutex>
+#include <sys/mman.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "base/log.h"
 #include "buffers.h"
 #include "gpu_memory.h"
+#include "guest.h"
+#include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/model_load.h"
+#include "schema/models.h"
 #include "state.h"
 
 namespace native {
@@ -47,7 +55,79 @@ uint32_t AlignUp(uint32_t value) {
   return (value + kAlignment - 1) & ~(kAlignment - 1);
 }
 
+// The GPU's address of the CPU's (as the graphics library's Physical).
+uint32_t GpuAddress(uint32_t address) {
+  return ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF);
+}
+
+// The held models' events, in order (VertexArena_GpuOnlyModel, a block
+// freed), for the render thread's next frame start.
+struct HeldBufferInput {
+  uint32_t object, address, size, endian;
+};
+struct ModelEvent {
+  bool freed = false;
+  // The data's physical allocation (the CPU's address: the memory block's
+  // header page, then the data) and the data's size.
+  uint32_t block = 0, data_size = 0;
+  std::vector<HeldBufferInput> buffers;
+};
+std::mutex g_model_mutex;
+std::vector<ModelEvent> g_model_events;
+// The blocks given to VertexArena_GpuOnlyModel and not freed since: only
+// their frees are queued.
+std::unordered_set<uint32_t> g_held_blocks;
+
+void OnPhysicalFreed(uint32_t address, uint32_t size) {
+  std::lock_guard lock(g_model_mutex);
+  if (g_held_blocks.erase(address)) {
+    g_model_events.push_back({true, address, size, {}});
+  }
+}
+
 }  // namespace
+
+void VertexArena_GpuOnlyModel(uint32_t model) {
+  const schema::Model m(model);
+  const uint32_t data = m.vertex_data();
+  if (!data) {
+    return;
+  }
+  // The memory block's header page is in front of its data (models'
+  // memory_blocks.h).
+  const uint32_t block = data - models::kBlockHeaderBytes;
+  const uint32_t allocated = memory::PhysicalSize(block);
+  if (allocated <= models::kBlockHeaderBytes) {
+    return;
+  }
+  ModelEvent event;
+  event.block = block;
+  event.data_size = allocated - models::kBlockHeaderBytes;
+  for (const models::ModelBuffer& b : models::ModelBuffers(model)) {
+    HeldBufferInput in{b.object, 0, 0, 0};
+    const uint32_t buffer = guest::LoadU32(b.object + 24);
+    if (b.index) {
+      // +0 bits 29-30 the endian, +28 the size in bytes.
+      in.address = GpuAddress(buffer);
+      in.size = guest::LoadU32(b.object + 28);
+      in.endian = guest::LoadU32(b.object) >> 29 & 3;
+    } else {
+      // +24 the address with the type in its low bits, +28 the size in
+      // words from bit 2 with the endian in the low bits (the fetch
+      // constant's words).
+      const uint32_t word1 = guest::LoadU32(b.object + 28);
+      in.address = GpuAddress(buffer & ~3u);
+      in.size = (word1 >> 2 & 0xFFFFFF) * 4;
+      in.endian = word1 & 3;
+    }
+    if (in.size) {
+      event.buffers.push_back(in);
+    }
+  }
+  std::lock_guard lock(g_model_mutex);
+  g_held_blocks.insert(block);
+  g_model_events.push_back(std::move(event));
+}
 
 struct VertexArena::State {
   DeviceContext context{};
@@ -95,6 +175,26 @@ struct VertexArena::State {
   uint64_t used_bytes = 0;
 
   std::vector<std::pair<uint32_t, uint32_t>> writes;
+
+  // Buffers held by their objects (VertexArena_GpuOnlyModel), each its own
+  // place, and the objects of each data block (the CPU's address).
+  struct Held {
+    uint32_t offset, address, size, endian, block;
+  };
+  std::unordered_map<uint32_t, Held> held;
+  struct HeldBlock {
+    std::vector<uint32_t> objects;
+    // Its places (offset, size): buffers of the same range share one.
+    std::vector<std::pair<uint32_t, uint32_t>> places;
+  };
+  std::unordered_map<uint32_t, HeldBlock> held_blocks;
+  // The held blocks by the GPU's address: start -> end, to find writes into
+  // them (none expected: their data is given back).
+  std::map<uint32_t, uint32_t> held_ranges;
+  bool logged_held_write = false;
+  uint64_t held_bytes = 0, given_back_bytes = 0;
+  void ProcessModels(const std::vector<ModelEvent>& events);
+  void Retire(uint32_t block);
 
   struct Stats {
     uint64_t placed = 0, copied = 0, copied_bytes = 0, recopied = 0, inline_bytes = 0;
@@ -260,6 +360,7 @@ bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) 
                s.size >> 20, kRangeBytes >> 20, frames_in_flight, kInlineSlotBytes >> 20);
   // From here on memcpy keeps the writes into physical memory for us.
   Buffers_CollectMirrorWrites();
+  memory::SetPhysicalFreeListener(&OnPhysicalFreed);
   return true;
 }
 
@@ -293,6 +394,31 @@ void VertexArena::BeginFrame(uint32_t frame) {
   s.writes.clear();
   Buffers_TakeMirrorWrites(s.writes);
   s.stats.writes += s.writes.size();
+  // The held models' loads and frees since then (a write into a block freed
+  // since is a new owner's).
+  std::vector<ModelEvent> events;
+  {
+    std::lock_guard lock(g_model_mutex);
+    events.swap(g_model_events);
+  }
+  std::unordered_set<uint32_t> freed;
+  for (const ModelEvent& e : events) {
+    if (e.freed) {
+      freed.insert(GpuAddress(e.block + models::kBlockHeaderBytes));
+    }
+  }
+  for (auto [start, end] : s.writes) {
+    // Into a held model's data (given back: the write would be lost).
+    if (auto h = s.held_ranges.upper_bound(start);
+        h != s.held_ranges.begin() && std::prev(h)->second > start &&
+        !freed.count(std::prev(h)->first) && !s.logged_held_write) {
+      s.logged_held_write = true;
+      ITC_LOG_ERROR("native renderer: memcpy wrote {:08X}-{:08X}, into a model's vertex data "
+                    "held by the GPU alone (its block {:08X})",
+                    start, end, std::prev(h)->first);
+    }
+  }
+  s.ProcessModels(events);
   for (auto [start, end] : s.writes) {
     uint32_t from = start > s.longest ? start - s.longest : 0;
     for (auto it = s.by_start.lower_bound(from); it != s.by_start.end() && it->first < end; ++it) {
@@ -309,6 +435,103 @@ void VertexArena::BeginFrame(uint32_t frame) {
   if (s.frame_number % 300 == 0) {
     s.GiveBack(kUnusedFrames);
   }
+}
+
+void VertexArena::State::Retire(uint32_t block) {
+  auto it = held_blocks.find(block);
+  if (it == held_blocks.end()) {
+    return;
+  }
+  for (uint32_t object : it->second.objects) {
+    auto h = held.find(object);
+    if (h != held.end() && h->second.block == block) {
+      held.erase(h);
+    }
+  }
+  for (auto [offset, size] : it->second.places) {
+    // Freed when this slot's fence has passed again (frames in flight).
+    frames[frame].to_free.emplace_back(offset, size);
+    held_bytes -= size;
+  }
+  held_blocks.erase(it);
+  held_ranges.erase(GpuAddress(block + models::kBlockHeaderBytes));
+}
+
+void VertexArena::State::ProcessModels(const std::vector<ModelEvent>& events) {
+  for (const ModelEvent& e : events) {
+    Retire(e.block);
+    if (e.freed) {
+      continue;
+    }
+    // Each range copied into a place of its own (buffers of the same range
+    // share it); if one doesn't fit, none is held (the draws place them by
+    // address, the data kept).
+    HeldBlock& block = held_blocks[e.block];
+    std::map<uint64_t, uint32_t> placed;  // address << 32 | size, endian in bits 30-31
+    bool all = true;
+    for (const HeldBufferInput& b : e.buffers) {
+      const uint64_t key = uint64_t(b.address | b.endian << 30) << 32 | b.size;
+      uint32_t offset;
+      if (auto p = placed.find(key); p != placed.end()) {
+        offset = p->second;
+      } else {
+        offset = Allocate(b.size);
+        if (offset == UINT32_MAX) {
+          GiveBack(frames_in_flight + 1);
+          offset = Allocate(b.size);
+        }
+        if (offset == UINT32_MAX) {
+          all = false;
+          break;
+        }
+        Copy(PhysicalHostAddress(b.address), b.size, offset, b.endian);
+        placed.emplace(key, offset);
+        block.places.emplace_back(offset, b.size);
+        held_bytes += b.size;
+      }
+      if (auto old = held.find(b.object); old != held.end() && old->second.block != e.block) {
+        // An object of another block (its memory reused): that block's
+        // places stay until it's freed.
+        held.erase(old);
+      }
+      held[b.object] = {offset, b.address, b.size, b.endian, e.block};
+      block.objects.push_back(b.object);
+    }
+    if (!all) {
+      Retire(e.block);
+      if (!logged_full) {
+        logged_full = true;
+        ITC_LOG_ERROR("native renderer: the vertex arena is full ({} MB used): a model's "
+                      "buffers left in physical memory",
+                      used_bytes >> 20);
+      }
+      continue;
+    }
+    // Copied (into staging, read from here on by the GPU only): the data's
+    // whole pages back to the system (not the block's header page).
+    const uint32_t data = GpuAddress(e.block + models::kBlockHeaderBytes);
+    held_ranges[data] = data + e.data_size;
+    uint8_t* host = PhysicalHostAddress(data);
+    uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
+    uintptr_t end = (reinterpret_cast<uintptr_t>(host) + e.data_size) & ~uintptr_t(0xFFF);
+    if (end > first) {
+      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+      given_back_bytes += end - first;
+    }
+  }
+}
+
+uint32_t VertexArena::HeldBuffer(uint32_t object, uint32_t address, uint32_t endian) const {
+  const State& s = *state_;
+  auto it = s.held.find(object);
+  if (it == s.held.end()) {
+    return UINT32_MAX;
+  }
+  const State::Held& h = it->second;
+  if (address < h.address || address - h.address >= h.size || endian != h.endian) {
+    return UINT32_MAX;
+  }
+  return h.offset + (address - h.address);
 }
 
 uint32_t VertexArena::State::Allocate(uint32_t bytes) {
@@ -534,11 +757,13 @@ std::string VertexArena::TakeStats() {
   return std::format(
       "vertex arena: {:.1f} of {} MB in {} ranges; a frame {:.0f} placed, {:.1f} copied ({:.2f} "
       "MB, {:.1f} again after a write), {:.2f} MB inline; memcpy's writes {:.1f} ({:.1f} marking "
-      "a range); {} given back; {} left out (full), {} inline left out",
+      "a range); {} given back; {} left out (full), {} inline left out; {} buffers held by "
+      "object ({:.1f} MB, {} models), {:.1f} MB of their data given back so far",
       s.used_bytes / 1048576.0, kRangeBytes >> 20, s.ranges.size(), st.placed / frames,
       st.copied / frames, st.copied_bytes / frames / 1048576.0, st.recopied / frames,
       st.inline_bytes / frames / 1048576.0, st.writes / frames, st.writes_hit / frames, st.freed,
-      st.full, st.inline_full);
+      st.full, st.inline_full, s.held.size(), s.held_bytes / 1048576.0, s.held_blocks.size(),
+      s.given_back_bytes / 1048576.0);
 }
 
 }  // namespace native

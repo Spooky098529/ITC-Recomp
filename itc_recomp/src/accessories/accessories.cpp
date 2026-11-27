@@ -738,6 +738,7 @@ uint32_t AccessoryFinish(uint32_t accessory, uint32_t release, uint32_t sp,
   // No guest frame (E5 step 6): the original's 112 bytes held only the back
   // chain; the guest calls are made from `sp`.
   const uint32_t file = a.model_file_data(), xpr = a.xpr_file_data();
+  memory::PhysicalTag tag("model vertices: accessories");
   if (!models::ModelLoad(accessory, file, xpr, calls.model_load)) {
     calls.load(accessory, file, xpr, sp);
   }

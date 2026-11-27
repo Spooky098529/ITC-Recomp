@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace models {
 
@@ -45,5 +46,15 @@ bool LoadFits(uint32_t file);
 // or LoadFits').
 bool ModelLoad(uint32_t model, uint32_t file, uint32_t xpr,
                const LoadCalls& calls);
+
+// A model's buffer objects, as Mesh::Parse relocates them: each shape's
+// vertex buffers (0, and 1 and 2 unless it's skinned) and each of its
+// materials' index buffer (the record's +352). For the renderer to hold
+// them by object (docs/pc-renderer.md, step 2b).
+struct ModelBuffer {
+  uint32_t object;
+  bool index;
+};
+std::vector<ModelBuffer> ModelBuffers(uint32_t model);
 
 }  // namespace models

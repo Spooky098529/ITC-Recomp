@@ -521,6 +521,7 @@ void SetVertexBuffer(uint32_t stream, uint32_t buffer, uint32_t offset, uint32_t
     g_bindings.stream_fetch[stream][0] =
         ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF);
     g_bindings.stream_fetch[stream][1] = b.data_size() - offset;
+    g_bindings.stream_buffer[stream] = buffer;
   }
   g_bindings.strides[stream] = uint8_t(stride >> 2);
 }

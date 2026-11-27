@@ -16,6 +16,7 @@
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "native/vertex_arena.h"
 #include "scenery_lists/scenery_lists.h"
 #include "schema/course_scenery.h"
 #include "schema/models.h"
@@ -1348,6 +1349,8 @@ struct ParseCalls {
 uint32_t LoadModel(ParseCalls& parse, uint32_t model, uint32_t entry,
                    uint32_t lr) {
   if (model != 0 && models::ModelLoad(model, entry, 0, parse.ModelLoad())) {
+    // The course's models: their vertex data only the GPU reads.
+    native::VertexArena_GpuOnlyModel(model);
     return schema::Model(model).shape_count();
   }
   return parse.Call(lr, 0x82596920, {model, entry, 0});
@@ -1459,6 +1462,7 @@ uint32_t AreaLightsOnLoaded(uint32_t lights) {
 
 uint32_t AreaModelOnLoaded(const Calls& calls, uint32_t stack, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820F1CE8 AreaModel::OnLoaded");
+  memory::PhysicalTag tag("model vertices: course");
   AreaModelParse(calls, stack, model);  // its 96-byte frame only a back chain
   MarkLoaded(model);
   return model;
@@ -1740,6 +1744,7 @@ uint64_t AreaModelLoad(uint32_t model, const archive::LoadCall& load) {
 
 uint32_t CourseSetOnLoaded(const Calls& calls, uint32_t stack, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820F22B8 CourseSet::OnLoaded");
+  memory::PhysicalTag tag("model vertices: course");
   CourseSetParse(calls, stack, set);  // its 96-byte frame only a back chain
   FreePhysical(schema::CourseSet(set).first_file());
   MarkLoaded(set);
