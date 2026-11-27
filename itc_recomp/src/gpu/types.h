@@ -150,7 +150,9 @@ struct ImageDesc {
 // What an image is about to be used for (docs/d3d11-backend.md, "Usage, not
 // layouts"): Vulkan changes its layout when it differs from the last use.
 enum class Usage : uint8_t {
-  kUndefined,  // its contents may be dropped
+  // Its contents may be dropped: no barrier now, the next use starts from
+  // nothing.
+  kUndefined,
   kSampled,
   kDepthSampled,  // a depth image sampled as depth
   kColorTarget,

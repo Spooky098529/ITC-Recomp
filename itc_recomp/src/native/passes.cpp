@@ -720,7 +720,8 @@ struct Passes::State {
   std::unordered_map<VkPipelineLayout, VkPipelineLayout> id_layouts;
   std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> id_pipelines;
   VkShaderModule id_pixel = VK_NULL_HANDLE;
-  Image id_image, id_depth;
+  gpu::Image* id_image = nullptr;
+  gpu::Image* id_depth = nullptr;
   bool id_drawn = false;  // this frame, for the dump
   VkPipeline GetIdPipeline(const IdDraw& draw);
   void DrawIds(VkCommandBuffer commands);
@@ -932,8 +933,7 @@ struct Passes::State {
   std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves;
 
   // What's shown, and this frame's resolve destinations (for showing one).
-  Image shown;
-  VkImageLayout shown_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  gpu::Image* shown = nullptr;
   // --xbox_gamma: a gamma table (xbox_gamma_table.h) applied to `shown` in
   // place (gamma.comp).
   const uint16_t* gamma_values = nullptr;
@@ -2241,7 +2241,7 @@ bool Passes::State::CreateGammaResources() {
   }
   // `shown` is only ever written by transfers and this pass, and lives as
   // long as the set: the set is written once.
-  VkDescriptorImageInfo image_info{VK_NULL_HANDLE, shown.view, VK_IMAGE_LAYOUT_GENERAL};
+  VkDescriptorImageInfo image_info{VK_NULL_HANDLE, View(shown), VK_IMAGE_LAYOUT_GENERAL};
   VkDescriptorBufferInfo table_info{gamma_table, 0, VK_WHOLE_SIZE};
   VkWriteDescriptorSet writes[2] = {{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
                                     {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
@@ -2294,8 +2294,7 @@ void Passes::State::ApplyGamma(VkCommandBuffer commands) {
                              nullptr);
     gamma_ready = true;
   }
-  Transition(commands, shown.image, VK_IMAGE_ASPECT_COLOR_BIT, shown_layout,
-             VK_IMAGE_LAYOUT_GENERAL);
+  backend->Use(shown, gpu::Usage::kStorage);
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_pipeline);
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_layout, 0, 1,
                               &gamma_set, 0, nullptr);
@@ -2838,11 +2837,14 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
   } else if (gamma != "off") {
     ITC_LOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
   }
-  if (!s.CreateImage(s.shown, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kShownFormat,
-                     {s.shown_extent.width, s.shown_extent.height, 1}, 1,
-                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                         (s.gamma_values ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
-                     VK_IMAGE_ASPECT_COLOR_BIT) ||
+  gpu::ImageDesc shown_desc;
+  shown_desc.format = gpu::Format::kR16G16B16A16Float;  // kShownFormat
+  shown_desc.width = s.shown_extent.width;
+  shown_desc.height = s.shown_extent.height;
+  shown_desc.usage = gpu::kImageCopySource | gpu::kImageCopyDest |
+                     (s.gamma_values ? gpu::kImageStorage : 0);
+  s.shown = s.NewImage(shown_desc);
+  if (!s.shown ||
       (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
       !s.CreateResolveResources() || !s.textures.Init(backend, frames_in_flight)) {
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
@@ -3893,22 +3895,26 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
 }
 
 void Passes::State::DrawIds(VkCommandBuffer commands) {
-  if (!id_image.image &&
-      (!CreateImage(id_image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R32_UINT,
-                    {main_view_extent.width, main_view_extent.height, 1}, 1,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                    VK_IMAGE_ASPECT_COLOR_BIT) ||
-       !CreateImage(id_depth, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, kDepthFormat,
-                    {main_view_extent.width, main_view_extent.height, 1}, 1,
-                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, kDepthStencilAspects))) {
-    return;
+  if (!id_image) {
+    gpu::ImageDesc desc;
+    desc.width = main_view_extent.width;
+    desc.height = main_view_extent.height;
+    desc.format = gpu::Format::kR32Uint;
+    desc.usage = gpu::kImageColorTarget | gpu::kImageCopySource;
+    id_image = NewImage(desc);
+    desc.format = gpu::Format::kD32FloatS8Uint;
+    desc.usage = gpu::kImageDepthTarget;
+    id_depth = NewImage(desc);
+    if (!id_image || !id_depth) {
+      return;
+    }
   }
   EndRendering(commands);
-  VkImageLayout color_layout = VK_IMAGE_LAYOUT_UNDEFINED, depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
-             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  Transition(commands, id_depth.image, kDepthStencilAspects, depth_layout,
-             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+  // Drawn from nothing every time.
+  backend->Use(id_image, gpu::Usage::kUndefined);
+  backend->Use(id_depth, gpu::Usage::kUndefined);
+  backend->Use(id_image, gpu::Usage::kColorTarget);
+  backend->Use(id_depth, gpu::Usage::kDepthTarget);
   // Depth cleared to far: 0 for the game's reversed depth (greater tests).
   bool reversed = false;
   for (const IdDraw& draw : id_draws) {
@@ -3917,13 +3923,13 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
                                       z_func == gpu::CompareOp::kGreaterOrEqual);
   }
   VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  color.imageView = id_image.view;
+  color.imageView = View(id_image);
   color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   color.clearValue.color.uint32[0] = UINT32_MAX;
   VkRenderingAttachmentInfo depth{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  depth.imageView = id_depth.view;
+  depth.imageView = View(id_depth);
   depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
   depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -3967,8 +3973,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   }
   vk::vkCmdEndRendering(commands);
   recorded.valid = false;
-  Transition(commands, id_image.image, VK_IMAGE_ASPECT_COLOR_BIT, color_layout,
-             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  backend->Use(id_image, gpu::Usage::kCopySource);
   id_drawn = true;
 }
 
@@ -4505,9 +4510,8 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     }
     ITC_LOG_INFO("native renderer: this frame's resolves: {}", list);
   }
-  VkImage shown = s.shown.image;
-  Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
-             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkImage shown = gpu::vulkan::Backend::Object(s.shown).image;
+  s.backend->Use(s.shown, gpu::Usage::kCopyDest);
   VkExtent2D extent = s.main_view_extent;
   if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size() &&
       s.Held(s.frame_resolves[show_resolve]) &&
@@ -4575,8 +4579,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   if (s.gamma_pipeline) {
     s.ApplyGamma(commands);
   }
-  Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
-             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  s.backend->Use(s.shown, gpu::Usage::kCopySource);
   if (dump) {
     if (!s.id_draws.empty()) {
       s.DrawIds(commands);
@@ -4681,7 +4684,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
   };
   add(prefix, kShownFormat, shown_extent);
-  std::vector<VkImage> images = {shown.image};
+  std::vector<VkImage> images = {gpu::vulkan::Backend::Object(shown).image};
   std::vector<VkImageAspectFlags> aspects = {VK_IMAGE_ASPECT_COLOR_BIT};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
@@ -4696,7 +4699,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   size_t resolve_end = images.size();
   if (id_drawn) {
     add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
-    images.push_back(id_image.image);
+    images.push_back(gpu::vulkan::Backend::Object(id_image).image);
     aspects.push_back(VK_IMAGE_ASPECT_COLOR_BIT);
   }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -4837,8 +4840,8 @@ void Passes::WriteDump(const std::string& directory) {
   s.dumped.clear();
 }
 
-VkImage Passes::shown() const {
-  return state_->shown.image;
+gpu::Image* Passes::shown() const {
+  return state_->shown;
 }
 
 Passes::Stats Passes::TakeStats() {

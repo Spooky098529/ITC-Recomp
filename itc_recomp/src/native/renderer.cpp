@@ -456,11 +456,10 @@ void Renderer::EndFrame() {
   if (g_window_resized.exchange(false)) {
     backend_->WindowResized();
   }
-  backend_->set_shown(passes_.shown());
   backend_->SubmitBefore(passes_.EndUploads());
   backend_->SubmitBefore(passes_.EndBufferUploads());
   recording_ = false;
-  if (backend_->EndFrame({source.width, source.height})) {
+  if (backend_->EndFrame(passes_.shown(), {source.width, source.height})) {
     frames_presented_++;
     // A frame much longer than usual (a hitch the per-second fps hides),
     // with what it spent on work that comes and goes (frame_costs.h).

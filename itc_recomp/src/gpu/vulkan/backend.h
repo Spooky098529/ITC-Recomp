@@ -50,7 +50,7 @@ class Backend final : public gpu::Backend {
   Extent2D OutputSize() const override { return {swapchain_extent_.width, swapchain_extent_.height}; }
   void WindowResized() override { window_resized_ = true; }
   uint32_t BeginFrame() override;
-  bool EndFrame(Extent2D size) override;
+  bool EndFrame(Image* shown, Extent2D size) override;
   void WaitIdle() override;
   Sampler* CreateSampler(const SamplerDesc& desc) override;
   static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
@@ -68,10 +68,8 @@ class Backend final : public gpu::Backend {
   const native::DeviceContext& context() const { return context_; }
   // The frame's command buffer, open between BeginFrame and EndFrame.
   VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
-  // What EndFrame shows (TRANSFER_SRC_OPTIMAL), and command buffers to
-  // submit before the frame's (the texture and arena uploads; null ones
-  // left out).
-  void set_shown(VkImage image) { shown_ = image; }
+  // Command buffers to submit before the frame's (the texture and arena
+  // uploads; null ones left out).
   void SubmitBefore(VkCommandBuffer commands) {
     if (commands) {
       before_.push_back(commands);
@@ -114,7 +112,6 @@ class Backend final : public gpu::Backend {
 
   native::DeviceContext context_{};
   VkPhysicalDeviceMemoryProperties memory_properties_{};
-  VkImage shown_ = VK_NULL_HANDLE;
   std::vector<VkCommandBuffer> before_;
 };
 

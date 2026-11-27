@@ -137,7 +137,7 @@ class Passes {
   void WriteDump(const std::string& directory);
   // How many resolves the last frame made (a race frame makes about 25).
   size_t frame_resolve_count() const;
-  VkImage shown() const;
+  gpu::Image* shown() const;
   // The frame's texture uploads, to be submitted before its commands; null
   // if none.
   VkCommandBuffer EndUploads();

@@ -355,7 +355,7 @@ uint32_t Backend::BeginFrame() {
   return frame_index_;
 }
 
-bool Backend::EndFrame(Extent2D size) {
+bool Backend::EndFrame(Image* shown, Extent2D size) {
   Frame& frame = frames_[frame_index_];
   VkCommandBuffer commands = frame.commands;
   const VkExtent2D source{size.width, size.height};
@@ -409,7 +409,7 @@ bool Backend::EndFrame(Extent2D size) {
                                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                                &barrier);
     }
-    vk::vkCmdBlitImage(commands, shown_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+    vk::vkCmdBlitImage(commands, Object(shown).image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = 0;
@@ -641,7 +641,9 @@ void Backend::DestroyImage(Image* image) {
 void Backend::Use(Image* image, Usage usage) {
   ImageObject& o = Object(image);
   const VkImageLayout wanted = vk_types::Layout(usage);
-  if (o.layout == wanted) {
+  if (o.layout == wanted || usage == Usage::kUndefined) {
+    // Undefined: forgotten (the next use starts from nothing; no barrier).
+    o.layout = wanted;
     return;
   }
   // Waiting for everything before.

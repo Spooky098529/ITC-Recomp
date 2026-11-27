@@ -40,10 +40,10 @@ class Backend {
   // A frame's recording begins once its slot's earlier frame is done on the
   // GPU. Returns the slot (0 to frames in flight - 1).
   virtual uint32_t BeginFrame() = 0;
-  // Ends the frame: shows the image the renderer made (in its copy source
-  // usage, `size` of it), fitted to the window with black bars, and
-  // submits. False if nothing could be shown (no swapchain image now).
-  virtual bool EndFrame(Extent2D size) = 0;
+  // Ends the frame: shows `size` of `shown` (in its copy source usage),
+  // fitted to the window with black bars, and submits. False if nothing
+  // could be shown (no swapchain image now).
+  virtual bool EndFrame(Image* shown, Extent2D size) = 0;
   // Waits for all submitted work.
   virtual void WaitIdle() = 0;
 
