@@ -81,4 +81,21 @@ enum class BorderColor : uint8_t {
   kOpaqueWhite,
 };
 
+// A sampler. The backend applies its device's limits (anisotropy it lacks
+// is off, a mirror clamp to edge it lacks repeats mirrored).
+struct SamplerDesc {
+  Filter mag_filter = Filter::kNearest, min_filter = Filter::kNearest;
+  MipMode mip_mode = MipMode::kNearest;
+  AddressMode address[3] = {AddressMode::kRepeat, AddressMode::kRepeat, AddressMode::kRepeat};
+  // 0: off.
+  float max_anisotropy = 0.0f;
+  float mip_lod_bias = 0.0f;
+  // The levels sampled (a max of 1000: all).
+  float min_lod = 0.0f, max_lod = 0.0f;
+  BorderColor border = BorderColor::kTransparentBlack;
+};
+
+// The backends' objects: opaque, each backend's own behind them.
+struct Sampler;
+
 }  // namespace gpu

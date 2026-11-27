@@ -6,6 +6,7 @@
 #include <format>
 
 #include "base/log.h"
+#include "native/vulkan_types.h"
 
 namespace gpu::vulkan {
 
@@ -421,5 +422,35 @@ bool Backend::EndFrame(Extent2D size) {
 }
 
 void Backend::WaitIdle() { vk::vkQueueWaitIdle(queue_); }
+
+Sampler* Backend::CreateSampler(const SamplerDesc& desc) {
+  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  info.magFilter = vk_types::Filter(desc.mag_filter);
+  info.minFilter = vk_types::Filter(desc.min_filter);
+  info.mipmapMode = vk_types::MipMode(desc.mip_mode);
+  VkSamplerAddressMode* modes[3] = {&info.addressModeU, &info.addressModeV, &info.addressModeW};
+  for (uint32_t i = 0; i < 3; i++) {
+    VkSamplerAddressMode mode = vk_types::AddressMode(desc.address[i]);
+    if (mode == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE &&
+        !context_.sampler_mirror_clamp_to_edge) {
+      mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    }
+    *modes[i] = mode;
+  }
+  if (desc.max_anisotropy >= 1.0f && context_.sampler_anisotropy) {
+    info.anisotropyEnable = VK_TRUE;
+    info.maxAnisotropy = std::min(desc.max_anisotropy, context_.max_sampler_anisotropy);
+    info.magFilter = info.minFilter = VK_FILTER_LINEAR;
+  }
+  info.mipLodBias = desc.mip_lod_bias;
+  info.minLod = desc.min_lod;
+  info.maxLod = desc.max_lod;
+  info.borderColor = vk_types::BorderColor(desc.border);
+  VkSampler sampler;
+  if (vk::vkCreateSampler(device_, &info, nullptr, &sampler) != VK_SUCCESS) {
+    return nullptr;
+  }
+  return reinterpret_cast<Sampler*>(sampler);
+}
 
 }  // namespace gpu::vulkan

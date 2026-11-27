@@ -6,6 +6,7 @@
 #include "graphics/shader_patch.h"
 #include "render/state.h"
 #include "native/vulkan_types.h"
+#include "gpu/vulkan/backend.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -650,6 +651,7 @@ class ShaderLookupTable {
 }  // namespace
 
 struct Passes::State {
+  gpu::vulkan::Backend* backend = nullptr;
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
@@ -1405,13 +1407,11 @@ bool Passes::State::CreateDescriptors() {
     }
   }
 
-  VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  sampler_info.magFilter = VK_FILTER_LINEAR;
-  sampler_info.minFilter = VK_FILTER_LINEAR;
-  sampler_info.addressModeU = sampler_info.addressModeV = sampler_info.addressModeW =
-      VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.maxLod = VK_LOD_CLAMP_NONE;
-  return vk::vkCreateSampler(device, &sampler_info, nullptr, &sampler) == VK_SUCCESS;
+  gpu::SamplerDesc sampler_desc;
+  sampler_desc.mag_filter = sampler_desc.min_filter = gpu::Filter::kLinear;
+  sampler_desc.max_lod = VK_LOD_CLAMP_NONE;
+  sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
+  return sampler != VK_NULL_HANDLE;
 }
 
 bool Passes::State::CreateDummyTextures() {
@@ -2201,10 +2201,11 @@ bool Passes::State::CreateResolveResources() {
       !module(k_resolve_ms_frag, sizeof(k_resolve_ms_frag), resolve_pixel_ms)) {
     return false;
   }
-  VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  sampler_info.addressModeU = sampler_info.addressModeV = sampler_info.addressModeW =
-      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  if (vk::vkCreateSampler(device, &sampler_info, nullptr, &resolve_sampler) != VK_SUCCESS) {
+  gpu::SamplerDesc sampler_desc;
+  sampler_desc.address[0] = sampler_desc.address[1] = sampler_desc.address[2] =
+      gpu::AddressMode::kClampToEdge;
+  resolve_sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
+  if (!resolve_sampler) {
     return false;
   }
   resolve_pools.resize(frames_in_flight);
@@ -2662,10 +2663,11 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
     module_info.codeSize = sizeof(k_movie_frag);
     module_info.pCode = k_movie_frag;
     // Bilinear, as the movie library's sampler states.
-    VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    sampler_info.magFilter = sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.addressModeU = sampler_info.addressModeV = sampler_info.addressModeW =
-        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    gpu::SamplerDesc sampler_desc;
+    sampler_desc.mag_filter = sampler_desc.min_filter = gpu::Filter::kLinear;
+    sampler_desc.address[0] = sampler_desc.address[1] = sampler_desc.address[2] =
+        gpu::AddressMode::kClampToEdge;
+    movie_sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
     VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                               3 * frames_in_flight};
     VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
@@ -2676,7 +2678,7 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
             VK_SUCCESS ||
         vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &movie_layout) != VK_SUCCESS ||
         vk::vkCreateShaderModule(device, &module_info, nullptr, &movie_pixel) != VK_SUCCESS ||
-        vk::vkCreateSampler(device, &sampler_info, nullptr, &movie_sampler) != VK_SUCCESS ||
+        !movie_sampler ||
         vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &movie_pool) != VK_SUCCESS) {
       return false;
     }
@@ -2845,9 +2847,11 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
 Passes::Passes() : state_(std::make_unique<State>()) {}
 Passes::~Passes() = default;
 
-bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
+bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
                   float resolution_scale) {
   State& s = *state_;
+  s.backend = &backend;
+  const DeviceContext& context = backend.context();
   s.context = context;
   s.scale = resolution_scale > 0.0f ? resolution_scale : 1.0f;
   s.main_view_scale =
@@ -2879,7 +2883,7 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
                          (s.gamma_values ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
                      VK_IMAGE_ASPECT_COLOR_BIT) ||
       (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
-      !s.CreateResolveResources() || !s.textures.Init(context, frames_in_flight)) {
+      !s.CreateResolveResources() || !s.textures.Init(backend, frames_in_flight)) {
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }

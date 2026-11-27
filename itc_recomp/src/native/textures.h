@@ -15,6 +15,10 @@
 #include "render/state.h"
 #include "vulkan_functions.h"
 
+namespace gpu::vulkan {
+class Backend;
+}
+
 namespace native {
 
 class TextureCache {
@@ -22,7 +26,7 @@ class TextureCache {
   TextureCache();
   ~TextureCache();
 
-  bool Init(const DeviceContext& context, uint32_t frames_in_flight);
+  bool Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight);
 
   // Render thread. After the frame's fence has been waited on.
   void BeginFrame(uint32_t frame_index);
@@ -193,8 +197,8 @@ class TextureCache {
   // answer may be kept until the generation changes.
   VkImageView LookUpView(const uint32_t fetch[6], VkImageViewType view_type,
                          bool& cacheable);
-  // The sampler made from `info`, kept by its fields.
-  VkSampler SamplerFor(const VkSamplerCreateInfo& info);
+  // The sampler made from `desc`, kept by its fields.
+  VkSampler SamplerFor(const gpu::SamplerDesc& desc);
   std::unique_ptr<State> state_;
   bool cache_bindings_ = true;
   bool log_writes_ = false;

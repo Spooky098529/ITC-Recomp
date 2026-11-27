@@ -27,7 +27,7 @@ class Passes {
   // base: the guest memory base. resolution_scale: every target and resolve
   // destination is drawn this many times its guest size (see "Resolution"
   // in docs/native-renderer.md).
-  bool Init(const DeviceContext& context, uint32_t frames_in_flight,
+  bool Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
             float resolution_scale);
 
   // Render thread. Before a frame's first command.

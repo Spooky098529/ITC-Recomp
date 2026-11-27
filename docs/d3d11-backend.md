@@ -176,6 +176,15 @@ each backend.
   inline draws' vertex addresses, 16 MB apart: which of the game's two
   command list buffers the frame used), the tick replay (both races
   match).
+- **Samplers (2026-11-27).** `gpu::SamplerDesc` (`src/gpu/types.h`) and
+  `Backend::CreateSampler`; the Vulkan backend applies the device's limits
+  (no anisotropy where it's missing, then linear filters with it; the most
+  anisotropy; mirrored repeat for a missing mirror clamp to edge), which the
+  texture cache did. The texture cache keeps its sampler cache, keyed by the
+  description; `passes.cpp`'s three fixed samplers (the resolve's, the
+  movie's, the linear placeholder's) come from the backend too.
+  `Passes::Init` and `TextureCache::Init` take the backend. Checked as
+  before (dump 0.0000%, the tick replay matching).
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between

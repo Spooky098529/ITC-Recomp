@@ -1,6 +1,7 @@
 // The graphics API under the renderer (docs/d3d11-backend.md, "The design"):
 // what the renderer's logic asks of Vulkan or Direct3D 11. Built up in
-// pieces (step 3); so far the window's device, the swapchain and the frames.
+// pieces (step 3); so far the window's device, the swapchain, the frames and
+// samplers.
 // Render thread only, but where a call says otherwise.
 
 #pragma once
@@ -9,6 +10,8 @@
 #include <string>
 
 #include <SDL3/SDL.h>
+
+#include "gpu/types.h"
 
 namespace gpu {
 
@@ -43,6 +46,9 @@ class Backend {
   virtual bool EndFrame(Extent2D size) = 0;
   // Waits for all submitted work.
   virtual void WaitIdle() = 0;
+
+  // A sampler, kept for the backend's life (null if it can't be made).
+  virtual Sampler* CreateSampler(const SamplerDesc& desc) = 0;
 };
 
 }  // namespace gpu

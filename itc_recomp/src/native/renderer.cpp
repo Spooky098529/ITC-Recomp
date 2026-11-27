@@ -330,7 +330,7 @@ bool Renderer::Init() {
     return false;
   }
   const gpu::Extent2D output = backend_->OutputSize();
-  if (!passes_.Init(backend_->context(), kFramesInFlight,
+  if (!passes_.Init(*backend_, kFramesInFlight,
                     ResolutionScale({output.width, output.height}))) {
     return false;
   }

@@ -5,7 +5,7 @@
 #include "buffers.h"
 #include "gpu_memory.h"
 #include "state.h"
-#include "native/vulkan_types.h"
+#include "gpu/vulkan/backend.h"
 
 #include <algorithm>
 #include <array>
@@ -557,6 +557,7 @@ struct TextureCache::State {
     return it->second.dropped && start < it->first + it->second.size && end > it->first;
   }
   uint64_t mismatched_total = 0;
+  gpu::vulkan::Backend* backend = nullptr;
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
 
@@ -1012,8 +1013,10 @@ bool TextureCache::State::Upload(Texture& t) {
 TextureCache::TextureCache() : state_(std::make_unique<State>()) {}
 TextureCache::~TextureCache() = default;
 
-bool TextureCache::Init(const DeviceContext& context, uint32_t frames_in_flight) {
+bool TextureCache::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight) {
   State& s = *state_;
+  s.backend = &backend;
+  const DeviceContext& context = backend.context();
   s.context = context;
   VkDevice device = context.device;
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
@@ -1930,32 +1933,22 @@ bool TextureCache::DecodeGuest(const uint32_t fetch_words[6],
 namespace {
 
 // A sampler as the stage's state describes it, for a texture of these
-// levels (a cube map clamps to the edge), with the device's limits.
-VkSamplerCreateInfo InfoFromState(const render::SamplerState& state, bool cube,
-                                  uint32_t min_level, uint32_t max_level, bool base_level_only,
-                                  const DeviceContext& context) {
-  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  bool anisotropic = state.max_anisotropy >= 1.0f && context.sampler_anisotropy;
-  info.magFilter = anisotropic ? VK_FILTER_LINEAR : vk_types::Filter(state.mag_filter);
-  info.minFilter = anisotropic ? VK_FILTER_LINEAR : vk_types::Filter(state.min_filter);
-  info.mipmapMode = vk_types::MipMode(state.mip_mode);
+// levels (a cube map clamps to the edge).
+gpu::SamplerDesc DescFromState(const render::SamplerState& state, bool cube, uint32_t min_level,
+                               uint32_t max_level, bool base_level_only) {
+  gpu::SamplerDesc desc;
+  desc.mag_filter = state.mag_filter;
+  desc.min_filter = state.min_filter;
+  desc.mip_mode = state.mip_mode;
   for (uint32_t i = 0; i < 3; i++) {
-    VkSamplerAddressMode mode = cube ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-                                     : vk_types::AddressMode(state.address[i]);
-    if (mode == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE && !context.sampler_mirror_clamp_to_edge) {
-      mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-    }
-    (i == 0 ? info.addressModeU : i == 1 ? info.addressModeV : info.addressModeW) = mode;
+    desc.address[i] = cube ? gpu::AddressMode::kClampToEdge : state.address[i];
   }
-  if (anisotropic) {
-    info.anisotropyEnable = VK_TRUE;
-    info.maxAnisotropy = std::min(state.max_anisotropy, context.max_sampler_anisotropy);
-  }
-  info.mipLodBias = state.mip_lod_bias;
-  info.minLod = float(min_level);
-  info.maxLod = float(state.base_level_only || base_level_only ? min_level : max_level);
-  info.borderColor = vk_types::BorderColor(state.border);
-  return info;
+  desc.max_anisotropy = state.max_anisotropy;
+  desc.mip_lod_bias = state.mip_lod_bias;
+  desc.min_lod = float(min_level);
+  desc.max_lod = float(state.base_level_only || base_level_only ? min_level : max_level);
+  desc.border = state.border;
+  return desc;
 }
 
 }  // namespace
@@ -1970,28 +1963,27 @@ VkSampler TextureCache::GetSampler(const render::SamplerState& state,
     min_level = layout.min_level;
     max_level = layout.max_level;
   }
-  return SamplerFor(InfoFromState(state, fetch.dimension == xenos::DataDimension::kCube,
-                                  min_level, max_level, base_level_only_, s.context));
+  return SamplerFor(DescFromState(state, fetch.dimension == xenos::DataDimension::kCube,
+                                  min_level, max_level, base_level_only_));
 }
 
-VkSampler TextureCache::SamplerFor(const VkSamplerCreateInfo& info) {
+VkSampler TextureCache::SamplerFor(const gpu::SamplerDesc& desc) {
   State& s = *state_;
-  // Keyed by the fields made from the state.
-  uint64_t key = uint64_t(info.magFilter) | uint64_t(info.minFilter) << 1 |
-                 uint64_t(info.mipmapMode) << 2 | uint64_t(info.addressModeU) << 3 |
-                 uint64_t(info.addressModeV) << 6 | uint64_t(info.addressModeW) << 9 |
-                 uint64_t(info.borderColor) << 12 | uint64_t(info.anisotropyEnable) << 15 |
-                 uint64_t(std::bit_cast<uint32_t>(info.maxAnisotropy) >> 23 & 0xFF) << 16 |
-                 uint64_t(uint32_t(info.minLod) & 0xF) << 24 |
-                 uint64_t(uint32_t(info.maxLod) & 0xF) << 28 |
-                 uint64_t(std::bit_cast<uint32_t>(info.mipLodBias)) << 32;
+  // Keyed by the description's fields.
+  uint64_t key = uint64_t(desc.mag_filter) | uint64_t(desc.min_filter) << 1 |
+                 uint64_t(desc.mip_mode) << 2 | uint64_t(desc.address[0]) << 3 |
+                 uint64_t(desc.address[1]) << 6 | uint64_t(desc.address[2]) << 9 |
+                 uint64_t(desc.border) << 12 |
+                 uint64_t(std::bit_cast<uint32_t>(desc.max_anisotropy) >> 23 & 0xFF) << 16 |
+                 uint64_t(uint32_t(desc.min_lod) & 0xF) << 24 |
+                 uint64_t(uint32_t(desc.max_lod) & 0xF) << 28 |
+                 uint64_t(std::bit_cast<uint32_t>(desc.mip_lod_bias)) << 32;
   VkSampler& sampler = s.samplers[key];
   if (sampler) {
     return sampler;
   }
-  if (vk::vkCreateSampler(s.context.device, &info, nullptr, &sampler) != VK_SUCCESS) {
-    sampler = VK_NULL_HANDLE;
-  } else {
+  sampler = gpu::vulkan::Backend::Handle(s.backend->CreateSampler(desc));
+  if (sampler) {
     s.stats.samplers++;
     gpu_memory::Created(gpu_memory::Object::kSampler);
   }

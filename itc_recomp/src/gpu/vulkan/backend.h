@@ -36,6 +36,8 @@ class Backend final : public gpu::Backend {
   uint32_t BeginFrame() override;
   bool EndFrame(Extent2D size) override;
   void WaitIdle() override;
+  Sampler* CreateSampler(const SamplerDesc& desc) override;
+  static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
 
   // Not yet moved (the plan's "In between").
   const native::DeviceContext& context() const { return context_; }
