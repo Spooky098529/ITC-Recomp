@@ -999,9 +999,7 @@ struct Passes::State {
   // vertex shader; per frame in flight, the three planes and the buffer
   // they're uploaded through. Made at the first frame, for its size.
   struct MovieUpload {
-    Image planes[3];
-    VkImageLayout layouts[3] = {VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED,
-                                VK_IMAGE_LAYOUT_UNDEFINED};
+    gpu::Image* planes[3] = {};
     VkBuffer staging = VK_NULL_HANDLE;
     VkDeviceMemory staging_memory = VK_NULL_HANDLE;
     uint8_t* mapped = nullptr;
@@ -2654,10 +2652,13 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
   const VkDeviceSize staging_size = VkDeviceSize(extent.width) * extent.height * 3 / 2;
   for (MovieUpload& upload : movie_uploads) {
     for (uint32_t i = 0; i < 3; i++) {
-      if (!CreateImage(upload.planes[i], VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D,
-                       VK_FORMAT_R8_UNORM, {sizes[i].width, sizes[i].height, 1}, 1,
-                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                       VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_SAMPLE_COUNT_1_BIT)) {
+      gpu::ImageDesc desc;
+      desc.format = gpu::Format::kR8Unorm;
+      desc.width = sizes[i].width;
+      desc.height = sizes[i].height;
+      desc.usage = gpu::kImageSampled | gpu::kImageCopyDest;
+      upload.planes[i] = NewImage(desc);
+      if (!upload.planes[i]) {
         return false;
       }
     }
@@ -2693,7 +2694,7 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
     VkDescriptorImageInfo images[3];
     VkWriteDescriptorSet writes[3];
     for (uint32_t i = 0; i < 3; i++) {
-      images[i] = {movie_sampler, upload.planes[i].view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+      images[i] = {movie_sampler, View(upload.planes[i]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
       writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
       writes[i].dstSet = upload.set;
       writes[i].dstBinding = i;
@@ -2757,16 +2758,15 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   }
   s.EndRendering(commands);
   for (uint32_t i = 0; i < 3; i++) {
-    Transition(commands, upload.planes[i].image, VK_IMAGE_ASPECT_COLOR_BIT, upload.layouts[i],
-               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    s.backend->Use(upload.planes[i], gpu::Usage::kCopyDest);
     VkBufferImageCopy copy{};
     copy.bufferOffset = offsets[i];
     copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy.imageExtent = {sizes[i].width, sizes[i].height, 1};
-    vk::vkCmdCopyBufferToImage(commands, upload.staging, upload.planes[i].image,
+    vk::vkCmdCopyBufferToImage(commands, upload.staging,
+                               gpu::vulkan::Backend::Object(upload.planes[i]).image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-    Transition(commands, upload.planes[i].image, VK_IMAGE_ASPECT_COLOR_BIT, upload.layouts[i],
-               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    s.backend->Use(upload.planes[i], gpu::Usage::kSampled);
   }
   // The library's rectangle: the target's top-left 1280x720 guest pixels.
   int32_t width = std::min(State::ScaledBy(1280, target->scale), int32_t(target->extent.width));
