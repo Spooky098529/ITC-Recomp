@@ -332,7 +332,15 @@ bool Renderer::Init() {
   if (!OpenWindow() || !backend_->Init()) {
     return false;
   }
-  const gpu::Extent2D output = backend_->OutputSize();
+  gpu::Extent2D output = backend_->OutputSize();
+  if (!output.width || !output.height) {
+    // No swapchain yet (a window not shown yet): the window's own pixels.
+    int width = 0, height = 0;
+    SDL_GetWindowSizeInPixels(window_, &width, &height);
+    output = {uint32_t(std::max(width, 0)), uint32_t(std::max(height, 0))};
+    ITC_LOG_INFO("native renderer: sized by the window's {}x{} pixels (no swapchain yet)", width,
+                 height);
+  }
   if (!passes_.Init(*backend_, kFramesInFlight,
                     ResolutionScale({output.width, output.height}))) {
     return false;

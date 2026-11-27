@@ -6,7 +6,7 @@
 
 #include "base/log.h"
 
-#include <sys/mman.h>
+#include "base/os_memory.h"
 #include <vector>
 
 #include <algorithm>
@@ -491,7 +491,7 @@ void FreePhysical(uint32_t address) {
     const uint32_t first = (offset + 0xFFF) & ~0xFFFu;
     const uint32_t end = (offset + it->second) & ~0xFFFu;
     if (end > first) {
-      madvise(g_physical + first, end - first, MADV_DONTNEED);
+      base::DropPages(g_physical + first, end - first);
     }
     physical_sizes.erase(it);
     physical_tags.erase(address);
@@ -523,8 +523,9 @@ std::string DescribePhysical() {
     uint32_t count = 0;
   };
   std::map<std::string, Totals> by_tag;
-  std::vector<unsigned char> pages(kPhysicalBytes / 0x1000);
-  const bool have_pages = mincore(g_physical, kPhysicalBytes, pages.data()) == 0;
+  std::vector<unsigned char> pages;
+  const bool have_pages = base::PageSize() == 0x1000 &&
+                          base::ResidentPages(g_physical, kPhysicalBytes, pages);
   {
     std::lock_guard lock(mutex);
     for (const auto& [address, size] : physical_sizes) {

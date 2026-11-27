@@ -23,8 +23,7 @@
 
 #include "base/log.h"
 
-#include <sys/mman.h>
-#include <unistd.h>
+#include "base/os_memory.h"
 
 #include <cerrno>
 #include <cstring>
@@ -44,14 +43,11 @@ constexpr uint64_t kPhysicalBytes = 0x20000000ull;
 // A block of host memory, read-write; its pages are only backed once
 // touched (zeroed).
 uint8_t* MapBlock(uint64_t bytes, const char* what) {
-  void* block = mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
-  if (block == MAP_FAILED) {
-    ITC_LOG_ERROR("memory: mapping {} ({:#x} bytes) failed: {}", what, bytes,
-                  std::strerror(errno));
-    return nullptr;
+  uint8_t* block = base::ReserveZeroed(bytes);
+  if (!block) {
+    ITC_LOG_ERROR("memory: mapping {} ({:#x} bytes) failed", what, bytes);
   }
-  return static_cast<uint8_t*>(block);
+  return block;
 }
 
 bool Map() {
@@ -94,9 +90,9 @@ uint64_t ResidentBytes(const uint8_t* block, uint64_t bytes) {
   if (!block) {
     return 0;
   }
-  const uint64_t page = uint64_t(sysconf(_SC_PAGESIZE));
-  std::vector<unsigned char> pages((bytes + page - 1) / page);
-  if (mincore(const_cast<uint8_t*>(block), bytes, pages.data()) != 0) {
+  const uint64_t page = base::PageSize();
+  std::vector<unsigned char> pages;
+  if (!base::ResidentPages(block, bytes, pages)) {
     return 0;
   }
   uint64_t resident = 0;

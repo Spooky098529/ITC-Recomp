@@ -37,6 +37,7 @@ set(ITC_SOURCES
     src/app/start_up.cpp
     src/base/flags.cpp
     src/base/log.cpp
+    src/base/os_memory.cpp
     src/audio/native_audio.cpp
     src/audio/render_driver.cpp
     src/audio/output_mix.cpp

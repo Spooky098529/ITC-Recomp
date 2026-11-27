@@ -8,7 +8,7 @@
 #include <format>
 #include <map>
 #include <mutex>
-#include <sys/mman.h>
+#include "base/os_memory.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -443,7 +443,7 @@ void VertexArena::State::ProcessModels(const std::vector<ModelEvent>& events) {
     uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
     uintptr_t end = (reinterpret_cast<uintptr_t>(host) + e.data_size) & ~uintptr_t(0xFFF);
     if (end > first) {
-      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+      base::DropPages(reinterpret_cast<void*>(first), end - first);
       given_back_bytes += end - first;
     }
   }

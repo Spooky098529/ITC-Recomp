@@ -189,7 +189,22 @@ std::string Backend::AttachWindow(SDL_Window* window) {
   return {};
 }
 
-bool Backend::Init() { return CreateDevice() && CreateSwapchain() && CreatePassResources(); }
+bool Backend::Init() {
+  if (!CreateDevice()) {
+    ITC_LOG_ERROR("native renderer: the device couldn't be set up");
+    return false;
+  }
+  // Without one now (a window not yet shown has no size, as a fullscreen
+  // one under Wine at first), EndFrame makes it once it can.
+  if (!CreateSwapchain()) {
+    ITC_LOG_INFO("native renderer: no swapchain yet; made once the window can show one");
+  }
+  if (!CreatePassResources()) {
+    ITC_LOG_ERROR("native renderer: the passes' shaders and layouts couldn't be made");
+    return false;
+  }
+  return true;
+}
 
 bool Backend::CreateDevice() {
   uint32_t count = 0;
@@ -383,7 +398,7 @@ bool Backend::CreateSwapchain() {
                                    caps.maxImageExtent.height)};
   }
   if (extent.width == 0 || extent.height == 0) {
-    return false;  // minimized
+    return false;  // minimized, or not shown yet
   }
 
   uint32_t count = 0;

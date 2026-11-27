@@ -16,7 +16,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
-#include <sys/mman.h>
+#include "base/os_memory.h"
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -1078,7 +1078,7 @@ void TextureCache::ProcessXprs() {
     uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
     uintptr_t end = (reinterpret_cast<uintptr_t>(host) + x.size) & ~uintptr_t(0xFFF);
     if (end > first) {
-      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+      base::DropPages(reinterpret_cast<void*>(first), end - first);
     }
     x.dropped = true;
     s.xpr_dropped_bytes += x.size;
