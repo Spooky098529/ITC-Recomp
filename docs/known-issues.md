@@ -56,3 +56,16 @@ exits: 441 of 1,720 left. 438 are called only from `src/lifted/originals.cpp`
 `825B8778`: the C runtime's floating-point exception paths, not reached in
 play). Giving every hand port an entry (or the originals direct calls) is
 left for later.
+
+**A new career stops in the car dealer (found 2026-11-27, Linux and
+Windows alike).** With no save (`saves/` next to the executable empty), the
+career's first visit to the car dealer goes through lifted `sub_82185518`
+and OpenColors `sub_821847A0`, which call hand ports by address. Entries
+were added for `CarDealer::SetColorBar` (`82182770`), `ShowSwatches`
+(`821826C0`), `SetKindBar` (`82182158`) and `BuildScreen::ValueText`
+(`8219BCC0`, the build screen stop seen in drifted pad replays); the run then
+stops at `821824A8`, so more are missing on that path. Every new player
+would hit it: to fix by giving the hand ports on the list above their
+entries, then checking a no-save run (the tick replay's input from an empty
+folder) gets through the dealer. Left for later by the user's call
+(2026-11-27, during the D3D11 work).
