@@ -984,7 +984,15 @@ function(itc_add_executable name)
     endif()
 endfunction()
 
+if(WIN32)
+    # The Direct3D 11 backend (docs/d3d11-backend.md, step 5).
+    list(APPEND ITC_SOURCES src/gpu/d3d11/backend.cpp)
+endif()
+
 itc_add_executable(itc ${ITC_SOURCES})
+if(WIN32)
+    target_link_libraries(itc PRIVATE d3d11 dxgi)
+endif()
 
 # The coverage build (itc_coverage: which recompiled functions ran in play,
 # docs/coverage.md) instrumented the recompiled code, which isn't built since

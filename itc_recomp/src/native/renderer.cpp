@@ -12,6 +12,9 @@
 #include "passes.h"
 #include "shaders.h"
 #include "gpu/vulkan/backend.h"  // the backend made (Init)
+#if defined(_WIN32)
+#include "gpu/d3d11/backend.h"
+#endif
 
 #include "guest.h"
 
@@ -105,6 +108,8 @@ ITC_FLAG_STRING(native_renderer_dump, "", "ITC",
                 "Directory to dump frames into, as PFM files, with draws.txt describing "
                 "each draw: once 10 s into a race, and again whenever a file named 'now' "
                 "appears in it (a debugging aid; see docs/native-renderer.md)");
+ITC_FLAG_STRING(renderer, "vulkan", "ITC",
+                "The graphics API: vulkan, or d3d11 (Windows only; docs/d3d11-backend.md)");
 ITC_FLAG_INT32(width, 0, "ITC",
                "Window width in pixels (in fullscreen, the drawing width); 0: 1280, or "
                "from height at 16:9");
@@ -324,11 +329,25 @@ bool Renderer::OpenWindow() {
 }
 
 bool Renderer::Init() {
-  gpu::vulkan::Backend::Options options;
-  options.frames_in_flight = kFramesInFlight;
-  options.validation = ITC_FLAG(native_renderer_validation);
-  options.requested_size = {WindowSize().width, WindowSize().height};
-  backend_ = std::make_unique<gpu::vulkan::Backend>(options);
+  const std::string api = ITC_FLAG(renderer);
+#if defined(_WIN32)
+  if (api == "d3d11") {
+    gpu::d3d11::Backend::Options options;
+    options.frames_in_flight = kFramesInFlight;
+    options.debug = ITC_FLAG(native_renderer_validation);
+    backend_ = std::make_unique<gpu::d3d11::Backend>(options);
+  }
+#endif
+  if (!backend_) {
+    if (api != "vulkan") {
+      ITC_LOG_ERROR("native renderer: --renderer={} isn't available here; Vulkan instead", api);
+    }
+    gpu::vulkan::Backend::Options options;
+    options.frames_in_flight = kFramesInFlight;
+    options.validation = ITC_FLAG(native_renderer_validation);
+    options.requested_size = {WindowSize().width, WindowSize().height};
+    backend_ = std::make_unique<gpu::vulkan::Backend>(options);
+  }
   if (!OpenWindow() || !backend_->Init()) {
     return false;
   }
