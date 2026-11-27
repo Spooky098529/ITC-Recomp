@@ -16,6 +16,15 @@
 
 namespace gpu::vulkan {
 
+// A buffer as this backend holds it (behind gpu::Buffer).
+struct BufferObject {
+  BufferDesc desc;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDeviceSize memory_size = 0;
+  uint8_t* mapped = nullptr;
+};
+
 // An image as this backend holds it (behind gpu::Image).
 struct ImageObject {
   ImageDesc desc;
@@ -59,6 +68,14 @@ class Backend final : public gpu::Backend {
   const ImageDesc& Describe(const Image* image) const override { return Object(image).desc; }
   uint64_t MemorySize(const Image* image) const override { return Object(image).memory_size; }
   void Use(Image* image, Usage usage) override;
+  Buffer* CreateBuffer(const BufferDesc& desc) override;
+  void DestroyBuffer(Buffer* buffer) override;
+  uint8_t* Mapped(Buffer* buffer) override { return Object(buffer).mapped; }
+  uint64_t MemorySize(const Buffer* buffer) const override {
+    return reinterpret_cast<const BufferObject*>(buffer)->memory_size;
+  }
+  static BufferObject& Object(Buffer* buffer) { return *reinterpret_cast<BufferObject*>(buffer); }
+  static VkBuffer Handle(Buffer* buffer) { return buffer ? Object(buffer).buffer : VK_NULL_HANDLE; }
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }

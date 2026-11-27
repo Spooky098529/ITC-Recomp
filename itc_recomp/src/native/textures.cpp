@@ -563,8 +563,8 @@ struct TextureCache::State {
   VkPhysicalDeviceMemoryProperties memory_properties{};
 
   struct Frame {
-    VkBuffer staging = VK_NULL_HANDLE;
-    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+    gpu::Buffer* staging_object = nullptr;
+    VkBuffer staging = VK_NULL_HANDLE;  // the object's
     uint8_t* staging_mapped = nullptr;
     VkCommandPool pool = VK_NULL_HANDLE;
     VkCommandBuffer uploads = VK_NULL_HANDLE;
@@ -1009,28 +1009,13 @@ bool TextureCache::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
   s.frames.resize(frames_in_flight);
   for (State::Frame& f : s.frames) {
-    VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    info.size = kStagingSize;
-    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vk::vkCreateBuffer(device, &info, nullptr, &f.staging) != VK_SUCCESS) {
+    f.staging_object = backend.CreateBuffer({kStagingSize, gpu::kBufferCopySource, true});
+    if (!f.staging_object) {
       return false;
     }
-    VkMemoryRequirements requirements;
-    vk::vkGetBufferMemoryRequirements(device, f.staging, &requirements);
-    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    alloc.allocationSize = requirements.size;
-    alloc.memoryTypeIndex =
-        FindMemoryType(s.memory_properties, requirements.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (alloc.memoryTypeIndex == UINT32_MAX ||
-        vk::vkAllocateMemory(device, &alloc, nullptr, &f.staging_memory) != VK_SUCCESS ||
-        vk::vkBindBufferMemory(device, f.staging, f.staging_memory, 0) != VK_SUCCESS ||
-        vk::vkMapMemory(device, f.staging_memory, 0, VK_WHOLE_SIZE, 0,
-                        reinterpret_cast<void**>(&f.staging_mapped)) != VK_SUCCESS) {
-      return false;
-    }
-    gpu_memory::Allocated(gpu_memory::Kind::kStaging, alloc.allocationSize);
+    f.staging = gpu::vulkan::Backend::Handle(f.staging_object);
+    f.staging_mapped = backend.Mapped(f.staging_object);
+    gpu_memory::Allocated(gpu_memory::Kind::kStaging, backend.MemorySize(f.staging_object));
     VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     pool_info.queueFamilyIndex = context.queue_family;

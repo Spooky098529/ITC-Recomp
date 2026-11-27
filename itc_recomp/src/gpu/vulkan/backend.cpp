@@ -638,6 +638,57 @@ void Backend::DestroyImage(Image* image) {
   delete o;
 }
 
+Buffer* Backend::CreateBuffer(const BufferDesc& desc) {
+  auto object = std::make_unique<BufferObject>();
+  BufferObject& o = *object;
+  o.desc = desc;
+  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  info.size = desc.size;
+  info.usage = ((desc.usage & kBufferVertex) ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : 0) |
+               ((desc.usage & kBufferIndex) ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT : 0) |
+               ((desc.usage & kBufferUniform) ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT : 0) |
+               ((desc.usage & kBufferStorage) ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : 0) |
+               ((desc.usage & kBufferCopySource) ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 0) |
+               ((desc.usage & kBufferCopyDest) ? VK_BUFFER_USAGE_TRANSFER_DST_BIT : 0);
+  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  if (vk::vkCreateBuffer(device_, &info, nullptr, &o.buffer) != VK_SUCCESS) {
+    return nullptr;
+  }
+  VkMemoryRequirements requirements;
+  vk::vkGetBufferMemoryRequirements(device_, o.buffer, &requirements);
+  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  alloc.allocationSize = requirements.size;
+  alloc.memoryTypeIndex = FindMemoryType(
+      memory_properties_, requirements.memoryTypeBits,
+      desc.host_visible ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                        : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (alloc.memoryTypeIndex == UINT32_MAX ||
+      vk::vkAllocateMemory(device_, &alloc, nullptr, &o.memory) != VK_SUCCESS ||
+      vk::vkBindBufferMemory(device_, o.buffer, o.memory, 0) != VK_SUCCESS ||
+      (desc.host_visible &&
+       vk::vkMapMemory(device_, o.memory, 0, VK_WHOLE_SIZE, 0,
+                       reinterpret_cast<void**>(&o.mapped)) != VK_SUCCESS)) {
+    DestroyBuffer(reinterpret_cast<Buffer*>(object.release()));
+    return nullptr;
+  }
+  o.memory_size = alloc.allocationSize;
+  return reinterpret_cast<Buffer*>(object.release());
+}
+
+void Backend::DestroyBuffer(Buffer* buffer) {
+  if (!buffer) {
+    return;
+  }
+  BufferObject* o = &Object(buffer);
+  if (o->buffer) {
+    vk::vkDestroyBuffer(device_, o->buffer, nullptr);
+  }
+  if (o->memory) {
+    vk::vkFreeMemory(device_, o->memory, nullptr);  // unmapped with it
+  }
+  delete o;
+}
+
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   const ImageObject& o = Object(image);
   auto component = [](Swizzle swizzle) {

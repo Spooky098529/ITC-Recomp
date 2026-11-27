@@ -1,6 +1,7 @@
 // See vertex_arena.h.
 
 #include "vertex_arena.h"
+#include "gpu/vulkan/backend.h"
 
 #include <algorithm>
 #include <cstring>
@@ -130,20 +131,20 @@ void VertexArena_GpuOnlyModel(uint32_t model) {
 }
 
 struct VertexArena::State {
+  gpu::vulkan::Backend* backend = nullptr;
   DeviceContext context{};
-  VkPhysicalDeviceMemoryProperties memory_properties{};
   uint32_t frames_in_flight = 0;
   uint32_t frame = 0;
   uint64_t frame_number = 0;
 
-  VkBuffer buffer = VK_NULL_HANDLE;
-  VkDeviceMemory memory = VK_NULL_HANDLE;
+  gpu::Buffer* object = nullptr;
+  VkBuffer buffer = VK_NULL_HANDLE;  // the object's
   uint32_t inline_start = 0, range_start = 0, size = 0;
   uint32_t inline_used = 0;
 
   struct StagingChunk {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
+    gpu::Buffer* object = nullptr;
+    VkBuffer buffer = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
     uint32_t size = 0;
   };
@@ -230,86 +231,51 @@ VertexArena::~VertexArena() {
       vk::vkDestroyCommandPool(device, f.pool, nullptr);
     }
   }
-  if (s.buffer) {
-    vk::vkDestroyBuffer(device, s.buffer, nullptr);
-  }
-  if (s.memory) {
-    vk::vkFreeMemory(device, s.memory, nullptr);
+  if (s.object) {
+    s.backend->DestroyBuffer(s.object);
     gpu_memory::Freed(gpu_memory::Kind::kMirror, s.size);
   }
 }
 
 bool VertexArena::State::CreateStaging(StagingChunk& chunk, uint32_t bytes) {
-  VkDevice device = context.device;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = bytes;
-  info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &chunk.buffer) != VK_SUCCESS) {
+  chunk.object = backend->CreateBuffer({bytes, gpu::kBufferCopySource, true});
+  if (!chunk.object) {
     return false;
   }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, chunk.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &chunk.memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(device, chunk.buffer, chunk.memory, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, chunk.memory, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&chunk.mapped)) != VK_SUCCESS) {
-    return false;
-  }
+  chunk.buffer = gpu::vulkan::Backend::Handle(chunk.object);
+  chunk.mapped = backend->Mapped(chunk.object);
   chunk.size = bytes;
-  gpu_memory::Allocated(gpu_memory::Kind::kStaging, alloc.allocationSize);
+  gpu_memory::Allocated(gpu_memory::Kind::kStaging, backend->MemorySize(chunk.object));
   return true;
 }
 
 void VertexArena::State::DestroyStaging(StagingChunk& chunk) {
-  VkDevice device = context.device;
-  if (chunk.buffer) {
-    vk::vkDestroyBuffer(device, chunk.buffer, nullptr);
-  }
-  if (chunk.memory) {
-    vk::vkFreeMemory(device, chunk.memory, nullptr);
+  if (chunk.object) {
+    backend->DestroyBuffer(chunk.object);
     gpu_memory::Freed(gpu_memory::Kind::kStaging, chunk.size);
   }
   chunk = {};
 }
 
-bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) {
+bool VertexArena::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight) {
   State& s = *state_;
+  s.backend = &backend;
+  const DeviceContext& context = backend.context();
   s.context = context;
   s.frames_in_flight = frames_in_flight;
   VkDevice device = context.device;
-  vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
 
   s.inline_start = AlignUp(kQuadIndices + 4 * 6 * kBuiltinPrimitives);
   s.range_start = s.inline_start + frames_in_flight * kInlineSlotBytes;
   s.size = s.range_start + kRangeBytes;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = s.size;
-  info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-               VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &s.buffer) != VK_SUCCESS) {
-    return false;
-  }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, s.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex = FindMemoryType(s.memory_properties, requirements.memoryTypeBits,
-                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &s.memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(device, s.buffer, s.memory, 0) != VK_SUCCESS) {
+  s.object = backend.CreateBuffer(
+      {s.size, gpu::kBufferIndex | gpu::kBufferVertex | gpu::kBufferCopyDest, false});
+  if (!s.object) {
     ITC_LOG_ERROR("native renderer: the vertex arena ({} MB, device-local) couldn't be made",
                   s.size >> 20);
     return false;
   }
+  s.buffer = gpu::vulkan::Backend::Handle(s.object);
   gpu_memory::Allocated(gpu_memory::Kind::kMirror, s.size);
   s.free_space.emplace(s.range_start, kRangeBytes);
 

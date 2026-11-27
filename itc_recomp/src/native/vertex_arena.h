@@ -21,6 +21,10 @@
 #include "device_context.h"
 #include "vulkan_functions.h"
 
+namespace gpu::vulkan {
+class Backend;
+}
+
 namespace native {
 
 // The built-in index lists in the arena (32-bit indices): rectangle lists
@@ -40,7 +44,7 @@ class VertexArena {
   static constexpr uint32_t kRectangleIndices = 0;
   static constexpr uint32_t kQuadIndices = (4 * RectangleIndexCount(kBuiltinPrimitives) + 255) & ~255u;
 
-  bool Init(const DeviceContext& context, uint32_t frames_in_flight);
+  bool Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight);
 
   // A frame's recording starts in slot `frame` (its fence waited): its
   // staging is free again, and memcpy's writes since the last frame mark

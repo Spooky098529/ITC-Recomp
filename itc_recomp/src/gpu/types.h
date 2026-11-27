@@ -172,7 +172,26 @@ struct ViewDesc {
   bool depth_only = false;
 };
 
+// What a buffer may be used for (bits).
+enum BufferUsageBits : uint32_t {
+  kBufferVertex = 1,
+  kBufferIndex = 2,
+  kBufferUniform = 4,
+  kBufferStorage = 8,
+  kBufferCopySource = 16,
+  kBufferCopyDest = 32,
+};
+
+struct BufferDesc {
+  uint64_t size = 0;
+  uint32_t usage = 0;  // BufferUsageBits
+  // In memory the CPU writes (and reads) directly, mapped for its life;
+  // else the GPU's own.
+  bool host_visible = false;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
+struct Buffer;
 struct Sampler;
 struct Image;
 struct View;

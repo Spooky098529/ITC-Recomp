@@ -938,7 +938,7 @@ struct Passes::State {
   // place (gamma.comp).
   const uint16_t* gamma_values = nullptr;
   VkBuffer gamma_table = VK_NULL_HANDLE;
-  VkDeviceMemory gamma_table_memory = VK_NULL_HANDLE;
+  gpu::Buffer* gamma_table_object = nullptr;  // gamma_table is its
   VkDescriptorSetLayout gamma_set_layout = VK_NULL_HANDLE;
   VkPipelineLayout gamma_layout = VK_NULL_HANDLE;
   VkPipeline gamma_pipeline = VK_NULL_HANDLE;
@@ -976,8 +976,8 @@ struct Passes::State {
     std::vector<uint8_t> cpu;  // if not empty, the data (not in the buffer)
   };
   std::vector<Dumped> dumped;
-  VkBuffer dump_buffer = VK_NULL_HANDLE;
-  VkDeviceMemory dump_memory = VK_NULL_HANDLE;
+  gpu::Buffer* dump_object = nullptr;
+  VkBuffer dump_buffer = VK_NULL_HANDLE;  // the object's
   void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent, const std::string& prefix,
                   bool with_resolves);
   void DumpGuestResolves();
@@ -1000,8 +1000,8 @@ struct Passes::State {
   // they're uploaded through. Made at the first frame, for its size.
   struct MovieUpload {
     gpu::Image* planes[3] = {};
-    VkBuffer staging = VK_NULL_HANDLE;
-    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+    gpu::Buffer* staging_object = nullptr;
+    VkBuffer staging = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
     VkDescriptorSet set = VK_NULL_HANDLE;
   };
@@ -1016,8 +1016,8 @@ struct Passes::State {
   std::map<std::pair<VkFormat, VkSampleCountFlagBits>, VkPipeline> movie_pipelines;
 
   struct ConstantBlock {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
+    gpu::Buffer* object = nullptr;
+    VkBuffer buffer = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
     VkDescriptorPool pool = VK_NULL_HANDLE;
     VkDescriptorSet set = VK_NULL_HANDLE;
@@ -1267,33 +1267,13 @@ bool Passes::State::CreateTexturePool(Ring& ring) {
 bool Passes::State::CreateConstantBlock(Ring& ring) {
   VkDevice device = context.device;
   ConstantBlock block;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = kConstantBlockSize;
-  info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &block.buffer) != VK_SUCCESS) {
+  block.object = backend->CreateBuffer({kConstantBlockSize, gpu::kBufferUniform, true});
+  if (!block.object) {
     return false;
   }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, block.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &block.memory) != VK_SUCCESS) {
-    vk::vkDestroyBuffer(device, block.buffer, nullptr);
-    return false;
-  }
-  if (vk::vkBindBufferMemory(device, block.buffer, block.memory, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, block.memory, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&block.mapped)) != VK_SUCCESS) {
-    vk::vkDestroyBuffer(device, block.buffer, nullptr);
-    vk::vkFreeMemory(device, block.memory, nullptr);
-    return false;
-  }
-  gpu_memory::Allocated(gpu_memory::Kind::kConstants, alloc.allocationSize);
+  block.buffer = gpu::vulkan::Backend::Handle(block.object);
+  block.mapped = backend->Mapped(block.object);
+  gpu_memory::Allocated(gpu_memory::Kind::kConstants, backend->MemorySize(block.object));
   VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 5};
   VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
   pool_info.maxSets = 1;
@@ -2127,25 +2107,14 @@ bool Passes::State::CreateResolveResources() {
 
 bool Passes::State::CreateGammaResources() {
   VkDevice device = context.device;
-  VkBufferCreateInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  buffer_info.size = 256 * sizeof(uint32_t);
-  buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &buffer_info, nullptr, &gamma_table) != VK_SUCCESS) {
+  gamma_table_object =
+      backend->CreateBuffer({256 * sizeof(uint32_t), gpu::kBufferStorage | gpu::kBufferCopyDest,
+                             false});
+  if (!gamma_table_object) {
     return false;
   }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, gamma_table, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &gamma_table_memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(device, gamma_table, gamma_table_memory, 0) != VK_SUCCESS) {
-    return false;
-  }
-  gpu_memory::Allocated(gpu_memory::Kind::kOther, alloc.allocationSize);
+  gamma_table = gpu::vulkan::Backend::Handle(gamma_table_object);
+  gpu_memory::Allocated(gpu_memory::Kind::kOther, backend->MemorySize(gamma_table_object));
   VkDescriptorSetLayoutBinding bindings[2] = {
       {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
       {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
@@ -2599,28 +2568,13 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
         return false;
       }
     }
-    VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    info.size = staging_size;
-    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vk::vkCreateBuffer(device, &info, nullptr, &upload.staging) != VK_SUCCESS) {
+    upload.staging_object = backend->CreateBuffer({staging_size, gpu::kBufferCopySource, true});
+    if (!upload.staging_object) {
       return false;
     }
-    VkMemoryRequirements requirements;
-    vk::vkGetBufferMemoryRequirements(device, upload.staging, &requirements);
-    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    alloc.allocationSize = requirements.size;
-    alloc.memoryTypeIndex =
-        FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (alloc.memoryTypeIndex == UINT32_MAX ||
-        vk::vkAllocateMemory(device, &alloc, nullptr, &upload.staging_memory) != VK_SUCCESS ||
-        vk::vkBindBufferMemory(device, upload.staging, upload.staging_memory, 0) != VK_SUCCESS ||
-        vk::vkMapMemory(device, upload.staging_memory, 0, VK_WHOLE_SIZE, 0,
-                        reinterpret_cast<void**>(&upload.mapped)) != VK_SUCCESS) {
-      return false;
-    }
-    gpu_memory::Allocated(gpu_memory::Kind::kOther, alloc.allocationSize);
+    upload.staging = gpu::vulkan::Backend::Handle(upload.staging_object);
+    upload.mapped = backend->Mapped(upload.staging_object);
+    gpu_memory::Allocated(gpu_memory::Kind::kOther, backend->MemorySize(upload.staging_object));
     VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     set_alloc.descriptorPool = movie_pool;
     set_alloc.descriptorSetCount = 1;
@@ -2762,7 +2716,7 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
-  if (!s.arena.Init(context, frames_in_flight)) {
+  if (!s.arena.Init(backend, frames_in_flight)) {
     return false;
   }
   const std::string& gamma = ITC_FLAG(xbox_gamma);
@@ -4636,25 +4590,12 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     images.push_back(gpu::vulkan::Backend::Object(id_image).image);
     aspects.push_back(VK_IMAGE_ASPECT_COLOR_BIT);
   }
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = size;
-  info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  VkMemoryRequirements requirements;
-  if (vk::vkCreateBuffer(context.device, &info, nullptr, &dump_buffer) != VK_SUCCESS) {
+  dump_object = backend->CreateBuffer({size, gpu::kBufferCopyDest, true});
+  if (!dump_object) {
     dumped.clear();
     return;
   }
-  vk::vkGetBufferMemoryRequirements(context.device, dump_buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (vk::vkAllocateMemory(context.device, &alloc, nullptr, &dump_memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(context.device, dump_buffer, dump_memory, 0) != VK_SUCCESS) {
-    dumped.clear();
-    return;
-  }
+  dump_buffer = gpu::vulkan::Backend::Handle(dump_object);
   for (size_t i = 0; i < dumped.size(); i++) {
     VkImage image = images[i];
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -4706,9 +4647,7 @@ void Passes::WriteDump(const std::string& directory) {
   if (s.dumped.empty()) {
     return;
   }
-  uint8_t* data = nullptr;
-  vk::vkMapMemory(s.context.device, s.dump_memory, 0, VK_WHOLE_SIZE, 0,
-                  reinterpret_cast<void**>(&data));
+  uint8_t* data = s.backend->Mapped(s.dump_object);
   for (const State::Dumped& d : s.dumped) {
     std::string path = directory + "/" + d.name + ".pfm";
     FILE* file = std::fopen(path.c_str(), "wb");
@@ -4767,10 +4706,9 @@ void Passes::WriteDump(const std::string& directory) {
     }
     s.recorded_draws.clear();
   }
-  vk::vkDestroyBuffer(s.context.device, s.dump_buffer, nullptr);
-  vk::vkFreeMemory(s.context.device, s.dump_memory, nullptr);
+  s.backend->DestroyBuffer(s.dump_object);
+  s.dump_object = nullptr;
   s.dump_buffer = VK_NULL_HANDLE;
-  s.dump_memory = VK_NULL_HANDLE;
   s.dumped.clear();
 }
 

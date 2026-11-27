@@ -221,6 +221,25 @@ each backend.
   `Backend::CreateView` and `DestroyView`: the texture cache's swizzled
   views are made and destroyed through them. Checked: the dump identical,
   the pad replay without errors.
+- **Buffers (2026-11-27).** `gpu::BufferDesc` (size; vertex, index,
+  uniform, storage, copy source and destination; host-visible and mapped
+  for its life, or device-local) and `Backend::CreateBuffer`,
+  `DestroyBuffer`, `Mapped`, `MemorySize`: every buffer the renderer made
+  itself (the arena, its and the texture cache's staging, the constant
+  blocks, the movie staging, the gamma table, the dump buffer) comes from
+  them; `VertexArena::Init` takes the backend. Checked: the dump identical,
+  `--xbox_gamma=hdtv` and the boot movie without errors.
+- **Next (as planned 2026-11-27):** uploads, then the recording.
+  *Uploads:* each client keeps
+  its own staging buffers and their sizes (so "staging full: try next
+  frame" stays as it is); the backend records `UploadImage` (old layout:
+  the image's tracked one, undefined before its first upload, then ready to
+  sample, as the cache's barriers do now) and `UploadBuffer` into one upload
+  command buffer of its own submitted before the frame (today the cache's
+  and the arena's, in that order), and `CopyBufferToImage` in the frame
+  (the movie planes). D3D11: `UpdateSubresource` from the staging memory.
+  *Recording:* passes, binds and draws (step 3's next piece), then the
+  full-screen and compute passes, then the dumps.
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
