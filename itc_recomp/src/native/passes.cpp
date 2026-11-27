@@ -1313,11 +1313,10 @@ bool Passes::State::CreateDescriptors() {
   }
   constexpr VkShaderStageFlags kBoth = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-  // Set 0: guest memory.
-  VkDescriptorSetLayoutBinding shared{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, kBoth, nullptr};
+  // Set 0: empty (it held the vertex arena as a storage buffer until the
+  // vertex shaders took vertex attributes; kept so the other sets keep
+  // their numbers).
   VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  layout_info.bindingCount = 1;
-  layout_info.pBindings = &shared;
   if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &shared_memory_layout) !=
       VK_SUCCESS) {
     return false;
@@ -1340,16 +1339,6 @@ bool Passes::State::CreateDescriptors() {
   alloc.pSetLayouts = &shared_memory_layout;
   if (vk::vkAllocateDescriptorSets(device, &alloc, &arena_set) != VK_SUCCESS) {
     return false;
-  }
-  {
-    VkDescriptorBufferInfo shared_buffer{arena.buffer(), 0, VK_WHOLE_SIZE};
-    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write.dstSet = arena_set;
-    write.dstBinding = 0;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write.pBufferInfo = &shared_buffer;
-    vk::vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
   }
 
   for (Ring& ring : rings) {

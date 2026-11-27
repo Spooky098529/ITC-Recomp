@@ -493,7 +493,6 @@ bool Renderer::CreateDevice() {
   context_.device = device_;
   context_.queue_family = queue_family_;
   context_.queue = queue_;
-  context_.max_storage_buffer_range = properties.limits.maxStorageBufferRange;
   // The vertex shaders take up to 24 attributes and bindings (a fetch's
   // three, passes.cpp's kMaxVertexBindings; Vulkan promises 16).
   if (properties.limits.maxVertexInputAttributes < 24 ||

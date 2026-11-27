@@ -72,8 +72,6 @@ layout(set = 1, binding = 3, std140) uniform XeBoolLoopConstants {
 };
 // The fetch constants: a texture is 6 words, a vertex buffer 2.
 layout(set = 1, binding = 4, std140) uniform XeFetchConstants { uvec4 xe_fetch[48]; };
-// Guest memory, in words (in the guest's byte order).
-layout(set = 0, binding = 0, std430) readonly buffer XeSharedMemory { uint xe_memory[]; };
 
 bool xe_bool(uint n) { return (xe_bools[n >> 7u][(n >> 5u) & 3u] & (1u << (n & 31u))) != 0u; }
 uint xe_loop_constant(uint n) { return xe_loops[n >> 2u][n & 3u]; }

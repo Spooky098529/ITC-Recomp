@@ -189,18 +189,9 @@ bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) 
   s.inline_start = AlignUp(kQuadIndices + 4 * 6 * kBuiltinPrimitives);
   s.range_start = s.inline_start + frames_in_flight * kInlineSlotBytes;
   s.size = s.range_start + kRangeBytes;
-  // The shaders read it as one storage buffer (xe_interface.glsl's
-  // xe_memory).
-  if (s.size > context.max_storage_buffer_range) {
-    ITC_LOG_ERROR("native renderer: the vertex arena ({} MB) is larger than a storage buffer "
-                  "can be on this GPU ({} MB)",
-                  s.size >> 20, context.max_storage_buffer_range >> 20);
-    return false;
-  }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = s.size;
-  info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+  info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vk::vkCreateBuffer(device, &info, nullptr, &s.buffer) != VK_SUCCESS) {
@@ -526,8 +517,7 @@ VkCommandBuffer VertexArena::EndUploads() {
   VkCommandBuffer commands = s.frames[s.recording_slot].uploads;
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
   barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
-                          VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+  barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
   vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
                                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
