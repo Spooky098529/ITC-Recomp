@@ -77,7 +77,6 @@ layout(location = SHADOW_REG) in vec4 v_shadow;
 #endif
 
 layout(location = 0) out vec4 out_color;
-#include "normals_out.glsl"
 
 // The surface at this pixel.
 vec3 surface_normal() {
@@ -343,5 +342,4 @@ void main() {
 
   if (!xe_alpha_test_passes(color.a)) discard;
   out_color = xe_color_output(color, 0);
-  write_normal(v_normal.xyz);  // the geometry's, without the normal map
 }

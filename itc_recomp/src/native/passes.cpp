@@ -24,7 +24,7 @@
 #include "shaders.h"
 #include "state.h"
 #include "draw_registers.h"
-#include "system_constants.h"
+#include "draw_constants.h"
 
 #include <algorithm>
 #include <array>
@@ -1366,7 +1366,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
     return false;
   }
-  const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(SystemConstants)),
+  const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(DrawConstants)),
                                             kFloatConstantsRange, kFloatConstantsRange,
                                             kBoolLoopConstantsRange};
   VkDescriptorBufferInfo buffers[kConstantBlocks];
@@ -1975,7 +1975,7 @@ bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data)
 bool Passes::State::ReserveDrawConstants() {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
   constexpr VkDeviceSize kDrawConstants =
-      sizeof(SystemConstants) + 2 * kFloatConstantsRange + kBoolLoopConstantsRange;
+      sizeof(DrawConstants) + 2 * kFloatConstantsRange + kBoolLoopConstantsRange;
   if (ring_offset + kDrawConstants + kConstantBlocks * alignment <= kConstantBlockSize) {
     return true;
   }
@@ -3424,14 +3424,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     return;  // nothing visible
   }
 
-  // System constants (as the plugin's UpdateSystemConstantValues, for what
-  // these draws use).
-  SystemConstants system{};
+  // The draw's own constants (draw_constants.h).
+  DrawConstants system{};
   uint32_t flags = 0;
-  // The game's shaders write W as it is, with the viewport transform on or
-  // off (D3D's ViewportEnable sets PA_CL_VTE_CNTL to 0x43F or 0x400: bit 10
-  // either way), and never X, Y or Z already divided by it.
-  flags |= kFlagWNotReciprocal;
   if (primitive.polygonal) {
     flags |= kFlagPrimitivePolygonal;
   } else if (type == 2 || type == 3) {
@@ -4420,7 +4415,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
       watched_this_frame[{vertex->hash, ps, index_address, primitive_count}]++;
   WatchedDraw now;
   now.frame = frames;
-  now.system.assign(system, system + sizeof(SystemConstants) / 4);
+  now.system.assign(system, system + sizeof(DrawConstants) / 4);
   std::vector<uint32_t> vertex_registers = FloatRegisters(vertex);
   std::vector<uint32_t> pixel_registers = FloatRegisters(pixel);
   now.vertex_floats.assign(vertex_floats, vertex_floats + 4 * vertex_registers.size());

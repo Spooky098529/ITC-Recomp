@@ -16,45 +16,27 @@
 #extension GL_EXT_scalar_block_layout : require
 
 // --- buffers -------------------------------------------------------------------
-// The system constants: the renderer's SystemConstants struct (the SDK's
-// SpirvShaderTranslator::SystemConstants). Only the fields ports read, at
-// their offsets; shaders.cpp static_asserts the offsets.
-layout(set = 1, binding = 0, scalar) uniform XeSystemConstants {
+// What the draw gives its shaders besides the game's constants (the
+// renderer's DrawConstants, draw_constants.h, at these offsets).
+layout(set = 1, binding = 0, scalar) uniform XeDrawConstants {
   layout(offset = 0) uint flags;
-  layout(offset = 4) uint vertex_index_load_address;
-  layout(offset = 8) uint vertex_index_endian;
-  layout(offset = 12) uint line_loop_closing_index;
-  layout(offset = 16) int vertex_base_index;
-  layout(offset = 124) vec3 ndc_scale;
-  layout(offset = 140) vec3 ndc_offset;
-  layout(offset = 272) float alpha_test_reference;
-  layout(offset = 288) vec4 color_exp_bias;
+  layout(offset = 4) float alpha_test_reference;
+  // The position to Vulkan's clip space: xyz * scale + offset * w.
+  layout(offset = 8) vec3 ndc_scale;
+  layout(offset = 20) vec3 ndc_offset;
+  // Each color target's exponent bias, as a factor.
+  layout(offset = 32) vec4 color_exp_bias;
   // Each texture stage's reader scale: 0 nothing; above 0 times it and
   // clamped to 0-1; below 0 times its negation (a pass's image handed to
   // its texture: what the resolve's exponent bias and a normalized format
   // did, docs/pc-renderer.md, step 4).
-  layout(offset = 304) float texture_scale[32];
-  layout(offset = 496) uint vertex_index_min;
-  layout(offset = 500) uint vertex_index_max;
+  layout(offset = 48) float texture_scale[32];
 } xe_sys;
 
-// The flags' bits (SpirvShaderTranslator::kSysFlag_*).
-const uint kXeFlagPrimitiveVertexIndexLoad = 1u << 1;
-const uint kXeFlagPrimitiveVertexIndexLoad32Bit = 1u << 2;
-const uint kXeFlagXYDividedByW = 1u << 8;
-const uint kXeFlagZDividedByW = 1u << 9;
-const uint kXeFlagWNotReciprocal = 1u << 10;
-const uint kXeFlagPrimitivePolygonal = 1u << 11;
-const uint kXeFlagPrimitiveLine = 1u << 12;
-const uint kXeFlagAlphaTestShift = 16u;  // 3 bits: the compare function
-const uint kXeFlagConvertColor0ToGamma = 1u << 19;
-// SBX's own (bit 31, past the translator's): the alpha test is a dither
-// instead, passing where the alpha is over a per-pixel threshold that the
-// reference moves each frame (passes.cpp, the smooth-alpha solids' copies).
-const uint kXeFlagSbxDitheredAlpha = 1u << 31;
-// SBX's own (bit 30): the draw takes no AO (passes.cpp: the mirrors, the
-// sky); in the normals target its view distance is the sign bit alone.
-const uint kXeFlagSbxNoAo = 1u << 30;
+// The flags' bits.
+const uint kXeFlagPrimitivePolygonal = 1u << 0;
+const uint kXeFlagPrimitiveLine = 1u << 1;
+const uint kXeFlagAlphaTestShift = 2u;  // 3 bits: the compare function (7 always)
 
 // The float constant registers the shader reads, from its lowest to its
 // highest (all 256 when it addresses them relative to the loop index): a
@@ -151,21 +133,6 @@ float xe_muls_prev2(float a, float b, float ps) {
 }
 
 // --- textures ------------------------------------------------------------------
-// The Xbox's piecewise linear gamma curve, as the translator computes it (a
-// gamma render target's color, xe_color_output).
-vec3 xe_linear_to_gamma(vec3 linear) {
-  linear = clamp(linear, 0.0, 1.0);
-  bvec3 at_least_2 = greaterThanEqual(linear, vec3(128.0 / 1023.0));
-  bvec3 at_least_3 = greaterThanEqual(linear, vec3(512.0 / 1023.0));
-  bvec3 at_least_1 = greaterThanEqual(linear, vec3(64.0 / 1023.0));
-  vec3 scale = mix(mix(vec3(1023.0), vec3(1023.0 / 2.0), at_least_1),
-                   mix(vec3(1023.0 / 4.0), vec3(1023.0 / 8.0), at_least_3), at_least_2);
-  vec3 offset = mix(mix(vec3(0.0), vec3(32.0 / 255.0), at_least_1),
-                    mix(vec3(64.0 / 255.0), vec3(128.0 / 255.0), at_least_3), at_least_2);
-  precise vec3 gamma = trunc(linear * scale) * (1.0 / 255.0) + offset;
-  return gamma;
-}
-
 // A texture is one view (1D and 2D textures a 2D array's first layer, cube
 // maps a cube) and a sampler, bound by the shader's sampler stage (its
 // fetch constant): already in RGBA order and its format's own values (the
@@ -409,13 +376,11 @@ vec4 xe_vfetch_words(uvec4 words, uint fetch_constant, uint format, uint flags, 
 }
 
 // --- the position -------------------------------------------------------------
-// The position as the shader wrote it, to Vulkan's clip space.
+// The position as the shader wrote it (the game's shaders write W as it is,
+// X, Y and Z not divided by it), to Vulkan's clip space.
 vec4 xe_host_position(vec4 guest) {
-  precise float w = (xe_sys.flags & kXeFlagWNotReciprocal) != 0u ? guest.w : 1.0 / guest.w;
-  precise vec2 xy = (xe_sys.flags & kXeFlagXYDividedByW) != 0u ? guest.xy * w : guest.xy;
-  precise float z = (xe_sys.flags & kXeFlagZDividedByW) != 0u ? guest.z * w : guest.z;
-  precise vec3 xyz = vec3(xy, z) * xe_sys.ndc_scale + xe_sys.ndc_offset * w;
-  return vec4(xyz, w);
+  precise vec3 xyz = guest.xyz * xe_sys.ndc_scale + xe_sys.ndc_offset * guest.w;
+  return vec4(xyz, guest.w);
 }
 #endif
 
@@ -434,12 +399,6 @@ vec4 xe_param_gen() {
 
 // The alpha test, on the first color target's alpha.
 bool xe_alpha_test_passes(float alpha) {
-  if ((xe_sys.flags & kXeFlagSbxDitheredAlpha) != 0u) {
-    // Interleaved gradient noise (Jimenez), shifted each frame.
-    vec2 p = floor(gl_FragCoord.xy) + 5.588238 * xe_sys.alpha_test_reference;
-    float threshold = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-    return alpha > threshold;
-  }
   uint function = (xe_sys.flags >> kXeFlagAlphaTestShift) & 7u;
   float reference = xe_sys.alpha_test_reference;
   if (function == 7u) return true;
@@ -449,54 +408,9 @@ bool xe_alpha_test_passes(float alpha) {
          (alpha > reference && (function & 4u) != 0u);
 }
 // A color as the shader wrote it, to what the render target takes: the
-// target's exponent bias, and gamma if the target is gamma but its format
-// isn't.
-//
-// SBX's light target (--xegtao; passes.cpp, "View targets"): render target
-// 0's color goes to location 2 as well, blended the same way, when the
-// renderer says the draw only adds light (XE_LIGHT: the models' unlit
-// material, additive blends); otherwise the part of the color a shader put
-// in xe_light_extra (light it added, such as course_projected's projector,
-// the neon underglow and headlights), with the same alpha, so the blend
-// fades what's under it as it fades the color. The AO then darkens the
-// color but not that light. Dropped where the pipeline has no light target.
-layout(constant_id = 900) const bool XE_LIGHT = false;
-layout(location = 2) out vec4 xe_out_light;
-// SBX's normals target (location 1; glsl/materials/normals_out.glsl): no
-// normal, and the fragment's view distance, unless the material writes its
-// normal after this (write_normal). Dropped where the pipeline has no
-// normals target or doesn't write it.
-layout(location = 1) out uvec2 xe_out_normal;
-// The view distance as the normals target holds it: its float bits, or,
-// for a draw that takes no AO (kXeFlagSbxNoAo), the sign bit alone (no
-// distance: the AO's depth there is the game's; xegtao_depth.comp).
-uint xe_normal_distance() {
-  return (xe_sys.flags & kXeFlagSbxNoAo) != 0u ? 0x80000000u
-                                               : floatBitsToUint(1.0 / gl_FragCoord.w);
-}
-vec3 xe_light_extra = vec3(0.0);
-vec3 xe_color_output_rgb(vec3 rgb, int target) {
-  rgb *= xe_sys.color_exp_bias[target];
-  if ((xe_sys.flags & (kXeFlagConvertColor0ToGamma << uint(target))) != 0u) {
-    rgb = xe_linear_to_gamma(rgb);
-  }
-  return rgb;
-}
+// target's exponent bias.
 vec4 xe_color_output(vec4 color, int target) {
   precise vec4 c = color * xe_sys.color_exp_bias[target];
-  if ((xe_sys.flags & (kXeFlagConvertColor0ToGamma << uint(target))) != 0u) {
-    c.rgb = xe_linear_to_gamma(c.rgb);
-  }
-  if (target == 0) {
-    xe_out_normal = uvec2(0u, xe_normal_distance());
-    if (XE_LIGHT) {
-      xe_out_light = c;
-    } else {
-      // The light's share of the output, so gamma stays exact.
-      vec3 rest = xe_color_output_rgb(max(color.rgb - xe_light_extra, 0.0), target);
-      xe_out_light = vec4(max(c.rgb - rest, 0.0), c.a);
-    }
-  }
   return c;
 }
 #endif

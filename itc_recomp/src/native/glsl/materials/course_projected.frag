@@ -44,7 +44,6 @@ layout(location = COLOR_REG) in vec4 v_color;
 #endif
 
 layout(location = 0) out vec4 out_color;
-#include "normals_out.glsl"
 
 #include "course_surface.glsl"
 #include "course_lights.glsl"
@@ -142,10 +141,8 @@ void main() {
     if (shade != 0.0) color.rgb -= dot(shade_texel, vec4(1.0)) * shade;
     vec3 added = lit != 0.0 ? light_texel.rgb * lit * 3.0 : vec3(0.0);
     color.rgb = max(color.rgb + added, 0.0);
-    xe_light_extra = min(added, color.rgb);  // light, for the AO (xe_interface.glsl)
   }
 
   if (!xe_alpha_test_passes(color.a)) discard;
   out_color = xe_color_output(color, 0);
-  write_normal(v_normal.xyz);  // the geometry's, without the normal map
 }

@@ -43,7 +43,6 @@ layout(location = 0) out vec4 out_color;
 layout(location = STREAM_NORMAL_REG) in vec4 v_stream_normal;
 #endif
 #if defined(NORMAL_REG) || defined(STREAM_NORMAL_REG)
-#include "normals_out.glsl"
 #endif
 
 #include "course_surface.glsl"
@@ -90,9 +89,4 @@ void main() {
 
   if (!xe_alpha_test_passes(color.a)) discard;
   out_color = xe_color_output(color, 0);
-#ifdef NORMAL_REG
-  write_normal(v_normal.xyz);
-#elif defined(STREAM_NORMAL_REG)
-  write_normal(v_stream_normal.xyz);
-#endif
 }
