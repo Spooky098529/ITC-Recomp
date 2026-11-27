@@ -53,8 +53,8 @@ void xe_shader() {
     case 0:
       r5.xyz = vec3(greaterThan(-abs(r3.xxx), lit255.yyy));
       // loop 31
-      loop_count = uvec4(xe_loop_constant(31u) & 0xFFu, loop_count.xyz);
-      loop_aL = ivec4(int((xe_loop_constant(31u) >> 8u) & 0xFFu), loop_aL.xyz);
+      loop_count = uvec4(xe_loop_count(31u), loop_count.xyz);
+      loop_aL = ivec4(xe_loop_start(31u), loop_aL.xyz);
       if (loop_count.x == 0u) { pc = 4; continue; }
     case 2:
       r4.xyz = xe_mul(xe_fc[loop_aL.x + 41].xyz, MatAmbientDiffuse.www);
@@ -65,15 +65,15 @@ void xe_shader() {
       { uint count = loop_count.x - 1u;
         if (count != 0u) {
           loop_count.x = count;
-          loop_aL.x += bitfieldExtract(int(xe_loop_constant(31u)), 16, 8);
+          loop_aL.x += xe_loop_step(31u);
           pc = 2; continue;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 4:
       r2.zw = lit255.xy;
       // loop 30
-      loop_count = uvec4(xe_loop_constant(30u) & 0xFFu, loop_count.xyz);
-      loop_aL = ivec4(int((xe_loop_constant(30u) >> 8u) & 0xFFu), loop_aL.xyz);
+      loop_count = uvec4(xe_loop_count(30u), loop_count.xyz);
+      loop_aL = ivec4(xe_loop_start(30u), loop_aL.xyz);
       if (loop_count.x == 0u) { pc = 11; continue; }
     case 6:
       r6.xyz = xe_fc[loop_aL.x + 8].xyz + -r0.xyz;
@@ -97,7 +97,7 @@ void xe_shader() {
       { uint count = loop_count.x - 1u;
         if (count != 0u) {
           loop_count.x = count;
-          loop_aL.x += bitfieldExtract(int(xe_loop_constant(30u)), 16, 8);
+          loop_aL.x += xe_loop_step(30u);
           pc = 6; continue;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }

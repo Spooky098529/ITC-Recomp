@@ -166,6 +166,14 @@ TranslatedShader* ShaderCache::Get(ShaderStage stage, const uint8_t* ucode, uint
   // What the microcode reads, from the table; the vertex fetch constants as
   // the game patched them.
   shader->float_constants = port->float_constants;
+  for (uint32_t r = 0; r < 256; r++) {
+    if (port->float_constants[r >> 6] >> (r & 63) & 1) {
+      if (!shader->float_count) {
+        shader->float_first = r;
+      }
+      shader->float_count = r - shader->float_first + 1;
+    }
+  }
   shader->writes_color_targets = port->color_targets;
   shader->vertex_fetch_constants = PortVertexFetchConstants(*port, port_ucode);
   ported_++;

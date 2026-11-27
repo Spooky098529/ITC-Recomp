@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 22
+#define XE_FLOAT_CONSTANTS 67
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1
@@ -21,23 +21,23 @@ layout(set = 3, binding = 5) uniform sampler xe_sampler2;  // fetch constant 6
 #define matView_0 xe_fc[0]  // c0
 #define matView_1 xe_fc[1]  // c1
 #define matView_2 xe_fc[2]  // c2
-#define EyePos xe_fc[3]  // c4
-#define PntLightPos_0 xe_fc[4]  // c8
-#define PntLightPos_1 xe_fc[5]  // c9
-#define PntLightAtten_0 xe_fc[6]  // c16
-#define PntLightAtten_1 xe_fc[7]  // c17
-#define SpotLightDir_0 xe_fc[8]  // c24
-#define SpotLightDir_1 xe_fc[9]  // c25
-#define SpotLightCone_0 xe_fc[10]  // c32
-#define SpotLightCone_1 xe_fc[11]  // c33
-#define AmbientColor xe_fc[12]  // c40
-#define PntLightColor_0 xe_fc[13]  // c47
-#define PntLightColor_1 xe_fc[14]  // c48
-#define PntLightSpecularColor_0 xe_fc[15]  // c55
-#define PntLightSpecularColor_1 xe_fc[16]  // c56
-#define MatParam xe_fc[17]  // c64
-#define MatAmbientDiffuse xe_fc[18]  // c65
-#define MatSpecularColor xe_fc[19]  // c66
+#define EyePos xe_fc[4]  // c4
+#define PntLightPos_0 xe_fc[8]  // c8
+#define PntLightPos_1 xe_fc[9]  // c9
+#define PntLightAtten_0 xe_fc[16]  // c16
+#define PntLightAtten_1 xe_fc[17]  // c17
+#define SpotLightDir_0 xe_fc[24]  // c24
+#define SpotLightDir_1 xe_fc[25]  // c25
+#define SpotLightCone_0 xe_fc[32]  // c32
+#define SpotLightCone_1 xe_fc[33]  // c33
+#define AmbientColor xe_fc[40]  // c40
+#define PntLightColor_0 xe_fc[47]  // c47
+#define PntLightColor_1 xe_fc[48]  // c48
+#define PntLightSpecularColor_0 xe_fc[55]  // c55
+#define PntLightSpecularColor_1 xe_fc[56]  // c56
+#define MatParam xe_fc[64]  // c64
+#define MatAmbientDiffuse xe_fc[65]  // c65
+#define MatSpecularColor xe_fc[66]  // c66
 const vec4 lit254 = vec4(0.1, 0.8, 0.2, 0.7);
 const vec4 lit255 = vec4(0.0, 1.0, 0.001, 0.5);
 

@@ -305,11 +305,12 @@ const uint32_t* TextureDescriptor(uint32_t stage) {
 
 void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, uint32_t data) {
   switch (type) {
-    case 0:  // loops: an int4 each, its low bytes (count, start, step)
+    case 0:  // loops: an int4 each (count, start, step)
       for (uint32_t i = 0; i < count && first + i < 16; i++, data += 16) {
-        g_constants.bool_loop[8 + (vertex ? 0 : 16) + first + i] =
-            guest::LoadU8(data + 3) | guest::LoadU8(data + 7) << 8 |
-            guest::LoadU8(data + 11) << 16;
+        int32_t* loop = g_constants.bool_loop.loops[vertex ? 0 : 1][first + i];
+        for (uint32_t c = 0; c < 3; c++) {
+          loop[c] = int32_t(guest::LoadU32(data + 4 * c));
+        }
       }
       break;
     case 1:  // floats: a vec4 a register
@@ -322,7 +323,7 @@ void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, ui
     case 2:  // bools: a word each, its low bit
       for (uint32_t i = 0; i < count && first + i < 128; i++, data += 4) {
         uint32_t n = first + i;
-        uint32_t& word = g_constants.bool_loop[(vertex ? 0 : 4) + (n >> 5)];
+        uint32_t& word = g_constants.bool_loop.bools[vertex ? 0 : 1][n >> 5];
         word = (word & ~(1u << (n & 31))) | (guest::LoadU32(data) & 1) << (n & 31);
       }
       break;
@@ -330,6 +331,32 @@ void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, ui
       break;
   }
 }
+
+// The device's bool and loop block, a word at a time (what a shader's
+// literal records write): words 0-3 the vertex shader's 128 bools, 4-7 the
+// pixel shader's, then 32 loop constants (0-15 the vertex shader's, 16-31
+// the pixel shader's), each count | start << 8 | step << 16 (step signed).
+namespace {
+
+void SetBoolLoopWord(uint32_t word, uint32_t value) {
+  if (word < 8) {
+    g_constants.bool_loop.bools[word >> 2][word & 3] = value;
+    return;
+  }
+  int32_t* loop = g_constants.bool_loop.loops[(word - 8) >> 4][(word - 8) & 15];
+  loop[0] = int32_t(value & 0xFF);
+  loop[1] = int32_t(value >> 8 & 0xFF);
+  loop[2] = int32_t(int8_t(value >> 16));
+}
+uint32_t BoolLoopWord(uint32_t word) {
+  if (word < 8) {
+    return g_constants.bool_loop.bools[word >> 2][word & 3];
+  }
+  const int32_t* loop = g_constants.bool_loop.loops[(word - 8) >> 4][(word - 8) & 15];
+  return uint32_t(loop[0] & 0xFF) | uint32_t(loop[1] & 0xFF) << 8 | uint32_t(loop[2] & 0xFF) << 16;
+}
+
+}  // namespace
 
 // A shader's literal constants (its file's def and defi: the float, bool
 // and loop constants it sets for itself), from the records its object
@@ -351,12 +378,12 @@ void ApplyLiterals(uint32_t header) {
       uint32_t i = (offset - 4864) >> 2;
       g_constants.floats[1][i >> 2][i & 3] = std::bit_cast<float>(value);
     } else if (offset >= 8960 && offset < 8960 + 160) {  // bools and loops (+9984)
-      g_constants.bool_loop[(offset - 8960) >> 2] = value;
+      SetBoolLoopWord((offset - 8960) >> 2, value);
     }
   };
   auto get = [](uint32_t offset) -> uint32_t {
     if (offset >= 8960 && offset < 8960 + 160) {
-      return g_constants.bool_loop[(offset - 8960) >> 2];
+      return BoolLoopWord((offset - 8960) >> 2);
     }
     return 0;
   };

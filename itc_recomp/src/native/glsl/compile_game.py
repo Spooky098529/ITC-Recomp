@@ -63,9 +63,12 @@ def header(info, source, defines):
              "// Shader %s (%s), made from %s by compile_game.py." % (
                  info["hash"], info["part_id"] or "game", source),
              "#define XE_PIXEL" if pixel else "#define XE_VERTEX"]
-    # Float constants: in register order, all 256 when the shader indexes
-    # them by the loop counter (as the translator packs them).
-    packed = list(range(256)) if info["relative_constants"] else info["float_constants"]
+    # Float constants: the registers from the lowest the shader reads to the
+    # highest (all 256 when it indexes them by the loop counter), as the
+    # renderer gives them; a constant's place is its register less the lowest.
+    used = info["float_constants"]
+    packed = list(range(256)) if info["relative_constants"] else \
+        (list(range(used[0], used[-1] + 1)) if used else [])
     lines.append("#define XE_FLOAT_CONSTANTS %d" % max(len(packed), 1))
     lines.append('#include "xe_interface.glsl"')
     textures = {}  # fetch constant -> sampler name

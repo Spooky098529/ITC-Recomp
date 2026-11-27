@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 53
+#define XE_FLOAT_CONSTANTS 78
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
@@ -21,46 +21,46 @@ layout(set = 3, binding = 5) uniform sampler xe_sampler2;  // fetch constant 6
 #define matView_0 xe_fc[0]  // c0
 #define matView_1 xe_fc[1]  // c1
 #define matView_2 xe_fc[2]  // c2
-#define EyePos xe_fc[3]  // c4
-#define DLightDir_0 xe_fc[4]  // c5
-#define DLightDir_1 xe_fc[5]  // c6
-#define DLightDir_2 xe_fc[6]  // c7
-#define PntLightPos_0 xe_fc[7]  // c8
-#define PntLightPos_1 xe_fc[8]  // c9
-#define PntLightPos_2 xe_fc[9]  // c10
-#define PntLightPos_3 xe_fc[10]  // c11
-#define PntLightAtten_0 xe_fc[11]  // c16
-#define PntLightAtten_1 xe_fc[12]  // c17
-#define PntLightAtten_2 xe_fc[13]  // c18
-#define PntLightAtten_3 xe_fc[14]  // c19
-#define SpotLightDir_0 xe_fc[15]  // c24
-#define SpotLightDir_1 xe_fc[16]  // c25
-#define SpotLightDir_2 xe_fc[17]  // c26
-#define SpotLightDir_3 xe_fc[18]  // c27
-#define SpotLightCone_0 xe_fc[19]  // c32
-#define SpotLightCone_1 xe_fc[20]  // c33
-#define SpotLightCone_2 xe_fc[21]  // c34
-#define SpotLightCone_3 xe_fc[22]  // c35
-#define AmbientColor xe_fc[23]  // c40
-#define DLightColor_0 xe_fc[24]  // c41
-#define DLightColor_1 xe_fc[25]  // c42
-#define DLightColor_2 xe_fc[26]  // c43
-#define DLightSpecularColor_0 xe_fc[27]  // c44
-#define DLightSpecularColor_1 xe_fc[28]  // c45
-#define DLightSpecularColor_2 xe_fc[29]  // c46
-#define PntLightColor_0 xe_fc[30]  // c47
-#define PntLightColor_1 xe_fc[31]  // c48
-#define PntLightColor_2 xe_fc[32]  // c49
-#define PntLightColor_3 xe_fc[33]  // c50
-#define PntLightSpecularColor_0 xe_fc[34]  // c55
-#define PntLightSpecularColor_1 xe_fc[35]  // c56
-#define PntLightSpecularColor_2 xe_fc[36]  // c57
-#define PntLightSpecularColor_3 xe_fc[37]  // c58
-#define BaseColor xe_fc[38]  // c63
-#define MatParam xe_fc[39]  // c64
-#define MatAmbientDiffuse xe_fc[40]  // c65
-#define MatSpecularColor xe_fc[41]  // c66
-#define shadowMapSize xe_fc[42]  // c77
+#define EyePos xe_fc[4]  // c4
+#define DLightDir_0 xe_fc[5]  // c5
+#define DLightDir_1 xe_fc[6]  // c6
+#define DLightDir_2 xe_fc[7]  // c7
+#define PntLightPos_0 xe_fc[8]  // c8
+#define PntLightPos_1 xe_fc[9]  // c9
+#define PntLightPos_2 xe_fc[10]  // c10
+#define PntLightPos_3 xe_fc[11]  // c11
+#define PntLightAtten_0 xe_fc[16]  // c16
+#define PntLightAtten_1 xe_fc[17]  // c17
+#define PntLightAtten_2 xe_fc[18]  // c18
+#define PntLightAtten_3 xe_fc[19]  // c19
+#define SpotLightDir_0 xe_fc[24]  // c24
+#define SpotLightDir_1 xe_fc[25]  // c25
+#define SpotLightDir_2 xe_fc[26]  // c26
+#define SpotLightDir_3 xe_fc[27]  // c27
+#define SpotLightCone_0 xe_fc[32]  // c32
+#define SpotLightCone_1 xe_fc[33]  // c33
+#define SpotLightCone_2 xe_fc[34]  // c34
+#define SpotLightCone_3 xe_fc[35]  // c35
+#define AmbientColor xe_fc[40]  // c40
+#define DLightColor_0 xe_fc[41]  // c41
+#define DLightColor_1 xe_fc[42]  // c42
+#define DLightColor_2 xe_fc[43]  // c43
+#define DLightSpecularColor_0 xe_fc[44]  // c44
+#define DLightSpecularColor_1 xe_fc[45]  // c45
+#define DLightSpecularColor_2 xe_fc[46]  // c46
+#define PntLightColor_0 xe_fc[47]  // c47
+#define PntLightColor_1 xe_fc[48]  // c48
+#define PntLightColor_2 xe_fc[49]  // c49
+#define PntLightColor_3 xe_fc[50]  // c50
+#define PntLightSpecularColor_0 xe_fc[55]  // c55
+#define PntLightSpecularColor_1 xe_fc[56]  // c56
+#define PntLightSpecularColor_2 xe_fc[57]  // c57
+#define PntLightSpecularColor_3 xe_fc[58]  // c58
+#define BaseColor xe_fc[63]  // c63
+#define MatParam xe_fc[64]  // c64
+#define MatAmbientDiffuse xe_fc[65]  // c65
+#define MatSpecularColor xe_fc[66]  // c66
+#define shadowMapSize xe_fc[77]  // c77
 const vec4 lit246 = vec4(0.2, 0.5, 0.8, 0.0);
 const vec4 lit247 = vec4(0.0, 1.0, 0.0625, 1e-05);
 const vec4 lit248 = vec4(0.4608, -2.403328, -0.708608, -0.888832);

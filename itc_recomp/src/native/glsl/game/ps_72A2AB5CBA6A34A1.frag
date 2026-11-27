@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 2
+#define XE_FLOAT_CONSTANTS 1
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1

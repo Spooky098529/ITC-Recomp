@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 4
+#define XE_FLOAT_CONSTANTS 2
 #include "xe_interface.glsl"
 
 #define StartY xe_fc[0]  // c2

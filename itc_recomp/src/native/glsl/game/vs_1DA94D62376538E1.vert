@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_VERTEX
-#define XE_FLOAT_CONSTANTS 38
+#define XE_FLOAT_CONSTANTS 135
 #include "xe_interface.glsl"
 
 #define matWVPVS_0 xe_fc[0]  // c0
@@ -14,36 +14,36 @@
 #define matWorldVS_1 xe_fc[5]  // c5
 #define matWorldVS_2 xe_fc[6]  // c6
 #define matWorldVS_3 xe_fc[7]  // c7
-#define TexOffsetVS xe_fc[8]  // c9
-#define MatColorVS xe_fc[9]  // c13
-#define matTXVPVS_0 xe_fc[10]  // c70
-#define matTXVPVS_1 xe_fc[11]  // c71
-#define matTXVPVS_2 xe_fc[12]  // c72
-#define matTXVPVS_3 xe_fc[13]  // c73
-#define matTXVPVS_4 xe_fc[14]  // c74
-#define matTXVPVS_5 xe_fc[15]  // c75
-#define matTXVPVS_6 xe_fc[16]  // c76
-#define matTXVPVS_7 xe_fc[17]  // c77
-#define matPLVPVS_0 xe_fc[18]  // c87
-#define matPLVPVS_1 xe_fc[19]  // c88
-#define matPLVPVS_2 xe_fc[20]  // c89
-#define matPLVPVS_3 xe_fc[21]  // c90
-#define matPLMVPVS_0 xe_fc[22]  // c119
-#define matPLMVPVS_1 xe_fc[23]  // c120
-#define matPLMVPVS_2 xe_fc[24]  // c121
-#define matPLMVPVS_3 xe_fc[25]  // c122
-#define matPLMVPVS_4 xe_fc[26]  // c123
-#define matPLMVPVS_5 xe_fc[27]  // c124
-#define matPLMVPVS_6 xe_fc[28]  // c125
-#define matPLMVPVS_7 xe_fc[29]  // c126
-#define matPLMVPVS_8 xe_fc[30]  // c127
-#define matPLMVPVS_9 xe_fc[31]  // c128
-#define matPLMVPVS_10 xe_fc[32]  // c129
-#define matPLMVPVS_11 xe_fc[33]  // c130
-#define matPLMVPVS_12 xe_fc[34]  // c131
-#define matPLMVPVS_13 xe_fc[35]  // c132
-#define matPLMVPVS_14 xe_fc[36]  // c133
-#define matPLMVPVS_15 xe_fc[37]  // c134
+#define TexOffsetVS xe_fc[9]  // c9
+#define MatColorVS xe_fc[13]  // c13
+#define matTXVPVS_0 xe_fc[70]  // c70
+#define matTXVPVS_1 xe_fc[71]  // c71
+#define matTXVPVS_2 xe_fc[72]  // c72
+#define matTXVPVS_3 xe_fc[73]  // c73
+#define matTXVPVS_4 xe_fc[74]  // c74
+#define matTXVPVS_5 xe_fc[75]  // c75
+#define matTXVPVS_6 xe_fc[76]  // c76
+#define matTXVPVS_7 xe_fc[77]  // c77
+#define matPLVPVS_0 xe_fc[87]  // c87
+#define matPLVPVS_1 xe_fc[88]  // c88
+#define matPLVPVS_2 xe_fc[89]  // c89
+#define matPLVPVS_3 xe_fc[90]  // c90
+#define matPLMVPVS_0 xe_fc[119]  // c119
+#define matPLMVPVS_1 xe_fc[120]  // c120
+#define matPLMVPVS_2 xe_fc[121]  // c121
+#define matPLMVPVS_3 xe_fc[122]  // c122
+#define matPLMVPVS_4 xe_fc[123]  // c123
+#define matPLMVPVS_5 xe_fc[124]  // c124
+#define matPLMVPVS_6 xe_fc[125]  // c125
+#define matPLMVPVS_7 xe_fc[126]  // c126
+#define matPLMVPVS_8 xe_fc[127]  // c127
+#define matPLMVPVS_9 xe_fc[128]  // c128
+#define matPLMVPVS_10 xe_fc[129]  // c129
+#define matPLMVPVS_11 xe_fc[130]  // c130
+#define matPLMVPVS_12 xe_fc[131]  // c131
+#define matPLMVPVS_13 xe_fc[132]  // c132
+#define matPLMVPVS_14 xe_fc[133]  // c133
+#define matPLMVPVS_15 xe_fc[134]  // c134
 
 // Vertex fetch 0 (instruction 6): its fields as in the shader file, until the renderer sets them from the patched instruction.
 layout(constant_id = 100) const uint XE_VF0_CONSTANT = 95u;

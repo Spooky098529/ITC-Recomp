@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 16
+#define XE_FLOAT_CONSTANTS 24
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
@@ -18,14 +18,14 @@ layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 #define g_avSampleOffsets_5 xe_fc[5]  // c5
 #define g_avSampleOffsets_6 xe_fc[6]  // c6
 #define g_avSampleOffsets_7 xe_fc[7]  // c7
-#define g_avSampleWeights_0 xe_fc[8]  // c16
-#define g_avSampleWeights_1 xe_fc[9]  // c17
-#define g_avSampleWeights_2 xe_fc[10]  // c18
-#define g_avSampleWeights_3 xe_fc[11]  // c19
-#define g_avSampleWeights_4 xe_fc[12]  // c20
-#define g_avSampleWeights_5 xe_fc[13]  // c21
-#define g_avSampleWeights_6 xe_fc[14]  // c22
-#define g_avSampleWeights_7 xe_fc[15]  // c23
+#define g_avSampleWeights_0 xe_fc[16]  // c16
+#define g_avSampleWeights_1 xe_fc[17]  // c17
+#define g_avSampleWeights_2 xe_fc[18]  // c18
+#define g_avSampleWeights_3 xe_fc[19]  // c19
+#define g_avSampleWeights_4 xe_fc[20]  // c20
+#define g_avSampleWeights_5 xe_fc[21]  // c21
+#define g_avSampleWeights_6 xe_fc[22]  // c22
+#define g_avSampleWeights_7 xe_fc[23]  // c23
 
 // The interpolators the vertex shader writes (a bit each), and the register
 // the generated parameter goes in (-1: none).

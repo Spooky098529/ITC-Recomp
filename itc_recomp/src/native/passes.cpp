@@ -203,7 +203,7 @@ constexpr VkDeviceSize kConstantBlockSize = 16u << 20;
 // Fixed descriptor ranges of the constant buffers (set 1), so one set per
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
-constexpr uint32_t kBoolLoopConstantsRange = 40 * 4;
+constexpr uint32_t kBoolLoopConstantsRange = sizeof(render::BoolLoopConstants);
 // The constant blocks: system, vertex floats, pixel floats, bool/loop.
 constexpr uint32_t kConstantBlocks = 4;
 // The fetch constants the draw reads (textures 0-31, 6 words each; vertex
@@ -3497,25 +3497,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   for (uint32_t stage = 0; stage < 2; stage++) {
     const TranslatedShader* shader = stage == 0 ? vertex : pixel;
     const float(*source)[4] = render::ShaderConstants().floats[stage];
-    // Only the registers the shader reads, packed in order, into the last
-    // copy, noting whether any differ: run by run of consecutive registers
-    // (testing each of the 256 bits in turn was ~14% of the render thread,
-    // mostly mispredicted branches).
+    // The registers the shader is given, from its lowest to its highest,
+    // into the last copy, noting whether any differ.
     uint32_t* copy = reinterpret_cast<uint32_t*>(s.last_constants.bytes[1 + stage]);
     bool same = s.last_constants.valid[1 + stage];
-    uint32_t packed = 0;
-    for (uint32_t w = 0; shader && w < 4; w++) {
-      uint64_t bits = shader->float_constants[w];
-      while (bits) {
-        uint32_t first = std::countr_zero(bits);
-        uint32_t count = std::countr_one(bits >> first);
-        bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        const float* from = source[64 * w + first];
-        if (std::memcmp(copy + 4 * packed, from, 16 * count)) {
-          std::memcpy(copy + 4 * packed, from, 16 * count);
-          same = false;
-        }
-        packed += count;
+    const uint32_t packed = shader ? shader->float_count : 0;
+    if (packed) {
+      const float* from = source[shader->float_first];
+      if (!same || std::memcmp(copy, from, 16 * packed)) {
+        std::memcpy(copy, from, 16 * packed);
+        same = false;
       }
     }
     if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
@@ -3587,7 +3578,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       vertex_offsets[vertex_bindings++] = VkDeviceSize(at) + 4 * f.stride_words * g;
     }
   }
-  if (!s.PlaceConstants(3, render::ShaderConstants().bool_loop,
+  if (!s.PlaceConstants(3, &render::ShaderConstants().bool_loop,
                         kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
@@ -3667,7 +3658,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[0]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[1]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[2]),
-                render::ShaderConstants().bool_loop,
+                reinterpret_cast<const uint32_t*>(&render::ShaderConstants().bool_loop),
                 regs.fetch);
   }
   if (!pipeline) {
@@ -4375,12 +4366,11 @@ void Passes::set_cache_shader_lookups(bool cache) {
 namespace {
 
 // The float constant registers a shader reads, in packed order.
+// The registers a shader is given, in its block's order.
 std::vector<uint32_t> FloatRegisters(const TranslatedShader* shader) {
   std::vector<uint32_t> registers;
-  for (uint32_t i = 0; shader && i < 256; i++) {
-    if (shader->float_constants[i >> 6] & (uint64_t(1) << (i & 63))) {
-      registers.push_back(i);
-    }
+  for (uint32_t i = 0; shader && i < shader->float_count; i++) {
+    registers.push_back(shader->float_first + i);
   }
   return registers;
 }

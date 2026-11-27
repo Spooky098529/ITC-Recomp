@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_VERTEX
-#define XE_FLOAT_CONSTANTS 9
+#define XE_FLOAT_CONSTANTS 14
 #include "xe_interface.glsl"
 
 #define matWVPVS_0 xe_fc[0]  // c0
@@ -14,7 +14,7 @@
 #define matWorldVS_1 xe_fc[5]  // c5
 #define matWorldVS_2 xe_fc[6]  // c6
 #define matWorldVS_3 xe_fc[7]  // c7
-#define MatColorVS xe_fc[8]  // c13
+#define MatColorVS xe_fc[13]  // c13
 
 // Vertex fetch 0 (instruction 3): its fields as in the shader file, until the renderer sets them from the patched instruction.
 layout(constant_id = 100) const uint XE_VF0_CONSTANT = 95u;

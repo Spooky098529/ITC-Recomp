@@ -38,9 +38,13 @@ struct TranslatedShader {
   // glsl/game/shaders.json's lookup_hash).
   uint64_t port_hash = 0;
   std::vector<uint32_t> spirv;
-  // The float constants the shader reads, one bit per register (c0-c255).
-  // The shader takes only these, packed in order.
+  // The float constants the shader reads, one bit per register (c0-c255;
+  // its literal constants left out, which it holds itself).
   std::array<uint64_t, 4> float_constants{};
+  // The registers it's given (its stage's uniform block): float_count from
+  // float_first, the lowest to the highest it reads (0 to 255 for a shader
+  // that addresses them by the loop index).
+  uint32_t float_first = 0, float_count = 0;
   // The vertex fetch constants it reads (0-95), one bit each: the vertex
   // buffers it fetches from.
   std::array<uint32_t, 3> vertex_fetch_constants{};

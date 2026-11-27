@@ -50,8 +50,8 @@ void xe_shader() {
       { precise vec3 v = vec3(greaterThan(-abs(r2.xxx), lit255.yyy)); precise float s = inversesqrt(abs(r0.w)); r5.xyz = v; r0.w = s; }
       { precise vec3 v = xe_mul(r0.www, r1.xyz); precise float s = r2.w; r4.xyz = v; r0.w = clamp(s, 0.0, 1.0); }
       // loop 31
-      loop_count = uvec4(xe_loop_constant(31u) & 0xFFu, loop_count.xyz);
-      loop_aL = ivec4(int((xe_loop_constant(31u) >> 8u) & 0xFFu), loop_aL.xyz);
+      loop_count = uvec4(xe_loop_count(31u), loop_count.xyz);
+      loop_aL = ivec4(xe_loop_start(31u), loop_aL.xyz);
       if (loop_count.x == 0u) { pc = 4; continue; }
     case 2:
       r1.yzw = xe_mul(xe_fc[loop_aL.x + 41].xyz, MatAmbientDiffuse.www);
@@ -62,15 +62,15 @@ void xe_shader() {
       { uint count = loop_count.x - 1u;
         if (count != 0u) {
           loop_count.x = count;
-          loop_aL.x += bitfieldExtract(int(xe_loop_constant(31u)), 16, 8);
+          loop_aL.x += xe_loop_step(31u);
           pc = 2; continue;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 4:
       r1.xy = lit255.xy;
       // loop 30
-      loop_count = uvec4(xe_loop_constant(30u) & 0xFFu, loop_count.xyz);
-      loop_aL = ivec4(int((xe_loop_constant(30u) >> 8u) & 0xFFu), loop_aL.xyz);
+      loop_count = uvec4(xe_loop_count(30u), loop_count.xyz);
+      loop_aL = ivec4(xe_loop_start(30u), loop_aL.xyz);
       if (loop_count.x == 0u) { pc = 15; continue; }
     case 6:
       r6.xyz = xe_fc[loop_aL.x + 8].xyz + -r0.xyz;
@@ -108,7 +108,7 @@ void xe_shader() {
       { uint count = loop_count.x - 1u;
         if (count != 0u) {
           loop_count.x = count;
-          loop_aL.x += bitfieldExtract(int(xe_loop_constant(30u)), 16, 8);
+          loop_aL.x += xe_loop_step(30u);
           pc = 6; continue;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }

@@ -3,15 +3,15 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_VERTEX
-#define XE_FLOAT_CONSTANTS 6
+#define XE_FLOAT_CONSTANTS 87
 #include "xe_interface.glsl"
 
 #define matWVPVS_0 xe_fc[0]  // c0
 #define matWVPVS_1 xe_fc[1]  // c1
 #define matWVPVS_2 xe_fc[2]  // c2
 #define matWVPVS_3 xe_fc[3]  // c3
-#define MatColorVS xe_fc[4]  // c13
-#define fogParamVS xe_fc[5]  // c86
+#define MatColorVS xe_fc[13]  // c13
+#define fogParamVS xe_fc[86]  // c86
 
 // Vertex fetch 0 (instruction 3): its fields as in the shader file, until the renderer sets them from the patched instruction.
 layout(constant_id = 100) const uint XE_VF0_CONSTANT = 95u;

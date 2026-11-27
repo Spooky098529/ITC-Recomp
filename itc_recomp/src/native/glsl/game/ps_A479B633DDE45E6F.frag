@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 4
+#define XE_FLOAT_CONSTANTS 64
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform textureCube xe_texture0;  // fetch constant 6
@@ -18,8 +18,8 @@ layout(set = 3, binding = 5) uniform sampler xe_sampler2;  // fetch constant 0
 // tx0: sampler 0
 // tx1: sampler 1
 #define EyePos xe_fc[0]  // c4
-#define MatParam xe_fc[1]  // c64
-#define ModTexAlpha xe_fc[2]  // c67
+#define MatParam xe_fc[60]  // c64
+#define ModTexAlpha xe_fc[63]  // c67
 const vec4 lit255 = vec4(0.0, 1.0, 1.5, 0.0);
 
 // The interpolators the vertex shader writes (a bit each), and the register

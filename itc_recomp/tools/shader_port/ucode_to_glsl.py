@@ -155,8 +155,14 @@ class Port:
                 if (i.fetch_constant, dim) not in self.textures:
                     self.textures.append((i.fetch_constant, dim))
         self.register_count = bound
-        self.packed = {r: r for r in range(256)} if self.dynamic_constants else \
-            {r: n for n, r in enumerate(sorted(self.float_used))}
+        # The registers the renderer gives the shader: its lowest to its
+        # highest (not the literal ones, which it holds), all 256 when it
+        # addresses them by the loop index; a register's place is its number
+        # less the lowest.
+        given = sorted(r for r in self.float_used if r not in self.s.literals)
+        first = 0 if self.dynamic_constants or not given else given[0]
+        last = 255 if self.dynamic_constants else (given[-1] if given else -1)
+        self.packed = {r: r - first for r in range(first, last + 1)}
         self.constant_names = {}
         taken = set()
         for c in self.s.constants:
@@ -563,10 +569,10 @@ class Port:
                     block.append("break;  // the end")
             elif c.op == "loop":
                 block += ["// loop %d" % c.loop_id,
-                          "loop_count = uvec4(xe_loop_constant(%du) & 0xFFu, loop_count.xyz);" % c.loop_id,
+                          "loop_count = uvec4(xe_loop_count(%du), loop_count.xyz);" % c.loop_id,
                           "loop_aL = ivec4(%s, loop_aL.xyz);" % (
                               "loop_aL.x" if c.is_repeat else
-                              "int((xe_loop_constant(%du) >> 8u) & 0xFFu)" % c.loop_id),
+                              "xe_loop_start(%du)" % c.loop_id),
                           "if (loop_count.x == 0u) { pc = %d; continue; }" % c.address]
             elif c.op == "endloop":
                 if c.predicated and c.condition:
@@ -579,7 +585,7 @@ class Port:
                           "{ uint count = loop_count.x - 1u;",
                           "  if (%s) {" % again,
                           "    loop_count.x = count;",
-                          "    loop_aL.x += bitfieldExtract(int(xe_loop_constant(%du)), 16, 8);" % c.loop_id,
+                          "    loop_aL.x += xe_loop_step(%du);" % c.loop_id,
                           "    pc = %d; continue;" % c.address,
                           "  }",
                           "  loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }"]

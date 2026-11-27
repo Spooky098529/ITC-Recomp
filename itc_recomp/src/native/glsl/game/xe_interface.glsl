@@ -56,21 +56,26 @@ const uint kXeFlagSbxDitheredAlpha = 1u << 31;
 // sky); in the normals target its view distance is the sign bit alone.
 const uint kXeFlagSbxNoAo = 1u << 30;
 
-// The float constants the shader reads, packed in register order (all 256
-// when it addresses them relative to the loop index).
+// The float constant registers the shader reads, from its lowest to its
+// highest (all 256 when it addresses them relative to the loop index): a
+// constant's name is xe_fc[its register - the lowest].
 #ifdef XE_VERTEX
 layout(set = 1, binding = 1, std140) uniform XeFloatConstants { vec4 xe_fc[XE_FLOAT_CONSTANTS]; };
 #else
 layout(set = 1, binding = 2, std140) uniform XeFloatConstants { vec4 xe_fc[XE_FLOAT_CONSTANTS]; };
 #endif
-// 256 bool constants (a bit each), then 32 loop constants.
+// The bool registers (128 a stage, a bit each: the vertex shader's, then the
+// pixel shader's), then the integer registers for loops (16 a stage: count,
+// start, step; the vertex shader's, then the pixel shader's).
 layout(set = 1, binding = 3, std140) uniform XeBoolLoopConstants {
   uvec4 xe_bools[2];
-  uvec4 xe_loops[8];
+  ivec4 xe_loops[32];
 };
 
 bool xe_bool(uint n) { return (xe_bools[n >> 7u][(n >> 5u) & 3u] & (1u << (n & 31u))) != 0u; }
-uint xe_loop_constant(uint n) { return xe_loops[n >> 2u][n & 3u]; }
+uint xe_loop_count(uint n) { return uint(xe_loops[n].x); }
+int xe_loop_start(uint n) { return xe_loops[n].y; }
+int xe_loop_step(uint n) { return xe_loops[n].z; }
 
 const float kXeFltMax = 3.40282347e+38;
 

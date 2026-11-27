@@ -85,9 +85,8 @@ struct LightRange {
 };
 
 LightRange light_range(uint loop_constant) {
-  uint value = xe_loop_constant(loop_constant);
-  return LightRange(int(value & 0xFFu), int((value >> 8u) & 0xFFu),
-                    bitfieldExtract(int(value), 16, 8));
+  return LightRange(int(xe_loop_count(loop_constant)), xe_loop_start(loop_constant),
+                    xe_loop_step(loop_constant));
 }
 
 // The specular highlight: pow(cosine, shininess), the cosine kept off 0 by

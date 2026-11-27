@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 49
+#define XE_FLOAT_CONSTANTS 74
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 10
@@ -22,37 +22,37 @@ layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 0
 #define PntLightPos_1 xe_fc[5]  // c9
 #define PntLightPos_2 xe_fc[6]  // c10
 #define PntLightPos_3 xe_fc[7]  // c11
-#define PntLightAtten_0 xe_fc[8]  // c16
-#define PntLightAtten_1 xe_fc[9]  // c17
-#define PntLightAtten_2 xe_fc[10]  // c18
-#define PntLightAtten_3 xe_fc[11]  // c19
-#define SpotLightDir_0 xe_fc[12]  // c24
-#define SpotLightDir_1 xe_fc[13]  // c25
-#define SpotLightDir_2 xe_fc[14]  // c26
-#define SpotLightDir_3 xe_fc[15]  // c27
-#define SpotLightCone_0 xe_fc[16]  // c32
-#define SpotLightCone_1 xe_fc[17]  // c33
-#define SpotLightCone_2 xe_fc[18]  // c34
-#define SpotLightCone_3 xe_fc[19]  // c35
-#define AmbientColor xe_fc[20]  // c40
-#define DLightColor_0 xe_fc[21]  // c41
-#define DLightColor_1 xe_fc[22]  // c42
-#define DLightColor_2 xe_fc[23]  // c43
-#define DLightSpecularColor_0 xe_fc[24]  // c44
-#define DLightSpecularColor_1 xe_fc[25]  // c45
-#define DLightSpecularColor_2 xe_fc[26]  // c46
-#define PntLightColor_0 xe_fc[27]  // c47
-#define PntLightColor_1 xe_fc[28]  // c48
-#define PntLightColor_2 xe_fc[29]  // c49
-#define PntLightColor_3 xe_fc[30]  // c50
-#define PntLightSpecularColor_0 xe_fc[31]  // c55
-#define PntLightSpecularColor_1 xe_fc[32]  // c56
-#define PntLightSpecularColor_2 xe_fc[33]  // c57
-#define PntLightSpecularColor_3 xe_fc[34]  // c58
-#define MatParam xe_fc[35]  // c64
-#define MatAmbientDiffuse xe_fc[36]  // c65
-#define MatSpecularColor xe_fc[37]  // c66
-#define shadowMapSize xe_fc[38]  // c77
+#define PntLightAtten_0 xe_fc[12]  // c16
+#define PntLightAtten_1 xe_fc[13]  // c17
+#define PntLightAtten_2 xe_fc[14]  // c18
+#define PntLightAtten_3 xe_fc[15]  // c19
+#define SpotLightDir_0 xe_fc[20]  // c24
+#define SpotLightDir_1 xe_fc[21]  // c25
+#define SpotLightDir_2 xe_fc[22]  // c26
+#define SpotLightDir_3 xe_fc[23]  // c27
+#define SpotLightCone_0 xe_fc[28]  // c32
+#define SpotLightCone_1 xe_fc[29]  // c33
+#define SpotLightCone_2 xe_fc[30]  // c34
+#define SpotLightCone_3 xe_fc[31]  // c35
+#define AmbientColor xe_fc[36]  // c40
+#define DLightColor_0 xe_fc[37]  // c41
+#define DLightColor_1 xe_fc[38]  // c42
+#define DLightColor_2 xe_fc[39]  // c43
+#define DLightSpecularColor_0 xe_fc[40]  // c44
+#define DLightSpecularColor_1 xe_fc[41]  // c45
+#define DLightSpecularColor_2 xe_fc[42]  // c46
+#define PntLightColor_0 xe_fc[43]  // c47
+#define PntLightColor_1 xe_fc[44]  // c48
+#define PntLightColor_2 xe_fc[45]  // c49
+#define PntLightColor_3 xe_fc[46]  // c50
+#define PntLightSpecularColor_0 xe_fc[51]  // c55
+#define PntLightSpecularColor_1 xe_fc[52]  // c56
+#define PntLightSpecularColor_2 xe_fc[53]  // c57
+#define PntLightSpecularColor_3 xe_fc[54]  // c58
+#define MatParam xe_fc[60]  // c64
+#define MatAmbientDiffuse xe_fc[61]  // c65
+#define MatSpecularColor xe_fc[62]  // c66
+#define shadowMapSize xe_fc[73]  // c77
 const vec4 lit246 = vec4(1e-05, 0.0, 0.0625, 1.0);
 const vec4 lit247 = vec4(0.5, 0.0, 0.0, 0.0);
 const vec4 lit248 = vec4(0.4608, -2.403328, -0.708608, -0.888832);

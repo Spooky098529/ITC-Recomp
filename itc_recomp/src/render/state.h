@@ -141,14 +141,19 @@ void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value);
 // Stage `stage`'s descriptor (stages 0-25).
 const uint32_t* TextureDescriptor(uint32_t stage);
 
-// The shaders' constants: each stage's 256 float registers (vertex 0,
-// pixel 1), and the bool and loop constants as the shaders' block takes
-// them (words 0-3 the vertex shader's 128 bools, 4-7 the pixel shader's,
-// then 32 loop constants: 0-15 the vertex shader's, 16-31 the pixel
-// shader's, each count | start << 8 | step << 16).
+// The shaders' constants, as D3D's registers: each stage's 256 float
+// registers (vertex 0, pixel 1), 128 bool registers (a bit each) and 16
+// integer registers for loops (count, start, step, 0), as the shaders'
+// uniform blocks take them (the bools and loops one block: the vertex
+// shader's bools, the pixel shader's, then the vertex shader's loops and the
+// pixel shader's).
+struct BoolLoopConstants {
+  uint32_t bools[2][4] = {};
+  int32_t loops[2][16][4] = {};
+};
 struct Constants {
   float floats[2][256][4] = {};
-  uint32_t bool_loop[40] = {};
+  BoolLoopConstants bool_loop;
 };
 // Commands 7 (and the single 7): `count` registers from `first` of a
 // stage's type (0 loop constants from int4s, 1 floats, 2 bools from

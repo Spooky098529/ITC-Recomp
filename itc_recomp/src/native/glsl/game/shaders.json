@@ -278,9 +278,7 @@
   "registers": 3,
   "float_constants": [
    40,
-   41,
-   254,
-   255
+   41
   ],
   "relative_constants": false,
   "textures": [
@@ -400,9 +398,7 @@
   "microcode_words": 18,
   "port": "ps_ECCA4F5E7E71FB5F.frag",
   "registers": 3,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [],
   "samplers": [],
@@ -887,17 +883,7 @@
    64,
    65,
    66,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -1031,9 +1017,7 @@
   "microcode_words": 18,
   "port": "ps_BDFAB64758384F20.frag",
   "registers": 2,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [
    {
@@ -1103,8 +1087,7 @@
   "registers": 18,
   "float_constants": [
    32,
-   33,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1189,8 +1172,7 @@
   "registers": 18,
   "float_constants": [
    32,
-   33,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1281,9 +1263,7 @@
   "registers": 18,
   "float_constants": [
    32,
-   33,
-   254,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1368,8 +1348,7 @@
   "registers": 10,
   "float_constants": [
    32,
-   33,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1460,10 +1439,7 @@
   "registers": 11,
   "float_constants": [
    32,
-   33,
-   253,
-   254,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1535,9 +1511,7 @@
   "microcode_words": 30,
   "port": "ps_89DB3429AA053B0E.frag",
   "registers": 2,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [
    {
@@ -1623,9 +1597,7 @@
   "port": "ps_8D3C07B2BE57E921.frag",
   "registers": 4,
   "float_constants": [
-   33,
-   254,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -1936,8 +1908,7 @@
   "registers": 7,
   "float_constants": [
    33,
-   34,
-   255
+   34
   ],
   "relative_constants": false,
   "textures": [
@@ -2056,8 +2027,7 @@
   "port": "ps_39755C8589500F4C.frag",
   "registers": 3,
   "float_constants": [
-   33,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -2139,8 +2109,7 @@
   "port": "ps_CC253DC700BC8028.frag",
   "registers": 3,
   "float_constants": [
-   33,
-   255
+   33
   ],
   "relative_constants": false,
   "textures": [
@@ -2217,8 +2186,7 @@
   "port": "ps_92A5199E7EA052BB.frag",
   "registers": 6,
   "float_constants": [
-   32,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2287,8 +2255,7 @@
   "port": "ps_4592974A77C2F02C.frag",
   "registers": 6,
   "float_constants": [
-   32,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2362,9 +2329,7 @@
   "port": "ps_CEA84F137BB1E483.frag",
   "registers": 10,
   "float_constants": [
-   32,
-   254,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2442,9 +2407,7 @@
   "port": "ps_41798B3BB7FDDB71.frag",
   "registers": 10,
   "float_constants": [
-   32,
-   254,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2528,10 +2491,7 @@
   "port": "ps_85D67A0216D12CB9.frag",
   "registers": 14,
   "float_constants": [
-   32,
-   253,
-   254,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2619,10 +2579,7 @@
   "port": "ps_3EF414175C8B86B3.frag",
   "registers": 14,
   "float_constants": [
-   32,
-   253,
-   254,
-   255
+   32
   ],
   "relative_constants": false,
   "textures": [
@@ -2711,8 +2668,7 @@
   "registers": 2,
   "float_constants": [
    35,
-   36,
-   255
+   36
   ],
   "relative_constants": false,
   "textures": [
@@ -2831,11 +2787,7 @@
   "float_constants": [
    37,
    38,
-   39,
-   252,
-   253,
-   254,
-   255
+   39
   ],
   "relative_constants": false,
   "textures": [
@@ -3172,18 +3124,7 @@
    64,
    65,
    66,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -3499,17 +3440,7 @@
    64,
    65,
    66,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -3824,9 +3755,7 @@
    56,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": false,
   "textures": [
@@ -4132,17 +4061,7 @@
    64,
    65,
    66,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -4442,9 +4361,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -4599,9 +4516,7 @@
   "microcode_words": 24,
   "port": "ps_4F4860F071E25904.frag",
   "registers": 3,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [
    {
@@ -4728,8 +4643,7 @@
   "float_constants": [
    40,
    65,
-   67,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -5143,9 +5057,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -5291,8 +5203,7 @@
   "float_constants": [
    40,
    65,
-   67,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -5492,8 +5403,7 @@
   "registers": 7,
   "float_constants": [
    40,
-   65,
-   255
+   65
   ],
   "relative_constants": true,
   "textures": [],
@@ -5659,9 +5569,7 @@
    40,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [
@@ -5840,9 +5748,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -6009,9 +5915,7 @@
    40,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [],
@@ -6170,9 +6074,7 @@
    40,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [
@@ -6344,9 +6246,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -6535,8 +6435,7 @@
   "registers": 7,
   "float_constants": [
    40,
-   65,
-   255
+   65
   ],
   "relative_constants": true,
   "textures": [],
@@ -6668,8 +6567,7 @@
    40,
    64,
    65,
-   66,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [],
@@ -6903,8 +6801,7 @@
    64,
    65,
    66,
-   67,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -7031,8 +6928,7 @@
   "float_constants": [
    40,
    65,
-   67,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -7321,9 +7217,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -7507,8 +7401,7 @@
   "port": "ps_F3C0D4132DB33EFE.frag",
   "registers": 3,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -7687,9 +7580,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -7993,9 +7884,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -8266,9 +8155,7 @@
    40,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [
@@ -8453,9 +8340,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -8602,8 +8487,7 @@
   "float_constants": [
    40,
    65,
-   67,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -8781,9 +8665,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -8962,9 +8844,7 @@
    40,
    64,
    65,
-   66,
-   254,
-   255
+   66
   ],
   "relative_constants": true,
   "textures": [
@@ -9153,9 +9033,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -9348,9 +9226,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -9658,9 +9534,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -9869,9 +9743,7 @@
    64,
    65,
    66,
-   67,
-   254,
-   255
+   67
   ],
   "relative_constants": true,
   "textures": [
@@ -9963,8 +9835,7 @@
   "port": "ps_92355BEBF0E0C743.frag",
   "registers": 3,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10127,8 +9998,7 @@
   "port": "ps_197CCCA2D2748351.frag",
   "registers": 5,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10220,8 +10090,7 @@
   "port": "ps_959EB72BB94E0226.frag",
   "registers": 4,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10312,8 +10181,7 @@
   "port": "ps_B9876682F784223B.frag",
   "registers": 5,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10405,8 +10273,7 @@
   "port": "ps_AF8C30E46F0F278A.frag",
   "registers": 4,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10497,8 +10364,7 @@
   "port": "ps_1D294C09E07EEED7.frag",
   "registers": 5,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10590,8 +10456,7 @@
   "port": "ps_53C20517319EB8FE.frag",
   "registers": 4,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -10999,17 +10864,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -11480,17 +11335,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -11821,17 +11666,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -12162,17 +11997,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -12503,17 +12328,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -12844,17 +12659,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -13185,17 +12990,7 @@
    67,
    68,
    69,
-   77,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -13677,18 +13472,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -14188,18 +13972,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -14553,18 +14326,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -14918,18 +14680,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -15283,18 +15034,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -15648,18 +15388,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -16013,18 +15742,7 @@
    67,
    68,
    69,
-   77,
-   245,
-   246,
-   247,
-   248,
-   249,
-   250,
-   251,
-   252,
-   253,
-   254,
-   255
+   77
   ],
   "relative_constants": false,
   "textures": [
@@ -16200,8 +15918,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16323,8 +16040,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16446,8 +16162,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16569,8 +16284,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16692,8 +16406,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16815,8 +16528,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -16932,8 +16644,7 @@
   "float_constants": [
    4,
    64,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17068,8 +16779,7 @@
    48,
    49,
    50,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17202,8 +16912,7 @@
    48,
    49,
    50,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17348,8 +17057,7 @@
    48,
    49,
    50,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17494,8 +17202,7 @@
    48,
    49,
    50,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17590,8 +17297,7 @@
   "port": "ps_72A2AB5CBA6A34A1.frag",
   "registers": 5,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17732,8 +17438,7 @@
    48,
    49,
    50,
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -17828,8 +17533,7 @@
   "port": "ps_A31B395C13508BBB.frag",
   "registers": 5,
   "float_constants": [
-   67,
-   255
+   67
   ],
   "relative_constants": false,
   "textures": [
@@ -18271,9 +17975,7 @@
   "microcode_words": 30,
   "port": "vs_100B3DED4CFC57D1.vert",
   "registers": 2,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [],
   "samplers": [],
@@ -18344,9 +18046,7 @@
   "registers": 3,
   "float_constants": [
    2,
-   3,
-   254,
-   255
+   3
   ],
   "relative_constants": false,
   "textures": [],
@@ -18391,9 +18091,7 @@
   "microcode_words": 18,
   "port": "ps_3290DE6676442FB7.frag",
   "registers": 2,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [
    {
@@ -18442,9 +18140,7 @@
   "microcode_words": 33,
   "port": "vs_3E4D3F93E10ABFFF.vert",
   "registers": 3,
-  "float_constants": [
-   255
-  ],
+  "float_constants": [],
   "relative_constants": false,
   "textures": [],
   "samplers": [],
@@ -18605,9 +18301,7 @@
    65,
    66,
    67,
-   76,
-   254,
-   255
+   76
   ],
   "relative_constants": true,
   "textures": [
@@ -18703,8 +18397,7 @@
   "registers": 5,
   "float_constants": [
    67,
-   76,
-   255
+   76
   ],
   "relative_constants": false,
   "textures": [
@@ -18815,8 +18508,7 @@
    4,
    64,
    67,
-   76,
-   255
+   76
   ],
   "relative_constants": false,
   "textures": [
@@ -19181,9 +18873,7 @@
    65,
    66,
    67,
-   76,
-   254,
-   255
+   76
   ],
   "relative_constants": true,
   "textures": [
@@ -19351,8 +19041,7 @@
   "registers": 3,
   "float_constants": [
    67,
-   76,
-   255
+   76
   ],
   "relative_constants": false,
   "textures": [
@@ -19430,8 +19119,7 @@
   "registers": 5,
   "float_constants": [
    67,
-   76,
-   255
+   76
   ],
   "relative_constants": false,
   "textures": [
@@ -19700,8 +19388,7 @@
    65,
    66,
    67,
-   76,
-   255
+   76
   ],
   "relative_constants": true,
   "textures": [
@@ -19981,8 +19668,7 @@
   "port": "ps_7436AD1E3A817843.frag",
   "registers": 2,
   "float_constants": [
-   76,
-   255
+   76
   ],
   "relative_constants": false,
   "textures": [],
@@ -20124,9 +19810,7 @@
   "registers": 3,
   "float_constants": [
    2,
-   3,
-   254,
-   255
+   3
   ],
   "relative_constants": false,
   "textures": [],

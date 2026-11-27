@@ -168,7 +168,7 @@ def main():
         entry.update({
             "port": file,
             "registers": port.register_count,
-            "float_constants": sorted(port.float_used),
+            "float_constants": sorted(r for r in port.float_used if r not in port.s.literals),
             "relative_constants": port.dynamic_constants,
             "textures": [{"fetch_constant": fc, "view": "cube" if d == 3 else "2D array"}
                          for fc, d in port.textures],

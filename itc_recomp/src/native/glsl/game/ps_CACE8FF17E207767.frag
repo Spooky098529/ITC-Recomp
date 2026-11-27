@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 22
+#define XE_FLOAT_CONSTANTS 60
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
@@ -15,23 +15,23 @@ layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 #define PntLightPos_1 xe_fc[1]  // c9
 #define PntLightPos_2 xe_fc[2]  // c10
 #define PntLightPos_3 xe_fc[3]  // c11
-#define PntLightAtten_0 xe_fc[4]  // c16
-#define PntLightAtten_1 xe_fc[5]  // c17
-#define PntLightAtten_2 xe_fc[6]  // c18
-#define PntLightAtten_3 xe_fc[7]  // c19
-#define SpotLightDir_0 xe_fc[8]  // c24
-#define SpotLightDir_1 xe_fc[9]  // c25
-#define SpotLightDir_2 xe_fc[10]  // c26
-#define SpotLightDir_3 xe_fc[11]  // c27
-#define SpotLightCone_0 xe_fc[12]  // c32
-#define SpotLightCone_1 xe_fc[13]  // c33
-#define SpotLightCone_2 xe_fc[14]  // c34
-#define SpotLightCone_3 xe_fc[15]  // c35
-#define PntLightColor_0 xe_fc[16]  // c47
-#define PntLightColor_1 xe_fc[17]  // c48
-#define PntLightColor_2 xe_fc[18]  // c49
-#define PntLightColor_3 xe_fc[19]  // c50
-#define ModTexAlpha xe_fc[20]  // c67
+#define PntLightAtten_0 xe_fc[8]  // c16
+#define PntLightAtten_1 xe_fc[9]  // c17
+#define PntLightAtten_2 xe_fc[10]  // c18
+#define PntLightAtten_3 xe_fc[11]  // c19
+#define SpotLightDir_0 xe_fc[16]  // c24
+#define SpotLightDir_1 xe_fc[17]  // c25
+#define SpotLightDir_2 xe_fc[18]  // c26
+#define SpotLightDir_3 xe_fc[19]  // c27
+#define SpotLightCone_0 xe_fc[24]  // c32
+#define SpotLightCone_1 xe_fc[25]  // c33
+#define SpotLightCone_2 xe_fc[26]  // c34
+#define SpotLightCone_3 xe_fc[27]  // c35
+#define PntLightColor_0 xe_fc[39]  // c47
+#define PntLightColor_1 xe_fc[40]  // c48
+#define PntLightColor_2 xe_fc[41]  // c49
+#define PntLightColor_3 xe_fc[42]  // c50
+#define ModTexAlpha xe_fc[59]  // c67
 const vec4 lit255 = vec4(0.5, 0.0, 1.0, 0.0);
 
 // The interpolators the vertex shader writes (a bit each), and the register

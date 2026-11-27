@@ -3,7 +3,7 @@
 // Written by tools/shader_port from the game's microcode; docs/shaders.md explains it.
 #extension GL_GOOGLE_include_directive : require
 #define XE_PIXEL
-#define XE_FLOAT_CONSTANTS 3
+#define XE_FLOAT_CONSTANTS 10
 #include "xe_interface.glsl"
 
 layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1
@@ -14,7 +14,7 @@ layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 0
 // tx0: sampler 0
 // tx1: sampler 1
 #define ModTexAlpha xe_fc[0]  // c67
-#define fogColor xe_fc[1]  // c76
+#define fogColor xe_fc[9]  // c76
 const vec4 lit255 = vec4(1.0, 0.0, 0.0, 0.0);
 
 // The interpolators the vertex shader writes (a bit each), and the register
