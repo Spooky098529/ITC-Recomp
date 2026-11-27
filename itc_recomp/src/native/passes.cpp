@@ -1701,7 +1701,7 @@ bool Passes::State::PlaceConstants(uint32_t block, const void* bytes, uint32_t s
 
 void Passes::State::EndRendering(VkCommandBuffer commands) {
   if (rendering) {
-    vk::vkCmdEndRendering(commands);
+    backend->EndPass();
     rendering = false;
   }
 }
@@ -1717,34 +1717,20 @@ void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Targ
   if (depth) {
     RestoreContents(commands, *depth);
   }
-  VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+  gpu::PassTarget color_target, depth_target;
   VkExtent2D extent{UINT32_MAX, UINT32_MAX};
   if (color) {
     backend->Use(color->image, gpu::Usage::kColorTarget);
-    color_attachment.imageView = color->view();
-    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    info.colorAttachmentCount = 1;
-    info.pColorAttachments = &color_attachment;
+    color_target.image = color->image;
     extent = color->extent;
   }
   if (depth) {
     backend->Use(depth->image, gpu::Usage::kDepthTarget);
-    depth_attachment.imageView = depth->view();
-    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    info.pDepthAttachment = &depth_attachment;
-    info.pStencilAttachment = &depth_attachment;
+    depth_target.image = depth->image;
     extent = {std::min(extent.width, depth->extent.width),
               std::min(extent.height, depth->extent.height)};
   }
-  info.renderArea = {{0, 0}, extent};
-  info.layerCount = 1;
-  vk::vkCmdBeginRendering(commands, &info);
+  backend->BeginPass(color_target, depth_target, {0, 0, extent.width, extent.height});
   bound_color = color;
   bound_depth = depth;
   render_extent = extent;
@@ -2265,17 +2251,9 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   backend->Use(source.image, source.depth ? gpu::Usage::kDepthSampled : gpu::Usage::kSampled);
   backend->Use(dest.object, gpu::Usage::kColorTarget);
   VkRect2D area{{host_x, host_y}, {uint32_t(host_width), uint32_t(host_height)}};
-  VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  attachment.imageView = dest.view;
-  attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = area;
-  info.layerCount = 1;
-  info.colorAttachmentCount = 1;
-  info.pColorAttachments = &attachment;
-  vk::vkCmdBeginRendering(commands, &info);
+  gpu::PassTarget dest_target;
+  dest_target.image = dest.object;
+  backend->BeginPass(dest_target, {}, {host_x, host_y, area.extent.width, area.extent.height});
   VkViewport viewport{float(host_x), float(host_y), float(host_width), float(host_height), 0.0f,
                       1.0f};
   vk::vkCmdSetViewport(commands, 0, 1, &viewport);
@@ -2294,7 +2272,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
-  vk::vkCmdEndRendering(commands);
+  backend->EndPass();
   recorded.valid = false;
   backend->Use(dest.object, gpu::Usage::kSampled);
   Resolved& resolved = frame_resolves.emplace_back();
@@ -2476,17 +2454,9 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   s.RestoreContents(commands, *target);
   s.backend->Use(target->image, gpu::Usage::kColorTarget);
   VkRect2D area{{0, 0}, {uint32_t(width), uint32_t(height)}};
-  VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  attachment.imageView = target->view();
-  attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = area;
-  info.layerCount = 1;
-  info.colorAttachmentCount = 1;
-  info.pColorAttachments = &attachment;
-  vk::vkCmdBeginRendering(commands, &info);
+  gpu::PassTarget movie_target;
+  movie_target.image = target->image;
+  s.backend->BeginPass(movie_target, {}, {0, 0, area.extent.width, area.extent.height});
   VkViewport viewport{0.0f, 0.0f, float(width), float(height), 0.0f, 1.0f};
   vk::vkCmdSetViewport(commands, 0, 1, &viewport);
   vk::vkCmdSetScissor(commands, 0, 1, &area);
@@ -2497,7 +2467,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   vk::vkCmdPushConstants(commands, s.movie_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
-  vk::vkCmdEndRendering(commands);
+  s.backend->EndPass();
   s.recorded.valid = false;
   s.stats.movie_draws++;
 }
@@ -3548,26 +3518,15 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     reversed |= draw.key.z_enable && (z_func == gpu::CompareOp::kGreater ||
                                       z_func == gpu::CompareOp::kGreaterOrEqual);
   }
-  VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  color.imageView = View(id_image);
-  color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color.clearValue.color.uint32[0] = UINT32_MAX;
-  VkRenderingAttachmentInfo depth{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  depth.imageView = View(id_depth);
-  depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-  depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth.clearValue.depthStencil = {reversed ? 0.0f : 1.0f, 0};
-  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  info.renderArea = {{0, 0}, main_view_extent};
-  info.layerCount = 1;
-  info.colorAttachmentCount = 1;
-  info.pColorAttachments = &color;
-  info.pDepthAttachment = &depth;
-  info.pStencilAttachment = &depth;
-  vk::vkCmdBeginRendering(commands, &info);
+  gpu::PassTarget color, depth;
+  color.image = id_image;
+  color.load = gpu::LoadOp::kClear;
+  color.clear_color[0] = UINT32_MAX;
+  depth.image = id_depth;
+  depth.load = gpu::LoadOp::kClear;
+  depth.store = gpu::StoreOp::kDontCare;
+  depth.clear_depth = reversed ? 0.0f : 1.0f;
+  backend->BeginPass(color, depth, {0, 0, main_view_extent.width, main_view_extent.height});
   for (const IdDraw& draw : id_draws) {
     VkPipeline pipeline = GetIdPipeline(draw);
     if (!pipeline) {
@@ -3597,7 +3556,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     }
     vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, draw.base_vertex, 0);
   }
-  vk::vkCmdEndRendering(commands);
+  backend->EndPass();
   recorded.valid = false;
   backend->Use(id_image, gpu::Usage::kCopySource);
   id_drawn = true;

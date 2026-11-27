@@ -1085,6 +1085,41 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
 }
 
+void Backend::BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) {
+  auto attachment = [](const PassTarget& target, VkImageLayout layout) {
+    VkRenderingAttachmentInfo a{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    a.imageView = Object(target.image).view;
+    a.imageLayout = layout;
+    a.loadOp = target.load == LoadOp::kLoad    ? VK_ATTACHMENT_LOAD_OP_LOAD
+               : target.load == LoadOp::kClear ? VK_ATTACHMENT_LOAD_OP_CLEAR
+                                               : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    a.storeOp = target.store == StoreOp::kStore ? VK_ATTACHMENT_STORE_OP_STORE
+                                                : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    return a;
+  };
+  VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+  info.renderArea = {{area.x, area.y}, {area.width, area.height}};
+  info.layerCount = 1;
+  if (color.image) {
+    color_attachment = attachment(color, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    std::memcpy(color_attachment.clearValue.color.uint32, color.clear_color,
+                sizeof(color.clear_color));
+    info.colorAttachmentCount = 1;
+    info.pColorAttachments = &color_attachment;
+  }
+  if (depth.image) {
+    depth_attachment = attachment(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    depth_attachment.clearValue.depthStencil = {depth.clear_depth, depth.clear_stencil};
+    info.pDepthAttachment = &depth_attachment;
+    info.pStencilAttachment = &depth_attachment;
+  }
+  vk::vkCmdBeginRendering(commands(), &info);
+}
+
+void Backend::EndPass() { vk::vkCmdEndRendering(commands()); }
+
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   const ImageObject& o = Object(image);
   auto component = [](Swizzle swizzle) {

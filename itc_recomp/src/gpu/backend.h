@@ -87,6 +87,12 @@ class Backend {
   // kept; null if it can't be made.
   virtual Pipeline* GetPipeline(const PipelineDesc& desc, bool* made = nullptr) = 0;
 
+  // A pass drawing into `color` and `depth` (either may have no image)
+  // within `area`, until EndPass. Copies, clears, uploads and Use aren't
+  // made inside one.
+  virtual void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) = 0;
+  virtual void EndPass() = 0;
+
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
   virtual void DestroyView(View* view) = 0;

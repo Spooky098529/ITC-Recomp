@@ -262,6 +262,24 @@ struct PipelineDesc {
 };
 static_assert(sizeof(PipelineDesc) == 2 * sizeof(void*) + 18 * sizeof(uint32_t));
 
+// A pass's target: its image (in its target usage), what the pass starts
+// from and keeps. The clear value as bits: four floats or integers for
+// color; depth and stencil.
+enum class LoadOp : uint8_t { kLoad, kClear, kDontCare };
+enum class StoreOp : uint8_t { kStore, kDontCare };
+struct PassTarget {
+  struct Image* image = nullptr;
+  LoadOp load = LoadOp::kLoad;
+  StoreOp store = StoreOp::kStore;
+  uint32_t clear_color[4] = {};
+  float clear_depth = 0.0f;
+  uint32_t clear_stencil = 0;
+};
+struct Rect {
+  int32_t x = 0, y = 0;
+  uint32_t width = 0, height = 0;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
 struct Pipeline;
 struct Buffer;

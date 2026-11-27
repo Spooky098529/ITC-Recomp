@@ -274,8 +274,13 @@ each backend.
   `passes.cpp`: `GetPipeline`, `GetPipelineLayout`, `GetModule`, the vertex
   inputs and the texture layouts. Checked: the dump identical (the ID pass's
   image too), the tick replay, the pad replay without errors.
-- **Next:** binding and recording (step 3's largest piece): passes (begin
-  and end, targets, clears), binds (pipeline, the texture sets from views
+- **Passes (2026-11-27).** `gpu::PassTarget` (an image, its load: kept,
+  cleared or dropped, its store, the clear value as bits), `gpu::Rect`, and
+  `Backend::BeginPass` and `EndPass`: the draws' passes, the resolve's, the
+  movie's and the ID pass's (`vkCmdBeginRendering` and `vkCmdEndRendering`
+  are the backend's alone). Checked: the dump identical (the ID pass's
+  image too), the tick replay, the pad replay, the boot movie drawn.
+- **Next:** binding and recording (step 3's largest piece): clears, binds (pipeline, the texture sets from views
   and samplers, the constant blocks by offset, vertex and index buffers),
   draws, copies and resolves in the frame (the movie planes' copies too);
   then the resolve, movie, gamma and ID passes' own pipelines and shaders;

@@ -119,6 +119,8 @@ class Backend final : public gpu::Backend {
   // floats, bool/loop; dynamic uniform buffers).
   VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
   VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
+  void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
+  void EndPass() override;
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
