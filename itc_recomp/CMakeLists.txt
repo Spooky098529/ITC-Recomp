@@ -775,6 +775,7 @@ set(ITC_SOURCES
     src/native/port_spirv.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
+    src/gpu/vulkan/backend.cpp
     src/hooks/replay_commands.cpp
     src/native/shaders.cpp
     src/native/draw_registers.cpp

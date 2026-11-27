@@ -12,6 +12,7 @@
 #include "passes.h"
 #include "shaders.h"
 #include "vulkan_functions.h"
+#include "gpu/vulkan/backend.h"
 
 #include "guest.h"
 
@@ -19,7 +20,6 @@
 #include <algorithm>
 #include <deque>
 #include <mutex>
-#include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -165,34 +165,18 @@ bool SDLCALL WatchWindowEvents(void*, SDL_Event* event) {
   return true;
 }
 
-// Where a frame of `source`'s shape goes in `target`: as large as fits,
-// centered (black bars on the sides or above and below).
-VkOffset3D FitOffsets(VkExtent2D source, VkExtent2D target, VkOffset3D& end) {
-  uint64_t width = target.width, height = target.height;
-  if (uint64_t(target.width) * source.height > uint64_t(target.height) * source.width) {
-    width = (uint64_t(target.height) * source.width + source.height / 2) / source.height;
-  } else {
-    height = (uint64_t(target.width) * source.height + source.width / 2) / source.width;
-  }
-  VkOffset3D start{int32_t((target.width - width) / 2), int32_t((target.height - height) / 2), 0};
-  end = {start.x + int32_t(width), start.y + int32_t(height), 1};
-  return start;
-}
-
 // Draw commands (see docs/gpu-functions.md).
 bool IsDraw(uint32_t id) {
   return id == 15 || id == 16 || id == 17 || id == 18 || id == 19 || id == 27;
 }
 
-// The window and Vulkan instance, created on the main thread (SDL's window
-// calls belong there; the SDK runs SDL's event loop on it).
+// The window, created on the main thread (SDL's window calls belong there;
+// the main thread runs SDL's event loop), with what the backend makes there.
 struct WindowSetup {
-  bool validation = false;
+  gpu::Backend* backend = nullptr;
   SDL_Window* window = nullptr;
   VkExtent2D display{};  // its screen's size in pixels
   float density = 1.0f;  // pixels per unit of the desktop's
-  VkInstance instance = VK_NULL_HANDLE;
-  VkSurfaceKHR surface = VK_NULL_HANDLE;
   std::string error;
   std::promise<void> done;
 };
@@ -209,7 +193,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   // High pixel density: real pixels under the desktop's scaling, not a
   // smaller surface the compositor stretches (2648x1490 for a 3840x2160
   // screen at 145%).
-  SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
+  SDL_WindowFlags flags = setup->backend->WindowFlags() | SDL_WINDOW_RESIZABLE |
                           SDL_WINDOW_HIGH_PIXEL_DENSITY |
                           (ITC_FLAG(fullscreen) ? SDL_WINDOW_FULLSCREEN : 0);
   setup->window =
@@ -234,43 +218,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   g_window_id = SDL_GetWindowID(setup->window);
   SDL_AddEventWatch(WatchWindowEvents, nullptr);
   AppWindow_AdoptOurWindow(setup->window);
-  auto get_instance_proc_addr =
-      reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
-  if (!get_instance_proc_addr || !vk::LoadGlobal(get_instance_proc_addr)) {
-    return finish(std::format("no Vulkan loader: {}", SDL_GetError()));
-  }
-  Uint32 extension_count = 0;
-  const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&extension_count);
-  uint32_t api_version = VK_API_VERSION_1_1;
-  vk::vkEnumerateInstanceVersion(&api_version);
-  VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
-  app.pApplicationName = "ITC native renderer";
-  app.apiVersion = std::min<uint32_t>(api_version, VK_API_VERSION_1_3);
-  const char* validation_layer = "VK_LAYER_KHRONOS_validation";
-  VkInstanceCreateInfo info{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
-  info.pApplicationInfo = &app;
-  info.enabledExtensionCount = extension_count;
-  info.ppEnabledExtensionNames = extensions;
-  if (setup->validation) {
-    info.enabledLayerCount = 1;
-    info.ppEnabledLayerNames = &validation_layer;
-  }
-  VkResult result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
-  if (result == VK_ERROR_LAYER_NOT_PRESENT) {
-    ITC_LOG_WARN("native renderer: validation layer not installed, continuing without it");
-    info.enabledLayerCount = 0;
-    result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
-  }
-  if (result != VK_SUCCESS) {
-    return finish(std::format("vkCreateInstance: {}", int(result)));
-  }
-  if (!vk::LoadInstance(setup->instance)) {
-    return finish("missing instance functions");
-  }
-  if (!SDL_Vulkan_CreateSurface(setup->window, setup->instance, nullptr, &setup->surface)) {
-    return finish(std::format("SDL_Vulkan_CreateSurface: {}", SDL_GetError()));
-  }
-  finish("");
+  finish(setup->backend->AttachWindow(setup->window));
 }
 
 class Renderer {
@@ -291,40 +239,15 @@ class Renderer {
   void EndFrame();
 
  private:
-  bool CreateWindowAndInstance();
-  bool CreateDevice();
+  bool OpenWindow();
   // Opens this frame's command buffer, once its previous use is done.
   VkCommandBuffer BeginFrame();
-  bool CreateSwapchain();
-  void DestroySwapchain();
   void LogStats();
 
   SDL_Window* window_ = nullptr;
   VkExtent2D display_{};  // the window's screen, in pixels
-  VkInstance instance_ = VK_NULL_HANDLE;
-  VkSurfaceKHR surface_ = VK_NULL_HANDLE;
-  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
-  VkDevice device_ = VK_NULL_HANDLE;
-  uint32_t queue_family_ = 0;
-  VkQueue queue_ = VK_NULL_HANDLE;
-
-  VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
-  VkFormat swapchain_format_ = VK_FORMAT_UNDEFINED;
-  VkExtent2D swapchain_extent_{};
-  std::vector<VkImage> swapchain_images_;
-  std::vector<VkSemaphore> render_done_;  // one per swapchain image
-  bool swapchain_stale_ = false;
-
-  struct Frame {
-    VkCommandPool pool = VK_NULL_HANDLE;
-    VkCommandBuffer commands = VK_NULL_HANDLE;
-    VkFence done = VK_NULL_HANDLE;
-    VkSemaphore image_ready = VK_NULL_HANDLE;
-  };
-  std::array<Frame, kFramesInFlight> frames_{};
-  uint32_t frame_index_ = 0;
-
-  DeviceContext context_{};
+  std::unique_ptr<gpu::vulkan::Backend> backend_;
+  uint32_t frame_index_ = 0;  // the frame's slot
   Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
   // The dump's frames after the first: what each hides.
@@ -365,10 +288,10 @@ class Renderer {
   Clock::time_point last_present_ = Clock::now();
 };
 
-bool Renderer::CreateWindowAndInstance() {
+bool Renderer::OpenWindow() {
   static Uint32 wakeup_event = SDL_RegisterEvents(1);
   auto setup = std::make_shared<WindowSetup>();
-  setup->validation = ITC_FLAG(native_renderer_validation);
+  setup->backend = backend_.get();
   auto future = setup->done.get_future();
   // Queued for the main thread, which runs it as it pumps events; an event
   // of our own wakes it (the SDK's loop ignores event types it doesn't know).
@@ -394,247 +317,21 @@ bool Renderer::CreateWindowAndInstance() {
                WindowSize().width, WindowSize().height,
                ITC_FLAG(fullscreen) ? " (fullscreen)" : "", display_.width, display_.height,
                setup->density);
-  instance_ = setup->instance;
-  surface_ = setup->surface;
   return true;
-}
-
-bool Renderer::CreateDevice() {
-  uint32_t count = 0;
-  vk::vkEnumeratePhysicalDevices(instance_, &count, nullptr);
-  std::vector<VkPhysicalDevice> devices(count);
-  vk::vkEnumeratePhysicalDevices(instance_, &count, devices.data());
-  // A queue that draws and presents; discrete GPUs first.
-  int best_score = -1;
-  for (VkPhysicalDevice candidate : devices) {
-    VkPhysicalDeviceProperties properties;
-    vk::vkGetPhysicalDeviceProperties(candidate, &properties);
-    uint32_t family_count = 0;
-    vk::vkGetPhysicalDeviceQueueFamilyProperties(candidate, &family_count, nullptr);
-    std::vector<VkQueueFamilyProperties> families(family_count);
-    vk::vkGetPhysicalDeviceQueueFamilyProperties(candidate, &family_count, families.data());
-    for (uint32_t i = 0; i < family_count; i++) {
-      VkBool32 present = VK_FALSE;
-      vk::vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface_, &present);
-      if (!(families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) || !present) {
-        continue;
-      }
-      int score = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 2 : 1;
-      if (score > best_score) {
-        best_score = score;
-        physical_device_ = candidate;
-        queue_family_ = i;
-      }
-      break;
-    }
-  }
-  if (!physical_device_) {
-    ITC_LOG_ERROR("native renderer: no GPU can draw to the window");
-    return false;
-  }
-  VkPhysicalDeviceProperties properties;
-  vk::vkGetPhysicalDeviceProperties(physical_device_, &properties);
-  ITC_LOG_INFO("native renderer: using {}", properties.deviceName);
-
-  // Dynamic rendering is core in Vulkan 1.3.
-  if (properties.apiVersion < VK_API_VERSION_1_3) {
-    ITC_LOG_ERROR("native renderer: needs Vulkan 1.3");
-    return false;
-  }
-
-  // Features: what the GPU has, of what the translated shaders can use.
-  VkPhysicalDeviceVulkan13Features supported13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
-  VkPhysicalDeviceVulkan12Features supported12{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
-  supported13.pNext = &supported12;
-  VkPhysicalDeviceFeatures2 supported{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
-  supported.pNext = &supported13;
-  vk::vkGetPhysicalDeviceFeatures2(physical_device_, &supported);
-  if (!supported13.dynamicRendering) {
-    ITC_LOG_ERROR("native renderer: needs dynamic rendering");
-    return false;
-  }
-  VkPhysicalDeviceVulkan13Features enabled13{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
-  enabled13.dynamicRendering = VK_TRUE;
-  enabled13.shaderDemoteToHelperInvocation = supported13.shaderDemoteToHelperInvocation;
-  VkPhysicalDeviceVulkan12Features enabled12{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
-  enabled12.samplerMirrorClampToEdge = supported12.samplerMirrorClampToEdge;
-  enabled13.pNext = &enabled12;
-  VkPhysicalDeviceFeatures2 enabled{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
-  enabled.pNext = &enabled13;
-  enabled.features.shaderClipDistance = supported.features.shaderClipDistance;
-  enabled.features.shaderCullDistance = supported.features.shaderCullDistance;
-  enabled.features.fullDrawIndexUint32 = supported.features.fullDrawIndexUint32;
-  enabled.features.independentBlend = supported.features.independentBlend;
-  enabled.features.samplerAnisotropy = supported.features.samplerAnisotropy;
-  enabled.features.imageCubeArray = supported.features.imageCubeArray;
-
-  float priority = 1.0f;
-  VkDeviceQueueCreateInfo queue_info{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-  queue_info.queueFamilyIndex = queue_family_;
-  queue_info.queueCount = 1;
-  queue_info.pQueuePriorities = &priority;
-  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-  VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-  info.pNext = &enabled;
-  info.queueCreateInfoCount = 1;
-  info.pQueueCreateInfos = &queue_info;
-  info.enabledExtensionCount = 1;
-  info.ppEnabledExtensionNames = extensions;
-  if (VkResult result = vk::vkCreateDevice(physical_device_, &info, nullptr, &device_);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: vkCreateDevice: {}", int(result));
-    return false;
-  }
-  if (!vk::LoadDevice(device_)) {
-    return false;
-  }
-  vk::vkGetDeviceQueue(device_, queue_family_, 0, &queue_);
-
-  context_.physical_device = physical_device_;
-  context_.device = device_;
-  context_.queue_family = queue_family_;
-  context_.queue = queue_;
-  // The vertex shaders take up to 24 attributes and bindings (a fetch's
-  // three, passes.cpp's kMaxVertexBindings; Vulkan promises 16).
-  if (properties.limits.maxVertexInputAttributes < 24 ||
-      properties.limits.maxVertexInputBindings < 24) {
-    ITC_LOG_ERROR("native renderer: the device takes {} vertex attributes and {} bindings; the "
-                  "game's shaders may need 24",
-                  properties.limits.maxVertexInputAttributes,
-                  properties.limits.maxVertexInputBindings);
-  }
-  context_.min_uniform_buffer_offset_alignment =
-      uint32_t(properties.limits.minUniformBufferOffsetAlignment);
-  context_.clip_distance = enabled.features.shaderClipDistance;
-  context_.cull_distance = enabled.features.shaderCullDistance;
-  context_.demote_to_helper_invocation = enabled13.shaderDemoteToHelperInvocation;
-  context_.sampler_anisotropy = enabled.features.samplerAnisotropy;
-  context_.max_sampler_anisotropy = properties.limits.maxSamplerAnisotropy;
-  context_.vendor_id = properties.vendorID;
-  context_.device_id = properties.deviceID;
-  std::copy(std::begin(properties.pipelineCacheUUID), std::end(properties.pipelineCacheUUID),
-            context_.pipeline_cache_uuid.begin());
-  context_.sampler_mirror_clamp_to_edge = enabled12.samplerMirrorClampToEdge;
-
-  for (Frame& frame : frames_) {
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_info.queueFamilyIndex = queue_family_;
-    vk::vkCreateCommandPool(device_, &pool_info, nullptr, &frame.pool);
-    VkCommandBufferAllocateInfo alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    alloc.commandPool = frame.pool;
-    alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc.commandBufferCount = 1;
-    vk::vkAllocateCommandBuffers(device_, &alloc, &frame.commands);
-    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vk::vkCreateFence(device_, &fence_info, nullptr, &frame.done);
-    VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    vk::vkCreateSemaphore(device_, &semaphore_info, nullptr, &frame.image_ready);
-  }
-  return true;
-}
-
-bool Renderer::CreateSwapchain() {
-  VkSurfaceCapabilitiesKHR caps;
-  vk::vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device_, surface_, &caps);
-  VkExtent2D extent = caps.currentExtent;
-  if (extent.width == UINT32_MAX) {
-    // The window system leaves the size to us (Wayland).
-    VkExtent2D size = WindowSize();
-    int width = int(size.width), height = int(size.height);
-    SDL_GetWindowSizeInPixels(window_, &width, &height);
-    extent = {std::clamp<uint32_t>(width, caps.minImageExtent.width, caps.maxImageExtent.width),
-              std::clamp<uint32_t>(height, caps.minImageExtent.height,
-                                   caps.maxImageExtent.height)};
-  }
-  if (extent.width == 0 || extent.height == 0) {
-    return false;  // minimized
-  }
-
-  uint32_t count = 0;
-  vk::vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device_, surface_, &count, nullptr);
-  std::vector<VkSurfaceFormatKHR> formats(count);
-  vk::vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device_, surface_, &count, formats.data());
-  VkSurfaceFormatKHR format = formats[0];
-  for (const VkSurfaceFormatKHR& candidate : formats) {
-    if (candidate.format == VK_FORMAT_B8G8R8A8_UNORM ||
-        candidate.format == VK_FORMAT_R8G8B8A8_UNORM) {
-      format = candidate;
-      break;
-    }
-  }
-  // Never wait for vblank: the render thread is the game's, and the frame
-  // rate is paced elsewhere.
-  vk::vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device_, surface_, &count, nullptr);
-  std::vector<VkPresentModeKHR> modes(count);
-  vk::vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device_, surface_, &count, modes.data());
-  VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
-  for (VkPresentModeKHR wanted : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
-    if (std::find(modes.begin(), modes.end(), wanted) != modes.end()) {
-      mode = wanted;
-      break;
-    }
-  }
-
-  VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
-  info.surface = surface_;
-  info.minImageCount = std::max(caps.minImageCount, 3u);
-  if (caps.maxImageCount) {
-    info.minImageCount = std::min(info.minImageCount, caps.maxImageCount);
-  }
-  info.imageFormat = format.format;
-  info.imageColorSpace = format.colorSpace;
-  info.imageExtent = extent;
-  info.imageArrayLayers = 1;
-  info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  info.preTransform = caps.currentTransform;
-  info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  info.presentMode = mode;
-  info.clipped = VK_TRUE;
-  info.oldSwapchain = swapchain_;
-  VkSwapchainKHR swapchain;
-  if (VkResult result = vk::vkCreateSwapchainKHR(device_, &info, nullptr, &swapchain);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: vkCreateSwapchainKHR: {}", int(result));
-    return false;
-  }
-  DestroySwapchain();
-  swapchain_ = swapchain;
-  swapchain_format_ = format.format;
-  swapchain_extent_ = extent;
-  vk::vkGetSwapchainImagesKHR(device_, swapchain_, &count, nullptr);
-  swapchain_images_.resize(count);
-  vk::vkGetSwapchainImagesKHR(device_, swapchain_, &count, swapchain_images_.data());
-  render_done_.resize(count);
-  for (VkSemaphore& semaphore : render_done_) {
-    VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    vk::vkCreateSemaphore(device_, &semaphore_info, nullptr, &semaphore);
-  }
-  swapchain_stale_ = false;
-  ITC_LOG_INFO("native renderer: swapchain {}x{}, {} images, present mode {}", extent.width,
-               extent.height, count, int(mode));
-  return true;
-}
-
-void Renderer::DestroySwapchain() {
-  if (!swapchain_) {
-    return;
-  }
-  vk::vkDeviceWaitIdle(device_);
-  for (VkSemaphore semaphore : render_done_) {
-    vk::vkDestroySemaphore(device_, semaphore, nullptr);
-  }
-  render_done_.clear();
-  swapchain_images_.clear();
-  vk::vkDestroySwapchainKHR(device_, swapchain_, nullptr);
-  swapchain_ = VK_NULL_HANDLE;
 }
 
 bool Renderer::Init() {
-  if (!CreateWindowAndInstance() || !CreateDevice() || !CreateSwapchain() ||
-      !passes_.Init(context_, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
+  gpu::vulkan::Backend::Options options;
+  options.frames_in_flight = kFramesInFlight;
+  options.validation = ITC_FLAG(native_renderer_validation);
+  options.requested_size = {WindowSize().width, WindowSize().height};
+  backend_ = std::make_unique<gpu::vulkan::Backend>(options);
+  if (!OpenWindow() || !backend_->Init()) {
+    return false;
+  }
+  const gpu::Extent2D output = backend_->OutputSize();
+  if (!passes_.Init(backend_->context(), kFramesInFlight,
+                    ResolutionScale({output.width, output.height}))) {
     return false;
   }
   return true;
@@ -648,16 +345,11 @@ void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
 }
 
 VkCommandBuffer Renderer::BeginFrame() {
-  Frame& frame = frames_[frame_index_];
   if (!recording_) {
-    vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
+    frame_index_ = backend_->BeginFrame();
     if (ITC_FLAG(native_renderer_serialize)) {
-      vk::vkQueueWaitIdle(queue_);
+      backend_->WaitIdle();
     }
-    vk::vkResetCommandBuffer(frame.commands, 0);
-    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vk::vkBeginCommandBuffer(frame.commands, &begin);
     passes_.BeginFrame(frame_index_);
     // A dump starts 10 s into a race, or when asked for.
     const std::string& dump_root = ITC_FLAG(native_renderer_dump);
@@ -725,7 +417,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
   }
-  return frame.commands;
+  return backend_->commands();
 }
 
 void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
@@ -760,105 +452,15 @@ void Renderer::EndFrame() {
                              std::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
                              false)
           : passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), false);
-  Frame& frame = frames_[frame_index_];
-
-  // Copy what's shown onto a swapchain image, if one can be had now.
-  bool acquired = false;
-  uint32_t image_index = 0;
+  // Shown, after the frame's uploads.
   if (g_window_resized.exchange(false)) {
-    swapchain_stale_ = true;
+    backend_->WindowResized();
   }
-  if ((!swapchain_stale_ && swapchain_) || CreateSwapchain()) {
-    VkResult result = vk::vkAcquireNextImageKHR(device_, swapchain_, 100'000'000,
-                                                frame.image_ready, VK_NULL_HANDLE, &image_index);
-    if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
-      acquired = true;
-      swapchain_stale_ = result == VK_SUBOPTIMAL_KHR;  // present it, recreate next frame
-    } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      swapchain_stale_ = true;
-    } else if (result != VK_TIMEOUT && result != VK_NOT_READY) {
-      ITC_LOG_ERROR("native renderer: vkAcquireNextImageKHR: {}", int(result));
-    }
-  }
-  if (acquired) {
-    VkImage image = swapchain_images_[image_index];
-    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
-    // The frame keeps its shape: black bars where the window's differs.
-    VkImageBlit blit{};
-    blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit.srcOffsets[1] = {int32_t(source.width), int32_t(source.height), 1};
-    blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit.dstOffsets[0] = FitOffsets(source, swapchain_extent_, blit.dstOffsets[1]);
-    if (blit.dstOffsets[0].x || blit.dstOffsets[0].y ||
-        blit.dstOffsets[1].x != int32_t(swapchain_extent_.width) ||
-        blit.dstOffsets[1].y != int32_t(swapchain_extent_.height)) {
-      VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
-      VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-      vk::vkCmdClearColorImage(commands, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1,
-                               &range);
-      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-      barrier.oldLayout = barrier.newLayout;
-      vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                               &barrier);
-    }
-    vk::vkCmdBlitImage(commands, passes_.shown(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = 0;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
-  }
-  vk::vkEndCommandBuffer(commands);
+  backend_->set_shown(passes_.shown());
+  backend_->SubmitBefore(passes_.EndUploads());
+  backend_->SubmitBefore(passes_.EndBufferUploads());
   recording_ = false;
-
-  vk::vkResetFences(device_, 1, &frame.done);
-  VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-  if (acquired) {
-    submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &frame.image_ready;
-    submit.pWaitDstStageMask = &wait_stage;
-    submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &render_done_[image_index];
-  }
-  // Texture and vertex arena uploads first, then the frame.
-  VkCommandBuffer command_buffers[3];
-  submit.commandBufferCount = 0;
-  if (VkCommandBuffer uploads = passes_.EndUploads()) {
-    command_buffers[submit.commandBufferCount++] = uploads;
-  }
-  if (VkCommandBuffer uploads = passes_.EndBufferUploads()) {
-    command_buffers[submit.commandBufferCount++] = uploads;
-  }
-  command_buffers[submit.commandBufferCount++] = commands;
-  submit.pCommandBuffers = command_buffers;
-  if (VkResult result = vk::vkQueueSubmit(queue_, 1, &submit, frame.done); result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: vkQueueSubmit: {}", int(result));
-  }
-  if (acquired) {
-    VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &render_done_[image_index];
-    present.swapchainCount = 1;
-    present.pSwapchains = &swapchain_;
-    present.pImageIndices = &image_index;
-    VkResult result = vk::vkQueuePresentKHR(queue_, &present);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-      swapchain_stale_ = true;
-    }
+  if (backend_->EndFrame({source.width, source.height})) {
     frames_presented_++;
     // A frame much longer than usual (a hitch the per-second fps hides),
     // with what it spent on work that comes and goes (frame_costs.h).
@@ -884,7 +486,7 @@ void Renderer::EndFrame() {
     frames_skipped_++;
   }
   if (cycle_capture) {
-    vk::vkQueueWaitIdle(queue_);
+    backend_->WaitIdle();
     passes_.WriteDump(cycle_directory_);
     cycle_captured_ = true;
   }
@@ -899,7 +501,7 @@ void Renderer::EndFrame() {
     }
   }
   if (dump) {
-    vk::vkQueueWaitIdle(queue_);
+    backend_->WaitIdle();
     passes_.WriteDump(dump_directory_);
     if (dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0) {
       // Each pixel shader the main view was drawn with, left out; then all
@@ -922,7 +524,6 @@ void Renderer::EndFrame() {
       dumping_ = false;
     }
   }
-  frame_index_ = (frame_index_ + 1) % kFramesInFlight;
   LogStats();
 }
 

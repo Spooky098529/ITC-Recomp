@@ -1,4 +1,4 @@
-# A Direct3D 11 backend (a plan; step 2 done)
+# A Direct3D 11 backend (a plan; step 2 done, step 3 in progress)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
 renderer's merge). Step 2 is done (below, "Step 2: `render::`'s own types").
@@ -72,6 +72,32 @@ Vulkan's image layouts and barriers stay inside its implementation; D3D11
 has none. `render::`'s Vulkan enums become our own (`src/gpu/types.h`),
 mapped by each backend.
 
+How that's done (decided at step 3's start, 2026-11-27):
+
+- **Usage, not layouts.** The renderer says what an image is about to be
+  used for (`Use(image, Usage)`: sampled, color target, depth target, copy
+  source, copy destination, shown), as D3D12's resource states do; the
+  Vulkan backend keeps each image's layout and records a barrier only when
+  the usage changes, and the D3D11 backend does nothing. Tracking it
+  wholly inside the backend (as DXVK does) can't work here without moving
+  the renderer's pass logic too: a texture bound inside a dynamic rendering
+  pass can't be transitioned there, so the renderer must say it before the
+  pass, as it does today with its `Transition` calls.
+- **Handles:** `gpu::Image`, `gpu::Buffer`, `gpu::Sampler`, `gpu::Shader`,
+  `gpu::Pipeline` are opaque objects each backend derives from (both
+  backends are built into the Windows executable, so no shared
+  definitions).
+- **One command stream:** the backend owns the frame's recording; the
+  renderer's calls don't pass a command buffer. Uploads (the texture cache's
+  and the arena's) go through the backend, which orders them before the
+  frame's drawing (Vulkan: their own command buffers submitted first;
+  D3D11: `UpdateSubresource` or a staging copy in place).
+- **In between:** the Vulkan implementation is a class of its own
+  (`gpu::vulkan::Backend`, `src/gpu/vulkan/`). While pieces move, code not
+  yet moved reaches Vulkan through a few Vulkan-only accessors on that class
+  (the device context, the frame's command buffer), which shrink as pieces
+  move, until the renderer holds only a `gpu::Backend`.
+
 ### Shaders for D3D11
 
 From the SPIR-V we already make: SPIRV-Cross (its command line tool, like
@@ -129,6 +155,31 @@ each backend.
 - Checked: an attract race's dump against the build before's at the same
   moment (2,654 draws; all 59 images 0.0000% of pixels off, `draws.txt` the
   same), the tick replay (both races match, 0 error lines).
+
+## Step 3: the backend interface (in progress)
+
+- **The device, swapchain and frames (2026-11-27).** `src/gpu/backend.h`
+  (`gpu::Backend`: the window's flags, what's made on the main thread once
+  the window is, the device, the output size, a frame's begin and end with
+  the shown image fitted with black bars, waiting for the GPU) and its
+  Vulkan implementation `src/gpu/vulkan/backend.{h,cpp}`
+  (`gpu::vulkan::Backend`): the instance and surface, the device and its
+  features (`native::DeviceContext`, still handed to the code not yet
+  moved), the swapchain, the frames' command buffers, fences and
+  semaphores, the blit to the swapchain image, the submit (the uploads'
+  command buffers first) and the present, moved from `renderer.cpp`
+  unchanged. `renderer.cpp` keeps the window (made with the backend's
+  flags), the dumps, the cycle and the stats; it reaches the frame's
+  command buffer through the backend (`commands()`, for the passes not yet
+  moved). Checked: an attract race's dump against the build before's at
+  the same moment (all 59 images 0.0000% off; `draws.txt` the same but for
+  inline draws' vertex addresses, 16 MB apart: which of the game's two
+  command list buffers the frame used), the tick replay (both races
+  match).
+- **Dump runs:** a run lands on one of at least three moments (2,654,
+  2,381 and 2,338 draws seen): take runs until one has the reference's
+  line count. `draws.txt`'s inline vertex addresses may differ between
+  runs of one build.
 
 ## Open questions
 
