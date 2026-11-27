@@ -32,14 +32,12 @@ class Passes {
 
   // Render thread. Before a frame's first command.
   void BeginFrame(uint32_t frame_index);
-  // After a draw command's library call (the device's shadow is complete).
-  void AfterDraw(VkCommandBuffer commands, uint32_t id, uint32_t payload,
-                 uint32_t arg1);
-  // A draw of vertices given inline (DrawPrimitiveUP, command 19, and the
-  // helper object's draws, command 15): at the library's End
-  // (sub_825BDDA0), when the vertices have been copied to `data` (a guest
-  // address) and the device's shadow holds the draw's state. type: the
-  // primitive type; count: vertices; stride in bytes.
+  // An indexed draw (render::DrawIndexed): command 18's item fields.
+  void DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_start,
+                   uint32_t primitive_count);
+  // A draw of vertices given inline (render::DrawUP: DrawPrimitiveUP,
+  // command 19, and the helper object's draws, command 15): `data` a guest
+  // address. type: the primitive type; count: vertices; stride in bytes.
   void InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                   uint32_t stride, uint32_t data);
   // After a clear (26) or resolve (25) command's library call.

@@ -163,12 +163,10 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     const uint32_t device = Globals::replay_device();
     // The drawer's Draw sets its declaration, [[drawer +4]].
     render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
-    const uint32_t vtable = schema::PrimitiveDrawer(drawer).vtable();
-    const uint32_t count = guest::LoadU32(state + 16);
-    const uint32_t vertices = guest::LoadU32(state + 12);
-    const uint32_t type = guest::LoadU32(state + 0);
-    const uint32_t draw = guest::LoadU32(vtable + 12);
-    call(draw, frame, 0x8258F640, {drawer, device, type, vertices, count});
+    // The drawer's Draw (no longer called): drawn by our renderer.
+    render::DrawUP(guest::LoadU32(state + 0), guest::LoadU32(state + 16), 24,
+                   guest::LoadU32(state + 12));
+    (void)device;
   }
   {
     const uint32_t device = Globals::replay_device();

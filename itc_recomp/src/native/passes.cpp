@@ -3170,7 +3170,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   const uint8_t* vertex_ucode = PhysicalHostAddress(GpuPhysicalAddress(vertex_address));
   uint32_t vertex_size = guest::LoadU32(vertex_object + 600);
   uint32_t declaration = bound.declaration;
-  uint32_t declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
   // The fetches take their fields from the declaration and the stream
   // strides (the library's patch of the microcode no longer runs), unless
   // the shader is one the library doesn't patch (its +592 bit 6).
@@ -3246,8 +3245,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // declaration (ShaderLookupTable).
   ShaderLookup lookup;
   if (s.cache_shader_lookups) {
-    ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size, declaration,
-                                   declaration_id, strides[0], strides[1], strides[2],
+    ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size,
+                                   uint32_t(bound.declaration_hash >> 32),
+                                   uint32_t(bound.declaration_hash), strides[0], strides[1], strides[2],
                                    strides[3], pixel_object, pixel_address, pixel_size,
                                    program_control, context_misc,
                                    uint32_t(type == 1) | uint32_t(rectangle_list) << 1 |
@@ -4092,24 +4092,16 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   id_drawn = true;
 }
 
-void Passes::AfterDraw(VkCommandBuffer commands, uint32_t id, uint32_t payload,
-                       uint32_t arg1) {
+void Passes::DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_start,
+                         uint32_t primitive_count) {
   State& s = *state_;
-  // Only indexed draws for now (command 18, 12 bytes an item).
-  if (id != 18) {
-    s.stats.unsupported += arg1;
-    return;
-  }
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 12 * i;
-    DrawCall call;
-    call.type = guest::LoadU32(item);
-    call.base_start = guest::LoadU32(item + 4);
-    call.primitive_count = guest::LoadU32(item + 8);
-    s.Draw(commands, device, call);
-  }
+  DrawCall call;
+  call.type = type;
+  call.base_start = base_start;
+  call.primitive_count = primitive_count;
+  s.Draw(commands, device, call);
 }
 
 void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,

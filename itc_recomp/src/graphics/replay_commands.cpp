@@ -293,13 +293,12 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
       const uint32_t drawer = guest::LoadU32(kDrawer);
       // The drawer's draws set its declaration, [[drawer +4]].
       render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
+      // The drawer's Draw (sub_825A17A0, no longer called): its vertices
+      // (state +12, 24 bytes each, state +16 of them) drawn inline as the
+      // state's +0 type.
       const uint32_t state = guest::LoadU32(kDrawerState);
-      const uint32_t device = Device();
-      const uint32_t draw = guest::LoadU32(guest::LoadU32(drawer) + 12);
-      call(draw, frame, 0x8259018C,
-           {drawer, device, guest::LoadU32(state + 0), guest::LoadU32(state + 12),
-            guest::LoadU32(state + 16)},
-           std::nullopt);
+      render::DrawUP(guest::LoadU32(state + 0), guest::LoadU32(state + 16), 24,
+                     guest::LoadU32(state + 12));
     }
     ds::SetViewportEnable(Device(), 1);
     render::SetRenderState(304, 1);
@@ -356,14 +355,11 @@ uint32_t DrawVertices(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t DrawIndexedVertices(uint32_t items, uint32_t count, uint32_t sp,
                              const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825902E0 Command::DrawIndexedVertices");
-  const uint32_t frame = Frame(sp, 128);
+  // Drawn by our renderer (the library's DrawIndexedVertices, sub_825BE708,
+  // no longer called: its shader load and dirty masks fed only the GPU).
   for (uint32_t i = 0, item = items; i < count; i++, item += 12) {
-    const uint32_t type = guest::LoadU32(item);
-    const uint32_t word = guest::LoadU32(item + 4);
-    const uint32_t indices = PrimitiveCount(type, guest::LoadU32(item + 8));
-    const uint64_t base_vertex = uint64_t(int64_t(int32_t(word) >> 16));  // srawi
-    call(0x825BE708, frame, 0x82590340, {Device(), type, base_vertex, word & 0xFFFF, indices},
-         std::nullopt);
+    render::DrawIndexed(guest::LoadU32(item), guest::LoadU32(item + 4),
+                        guest::LoadU32(item + 8));
   }
   return count;
 }
@@ -371,20 +367,12 @@ uint32_t DrawIndexedVertices(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t DrawVerticesUP(uint32_t items, uint32_t count, uint32_t sp,
                         const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590360 Command::DrawVerticesUP");
-  const uint32_t frame = Frame(sp, 128);
+  // Drawn by our renderer from the item's vertices (the library's
+  // BeginVertices, memcpy into the command buffer and EndVertices no longer
+  // called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 12) {
-    const uint32_t vertices = guest::LoadU16(item + 4);
-    const uint32_t stride = guest::LoadU16(item + 6);
-    const uint32_t type = guest::LoadU32(item);
-    const uint32_t data = uint32_t(
-        call(0x825BD8F0, frame, 0x82590398, {Device(), type, vertices, stride}, std::nullopt));
-    if (data == 0) {
-      continue;
-    }
-    const uint32_t bytes = guest::LoadU16(item + 6) * guest::LoadU16(item + 4);
-    call(0x825A7410, frame, 0x825903B4, {data, guest::LoadU32(item + 8), bytes},
-         std::nullopt);
-    call(0x825BDDA0, frame, 0x825903BC, {Device()}, std::nullopt);
+    render::DrawUP(guest::LoadU32(item), guest::LoadU16(item + 4), guest::LoadU16(item + 6),
+                   guest::LoadU32(item + 8));
   }
   return count;
 }

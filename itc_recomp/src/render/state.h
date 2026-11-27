@@ -94,6 +94,9 @@ const Targets& BoundTargets();
 // low bits, then its size) and stride in words.
 struct Bindings {
   uint32_t vertex_shader = 0, pixel_shader = 0, declaration = 0, index_buffer = 0;
+  // The declaration's elements hashed (the shader lookups' key: what the
+  // vertex fetches are made from).
+  uint64_t declaration_hash = 0;
   uint32_t stream_fetch[16][2] = {};
   uint8_t strides[16] = {};
 };
@@ -142,6 +145,14 @@ struct Constants {
 // words), from the guest's `data`.
 void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, uint32_t data);
 const Constants& ShaderConstants();
+
+// The draws, made by the renderer (src/native/renderer.cpp) with the state
+// above. DrawIndexed: command 18's item (the primitive type, the base
+// vertex << 16 | the start index, the primitive count). DrawUP: vertices
+// in the guest's memory, `count` of `stride` bytes (commands 19 and the
+// drawer's 15).
+void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
+void DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
 
 // The game's render state `state` (a byte offset: 40 ZEnable, 44 ZFunc, ...)
 // set to `value`, as the device's setter for it gives it meaning.

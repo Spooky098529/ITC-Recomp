@@ -598,9 +598,22 @@ and resolve on one 256x144 target in turn, then the main view draws on
   describe it (`--native_renderer_check_render_states`, a dump's draw
   records). The base vertex comparison and its log line are gone.
 
-Left for step 3: clears and draws through the interface, then the game's
-setters out of the handlers (only game code outside the replay that reads
-the Direct3D state keeps what it needs), and `replay_hooks.cpp`.
+- **The seam, sixth part: the draws (2026-11-27).** `render::DrawIndexed`
+  and `render::DrawUP`, made by the renderer: command 18's items, command
+  19's vertices and the drawer's (15 and the single 15, its 24-byte
+  vertices from its state) go to them; the library's DrawIndexedVertices,
+  BeginVertices, the memcpy into the command buffer, EndVertices and the
+  drawer's Draw are no longer called from the replay (their shader load
+  and dirty masks fed only the GPU). Without the shader load no
+  declaration gets an id, so shader lookups are keyed by the declaration's
+  elements, hashed when it's bound. Checked: an attract race's dump
+  against the build before's at the same moment (2,413 draws, 0.008% of
+  pixels off), the pad replay with dumps, the tick replay (both races
+  match).
+
+Left for step 3: clears, resolves and tiling through the interface, then
+the game's setters out of the handlers (only game code outside the replay
+that reads the Direct3D state keeps what it needs), and `replay_hooks.cpp`.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

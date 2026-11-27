@@ -5,6 +5,7 @@
 #include <climits>
 #include <cstring>
 
+#include "base/hash.h"
 #include "schema/device_state.h"
 
 namespace render {
@@ -427,7 +428,16 @@ void SetPixelShader(uint32_t shader) {
     ApplyLiterals(shader + 56);
   }
 }
-void SetVertexLayout(uint32_t declaration) { g_bindings.declaration = declaration; }
+void SetVertexLayout(uint32_t declaration) {
+  g_bindings.declaration = declaration;
+  g_bindings.declaration_hash = 0;
+  if (declaration) {
+    // Its element count (+24) and 12-byte elements (+52).
+    const uint32_t count = guest::LoadU32(declaration + 24);
+    g_bindings.declaration_hash =
+        base::Hash64(guest::Pointer(declaration + 52), 12 * std::min(count, 64u)) ^ count;
+  }
+}
 void SetIndexBuffer(uint32_t buffer) { g_bindings.index_buffer = buffer; }
 
 void SetVertexBuffer(uint32_t stream, uint32_t buffer, uint32_t offset, uint32_t stride) {

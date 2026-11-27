@@ -1,5 +1,6 @@
 #include <format>
 #include "renderer.h"
+#include "render/state.h"
 #include "frame_costs.h"
 #include "base/log.h"
 
@@ -283,6 +284,7 @@ class Renderer {
   void OnCommand(uint32_t id, uint32_t arg1);
   void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+  void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
   void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                     uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
                     uint32_t tile, uint32_t tiles) {
@@ -741,12 +743,14 @@ void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
   passes_.InlineDraw(BeginFrame(), type, count, stride, data);
 }
 
+void Renderer::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
+  passes_.DrawIndexed(BeginFrame(), type, base_start, primitive_count);
+}
+
 void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
-  // Commands 15 and 19 draw inline vertices, drawn at the library's End
-  // (Renderer_InlineDraw).
-  if (IsDraw(id) && id != 15 && id != 19) {
-    passes_.AfterDraw(BeginFrame(), id, payload, arg1);
-  } else if (id == 25) {
+  // The draws come through render::DrawIndexed and DrawUP from the
+  // handlers.
+  if (id == 25) {
     passes_.AfterResolve(BeginFrame(), payload, arg1);
   } else if (id == 26) {
     passes_.AfterClear(BeginFrame(), payload, arg1);
@@ -1150,7 +1154,7 @@ void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
 
 void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
-  if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
+  if (!(id == 25 || id == 26 || id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
@@ -1164,6 +1168,22 @@ void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
     renderer->InlineDraw(type, count, stride, data);
   }
 }
+
+}  // namespace native
+
+void render::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->DrawIndexed(type, base_start, primitive_count);
+  }
+}
+
+void render::DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t data) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->InlineDraw(type, count, stride, data);
+  }
+}
+
+namespace native {
 
 void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                            uint32_t destination, uint32_t point, uint32_t clear_color,
