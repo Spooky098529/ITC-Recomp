@@ -183,6 +183,7 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     if (!device_state::SetTexture(device, 0, 0, kStage0)) {
       call(0x822A6008, frame, 0x8258F674, {device, 0, 0, kStage0});
     }
+    render::SetTexture(0, 0);
   }
   device_state::SetViewportEnable(Globals::replay_device(), viewport);
   render::SetRenderState(304, render_viewport ? 1 : 0);

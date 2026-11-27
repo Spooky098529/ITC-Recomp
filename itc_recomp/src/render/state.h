@@ -115,6 +115,19 @@ const Bindings& BoundResources();
 // SQ_PROGRAM_CNTL and SQ_CONTEXT_MISC.
 void ShaderControls(uint32_t& program_control, uint32_t& context_misc);
 
+// Commands 4 and 2: a sampler stage's texture (the game's texture object; 0
+// keeps the stage's descriptor as it was) and its sampler states (by the
+// game's sampler state numbers, the byte offsets into the device's sampler
+// setter table: 0 AddressU, 16 MagFilter, ...). Each stage's texture
+// descriptor (the six words the shaders and the texture cache read, the
+// texture's own fields merged with the stage's sampler fields) as the
+// game's SetTexture and sampler setters build it; the defaults applied as
+// Device::SetDefaultState applies them.
+void SetTexture(uint32_t stage, uint32_t texture);
+void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value);
+// Stage `stage`'s descriptor (stages 0-25).
+const uint32_t* TextureDescriptor(uint32_t stage);
+
 // The shaders' constants: each stage's 256 float registers (vertex 0,
 // pixel 1), and the bool and loop constants as the shaders' block takes
 // them (words 0-3 the vertex shader's 128 bools, 4-7 the pixel shader's,

@@ -78,6 +78,7 @@ uint32_t SetSamplerStates(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t sampler = guest::LoadU32(item);
     const uint32_t setter = guest::LoadU32(device + state + 440);
     call(setter, frame, 0x8258FC74, {device, sampler, value}, std::nullopt);
+    render::SetSamplerState(sampler, state, value);
   }
   return count;
 }
@@ -104,6 +105,7 @@ uint32_t SetTextures(uint32_t items, uint32_t count, uint32_t sp,
     if (!ds::SetTexture(device, stage, texture, dirty)) {
       call(0x822A6008, frame, 0x8258FD28, {device, stage, texture, dirty}, std::nullopt);
     }
+    render::SetTexture(stage, texture);
   }
   return count;
 }

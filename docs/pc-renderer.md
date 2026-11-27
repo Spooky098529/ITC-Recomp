@@ -577,9 +577,21 @@ and resolve on one 256x144 target in turn, then the main view draws on
   the shadow (no difference in an attract race or the pad replay), then
   frames right.
 
-Left for step 3: textures and sampler states (with 2b's resources by
-handle), clears and draws through the interface, then the game's setters
-out of the handlers, which ends the shadow on the render path.
+- **The seam, fifth part: textures and sampler states (2026-11-27).**
+  `render::SetTexture` and `SetSamplerState`, from commands 4 and 2 (and
+  the single 15's reset of stage 0): each stage's texture descriptor (the
+  six words the shaders' uniform and the texture cache still read: the
+  texture object's own fields merged with the stage's sampler fields, by
+  the game's SetTexture and sampler setters' rules, ported, with the
+  stage's bytes they keep beside: maximum anisotropy, Z filters, mip
+  level limits), its defaults applied as SetDefaultState applies them.
+  The draw's fetch constant block is built from these and the streams'.
+  Checked against the shadow (no difference in an attract race or the pad
+  replay), then frames right. The descriptor words stay until the shaders
+  take plain textures and the cache binds by handle (2b).
+
+Left for step 3: clears and draws through the interface, then the game's
+setters out of the handlers, which ends the shadow on the render path.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

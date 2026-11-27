@@ -894,7 +894,7 @@ struct Passes::State {
   // device's shadow at each draw, differences logged
   // (--native_renderer_check_render_states).
   bool check_render_states = false;
-  uint64_t render_state_mismatches[26] = {};
+  uint64_t render_state_mismatches[28] = {};
   void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
   void CheckTargets(uint32_t device);
   void CheckBindings(uint32_t device, const TranslatedShader* vertex, bool inline_vertices);
@@ -1149,7 +1149,28 @@ struct Passes::State {
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
-  void ReadState(uint32_t device) { regs.Read(device); }
+  // The device's fetch constants as the shadow holds them, for
+  // --native_renderer_check_render_states.
+  uint32_t shadow_fetch[kFetchConstantWords] = {};
+  void ReadState(uint32_t device) {
+    regs.Read(device);
+    if (check_render_states) {
+      std::memcpy(shadow_fetch, regs.fetch, sizeof(shadow_fetch));
+    }
+    // The fetch constants from the renderer's own state (render/state.h):
+    // the sampler stages' texture descriptors (constants 0-25, 6 words
+    // each), and each stream's vertex fetch constant (95 - stream, 2
+    // words, in the same space).
+    std::memset(regs.fetch, 0, sizeof(regs.fetch));
+    for (uint32_t stage = 0; stage < 26; stage++) {
+      std::memcpy(&regs.fetch[6 * stage], render::TextureDescriptor(stage), 24);
+    }
+    const render::Bindings& bound = render::BoundResources();
+    for (uint32_t stream = 0; stream < 16; stream++) {
+      regs.fetch[2 * (95 - stream)] = bound.stream_fetch[stream][0];
+      regs.fetch[2 * (95 - stream) + 1] = bound.stream_fetch[stream][1];
+    }
+  }
   // Points offset at a copy of the block's size bytes in the constant
   // block in use: the last one written if the same (and reuse_constants),
   // or a new one, reserving range bytes. With copied, the bytes are
@@ -4768,9 +4789,10 @@ void Passes::State::CheckBindings(uint32_t device, const TranslatedShader* verte
         continue;
       }
       const uint32_t* words = b.stream_fetch[95 - k];
-      check(20, "stream fetch", words[0] == regs.fetch[2 * k] && words[1] == regs.fetch[2 * k + 1],
+      check(20, "stream fetch",
+            words[0] == shadow_fetch[2 * k] && words[1] == shadow_fetch[2 * k + 1],
             std::format("constant {} ours {:08X} {:08X} shadow {:08X} {:08X}", k, words[0],
-                        words[1], regs.fetch[2 * k], regs.fetch[2 * k + 1]));
+                        words[1], shadow_fetch[2 * k], shadow_fetch[2 * k + 1]));
     }
     // The streams the shader fetches from (fetch constant 95 - stream).
     for (uint32_t k = 80; vertex && k < 96; k++) {
@@ -4820,6 +4842,25 @@ void Passes::State::CheckConstants(uint32_t device, const TranslatedShader* vert
       }
     }
   }
+  for (const TranslatedShader* shader : {vertex, pixel}) {
+    for (size_t i = 0; shader && i < shader->textures.size() + shader->samplers.size(); i++) {
+      uint32_t k = i < shader->textures.size()
+                       ? shader->textures[i].fetch_constant
+                       : shader->samplers[i - shader->textures.size()].fetch_constant;
+      if (k >= 26) {
+        continue;
+      }
+      const uint32_t* ours = render::TextureDescriptor(k);
+      if (std::memcmp(ours, &shadow_fetch[6 * k], 24) && render_state_mismatches[26]++ < 6) {
+        ITC_LOG_INFO("native renderer: render state texture descriptor {} differs from the "
+                     "shadow's: ours {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} shadow {:08X} "
+                     "{:08X} {:08X} {:08X} {:08X} {:08X} (command {})",
+                     k, ours[0], ours[1], ours[2], ours[3], ours[4], ours[5], shadow_fetch[6 * k],
+                     shadow_fetch[6 * k + 1], shadow_fetch[6 * k + 2], shadow_fetch[6 * k + 3],
+                     shadow_fetch[6 * k + 4], shadow_fetch[6 * k + 5], g_current_command);
+      }
+    }
+  }
   for (uint32_t i = 0; i < 40; i++) {
     if (c.bool_loop[i] != regs.bool_loop[i] && render_state_mismatches[25]++ < 3) {
       ITC_LOG_INFO("native renderer: render state bool/loop word {} differs from the "
@@ -4836,15 +4877,15 @@ void Passes::set_check_render_states(bool check) {
 
 std::string Passes::TakeRenderStateChecks() {
   State& s = *state_;
-  static const char* const kNames[26] = {
+  static const char* const kNames[27] = {
       "z_enable",      "z_write",         "z_func",       "cull",
       "blend",         "color_write",     "blend_constants", "alpha_test",
       "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
       "scissor_enable", "scissor_rect", "targets", "viewport", "color_exp_bias",
       "depth_float24", "clip_space", "bound objects", "stream fetch", "strides",
-      "shader controls", "color drawn", "float constants", "bool/loop"};
+      "shader controls", "color drawn", "float constants", "bool/loop", "textures"};
   std::string text;
-  for (int i = 0; i < 26; i++) {
+  for (int i = 0; i < 27; i++) {
     text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
   }
   return text;

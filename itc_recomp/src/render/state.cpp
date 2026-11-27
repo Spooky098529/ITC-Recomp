@@ -17,6 +17,32 @@ Targets g_targets;
 Viewport g_set_viewport;
 Bindings g_bindings;
 Constants g_constants;
+
+// A sampler stage: its descriptor words and what the sampler setters keep
+// beside them (the device's per-stage bytes), and the bound texture.
+struct Stage {
+  uint32_t words[6] = {};
+  uint8_t max_anisotropy = 0, z_filters = 0, max_mip = 0, min_mip = 0;
+  uint32_t texture = 0;
+};
+constexpr uint32_t kStages = 26;
+Stage g_stages[kStages];
+bool g_stages_set_up = false;
+
+// rlwimi: `word`'s bits in `mask` from `value` rotated left by `shift`.
+void Insert(uint32_t& word, uint32_t value, int shift, uint32_t mask) {
+  word = (std::rotl(value, shift) & mask) | (word & ~mask);
+}
+// fctidz as the recompiled code does it.
+int64_t ToInt64(double d) {
+  if (d != d) {
+    return INT64_MIN;
+  }
+  if (d > double(LLONG_MAX)) {
+    return LLONG_MAX;
+  }
+  return int64_t(d);
+}
 // While tiling: the tiles' extent together.
 uint32_t g_tiling_width = 0, g_tiling_height = 0;
 
@@ -135,6 +161,169 @@ const RenderStates& States() { return g_states; }
 const Targets& BoundTargets() { return g_targets; }
 const Bindings& BoundResources() { return g_bindings; }
 const Constants& ShaderConstants() { return g_constants; }
+
+namespace {
+
+// Word 4's low two bits from word 3's filters and the z filters (the
+// original's steps).
+uint32_t ZFilterBits(uint32_t word3, uint32_t z) {
+  uint32_t bits = (std::rotl(word3, 31) & 0x7FFFF) | (word3 & 0xFFF80000u);
+  bits = (std::rotl(word3, 31) & 0x7FF00000u) | (bits & 0x800FFFFFu);
+  const uint32_t filters = std::rotl(bits, 13) & 0xFFF;
+  const uint32_t m = (z >> 2) - 1;
+  return (filters & m) + (z & ~m);
+}
+
+void SetFilter(Stage& s, uint32_t value, bool mag) {
+  uint32_t& word3 = s.words[3];
+  uint32_t& word4 = s.words[4];
+  const uint32_t entry =
+      guest::LoadU32(schema::DeviceStateGlobals::anisotropy_table_address() +
+                     4 * s.max_anisotropy);
+  const uint32_t anisotropic = value >> 2;
+  const uint32_t other = (word4 >> (mag ? 11 : 10)) & 1;
+  const uint32_t own = mag ? 0x400 : 0x800;
+  word4 = (std::rotl(anisotropic, mag ? 10 : 11) & own) | (word4 & ~own);
+  const uint32_t m = (other | anisotropic) - 1;
+  const uint32_t bits = (mag ? (std::rotl(entry & ~m, 6) & 0xFFFFFFC0u)
+                             : (std::rotl(entry & ~m, 4) & 0xFFFFFFF0u)) |
+                        anisotropic | value;
+  const int shift = mag ? 19 : 21;
+  const uint32_t field = mag ? 0x180000 : 0x600000;
+  word3 = (std::rotl(bits, shift) & field) | (word3 & ~field);
+  word3 = (std::rotl(bits, shift) & 0xE000000) | (word3 & ~0xE000000u);
+  word4 = (word4 & 0xFFFFFFFCu) | (ZFilterBits(word3, s.z_filters) & 3);
+}
+
+void SetZFilter(Stage& s, uint32_t value, int shift) {
+  const uint32_t z = (s.z_filters & ~(1u << shift)) | (value << shift);
+  s.words[4] = (s.words[4] & 0xFFFFFFFCu) | (ZFilterBits(s.words[3], z) & 3);
+  s.z_filters = uint8_t(z);
+}
+
+void SetMipLevel(Stage& s, uint32_t value, bool max) {
+  if (s.texture) {
+    const uint32_t own = schema::DeviceTexture(s.texture).mip_levels();
+    uint32_t level = max ? (own >> 2) & 0xF : (own >> 6) & 0xF;
+    if (max ? !(level > value) : !(level < value)) {
+      level = value;
+    }
+    Insert(s.words[4], level, max ? 2 : 6, max ? 0x3Cu : 0x3C0u);
+  }
+  (max ? s.max_mip : s.min_mip) = uint8_t(value);
+}
+
+void ApplySamplerState(Stage& s, uint32_t state, uint32_t value) {
+  using G = schema::DeviceStateGlobals;
+  switch (state) {
+    case 0: Insert(s.words[0], value, 10, 0x1C00); break;   // AddressU
+    case 4: Insert(s.words[0], value, 13, 0xE000); break;   // AddressV
+    case 8: Insert(s.words[0], value, 16, 0x70000); break;  // AddressW
+    case 12:  // BorderColor
+      s.words[5] = (s.words[5] & 0xFFFFFFFCu) | (value != 0 ? 1 : 0);
+      break;
+    case 16: SetFilter(s, value, true); break;   // MagFilter
+    case 20: SetFilter(s, value, false); break;  // MinFilter
+    case 24: Insert(s.words[3], value, 23, 0x1800000); break;  // MipFilter
+    case 28:  // MipMapLodBias: a float, in the GPU's fixed point
+      Insert(s.words[4],
+             uint32_t(ToInt64(double(std::bit_cast<float>(value) * G::mip_map_lod_bias_scale()))),
+             12, 0x3FF000);
+      break;
+    case 32: SetMipLevel(s, value, true); break;  // MaxMipLevel
+    case 36:  // MaxAnisotropy
+      if ((s.words[4] & 0x800) || (s.words[4] & 0x400)) {
+        Insert(s.words[3], guest::LoadU32(G::anisotropy_table_address() + (value << 2)), 25,
+               0xE000000);
+      }
+      s.max_anisotropy = uint8_t(value);
+      break;
+    case 40: SetZFilter(s, value, 0); break;  // MagFilterZ
+    case 44: SetZFilter(s, value, 1); break;  // MinFilterZ
+    case 48: SetZFilter(s, value, 2); break;  // SeparateZFilterEnable
+    case 52: SetMipLevel(s, value, false); break;  // MinMipLevel
+    case 56: Insert(s.words[5], value, 3, 0x18); break;  // TrilinearThreshold
+    case 60:  // AnisotropyBias
+      Insert(s.words[5],
+             uint32_t(ToInt64(double(std::bit_cast<float>(value) * G::anisotropy_bias_scale()))),
+             5, 0x1E0);
+      break;
+    case 64: Insert(s.words[4], value, 22, 0x7C00000); break;    // HGradientExpBias
+    case 68: Insert(s.words[4], value, 27, 0xF8000000u); break;  // VGradientExpBias
+    case 72: Insert(s.words[5], value, 2, 0x4); break;           // WhiteBorderColorW
+    case 76: Insert(s.words[1], value == 0 ? 1 : 0, 11, 0x800); break;  // PointBorderEnable
+    default: break;
+  }
+}
+
+void ApplyTexture(Stage& s, uint32_t texture) {
+  s.texture = texture;
+  if (!texture) {
+    return;  // the descriptor stays
+  }
+  const schema::DeviceTexture t(texture);
+  auto physical = [](uint32_t address) {
+    return ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF);
+  };
+  const uint32_t mip = t.mip_address();
+  const uint32_t mip_address = ((((mip >> 20) & 0xFFF) + 512) & 0x1000) + (mip & 0x1FFFFE00);
+  const uint32_t levels = t.mip_levels();
+  uint32_t* w = s.words;
+  w[2] = t.fetch2();
+  w[0] = (w[0] & 0x3FFC00) | (t.fetch0() & ~0x3FFC00u);  // the clamps kept
+  w[5] = (w[5] & 0x1FF) | (mip_address & ~0x1FFu);
+  uint32_t max_level = s.max_mip;
+  if (((levels >> 2) & 0xF) > max_level) {
+    max_level = (levels >> 2) & 0xF;
+  }
+  uint32_t word4 = (w[4] & 0xFFFFFC03u) | (levels & 0x3FC);
+  w[3] = (w[3] & 0x7FF80000) | (t.fetch3() & ~0x7FF80000u);  // the filters kept
+  w[1] = (w[1] & 0x800) | (physical(t.base_address()) & ~0x800u);
+  word4 = (std::rotl(max_level, 2) & 0x3C) | (word4 & ~0x3Cu);
+  uint32_t min_level = s.min_mip;
+  if (((levels >> 6) & 0xF) < min_level) {
+    min_level = (levels >> 6) & 0xF;
+  }
+  w[4] = (std::rotl(min_level, 6) & 0x3C0) | (word4 & ~0x3C0u);
+}
+
+}  // namespace
+
+void SetUpStages() {
+  g_stages_set_up = true;
+  for (uint32_t stage = 0; stage < kStages; stage++) {
+    for (uint32_t state = 0; state < 80; state += 4) {
+      ApplySamplerState(g_stages[stage], state,
+                        guest::LoadU32(0x82638D78 + 3 * state + 8));
+    }
+    ApplyTexture(g_stages[stage], 0);
+  }
+}
+
+void SetTexture(uint32_t stage, uint32_t texture) {
+  if (!g_stages_set_up) {
+    SetUpStages();
+  }
+  if (stage < kStages) {
+    ApplyTexture(g_stages[stage], texture);
+  }
+}
+
+void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value) {
+  if (!g_stages_set_up) {
+    SetUpStages();
+  }
+  if (stage < kStages) {
+    ApplySamplerState(g_stages[stage], state, value);
+  }
+}
+
+const uint32_t* TextureDescriptor(uint32_t stage) {
+  if (!g_stages_set_up) {
+    SetUpStages();
+  }
+  return g_stages[stage < kStages ? stage : 0].words;
+}
 
 void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, uint32_t data) {
   switch (type) {
