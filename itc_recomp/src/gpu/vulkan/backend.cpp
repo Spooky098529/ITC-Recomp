@@ -14,7 +14,7 @@
 #include "native/disk_cache.h"
 #include "native/frame_costs.h"
 #include "native/gpu_memory.h"
-#include "native/vulkan_types.h"
+#include "gpu/vulkan/types.h"
 #include "native/generated_gamma_comp.h"
 #include "native/generated_id_frag.h"
 #include "native/generated_movie_frag.h"
@@ -1542,6 +1542,12 @@ void Backend::Use(Image* image, Usage usage) {
                            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1,
                            &barrier);
   o.layout = wanted;
+}
+
+bool Backend::CanFilter(Format format) const {
+  VkFormatProperties properties{};
+  vk::vkGetPhysicalDeviceFormatProperties(physical_device_, vk_types::Format(format), &properties);
+  return properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
 }
 
 Sampler* Backend::CreateSampler(const SamplerDesc& desc) {

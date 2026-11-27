@@ -6,7 +6,7 @@
 #include <array>
 #include <cstdint>
 
-#include "vulkan_functions.h"
+#include "gpu/vulkan/functions.h"
 
 namespace native {
 

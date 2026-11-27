@@ -1,7 +1,7 @@
 // The renderer's own values for draw and sampler state
 // (docs/d3d11-backend.md, step 2): what `render::` holds and the renderer's
 // logic works with, independent of the graphics API. Each backend maps them
-// to its own (the Vulkan one in src/native/vulkan_types.h).
+// to its own (the Vulkan one in src/gpu/vulkan/types.h).
 
 #pragma once
 
@@ -274,6 +274,9 @@ struct PassTarget {
   uint32_t clear_color[4] = {};
   float clear_depth = 0.0f;
   uint32_t clear_stencil = 0;
+};
+struct Extent2D {
+  uint32_t width = 0, height = 0;
 };
 struct Rect {
   int32_t x = 0, y = 0;

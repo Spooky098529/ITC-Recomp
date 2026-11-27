@@ -3,7 +3,7 @@
 #pragma once
 
 #include "gpu/types.h"
-#include "native/vulkan_functions.h"
+#include "gpu/vulkan/functions.h"
 
 namespace vk_types {
 

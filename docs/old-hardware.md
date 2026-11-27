@@ -46,7 +46,7 @@ they need no change.
    - Use `VK_KHR_dynamic_rendering` when the device is below 1.3: enable
      the extension and chain `VkPhysicalDeviceDynamicRenderingFeaturesKHR`.
      Also load `vkCmdBeginRenderingKHR`/`vkCmdEndRenderingKHR` in
-     [vulkan_functions.h](../itc_recomp/src/native/vulkan_functions.h),
+     [gpu/vulkan/functions.h](../itc_recomp/src/gpu/vulkan/functions.h),
      which currently loads only the core names. Small, but drivers that
      stopped at 1.1/1.2 often lack this extension.
    - Or replace the three sites with `VkRenderPass` + `VkFramebuffer`.

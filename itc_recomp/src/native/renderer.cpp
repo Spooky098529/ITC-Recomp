@@ -11,8 +11,7 @@
 
 #include "passes.h"
 #include "shaders.h"
-#include "vulkan_functions.h"
-#include "gpu/vulkan/backend.h"
+#include "gpu/vulkan/backend.h"  // the backend made (Init)
 
 #include "guest.h"
 
@@ -126,7 +125,7 @@ constexpr uint32_t kFramesInFlight = 2;
 constexpr uint32_t kDefaultWidth = 1280, kDefaultHeight = 720;
 
 // The window's size from --width and --height (one alone keeps 16:9).
-VkExtent2D WindowSize() {
+gpu::Extent2D WindowSize() {
   int32_t width = ITC_FLAG(width), height = ITC_FLAG(height);
   if (width <= 0 && height <= 0) {
     return {kDefaultWidth, kDefaultHeight};
@@ -144,9 +143,9 @@ VkExtent2D WindowSize() {
 // fullscreen with --width or --height, the largest that fits them;
 // otherwise the largest that fits the window's pixels (`pixels`, the
 // swapchain's size).
-float ResolutionScale(VkExtent2D pixels) {
+float ResolutionScale(gpu::Extent2D pixels) {
   bool sized = ITC_FLAG(width) > 0 || ITC_FLAG(height) > 0;
-  VkExtent2D size = (ITC_FLAG(fullscreen) && sized) || !pixels.width || !pixels.height
+  gpu::Extent2D size = (ITC_FLAG(fullscreen) && sized) || !pixels.width || !pixels.height
                         ? WindowSize()
                         : pixels;
   return std::min(float(size.width) / kDefaultWidth, float(size.height) / kDefaultHeight);
@@ -175,7 +174,7 @@ bool IsDraw(uint32_t id) {
 struct WindowSetup {
   gpu::Backend* backend = nullptr;
   SDL_Window* window = nullptr;
-  VkExtent2D display{};  // its screen's size in pixels
+  gpu::Extent2D display{};  // its screen's size in pixels
   float density = 1.0f;  // pixels per unit of the desktop's
   std::string error;
   std::promise<void> done;
@@ -188,7 +187,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     setup->done.set_value();
     delete static_cast<std::shared_ptr<WindowSetup>*>(data);
   };
-  VkExtent2D size = WindowSize();
+  gpu::Extent2D size = WindowSize();
   // Fullscreen: borderless, at the desktop's resolution (no mode change).
   // High pixel density: real pixels under the desktop's scaling, not a
   // smaller surface the compositor stretches (2648x1490 for a 3840x2160
@@ -249,8 +248,8 @@ class Renderer {
   void LogStats();
 
   SDL_Window* window_ = nullptr;
-  VkExtent2D display_{};  // the window's screen, in pixels
-  std::unique_ptr<gpu::vulkan::Backend> backend_;
+  gpu::Extent2D display_{};  // the window's screen, in pixels
+  std::unique_ptr<gpu::Backend> backend_;
   uint32_t frame_index_ = 0;  // the frame's slot
   Passes passes_;
   bool recording_ = false;  // this frame's command buffer is open
@@ -446,7 +445,7 @@ void Renderer::EndFrame() {
   // by the next).
   bool cycle_capture = !cycle_steps_.empty() && !cycle_captured_ &&
                        Clock::now() - cycle_step_start_ >= std::chrono::seconds(2);
-  VkExtent2D source =
+  gpu::Extent2D source =
       dump ? passes_.EndFrame(ITC_FLAG(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
                               dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0)

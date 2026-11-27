@@ -783,7 +783,7 @@ set(ITC_SOURCES
     src/graphics/shader_load.cpp
     src/hooks/shader_load.cpp
     src/native/textures.cpp
-    src/native/vulkan_functions.cpp
+    src/gpu/vulkan/functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp

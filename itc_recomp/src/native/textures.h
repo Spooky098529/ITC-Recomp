@@ -11,11 +11,10 @@
 #include <memory>
 #include <vector>
 
-#include "device_context.h"
+#include "gpu/types.h"
 #include "render/state.h"
-#include "vulkan_functions.h"
 
-namespace gpu::vulkan {
+namespace gpu {
 class Backend;
 }
 
@@ -26,7 +25,7 @@ class TextureCache {
   TextureCache();
   ~TextureCache();
 
-  bool Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight);
+  bool Init(gpu::Backend& backend, uint32_t frames_in_flight);
 
   // Render thread. After the frame's fence has been waited on.
   void BeginFrame(uint32_t frame_index);
@@ -40,11 +39,10 @@ class TextureCache {
   // (--native_renderer_cache_texture_bindings), so Stats count only the
   // calls that weren't answered from it. Before the table, each fetch
   // constant's last answer (fetch_constant: its index, 0-31).
-  VkImageView GetView(const uint32_t fetch[6], VkImageViewType view_type,
-                      uint32_t fetch_constant);
+  gpu::View* GetView(const uint32_t fetch[6], gpu::ImageType view_type, uint32_t fetch_constant);
   // A sampler as the stage's state describes it (render::StageSampler), for
   // the texture in `fetch` (its level range; a cube map clamps to the edge).
-  VkSampler GetSampler(const render::SamplerState& state, const uint32_t fetch[6]);
+  gpu::Sampler* GetSampler(const render::SamplerState& state, const uint32_t fetch[6]);
   // The post-swizzle signedness of each component, 2 bits each (the
   // translator's swizzled signs byte; the shaders no longer apply them:
   // a texture with signs is logged).
@@ -55,21 +53,19 @@ class TextureCache {
   // `scale` times its size (the resolution scale of the target first
   // resolved into it; see "Resolution" in docs/native-renderer.md), which
   // draws sampling a texture at its base address then get instead of
-  // guest memory (the emulated GPU doesn't write resolves back). Left in
-  // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
-  // format can't be a color attachment.
+  // guest memory (the emulated GPU doesn't write resolves back). Left
+  // sampled, or undefined while `fresh`. False if its format can't be a
+  // color target.
   struct ResolveDestination {
     gpu::Image* object;  // its image (Use: undefined while fresh)
-    VkImage image;
-    VkImageView view;  // all components as is, for drawing into
-    VkFormat format;
+    gpu::Format format;
     uint32_t width, height;            // the guest's
     uint32_t host_width, host_height;  // the image's (scaled)
     float scale;                       // the scale it was made at
     bool fresh;
     // It holds a pass's image handed over (HandOver), not its own.
     bool handed;
-    VkFormat native_format;  // its own image's format
+    gpu::Format native_format;  // its own image's format
     // A resolve has copied into it (RestoreResolveDestination): it isn't
     // handed images (a partial copy keeps what's outside its rectangle).
     bool copied;
@@ -78,25 +74,19 @@ class TextureCache {
 
   // A pass's image handed to a resolve destination in place of a copy
   // (docs/pc-renderer.md, step 4): the pass has drawn into its texture.
-  // The image, its memory and its view (all of it, in `format`) become the
-  // destination's (GetResolveDestination made it first), left in
-  // SHADER_READ_ONLY_OPTIMAL by the caller. What the copy did is left to
+  // The image (in `format`) becomes the destination's
+  // (GetResolveDestination made it first), left sampled by the caller. What the copy did is left to
   // the readers: red and blue exchanged by the views' swizzle
   // (swap_red_blue), and reader_scale (ReaderScale). Returns the image the
   // destination held when it's of `format` (a pass's image handed over
   // before: the target draws into it next), else retires it and returns
   // none.
   struct HandedImage {
-    // The backend's image (its image, memory and views below are its).
     gpu::Image* object = nullptr;
-    VkImage image = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    VkImageView view = VK_NULL_HANDLE;
-    VkFormat format = VK_FORMAT_UNDEFINED;
-    // A depth target's (its depth sampled, as the resolve's 24_8 copy
-    // holds): the aspect its views take, and its depth-only view.
-    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    VkImageView depth_view = VK_NULL_HANDLE;
+    gpu::Format format = gpu::Format::kUndefined;
+    // A depth target's: its depth sampled (as the resolve's 24_8 copy
+    // holds), the views taking the depth alone.
+    bool depth = false;
   };
   HandedImage HandOver(const uint32_t fetch[6], float scale, const HandedImage& image,
                        bool swap_red_blue, float reader_scale);
@@ -119,7 +109,7 @@ class TextureCache {
   // With --readback_resolve=full, a resolve destination's memory holds what
   // the emulated GPU resolved.
   static bool DecodeGuest(const uint32_t fetch[6], std::vector<uint8_t>& out,
-                          VkFormat& format, uint32_t& width, uint32_t& height);
+                          gpu::Format& format, uint32_t& width, uint32_t& height);
 
   // A debugging aid: makes GetView give nothing (so placeholders) for some
   // textures: from guest memory (all, or of one format), or resolve
@@ -195,10 +185,9 @@ class TextureCache {
   struct State;
   // GetView worked out in full; `cacheable`: whether the
   // answer may be kept until the generation changes.
-  VkImageView LookUpView(const uint32_t fetch[6], VkImageViewType view_type,
-                         bool& cacheable);
+  gpu::View* LookUpView(const uint32_t fetch[6], gpu::ImageType view_type, bool& cacheable);
   // The sampler made from `desc`, kept by its fields.
-  VkSampler SamplerFor(const gpu::SamplerDesc& desc);
+  gpu::Sampler* SamplerFor(const gpu::SamplerDesc& desc);
   std::unique_ptr<State> state_;
   bool cache_bindings_ = true;
   bool log_writes_ = false;

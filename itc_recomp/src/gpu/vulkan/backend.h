@@ -1,6 +1,6 @@
-// The Vulkan backend (docs/d3d11-backend.md, step 3). While the renderer's
-// Vulkan calls move here piece by piece, the code not yet moved reaches
-// Vulkan through the accessors at the end ("In between" in the plan).
+// The Vulkan backend (docs/d3d11-backend.md, step 3): gpu::Backend on
+// Vulkan 1.3 (dynamic rendering), with its own shaders for the renderer's
+// passes (resolve, movie, gamma, draw IDs).
 
 #pragma once
 
@@ -17,8 +17,8 @@
 #include <vector>
 
 #include "gpu/backend.h"
-#include "native/device_context.h"
-#include "native/vulkan_functions.h"
+#include "gpu/vulkan/device_context.h"
+#include "gpu/vulkan/functions.h"
 
 namespace gpu::vulkan {
 
@@ -87,6 +87,13 @@ class Backend final : public gpu::Backend {
   bool EndFrame(Image* shown, Extent2D size) override;
   void WaitIdle() override;
   void OpenDiskCache(const std::filesystem::path& directory) override;
+  uint32_t ConstantsAlignment() const override {
+    return uint32_t(context_.min_uniform_buffer_offset_alignment);
+  }
+  bool CanFilter(Format format) const override;
+  const void* ResourceLayout(Pipeline* pipeline) const override {
+    return Object(pipeline).layout;
+  }
   Sampler* CreateSampler(const SamplerDesc& desc) override;
   static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
   Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) override;
@@ -111,12 +118,9 @@ class Backend final : public gpu::Backend {
   static PipelineObject& Object(Pipeline* pipeline) {
     return *reinterpret_cast<PipelineObject*>(pipeline);
   }
-  // A stage's texture set layout: the shader's, or an empty one without.
-  VkDescriptorSetLayout TexturesLayout(Shader* shader, ShaderStage stage);
-  // Sets 0 (empty) and 1 (the constant blocks: system, vertex floats, pixel
-  // floats, bool/loop; dynamic uniform buffers).
-  VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
-  VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
+  static const PipelineObject& Object(const Pipeline* pipeline) {
+    return *reinterpret_cast<const PipelineObject*>(pipeline);
+  }
   TextureSet* MakeTextureSet(Shader* shader, ShaderStage stage, View* const* views,
                              uint32_t view_count, Sampler* const* samplers, uint32_t sampler_count,
                              bool* found = nullptr) override;
@@ -124,9 +128,6 @@ class Backend final : public gpu::Backend {
   bool DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) override;
   void BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel, Buffer* constants,
                      const uint32_t offsets[4]) override;
-  // Set 0's (empty) and a constant buffer's set 1 (for the ID pass's binds).
-  VkDescriptorSet empty_set() const { return empty_set_; }
-  VkDescriptorSet constants_set(Buffer* buffer) const { return constants_sets_.at(buffer); }
   void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
   void SetViewport(const Viewport& viewport) override;
   void SetScissor(const Rect& scissor) override;
@@ -164,10 +165,10 @@ class Backend final : public gpu::Backend {
     return *reinterpret_cast<const ImageObject*>(image);
   }
 
-  // Not yet moved (the plan's "In between").
-  const native::DeviceContext& context() const { return context_; }
 
  private:
+  // A stage's texture set layout: the shader's, or an empty one without.
+  VkDescriptorSetLayout TexturesLayout(Shader* shader, ShaderStage stage);
   // The frame's command buffer, open between BeginFrame and EndFrame.
   VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
   bool CreateDevice();

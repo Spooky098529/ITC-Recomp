@@ -11,7 +11,6 @@
 #include <memory>
 #include <vector>
 
-#include "vulkan_functions.h"
 #include "gpu/types.h"
 
 namespace native {
@@ -19,10 +18,10 @@ namespace native {
 enum class ShaderStage { kVertex, kPixel };
 
 // A texture the shader samples: its fetch constant and how it's declared
-// (the descriptor's image view type).
+// (k2DArray or kCube).
 struct ShaderTexture {
   uint32_t fetch_constant;
-  VkImageViewType view_type;
+  gpu::ImageType view_type;
 };
 
 // A sampler the shader uses: its fetch constant and the fetch instruction's

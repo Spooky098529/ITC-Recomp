@@ -12,10 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "device_context.h"
 #include "state.h"
 #include "textures.h"
-#include "vulkan_functions.h"
 
 namespace native {
 
@@ -27,7 +25,7 @@ class Passes {
   // base: the guest memory base. resolution_scale: every target and resolve
   // destination is drawn this many times its guest size (see "Resolution"
   // in docs/native-renderer.md).
-  bool Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
+  bool Init(gpu::Backend& backend, uint32_t frames_in_flight,
             float resolution_scale);
 
   // Render thread. Before a frame's first command.
@@ -80,7 +78,7 @@ class Passes {
   // into memory, for WriteDump once the frame is done (a debugging aid).
   // dump_prefix: the shown image's file name; dump_resolves: the resolves
   // too.
-  VkExtent2D EndFrame(int32_t show_resolve, bool dump,
+  gpu::Extent2D EndFrame(int32_t show_resolve, bool dump,
                       const std::string& dump_prefix = "shown", bool dump_resolves = true);
   // For the next frames: the texture cache's debug_hide (see TextureCache).
   void set_debug_hide(TextureCache::Hide hide, uint32_t value = 0);

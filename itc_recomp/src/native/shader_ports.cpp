@@ -230,7 +230,7 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   for (uint32_t i = 0; i < port.texture_count; i++) {
     const GamePortTexture& t = port.textures[i];
     shader.textures.push_back({t.fetch_constant,
-                               t.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY});
+                               t.cube ? gpu::ImageType::kCube : gpu::ImageType::k2DArray});
   }
   shader.samplers.clear();
   for (uint32_t i = 0; i < port.sampler_count; i++) {

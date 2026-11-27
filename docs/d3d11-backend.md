@@ -1,7 +1,9 @@
-# A Direct3D 11 backend (a plan; step 2 done, step 3 in progress)
+# A Direct3D 11 backend (a plan; steps 2 and 3 done)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
-renderer's merge). Step 2 is done (below, "Step 2: `render::`'s own types").
+renderer's merge). Steps 2 and 3 are done (below): the renderer holds only
+`gpu::Backend` and `gpu::` types, the Vulkan calls all in
+`src/gpu/vulkan/`.
 
 ## The goal
 
@@ -148,7 +150,7 @@ each backend.
 - `render::` (`state.{h,cpp}`) and the handlers no longer include anything
   of Vulkan's. The pipeline key carries the `gpu::` values; the Vulkan code
   maps them where it makes a pipeline (the draw's and the ID pass's) or a
-  sampler (`src/native/vulkan_types.h`). The pipeline disk cache is the
+  sampler (`src/native/vulkan_types.h`, now `src/gpu/vulkan/types.h`). The pipeline disk cache is the
   driver's `VkPipelineCache` blob, not our keys, so it's unaffected.
   `passes.cpp`'s own copies of the blend factor and op maps had no callers:
   gone.
@@ -156,7 +158,7 @@ each backend.
   moment (2,654 draws; all 59 images 0.0000% of pixels off, `draws.txt` the
   same), the tick replay (both races match, 0 error lines).
 
-## Step 3: the backend interface (in progress)
+## Step 3: the backend interface (done 2026-11-27)
 
 - **The device, swapchain and frames (2026-11-27).** `src/gpu/backend.h`
   (`gpu::Backend`: the window's flags, what's made on the main thread once
@@ -342,11 +344,30 @@ each backend.
   dumped image, the pad replay with dumps in the menus (the garage's
   frame drawn; the replay then drifted into the known `8219BCC0` stop, as
   dump stalls do) and without (no errors), the tick replay.
-- **Next:** the in-between accessors go (`context()`, `commands()`,
-  `Object(...)`, `Handle(...)`, `empty_set()`, `constants_set()`,
-  `TexturesLayout`): the renderer (`passes.cpp`, `textures.cpp`,
-  `vertex_arena.cpp`, `renderer.cpp`) holding only `gpu::Backend` and
-  `gpu::` types, its `VkFormat`, `VkExtent2D` and view logic types too.
+- **The in-between accessors gone (2026-11-27).** The renderer
+  (`passes.cpp`, `textures.cpp`, `vertex_arena.cpp`, `renderer.cpp`) holds
+  only `gpu::Backend` and `gpu::` types: formats are `gpu::Format`
+  (`Target`, the texture cache's formats, the dump's), samples a count,
+  extents, viewports and scissors `gpu::Extent2D`, `Viewport` and `Rect`,
+  clears a value of our own, the shaders' declared texture types
+  `gpu::ImageType`, views, samplers and texture sets the backend's objects
+  (the placeholders' views made with `CreateView`); the texture cache's
+  `ResolveDestination` and `HandedImage` carry the image and its format
+  alone. No command buffer is passed around: the backend records. Three
+  questions the renderer asked the device are the backend's:
+  `ConstantsAlignment`, `CanFilter` (the depth hand-over) and
+  `ResourceLayout` (which pipelines keep the bound resources, for the
+  repeated-state skip). `vulkan_functions`, `vulkan_types.h` and
+  `device_context.h` moved to `src/gpu/vulkan/` (`functions`, `types.h`,
+  `device_context.h`); `renderer.cpp` names `gpu::vulkan::Backend` only
+  where it makes it. Checked: the dump identical (`draws.txt`'s declared
+  texture types now `gpu::ImageType`'s numbers: 2D arrays 1, not 5), the
+  tick replay, the pad replay without errors, `--xbox_gamma=hdtv` at a
+  reference moment (`shown` the reference's through the table), the boot
+  movie drawn. A drive is welcome.
+- **Next:** step 1 (the Windows build) waits for the user's go-ahead (their
+  2026-11-16 call keeps code Linux-only until they say otherwise); steps 4
+  and 5 can start without it on Linux (HLSL checked with vkd3d-shader).
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
 - **Dump runs:** a run lands on one of at least four moments (2,654,

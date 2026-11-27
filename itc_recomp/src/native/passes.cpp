@@ -5,8 +5,7 @@
 #include "shader_ports.h"
 #include "graphics/shader_patch.h"
 #include "render/state.h"
-#include "native/vulkan_types.h"
-#include "gpu/vulkan/backend.h"
+#include "gpu/backend.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -53,7 +52,7 @@ namespace native {
 namespace {
 
 // Every depth surface (24_8 and 24_8_FLOAT) is drawn as this.
-constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+constexpr gpu::Format kDepthFormat = gpu::Format::kD32FloatS8Uint;
 
 // The main view, which is shown: its surface (pitch 1040, 2x MSAA, 7e3
 // color, drawn as RGBA16F) and the part of it drawn (its viewport).
@@ -65,7 +64,7 @@ constexpr uint64_t kGlowCrossFade = 0xE0D070FB58A4EA03ull;
 constexpr uint32_t kMainViewWidth = 1024, kMainViewHeight = 576;
 // What's shown is copied into an image of this size.
 constexpr uint32_t kShownWidth = 1280, kShownHeight = 720;
-constexpr VkFormat kShownFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+constexpr gpu::Format kShownFormat = gpu::Format::kR16G16B16A16Float;
 
 // EDRAM: 2048 tiles of 80x16 samples at 32 bits a sample.
 
@@ -94,83 +93,90 @@ Surface ReadSurface(uint32_t object) {
 // How a color format is drawn. 7e3 and its high-precision blending
 // variant (which draws switch between, see render states 308-320) share
 // one; the fixed-point -32..32 formats are drawn as floats.
-VkFormat ColorFormat(uint32_t format) {
+gpu::Format ColorFormat(uint32_t format) {
   switch (xenos::ColorRenderTargetFormat(format)) {
     case xenos::ColorRenderTargetFormat::k_8_8_8_8:
     case xenos::ColorRenderTargetFormat::k_8_8_8_8_GAMMA:
-      return VK_FORMAT_R8G8B8A8_UNORM;
+      return gpu::Format::kR8G8B8A8Unorm;
     case xenos::ColorRenderTargetFormat::k_2_10_10_10:
     case xenos::ColorRenderTargetFormat::k_2_10_10_10_AS_10_10_10_10:
-      return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+      return gpu::Format::kA2B10G10R10Unorm;
     case xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT:
     case xenos::ColorRenderTargetFormat::k_2_10_10_10_FLOAT_AS_16_16_16_16:
     case xenos::ColorRenderTargetFormat::k_16_16_16_16:
     case xenos::ColorRenderTargetFormat::k_16_16_16_16_FLOAT:
-      return VK_FORMAT_R16G16B16A16_SFLOAT;
+      return gpu::Format::kR16G16B16A16Float;
     case xenos::ColorRenderTargetFormat::k_16_16:
     case xenos::ColorRenderTargetFormat::k_16_16_FLOAT:
-      return VK_FORMAT_R16G16_SFLOAT;
+      return gpu::Format::kR16G16Float;
     case xenos::ColorRenderTargetFormat::k_32_FLOAT:
-      return VK_FORMAT_R32_SFLOAT;
+      return gpu::Format::kR32Float;
     case xenos::ColorRenderTargetFormat::k_32_32_FLOAT:
-      return VK_FORMAT_R32G32_SFLOAT;
+      return gpu::Format::kR32G32Float;
     default:
-      return VK_FORMAT_UNDEFINED;
+      return gpu::Format::kUndefined;
   }
 }
 
 // The components a color format has (0 for others).
-uint32_t FormatComponents(VkFormat format) {
+uint32_t FormatComponents(gpu::Format format) {
   switch (format) {
-    case VK_FORMAT_R8_UNORM:
-    case VK_FORMAT_R16_UNORM:
-    case VK_FORMAT_R16_SFLOAT:
-    case VK_FORMAT_R32_SFLOAT:
+    case gpu::Format::kR8Unorm:
+    case gpu::Format::kR16Unorm:
+    case gpu::Format::kR16Float:
+    case gpu::Format::kR32Float:
       return 1;
-    case VK_FORMAT_R8G8_UNORM:
-    case VK_FORMAT_R16G16_UNORM:
-    case VK_FORMAT_R16G16_SFLOAT:
-    case VK_FORMAT_R32G32_SFLOAT:
+    case gpu::Format::kR8G8Unorm:
+    case gpu::Format::kR16G16Unorm:
+    case gpu::Format::kR16G16Float:
+    case gpu::Format::kR32G32Float:
       return 2;
-    case VK_FORMAT_R8G8B8A8_UNORM:
-    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-    case VK_FORMAT_R16G16B16A16_UNORM:
-    case VK_FORMAT_R16G16B16A16_SFLOAT:
-    case VK_FORMAT_R32G32B32A32_SFLOAT:
+    case gpu::Format::kR8G8B8A8Unorm:
+    case gpu::Format::kA2B10G10R10Unorm:
+    case gpu::Format::kR16G16B16A16Unorm:
+    case gpu::Format::kR16G16B16A16Float:
+    case gpu::Format::kR32G32B32A32Float:
       return 4;
     default:
       return 0;
   }
 }
 
-bool IsUnorm(VkFormat format) {
+bool IsUnorm(gpu::Format format) {
   switch (format) {
-    case VK_FORMAT_R8_UNORM:
-    case VK_FORMAT_R16_UNORM:
-    case VK_FORMAT_R8G8_UNORM:
-    case VK_FORMAT_R16G16_UNORM:
-    case VK_FORMAT_R8G8B8A8_UNORM:
-    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-    case VK_FORMAT_R16G16B16A16_UNORM:
+    case gpu::Format::kR8Unorm:
+    case gpu::Format::kR16Unorm:
+    case gpu::Format::kR8G8Unorm:
+    case gpu::Format::kR16G16Unorm:
+    case gpu::Format::kR8G8B8A8Unorm:
+    case gpu::Format::kA2B10G10R10Unorm:
+    case gpu::Format::kR16G16B16A16Unorm:
       return true;
     default:
       return false;
   }
 }
 
-VkSampleCountFlagBits SampleCount(uint32_t msaa) {
-  return msaa == 2 ? VK_SAMPLE_COUNT_4_BIT : msaa == 1 ? VK_SAMPLE_COUNT_2_BIT
-                                                       : VK_SAMPLE_COUNT_1_BIT;
+uint32_t SampleCount(uint32_t msaa) {
+  return msaa == 2 ? 4 : msaa == 1 ? 2 : 1;
 }
 
-constexpr VkImageAspectFlags kDepthStencilAspects =
-    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+// What of a target a clear takes (bits).
+enum : uint32_t { kAspectColor = 1, kAspectDepth = 2, kAspectStencil = 4 };
+
+// A clear's values: a color target's, or a depth target's depth and
+// stencil.
+struct ClearValue {
+  float color[4] = {};
+  float depth = 0.0f;
+  uint32_t stencil = 0;
+};
 
 // Per frame in flight: the draws' constants, in blocks of this size (about
 // 1,750 draws each, fewer reused); a frame that fills its blocks gets
 // another, kept for later frames. Host-visible, so pinned system memory on
 // a discrete GPU: 16 MB since docs/pc-renderer.md (64 before).
-constexpr VkDeviceSize kConstantBlockSize = 16u << 20;
+constexpr uint64_t kConstantBlockSize = 16u << 20;
 // Fixed descriptor ranges of the constant buffers (set 1), so one set per
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
@@ -199,16 +205,16 @@ constexpr uint32_t kMaxVertexFetches = 8;
 constexpr uint32_t kMaxVertexBindings = 3 * kMaxVertexFetches;
 
 // The attribute format holding a fetch's raw words.
-VkFormat RawWordsFormat(uint32_t words) {
+gpu::Format RawWordsFormat(uint32_t words) {
   switch (words) {
     case 1:
-      return VK_FORMAT_R32_UINT;
+      return gpu::Format::kR32Uint;
     case 2:
-      return VK_FORMAT_R32G32_UINT;
+      return gpu::Format::kR32G32Uint;
     case 3:
-      return VK_FORMAT_R32G32B32_UINT;
+      return gpu::Format::kR32G32B32Uint;
     default:
-      return VK_FORMAT_R32G32B32A32_UINT;
+      return gpu::Format::kR32G32B32A32Uint;
   }
 }
 
@@ -228,7 +234,7 @@ struct DrawCall {
 // primitive count]; the index count is count * a + b (the table at
 // 0x82000950, see docs/gpu-functions.md).
 struct PrimitiveInfo {
-  VkPrimitiveTopology topology;
+  gpu::Topology topology;
   uint32_t a, b;
   bool strip;
   bool polygonal;
@@ -237,44 +243,34 @@ struct PrimitiveInfo {
 bool GetPrimitiveInfo(uint32_t type, PrimitiveInfo& out) {
   switch (type) {
     case 1:
-      out = {VK_PRIMITIVE_TOPOLOGY_POINT_LIST, 1, 0, false, false};
+      out = {gpu::Topology::kPointList, 1, 0, false, false};
       return true;
     case 2:
-      out = {VK_PRIMITIVE_TOPOLOGY_LINE_LIST, 2, 0, false, false};
+      out = {gpu::Topology::kLineList, 2, 0, false, false};
       return true;
     case 3:
-      out = {VK_PRIMITIVE_TOPOLOGY_LINE_STRIP, 1, 1, true, false};
+      out = {gpu::Topology::kLineStrip, 1, 1, true, false};
       return true;
     case 4:
-      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 3, 0, false, true};
+      out = {gpu::Topology::kTriangleList, 3, 0, false, true};
       return true;
     case 5:
-      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, 1, 2, true, true};
+      out = {gpu::Topology::kTriangleFan, 1, 2, true, true};
       return true;
     case 6:
-      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 1, 2, true, true};
+      out = {gpu::Topology::kTriangleStrip, 1, 2, true, true};
       return true;
     case 8:  // rectangle list: inline draws only, as two-triangle strips
-      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 3, 0, false, true};
+      out = {gpu::Topology::kTriangleStrip, 3, 0, false, true};
       return true;
     case 13:  // quad list: inline draws only, as a triangle list
-      out = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 4, 0, false, true};
+      out = {gpu::Topology::kTriangleList, 4, 0, false, true};
       return true;
     default:
       return false;
   }
 }
 
-uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint32_t type_bits,
-                        VkMemoryPropertyFlags wanted) {
-  for (uint32_t i = 0; i < properties.memoryTypeCount; i++) {
-    if ((type_bits & (1u << i)) &&
-        (properties.memoryTypes[i].propertyFlags & wanted) == wanted) {
-      return i;
-    }
-  }
-  return UINT32_MAX;
-}
 
 // Everything that selects a pipeline (the backend's description).
 using PipelineKey = gpu::PipelineDesc;
@@ -290,21 +286,14 @@ struct PipelineKeyHash {
 struct Target {
   bool depth;
   Surface surface;
-  VkFormat format;
-  gpu::Format gpu_format;  // format's
-  VkSampleCountFlagBits samples;
-  VkExtent2D guest_extent;  // the surface's, in the guest's pixels
-  VkExtent2D extent;        // the image's: guest_extent times scale
+  gpu::Format format;
+  uint32_t samples;
+  gpu::Extent2D guest_extent;  // the surface's, in the guest's pixels
+  gpu::Extent2D extent;        // the image's: guest_extent times scale
   float scale;              // the resolution scale it's drawn at
   // Drawn into (a depth image's depth and stencil); its view for drawing,
   // and for resolving and sampling (a depth image's depth alone).
   gpu::Image* image = nullptr;
-  VkImage vk() const { return gpu::vulkan::Backend::Object(image).image; }
-  VkImageView view() const { return gpu::vulkan::Backend::Object(image).view; }
-  VkImageView sample_view() const {
-    const gpu::vulkan::ImageObject& o = gpu::vulkan::Backend::Object(image);
-    return depth ? o.depth_view : o.view;
-  }
   // Its image was handed to a resolve destination (HandOver) and it hasn't
   // been cleared since: what it held is in that image, copied back before
   // it's drawn into or read (RestoreContents) while the destination holds
@@ -312,9 +301,7 @@ struct Target {
   gpu::Image* handed_image = nullptr;
   uint32_t handed_fetch[6] = {};
   float handed_scale = 1.0f;
-  VkImageAspectFlags aspects() const {
-    return depth ? kDepthStencilAspects : VK_IMAGE_ASPECT_COLOR_BIT;
-  }
+  uint32_t aspects() const { return depth ? kAspectDepth | kAspectStencil : kAspectColor; }
 };
 
 
@@ -535,9 +522,7 @@ class ShaderLookupTable {
 }  // namespace
 
 struct Passes::State {
-  gpu::vulkan::Backend* backend = nullptr;
-  DeviceContext context{};
-  VkPhysicalDeviceMemoryProperties memory_properties{};
+  gpu::Backend* backend = nullptr;
   uint32_t frames_in_flight = 0;
 
   // Resolution scaling (see "Resolution" in docs/native-renderer.md): every
@@ -555,23 +540,22 @@ struct Passes::State {
   static uint32_t ScaledBy(uint32_t guest, float by) {
     return uint32_t(std::lround(guest * by));
   }
-  static VkExtent2D ScaledBy(VkExtent2D guest, float by) {
+  static gpu::Extent2D ScaledBy(gpu::Extent2D guest, float by) {
     return {std::max(ScaledBy(guest.width, by), 1u), std::max(ScaledBy(guest.height, by), 1u)};
   }
-  VkExtent2D Scaled(VkExtent2D guest) const { return ScaledBy(guest, scale); }
+  gpu::Extent2D Scaled(gpu::Extent2D guest) const { return ScaledBy(guest, scale); }
   // The main view's surfaces (color and depth): pitch 1040, 2x MSAA.
   static bool IsMainViewSurface(const Surface& surface) {
     return surface.pitch == kMainViewPitch && surface.msaa == 1;
   }
   // What's shown and the main view's drawn part, scaled.
-  VkExtent2D shown_extent{kShownWidth, kShownHeight};
-  VkExtent2D main_view_extent{kMainViewWidth, kMainViewHeight};
+  gpu::Extent2D shown_extent{kShownWidth, kShownHeight};
+  gpu::Extent2D main_view_extent{kMainViewWidth, kMainViewHeight};
 
   // The vertex and index data draws read (set 0 and the index buffer):
   // device-local, the ranges draws use copied in (docs/pc-renderer.md
   // step 1).
   VertexArena arena;
-  VkDescriptorSet arena_set = VK_NULL_HANDLE;
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
@@ -588,14 +572,14 @@ struct Passes::State {
     gpu::TextureSet* vertex_textures;
     gpu::Buffer* constants;
     uint32_t offsets[kConstantBlocks];
-    VkViewport viewport;
-    VkRect2D scissor;
-    VkDeviceSize index_offset;
+    gpu::Viewport viewport;
+    gpu::Rect scissor;
+    uint64_t index_offset;
     bool index_32bit;
     uint32_t index_count;
     int32_t base_vertex;
     uint32_t vertex_bindings;
-    VkDeviceSize vertex_offsets[kMaxVertexBindings];
+    uint64_t vertex_offsets[kMaxVertexBindings];
     PipelineKey key;
     float bias_constant, bias_slope;
   };
@@ -801,13 +785,13 @@ struct Passes::State {
   std::map<std::array<uint32_t, 7>, Target> targets;
   Target* bound_color = nullptr;
   Target* bound_depth = nullptr;
-  VkExtent2D render_extent{};
+  gpu::Extent2D render_extent{};
   bool rendering = false;
   Target* main_view = nullptr;  // drawn into this frame
   // The target resolved to the front buffer this frame, and the front
   // buffer's size.
   Target* front = nullptr;
-  VkExtent2D front_extent{};
+  gpu::Extent2D front_extent{};
   bool logged_front = false;
   std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves;
 
@@ -819,9 +803,9 @@ struct Passes::State {
   bool logged_gamma_failure = false;
   struct Resolved {
     gpu::Image* object;
-    VkExtent2D extent;
+    gpu::Extent2D extent;
     uint32_t address, format, flags;
-    VkFormat host_format;
+    gpu::Format host_format;
     uint32_t fetch[6];  // the destination's fetch constant, addresses physical
     // A target's image handed over (at the target's scale): held by the
     // destination only until a later hand-over gives it back to a target.
@@ -840,14 +824,14 @@ struct Passes::State {
   // A dump being read back: the images' data, one after another.
   struct Dumped {
     std::string name;
-    VkFormat format;
-    VkExtent2D extent;
-    VkDeviceSize offset;
+    gpu::Format format;
+    gpu::Extent2D extent;
+    uint64_t offset;
     std::vector<uint8_t> cpu;  // if not empty, the data (not in the buffer)
   };
   std::vector<Dumped> dumped;
   gpu::Buffer* dump_object = nullptr;
-  void RecordDump(VkExtent2D shown_extent, const std::string& prefix,
+  void RecordDump(gpu::Extent2D shown_extent, const std::string& prefix,
                   bool with_resolves);
   void DumpGuestResolves();
   bool logged_extra_targets = false;
@@ -865,14 +849,12 @@ struct Passes::State {
     uint8_t* mapped = nullptr;
   };
   std::vector<MovieUpload> movie_uploads;
-  VkExtent2D movie_extent{};
+  gpu::Extent2D movie_extent{};
   bool movie_failed = false;
 
   struct ConstantBlock {
     gpu::Buffer* object = nullptr;
-    VkBuffer buffer = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
-    VkDescriptorSet set = VK_NULL_HANDLE;  // the backend's (for the ID pass)
   };
   struct Ring {
     std::vector<ConstantBlock> blocks;
@@ -880,10 +862,7 @@ struct Passes::State {
   };
   std::vector<Ring> rings;
   uint32_t frame = 0;
-  VkDeviceSize ring_offset = 0;  // in the block in use
-
-  VkDescriptorSetLayout shared_memory_layout = VK_NULL_HANDLE;
-  VkDescriptorSetLayout constants_layout = VK_NULL_HANDLE;
+  uint64_t ring_offset = 0;  // in the block in use
 
   // Textures, and white 1x1 placeholders of each declared type for what
   // can't be had yet.
@@ -897,10 +876,11 @@ struct Passes::State {
   gpu::Image* zero_2d_array = nullptr;
   gpu::Image* zero_3d = nullptr;
   gpu::Image* zero_cube = nullptr;
-  VkSampler sampler = VK_NULL_HANDLE;
-  // This frame's texture sets by their contents.
+  // Their views, and the sampler for a sampler that can't be had.
+  gpu::View* dummy_views[3] = {};  // 2D array, 3D, cube
+  gpu::View* zero_views[3] = {};
+  gpu::Sampler* sampler = nullptr;
   // GetTextureSet's buffers, kept to save allocating them every draw.
-  std::vector<VkDescriptorImageInfo> set_infos;
   std::vector<gpu::View*> set_views;
   std::vector<gpu::Sampler*> set_samplers;
 
@@ -914,21 +894,22 @@ struct Passes::State {
   // resolve's draw, the ID pass).
   struct RecordedState {
     bool valid = false;
-    VkViewport viewport;
-    VkRect2D scissor;
+    gpu::Viewport viewport;
+    gpu::Rect scissor;
     float bias[2];
     float blend_constants[4];
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-    VkDescriptorSet sets[4];
+    gpu::Pipeline* pipeline;
+    const void* layout;  // the pipeline's ResourceLayout
+    gpu::TextureSet* sets[2];  // vertex, pixel
+    gpu::Buffer* constants;
     uint32_t offsets[kConstantBlocks];  // the constants' dynamic offsets
     bool indexed;  // index buffer below bound
     gpu::Buffer* index_buffer;
-    VkDeviceSize index_offset;
-    VkIndexType index_type;
+    uint64_t index_offset;
+    bool index_32bit;
     // The vertex buffers bound (the arena at these offsets).
     uint32_t vertex_bindings;
-    VkDeviceSize vertex_offsets[kMaxVertexBindings];
+    uint64_t vertex_offsets[kMaxVertexBindings];
   } recorded;
   // Each vertex shader module's vertex input: a binding a fetch (three for
   // a rectangle list, at instance rate), its attributes the raw words.
@@ -976,15 +957,11 @@ struct Passes::State {
     }
     return image;
   }
-  static VkImageView View(gpu::Image* image) {
-    return gpu::vulkan::Backend::Object(image).view;
-  }
   // The bound surface's target, made (and cleared) on first use; null if
   // its format isn't drawn.
   Target* GetTarget(uint32_t object, bool depth);
   // Clears the whole target (aspects: all if 0).
-  void ClearTarget(Target& target, const VkClearValue& value,
-                   VkImageAspectFlags aspects = 0);
+  void ClearTarget(Target& target, const ClearValue& value, uint32_t aspects = 0);
   // Draws the source's rectangle (left, top, right, bottom; the whole
   // destination if null) into the resolve's destination texture at the
   // point (x, y; 0, 0 if null).
@@ -1002,8 +979,8 @@ struct Passes::State {
   // docs/gpu-functions.md): the surfaces are drawn whole, not tile by tile,
   // so targets made while tiling are as large as the tiles together.
   bool tiling = false;
-  VkExtent2D tiling_extent{};
-  bool CreateMovieResources(VkExtent2D extent);
+  gpu::Extent2D tiling_extent{};
+  bool CreateMovieResources(gpu::Extent2D extent);
   void EndRendering();
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
@@ -1013,28 +990,23 @@ struct Passes::State {
   ConstantBlock& constant_block() { return rings[frame].blocks[rings[frame].block]; }
   bool CreateDescriptors();
   bool CreateDummyTextures();
-  VkDescriptorSetLayout GetTextureLayout(const TranslatedShader* shader,
-                                         VkShaderStageFlags stage);
   // The texture set for the shader's bindings from the current fetch
   // constants (stage: 0 vertex, 1 pixel): the last one for the stage again
   // when nothing it was built from changed (reuse_texture_sets), else
   // BuildTextureSet's.
-  VkDescriptorSet GetTextureSet(const TranslatedShader* shader,
-                                VkDescriptorSetLayout layout, uint32_t stage);
-  VkDescriptorSet BuildTextureSet(const TranslatedShader* shader, uint32_t stage,
-                                  VkDescriptorSetLayout layout);
+  gpu::TextureSet* GetTextureSet(const TranslatedShader* shader, uint32_t stage);
+  gpu::TextureSet* BuildTextureSet(const TranslatedShader* shader, uint32_t stage);
   // Each stage's last texture set and what it was built from: the shader,
-  // the layout, the fetch constants the shader reads (a bit each, and their
+  // the fetch constants the shader reads (a bit each, and their
   // words), and the texture cache's generations. Null set: none to reuse
   // (forgotten each frame, as sets are; not kept when an answer it was
   // built from wasn't kept by the texture cache, e.g. a placeholder).
   struct LastTextureSet {
     const TranslatedShader* shader = nullptr;
-    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
     uint64_t generation = 0, sampler_generation = 0;
     uint32_t fetch_mask = 0;
     uint32_t fetch[32 * 6];
-    VkDescriptorSet set = VK_NULL_HANDLE;
+    gpu::TextureSet* set = nullptr;
   } last_texture_sets[2];
   bool reuse_texture_sets = true;
   // Draws' shader lookups kept by what they read from the shader objects
@@ -1047,7 +1019,7 @@ struct Passes::State {
   bool last_shader_valid = false;
   // The shader's backend object, made at its first use.
   gpu::Shader* GetShader(const TranslatedShader* shader);
-  bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
+  bool Reserve(uint64_t size, uint32_t& offset, uint8_t*& data);
   void BeginRendering(Target* color, Target* depth);
   void Draw(uint32_t device, const DrawCall& call);
 };
@@ -1059,13 +1031,11 @@ bool Passes::State::CreateRings() {
 
 // Called once constants_layout exists (CreateDescriptors).
 bool Passes::State::CreateConstantBlock(Ring& ring) {
-  VkDevice device = context.device;
   ConstantBlock block;
   block.object = backend->CreateBuffer({kConstantBlockSize, gpu::kBufferUniform, true});
   if (!block.object) {
     return false;
   }
-  block.buffer = gpu::vulkan::Backend::Handle(block.object);
   block.mapped = backend->Mapped(block.object);
   gpu_memory::Allocated(gpu_memory::Kind::kConstants, backend->MemorySize(block.object));
   const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(DrawConstants)),
@@ -1074,19 +1044,11 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (!backend->DescribeConstants(block.object, ranges)) {
     return false;
   }
-  block.set = backend->constants_set(block.object);
   ring.blocks.push_back(block);
   return true;
 }
 
 bool Passes::State::CreateDescriptors() {
-  VkDevice device = context.device;
-  // Sets 0 (empty) and 1 (the constant blocks) are the backend's.
-  shared_memory_layout = backend->empty_layout();
-  constants_layout = backend->constants_layout();
-
-  arena_set = backend->empty_set();
-
   for (Ring& ring : rings) {
     if (!CreateConstantBlock(ring)) {
       return false;
@@ -1095,9 +1057,9 @@ bool Passes::State::CreateDescriptors() {
 
   gpu::SamplerDesc sampler_desc;
   sampler_desc.mag_filter = sampler_desc.min_filter = gpu::Filter::kLinear;
-  sampler_desc.max_lod = VK_LOD_CLAMP_NONE;
-  sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
-  return sampler != VK_NULL_HANDLE;
+  sampler_desc.max_lod = 1000.0f;  // all levels
+  sampler = backend->CreateSampler(sampler_desc);
+  return sampler != nullptr;
 }
 
 bool Passes::State::CreateDummyTextures() {
@@ -1123,24 +1085,28 @@ bool Passes::State::CreateDummyTextures() {
     (is_white ? dummy_2d_array : zero_2d_array) = array;
     (is_white ? dummy_3d : zero_3d) = volume;
     (is_white ? dummy_cube : zero_cube) = cube;
+    gpu::View** views = is_white ? dummy_views : zero_views;
+    const gpu::ImageType types[3] = {gpu::ImageType::k2DArray, gpu::ImageType::k3D,
+                                     gpu::ImageType::kCube};
+    gpu::Image* images[3] = {array, volume, cube};
+    for (uint32_t i = 0; i < 3; i++) {
+      gpu::ViewDesc view;
+      view.type = types[i];
+      views[i] = backend->CreateView(images[i], view);
+      if (!views[i]) {
+        return false;
+      }
+    }
   }
   return true;
 }
 
-VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* shader,
-                                                       VkShaderStageFlags stage) {
-  return backend->TexturesLayout(GetShader(shader), stage == VK_SHADER_STAGE_VERTEX_BIT
-                                                        ? gpu::ShaderStage::kVertex
-                                                        : gpu::ShaderStage::kPixel);
-}
-
-VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
-                                               VkDescriptorSetLayout layout, uint32_t stage) {
+gpu::TextureSet* Passes::State::GetTextureSet(const TranslatedShader* shader, uint32_t stage) {
   LastTextureSet& last = last_texture_sets[stage];
   const uint32_t* fetch = regs.fetch;
   uint64_t generation = textures.generation();
   uint64_t sampler_generation = textures.sampler_generation();
-  if (reuse_texture_sets && last.set && last.shader == shader && last.layout == layout &&
+  if (reuse_texture_sets && last.set && last.shader == shader &&
       last.generation == generation && last.sampler_generation == sampler_generation) {
     bool same = true;
     for (uint32_t mask = last.fetch_mask; mask && same; mask &= mask - 1) {
@@ -1152,7 +1118,7 @@ VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
     }
   }
   uint64_t unkept = textures.unkept_answers();
-  VkDescriptorSet set = BuildTextureSet(shader, stage, layout);
+  gpu::TextureSet* set = BuildTextureSet(shader, stage);
   if (shader != last.shader) {
     last.shader = shader;
     last.fetch_mask = 0;
@@ -1165,25 +1131,25 @@ VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
       }
     }
   }
-  last.layout = layout;
   last.generation = generation;
   last.sampler_generation = sampler_generation;
   for (uint32_t mask = last.fetch_mask; mask; mask &= mask - 1) {
     uint32_t i = 6 * uint32_t(std::countr_zero(mask));
     std::memcpy(last.fetch + i, fetch + i, 24);
   }
-  last.set = textures.unkept_answers() == unkept && !(hide_cubes && shader) ? set : VK_NULL_HANDLE;
+  last.set = textures.unkept_answers() == unkept && !(hide_cubes && shader) ? set : nullptr;
   return set;
 }
 
-VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, uint32_t stage,
-                                                 VkDescriptorSetLayout layout) {
+gpu::TextureSet* Passes::State::BuildTextureSet(const TranslatedShader* shader, uint32_t stage) {
   // The views and samplers for the shader's bindings, from the current
   // fetch constants; placeholders for what can't be had.
   size_t texture_count = shader ? shader->textures.size() : 0;
   size_t sampler_count = shader ? shader->samplers.size() : 0;
-  std::vector<VkDescriptorImageInfo>& infos = set_infos;
-  infos.assign(texture_count + sampler_count, {});
+  std::vector<gpu::View*>& views = set_views;
+  std::vector<gpu::Sampler*>& samplers = set_samplers;
+  views.resize(texture_count);
+  samplers.resize(sampler_count);
   for (size_t i = 0; i < texture_count; i++) {
     const ShaderTexture& texture = shader->textures[i];
     const uint32_t* fetch =
@@ -1192,10 +1158,9 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, u
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
     }
-    VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
-                           ? VK_NULL_HANDLE
-                           : textures.GetView(fetch, texture.view_type,
-                                                              texture.fetch_constant);
+    gpu::View* view = hide_cubes && texture.view_type == gpu::ImageType::kCube
+                          ? nullptr
+                          : textures.GetView(fetch, texture.view_type, texture.fetch_constant);
     bool mismatched = false;
     if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
       mismatched = true;
@@ -1213,16 +1178,13 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, u
         ITC_LOG_INFO("native renderer: dimension mismatch: {} (frame {})", key, frames);
       }
     }
-    if (!view && mismatched) {
-      view = View(texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? zero_3d
-                  : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? zero_cube
-                                                                 : zero_2d_array);
-    } else if (!view) {
-      view = View(texture.view_type == VK_IMAGE_VIEW_TYPE_3D     ? dummy_3d
-                  : texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? dummy_cube
-                                                                 : dummy_2d_array);
+    if (!view) {
+      const uint32_t type = texture.view_type == gpu::ImageType::k3D     ? 1
+                            : texture.view_type == gpu::ImageType::kCube ? 2
+                                                                         : 0;
+      view = (mismatched ? zero_views : dummy_views)[type];
     }
-    infos[i] = {VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    views[i] = view;
   }
   for (size_t i = 0; i < sampler_count; i++) {
     const ShaderSampler& binding = shader->samplers[i];
@@ -1233,23 +1195,12 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, u
                            binding.aniso_filter};
       CountBinding(false, binding.fetch_constant, fetch, extra);
     }
-    VkSampler texture_sampler =
+    gpu::Sampler* texture_sampler =
         textures.GetSampler(render::StageSampler(binding.fetch_constant), fetch);
-    infos[texture_count + i] = {texture_sampler ? texture_sampler : sampler, VK_NULL_HANDLE,
-                                VK_IMAGE_LAYOUT_UNDEFINED};
+    samplers[i] = texture_sampler ? texture_sampler : sampler;
   }
 
   // The backend's set of them (one per distinct contents a frame).
-  std::vector<gpu::View*>& views = set_views;
-  std::vector<gpu::Sampler*>& samplers = set_samplers;
-  views.resize(texture_count);
-  samplers.resize(sampler_count);
-  for (size_t i = 0; i < texture_count; i++) {
-    views[i] = reinterpret_cast<gpu::View*>(infos[i].imageView);
-  }
-  for (size_t i = 0; i < sampler_count; i++) {
-    samplers[i] = reinterpret_cast<gpu::Sampler*>(infos[texture_count + i].sampler);
-  }
   bool found = false;
   gpu::TextureSet* set = backend->MakeTextureSet(
       GetShader(shader), stage == 0 ? gpu::ShaderStage::kVertex : gpu::ShaderStage::kPixel,
@@ -1258,7 +1209,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader, u
     binding_counts.sets++;
     binding_counts.sets_found += found;
   }
-  return gpu::vulkan::Backend::Handle(set);
+  return set;
 }
 
 void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch,
@@ -1350,17 +1301,14 @@ gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
     desc.spirv = shader->spirv.data();
     desc.spirv_words = shader->spirv.size();
     for (const ShaderTexture& texture : shader->textures) {
-      desc.textures.push_back(texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? gpu::ImageType::kCube
-                              : texture.view_type == VK_IMAGE_VIEW_TYPE_3D ? gpu::ImageType::k3D
-                              : texture.view_type == VK_IMAGE_VIEW_TYPE_2D ? gpu::ImageType::k2D
-                                                                           : gpu::ImageType::k2DArray);
+      desc.textures.push_back(texture.view_type);
     }
     desc.samplers = uint32_t(shader->samplers.size());
     if (shader->stage == ShaderStage::kVertex) {
       const auto& fetches = shader->vertex_fetches;
       for (uint32_t n = 0; n < fetches.size() && n < kMaxVertexFetches; n++) {
         uint32_t stride = 4 * fetches[n].stride_words;
-        gpu::Format format = vk_types::FormatFrom(RawWordsFormat(fetches[n].words));
+        gpu::Format format = RawWordsFormat(fetches[n].words);
         for (uint32_t g = 0; g < 3; g++) {
           uint32_t binding = shader->rectangle_list ? 3 * n + g : n;
           if (shader->rectangle_list || g == 0) {
@@ -1377,9 +1325,9 @@ gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
   return shader->gpu;
 }
 
-bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data) {
-  VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
-  VkDeviceSize start = (ring_offset + alignment - 1) / alignment * alignment;
+bool Passes::State::Reserve(uint64_t size, uint32_t& offset, uint8_t*& data) {
+  uint64_t alignment = std::max<uint64_t>(backend->ConstantsAlignment(), 16);
+  uint64_t start = (ring_offset + alignment - 1) / alignment * alignment;
   if (start + size > kConstantBlockSize) {
     return false;
   }
@@ -1390,8 +1338,8 @@ bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data)
 }
 
 bool Passes::State::ReserveDrawConstants() {
-  VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
-  constexpr VkDeviceSize kDrawConstants =
+  uint64_t alignment = std::max<uint64_t>(backend->ConstantsAlignment(), 16);
+  constexpr uint64_t kDrawConstants =
       sizeof(DrawConstants) + 2 * kFloatConstantsRange + kBoolLoopConstantsRange;
   if (ring_offset + kDrawConstants + kConstantBlocks * alignment <= kConstantBlockSize) {
     return true;
@@ -1459,7 +1407,7 @@ void Passes::State::BeginRendering(Target* color, Target* depth) {
     RestoreContents(*depth);
   }
   gpu::PassTarget color_target, depth_target;
-  VkExtent2D extent{UINT32_MAX, UINT32_MAX};
+  gpu::Extent2D extent{UINT32_MAX, UINT32_MAX};
   if (color) {
     backend->Use(color->image, gpu::Usage::kColorTarget);
     color_target.image = color->image;
@@ -1481,8 +1429,8 @@ void Passes::State::BeginRendering(Target* color, Target* depth) {
 Target* Passes::State::GetTarget(uint32_t object,
                                  bool depth) {
   Surface surface = ReadSurface(object);
-  VkFormat format = depth ? kDepthFormat : ColorFormat(surface.format);
-  if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
+  gpu::Format format = depth ? kDepthFormat : ColorFormat(surface.format);
+  if (format == gpu::Format::kUndefined || !surface.pitch) {
     return nullptr;
   }
   // A target an image, by the surface object the game made it as, its size,
@@ -1493,12 +1441,11 @@ Target* Passes::State::GetTarget(uint32_t object,
   auto [it, added] = targets.try_emplace(key);
   Target& t = it->second;
   if (!added) {
-    return t.vk() ? &t : nullptr;
+    return t.image ? &t : nullptr;
   }
   t.depth = depth;
   t.surface = surface;
   t.format = format;
-  t.gpu_format = vk_types::FormatFrom(format);
   t.samples = SampleCount(surface.msaa);
   t.guest_extent = {std::clamp(surface.width, 1u, 8192u), std::clamp(surface.height, 1u, 8192u)};
   if (tiling) {
@@ -1519,21 +1466,18 @@ Target* Passes::State::GetTarget(uint32_t object,
                surface.format, t.guest_extent.width, t.guest_extent.height,
                tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;
-  VkClearValue initial{};
-  initial.depthStencil = {1.0f, 0};
-  if (!depth) {
-    initial.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
-  }
+  ClearValue initial;
+  initial.depth = 1.0f;
   ClearTarget(t, initial);
   return &t;
 }
 
 bool Passes::State::CreateTargetImage(Target& t) {
   gpu::ImageDesc desc;
-  desc.format = vk_types::FormatFrom(t.format);
+  desc.format = t.format;
   desc.width = t.extent.width;
   desc.height = t.extent.height;
-  desc.samples = uint32_t(t.samples);
+  desc.samples = t.samples;
   desc.usage = gpu::kImageSampled | gpu::kImageCopySource | gpu::kImageCopyDest |
                (t.depth ? gpu::kImageDepthTarget : gpu::kImageColorTarget);
   t.image = NewImage(desc);
@@ -1564,20 +1508,20 @@ void Passes::State::RestoreContents(Target& t) {
   }
 }
 
-void Passes::State::ClearTarget(Target& target,
-                                const VkClearValue& value, VkImageAspectFlags aspects) {
+void Passes::State::ClearTarget(Target& target, const ClearValue& value, uint32_t aspects) {
   EndRendering();
   if (!aspects || aspects == target.aspects()) {
     target.handed_image = nullptr;  // all of it cleared
   }
   backend->Use(target.image, gpu::Usage::kCopyDest);
-  const VkImageAspectFlags cleared = aspects ? aspects : target.aspects();
+  const uint32_t cleared = aspects ? aspects : target.aspects();
   if (target.depth) {
-    backend->ClearDepthStencil(target.image, value.depthStencil.depth, value.depthStencil.stencil,
-                               (cleared & VK_IMAGE_ASPECT_DEPTH_BIT) != 0,
-                               (cleared & VK_IMAGE_ASPECT_STENCIL_BIT) != 0);
+    backend->ClearDepthStencil(target.image, value.depth, value.stencil,
+                               (cleared & kAspectDepth) != 0, (cleared & kAspectStencil) != 0);
   } else {
-    backend->ClearColor(target.image, value.color.uint32);
+    uint32_t bits[4];
+    std::memcpy(bits, value.color, sizeof(bits));
+    backend->ClearColor(target.image, bits);
   }
 }
 
@@ -1662,9 +1606,9 @@ bool Passes::State::ResolveInto(Target& source,
   bool color_hand_over = !source.depth &&
                          FormatComponents(source.format) == FormatComponents(dest.native_format) &&
                          FormatComponents(source.format) != 0;
-  bool depth_hand_over = source.depth && dest.native_format == VK_FORMAT_R32_SFLOAT &&
+  bool depth_hand_over = source.depth && dest.native_format == gpu::Format::kR32Float &&
                          bias == 0 && depth_filterable;
-  if (hand_over_resolves && whole && !dest.copied && source.samples == VK_SAMPLE_COUNT_1_BIT &&
+  if (hand_over_resolves && whole && !dest.copied && source.samples == 1 &&
       (color_hand_over || depth_hand_over)) {
     float reader_scale = 0.0f;
     float factor = std::ldexp(1.0f, bias);
@@ -1679,13 +1623,7 @@ bool Passes::State::ResolveInto(Target& source,
     }
     EndRendering();
     backend->Use(source.image, gpu::Usage::kSampled);
-    const gpu::vulkan::ImageObject& object = gpu::vulkan::Backend::Object(source.image);
-    TextureCache::HandedImage handed{source.image, object.image, object.memory, object.view,
-                                     source.format};
-    if (source.depth) {
-      handed.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-      handed.depth_view = source.sample_view();
-    }
+    TextureCache::HandedImage handed{source.image, source.format, source.depth};
     TextureCache::HandedImage back =
         textures.HandOver(fetch, source.scale, handed, swap, reader_scale);
     if (back.object) {
@@ -1714,7 +1652,7 @@ bool Passes::State::ResolveInto(Target& source,
     Resolved& resolved = frame_resolves.emplace_back();
     resolved = {handed.object, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
                 fetch[1] & 0x3F, flags,
-                source.depth ? VK_FORMAT_R32_SFLOAT : source.format};
+                source.depth ? gpu::Format::kR32Float : source.format};
     std::copy(fetch, fetch + 6, resolved.fetch);
     resolved.handed = true;
     resolved.scale = source.scale;
@@ -1757,17 +1695,16 @@ bool Passes::State::ResolveInto(Target& source,
   return true;
 }
 
-bool Passes::State::CreateMovieResources(VkExtent2D extent) {
-  VkDevice device = context.device;
+bool Passes::State::CreateMovieResources(gpu::Extent2D extent) {
   // Another size than the last movie's (none in the game: all are
   // 1280x720): the old planes are left, as the renderer leaves its other
   // images at exit.
   movie_uploads.assign(frames_in_flight, {});
   movie_extent = extent;
-  const VkExtent2D sizes[3] = {extent,
+  const gpu::Extent2D sizes[3] = {extent,
                                {extent.width / 2, extent.height / 2},
                                {extent.width / 2, extent.height / 2}};
-  const VkDeviceSize staging_size = VkDeviceSize(extent.width) * extent.height * 3 / 2;
+  const uint64_t staging_size = uint64_t(extent.width) * extent.height * 3 / 2;
   for (MovieUpload& upload : movie_uploads) {
     for (uint32_t i = 0; i < 3; i++) {
       gpu::ImageDesc desc;
@@ -1811,15 +1748,15 @@ void Passes::DrawMovie(uint32_t device,
   }
   State::MovieUpload& upload = s.movie_uploads[s.frame];
   // The planes into this frame's buffer, then into its images.
-  const VkExtent2D sizes[3] = {{planes.width, planes.height},
+  const gpu::Extent2D sizes[3] = {{planes.width, planes.height},
                                {planes.width / 2, planes.height / 2},
                                {planes.width / 2, planes.height / 2}};
   const uint8_t* sources[3] = {planes.y, planes.u, planes.v};
-  VkDeviceSize offsets[3];
-  VkDeviceSize offset = 0;
+  uint64_t offsets[3];
+  uint64_t offset = 0;
   for (uint32_t i = 0; i < 3; i++) {
     offsets[i] = offset;
-    VkDeviceSize bytes = VkDeviceSize(sizes[i].width) * sizes[i].height;
+    uint64_t bytes = uint64_t(sizes[i].width) * sizes[i].height;
     std::memcpy(upload.mapped + offset, sources[i], bytes);
     offset += bytes;
   }
@@ -1852,17 +1789,14 @@ void Passes::DrawMovie(uint32_t device,
 Passes::Passes() : state_(std::make_unique<State>()) {}
 Passes::~Passes() = default;
 
-bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
-                  float resolution_scale) {
+bool Passes::Init(gpu::Backend& backend, uint32_t frames_in_flight, float resolution_scale) {
   State& s = *state_;
   s.backend = &backend;
-  const DeviceContext& context = backend.context();
-  s.context = context;
   s.scale = resolution_scale > 0.0f ? resolution_scale : 1.0f;
   s.main_view_scale =
       s.scale == 1.0f ? 1.0f : s.scale * float(kShownWidth) / float(kMainViewWidth);
-  s.shown_extent = s.Scaled(VkExtent2D{kShownWidth, kShownHeight});
-  s.main_view_extent = State::ScaledBy(VkExtent2D{kMainViewWidth, kMainViewHeight},
+  s.shown_extent = s.Scaled(gpu::Extent2D{kShownWidth, kShownHeight});
+  s.main_view_extent = State::ScaledBy(gpu::Extent2D{kMainViewWidth, kMainViewHeight},
                                        s.main_view_scale);
   ITC_LOG_INFO("native renderer: resolution scale {}: frame {}x{}, 3D view {}x{} (scale {})",
                s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
@@ -1870,7 +1804,6 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
-  vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
   if (!s.arena.Init(backend, frames_in_flight)) {
     return false;
   }
@@ -1900,11 +1833,7 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
-  VkFormatProperties depth_properties{};
-  vk::vkGetPhysicalDeviceFormatProperties(context.physical_device, kDepthFormat,
-                                          &depth_properties);
-  s.depth_filterable = depth_properties.optimalTilingFeatures &
-                       VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+  s.depth_filterable = backend.CanFilter(kDepthFormat);
   ITC_LOG_INFO("native renderer: depth targets {} handed to their resolves' textures (linear "
                "filtering of the depth format {})",
                s.depth_filterable ? "can be" : "can't be",
@@ -1939,7 +1868,7 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.watched_this_frame.clear();
   s.frame_pixel_shaders.clear();
   for (State::LastTextureSet& last : s.last_texture_sets) {
-    last.set = VK_NULL_HANDLE;
+    last.set = nullptr;
   }
   s.textures.BeginFrame(frame_index);
 }
@@ -1990,8 +1919,8 @@ void Passes::State::Draw(uint32_t device,
     return;
   }
   // The area both can be drawn in, in the guest's pixels and the images'.
-  VkExtent2D guest_extent = color ? color->guest_extent : depth->guest_extent;
-  VkExtent2D extent = color ? color->extent : depth->extent;
+  gpu::Extent2D guest_extent = color ? color->guest_extent : depth->guest_extent;
+  gpu::Extent2D extent = color ? color->extent : depth->extent;
   if (color && depth) {
     guest_extent = {std::min(color->guest_extent.width, depth->guest_extent.width),
                     std::min(color->guest_extent.height, depth->guest_extent.height)};
@@ -2160,7 +2089,7 @@ void Passes::State::Draw(uint32_t device,
     return;
   }
   bool main_view_draw = color && color->surface.pitch == kMainViewPitch &&
-                        color->samples == VK_SAMPLE_COUNT_2_BIT;
+                        color->samples == 2;
   if (pixel) {
     if (main_view_draw && std::find(frame_pixel_shaders.begin(), frame_pixel_shaders.end(),
                                     pixel->hash) == frame_pixel_shaders.end()) {
@@ -2463,7 +2392,7 @@ void Passes::State::Draw(uint32_t device,
   // The vertex buffers: each fetch's stream in the arena, bound at its
   // element (the fetch's offset in the vertex); a rectangle list's three
   // times, a vertex apart.
-  VkDeviceSize vertex_offsets[kMaxVertexBindings];
+  uint64_t vertex_offsets[kMaxVertexBindings];
   uint32_t vertex_bindings = 0;
   if (vertex->vertex_fetches.size() > kMaxVertexFetches) {
     s.stats.failed++;
@@ -2479,7 +2408,7 @@ void Passes::State::Draw(uint32_t device,
       return;
     }
     for (uint32_t g = 0; g < (rectangle_list ? 3u : 1u); g++) {
-      vertex_offsets[vertex_bindings++] = VkDeviceSize(at) + 4 * f.stride_words * g;
+      vertex_offsets[vertex_bindings++] = uint64_t(at) + 4 * f.stride_words * g;
     }
   }
   if (!s.PlaceConstants(3, &render::ShaderConstants().bool_loop,
@@ -2491,9 +2420,7 @@ void Passes::State::Draw(uint32_t device,
   s.stats.constants_draws++;
 
   // Pipeline and textures.
-  VkDescriptorSetLayout vertex_layout = s.GetTextureLayout(vertex, VK_SHADER_STAGE_VERTEX_BIT);
-  VkDescriptorSetLayout pixel_layout = s.GetTextureLayout(pixel, VK_SHADER_STAGE_FRAGMENT_BIT);
-  if (!vertex_layout || !pixel_layout) {
+  if (!s.GetShader(vertex) || (pixel && !s.GetShader(pixel))) {
     s.stats.failed++;
     s.stats.failed_by[5]++;
     return;
@@ -2501,8 +2428,8 @@ void Passes::State::Draw(uint32_t device,
   if (s.log_texture_bindings) {
     s.CountDrawBindings(vertex, pixel);
   }
-  VkDescriptorSet vertex_textures = s.GetTextureSet(vertex, vertex_layout, 0);
-  VkDescriptorSet pixel_textures = s.GetTextureSet(pixel, pixel_layout, 1);
+  gpu::TextureSet* vertex_textures = s.GetTextureSet(vertex, 0);
+  gpu::TextureSet* pixel_textures = s.GetTextureSet(pixel, 1);
   if (!vertex_textures || !pixel_textures) {
     s.stats.failed++;
     s.stats.failed_by[6]++;
@@ -2521,7 +2448,7 @@ void Passes::State::Draw(uint32_t device,
     key.z_write = z_write;
     key.z_func = z_func;
   }
-  key.color_format = uint32_t(color ? color->gpu_format : gpu::Format::kUndefined);
+  key.color_format = uint32_t(color ? color->format : gpu::Format::kUndefined);
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
   const render::BlendState& blend = states.blend[0];
@@ -2557,10 +2484,6 @@ void Passes::State::Draw(uint32_t device,
   bool pipeline_made = false;
   gpu::Pipeline* pipeline_object = s.backend->GetPipeline(key, &pipeline_made);
   s.stats.pipelines += pipeline_made && pipeline_object;
-  const VkPipeline pipeline =
-      pipeline_object ? gpu::vulkan::Backend::Object(pipeline_object).pipeline : VK_NULL_HANDLE;
-  const VkPipelineLayout pipeline_layout =
-      pipeline_object ? gpu::vulkan::Backend::Object(pipeline_object).layout : VK_NULL_HANDLE;
   if (s.watch_draws && main_view_draw &&
       (!s.watch_pixel_shader || (pixel && pixel->hash == s.watch_pixel_shader))) {
     s.WatchDraw(vertex, pixel, index_address, primitive_count, key,
@@ -2570,22 +2493,22 @@ void Passes::State::Draw(uint32_t device,
                 reinterpret_cast<const uint32_t*>(&render::ShaderConstants().bool_loop),
                 regs.fetch);
   }
-  if (!pipeline) {
+  if (!pipeline_object) {
     s.stats.failed++;
     return;
   }
 
   // Draw.
   s.BeginRendering(color, depth);
-  if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
-      color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+  if (color && color->surface.pitch == kMainViewPitch && color->samples == 2 &&
+      color->format == gpu::Format::kR16G16B16A16Float) {
     s.main_view = color;
   }
   // Both scaled from the guest's pixels (the NDC scale and offset are
   // ratios, unchanged), by the targets' scale (color and depth share one:
   // the main view's surfaces are both scaled alike).
   float draw_scale = color ? color->scale : depth->scale;
-  VkViewport viewport{float(viewport_info.offset[0]) * draw_scale,
+  gpu::Viewport viewport{float(viewport_info.offset[0]) * draw_scale,
                       float(viewport_info.offset[1]) * draw_scale,
                       float(viewport_info.extent[0]) * draw_scale,
                       float(viewport_info.extent[1]) * draw_scale,
@@ -2595,10 +2518,10 @@ void Passes::State::Draw(uint32_t device,
   uint32_t scissor_top = State::ScaledBy(scissor.offset[1], draw_scale);
   uint32_t scissor_right_scaled = State::ScaledBy(scissor_right, draw_scale);
   uint32_t scissor_bottom_scaled = State::ScaledBy(scissor_bottom, draw_scale);
-  VkRect2D scissor_rect{
-      {int32_t(scissor_left), int32_t(scissor_top)},
-      {std::min(scissor_right_scaled, extent.width) - std::min(scissor_left, extent.width),
-       std::min(scissor_bottom_scaled, extent.height) - std::min(scissor_top, extent.height)}};
+  gpu::Rect scissor_rect{
+      int32_t(scissor_left), int32_t(scissor_top),
+      std::min(scissor_right_scaled, extent.width) - std::min(scissor_left, extent.width),
+       std::min(scissor_bottom_scaled, extent.height) - std::min(scissor_top, extent.height)};
   // Set for every pipeline (it's dynamic in all of them), used with depth.
   float slope = 0.0f, constant = 0.0f;
   if (depth) {
@@ -2627,8 +2550,6 @@ void Passes::State::Draw(uint32_t device,
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
   std::memcpy(blend_constants, states.blend_constants, sizeof(blend_constants));
-  VkDescriptorSet sets[4] = {s.arena_set, s.constant_block().set,
-                             vertex_textures, pixel_textures};
 
   // The state this draw needs. Indexed draws bind the mirror at offset 0
   // and start at their indices with firstIndex, so consecutive draws share
@@ -2640,14 +2561,16 @@ void Passes::State::Draw(uint32_t device,
   now.bias[0] = constant;
   now.bias[1] = slope;
   std::memcpy(now.blend_constants, blend_constants, sizeof(blend_constants));
-  now.pipeline = pipeline;
-  now.layout = pipeline_layout;
-  std::memcpy(now.sets, sets, sizeof(sets));
+  now.pipeline = pipeline_object;
+  now.layout = s.backend->ResourceLayout(pipeline_object);
+  now.sets[0] = vertex_textures;
+  now.sets[1] = pixel_textures;
+  now.constants = s.constant_block().object;
   std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = quad_list || !call.inline_vertices;
   now.index_buffer = s.arena.object();
-  now.index_type = quad_list || index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
-  uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+  now.index_32bit = quad_list || index_32bit;
+  uint32_t index_bytes = now.index_32bit ? 4 : 2;
   uint64_t index_start = quad_list ? kQuadIndices : index_offset;
   now.vertex_bindings = vertex_bindings;
   std::copy(vertex_offsets, vertex_offsets + vertex_bindings, now.vertex_offsets);
@@ -2671,11 +2594,12 @@ void Passes::State::Draw(uint32_t device,
     repeated[2] = same(last.bias, now.bias);
     repeated[3] = same(last.blend_constants, now.blend_constants);
     repeated[4] = last.pipeline == now.pipeline;
-    repeated[5] = last.layout == now.layout && same(last.sets, now.sets);
+    repeated[5] = last.layout == now.layout && same(last.sets, now.sets) &&
+                  last.constants == now.constants;
     repeated[6] = both_indexed && last.index_buffer == now.index_buffer &&
-                  last.index_offset == now.index_offset && last.index_type == now.index_type;
+                  last.index_offset == now.index_offset && last.index_32bit == now.index_32bit;
     repeated[7] = both_indexed && last.index_buffer == now.index_buffer &&
-                  last.index_type == now.index_type;
+                  last.index_32bit == now.index_32bit;
     repeated[8] = repeated[5] && same(last.offsets, now.offsets);
     s.stats.state_compared++;
     for (int i = 0; i < 9; i++) {
@@ -2693,12 +2617,10 @@ void Passes::State::Draw(uint32_t device,
   bool skip = s.skip_repeated_state;
   gpu::Backend& backend = *s.backend;
   if (!(skip && repeated[0])) {
-    backend.SetViewport({viewport.x, viewport.y, viewport.width, viewport.height,
-                         viewport.minDepth, viewport.maxDepth});
+    backend.SetViewport(viewport);
   }
   if (!(skip && repeated[1])) {
-    backend.SetScissor({scissor_rect.offset.x, scissor_rect.offset.y, scissor_rect.extent.width,
-                        scissor_rect.extent.height});
+    backend.SetScissor(scissor_rect);
   }
   if (!(skip && repeated[2])) {
     backend.SetDepthBias(constant, slope);
@@ -2710,13 +2632,11 @@ void Passes::State::Draw(uint32_t device,
     backend.BindPipeline(pipeline_object);
   }
   if (!(skip && repeated[8])) {
-    backend.BindResources(pipeline_object, reinterpret_cast<gpu::TextureSet*>(vertex_textures),
-                          reinterpret_cast<gpu::TextureSet*>(pixel_textures),
+    backend.BindResources(pipeline_object, vertex_textures, pixel_textures,
                           s.constant_block().object, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
-    backend.BindIndexBuffer(s.arena.object(), now.index_offset,
-                            now.index_type == VK_INDEX_TYPE_UINT32);
+    backend.BindIndexBuffer(s.arena.object(), now.index_offset, now.index_32bit);
   }
   bool vertex_repeated = last.valid && last.vertex_bindings == vertex_bindings &&
                          std::equal(vertex_offsets, vertex_offsets + vertex_bindings,
@@ -2741,7 +2661,7 @@ void Passes::State::Draw(uint32_t device,
     now.indexed = last.indexed;
     now.index_buffer = last.index_buffer;
     now.index_offset = last.index_offset;
-    now.index_type = last.index_type;
+    now.index_32bit = last.index_32bit;
   }
   s.recorded = now;
   s.stats.drawn++;
@@ -2753,7 +2673,7 @@ void Passes::State::Draw(uint32_t device,
   if (s.record_draws && main_view_draw && !call.inline_vertices) {
     IdDraw& id = s.id_draws.emplace_back();
     id.number = uint32_t(s.recorded_draws.size() - 1);
-    id.vertex_textures = reinterpret_cast<gpu::TextureSet*>(vertex_textures);
+    id.vertex_textures = vertex_textures;
     id.constants = s.constant_block().object;
     std::copy(offsets, offsets + kConstantBlocks, id.offsets);
     id.viewport = viewport;
@@ -2812,17 +2732,13 @@ void Passes::State::DrawIds() {
     if (!pipeline) {
       continue;
     }
-    VkRect2D scissor = draw.scissor;
-    scissor.extent.width = std::min<uint32_t>(
-        scissor.extent.width,
-        uint32_t(std::max(0, int32_t(main_view_extent.width) - scissor.offset.x)));
-    scissor.extent.height = std::min<uint32_t>(
-        scissor.extent.height,
-        uint32_t(std::max(0, int32_t(main_view_extent.height) - scissor.offset.y)));
-    backend->SetViewport({draw.viewport.x, draw.viewport.y, draw.viewport.width,
-                          draw.viewport.height, draw.viewport.minDepth, draw.viewport.maxDepth});
-    backend->SetScissor({scissor.offset.x, scissor.offset.y, scissor.extent.width,
-                         scissor.extent.height});
+    gpu::Rect scissor = draw.scissor;
+    scissor.width = std::min<uint32_t>(
+        scissor.width, uint32_t(std::max(0, int32_t(main_view_extent.width) - scissor.x)));
+    scissor.height = std::min<uint32_t>(
+        scissor.height, uint32_t(std::max(0, int32_t(main_view_extent.height) - scissor.y)));
+    backend->SetViewport(draw.viewport);
+    backend->SetScissor(scissor);
     backend->SetDepthBias(draw.bias_constant, draw.bias_slope);
     backend->BindPipeline(pipeline);
     backend->BindResources(pipeline, draw.vertex_textures, nullptr, draw.constants, draw.offsets);
@@ -2897,9 +2813,11 @@ void Passes::Clear(uint32_t flags, uint32_t color, float z,
     s.stats.clear_rects++;
   }
   if (flags & 0xF) {
-    VkClearValue value{};
-    value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
-                    float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
+    ClearValue value;
+    value.color[0] = float((color >> 16) & 0xFF) / 255.0f;
+    value.color[1] = float((color >> 8) & 0xFF) / 255.0f;
+    value.color[2] = float(color & 0xFF) / 255.0f;
+    value.color[3] = float(color >> 24) / 255.0f;
     if (flags & 0xE) {
       s.stats.extra_targets++;
     }
@@ -2913,12 +2831,11 @@ void Passes::Clear(uint32_t flags, uint32_t color, float z,
     uint32_t object = render::BoundTargets().depth;
     Target* target = object ? s.GetTarget(object, true) : nullptr;
     if (target) {
-      VkClearValue value{};
-      value.depthStencil.depth = z;
-      value.depthStencil.stencil = stencil & 0xFF;
+      ClearValue value;
+      value.depth = z;
+      value.stencil = stencil & 0xFF;
       s.ClearTarget(*target, value,
-                    ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
-                        ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
+                    ((flags & 0x10) ? kAspectDepth : 0) | ((flags & 0x20) ? kAspectStencil : 0));
     }
   }
 }
@@ -2959,18 +2876,18 @@ void Passes::State::Resolve(uint32_t device,
   }
   if ((flags & 0x100) && color_object) {
     if (Target* target = GetTarget(color_object, false)) {
-      VkClearValue value{};
+      ClearValue value;
       for (uint32_t c = 0; clear_color && c < 4; c++) {
-        value.color.float32[c] = clear_color[c];
+        value.color[c] = clear_color[c];
       }
       ClearTarget(*target, value);
     }
   }
   if ((flags & 0x200) && depth_object) {
     if (Target* target = GetTarget(depth_object, true)) {
-      VkClearValue value{};
-      value.depthStencil.depth = clear_z;
-      value.depthStencil.stencil = clear_stencil & 0xFF;
+      ClearValue value;
+      value.depth = clear_z;
+      value.stencil = clear_stencil & 0xFF;
       ClearTarget(*target, value);
     }
   }
@@ -2990,15 +2907,15 @@ void Passes::BeginTiling(uint32_t width, uint32_t height,
   // Each tile starts cleared to these.
   if (uint32_t object = render::BoundTargets().color[0]) {
     if (Target* target = s.GetTarget(object, false)) {
-      VkClearValue value{};
-      value.color = {{clear, clear, clear, clear}};
+      ClearValue value;
+      std::fill(std::begin(value.color), std::end(value.color), clear);
       s.ClearTarget(*target, value);
     }
   }
   if (uint32_t object = render::BoundTargets().depth) {
     if (Target* target = s.GetTarget(object, true)) {
-      VkClearValue value{};
-      value.depthStencil = {clear, 0};
+      ClearValue value;
+      value.depth = clear;
       s.ClearTarget(*target, value);
     }
   }
@@ -3335,7 +3252,7 @@ std::vector<uint32_t> Passes::resolve_addresses() const {
   return addresses;
 }
 
-VkExtent2D Passes::EndFrame(int32_t show_resolve, bool dump,
+gpu::Extent2D Passes::EndFrame(int32_t show_resolve, bool dump,
                             const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
   s.EndRendering();
@@ -3373,7 +3290,7 @@ VkExtent2D Passes::EndFrame(int32_t show_resolve, bool dump,
     ITC_LOG_INFO("native renderer: this frame's resolves: {}", list);
   }
   s.backend->Use(s.shown, gpu::Usage::kCopyDest);
-  VkExtent2D extent = s.main_view_extent;
+  gpu::Extent2D extent = s.main_view_extent;
   if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size() &&
       s.Held(s.frame_resolves[show_resolve]) &&
       !s.frame_resolves[show_resolve].depth) {
@@ -3391,10 +3308,10 @@ VkExtent2D Passes::EndFrame(int32_t show_resolve, bool dump,
     s.EndRendering();
     s.RestoreContents(*front);
     s.backend->Use(front->image, gpu::Usage::kCopySource);
-    VkExtent2D front_extent = s.Scaled(s.front_extent);
+    gpu::Extent2D front_extent = s.Scaled(s.front_extent);
     extent = {std::min({front_extent.width, front->extent.width, s.shown_extent.width}),
               std::min({front_extent.height, front->extent.height, s.shown_extent.height})};
-    if (front->samples == VK_SAMPLE_COUNT_1_BIT) {
+    if (front->samples == 1) {
       const gpu::Rect all{0, 0, extent.width, extent.height};
       s.backend->BlitImage(front->image, all, s.shown, all, gpu::Filter::kNearest);
     } else if (front->format == kShownFormat) {  // a resolve doesn't convert
@@ -3441,19 +3358,19 @@ size_t Passes::frame_resolve_count() const {
 
 namespace {
 
-uint32_t BytesPerPixel(VkFormat format) {
+uint32_t BytesPerPixel(gpu::Format format) {
   switch (format) {
-    case VK_FORMAT_R16G16B16A16_UNORM:
-    case VK_FORMAT_R16G16B16A16_SFLOAT:
-    case VK_FORMAT_R32G32_SFLOAT:
+    case gpu::Format::kR16G16B16A16Unorm:
+    case gpu::Format::kR16G16B16A16Float:
+    case gpu::Format::kR32G32Float:
       return 8;
-    case VK_FORMAT_R32G32B32A32_SFLOAT:
+    case gpu::Format::kR32G32B32A32Float:
       return 16;
-    case VK_FORMAT_R8_UNORM:
+    case gpu::Format::kR8Unorm:
       return 1;
-    case VK_FORMAT_R8G8_UNORM:
-    case VK_FORMAT_R16_UNORM:
-    case VK_FORMAT_R16_SFLOAT:
+    case gpu::Format::kR8G8Unorm:
+    case gpu::Format::kR16Unorm:
+    case gpu::Format::kR16Float:
       return 2;
     default:
       return 4;
@@ -3474,40 +3391,40 @@ float HalfToFloat(uint16_t h) {
 }
 
 // A pixel as RGB floats (missing components 0).
-void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
+void ToRgb(gpu::Format format, const uint8_t* p, float out[3]) {
   out[0] = out[1] = out[2] = 0.0f;
   uint16_t h[4];
   uint32_t w;
   float f;
   switch (format) {
-    case VK_FORMAT_R8G8B8A8_UNORM:
+    case gpu::Format::kR8G8B8A8Unorm:
       for (int c = 0; c < 3; c++) out[c] = p[c] / 255.0f;
       break;
-    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+    case gpu::Format::kA2B10G10R10Unorm:
       std::memcpy(&w, p, 4);
       for (int c = 0; c < 3; c++) out[c] = float((w >> (10 * c)) & 0x3FF) / 1023.0f;
       break;
-    case VK_FORMAT_R16G16B16A16_UNORM:
+    case gpu::Format::kR16G16B16A16Unorm:
       std::memcpy(h, p, 8);
       for (int c = 0; c < 3; c++) out[c] = h[c] / 65535.0f;
       break;
-    case VK_FORMAT_R16G16_UNORM:
+    case gpu::Format::kR16G16Unorm:
       std::memcpy(h, p, 4);
       for (int c = 0; c < 2; c++) out[c] = h[c] / 65535.0f;
       break;
-    case VK_FORMAT_R16G16B16A16_SFLOAT:
+    case gpu::Format::kR16G16B16A16Float:
       std::memcpy(h, p, 8);
       for (int c = 0; c < 3; c++) out[c] = HalfToFloat(h[c]);
       break;
-    case VK_FORMAT_R16G16_SFLOAT:
+    case gpu::Format::kR16G16Float:
       std::memcpy(h, p, 4);
       for (int c = 0; c < 2; c++) out[c] = HalfToFloat(h[c]);
       break;
-    case VK_FORMAT_R32_UINT:
+    case gpu::Format::kR32Uint:
       std::memcpy(&w, p, 4);
       out[0] = out[1] = out[2] = w == UINT32_MAX ? -1.0f : float(w);
       break;
-    case VK_FORMAT_R32_SFLOAT:
+    case gpu::Format::kR32Float:
       std::memcpy(&f, p, 4);
       out[0] = out[1] = out[2] = f;
       break;
@@ -3518,13 +3435,13 @@ void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
 
 }  // namespace
 
-void Passes::State::RecordDump(VkExtent2D shown_extent,
+void Passes::State::RecordDump(gpu::Extent2D shown_extent,
                                const std::string& prefix, bool with_resolves) {
   dumped.clear();
-  VkDeviceSize size = 0;
-  auto add = [&](std::string name, VkFormat format, VkExtent2D extent) {
+  uint64_t size = 0;
+  auto add = [&](std::string name, gpu::Format format, gpu::Extent2D extent) {
     dumped.push_back({std::move(name), format, extent, size});
-    size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
+    size += (uint64_t(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
   };
   add(prefix, kShownFormat, shown_extent);
   std::vector<gpu::Image*> images = {shown};
@@ -3539,7 +3456,7 @@ void Passes::State::RecordDump(VkExtent2D shown_extent,
   }
   size_t resolve_end = images.size();
   if (id_drawn) {
-    add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
+    add("draw_ids", gpu::Format::kR32Uint, main_view_extent);
     images.push_back(id_image);
   }
   dump_object = backend->CreateBuffer({size, gpu::kBufferCopyDest, true});

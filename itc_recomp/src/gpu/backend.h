@@ -1,7 +1,6 @@
 // The graphics API under the renderer (docs/d3d11-backend.md, "The design"):
-// what the renderer's logic asks of Vulkan or Direct3D 11. Built up in
-// pieces (step 3); so far the window's device, the swapchain, the frames,
-// samplers and images.
+// what the renderer's logic asks of Vulkan or Direct3D 11. The renderer
+// (src/native/) holds only this and gpu:: types.
 // Render thread only, but where a call says otherwise.
 
 #pragma once
@@ -15,10 +14,6 @@
 #include "gpu/types.h"
 
 namespace gpu {
-
-struct Extent2D {
-  uint32_t width = 0, height = 0;
-};
 
 class Backend {
  public:
@@ -50,6 +45,12 @@ class Backend {
   virtual bool EndFrame(Image* shown, Extent2D size) = 0;
   // Waits for all submitted work.
   virtual void WaitIdle() = 0;
+
+  // What the device allows: the alignment of a constant block's offset in
+  // its buffer (BindResources), and whether a format's images can be
+  // sampled with linear filtering.
+  virtual uint32_t ConstantsAlignment() const = 0;
+  virtual bool CanFilter(Format format) const = 0;
 
   // A sampler, kept for the backend's life (null if it can't be made).
   virtual Sampler* CreateSampler(const SamplerDesc& desc) = 0;
@@ -98,6 +99,9 @@ class Backend {
   // blocks (system, vertex floats, pixel floats, bool/loop), each
   // `ranges[i]` bytes at the offsets BindResources gives. Once a buffer.
   virtual bool DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) = 0;
+  // Pipelines with the same value keep the resources bound for one
+  // (BindResources) bound for the other.
+  virtual const void* ResourceLayout(Pipeline* pipeline) const = 0;
   // In a pass: the draw's texture sets and constant blocks, for `pipeline`.
   virtual void BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel,
                              Buffer* constants, const uint32_t offsets[4]) = 0;
