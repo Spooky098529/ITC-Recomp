@@ -244,7 +244,21 @@ each backend.
   `Backend::SubmitBefore`. The movie planes' copies (made in the frame, as
   the movie is drawn) wait for the recording piece. Checked: the dump
   identical, the tick replay, the pad replay without errors.
-- **Next:** the recording: passes (begin and end, targets, clears), the
+- **Shaders (2026-11-27).** `gpu::ShaderDesc` (stage, SPIR-V, the
+  textures' types and the sampler count of its stage's set, a vertex
+  shader's vertex input) and `Backend::CreateShader`: the Vulkan backend's
+  shader (`ShaderObject`) holds the module, the texture set layout (shared
+  by stage, types and count, as `passes.cpp` shared them) and the vertex
+  input. The game's shaders (`TranslatedShader::gpu`) are made through it
+  at their first draw; `passes.cpp`'s pipeline code still reads the module,
+  layouts and vertex input from the object (until pipelines move). The
+  resolve, movie, gamma and ID pass shaders are still `passes.cpp`'s own
+  modules. Checked: the dump identical, the tick replay, the pad replay
+  without errors.
+- **Next:** pipelines from a description (`PipelineDesc`: the shaders and
+  the fixed-function state of today's `PipelineKey`; the backend makes the
+  pipeline layout from the shaders and keeps the pipeline disk cache), then
+  the recording: passes (begin and end, targets, clears), the
   draw's state (pipelines from a description, binds, constants by offset),
   draws, copies and resolves in the frame, then the full-screen and compute
   passes, then the dumps. *(D3D11 later: `UpdateSubresource` from the

@@ -77,6 +77,9 @@ class Backend {
                            uint32_t count) = 0;
   virtual void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) = 0;
 
+  // A shader (null if it can't be made), kept for the backend's life.
+  virtual Shader* CreateShader(const ShaderDesc& desc) = 0;
+
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
   virtual void DestroyView(View* view) = 0;

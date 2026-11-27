@@ -787,6 +787,60 @@ void Backend::UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& 
   vk::vkCmdCopyBuffer(commands, Handle(staging), Handle(buffer), 1, &copy);
 }
 
+Shader* Backend::CreateShader(const ShaderDesc& desc) {
+  auto object = std::make_unique<ShaderObject>();
+  ShaderObject& o = *object;
+  VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+  info.codeSize = desc.spirv_words * 4;
+  info.pCode = desc.spirv;
+  if (vk::vkCreateShaderModule(device_, &info, nullptr, &o.module) != VK_SUCCESS) {
+    return nullptr;
+  }
+  // The texture set layout, by stage, the image types and the sampler count.
+  const VkShaderStageFlags stage = desc.stage == ShaderStage::kVertex
+                                       ? VK_SHADER_STAGE_VERTEX_BIT
+                                       : VK_SHADER_STAGE_FRAGMENT_BIT;
+  auto view_type = [](ImageType type) {
+    return type == ImageType::k3D     ? VK_IMAGE_VIEW_TYPE_3D
+           : type == ImageType::kCube ? VK_IMAGE_VIEW_TYPE_CUBE
+           : type == ImageType::k2D   ? VK_IMAGE_VIEW_TYPE_2D
+                                      : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+  };
+  std::string key(1, char(stage));
+  for (ImageType type : desc.textures) {
+    key += char('0' + view_type(type));
+  }
+  key += ':' + std::to_string(desc.samplers);
+  VkDescriptorSetLayout& layout = texture_layouts_[key];
+  if (!layout) {
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    for (uint32_t i = 0; i < desc.textures.size(); i++) {
+      bindings.push_back({i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stage, nullptr});
+    }
+    for (uint32_t i = 0; i < desc.samplers; i++) {
+      bindings.push_back({uint32_t(desc.textures.size() + i), VK_DESCRIPTOR_TYPE_SAMPLER, 1,
+                          stage, nullptr});
+    }
+    VkDescriptorSetLayoutCreateInfo layout_info{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    layout_info.bindingCount = uint32_t(bindings.size());
+    layout_info.pBindings = bindings.data();
+    if (vk::vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &layout) != VK_SUCCESS) {
+      layout = VK_NULL_HANDLE;
+    }
+  }
+  o.textures = layout;
+  for (const VertexBinding& b : desc.bindings) {
+    o.bindings.push_back({b.binding, b.stride,
+                          b.per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                         : VK_VERTEX_INPUT_RATE_VERTEX});
+  }
+  for (const VertexAttribute& a : desc.attributes) {
+    o.attributes.push_back({a.location, a.binding, vk_types::Format(a.format), a.offset});
+  }
+  return reinterpret_cast<Shader*>(object.release());
+}
+
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   const ImageObject& o = Object(image);
   auto component = [](Swizzle swizzle) {

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "vulkan_functions.h"
+#include "gpu/types.h"
 
 namespace native {
 
@@ -69,7 +70,7 @@ struct TranslatedShader {
   std::vector<ShaderSampler> samplers;
   // The render targets the (pixel) shader writes, a bit each.
   uint32_t writes_color_targets = 0;
-  VkShaderModule module = VK_NULL_HANDLE;  // created by the renderer
+  gpu::Shader* gpu = nullptr;  // made by the renderer (the backend's)
 };
 
 // The cache's key for a shader's microcode (as in guest memory).

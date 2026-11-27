@@ -1054,7 +1054,6 @@ struct Passes::State {
   // their contents.
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts;
   // Each shader's layout (shaders are never freed, and have one stage).
-  std::unordered_map<const TranslatedShader*, VkDescriptorSetLayout> shader_texture_layouts;
   FrameSetCache texture_sets;
   // GetTextureSet's buffers, kept to save allocating them every draw.
   std::vector<VkDescriptorImageInfo> set_infos;
@@ -1228,6 +1227,8 @@ struct Passes::State {
   ShaderLookup last_shader_lookup;
   bool last_shader_valid = false;
   VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
+  // The shader's backend object, made at its first use.
+  gpu::Shader* GetShader(const TranslatedShader* shader);
   VkShaderModule GetModule(TranslatedShader* shader);
   VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
@@ -1393,13 +1394,11 @@ bool Passes::State::CreateDummyTextures() {
 
 VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* shader,
                                                        VkShaderStageFlags stage) {
-  VkDescriptorSetLayout* cached = nullptr;
   if (shader) {
-    cached = &shader_texture_layouts[shader];
-    if (*cached) {
-      return *cached;
-    }
+    gpu::Shader* object = GetShader(shader);
+    return object ? gpu::vulkan::Backend::Object(object).textures : VK_NULL_HANDLE;
   }
+  VkDescriptorSetLayout* cached = nullptr;
   // Keyed by stage, the image types and the sampler count.
   std::string key(1, char(stage));
   if (shader) {
@@ -1698,35 +1697,51 @@ VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
   return layout;
 }
 
-VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
+gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
   if (!shader) {
-    return VK_NULL_HANDLE;
+    return nullptr;
   }
-  if (!shader->module) {
-    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    info.codeSize = shader->spirv.size() * 4;
-    info.pCode = shader->spirv.data();
-    vk::vkCreateShaderModule(context.device, &info, nullptr, &shader->module);
-    if (shader->module && shader->stage == ShaderStage::kVertex) {
-      VertexInput& input = vertex_inputs[shader->module];
+  if (!shader->gpu) {
+    gpu::ShaderDesc desc;
+    desc.stage = shader->stage == ShaderStage::kVertex ? gpu::ShaderStage::kVertex
+                                                       : gpu::ShaderStage::kPixel;
+    desc.spirv = shader->spirv.data();
+    desc.spirv_words = shader->spirv.size();
+    for (const ShaderTexture& texture : shader->textures) {
+      desc.textures.push_back(texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE ? gpu::ImageType::kCube
+                              : texture.view_type == VK_IMAGE_VIEW_TYPE_3D ? gpu::ImageType::k3D
+                              : texture.view_type == VK_IMAGE_VIEW_TYPE_2D ? gpu::ImageType::k2D
+                                                                           : gpu::ImageType::k2DArray);
+    }
+    desc.samplers = uint32_t(shader->samplers.size());
+    if (shader->stage == ShaderStage::kVertex) {
       const auto& fetches = shader->vertex_fetches;
       for (uint32_t n = 0; n < fetches.size() && n < kMaxVertexFetches; n++) {
         uint32_t stride = 4 * fetches[n].stride_words;
-        VkFormat format = RawWordsFormat(fetches[n].words);
+        gpu::Format format = vk_types::FormatFrom(RawWordsFormat(fetches[n].words));
         for (uint32_t g = 0; g < 3; g++) {
           uint32_t binding = shader->rectangle_list ? 3 * n + g : n;
           if (shader->rectangle_list || g == 0) {
-            input.bindings.push_back(
-                {binding, shader->rectangle_list ? 3 * stride : stride,
-                 shader->rectangle_list ? VK_VERTEX_INPUT_RATE_INSTANCE
-                                        : VK_VERTEX_INPUT_RATE_VERTEX});
+            desc.bindings.push_back({binding, shader->rectangle_list ? 3 * stride : stride,
+                                     shader->rectangle_list});
           }
-          input.attributes.push_back({3 * n + g, binding, format, 0});
+          desc.attributes.push_back({3 * n + g, binding, format, 0});
         }
       }
     }
+    // (A cache of the shader's: kept with it.)
+    const_cast<TranslatedShader*>(shader)->gpu = backend->CreateShader(desc);
+    if (shader->gpu && shader->stage == ShaderStage::kVertex) {
+      const gpu::vulkan::ShaderObject& o = gpu::vulkan::Backend::Object(shader->gpu);
+      vertex_inputs[o.module] = {o.bindings, o.attributes};
+    }
   }
-  return shader->module;
+  return shader->gpu;
+}
+
+VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
+  gpu::Shader* object = GetShader(shader);
+  return object ? gpu::vulkan::Backend::Object(object).module : VK_NULL_HANDLE;
 }
 
 VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {

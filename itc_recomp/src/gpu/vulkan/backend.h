@@ -6,6 +6,8 @@
 
 #include <array>
 #include <atomic>
+#include <string>
+#include <unordered_map>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -15,6 +17,16 @@
 #include "native/vulkan_functions.h"
 
 namespace gpu::vulkan {
+
+// A shader as this backend holds it (behind gpu::Shader): its module, its
+// stage's texture set layout (shared by shaders of the same stage, texture
+// types and sampler count), and a vertex shader's vertex input.
+struct ShaderObject {
+  VkShaderModule module = VK_NULL_HANDLE;
+  VkDescriptorSetLayout textures = VK_NULL_HANDLE;
+  std::vector<VkVertexInputBindingDescription> bindings;
+  std::vector<VkVertexInputAttributeDescription> attributes;
+};
 
 // A buffer as this backend holds it (behind gpu::Buffer).
 struct BufferObject {
@@ -79,6 +91,8 @@ class Backend final : public gpu::Backend {
   void UploadImage(Buffer* staging, Image* image, const ImageUpload* regions,
                    uint32_t count) override;
   void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) override;
+  Shader* CreateShader(const ShaderDesc& desc) override;
+  static ShaderObject& Object(Shader* shader) { return *reinterpret_cast<ShaderObject*>(shader); }
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
@@ -137,6 +151,7 @@ class Backend final : public gpu::Backend {
   // The upload commands are open (from the first upload, maybe before the
   // first frame, to the frame's end), and hold buffer uploads.
   bool uploading_ = false, uploaded_buffers_ = false;
+  std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts_;
 };
 
 }  // namespace gpu::vulkan

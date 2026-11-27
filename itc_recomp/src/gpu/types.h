@@ -5,7 +5,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace gpu {
 
@@ -203,7 +205,32 @@ struct BufferUpload {
   uint64_t source_offset = 0, dest_offset = 0, size = 0;
 };
 
+// A shader: its code (SPIR-V) and what it's bound with. Its textures and
+// samplers are its stage's set (the vertex shader's 2, the pixel shader's
+// 3): the textures' types in binding order, then the samplers.
+enum class ShaderStage : uint8_t { kVertex, kPixel };
+struct VertexBinding {
+  uint32_t binding = 0, stride = 0;
+  bool per_instance = false;
+};
+struct VertexAttribute {
+  uint32_t location = 0, binding = 0;
+  Format format = Format::kUndefined;
+  uint32_t offset = 0;
+};
+struct ShaderDesc {
+  ShaderStage stage = ShaderStage::kVertex;
+  const uint32_t* spirv = nullptr;
+  size_t spirv_words = 0;
+  std::vector<ImageType> textures;
+  uint32_t samplers = 0;
+  // A vertex shader's vertex input.
+  std::vector<VertexBinding> bindings;
+  std::vector<VertexAttribute> attributes;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
+struct Shader;
 struct Buffer;
 struct Sampler;
 struct Image;
