@@ -1,7 +1,7 @@
 // See vertex_arena.h.
 
 #include "vertex_arena.h"
-#include "gpu/vulkan/backend.h"
+#include "gpu/backend.h"
 
 #include <algorithm>
 #include <cstring>
@@ -41,16 +41,6 @@ constexpr uint32_t kAlignment = 256;
 // Ranges not drawn for this many frames are given back (models of a race
 // left, the work memory's moved morphs).
 constexpr uint64_t kUnusedFrames = 900;
-
-uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint32_t type_bits,
-                        VkMemoryPropertyFlags wanted) {
-  for (uint32_t i = 0; i < properties.memoryTypeCount; i++) {
-    if ((type_bits & (1u << i)) && (properties.memoryTypes[i].propertyFlags & wanted) == wanted) {
-      return i;
-    }
-  }
-  return UINT32_MAX;
-}
 
 uint32_t AlignUp(uint32_t value) {
   return (value + kAlignment - 1) & ~(kAlignment - 1);
@@ -131,20 +121,17 @@ void VertexArena_GpuOnlyModel(uint32_t model) {
 }
 
 struct VertexArena::State {
-  gpu::vulkan::Backend* backend = nullptr;
-  DeviceContext context{};
+  gpu::Backend* backend = nullptr;
   uint32_t frames_in_flight = 0;
   uint32_t frame = 0;
   uint64_t frame_number = 0;
 
   gpu::Buffer* object = nullptr;
-  VkBuffer buffer = VK_NULL_HANDLE;  // the object's
   uint32_t inline_start = 0, range_start = 0, size = 0;
   uint32_t inline_used = 0;
 
   struct StagingChunk {
     gpu::Buffer* object = nullptr;
-    VkBuffer buffer = VK_NULL_HANDLE;  // the object's
     uint8_t* mapped = nullptr;
     uint32_t size = 0;
   };
@@ -217,10 +204,9 @@ VertexArena::VertexArena() : state_(std::make_unique<State>()) {}
 
 VertexArena::~VertexArena() {
   State& s = *state_;
-  if (!s.context.device) {
+  if (!s.backend) {
     return;
   }
-  VkDevice device = s.context.device;
   for (State::Frame& f : s.frames) {
     for (State::StagingChunk& chunk : f.staging) {
       s.DestroyStaging(chunk);
@@ -237,7 +223,6 @@ bool VertexArena::State::CreateStaging(StagingChunk& chunk, uint32_t bytes) {
   if (!chunk.object) {
     return false;
   }
-  chunk.buffer = gpu::vulkan::Backend::Handle(chunk.object);
   chunk.mapped = backend->Mapped(chunk.object);
   chunk.size = bytes;
   gpu_memory::Allocated(gpu_memory::Kind::kStaging, backend->MemorySize(chunk.object));
@@ -252,13 +237,10 @@ void VertexArena::State::DestroyStaging(StagingChunk& chunk) {
   chunk = {};
 }
 
-bool VertexArena::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight) {
+bool VertexArena::Init(gpu::Backend& backend, uint32_t frames_in_flight) {
   State& s = *state_;
   s.backend = &backend;
-  const DeviceContext& context = backend.context();
-  s.context = context;
   s.frames_in_flight = frames_in_flight;
-  VkDevice device = context.device;
 
   s.inline_start = AlignUp(kQuadIndices + 4 * 6 * kBuiltinPrimitives);
   s.range_start = s.inline_start + frames_in_flight * kInlineSlotBytes;
@@ -270,7 +252,6 @@ bool VertexArena::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight)
                   s.size >> 20);
     return false;
   }
-  s.buffer = gpu::vulkan::Backend::Handle(s.object);
   gpu_memory::Allocated(gpu_memory::Kind::kMirror, s.size);
   s.free_space.emplace(s.range_start, kRangeBytes);
 
@@ -658,10 +639,6 @@ uint32_t VertexArena::PlaceInline(const void* data, uint32_t size, uint32_t endi
   s.Copy(data, size, offset, endian);
   s.stats.inline_bytes += size;
   return offset;
-}
-
-VkBuffer VertexArena::buffer() const {
-  return state_->buffer;
 }
 
 gpu::Buffer* VertexArena::object() const {

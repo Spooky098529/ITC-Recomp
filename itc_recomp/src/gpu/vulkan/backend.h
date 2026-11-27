@@ -166,10 +166,10 @@ class Backend final : public gpu::Backend {
 
   // Not yet moved (the plan's "In between").
   const native::DeviceContext& context() const { return context_; }
-  // The frame's command buffer, open between BeginFrame and EndFrame.
-  VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
 
  private:
+  // The frame's command buffer, open between BeginFrame and EndFrame.
+  VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
   bool CreateDevice();
   // The resolve's and movie's shaders, layouts and samplers.
   bool CreatePassResources();

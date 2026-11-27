@@ -603,7 +603,7 @@ struct Passes::State {
   gpu::Image* id_image = nullptr;
   gpu::Image* id_depth = nullptr;
   bool id_drawn = false;  // this frame, for the dump
-  void DrawIds(VkCommandBuffer commands);
+  void DrawIds();
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;
   uint64_t mismatched_seen = 0;
@@ -754,7 +754,7 @@ struct Passes::State {
   uint32_t logged_new_target_images = 0;
   std::unordered_set<uint64_t> logged_copy_backs;
   bool CreateTargetImage(Target& t);
-  void RestoreContents(VkCommandBuffer commands, Target& t);
+  void RestoreContents(Target& t);
   bool record_draws = false;
   // With log_glow: per frame, the glow history's cross-fade draws (pixel
   // shader kGlowCrossFade) and the texture they read, and 256x144 resolves
@@ -847,7 +847,7 @@ struct Passes::State {
   };
   std::vector<Dumped> dumped;
   gpu::Buffer* dump_object = nullptr;
-  void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent, const std::string& prefix,
+  void RecordDump(VkExtent2D shown_extent, const std::string& prefix,
                   bool with_resolves);
   void DumpGuestResolves();
   bool logged_extra_targets = false;
@@ -923,7 +923,7 @@ struct Passes::State {
     VkDescriptorSet sets[4];
     uint32_t offsets[kConstantBlocks];  // the constants' dynamic offsets
     bool indexed;  // index buffer below bound
-    VkBuffer index_buffer;
+    gpu::Buffer* index_buffer;
     VkDeviceSize index_offset;
     VkIndexType index_type;
     // The vertex buffers bound (the arena at these offsets).
@@ -981,20 +981,20 @@ struct Passes::State {
   }
   // The bound surface's target, made (and cleared) on first use; null if
   // its format isn't drawn.
-  Target* GetTarget(VkCommandBuffer commands, uint32_t object, bool depth);
+  Target* GetTarget(uint32_t object, bool depth);
   // Clears the whole target (aspects: all if 0).
-  void ClearTarget(VkCommandBuffer commands, Target& target, const VkClearValue& value,
+  void ClearTarget(Target& target, const VkClearValue& value,
                    VkImageAspectFlags aspects = 0);
   // Draws the source's rectangle (left, top, right, bottom; the whole
   // destination if null) into the resolve's destination texture at the
   // point (x, y; 0, 0 if null).
-  bool ResolveInto(VkCommandBuffer commands, Target& source, uint32_t destination,
+  bool ResolveInto(Target& source, uint32_t destination,
                    const int32_t* rect, const int32_t* point, uint32_t flags);
   // A resolve as the library's Resolve (sub_822AFA58) takes it: flags as
   // the XDK's D3DRESOLVE, from the device's bound surfaces; then the clears
   // its flags ask for (0x100 color, 0x200 depth and stencil), if
   // apply_clears.
-  void Resolve(VkCommandBuffer commands, uint32_t device, uint32_t flags,
+  void Resolve(uint32_t device, uint32_t flags,
                const int32_t* rect, uint32_t destination, const int32_t* point,
                bool level_or_slice, const float* clear_color, float clear_z,
                uint32_t clear_stencil, bool apply_clears);
@@ -1004,7 +1004,7 @@ struct Passes::State {
   bool tiling = false;
   VkExtent2D tiling_extent{};
   bool CreateMovieResources(VkExtent2D extent);
-  void EndRendering(VkCommandBuffer commands);
+  void EndRendering();
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
   // Makes room for a draw's constants in one block, moving to the next
@@ -1048,8 +1048,8 @@ struct Passes::State {
   // The shader's backend object, made at its first use.
   gpu::Shader* GetShader(const TranslatedShader* shader);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
-  void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
-  void Draw(VkCommandBuffer commands, uint32_t device, const DrawCall& call);
+  void BeginRendering(Target* color, Target* depth);
+  void Draw(uint32_t device, const DrawCall& call);
 };
 
 bool Passes::State::CreateRings() {
@@ -1440,23 +1440,23 @@ bool Passes::State::PlaceConstants(uint32_t block, const void* bytes, uint32_t s
   return true;
 }
 
-void Passes::State::EndRendering(VkCommandBuffer commands) {
+void Passes::State::EndRendering() {
   if (rendering) {
     backend->EndPass();
     rendering = false;
   }
 }
 
-void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Target* depth) {
+void Passes::State::BeginRendering(Target* color, Target* depth) {
   if (rendering && bound_color == color && bound_depth == depth) {
     return;
   }
-  EndRendering(commands);
+  EndRendering();
   if (color) {
-    RestoreContents(commands, *color);
+    RestoreContents(*color);
   }
   if (depth) {
-    RestoreContents(commands, *depth);
+    RestoreContents(*depth);
   }
   gpu::PassTarget color_target, depth_target;
   VkExtent2D extent{UINT32_MAX, UINT32_MAX};
@@ -1478,7 +1478,7 @@ void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Targ
   rendering = true;
 }
 
-Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
+Target* Passes::State::GetTarget(uint32_t object,
                                  bool depth) {
   Surface surface = ReadSurface(object);
   VkFormat format = depth ? kDepthFormat : ColorFormat(surface.format);
@@ -1524,7 +1524,7 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   if (!depth) {
     initial.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
   }
-  ClearTarget(commands, t, initial);
+  ClearTarget(t, initial);
   return &t;
 }
 
@@ -1540,7 +1540,7 @@ bool Passes::State::CreateTargetImage(Target& t) {
   return t.image != nullptr;
 }
 
-void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
+void Passes::State::RestoreContents(Target& t) {
   if (!t.handed_image) {
     return;
   }
@@ -1549,7 +1549,7 @@ void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
   if (!textures.HoldsHanded(t.handed_fetch, t.handed_scale, handed)) {
     return;  // gone (a race's end): as after a clear
   }
-  EndRendering(commands);
+  EndRendering();
   // The destination keeps its image ready to sample.
   backend->Use(handed, gpu::Usage::kCopySource);
   backend->Use(t.image, gpu::Usage::kCopyDest);
@@ -1564,9 +1564,9 @@ void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
   }
 }
 
-void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
+void Passes::State::ClearTarget(Target& target,
                                 const VkClearValue& value, VkImageAspectFlags aspects) {
-  EndRendering(commands);
+  EndRendering();
   if (!aspects || aspects == target.aspects()) {
     target.handed_image = nullptr;  // all of it cleared
   }
@@ -1581,7 +1581,7 @@ void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
   }
 }
 
-bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
+bool Passes::State::ResolveInto(Target& source,
                                 uint32_t destination, const int32_t* rect,
                                 const int32_t* point, uint32_t flags) {
   // The destination texture's fetch constant (+28..+48), its addresses
@@ -1592,7 +1592,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
-  RestoreContents(commands, source);
+  RestoreContents(source);
   TextureCache::ResolveDestination dest;
   if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
     return false;
@@ -1677,7 +1677,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
     } else if (bias != 0) {
       reader_scale = -factor;
     }
-    EndRendering(commands);
+    EndRendering();
     backend->Use(source.image, gpu::Usage::kSampled);
     const gpu::vulkan::ImageObject& object = gpu::vulkan::Backend::Object(source.image);
     TextureCache::HandedImage handed{source.image, object.image, object.memory, object.view,
@@ -1724,7 +1724,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   if (!dest.copied && !textures.RestoreResolveDestination(fetch, source.scale, dest)) {
     return false;
   }
-  EndRendering(commands);
+  EndRendering();
   backend->Use(source.image, source.depth ? gpu::Usage::kDepthSampled : gpu::Usage::kSampled);
   backend->Use(dest.object, gpu::Usage::kColorTarget);
   gpu::ResolveDraw draw;
@@ -1790,7 +1790,7 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
   return true;
 }
 
-void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
+void Passes::DrawMovie(uint32_t device,
                        const MoviePlanes& planes) {
   State& s = *state_;
   if (s.movie_failed || !planes.width || !planes.height) {
@@ -1805,7 +1805,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
     ITC_LOG_INFO("native renderer: movies drawn from {}x{} planes", planes.width, planes.height);
   }
   uint32_t object = render::BoundTargets().color[0];
-  Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
+  Target* target = object ? s.GetTarget(object, false) : nullptr;
   if (!target) {
     return;
   }
@@ -1823,7 +1823,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
     std::memcpy(upload.mapped + offset, sources[i], bytes);
     offset += bytes;
   }
-  s.EndRendering(commands);
+  s.EndRendering();
   for (uint32_t i = 0; i < 3; i++) {
     s.backend->Use(upload.planes[i], gpu::Usage::kCopyDest);
     gpu::ImageUpload copy;
@@ -1839,7 +1839,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   if (width <= 0 || height <= 0) {
     return;
   }
-  s.RestoreContents(commands, *target);
+  s.RestoreContents(*target);
   s.backend->Use(target->image, gpu::Usage::kColorTarget);
   if (!s.backend->DrawMovie(upload.planes, target->image,
                            {0, 0, uint32_t(width), uint32_t(height)})) {
@@ -1952,7 +1952,7 @@ std::string Passes::TakeArenaStats() {
   return state_->arena.TakeStats();
 }
 
-void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
+void Passes::State::Draw(uint32_t device,
                          const DrawCall& call) {
   State& s = *this;
   auto& regs = s.regs;
@@ -1978,8 +1978,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       break;
     }
   }
-  Target* color = color_object ? s.GetTarget(commands, color_object, false) : nullptr;
-  Target* depth = depth_object ? s.GetTarget(commands, depth_object, true) : nullptr;
+  Target* color = color_object ? s.GetTarget(color_object, false) : nullptr;
+  Target* depth = depth_object ? s.GetTarget(depth_object, true) : nullptr;
   if (!color && !depth) {
     s.stats.failed++;
     s.stats.failed_by[0]++;
@@ -2576,7 +2576,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
 
   // Draw.
-  s.BeginRendering(commands, color, depth);
+  s.BeginRendering(color, depth);
   if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
       color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
     s.main_view = color;
@@ -2645,7 +2645,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = quad_list || !call.inline_vertices;
-  now.index_buffer = s.arena.buffer();
+  now.index_buffer = s.arena.object();
   now.index_type = quad_list || index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
   uint64_t index_start = quad_list ? kQuadIndices : index_offset;
@@ -2770,7 +2770,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
 }
 
-void Passes::State::DrawIds(VkCommandBuffer commands) {
+void Passes::State::DrawIds() {
   if (!id_image) {
     gpu::ImageDesc desc;
     desc.width = main_view_extent.width;
@@ -2785,7 +2785,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
       return;
     }
   }
-  EndRendering(commands);
+  EndRendering();
   // Drawn from nothing every time.
   backend->Use(id_image, gpu::Usage::kUndefined);
   backend->Use(id_depth, gpu::Usage::kUndefined);
@@ -2839,7 +2839,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   id_drawn = true;
 }
 
-void Passes::DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_start,
+void Passes::DrawIndexed(uint32_t type, uint32_t base_start,
                          uint32_t primitive_count) {
   State& s = *state_;
   uint32_t device = guest::LoadU32(kDevicePointer);
@@ -2848,10 +2848,10 @@ void Passes::DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_
   call.type = type;
   call.base_start = base_start;
   call.primitive_count = primitive_count;
-  s.Draw(commands, device, call);
+  s.Draw(device, call);
 }
 
-void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
+void Passes::InlineDraw(uint32_t type, uint32_t count,
                         uint32_t stride, uint32_t data) {
   State& s = *state_;
   uint32_t size = count * stride;
@@ -2884,10 +2884,10 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
-  s.Draw(commands, device, call);
+  s.Draw(device, call);
 }
 
-void Passes::Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, float z,
+void Passes::Clear(uint32_t flags, uint32_t color, float z,
                    uint32_t stencil, bool rects) {
   State& s = *state_;
   // Flags: bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil; color a
@@ -2904,34 +2904,34 @@ void Passes::Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, flo
       s.stats.extra_targets++;
     }
     if (uint32_t object = render::BoundTargets().color[0]; object && (flags & 1)) {
-      if (Target* target = s.GetTarget(commands, object, false)) {
-        s.ClearTarget(commands, *target, value);
+      if (Target* target = s.GetTarget(object, false)) {
+        s.ClearTarget(*target, value);
       }
     }
   }
   if (flags & 0x30) {
     uint32_t object = render::BoundTargets().depth;
-    Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
+    Target* target = object ? s.GetTarget(object, true) : nullptr;
     if (target) {
       VkClearValue value{};
       value.depthStencil.depth = z;
       value.depthStencil.stencil = stencil & 0xFF;
-      s.ClearTarget(commands, *target, value,
+      s.ClearTarget(*target, value,
                     ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
                         ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
     }
   }
 }
 
-void Passes::Resolve(VkCommandBuffer commands, uint32_t flags, const int32_t* rect,
+void Passes::Resolve(uint32_t flags, const int32_t* rect,
                      uint32_t destination, const int32_t* point, bool level_or_slice,
                      const float* clear_color, float clear_z, uint32_t clear_stencil) {
   State& s = *state_;
-  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point,
+  s.Resolve(guest::LoadU32(kDevicePointer), flags, rect, destination, point,
             level_or_slice, clear_color, clear_z, clear_stencil, true);
 }
 
-void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
+void Passes::State::Resolve(uint32_t device,
                             uint32_t flags, const int32_t* rect, uint32_t destination,
                             const int32_t* point, bool level_or_slice, const float* clear_color,
                             float clear_z, uint32_t clear_stencil, bool apply_clears) {
@@ -2947,9 +2947,9 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
   uint32_t color_object = render::BoundTargets().color[flags & 3];
   uint32_t depth_object = render::BoundTargets().depth;
   uint32_t source_object = from_depth ? depth_object : color_object;
-  Target* source = source_object ? GetTarget(commands, source_object, from_depth) : nullptr;
+  Target* source = source_object ? GetTarget(source_object, from_depth) : nullptr;
   if (source && destination && !level_or_slice &&
-      ResolveInto(commands, *source, destination, rect, point, flags)) {
+      ResolveInto(*source, destination, rect, point, flags)) {
     stats.resolves++;
   } else {
     stats.resolves_skipped++;
@@ -2958,53 +2958,53 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
     return;
   }
   if ((flags & 0x100) && color_object) {
-    if (Target* target = GetTarget(commands, color_object, false)) {
+    if (Target* target = GetTarget(color_object, false)) {
       VkClearValue value{};
       for (uint32_t c = 0; clear_color && c < 4; c++) {
         value.color.float32[c] = clear_color[c];
       }
-      ClearTarget(commands, *target, value);
+      ClearTarget(*target, value);
     }
   }
   if ((flags & 0x200) && depth_object) {
-    if (Target* target = GetTarget(commands, depth_object, true)) {
+    if (Target* target = GetTarget(depth_object, true)) {
       VkClearValue value{};
       value.depthStencil.depth = clear_z;
       value.depthStencil.stencil = clear_stencil & 0xFF;
-      ClearTarget(commands, *target, value);
+      ClearTarget(*target, value);
     }
   }
 }
 
-void Passes::BeginTiling(VkCommandBuffer commands, uint32_t width, uint32_t height,
+void Passes::BeginTiling(uint32_t width, uint32_t height,
                          float clear) {
   State& s = *state_;
   if (s.logged_tilings.insert(uint64_t(width) << 32 | height).second) {
     ITC_LOG_INFO("native renderer: begin tiling: {}x{}; clear color and Z {}", width, height,
                  clear);
   }
-  s.EndRendering(commands);
+  s.EndRendering();
   s.tiling = true;
   s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
   s.stats.tilings++;
   // Each tile starts cleared to these.
   if (uint32_t object = render::BoundTargets().color[0]) {
-    if (Target* target = s.GetTarget(commands, object, false)) {
+    if (Target* target = s.GetTarget(object, false)) {
       VkClearValue value{};
       value.color = {{clear, clear, clear, clear}};
-      s.ClearTarget(commands, *target, value);
+      s.ClearTarget(*target, value);
     }
   }
   if (uint32_t object = render::BoundTargets().depth) {
-    if (Target* target = s.GetTarget(commands, object, true)) {
+    if (Target* target = s.GetTarget(object, true)) {
       VkClearValue value{};
       value.depthStencil = {clear, 0};
-      s.ClearTarget(commands, *target, value);
+      s.ClearTarget(*target, value);
     }
   }
 }
 
-void Passes::EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destination,
+void Passes::EndTiling(uint32_t flags, uint32_t destination,
                        float clear) {
   State& s = *state_;
   // The tiled target drawn whole: one resolve of all of it (the library's
@@ -3019,17 +3019,17 @@ void Passes::EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destin
     ITC_LOG_INFO("native renderer: end tiling: flags {:08X}, {}x{} to {:08X}", flags,
                  rect[2], rect[3], destination);
   }
-  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point, false,
+  s.Resolve(guest::LoadU32(kDevicePointer), flags, rect, destination, point, false,
             color, clear, 0, true);
   s.stats.tiled_resolves++;
   s.tiling = false;
 }
 
-void Passes::FrontBufferResolve(VkCommandBuffer commands, uint32_t device,
+void Passes::FrontBufferResolve(uint32_t device,
                                 uint32_t front_buffer) {
   State& s = *state_;
   uint32_t object = render::BoundTargets().color[0];
-  Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
+  Target* target = object ? s.GetTarget(object, false) : nullptr;
   // The front buffer's size, from its fetch constant's word 2 (2D: width - 1
   // in bits 0-12, height - 1 in bits 13-25).
   uint32_t size = front_buffer ? guest::LoadU32(front_buffer + 28 + 8) : 0;
@@ -3335,10 +3335,10 @@ std::vector<uint32_t> Passes::resolve_addresses() const {
   return addresses;
 }
 
-VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,
+VkExtent2D Passes::EndFrame(int32_t show_resolve, bool dump,
                             const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
-  s.EndRendering(commands);
+  s.EndRendering();
   if (Buffers_LogPhysicalWrites()) {
     Buffers_OnFrameEnd();
   }
@@ -3388,8 +3388,8 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     s.backend->Use(resolved.object, gpu::Usage::kSampled);
   } else if (Target* front = s.front) {
     // The frame as the game resolves it to the front buffer.
-    s.EndRendering(commands);
-    s.RestoreContents(commands, *front);
+    s.EndRendering();
+    s.RestoreContents(*front);
     s.backend->Use(front->image, gpu::Usage::kCopySource);
     VkExtent2D front_extent = s.Scaled(s.front_extent);
     extent = {std::min({front_extent.width, front->extent.width, s.shown_extent.width}),
@@ -3425,9 +3425,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   s.backend->Use(s.shown, gpu::Usage::kCopySource);
   if (dump) {
     if (!s.id_draws.empty()) {
-      s.DrawIds(commands);
+      s.DrawIds();
     }
-    s.RecordDump(commands, extent, dump_prefix, dump_resolves);
+    s.RecordDump(extent, dump_prefix, dump_resolves);
     if (dump_resolves && s.drew_any) {
       s.DumpGuestResolves();
     }
@@ -3518,7 +3518,7 @@ void ToRgb(VkFormat format, const uint8_t* p, float out[3]) {
 
 }  // namespace
 
-void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent,
+void Passes::State::RecordDump(VkExtent2D shown_extent,
                                const std::string& prefix, bool with_resolves) {
   dumped.clear();
   VkDeviceSize size = 0;

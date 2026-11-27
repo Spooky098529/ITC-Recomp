@@ -228,20 +228,24 @@ class Renderer {
   void OnCommand(uint32_t id, uint32_t arg1);
   void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
   void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
-  VkCommandBuffer Commands() { return BeginFrame(); }
-  Passes& passes() { return passes_; }
+  // The passes, in a frame being recorded (begun if it isn't).
+  Passes& passes() {
+    BeginFrame();
+    return passes_;
+  }
   void FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
-    passes_.FrontBufferResolve(BeginFrame(), device, front_buffer);
+    passes().FrontBufferResolve(device, front_buffer);
   }
   void DrawMovie(uint32_t device, const Passes::MoviePlanes& planes) {
-    passes_.DrawMovie(BeginFrame(), device, planes);
+    passes().DrawMovie(device, planes);
   }
   void EndFrame();
 
  private:
   bool OpenWindow();
-  // Opens this frame's command buffer, once its previous use is done.
-  VkCommandBuffer BeginFrame();
+  // Begins this frame's recording (once its slot's previous frame is
+  // done), if it isn't begun.
+  void BeginFrame();
   void LogStats();
 
   SDL_Window* window_ = nullptr;
@@ -344,7 +348,7 @@ void Renderer::OnCommand(uint32_t id, uint32_t arg1) {
   }
 }
 
-VkCommandBuffer Renderer::BeginFrame() {
+void Renderer::BeginFrame() {
   if (!recording_) {
     frame_index_ = backend_->BeginFrame();
     if (ITC_FLAG(native_renderer_serialize)) {
@@ -417,16 +421,15 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
   }
-  return backend_->commands();
 }
 
 void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                           uint32_t data) {
-  passes_.InlineDraw(BeginFrame(), type, count, stride, data);
+  passes().InlineDraw(type, count, stride, data);
 }
 
 void Renderer::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
-  passes_.DrawIndexed(BeginFrame(), type, base_start, primitive_count);
+  passes().DrawIndexed(type, base_start, primitive_count);
 }
 
 void Renderer::EndFrame() {
@@ -435,7 +438,7 @@ void Renderer::EndFrame() {
   uint32_t frame_draws = frame_draws_;
   frame_commands_ = frame_draws_ = 0;
 
-  VkCommandBuffer commands = BeginFrame();
+  BeginFrame();
   // A dump: the frame as is (with the resolves), then frames with something
   // left out (see dump_steps_).
   bool dump = dumping_;
@@ -444,14 +447,14 @@ void Renderer::EndFrame() {
   bool cycle_capture = !cycle_steps_.empty() && !cycle_captured_ &&
                        Clock::now() - cycle_step_start_ >= std::chrono::seconds(2);
   VkExtent2D source =
-      dump ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
+      dump ? passes_.EndFrame(ITC_FLAG(native_renderer_show_resolve), true,
                               dump_step_ ? dump_steps_[dump_step_ - 1].name : "shown",
                               dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0)
       : cycle_capture
-          ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
+          ? passes_.EndFrame(ITC_FLAG(native_renderer_show_resolve), true,
                              std::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
                              false)
-          : passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), false);
+          : passes_.EndFrame(ITC_FLAG(native_renderer_show_resolve), false);
   // Shown, after the frame's uploads.
   if (g_window_resized.exchange(false)) {
     backend_->WindowResized();
@@ -723,7 +726,7 @@ void render::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_
 
 void render::Clear(uint32_t flags, uint32_t color, float z, uint32_t stencil, bool rects) {
   if (native::Renderer* renderer = native::GetRenderer()) {
-    renderer->passes().Clear(renderer->Commands(), flags, color, z, stencil, rects);
+    renderer->passes().Clear(flags, color, z, stencil, rects);
   }
 }
 
@@ -731,20 +734,20 @@ void render::Resolve(uint32_t flags, const int32_t* rect, uint32_t destination,
                      const int32_t* point, bool level_or_slice, const float clear_color[4],
                      float clear_z, uint32_t clear_stencil) {
   if (native::Renderer* renderer = native::GetRenderer()) {
-    renderer->passes().Resolve(renderer->Commands(), flags, rect, destination, point,
+    renderer->passes().Resolve(flags, rect, destination, point,
                                level_or_slice, clear_color, clear_z, clear_stencil);
   }
 }
 
 void render::TilingBegun(uint32_t width, uint32_t height, float clear) {
   if (native::Renderer* renderer = native::GetRenderer()) {
-    renderer->passes().BeginTiling(renderer->Commands(), width, height, clear);
+    renderer->passes().BeginTiling(width, height, clear);
   }
 }
 
 void render::TilingEnded(uint32_t flags, uint32_t destination, float clear) {
   if (native::Renderer* renderer = native::GetRenderer()) {
-    renderer->passes().EndTiling(renderer->Commands(), flags, destination, clear);
+    renderer->passes().EndTiling(flags, destination, clear);
   }
 }
 
