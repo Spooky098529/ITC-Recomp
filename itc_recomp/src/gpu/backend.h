@@ -83,6 +83,9 @@ class Backend {
 
   // A shader (null if it can't be made), kept for the backend's life.
   virtual Shader* CreateShader(const ShaderDesc& desc) = 0;
+  // The pipeline for `desc`, made the first time (`made` set then) and
+  // kept; null if it can't be made.
+  virtual Pipeline* GetPipeline(const PipelineDesc& desc, bool* made = nullptr) = 0;
 
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;

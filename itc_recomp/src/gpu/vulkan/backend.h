@@ -6,6 +6,7 @@
 
 #include <array>
 #include <atomic>
+#include <memory>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -28,6 +29,15 @@ struct ShaderObject {
   VkDescriptorSetLayout textures = VK_NULL_HANDLE;
   std::vector<VkVertexInputBindingDescription> bindings;
   std::vector<VkVertexInputAttributeDescription> attributes;
+};
+
+// A pipeline as this backend holds it (behind gpu::Pipeline), with its
+// layout and the layout's sets (0 empty, 1 the constant blocks, 2 and 3 the
+// vertex and pixel shaders' textures).
+struct PipelineObject {
+  VkPipeline pipeline = VK_NULL_HANDLE;
+  VkPipelineLayout layout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout sets[4] = {};
 };
 
 // A buffer as this backend holds it (behind gpu::Buffer).
@@ -99,6 +109,16 @@ class Backend final : public gpu::Backend {
   void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) override;
   Shader* CreateShader(const ShaderDesc& desc) override;
   static ShaderObject& Object(Shader* shader) { return *reinterpret_cast<ShaderObject*>(shader); }
+  Pipeline* GetPipeline(const PipelineDesc& desc, bool* made = nullptr) override;
+  static PipelineObject& Object(Pipeline* pipeline) {
+    return *reinterpret_cast<PipelineObject*>(pipeline);
+  }
+  // A stage's texture set layout: the shader's, or an empty one without.
+  VkDescriptorSetLayout TexturesLayout(Shader* shader, ShaderStage stage);
+  // Sets 0 (empty) and 1 (the constant blocks: system, vertex floats, pixel
+  // floats, bool/loop; dynamic uniform buffers).
+  VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
+  VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
@@ -158,6 +178,20 @@ class Backend final : public gpu::Backend {
   // first frame, to the frame's end), and hold buffer uploads.
   bool uploading_ = false, uploaded_buffers_ = false;
   std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts_;
+  VkDescriptorSetLayout empty_layout_ = VK_NULL_HANDLE, constants_layout_ = VK_NULL_HANDLE;
+  struct DescHash {
+    size_t operator()(const PipelineDesc& desc) const;
+  };
+  struct LayoutPairHash {
+    size_t operator()(const std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>& key) const {
+      return std::hash<const void*>()(key.first) ^
+             (std::hash<const void*>()(key.second) * 0x9E3779B97F4A7C15ull);
+    }
+  };
+  std::unordered_map<std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>, VkPipelineLayout,
+                     LayoutPairHash>
+      pipeline_layouts_;
+  std::unordered_map<PipelineDesc, std::unique_ptr<PipelineObject>, DescHash> pipelines_;
   VkPipelineCache pipeline_cache_ = VK_NULL_HANDLE;
   std::filesystem::path pipeline_cache_file_;
   size_t pipeline_cache_saved_pipelines_ = 0;

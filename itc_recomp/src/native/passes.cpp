@@ -307,34 +307,11 @@ uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint
   return UINT32_MAX;
 }
 
-// Everything that selects a pipeline. Zeroed before filling, so it can be
-// compared as bytes.
-struct PipelineKey {
-  VkShaderModule vertex;
-  VkShaderModule pixel;
-  VkPipelineLayout layout;
-  uint32_t topology, primitive_restart;
-  uint32_t cull_mode, front_clockwise;
-  uint32_t z_enable, z_write, z_func;
-  uint32_t blend_enable, src_color, dst_color, color_op, src_alpha, dst_alpha, alpha_op;
-  uint32_t write_mask;
-  // cull_mode, z_func and the blend fields are gpu:: values (src/gpu/types.h).
-  // The targets: color format (UNDEFINED for none), depth or not, samples.
-  uint32_t color_format, depth, samples;
-
-  bool operator==(const PipelineKey&) const = default;
-};
-// Hashed and compared as a whole (no padding to hold stray bytes).
-static_assert(sizeof(PipelineKey) == 3 * sizeof(void*) + 18 * sizeof(uint32_t));
+// Everything that selects a pipeline (the backend's description).
+using PipelineKey = gpu::PipelineDesc;
 struct PipelineKeyHash {
   size_t operator()(const PipelineKey& key) const {
     return size_t(base::Hash64(&key, sizeof(key)));
-  }
-};
-struct HandlePairHash {
-  size_t operator()(const std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>& key) const {
-    return std::hash<const void*>()(key.first) ^
-           (std::hash<const void*>()(key.second) * 0x9E3779B97F4A7C15ull);
   }
 };
 
@@ -403,6 +380,7 @@ struct Target {
   bool depth;
   Surface surface;
   VkFormat format;
+  gpu::Format gpu_format;  // format's
   VkSampleCountFlagBits samples;
   VkExtent2D guest_extent;  // the surface's, in the guest's pixels
   VkExtent2D extent;        // the image's: guest_extent times scale
@@ -702,7 +680,9 @@ struct Passes::State {
   struct IdDraw {
     uint32_t number;
     VkShaderModule vertex;
+    gpu::Shader* vertex_shader;
     VkPipelineLayout layout;
+    VkDescriptorSetLayout set_layouts[4];  // the draw's layout's
     VkDescriptorSet sets[4];
     uint32_t offsets[kConstantBlocks];
     VkViewport viewport;
@@ -724,6 +704,21 @@ struct Passes::State {
   gpu::Image* id_depth = nullptr;
   bool id_drawn = false;  // this frame, for the dump
   VkPipeline GetIdPipeline(const IdDraw& draw);
+  // The draw's layout with the ID pass's push constant (its sets stay
+  // compatible).
+  VkPipelineLayout GetIdLayout(const IdDraw& draw) {
+    VkPipelineLayout& layout = id_layouts[draw.layout];
+    if (!layout) {
+      VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4};
+      VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+      info.setLayoutCount = 4;
+      info.pSetLayouts = draw.set_layouts;
+      info.pushConstantRangeCount = 1;
+      info.pPushConstantRanges = &push;
+      vk::vkCreatePipelineLayout(context.device, &info, nullptr, &layout);
+    }
+    return layout;
+  }
   void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;
@@ -1050,19 +1045,12 @@ struct Passes::State {
   gpu::Image* zero_3d = nullptr;
   gpu::Image* zero_cube = nullptr;
   VkSampler sampler = VK_NULL_HANDLE;
-  // Texture set layouts by the shader's bindings; this frame's sets by
-  // their contents.
-  std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts;
-  // Each shader's layout (shaders are never freed, and have one stage).
+  // This frame's texture sets by their contents.
   FrameSetCache texture_sets;
   // GetTextureSet's buffers, kept to save allocating them every draw.
   std::vector<VkDescriptorImageInfo> set_infos;
   std::vector<uint64_t> set_key;
   std::vector<VkWriteDescriptorSet> set_writes;
-  std::unordered_map<std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>, VkPipelineLayout,
-                     HandlePairHash>
-      pipeline_layouts;
-  std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> pipelines;
 
   std::unique_ptr<ShaderCache> shaders;
   // The driver's compiled pipelines, kept in the disk cache (disk_cache.h):
@@ -1095,11 +1083,6 @@ struct Passes::State {
   } recorded;
   // Each vertex shader module's vertex input: a binding a fetch (three for
   // a rectangle list, at instance rate), its attributes the raw words.
-  struct VertexInput {
-    std::vector<VkVertexInputBindingDescription> bindings;
-    std::vector<VkVertexInputAttributeDescription> attributes;
-  };
-  std::unordered_map<VkShaderModule, VertexInput> vertex_inputs;
   // The constants each block (system, vertex floats, pixel floats,
   // bool/loop) last had written into the constant block in use: a
   // copy of the bytes and where they went, so a draw whose block holds the
@@ -1221,11 +1204,8 @@ struct Passes::State {
   ShaderLookupTable::Key last_shader_key = {};
   ShaderLookup last_shader_lookup;
   bool last_shader_valid = false;
-  VkPipelineLayout GetPipelineLayout(VkDescriptorSetLayout vertex, VkDescriptorSetLayout pixel);
   // The shader's backend object, made at its first use.
   gpu::Shader* GetShader(const TranslatedShader* shader);
-  VkShaderModule GetModule(TranslatedShader* shader);
-  VkPipeline GetPipeline(const PipelineKey& key);
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
   void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
   void Draw(VkCommandBuffer commands, uint32_t device, const DrawCall& call);
@@ -1317,27 +1297,9 @@ bool Passes::State::CreateDescriptors() {
   if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
     return false;
   }
-  constexpr VkShaderStageFlags kBoth = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  // Set 0: empty (it held the vertex arena as a storage buffer until the
-  // vertex shaders took vertex attributes; kept so the other sets keep
-  // their numbers).
-  VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &shared_memory_layout) !=
-      VK_SUCCESS) {
-    return false;
-  }
-  // Set 1: system, vertex float, pixel float and bool/loop constants.
-  VkDescriptorSetLayoutBinding constants[kConstantBlocks];
-  for (uint32_t i = 0; i < kConstantBlocks; i++) {
-    constants[i] = {i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, kBoth, nullptr};
-  }
-  layout_info.bindingCount = kConstantBlocks;
-  layout_info.pBindings = constants;
-  if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &constants_layout) !=
-      VK_SUCCESS) {
-    return false;
-  }
+  // Sets 0 (empty) and 1 (the constant blocks) are the backend's.
+  shared_memory_layout = backend->empty_layout();
+  constants_layout = backend->constants_layout();
 
   VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   alloc.descriptorPool = pool;
@@ -1389,47 +1351,9 @@ bool Passes::State::CreateDummyTextures() {
 
 VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* shader,
                                                        VkShaderStageFlags stage) {
-  if (shader) {
-    gpu::Shader* object = GetShader(shader);
-    return object ? gpu::vulkan::Backend::Object(object).textures : VK_NULL_HANDLE;
-  }
-  VkDescriptorSetLayout* cached = nullptr;
-  // Keyed by stage, the image types and the sampler count.
-  std::string key(1, char(stage));
-  if (shader) {
-    for (const ShaderTexture& texture : shader->textures) {
-      key += char('0' + texture.view_type);
-    }
-    key += ':' + std::to_string(shader->samplers.size());
-  }
-  VkDescriptorSetLayout& layout = texture_layouts[key];
-  if (layout) {
-    if (cached) {
-      *cached = layout;
-    }
-    return layout;
-  }
-  std::vector<VkDescriptorSetLayoutBinding> bindings;
-  if (shader) {
-    for (uint32_t i = 0; i < shader->textures.size(); i++) {
-      bindings.push_back({i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stage, nullptr});
-    }
-    for (uint32_t i = 0; i < shader->samplers.size(); i++) {
-      bindings.push_back({uint32_t(shader->textures.size() + i), VK_DESCRIPTOR_TYPE_SAMPLER, 1,
-                          stage, nullptr});
-    }
-  }
-  VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  layout_info.bindingCount = uint32_t(bindings.size());
-  layout_info.pBindings = bindings.data();
-  if (vk::vkCreateDescriptorSetLayout(context.device, &layout_info, nullptr, &layout) !=
-      VK_SUCCESS) {
-    layout = VK_NULL_HANDLE;
-  }
-  if (cached) {
-    *cached = layout;
-  }
-  return layout;
+  return backend->TexturesLayout(GetShader(shader), stage == VK_SHADER_STAGE_VERTEX_BIT
+                                                        ? gpu::ShaderStage::kVertex
+                                                        : gpu::ShaderStage::kPixel);
 }
 
 VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
@@ -1674,24 +1598,6 @@ void Passes::State::CountDrawBindings(const TranslatedShader* vertex,
   last.valid = true;
 }
 
-VkPipelineLayout Passes::State::GetPipelineLayout(VkDescriptorSetLayout vertex,
-                                                    VkDescriptorSetLayout pixel) {
-  VkPipelineLayout& layout = pipeline_layouts[{vertex, pixel}];
-  if (!layout) {
-    VkDescriptorSetLayout sets[4] = {shared_memory_layout, constants_layout, vertex, pixel};
-    VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    info.setLayoutCount = 4;
-    info.pSetLayouts = sets;
-    vk::vkCreatePipelineLayout(context.device, &info, nullptr, &layout);
-    // The same with the ID pass's push constant (its sets stay compatible).
-    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4};
-    info.pushConstantRangeCount = 1;
-    info.pPushConstantRanges = &push;
-    vk::vkCreatePipelineLayout(context.device, &info, nullptr, &id_layouts[layout]);
-  }
-  return layout;
-}
-
 gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
   if (!shader) {
     return nullptr;
@@ -1726,117 +1632,8 @@ gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
     }
     // (A cache of the shader's: kept with it.)
     const_cast<TranslatedShader*>(shader)->gpu = backend->CreateShader(desc);
-    if (shader->gpu && shader->stage == ShaderStage::kVertex) {
-      const gpu::vulkan::ShaderObject& o = gpu::vulkan::Backend::Object(shader->gpu);
-      vertex_inputs[o.module] = {o.bindings, o.attributes};
-    }
   }
   return shader->gpu;
-}
-
-VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
-  gpu::Shader* object = GetShader(shader);
-  return object ? gpu::vulkan::Backend::Object(object).module : VK_NULL_HANDLE;
-}
-
-VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
-  auto [it, added] = pipelines.try_emplace(key, VK_NULL_HANDLE);
-  if (!added) {
-    return it->second;
-  }
-  ScopedCost cost(g_frame_costs.pipeline_ns);
-  g_frame_costs.pipelines++;
-  VkPipelineShaderStageCreateInfo stages[2] = {};
-  uint32_t stage_count = 0;
-  stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-  stages[stage_count].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[stage_count].module = key.vertex;
-  stages[stage_count++].pName = "main";
-  if (key.pixel) {
-    stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stages[stage_count].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[stage_count].module = key.pixel;
-    stages[stage_count++].pName = "main";
-  }
-  VkPipelineVertexInputStateCreateInfo vertex_input{
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-  if (auto input = vertex_inputs.find(key.vertex); input != vertex_inputs.end()) {
-    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
-    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
-    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
-    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
-  }
-  VkPipelineInputAssemblyStateCreateInfo input_assembly{
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-  input_assembly.topology = VkPrimitiveTopology(key.topology);
-  input_assembly.primitiveRestartEnable = key.primitive_restart;
-  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-  viewport.viewportCount = 1;
-  viewport.scissorCount = 1;
-  VkPipelineRasterizationStateCreateInfo raster{
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = vk_types::CullMode(gpu::CullMode(key.cull_mode));
-  raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  raster.lineWidth = 1.0f;
-  VkPipelineMultisampleStateCreateInfo multisample{
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  multisample.rasterizationSamples = VkSampleCountFlagBits(key.samples);
-  VkPipelineDepthStencilStateCreateInfo depth{
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  depth.depthTestEnable = key.z_enable;
-  depth.depthWriteEnable = key.z_write;
-  depth.depthCompareOp = vk_types::CompareOp(gpu::CompareOp(key.z_func));
-  VkPipelineColorBlendAttachmentState attachment{};
-  attachment.blendEnable = key.blend_enable;
-  attachment.srcColorBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.src_color));
-  attachment.dstColorBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.dst_color));
-  attachment.colorBlendOp = vk_types::BlendOp(gpu::BlendOp(key.color_op));
-  attachment.srcAlphaBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.src_alpha));
-  attachment.dstAlphaBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.dst_alpha));
-  attachment.alphaBlendOp = vk_types::BlendOp(gpu::BlendOp(key.alpha_op));
-  attachment.colorWriteMask = key.write_mask;
-  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  bool has_color = key.color_format != VK_FORMAT_UNDEFINED;
-  blend.attachmentCount = has_color ? 1 : 0;
-  blend.pAttachments = &attachment;
-  // Depth bias is set per draw.
-  raster.depthBiasEnable = key.depth;
-  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
-                                     VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_BLEND_CONSTANTS};
-  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 4;
-  dynamic.pDynamicStates = dynamic_states;
-  VkFormat color_format = VkFormat(key.color_format);
-  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  rendering.colorAttachmentCount = has_color ? 1 : 0;
-  rendering.pColorAttachmentFormats = &color_format;
-  rendering.depthAttachmentFormat = key.depth ? kDepthFormat : VK_FORMAT_UNDEFINED;
-  rendering.stencilAttachmentFormat = rendering.depthAttachmentFormat;
-
-  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-  info.pNext = &rendering;
-  info.stageCount = stage_count;
-  info.pStages = stages;
-  info.pVertexInputState = &vertex_input;
-  info.pInputAssemblyState = &input_assembly;
-  info.pViewportState = &viewport;
-  info.pRasterizationState = &raster;
-  info.pMultisampleState = &multisample;
-  info.pDepthStencilState = &depth;
-  info.pColorBlendState = &blend;
-  info.pDynamicState = &dynamic;
-  info.layout = key.layout;
-  if (VkResult result = vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info,
-                                                      nullptr, &it->second);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: vkCreateGraphicsPipelines: {}", int(result));
-    it->second = VK_NULL_HANDLE;
-  } else {
-    stats.pipelines++;
-    gpu_memory::Created(gpu_memory::Object::kPipeline);
-  }
-  return it->second;
 }
 
 bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data) {
@@ -1974,6 +1771,7 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   t.depth = depth;
   t.surface = surface;
   t.format = format;
+  t.gpu_format = vk_types::FormatFrom(format);
   t.samples = SampleCount(surface.msaa);
   t.guest_extent = {std::clamp(surface.width, 1u, 8192u), std::clamp(surface.height, 1u, 8192u)};
   if (tiling) {
@@ -2767,8 +2565,7 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
 
 void Passes::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
-  s.backend->MaybeSaveDiskCache(s.pipelines.size() + s.resolve_pipelines.size() +
-                                s.id_pipelines.size());
+  s.backend->MaybeSaveDiskCache(s.resolve_pipelines.size() + s.id_pipelines.size());
   s.frame = frame_index;
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
@@ -3370,10 +3167,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   PipelineKey key;
   std::memset(&key, 0, sizeof(key));
-  key.vertex = s.GetModule(vertex);
-  key.pixel = s.GetModule(pixel);
-  key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
-  key.topology = primitive.topology;
+  key.vertex = s.GetShader(vertex);
+  key.pixel = s.GetShader(pixel);
+  key.topology = uint32_t(primitive.topology);  // gpu::Topology's numbers
   key.primitive_restart = primitive.strip && states.primitive_restart;
   key.cull_mode = uint32_t(states.cull);
   key.front_clockwise = states.front_clockwise;
@@ -3382,7 +3178,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     key.z_write = z_write;
     key.z_func = z_func;
   }
-  key.color_format = color ? color->format : VK_FORMAT_UNDEFINED;
+  key.color_format = uint32_t(color ? color->gpu_format : gpu::Format::kUndefined);
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
   const render::BlendState& blend = states.blend[0];
@@ -3411,11 +3207,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write,
                                pixel_object != 0, target_formats) &
       0xF;
-  if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
+  if (!key.vertex || (pixel && !key.pixel)) {
     s.stats.failed++;
     return;
   }
-  VkPipeline pipeline = s.GetPipeline(key);
+  bool pipeline_made = false;
+  gpu::Pipeline* pipeline_object = s.backend->GetPipeline(key, &pipeline_made);
+  s.stats.pipelines += pipeline_made && pipeline_object;
+  const VkPipeline pipeline =
+      pipeline_object ? gpu::vulkan::Backend::Object(pipeline_object).pipeline : VK_NULL_HANDLE;
+  const VkPipelineLayout pipeline_layout =
+      pipeline_object ? gpu::vulkan::Backend::Object(pipeline_object).layout : VK_NULL_HANDLE;
   if (s.watch_draws && main_view_draw &&
       (!s.watch_pixel_shader || (pixel && pixel->hash == s.watch_pixel_shader))) {
     s.WatchDraw(vertex, pixel, index_address, primitive_count, key,
@@ -3496,7 +3298,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   now.bias[1] = slope;
   std::memcpy(now.blend_constants, blend_constants, sizeof(blend_constants));
   now.pipeline = pipeline;
-  now.layout = key.layout;
+  now.layout = pipeline_layout;
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
   now.indexed = quad_list || !call.inline_vertices;
@@ -3562,7 +3364,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   }
   if (!(skip && repeated[8])) {
-    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
+    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 4, sets,
                                 kConstantBlocks, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
@@ -3605,8 +3407,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (s.record_draws && main_view_draw && !call.inline_vertices) {
     IdDraw& id = s.id_draws.emplace_back();
     id.number = uint32_t(s.recorded_draws.size() - 1);
-    id.vertex = key.vertex;
-    id.layout = key.layout;
+    id.vertex = gpu::vulkan::Backend::Object(key.vertex).module;
+    id.vertex_shader = key.vertex;
+    id.layout = pipeline_layout;
+    std::copy(std::begin(gpu::vulkan::Backend::Object(pipeline_object).sets),
+              std::end(gpu::vulkan::Backend::Object(pipeline_object).sets), id.set_layouts);
     std::copy(sets, sets + 4, id.sets);
     std::copy(offsets, offsets + 5, id.offsets);
     id.viewport = viewport;
@@ -3625,7 +3430,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
 
 VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   PipelineKey key = draw.key;
-  key.pixel = VK_NULL_HANDLE;
+  key.pixel = nullptr;
   key.blend_enable = key.src_color = key.dst_color = key.color_op = 0;
   key.src_alpha = key.dst_alpha = key.alpha_op = key.write_mask = 0;
   key.color_format = key.samples = 0;
@@ -3650,11 +3455,12 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   stages[1].module = id_pixel;
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-  if (auto input = vertex_inputs.find(draw.vertex); input != vertex_inputs.end()) {
-    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
-    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
-    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
-    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
+  {
+    const gpu::vulkan::ShaderObject& input = gpu::vulkan::Backend::Object(draw.vertex_shader);
+    vertex_input.vertexBindingDescriptionCount = uint32_t(input.bindings.size());
+    vertex_input.pVertexBindingDescriptions = input.bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = uint32_t(input.attributes.size());
+    vertex_input.pVertexAttributeDescriptions = input.attributes.data();
   }
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -3706,7 +3512,7 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   info.pDepthStencilState = &depth;
   info.pColorBlendState = &blend;
   info.pDynamicState = &dynamic;
-  info.layout = id_layouts[draw.layout];
+  info.layout = GetIdLayout(draw);
   if (vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info, nullptr,
                                     &it->second) != VK_SUCCESS) {
     it->second = VK_NULL_HANDLE;
@@ -3778,7 +3584,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdSetScissor(commands, 0, 1, &scissor);
     vk::vkCmdSetDepthBias(commands, draw.bias_constant, 0.0f, draw.bias_slope);
     vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    VkPipelineLayout layout = id_layouts[draw.layout];
+    VkPipelineLayout layout = GetIdLayout(draw);
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
                                 draw.sets, kConstantBlocks, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);

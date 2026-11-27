@@ -229,8 +229,41 @@ struct ShaderDesc {
   std::vector<VertexAttribute> attributes;
 };
 
-// The backends' objects: opaque, each backend's own behind them.
+// The order Vulkan numbers them.
+enum class Topology : uint8_t {
+  kPointList,
+  kLineList,
+  kLineStrip,
+  kTriangleList,
+  kTriangleStrip,
+  kTriangleFan,
+};
+
 struct Shader;
+
+// A draw's pipeline: its shaders and fixed-function state. Plain 32-bit
+// fields (the enums' values) and no padding, so it's hashed and compared
+// as bytes: zero it before filling. A draw is bound with its shaders'
+// texture sets (2 and 3) and the four constant blocks (set 1); viewport,
+// scissor, depth bias and blend constants are set per draw.
+struct PipelineDesc {
+  Shader* vertex;
+  Shader* pixel;  // null: depth only
+  uint32_t topology, primitive_restart;  // Topology
+  uint32_t cull_mode, front_clockwise;   // CullMode
+  uint32_t z_enable, z_write, z_func;    // CompareOp
+  uint32_t blend_enable, src_color, dst_color, color_op, src_alpha, dst_alpha,
+      alpha_op;  // BlendFactor, BlendOp
+  uint32_t write_mask;  // RGBA bits
+  // The target: its color format (kUndefined: none), a depth target or
+  // not, the samples.
+  uint32_t color_format, depth, samples;
+  bool operator==(const PipelineDesc&) const = default;
+};
+static_assert(sizeof(PipelineDesc) == 2 * sizeof(void*) + 18 * sizeof(uint32_t));
+
+// The backends' objects: opaque, each backend's own behind them.
+struct Pipeline;
 struct Buffer;
 struct Sampler;
 struct Image;

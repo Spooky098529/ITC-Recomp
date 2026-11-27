@@ -262,14 +262,25 @@ each backend.
   unchanged (`MaybeSaveDiskCache` is told the pipelines made until the
   backend makes them itself). Checked: the dump identical, the cache loaded
   and written.
-- **Next:** pipelines from a description (`PipelineDesc`: the shaders and
-  the fixed-function state of today's `PipelineKey`; the backend makes the
-  pipeline layout from the shaders and keeps the pipeline disk cache), then
-  the recording: passes (begin and end, targets, clears), the
-  draw's state (pipelines from a description, binds, constants by offset),
-  draws, copies and resolves in the frame, then the full-screen and compute
-  passes, then the dumps. *(D3D11 later: `UpdateSubresource` from the
-  staging memory for the uploads.)*
+- **Pipelines (2026-11-27).** `gpu::PipelineDesc` (`src/gpu/types.h`:
+  the two shaders and the fixed-function state, field for field the
+  draw's old `PipelineKey`, plain 32-bit fields hashed as bytes) and
+  `Backend::GetPipeline`: the Vulkan backend owns sets 0 (empty) and 1 (the
+  constant blocks), derives the pipeline layout from the shaders' texture
+  sets (shared by layout pair, as before), and caches the pipelines by
+  description; its `PipelineObject` gives `passes.cpp` the pipeline, its
+  layout and its set layouts for binding (until binding moves). The draw
+  ID pass makes its push-constant layouts from those set layouts. Gone from
+  `passes.cpp`: `GetPipeline`, `GetPipelineLayout`, `GetModule`, the vertex
+  inputs and the texture layouts. Checked: the dump identical (the ID pass's
+  image too), the tick replay, the pad replay without errors.
+- **Next:** binding and recording (step 3's largest piece): passes (begin
+  and end, targets, clears), binds (pipeline, the texture sets from views
+  and samplers, the constant blocks by offset, vertex and index buffers),
+  draws, copies and resolves in the frame (the movie planes' copies too);
+  then the resolve, movie, gamma and ID passes' own pipelines and shaders;
+  then the dumps. *(D3D11 later: `UpdateSubresource` from the staging
+  memory for the uploads.)*
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between

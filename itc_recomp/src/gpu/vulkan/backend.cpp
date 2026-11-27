@@ -10,7 +10,10 @@
 #include <memory>
 
 #include "base/log.h"
+#include "base/hash.h"
 #include "native/disk_cache.h"
+#include "native/frame_costs.h"
+#include "native/gpu_memory.h"
 #include "native/vulkan_types.h"
 
 namespace gpu::vulkan {
@@ -257,7 +260,23 @@ bool Backend::CreateDevice() {
       return false;
     }
   }
-  return true;
+  // Set 0: empty (it held the vertex arena as a storage buffer until the
+  // vertex shaders took vertex attributes; kept so the other sets keep
+  // their numbers). Set 1: the constant blocks.
+  VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  if (vk::vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &empty_layout_) !=
+      VK_SUCCESS) {
+    return false;
+  }
+  constexpr VkShaderStageFlags kBoth = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  VkDescriptorSetLayoutBinding constants[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    constants[i] = {i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, kBoth, nullptr};
+  }
+  layout_info.bindingCount = 4;
+  layout_info.pBindings = constants;
+  return vk::vkCreateDescriptorSetLayout(device_, &layout_info, nullptr, &constants_layout_) ==
+         VK_SUCCESS;
 }
 
 bool Backend::CreateSwapchain() {
@@ -531,6 +550,7 @@ void Backend::OpenDiskCache(const std::filesystem::path& directory) {
 }
 
 void Backend::MaybeSaveDiskCache(size_t made) {
+  made += pipelines_.size();
   auto now = std::chrono::steady_clock::now();
   if (!pipeline_cache_ || pipeline_cache_file_.empty() || made == pipeline_cache_saved_pipelines_ ||
       now - pipeline_cache_saved_ < std::chrono::seconds(10)) {
@@ -919,6 +939,150 @@ Shader* Backend::CreateShader(const ShaderDesc& desc) {
     o.attributes.push_back({a.location, a.binding, vk_types::Format(a.format), a.offset});
   }
   return reinterpret_cast<Shader*>(object.release());
+}
+
+VkDescriptorSetLayout Backend::TexturesLayout(Shader* shader, ShaderStage stage) {
+  if (shader) {
+    return Object(shader).textures;
+  }
+  const VkShaderStageFlags flags =
+      stage == ShaderStage::kVertex ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+  VkDescriptorSetLayout& layout = texture_layouts_[std::string(1, char(flags))];
+  if (!layout) {
+    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    if (vk::vkCreateDescriptorSetLayout(device_, &info, nullptr, &layout) != VK_SUCCESS) {
+      layout = VK_NULL_HANDLE;
+    }
+  }
+  return layout;
+}
+
+size_t Backend::DescHash::operator()(const PipelineDesc& desc) const {
+  return size_t(base::Hash64(&desc, sizeof(desc)));
+}
+
+Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
+  auto [it, added] = pipelines_.try_emplace(key);
+  if (!added) {
+    PipelineObject* o = it->second.get();
+    return o && o->pipeline ? reinterpret_cast<Pipeline*>(o) : nullptr;
+  }
+  if (made) {
+    *made = true;
+  }
+  auto object = std::make_unique<PipelineObject>();
+  PipelineObject& o = *object;
+  o.sets[0] = empty_layout_;
+  o.sets[1] = constants_layout_;
+  o.sets[2] = TexturesLayout(key.vertex, ShaderStage::kVertex);
+  o.sets[3] = TexturesLayout(key.pixel, ShaderStage::kPixel);
+  if (!key.vertex || !o.sets[2] || !o.sets[3]) {
+    return nullptr;  // (kept as made: not tried again)
+  }
+  VkPipelineLayout& layout = pipeline_layouts_[{o.sets[2], o.sets[3]}];
+  if (!layout) {
+    VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    info.setLayoutCount = 4;
+    info.pSetLayouts = o.sets;
+    vk::vkCreatePipelineLayout(device_, &info, nullptr, &layout);
+  }
+  o.layout = layout;
+  if (!layout) {
+    return nullptr;
+  }
+  native::ScopedCost cost(native::g_frame_costs.pipeline_ns);
+  native::g_frame_costs.pipelines++;
+  const ShaderObject& vertex = Object(key.vertex);
+  VkPipelineShaderStageCreateInfo stages[2] = {};
+  uint32_t stage_count = 0;
+  stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+  stages[stage_count].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[stage_count].module = vertex.module;
+  stages[stage_count++].pName = "main";
+  if (key.pixel) {
+    stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    stages[stage_count].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[stage_count].module = Object(key.pixel).module;
+    stages[stage_count++].pName = "main";
+  }
+  VkPipelineVertexInputStateCreateInfo vertex_input{
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  vertex_input.vertexBindingDescriptionCount = uint32_t(vertex.bindings.size());
+  vertex_input.pVertexBindingDescriptions = vertex.bindings.data();
+  vertex_input.vertexAttributeDescriptionCount = uint32_t(vertex.attributes.size());
+  vertex_input.pVertexAttributeDescriptions = vertex.attributes.data();
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{
+      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  input_assembly.topology = VkPrimitiveTopology(key.topology);  // the same order
+  input_assembly.primitiveRestartEnable = key.primitive_restart;
+  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  viewport.viewportCount = 1;
+  viewport.scissorCount = 1;
+  VkPipelineRasterizationStateCreateInfo raster{
+      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.cullMode = vk_types::CullMode(CullMode(key.cull_mode));
+  raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.lineWidth = 1.0f;
+  VkPipelineMultisampleStateCreateInfo multisample{
+      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  multisample.rasterizationSamples = VkSampleCountFlagBits(key.samples);
+  VkPipelineDepthStencilStateCreateInfo depth{
+      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+  depth.depthTestEnable = key.z_enable;
+  depth.depthWriteEnable = key.z_write;
+  depth.depthCompareOp = vk_types::CompareOp(CompareOp(key.z_func));
+  VkPipelineColorBlendAttachmentState attachment{};
+  attachment.blendEnable = key.blend_enable;
+  attachment.srcColorBlendFactor = vk_types::BlendFactor(BlendFactor(key.src_color));
+  attachment.dstColorBlendFactor = vk_types::BlendFactor(BlendFactor(key.dst_color));
+  attachment.colorBlendOp = vk_types::BlendOp(BlendOp(key.color_op));
+  attachment.srcAlphaBlendFactor = vk_types::BlendFactor(BlendFactor(key.src_alpha));
+  attachment.dstAlphaBlendFactor = vk_types::BlendFactor(BlendFactor(key.dst_alpha));
+  attachment.alphaBlendOp = vk_types::BlendOp(BlendOp(key.alpha_op));
+  attachment.colorWriteMask = key.write_mask;
+  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  VkFormat color_format = vk_types::Format(Format(key.color_format));
+  bool has_color = color_format != VK_FORMAT_UNDEFINED;
+  blend.attachmentCount = has_color ? 1 : 0;
+  blend.pAttachments = &attachment;
+  // Depth bias is set per draw.
+  raster.depthBiasEnable = key.depth;
+  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                     VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_BLEND_CONSTANTS};
+  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dynamic.dynamicStateCount = 4;
+  dynamic.pDynamicStates = dynamic_states;
+  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+  rendering.colorAttachmentCount = has_color ? 1 : 0;
+  rendering.pColorAttachmentFormats = &color_format;
+  rendering.depthAttachmentFormat =
+      key.depth ? vk_types::Format(Format::kD32FloatS8Uint) : VK_FORMAT_UNDEFINED;
+  rendering.stencilAttachmentFormat = rendering.depthAttachmentFormat;
+
+  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  info.pNext = &rendering;
+  info.stageCount = stage_count;
+  info.pStages = stages;
+  info.pVertexInputState = &vertex_input;
+  info.pInputAssemblyState = &input_assembly;
+  info.pViewportState = &viewport;
+  info.pRasterizationState = &raster;
+  info.pMultisampleState = &multisample;
+  info.pDepthStencilState = &depth;
+  info.pColorBlendState = &blend;
+  info.pDynamicState = &dynamic;
+  info.layout = layout;
+  if (VkResult result =
+          vk::vkCreateGraphicsPipelines(device_, pipeline_cache_, 1, &info, nullptr, &o.pipeline);
+      result != VK_SUCCESS) {
+    ITC_LOG_ERROR("native renderer: vkCreateGraphicsPipelines: {}", int(result));
+    o.pipeline = VK_NULL_HANDLE;
+  } else {
+    native::gpu_memory::Created(native::gpu_memory::Object::kPipeline);
+  }
+  it->second = std::move(object);
+  return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
 }
 
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
