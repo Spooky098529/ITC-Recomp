@@ -53,7 +53,7 @@ void xe_shader() {
       r0 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r1 = clamp(r0.ywzx, 0.0, 1.0);
       if (!xe_bool(129u /* PS_CONSTANT_BOOL_USE_HSV_SCALE */)) {
-        pc = 35; continue;
+        pc = 35; break;
       }
       r0.x = xe_min(r1.w, r1.x);
       r0.y = xe_max(r1.w, r1.x);
@@ -220,9 +220,10 @@ void xe_shader() {
       r0.w = xe_dp3(r0.zxy, lit255.xyz);
       r1.xyz = -r0.yzx + r0.www;
       { precise vec3 e = xe_mul(r1.zxy, PS_CONSTANT_PARAM_CARIBRATE.zzz) + r0.xyz; xe_color0.xyz = e; }
-      break;  // the end
+      pc = -1; break;  // the end
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

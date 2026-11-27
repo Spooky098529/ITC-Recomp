@@ -80,7 +80,7 @@ void xe_shader() {
       // loop 31
       loop_count = uvec4(xe_loop_count(31u), loop_count.xyz);
       loop_aL = ivec4(xe_loop_start(31u), loop_aL.xyz);
-      if (loop_count.x == 0u) { pc = 8; continue; }
+      if (loop_count.x == 0u) { pc = 8; break; }
     case 4:
       r6.xyz = xe_mul(xe_fc[loop_aL.x + 41].xyz, MatAmbientDiffuse.www);
       { precise float v = xe_dp3(r2.xyz, xe_fc[loop_aL.x + 5].xyz); precise float s = (-abs(r4.x) > 0.0 ? 1.0 : 0.0); ps = s; r1.x = v; r0.w = s; }
@@ -104,7 +104,7 @@ void xe_shader() {
         if (count != 0u) {
           loop_count.x = count;
           loop_aL.x += xe_loop_step(31u);
-          pc = 4; continue;
+          pc = 4; break;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 8:
@@ -112,7 +112,7 @@ void xe_shader() {
       // loop 30
       loop_count = uvec4(xe_loop_count(30u), loop_count.xyz);
       loop_aL = ivec4(xe_loop_start(30u), loop_aL.xyz);
-      if (loop_count.x == 0u) { pc = 15; continue; }
+      if (loop_count.x == 0u) { pc = 15; break; }
     case 10:
       r8.xyz = xe_fc[loop_aL.x + 8].xyz + -r0.xyz;
       r6.x = xe_dp3(r8.xyz, r8.xyz);
@@ -122,7 +122,7 @@ void xe_shader() {
       { precise float v = xe_dp3(r6.xyz, xe_fc[loop_aL.x + 16].xyz); precise float s = inversesqrt(abs(r6.x)); ps = s; r0.w = v; r1.z = s; }
       { precise vec3 v = xe_mul(r8.xyz, r1.zzz); precise float s = 1.0 / r0.w; ps = s; r6.xyz = v; r1.z = s; }
       if (!p) {
-        pc = 19; continue;
+        pc = 19; break;
       }
       r8.xyz = xe_mul(xe_fc[loop_aL.x + 47].xyz, MatAmbientDiffuse.www);
       r0.w = xe_dp3(r2.xyz, r6.xyz);
@@ -138,7 +138,7 @@ void xe_shader() {
         if (count != 0u) {
           loop_count.x = count;
           loop_aL.x += xe_loop_step(30u);
-          pc = 10; continue;
+          pc = 10; break;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 15:
@@ -149,7 +149,7 @@ void xe_shader() {
         r1.xyz = xe_max(r1.xyz, lit255.yyy);
       }
       { precise vec4 e = r1; xe_color0 = e; }
-      break;  // the end
+      pc = -1; break;  // the end
     case 19:
       r4.w = xe_dp3(r6.xyz, xe_fc[loop_aL.x + 24].xyz);
       r0.w = (r4.w > xe_fc[loop_aL.x + 32].x ? 1.0 : 0.0);
@@ -190,9 +190,10 @@ void xe_shader() {
       }
       { float pop = r2.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r2.w = ps; }
       { float pop = r2.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r2.w = ps; }
-      pc = 13; continue;
+      pc = 13; break;
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

@@ -566,14 +566,14 @@ class Port:
                 self.emit_instructions(c.instructions, block,
                                        c.condition if c.op in ("cexec_pred", "cexece_pred") else None)
                 if c.op.startswith(("exece", "cexece")):
-                    block.append("break;  // the end")
+                    block.append("pc = -1; break;  // the end" if switch else "break;  // the end")
             elif c.op == "loop":
                 block += ["// loop %d" % c.loop_id,
                           "loop_count = uvec4(xe_loop_count(%du), loop_count.xyz);" % c.loop_id,
                           "loop_aL = ivec4(%s, loop_aL.xyz);" % (
                               "loop_aL.x" if c.is_repeat else
                               "xe_loop_start(%du)" % c.loop_id),
-                          "if (loop_count.x == 0u) { pc = %d; continue; }" % c.address]
+                          "if (loop_count.x == 0u) { pc = %d; break; }" % c.address]
             elif c.op == "endloop":
                 if c.predicated and c.condition:
                     again = "!(count == 0u || p)"
@@ -586,11 +586,11 @@ class Port:
                           "  if (%s) {" % again,
                           "    loop_count.x = count;",
                           "    loop_aL.x += xe_loop_step(%du);" % c.loop_id,
-                          "    pc = %d; continue;" % c.address,
+                          "    pc = %d; break;" % c.address,
                           "  }",
                           "  loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }"]
             elif c.op == "cjmp":
-                block.append("pc = %d; continue;" % c.address)
+                block.append("pc = %d; break;" % c.address)
             elif c.op in ("nop", "alloc", "vfetch_done"):
                 continue
             else:
@@ -703,7 +703,10 @@ class Port:
         if switch:
             L += ["  while (true) {", "    switch (pc) {", "    case 0:"]
             L.extend("      " + s if not s.startswith("case ") else "    " + s for s in body)
-            L += ["    }", "    break;", "  }"]
+            # A jump sets pc and leaves the switch (HLSL has no continue in a
+            # switch, docs/d3d11-backend.md, step 4); the end, or falling off
+            # the last case, sets pc to -1, which leaves the loop.
+            L += ["      pc = -1;", "    }", "    if (pc < 0) break;", "  }"]
         else:
             L.append("  do {")
             L.extend("    " + s for s in body)
