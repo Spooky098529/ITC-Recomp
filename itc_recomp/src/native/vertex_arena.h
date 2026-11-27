@@ -49,15 +49,15 @@ class VertexArena {
 
   // The arena offset of the physical range [address, address + size),
   // copied in if it's new this way or was written since; UINT32_MAX if
-  // there's no room (the draw is left out, counted). endian: 0 as it is
-  // (vertices: the shaders swap them), or an index buffer's (xenos::Endian:
-  // 1 16-bit indices, 2 32-bit ones) to keep it in the host's byte order
-  // for the vertex input to fetch by (kept apart from the same range as
-  // it is).
-  uint32_t Place(uint32_t address, uint32_t size, uint32_t endian = 0);
+  // there's no room (the draw is left out, counted). endian: the guest
+  // data's (xenos::Endian: 0 none, 1 8-in-16, 2 8-in-32, 3 16-in-32; a
+  // vertex stream's from its fetch constant, an index buffer's from its
+  // size), swapped as it's copied so the arena holds the host's byte order
+  // for the vertex input to fetch by (each endian mode a range of its own).
+  uint32_t Place(uint32_t address, uint32_t size, uint32_t endian);
   // The frame's inline vertices: copied into this frame's part of the
-  // arena; UINT32_MAX if it's full.
-  uint32_t PlaceInline(const void* data, uint32_t size);
+  // arena, swapped from `endian` as Place does; UINT32_MAX if it's full.
+  uint32_t PlaceInline(const void* data, uint32_t size, uint32_t endian);
 
   VkBuffer buffer() const;
   // This frame's copies, ended, to be submitted before its drawing; null if

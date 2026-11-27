@@ -3548,7 +3548,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       }
       uint32_t word0 = arena_fetch[2 * k];
       uint32_t size = ((arena_fetch[2 * k + 1] >> 2) & 0xFFFFFFu) * 4;
-      uint32_t offset = s.arena.Place(word0 & 0x1FFFFFFCu, size);
+      // In the host's byte order (the fetch constant's endian mode).
+      uint32_t offset = s.arena.Place(word0 & 0x1FFFFFFCu, size, arena_fetch[2 * k + 1] & 3);
       if (offset == UINT32_MAX) {
         s.stats.failed++;
         s.stats.failed_by[7]++;
@@ -4095,7 +4096,12 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                         uint32_t stride, uint32_t data) {
   State& s = *state_;
   uint32_t size = count * stride;
-  uint32_t offset = count && stride ? s.arena.PlaceInline(guest::Pointer(data), size) : UINT32_MAX;
+  // In the host's byte order: inline vertices are 8-in-32, as BeginVertices'
+  // fetch constant has them.
+  uint32_t offset = count && stride
+                        ? s.arena.PlaceInline(guest::Pointer(data), size,
+                                              uint32_t(xenos::Endian::k8in32))
+                        : UINT32_MAX;
   if (offset == UINT32_MAX) {
     s.stats.failed++;
     s.stats.failed_by[7]++;

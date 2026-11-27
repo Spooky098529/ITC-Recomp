@@ -490,7 +490,7 @@ uint32_t VertexArena::Place(uint32_t address, uint32_t size, uint32_t endian) {
   return range.offset;
 }
 
-uint32_t VertexArena::PlaceInline(const void* data, uint32_t size) {
+uint32_t VertexArena::PlaceInline(const void* data, uint32_t size, uint32_t endian) {
   State& s = *state_;
   uint32_t at = AlignUp(s.inline_used);
   if (at + size > kInlineSlotBytes) {
@@ -499,7 +499,7 @@ uint32_t VertexArena::PlaceInline(const void* data, uint32_t size) {
   }
   s.inline_used = at + size;
   uint32_t offset = s.inline_start + s.frame * kInlineSlotBytes + at;
-  s.Copy(data, size, offset);
+  s.Copy(data, size, offset, endian);
   s.stats.inline_bytes += size;
   return offset;
 }

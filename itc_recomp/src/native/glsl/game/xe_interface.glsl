@@ -84,12 +84,6 @@ uint xe_fetch_word(uint n) { return xe_fetch[n >> 2u][n & 3u]; }
 
 const float kXeFltMax = 3.40282347e+38;
 
-uint xe_endian_swap(uint v, uint endian) {
-  if (endian == 1u || endian == 2u) v = ((v & 0x00FF00FFu) << 8u) | ((v >> 8u) & 0x00FF00FFu);
-  if (endian == 2u || endian == 3u) v = (v << 16u) | (v >> 16u);
-  return v;
-}
-
 // --- instructions --------------------------------------------------------------
 // A multiply is 0 when either factor is 0, even infinity or NaN times 0
 // (as on the console, which D3D9 shaders count on).
@@ -389,7 +383,7 @@ uint xe_vf_needed_words(uint format, uint used) {
 }
 
 // Vertex fetch n's attribute: the raw words of the vertex's element (in the
-// guest's byte order), one input a fetch and a vertex of the rectangle
+// host's byte order), one input a fetch and a vertex of the rectangle
 // (locations 3n to 3n + 2; a rectangle list reads its three vertices'
 // through bindings at instance rate, other draws read the first). The
 // renderer makes the vertex input state from the fetches' fields
@@ -412,12 +406,13 @@ uint xe_vf_slot = 0u;
 // instruction gives them (identity: 0x688, xyzw).
 vec4 xe_vfetch_words(uvec4 words, uint fetch_constant, uint format, uint flags, int exp_adjust,
                      uint swizzle, uint used) {
-  uint word_1 = xe_fetch_word(fetch_constant * 2u + 1u);
+  // The words are in the host's byte order (the vertex arena swaps them as
+  // it copies them in, docs/pc-renderer.md, step 2).
   uint needed = xe_vf_needed_words(format, used);
   uvec4 w = uvec4(0u);
   for (int i = 0; i < 4; i++) {
     if ((needed & (1u << i)) != 0u) {
-      w[i] = xe_endian_swap(words[i], word_1 & 3u);
+      w[i] = words[i];
     }
   }
   vec4 r = vec4(0.0);
