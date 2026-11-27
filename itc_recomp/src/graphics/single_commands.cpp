@@ -77,6 +77,7 @@ uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call) {
   // in play) a guest call, the pixel shader's its plain C++.
   auto set_bools = [&](uint32_t values, uint32_t count) {
     const uint32_t first = single.first_register();
+    render::SetConstants(vertex, 2, first, count, values);
     const uint32_t device = Globals::replay_device();
     if (vertex) {
       call(0x822A8418, frame, 0x8258F250, {device, first, values, count});
@@ -91,6 +92,7 @@ uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call) {
       const uint32_t device = Globals::replay_device();
       call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258F160 : 0x8258F2BC,
            {device, first, data, count});
+      render::SetConstants(vertex, 0, first, count, data);
       break;
     }
     case 1: {  // the floats, with the dirty mask of the 4-register blocks
@@ -108,6 +110,7 @@ uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call) {
       } else {
         device_state::SetPixelShaderConstantF(device, first, data, count, dirty);
       }
+      render::SetConstants(vertex, 1, first, count, data);
       break;
     }
     case 2:

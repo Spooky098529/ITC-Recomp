@@ -137,6 +137,7 @@ uint32_t SetShaderConstants(uint32_t payload, uint32_t count, uint32_t packed,
   const bool vertex = stage == 0;
   const uint32_t type = uint32_t(int32_t(packed << 8) >> 24);
   const uint32_t first = (packed >> 8) & 0xFF;
+  render::SetConstants(vertex, type, first, count, payload);
   switch (type) {
     case 0:  // the loop constants (sub_822A84C8, sub_822A8518)
       call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258FDB8 : 0x8258FED4,

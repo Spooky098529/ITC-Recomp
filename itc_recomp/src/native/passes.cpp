@@ -898,6 +898,8 @@ struct Passes::State {
   void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
   void CheckTargets(uint32_t device);
   void CheckBindings(uint32_t device, const TranslatedShader* vertex, bool inline_vertices);
+  void CheckConstants(uint32_t device, const TranslatedShader* vertex,
+                      const TranslatedShader* pixel);
   // The depth format can be sampled with linear filtering (the depth
   // resolves' readers' samplers may ask for it).
   bool depth_filterable = false;
@@ -3483,8 +3485,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   for (uint32_t stage = 0; stage < 2; stage++) {
     const TranslatedShader* shader = stage == 0 ? vertex : pixel;
-    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
-                                           : kDevicePixelFloatConstants);
+    const float(*source)[4] = render::ShaderConstants().floats[stage];
     // Only the registers the shader reads, packed in order, into the last
     // copy, noting whether any differ: run by run of consecutive registers
     // (testing each of the 256 bits in turn was ~14% of the render thread,
@@ -3498,8 +3499,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
         uint32_t first = std::countr_zero(bits);
         uint32_t count = std::countr_one(bits >> first);
         bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        if (guest::CopyU32s(source + 16 * (64 * w + first), copy + 4 * packed,
-                            4 * count)) {
+        const float* from = source[64 * w + first];
+        if (std::memcmp(copy + 4 * packed, from, 16 * count)) {
+          std::memcpy(copy + 4 * packed, from, 16 * count);
           same = false;
         }
         packed += count;
@@ -3612,7 +3614,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       s.stats.fetch_changed_unread += !texture_differs && !vertex_differs;
     }
   }
-  if (!s.PlaceConstants(3, regs.bool_loop,
+  if (!s.PlaceConstants(3, render::ShaderConstants().bool_loop,
                         kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
       !s.PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
     s.stats.failed++;
@@ -3684,6 +3686,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     s.CheckRenderStates(color != nullptr, depth != nullptr, device);
     s.CheckTargets(device);
     s.CheckBindings(device, vertex, call.inline_vertices);
+    s.CheckConstants(device, vertex, pixel);
   }
   VkPipeline pipeline = s.GetPipeline(key);
   if (s.watch_draws && main_view_draw &&
@@ -4789,21 +4792,59 @@ void Passes::State::CheckBindings(uint32_t device, const TranslatedShader* verte
         std::format("pixel shader {:08X} mode {}", b.pixel_shader, regs.edram_mode & 7));
 }
 
+void Passes::State::CheckConstants(uint32_t device, const TranslatedShader* vertex,
+                                   const TranslatedShader* pixel) {
+  const render::Constants& c = render::ShaderConstants();
+  for (uint32_t stage = 0; stage < 2; stage++) {
+    const TranslatedShader* shader = stage == 0 ? vertex : pixel;
+    if (!shader) {
+      continue;
+    }
+    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
+                                           : kDevicePixelFloatConstants);
+    for (uint32_t r = 0; r < 256; r++) {
+      if (!(shader->float_constants[r >> 6] & (uint64_t(1) << (r & 63)))) {
+        continue;
+      }
+      float shadow[4];
+      for (uint32_t i = 0; i < 4; i++) {
+        shadow[i] = guest::LoadFloat(source + 16 * r + 4 * i);
+      }
+      if (std::memcmp(shadow, c.floats[stage][r], 16) &&
+          render_state_mismatches[24]++ < 3) {
+        ITC_LOG_INFO("native renderer: render state float constant differs from the "
+                     "shadow's: {} c{} ours {} {} {} {} shadow {} {} {} {} (command {})",
+                     stage ? "pixel" : "vertex", r, c.floats[stage][r][0],
+                     c.floats[stage][r][1], c.floats[stage][r][2], c.floats[stage][r][3],
+                     shadow[0], shadow[1], shadow[2], shadow[3], g_current_command);
+      }
+    }
+  }
+  for (uint32_t i = 0; i < 40; i++) {
+    if (c.bool_loop[i] != regs.bool_loop[i] && render_state_mismatches[25]++ < 3) {
+      ITC_LOG_INFO("native renderer: render state bool/loop word {} differs from the "
+                   "shadow's: ours {:08X} shadow {:08X} (command {}; vs {:016X} ps {:016X})",
+                   i, c.bool_loop[i], regs.bool_loop[i], g_current_command,
+                   vertex ? vertex->hash : 0, pixel ? pixel->hash : 0);
+    }
+  }
+}
+
 void Passes::set_check_render_states(bool check) {
   state_->check_render_states = check;
 }
 
 std::string Passes::TakeRenderStateChecks() {
   State& s = *state_;
-  static const char* const kNames[24] = {
+  static const char* const kNames[26] = {
       "z_enable",      "z_write",         "z_func",       "cull",
       "blend",         "color_write",     "blend_constants", "alpha_test",
       "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
       "scissor_enable", "scissor_rect", "targets", "viewport", "color_exp_bias",
       "depth_float24", "clip_space", "bound objects", "stream fetch", "strides",
-      "shader controls", "color drawn"};
+      "shader controls", "color drawn", "float constants", "bool/loop"};
   std::string text;
-  for (int i = 0; i < 24; i++) {
+  for (int i = 0; i < 26; i++) {
     text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
   }
   return text;

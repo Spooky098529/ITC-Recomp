@@ -16,6 +16,7 @@ Targets g_targets;
 // D3D's viewport as last set (before the clamp to a surface).
 Viewport g_set_viewport;
 Bindings g_bindings;
+Constants g_constants;
 // While tiling: the tiles' extent together.
 uint32_t g_tiling_width = 0, g_tiling_height = 0;
 
@@ -133,9 +134,110 @@ VkBlendOp BlendOp(uint32_t op) {
 const RenderStates& States() { return g_states; }
 const Targets& BoundTargets() { return g_targets; }
 const Bindings& BoundResources() { return g_bindings; }
+const Constants& ShaderConstants() { return g_constants; }
 
-void SetVertexShader(uint32_t shader) { g_bindings.vertex_shader = shader; }
-void SetPixelShader(uint32_t shader) { g_bindings.pixel_shader = shader; }
+void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, uint32_t data) {
+  switch (type) {
+    case 0:  // loops: an int4 each, its low bytes (count, start, step)
+      for (uint32_t i = 0; i < count && first + i < 16; i++, data += 16) {
+        g_constants.bool_loop[8 + (vertex ? 0 : 16) + first + i] =
+            guest::LoadU8(data + 3) | guest::LoadU8(data + 7) << 8 |
+            guest::LoadU8(data + 11) << 16;
+      }
+      break;
+    case 1:  // floats: a vec4 a register
+      for (uint32_t i = 0; i < count && first + i < 256; i++, data += 16) {
+        for (uint32_t c = 0; c < 4; c++) {
+          g_constants.floats[vertex ? 0 : 1][first + i][c] = guest::LoadFloat(data + 4 * c);
+        }
+      }
+      break;
+    case 2:  // bools: a word each, its low bit
+      for (uint32_t i = 0; i < count && first + i < 128; i++, data += 4) {
+        uint32_t n = first + i;
+        uint32_t& word = g_constants.bool_loop[(vertex ? 0 : 4) + (n >> 5)];
+        word = (word & ~(1u << (n & 31))) | (guest::LoadU32(data) & 1) << (n & 31);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+// A shader's literal constants (its file's def and defi: the float, bool
+// and loop constants it sets for itself), from the records its object
+// carries (the file header copied at the vertex shader's +592, the pixel
+// shader's +56; its +12 the records' offset): words copied to places in
+// the block from the device's +1024 (as Device::SetVertexShader and
+// SetPixelShader apply them), of which the constants are taken here.
+void ApplyLiterals(uint32_t header) {
+  const uint32_t at = guest::LoadU32(header + 12);
+  if (!at) {
+    return;
+  }
+  const uint32_t p = header + at;
+  auto put = [](uint32_t offset, uint32_t value) {
+    if (offset >= 768 && offset < 768 + 4096) {  // vertex floats (device +1792)
+      uint32_t i = (offset - 768) >> 2;
+      g_constants.floats[0][i >> 2][i & 3] = std::bit_cast<float>(value);
+    } else if (offset >= 4864 && offset < 4864 + 4096) {  // pixel floats (+5888)
+      uint32_t i = (offset - 4864) >> 2;
+      g_constants.floats[1][i >> 2][i & 3] = std::bit_cast<float>(value);
+    } else if (offset >= 8960 && offset < 8960 + 160) {  // bools and loops (+9984)
+      g_constants.bool_loop[(offset - 8960) >> 2] = value;
+    }
+  };
+  auto get = [](uint32_t offset) -> uint32_t {
+    if (offset >= 8960 && offset < 8960 + 160) {
+      return g_constants.bool_loop[(offset - 8960) >> 2];
+    }
+    return 0;
+  };
+  uint32_t record = p + 24;
+  const uint32_t end = guest::LoadU32(p + 16) + record;
+  bool masked = false;
+  while (record < end) {
+    const uint16_t count = guest::LoadU16(record + 2), offset = guest::LoadU16(record);
+    record += 4;
+    if (count == 0) {
+      masked = true;
+      break;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+      put(offset + 4 * i, guest::LoadU32(record + 4 * i));
+    }
+    record += uint32_t(count) << 2;
+  }
+  // The masked records: a pair of words a word (and-mask, or-value).
+  while (masked && record < end) {
+    uint16_t count = guest::LoadU16(record + 2);
+    uint32_t offset = guest::LoadU16(record);
+    record += 4;
+    if (count == 0) {
+      break;
+    }
+    do {
+      put(offset, (guest::LoadU32(record) & get(offset)) | guest::LoadU32(record + 4));
+      record += 8;
+      offset += 4;
+      count = uint16_t(count - 2);
+    } while (count != 0);
+  }
+}
+
+void SetVertexShader(uint32_t shader) {
+  g_bindings.vertex_shader = shader;
+  if (shader) {
+    ApplyLiterals(shader + 592);
+  }
+}
+
+void SetPixelShader(uint32_t shader) {
+  g_bindings.pixel_shader = shader;
+  if (shader) {
+    ApplyLiterals(shader + 56);
+  }
+}
 void SetVertexLayout(uint32_t declaration) { g_bindings.declaration = declaration; }
 void SetIndexBuffer(uint32_t buffer) { g_bindings.index_buffer = buffer; }
 

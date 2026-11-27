@@ -115,6 +115,21 @@ const Bindings& BoundResources();
 // SQ_PROGRAM_CNTL and SQ_CONTEXT_MISC.
 void ShaderControls(uint32_t& program_control, uint32_t& context_misc);
 
+// The shaders' constants: each stage's 256 float registers (vertex 0,
+// pixel 1), and the bool and loop constants as the shaders' block takes
+// them (words 0-3 the vertex shader's 128 bools, 4-7 the pixel shader's,
+// then 32 loop constants: 0-15 the vertex shader's, 16-31 the pixel
+// shader's, each count | start << 8 | step << 16).
+struct Constants {
+  float floats[2][256][4] = {};
+  uint32_t bool_loop[40] = {};
+};
+// Commands 7 (and the single 7): `count` registers from `first` of a
+// stage's type (0 loop constants from int4s, 1 floats, 2 bools from
+// words), from the guest's `data`.
+void SetConstants(bool vertex, uint32_t type, uint32_t first, uint32_t count, uint32_t data);
+const Constants& ShaderConstants();
+
 // The game's render state `state` (a byte offset: 40 ZEnable, 44 ZFunc, ...)
 // set to `value`, as the device's setter for it gives it meaning.
 void SetRenderState(uint32_t state, uint32_t value);

@@ -563,9 +563,23 @@ and resolve on one 256x144 target in turn, then the main view draws on
   shader reads compared: the loaded copy lags for unused ones), then
   frames right.
 
-Left for step 3: the rest of the interface (textures, constants, clears
-and draws), then the game's setters out of the handlers, which ends the
-shadow on the render path.
+- **The seam, fourth part: the constants (2026-11-27).**
+  `render::SetConstants`, from command 7 and the single 7 (after
+  interpolation's substitution, which writes the payload first): each
+  stage's 256 float registers and the bool and loop block as the shaders'
+  uniform takes it (loops from D3D's int4s: count, start, step). A shader's
+  literal constants (its file's `def` and `defi`: the drawer's vertex
+  shader's c255, the lit material's light counts in pixel loops 14 and 15)
+  come with the shader: `render::SetVertexShader` and `SetPixelShader`
+  apply the records its object carries that land in the constants, as the
+  game's setters apply them all to the device. The draw packs the float
+  registers and places the bool/loop block from there. Checked against
+  the shadow (no difference in an attract race or the pad replay), then
+  frames right.
+
+Left for step 3: textures and sampler states (with 2b's resources by
+handle), clears and draws through the interface, then the game's setters
+out of the handlers, which ends the shadow on the render path.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 
