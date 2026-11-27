@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0 and 1 done, 2, 2b, 3, 4 and 5 in progress)
+# A PC renderer (a plan; steps 0, 1 and 4 done, 2, 2b, 3 and 5 in progress)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -366,8 +366,61 @@ kept by the declaration and the strides. Gone with the patch: its wrap and
 copy in `replay_hooks.cpp`, the declaration mismatch and copy counts, and
 `--native_renderer_log_shader_lookups`.
 
-Left for step 2: constants by name and plain textures, with step 3, where
-the draw state stops coming from the registers.
+**Part 4 (2026-11-27): PC inputs.** The shaders read no 360 register
+files or descriptors (`docs/shaders.md`, "PC inputs"):
+
+- **Vertex data in the host's byte order.** The vertex arena swaps each
+  stream from its fetch constant's endian mode as it copies it in (inline
+  vertices from 8-in-32), as it did for indices; `xe_vfetch` swaps
+  nothing.
+- **Plain textures.** Measured first (a survey at every draw, the attract
+  race and the pad replay): no texture has signed, biased or gamma
+  components, an exponent bias or a LOD bias. Each texture is one view
+  (a 2D array's first layer, or a cube) and one sampler bound by its stage;
+  its size comes from `textureSize`, its LOD bias is the sampler's. The
+  draw's only word on a texture is its reader scale (step 4). A texture
+  with signs or an exponent is logged as an error. SBX's menu texture
+  filter and distance-field font, which read the fetch constant and were
+  never turned on here, are removed.
+- **Samplers mapped where they're set.** `render::SetSamplerState` maps the
+  game's sampler states to a stage's `render::SamplerState` of Vulkan
+  values (filters, mip mode, address modes, anisotropy from the game's
+  table, border, LOD bias); the texture cache makes the sampler that
+  describes with the texture's level range. The decode of the sampler
+  fields merged into the descriptor words is gone, and so are the shader
+  instruction's filter overrides (no game shader has any; a port with one
+  fails its fit, named). Checked against the old decode at every draw
+  first (no difference in an attract race, the tick replay or the pad
+  replay).
+- **Constants as D3D's registers, by name.** Each stage's float registers
+  go up as one range, from the lowest the shader reads to the highest (all
+  256 for a shader addressing them by the loop index; its literal
+  constants left out), and a constant's name is `xe_fc[register -
+  lowest]`: the draw copies the range instead of gathering a mask's
+  registers. Bools stay a bit each; loops are D3D's int4s (count, start,
+  step; `render::BoolLoopConstants`) instead of the 360's packed word.
+- **The draw's own constants** (`draw_constants.h`): the flags (polygonal,
+  line, the alpha test), the alpha reference, the NDC scale and offset,
+  the targets' exponent biases and the reader scales, 176 bytes, in place
+  of the translator's system constants (504 bytes, most of them unused).
+  The fetch constant block (set 1, binding 4) is gone, and so are SBX's AO
+  extras (the normals and light outputs, the dithered alpha).
+
+The ports, the generator (`ucode_to_glsl.py`, `port_all.py`,
+`table_from_json.py`), `shaders.json`, the table and the hand-written
+header follow each change. `--attract_seed` (new) makes the attract race
+the same every run: with `--max_fps=30` and no interpolation, two runs'
+dumps are identical when they land on the same moment (the attract
+cameras seem to follow the wall clock: a run lands on one of two moments).
+Checked: each part against the build before at the same moment (from the
+plain textures on, every part's frame and resolves pixel for pixel the
+same as the vertex data part's), the tick replay (both races match), the
+pad replay's menus.
+
+Left for step 2: the texture views are still found by the stage's six
+descriptor words (`render::TextureDescriptor`, the texture's fields with
+the sampler fields still merged in, which the views ignore); they go with
+textures by handle (step 2b).
 
 **The order from here (2026-11-26).** The faked GPU (`gpu_link.cpp`) only
 makes fences in play now (~3,000 a second, two a kick; no memory writes,
@@ -386,7 +439,7 @@ Step 4's approach:
 - MSAA resolves, format changes and the exponent bias (-3 on the main
   view's and the glow's copies) stay copies, as PC renderers do them.
 
-## Step 4: render targets (first part done 2026-11-26)
+## Step 4: render targets (done 2026-11-27)
 
 - **Targets keyed by the surface object.** `Passes::State::GetTarget` keys
   an image by the game's surface object, its size (the object's +36:

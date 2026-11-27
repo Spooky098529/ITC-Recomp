@@ -40,12 +40,34 @@ renderer's table and fitting (`src/native/shader_ports.*`,
   base vertex is the draw's `vertexOffset`; the shaders' index remap (base,
   24-bit mask, the VGT_MIN/MAX clamp), index loads and the line loop's
   closing index are gone.
-- SBX's own additions are compiled in but not used: the menu texture
-  filtering and the distance-field font (`sbx_sprite_mode`, never set
-  here), the AO normals (`STREAM_NORMAL_REG` in `course.frag`, which no
-  variant sets: `model.vert`'s read of the normal stream by address is
-  gone), `--motion_blur_quality` and `--bloom_quality` (always 1,
-  the game's).
+- **PC inputs** (since 2026-11-27, `docs/pc-renderer.md`, step 2): the
+  shaders read no 360 register files or descriptors.
+  - Vertex data is in the host's byte order (the vertex arena swaps each
+    stream from its fetch constant's endian mode as it copies it in), so
+    `xe_vfetch` swaps nothing.
+  - A texture is one view and one sampler, bound by its stage: no signed
+    view, no sign modes, gamma or exponent picked per component, its size
+    from `textureSize` and its LOD bias the instruction's (the sampler's
+    own, `render::SamplerState`, from D3D's MipMapLodBias). The only thing
+    the draw says of a texture is its reader scale (a pass's image handed
+    over, step 4). No texture in play has signed, biased or gamma
+    components or an exponent bias (measured; one that does is logged).
+  - Float constants: each stage's registers from the lowest the shader
+    reads to the highest (all 256 for one that addresses them by the loop
+    index; its literal constants, which it holds, left out), a constant's
+    name being `xe_fc[its register - the lowest]`. Bools a bit each, loops
+    as D3D's int4s (`xe_loop_count`, `xe_loop_start`, `xe_loop_step`).
+  - The draw's own constants (`draw_constants.h`, `XeDrawConstants`): the
+    flags (polygonal, line, the alpha test's compare), the alpha reference,
+    the NDC scale and offset, the targets' exponent biases, the reader
+    scales. The fetch constants block is gone.
+  So `tools/shader_port/check` (written for the translator's interface) no
+  longer binds what the ports read; the sections below on matching the
+  translation describe how the ports were made.
+- SBX's own additions not used here are removed: the menu texture filter
+  and the distance-field font, the AO's normals and light outputs and its
+  dithered alpha. `--motion_blur_quality` and `--bloom_quality` stay
+  (always 1, the game's).
 - Every shader is drawn from its GLSL; the SDK's translator isn't used
   (since 2026-11-26, `docs/pc-renderer.md`, step 3): a shader with no GLSL,
   or a draw its GLSL can't make (point sprites), stops the program, named
@@ -340,33 +362,8 @@ set in `shader_ports.cpp`), so at 1 the shaders are the game's.
 **Boot** (`boot/`): sprites, the font (one
 texture channel as alpha), a depth view and a hue gradient.
 
-**Menu texture filtering** (`boot/menu_filter.glsl`,
-`--menu_texture_filtering`; recommended above the original 720p). The
-game draws the UI movies' pictures (the XMD screens, the HUD)
-point-sampled: the UI movie drawer (`sub_825831C8`, `sub_82583790`) sets
-sampler 0's mag and min filters to linear only when its movie's context
-flag (movie+172, context +108, copied down the scene by `sub_825830F0`) is
-set, and the game never sets it. That is 1:1 at 720p and blocky above it.
-The two textured sprite variants sample through `sample_menu`: with the
-setting on, where the fetch constant asks for point on mag and min, it
-reads the 4 nearest texels through the game's own sampler (so its clamp or
-wrap still applies) and blends them bilinearly, colors weighted by alpha so
-transparent texels don't darken cut-out edges. The renderer sets the
-system constants' `point_vertex_diameter_min` (`sbx_sprite_mode`, which no
-port reads) to 1 for those two shaders' draws only; samplers and the
-game's state are left as they are. The fonts already draw linear and
-aren't changed.
-
-**Distance-field font** (`boot/font_sdf.glsl`). A font file sbxr_tools'
-`font_upscale layout` makes has a third container file, its SBXF
-(`docs/game_data.md`, "Font"), saying its sheet holds signed distance
-fields. `src/hooks/font.cpp` reads it at `Font::LoadSheet` and gives the
-renderer the sheet's address and spread (`Renderer_SetDistanceFieldFont`).
-For the four font shaders' draws of that sheet the renderer sets
-`sbx_sprite_mode` to 2, the spread in 1/256 sheet pixels from bit 8, and
-`sprite.frag`'s font variants turn the sampled distance into coverage over
-one screen pixel (`fwidth` of the sheet's texels), so text is sharp at any
-resolution. Other fonts and sheets draw as before.
+SBX's menu texture filtering and distance-field font (`boot/menu_filter.glsl`,
+`boot/font_sdf.glsl`) were never turned on here and are removed (2026-11-27).
 
 **Vertex shaders** (`vertex/`, all 30). The game patches each vertex fetch
 for the vertex layout in use (stride, offsets, formats), and the renderer
