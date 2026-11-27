@@ -12,19 +12,30 @@
 # digest is written next to the log (<log>.digest), to keep as a new
 # baseline when a change is meant to change the game. Run from the repo
 # root, after building; no virtual pad (unlike scripted_run.sh).
+# ITC_WINE=1: the Windows build (win-amd64-cross-release) under Wine, with
+# its own prefix (docs/windows.md), against the same baseline.
 set -u
 TICKS=${1:-itc_recomp/pad_recordings/race_test.ticks}; shift || true
 BASELINE=${1:-itc_recomp/pad_recordings/race_test.digest}; shift || true
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
+RUN=("$B/itc")
+TICKS_ARG=$TICKS
+if [ -n "${ITC_WINE:-}" ]; then
+  B=itc_recomp/out/build/win-amd64-cross-release
+  export WINEPREFIX=$PWD/itc_recomp/out/wineprefix WINEDLLOVERRIDES="mscoree,mshtml="
+  winpath() { echo "Z:$(realpath "$1" | tr / '\\')"; }
+  G=$(winpath "$G"); TICKS_ARG=$(winpath "$TICKS")
+  RUN=(wine "$B/itc.exe")
+fi
 
 newest_log() { ls -t $B/logs/itc_*.log 2>/dev/null | head -1; }
 before=$(newest_log)
 SDL_GAMECONTROLLER_IGNORE_DEVICES=0x2E24/0x072F XDG_DATA_DIRS=/usr/local/share:/usr/share \
-  timeout 300 "$B/itc" \
+  timeout 300 "${RUN[@]}" \
   --native_audio=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \
   --interpolate_draw_state=true --log_level=info --skip_intro \
-  --state_digest=true --pad_ticks_play="$TICKS" "$@" >/dev/null 2>&1 &
+  --state_digest=true --pad_ticks_play="$TICKS_ARG" "$@" >/dev/null 2>&1 &
 GAME=$!
 L=""
 while kill -0 $GAME 2>/dev/null; do

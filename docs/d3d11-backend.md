@@ -1,4 +1,4 @@
-# A Direct3D 11 backend (a plan; steps 2 and 3 done)
+# A Direct3D 11 backend (a plan; steps 1 to 3 done)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
 renderer's merge). Steps 2 and 3 are done (below): the renderer holds only
@@ -136,6 +136,19 @@ moment (`--attract_seed`, `--max_fps=30`, no interpolation), and by a drive.
 
 No profiling until the end, as with the PC renderer: then one profile of
 each backend.
+
+## Step 1: the Windows build again (done 2026-11-27)
+
+The user's go-ahead, 2026-11-27 ("we need windows code"). `itc.exe` cross-
+builds again and runs under Wine (details and checks in `docs/windows.md`,
+"Status"): the game's memory blocks through `src/base/os_memory`
+(VirtualAlloc on Windows), simde given `<cmath>` first, the executable's
+folder found on Windows, and the Vulkan backend starting without a
+swapchain until the window can show one (a fullscreen window under Wine).
+The tick replay runs under Wine (`ITC_WINE=1`) and matches Linux's
+baseline for race 0, tick for tick; CI packages `itc.exe` with the Visual
+C++ runtime DLLs (and what those import). Found on the way, not this
+plan's: a new career stops in the car dealer (`docs/known-issues.md`).
 
 ## Step 2: `render::`'s own types (done 2026-11-27)
 
@@ -365,9 +378,7 @@ each backend.
   tick replay, the pad replay without errors, `--xbox_gamma=hdtv` at a
   reference moment (`shown` the reference's through the table), the boot
   movie drawn. A drive is welcome.
-- **Next:** step 1 (the Windows build) waits for the user's go-ahead (their
-  2026-11-16 call keeps code Linux-only until they say otherwise); steps 4
-  and 5 can start without it on Linux (HLSL checked with vkd3d-shader).
+- **Next:** step 4 (HLSL).
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
 - **Dump runs:** a run lands on one of at least four moments (2,654,

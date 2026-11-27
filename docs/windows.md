@@ -6,6 +6,38 @@ branch, merged into `main` 2026-10-16.
 
 ## Status
 
+- **Built and running again (2026-11-27, `d3d11`, the D3D11 plan's step 1;
+  `docs/d3d11-backend.md`).** It failed from the E steps on (Linux-only
+  memory calls, by the user's call then) until the user asked for Windows
+  code again. Now one `itc.exe` (SDL, FFmpeg and everything else linked in;
+  no SDK DLLs) plus the Visual C++ runtime DLLs. Under Wine 11.22
+  (staging): boots, races at the 144 cap (~150 fps reported), audio (0
+  silence fills after the start), the disk cache and logs next to
+  `itc.exe`, fullscreen at 4K (drawn at scale 3, as on Linux) and windowed.
+  The tick replay under Wine (`ITC_WINE=1 tick_replay.sh`) matches Linux's
+  baseline for all of race 0, tick for tick (112 ticks): the game's logic
+  runs the same. Its race 1 isn't reached: the replay lines up only at race
+  0 and plays the menus after it by tick, and Wine's slower loads put the
+  inputs on other menu states (it drifts into the known `8219BCC0` stop).
+  Frame dumps can't be compared with Linux's: an attract race under Wine
+  reaches other moments (2,175 and 2,248 draws).
+- **What changed for it:** the game's memory blocks go through
+  `src/base/os_memory.{h,cpp}` (mmap, madvise and mincore on Linux;
+  VirtualAlloc, decommit and recommit, and QueryWorkingSetEx on Windows);
+  simde's users get `<cmath>` first on Windows (`cmake/thirdparty.cmake`:
+  the MSVC runtime's `math.h` alone made simde take `std::isnan`);
+  `main.cpp` finds its folder with `helpers::ExecutableFolder` (it read
+  `/proc/self/exe`); the Vulkan backend starts without a swapchain when the
+  window can't show one yet (a fullscreen window under Wine at first: this
+  was the "couldn't start" below) and the renderer then sizes itself by
+  the window's pixels.
+- **Saves** are in `saves/` next to the executable: the Windows build
+  folder needs a copy of the Linux one for the tick replay (without, a new
+  career goes to the car dealer, and stops at `82182770`, a lifted call
+  with no dispatch table entry: a bug on any platform, to fix).
+
+Before the E steps (SDK era):
+
 - **Runs under Wine** (wine-staging 11.19, RX 7900 XT, 2026-10-14): boot,
   title screen, attract races, our renderer (exclusive mode, no GPU
   plugin) and our audio (WASAPI through Wine's PulseAudio output, 0
@@ -54,9 +86,9 @@ branch, merged into `main` 2026-10-16.
 
 ## What differs from Linux
 
-- **SDL is a DLL** (`SDL3.dll`, SDK patch `0003`; since E4, 2026-11-16, the
+- **SDL was a DLL** (`SDL3.dll`, SDK patch `0003`; since E4, 2026-11-16, the
   patch is removed, the SDK isn't in our build and SDL is our own static
-  build, so this no longer applies: Windows isn't kept working for now): a DLL only exports its
+  build, linked into `itc.exe`, so this no longer applies): a DLL only exports its
   own code, so the SDK's static SDL ended up in both `rexruntime.dll` and
   `itc.exe`, and our window and audio would have used another SDL than the
   SDK's event loop (no input, `SDL_RunOnMainThread` never running). The
@@ -133,8 +165,8 @@ cmake --build itc_recomp/out/build/win-amd64-cross-release -j$(nproc)
 A changed `CMAKE_*_FLAGS_INIT` needs `-U CMAKE_<LANG>_FLAGS` (or a fresh
 build directory): the old value stays cached.
 
-The output is `itc.exe`, `rexruntime.dll` and `SDL3.dll` in the build
-directory (`rexgpu-xenos.dll` is built but not needed).
+The output is `itc.exe` in the build directory (older `rexruntime.dll`,
+`SDL3.dll` and `rexgpu-xenos.dll` there are leftovers from the SDK era).
 
 ## Testing under Wine
 
@@ -151,7 +183,11 @@ timeout 90 wine $B/itc.exe \
   --log_fps=true --interpolate_draw_state=true --skip_intro --attract_after_s=1
 ```
 
-Logs go to `logs/` next to `itc.exe`. Wine's own messages (stderr) are
+Logs go to `logs/` next to `itc.exe`. The local build folders have an
+`itc.toml` of their own with `audio_mute = true` (the user's call,
+2026-11-27: test runs launch muted; not the shipped one). The tick
+replay runs under Wine with `ITC_WINE=1 itc_recomp/tools/tick_replay.sh`
+(the Linux build folder's `saves/` copied next to `itc.exe` first). Wine's own messages (stderr) are
 mostly harmless `fixme` lines. To test a package as players get it,
 package as below, put it in the game folder and run `wine itc.exe` there
 (add `--log_level=info` for logs; without `--game_data_root`, the game's
@@ -166,10 +202,14 @@ Test zips, as for Linux:
 ```sh
 name=itc-<label>-win-amd64; D=itc_recomp/out/dist/$name; B=itc_recomp/out/build/win-amd64-cross-release
 rm -rf $D $D.zip; mkdir -p $D
-cp $B/itc.exe $B/rexruntime.dll $B/SDL3.dll itc_recomp/itc.toml $D/
-runtime=$(for f in itc.exe rexruntime.dll SDL3.dll; do llvm-readobj --coff-imports $D/$f | sed -n 's/^ *Name: //p'; done \
-  | grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' | sort -fu)
-python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk $D $runtime
+cp $B/itc.exe itc_recomp/itc.toml $D/
+# The runtime DLLs itc.exe imports, then what those import (msvcp140.dll
+# needs vcruntime140_1.dll).
+for pass in 1 2; do
+  runtime=$(for f in $D/*.exe $D/*.dll; do [ -f "$f" ] && llvm-readobj --coff-imports $f | sed -n 's/^ *Name: //p'; done \
+    | grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' | sort -fu)
+  python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk $D $runtime
+done
 (cd $D && python3 -I -m zipfile -c ../$name.zip *)
 ```
 

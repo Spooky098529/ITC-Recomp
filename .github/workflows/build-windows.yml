@@ -97,6 +97,11 @@ jobs:
           imports=$(llvm-readobj --coff-imports "$D/itc.exe" | sed -n 's/^ *Name: //p' | sort -fu)
           runtime=$(grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' <<<"$imports")
           python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk "$D" $runtime
+          # And what those import in turn (msvcp140.dll needs vcruntime140_1.dll).
+          imports=$( (echo "$imports"; for f in "$D"/*.dll; do
+            llvm-readobj --coff-imports "$f" | sed -n 's/^ *Name: //p'; done) | sort -fu)
+          runtime=$(grep -iE '^(msvcp|vcruntime|concrt|vccorlib)' <<<"$imports")
+          python3 -I itc_recomp/tools/fetch_vc_redist.py itc_recomp/out/xwin-sdk "$D" $runtime
 
           # Fail if it needs a DLL of ours or a runtime DLL the zip doesn't
           # carry (the rest are Windows' own).
