@@ -204,7 +204,11 @@ constexpr VkDeviceSize kConstantBlockSize = 16u << 20;
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
 constexpr uint32_t kBoolLoopConstantsRange = 40 * 4;
-constexpr uint32_t kFetchConstantsRange = 32 * 6 * 4;
+// The constant blocks: system, vertex floats, pixel floats, bool/loop.
+constexpr uint32_t kConstantBlocks = 4;
+// The fetch constants the draw reads (textures 0-31, 6 words each; vertex
+// fetch constants 2 words each, the same space).
+constexpr uint32_t kFetchConstantsBytes = 32 * 6 * 4;
 
 // The built-in index lists (rectangle and quad lists) live in the vertex
 // arena (vertex_arena.h), with the frame's inline vertices.
@@ -726,7 +730,7 @@ struct Passes::State {
     VkShaderModule vertex;
     VkPipelineLayout layout;
     VkDescriptorSet sets[4];
-    uint32_t offsets[5];
+    uint32_t offsets[kConstantBlocks];
     VkViewport viewport;
     VkRect2D scissor;
     VkDeviceSize index_offset;
@@ -1110,7 +1114,7 @@ struct Passes::State {
     VkPipeline pipeline;
     VkPipelineLayout layout;
     VkDescriptorSet sets[4];
-    uint32_t offsets[5];  // the constants' dynamic offsets
+    uint32_t offsets[kConstantBlocks];  // the constants' dynamic offsets
     bool indexed;  // index buffer below bound
     VkBuffer index_buffer;
     VkDeviceSize index_offset;
@@ -1127,15 +1131,15 @@ struct Passes::State {
   };
   std::unordered_map<VkShaderModule, VertexInput> vertex_inputs;
   // The constants each block (system, vertex floats, pixel floats,
-  // bool/loop, fetch) last had written into the constant block in use: a
+  // bool/loop) last had written into the constant block in use: a
   // copy of the bytes and where they went, so a draw whose block holds the
   // same bytes points at them instead of writing them again
   // (reuse_constants). Forgotten when the frame or the block changes.
   struct LastConstants {
-    bool valid[5] = {};
-    uint32_t offsets[5];
-    uint32_t sizes[5];  // bytes written
-    alignas(16) uint8_t bytes[5][kFloatConstantsRange];
+    bool valid[kConstantBlocks] = {};
+    uint32_t offsets[kConstantBlocks];
+    uint32_t sizes[kConstantBlocks];  // bytes written
+    alignas(16) uint8_t bytes[kConstantBlocks][kFloatConstantsRange];
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
@@ -1362,12 +1366,12 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
     return false;
   }
-  const uint32_t ranges[5] = {uint32_t(sizeof(SystemConstants)),
-                              kFloatConstantsRange, kFloatConstantsRange,
-                              kBoolLoopConstantsRange, kFetchConstantsRange};
-  VkDescriptorBufferInfo buffers[5];
-  VkWriteDescriptorSet writes[5];
-  for (uint32_t i = 0; i < 5; i++) {
+  const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(SystemConstants)),
+                                            kFloatConstantsRange, kFloatConstantsRange,
+                                            kBoolLoopConstantsRange};
+  VkDescriptorBufferInfo buffers[kConstantBlocks];
+  VkWriteDescriptorSet writes[kConstantBlocks];
+  for (uint32_t i = 0; i < kConstantBlocks; i++) {
     buffers[i] = {block.buffer, 0, ranges[i]};
     writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
     writes[i].dstSet = block.set;
@@ -1376,7 +1380,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
     writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     writes[i].pBufferInfo = &buffers[i];
   }
-  vk::vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
+  vk::vkUpdateDescriptorSets(device, kConstantBlocks, writes, 0, nullptr);
   ring.blocks.push_back(block);
   return true;
 }
@@ -1403,12 +1407,12 @@ bool Passes::State::CreateDescriptors() {
       VK_SUCCESS) {
     return false;
   }
-  // Set 1: system, vertex float, pixel float, bool/loop and fetch constants.
-  VkDescriptorSetLayoutBinding constants[5];
-  for (uint32_t i = 0; i < 5; i++) {
+  // Set 1: system, vertex float, pixel float and bool/loop constants.
+  VkDescriptorSetLayoutBinding constants[kConstantBlocks];
+  for (uint32_t i = 0; i < kConstantBlocks; i++) {
     constants[i] = {i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, kBoth, nullptr};
   }
-  layout_info.bindingCount = 5;
+  layout_info.bindingCount = kConstantBlocks;
   layout_info.pBindings = constants;
   if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &constants_layout) !=
       VK_SUCCESS) {
@@ -1619,23 +1623,6 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
     const ShaderTexture& texture = shader->textures[i];
     const uint32_t* fetch =
         &regs.fetch[6 * texture.fetch_constant];
-    // The signed binding gets the same (unsigned) view: it's read only for
-    // components whose sign is signed, which this game's textures don't
-    // have (logged if they do).
-    // The translator binds a signed and an unsigned view of each texture:
-    // both get the same.
-    size_t same = 0;
-    while (same < i && (shader->textures[same].fetch_constant != texture.fetch_constant ||
-                        shader->textures[same].view_type != texture.view_type)) {
-      same++;
-    }
-    if (same < i) {
-      // Field by field: copied whole, the 8-byte read of its layout and
-      // padding waited on the 4-byte store of the layout just made.
-      infos[i] = {VK_NULL_HANDLE, infos[same].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-      continue;
-    }
-    // Counted as asked of the texture cache (not the copies above).
     if (log_texture_bindings) {
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
@@ -1988,10 +1975,9 @@ bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data)
 
 bool Passes::State::ReserveDrawConstants() {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
-  constexpr VkDeviceSize kDrawConstants = sizeof(SystemConstants) +
-                                          2 * kFloatConstantsRange + kBoolLoopConstantsRange +
-                                          kFetchConstantsRange;
-  if (ring_offset + kDrawConstants + 5 * alignment <= kConstantBlockSize) {
+  constexpr VkDeviceSize kDrawConstants =
+      sizeof(SystemConstants) + 2 * kFloatConstantsRange + kBoolLoopConstantsRange;
+  if (ring_offset + kDrawConstants + kConstantBlocks * alignment <= kConstantBlockSize) {
     return true;
   }
   Ring& ring = rings[frame];
@@ -3460,17 +3446,32 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
   }
   system.alpha_test_reference = states.alpha_ref;
-  // Each sampled texture's post-swizzle signs, a byte per fetch constant.
+  // Each sampled texture's reader scale. The shaders sample a texture's
+  // view as it is: signed, biased or gamma components, an exponent bias
+  // and a LOD bias in the texture aren't applied (none of the game's
+  // textures has them in the attract race or the pad replay; logged once
+  // each if one does).
   for (const TranslatedShader* shader : {vertex, pixel}) {
     if (!shader) {
       continue;
     }
     for (const ShaderTexture& texture : shader->textures) {
       uint32_t index = texture.fetch_constant;
-      uint8_t signs = TextureCache::SwizzledSigns(
-          &regs.fetch[6 * index]);
-      system.texture_swizzled_signs[index >> 2] |= uint32_t(signs) << (8 * (index & 3));
-      system.texture_scale[index & 31] = s.textures.ReaderScale(&regs.fetch[6 * index]);
+      const uint32_t* words = &regs.fetch[6 * index];
+      system.texture_scale[index & 31] = s.textures.ReaderScale(words);
+      uint8_t signs = TextureCache::SwizzledSigns(words);
+      int32_t exponent = int32_t(words[3] << 13) >> 26;
+      int32_t lod_bias = int32_t(words[4] << 10) >> 22;
+      if (signs || exponent || lod_bias) [[unlikely]] {
+        static std::unordered_set<uint64_t> logged;
+        if (logged.insert(shader->hash ^ (uint64_t(words[1]) << 32) ^ signs).second) {
+          ITC_LOG_ERROR("native renderer: {} shader {:016X} samples texture {:08X} (format {}) "
+                        "with signs {:02X}, exponent bias {} or LOD bias {}, which the shaders "
+                        "don't apply",
+                        shader == vertex ? "vertex" : "pixel", shader->hash,
+                        words[1] & 0xFFFFF000u, words[1] & 63, signs, exponent, lod_bias);
+        }
+      }
     }
   }
   // Each bound target's exponent bias, from its surface's color info (+28,
@@ -3486,7 +3487,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // Constants into this frame's ring: system, vertex float, pixel float,
   // bool/loop, fetch. A block the same as the last one written points at it.
   static_assert(sizeof(system) <= kFloatConstantsRange);
-  uint32_t offsets[5];
+  uint32_t offsets[kConstantBlocks];
   if (!s.ReserveDrawConstants() ||
       !s.PlaceConstants(0, &system, sizeof(system), sizeof(system), offsets[0])) {
     s.stats.failed++;
@@ -3524,15 +3525,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       return;
     }
   }
-  // Why the fetch block changed (log_constant_changes): in the fetch
-  // constants the shaders read (textures, vertices), or only in others.
   // The draw's vertex streams and indices in the vertex arena: each stream
   // the vertex shader reads gets its range's arena offset in place of the
   // address (word 0, low 2 bits the type; word 1 bits 2-25 the size in
   // words). An inline draw's stream points into the arena already.
-  uint32_t arena_fetch[kFetchConstantsRange / 4];
+  uint32_t arena_fetch[kFetchConstantsBytes / 4];
   std::memcpy(arena_fetch, regs.fetch,
-              kFetchConstantsRange);
+              kFetchConstantsBytes);
   if (!call.inline_vertices) {
     // The streams' vertex fetch constants as bound (95 - stream).
     for (uint32_t stream = 0; stream < 16; stream++) {
@@ -3588,46 +3587,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       vertex_offsets[vertex_bindings++] = VkDeviceSize(at) + 4 * f.stride_words * g;
     }
   }
-  const uint32_t* fetch = arena_fetch;
-  if (s.log_constant_changes && s.last_constants.valid[4] &&
-      s.last_constants.sizes[4] == kFetchConstantsRange) {
-    const uint32_t* last = reinterpret_cast<const uint32_t*>(s.last_constants.bytes[4]);
-    if (std::memcmp(last, fetch, kFetchConstantsRange)) {
-      s.stats.fetch_changed++;
-      bool texture_differs = false, vertex_differs = false, vertex_address_only = true;
-      for (const TranslatedShader* shader : {vertex, pixel}) {
-        if (!shader) {
-          continue;
-        }
-        for (const ShaderTexture& texture : shader->textures) {
-          uint32_t i = 6 * texture.fetch_constant;
-          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
-        }
-        for (const ShaderSampler& sampler : shader->samplers) {
-          uint32_t i = 6 * sampler.fetch_constant;
-          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
-        }
-      }
-      for (uint32_t k = 0; vertex && k < 96; k++) {
-        if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-          continue;
-        }
-        if (last[2 * k + 1] != fetch[2 * k + 1]) {
-          vertex_differs = true;
-          vertex_address_only = false;
-        } else if (last[2 * k] != fetch[2 * k]) {
-          vertex_differs = true;
-        }
-      }
-      s.stats.fetch_changed_texture += texture_differs;
-      s.stats.fetch_changed_vertex += vertex_differs;
-      s.stats.fetch_changed_vertex_address += vertex_differs && vertex_address_only;
-      s.stats.fetch_changed_unread += !texture_differs && !vertex_differs;
-    }
-  }
   if (!s.PlaceConstants(3, render::ShaderConstants().bool_loop,
-                        kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
-      !s.PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
+                        kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
@@ -3822,14 +3783,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
     if (s.log_constant_changes && repeated[5] && !repeated[8]) {
       s.stats.offsets_differ++;
-      uint32_t differ = 0;
-      for (int i = 0; i < 5; i++) {
+      for (uint32_t i = 0; i < kConstantBlocks; i++) {
         if (last.offsets[i] != now.offsets[i]) {
           s.stats.offset_differs[i]++;
-          differ |= 1u << i;
         }
       }
-      s.stats.only_fetch_offset_differs += differ == 1u << 4;
     }
   }
   bool skip = s.skip_repeated_state;
@@ -3850,7 +3808,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   if (!(skip && repeated[8])) {
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
-                                5, offsets);
+                                kConstantBlocks, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
     vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
@@ -4062,7 +4020,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     VkPipelineLayout layout = id_layouts[draw.layout];
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
-                                draw.sets, 5, draw.offsets);
+                                draw.sets, kConstantBlocks, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
     vk::vkCmdBindIndexBuffer(commands, arena.buffer(), draw.index_offset, draw.index_type);
     if (draw.vertex_bindings) {
@@ -4483,7 +4441,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
   now.bool_loop.assign(bool_loop, bool_loop + kBoolLoopConstantsRange / 4);
   // Only the fetch constants the shaders read (the space is shared: texture
   // slot n is vertex buffers 3n-3n+2); unused ones are zeroed.
-  now.fetch.assign(kFetchConstantsRange / 4, 0);
+  now.fetch.assign(kFetchConstantsBytes / 4, 0);
   for (const TranslatedShader* shader : {vertex, pixel}) {
     for (size_t i = 0; shader && i < shader->textures.size(); i++) {
       uint32_t slot = shader->textures[i].fetch_constant;
@@ -4927,9 +4885,9 @@ void Passes::WriteDump(const std::string& directory) {
         for (const State::RecordedDraw::Texture& t : r.textures) {
           const uint32_t* f = t.fetch;
           line += std::format(
-              "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
+              "; {} tex {}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
               "{:08X} {:08X} {:08X} {:08X}",
-              t.pixel ? "ps" : "vs", t.texture.fetch_constant, t.texture.is_signed ? "s" : "",
+              t.pixel ? "ps" : "vs", t.texture.fetch_constant,
               f[1] & 0xFFFFF000u, f[1] & 0x3F, (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1,
               (f[5] >> 9) & 3, int(t.texture.view_type), f[0], f[1], f[2], f[3], f[4], f[5]);
         }

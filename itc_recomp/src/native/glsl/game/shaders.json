@@ -160,13 +160,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -292,23 +286,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -514,13 +496,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -927,23 +903,11 @@
   "textures": [
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1074,13 +1038,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1152,13 +1110,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1244,13 +1196,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1343,13 +1289,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1435,13 +1375,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1535,13 +1469,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1614,23 +1542,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1715,23 +1631,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1818,13 +1722,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -1913,43 +1811,19 @@
   "textures": [
    {
     "fetch_constant": 3,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 3,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2069,53 +1943,23 @@
   "textures": [
    {
     "fetch_constant": 3,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 3,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 4,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 4,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2219,23 +2063,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2314,23 +2146,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2404,13 +2224,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2480,13 +2294,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2562,13 +2370,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2648,13 +2450,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2741,13 +2537,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2838,13 +2628,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -2934,23 +2718,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -3069,13 +2841,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -3423,33 +3189,15 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 7,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 7,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -3767,33 +3515,15 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 7,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 7,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -4102,33 +3832,15 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -4436,33 +4148,15 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 7,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 7,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -4756,23 +4450,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -4924,13 +4606,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -5059,13 +4735,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -5199,13 +4869,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -5487,23 +5151,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -5646,13 +5298,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -6021,13 +5667,7 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -6208,13 +5848,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -6544,13 +6178,7 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    }
   ],
   "samplers": [
@@ -6724,13 +6352,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -7288,13 +6910,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -7422,13 +7038,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -7719,33 +7329,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -7922,13 +7514,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -8109,23 +7695,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -8427,23 +8001,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -8712,13 +8274,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -8905,23 +8461,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -9065,13 +8609,7 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -9251,13 +8789,7 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -9438,23 +8970,11 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    }
   ],
   "samplers": [
@@ -9641,13 +9161,7 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -9842,23 +9356,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10164,33 +9666,15 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10393,23 +9877,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10498,13 +9970,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10668,23 +10134,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10773,23 +10227,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10877,23 +10319,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -10982,23 +10412,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -11086,23 +10504,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -11191,23 +10597,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -11621,53 +11015,23 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -12132,63 +11496,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -12509,63 +11837,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -12886,63 +12178,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -13263,63 +12519,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -13640,63 +12860,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -14017,63 +13201,27 @@
   "textures": [
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -14546,63 +13694,27 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -15093,73 +14205,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -15500,73 +14570,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -15907,73 +14935,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -16314,73 +15300,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -16721,73 +15665,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17128,73 +16030,31 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 8,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 8,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 11,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 11,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 9,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 9,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 10,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 10,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17347,33 +16207,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17488,33 +16330,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17629,33 +16453,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17770,33 +16576,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -17911,33 +16699,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18052,33 +16822,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18187,23 +16939,11 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18335,13 +17075,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18475,23 +17209,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18633,23 +17355,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18791,23 +17501,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -18899,23 +17597,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19053,23 +17739,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19161,23 +17835,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19236,13 +17898,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19291,13 +17947,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19430,13 +18080,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19485,13 +18129,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19540,13 +18178,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19595,13 +18227,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19772,13 +18398,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -19993,23 +18613,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -20102,23 +18710,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -20226,33 +18822,15 @@
   "textures": [
    {
     "fetch_constant": 6,
-    "view": "cube",
-    "signed": false
-   },
-   {
-    "fetch_constant": 6,
-    "view": "cube",
-    "signed": true
+    "view": "cube"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -20611,33 +19189,15 @@
   "textures": [
    {
     "fetch_constant": 2,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 2,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -20798,13 +19358,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -20883,23 +19437,11 @@
   "textures": [
    {
     "fetch_constant": 1,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 1,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    },
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [
@@ -21165,13 +19707,7 @@
   "textures": [
    {
     "fetch_constant": 0,
-    "view": "2D array",
-    "signed": false
-   },
-   {
-    "fetch_constant": 0,
-    "view": "2D array",
-    "signed": true
+    "view": "2D array"
    }
   ],
   "samplers": [

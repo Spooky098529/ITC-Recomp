@@ -170,8 +170,8 @@ def main():
             "registers": port.register_count,
             "float_constants": sorted(port.float_used),
             "relative_constants": port.dynamic_constants,
-            "textures": [{"fetch_constant": fc, "view": "cube" if d == 3 else "2D array",
-                          "signed": bool(s)} for fc, d, s in port.textures],
+            "textures": [{"fetch_constant": fc, "view": "cube" if d == 3 else "2D array"}
+                         for fc, d in port.textures],
             "samplers": [{"fetch_constant": s[0], "mag": s[1], "min": s[2], "mip": s[3],
                           "aniso": s[4]} for s in port.samplers],
             "vertex_fetches": [{"instruction": f.address, "fetch_constant": f.fetch_constant,

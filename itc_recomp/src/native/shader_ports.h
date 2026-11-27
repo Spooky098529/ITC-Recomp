@@ -24,7 +24,6 @@ namespace native {
 struct GamePortTexture {
   uint32_t fetch_constant;
   bool cube;  // else a 2D array (1D and 2D textures)
-  bool is_signed;
 };
 
 struct GamePortSampler {

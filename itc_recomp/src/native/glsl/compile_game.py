@@ -99,23 +99,23 @@ def header(info, source, defines):
                 aliases.append((c["name"], textures[c["register"]]))
             else:
                 textures[c["register"]] = c["name"]
-    # Textures: the images (unsigned, then signed) and the samplers, at the
-    # translator's bindings.
+    # Textures: a view each, then the samplers (the renderer's bindings:
+    # shader_ports.cpp, in the table's order).
     texture_set = 3 if pixel else 2
     names = {}
-    for binding, t in enumerate(info["textures"]):
+    views = info["textures"]
+    for binding, t in enumerate(views):
         name = textures[t["fetch_constant"]]
         kind = "textureCube" if t["view"] == "cube" else "texture2DArray"
-        view = "signed" if t["signed"] else "unsigned"
-        lines.append("layout(set = %d, binding = %d) uniform %s %s_%s;" % (
-            texture_set, binding, kind, name, view))
+        lines.append("layout(set = %d, binding = %d) uniform %s %s_view;" % (
+            texture_set, binding, kind, name))
         names[t["fetch_constant"]] = name
     for n, s in enumerate(info["samplers"]):
         fc = s["fetch_constant"]
         lines.append("layout(set = %d, binding = %d) uniform sampler %s_sampler;" % (
-            texture_set, len(info["textures"]) + n, names[fc]))
-        lines.append("#define %s %s_unsigned, %s_signed, %s_sampler, %du" % (
-            names[fc], names[fc], names[fc], names[fc], fc))
+            texture_set, len(views) + n, names[fc]))
+        lines.append("#define %s %s_view, %s_sampler, %du" % (
+            names[fc], names[fc], names[fc], fc))
     for name, same in aliases:
         lines.append("#define %s %s" % (name, same))
     if not pixel:

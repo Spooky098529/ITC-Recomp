@@ -14,7 +14,7 @@ files' shaders for the mod tool.
 | `xe_interface.glsl` | What the ports share: the buffers, fetches, instructions without an operator, and what happens before and after the shader. Copied beside the ports. |
 | `port_all.py` | Ports every shader in its inputs, once each (by microcode hash), and writes `shaders.json` and the renderer's table (`--table`). |
 | `write_doc.py` | Writes the tables in `docs/shaders.md` (`catalog`) and `docs/part_shaders.md` (`parts`) from `shaders.json`. |
-| `check/` | Runs each port against the SDK's translation with the same inputs (`check/README.md`). |
+| `check/` | Runs each port against the SDK's translation with the same inputs (`check/README.md`). Written for the translator's interface (signed and unsigned views, the fetch constants block): since `docs/pc-renderer.md`'s step 2 gave the shaders PC inputs (2026-11-27), it no longer binds what the ports read. |
 
 Needs Python 3 and `xxhash` (`pip install xxhash`). From this folder:
 

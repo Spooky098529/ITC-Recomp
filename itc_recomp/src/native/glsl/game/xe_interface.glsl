@@ -26,18 +26,11 @@ layout(set = 1, binding = 0, scalar) uniform XeSystemConstants {
   layout(offset = 12) uint line_loop_closing_index;
   layout(offset = 16) int vertex_base_index;
   layout(offset = 124) vec3 ndc_scale;
-  // SBX's own: the translator's point_vertex_diameter_min, which no port
-  // reads (ports don't make point sprites) and the renderer doesn't set
-  // otherwise; the 2D sprite shaders' mode (passes.cpp), its low byte:
-  // 1 menu texture filtering (boot/menu_filter.glsl); 2 a distance-field
-  // font, its spread in 1/256 sheet pixels from bit 8 (boot/font_sdf.glsl).
-  layout(offset = 136) uint sbx_sprite_mode;
   layout(offset = 140) vec3 ndc_offset;
-  layout(offset = 176) uint texture_swizzled_signs[8];
   layout(offset = 272) float alpha_test_reference;
   layout(offset = 288) vec4 color_exp_bias;
-  // Each texture fetch constant's reader scale: 0 nothing; above 0 times it
-  // and clamped to 0-1; below 0 times its negation (a pass's image handed to
+  // Each texture stage's reader scale: 0 nothing; above 0 times it and
+  // clamped to 0-1; below 0 times its negation (a pass's image handed to
   // its texture: what the resolve's exponent bias and a normalized format
   // did, docs/pc-renderer.md, step 4).
   layout(offset = 304) float texture_scale[32];
@@ -75,12 +68,9 @@ layout(set = 1, binding = 3, std140) uniform XeBoolLoopConstants {
   uvec4 xe_bools[2];
   uvec4 xe_loops[8];
 };
-// The fetch constants: a texture is 6 words, a vertex buffer 2.
-layout(set = 1, binding = 4, std140) uniform XeFetchConstants { uvec4 xe_fetch[48]; };
 
 bool xe_bool(uint n) { return (xe_bools[n >> 7u][(n >> 5u) & 3u] & (1u << (n & 31u))) != 0u; }
 uint xe_loop_constant(uint n) { return xe_loops[n >> 2u][n & 3u]; }
-uint xe_fetch_word(uint n) { return xe_fetch[n >> 2u][n & 3u]; }
 
 const float kXeFltMax = 3.40282347e+38;
 
@@ -156,19 +146,8 @@ float xe_muls_prev2(float a, float b, float ps) {
 }
 
 // --- textures ------------------------------------------------------------------
-// The Xbox's piecewise linear gamma curve, both ways, as the translator
-// computes it.
-float xe_gamma_to_linear(float gamma) {
-  gamma = clamp(gamma, 0.0, 1.0);
-  float scale = gamma >= 96.0 / 255.0 ? (gamma >= 192.0 / 255.0 ? 8.0 / 1024.0 : 4.0 / 1024.0)
-                                      : (gamma >= 64.0 / 255.0 ? 2.0 / 1024.0 : 1.0 / 1024.0);
-  float offset = gamma >= 96.0 / 255.0 ? (gamma >= 192.0 / 255.0 ? -1024.0 : -256.0)
-                                       : (gamma >= 64.0 / 255.0 ? -64.0 : 0.0);
-  precise float linear = (gamma * (255.0 * 1024.0)) * scale + offset;
-  linear = linear + trunc(linear * scale);
-  linear = linear * (1.0 / 1023.0);
-  return linear;
-}
+// The Xbox's piecewise linear gamma curve, as the translator computes it (a
+// gamma render target's color, xe_color_output).
 vec3 xe_linear_to_gamma(vec3 linear) {
   linear = clamp(linear, 0.0, 1.0);
   bvec3 at_least_2 = greaterThanEqual(linear, vec3(128.0 / 1023.0));
@@ -182,90 +161,53 @@ vec3 xe_linear_to_gamma(vec3 linear) {
   return gamma;
 }
 
-// A texture fetch's result from the unsigned and the signed view's samples:
-// each component's sign mode (from the system constants: signed, biased
-// x * 2 - 1, or gamma), then the exponent bias. The fetch constant's
-// swizzle is in the image views.
-vec4 xe_texture_result(vec4 unsigned_sample, vec4 signed_sample, uint fetch_constant) {
-  float reader_scale = xe_sys.texture_scale[fetch_constant & 31u];
+// A texture is one view (1D and 2D textures a 2D array's first layer, cube
+// maps a cube) and a sampler, bound by the shader's sampler stage (its
+// fetch constant): already in RGBA order and its format's own values (the
+// views' swizzle; docs/pc-renderer.md, step 2). What the draw says of it
+// besides: its reader scale.
+vec4 xe_texture_result(vec4 texel, uint stage) {
+  float reader_scale = xe_sys.texture_scale[stage & 31u];
   if (reader_scale > 0.0) {
-    unsigned_sample = clamp(unsigned_sample * reader_scale, 0.0, 1.0);
+    texel = clamp(texel * reader_scale, 0.0, 1.0);
   } else if (reader_scale < 0.0) {
-    unsigned_sample = unsigned_sample * -reader_scale;
+    texel = texel * -reader_scale;
   }
-  uint signs = xe_sys.texture_swizzled_signs[fetch_constant >> 2u] >> (8u * (fetch_constant & 3u));
-  // The translator takes the exponent from the fetch constant's word 4,
-  // bits 13-18 (the hardware's is in word 3); kept for the same result.
-  int exponent = bitfieldExtract(int(xe_fetch_word(fetch_constant * 6u + 4u)), 13, 6);
-  precise vec4 result;
-  for (int c = 0; c < 4; c++) {
-    uint sign = (signs >> (2 * c)) & 3u;
-    precise float value = unsigned_sample[c];
-    if (sign == 1u) value = signed_sample[c];
-    else if (sign == 2u) value = value * 2.0 + -1.0;
-    else if (sign == 3u) value = xe_gamma_to_linear(value);
-    result[c] = value * ldexp(1.0, exponent);
-  }
-  return result;
-}
-
-// The LOD bias from the fetch constant (word 4, bits 12-21, 1/32 steps) and
-// the instruction.
-float xe_texture_lod(uint fetch_constant, float instruction_bias) {
-  precise float lod = float(bitfieldExtract(int(xe_fetch_word(fetch_constant * 6u + 4u)), 12, 10)) *
-                      (1.0 / 32.0);
-  lod = lod + instruction_bias;
-  return lod;
-}
-
-// The size of a 2D or cube texture, from the fetch constant's word 2.
-vec2 xe_texture_size_2d(uint fetch_constant) {
-  uint word = xe_fetch_word(fetch_constant * 6u + 2u);
-  return vec2(float(bitfieldExtract(word, 0, 13) + 1u), float(bitfieldExtract(word, 13, 13) + 1u));
+  return texel;
 }
 
 // 1D and 2D textures are 2D arrays (a 1D texture is a row); offset is the
-// instruction's texel offset plus the rounding offset (1.5/1024 of a texel).
-vec4 xe_tfetch2d(texture2DArray unsigned_view, texture2DArray signed_view, sampler s,
-                 uint fetch_constant, vec2 uv, vec2 offset, float bias, bool computed_lod) {
-  precise vec2 c = uv + offset / xe_texture_size_2d(fetch_constant);
-  float lod = xe_texture_lod(fetch_constant, bias);
+// instruction's texel offset plus the rounding offset (1.5/1024 of a texel);
+// bias the instruction's LOD bias.
+vec4 xe_tfetch2d(texture2DArray view, sampler s, uint stage, vec2 uv, vec2 offset, float bias,
+                 bool computed_lod) {
+  precise vec2 c = uv + offset / vec2(textureSize(sampler2DArray(view, s), 0).xy);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec2 dx = dFdxCoarse(c) * gradient_scale, dy = dFdyCoarse(c) * gradient_scale;
-  return xe_texture_result(textureGrad(sampler2DArray(unsigned_view, s), vec3(c, 0.0), dx, dy),
-                           textureGrad(sampler2DArray(signed_view, s), vec3(c, 0.0), dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(sampler2DArray(view, s), vec3(c, 0.0), dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(sampler2DArray(unsigned_view, s), vec3(c, 0.0), lod),
-                           textureLod(sampler2DArray(signed_view, s), vec3(c, 0.0), lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(sampler2DArray(view, s), vec3(c, 0.0), bias), stage);
 }
-vec4 xe_tfetch1d(texture2DArray unsigned_view, texture2DArray signed_view, sampler s,
-                 uint fetch_constant, float u, float offset, float bias, bool computed_lod) {
-  // A 1D size is word 2's low 24 bits; the row is at v = 0.
-  precise float c = u + offset / float(bitfieldExtract(xe_fetch_word(fetch_constant * 6u + 2u), 0, 24) + 1u);
-  float lod = xe_texture_lod(fetch_constant, bias);
+vec4 xe_tfetch1d(texture2DArray view, sampler s, uint stage, float u, float offset, float bias,
+                 bool computed_lod) {
+  precise float c = u + offset / float(textureSize(sampler2DArray(view, s), 0).x);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec2 dx = vec2(dFdxCoarse(c) * gradient_scale, 0.0), dy = vec2(dFdyCoarse(c) * gradient_scale, 0.0);
-  return xe_texture_result(textureGrad(sampler2DArray(unsigned_view, s), vec3(c, 0.0, 0.0), dx, dy),
-                           textureGrad(sampler2DArray(signed_view, s), vec3(c, 0.0, 0.0), dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(sampler2DArray(view, s), vec3(c, 0.0, 0.0), dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(sampler2DArray(unsigned_view, s), vec3(c, 0.0, 0.0), lod),
-                           textureLod(sampler2DArray(signed_view, s), vec3(c, 0.0, 0.0), lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(sampler2DArray(view, s), vec3(c, 0.0, 0.0), bias), stage);
 }
 // A cube fetch takes what the cube instruction makes: s and t in 1 to 2,
 // and the face (offset: s and t's as for 2D, then the face's).
-vec4 xe_tfetchcube(textureCube unsigned_view, textureCube signed_view, sampler s,
-                   uint fetch_constant, vec3 stf, vec3 offset, float bias, bool computed_lod) {
-  precise vec2 st = stf.xy + offset.xy / xe_texture_size_2d(fetch_constant);
+vec4 xe_tfetchcube(textureCube view, sampler s, uint stage, vec3 stf, vec3 offset, float bias,
+                   bool computed_lod) {
+  precise vec2 st = stf.xy + offset.xy / vec2(textureSize(samplerCube(view, s), 0));
   st = st * 2.0 + -3.0;
   precise float face_value = stf.z + offset.z;
   uint face = uint(clamp(face_value, 0.0, 5.0));
@@ -279,19 +221,14 @@ vec4 xe_tfetchcube(textureCube unsigned_view, textureCube signed_view, sampler s
   } else {
     direction = vec3(negative ? -st.x : st.x, -st.y, face_sign);
   }
-  float lod = xe_texture_lod(fetch_constant, bias);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec3 dx = dFdxCoarse(direction) * gradient_scale, dy = dFdyCoarse(direction) * gradient_scale;
-  return xe_texture_result(textureGrad(samplerCube(unsigned_view, s), direction, dx, dy),
-                           textureGrad(samplerCube(signed_view, s), direction, dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(samplerCube(view, s), direction, dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(samplerCube(unsigned_view, s), direction, lod),
-                           textureLod(samplerCube(signed_view, s), direction, lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(samplerCube(view, s), direction, bias), stage);
 }
 
 #ifdef XE_VERTEX

@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 5
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 0, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 
 // tx0: sampler 0
 #define PS_CONSTANT_TEX_SIZE xe_fc[0]  // c32
@@ -64,15 +63,15 @@ void xe_shader() {
     { precise float v = r0.z + r0.y; precise float s = r2.z; ps = s; r0.z = v; }
     { precise float v = r0.z; precise float s = r0.x + ps; ps = s; r3.y = v; r2.z = s; }
     { precise float v = r2.z; precise float s = r2.z; ps = s; r5.x = v; r3.x = s; }
-    r4.yzw = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.wz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r7.yzw = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r10.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.wy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r8.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r9.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r2.zy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r3.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r2.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r5.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r5.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r5.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r6.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r4.yzw = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.wz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r7.yzw = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r10.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.wy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r8.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r9.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r2.zy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r3.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r2.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r5.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r5.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r5.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r6.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
     r5.xyz = xe_mul(r5.zyx, r1.zyx);
     { precise vec3 v = xe_mul(r2.zyx, r1.zyx); precise float s = r6.x; ps = s; r2.yzw = v; }
     { precise vec3 v = xe_mul(r3.zyx, r1.zyx); precise float s = xe_mul(r1.x, ps); ps = s; r3.yzw = v; r3.x = s; }

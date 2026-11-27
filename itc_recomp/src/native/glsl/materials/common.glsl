@@ -5,8 +5,8 @@
 // files (see variants.txt): xe_interface.glsl (the buffers and helpers every
 // game shader uses), the shader's constants by their D3D names (EyePos,
 // DLightDir(i), ...), and its textures by their sampler names (tx0, cubetx0,
-// ...). A texture name stands for its views, its sampler and its fetch
-// constant, so it can be handed to the sampling macros below as is.
+// ...). A texture name stands for its view, its sampler and its stage (the
+// fetch constant), so it can be handed to the sampling macros below as is.
 
 // --- textures --------------------------------------------------------------------
 // Every fetch the game's shaders make is offset by 1.5/1024 of a texel (the
@@ -51,16 +51,16 @@ const vec2 kShadowTaps[16] = vec2[](
 // point's: 1 outside the map's frustum. map_size is the map's width in
 // texels. Sampled at every pixel (call it outside branches), so the
 // texture level is defined.
-float shadow_taps(texture2DArray unsigned_view, texture2DArray signed_view, sampler s,
-                  uint fetch_constant, vec4 coords, float map_size) {
+float shadow_taps(texture2DArray view, sampler s, uint fetch_constant, vec4 coords,
+                  float map_size) {
   vec2 uv;
   float depth;
   bool inside = in_light_frustum(coords, uv, depth);
   float texel = 1.0 / map_size;
   float count = 0.0;
   for (int k = 0; k < 16; k++) {
-    float stored = xe_tfetch2d(unsigned_view, signed_view, s, fetch_constant,
-                               uv + kShadowTaps[k] * texel, vec2(kTexelRounding), 0.0, true).x;
+    float stored = xe_tfetch2d(view, s, fetch_constant, uv + kShadowTaps[k] * texel,
+                               vec2(kTexelRounding), 0.0, true).x;
     if (stored < depth) count += 1.0;
   }
   return inside ? count / 16.0 : 1.0;

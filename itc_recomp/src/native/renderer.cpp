@@ -1034,9 +1034,9 @@ void Renderer::LogStats() {
     if (view.offsets_differ) {
       ITC_LOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
                    "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
-                   "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
+                   "bool/loop {:.0f}%",
                    share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
-                   share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
+                   share(o[3]));
     }
   }
   if (view.constants_draws) {
@@ -1044,17 +1044,9 @@ void Renderer::LogStats() {
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
     ITC_LOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
                  "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
-                 "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
+                 "{:.0f}%; {:.0f} KB written a frame",
                  double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
-                 share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
-    if (view.fetch_changed) {
-      ITC_LOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
-                   "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
-                   "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
-                   share(view.fetch_changed), share(view.fetch_changed_texture),
-                   share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
-                   share(view.fetch_changed_unread));
-    }
+                 share(r[3]), double(view.constant_bytes) / frames / 1024);
   }
   if (view.vertex_overruns) {
     const auto& v = view.vertex_overrun_sample;

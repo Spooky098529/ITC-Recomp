@@ -6,12 +6,10 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 6, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 6, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 0, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 0, signed
-layout(set = 3, binding = 4) uniform sampler xe_sampler0;  // fetch constant 6
-layout(set = 3, binding = 5) uniform sampler xe_sampler1;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 6
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 0
+layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 6
+layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 0
 
 // UseProjTex: bool 0
 // spheretx0: sampler 6
@@ -161,8 +159,8 @@ void xe_shader() {
       ps = 1.0 / r0.x;
       r0.x = ps;
       r0.xz = xe_mul(r0.zw, r0.xx) + lit254.yy;
-      r0.xzw = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 6u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-      r4 = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r0.xzw = xe_tfetch2d(xe_texture0, xe_sampler0, 6u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+      r4 = xe_tfetch2d(xe_texture2, xe_sampler1, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r2.xyz = AmbientColor.xyz + MatAmbientDiffuse.xyz;
       r1.xyz = xe_mul(r4.xyz, r3.xyz);
       r3.xyz = r2.xyz + r6.xyz;

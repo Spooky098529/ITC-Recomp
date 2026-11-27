@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 6, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 6, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 6
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 6
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 6
 
 // UseProjTex: bool 0
 // spheretx0: sampler 6
@@ -154,7 +153,7 @@ void xe_shader() {
       ps = 1.0 / r2.w;
       r2.w = ps;
       r0.xy = xe_mul(r0.xy, r2.ww) + lit254.yy;
-      r0.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 6u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+      r0.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 6u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
       r1.xyz = AmbientColor.xyz + MatAmbientDiffuse.xyz;
       r1.xyz = r1.xyz + r7.xyz;
       r2.xyz = xe_mul(r1.xyz, r2.xyz) + r3.xyz;

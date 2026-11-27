@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform textureCube xe_texture0;  // fetch constant 6, unsigned
-layout(set = 3, binding = 1) uniform textureCube xe_texture1;  // fetch constant 6, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 6
+layout(set = 3, binding = 0) uniform textureCube xe_texture0;  // fetch constant 6
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 6
 
 // UseProjTex: bool 0
 // cubetx0: sampler 6
@@ -138,7 +137,7 @@ void xe_shader() {
       r0 = xe_cube(r6.zzxy);
       { precise float v = r0.w; precise float s = 1.0 / abs(r0.z); ps = s; r1.z = v; r2.w = s; }
       r1.xy = xe_mul(r0.yx, r2.ww) + lit255.zz;
-      r1.xyz = xe_tfetchcube(xe_texture0, xe_texture1, xe_sampler0, 6u, r1.xyz, vec3(0.0014648438, 0.0014648438, 0.0), 0.0, true).xyz;
+      r1.xyz = xe_tfetchcube(xe_texture0, xe_sampler0, 6u, r1.xyz, vec3(0.0014648438, 0.0014648438, 0.0), 0.0, true).xyz;
       r0.xyz = AmbientColor.xyz + MatAmbientDiffuse.xyz;
       r0.xyz = r0.xyz + r7.xyz;
       r2.xyz = xe_mul(r0.xyz, r2.xyz) + r3.xyz;

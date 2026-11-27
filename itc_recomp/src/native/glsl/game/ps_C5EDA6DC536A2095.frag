@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 7
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 0, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 
 // PS_CONSTANT_BOOL_USE_GAMMA: bool 0
 // PS_CONSTANT_BOOL_USE_HSV_SCALE: bool 1
@@ -51,7 +50,7 @@ void xe_shader() {
   while (true) {
     switch (pc) {
     case 0:
-      r0 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r0 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r1 = clamp(r0.ywzx, 0.0, 1.0);
       if (!xe_bool(129u /* PS_CONSTANT_BOOL_USE_HSV_SCALE */)) {
         pc = 35; continue;

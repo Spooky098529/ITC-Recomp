@@ -22,9 +22,6 @@ enum class ShaderStage { kVertex, kPixel };
 struct ShaderTexture {
   uint32_t fetch_constant;
   VkImageViewType view_type;
-  // A signed and an unsigned view of a texture are bound separately, and
-  // the shader picks per component by the system constants' signs.
-  bool is_signed;
 };
 
 // A sampler the shader uses: its fetch constant and the fetch instruction's

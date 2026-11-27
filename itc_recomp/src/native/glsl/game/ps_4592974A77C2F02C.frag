@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 2
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 0, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 
 // tx0: sampler 0
 #define PS_CONSTANT_TEX_SIZE xe_fc[0]  // c32
@@ -50,11 +49,11 @@ void xe_shader() {
     { precise float v = PS_CONSTANT_TEX_SIZE.x + PS_CONSTANT_TEX_SIZE.x; precise float s = r0.y; ps = s; r0.z = v; r2.y = s; }
     { precise float v = r0.z + r0.x; precise float s = r0.x; ps = s; r3.x = v; }
     { precise float v = -r0.z + r0.x; precise float s = PS_CONSTANT_TEX_SIZE.x + ps; ps = s; r0.z = v; r2.x = s; }
-    r3 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
-    r4 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r2.zw, vec2(0.0014648438, 0.0014648438), 0.0, true);
-    r5 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
-    r2 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
-    r0 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.zy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+    r3 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+    r4 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r2.zw, vec2(0.0014648438, 0.0014648438), 0.0, true);
+    r5 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+    r2 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+    r0 = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.zy, vec2(0.0014648438, 0.0014648438), 0.0, true);
     r0 = xe_mul(r0.wzyx, lit255.xxxx);
     r2 = xe_mul(r2, lit255.yyyy);
     r2 = xe_mul(r5.xzwy, lit255.zzzz) + r2.xzwy;

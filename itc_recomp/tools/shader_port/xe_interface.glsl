@@ -27,9 +27,13 @@ layout(set = 1, binding = 0, scalar) uniform XeSystemConstants {
   layout(offset = 16) int vertex_base_index;
   layout(offset = 124) vec3 ndc_scale;
   layout(offset = 140) vec3 ndc_offset;
-  layout(offset = 176) uint texture_swizzled_signs[8];
   layout(offset = 272) float alpha_test_reference;
   layout(offset = 288) vec4 color_exp_bias;
+  // Each texture stage's reader scale: 0 nothing; above 0 times it and
+  // clamped to 0-1; below 0 times its negation (a pass's image handed to
+  // its texture: what the resolve's exponent bias and a normalized format
+  // did, docs/pc-renderer.md, step 4).
+  layout(offset = 304) float texture_scale[32];
   layout(offset = 496) uint vertex_index_min;
   layout(offset = 500) uint vertex_index_max;
 } xe_sys;
@@ -44,6 +48,13 @@ const uint kXeFlagPrimitivePolygonal = 1u << 11;
 const uint kXeFlagPrimitiveLine = 1u << 12;
 const uint kXeFlagAlphaTestShift = 16u;  // 3 bits: the compare function
 const uint kXeFlagConvertColor0ToGamma = 1u << 19;
+// SBX's own (bit 31, past the translator's): the alpha test is a dither
+// instead, passing where the alpha is over a per-pixel threshold that the
+// reference moves each frame (passes.cpp, the smooth-alpha solids' copies).
+const uint kXeFlagSbxDitheredAlpha = 1u << 31;
+// SBX's own (bit 30): the draw takes no AO (passes.cpp: the mirrors, the
+// sky); in the normals target its view distance is the sign bit alone.
+const uint kXeFlagSbxNoAo = 1u << 30;
 
 // The float constants the shader reads, packed in register order (all 256
 // when it addresses them relative to the loop index).
@@ -57,22 +68,11 @@ layout(set = 1, binding = 3, std140) uniform XeBoolLoopConstants {
   uvec4 xe_bools[2];
   uvec4 xe_loops[8];
 };
-// The fetch constants: a texture is 6 words, a vertex buffer 2.
-layout(set = 1, binding = 4, std140) uniform XeFetchConstants { uvec4 xe_fetch[48]; };
-// Guest memory, in words (in the guest's byte order).
-layout(set = 0, binding = 0, std430) readonly buffer XeSharedMemory { uint xe_memory[]; };
 
 bool xe_bool(uint n) { return (xe_bools[n >> 7u][(n >> 5u) & 3u] & (1u << (n & 31u))) != 0u; }
 uint xe_loop_constant(uint n) { return xe_loops[n >> 2u][n & 3u]; }
-uint xe_fetch_word(uint n) { return xe_fetch[n >> 2u][n & 3u]; }
 
 const float kXeFltMax = 3.40282347e+38;
-
-uint xe_endian_swap(uint v, uint endian) {
-  if (endian == 1u || endian == 2u) v = ((v & 0x00FF00FFu) << 8u) | ((v >> 8u) & 0x00FF00FFu);
-  if (endian == 2u || endian == 3u) v = (v << 16u) | (v >> 16u);
-  return v;
-}
 
 // --- instructions --------------------------------------------------------------
 // A multiply is 0 when either factor is 0, even infinity or NaN times 0
@@ -146,19 +146,8 @@ float xe_muls_prev2(float a, float b, float ps) {
 }
 
 // --- textures ------------------------------------------------------------------
-// The Xbox's piecewise linear gamma curve, both ways, as the translator
-// computes it.
-float xe_gamma_to_linear(float gamma) {
-  gamma = clamp(gamma, 0.0, 1.0);
-  float scale = gamma >= 96.0 / 255.0 ? (gamma >= 192.0 / 255.0 ? 8.0 / 1024.0 : 4.0 / 1024.0)
-                                      : (gamma >= 64.0 / 255.0 ? 2.0 / 1024.0 : 1.0 / 1024.0);
-  float offset = gamma >= 96.0 / 255.0 ? (gamma >= 192.0 / 255.0 ? -1024.0 : -256.0)
-                                       : (gamma >= 64.0 / 255.0 ? -64.0 : 0.0);
-  precise float linear = (gamma * (255.0 * 1024.0)) * scale + offset;
-  linear = linear + trunc(linear * scale);
-  linear = linear * (1.0 / 1023.0);
-  return linear;
-}
+// The Xbox's piecewise linear gamma curve, as the translator computes it (a
+// gamma render target's color, xe_color_output).
 vec3 xe_linear_to_gamma(vec3 linear) {
   linear = clamp(linear, 0.0, 1.0);
   bvec3 at_least_2 = greaterThanEqual(linear, vec3(128.0 / 1023.0));
@@ -172,84 +161,53 @@ vec3 xe_linear_to_gamma(vec3 linear) {
   return gamma;
 }
 
-// A texture fetch's result from the unsigned and the signed view's samples:
-// each component's sign mode (from the system constants: signed, biased
-// x * 2 - 1, or gamma), then the exponent bias. The fetch constant's
-// swizzle is in the image views.
-vec4 xe_texture_result(vec4 unsigned_sample, vec4 signed_sample, uint fetch_constant) {
-  uint signs = xe_sys.texture_swizzled_signs[fetch_constant >> 2u] >> (8u * (fetch_constant & 3u));
-  // The translator takes the exponent from the fetch constant's word 4,
-  // bits 13-18 (the hardware's is in word 3); kept for the same result.
-  int exponent = bitfieldExtract(int(xe_fetch_word(fetch_constant * 6u + 4u)), 13, 6);
-  precise vec4 result;
-  for (int c = 0; c < 4; c++) {
-    uint sign = (signs >> (2 * c)) & 3u;
-    precise float value = unsigned_sample[c];
-    if (sign == 1u) value = signed_sample[c];
-    else if (sign == 2u) value = value * 2.0 + -1.0;
-    else if (sign == 3u) value = xe_gamma_to_linear(value);
-    result[c] = value * ldexp(1.0, exponent);
+// A texture is one view (1D and 2D textures a 2D array's first layer, cube
+// maps a cube) and a sampler, bound by the shader's sampler stage (its
+// fetch constant): already in RGBA order and its format's own values (the
+// views' swizzle; docs/pc-renderer.md, step 2). What the draw says of it
+// besides: its reader scale.
+vec4 xe_texture_result(vec4 texel, uint stage) {
+  float reader_scale = xe_sys.texture_scale[stage & 31u];
+  if (reader_scale > 0.0) {
+    texel = clamp(texel * reader_scale, 0.0, 1.0);
+  } else if (reader_scale < 0.0) {
+    texel = texel * -reader_scale;
   }
-  return result;
-}
-
-// The LOD bias from the fetch constant (word 4, bits 12-21, 1/32 steps) and
-// the instruction.
-float xe_texture_lod(uint fetch_constant, float instruction_bias) {
-  precise float lod = float(bitfieldExtract(int(xe_fetch_word(fetch_constant * 6u + 4u)), 12, 10)) *
-                      (1.0 / 32.0);
-  lod = lod + instruction_bias;
-  return lod;
-}
-
-// The size of a 2D or cube texture, from the fetch constant's word 2.
-vec2 xe_texture_size_2d(uint fetch_constant) {
-  uint word = xe_fetch_word(fetch_constant * 6u + 2u);
-  return vec2(float(bitfieldExtract(word, 0, 13) + 1u), float(bitfieldExtract(word, 13, 13) + 1u));
+  return texel;
 }
 
 // 1D and 2D textures are 2D arrays (a 1D texture is a row); offset is the
-// instruction's texel offset plus the rounding offset (1.5/1024 of a texel).
-vec4 xe_tfetch2d(texture2DArray unsigned_view, texture2DArray signed_view, sampler s,
-                 uint fetch_constant, vec2 uv, vec2 offset, float bias, bool computed_lod) {
-  precise vec2 c = uv + offset / xe_texture_size_2d(fetch_constant);
-  float lod = xe_texture_lod(fetch_constant, bias);
+// instruction's texel offset plus the rounding offset (1.5/1024 of a texel);
+// bias the instruction's LOD bias.
+vec4 xe_tfetch2d(texture2DArray view, sampler s, uint stage, vec2 uv, vec2 offset, float bias,
+                 bool computed_lod) {
+  precise vec2 c = uv + offset / vec2(textureSize(sampler2DArray(view, s), 0).xy);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec2 dx = dFdxCoarse(c) * gradient_scale, dy = dFdyCoarse(c) * gradient_scale;
-  return xe_texture_result(textureGrad(sampler2DArray(unsigned_view, s), vec3(c, 0.0), dx, dy),
-                           textureGrad(sampler2DArray(signed_view, s), vec3(c, 0.0), dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(sampler2DArray(view, s), vec3(c, 0.0), dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(sampler2DArray(unsigned_view, s), vec3(c, 0.0), lod),
-                           textureLod(sampler2DArray(signed_view, s), vec3(c, 0.0), lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(sampler2DArray(view, s), vec3(c, 0.0), bias), stage);
 }
-vec4 xe_tfetch1d(texture2DArray unsigned_view, texture2DArray signed_view, sampler s,
-                 uint fetch_constant, float u, float offset, float bias, bool computed_lod) {
-  // A 1D size is word 2's low 24 bits; the row is at v = 0.
-  precise float c = u + offset / float(bitfieldExtract(xe_fetch_word(fetch_constant * 6u + 2u), 0, 24) + 1u);
-  float lod = xe_texture_lod(fetch_constant, bias);
+vec4 xe_tfetch1d(texture2DArray view, sampler s, uint stage, float u, float offset, float bias,
+                 bool computed_lod) {
+  precise float c = u + offset / float(textureSize(sampler2DArray(view, s), 0).x);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec2 dx = vec2(dFdxCoarse(c) * gradient_scale, 0.0), dy = vec2(dFdyCoarse(c) * gradient_scale, 0.0);
-  return xe_texture_result(textureGrad(sampler2DArray(unsigned_view, s), vec3(c, 0.0, 0.0), dx, dy),
-                           textureGrad(sampler2DArray(signed_view, s), vec3(c, 0.0, 0.0), dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(sampler2DArray(view, s), vec3(c, 0.0, 0.0), dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(sampler2DArray(unsigned_view, s), vec3(c, 0.0, 0.0), lod),
-                           textureLod(sampler2DArray(signed_view, s), vec3(c, 0.0, 0.0), lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(sampler2DArray(view, s), vec3(c, 0.0, 0.0), bias), stage);
 }
 // A cube fetch takes what the cube instruction makes: s and t in 1 to 2,
 // and the face (offset: s and t's as for 2D, then the face's).
-vec4 xe_tfetchcube(textureCube unsigned_view, textureCube signed_view, sampler s,
-                   uint fetch_constant, vec3 stf, vec3 offset, float bias, bool computed_lod) {
-  precise vec2 st = stf.xy + offset.xy / xe_texture_size_2d(fetch_constant);
+vec4 xe_tfetchcube(textureCube view, sampler s, uint stage, vec3 stf, vec3 offset, float bias,
+                   bool computed_lod) {
+  precise vec2 st = stf.xy + offset.xy / vec2(textureSize(samplerCube(view, s), 0));
   st = st * 2.0 + -3.0;
   precise float face_value = stf.z + offset.z;
   uint face = uint(clamp(face_value, 0.0, 5.0));
@@ -263,19 +221,14 @@ vec4 xe_tfetchcube(textureCube unsigned_view, textureCube signed_view, sampler s
   } else {
     direction = vec3(negative ? -st.x : st.x, -st.y, face_sign);
   }
-  float lod = xe_texture_lod(fetch_constant, bias);
 #ifdef XE_PIXEL
   if (computed_lod) {
-  precise float gradient_scale = exp2(lod);
+  precise float gradient_scale = exp2(bias);
   precise vec3 dx = dFdxCoarse(direction) * gradient_scale, dy = dFdyCoarse(direction) * gradient_scale;
-  return xe_texture_result(textureGrad(samplerCube(unsigned_view, s), direction, dx, dy),
-                           textureGrad(samplerCube(signed_view, s), direction, dx, dy),
-                           fetch_constant);
+  return xe_texture_result(textureGrad(samplerCube(view, s), direction, dx, dy), stage);
   }
 #endif
-  return xe_texture_result(textureLod(samplerCube(unsigned_view, s), direction, lod),
-                           textureLod(samplerCube(signed_view, s), direction, lod),
-                           fetch_constant);
+  return xe_texture_result(textureLod(samplerCube(view, s), direction, bias), stage);
 }
 
 #ifdef XE_VERTEX
@@ -366,25 +319,37 @@ uint xe_vf_needed_words(uint format, uint used) {
   return used;
 }
 
+// Vertex fetch n's attribute: the raw words of the vertex's element (in the
+// host's byte order), one input a fetch and a vertex of the rectangle
+// (locations 3n to 3n + 2; a rectangle list reads its three vertices'
+// through bindings at instance rate, other draws read the first). The
+// renderer makes the vertex input state from the fetches' fields
+// (passes.cpp, docs/pc-renderer.md, step 2).
+uint xe_vf_slot = 0u;
+#define XE_VF_IN(n) XE_VF_IN_(n)
+#define XE_VF_IN_(n) \
+  (xe_vf_slot == 0u ? xe_vf_in_##n##_0 : (xe_vf_slot == 1u ? xe_vf_in_##n##_1 : xe_vf_in_##n##_2))
+// The fetch n with its fields; index (the register the instruction reads)
+// is the vertex the invocation runs for, already applied by the vertex input.
+#define xe_vfetch(n, fetch_constant, offset, stride, format, flags, exp_adjust, swizzle, index, \
+                  used)                                                                         \
+  xe_vfetch_words(XE_VF_IN(n), fetch_constant, format, flags, exp_adjust, swizzle, used)
+
 // used: the result components the shader reads (a bit each).
 // swizzle: 3 bits a component, what the fetch's result gives that
 // component of the value the shader's instruction then swizzles as the file
 // has it (0-3 a component of the fetched value, 4 zero, 5 one): the
 // declaration's component order and defaults, as the game's patch of the
 // instruction gives them (identity: 0x688, xyzw).
-vec4 xe_vfetch(uint fetch_constant, int offset, uint stride, uint format, uint flags,
-               int exp_adjust, uint swizzle, float index, uint used) {
-  uint word_0 = xe_fetch_word(fetch_constant * 2u), word_1 = xe_fetch_word(fetch_constant * 2u + 1u);
-  int address = int(word_0 >> 2u);
-  if (stride != 0u) {
-    precise float i = (flags & kXeVfIndexRounded) != 0u ? index + 0.5 : index;
-    address += int(floor(i)) * int(stride);
-  }
+vec4 xe_vfetch_words(uvec4 words, uint fetch_constant, uint format, uint flags, int exp_adjust,
+                     uint swizzle, uint used) {
+  // The words are in the host's byte order (the vertex arena swaps them as
+  // it copies them in, docs/pc-renderer.md, step 2).
   uint needed = xe_vf_needed_words(format, used);
   uvec4 w = uvec4(0u);
   for (int i = 0; i < 4; i++) {
     if ((needed & (1u << i)) != 0u) {
-      w[i] = xe_endian_swap(xe_memory[address + offset + i], word_1 & 3u);
+      w[i] = words[i];
     }
   }
   vec4 r = vec4(0.0);
@@ -438,21 +403,7 @@ vec4 xe_vfetch(uint fetch_constant, int offset, uint stride, uint format, uint f
   return swizzled;
 }
 
-// --- the vertex index and the position -----------------------------------------
-float xe_remap_vertex_index(uint index) {
-  index = (index + uint(xe_sys.vertex_base_index)) & 0xFFFFFFu;
-  return float(clamp(index, xe_sys.vertex_index_min, xe_sys.vertex_index_max));
-}
-// An index from the index buffer in guest memory (for rectangle lists drawn
-// with one).
-uint xe_load_vertex_index(uint index) {
-  bool is_32bit = (xe_sys.flags & kXeFlagPrimitiveVertexIndexLoad32Bit) != 0u;
-  uint address = xe_sys.vertex_index_load_address + (index << (is_32bit ? 2u : 1u));
-  uint word = xe_memory[int(address >> 2u)];
-  if (!is_32bit) word = bitfieldExtract(word, int((address & 2u) << 3u), 16);
-  return xe_endian_swap(word, xe_sys.vertex_index_endian);
-}
-
+// --- the position -------------------------------------------------------------
 // The position as the shader wrote it, to Vulkan's clip space.
 vec4 xe_host_position(vec4 guest) {
   precise float w = (xe_sys.flags & kXeFlagWNotReciprocal) != 0u ? guest.w : 1.0 / guest.w;
@@ -478,6 +429,12 @@ vec4 xe_param_gen() {
 
 // The alpha test, on the first color target's alpha.
 bool xe_alpha_test_passes(float alpha) {
+  if ((xe_sys.flags & kXeFlagSbxDitheredAlpha) != 0u) {
+    // Interleaved gradient noise (Jimenez), shifted each frame.
+    vec2 p = floor(gl_FragCoord.xy) + 5.588238 * xe_sys.alpha_test_reference;
+    float threshold = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    return alpha > threshold;
+  }
   uint function = (xe_sys.flags >> kXeFlagAlphaTestShift) & 7u;
   float reference = xe_sys.alpha_test_reference;
   if (function == 7u) return true;
@@ -489,10 +446,51 @@ bool xe_alpha_test_passes(float alpha) {
 // A color as the shader wrote it, to what the render target takes: the
 // target's exponent bias, and gamma if the target is gamma but its format
 // isn't.
+//
+// SBX's light target (--xegtao; passes.cpp, "View targets"): render target
+// 0's color goes to location 2 as well, blended the same way, when the
+// renderer says the draw only adds light (XE_LIGHT: the models' unlit
+// material, additive blends); otherwise the part of the color a shader put
+// in xe_light_extra (light it added, such as course_projected's projector,
+// the neon underglow and headlights), with the same alpha, so the blend
+// fades what's under it as it fades the color. The AO then darkens the
+// color but not that light. Dropped where the pipeline has no light target.
+layout(constant_id = 900) const bool XE_LIGHT = false;
+layout(location = 2) out vec4 xe_out_light;
+// SBX's normals target (location 1; glsl/materials/normals_out.glsl): no
+// normal, and the fragment's view distance, unless the material writes its
+// normal after this (write_normal). Dropped where the pipeline has no
+// normals target or doesn't write it.
+layout(location = 1) out uvec2 xe_out_normal;
+// The view distance as the normals target holds it: its float bits, or,
+// for a draw that takes no AO (kXeFlagSbxNoAo), the sign bit alone (no
+// distance: the AO's depth there is the game's; xegtao_depth.comp).
+uint xe_normal_distance() {
+  return (xe_sys.flags & kXeFlagSbxNoAo) != 0u ? 0x80000000u
+                                               : floatBitsToUint(1.0 / gl_FragCoord.w);
+}
+vec3 xe_light_extra = vec3(0.0);
+vec3 xe_color_output_rgb(vec3 rgb, int target) {
+  rgb *= xe_sys.color_exp_bias[target];
+  if ((xe_sys.flags & (kXeFlagConvertColor0ToGamma << uint(target))) != 0u) {
+    rgb = xe_linear_to_gamma(rgb);
+  }
+  return rgb;
+}
 vec4 xe_color_output(vec4 color, int target) {
   precise vec4 c = color * xe_sys.color_exp_bias[target];
   if ((xe_sys.flags & (kXeFlagConvertColor0ToGamma << uint(target))) != 0u) {
     c.rgb = xe_linear_to_gamma(c.rgb);
+  }
+  if (target == 0) {
+    xe_out_normal = uvec2(0u, xe_normal_distance());
+    if (XE_LIGHT) {
+      xe_out_light = c;
+    } else {
+      // The light's share of the output, so gamma stays exact.
+      vec3 rest = xe_color_output_rgb(max(color.rgb - xe_light_extra, 0.0), target);
+      xe_out_light = vec4(max(c.rgb - rest, 0.0), c.a);
+    }
   }
   return c;
 }

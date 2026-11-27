@@ -47,7 +47,8 @@ class TextureCache {
                       uint32_t fetch_constant);
   VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
   // The post-swizzle signedness of each component, 2 bits each (the
-  // translator's texture_swizzled_signs byte).
+  // translator's swizzled signs byte; the shaders no longer apply them:
+  // a texture with signs is logged).
   static uint8_t SwizzledSigns(const uint32_t fetch[6]);
 
   // A resolve's destination texture (fetch: its fetch constant, addresses

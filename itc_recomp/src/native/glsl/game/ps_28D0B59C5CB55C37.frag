@@ -6,21 +6,16 @@
 #define XE_FLOAT_CONSTANTS 3
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 3, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 3, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 2, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 2, signed
-layout(set = 3, binding = 4) uniform texture2DArray xe_texture4;  // fetch constant 0, unsigned
-layout(set = 3, binding = 5) uniform texture2DArray xe_texture5;  // fetch constant 0, signed
-layout(set = 3, binding = 6) uniform texture2DArray xe_texture6;  // fetch constant 1, unsigned
-layout(set = 3, binding = 7) uniform texture2DArray xe_texture7;  // fetch constant 1, signed
-layout(set = 3, binding = 8) uniform texture2DArray xe_texture8;  // fetch constant 4, unsigned
-layout(set = 3, binding = 9) uniform texture2DArray xe_texture9;  // fetch constant 4, signed
-layout(set = 3, binding = 10) uniform sampler xe_sampler0;  // fetch constant 3
-layout(set = 3, binding = 11) uniform sampler xe_sampler1;  // fetch constant 2
-layout(set = 3, binding = 12) uniform sampler xe_sampler2;  // fetch constant 0
-layout(set = 3, binding = 13) uniform sampler xe_sampler3;  // fetch constant 1
-layout(set = 3, binding = 14) uniform sampler xe_sampler4;  // fetch constant 4
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 3
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 2
+layout(set = 3, binding = 2) uniform texture2DArray xe_texture4;  // fetch constant 0
+layout(set = 3, binding = 3) uniform texture2DArray xe_texture6;  // fetch constant 1
+layout(set = 3, binding = 4) uniform texture2DArray xe_texture8;  // fetch constant 4
+layout(set = 3, binding = 5) uniform sampler xe_sampler0;  // fetch constant 3
+layout(set = 3, binding = 6) uniform sampler xe_sampler1;  // fetch constant 2
+layout(set = 3, binding = 7) uniform sampler xe_sampler2;  // fetch constant 0
+layout(set = 3, binding = 8) uniform sampler xe_sampler3;  // fetch constant 1
+layout(set = 3, binding = 9) uniform sampler xe_sampler4;  // fetch constant 4
 
 // tx0: sampler 0
 // tx1: sampler 1
@@ -62,11 +57,11 @@ void xe_shader() {
   precise vec4 r6 = xe_input(6, xe_in_interpolator_6);
   bool p = false;
   do {
-    r3.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 3u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r4.xyz = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 2u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r6.xyz = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r5.xyz = xe_tfetch2d(xe_texture6, xe_texture7, xe_sampler3, 1u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
-    r0.xyz = xe_tfetch2d(xe_texture8, xe_texture9, xe_sampler4, 4u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r3.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 3u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r4.xyz = xe_tfetch2d(xe_texture2, xe_sampler1, 2u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r6.xyz = xe_tfetch2d(xe_texture4, xe_sampler2, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r5.xyz = xe_tfetch2d(xe_texture6, xe_sampler3, 1u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+    r0.xyz = xe_tfetch2d(xe_texture8, xe_sampler4, 4u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
     r2.xyz = xe_mul(r0.xyz, r1.xyz);
     r0.xyz = r6.xyz + r5.xyz;
     r0.xyz = r0.xyz + r4.xyz;

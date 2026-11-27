@@ -6,12 +6,10 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 1, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 0, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 0, signed
-layout(set = 3, binding = 4) uniform sampler xe_sampler0;  // fetch constant 1
-layout(set = 3, binding = 5) uniform sampler xe_sampler1;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 0
+layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 1
+layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 0
 
 // UseProjTex: bool 0
 // btx0: sampler 1
@@ -69,7 +67,7 @@ void xe_shader() {
   while (true) {
     switch (pc) {
     case 0:
-      r4.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+      r4.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
       r9 = xe_mul(r2.yzxy, r1.zxyx);
       r6.yzw = -r0.xyz + EyePos.xyz;
       { precise float v = xe_dp3(r6.wyz, r6.wyz); precise float s = (-abs(r5.x) > 0.0 ? 1.0 : 0.0); ps = s; r3.z = v; r8.y = s; }
@@ -155,7 +153,7 @@ void xe_shader() {
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 19:
-      r0 = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r0 = xe_tfetch2d(xe_texture2, xe_sampler1, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r2.xyz = AmbientColor.zyx + MatAmbientDiffuse.zyx;
       r2.xyz = r2.zxy + r6.xyz;
       r2.w = xe_mul(r0.w, ModTexAlpha.x);

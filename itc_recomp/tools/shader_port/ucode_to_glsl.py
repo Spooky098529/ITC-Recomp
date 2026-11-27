@@ -152,9 +152,8 @@ class Port:
                 if skey not in self.samplers:
                     self.samplers.append(skey)
                 dim = 1 if i.dimension == 0 else i.dimension   # 1D is bound as 2D
-                for signed in (False, True):
-                    if (i.fetch_constant, dim, signed) not in self.textures:
-                        self.textures.append((i.fetch_constant, dim, signed))
+                if (i.fetch_constant, dim) not in self.textures:
+                    self.textures.append((i.fetch_constant, dim))
         self.register_count = bound
         self.packed = {r: r for r in range(256)} if self.dynamic_constants else \
             {r: n for n, r in enumerate(sorted(self.float_used))}
@@ -466,8 +465,7 @@ class Port:
         mag, min_, mip, aniso = i.filters
         sampler = self.samplers.index((i.fetch_constant, mag, min_, mip, aniso if computed else 0))
         dim = 1 if i.dimension == 0 else i.dimension
-        tu = self.textures.index((i.fetch_constant, dim, False))
-        ts = self.textures.index((i.fetch_constant, dim, True))
+        tu = self.textures.index((i.fetch_constant, dim))
         rounding = 1.5 / 1024.0
         ox, oy, oz = i.offsets
         if i.dimension == 0:
@@ -483,8 +481,8 @@ class Port:
         if not used:
             self.store_fetch(out, i.dest, i.dest_swizzle, "vec4(0.0)")
             return
-        call = "%s(xe_texture%d, xe_texture%d, xe_sampler%d, %du, %s, %s, %s, %s)" % (
-            fn, tu, ts, sampler, i.fetch_constant, source, offset, fnum(i.lod_bias),
+        call = "%s(xe_texture%d, xe_sampler%d, %du, %s, %s, %s, %s)" % (
+            fn, tu, sampler, i.fetch_constant, source, offset, fnum(i.lod_bias),
             "true" if computed else "false")
         lines = []
         self.store_fetch(lines, i.dest, i.dest_swizzle, "t")
@@ -614,9 +612,9 @@ class Port:
              '#include "xe_interface.glsl"', ""]
         tset = 2 if self.vertex else 3
         dims = {1: "texture2DArray", 3: "textureCube"}
-        for n, (fc, dim, signed) in enumerate(self.textures):
-            L.append("layout(set = %d, binding = %d) uniform %s xe_texture%d;  // fetch constant %d, %s"
-                     % (tset, n, dims[dim], n, fc, "signed" if signed else "unsigned"))
+        for n, (fc, dim) in enumerate(self.textures):
+            L.append("layout(set = %d, binding = %d) uniform %s xe_texture%d;  // fetch constant %d"
+                     % (tset, n, dims[dim], n, fc))
         for n, (fc, mag, min_, mip, aniso) in enumerate(self.samplers):
             L.append("layout(set = %d, binding = %d) uniform sampler xe_sampler%d;  // fetch constant %d"
                      % (tset, len(self.textures) + n, n, fc))

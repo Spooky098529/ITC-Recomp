@@ -24,8 +24,8 @@ def entry_lines(e):
         stage, e["lookup_hash"], e["microcode_words"], name, name, title(e))]
     fetches = [str(f["instruction"]) for f in e["vertex_fetches"]]
     lines.append("   {{%s}}, %d," % (", ".join(fetches), len(fetches)))
-    textures = ["{%d, %s, %s}" % (t["fetch_constant"], "true" if t["view"] == "cube" else "false",
-                                  "true" if t["signed"] else "false") for t in e["textures"]]
+    textures = ["{%d, %s}" % (t["fetch_constant"], "true" if t["view"] == "cube" else "false")
+                for t in e["textures"] if not t.get("signed")]
     lines.append("   {{%s}}, %d," % (", ".join(textures), len(textures)))
     samplers = ["{%d, %d, %d, %d, %d}" % (s["fetch_constant"], s["mag"], s["min"], s["mip"], s["aniso"])
                 for s in e["samplers"]]

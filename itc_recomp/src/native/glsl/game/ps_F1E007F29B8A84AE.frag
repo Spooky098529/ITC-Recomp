@@ -6,27 +6,20 @@
 #define XE_FLOAT_CONSTANTS 42
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 2, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 2, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 8, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 8, signed
-layout(set = 3, binding = 4) uniform texture2DArray xe_texture4;  // fetch constant 11, unsigned
-layout(set = 3, binding = 5) uniform texture2DArray xe_texture5;  // fetch constant 11, signed
-layout(set = 3, binding = 6) uniform texture2DArray xe_texture6;  // fetch constant 1, unsigned
-layout(set = 3, binding = 7) uniform texture2DArray xe_texture7;  // fetch constant 1, signed
-layout(set = 3, binding = 8) uniform texture2DArray xe_texture8;  // fetch constant 0, unsigned
-layout(set = 3, binding = 9) uniform texture2DArray xe_texture9;  // fetch constant 0, signed
-layout(set = 3, binding = 10) uniform texture2DArray xe_texture10;  // fetch constant 9, unsigned
-layout(set = 3, binding = 11) uniform texture2DArray xe_texture11;  // fetch constant 9, signed
-layout(set = 3, binding = 12) uniform texture2DArray xe_texture12;  // fetch constant 10, unsigned
-layout(set = 3, binding = 13) uniform texture2DArray xe_texture13;  // fetch constant 10, signed
-layout(set = 3, binding = 14) uniform sampler xe_sampler0;  // fetch constant 2
-layout(set = 3, binding = 15) uniform sampler xe_sampler1;  // fetch constant 8
-layout(set = 3, binding = 16) uniform sampler xe_sampler2;  // fetch constant 11
-layout(set = 3, binding = 17) uniform sampler xe_sampler3;  // fetch constant 1
-layout(set = 3, binding = 18) uniform sampler xe_sampler4;  // fetch constant 0
-layout(set = 3, binding = 19) uniform sampler xe_sampler5;  // fetch constant 9
-layout(set = 3, binding = 20) uniform sampler xe_sampler6;  // fetch constant 10
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 2
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 8
+layout(set = 3, binding = 2) uniform texture2DArray xe_texture4;  // fetch constant 11
+layout(set = 3, binding = 3) uniform texture2DArray xe_texture6;  // fetch constant 1
+layout(set = 3, binding = 4) uniform texture2DArray xe_texture8;  // fetch constant 0
+layout(set = 3, binding = 5) uniform texture2DArray xe_texture10;  // fetch constant 9
+layout(set = 3, binding = 6) uniform texture2DArray xe_texture12;  // fetch constant 10
+layout(set = 3, binding = 7) uniform sampler xe_sampler0;  // fetch constant 2
+layout(set = 3, binding = 8) uniform sampler xe_sampler1;  // fetch constant 8
+layout(set = 3, binding = 9) uniform sampler xe_sampler2;  // fetch constant 11
+layout(set = 3, binding = 10) uniform sampler xe_sampler3;  // fetch constant 1
+layout(set = 3, binding = 11) uniform sampler xe_sampler4;  // fetch constant 0
+layout(set = 3, binding = 12) uniform sampler xe_sampler5;  // fetch constant 9
+layout(set = 3, binding = 13) uniform sampler xe_sampler6;  // fetch constant 10
 
 // UseProjTex: bool 0
 // btx0: sampler 2
@@ -145,7 +138,7 @@ void xe_shader() {
   while (true) {
     switch (pc) {
     case 0:
-      r13 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 2u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r13 = xe_tfetch2d(xe_texture0, xe_sampler0, 2u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r3.z = (PntLightColor_0.w > lit246.w ? 1.0 : 0.0);
       r17 = xe_mul(r2.yzxy, r1.zxyx);
       r15.xyz = -r0.xyz + EyePos.xyz;
@@ -221,28 +214,28 @@ void xe_shader() {
         r19 = xe_mul(r12.wwww, lit251) + r5.xyxy;
         r22 = xe_mul(r12.wwww, lit248) + r5.xyxy;
         r16 = xe_mul(r12.wwww, lit249) + r5.xyxy;
-        r5.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r16.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r5.y = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r16.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r5.x = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r16.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r5.y = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r16.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       if (p) {
-        r5.z = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r22.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r16.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r19.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r16.y = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r18.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r16.z = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r18.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r18.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r23.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r18.y = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r23.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r5.z = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r22.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r16.x = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r19.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r16.y = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r18.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r16.z = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r18.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r18.x = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r23.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r18.y = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r23.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       if (p) {
-        r18.z = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r17.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r18.w = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r22.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r17.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r17.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r17.y = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r20.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r17.z = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r20.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r20.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r21.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r18.z = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r17.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r18.w = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r22.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r17.x = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r17.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r17.y = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r20.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r17.z = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r20.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r20.x = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r21.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       if (p) {
-        r20.y = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r21.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-        r20.z = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 8u, r19.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r20.y = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r21.zw, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r20.z = xe_tfetch2d(xe_texture2, xe_sampler1, 8u, r19.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
         { precise vec3 v = -r2.zzz + r17.xyz; precise float s = -r2.z; ps = s; r17.xyz = v; }
         { precise vec4 v = -r2.zzzz + r18; precise float s = r20.x + ps; ps = s; r18 = v; r19.y = s; }
         { precise vec3 v = -r2.zzz + r16.xyz; precise float s = -r2.z; ps = s; r16.xyz = v; }
@@ -288,7 +281,7 @@ void xe_shader() {
         r2.xy = xe_mul(r2.yx, lit246.ww) + lit246.ww;
         ps = lit247.y - r2.x;
         r2.z = ps;
-        r12.w = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r12.w = xe_tfetch2d(xe_texture4, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
       if (p) {
@@ -372,7 +365,7 @@ void xe_shader() {
         r2.xy = xe_mul(r2.yx, lit246.ww) + lit246.ww;
         ps = lit247.y - r2.x;
         r2.z = ps;
-        r13.y = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r13.y = xe_tfetch2d(xe_texture4, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       { float pop = r0.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r0.w = ps; }
       { float pop = r0.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r0.w = ps; }
@@ -446,7 +439,7 @@ void xe_shader() {
         r2.xy = xe_mul(r2.yx, lit246.ww) + lit246.ww;
         ps = lit247.y - r2.x;
         r2.z = ps;
-        r13.y = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r13.y = xe_tfetch2d(xe_texture4, xe_sampler2, 11u, r2.yz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
@@ -520,7 +513,7 @@ void xe_shader() {
         r0.xw = xe_mul(r0.xz, lit246.ww) + lit246.ww;
         ps = lit247.y - r0.w;
         r0.z = ps;
-        r13.y = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 11u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+        r13.y = xe_tfetch2d(xe_texture4, xe_sampler2, 11u, r0.xz, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
       }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
@@ -548,8 +541,8 @@ void xe_shader() {
       }
       { float pop = r1.w - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r1.w = ps; }
     case 67:
-      r5 = xe_tfetch2d(xe_texture6, xe_texture7, xe_sampler3, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
-      r8 = xe_tfetch2d(xe_texture8, xe_texture9, xe_sampler4, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r5 = xe_tfetch2d(xe_texture6, xe_sampler3, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r8 = xe_tfetch2d(xe_texture8, xe_sampler4, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r3.w = clamp(r5.w + r8.w, 0.0, 1.0);
       r2.xyz = r14.xyz + r12.yzx;
       { precise vec3 v = xe_mul(r8.xyz, ModTexAlpha.xxx); p = !(r2.w == 0.0); precise float s = (p ? 0.0 : 1.0); ps = s; r12.xyz = v; }
@@ -599,7 +592,7 @@ void xe_shader() {
       if (p) {
         ps = lit247.y - r12.x;
         r12.x = ps;
-        r4 = xe_tfetch2d(xe_texture10, xe_texture11, xe_sampler5, 9u, r12.yx, vec2(0.0014648438, 0.0014648438), 0.0, true);
+        r4 = xe_tfetch2d(xe_texture10, xe_sampler5, 9u, r12.yx, vec2(0.0014648438, 0.0014648438), 0.0, true);
         r12.x = xe_dp4(r4.wzxy, lit247.yyyy);
         r12.x = xe_mul(r12.x, r0.w);
         r2.y = xe_mul(r12.x, r0.z);
@@ -653,7 +646,7 @@ void xe_shader() {
       if (p) {
         ps = lit247.y - r12.x;
         r12.x = ps;
-        r12.xyw = xe_tfetch2d(xe_texture12, xe_texture13, xe_sampler6, 10u, r12.yx, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+        r12.xyw = xe_tfetch2d(xe_texture12, xe_sampler6, 10u, r12.yx, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
         r12.xyw = xe_mul(r0.zzz, r12.xyw);
         r12.xyw = xe_mul(r12.wxy, r0.yyy);
         r12.xyw = xe_mul(r12.xwy, lit246.zzz);

@@ -6,12 +6,10 @@
 #define XE_FLOAT_CONSTANTS 1
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 0, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 1, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 1, signed
-layout(set = 3, binding = 4) uniform sampler xe_sampler0;  // fetch constant 0
-layout(set = 3, binding = 5) uniform sampler xe_sampler1;  // fetch constant 1
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 1
+layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 0
+layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 1
 
 // tx0: sampler 0
 // tx1: sampler 1
@@ -39,8 +37,8 @@ void xe_shader() {
   bool p = false;
   do {
     r0.x = lit255.y;
-    r0.y = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xx, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
-    r0.x = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 1u, r0.xx, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+    r0.y = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xx, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+    r0.x = xe_tfetch2d(xe_texture2, xe_sampler1, 1u, r0.xx, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
     { precise float e = r1.w; xe_color0.w = e; }
     r0.y = r0.y + -r0.x;
     r0.x = xe_mul(r0.y, lit255.x) + r0.x;

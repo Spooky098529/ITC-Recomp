@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 1
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 0, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 0
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 0
 
 // Texture: sampler 0
 const vec4 lit255 = vec4(0.1, 0.00033334445, 0.0, 0.0);
@@ -34,7 +33,7 @@ void xe_shader() {
   precise vec4 r1 = xe_input(1, xe_in_interpolator_1);
   bool p = false;
   do {
-    r1.x = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
+    r1.x = xe_tfetch2d(xe_texture0, xe_sampler0, 0u, r0.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).x;
     r1.x = r1.x + -lit255.x;
     { precise vec3 e = xe_mul(r1.xxx, lit255.yyy); xe_color0.xyz = e; }
     xe_color0.w = 1.0;

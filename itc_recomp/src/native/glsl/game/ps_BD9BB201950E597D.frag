@@ -6,9 +6,8 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 1, signed
-layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 1
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1
+layout(set = 3, binding = 1) uniform sampler xe_sampler0;  // fetch constant 1
 
 // UseProjTex: bool 0
 // tx1: sampler 1
@@ -138,7 +137,7 @@ void xe_shader() {
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 14:
-      r5 = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 1u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r5 = xe_tfetch2d(xe_texture0, xe_sampler0, 1u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r0.xyz = AmbientColor.xyz + MatAmbientDiffuse.xyz;
       { precise vec3 v = xe_mul(r5.xyz, r4.xyz); precise float s = r5.w; ps = s; r1.xyz = v; r4.x = s; }
       { precise vec3 v = r0.xyz + r8.xyz; precise float s = xe_mul(ModTexAlpha.y, r4.x); ps = s; r0.yzw = v; r0.x = s; }

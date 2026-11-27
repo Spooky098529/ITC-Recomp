@@ -6,12 +6,10 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 1, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 0, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 0, signed
-layout(set = 3, binding = 4) uniform sampler xe_sampler0;  // fetch constant 1
-layout(set = 3, binding = 5) uniform sampler xe_sampler1;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 1
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 0
+layout(set = 3, binding = 2) uniform sampler xe_sampler0;  // fetch constant 1
+layout(set = 3, binding = 3) uniform sampler xe_sampler1;  // fetch constant 0
 
 // UseProjTex: bool 0
 // sptx0: sampler 1
@@ -70,7 +68,7 @@ void xe_shader() {
   while (true) {
     switch (pc) {
     case 0:
-      r5.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 1u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+      r5.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 1u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
       r9.xyz = vec3(greaterThan(-abs(r4.xxx), lit254.yyy));
       r6.xyz = -r0.xyz + EyePos.xyz;
       { precise float v = xe_dp3(r1.xyz, r1.xyz); precise float s = lit254.x; ps = s; r2.z = v; r1.w = s; }
@@ -144,7 +142,7 @@ void xe_shader() {
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 14:
-      r3 = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r3 = xe_tfetch2d(xe_texture2, xe_sampler1, 0u, r2.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r0.xyz = AmbientColor.xyz + MatAmbientDiffuse.xyz;
       { precise vec3 v = xe_mul(r3.xyz, r4.xyz); precise float s = r3.w; ps = s; r1.xyz = v; r4.y = s; }
       { precise vec3 v = r0.xyz + r9.xyz; precise float s = xe_mul(ModTexAlpha.x, r4.y); ps = s; r0.yzw = v; r0.x = s; }

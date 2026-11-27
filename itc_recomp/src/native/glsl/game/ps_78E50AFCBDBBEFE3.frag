@@ -6,15 +6,12 @@
 #define XE_FLOAT_CONSTANTS 256
 #include "xe_interface.glsl"
 
-layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 2, unsigned
-layout(set = 3, binding = 1) uniform texture2DArray xe_texture1;  // fetch constant 2, signed
-layout(set = 3, binding = 2) uniform texture2DArray xe_texture2;  // fetch constant 1, unsigned
-layout(set = 3, binding = 3) uniform texture2DArray xe_texture3;  // fetch constant 1, signed
-layout(set = 3, binding = 4) uniform texture2DArray xe_texture4;  // fetch constant 0, unsigned
-layout(set = 3, binding = 5) uniform texture2DArray xe_texture5;  // fetch constant 0, signed
-layout(set = 3, binding = 6) uniform sampler xe_sampler0;  // fetch constant 2
-layout(set = 3, binding = 7) uniform sampler xe_sampler1;  // fetch constant 1
-layout(set = 3, binding = 8) uniform sampler xe_sampler2;  // fetch constant 0
+layout(set = 3, binding = 0) uniform texture2DArray xe_texture0;  // fetch constant 2
+layout(set = 3, binding = 1) uniform texture2DArray xe_texture2;  // fetch constant 1
+layout(set = 3, binding = 2) uniform texture2DArray xe_texture4;  // fetch constant 0
+layout(set = 3, binding = 3) uniform sampler xe_sampler0;  // fetch constant 2
+layout(set = 3, binding = 4) uniform sampler xe_sampler1;  // fetch constant 1
+layout(set = 3, binding = 5) uniform sampler xe_sampler2;  // fetch constant 0
 
 // UseProjTex: bool 0
 // btx0: sampler 2
@@ -75,7 +72,7 @@ void xe_shader() {
   while (true) {
     switch (pc) {
     case 0:
-      r5.xyz = xe_tfetch2d(xe_texture0, xe_texture1, xe_sampler0, 2u, r5.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
+      r5.xyz = xe_tfetch2d(xe_texture0, xe_sampler0, 2u, r5.xy, vec2(0.0014648438, 0.0014648438), 0.0, true).xyz;
       r10 = xe_mul(r2.yzxy, r1.zxyx);
       r7.xyz = -r0.xyz + EyePos.xyz;
       { precise float v = xe_dp3(r7.zxy, r7.zxy); precise float s = (-abs(r6.x) > 0.0 ? 1.0 : 0.0); ps = s; r3.z = v; r8.x = s; }
@@ -161,8 +158,8 @@ void xe_shader() {
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 19:
-      r4 = xe_tfetch2d(xe_texture2, xe_texture3, xe_sampler1, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
-      r3 = xe_tfetch2d(xe_texture4, xe_texture5, xe_sampler2, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r4 = xe_tfetch2d(xe_texture2, xe_sampler1, 1u, r4.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
+      r3 = xe_tfetch2d(xe_texture4, xe_sampler2, 0u, r3.xy, vec2(0.0014648438, 0.0014648438), 0.0, true);
       r2.xyz = AmbientColor.zyx + MatAmbientDiffuse.zyx;
       r0.xyz = r4.xyz + -r3.xyz;
       r2.yzw = r2.zxy + r5.xyz;
