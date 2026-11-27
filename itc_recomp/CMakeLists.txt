@@ -768,14 +768,14 @@ set(ITC_SOURCES
     src/native/app_window.cpp
     src/native/buffers.cpp
     src/native/disk_cache.cpp
-    src/native/draw_packets.cpp
+    src/hooks/draw_packets.cpp
     src/native/passes.cpp
     src/native/vertex_arena.cpp
     src/native/shader_ports.cpp
     src/native/port_spirv.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
-    src/native/replay_hooks.cpp
+    src/hooks/replay_commands.cpp
     src/native/shaders.cpp
     src/native/draw_registers.cpp
     src/render/state.cpp

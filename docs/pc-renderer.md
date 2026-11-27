@@ -658,10 +658,18 @@ and resolve on one 256x144 target in turn, then the main view draws on
   Checked: an attract race's frame (2,413 draws), the pad replay with
   dumps, the tick replay (both races match).
 
+- **`replay_hooks.cpp` out of the renderer (2026-11-27).** The replay's
+  command entries, the inline draw, resolve and front buffer wraps and the
+  library's packet-free draw are the game's hooks, not the renderer's:
+  moved to `src/hooks/replay_commands.{h,cpp}` (`hooks::ReplayCall`) and
+  `src/hooks/draw_packets.{h,cpp}`. The renderer is reached from them only
+  for command counting and the front buffer; its inline draw hook (for
+  commands 15 and 19, which now draw through `render::DrawUP`) is gone.
+
 Left for step 3: the vertex shader setter (it keeps the shader's
-reference count: kept), the render target and depth surface setters
+reference count: kept) and the render target and depth surface setters
 (kept until it's clear nothing outside the replay reads the device's
-bound surfaces), and `replay_hooks.cpp`.
+bound surfaces).
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

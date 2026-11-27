@@ -10,10 +10,10 @@
 // draws (predicated tiling) take the same path: their packets went into
 // chains only the tiling worker's job reads, which never runs.
 
-#include "draw_packets.h"
+#include "hooks/draw_packets.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
-#include "state.h"
+#include "native/state.h"
 
 #include "base/log.h"
 #include "hooks/command_buffer.h"
@@ -56,7 +56,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229EF48) {
   hooks::EndCommandSegment(ctx);
 }
 
-// DrawIndexedVertices (sub_825BE708, wrapped in replay_hooks.cpp): r3
+// DrawIndexedVertices (sub_825BE708, wrapped in src/hooks/replay_commands.cpp): r3
 // device, r4 primitive type, r5 base vertex, r6 start index, r7 index
 // count. The original writes the dirty state's packets (five masks at
 // device +0..+32) and DRAW_INDX.

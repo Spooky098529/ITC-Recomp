@@ -62,7 +62,7 @@ namespace {
 
 // Command 15: marked as command 15 around it, so the wraps of BeginVertices
 // and EndVertices hand PrimitiveDrawer::Draw's inline draw to the renderer
-// (as its wrap in src/native/replay_hooks.cpp does around the original).
+// (as its wrap in src/hooks/replay_commands.cpp does around the original).
 uint32_t DrawerDrawMarked(lifted::Regs& ctx, uint32_t sp) {
   const uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;

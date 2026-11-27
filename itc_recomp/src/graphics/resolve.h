@@ -19,7 +19,7 @@
 // data space, and Device::SetScreenScissor (sub_822A0F80, already Dropped:
 // only packets); the write position +40 is left where it was, as the
 // dropped writers leave it. The adapter is the wrap in
-// src/native/replay_hooks.cpp (--native_resolve).
+// src/hooks/replay_commands.cpp (--native_resolve).
 #pragma once
 
 #include <cstdint>

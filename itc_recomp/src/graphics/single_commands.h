@@ -10,7 +10,7 @@
 // from frames made where the originals make theirs; the device's setters
 // that are native (src/graphics/device_state.h) are called as plain C++.
 // Adapters: src/hooks/single_commands.cpp (--native_single_commands), and
-// command 15's in src/native/replay_hooks.cpp, inside its wrap.
+// command 15's in src/hooks/replay_commands.cpp, inside its wrap.
 
 #pragma once
 
@@ -64,7 +64,7 @@ uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call);
 // originals, through their adapters, where SetStreamSource or SetTexture
 // would fence on a full fence list). Returns 0. Its callers mark it as
 // command 15 (native::g_current_command) around it, for the renderer's
-// inline draw (src/native/replay_hooks.cpp).
+// inline draw (src/hooks/replay_commands.cpp).
 uint32_t DrawerDraw(uint32_t sp, const GuestCall& call);
 
 // Single::Callback (sub_8258E9B8, 28), in its 96-byte frame: the slot's +4

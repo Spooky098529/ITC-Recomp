@@ -1,17 +1,17 @@
 // The render command handlers (the table at 0x8265EDE0; see
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
-#include "native/replay_hooks.h"
+#include "hooks/replay_commands.h"
 #include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "debug/replay_stats.h"
-#include "draw_packets.h"
+#include "hooks/draw_packets.h"
 #include "guest.h"
-#include "renderer.h"
-#include "state.h"
+#include "native/renderer.h"
+#include "native/state.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -52,7 +52,7 @@ ITC_FLAG_BOOL(native_resolve, true, "ITC",
 namespace rc = graphics::replay_commands;
 namespace inline_draws = graphics::inline_draws;
 
-rc::GuestCall native::ReplayCall(lifted::Regs& ctx) {
+rc::GuestCall hooks::ReplayCall(lifted::Regs& ctx) {
   return [&ctx](uint32_t function, uint32_t sp, uint32_t return_address,
                       std::initializer_list<uint64_t> args, std::optional<double> f1) {
     const uint64_t stack = ctx.r1.u64;
@@ -92,7 +92,7 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx) {
     native::g_command_serial++;                                                     \
     if (ITC_FLAG(native_replay_commands)) {                                         \
       [[maybe_unused]] const uint32_t sp = ctx.r1.u32;                              \
-      [[maybe_unused]] const rc::GuestCall call = native::ReplayCall(ctx);    \
+      [[maybe_unused]] const rc::GuestCall call = hooks::ReplayCall(ctx);    \
       ctx.fpscr.disableFlushMode();                                                 \
       ctx.r3.u64 = (body);                                                          \
     } else {                                                                        \
@@ -149,14 +149,11 @@ ITC_NATIVE_ENTRY_ALWAYS(825BDDA0) {
   
   PendingInline draw = g_pending_inline;
   g_pending_inline.pending = false;
+  // The replay's inline draws (commands 15 and 19) are our renderer's
+  // (render::DrawUP); one made otherwise is logged, not drawn.
   if (draw.pending) {
-    uint32_t command = native::g_current_command;
-    if (command == 15 || command == 19) {
-      native::Renderer_InlineDraw(draw.type, draw.count, draw.stride, draw.data);
-    } else {
-      LogOutside("an inline vertex draw, not drawn, BeginVertices", 0x825BD8F0, draw.caller,
-                 command);
-    }
+    LogOutside("an inline vertex draw, not drawn, BeginVertices", 0x825BD8F0, draw.caller,
+               native::g_current_command);
   }
   if (ITC_FLAG(native_inline_draws)) {
     inline_draws::EndVertices(ctx.r3.u32);  // r3 left as the device, as the original
@@ -237,7 +234,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D998) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = graphics::video_output::ResolveFrontBuffer(video_output, ctx.r1.u32,
-                                                          native::ReplayCall(ctx));
+                                                          hooks::ReplayCall(ctx));
 }
 
 // The library's other draws and Resolve: logged when called outside the

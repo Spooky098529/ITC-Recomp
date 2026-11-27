@@ -13,7 +13,7 @@
 // looks only for fences and interrupts; the chains are never kicked,
 // docs/functions/predicated-tiling.md). The write position +40 is left
 // where it was, as the dropped writers leave it. The adapters are the wraps
-// in src/native/replay_hooks.cpp (--native_inline_draws).
+// in src/hooks/replay_commands.cpp (--native_inline_draws).
 #pragma once
 
 #include <cstdint>

@@ -27,7 +27,7 @@ void NativeSingleInlineVertices(lifted::Regs& ctx);
 void NativeSingleSetUpDrawer(lifted::Regs& ctx);
 void NativeSingleSetShaderConstants(lifted::Regs& ctx);
 // Command 15 marked as command 15 (native::g_current_command) around it, as
-// its wrap in src/native/replay_hooks.cpp does.
+// its wrap in src/hooks/replay_commands.cpp does.
 void NativeSingleDrawerDraw(lifted::Regs& ctx);
 void NativeSingleCallback(lifted::Regs& ctx);
 

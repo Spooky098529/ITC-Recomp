@@ -1121,12 +1121,6 @@ void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
   }
 }
 
-void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
-                         uint32_t data) {
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->InlineDraw(type, count, stride, data);
-  }
-}
 
 }  // namespace native
 
