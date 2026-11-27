@@ -87,7 +87,7 @@ uint32_t Swizzle(uint32_t word, uint32_t components) {
 }  // namespace
 
 Fetch FetchFromDeclaration(uint32_t usage_word, const uint32_t original[3], uint32_t declaration,
-                           uint32_t streams) {
+                           const uint8_t strides[16]) {
   // The original's first loop for one fetch. Its r8 carries a nibble from
   // an unwritten stack slot into the swizzle's component mask, of which
   // only bit 0 survives (| 14), and no swizzle mask (kSwizzleMasks) has bit
@@ -139,7 +139,7 @@ Fetch FetchFromDeclaration(uint32_t usage_word, const uint32_t original[3], uint
     r5 = guest::LoadU16(element + 2);
     r10 = r21 | r10;
     r10 = r10 << 4;
-    r21 = guest::LoadU8(stream + streams);
+    r21 = strides[stream & 15];
     r28 = r28 & 0xBFC0CFFF;
     r10 |= r28;
     const uint32_t product = (95u - stream) * 0x01560056u;
@@ -153,7 +153,7 @@ Fetch FetchFromDeclaration(uint32_t usage_word, const uint32_t original[3], uint
     r11 &= 0xC7FFFFFF;
   } else {
     // No element: stream 95, the first stream byte.
-    r5 = guest::LoadU8(streams);
+    r5 = strides[0];
     r9 = r8 & 0xF;
     r11 = Insert(r11, 95, 20, 0x3FF00000);
     r10 = r28 & 0xBFC6CFFF;

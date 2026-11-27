@@ -15,6 +15,7 @@ RenderStates g_states;
 Targets g_targets;
 // D3D's viewport as last set (before the clamp to a surface).
 Viewport g_set_viewport;
+Bindings g_bindings;
 // While tiling: the tiles' extent together.
 uint32_t g_tiling_width = 0, g_tiling_height = 0;
 
@@ -131,6 +132,41 @@ VkBlendOp BlendOp(uint32_t op) {
 
 const RenderStates& States() { return g_states; }
 const Targets& BoundTargets() { return g_targets; }
+const Bindings& BoundResources() { return g_bindings; }
+
+void SetVertexShader(uint32_t shader) { g_bindings.vertex_shader = shader; }
+void SetPixelShader(uint32_t shader) { g_bindings.pixel_shader = shader; }
+void SetVertexLayout(uint32_t declaration) { g_bindings.declaration = declaration; }
+void SetIndexBuffer(uint32_t buffer) { g_bindings.index_buffer = buffer; }
+
+void SetVertexBuffer(uint32_t stream, uint32_t buffer, uint32_t offset, uint32_t stride) {
+  if (stream >= 16) {
+    return;
+  }
+  if (buffer) {
+    const schema::DeviceVertexBuffer b(buffer);
+    const uint32_t address = b.data() + offset;
+    // The GPU's address of the CPU's (as the library's Physical).
+    g_bindings.stream_fetch[stream][0] =
+        ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF);
+    g_bindings.stream_fetch[stream][1] = b.data_size() - offset;
+  }
+  g_bindings.strides[stream] = uint8_t(stride >> 2);
+}
+
+void ShaderControls(uint32_t& program_control, uint32_t& context_misc) {
+  program_control = context_misc = 0;
+  if (uint32_t vs = g_bindings.vertex_shader) {
+    const uint32_t header = vs + 592 + guest::LoadU32(vs + 612);
+    program_control = guest::LoadU32(header);
+    context_misc = guest::LoadU32(header + 4);
+  }
+  if (uint32_t ps = g_bindings.pixel_shader) {
+    const uint32_t header = ps + 56 + guest::LoadU32(ps + 76);
+    program_control |= guest::LoadU32(header);
+    context_misc |= guest::LoadU32(header + 4);
+  }
+}
 
 void SetRenderTarget(uint32_t index, uint32_t surface) {
   if (index > 3) {

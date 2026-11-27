@@ -2,6 +2,8 @@
 // (docs/functions/single-commands.md): see single_commands.h.
 
 #include "render/state.h"
+
+#include <algorithm>
 #include "graphics/single_commands.h"
 
 #include "guest.h"
@@ -55,6 +57,9 @@ uint32_t SetUpDrawer(uint32_t slot, uint32_t sp, const GuestCall& call) {
   guest::StoreU32(state + 8, pixel_shader);
   const uint32_t set_shaders = guest::LoadU32(schema::PrimitiveDrawer(drawer).vtable() + 8);
   call(set_shaders, frame, 0x8258E9A4, {drawer, device, vertex_shader, pixel_shader});
+  // What the drawer's SetShaders binds (Command::SetUpDrawer's note).
+  render::SetVertexShader(guest::LoadU32(0x82970F2C + 8 + 12 * (vertex_shader ? 1 : 0)));
+  render::SetPixelShader(guest::LoadU32(0x82970F44 + 8 + 12 * std::min(pixel_shader, 4u)));
   return 0;
 }
 
@@ -153,6 +158,8 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     const uint32_t drawer = Globals::replay_drawer();
     const uint32_t state = Globals::replay_drawer_state();
     const uint32_t device = Globals::replay_device();
+    // The drawer's Draw sets its declaration, [[drawer +4]].
+    render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
     const uint32_t vtable = schema::PrimitiveDrawer(drawer).vtable();
     const uint32_t count = guest::LoadU32(state + 16);
     const uint32_t vertices = guest::LoadU32(state + 12);
@@ -165,6 +172,7 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     if (!device_state::SetStreamSource(device, 0, 0, 0, 0, 4096)) {
       call(0x822A3758, frame, 0x8258F65C, {device, 0, 0, 0, 0, 4096});
     }
+    render::SetVertexBuffer(0, 0, 0, 0);
   }
   {
     const uint32_t device = Globals::replay_device();

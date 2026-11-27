@@ -91,8 +91,9 @@ void DrawRegisters::Read(uint32_t device) {
 }
 
 uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets,
-                                            const uint32_t color_write[4]) const {
-  if (!draws_color()) {
+                                            const uint32_t color_write[4],
+                                            bool has_pixel_shader) const {
+  if (!has_pixel_shader) {
     return 0;
   }
   uint32_t mask = 0;

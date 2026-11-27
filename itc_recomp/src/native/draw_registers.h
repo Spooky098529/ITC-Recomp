@@ -94,8 +94,9 @@ struct DrawRegisters {
   // The color write mask (4 bits a target) for the targets the pixel shader
   // writes, from each target's write enables (the render states,
   // render/state.h), components the format lacks counted as written.
+  // Nothing without a pixel shader (depth only).
   uint32_t NormalizedColorMask(uint32_t pixel_shader_writes_targets,
-                               const uint32_t color_write[4]) const;
+                               const uint32_t color_write[4], bool has_pixel_shader) const;
 
   struct Viewport {
     uint32_t offset[2], extent[2];

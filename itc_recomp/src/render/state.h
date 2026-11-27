@@ -88,6 +88,33 @@ void BeginTiling(uint32_t width, uint32_t height);
 void EndTiling();
 const Targets& BoundTargets();
 
+// What a draw reads its shaders and vertices from: the game's shader,
+// declaration and buffer objects, and each stream's vertex fetch constant
+// (fetch constant 95 - stream: the data's GPU address with its type in the
+// low bits, then its size) and stride in words.
+struct Bindings {
+  uint32_t vertex_shader = 0, pixel_shader = 0, declaration = 0, index_buffer = 0;
+  uint32_t stream_fetch[16][2] = {};
+  uint8_t strides[16] = {};
+};
+
+// Commands 8, 9, 10 and the drawer's shaders (13, 14) and declaration (15,
+// 16): the bound shaders and vertex declaration.
+void SetVertexShader(uint32_t shader);
+void SetPixelShader(uint32_t shader);
+void SetVertexLayout(uint32_t declaration);
+// Command 11: a stream's vertex buffer (none keeps its fetch constant, as
+// the game's SetStreamSource does), offset and stride in bytes.
+void SetVertexBuffer(uint32_t stream, uint32_t buffer, uint32_t offset, uint32_t stride);
+// Command 12.
+void SetIndexBuffer(uint32_t buffer);
+const Bindings& BoundResources();
+// The shader program's controls from the bound shaders' program control
+// blocks (the vertex shader's +592 plus its +612, the pixel shader's +56
+// plus its +76; words 0 and 1), as the game's shader load combines them:
+// SQ_PROGRAM_CNTL and SQ_CONTEXT_MISC.
+void ShaderControls(uint32_t& program_control, uint32_t& context_misc);
+
 // The game's render state `state` (a byte offset: 40 ZEnable, 44 ZFunc, ...)
 // set to `value`, as the device's setter for it gives it meaning.
 void SetRenderState(uint32_t state, uint32_t value);

@@ -246,6 +246,7 @@ struct DrawCall {
   // Inline vertices: their count, and their offset in the vertex arena.
   bool inline_vertices = false;
   uint32_t vertex_count = 0, vertex_address = 0;
+  uint32_t inline_stride = 0;  // bytes
 };
 
 // Command 18's item: [primitive type, base vertex << 16 | start index,
@@ -893,9 +894,10 @@ struct Passes::State {
   // device's shadow at each draw, differences logged
   // (--native_renderer_check_render_states).
   bool check_render_states = false;
-  uint64_t render_state_mismatches[20] = {};
+  uint64_t render_state_mismatches[26] = {};
   void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
   void CheckTargets(uint32_t device);
+  void CheckBindings(uint32_t device, const TranslatedShader* vertex, bool inline_vertices);
   // The depth format can be sampled with linear filtering (the depth
   // resolves' readers' samplers may ask for it).
   bool depth_filterable = false;
@@ -3135,9 +3137,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                                               : primitive_count * primitive.a + primitive.b;
 
   // Shaders, read through physical memory as the GPU reads them.
-  uint32_t program_control = regs.program_control;
-  uint32_t vertex_object = guest::LoadU32(device + kDeviceVertexShader);
-  uint32_t pixel_object = guest::LoadU32(device + kDevicePixelShader);
+  const render::Bindings& bound = render::BoundResources();
+  uint32_t program_control, context_misc;
+  render::ShaderControls(program_control, context_misc);
+  uint32_t vertex_object = bound.vertex_shader;
+  uint32_t pixel_object = bound.pixel_shader;
   if (!vertex_object) {
     s.stats.failed++;
     s.stats.failed_by[1]++;
@@ -3146,24 +3150,27 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   uint32_t vertex_address = guest::LoadU32(vertex_object + 48);
   const uint8_t* vertex_ucode = PhysicalHostAddress(GpuPhysicalAddress(vertex_address));
   uint32_t vertex_size = guest::LoadU32(vertex_object + 600);
-  uint32_t declaration = guest::LoadU32(device + kDeviceVertexDeclaration);
+  uint32_t declaration = bound.declaration;
   uint32_t declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
   // The fetches take their fields from the declaration and the stream
   // strides (the library's patch of the microcode no longer runs), unless
   // the shader is one the library doesn't patch (its +592 bit 6).
   bool fields_from_declaration =
       declaration && !(guest::LoadU32(vertex_object + 592) & 0x40);
-  uint32_t strides[4];
-  for (uint32_t i = 0; i < 4; i++) {
-    strides[i] = fields_from_declaration
-                     ? guest::LoadU32(device + kDeviceStreamStrides + 4 * i)
-                     : 0;
+  // Each stream's stride in words; an inline draw's stream 0 its own.
+  uint8_t stream_strides[16];
+  std::memcpy(stream_strides, bound.strides, sizeof(stream_strides));
+  if (call.inline_vertices) {
+    stream_strides[0] = uint8_t(call.inline_stride >> 2);
+  }
+  uint32_t strides[4] = {};
+  if (fields_from_declaration) {
+    std::memcpy(strides, stream_strides, sizeof(strides));
   }
   uint32_t pixel_address = pixel_object ? guest::LoadU32(pixel_object + 24) : 0;
   const uint8_t* pixel_ucode =
       pixel_object ? PhysicalHostAddress(GpuPhysicalAddress(pixel_address)) : nullptr;
   uint32_t pixel_size = pixel_object ? guest::LoadU32(pixel_object + 64) : 0;
-  uint32_t context_misc = regs.context_misc;
   // The lookup in full: each microcode hashed once (the cache's lookups take
   // the hash), which interpolators connect them (an unconnected one the
   // pixel shader reads would be undefined), and the translations.
@@ -3188,7 +3195,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
         }
         if (fields_from_declaration) {
           graphics::shader_patch::Fetch fetch = graphics::shader_patch::FetchFromDeclaration(
-              records[j], original, declaration, device + kDeviceStreamStrides);
+              records[j], original, declaration, stream_strides);
           made[j] = {fetch.words[0], fetch.words[1], fetch.words[2]};
         } else {
           made[j] = {original[0], original[1], original[2]};
@@ -3358,7 +3365,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   bool index_32bit = false;
   uint32_t index_endian = 0, index_address = 0;
   if (!call.inline_vertices) {
-    uint32_t index_buffer = guest::LoadU32(device + kDeviceIndexBuffer);
+    uint32_t index_buffer = bound.index_buffer;
     if (!index_buffer) {
       s.stats.failed++;
       s.stats.failed_by[3]++;
@@ -3377,7 +3384,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   const render::RenderStates& states = render::States();
   // No depth drawn (RB_MODECONTROL), or a test that always passes and
   // doesn't write: off.
-  if (regs.draws_depth()) {
+  {  // Depth is drawn with a pixel shader or without (depth only).
     z_enable = states.z_enable;
     z_write = states.z_write;
     z_func = uint32_t(states.z_func);
@@ -3514,6 +3521,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   uint32_t arena_fetch[kFetchConstantsRange / 4];
   std::memcpy(arena_fetch, regs.fetch,
               kFetchConstantsRange);
+  if (!call.inline_vertices) {
+    // The streams' vertex fetch constants as bound (95 - stream).
+    for (uint32_t stream = 0; stream < 16; stream++) {
+      arena_fetch[2 * (95 - stream)] = bound.stream_fetch[stream][0];
+      arena_fetch[2 * (95 - stream) + 1] = bound.stream_fetch[stream][1];
+    }
+  }
   uint32_t index_offset = 0;
   if (!call.inline_vertices) {
     for (uint32_t k = 0; k < 96; k++) {
@@ -3659,7 +3673,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // the rainbow effect on buildings, from ~230 main view draws a frame
   // without a pixel shader.)
   key.write_mask =
-      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write) &
+      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write,
+                               pixel_object != 0) &
       0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
@@ -3668,6 +3683,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (s.check_render_states) {
     s.CheckRenderStates(color != nullptr, depth != nullptr, device);
     s.CheckTargets(device);
+    s.CheckBindings(device, vertex, call.inline_vertices);
   }
   VkPipeline pipeline = s.GetPipeline(key);
   if (s.watch_draws && main_view_draw &&
@@ -4085,6 +4101,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   call.inline_vertices = true;
   call.vertex_count = count;
   call.vertex_address = offset;
+  call.inline_stride = stride;
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
@@ -4715,20 +4732,78 @@ void Passes::State::CheckTargets(uint32_t device) {
         std::format("clip control {:08X}", regs.clip_control));
 }
 
+void Passes::State::CheckBindings(uint32_t device, const TranslatedShader* vertex,
+                                  bool inline_vertices) {
+  const render::Bindings& b = render::BoundResources();
+  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
+    if (same) {
+      return;
+    }
+    if (render_state_mismatches[field]++ < 3) {
+      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
+                   "{})",
+                   name, detail, g_current_command);
+    }
+  };
+  uint32_t shadow[4] = {guest::LoadU32(device + kDeviceVertexShader),
+                        guest::LoadU32(device + kDevicePixelShader),
+                        guest::LoadU32(device + kDeviceVertexDeclaration),
+                        guest::LoadU32(device + kDeviceIndexBuffer)};
+  uint32_t ours[4] = {b.vertex_shader, b.pixel_shader, b.declaration, b.index_buffer};
+  check(19, "bound objects", !std::memcmp(shadow, ours, sizeof(ours)) || inline_vertices,
+        std::format("ours {:08X} {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X} {:08X}",
+                    ours[0], ours[1], ours[2], ours[3], shadow[0], shadow[1], shadow[2],
+                    shadow[3]));
+  if (inline_vertices) {
+    check(19, "bound shaders",
+          shadow[0] == ours[0] && shadow[1] == ours[1] && shadow[2] == ours[2],
+          std::format("ours {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X}", ours[0], ours[1],
+                      ours[2], shadow[0], shadow[1], shadow[2]));
+  } else {
+    for (uint32_t k = 80; vertex && k < 96; k++) {
+      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+        continue;
+      }
+      const uint32_t* words = b.stream_fetch[95 - k];
+      check(20, "stream fetch", words[0] == regs.fetch[2 * k] && words[1] == regs.fetch[2 * k + 1],
+            std::format("constant {} ours {:08X} {:08X} shadow {:08X} {:08X}", k, words[0],
+                        words[1], regs.fetch[2 * k], regs.fetch[2 * k + 1]));
+    }
+    // The streams the shader fetches from (fetch constant 95 - stream).
+    for (uint32_t k = 80; vertex && k < 96; k++) {
+      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+        continue;
+      }
+      uint8_t stride = guest::LoadU8(device + kDeviceStreamStrides + (95 - k));
+      check(21, "strides", stride == b.strides[95 - k],
+            std::format("stream {} ours {} shadow {}", 95 - k, b.strides[95 - k], stride));
+    }
+  }
+  uint32_t program_control, context_misc;
+  render::ShaderControls(program_control, context_misc);
+  check(22, "shader controls",
+        program_control == regs.program_control && context_misc == regs.context_misc,
+        std::format("ours {:08X} {:08X} shadow {:08X} {:08X}", program_control, context_misc,
+                    regs.program_control, regs.context_misc));
+  check(23, "color drawn", (b.pixel_shader != 0) == regs.draws_color() && regs.draws_depth(),
+        std::format("pixel shader {:08X} mode {}", b.pixel_shader, regs.edram_mode & 7));
+}
+
 void Passes::set_check_render_states(bool check) {
   state_->check_render_states = check;
 }
 
 std::string Passes::TakeRenderStateChecks() {
   State& s = *state_;
-  static const char* const kNames[19] = {
+  static const char* const kNames[24] = {
       "z_enable",      "z_write",         "z_func",       "cull",
       "blend",         "color_write",     "blend_constants", "alpha_test",
       "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
       "scissor_enable", "scissor_rect", "targets", "viewport", "color_exp_bias",
-      "depth_float24", "clip_space"};
+      "depth_float24", "clip_space", "bound objects", "stream fetch", "strides",
+      "shader controls", "color drawn"};
   std::string text;
-  for (int i = 0; i < 19; i++) {
+  for (int i = 0; i < 24; i++) {
     text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
   }
   return text;

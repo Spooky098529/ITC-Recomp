@@ -549,9 +549,23 @@ and resolve on one 256x144 target in turn, then the main view draws on
   biases, depth formats, the clip space: no difference in an attract race
   or the pad replay, once the tiling's size was taken), then frames right.
 
-Left for step 3: the rest of the interface (shaders, textures and vertex
-buffers by handle, constants, clears and draws), then the game's setters
-out of the handlers, which ends the shadow on the render path.
+- **The seam, third part: shaders and vertex input (2026-11-27).**
+  `render::SetVertexShader`, `SetPixelShader`, `SetVertexLayout`,
+  `SetVertexBuffer` and `SetIndexBuffer`, from commands 8 to 12 and the
+  drawer's (13 to 16, the single 15: its shaders from the tables at
+  `0x82970F2C` and `0x82970F44`, its declaration `[[drawer +4]]`). The
+  draw takes the shaders, declaration and index buffer from there, each
+  stream's fetch constant and stride (an inline draw's own for stream 0),
+  the program controls (SQ_PROGRAM_CNTL, SQ_CONTEXT_MISC) from the bound
+  shaders' headers as the shader load combines them, and draws color only
+  with a pixel shader. Checked against the shadow first (no difference in
+  an attract race or the pad replay; only the strides of streams the
+  shader reads compared: the loaded copy lags for unused ones), then
+  frames right.
+
+Left for step 3: the rest of the interface (textures, constants, clears
+and draws), then the game's setters out of the handlers, which ends the
+shadow on the render path.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 
@@ -626,6 +640,12 @@ the tuning shop, both races with their HUD, the pause menu, the return to
 the garage: frames right, 0 error lines). **The physical block's resident
 pages: ~205 -> ~33 MB in the menus, ~250 -> ~64 MB in a race; the process's
 resident set ~510-645 -> ~400-490 MB.**
+
+- **An XPR's given-back data written over (2026-11-27).** Twice in the pad
+  replay, leaving the tuning screen, memcpy wrote over an XPR's data whose
+  pages were given back without the XPR's release having been seen (the
+  memory reused). Its textures were then stale; now such an XPR is taken
+  as released (its kept textures retired), logged once a run at info.
 
 Left for 2b: the model vertices and indices (~10-40 MB) by handle, which
 waits on step 3 (draws find their streams by address until then).

@@ -27,9 +27,9 @@ struct Fetch {
 // usage and usage index); original: the file's instruction (the object's
 // +192 + 12n), as host words; declaration: the vertex declaration (+24 its
 // element count, +52 its 12-byte elements: +0 the stream, +2 the offset,
-// +4 the type, +9 the usage, +10 the usage index); streams: the device's
-// stride bytes, one a stream (device +12272), in words.
+// +4 the type, +9 the usage, +10 the usage index); strides: each stream's
+// stride in words.
 Fetch FetchFromDeclaration(uint32_t usage_word, const uint32_t original[3], uint32_t declaration,
-                           uint32_t streams);
+                           const uint8_t strides[16]);
 
 }  // namespace graphics::shader_patch

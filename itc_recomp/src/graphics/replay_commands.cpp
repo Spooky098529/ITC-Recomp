@@ -180,6 +180,7 @@ uint32_t SetVertexShaders(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     call(0x822A8958, frame, 0x8258FF80, {Device(), guest::LoadU32(item)},
          std::nullopt);
+    render::SetVertexShader(guest::LoadU32(item));
   }
   return count;
 }
@@ -191,6 +192,7 @@ uint32_t SetPixelShaders(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     call(0x822A8618, frame, 0x8258FFD0, {Device(), guest::LoadU32(item)},
          std::nullopt);
+    render::SetPixelShader(guest::LoadU32(item));
   }
   return count;
 }
@@ -202,6 +204,7 @@ uint32_t SetVertexDeclarations(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     call(0x822A8960, frame, 0x82590020, {Device(), guest::LoadU32(item)},
          std::nullopt);
+    render::SetVertexLayout(guest::LoadU32(item));
   }
   return count;
 }
@@ -223,6 +226,7 @@ uint32_t SetStreamSources(uint32_t items, uint32_t count, uint32_t sp,
       call(0x822A3758, frame, 0x8259009C, {device, stream, buffer, offset, stride, dirty},
            std::nullopt);
     }
+    render::SetVertexBuffer(stream, buffer, offset, stride);
   }
   return count;
 }
@@ -237,6 +241,7 @@ uint32_t SetIndices(uint32_t items, uint32_t count, uint32_t sp,
     if (!ds::SetIndices(device, buffer)) {
       call(0x822A3908, frame, 0x825900E8, {device, buffer}, std::nullopt);
     }
+    render::SetIndexBuffer(buffer);
   }
   return count;
 }
@@ -255,6 +260,11 @@ uint32_t SetUpDrawer(uint32_t items, uint32_t count, uint32_t sp,
     guest::StoreU32(state + 4, vertex_shader);
     guest::StoreU32(state + 8, pixel_shader);
     guest::StoreU32(state + 0, type);
+    // The drawer's SetShaders (sub_825A16B0): its shaders from two tables
+    // of 12-byte entries (the shader at +8), the vertex shader's by item +4
+    // (0 or 1), the pixel shader's by item +8 (0 to 4).
+    render::SetVertexShader(guest::LoadU32(0x82970F2C + 8 + 12 * (vertex_shader ? 1 : 0)));
+    render::SetPixelShader(guest::LoadU32(0x82970F44 + 8 + 12 * std::min(pixel_shader, 4u)));
     const uint32_t set_shaders = guest::LoadU32(guest::LoadU32(drawer) + 8);
     call(set_shaders, frame, 0x8258EAB4, {drawer, device, vertex_shader, pixel_shader},
          std::nullopt);
@@ -278,6 +288,8 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
+      // The drawer's draws set its declaration, [[drawer +4]].
+      render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t device = Device();
       const uint32_t draw = guest::LoadU32(guest::LoadU32(drawer) + 12);
@@ -308,6 +320,8 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
+      // The drawer's draws set its declaration, [[drawer +4]].
+      render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t device = Device();
       const uint32_t draw = guest::LoadU32(guest::LoadU32(drawer) + 16);
