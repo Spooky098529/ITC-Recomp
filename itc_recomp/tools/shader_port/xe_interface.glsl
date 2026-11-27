@@ -13,25 +13,26 @@
 // NoContraction, so a multiply and an add stay two roundings, never a fused
 // multiply-add.
 
-#extension GL_EXT_scalar_block_layout : require
-
 // --- buffers -------------------------------------------------------------------
 // What the draw gives its shaders besides the game's constants (the
-// renderer's DrawConstants, draw_constants.h, at these offsets).
-layout(set = 1, binding = 0, scalar) uniform XeDrawConstants {
-  layout(offset = 0) uint flags;
-  layout(offset = 4) float alpha_test_reference;
-  // The position to Vulkan's clip space: xyz * scale + offset * w.
-  layout(offset = 8) vec3 ndc_scale;
-  layout(offset = 20) vec3 ndc_offset;
-  // Each color target's exponent bias, as a factor.
-  layout(offset = 32) vec4 color_exp_bias;
-  // Each texture stage's reader scale: 0 nothing; above 0 times it and
-  // clamped to 0-1; below 0 times its negation (a pass's image handed to
-  // its texture: what the resolve's exponent bias and a normalized format
-  // did, docs/pc-renderer.md, step 4).
-  layout(offset = 48) float texture_scale[32];
-} xe_sys;
+// renderer's DrawConstants, draw_constants.h), read from vec4s at its byte
+// offsets: std140 vec4s, unlike a block of named members with these offsets,
+// can be written as HLSL (docs/d3d11-backend.md, step 4).
+layout(set = 1, binding = 0, std140) uniform XeDrawConstants { vec4 xe_draw[11]; };
+// 0: the flags (the bits below).
+uint xe_draw_flags() { return floatBitsToUint(xe_draw[0].x); }
+// 4: the alpha test's reference.
+float xe_draw_alpha_test_reference() { return xe_draw[0].y; }
+// 8 and 20: the position to Vulkan's clip space: xyz * scale + offset * w.
+vec3 xe_draw_ndc_scale() { return vec3(xe_draw[0].zw, xe_draw[1].x); }
+vec3 xe_draw_ndc_offset() { return xe_draw[1].yzw; }
+// 32: each color target's exponent bias, as a factor.
+float xe_draw_color_exp_bias(int target) { return xe_draw[2][target]; }
+// 48: each texture stage's reader scale: 0 nothing; above 0 times it and
+// clamped to 0-1; below 0 times its negation (a pass's image handed to its
+// texture: what the resolve's exponent bias and a normalized format did,
+// docs/pc-renderer.md, step 4).
+float xe_draw_texture_scale(uint stage) { return xe_draw[3u + (stage >> 2u)][stage & 3u]; }
 
 // The flags' bits.
 const uint kXeFlagPrimitivePolygonal = 1u << 0;
@@ -139,7 +140,7 @@ float xe_muls_prev2(float a, float b, float ps) {
 // views' swizzle; docs/pc-renderer.md, step 2). What the draw says of it
 // besides: its reader scale.
 vec4 xe_texture_result(vec4 texel, uint stage) {
-  float reader_scale = xe_sys.texture_scale[stage & 31u];
+  float reader_scale = xe_draw_texture_scale(stage & 31u);
   if (reader_scale > 0.0) {
     texel = clamp(texel * reader_scale, 0.0, 1.0);
   } else if (reader_scale < 0.0) {
@@ -379,7 +380,7 @@ vec4 xe_vfetch_words(uvec4 words, uint fetch_constant, uint format, uint flags, 
 // The position as the shader wrote it (the game's shaders write W as it is,
 // X, Y and Z not divided by it), to Vulkan's clip space.
 vec4 xe_host_position(vec4 guest) {
-  precise vec3 xyz = guest.xyz * xe_sys.ndc_scale + xe_sys.ndc_offset * guest.w;
+  precise vec3 xyz = guest.xyz * xe_draw_ndc_scale() + xe_draw_ndc_offset() * guest.w;
   return vec4(xyz, guest.w);
 }
 #endif
@@ -390,17 +391,17 @@ vec4 xe_host_position(vec4 guest) {
 // whether it's a line in z's), when the renderer asks for it in register n.
 vec4 xe_param_gen() {
   float x = abs(floor(gl_FragCoord.x));
-  if ((xe_sys.flags & kXeFlagPrimitivePolygonal) != 0u && !gl_FrontFacing) {
+  if ((xe_draw_flags() & kXeFlagPrimitivePolygonal) != 0u && !gl_FrontFacing) {
     x = uintBitsToFloat(floatBitsToUint(x) ^ 0x80000000u);
   }
-  float z = (xe_sys.flags & kXeFlagPrimitiveLine) != 0u ? uintBitsToFloat(0x80000000u) : 0.0;
+  float z = (xe_draw_flags() & kXeFlagPrimitiveLine) != 0u ? uintBitsToFloat(0x80000000u) : 0.0;
   return vec4(x, abs(floor(gl_FragCoord.y)), z, 0.0);
 }
 
 // The alpha test, on the first color target's alpha.
 bool xe_alpha_test_passes(float alpha) {
-  uint function = (xe_sys.flags >> kXeFlagAlphaTestShift) & 7u;
-  float reference = xe_sys.alpha_test_reference;
+  uint function = (xe_draw_flags() >> kXeFlagAlphaTestShift) & 7u;
+  float reference = xe_draw_alpha_test_reference();
   if (function == 7u) return true;
   if (function == 5u) return !(alpha == reference);
   return (alpha < reference && (function & 1u) != 0u) ||
@@ -410,7 +411,7 @@ bool xe_alpha_test_passes(float alpha) {
 // A color as the shader wrote it, to what the render target takes: the
 // target's exponent bias.
 vec4 xe_color_output(vec4 color, int target) {
-  precise vec4 c = color * xe_sys.color_exp_bias[target];
+  precise vec4 c = color * xe_draw_color_exp_bias(target);
   return c;
 }
 #endif
