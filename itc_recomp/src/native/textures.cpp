@@ -529,6 +529,24 @@ struct TextureCache::State {
   uint64_t xpr_dropped_bytes = 0;
   uint32_t logged_dropped_misses = 0;
   uint32_t logged_dropped_writes = 0;
+  uint64_t released_by_writes = 0;
+  // An XPR released (or its memory written over): its textures leave (their
+  // data is gone or about to be).
+  void ReleaseXpr(std::map<uint32_t, Xpr>::iterator it) {
+    for (const auto& fetch : it->second.fetches) {
+      auto t = textures.find(KeyOf(fetch.data()));
+      if (t == textures.end() || !t->second.kept) {
+        continue;
+      }
+      t->second.kept = false;
+      t->second.changed = true;  // so RetireOverwritten takes it for what replaces it
+      RetireOverwritten(t->second);
+    }
+    if (it->second.dropped) {
+      xpr_dropped_bytes -= it->second.size;
+    }
+    xprs.erase(it);
+  }
   bool InDroppedXpr(uint32_t start, uint32_t end) const {
     auto it = xprs.upper_bound(start);
     if (it == xprs.begin()) {
@@ -1124,20 +1142,7 @@ void TextureCache::ProcessXprs() {
     if (it == s.xprs.end()) {
       continue;
     }
-    // Released: its textures leave (their data is gone or about to be).
-    for (const auto& fetch : it->second.fetches) {
-      auto t = s.textures.find(KeyOf(fetch.data()));
-      if (t == s.textures.end() || !t->second.kept) {
-        continue;
-      }
-      t->second.kept = false;
-      t->second.changed = true;  // so RetireOverwritten takes it for what replaces it
-      s.RetireOverwritten(t->second);
-    }
-    if (it->second.dropped) {
-      s.xpr_dropped_bytes -= it->second.size;
-    }
-    s.xprs.erase(it);
+    s.ReleaseXpr(it);
     generation_++;
   }
   // Each XPR not yet given back: its textures uploaded (as a draw would;
@@ -1424,12 +1429,20 @@ void TextureCache::State::MarkWritten() {
   ScopedCost cost(g_frame_costs.mark_ns);
   stats.writes += new_writes.size();
   for (const auto& [start, end] : new_writes) {
-    // Not expected (none in an attract race or the pad replay): a texture
-    // reloaded from there would read zeros around the write.
-    if (logged_dropped_writes < 20 && InDroppedXpr(start, end)) {
-      logged_dropped_writes++;
-      ITC_LOG_ERROR("native renderer: memcpy wrote {:08X}-{:08X}, in an XPR's data whose pages "
-                    "were given back (--give_back_xpr_data)", start, end);
+    // An XPR's data given back and written over: its memory was reused
+    // without its release seen (seen leaving the tuning screen), so it's
+    // taken as released, its textures retired.
+    while (InDroppedXpr(start, end)) {
+      auto it = std::prev(xprs.upper_bound(start));
+      if (logged_dropped_writes < 20) {
+        logged_dropped_writes++;
+        ITC_LOG_INFO("native renderer: memcpy wrote {:08X}-{:08X} over the XPR data at {:08X} "
+                     "({} bytes) given back: taken as released",
+                     start, end, it->first, it->second.size);
+      }
+      ReleaseXpr(it);
+      released_by_writes++;
+      stats.marked++;  // the bindings' answers may hold its textures' views
     }
     auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
     for (; it != by_address.end() && it->first < end; ++it) {
