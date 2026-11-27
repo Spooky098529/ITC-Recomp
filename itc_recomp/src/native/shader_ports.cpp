@@ -5,11 +5,16 @@
 #include "shader_ports.h"
 
 #include <algorithm>
+#include <bit>
+#include <string>
 #include <cstring>
 #include <unordered_map>
 
 #include "game_shader_ports.h"
 #include "port_spirv.h"
+#if defined(_WIN32)
+#include "generated_game_shaders_hlsl.h"  // the D3D11 backend's (Windows only)
+#endif
 
 namespace native {
 
@@ -225,6 +230,30 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   shader.spirv = SpecializePort(port.spirv, port.spirv_words, specialization);
   if (shader.spirv.empty()) {
     return false;
+  }
+  // The same fit for the HLSL (docs/d3d11-backend.md, step 4): each
+  // constant's value (as an unsigned literal: an int constant takes its
+  // bits, a bool constant is true when not 0), and each interpolator's
+  // semantic at the place SpecializePort gives its location.
+  shader.hlsl = nullptr;
+#if defined(_WIN32)
+  for (const GamePortHlsl& h : kGamePortsHlsl) {
+    if (h.spirv == port.spirv) {
+      shader.hlsl = h.hlsl;
+      break;
+    }
+  }
+#endif
+  shader.hlsl_defines.clear();
+  for (const auto& [id, value] : constants) {
+    shader.hlsl_defines.emplace_back("SPIRV_CROSS_CONSTANT_ID_" + std::to_string(id),
+                                     std::to_string(value) + "u");
+  }
+  const uint32_t mask = specialization.interpolator_mask;
+  for (uint32_t n = 0; n < 16; n++) {
+    uint32_t place = (mask >> n) & 1 ? uint32_t(std::popcount(mask & ((1u << n) - 1))) : 16 + n;
+    shader.hlsl_defines.emplace_back("XE_INTERPOLATOR_" + std::to_string(n),
+                                     "TEXCOORD" + std::to_string(place));
   }
   shader.textures.clear();
   for (uint32_t i = 0; i < port.texture_count; i++) {

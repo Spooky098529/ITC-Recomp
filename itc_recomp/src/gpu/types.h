@@ -7,6 +7,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace gpu {
@@ -222,6 +224,11 @@ struct ShaderDesc {
   ShaderStage stage = ShaderStage::kVertex;
   const uint32_t* spirv = nullptr;
   size_t spirv_words = 0;
+  // The same shader as HLSL (Shader Model 5, generated_*_hlsl.h) and the
+  // defines that fit it as the SPIR-V was fitted (docs/d3d11-backend.md,
+  // step 4): for the D3D11 backend, null elsewhere.
+  const char* hlsl = nullptr;
+  std::vector<std::pair<std::string, std::string>> defines;
   std::vector<ImageType> textures;
   uint32_t samplers = 0;
   // A vertex shader's vertex input.

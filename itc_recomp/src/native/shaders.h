@@ -38,6 +38,10 @@ struct TranslatedShader {
   // glsl/game/shaders.json's lookup_hash).
   uint64_t port_hash = 0;
   std::vector<uint32_t> spirv;
+  // Its HLSL and the defines fitting it as `spirv` was fitted (the D3D11
+  // backend's; the HLSL is only linked in on Windows, else null).
+  const char* hlsl = nullptr;
+  std::vector<std::pair<std::string, std::string>> hlsl_defines;
   // The float constants the shader reads, one bit per register (c0-c255;
   // its literal constants left out, which it holds itself).
   std::array<uint64_t, 4> float_constants{};

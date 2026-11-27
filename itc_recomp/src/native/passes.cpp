@@ -1300,6 +1300,8 @@ gpu::Shader* Passes::State::GetShader(const TranslatedShader* shader) {
                                                        : gpu::ShaderStage::kPixel;
     desc.spirv = shader->spirv.data();
     desc.spirv_words = shader->spirv.size();
+    desc.hlsl = shader->hlsl;
+    desc.defines = shader->hlsl_defines;
     for (const ShaderTexture& texture : shader->textures) {
       desc.textures.push_back(texture.view_type);
     }
