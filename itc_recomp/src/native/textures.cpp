@@ -422,8 +422,8 @@ TextureKey KeyOf(const uint32_t fetch[6]) {
           fetch[5] & 0xFFFFFE00u};
 }
 
-// GetView's and GetSampler's answers by what they're asked: the fetch
-// constant's 6 words and the view type, or the packed filter overrides.
+// GetView's answers by what it's asked: the fetch constant's 6 words and
+// the view type.
 // An entry holds while its generation is current; nearly every call
 // repeats an earlier one ("Texture binding" in docs/native-renderer.md).
 //
@@ -636,7 +636,7 @@ struct TextureCache::State {
     return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
   }
   std::unordered_map<uint64_t, VkSampler> samplers;
-  BindingTable view_answers, sampler_answers;
+  BindingTable view_answers;
   // Each fetch constant's last answer from them (a copy of the entry, so
   // with its generation: an answer not kept never matches).
   static std::array<BindingTable::Entry, 32> Unfilled() {
@@ -646,7 +646,7 @@ struct TextureCache::State {
     }
     return entries;
   }
-  std::array<BindingTable::Entry, 32> last_views = Unfilled(), last_samplers = Unfilled();
+  std::array<BindingTable::Entry, 32> last_views = Unfilled();
   Stats stats;
 
   // --native_renderer_log_texture_writes: who wrote textures' memory.
@@ -1926,104 +1926,67 @@ bool TextureCache::DecodeGuest(const uint32_t fetch_words[6],
   return true;
 }
 
-VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
-                                   const SamplerOverrides& overrides) {
-  if (!cache_bindings_) {
-    unkept_answers_++;
-    return LookUpSampler(fetch_words, overrides);
+namespace {
+
+// A sampler as the stage's state describes it, for a texture of these
+// levels (a cube map clamps to the edge), with the device's limits.
+VkSamplerCreateInfo InfoFromState(const render::SamplerState& state, bool cube,
+                                  uint32_t min_level, uint32_t max_level, bool base_level_only,
+                                  const DeviceContext& context) {
+  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  bool anisotropic = state.max_anisotropy >= 1.0f && context.sampler_anisotropy;
+  info.magFilter = anisotropic ? VK_FILTER_LINEAR : state.mag_filter;
+  info.minFilter = anisotropic ? VK_FILTER_LINEAR : state.min_filter;
+  info.mipmapMode = state.mip_mode;
+  for (uint32_t i = 0; i < 3; i++) {
+    VkSamplerAddressMode mode = cube ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : state.address[i];
+    if (mode == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE && !context.sampler_mirror_clamp_to_edge) {
+      mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    }
+    (i == 0 ? info.addressModeU : i == 1 ? info.addressModeV : info.addressModeW) = mode;
   }
-  State& s = *state_;
-  BindingTable::Key key(fetch_words, (overrides.mag_filter & 0xFF) |
-                                         (overrides.min_filter & 0xFF) << 8 |
-                                         (overrides.mip_filter & 0xFF) << 16 |
-                                         (overrides.aniso_filter & 0xFF) << 24);
-  BindingTable::Entry& last = s.last_samplers[overrides.fetch_constant & 31];
-  if (last.generation == sampler_generation_ && last.key == key) {
-    return FromBits<VkSampler>(last.value);
+  if (anisotropic) {
+    info.anisotropyEnable = VK_TRUE;
+    info.maxAnisotropy = std::min(state.max_anisotropy, context.max_sampler_anisotropy);
   }
-  BindingTable::Entry& e = s.sampler_answers.Find(key);
-  if (e.generation != sampler_generation_) {
-    VkSampler sampler = LookUpSampler(fetch_words, overrides);
-    e.value = HandleBits(sampler);
-    e.generation = sampler ? sampler_generation_ : UINT64_MAX;
-    unkept_answers_ += !sampler;
-  }
-  last = e;
-  return FromBits<VkSampler>(e.value);
+  info.mipLodBias = state.mip_lod_bias;
+  info.minLod = float(min_level);
+  info.maxLod = float(state.base_level_only || base_level_only ? min_level : max_level);
+  info.borderColor = state.border;
+  return info;
 }
 
-VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
-                                      const SamplerOverrides& overrides) {
+}  // namespace
+
+VkSampler TextureCache::GetSampler(const render::SamplerState& state,
+                                   const uint32_t fetch_words[6]) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
-  auto pick = [](uint32_t override_value, uint32_t from_fetch, uint32_t use_fetch) {
-    return override_value == use_fetch ? from_fetch : override_value;
-  };
-  uint32_t mag = pick(overrides.mag_filter, uint32_t(fetch.mag_filter), 3);
-  uint32_t min = pick(overrides.min_filter, uint32_t(fetch.min_filter), 3);
-  uint32_t mip = pick(overrides.mip_filter, uint32_t(fetch.mip_filter), 3);
-  uint32_t aniso = pick(overrides.aniso_filter, uint32_t(fetch.aniso_filter), 7);
-  if (!s.context.sampler_anisotropy) {
-    aniso = 0;
-  }
   Layout layout;
   uint32_t min_level = 0, max_level = 0;
   if (GetLayout(fetch, layout)) {
     min_level = layout.min_level;
     max_level = layout.max_level;
   }
-  if (mip == uint32_t(xenos::TextureFilter::kBaseMap) || base_level_only_) {
-    max_level = min_level;
-  }
-  uint32_t clamp[3] = {uint32_t(fetch.clamp_x), uint32_t(fetch.clamp_y), uint32_t(fetch.clamp_z)};
-  if (fetch.dimension == xenos::DataDimension::kCube) {
-    clamp[0] = clamp[1] = clamp[2] = uint32_t(xenos::ClampMode::kClampToEdge);
-  }
-  uint32_t border = uint32_t(fetch.border_color);
-  uint64_t key = uint64_t(mag & 1) | uint64_t(min & 1) << 1 | uint64_t(mip & 3) << 2 |
-                 uint64_t(aniso & 7) << 4 | uint64_t(clamp[0]) << 7 | uint64_t(clamp[1]) << 10 |
-                 uint64_t(clamp[2]) << 13 | uint64_t(border) << 16 | uint64_t(min_level) << 18 |
-                 uint64_t(max_level) << 22 | uint64_t(base_level_only_) << 30;
+  return SamplerFor(InfoFromState(state, fetch.dimension == xenos::DataDimension::kCube,
+                                  min_level, max_level, base_level_only_, s.context));
+}
+
+VkSampler TextureCache::SamplerFor(const VkSamplerCreateInfo& info) {
+  State& s = *state_;
+  // Keyed by the fields made from the state.
+  uint64_t key = uint64_t(info.magFilter) | uint64_t(info.minFilter) << 1 |
+                 uint64_t(info.mipmapMode) << 2 | uint64_t(info.addressModeU) << 3 |
+                 uint64_t(info.addressModeV) << 6 | uint64_t(info.addressModeW) << 9 |
+                 uint64_t(info.borderColor) << 12 | uint64_t(info.anisotropyEnable) << 15 |
+                 uint64_t(std::bit_cast<uint32_t>(info.maxAnisotropy) >> 23 & 0xFF) << 16 |
+                 uint64_t(uint32_t(info.minLod) & 0xF) << 24 |
+                 uint64_t(uint32_t(info.maxLod) & 0xF) << 28 |
+                 uint64_t(std::bit_cast<uint32_t>(info.mipLodBias)) << 32;
   VkSampler& sampler = s.samplers[key];
   if (sampler) {
     return sampler;
   }
-  auto address_mode = [&](uint32_t mode) {
-    switch (xenos::ClampMode(mode)) {
-      case xenos::ClampMode::kRepeat:
-        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      case xenos::ClampMode::kMirroredRepeat:
-        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-      case xenos::ClampMode::kClampToBorder:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-      case xenos::ClampMode::kMirrorClampToEdge:
-      case xenos::ClampMode::kMirrorClampToHalfway:
-      case xenos::ClampMode::kMirrorClampToBorder:
-        return s.context.sampler_mirror_clamp_to_edge
-                   ? VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE
-                   : VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-      default:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    }
-  };
-  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  bool anisotropic = aniso >= uint32_t(xenos::AnisoFilter::kMax_2_1);
-  info.magFilter = mag == 1 || anisotropic ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  info.minFilter = min == 1 || anisotropic ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  info.mipmapMode = mip == 1 ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
-  info.addressModeU = address_mode(clamp[0]);
-  info.addressModeV = address_mode(clamp[1]);
-  info.addressModeW = address_mode(clamp[2]);
-  if (anisotropic) {
-    info.anisotropyEnable = VK_TRUE;
-    info.maxAnisotropy =
-        std::min(float(1u << (aniso - 1)), s.context.max_sampler_anisotropy);
-  }
-  info.minLod = float(min_level);
-  info.maxLod = float(max_level);
-  info.borderColor = border == 1   ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
-                     : border == 0 ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK
-                                   : VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
   if (vk::vkCreateSampler(s.context.device, &info, nullptr, &sampler) != VK_SUCCESS) {
     sampler = VK_NULL_HANDLE;
   } else {

@@ -23,6 +23,12 @@ struct Stage {
   uint32_t words[6] = {};
   uint8_t max_anisotropy = 0, z_filters = 0, max_mip = 0, min_mip = 0;
   uint32_t texture = 0;
+  // The sampler as Vulkan's (SamplerState), and what it's made from: the
+  // mag and min filters (point 0, linear 1) and whether each asked for
+  // anisotropy.
+  SamplerState sampler;
+  uint8_t filters[2] = {};
+  bool anisotropic[2] = {};
 };
 constexpr uint32_t kStages = 26;
 Stage g_stages[kStages];
@@ -191,8 +197,60 @@ void SetMipLevel(Stage& s, uint32_t value, bool max) {
   (max ? s.max_mip : s.min_mip) = uint8_t(value);
 }
 
+// The GPU's clamp modes (D3D's address modes on the 360) as Vulkan's;
+// mirror clamp to edge where a device lacks it is the sampler cache's.
+VkSamplerAddressMode AddressMode(uint32_t mode) {
+  switch (mode & 7) {
+    case 0: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    case 1: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    case 6: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    case 3: case 5: case 7: return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+    default: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;  // 2, 4: to the edge, halfway
+  }
+}
+
+// The stage's sampler from what its sampler states set: as the GPU reads
+// the merged descriptor (a filter is linear when its field is 1 or the
+// stage is anisotropic; anisotropy from the game's table by MaxAnisotropy
+// when either filter asks for it).
+void MapSampler(Stage& s) {
+  using G = schema::DeviceStateGlobals;
+  SamplerState& m = s.sampler;
+  const uint32_t aniso = (s.anisotropic[0] || s.anisotropic[1])
+                             ? guest::LoadU32(G::anisotropy_table_address() +
+                                              4 * s.max_anisotropy) & 7
+                             : 0;
+  m.max_anisotropy = aniso >= 1 ? float(1u << (aniso - 1)) : 0.0f;
+  m.mag_filter = s.filters[0] == 1 || aniso >= 1 ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+  m.min_filter = s.filters[1] == 1 || aniso >= 1 ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+}
+
 void ApplySamplerState(Stage& s, uint32_t state, uint32_t value) {
   using G = schema::DeviceStateGlobals;
+  // The sampler, as Vulkan's.
+  switch (state) {
+    case 0: case 4: case 8:  // AddressU, V, W
+      s.sampler.address[state / 4] = AddressMode(value);
+      break;
+    case 12:  // BorderColor: opaque white unless 0
+      s.sampler.border = value != 0 ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
+                                    : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+      break;
+    case 16: case 20:  // MagFilter, MinFilter (4 anisotropic, as linear)
+      s.filters[state == 20] = uint8_t((value | value >> 2) & 3);
+      s.anisotropic[state == 20] = (value >> 2) != 0;
+      break;
+    case 24:  // MipFilter: point 0, linear 1, none 2
+      s.sampler.mip_mode =
+          (value & 3) == 1 ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+      s.sampler.base_level_only = (value & 3) == 2;
+      break;
+    case 28:  // MipMapLodBias, in levels
+      s.sampler.mip_lod_bias = std::bit_cast<float>(value);
+      break;
+    default:
+      break;
+  }
   switch (state) {
     case 0: Insert(s.words[0], value, 10, 0x1C00); break;   // AddressU
     case 4: Insert(s.words[0], value, 13, 0xE000); break;   // AddressV
@@ -232,6 +290,7 @@ void ApplySamplerState(Stage& s, uint32_t state, uint32_t value) {
     case 76: Insert(s.words[1], value == 0 ? 1 : 0, 11, 0x800); break;  // PointBorderEnable
     default: break;
   }
+  MapSampler(s);
 }
 
 void ApplyTexture(Stage& s, uint32_t texture) {
@@ -294,6 +353,13 @@ void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value) {
   if (stage < kStages) {
     ApplySamplerState(g_stages[stage], state, value);
   }
+}
+
+const SamplerState& StageSampler(uint32_t stage) {
+  if (!g_stages_set_up) {
+    SetUpStages();
+  }
+  return g_stages[stage < kStages ? stage : 0].sampler;
 }
 
 const uint32_t* TextureDescriptor(uint32_t stage) {

@@ -141,6 +141,26 @@ void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value);
 // Stage `stage`'s descriptor (stages 0-25).
 const uint32_t* TextureDescriptor(uint32_t stage);
 
+// A stage's sampler, as Vulkan's, mapped from the game's sampler states as
+// they're set (the device's own clamps applied when the sampler is made:
+// the most anisotropy, mirror clamp to edge's support). The level range is
+// the texture's, from its view.
+struct SamplerState {
+  VkFilter mag_filter = VK_FILTER_NEAREST, min_filter = VK_FILTER_NEAREST;
+  VkSamplerMipmapMode mip_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  // The mip filter none: the base level only.
+  bool base_level_only = false;
+  VkSamplerAddressMode address[3] = {VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                                     VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                                     VK_SAMPLER_ADDRESS_MODE_REPEAT};
+  // 0: off.
+  float max_anisotropy = 0.0f;
+  float mip_lod_bias = 0.0f;
+  VkBorderColor border = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+  bool operator==(const SamplerState&) const = default;
+};
+const SamplerState& StageSampler(uint32_t stage);
+
 // The shaders' constants, as D3D's registers: each stage's 256 float
 // registers (vertex 0, pixel 1), 128 bool registers (a bit each) and 16
 // integer registers for loops (count, start, step, 0), as the shaders'

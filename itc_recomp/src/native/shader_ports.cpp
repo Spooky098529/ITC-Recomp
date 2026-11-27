@@ -235,6 +235,12 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   shader.samplers.clear();
   for (uint32_t i = 0; i < port.sampler_count; i++) {
     const GamePortSampler& s = port.samplers[i];
+    // A sampler is the stage's (render::StageSampler): every game shader's
+    // fetches take their filters from it (3 and 7: "from the fetch
+    // constant"); one that overrides them isn't drawn (named).
+    if (s.mag_filter != 3 || s.min_filter != 3 || s.mip_filter != 3 || s.aniso_filter != 7) {
+      return false;
+    }
     shader.samplers.push_back(
         {s.fetch_constant, s.mag_filter, s.min_filter, s.mip_filter, s.aniso_filter});
   }

@@ -1668,9 +1668,8 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
                            binding.aniso_filter};
       CountBinding(false, binding.fetch_constant, fetch, extra);
     }
-    VkSampler texture_sampler = textures.GetSampler(
-        fetch, {binding.fetch_constant, binding.mag_filter, binding.min_filter, binding.mip_filter,
-                binding.aniso_filter});
+    VkSampler texture_sampler =
+        textures.GetSampler(render::StageSampler(binding.fetch_constant), fetch);
     infos[texture_count + i] = {texture_sampler ? texture_sampler : sampler, VK_NULL_HANDLE,
                                 VK_IMAGE_LAYOUT_UNDEFINED};
   }
@@ -3447,10 +3446,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   system.alpha_test_reference = states.alpha_ref;
   // Each sampled texture's reader scale. The shaders sample a texture's
-  // view as it is: signed, biased or gamma components, an exponent bias
-  // and a LOD bias in the texture aren't applied (none of the game's
-  // textures has them in the attract race or the pad replay; logged once
-  // each if one does).
+  // view as it is: signed, biased or gamma components and an exponent bias
+  // in the texture aren't applied (none of the game's textures has them in
+  // the attract race or the pad replay; logged once each if one does). Its
+  // LOD bias is the sampler's (render::SamplerState).
   for (const TranslatedShader* shader : {vertex, pixel}) {
     if (!shader) {
       continue;
@@ -3461,15 +3460,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       system.texture_scale[index & 31] = s.textures.ReaderScale(words);
       uint8_t signs = TextureCache::SwizzledSigns(words);
       int32_t exponent = int32_t(words[3] << 13) >> 26;
-      int32_t lod_bias = int32_t(words[4] << 10) >> 22;
-      if (signs || exponent || lod_bias) [[unlikely]] {
+      if (signs || exponent) [[unlikely]] {
         static std::unordered_set<uint64_t> logged;
         if (logged.insert(shader->hash ^ (uint64_t(words[1]) << 32) ^ signs).second) {
           ITC_LOG_ERROR("native renderer: {} shader {:016X} samples texture {:08X} (format {}) "
-                        "with signs {:02X}, exponent bias {} or LOD bias {}, which the shaders "
-                        "don't apply",
+                        "with signs {:02X} or exponent bias {}, which the shaders don't apply",
                         shader == vertex ? "vertex" : "pixel", shader->hash,
-                        words[1] & 0xFFFFF000u, words[1] & 63, signs, exponent, lod_bias);
+                        words[1] & 0xFFFFF000u, words[1] & 63, signs, exponent);
         }
       }
     }

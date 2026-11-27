@@ -12,17 +12,10 @@
 #include <vector>
 
 #include "device_context.h"
+#include "render/state.h"
 #include "vulkan_functions.h"
 
 namespace native {
-
-// A shader's sampler binding: the fetch constant and the instruction's
-// filter overrides (xenos::TextureFilter, AnisoFilter values; 3 and 7 mean
-// "from the fetch constant").
-struct SamplerOverrides {
-  uint32_t fetch_constant;
-  uint32_t mag_filter, min_filter, mip_filter, aniso_filter;
-};
 
 class TextureCache {
  public:
@@ -45,7 +38,9 @@ class TextureCache {
   // constant's last answer (fetch_constant: its index, 0-31).
   VkImageView GetView(const uint32_t fetch[6], VkImageViewType view_type,
                       uint32_t fetch_constant);
-  VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
+  // A sampler as the stage's state describes it (render::StageSampler), for
+  // the texture in `fetch` (its level range; a cube map clamps to the edge).
+  VkSampler GetSampler(const render::SamplerState& state, const uint32_t fetch[6]);
   // The post-swizzle signedness of each component, 2 bits each (the
   // translator's swizzled signs byte; the shaders no longer apply them:
   // a texture with signs is logged).
@@ -151,7 +146,7 @@ class TextureCache {
   uint64_t generation() const { return generation_; }
   // The same for samplers (bumped when base_level_only changes).
   uint64_t sampler_generation() const { return sampler_generation_; }
-  // GetView and GetSampler answers not kept in the table so far (null, a
+  // GetView answers not kept in the table so far (null, a
   // reload deferred, or the table off): a caller keeping what it built from
   // answers can tell whether all of them would be asked again.
   uint64_t unkept_answers() const { return unkept_answers_; }
@@ -194,11 +189,12 @@ class TextureCache {
 
  private:
   struct State;
-  // GetView and GetSampler worked out in full; `cacheable`: whether the
+  // GetView worked out in full; `cacheable`: whether the
   // answer may be kept until the generation changes.
   VkImageView LookUpView(const uint32_t fetch[6], VkImageViewType view_type,
                          bool& cacheable);
-  VkSampler LookUpSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
+  // The sampler made from `info`, kept by its fields.
+  VkSampler SamplerFor(const VkSamplerCreateInfo& info);
   std::unique_ptr<State> state_;
   bool cache_bindings_ = true;
   bool log_writes_ = false;
