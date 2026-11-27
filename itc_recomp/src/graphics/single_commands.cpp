@@ -146,21 +146,9 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
                    guest::LoadU32(state + 12));
     (void)device;
   }
-  {
-    const uint32_t device = Globals::replay_device();
-    if (!device_state::SetStreamSource(device, 0, 0, 0, 0, 4096)) {
-      call(0x822A3758, frame, 0x8258F65C, {device, 0, 0, 0, 0, 4096});
-    }
-    render::SetVertexBuffer(0, 0, 0, 0);
-  }
-  {
-    const uint32_t device = Globals::replay_device();
-    constexpr uint64_t kStage0 = 1ull << 43;
-    if (!device_state::SetTexture(device, 0, 0, kStage0)) {
-      call(0x822A6008, frame, 0x8258F674, {device, 0, 0, kStage0});
-    }
-    render::SetTexture(0, 0);
-  }
+  // Stream 0 and stage 0 unbound (the device's setters no longer called).
+  render::SetVertexBuffer(0, 0, 0, 0);
+  render::SetTexture(0, 0);
   render::SetRenderState(304, render_viewport ? 1 : 0);
   return 0;
 }

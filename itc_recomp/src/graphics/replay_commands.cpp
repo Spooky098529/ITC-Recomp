@@ -85,16 +85,10 @@ uint32_t SetBlendControls(uint32_t items, uint32_t count) {
 uint32_t SetTextures(uint32_t items, uint32_t count, uint32_t sp,
                      const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FCE0 Command::SetTextures");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetTexture no longer called: nothing else
+  // reads its slots, and its fences fed only the dropped GPU waits).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t stage = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t texture = guest::LoadU32(item + 4);
-    const uint64_t dirty = HighBitShifted(stage + 20);
-    if (!ds::SetTexture(device, stage, texture, dirty)) {
-      call(0x822A6008, frame, 0x8258FD28, {device, stage, texture, dirty}, std::nullopt);
-    }
-    render::SetTexture(stage, texture);
+    render::SetTexture(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -156,10 +150,9 @@ uint32_t SetVertexShaders(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetPixelShaders(uint32_t items, uint32_t count, uint32_t sp,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FFA0 Command::SetPixelShaders");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetPixelShader, which takes no reference,
+  // no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    call(0x822A8618, frame, 0x8258FFD0, {Device(), guest::LoadU32(item)},
-         std::nullopt);
     render::SetPixelShader(guest::LoadU32(item));
   }
   return count;
@@ -177,21 +170,10 @@ uint32_t SetVertexDeclarations(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetStreamSources(uint32_t items, uint32_t count, uint32_t sp,
                           const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590040 Command::SetStreamSources");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetStreamSource no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t stream = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t stride = guest::LoadU32(item + 12);
-    const uint32_t offset = guest::LoadU32(item + 8);
-    const uint32_t buffer = guest::LoadU32(item + 4);
-    // subfic, mulli 21846, the high halfword (rlwinm 16,16,31), + 20.
-    const uint32_t product = (95u - stream) * 21846u;
-    const uint64_t dirty = HighBitShifted((product >> 16) + 20);
-    if (!ds::SetStreamSource(device, stream, buffer, offset, stride, dirty)) {
-      call(0x822A3758, frame, 0x8259009C, {device, stream, buffer, offset, stride, dirty},
-           std::nullopt);
-    }
-    render::SetVertexBuffer(stream, buffer, offset, stride);
+    render::SetVertexBuffer(guest::LoadU32(item), guest::LoadU32(item + 4),
+                            guest::LoadU32(item + 8), guest::LoadU32(item + 12));
   }
   return count;
 }
@@ -199,14 +181,9 @@ uint32_t SetStreamSources(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetIndices(uint32_t items, uint32_t count, uint32_t sp,
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825900B8 Command::SetIndices");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetIndices no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t device = Device();
-    const uint32_t buffer = guest::LoadU32(item);
-    if (!ds::SetIndices(device, buffer)) {
-      call(0x822A3908, frame, 0x825900E8, {device, buffer}, std::nullopt);
-    }
-    render::SetIndexBuffer(buffer);
+    render::SetIndexBuffer(guest::LoadU32(item));
   }
   return count;
 }

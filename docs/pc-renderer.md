@@ -650,10 +650,18 @@ and resolve on one 256x144 target in turn, then the main view draws on
   the pad replay with dumps (the tuning shop, both races), the tick replay
   (both races match).
 
-Left for step 3: the setters with obligations (SetTexture's and the
-streams' and indices' fences, the shaders' reference counts, the render
-targets' bookkeeping) out of the handlers where nothing needs them, and
-`replay_hooks.cpp`.
+- **The setters out of the handlers, second part (2026-11-27).** SetTexture,
+  SetStreamSource, SetIndices and SetPixelShader are no longer called from
+  the handlers (nor the single drawer's resets of stream 0 and stage 0):
+  nothing else reads the device's slots, their fences fed only the GPU
+  waits dropped long ago, and the pixel shader setter takes no reference.
+  Checked: an attract race's frame (2,413 draws), the pad replay with
+  dumps, the tick replay (both races match).
+
+Left for step 3: the vertex shader setter (it keeps the shader's
+reference count: kept), the render target and depth surface setters
+(kept until it's clear nothing outside the replay reads the device's
+bound surfaces), and `replay_hooks.cpp`.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 
