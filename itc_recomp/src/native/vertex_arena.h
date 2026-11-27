@@ -69,9 +69,9 @@ class VertexArena {
   uint32_t HeldBuffer(uint32_t object, uint32_t address, uint32_t endian) const;
 
   VkBuffer buffer() const;
-  // This frame's copies, ended, to be submitted before its drawing; null if
-  // there were none.
-  VkCommandBuffer EndUploads();
+  // This frame's copies are all asked for (the backend submits them before
+  // its drawing): the next frame's go into its own slot's staging.
+  void EndUploads();
 
   // "arena 41.2 of 192 MB in 1503 ranges; this frame ... " for the log, and
   // the counts reset.

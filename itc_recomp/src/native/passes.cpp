@@ -2870,12 +2870,8 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.textures.BeginFrame(frame_index);
 }
 
-VkCommandBuffer Passes::EndUploads() {
-  return state_->textures.EndUploads();
-}
-
-VkCommandBuffer Passes::EndBufferUploads() {
-  return state_->arena.EndUploads();
+void Passes::EndUploads() {
+  state_->arena.EndUploads();
 }
 
 std::string Passes::TakeArenaStats() {

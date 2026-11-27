@@ -566,14 +566,11 @@ struct TextureCache::State {
     gpu::Buffer* staging_object = nullptr;
     VkBuffer staging = VK_NULL_HANDLE;  // the object's
     uint8_t* staging_mapped = nullptr;
-    VkCommandPool pool = VK_NULL_HANDLE;
-    VkCommandBuffer uploads = VK_NULL_HANDLE;
   };
   std::vector<Frame> frames;
   uint32_t frame = 0;
   uint64_t frame_number = 0;
   VkDeviceSize staging_used = 0;
-  bool recording = false;
 
   struct Texture {
     TextureKey key{};
@@ -712,7 +709,6 @@ struct TextureCache::State {
   uint64_t Hash(const Texture& texture) const;
   VkImageView GetSwizzledView(Texture& texture, uint32_t swizzle, VkImageViewType natural);
   bool Upload(Texture& texture);
-  VkCommandBuffer Uploads();
 };
 
 std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
@@ -881,17 +877,6 @@ uint64_t TextureCache::State::Hash(const Texture& t) const {
   return hash;
 }
 
-VkCommandBuffer TextureCache::State::Uploads() {
-  Frame& f = frames[frame];
-  if (!recording) {
-    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vk::vkBeginCommandBuffer(f.uploads, &begin);
-    recording = true;
-  }
-  return f.uploads;
-}
-
 bool TextureCache::State::Upload(Texture& t) {
   const Layout& l = t.layout;
   const Format& f = t.format;
@@ -915,7 +900,7 @@ bool TextureCache::State::Upload(Texture& t) {
   g_frame_costs.texture_bytes += needed;
 
   Frame& frame_data = frames[frame];
-  std::vector<VkBufferImageCopy> copies;
+  std::vector<gpu::ImageUpload> copies;
   std::vector<uint8_t> row;
   for (uint32_t level = first_level; level <= l.max_level; level++) {
     Placement p = Place(l, f, level);
@@ -954,43 +939,21 @@ bool TextureCache::State::Upload(Texture& t) {
           std::memcpy(out_row, row.data(), row_bytes);
         }
       }
-      VkBufferImageCopy copy{};
-      copy.bufferOffset = staging_used;
-      copy.bufferRowLength = width_blocks * f.block_width;
-      copy.bufferImageHeight = height_blocks * f.block_height;
-      copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, layer, 1};
-      copy.imageExtent = {level_width, level_height, 1};
+      gpu::ImageUpload copy;
+      copy.offset = staging_used;
+      copy.row_texels = width_blocks * f.block_width;
+      copy.rows = height_blocks * f.block_height;
+      copy.level = level;
+      copy.layer = layer;
+      copy.width = level_width;
+      copy.height = level_height;
       copies.push_back(copy);
       staging_used += Align(width_blocks * height_blocks * out_bytes_per_block, 16);
     }
   }
 
-  VkCommandBuffer commands = Uploads();
-  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-  barrier.srcAccessMask = 0;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.oldLayout = t.loaded ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = t.image;
-  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, t.levels, 0, l.layers};
-  vk::vkCmdPipelineBarrier(commands,
-                           t.loaded ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                                    : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-  vk::vkCmdCopyBufferToImage(commands, frame_data.staging, t.image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, uint32_t(copies.size()),
-                             copies.data());
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           0, 0, nullptr, 0, nullptr, 1, &barrier);
-  gpu::vulkan::Backend::Object(t.object).layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  backend->UploadImage(frame_data.staging_object, t.object, copies.data(),
+                       uint32_t(copies.size()));
   stats.loaded_bytes += needed;
   (t.loaded ? stats.reloaded : stats.loaded)++;
   t.loaded = true;
@@ -1016,19 +979,6 @@ bool TextureCache::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight
     f.staging = gpu::vulkan::Backend::Handle(f.staging_object);
     f.staging_mapped = backend.Mapped(f.staging_object);
     gpu_memory::Allocated(gpu_memory::Kind::kStaging, backend.MemorySize(f.staging_object));
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = context.queue_family;
-    if (vk::vkCreateCommandPool(device, &pool_info, nullptr, &f.pool) != VK_SUCCESS) {
-      return false;
-    }
-    VkCommandBufferAllocateInfo command_alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    command_alloc.commandPool = f.pool;
-    command_alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_alloc.commandBufferCount = 1;
-    if (vk::vkAllocateCommandBuffers(device, &command_alloc, &f.uploads) != VK_SUCCESS) {
-      return false;
-    }
   }
   return true;
 }
@@ -1038,8 +988,6 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
   s.frame = frame_index;
   s.frame_number++;
   s.staging_used = 0;
-  s.recording = false;
-  vk::vkResetCommandPool(s.context.device, s.frames[frame_index].pool, 0);
   cache_bindings_ = ITC_FLAG(native_renderer_cache_texture_bindings);
   log_writes_ = ITC_FLAG(native_renderer_log_texture_writes);
   if (log_writes_) {
@@ -1988,17 +1936,6 @@ uint8_t TextureCache::SwizzledSigns(const uint32_t fetch_words[6]) {
     constants_sign = 1;
   }
   return uint8_t(signs | constants_sign * constant_mask);
-}
-
-VkCommandBuffer TextureCache::EndUploads() {
-  State& s = *state_;
-  if (!s.recording) {
-    return VK_NULL_HANDLE;
-  }
-  s.recording = false;
-  VkCommandBuffer commands = s.frames[s.frame].uploads;
-  vk::vkEndCommandBuffer(commands);
-  return commands;
 }
 
 TextureCache::Stats TextureCache::TakeStats() {

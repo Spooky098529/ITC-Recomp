@@ -456,8 +456,7 @@ void Renderer::EndFrame() {
   if (g_window_resized.exchange(false)) {
     backend_->WindowResized();
   }
-  backend_->SubmitBefore(passes_.EndUploads());
-  backend_->SubmitBefore(passes_.EndBufferUploads());
+  passes_.EndUploads();
   recording_ = false;
   if (backend_->EndFrame(passes_.shown(), {source.width, source.height})) {
     frames_presented_++;

@@ -138,12 +138,9 @@ class Passes {
   // How many resolves the last frame made (a race frame makes about 25).
   size_t frame_resolve_count() const;
   gpu::Image* shown() const;
-  // The frame's texture uploads, to be submitted before its commands; null
-  // if none.
-  VkCommandBuffer EndUploads();
-  // The vertex arena's copies for this frame (vertex_arena.h), ended; null
-  // if none. Submitted after the texture uploads, before the frame.
-  VkCommandBuffer EndBufferUploads();
+  // The frame's uploads are all asked for (the backend submits them before
+  // its commands).
+  void EndUploads();
   std::string TakeArenaStats();
 
   // Logged by the renderer.

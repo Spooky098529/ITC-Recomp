@@ -68,6 +68,15 @@ class Backend {
   virtual uint8_t* Mapped(Buffer* buffer) = 0;
   virtual uint64_t MemorySize(const Buffer* buffer) const = 0;
 
+  // Uploads from a host-visible staging buffer the caller keeps until the
+  // frame is done, run before the frame's commands (whenever in the frame
+  // they're asked for, in the order asked). An image is ready to sample
+  // after (all of it, its contents before kept unless it was never
+  // uploaded); a buffer's ranges are ready to draw from.
+  virtual void UploadImage(Buffer* staging, Image* image, const ImageUpload* regions,
+                           uint32_t count) = 0;
+  virtual void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) = 0;
+
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
   virtual void DestroyView(View* view) = 0;

@@ -190,6 +190,19 @@ struct BufferDesc {
   bool host_visible = false;
 };
 
+// An upload's region: from a staging buffer into an image (rows of
+// `row_texels`, `rows` of them a layer; texels, or 4x4 blocks' texels for a
+// compressed format) or into a buffer.
+struct ImageUpload {
+  uint64_t offset = 0;
+  uint32_t row_texels = 0, rows = 0;
+  uint32_t level = 0, layer = 0;
+  uint32_t width = 0, height = 0;
+};
+struct BufferUpload {
+  uint64_t source_offset = 0, dest_offset = 0, size = 0;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
 struct Buffer;
 struct Sampler;

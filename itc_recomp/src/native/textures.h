@@ -163,9 +163,6 @@ class TextureCache {
   };
   GenerationEvents TakeGenerationEvents();
 
-  // This frame's uploads, ended, to be submitted before its drawing; null if
-  // none.
-  VkCommandBuffer EndUploads();
   // XPR files' events, at the frame's start (TextureCache_XprLoaded).
   void ProcessXprs();
 

@@ -245,6 +245,14 @@ bool Backend::CreateDevice() {
     vk::vkCreateFence(device_, &fence_info, nullptr, &frame.done);
     VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vk::vkCreateSemaphore(device_, &semaphore_info, nullptr, &frame.image_ready);
+    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    if (vk::vkCreateCommandPool(device_, &pool_info, nullptr, &frame.upload_pool) != VK_SUCCESS) {
+      return false;
+    }
+    alloc.commandPool = frame.upload_pool;
+    if (vk::vkAllocateCommandBuffers(device_, &alloc, &frame.uploads) != VK_SUCCESS) {
+      return false;
+    }
   }
   return true;
 }
@@ -348,6 +356,10 @@ void Backend::DestroySwapchain() {
 uint32_t Backend::BeginFrame() {
   Frame& frame = frames_[frame_index_];
   vk::vkWaitForFences(device_, 1, &frame.done, VK_TRUE, UINT64_MAX);
+  if (!uploading_) {
+    // (Uploads asked for before the first frame stay for it.)
+    vk::vkResetCommandPool(device_, frame.upload_pool, 0);
+  }
   vk::vkResetCommandBuffer(frame.commands, 0);
   VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -432,6 +444,22 @@ bool Backend::EndFrame(Image* shown, Extent2D size) {
     submit.pSignalSemaphores = &render_done_[image_index];
   }
   // The uploads first, then the frame.
+  if (uploading_) {
+    if (uploaded_buffers_) {
+      // The buffers' ranges are read by the frame's vertex input and shaders.
+      VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+      vk::vkCmdPipelineBarrier(frame.uploads, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+                                   VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                               0, 1, &barrier, 0, nullptr, 0, nullptr);
+    }
+    vk::vkEndCommandBuffer(frame.uploads);
+    before_.insert(before_.begin(), frame.uploads);
+    uploading_ = uploaded_buffers_ = false;
+  }
   before_.push_back(commands);
   submit.commandBufferCount = uint32_t(before_.size());
   submit.pCommandBuffers = before_.data();
@@ -687,6 +715,76 @@ void Backend::DestroyBuffer(Buffer* buffer) {
     vk::vkFreeMemory(device_, o->memory, nullptr);  // unmapped with it
   }
   delete o;
+}
+
+VkCommandBuffer Backend::Uploads() {
+  VkCommandBuffer commands = frames_[frame_index_].uploads;
+  if (!uploading_) {
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vk::vkBeginCommandBuffer(commands, &begin);
+    uploading_ = true;
+  }
+  return commands;
+}
+
+void Backend::UploadImage(Buffer* staging, Image* image, const ImageUpload* regions,
+                          uint32_t count) {
+  ImageObject& o = Object(image);
+  VkCommandBuffer commands = Uploads();
+  // From what earlier frames' shaders read (or nothing, never uploaded).
+  const bool fresh = o.layout == VK_IMAGE_LAYOUT_UNDEFINED;
+  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+  barrier.srcAccessMask = 0;
+  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  barrier.oldLayout = fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = o.image;
+  barrier.subresourceRange = {o.aspects, 0, o.desc.levels, 0, o.desc.layers};
+  vk::vkCmdPipelineBarrier(commands,
+                           fresh ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                                 : VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  std::vector<VkBufferImageCopy> copies(count);
+  for (uint32_t i = 0; i < count; i++) {
+    const ImageUpload& r = regions[i];
+    VkBufferImageCopy& copy = copies[i];
+    copy.bufferOffset = r.offset;
+    copy.bufferRowLength = r.row_texels;
+    copy.bufferImageHeight = r.rows;
+    copy.imageSubresource = {o.aspects, r.level, r.layer, 1};
+    copy.imageExtent = {r.width, r.height, 1};
+  }
+  vk::vkCmdCopyBufferToImage(commands, Handle(staging), o.image,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, copies.data());
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                           0, 0, nullptr, 0, nullptr, 1, &barrier);
+  o.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+void Backend::UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) {
+  VkCommandBuffer commands = Uploads();
+  if (!uploaded_buffers_) {
+    // Earlier frames' draws may still read ranges copied again in place:
+    // the copies wait for them.
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &barrier, 0, nullptr, 0,
+                             nullptr);
+    uploaded_buffers_ = true;
+  }
+  VkBufferCopy copy{region.source_offset, region.dest_offset, region.size};
+  vk::vkCmdCopyBuffer(commands, Handle(staging), Handle(buffer), 1, &copy);
 }
 
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {

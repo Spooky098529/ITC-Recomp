@@ -149,8 +149,6 @@ struct VertexArena::State {
     uint32_t size = 0;
   };
   struct Frame {
-    VkCommandPool pool = VK_NULL_HANDLE;
-    VkCommandBuffer uploads = VK_NULL_HANDLE;
     std::vector<StagingChunk> staging;  // [0] kept; others freed at the slot's next frame
     uint32_t chunk = 0, chunk_used = 0;
     // Ranges given back while this slot's frame was recorded: free once its
@@ -227,9 +225,6 @@ VertexArena::~VertexArena() {
     for (State::StagingChunk& chunk : f.staging) {
       s.DestroyStaging(chunk);
     }
-    if (f.pool) {
-      vk::vkDestroyCommandPool(device, f.pool, nullptr);
-    }
   }
   if (s.object) {
     s.backend->DestroyBuffer(s.object);
@@ -281,19 +276,6 @@ bool VertexArena::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight)
 
   s.frames.resize(frames_in_flight);
   for (State::Frame& f : s.frames) {
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = context.queue_family;
-    if (vk::vkCreateCommandPool(device, &pool_info, nullptr, &f.pool) != VK_SUCCESS) {
-      return false;
-    }
-    VkCommandBufferAllocateInfo command_alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    command_alloc.commandPool = f.pool;
-    command_alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_alloc.commandBufferCount = 1;
-    if (vk::vkAllocateCommandBuffers(device, &command_alloc, &f.uploads) != VK_SUCCESS) {
-      return false;
-    }
     f.staging.emplace_back();
     if (!s.CreateStaging(f.staging.back(), kStagingChunk)) {
       return false;
@@ -346,7 +328,6 @@ void VertexArena::BeginFrame(uint32_t frame) {
   }
   f.to_free.clear();
   if (!s.recording) {
-    vk::vkResetCommandPool(s.context.device, f.pool, 0);
     while (f.staging.size() > 1) {
       s.DestroyStaging(f.staging.back());
       f.staging.pop_back();
@@ -560,22 +541,9 @@ void VertexArena::State::GiveBack(uint64_t older_than) {
 }
 
 void VertexArena::State::BeginRecording() {
-  if (recording) {
-    return;
-  }
+  // (The backend's upload commands hold the copies; this slot's staging
+  // stays in use until they're submitted.)
   recording = true;
-  VkCommandBuffer commands = frames[recording_slot].uploads;
-  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vk::vkBeginCommandBuffer(commands, &begin);
-  // Earlier frames' draws may still read ranges copied again in place:
-  // the copies wait for them.
-  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = 0;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &barrier, 0, nullptr, 0,
-                           nullptr);
 }
 
 std::pair<VertexArena::State::StagingChunk*, uint32_t> VertexArena::State::Stage(
@@ -631,8 +599,7 @@ void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_o
     }
   }
   BeginRecording();
-  VkBufferCopy region{at, arena_offset, bytes};
-  vk::vkCmdCopyBuffer(frames[recording_slot].uploads, chunk->buffer, buffer, 1, &region);
+  backend->UploadBuffer(chunk->object, object, {at, arena_offset, bytes});
   stats.copied++;
   stats.copied_bytes += bytes;
 }
@@ -697,22 +664,8 @@ VkBuffer VertexArena::buffer() const {
   return state_->buffer;
 }
 
-VkCommandBuffer VertexArena::EndUploads() {
-  State& s = *state_;
-  if (!s.recording) {
-    return VK_NULL_HANDLE;
-  }
-  s.recording = false;
-  VkCommandBuffer commands = s.frames[s.recording_slot].uploads;
-  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           0, 1, &barrier, 0, nullptr, 0, nullptr);
-  vk::vkEndCommandBuffer(commands);
-  return commands;
+void VertexArena::EndUploads() {
+  state_->recording = false;
 }
 
 std::string VertexArena::TakeStats() {

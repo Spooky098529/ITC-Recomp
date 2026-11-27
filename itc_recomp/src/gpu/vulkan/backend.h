@@ -76,6 +76,9 @@ class Backend final : public gpu::Backend {
   }
   static BufferObject& Object(Buffer* buffer) { return *reinterpret_cast<BufferObject*>(buffer); }
   static VkBuffer Handle(Buffer* buffer) { return buffer ? Object(buffer).buffer : VK_NULL_HANDLE; }
+  void UploadImage(Buffer* staging, Image* image, const ImageUpload* regions,
+                   uint32_t count) override;
+  void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) override;
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
@@ -88,16 +91,11 @@ class Backend final : public gpu::Backend {
   const native::DeviceContext& context() const { return context_; }
   // The frame's command buffer, open between BeginFrame and EndFrame.
   VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
-  // Command buffers to submit before the frame's (the texture and arena
-  // uploads; null ones left out).
-  void SubmitBefore(VkCommandBuffer commands) {
-    if (commands) {
-      before_.push_back(commands);
-    }
-  }
 
  private:
   bool CreateDevice();
+  // The frame's upload commands, begun if they aren't.
+  VkCommandBuffer Uploads();
   // Records `commands` with `record` and runs them now, waiting for them.
   template <typename Record>
   bool RunNow(Record record);
@@ -126,6 +124,9 @@ class Backend final : public gpu::Backend {
     VkCommandBuffer commands = VK_NULL_HANDLE;
     VkFence done = VK_NULL_HANDLE;
     VkSemaphore image_ready = VK_NULL_HANDLE;
+    // Uploads, submitted before the frame's commands.
+    VkCommandPool upload_pool = VK_NULL_HANDLE;
+    VkCommandBuffer uploads = VK_NULL_HANDLE;
   };
   std::vector<Frame> frames_;
   uint32_t frame_index_ = 0;
@@ -133,6 +134,9 @@ class Backend final : public gpu::Backend {
   native::DeviceContext context_{};
   VkPhysicalDeviceMemoryProperties memory_properties_{};
   std::vector<VkCommandBuffer> before_;
+  // The upload commands are open (from the first upload, maybe before the
+  // first frame, to the frame's end), and hold buffer uploads.
+  bool uploading_ = false, uploaded_buffers_ = false;
 };
 
 }  // namespace gpu::vulkan

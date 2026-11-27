@@ -229,17 +229,26 @@ each backend.
   blocks, the movie staging, the gamma table, the dump buffer) comes from
   them; `VertexArena::Init` takes the backend. Checked: the dump identical,
   `--xbox_gamma=hdtv` and the boot movie without errors.
-- **Next (as planned 2026-11-27):** uploads, then the recording.
-  *Uploads:* each client keeps
-  its own staging buffers and their sizes (so "staging full: try next
-  frame" stays as it is); the backend records `UploadImage` (old layout:
-  the image's tracked one, undefined before its first upload, then ready to
-  sample, as the cache's barriers do now) and `UploadBuffer` into one upload
-  command buffer of its own submitted before the frame (today the cache's
-  and the arena's, in that order), and `CopyBufferToImage` in the frame
-  (the movie planes). D3D11: `UpdateSubresource` from the staging memory.
-  *Recording:* passes, binds and draws (step 3's next piece), then the
-  full-screen and compute passes, then the dumps.
+- **Uploads (2026-11-27).** `gpu::ImageUpload` and `BufferUpload`, and
+  `Backend::UploadImage` and `UploadBuffer`: copies from a client's staging
+  buffer, recorded into one upload command buffer of the backend's per
+  frame slot, submitted before the frame's (opened at the first upload,
+  which for the arena's built-in index lists is before the first frame; a
+  slot's stream is reset at its frame's start only when it isn't already
+  open). An image goes from its tracked layout (undefined before its first
+  upload, else sampled) to the copy and back to sampled, with the cache's
+  old barriers; the buffer copies wait for earlier frames' reads once and
+  end with the arena's old barrier for vertex input. The clients keep their
+  own staging and its sizes ("staging full: next frame" unchanged); the
+  texture cache's and the arena's own command pools are gone, with
+  `Backend::SubmitBefore`. The movie planes' copies (made in the frame, as
+  the movie is drawn) wait for the recording piece. Checked: the dump
+  identical, the tick replay, the pad replay without errors.
+- **Next:** the recording: passes (begin and end, targets, clears), the
+  draw's state (pipelines from a description, binds, constants by offset),
+  draws, copies and resolves in the frame, then the full-screen and compute
+  passes, then the dumps. *(D3D11 later: `UpdateSubresource` from the
+  staging memory for the uploads.)*
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
