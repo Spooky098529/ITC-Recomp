@@ -183,6 +183,12 @@ timeout 90 wine $B/itc.exe \
   --log_fps=true --interpolate_draw_state=true --skip_intro --attract_after_s=1
 ```
 
+The prefix has Microsoft's `d3dcompiler_47.dll` (`winetricks -q
+d3dcompiler_47`, 2026-11-27, a native override): Wine's own is
+vkd3d-shader's HLSL compiler, which refuses most of our HLSL
+(`docs/d3d11-backend.md`, step 4); `itc_recomp/tools/hlsl_check` compiles
+HLSL with it.
+
 Logs go to `logs/` next to `itc.exe`. The local build folders have an
 `itc.toml` of their own with `audio_mute = true` (the user's call,
 2026-11-27: test runs launch muted; not the shipped one). The tick

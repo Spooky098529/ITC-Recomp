@@ -1,4 +1,4 @@
-# A Direct3D 11 backend (a plan; steps 1 to 3 done)
+# A Direct3D 11 backend (a plan; steps 1 to 4 done)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
 renderer's merge). Steps 2 and 3 are done (below): the renderer holds only
@@ -378,13 +378,75 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
   tick replay, the pad replay without errors, `--xbox_gamma=hdtv` at a
   reference moment (`shown` the reference's through the table), the boot
   movie drawn. A drive is welcome.
-- **Next:** step 4 (HLSL).
-  *(D3D11 later: `UpdateSubresource` from the staging memory for the
+- *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
 - **Dump runs:** a run lands on one of at least four moments (2,654,
   2,669, 2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
   runs of one build.
+
+## Step 4: HLSL (done 2026-11-27)
+
+- **SPIRV-Cross.** Not in Artix's repos: `itc_recomp/tools/build_spirv_cross.sh`
+  builds its command-line tool (tag `vulkan-sdk-1.4.363.0`, the installed
+  glslang's and spirv-tools' SDK) into `itc_recomp/out/tools/spirv-cross/`
+  (the user's call, 2026-11-27). `compile_game.py` and `compile.sh` find it
+  there (or `$SPIRV_CROSS`, or the PATH).
+- **Output.** `compile_game.py` writes every game shader as Shader Model 5
+  HLSL into `src/native/generated_game_shaders_hlsl.h` (`k_hlsl_game_<name>`,
+  raw string literals, ~2.4 MB), cross-compiled from the same GLSL compiled
+  again with its names (readable HLSL; the SPIR-V header is unchanged);
+  `compile.sh` writes the backend's own (`generated_<name>_hlsl.h`,
+  `k_hlsl_<name>`). Vertex shaders have Y flipped to D3D's clip space
+  (`--flip-vert-y`: D3D's NDC has +Y up, Vulkan's down; Z is 0 to 1 in both,
+  and the pixel position's origin is the top left in both).
+- **The fit as defines.** Each specialization constant is
+  `SPIRV_CROSS_CONSTANT_ID_n` (SPIRV-Cross's own, its value in the GLSL the
+  default). Interpolator n's semantic (the vertex shader's outputs, the pixel
+  shader's inputs) is `XE_INTERPOLATOR_n`, `TEXCOORDn` unless the backend
+  defines it: the D3D11 backend defines it as `port_spirv.cpp` moves the
+  locations (an interpolator in the pair's mask at its place among them, the
+  others at 16 + n). A define in a semantic works with D3DCompile (checked:
+  remapped places compile, two on one place are refused).
+- **Bindings as SPIRV-Cross writes them.** The constant blocks are `b0`
+  (the draw constants), `b1` or `b2` (the vertex or pixel float constants),
+  `b3` (bools and loops); a stage's views and samplers keep their bindings
+  (`tN`, `sN`: views first, then samplers, the highest sampler `s13`, inside
+  D3D11's 16). The own shaders' push constants are a `cbuffer Constants`
+  with no register (the only one in each, so `b0`); combined samplers become
+  a view and a sampler at the same number; the gamma's storage image is
+  `u0`, its table a `ByteAddressBuffer` at `t1`.
+- **Changed for HLSL** (no visible change: the frame dump identical, 59 of
+  59 images 0.0000% off):
+  - The draw constants (`XeDrawConstants`) were a scalar-layout block (a vec3
+    across a 16-byte boundary, a float array with a 4-byte stride), which
+    HLSL's packing can't express: now `vec4 xe_draw[11]` (std140) read at
+    the same byte offsets through `xe_draw_*()` functions; `DrawConstants`
+    (`draw_constants.h`) unchanged.
+  - The ports' jumps were `pc = N; continue;` inside `switch (pc)` in a
+    loop; HLSL has no `continue` in a switch (3 shaders failed). Now
+    `pc = N; break;`, the end `pc = -1; break;`, and the loop leaves on
+    `pc < 0`: the generator (`ucode_to_glsl.py`) and the 49 ports with jumps
+    alike (the generator gives the ports' control flow exactly, checked on
+    the 121 it ports before an older, unrelated stop on its texture tuples).
+- **Checked: every shader compiles** with Microsoft's `D3DCompile`:
+  `itc_recomp/tools/hlsl_check` (`hlsl_check.exe`, built with the cross
+  toolchain by its `build.sh`) under Wine; `compile_game.py --check-hlsl` and
+  `compile.sh --check-hlsl` run it (151 game shaders and 6 own ones, 0
+  failed). Wine's own `d3dcompiler_47.dll` is vkd3d-shader's HLSL compiler,
+  which refuses valid HLSL (139 of the 151: `SampleGrad` on a 2D array's
+  float2 gradients, dynamic vector stores, constant expressions), so the test
+  prefix has Microsoft's (`winetricks d3dcompiler_47`, a native override).
+  That's also what the D3D11 backend compiles with under Wine in step 5,
+  with DXVK running the result (or wined3d), as Windows' own
+  `d3dcompiler_47.dll` is Microsoft's.
+- **Next:** step 5 (the D3D11 backend). For it, from this step: the vertex
+  shaders read `SV_VertexID` as `gl_VertexIndex` (no base vertex added:
+  SPIRV-Cross's default, so a draw with a base vertex must offset its
+  vertex buffer instead, or the shaders be made with
+  `--hlsl-support-nonzero-basevertex-baseinstance`); the vertex shader
+  declares all 16 interpolators before `SV_Position`, and the pixel shader
+  only those it reads.
 
 ## Open questions
 
