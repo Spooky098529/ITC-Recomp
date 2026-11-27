@@ -57,6 +57,37 @@ struct RenderStates {
   float alpha_ref = 0.0f;
 };
 
+// The viewport, as D3D's (pixels; Z range 0-1), clamped to the bound
+// surface as the game's Direct3D clamps it.
+struct Viewport {
+  uint32_t x = 0, y = 0, width = 0, height = 0;
+  float min_z = 0.0f, max_z = 1.0f;
+};
+
+// What's drawn into: the game's surface objects (render targets 0-3, the
+// depth surface; 0 none) and the viewport.
+struct Targets {
+  uint32_t color[4] = {};
+  uint32_t depth = 0;
+  Viewport viewport;
+};
+
+// Commands 23, 24, 29, 34 and 35: a render target or the depth surface
+// bound. Binding render target 0 (or the depth surface without one) makes
+// the viewport and scissor the whole surface, as SetRenderTarget's
+// SetSurfaceInfo does.
+void SetRenderTarget(uint32_t index, uint32_t surface);
+void SetDepthTarget(uint32_t surface);
+// Commands 30 and 35: the viewport (pixels, Z range).
+void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float min_z,
+                 float max_z);
+// Commands 32 and 33: predicated tiling begun with its tiles' rectangles
+// (the viewport is then clamped to the tiles together, as the game's
+// Direct3D clamps it while tiling holds the bound surfaces), and ended.
+void BeginTiling(uint32_t width, uint32_t height);
+void EndTiling();
+const Targets& BoundTargets();
+
 // The game's render state `state` (a byte offset: 40 ZEnable, 44 ZFunc, ...)
 // set to `value`, as the device's setter for it gives it meaning.
 void SetRenderState(uint32_t state, uint32_t value);

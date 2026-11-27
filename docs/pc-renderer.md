@@ -535,10 +535,23 @@ and resolve on one 256x144 target in turn, then the main view draws on
   The handlers still call the game's setters too, until nothing reads
   what they write.
 
-Left for step 3: the rest of the interface (render targets and the
-viewport, shaders, textures and vertex buffers by handle, constants,
-clears and draws), then the game's setters out of the handlers, which ends
-the shadow on the render path.
+- **The seam, second part: targets and the viewport (2026-11-27).**
+  `render::SetRenderTarget`, `SetDepthTarget`, `SetViewport`,
+  `BeginTiling` and `EndTiling`, from commands 23, 24, 29, 30, 32-35: the
+  bound surfaces (the game's surface objects) and D3D's viewport, clamped
+  to the bound surface (or the tiles together while tiling) as the game's
+  SetViewport does; binding render target 0 makes the viewport and
+  scissor the whole surface. The draws, clears, resolves, the tiling, the
+  movie and the shown frame take the bound surfaces from there; the host
+  viewport is computed from D3D's viewport (y down, D3D's clip space); each
+  target's exponent bias from its surface's color info. Checked against
+  the shadow first (bound surfaces, the viewport transform, exponent
+  biases, depth formats, the clip space: no difference in an attract race
+  or the pad replay, once the tiling's size was taken), then frames right.
+
+Left for step 3: the rest of the interface (shaders, textures and vertex
+buffers by handle, constants, clears and draws), then the game's setters
+out of the handlers, which ends the shadow on the render path.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

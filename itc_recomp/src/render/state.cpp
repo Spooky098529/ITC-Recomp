@@ -1,13 +1,49 @@
 #include "render/state.h"
 
+#include <algorithm>
 #include <bit>
+#include <climits>
 #include <cstring>
+
+#include "schema/device_state.h"
 
 namespace render {
 
 namespace {
 
 RenderStates g_states;
+Targets g_targets;
+// D3D's viewport as last set (before the clamp to a surface).
+Viewport g_set_viewport;
+// While tiling: the tiles' extent together.
+uint32_t g_tiling_width = 0, g_tiling_height = 0;
+
+// The viewport clamped to the surface render target 0 (or the depth
+// surface) is, as the game's SetViewport.
+void ClampViewport(const Viewport& v) {
+  uint32_t surface = g_targets.color[0] ? g_targets.color[0] : g_targets.depth;
+  if (!surface) {
+    return;  // kept as it was
+  }
+  const uint32_t size = schema::DeviceSurface(surface).size();
+  uint32_t max_height = (std::rotl(size, 29) & 0x7FFF) + 1;
+  uint32_t max_width = (std::rotl(size, 14) & 0x3FFF) + 1;
+  if (g_tiling_width) {
+    max_width = g_tiling_width;
+    max_height = g_tiling_height;
+  }
+  const uint32_t right = std::min(v.width + v.x, max_width);
+  const uint32_t bottom = std::min(v.height + v.y, max_height);
+  g_targets.viewport = {v.x, v.y, right - v.x, bottom - v.y, v.min_z, v.max_z};
+}
+
+// The whole surface: the viewport and the scissor rectangle.
+void Whole() {
+  g_set_viewport = {0, 0, uint32_t(INT_MAX), uint32_t(INT_MAX), 0.0f, 1.0f};
+  ClampViewport(g_set_viewport);
+  g_states.scissor[0] = g_states.scissor[1] = 0;
+  g_states.scissor[2] = g_states.scissor[3] = INT_MAX;
+}
 
 // The blend as D3D's state builds it (the device's software copy, +11616,
 // and its enables): the fields at the blend control's places, kept so
@@ -94,6 +130,41 @@ VkBlendOp BlendOp(uint32_t op) {
 }
 
 const RenderStates& States() { return g_states; }
+const Targets& BoundTargets() { return g_targets; }
+
+void SetRenderTarget(uint32_t index, uint32_t surface) {
+  if (index > 3) {
+    return;
+  }
+  g_targets.color[index] = surface;
+  if (index == 0 && (surface || g_targets.depth)) {
+    Whole();
+  }
+}
+
+void SetDepthTarget(uint32_t surface) {
+  g_targets.depth = surface;
+  if (surface && !g_targets.color[0]) {
+    Whole();
+  }
+}
+
+void BeginTiling(uint32_t width, uint32_t height) {
+  g_tiling_width = width;
+  g_tiling_height = height;
+  ClampViewport(g_set_viewport);
+}
+
+void EndTiling() {
+  g_tiling_width = g_tiling_height = 0;
+  ClampViewport(g_set_viewport);
+}
+
+void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float min_z,
+                 float max_z) {
+  g_set_viewport = {x, y, width, height, min_z, max_z};
+  ClampViewport(g_set_viewport);
+}
 
 void ResetRenderStates() {
   g_states = RenderStates{};

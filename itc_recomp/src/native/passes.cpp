@@ -893,8 +893,9 @@ struct Passes::State {
   // device's shadow at each draw, differences logged
   // (--native_renderer_check_render_states).
   bool check_render_states = false;
-  uint64_t render_state_mismatches[16] = {};
+  uint64_t render_state_mismatches[20] = {};
   void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
+  void CheckTargets(uint32_t device);
   // The depth format can be sampled with linear filtering (the depth
   // resolves' readers' samplers may ask for it).
   bool depth_filterable = false;
@@ -2804,7 +2805,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
     }
     ITC_LOG_INFO("native renderer: movies drawn from {}x{} planes", planes.width, planes.height);
   }
-  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  uint32_t object = render::BoundTargets().color[0];
   Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   if (!target) {
     return;
@@ -3064,12 +3065,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   State& s = *this;
   auto& regs = s.regs;
   // The bound surfaces: render target 0 and depth (others aren't drawn).
-  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0);
-  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
+  uint32_t color_object = render::BoundTargets().color[0];
+  uint32_t depth_object = render::BoundTargets().depth;
   for (uint32_t i = 1; i < 4; i++) {
     // The same surface in another slot (seen: target 1 = target 0) adds
     // nothing.
-    if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * i);
+    if (uint32_t object = render::BoundTargets().color[i];
         object && object != color_object) {
       if (!s.logged_extra_targets) {
         s.logged_extra_targets = true;
@@ -3385,7 +3386,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
   }
   const DrawRegisters::Viewport viewport_info =
-      regs.HostViewport(states.viewport_enable, states.half_pixel_offset);
+      HostViewport(render::BoundTargets().viewport, states.viewport_enable,
+                   states.half_pixel_offset);
   // Scissor: the window scissor registers aren't in the shadow's flushed
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
@@ -3452,8 +3454,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       system.texture_scale[index & 31] = s.textures.ReaderScale(&regs.fetch[6 * index]);
     }
   }
+  // Each bound target's exponent bias, from its surface's color info (+28,
+  // bits 20-25).
   for (uint32_t i = 0; i < 4; i++) {
-    int32_t bias = regs.color_exp_bias(i);
+    uint32_t surface = render::BoundTargets().color[i];
+    uint32_t info = surface ? guest::LoadU32(surface + 28) : 0;
+    int32_t bias = int32_t(info << 6) >> 26;
     uint32_t scale_bits = uint32_t(0x3F800000 + (bias << 23));
     std::memcpy(&system.color_exp_bias[i], &scale_bits, 4);
   }
@@ -3661,6 +3667,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   if (s.check_render_states) {
     s.CheckRenderStates(color != nullptr, depth != nullptr, device);
+    s.CheckTargets(device);
   }
   VkPipeline pipeline = s.GetPipeline(key);
   if (s.watch_draws && main_view_draw &&
@@ -4117,14 +4124,14 @@ void Passes::AfterClear(VkCommandBuffer commands, uint32_t payload,
       if (flags & 0xE) {
         s.stats.extra_targets++;
       }
-      if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0); object && (flags & 1)) {
+      if (uint32_t object = render::BoundTargets().color[0]; object && (flags & 1)) {
         if (Target* target = s.GetTarget(commands, object, false)) {
           s.ClearTarget(commands, *target, value);
         }
       }
     }
     if (flags & 0x30) {
-      uint32_t object = guest::LoadU32(device + kDeviceDepthStencil);
+      uint32_t object = render::BoundTargets().depth;
       Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
       if (target) {
         VkClearValue value{};
@@ -4183,8 +4190,8 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
     stats.resolve_flags_sample = flags;
   }
   bool from_depth = flags & 4;
-  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * (flags & 3));
-  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
+  uint32_t color_object = render::BoundTargets().color[flags & 3];
+  uint32_t depth_object = render::BoundTargets().depth;
   uint32_t source_object = from_depth ? depth_object : color_object;
   Target* source = source_object ? GetTarget(commands, source_object, from_depth) : nullptr;
   if (source && destination && !level_or_slice &&
@@ -4247,14 +4254,14 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
   s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
   s.stats.tilings++;
   // Each tile starts cleared to these.
-  if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0)) {
+  if (uint32_t object = render::BoundTargets().color[0]) {
     if (Target* target = s.GetTarget(commands, object, false)) {
       VkClearValue value{};
       value.color = {{clear, clear, clear, clear}};
       s.ClearTarget(commands, *target, value);
     }
   }
-  if (uint32_t object = guest::LoadU32(device + kDeviceDepthStencil)) {
+  if (uint32_t object = render::BoundTargets().depth) {
     if (Target* target = s.GetTarget(commands, object, true)) {
       VkClearValue value{};
       value.depthStencil = {clear, 0};
@@ -4302,7 +4309,7 @@ void Passes::EndTiling() {
 void Passes::FrontBufferResolve(VkCommandBuffer commands, uint32_t device,
                                 uint32_t front_buffer) {
   State& s = *state_;
-  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  uint32_t object = render::BoundTargets().color[0];
   Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   // The front buffer's size, from its fetch constant's word 2 (2D: width - 1
   // in bits 0-12, height - 1 in bits 13-25).
@@ -4657,19 +4664,71 @@ void Passes::State::CheckRenderStates(bool has_color, bool has_depth, uint32_t d
   }
 }
 
+void Passes::State::CheckTargets(uint32_t device) {
+  const render::Targets& t = render::BoundTargets();
+  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
+    if (same) {
+      return;
+    }
+    if (render_state_mismatches[field]++ < 3) {
+      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
+                   "{})",
+                   name, detail, g_current_command);
+    }
+  };
+  uint32_t bound[5];
+  for (uint32_t i = 0; i < 4; i++) {
+    bound[i] = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * i);
+  }
+  bound[4] = guest::LoadU32(device + kDeviceDepthStencil);
+  check(14, "targets",
+        !std::memcmp(bound, t.color, sizeof(t.color)) && bound[4] == t.depth,
+        std::format("ours {:08X} {:08X} {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X} {:08X} "
+                    "{:08X}",
+                    t.color[0], t.color[1], t.color[2], t.color[3], t.depth, bound[0], bound[1],
+                    bound[2], bound[3], bound[4]));
+  const render::Viewport& v = t.viewport;
+  float x_scale = float(double(v.width)) * 0.5f, y_scale = float(double(v.height)) * 0.5f;
+  float scale[3] = {x_scale, -y_scale, v.max_z - v.min_z};
+  float offset[3] = {float(double(v.x)) + x_scale, float(double(v.y)) + y_scale, v.min_z};
+  check(15, "viewport",
+        !std::memcmp(scale, regs.viewport_scale, sizeof(scale)) &&
+            !std::memcmp(offset, regs.viewport_offset, sizeof(offset)),
+        std::format("ours {} {} {} / {} {} {} shadow {} {} {} / {} {} {}", scale[0], scale[1],
+                    scale[2], offset[0], offset[1], offset[2], regs.viewport_scale[0],
+                    regs.viewport_scale[1], regs.viewport_scale[2], regs.viewport_offset[0],
+                    regs.viewport_offset[1], regs.viewport_offset[2]));
+  if (t.color[0]) {
+    uint32_t info = guest::LoadU32(t.color[0] + 28);
+    check(16, "color_exp_bias",
+          (int32_t(info << 6) >> 26) == regs.color_exp_bias(0) &&
+              ((info >> 16 & 0xF) == regs.color_format(0) ||
+               ((info >> 16 & 0xF) | 8) == (regs.color_format(0) | 8)),
+          std::format("surface {:08X} shadow {:08X}", info, regs.color_info[0]));
+  }
+  if (t.depth) {
+    uint32_t info = guest::LoadU32(t.depth + 28);
+    check(17, "depth_float24", (info >> 16 & 1) == uint32_t(regs.depth_float24()),
+          std::format("surface {:08X} shadow {:08X}", info, regs.depth_info));
+  }
+  check(18, "clip_space", regs.direct3d_clip_space(),
+        std::format("clip control {:08X}", regs.clip_control));
+}
+
 void Passes::set_check_render_states(bool check) {
   state_->check_render_states = check;
 }
 
 std::string Passes::TakeRenderStateChecks() {
   State& s = *state_;
-  static const char* const kNames[14] = {
+  static const char* const kNames[19] = {
       "z_enable",      "z_write",         "z_func",       "cull",
       "blend",         "color_write",     "blend_constants", "alpha_test",
       "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
-      "scissor_enable", "scissor_rect"};
+      "scissor_enable", "scissor_rect", "targets", "viewport", "color_exp_bias",
+      "depth_float24", "clip_space"};
   std::string text;
-  for (int i = 0; i < 14; i++) {
+  for (int i = 0; i < 19; i++) {
     text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
   }
   return text;

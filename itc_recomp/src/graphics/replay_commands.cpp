@@ -10,6 +10,7 @@
 #include "helpers/debug_output.h"
 #include "render/state.h"
 
+#include <algorithm>
 #include <cstdint>
 
 namespace graphics::replay_commands {
@@ -419,6 +420,7 @@ uint32_t SetRenderTargets(uint32_t items, uint32_t count) {
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     const uint32_t surface = guest::LoadU32(item + 4);
     ds::SetRenderTargetExternal(Device(), guest::LoadU32(item), surface);
+    render::SetRenderTarget(guest::LoadU32(item), surface);
   }
   return count;
 }
@@ -427,6 +429,7 @@ uint32_t SetDepthStencilSurfaces(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590478 Command::SetDepthStencilSurfaces");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     ds::SetDepthStencilSurface(Device(), guest::LoadU32(item));
+    render::SetDepthTarget(guest::LoadU32(item));
   }
   return count;
 }
@@ -537,11 +540,13 @@ uint32_t RestoreSurfaces(uint32_t items, uint32_t count) {
         const uint32_t set = guest::LoadU32(kRestoreSet);
         ds::SetRenderTargetExternal(Device(), target,
                                     guest::LoadU32(set + 4 * target));
+        render::SetRenderTarget(target, guest::LoadU32(set + 4 * target));
       }
     }
     if (guest::LoadU32(item) & 0x80) {
       const uint32_t set = guest::LoadU32(kRestoreSet);
       ds::SetDepthStencilSurface(Device(), guest::LoadU32(set + 16));
+      render::SetDepthTarget(guest::LoadU32(set + 16));
     }
   }
   return count;
@@ -559,6 +564,9 @@ uint32_t SetViewports(uint32_t items, uint32_t count, uint32_t sp) {
     guest::StoreU32(viewport + 8, guest::LoadU16(item + 4));
     guest::StoreU32(viewport + 12, guest::LoadU16(item + 6));
     ds::SetViewport(Device(), viewport);
+    render::SetViewport(guest::LoadU16(item + 0), guest::LoadU16(item + 2),
+                        guest::LoadU16(item + 4), guest::LoadU16(item + 6),
+                        guest::LoadFloat(item + 8), guest::LoadFloat(item + 12));
   }
   return count;
 }
@@ -590,6 +598,18 @@ uint32_t BeginTiling(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t c = 0; c < 4; c++) {
     guest::StoreFloat(frame + 80 + 4 * c, value);
   }
+  {
+    // The tiles' extent together: item +4 the count, +8 the rectangles
+    // (left, top, right, bottom).
+    const uint32_t tiles = guest::LoadU32(items + 4), rects = guest::LoadU32(items + 8);
+    uint32_t width = 0, height = 0;
+    for (uint32_t t = 0; rects && t < tiles && t < 16; t++) {
+      width = std::max(width, uint32_t(std::max(int32_t(guest::LoadU32(rects + 16 * t + 8)), 0)));
+      height =
+          std::max(height, uint32_t(std::max(int32_t(guest::LoadU32(rects + 16 * t + 12)), 0)));
+    }
+    render::BeginTiling(width, height);
+  }
   // Each pass takes the first item (the original doesn't step through
   // them); r8 isn't set by the original, nor read by BeginTiling: 0 here.
   for (uint32_t i = 0; i < count; i++) {
@@ -617,6 +637,7 @@ uint32_t EndTiling(uint32_t items, uint32_t count, uint32_t sp,
           frame + 80, 0, 0, 0},
          double(value));
   }
+  render::EndTiling();
   return count;
 }
 
@@ -645,10 +666,17 @@ uint32_t RestoreSavedSurfaces(uint32_t count) {
   for (uint32_t target = 0; target < 4; target++) {
     const uint32_t surface = guest::LoadU32(saved + 24 + 4 * target);
     ds::SetRenderTargetExternal(guest::LoadU32(saved + 48), target, surface);
+    render::SetRenderTarget(target, surface);
   }
   ds::SetDepthStencilSurface(guest::LoadU32(saved + 48),
                              guest::LoadU32(saved + 40));
+  render::SetDepthTarget(guest::LoadU32(saved + 40));
   ds::SetViewport(guest::LoadU32(saved + 48), saved);
+  // The viewport saved by command 34 (D3DVIEWPORT9: x, y, width, height,
+  // min Z, max Z).
+  render::SetViewport(guest::LoadU32(saved), guest::LoadU32(saved + 4),
+                      guest::LoadU32(saved + 8), guest::LoadU32(saved + 12),
+                      guest::LoadFloat(saved + 16), guest::LoadFloat(saved + 20));
   return count;
 }
 

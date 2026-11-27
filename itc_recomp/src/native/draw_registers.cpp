@@ -1,5 +1,7 @@
 #include "native/draw_registers.h"
 
+#include "render/state.h"
+
 #include "guest.h"
 
 #include <algorithm>
@@ -107,16 +109,19 @@ uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets
   return mask;
 }
 
-DrawRegisters::Viewport DrawRegisters::HostViewport(bool viewport_enable,
-                                                    bool half_pixel_offset) const {
+DrawRegisters::Viewport HostViewport(const render::Viewport& viewport, bool viewport_enable,
+                                     bool half_pixel_offset) {
   constexpr uint32_t kMax = 8192;
-  Viewport v{};
-  float scale_xy[2] = {viewport_enable ? viewport_scale[0] : 1.0f,
-                       viewport_enable ? viewport_scale[1] : 1.0f};
-  float scale_z = viewport_enable ? viewport_scale[2] : 1.0f;
-  float offset_base_xy[2] = {viewport_enable ? viewport_offset[0] : 0.0f,
-                             viewport_enable ? viewport_offset[1] : 0.0f};
-  float offset_z = viewport_enable ? viewport_offset[2] : 0.0f;
+  DrawRegisters::Viewport v{};
+  // D3D's viewport transform (as the game's SetViewport builds
+  // PA_CL_VPORT_*: y down), when it's on.
+  float x_scale = float(double(viewport.width)) * 0.5f;
+  float y_scale = float(double(viewport.height)) * 0.5f;
+  float scale_xy[2] = {viewport_enable ? x_scale : 1.0f, viewport_enable ? -y_scale : 1.0f};
+  float scale_z = viewport_enable ? viewport.max_z - viewport.min_z : 1.0f;
+  float offset_base_xy[2] = {viewport_enable ? float(double(viewport.x)) + x_scale : 0.0f,
+                             viewport_enable ? float(double(viewport.y)) + y_scale : 0.0f};
+  float offset_z = viewport_enable ? viewport.min_z : 0.0f;
   // The window offset (PA_SC_WINDOW_OFFSET) isn't in the shadow's blocks:
   // 0, as the register file always had it.
   float offset_add_xy[2] = {};
@@ -156,18 +161,10 @@ DrawRegisters::Viewport DrawRegisters::HostViewport(bool viewport_enable,
       v.ndc_offset[i] = 0.0f;
     }
   }
-  float clip_offset_z, clip_scale_z;
-  if (direct3d_clip_space()) {
-    clip_offset_z = offset_z;
-    clip_scale_z = scale_z;
-    v.ndc_scale[2] = 1.0f;
-    v.ndc_offset[2] = 0.0f;
-  } else {
-    clip_offset_z = offset_z - scale_z;
-    clip_scale_z = scale_z * 2.0f;
-    v.ndc_scale[2] = 0.5f;
-    v.ndc_offset[2] = 0.5f;
-  }
+  // D3D's clip space (Z from 0 to W).
+  float clip_offset_z = offset_z, clip_scale_z = scale_z;
+  v.ndc_scale[2] = 1.0f;
+  v.ndc_offset[2] = 0.0f;
   v.z_min = Saturate(clip_offset_z);
   v.z_max = Saturate(clip_offset_z + clip_scale_z);
   return v;

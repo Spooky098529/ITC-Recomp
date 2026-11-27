@@ -9,6 +9,10 @@
 
 #include <cstdint>
 
+namespace render {
+struct Viewport;
+}
+
 namespace native {
 
 // The device's shadow of the registers the renderer reads: a register's word
@@ -93,19 +97,20 @@ struct DrawRegisters {
   uint32_t NormalizedColorMask(uint32_t pixel_shader_writes_targets,
                                const uint32_t color_write[4]) const;
 
-  // The host viewport (integer pixels, unscaled) and how the shaders
-  // rescale positions into it (ndc_scale, ndc_offset), as the SDK's
-  // GetHostViewportInfo for this renderer's arguments: no resolution scale,
-  // origin top left, 8192 pixels at most, reverse Z allowed, Z neither
-  // converted nor written by pixel shaders, the half-pixel offset on.
   struct Viewport {
     uint32_t offset[2], extent[2];
     float z_min, z_max;
     float ndc_scale[3], ndc_offset[3];
   };
-  // viewport_enable and half_pixel_offset: the render states
-  // (render/state.h).
-  Viewport HostViewport(bool viewport_enable, bool half_pixel_offset) const;
 };
+
+// The host viewport (integer pixels, unscaled) and how the shaders rescale
+// positions into it (ndc_scale, ndc_offset), from D3D's viewport and the
+// ViewportEnable and HalfPixelOffset render states (render/state.h), as the
+// SDK's GetHostViewportInfo for this renderer's arguments: no resolution
+// scale, origin top left, 8192 pixels at most, D3D's clip space, Z neither
+// converted nor written by pixel shaders.
+DrawRegisters::Viewport HostViewport(const render::Viewport& viewport, bool viewport_enable,
+                                     bool half_pixel_offset);
 
 }  // namespace native
