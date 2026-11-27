@@ -23,6 +23,9 @@ struct BlendState {
   VkBlendOp color_op = VK_BLEND_OP_ADD;
   VkBlendFactor src_alpha = VK_BLEND_FACTOR_ONE, dst_alpha = VK_BLEND_FACTOR_ZERO;
   VkBlendOp alpha_op = VK_BLEND_OP_ADD;
+  // The fields as the game gave them (the blend control's layout), for
+  // diagnostics.
+  uint32_t fields = 0x00010001;
   bool operator==(const BlendState&) const = default;
 };
 

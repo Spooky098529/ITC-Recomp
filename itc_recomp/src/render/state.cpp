@@ -70,6 +70,7 @@ uint32_t AlphaFromColor(uint32_t blend) {
 
 BlendState Decode(uint32_t control) {
   BlendState b;
+  b.fields = control;
   b.src_color = BlendFactor(control & 0x1F);
   b.color_op = BlendOp(control >> 5 & 7);
   b.dst_color = BlendFactor(control >> 8 & 0x1F);

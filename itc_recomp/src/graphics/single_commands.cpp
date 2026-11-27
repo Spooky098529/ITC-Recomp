@@ -73,43 +73,22 @@ uint32_t SetShaderConstants(uint32_t slot, uint32_t sp, const GuestCall& call) {
     return 0;
   }
   const bool vertex = shader == 0;
-  // The bool constants: the vertex shader's setter (sub_822A8418, not seen
-  // in play) a guest call, the pixel shader's its plain C++.
+  // The constants are our renderer's (the device's setters no longer
+  // called).
   auto set_bools = [&](uint32_t values, uint32_t count) {
     const uint32_t first = single.first_register();
     render::SetConstants(vertex, 2, first, count, values);
-    const uint32_t device = Globals::replay_device();
-    if (vertex) {
-      call(0x822A8418, frame, 0x8258F250, {device, first, values, count});
-    } else {
-      device_state::SetPixelShaderConstantB(device, first, values, count);
-    }
   };
   switch (single.argument1()) {
     case 0: {  // the loop constants (sub_822A84C8, sub_822A8518): not seen in play
       const uint32_t count = single.register_count();
       const uint32_t first = single.first_register();
-      const uint32_t device = Globals::replay_device();
-      call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258F160 : 0x8258F2BC,
-           {device, first, data, count});
       render::SetConstants(vertex, 0, first, count, data);
       break;
     }
-    case 1: {  // the floats, with the dirty mask of the 4-register blocks
+    case 1: {  // the floats
       const uint32_t first = single.first_register();
       const uint32_t count = single.register_count();
-      const uint32_t device = Globals::replay_device();
-      const uint32_t last_block = uint32_t(first + count - 1) >> 2;
-      const uint32_t first_block = first >> 2;
-      uint32_t shift = (last_block - first_block) & 0x7F;
-      if (shift > 63) shift = 63;
-      const int64_t ones = int64_t(0x8000000000000000ull) >> shift;
-      const uint64_t dirty = (first_block & 0x40) ? 0 : (uint64_t(ones) >> (first_block & 0x7F));
-      if (vertex) {
-        device_state::SetVertexShaderConstantF(device, first, data, count, dirty);
-      } else {
-        device_state::SetPixelShaderConstantF(device, first, data, count, dirty);
-      }
       render::SetConstants(vertex, 1, first, count, data);
       break;
     }
@@ -148,13 +127,12 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
   if (guest::LoadU32(Globals::replay_drawer_state() + 16) == 0) {
     return 0;
   }
-  const uint32_t viewport = device_state::GetViewportEnable(Globals::replay_device());
   const bool render_viewport = render::States().viewport_enable;
   {
     const uint32_t state = Globals::replay_drawer_state();
     const uint32_t device = Globals::replay_device();
     const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
-    device_state::SetViewportEnable(device, on);
+    (void)device;
     render::SetRenderState(304, on);
   }
   {
@@ -183,7 +161,6 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     }
     render::SetTexture(0, 0);
   }
-  device_state::SetViewportEnable(Globals::replay_device(), viewport);
   render::SetRenderState(304, render_viewport ? 1 : 0);
   return 0;
 }

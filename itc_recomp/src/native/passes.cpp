@@ -890,16 +890,6 @@ struct Passes::State {
   // hands the target's image to the destination texture instead
   // (docs/pc-renderer.md, step 4; --native_renderer_hand_over_resolves).
   bool hand_over_resolves = true;
-  // The renderer's own render states (render/state.h) against the
-  // device's shadow at each draw, differences logged
-  // (--native_renderer_check_render_states).
-  bool check_render_states = false;
-  uint64_t render_state_mismatches[28] = {};
-  void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
-  void CheckTargets(uint32_t device);
-  void CheckBindings(uint32_t device, const TranslatedShader* vertex, bool inline_vertices);
-  void CheckConstants(uint32_t device, const TranslatedShader* vertex,
-                      const TranslatedShader* pixel);
   // The depth format can be sampled with linear filtering (the depth
   // resolves' readers' samplers may ask for it).
   bool depth_filterable = false;
@@ -1149,17 +1139,7 @@ struct Passes::State {
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
-  // The device's fetch constants as the shadow holds them, for
-  // --native_renderer_check_render_states.
-  uint32_t shadow_fetch[kFetchConstantWords] = {};
-  void ReadState(uint32_t device) {
-    // The device's shadow only for the diagnostics that compare with it or
-    // describe it (the render state check, a dump's draw records): nothing
-    // the draw uses comes from it.
-    if (check_render_states || record_draws) {
-      regs.Read(device);
-      std::memcpy(shadow_fetch, regs.fetch, sizeof(shadow_fetch));
-    }
+  void ReadState(uint32_t) {
     // The fetch constants from the renderer's own state (render/state.h):
     // the sampler stages' texture descriptors (constants 0-25, 6 words
     // each), and each stream's vertex fetch constant (95 - stream, 2
@@ -3333,16 +3313,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                                     regs.fetch[2 * k + 1]});
       }
     }
-    r.render_state = {regs.depth_control,
-                      regs.blend_control[0],
-                      regs.color_control,
-                      regs.edram_mode,
-                      regs.color_mask,
-                      std::bit_cast<uint32_t>(regs.blend_constants[0]),
-                      std::bit_cast<uint32_t>(regs.blend_constants[1]),
-                      std::bit_cast<uint32_t>(regs.blend_constants[2]),
-                      std::bit_cast<uint32_t>(regs.blend_constants[3]),
-                      std::bit_cast<uint32_t>(regs.alpha_ref)};
+    // The render states in the registers' layouts the dump prints them in.
+    const render::RenderStates& rs = render::States();
+    r.render_state = {uint32_t(rs.z_enable) << 1 | uint32_t(rs.z_write) << 2 |
+                          uint32_t(rs.z_func) << 4,
+                      rs.blend[0].fields,
+                      uint32_t(rs.alpha_func) | uint32_t(rs.alpha_test) << 3,
+                      pixel_object ? 4u : 5u,
+                      rs.color_write[0],
+                      std::bit_cast<uint32_t>(rs.blend_constants[0]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[1]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[2]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[3]),
+                      std::bit_cast<uint32_t>(rs.alpha_ref)};
     for (const TranslatedShader* shader : {vertex, pixel}) {
       for (size_t i = 0; shader && i < shader->textures.size(); i++) {
         const ShaderTexture& texture = shader->textures[i];
@@ -3715,12 +3698,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     s.stats.failed++;
     return;
   }
-  if (s.check_render_states) {
-    s.CheckRenderStates(color != nullptr, depth != nullptr, device);
-    s.CheckTargets(device);
-    s.CheckBindings(device, vertex, call.inline_vertices);
-    s.CheckConstants(device, vertex, pixel);
-  }
   VkPipeline pipeline = s.GetPipeline(key);
   if (s.watch_draws && main_view_draw &&
       (!s.watch_pixel_shader || (pixel && pixel->hash == s.watch_pixel_shader))) {
@@ -3728,7 +3705,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[0]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[1]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[2]),
-                regs.bool_loop,
+                render::ShaderConstants().bool_loop,
                 regs.fetch);
   }
   if (!pipeline) {
@@ -4142,7 +4119,6 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
-  s.regs.vertex_index_offset = 0;
   s.Draw(commands, device, call);
 }
 
@@ -4559,274 +4535,6 @@ std::string Passes::TakeInterfaces() {
   return text;
 }
 
-
-void Passes::State::CheckRenderStates(bool has_color, bool has_depth, uint32_t device) {
-  const render::RenderStates& r = render::States();
-  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
-    if (same) {
-      return;
-    }
-    if (render_state_mismatches[field]++ < 3) {
-      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
-                   "{})",
-                   name, detail, g_current_command);
-    }
-  };
-  if (has_depth) {
-    check(0, "z_enable", r.z_enable == regs.z_enable(),
-          std::format("ours {} shadow {}", r.z_enable, regs.z_enable()));
-    check(1, "z_write", r.z_write == regs.z_write(),
-          std::format("ours {} shadow {}", r.z_write, regs.z_write()));
-    check(2, "z_func", uint32_t(r.z_func) == regs.z_func(),
-          std::format("ours {} shadow {}", int(r.z_func), regs.z_func()));
-  }
-  VkCullModeFlags cull = (regs.cull_front() ? VK_CULL_MODE_FRONT_BIT : 0) |
-                         (regs.cull_back() ? VK_CULL_MODE_BACK_BIT : 0);
-  check(3, "cull", r.cull == cull && r.front_clockwise == regs.front_clockwise(),
-        std::format("ours {} {} shadow {} {}", r.cull, r.front_clockwise, cull,
-                    regs.front_clockwise()));
-  const uint32_t b = regs.blend_control[0];
-  render::BlendState shadow_blend;
-  shadow_blend.src_color = render::BlendFactor(b & 0x1F);
-  shadow_blend.color_op = render::BlendOp(b >> 5 & 7);
-  shadow_blend.dst_color = render::BlendFactor(b >> 8 & 0x1F);
-  shadow_blend.src_alpha = render::BlendFactor(b >> 16 & 0x1F);
-  shadow_blend.alpha_op = render::BlendOp(b >> 21 & 7);
-  shadow_blend.dst_alpha = render::BlendFactor(b >> 24 & 0x1F);
-  render::BlendState ours = r.blend[0];
-  ours.enable = shadow_blend.enable = false;
-  check(4, "blend", ours == shadow_blend, std::format("shadow {:08X}", b));
-  if (has_color) {
-    check(5, "color_write", r.color_write[0] == (regs.color_mask & 0xF),
-          std::format("ours {:X} shadow {:X}", r.color_write[0], regs.color_mask & 0xF));
-  }
-  check(6, "blend_constants",
-        !std::memcmp(r.blend_constants, regs.blend_constants, sizeof(r.blend_constants)),
-        std::format("ours {} {} {} {} shadow {} {} {} {}", r.blend_constants[0],
-                    r.blend_constants[1], r.blend_constants[2], r.blend_constants[3],
-                    regs.blend_constants[0], regs.blend_constants[1], regs.blend_constants[2],
-                    regs.blend_constants[3]));
-  check(7, "alpha_test",
-        r.alpha_test == regs.alpha_test() && uint32_t(r.alpha_func) == regs.alpha_func() &&
-            r.alpha_ref == regs.alpha_ref,
-        std::format("ours {} {} {} shadow {} {} {}", r.alpha_test, int(r.alpha_func),
-                    r.alpha_ref, regs.alpha_test(), regs.alpha_func(), regs.alpha_ref));
-  bool bias_on = r.depth_bias_slope != 0.0f || r.depth_bias_constant != 0.0f;
-  check(8, "depth_bias",
-        r.depth_bias_slope == regs.polygon_offset[0] &&
-            r.depth_bias_constant == regs.polygon_offset[1] &&
-            bias_on == regs.polygon_offset_front() && bias_on == regs.polygon_offset_back(),
-        std::format("ours {} {} shadow {} {} enables {} {}", r.depth_bias_slope,
-                    r.depth_bias_constant, regs.polygon_offset[0], regs.polygon_offset[1],
-                    regs.polygon_offset_front(), regs.polygon_offset_back()));
-  check(9, "primitive_restart", r.primitive_restart == regs.primitive_restart(),
-        std::format("ours {} shadow {}", r.primitive_restart, regs.primitive_restart()));
-  check(10, "viewport_enable",
-        regs.viewport_control == (r.viewport_enable ? 0x43Fu : 0x400u) &&
-            regs.clip_disable() == !r.viewport_enable,
-        std::format("ours {} shadow VTE {:X} clip disable {}", r.viewport_enable,
-                    regs.viewport_control, regs.clip_disable()));
-  check(11, "half_pixel_offset", r.half_pixel_offset == ((regs.vertex_control & 1) != 0),
-        std::format("ours {} shadow {}", r.half_pixel_offset, regs.vertex_control & 1));
-  bool scissor = guest::LoadU32(device + kDeviceScissorEnable) != 0;
-  check(12, "scissor_enable", r.scissor_enable == scissor,
-        std::format("ours {} shadow {}", r.scissor_enable, scissor));
-  if (scissor) {
-    int32_t rect[4];
-    for (uint32_t i = 0; i < 4; i++) {
-      rect[i] = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4 * i));
-    }
-    check(13, "scissor_rect", !std::memcmp(rect, r.scissor, sizeof(rect)),
-          std::format("ours {},{}-{},{} shadow {},{}-{},{}", r.scissor[0], r.scissor[1],
-                      r.scissor[2], r.scissor[3], rect[0], rect[1], rect[2], rect[3]));
-  }
-}
-
-void Passes::State::CheckTargets(uint32_t device) {
-  const render::Targets& t = render::BoundTargets();
-  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
-    if (same) {
-      return;
-    }
-    if (render_state_mismatches[field]++ < 3) {
-      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
-                   "{})",
-                   name, detail, g_current_command);
-    }
-  };
-  uint32_t bound[5];
-  for (uint32_t i = 0; i < 4; i++) {
-    bound[i] = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * i);
-  }
-  bound[4] = guest::LoadU32(device + kDeviceDepthStencil);
-  check(14, "targets",
-        !std::memcmp(bound, t.color, sizeof(t.color)) && bound[4] == t.depth,
-        std::format("ours {:08X} {:08X} {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X} {:08X} "
-                    "{:08X}",
-                    t.color[0], t.color[1], t.color[2], t.color[3], t.depth, bound[0], bound[1],
-                    bound[2], bound[3], bound[4]));
-  const render::Viewport& v = t.viewport;
-  float x_scale = float(double(v.width)) * 0.5f, y_scale = float(double(v.height)) * 0.5f;
-  float scale[3] = {x_scale, -y_scale, v.max_z - v.min_z};
-  float offset[3] = {float(double(v.x)) + x_scale, float(double(v.y)) + y_scale, v.min_z};
-  check(15, "viewport",
-        !std::memcmp(scale, regs.viewport_scale, sizeof(scale)) &&
-            !std::memcmp(offset, regs.viewport_offset, sizeof(offset)),
-        std::format("ours {} {} {} / {} {} {} shadow {} {} {} / {} {} {}", scale[0], scale[1],
-                    scale[2], offset[0], offset[1], offset[2], regs.viewport_scale[0],
-                    regs.viewport_scale[1], regs.viewport_scale[2], regs.viewport_offset[0],
-                    regs.viewport_offset[1], regs.viewport_offset[2]));
-  if (t.color[0]) {
-    uint32_t info = guest::LoadU32(t.color[0] + 28);
-    check(16, "color_exp_bias",
-          (int32_t(info << 6) >> 26) == regs.color_exp_bias(0) &&
-              ((info >> 16 & 0xF) == regs.color_format(0) ||
-               ((info >> 16 & 0xF) | 8) == (regs.color_format(0) | 8)),
-          std::format("surface {:08X} shadow {:08X}", info, regs.color_info[0]));
-  }
-  if (t.depth) {
-    uint32_t info = guest::LoadU32(t.depth + 28);
-    check(17, "depth_float24", (info >> 16 & 1) == uint32_t(regs.depth_float24()),
-          std::format("surface {:08X} shadow {:08X}", info, regs.depth_info));
-  }
-  check(18, "clip_space", regs.direct3d_clip_space(),
-        std::format("clip control {:08X}", regs.clip_control));
-}
-
-void Passes::State::CheckBindings(uint32_t device, const TranslatedShader* vertex,
-                                  bool inline_vertices) {
-  const render::Bindings& b = render::BoundResources();
-  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
-    if (same) {
-      return;
-    }
-    if (render_state_mismatches[field]++ < 3) {
-      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
-                   "{})",
-                   name, detail, g_current_command);
-    }
-  };
-  uint32_t shadow[4] = {guest::LoadU32(device + kDeviceVertexShader),
-                        guest::LoadU32(device + kDevicePixelShader),
-                        guest::LoadU32(device + kDeviceVertexDeclaration),
-                        guest::LoadU32(device + kDeviceIndexBuffer)};
-  uint32_t ours[4] = {b.vertex_shader, b.pixel_shader, b.declaration, b.index_buffer};
-  check(19, "bound objects", !std::memcmp(shadow, ours, sizeof(ours)) || inline_vertices,
-        std::format("ours {:08X} {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X} {:08X}",
-                    ours[0], ours[1], ours[2], ours[3], shadow[0], shadow[1], shadow[2],
-                    shadow[3]));
-  if (inline_vertices) {
-    check(19, "bound shaders",
-          shadow[0] == ours[0] && shadow[1] == ours[1] && shadow[2] == ours[2],
-          std::format("ours {:08X} {:08X} {:08X} shadow {:08X} {:08X} {:08X}", ours[0], ours[1],
-                      ours[2], shadow[0], shadow[1], shadow[2]));
-  } else {
-    for (uint32_t k = 80; vertex && k < 96; k++) {
-      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-        continue;
-      }
-      const uint32_t* words = b.stream_fetch[95 - k];
-      check(20, "stream fetch",
-            words[0] == shadow_fetch[2 * k] && words[1] == shadow_fetch[2 * k + 1],
-            std::format("constant {} ours {:08X} {:08X} shadow {:08X} {:08X}", k, words[0],
-                        words[1], shadow_fetch[2 * k], shadow_fetch[2 * k + 1]));
-    }
-    // The streams the shader fetches from (fetch constant 95 - stream).
-    for (uint32_t k = 80; vertex && k < 96; k++) {
-      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-        continue;
-      }
-      uint8_t stride = guest::LoadU8(device + kDeviceStreamStrides + (95 - k));
-      check(21, "strides", stride == b.strides[95 - k],
-            std::format("stream {} ours {} shadow {}", 95 - k, b.strides[95 - k], stride));
-    }
-  }
-  uint32_t program_control, context_misc;
-  render::ShaderControls(program_control, context_misc);
-  check(22, "shader controls",
-        program_control == regs.program_control && context_misc == regs.context_misc,
-        std::format("ours {:08X} {:08X} shadow {:08X} {:08X}", program_control, context_misc,
-                    regs.program_control, regs.context_misc));
-  check(23, "color drawn", (b.pixel_shader != 0) == regs.draws_color() && regs.draws_depth(),
-        std::format("pixel shader {:08X} mode {}", b.pixel_shader, regs.edram_mode & 7));
-}
-
-void Passes::State::CheckConstants(uint32_t device, const TranslatedShader* vertex,
-                                   const TranslatedShader* pixel) {
-  const render::Constants& c = render::ShaderConstants();
-  for (uint32_t stage = 0; stage < 2; stage++) {
-    const TranslatedShader* shader = stage == 0 ? vertex : pixel;
-    if (!shader) {
-      continue;
-    }
-    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
-                                           : kDevicePixelFloatConstants);
-    for (uint32_t r = 0; r < 256; r++) {
-      if (!(shader->float_constants[r >> 6] & (uint64_t(1) << (r & 63)))) {
-        continue;
-      }
-      float shadow[4];
-      for (uint32_t i = 0; i < 4; i++) {
-        shadow[i] = guest::LoadFloat(source + 16 * r + 4 * i);
-      }
-      if (std::memcmp(shadow, c.floats[stage][r], 16) &&
-          render_state_mismatches[24]++ < 3) {
-        ITC_LOG_INFO("native renderer: render state float constant differs from the "
-                     "shadow's: {} c{} ours {} {} {} {} shadow {} {} {} {} (command {})",
-                     stage ? "pixel" : "vertex", r, c.floats[stage][r][0],
-                     c.floats[stage][r][1], c.floats[stage][r][2], c.floats[stage][r][3],
-                     shadow[0], shadow[1], shadow[2], shadow[3], g_current_command);
-      }
-    }
-  }
-  for (const TranslatedShader* shader : {vertex, pixel}) {
-    for (size_t i = 0; shader && i < shader->textures.size() + shader->samplers.size(); i++) {
-      uint32_t k = i < shader->textures.size()
-                       ? shader->textures[i].fetch_constant
-                       : shader->samplers[i - shader->textures.size()].fetch_constant;
-      if (k >= 26) {
-        continue;
-      }
-      const uint32_t* ours = render::TextureDescriptor(k);
-      if (std::memcmp(ours, &shadow_fetch[6 * k], 24) && render_state_mismatches[26]++ < 6) {
-        ITC_LOG_INFO("native renderer: render state texture descriptor {} differs from the "
-                     "shadow's: ours {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} shadow {:08X} "
-                     "{:08X} {:08X} {:08X} {:08X} {:08X} (command {})",
-                     k, ours[0], ours[1], ours[2], ours[3], ours[4], ours[5], shadow_fetch[6 * k],
-                     shadow_fetch[6 * k + 1], shadow_fetch[6 * k + 2], shadow_fetch[6 * k + 3],
-                     shadow_fetch[6 * k + 4], shadow_fetch[6 * k + 5], g_current_command);
-      }
-    }
-  }
-  for (uint32_t i = 0; i < 40; i++) {
-    if (c.bool_loop[i] != regs.bool_loop[i] && render_state_mismatches[25]++ < 3) {
-      ITC_LOG_INFO("native renderer: render state bool/loop word {} differs from the "
-                   "shadow's: ours {:08X} shadow {:08X} (command {}; vs {:016X} ps {:016X})",
-                   i, c.bool_loop[i], regs.bool_loop[i], g_current_command,
-                   vertex ? vertex->hash : 0, pixel ? pixel->hash : 0);
-    }
-  }
-}
-
-void Passes::set_check_render_states(bool check) {
-  state_->check_render_states = check;
-}
-
-std::string Passes::TakeRenderStateChecks() {
-  State& s = *state_;
-  static const char* const kNames[27] = {
-      "z_enable",      "z_write",         "z_func",       "cull",
-      "blend",         "color_write",     "blend_constants", "alpha_test",
-      "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
-      "scissor_enable", "scissor_rect", "targets", "viewport", "color_exp_bias",
-      "depth_float24", "clip_space", "bound objects", "stream fetch", "strides",
-      "shader controls", "color drawn", "float constants", "bool/loop", "textures"};
-  std::string text;
-  for (int i = 0; i < 27; i++) {
-    text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
-  }
-  return text;
-}
 
 void Passes::set_hand_over_resolves(bool hand_over) {
   state_->hand_over_resolves = hand_over;

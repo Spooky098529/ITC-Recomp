@@ -1,6 +1,6 @@
 // The graphics device's fields the native renderer reads, and the
-// physical memory's addresses. The draw's register state is read by
-// draw_registers.h.
+// physical memory's addresses (the draw's state is the renderer's own,
+// render/state.h).
 
 #pragma once
 

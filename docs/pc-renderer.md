@@ -637,9 +637,23 @@ and resolve on one 256x144 target in turn, then the main view draws on
   earlier build's at the same moment (2,413 draws, 0.016% of pixels off),
   the tick replay (both races match).
 
-Left for step 3: the game's setters out of the handlers (only game code
-outside the replay that reads the Direct3D state keeps what it needs),
-and `replay_hooks.cpp`.
+- **The setters out of the handlers, first part (2026-11-27).** The
+  handlers no longer call the game's render state, sampler state, blend
+  control, constant, declaration, viewport, scissor and viewport-enable
+  setters (the drawer's and single commands' included): with the shader
+  load, Clear and Resolve no longer run, nothing else read what they wrote
+  (the one getter, ViewportEnable, was the drawer handlers' own; they keep
+  `render::`'s instead). The render state check went with the shadow it
+  compared against; `draw_registers.{h,cpp}` keep only the draw's fetch
+  constant block, the write mask and the host viewport; a dump's draw
+  records describe `render::`'s states. Checked: an attract race's frame,
+  the pad replay with dumps (the tuning shop, both races), the tick replay
+  (both races match).
+
+Left for step 3: the setters with obligations (SetTexture's and the
+streams' and indices' fences, the shaders' reference counts, the render
+targets' bookkeeping) out of the handlers where nothing needs them, and
+`replay_hooks.cpp`.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

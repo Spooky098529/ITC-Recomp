@@ -2,35 +2,13 @@
 
 #include "render/state.h"
 
-#include "guest.h"
-
 #include <algorithm>
-#include <bit>
 #include <cmath>
-#include <cstring>
+#include <cstdint>
 
 namespace native {
 
 namespace {
-
-// The shadow's blocks: first register, registers, offset in the device.
-struct ShadowBlock {
-  uint32_t first_register, count, offset;
-};
-constexpr ShadowBlock kBlocks[] = {
-    {0x2000, 16, 10240}, {0x2100, 21, 10316}, {0x2180, 5, 10400}, {0x2200, 12, 10420},
-    {0x2280, 21, 10468}, {0x2300, 38, 10552}, {0x2380, 4, 10704},
-};
-// The fetch constants (32 of 6 words), and the bool and loop constants
-// (8 words, vertex then pixel, then 32), one after the other.
-constexpr uint32_t kFetchOffset = 1024, kBoolLoopOffset = 9984;
-
-uint32_t Word(uint32_t device, uint32_t reg) {
-  return guest::LoadU32(device + ShadowOffset(reg));
-}
-float Float(uint32_t device, uint32_t reg) {
-  return std::bit_cast<float>(Word(device, reg));
-}
 
 float ClampFloat(float value, float low, float high) {
   float clamped = std::isgreater(value, low) ? value : low;
@@ -49,46 +27,8 @@ uint32_t ComponentCount(uint32_t format) {
   }
 }
 
+
 }  // namespace
-
-uint32_t ShadowOffset(uint32_t reg) {
-  for (const ShadowBlock& block : kBlocks) {
-    if (reg >= block.first_register && reg < block.first_register + block.count) {
-      return block.offset + 4 * (reg - block.first_register);
-    }
-  }
-  return 0;
-}
-
-void DrawRegisters::Read(uint32_t device) {
-  guest::CopyU32s(device + kFetchOffset, fetch, kFetchConstantWords);
-  guest::CopyU32s(device + kBoolLoopOffset, bool_loop, kBoolLoopConstantWords);
-  depth_control = Word(device, gpu_reg::kDepthControl);
-  color_control = Word(device, gpu_reg::kColorControl);
-  clip_control = Word(device, gpu_reg::kClipControl);
-  mode_control = Word(device, gpu_reg::kModeControl);
-  viewport_control = Word(device, gpu_reg::kViewportControl);
-  edram_mode = Word(device, gpu_reg::kEdramModeControl);
-  vertex_control = Word(device, gpu_reg::kVertexControl);
-  color_mask = Word(device, gpu_reg::kColorMask);
-  depth_info = Word(device, gpu_reg::kDepthInfo);
-  for (uint32_t i = 0; i < 4; i++) {
-    blend_control[i] = Word(device, gpu_reg::kBlendControl[i]);
-    color_info[i] = Word(device, gpu_reg::kColorInfo[i]);
-    blend_constants[i] = Float(device, gpu_reg::kBlendRed + i);
-    polygon_offset[i] = Float(device, gpu_reg::kPolygonOffset + i);
-  }
-  vertex_index_min = Word(device, gpu_reg::kVertexIndexMin);
-  vertex_index_max = Word(device, gpu_reg::kVertexIndexMax);
-  vertex_index_offset = int32_t(Word(device, gpu_reg::kVertexIndexOffset));
-  program_control = Word(device, gpu_reg::kProgramControl);
-  context_misc = Word(device, gpu_reg::kContextMisc);
-  alpha_ref = Float(device, gpu_reg::kAlphaRef);
-  for (uint32_t i = 0; i < 3; i++) {
-    viewport_scale[i] = Float(device, gpu_reg::kViewportXScale + 2 * i);
-    viewport_offset[i] = Float(device, gpu_reg::kViewportXScale + 2 * i + 1);
-  }
-}
 
 uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets,
                                             const uint32_t color_write[4],

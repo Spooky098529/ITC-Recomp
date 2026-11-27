@@ -73,10 +73,6 @@ ITC_FLAG_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
 ITC_FLAG_BOOL(native_renderer_watch_draws, false, "ITC",
               "Log what changes in the main view's draws' inputs between frames: with the "
               "camera still, only flickering draws should (a debugging aid)");
-ITC_FLAG_BOOL(native_renderer_check_render_states, false, "ITC",
-              "Compare the renderer's own render states (render/state.h, set by the replay's "
-              "handlers) with the device's register shadow at each draw, logging differences "
-              "(docs/pc-renderer.md, step 3)");
 ITC_FLAG_BOOL(native_renderer_hand_over_resolves, true, "ITC",
               "Hand a pass's image to its resolve's destination texture when the resolve is a "
               "whole-image copy from a single-sample target, instead of copying "
@@ -725,7 +721,6 @@ VkCommandBuffer Renderer::BeginFrame() {
         std::strtoull(ITC_FLAG(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(ITC_FLAG(native_renderer_hide_cubes));
     passes_.set_hand_over_resolves(ITC_FLAG(native_renderer_hand_over_resolves));
-    passes_.set_check_render_states(ITC_FLAG(native_renderer_check_render_states));
     passes_.set_base_level_only(ITC_FLAG(native_renderer_base_level_only));
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
@@ -987,10 +982,6 @@ void Renderer::LogStats() {
                double(view.depth_biased) / frames, double(view.depth_equal) / frames,
                view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
                view.tiled_resolves);
-  if (ITC_FLAG(native_renderer_check_render_states)) {
-    ITC_LOG_INFO("native renderer: render state checks, draws differing: {}",
-                 passes_.TakeRenderStateChecks());
-  }
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   ITC_LOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "

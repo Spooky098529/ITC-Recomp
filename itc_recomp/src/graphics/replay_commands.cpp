@@ -55,14 +55,10 @@ uint32_t PrimitiveCount(uint32_t type, uint32_t primitives) {
 uint32_t SetRenderStates(uint32_t items, uint32_t count, uint32_t sp,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FBD0 Command::SetRenderStates");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's setters no longer called: nothing else
+  // reads what they wrote).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t state = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t value = guest::LoadU32(item + 4);
-    const uint32_t setter = guest::LoadU32(device + state + 56);
-    call(setter, frame, 0x8258FC10, {device, value}, std::nullopt);
-    render::SetRenderState(state, value);
+    render::SetRenderState(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -70,15 +66,10 @@ uint32_t SetRenderStates(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetSamplerStates(uint32_t items, uint32_t count, uint32_t sp,
                           const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FC30 Command::SetSamplerStates");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's setters no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t state = guest::LoadU32(item + 4);
-    const uint32_t device = Device();
-    const uint32_t value = guest::LoadU32(item + 8);
-    const uint32_t sampler = guest::LoadU32(item);
-    const uint32_t setter = guest::LoadU32(device + state + 440);
-    call(setter, frame, 0x8258FC74, {device, sampler, value}, std::nullopt);
-    render::SetSamplerState(sampler, state, value);
+    render::SetSamplerState(guest::LoadU32(item), guest::LoadU32(item + 4),
+                            guest::LoadU32(item + 8));
   }
   return count;
 }
@@ -86,9 +77,7 @@ uint32_t SetSamplerStates(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetBlendControls(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_8258FC90 Command::SetBlendControls");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t value = guest::LoadU32(item + 4);
-    ds::SetBlendControl(Device(), guest::LoadU32(item), value);
-    render::SetBlendControl(guest::LoadU32(item), value);
+    render::SetBlendControl(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -139,34 +128,10 @@ uint32_t SetShaderConstants(uint32_t payload, uint32_t count, uint32_t packed,
   const bool vertex = stage == 0;
   const uint32_t type = uint32_t(int32_t(packed << 8) >> 24);
   const uint32_t first = (packed >> 8) & 0xFF;
+  // Our renderer's (the device's constant setters no longer called).
   render::SetConstants(vertex, type, first, count, payload);
+  (void)frame;
   switch (type) {
-    case 0:  // the loop constants (sub_822A84C8, sub_822A8518)
-      call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258FDB8 : 0x8258FED4,
-           {Device(), first, payload, count}, std::nullopt);
-      break;
-    case 1: {  // the floats, with the dirty mask of their 4-register blocks
-      const uint32_t last_block = uint32_t(first + count - 1) >> 2;
-      const uint32_t first_block = first >> 2;
-      uint32_t shift = (last_block - first_block) & 0x7F;
-      if (shift > 63) shift = 63;
-      const int64_t ones = int64_t(0x8000000000000000ull) >> shift;
-      const uint64_t dirty = (first_block & 0x40) ? 0 : (uint64_t(ones) >> (first_block & 0x3F));
-      if (vertex) {
-        ds::SetVertexShaderConstantF(Device(), first, payload, count, dirty);
-      } else {
-        ds::SetPixelShaderConstantF(Device(), first, payload, count, dirty);
-      }
-      break;
-    }
-    case 2:  // the bools: the vertex shader's setter (sub_822A8418) a guest call
-      if (vertex) {
-        call(0x822A8418, frame, 0x8258FE40, {Device(), first, payload, count},
-             std::nullopt);
-      } else {
-        ds::SetPixelShaderConstantB(Device(), first, payload, count);
-      }
-      break;
     case 3:  // OutputDebugStringA("aaaa...\n") (0x8206CB64), which goes nowhere
       helpers::DebugOutput(nullptr);
       break;
@@ -203,10 +168,7 @@ uint32_t SetPixelShaders(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetVertexDeclarations(uint32_t items, uint32_t count, uint32_t sp,
                                const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FFF0 Command::SetVertexDeclarations");
-  const uint32_t frame = Frame(sp, 128);
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    call(0x822A8960, frame, 0x82590020, {Device(), guest::LoadU32(item)},
-         std::nullopt);
     render::SetVertexLayout(guest::LoadU32(item));
   }
   return count;
@@ -282,11 +244,9 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
     if (guest::LoadU32(guest::LoadU32(kDrawerState) + 16) == 0) {
       continue;
     }
-    ds::GetViewportEnable(Device());  // read, and not kept
     {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
-      ds::SetViewportEnable(Device(), on);
       render::SetRenderState(304, on);
     }
     {
@@ -300,7 +260,6 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
       render::DrawUP(guest::LoadU32(state + 0), guest::LoadU32(state + 16), 24,
                      guest::LoadU32(state + 12));
     }
-    ds::SetViewportEnable(Device(), 1);
     render::SetRenderState(304, 1);
   }
   return count;
@@ -313,11 +272,10 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
     if (guest::LoadU32(guest::LoadU32(kDrawerState) + 16) == 0) {
       continue;
     }
-    const uint32_t viewport = ds::GetViewportEnable(Device());
+    const uint32_t viewport = render::States().viewport_enable ? 1 : 0;
     {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
-      ds::SetViewportEnable(Device(), on);
       render::SetRenderState(304, on);
     }
     {
@@ -333,7 +291,6 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
             guest::LoadU32(state + 24), guest::LoadU32(state + 28)},
            std::nullopt);
     }
-    ds::SetViewportEnable(Device(), viewport);
     render::SetRenderState(304, viewport);
   }
   return count;
@@ -587,7 +544,6 @@ uint32_t SetViewports(uint32_t items, uint32_t count, uint32_t sp) {
     guest::StoreU32(viewport + 4, guest::LoadU16(item + 2));
     guest::StoreU32(viewport + 8, guest::LoadU16(item + 4));
     guest::StoreU32(viewport + 12, guest::LoadU16(item + 6));
-    ds::SetViewport(Device(), viewport);
     render::SetViewport(guest::LoadU16(item + 0), guest::LoadU16(item + 2),
                         guest::LoadU16(item + 4), guest::LoadU16(item + 6),
                         guest::LoadFloat(item + 8), guest::LoadFloat(item + 12));
@@ -604,8 +560,6 @@ uint32_t SetScissorRects(uint32_t items, uint32_t count, uint32_t sp) {
       const int32_t value = int16_t(guest::LoadU16(item + 2 * c));
       guest::StoreU32(rect + 4 * c, uint32_t(value));
     }
-    ds::SetScissorTestEnable(Device(), 1);
-    ds::SetScissorRect(Device(), rect);
     render::SetRenderState(200, 1);
     render::SetScissorRect(int32_t(guest::LoadU32(rect)), int32_t(guest::LoadU32(rect + 4)),
                            int32_t(guest::LoadU32(rect + 8)),
