@@ -3310,47 +3310,49 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
   }
   bool skip = s.skip_repeated_state;
+  gpu::Backend& backend = *s.backend;
   if (!(skip && repeated[0])) {
-    vk::vkCmdSetViewport(commands, 0, 1, &viewport);
+    backend.SetViewport({viewport.x, viewport.y, viewport.width, viewport.height,
+                         viewport.minDepth, viewport.maxDepth});
   }
   if (!(skip && repeated[1])) {
-    vk::vkCmdSetScissor(commands, 0, 1, &scissor_rect);
+    backend.SetScissor({scissor_rect.offset.x, scissor_rect.offset.y, scissor_rect.extent.width,
+                        scissor_rect.extent.height});
   }
   if (!(skip && repeated[2])) {
-    vk::vkCmdSetDepthBias(commands, constant, 0.0f, slope);
+    backend.SetDepthBias(constant, slope);
   }
   if (!(skip && repeated[3])) {
-    vk::vkCmdSetBlendConstants(commands, blend_constants);
+    backend.SetBlendConstants(blend_constants);
   }
   if (!(skip && repeated[4])) {
-    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    backend.BindPipeline(pipeline_object);
   }
   if (!(skip && repeated[8])) {
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 4, sets,
                                 kConstantBlocks, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
-    vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
+    backend.BindIndexBuffer(s.arena.object(), now.index_offset,
+                            now.index_type == VK_INDEX_TYPE_UINT32);
   }
   bool vertex_repeated = last.valid && last.vertex_bindings == vertex_bindings &&
                          std::equal(vertex_offsets, vertex_offsets + vertex_bindings,
                                     last.vertex_offsets);
   if (vertex_bindings && !(skip && vertex_repeated)) {
-    VkBuffer buffers[kMaxVertexBindings];
-    std::fill(buffers, buffers + vertex_bindings, s.arena.buffer());
-    vk::vkCmdBindVertexBuffers(commands, 0, vertex_bindings, buffers, vertex_offsets);
+    backend.BindVertexBuffers(s.arena.object(), vertex_bindings, vertex_offsets);
   }
   // The base vertex is the vertex input's (VGT_INDX_OFFSET; 0 for inline
   // draws). A rectangle list is an instance a rectangle, four vertices each
   // (the vertex shader makes the fourth corner).
   if (rectangle_list) {
-    vk::vkCmdDraw(commands, 4, index_count / 3, 0, 0);
+    backend.Draw(4, index_count / 3, 0, 0);
   } else if (quad_list) {
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, base_vertex, 0);
+    backend.DrawIndexed(index_count / 4 * 6, 1, first_index, base_vertex, 0);
   } else if (call.inline_vertices) {
-    vk::vkCmdDraw(commands, index_count, 1, uint32_t(base_vertex), 0);
+    backend.Draw(index_count, 1, uint32_t(base_vertex), 0);
   } else {
-    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, base_vertex, 0);
+    backend.DrawIndexed(index_count, 1, first_index, base_vertex, 0);
   }
   if (!now.indexed && last.valid) {
     // A draw without indices leaves the earlier binding in place.

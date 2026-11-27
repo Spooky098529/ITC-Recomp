@@ -19,6 +19,7 @@
 #include <string>
 
 #include "device_context.h"
+#include "gpu/types.h"
 #include "vulkan_functions.h"
 
 namespace gpu::vulkan {
@@ -69,6 +70,7 @@ class VertexArena {
   uint32_t HeldBuffer(uint32_t object, uint32_t address, uint32_t endian) const;
 
   VkBuffer buffer() const;
+  gpu::Buffer* object() const;  // the buffer's
   // This frame's copies are all asked for (the backend submits them before
   // its drawing): the next frame's go into its own slot's staging.
   void EndUploads();

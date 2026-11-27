@@ -289,7 +289,18 @@ each backend.
   (`--native_renderer_show_resolve`'s blit and the dump's read-back).
   Checked: the dump identical, the tick replay, the pad replay, the boot
   movie without errors.
-- **Next:** binding and recording (step 3's largest piece): binds (pipeline, the texture sets from views
+- **The draw's binds and draws (2026-11-27).** `gpu::Viewport` and
+  `Backend::SetViewport`, `SetScissor`, `SetDepthBias`,
+  `SetBlendConstants`, `BindPipeline`, `BindVertexBuffers` (one buffer, an
+  offset a binding), `BindIndexBuffer`, `Draw` and `DrawIndexed`: the game's
+  draws record through them (the repeated-state skipping stays in
+  `passes.cpp`, comparing what it asks for). Checked: the dump identical,
+  the tick replay, the pad replay without errors.
+- **Next:** the descriptor sets (the texture sets from views and samplers,
+  with `passes.cpp`'s per-frame set cache and last-set reuse moving into
+  the backend; the constant blocks by offset), then the resolve, movie,
+  gamma and ID passes' own pipelines, shaders and binds; then the dumps.
+  Was: binds (pipeline, the texture sets from views
   and samplers, the constant blocks by offset, vertex and index buffers),
   draws, copies and resolves in the frame (the movie planes' copies too);
   then the resolve, movie, gamma and ID passes' own pipelines and shaders;

@@ -1120,6 +1120,50 @@ void Backend::BeginPass(const PassTarget& color, const PassTarget& depth, const 
 
 void Backend::EndPass() { vk::vkCmdEndRendering(commands()); }
 
+void Backend::SetViewport(const Viewport& v) {
+  VkViewport viewport{v.x, v.y, v.width, v.height, v.min_depth, v.max_depth};
+  vk::vkCmdSetViewport(commands(), 0, 1, &viewport);
+}
+
+void Backend::SetScissor(const Rect& r) {
+  VkRect2D scissor{{r.x, r.y}, {r.width, r.height}};
+  vk::vkCmdSetScissor(commands(), 0, 1, &scissor);
+}
+
+void Backend::SetDepthBias(float constant, float slope) {
+  vk::vkCmdSetDepthBias(commands(), constant, 0.0f, slope);
+}
+
+void Backend::SetBlendConstants(const float constants[4]) {
+  vk::vkCmdSetBlendConstants(commands(), constants);
+}
+
+void Backend::BindPipeline(Pipeline* pipeline) {
+  vk::vkCmdBindPipeline(commands(), VK_PIPELINE_BIND_POINT_GRAPHICS, Object(pipeline).pipeline);
+}
+
+void Backend::BindVertexBuffers(Buffer* buffer, uint32_t count, const uint64_t* offsets) {
+  VkBuffer buffers[32];
+  count = std::min<uint32_t>(count, 32);
+  std::fill(buffers, buffers + count, Handle(buffer));
+  vk::vkCmdBindVertexBuffers(commands(), 0, count, buffers, offsets);
+}
+
+void Backend::BindIndexBuffer(Buffer* buffer, uint64_t offset, bool index_32bit) {
+  vk::vkCmdBindIndexBuffer(commands(), Handle(buffer), offset,
+                           index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
+}
+
+void Backend::Draw(uint32_t vertices, uint32_t instances, uint32_t first_vertex,
+                   uint32_t first_instance) {
+  vk::vkCmdDraw(commands(), vertices, instances, first_vertex, first_instance);
+}
+
+void Backend::DrawIndexed(uint32_t indices, uint32_t instances, uint32_t first_index,
+                          int32_t base_vertex, uint32_t first_instance) {
+  vk::vkCmdDrawIndexed(commands(), indices, instances, first_index, base_vertex, first_instance);
+}
+
 void Backend::ClearColor(Image* image, const uint32_t bits[4]) {
   const ImageObject& o = Object(image);
   VkClearColorValue value;

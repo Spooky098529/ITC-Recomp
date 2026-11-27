@@ -120,6 +120,17 @@ class Backend final : public gpu::Backend {
   VkDescriptorSetLayout empty_layout() const { return empty_layout_; }
   VkDescriptorSetLayout constants_layout() const { return constants_layout_; }
   void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
+  void SetViewport(const Viewport& viewport) override;
+  void SetScissor(const Rect& scissor) override;
+  void SetDepthBias(float constant, float slope) override;
+  void SetBlendConstants(const float constants[4]) override;
+  void BindPipeline(Pipeline* pipeline) override;
+  void BindVertexBuffers(Buffer* buffer, uint32_t count, const uint64_t* offsets) override;
+  void BindIndexBuffer(Buffer* buffer, uint64_t offset, bool index_32bit) override;
+  void Draw(uint32_t vertices, uint32_t instances, uint32_t first_vertex,
+            uint32_t first_instance) override;
+  void DrawIndexed(uint32_t indices, uint32_t instances, uint32_t first_index, int32_t base_vertex,
+                   uint32_t first_instance) override;
   void ClearColor(Image* image, const uint32_t bits[4]) override;
   void ClearDepthStencil(Image* image, float depth, uint32_t stencil, bool clear_depth,
                          bool clear_stencil) override;

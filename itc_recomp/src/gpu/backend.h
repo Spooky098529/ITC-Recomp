@@ -93,6 +93,21 @@ class Backend {
   virtual void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) = 0;
   virtual void EndPass() = 0;
 
+  // In a pass: the draw's dynamic state, pipeline, vertex and index
+  // buffers, and the draws.
+  virtual void SetViewport(const Viewport& viewport) = 0;
+  virtual void SetScissor(const Rect& scissor) = 0;
+  virtual void SetDepthBias(float constant, float slope) = 0;
+  virtual void SetBlendConstants(const float constants[4]) = 0;
+  virtual void BindPipeline(Pipeline* pipeline) = 0;
+  // Bindings 0 to count - 1, all from `buffer`, at `offsets`.
+  virtual void BindVertexBuffers(Buffer* buffer, uint32_t count, const uint64_t* offsets) = 0;
+  virtual void BindIndexBuffer(Buffer* buffer, uint64_t offset, bool index_32bit) = 0;
+  virtual void Draw(uint32_t vertices, uint32_t instances, uint32_t first_vertex,
+                    uint32_t first_instance) = 0;
+  virtual void DrawIndexed(uint32_t indices, uint32_t instances, uint32_t first_index,
+                           int32_t base_vertex, uint32_t first_instance) = 0;
+
   // In the frame, outside passes, the images in their copy usages (the
   // cleared one copy destination). Level 0, layer 0.
   // A color image cleared to `bits` (four floats or integers).

@@ -664,6 +664,10 @@ VkBuffer VertexArena::buffer() const {
   return state_->buffer;
 }
 
+gpu::Buffer* VertexArena::object() const {
+  return state_->object;
+}
+
 void VertexArena::EndUploads() {
   state_->recording = false;
 }
