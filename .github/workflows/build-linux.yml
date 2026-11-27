@@ -31,8 +31,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          # Ours and rexglue-sdk (the shader translator's source); not the
-          # SDK's own third-party submodules, which our build doesn't use.
+          # Our third-party libraries (the ReXGlue SDK is no longer one).
           submodules: true
 
       # Same dependencies as the SDK's linux-amd64 CI.

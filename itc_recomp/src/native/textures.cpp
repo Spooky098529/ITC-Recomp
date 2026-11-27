@@ -14,11 +14,13 @@
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <mutex>
+#include <sys/mman.h>
 #include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <rex/graphics/xenos.h>
+#include "xenos_types.h"
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -28,6 +30,9 @@
 #include <tmmintrin.h>
 #endif
 
+ITC_FLAG_BOOL(give_back_xpr_data, true, "ITC",
+              "Upload XPR files' textures at load and give their data's pages back to the "
+              "system (docs/pc-renderer.md, step 2b)");
 ITC_FLAG_BOOL(native_renderer_log_texture_writes, false, "ITC",
               "Log which code writes textures' memory: on first load and when a texture "
               "is found changed, what the library's memcpy wrote there (a debugging aid; "
@@ -43,15 +48,28 @@ namespace native {
 namespace {
 // Races left (TextureCache_RaceLeft), counted on the main thread.
 std::atomic<uint64_t> g_races_left{0};
+
+// XPR files loaded and released (TextureCache_XprLoaded, _XprReleased),
+// from the threads that load them, for the render thread's frame start.
+struct XprEvent {
+  bool loaded;
+  uint32_t data, size;
+  std::vector<std::array<uint32_t, 6>> fetches;
+};
+std::mutex g_xpr_mutex;
+std::vector<XprEvent> g_xpr_events;
 }  // namespace
 
-namespace xenos = rex::graphics::xenos;
 
 namespace {
 
 // Per frame in flight: texture data on its way into images. A frame that
 // needs more defers the rest to the next frames (placeholders meanwhile).
-constexpr VkDeviceSize kStagingSize = 64u << 20;
+// Per frame in flight (host-visible: pinned system memory on a discrete
+// GPU); a texture that doesn't fit waits for the next frame. 32 MB since
+// docs/pc-renderer.md (64 before): the largest texture with its mips is
+// ~21 MB.
+constexpr VkDeviceSize kStagingSize = 32u << 20;
 
 uint32_t Log2Ceil(uint32_t v) {
   return v <= 1 ? 0 : 32 - std::countl_zero(v - 1);
@@ -404,8 +422,8 @@ TextureKey KeyOf(const uint32_t fetch[6]) {
           fetch[5] & 0xFFFFFE00u};
 }
 
-// GetView's and GetSampler's answers by what they're asked: the fetch
-// constant's 6 words and the view type, or the packed filter overrides.
+// GetView's answers by what it's asked: the fetch constant's 6 words and
+// the view type.
 // An entry holds while its generation is current; nearly every call
 // repeats an earlier one ("Texture binding" in docs/native-renderer.md).
 //
@@ -498,6 +516,45 @@ class BindingTable {
 }  // namespace
 
 struct TextureCache::State {
+  // XPR files' data blocks (by physical address): their textures, uploaded
+  // at a frame's start; once all are on the GPU, the block's pages are
+  // given back (`dropped`).
+  struct Xpr {
+    uint32_t size = 0;
+    std::vector<std::array<uint32_t, 6>> fetches;
+    bool dropped = false;
+    uint32_t frames_waited = 0;
+  };
+  std::map<uint32_t, Xpr> xprs;
+  uint64_t xpr_dropped_bytes = 0;
+  uint32_t logged_dropped_misses = 0;
+  uint32_t logged_dropped_writes = 0;
+  uint64_t released_by_writes = 0;
+  // An XPR released (or its memory written over): its textures leave (their
+  // data is gone or about to be).
+  void ReleaseXpr(std::map<uint32_t, Xpr>::iterator it) {
+    for (const auto& fetch : it->second.fetches) {
+      auto t = textures.find(KeyOf(fetch.data()));
+      if (t == textures.end() || !t->second.kept) {
+        continue;
+      }
+      t->second.kept = false;
+      t->second.changed = true;  // so RetireOverwritten takes it for what replaces it
+      RetireOverwritten(t->second);
+    }
+    if (it->second.dropped) {
+      xpr_dropped_bytes -= it->second.size;
+    }
+    xprs.erase(it);
+  }
+  bool InDroppedXpr(uint32_t start, uint32_t end) const {
+    auto it = xprs.upper_bound(start);
+    if (it == xprs.begin()) {
+      return false;
+    }
+    --it;
+    return it->second.dropped && start < it->first + it->second.size && end > it->first;
+  }
   uint64_t mismatched_total = 0;
   DeviceContext context{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
@@ -528,6 +585,10 @@ struct TextureCache::State {
     uint32_t last_drawn_s = 0;
     uint32_t levels = 0;
     bool loaded = false;
+    // An XPR file's texture whose data's pages were given back once it was
+    // on the GPU (docs/pc-renderer.md, step 2b): kept through race ends,
+    // retired when the XPR is released.
+    bool kept = false;
     // The library's memcpy wrote its memory since it was loaded: reload.
     bool changed = false;
     // With verify_every_frame_: its memory's hash when loaded or last
@@ -544,6 +605,16 @@ struct TextureCache::State {
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
+    // A resolve destination holding a pass's image (HandOver): its format
+    // (format.format is the image's), and what readers apply.
+    bool handed = false;
+    VkFormat native_format = VK_FORMAT_UNDEFINED;
+    bool swap_red_blue = false;
+    float reader_scale = 0.0f;
+    bool copied = false;  // a resolve copied into it (never handed images then)
+    // A handed depth image: its views' aspect, and its depth-only view.
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkImageView depth_view = VK_NULL_HANDLE;
     // A resolve destination's last resolve (GetResolveDestination).
     std::chrono::steady_clock::time_point last_resolved{};
   };
@@ -565,7 +636,7 @@ struct TextureCache::State {
     return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
   }
   std::unordered_map<uint64_t, VkSampler> samplers;
-  BindingTable view_answers, sampler_answers;
+  BindingTable view_answers;
   // Each fetch constant's last answer from them (a copy of the entry, so
   // with its generation: an answer not kept never matches).
   static std::array<BindingTable::Entry, 32> Unfilled() {
@@ -575,7 +646,7 @@ struct TextureCache::State {
     }
     return entries;
   }
-  std::array<BindingTable::Entry, 32> last_views = Unfilled(), last_samplers = Unfilled();
+  std::array<BindingTable::Entry, 32> last_views = Unfilled();
   Stats stats;
 
   // --native_renderer_log_texture_writes: who wrote textures' memory.
@@ -1020,6 +1091,106 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
     generation_++;
     events_.marked_frames++;
   }
+  ProcessXprs();
+}
+
+void TextureCache_XprLoaded(uint32_t data, uint32_t size,
+                            std::vector<std::array<uint32_t, 6>> fetches) {
+  std::lock_guard lock(g_xpr_mutex);
+  g_xpr_events.push_back({true, data, size, std::move(fetches)});
+}
+
+void TextureCache_XprReleased(uint32_t data) {
+  std::lock_guard lock(g_xpr_mutex);
+  g_xpr_events.push_back({false, data, 0, {}});
+}
+
+void TextureCache::ProcessXprs() {
+  State& s = *state_;
+  std::vector<XprEvent> events;
+  {
+    std::lock_guard lock(g_xpr_mutex);
+    events.swap(g_xpr_events);
+  }
+  if (!ITC_FLAG(give_back_xpr_data)) {
+    return;
+  }
+  for (XprEvent& e : events) {
+    uint32_t data = GpuPhysicalAddress(e.data);
+    if (e.loaded) {
+      State::Xpr& x = s.xprs[data];
+      x = {};
+      x.size = e.size;
+      x.fetches = std::move(e.fetches);
+      // The headers' base and mip addresses (words 1 and 5, 4 KB units) are
+      // the CPU's view of the physical memory (0xE0000000, 4 KB back), as
+      // RelocateTexture writes them; SetTexture binds the GPU's address. As
+      // the draws will have them, or each texture is uploaded under a key no
+      // draw asks for and the draws read the given-back pages' zeros (the
+      // menus' 2D elements and much of a race, 2026-11-26). The sampler
+      // fields set at binding aren't in the key (KeyOf).
+      for (auto& fetch : x.fetches) {
+        for (uint32_t w : {1u, 5u}) {
+          if (fetch[w] & 0xFFFFF000u) {
+            fetch[w] = GpuPhysicalAddress(fetch[w] & 0xFFFFF000u) | (fetch[w] & 0xFFFu);
+          }
+        }
+      }
+      continue;
+    }
+    auto it = s.xprs.find(data);
+    if (it == s.xprs.end()) {
+      continue;
+    }
+    s.ReleaseXpr(it);
+    generation_++;
+  }
+  // Each XPR not yet given back: its textures uploaded (as a draw would;
+  // one that doesn't fit this frame's staging waits for the next), then its
+  // pages given back.
+  for (auto& [data, x] : s.xprs) {
+    if (x.dropped) {
+      continue;
+    }
+    bool all = true;
+    for (const auto& fetch : x.fetches) {
+      xenos::xe_gpu_texture_fetch_t f = ToFetch(fetch.data());
+      VkImageViewType natural = f.dimension == xenos::DataDimension::kCube
+                                    ? VK_IMAGE_VIEW_TYPE_CUBE
+                                    : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+      bool cacheable = false;
+      LookUpView(fetch.data(), natural, cacheable);
+      auto t = s.textures.find(KeyOf(fetch.data()));
+      if (t == s.textures.end()) {
+        continue;  // a format we can't draw: nothing to keep
+      }
+      if (!t->second.loaded) {
+        all = false;
+      }
+    }
+    if (!all && ++x.frames_waited < 600) {
+      continue;
+    }
+    if (!all) {
+      // Left as is (its data stays) after 600 frames of trying.
+      x.dropped = false;
+      x.fetches.clear();
+      continue;
+    }
+    for (const auto& fetch : x.fetches) {
+      if (auto t = s.textures.find(KeyOf(fetch.data())); t != s.textures.end()) {
+        t->second.kept = true;
+      }
+    }
+    uint8_t* host = PhysicalHostAddress(data);
+    uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
+    uintptr_t end = (reinterpret_cast<uintptr_t>(host) + x.size) & ~uintptr_t(0xFFF);
+    if (end > first) {
+      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+    }
+    x.dropped = true;
+    s.xpr_dropped_bytes += x.size;
+  }
 }
 
 // The textures already held that a new one's memory overlaps: the game
@@ -1086,7 +1257,14 @@ void TextureCache_RaceLeft() {
 // Called before this frame's draws, so only earlier frames can use them.
 void TextureCache::State::RetireLoaded() {
   VkDeviceSize bytes = 0;
+  // XPR textures whose data's pages were given back stay: they can't be
+  // loaded again (they leave when their XPR is released).
+  std::vector<TextureKey> kept_keys;
   for (auto& [key, t] : textures) {
+    if (t.kept) {
+      kept_keys.push_back(key);
+      continue;
+    }
     bytes += t.memory_size;
     Retire(t);
   }
@@ -1094,9 +1272,17 @@ void TextureCache::State::RetireLoaded() {
     ITC_LOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
                  bytes / 1048576.0);
   }
-  textures.clear();
+  std::erase_if(textures, [](const auto& entry) { return !entry.second.kept; });
   by_address.clear();
   longest_range = 0;
+  for (auto& [key, t] : textures) {
+    for (const auto& [address, size] : t.ranges) {
+      if (size) {
+        by_address.emplace(address, std::make_pair(size, &t));
+        longest_range = std::max(longest_range, size);
+      }
+    }
+  }
   write_snapshots.clear();
 }
 
@@ -1116,6 +1302,9 @@ void TextureCache::State::Retire(const Texture& t) {
   }
   if (t.attachment_view) {
     r.views.push_back(t.attachment_view);
+  }
+  if (t.depth_view && t.depth_view != t.attachment_view) {
+    r.views.push_back(t.depth_view);
   }
   retired.push_back(std::move(r));
 }
@@ -1240,6 +1429,21 @@ void TextureCache::State::MarkWritten() {
   ScopedCost cost(g_frame_costs.mark_ns);
   stats.writes += new_writes.size();
   for (const auto& [start, end] : new_writes) {
+    // An XPR's data given back and written over: its memory was reused
+    // without its release seen (seen leaving the tuning screen), so it's
+    // taken as released, its textures retired.
+    while (InDroppedXpr(start, end)) {
+      auto it = std::prev(xprs.upper_bound(start));
+      if (logged_dropped_writes < 20) {
+        logged_dropped_writes++;
+        ITC_LOG_INFO("native renderer: memcpy wrote {:08X}-{:08X} over the XPR data at {:08X} "
+                     "({} bytes) given back: taken as released",
+                     start, end, it->first, it->second.size);
+      }
+      ReleaseXpr(it);
+      released_by_writes++;
+      stats.marked++;  // the bindings' answers may hold its textures' views
+    }
     auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
     for (; it != by_address.end() && it->first < end; ++it) {
       auto& [size, texture] = it->second;
@@ -1349,6 +1553,35 @@ VkImageView TextureCache::LookUpView(const uint32_t fetch_words[6],
       return VK_NULL_HANDLE;
     }
     t.endian = fetch.endianness;
+    if (s.logged_dropped_misses < 40) {
+      uint32_t start = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+      if (s.InDroppedXpr(start, start + 1)) {
+        s.logged_dropped_misses++;
+        std::string header;
+        for (const auto& [data, x] : s.xprs) {
+          if (start < data || start >= data + x.size) {
+            continue;
+          }
+          header += std::format(" (in XPR data {:08X}-{:08X}:", data, data + x.size);
+          for (const auto& f : x.fetches) {
+            header += std::format(" [{:08X} {:08X} {:08X} {:08X} {:08X} {:08X}]", f[0], f[1], f[2],
+                                  f[3], f[4], f[5]);
+          }
+          header += ")";
+        }
+        const uint8_t* bytes = PhysicalHostAddress(start);
+        uint32_t nonzero = 0;
+        for (uint32_t i = 0; i < 65536; i++) {
+          nonzero += bytes[i] != 0;
+        }
+        ITC_LOG_ERROR("native renderer: a texture at {:08X} (format {}, {}x{}) asked for from an "
+                      "XPR whose data was given back ({} of its first 64 KB not zero); fetch "
+                      "{:08X} {:08X} {:08X} {:08X} {:08X} {:08X}{}",
+                      start, uint32_t(fetch.format), t.layout.width, t.layout.height, nonzero,
+                      fetch_words[0], fetch_words[1], fetch_words[2], fetch_words[3],
+                      fetch_words[4], fetch_words[5], header);
+      }
+    }
     if (!s.CreateTexture(t)) {
       return VK_NULL_HANDLE;
     }
@@ -1447,6 +1680,11 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   if (!view) {
     auto component = [&](uint32_t i) {
       uint32_t select = (swizzle >> (3 * i)) & 7;
+      // A handed pass's image isn't red and blue exchanged as a resolve's
+      // copy is: the swizzle's X and Z exchanged instead.
+      if (t.swap_red_blue && (select == 0 || select == 2)) {
+        select ^= 2;
+      }
       if (select == 4) {
         return VK_COMPONENT_SWIZZLE_ZERO;
       }
@@ -1461,7 +1699,7 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
     info.viewType = natural;
     info.format = t.format.format;
     info.components = {component(0), component(1), component(2), component(3)};
-    info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, t.levels, 0, t.layout.layers};
+    info.subresourceRange = {t.aspect, 0, t.levels, 0, t.layout.layers};
     if (vk::vkCreateImageView(context.device, &info, nullptr, &view) != VK_SUCCESS) {
       view = VK_NULL_HANDLE;
     } else {
@@ -1502,6 +1740,7 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
                t.format.conversion != Conversion::kNone) {
       return false;
     }
+    t.native_format = t.format.format;
     t.layout.width = width;
     t.layout.height = height;
     t.scale = scale;
@@ -1531,10 +1770,124 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
     generation_++;
     events_.resolve_changes++;
   }
-  out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
-         t.host_height, t.scale,           !t.loaded};
+  out = {t.image,         t.attachment_view, t.format.format, width,     height,
+         t.host_width,    t.host_height,     t.scale,         !t.loaded, t.handed,
+         t.native_format, t.copied};
   t.loaded = true;  // written by the caller
   return true;
+}
+
+TextureCache::HandedImage TextureCache::HandOver(const uint32_t fetch_words[6], float scale,
+                                                 const HandedImage& image, bool swap_red_blue,
+                                                 float reader_scale) {
+  State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  uint32_t page = fetch.base_address & 0x1FFFF;
+  auto it = s.resolved.find(State::ResolveKey(page, scale));
+  if (it == s.resolved.end()) {
+    return {};
+  }
+  State::Texture& t = it->second;
+  VkDevice device = s.context.device;
+  auto size_of = [&](VkImage i) {
+    VkMemoryRequirements requirements;
+    vk::vkGetImageMemoryRequirements(device, i, &requirements);
+    return requirements.size;
+  };
+  // The views of the image it held go once no frame in flight can use them
+  // (this frame's earlier draws may have sampled it).
+  State::Retired views{s.frame_number, gpu_memory::Kind::kResolved, VK_NULL_HANDLE,
+                       VK_NULL_HANDLE, 0, {}};
+  for (const auto& [swizzle, view] : t.views) {
+    if (view) {
+      views.views.push_back(view);
+    }
+  }
+  t.views.clear();
+  HandedImage back;
+  if (t.handed && t.format.format == image.format) {
+    // A pass's image before: back to drawing (its views for sampling go).
+    back = {t.image, t.memory, t.attachment_view, t.format.format, t.aspect, t.depth_view};
+    gpu_memory::Freed(gpu_memory::Kind::kResolved, t.memory_size);
+    gpu_memory::Allocated(gpu_memory::Kind::kImage, t.memory_size);
+  } else {
+    views.image = t.image;
+    views.memory = t.memory;
+    views.memory_size = t.memory_size;
+    if (t.attachment_view) {
+      views.views.push_back(t.attachment_view);
+    }
+    if (t.depth_view && t.depth_view != t.attachment_view) {
+      views.views.push_back(t.depth_view);
+    }
+  }
+  s.retired.push_back(std::move(views));
+  t.image = image.image;
+  t.memory = image.memory;
+  t.attachment_view = image.view;
+  t.aspect = image.aspect;
+  t.depth_view = image.depth_view;
+  t.memory_size = size_of(image.image);
+  gpu_memory::Freed(gpu_memory::Kind::kImage, t.memory_size);
+  gpu_memory::Allocated(gpu_memory::Kind::kResolved, t.memory_size);
+  t.format.format = image.format;
+  t.handed = true;
+  t.swap_red_blue = swap_red_blue;
+  t.reader_scale = reader_scale;
+  t.loaded = true;
+  s.current[page] = &t;
+  generation_++;  // answers and last texture sets hold the old views
+  events_.resolve_changes++;
+  return back;
+}
+
+bool TextureCache::RestoreResolveDestination(const uint32_t fetch_words[6], float scale,
+                                             ResolveDestination& out) {
+  State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  uint32_t page = fetch.base_address & 0x1FFFF;
+  auto it = s.resolved.find(State::ResolveKey(page, scale));
+  if (it == s.resolved.end()) {
+    return false;
+  }
+  State::Texture& t = it->second;
+  t.copied = true;
+  if (t.handed) {
+    s.Retire(t);
+    t.image = VK_NULL_HANDLE;
+    t.memory = VK_NULL_HANDLE;
+    t.attachment_view = VK_NULL_HANDLE;
+    t.depth_view = VK_NULL_HANDLE;
+    t.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    t.views.clear();
+    t.format.format = t.native_format;
+    t.handed = false;
+    t.swap_red_blue = false;
+    t.reader_scale = 0.0f;
+    t.loaded = false;
+    if (!s.CreateTexture(t)) {
+      return false;
+    }
+    generation_++;
+  }
+  return GetResolveDestination(fetch_words, scale, out);
+}
+
+bool TextureCache::HoldsHanded(const uint32_t fetch_words[6], float scale, VkImage image) const {
+  const State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  auto it = s.resolved.find(State::ResolveKey(fetch.base_address & 0x1FFFF, scale));
+  return it != s.resolved.end() && it->second.handed && it->second.image == image;
+}
+
+float TextureCache::ReaderScale(const uint32_t fetch_words[6]) const {
+  const State& s = *state_;
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  auto r = s.current.find(fetch.base_address & 0x1FFFF);
+  if (r == s.current.end() || !r->second->loaded || !r->second->handed) {
+    return 0.0f;
+  }
+  return r->second->reader_scale;
 }
 
 uint64_t TextureCache::mismatched_total() const {
@@ -1573,104 +1926,67 @@ bool TextureCache::DecodeGuest(const uint32_t fetch_words[6],
   return true;
 }
 
-VkSampler TextureCache::GetSampler(const uint32_t fetch_words[6],
-                                   const SamplerOverrides& overrides) {
-  if (!cache_bindings_) {
-    unkept_answers_++;
-    return LookUpSampler(fetch_words, overrides);
+namespace {
+
+// A sampler as the stage's state describes it, for a texture of these
+// levels (a cube map clamps to the edge), with the device's limits.
+VkSamplerCreateInfo InfoFromState(const render::SamplerState& state, bool cube,
+                                  uint32_t min_level, uint32_t max_level, bool base_level_only,
+                                  const DeviceContext& context) {
+  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  bool anisotropic = state.max_anisotropy >= 1.0f && context.sampler_anisotropy;
+  info.magFilter = anisotropic ? VK_FILTER_LINEAR : state.mag_filter;
+  info.minFilter = anisotropic ? VK_FILTER_LINEAR : state.min_filter;
+  info.mipmapMode = state.mip_mode;
+  for (uint32_t i = 0; i < 3; i++) {
+    VkSamplerAddressMode mode = cube ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : state.address[i];
+    if (mode == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE && !context.sampler_mirror_clamp_to_edge) {
+      mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    }
+    (i == 0 ? info.addressModeU : i == 1 ? info.addressModeV : info.addressModeW) = mode;
   }
-  State& s = *state_;
-  BindingTable::Key key(fetch_words, (overrides.mag_filter & 0xFF) |
-                                         (overrides.min_filter & 0xFF) << 8 |
-                                         (overrides.mip_filter & 0xFF) << 16 |
-                                         (overrides.aniso_filter & 0xFF) << 24);
-  BindingTable::Entry& last = s.last_samplers[overrides.fetch_constant & 31];
-  if (last.generation == sampler_generation_ && last.key == key) {
-    return FromBits<VkSampler>(last.value);
+  if (anisotropic) {
+    info.anisotropyEnable = VK_TRUE;
+    info.maxAnisotropy = std::min(state.max_anisotropy, context.max_sampler_anisotropy);
   }
-  BindingTable::Entry& e = s.sampler_answers.Find(key);
-  if (e.generation != sampler_generation_) {
-    VkSampler sampler = LookUpSampler(fetch_words, overrides);
-    e.value = HandleBits(sampler);
-    e.generation = sampler ? sampler_generation_ : UINT64_MAX;
-    unkept_answers_ += !sampler;
-  }
-  last = e;
-  return FromBits<VkSampler>(e.value);
+  info.mipLodBias = state.mip_lod_bias;
+  info.minLod = float(min_level);
+  info.maxLod = float(state.base_level_only || base_level_only ? min_level : max_level);
+  info.borderColor = state.border;
+  return info;
 }
 
-VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
-                                      const SamplerOverrides& overrides) {
+}  // namespace
+
+VkSampler TextureCache::GetSampler(const render::SamplerState& state,
+                                   const uint32_t fetch_words[6]) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
-  auto pick = [](uint32_t override_value, uint32_t from_fetch, uint32_t use_fetch) {
-    return override_value == use_fetch ? from_fetch : override_value;
-  };
-  uint32_t mag = pick(overrides.mag_filter, uint32_t(fetch.mag_filter), 3);
-  uint32_t min = pick(overrides.min_filter, uint32_t(fetch.min_filter), 3);
-  uint32_t mip = pick(overrides.mip_filter, uint32_t(fetch.mip_filter), 3);
-  uint32_t aniso = pick(overrides.aniso_filter, uint32_t(fetch.aniso_filter), 7);
-  if (!s.context.sampler_anisotropy) {
-    aniso = 0;
-  }
   Layout layout;
   uint32_t min_level = 0, max_level = 0;
   if (GetLayout(fetch, layout)) {
     min_level = layout.min_level;
     max_level = layout.max_level;
   }
-  if (mip == uint32_t(xenos::TextureFilter::kBaseMap) || base_level_only_) {
-    max_level = min_level;
-  }
-  uint32_t clamp[3] = {uint32_t(fetch.clamp_x), uint32_t(fetch.clamp_y), uint32_t(fetch.clamp_z)};
-  if (fetch.dimension == xenos::DataDimension::kCube) {
-    clamp[0] = clamp[1] = clamp[2] = uint32_t(xenos::ClampMode::kClampToEdge);
-  }
-  uint32_t border = uint32_t(fetch.border_color);
-  uint64_t key = uint64_t(mag & 1) | uint64_t(min & 1) << 1 | uint64_t(mip & 3) << 2 |
-                 uint64_t(aniso & 7) << 4 | uint64_t(clamp[0]) << 7 | uint64_t(clamp[1]) << 10 |
-                 uint64_t(clamp[2]) << 13 | uint64_t(border) << 16 | uint64_t(min_level) << 18 |
-                 uint64_t(max_level) << 22 | uint64_t(base_level_only_) << 30;
+  return SamplerFor(InfoFromState(state, fetch.dimension == xenos::DataDimension::kCube,
+                                  min_level, max_level, base_level_only_, s.context));
+}
+
+VkSampler TextureCache::SamplerFor(const VkSamplerCreateInfo& info) {
+  State& s = *state_;
+  // Keyed by the fields made from the state.
+  uint64_t key = uint64_t(info.magFilter) | uint64_t(info.minFilter) << 1 |
+                 uint64_t(info.mipmapMode) << 2 | uint64_t(info.addressModeU) << 3 |
+                 uint64_t(info.addressModeV) << 6 | uint64_t(info.addressModeW) << 9 |
+                 uint64_t(info.borderColor) << 12 | uint64_t(info.anisotropyEnable) << 15 |
+                 uint64_t(std::bit_cast<uint32_t>(info.maxAnisotropy) >> 23 & 0xFF) << 16 |
+                 uint64_t(uint32_t(info.minLod) & 0xF) << 24 |
+                 uint64_t(uint32_t(info.maxLod) & 0xF) << 28 |
+                 uint64_t(std::bit_cast<uint32_t>(info.mipLodBias)) << 32;
   VkSampler& sampler = s.samplers[key];
   if (sampler) {
     return sampler;
   }
-  auto address_mode = [&](uint32_t mode) {
-    switch (xenos::ClampMode(mode)) {
-      case xenos::ClampMode::kRepeat:
-        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      case xenos::ClampMode::kMirroredRepeat:
-        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-      case xenos::ClampMode::kClampToBorder:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-      case xenos::ClampMode::kMirrorClampToEdge:
-      case xenos::ClampMode::kMirrorClampToHalfway:
-      case xenos::ClampMode::kMirrorClampToBorder:
-        return s.context.sampler_mirror_clamp_to_edge
-                   ? VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE
-                   : VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-      default:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    }
-  };
-  VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  bool anisotropic = aniso >= uint32_t(xenos::AnisoFilter::kMax_2_1);
-  info.magFilter = mag == 1 || anisotropic ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  info.minFilter = min == 1 || anisotropic ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  info.mipmapMode = mip == 1 ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
-  info.addressModeU = address_mode(clamp[0]);
-  info.addressModeV = address_mode(clamp[1]);
-  info.addressModeW = address_mode(clamp[2]);
-  if (anisotropic) {
-    info.anisotropyEnable = VK_TRUE;
-    info.maxAnisotropy =
-        std::min(float(1u << (aniso - 1)), s.context.max_sampler_anisotropy);
-  }
-  info.minLod = float(min_level);
-  info.maxLod = float(max_level);
-  info.borderColor = border == 1   ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
-                     : border == 0 ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK
-                                   : VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
   if (vk::vkCreateSampler(s.context.device, &info, nullptr, &sampler) != VK_SUCCESS) {
     sampler = VK_NULL_HANDLE;
   } else {
@@ -1681,7 +1997,7 @@ VkSampler TextureCache::LookUpSampler(const uint32_t fetch_words[6],
 }
 
 uint8_t TextureCache::SwizzledSigns(const uint32_t fetch_words[6]) {
-  // As the SDK's texture_util::SwizzleSigns: each result component's sign
+  // As the SDK's xenos::SwizzleSigns: each result component's sign
   // after the swizzle; constant components take signed only if everything
   // else is signed.
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);

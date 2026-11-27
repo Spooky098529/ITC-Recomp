@@ -1,0 +1,35 @@
+# The post-effect and screen shaders written by hand (see
+# docs/shaders.md, "Hand-written shaders"): the game's shader name, the file
+# it's made from, and the defines. A shader not listed ships as its port.
+# The ids are the BUILD_OUT entries the shaders are in.
+
+ps_4B65AAC8168F306F  constant_color.frag                       # 00000004
+ps_7C91ACFDA08200EB  constant_color.frag  UV_REG=0             # 00000006
+ps_ECCA4F5E7E71FB5F  screen_motion.frag                        # 00000010, 14, 68
+ps_E0D070FB58A4EA03  textured_color.frag  UV_REG=0 COLOR_REG=1 # 00000012, 18, 20 (glow history)
+ps_BDFAB64758384F20  textured_color.frag  UV_REG=0 COLOR_REG=1 MINUS_ONE  # 00000022
+# 22811: in the cockpit view, the windshield's overlay (its texture is the
+# one the lit layer under it uses; frame dump 2026-11-18, draws 2598-2600):
+# glass, which the AO looks through (SBX_GLASS).
+ps_4F4860F071E25904  textured_color.frag  UV_REG=1 COLOR_REG=2 TEXTURE_ALPHA PROJTEX_CLAMP SBX_GLASS  # 00022811
+ps_89DB3429AA053B0E  adapted_luminance.frag                    # 00000034
+ps_39755C8589500F4C  tone_map.frag  LUMINANCE_BIAS=0.1 KNEE=0.25   # 00000044
+ps_8D3C07B2BE57E921  tone_map.frag  LUMINANCE_BIAS=0.05 KNEE=5.0 BRIGHT_PASS  # 00000036
+ps_92A5199E7EA052BB  gaussian_blur.frag  TAPS=5                # 00000048, 60
+ps_4592974A77C2F02C  gaussian_blur.frag  TAPS=5 HORIZONTAL     # 00000050, 62
+ps_CEA84F137BB1E483  gaussian_blur.frag  TAPS=9                # 00000052
+ps_41798B3BB7FDDB71  gaussian_blur.frag  TAPS=9 HORIZONTAL     # 00000054
+ps_85D67A0216D12CB9  gaussian_blur.frag  TAPS=13               # 00000056
+ps_3EF414175C8B86B3  gaussian_blur.frag  TAPS=13 HORIZONTAL    # 00000058
+ps_E8E9B15BB250C9A2  bright_pass.frag  GRID=3 AVERAGE          # 00000030
+ps_2B77D92EF843AECC  bright_pass.frag  GRID=4 AVERAGE          # 00000026
+ps_0E2F6DFFB4C83835  bright_pass.frag  GRID=4 MAXIMUM          # 00000024
+ps_673F221F054ED0A8  bright_pass.frag  GRID=4 EXPONENT         # 00000028
+ps_F21079DB9D2217A1  bright_pass.frag  GRID=3 LOG_LUMINANCE    # 00000032
+ps_61DB6B3F91E0ED87  weighted_blur.frag                        # 00000038
+ps_9750599DF5ED3B39  glow_combine.frag                         # 00000040
+ps_28D0B59C5CB55C37  glow_combine.frag  EXPOSURE               # 00000042
+ps_CC253DC700BC8028  glow_add.frag                             # 00000046
+ps_D8928E2407A68256  depth_of_field.frag                       # 00000064
+ps_7EB16456AAD56CBA  motion_blur.frag                          # 00000008, 70
+ps_C5EDA6DC536A2095  final_color.frag                          # 00000066

@@ -1,5 +1,10 @@
 #include <format>
 #include "passes.h"
+#include <cstdlib>
+#include "vertex_arena.h"
+#include "shader_ports.h"
+#include "graphics/shader_patch.h"
+#include "render/state.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -18,6 +23,8 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "state.h"
+#include "draw_registers.h"
+#include "draw_constants.h"
 
 #include <algorithm>
 #include <array>
@@ -31,11 +38,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <rex/graphics/pipeline/shader/spirv_translator.h>
-#include <rex/graphics/register_file.h>
-#include <rex/graphics/registers.h>
-#include <rex/graphics/util/draw.h>
-#include <rex/graphics/xenos.h>
+#include "xenos_types.h"
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -50,19 +53,6 @@ ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
 
 namespace native {
 
-namespace graphics = rex::graphics;
-namespace reg = rex::graphics::reg;
-namespace xenos = rex::graphics::xenos;
-namespace draw_util = rex::graphics::draw_util;
-using Translator = graphics::SpirvShaderTranslator;
-using graphics::XE_GPU_REG_RB_ALPHA_REF;
-using graphics::XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031;
-using graphics::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0;
-using graphics::XE_GPU_REG_SQ_CONTEXT_MISC;
-using graphics::XE_GPU_REG_SQ_PROGRAM_CNTL;
-using graphics::XE_GPU_REG_VGT_INDX_OFFSET;
-using graphics::XE_GPU_REG_VGT_MAX_VTX_INDX;
-using graphics::XE_GPU_REG_VGT_MIN_VTX_INDX;
 
 namespace {
 
@@ -82,7 +72,6 @@ constexpr uint32_t kShownWidth = 1280, kShownHeight = 720;
 constexpr VkFormat kShownFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
 // EDRAM: 2048 tiles of 80x16 samples at 32 bits a sample.
-constexpr uint32_t kEdramTiles = 2048;
 
 // Device fields: the bound surfaces (render targets 0-3, then depth).
 constexpr uint32_t kDeviceDepthStencil = 12200;
@@ -91,13 +80,19 @@ constexpr uint32_t kDeviceDepthStencil = 12200;
 // +24 RB_SURFACE_INFO (pitch in bits 0-13, MSAA in bits 16-17), +28
 // RB_COLOR_INFO or RB_DEPTH_INFO (EDRAM base in bits 0-11, format in bits
 // 16-19).
+// A render target as the game made it (graphics::CreateSurface): +24 the
+// pitch and samples, +28 the format (and its EDRAM base, which we don't
+// use: docs/pc-renderer.md, step 4), +36 the size (width - 1 from bit 18,
+// height - 1 from bit 3).
 struct Surface {
-  uint32_t pitch, msaa, edram_base, format;
+  uint32_t pitch, msaa, edram_base, format, width, height;
 };
 Surface ReadSurface(uint32_t object) {
   uint32_t surface_info = guest::LoadU32(object + 24);
   uint32_t info = guest::LoadU32(object + 28);
-  return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF};
+  uint32_t size = guest::LoadU32(object + 36);
+  return {surface_info & 0x3FFF, (surface_info >> 16) & 3, info & 0xFFF, (info >> 16) & 0xF,
+          (size >> 18) + 1, ((size >> 3) & 0x7FFF) + 1};
 }
 
 // How a color format is drawn. 7e3 and its high-precision blending
@@ -128,21 +123,48 @@ VkFormat ColorFormat(uint32_t format) {
   }
 }
 
+// The components a color format has (0 for others).
+uint32_t FormatComponents(VkFormat format) {
+  switch (format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R16_UNORM:
+    case VK_FORMAT_R16_SFLOAT:
+    case VK_FORMAT_R32_SFLOAT:
+      return 1;
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16G16_UNORM:
+    case VK_FORMAT_R16G16_SFLOAT:
+    case VK_FORMAT_R32G32_SFLOAT:
+      return 2;
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+    case VK_FORMAT_R16G16B16A16_UNORM:
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+bool IsUnorm(VkFormat format) {
+  switch (format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R16_UNORM:
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16G16_UNORM:
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+    case VK_FORMAT_R16G16B16A16_UNORM:
+      return true;
+    default:
+      return false;
+  }
+}
+
 VkSampleCountFlagBits SampleCount(uint32_t msaa) {
   return msaa == 2 ? VK_SAMPLE_COUNT_4_BIT : msaa == 1 ? VK_SAMPLE_COUNT_2_BIT
                                                        : VK_SAMPLE_COUNT_1_BIT;
-}
-
-// Each surface gets an image of its pitch, as tall as the EDRAM from its
-// base holds (2x MSAA doubles the samples down, 4x also across).
-VkExtent2D SurfaceExtent(const Surface& surface, bool depth) {
-  uint32_t samples_x = surface.msaa == 2 ? 2 : 1, samples_y = surface.msaa ? 2 : 1;
-  bool wide = !depth && xenos::IsColorRenderTargetFormat64bpp(
-                            xenos::ColorRenderTargetFormat(surface.format));
-  uint32_t tiles_across = std::max((surface.pitch * samples_x + 79) / 80, 1u) * (wide ? 2 : 1);
-  uint32_t tile_rows = (kEdramTiles - std::min(surface.edram_base, kEdramTiles - 1)) / tiles_across;
-  uint32_t height = tile_rows * 16 / samples_y;
-  return {std::max(surface.pitch, 1u), std::clamp(height, 16u, 4096u)};
 }
 
 constexpr VkAccessFlags kAllAccess = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
@@ -174,32 +196,23 @@ constexpr VkImageAspectFlags kDepthStencilAspects =
 constexpr uint32_t kResolvesPerFrame = 256;
 
 // Per frame in flight: the draws' constants, in blocks of this size (about
-// 7,000 draws each); a frame that fills its blocks gets another, kept for
-// later frames.
-constexpr VkDeviceSize kConstantBlockSize = 64u << 20;
+// 1,750 draws each, fewer reused); a frame that fills its blocks gets
+// another, kept for later frames. Host-visible, so pinned system memory on
+// a discrete GPU: 16 MB since docs/pc-renderer.md (64 before).
+constexpr VkDeviceSize kConstantBlockSize = 16u << 20;
 // Fixed descriptor ranges of the constant buffers (set 1), so one set per
 // frame serves every draw through dynamic offsets.
 constexpr uint32_t kFloatConstantsRange = 256 * 16;
-constexpr uint32_t kBoolLoopConstantsRange = 40 * 4;
-constexpr uint32_t kFetchConstantsRange = 32 * 6 * 4;
+constexpr uint32_t kBoolLoopConstantsRange = sizeof(render::BoolLoopConstants);
+// The constant blocks: system, vertex floats, pixel floats, bool/loop.
+constexpr uint32_t kConstantBlocks = 4;
+// The fetch constants the draw reads (textures 0-31, 6 words each; vertex
+// fetch constants 2 words each, the same space).
+constexpr uint32_t kFetchConstantsBytes = 32 * 6 * 4;
 
-// Past guest memory, each mirror holds data of ours that the translated
-// shaders and draws read like guest memory: built-in index buffers, then
-// the frame's inline vertices (an inline draw's vertex fetch constant
-// points there; the translator doesn't mask the address).
-constexpr uint32_t kBuiltinPrimitives = 4096;
-// Rectangle lists as two-triangle strips (the translator's
-// kRectangleListAsTriangleStrip): 32-bit, rectangle << 2 | corner, with
-// restarts between rectangles, as the plugin's built-in index buffer.
-constexpr uint32_t kRectangleIndices = kPhysicalMemorySize;
-constexpr uint32_t RectangleIndexCount(uint32_t rectangles) {
-  return 4 * rectangles + (std::max(rectangles, 1u) - 1);
-}
-// Quad lists as triangle lists, 32-bit: (v0, v1, v2), (v0, v2, v3) a quad.
-constexpr uint32_t kQuadIndices = kRectangleIndices + 4 * RectangleIndexCount(kBuiltinPrimitives);
-constexpr uint32_t kInlineVertices = kQuadIndices + 4 * 6 * kBuiltinPrimitives;
-constexpr uint32_t kInlineVerticesSize = 32u << 20;
-constexpr VkDeviceSize kMirrorSize = VkDeviceSize(kInlineVertices) + kInlineVerticesSize;
+// The built-in index lists (rectangle and quad lists) live in the vertex
+// arena (vertex_arena.h), with the frame's inline vertices.
+constexpr uint32_t kQuadIndices = VertexArena::kQuadIndices;
 
 // An inline draw's vertices: vertex fetch constant 95 (stream 0), as the
 // library's BeginVertices (sub_825BD8F0) writes it into the command buffer
@@ -207,15 +220,37 @@ constexpr VkDeviceSize kMirrorSize = VkDeviceSize(kInlineVertices) + kInlineVert
 // and VGT_INDX_OFFSET 0; endianness 8-in-32.
 constexpr uint32_t kInlineFetchConstant = 95;
 
+// A vertex shader's vertex input (docs/pc-renderer.md, step 2): a fetch's
+// attributes at locations 3n to 3n + 2 (xe_interface.glsl's XE_VF_IN), so
+// up to 8 fetches; a rectangle list's shaders (the screen quads') have at
+// most 4, three bindings each.
+constexpr uint32_t kMaxVertexFetches = 8;
+constexpr uint32_t kMaxVertexBindings = 3 * kMaxVertexFetches;
+
+// The attribute format holding a fetch's raw words.
+VkFormat RawWordsFormat(uint32_t words) {
+  switch (words) {
+    case 1:
+      return VK_FORMAT_R32_UINT;
+    case 2:
+      return VK_FORMAT_R32G32_UINT;
+    case 3:
+      return VK_FORMAT_R32G32B32_UINT;
+    default:
+      return VK_FORMAT_R32G32B32A32_UINT;
+  }
+}
+
 // A draw: command 18's item (an indexed draw) or an inline one.
 struct DrawCall {
   uint32_t type;
   // Command 18: the item's base vertex << 16 | start index, and its
   // primitive count.
   uint32_t base_start = 0, primitive_count = 0;
-  // Inline vertices: their count, copied to vertex_address in the mirror.
+  // Inline vertices: their count, and their offset in the vertex arena.
   bool inline_vertices = false;
   uint32_t vertex_count = 0, vertex_address = 0;
+  uint32_t inline_stride = 0;  // bytes
 };
 
 // Command 18's item: [primitive type, base vertex << 16 | start index,
@@ -408,6 +443,13 @@ struct Target {
   Image image;               // view: for drawing (depth and stencil)
   VkImageView sample_view;   // for resolving (depth only, for depth)
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  // Its image was handed to a resolve destination (HandOver) and it hasn't
+  // been cleared since: what it held is in that image, copied back before
+  // it's drawn into or read (RestoreContents) while the destination holds
+  // it.
+  VkImage handed_image = VK_NULL_HANDLE;
+  uint32_t handed_fetch[6] = {};
+  float handed_scale = 1.0f;
   VkImageAspectFlags aspects() const {
     return depth ? kDepthStencilAspects : VK_IMAGE_ASPECT_COLOR_BIT;
   }
@@ -548,17 +590,17 @@ struct ShaderLookup {
 
 // Shader lookups kept by what the draw reads from the shader objects instead
 // of the microcode's hash (see "Shader lookup" in docs/native-renderer.md):
-// both objects, their microcode's address and size, the id the vertex
-// shader is patched for and the bound declaration's, and the registers and
-// flags the interface depends on. Measured over races, a key never came back
-// with other microcode: the game's Direct3D changes a vertex shader's only by
-// patching it, which changes the id it's patched for. Translations are never
-// freed, so their pointers stay good. An open-addressed table, at most half
+// both objects, their microcode's address and size, the bound declaration
+// (its address and id) and the stream strides the vertex fetches take their
+// fields from, and the registers and flags the interface depends on (the
+// microcode itself isn't changed since the library's patch stopped running,
+// docs/pc-renderer.md, step 2). Shaders are never freed, so their pointers
+// stay good. An open-addressed table, at most half
 // full; never emptied (a session meets ~600 keys).
 class ShaderLookupTable {
  public:
   struct Key {
-    uint32_t words[12];
+    uint32_t words[16];
     bool operator==(const Key& other) const {
       return std::memcmp(words, other.words, sizeof(words)) == 0;
     }
@@ -598,7 +640,7 @@ class ShaderLookupTable {
   };
   static size_t HashOf(const Key& key) {
     uint64_t h = 0;
-    for (int i = 0; i < 12; i += 2) {
+    for (int i = 0; i < 16; i += 2) {
       uint64_t word;
       std::memcpy(&word, &key.words[i], 8);
       h = (h ^ word) * 0x9E3779B97F4A7C15ull;
@@ -667,56 +709,11 @@ struct Passes::State {
   VkExtent2D shown_extent{kShownWidth, kShownHeight};
   VkExtent2D main_view_extent{kMainViewWidth, kMainViewHeight};
 
-  // Mirrors of guest physical memory at the same offsets: the shaders'
-  // storage buffer (set 0) and the index buffer. The driver won't import
-  // guest memory itself (a shared memory-file mapping), so each draw's
-  // index and vertex ranges are copied in, once a frame. One per frame in
-  // flight: with one shared, the next frame's copies overwrote vertices the
-  // GPU was still drawing (buildings showing a rainbow texture).
-  struct GuestMirror {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    uint8_t* mapped = nullptr;
-    VkDescriptorSet set = VK_NULL_HANDLE;
-    // Each range copied in (address << 32 | size): the memcpy write
-    // sequence (Buffers_Sequence) when it was copied.
-    std::unordered_map<uint64_t, uint64_t> copied;
-  };
-  std::vector<GuestMirror> mirrors;
-  // With mirror_by_tick (two mirrors; "Hypothesis to test: the mirrors
-  // updated once a tick" in docs/native-renderer.md): draws read the front
-  // mirror, swapped only as a logic pass's list starts replaying; memcpy's
-  // writes are applied at frame starts to the other mirror, which no frame
-  // in flight reads, and each mirror keeps the writes it hasn't had yet.
-  // Inline vertices get a part of their region per frame slot.
-  bool mirror_by_tick = false, mirror_to_both = false;
-  uint32_t front_mirror = 0;
-  std::vector<std::pair<uint32_t, uint32_t>> mirror_pending[2], mirror_taken;
-  // The writes the front mirror hasn't had, sorted by start, to count drawn
-  // ranges it's missing data of (memcpy being the only writer).
-  std::vector<std::pair<uint32_t, uint32_t>> front_missing;
-  uint32_t front_missing_longest = 0;
-  struct MirrorByTickStats {
-    uint64_t frames = 0, swaps = 0, writes = 0, bytes = 0;
-    uint64_t stale[2] = {}, stale_bytes[2] = {};  // [render-only list]
-    uint64_t stale_lines = 200;
-  } by_tick;
-  // The mirror this frame's draws read.
-  GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
-  // Whether draws work out their vertex and index ranges and pass them to
-  // Mirror: always, except with mirror_by_tick and none of the mirror's
-  // diagnostics (then the mirror needs nothing from draws).
-  bool MirrorPerDraw() const {
-    return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
-           check_clobbers || verify_mirror || log_index_ranges ||
-           Buffers_Logging() || Buffers_LogPhysicalWrites();
-  }
-  uint32_t inline_slot_size() const {
-    return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
-  }
-  void MirrorByTickFrameStart();
-  std::unordered_set<uint64_t> mirrored;  // address << 32 | size, this frame
-  uint32_t inline_offset = 0;  // this frame's inline vertices so far
+  // The vertex and index data draws read (set 0 and the index buffer):
+  // device-local, the ranges draws use copied in (docs/pc-renderer.md
+  // step 1).
+  VertexArena arena;
+  VkDescriptorSet arena_set = VK_NULL_HANDLE;
   // With check_mirror: each range's hash when copied, to find ranges whose
   // contents change within a frame (draws after the change get the first).
   bool check_mirror = false;
@@ -733,12 +730,15 @@ struct Passes::State {
     VkShaderModule vertex;
     VkPipelineLayout layout;
     VkDescriptorSet sets[4];
-    uint32_t offsets[5];
+    uint32_t offsets[kConstantBlocks];
     VkViewport viewport;
     VkRect2D scissor;
     VkDeviceSize index_offset;
     VkIndexType index_type;
     uint32_t index_count;
+    int32_t base_vertex;
+    uint32_t vertex_bindings;
+    VkDeviceSize vertex_offsets[kMaxVertexBindings];
     PipelineKey key;
     float bias_constant, bias_slope;
   };
@@ -754,7 +754,6 @@ struct Passes::State {
   bool hide_cubes = false;
   uint64_t mismatched_seen = 0;
   std::unordered_set<std::string> mismatch_lines;
-  bool no_index_clamp = false;  // debugging aid
   // Pixel shaders given PsParamGen (interpolators, a bit each), and the
   // interpolator masks each was translated with (bits 16-31: with
   // SQ_PROGRAM_CNTL's param_gen set).
@@ -797,8 +796,6 @@ struct Passes::State {
   };
   std::vector<CopiedRange> copied_ranges;
   uint64_t current_vertex_shader = 0, current_pixel_shader = 0;
-  uint32_t vertex_shader_patches = 0;  // g_vertex_shader_patches at the last draw
-  std::vector<std::string> declaration_lines;
   // With check_clobbers: the ranges copied this frame, by start (end,
   // index or not, the shaders of the draw that copied it), to find copies
   // that change bytes an earlier draw's copy put in the mirror (the GPU
@@ -836,12 +833,6 @@ struct Passes::State {
   bool cache_index_ranges = true;
   // IndexRange's result for the draw's indices, from index_cache when it
   // holds.
-  // What DrawIndexRange learned from Buffers_NewestWrite for the draw's
-  // index range (kNewestUnknown if it didn't ask), for Mirror.
-  uint64_t draw_index_newest = kNewestUnknown;
-  std::pair<uint32_t, uint32_t> DrawIndexRange(uint32_t address, uint32_t count,
-                                               bool index_32bit, uint32_t endian,
-                                               bool skip_restart);
   // With log_index_ranges: each draw's index range (address, count and
   // format) as last scanned, to see how often a scan could be reused (the
   // range not written by memcpy since) and whether the reused result would
@@ -862,8 +853,6 @@ struct Passes::State {
     uint64_t frame_sequence = 0;  // Buffers_Sequence at the frame's start
     uint32_t mismatch_sample[6] = {};  // address, count, cached low/high, scanned low/high
   } index_range_counts;
-  void CountIndexRange(uint32_t address, uint32_t count, bool index_32bit, uint32_t endian,
-                       bool skip_restart, uint32_t low, uint32_t high);
   // With log_texture_bindings: how much of texture binding repeats, to
   // judge caching it (TakeTextureBindings describes it). A binding repeats
   // its fetch constant's last when the words (and view type, or filter
@@ -896,44 +885,22 @@ struct Passes::State {
   } last_draw;
   void CountBinding(bool view, uint32_t slot, const uint32_t* fetch, const uint32_t extra[4]);
   void CountDrawBindings(const TranslatedShader* vertex, const TranslatedShader* pixel);
-  // With log_shader_lookups: how much of the shader lookup repeats, to
-  // judge keying it by what the draw reads from the shader objects instead
-  // of hashing the microcode (TakeShaderLookups describes it). A stage's
-  // key is its object, microcode address and size, and for the vertex
-  // shader the id it's patched for, the bound declaration's and whether the
-  // patched copy is drawn. A key met before (this session) whose microcode
-  // now hashes differently is stale: a cache by the key would have given
-  // the wrong shader. Split by whether a patch (g_vertex_shader_patches)
-  // came between.
-  bool log_shader_lookups = false;
-  struct ShaderKey {
-    uint32_t object, microcode, size, patched_for, declaration_id, copy;
-  };
-  struct ShaderSeen {
-    uint64_t hash;
-    uint32_t patches;  // g_vertex_shader_patches when last seen
-  };
-  std::unordered_map<uint64_t, ShaderSeen> shaders_seen[2];  // by key hash; vertex, pixel
-  std::unordered_set<uint64_t> lookups_seen;  // whole lookups' key hashes
-  struct ShaderLookupCounts {
-    uint64_t frames = 0, draws = 0, copies = 0, lookup_same = 0, lookup_seen = 0;
-    uint64_t same[2] = {}, seen[2] = {}, stale[2] = {}, stale_patched[2] = {};
-    ShaderKey stale_sample[2] = {};
-    uint64_t stale_hashes[2][2] = {};  // the sample's hash before and now
-    uint32_t patches = 0;  // g_vertex_shader_patches when last taken
-  } lookup_counts;
-  struct LastLookup {
-    uint64_t key[2], lookup;
-    bool valid;
-  } last_lookup = {};
-  void CountShaderLookup(const ShaderKey keys[2], const uint64_t hashes[2],
-                         uint32_t program_control, uint32_t context_misc, bool point,
-                         bool rectangle_list);
   void LogGlow();
   // Debugging aids: draws of this pixel shader (hash) are skipped; with
   // record_draws, each draw is described in a line (written with a dump).
   uint64_t skip_pixel_shader = 0;
   bool skip_motion_blur = false;  // --motion_blur=false
+  // A resolve that is a whole-image copy from a single-sample color target
+  // hands the target's image to the destination texture instead
+  // (docs/pc-renderer.md, step 4; --native_renderer_hand_over_resolves).
+  bool hand_over_resolves = true;
+  // The depth format can be sampled with linear filtering (the depth
+  // resolves' readers' samplers may ask for it).
+  bool depth_filterable = false;
+  uint32_t logged_new_target_images = 0;
+  std::unordered_set<uint64_t> logged_copy_backs;
+  bool CreateTargetImage(Target& t);
+  void RestoreContents(VkCommandBuffer commands, Target& t);
   bool record_draws = false;
   // With log_glow: per frame, the glow history's cross-fade draws (pixel
   // shader kGlowCrossFade) and the texture they read, and 256x144 resolves
@@ -977,7 +944,7 @@ struct Passes::State {
 
   // Targets by surface (color or depth, EDRAM base, pitch, samples, the
   // format they're drawn in), and the ones being drawn into now.
-  std::map<std::array<uint32_t, 6>, Target> targets;
+  std::map<std::array<uint32_t, 7>, Target> targets;
   Target* bound_color = nullptr;
   Target* bound_depth = nullptr;
   VkExtent2D render_extent{};
@@ -1012,8 +979,17 @@ struct Passes::State {
     uint32_t address, format, flags;
     VkFormat host_format;
     uint32_t fetch[6];  // the destination's fetch constant, addresses physical
+    // A target's image handed over (at the target's scale): held by the
+    // destination only until a later hand-over gives it back to a target.
+    bool handed = false;
+    float scale = 1.0f;
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
   };
   std::vector<Resolved> frame_resolves;
+  // The resolve's image still in SHADER_READ_ONLY_OPTIMAL as its texture's.
+  bool Held(const Resolved& r) const {
+    return !r.handed || textures.HoldsHanded(r.fetch, r.scale, r.image);
+  }
   uint64_t frames = 0;  // for logging the resolve list now and then
   size_t last_frame_resolves = 0;
 
@@ -1122,7 +1098,8 @@ struct Passes::State {
   std::chrono::steady_clock::time_point pipeline_cache_saved;
   void OpenPipelineCache();
   void MaybeSavePipelineCache();
-  rex::graphics::RegisterFile regs;
+  // The draw's state, from the device's shadow (ReadState).
+  DrawRegisters regs;
   Stats stats;
   // The state the last draw recorded into the frame's command buffer, to
   // count the state calls that repeat it (stats.state_repeated). Forgotten
@@ -1137,32 +1114,48 @@ struct Passes::State {
     VkPipeline pipeline;
     VkPipelineLayout layout;
     VkDescriptorSet sets[4];
-    uint32_t offsets[5];  // the constants' dynamic offsets
+    uint32_t offsets[kConstantBlocks];  // the constants' dynamic offsets
     bool indexed;  // index buffer below bound
     VkBuffer index_buffer;
     VkDeviceSize index_offset;
     VkIndexType index_type;
+    // The vertex buffers bound (the arena at these offsets).
+    uint32_t vertex_bindings;
+    VkDeviceSize vertex_offsets[kMaxVertexBindings];
   } recorded;
+  // Each vertex shader module's vertex input: a binding a fetch (three for
+  // a rectangle list, at instance rate), its attributes the raw words.
+  struct VertexInput {
+    std::vector<VkVertexInputBindingDescription> bindings;
+    std::vector<VkVertexInputAttributeDescription> attributes;
+  };
+  std::unordered_map<VkShaderModule, VertexInput> vertex_inputs;
   // The constants each block (system, vertex floats, pixel floats,
-  // bool/loop, fetch) last had written into the constant block in use: a
+  // bool/loop) last had written into the constant block in use: a
   // copy of the bytes and where they went, so a draw whose block holds the
   // same bytes points at them instead of writing them again
   // (reuse_constants). Forgotten when the frame or the block changes.
   struct LastConstants {
-    bool valid[5] = {};
-    uint32_t offsets[5];
-    uint32_t sizes[5];  // bytes written
-    alignas(16) uint8_t bytes[5][kFloatConstantsRange];
+    bool valid[kConstantBlocks] = {};
+    uint32_t offsets[kConstantBlocks];
+    uint32_t sizes[kConstantBlocks];  // bytes written
+    alignas(16) uint8_t bytes[kConstantBlocks][kFloatConstantsRange];
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
-  bool log_register_reads = false;
-  // ReadRegisters into regs, counted with log_register_reads.
-  void ReadState(uint32_t device) {
-    if (log_register_reads) {
-      ReadRegisters(device, regs, stats.register_reads);
-    } else {
-      ReadRegisters(device, regs);
+  void ReadState(uint32_t) {
+    // The fetch constants from the renderer's own state (render/state.h):
+    // the sampler stages' texture descriptors (constants 0-25, 6 words
+    // each), and each stream's vertex fetch constant (95 - stream, 2
+    // words, in the same space).
+    std::memset(regs.fetch, 0, sizeof(regs.fetch));
+    for (uint32_t stage = 0; stage < 26; stage++) {
+      std::memcpy(&regs.fetch[6 * stage], render::TextureDescriptor(stage), 24);
+    }
+    const render::Bindings& bound = render::BoundResources();
+    for (uint32_t stream = 0; stream < 16; stream++) {
+      regs.fetch[2 * (95 - stream)] = bound.stream_fetch[stream][0];
+      regs.fetch[2 * (95 - stream) + 1] = bound.stream_fetch[stream][1];
     }
   }
   // Points offset at a copy of the block's size bytes in the constant
@@ -1210,14 +1203,6 @@ struct Passes::State {
   bool CreateMovieResources(VkExtent2D extent);
   VkPipeline GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples);
   void EndRendering(VkCommandBuffer commands);
-  bool CreateGuestMemoryMirror();
-  bool CreateGuestMemoryMirror(GuestMirror& mirror);
-  // `newest`: Buffers_NewestWrite's answer for exactly this range if the
-  // caller has just asked it (kNewestUnknown otherwise), to not ask twice.
-  static constexpr uint64_t kNewestUnknown = ~uint64_t(0);
-  void Mirror(uint32_t address, uint32_t size, bool index,
-              uint64_t newest = kNewestUnknown);
-  void CheckClobbers(uint32_t address, uint32_t size, bool index);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
   bool CreateTexturePool(Ring& ring);
@@ -1306,354 +1291,6 @@ bool Passes::State::CreateImage(Image& out, VkImageType type, VkImageViewType vi
   return vk::vkCreateImageView(device, &view, nullptr, &out.view) == VK_SUCCESS;
 }
 
-bool Passes::State::CreateGuestMemoryMirror() {
-  mirrors.resize(frames_in_flight);
-  for (GuestMirror& mirror : mirrors) {
-    if (!CreateGuestMemoryMirror(mirror)) {
-      return false;
-    }
-  }
-  ITC_LOG_INFO("native renderer: {} guest memory mirrors of {} MB", mirrors.size(),
-               kPhysicalMemorySize >> 20);
-  return true;
-}
-
-bool Passes::State::CreateGuestMemoryMirror(GuestMirror& mirror) {
-  VkDevice device = context.device;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = kMirrorSize;
-  info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &mirror.buffer) != VK_SUCCESS) {
-    return false;
-  }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, mirror.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX) {
-    ITC_LOG_ERROR("native renderer: no host-visible memory for the guest memory mirror");
-    return false;
-  }
-  if (VkResult result = vk::vkAllocateMemory(device, &alloc, nullptr, &mirror.memory);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: allocating the guest memory mirror failed: {}", int(result));
-    return false;
-  }
-  gpu_memory::Allocated(gpu_memory::Kind::kMirror, alloc.allocationSize);
-  if (vk::vkBindBufferMemory(device, mirror.buffer, mirror.memory, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, mirror.memory, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&mirror.mapped)) != VK_SUCCESS) {
-    return false;
-  }
-  // The built-in index buffers.
-  uint32_t* rectangles = reinterpret_cast<uint32_t*>(mirror.mapped + kRectangleIndices);
-  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
-    if (i) {
-      *rectangles++ = UINT32_MAX;
-    }
-    for (uint32_t j = 0; j < 4; j++) {
-      *rectangles++ = i << 2 | j;
-    }
-  }
-  uint32_t* quads = reinterpret_cast<uint32_t*>(mirror.mapped + kQuadIndices);
-  for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
-    for (uint32_t j : {0u, 1u, 2u, 0u, 2u, 3u}) {
-      *quads++ = 4 * i + j;
-    }
-  }
-  return true;
-}
-
-void Passes::State::Mirror(uint32_t address, uint32_t size, bool index,
-                           uint64_t newest) {
-  if (!size || address >= kPhysicalMemorySize) {
-    return;
-  }
-  if (size > kPhysicalMemorySize - address) {
-    size = kPhysicalMemorySize - address;
-    newest = kNewestUnknown;  // asked of a larger range
-  }
-  uint64_t key = (uint64_t(address) << 32) | size;
-  if (check_mirror) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
-    auto [it, added] = mirrored_hashes.try_emplace(key, hash);
-    if (!added && it->second != hash) {
-      it->second = hash;
-      stats.mirror_rewritten++;
-      stats.mirror_rewritten_bytes += size;
-      if (!stats.mirror_rewritten_sample_size) {
-        stats.mirror_rewritten_sample_address = address;
-        stats.mirror_rewritten_sample_size = size;
-      }
-    }
-  }
-  if (log_index_ranges) {
-    index_range_counts.mirror_calls++;
-  }
-  if (!mirrored.insert(key).second) {
-    if (log_index_ranges) {
-      index_range_counts.mirror_repeats++;
-    }
-    return;  // already copied this frame
-  }
-  if (Buffers_Logging()) {
-    Buffers_OnMirror(address, size, index);
-  }
-  if (Buffers_LogPhysicalWrites()) {
-    Buffers_OnDrawnRange(address, size, index);
-  }
-  if (check_late_writes) {
-    // Hashed again at the end of the frame.
-    copied_ranges.push_back({address, size, base::Hash64(PhysicalHostAddress(address), size),
-                             index, current_vertex_shader});
-  }
-  if (check_clobbers) {
-    CheckClobbers(address, size, index);
-  }
-  if (check_mirror_frames) {
-    uint64_t hash = base::Hash64(PhysicalHostAddress(address), size);
-    auto [it, added] = range_history.try_emplace(key, RangeHistory{hash, 0, index});
-    if (added) {
-      mirror_new_bytes += size;
-    } else if (it->second.hash != hash) {
-      it->second.hash = hash;
-      it->second.changes++;
-      mirror_changed_bytes += size;
-    }
-    if (!index) {
-      mirror_vertex_bytes += size;
-    }
-  }
-  if (mirror_by_tick) {
-    // The mirror has memcpy's writes as of the last logic pass's list (or,
-    // with mirror_to_both, as of this frame's start). With verify_mirror,
-    // the drawn ranges it misses a write of (memcpy being the only writer;
-    // comparing with guest memory slows frames below the tick).
-    if (!verify_mirror) {
-      return;
-    }
-    stats.mirror_checked++;
-    uint32_t end = address + size;
-    auto it = std::lower_bound(
-        front_missing.begin(), front_missing.end(),
-        std::make_pair(address > front_missing_longest ? address - front_missing_longest : 0, 0u));
-    for (; it != front_missing.end() && it->first < end; ++it) {
-      if (it->second <= address) {
-        continue;
-      }
-      bool render_only = !Renderer_ReplayingLogicList();
-      by_tick.stale[render_only]++;
-      by_tick.stale_bytes[render_only] += size;
-      stats.mirror_stale++;
-      stats.mirror_stale_bytes += size;
-      if (by_tick.stale_lines) {
-        by_tick.stale_lines--;
-        ITC_LOG_INFO("native renderer: mirror by tick: frame {}, {} list: {} range {:08X} ({} "
-                     "bytes) misses a write to {:08X}-{:08X}",
-                     by_tick.frames, render_only ? "a render-only pass's" : "a logic pass's",
-                     index ? "index" : "vertex", address, size, it->first, it->second);
-      }
-      break;
-    }
-    return;
-  }
-  // Only what memcpy has written since this mirror last got the range (see
-  // "Buffers" in docs/native-renderer.md): vertex and index data is
-  // written by the library's memcpy and nothing else.
-  GuestMirror& mirror = mirrors[frame];
-  if (!copy_all) {
-    auto [it, added] = mirror.copied.try_emplace(key, 0);
-    if (log_index_ranges && !added) {
-      // No write taken since the copy (Buffers_NewestWrite takes the
-      // pending ones): the answer is known without the lookup.
-      index_range_counts.newest_asked++;
-      Buffers_NewestWrite(address, size);
-      if (Buffers_Sequence() == it->second) {
-        index_range_counts.nothing_taken++;
-      }
-    }
-    if (!added && (newest != kNewestUnknown ? newest : Buffers_NewestWrite(address, size)) <=
-                      it->second) {
-      stats.mirror_skipped_bytes += size;
-      // Slow (the mirror is uncached memory: ~20 fps in a race), but
-      // checks every range every frame.
-      if (verify_mirror &&
-          (stats.mirror_checked++,
-           std::memcmp(mirror.mapped + address, PhysicalHostAddress(address), size))) {
-        stats.mirror_stale++;
-        stats.mirror_stale_bytes += size;
-        if (!stats.mirror_stale_sample_size) {
-          stats.mirror_stale_sample_address = address;
-          stats.mirror_stale_sample_size = size;
-          stats.mirror_stale_sample_index = index;
-        }
-      }
-      return;
-    }
-    it->second = Buffers_Sequence();
-  }
-  std::memcpy(mirror.mapped + address, PhysicalHostAddress(address), size);
-  stats.mirrored_bytes += size;
-}
-
-void Passes::State::MirrorByTickFrameStart() {
-  by_tick.frames++;
-  mirror_taken.clear();
-  Buffers_TakeMirrorWrites(mirror_taken);
-  for (auto& pending : mirror_pending) {
-    pending.insert(pending.end(), mirror_taken.begin(), mirror_taken.end());
-  }
-  // The back mirror: no frame in flight reads it. It was last read by the
-  // frame before it stopped being the front, which, with two frames in
-  // flight, is done by now (this frame slot's fence has been waited on) as
-  // long as the front changed in an earlier frame than this one.
-  uint32_t back = front_mirror ^ 1;
-  auto apply = [&](uint32_t m) {
-    for (auto [start, end] : mirror_pending[m]) {
-      end = std::min(end, kPhysicalMemorySize);
-      if (start < end) {
-        std::memcpy(mirrors[m].mapped + start, PhysicalHostAddress(start), end - start);
-        by_tick.writes++;
-        by_tick.bytes += end - start;
-      }
-    }
-    mirror_pending[m].clear();
-  };
-  apply(back);
-  // With mirror_to_both, the front too: frames in flight read it, but no
-  // write has been seen landing in data a frame drew around it
-  // (--native_renderer_log_physical_writes).
-  if (mirror_to_both) {
-    apply(front_mirror);
-  }
-  if (Renderer_ReplayingLogicList()) {
-    front_mirror = back;
-    by_tick.swaps++;
-  }
-  front_missing.clear();
-  front_missing_longest = 0;
-  for (auto [start, end] : verify_mirror ? mirror_pending[front_mirror]
-                                          : std::vector<std::pair<uint32_t, uint32_t>>{}) {
-    end = std::min(end, kPhysicalMemorySize);
-    if (start < end) {
-      front_missing.emplace_back(start, end);
-      front_missing_longest = std::max(front_missing_longest, end - start);
-    }
-  }
-  std::sort(front_missing.begin(), front_missing.end());
-}
-
-std::pair<uint32_t, uint32_t> Passes::State::DrawIndexRange(uint32_t address,
-                                                            uint32_t count, bool index_32bit,
-                                                            uint32_t endian, bool skip_restart) {
-  if (!cache_index_ranges) {
-    return IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
-                      skip_restart);
-  }
-  uint64_t key = IndexRangeCache::Key(address, count, index_32bit, endian, skip_restart);
-  IndexRangeCache::Entry& entry = index_cache.Find(key);
-  std::pair<uint32_t, uint32_t> range;
-  if (entry.key && entry.frame != mirror_frames) {
-    draw_index_newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
-  }
-  if (entry.key && (entry.frame == mirror_frames || draw_index_newest <= entry.sequence)) {
-    entry.frame = mirror_frames;
-    range = {entry.low, entry.high};
-    return range;
-  }
-  // Writes not yet taken get later sequences, so the entry is scanned again
-  // once they are.
-  uint64_t sequence = Buffers_Sequence();
-  range = IndexRange(PhysicalHostAddress(address), count, index_32bit, endian,
-                     skip_restart);
-  if (!entry.key) {
-    index_cache.Added();
-  }
-  entry = {key, sequence, mirror_frames, range.first, range.second};
-  return range;
-}
-
-void Passes::State::CountIndexRange(uint32_t address, uint32_t count, bool index_32bit,
-                                    uint32_t endian, bool skip_restart, uint32_t low,
-                                    uint32_t high) {
-  IndexRangeCounts& c = index_range_counts;
-  c.scans++;
-  c.indices += count;
-  // A draw's count is far below 2^28, leaving room for the format.
-  uint64_t key = (uint64_t(address) << 32) | (count & 0x0FFFFFFFu) |
-                 (uint64_t(index_32bit) << 28) | (uint64_t(endian & 3) << 29) |
-                 (uint64_t(skip_restart) << 31);
-  uint64_t newest = Buffers_NewestWrite(address, count * (index_32bit ? 4 : 2));
-  auto [it, added] = index_ranges_seen.try_emplace(
-      key, IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames});
-  if (added) {
-    c.first++;
-    c.distinct++;
-    return;
-  }
-  IndexRangeSeen& seen = it->second;
-  if (seen.frame == mirror_frames) {
-    c.same_frame++;
-  } else {
-    c.distinct++;
-  }
-  if (newest > seen.sequence) {
-    c.written++;
-  } else {
-    c.unchanged++;
-    c.unchanged_indices += count;
-    if (seen.low != low || seen.high != high) {
-      if (!c.mismatched++) {
-        uint32_t sample[] = {address, count, seen.low, seen.high, low, high};
-        std::copy(std::begin(sample), std::end(sample), c.mismatch_sample);
-      }
-    }
-  }
-  seen = IndexRangeSeen{Buffers_Sequence(), low, high, mirror_frames};
-}
-
-void Passes::State::CheckClobbers(uint32_t address, uint32_t size, bool index) {
-  // Earlier ranges overlapping this one: the mirror holds what their draws
-  // copied (the last copy of each byte); bytes differing from guest memory
-  // now are about to be replaced under them.
-  clobber_copies++;
-  uint32_t end = address + size;
-  uint32_t from = address > clobber_longest ? address - clobber_longest : 0;
-  const uint8_t* mirror = draw_mirror().mapped;
-  const uint8_t* guest = PhysicalHostAddress(0);
-  for (auto it = clobber_ranges.lower_bound(from);
-       it != clobber_ranges.end() && it->first < end; ++it) {
-    uint32_t lo = std::max(address, it->first), hi = std::min(end, it->second.end);
-    if (lo >= hi || !std::memcmp(mirror + lo, guest + lo, hi - lo)) {
-      continue;
-    }
-    uint32_t differing = 0, first = 0;
-    for (uint32_t a = lo; a < hi; a++) {
-      if (mirror[a] != guest[a]) {
-        first = differing++ ? first : a;
-      }
-    }
-    clobbers++;
-    clobbered_bytes += differing;
-    clobbers_by_shaders[{it->second.vertex_shader, it->second.pixel_shader, current_vertex_shader,
-                         current_pixel_shader}]++;
-    if (clobber_sample.empty()) {
-      clobber_sample = std::format(
-          "{} {:08X}-{:08X} of vs {:016X} ps {:016X} by {} {:08X}-{:08X} of vs {:016X} ps "
-          "{:016X}: {} bytes differ from {:08X}",
-          it->second.index ? "index" : "vertex", it->first, it->second.end,
-          it->second.vertex_shader, it->second.pixel_shader, index ? "index" : "vertex", address,
-          end, current_vertex_shader, current_pixel_shader, differing, first);
-    }
-  }
-  clobber_ranges.insert({address, {end, index, current_vertex_shader, current_pixel_shader}});
-  clobber_longest = std::max(clobber_longest, size);
-}
-
 bool Passes::State::CreateRings() {
   rings.resize(frames_in_flight);
   for (Ring& ring : rings) {
@@ -1729,12 +1366,12 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
   if (vk::vkAllocateDescriptorSets(device, &set_alloc, &block.set) != VK_SUCCESS) {
     return false;
   }
-  const uint32_t ranges[5] = {uint32_t(sizeof(Translator::SystemConstants)),
-                              kFloatConstantsRange, kFloatConstantsRange,
-                              kBoolLoopConstantsRange, kFetchConstantsRange};
-  VkDescriptorBufferInfo buffers[5];
-  VkWriteDescriptorSet writes[5];
-  for (uint32_t i = 0; i < 5; i++) {
+  const uint32_t ranges[kConstantBlocks] = {uint32_t(sizeof(DrawConstants)),
+                                            kFloatConstantsRange, kFloatConstantsRange,
+                                            kBoolLoopConstantsRange};
+  VkDescriptorBufferInfo buffers[kConstantBlocks];
+  VkWriteDescriptorSet writes[kConstantBlocks];
+  for (uint32_t i = 0; i < kConstantBlocks; i++) {
     buffers[i] = {block.buffer, 0, ranges[i]};
     writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
     writes[i].dstSet = block.set;
@@ -1743,7 +1380,7 @@ bool Passes::State::CreateConstantBlock(Ring& ring) {
     writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     writes[i].pBufferInfo = &buffers[i];
   }
-  vk::vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
+  vk::vkUpdateDescriptorSets(device, kConstantBlocks, writes, 0, nullptr);
   ring.blocks.push_back(block);
   return true;
 }
@@ -1762,21 +1399,20 @@ bool Passes::State::CreateDescriptors() {
   }
   constexpr VkShaderStageFlags kBoth = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-  // Set 0: guest memory.
-  VkDescriptorSetLayoutBinding shared{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, kBoth, nullptr};
+  // Set 0: empty (it held the vertex arena as a storage buffer until the
+  // vertex shaders took vertex attributes; kept so the other sets keep
+  // their numbers).
   VkDescriptorSetLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  layout_info.bindingCount = 1;
-  layout_info.pBindings = &shared;
   if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &shared_memory_layout) !=
       VK_SUCCESS) {
     return false;
   }
-  // Set 1: system, vertex float, pixel float, bool/loop and fetch constants.
-  VkDescriptorSetLayoutBinding constants[5];
-  for (uint32_t i = 0; i < 5; i++) {
+  // Set 1: system, vertex float, pixel float and bool/loop constants.
+  VkDescriptorSetLayoutBinding constants[kConstantBlocks];
+  for (uint32_t i = 0; i < kConstantBlocks; i++) {
     constants[i] = {i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, kBoth, nullptr};
   }
-  layout_info.bindingCount = 5;
+  layout_info.bindingCount = kConstantBlocks;
   layout_info.pBindings = constants;
   if (vk::vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &constants_layout) !=
       VK_SUCCESS) {
@@ -1787,18 +1423,8 @@ bool Passes::State::CreateDescriptors() {
   alloc.descriptorPool = pool;
   alloc.descriptorSetCount = 1;
   alloc.pSetLayouts = &shared_memory_layout;
-  for (GuestMirror& mirror : mirrors) {
-    if (vk::vkAllocateDescriptorSets(device, &alloc, &mirror.set) != VK_SUCCESS) {
-      return false;
-    }
-    VkDescriptorBufferInfo shared_buffer{mirror.buffer, 0, VK_WHOLE_SIZE};
-    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write.dstSet = mirror.set;
-    write.dstBinding = 0;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write.pBufferInfo = &shared_buffer;
-    vk::vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+  if (vk::vkAllocateDescriptorSets(device, &alloc, &arena_set) != VK_SUCCESS) {
+    return false;
   }
 
   for (Ring& ring : rings) {
@@ -1946,7 +1572,7 @@ VkDescriptorSetLayout Passes::State::GetTextureLayout(const TranslatedShader* sh
 VkDescriptorSet Passes::State::GetTextureSet(const TranslatedShader* shader,
                                                VkDescriptorSetLayout layout, uint32_t stage) {
   LastTextureSet& last = last_texture_sets[stage];
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  const uint32_t* fetch = regs.fetch;
   uint64_t generation = textures.generation();
   uint64_t sampler_generation = textures.sampler_generation();
   if (reuse_texture_sets && last.set && last.shader == shader && last.layout == layout &&
@@ -1996,24 +1622,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
   for (size_t i = 0; i < texture_count; i++) {
     const ShaderTexture& texture = shader->textures[i];
     const uint32_t* fetch =
-        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant];
-    // The signed binding gets the same (unsigned) view: it's read only for
-    // components whose sign is signed, which this game's textures don't
-    // have (logged if they do).
-    // The translator binds a signed and an unsigned view of each texture:
-    // both get the same.
-    size_t same = 0;
-    while (same < i && (shader->textures[same].fetch_constant != texture.fetch_constant ||
-                        shader->textures[same].view_type != texture.view_type)) {
-      same++;
-    }
-    if (same < i) {
-      // Field by field: copied whole, the 8-byte read of its layout and
-      // padding waited on the 4-byte store of the layout just made.
-      infos[i] = {VK_NULL_HANDLE, infos[same].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-      continue;
-    }
-    // Counted as asked of the texture cache (not the copies above).
+        &regs.fetch[6 * texture.fetch_constant];
     if (log_texture_bindings) {
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
@@ -2053,15 +1662,14 @@ VkDescriptorSet Passes::State::BuildTextureSet(const TranslatedShader* shader,
   for (size_t i = 0; i < sampler_count; i++) {
     const ShaderSampler& binding = shader->samplers[i];
     const uint32_t* fetch =
-        &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * binding.fetch_constant];
+        &regs.fetch[6 * binding.fetch_constant];
     if (log_texture_bindings) {
       uint32_t extra[4] = {binding.mag_filter, binding.min_filter, binding.mip_filter,
                            binding.aniso_filter};
       CountBinding(false, binding.fetch_constant, fetch, extra);
     }
-    VkSampler texture_sampler = textures.GetSampler(
-        fetch, {binding.fetch_constant, binding.mag_filter, binding.min_filter, binding.mip_filter,
-                binding.aniso_filter});
+    VkSampler texture_sampler =
+        textures.GetSampler(render::StageSampler(binding.fetch_constant), fetch);
     infos[texture_count + i] = {texture_sampler ? texture_sampler : sampler, VK_NULL_HANDLE,
                                 VK_IMAGE_LAYOUT_UNDEFINED};
   }
@@ -2157,49 +1765,10 @@ void Passes::State::CountBinding(bool view, uint32_t slot, const uint32_t* fetch
   }
 }
 
-void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t hashes[2],
-                                      uint32_t program_control, uint32_t context_misc,
-                                      bool point, bool rectangle_list) {
-  ShaderLookupCounts& c = lookup_counts;
-  LastLookup& last = last_lookup;
-  c.draws++;
-  c.copies += keys[0].copy;
-  uint64_t key_hashes[2];
-  for (int stage = 0; stage < 2; stage++) {
-    key_hashes[stage] = base::Hash64(&keys[stage], sizeof(ShaderKey));
-    c.same[stage] += last.valid && last.key[stage] == key_hashes[stage];
-    auto [it, added] =
-        shaders_seen[stage].try_emplace(key_hashes[stage], ShaderSeen{hashes[stage], 0});
-    if (!added) {
-      c.seen[stage]++;
-      if (it->second.hash != hashes[stage]) {
-        bool patched = it->second.patches != g_vertex_shader_patches;
-        c.stale[stage]++;
-        c.stale_patched[stage] += patched;
-        if (!patched && !c.stale_sample[stage].object) {
-          c.stale_sample[stage] = keys[stage];
-          c.stale_hashes[stage][0] = it->second.hash;
-          c.stale_hashes[stage][1] = hashes[stage];
-        }
-        it->second.hash = hashes[stage];
-      }
-    }
-    it->second.patches = g_vertex_shader_patches;
-  }
-  // The whole lookup: both stages' keys and what the interface depends on.
-  uint64_t lookup[4] = {key_hashes[0], key_hashes[1],
-                        uint64_t(program_control) << 32 | context_misc,
-                        uint64_t(point) | uint64_t(rectangle_list) << 1};
-  uint64_t lookup_hash = base::Hash64(lookup, sizeof(lookup));
-  c.lookup_same += last.valid && last.lookup == lookup_hash;
-  c.lookup_seen += !lookups_seen.insert(lookup_hash).second;
-  last = {{key_hashes[0], key_hashes[1]}, lookup_hash, true};
-}
-
 void Passes::State::CountDrawBindings(const TranslatedShader* vertex,
                                       const TranslatedShader* pixel) {
   TextureBindingCounts& c = binding_counts;
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  const uint32_t* fetch = regs.fetch;
   uint64_t generation = textures.generation();
   LastDraw& last = last_draw;
   // Whether a stage's shader and the fetch constants it reads are as at the
@@ -2269,6 +1838,24 @@ VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
     info.codeSize = shader->spirv.size() * 4;
     info.pCode = shader->spirv.data();
     vk::vkCreateShaderModule(context.device, &info, nullptr, &shader->module);
+    if (shader->module && shader->stage == ShaderStage::kVertex) {
+      VertexInput& input = vertex_inputs[shader->module];
+      const auto& fetches = shader->vertex_fetches;
+      for (uint32_t n = 0; n < fetches.size() && n < kMaxVertexFetches; n++) {
+        uint32_t stride = 4 * fetches[n].stride_words;
+        VkFormat format = RawWordsFormat(fetches[n].words);
+        for (uint32_t g = 0; g < 3; g++) {
+          uint32_t binding = shader->rectangle_list ? 3 * n + g : n;
+          if (shader->rectangle_list || g == 0) {
+            input.bindings.push_back(
+                {binding, shader->rectangle_list ? 3 * stride : stride,
+                 shader->rectangle_list ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                        : VK_VERTEX_INPUT_RATE_VERTEX});
+          }
+          input.attributes.push_back({3 * n + g, binding, format, 0});
+        }
+      }
+    }
   }
   return shader->module;
 }
@@ -2294,6 +1881,12 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   }
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  if (auto input = vertex_inputs.find(key.vertex); input != vertex_inputs.end()) {
+    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
+    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
+    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
+  }
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   input_assembly.topology = VkPrimitiveTopology(key.topology);
@@ -2381,10 +1974,9 @@ bool Passes::State::Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data)
 
 bool Passes::State::ReserveDrawConstants() {
   VkDeviceSize alignment = std::max<VkDeviceSize>(context.min_uniform_buffer_offset_alignment, 16);
-  constexpr VkDeviceSize kDrawConstants = sizeof(Translator::SystemConstants) +
-                                          2 * kFloatConstantsRange + kBoolLoopConstantsRange +
-                                          kFetchConstantsRange;
-  if (ring_offset + kDrawConstants + 5 * alignment <= kConstantBlockSize) {
+  constexpr VkDeviceSize kDrawConstants =
+      sizeof(DrawConstants) + 2 * kFloatConstantsRange + kBoolLoopConstantsRange;
+  if (ring_offset + kDrawConstants + kConstantBlocks * alignment <= kConstantBlockSize) {
     return true;
   }
   Ring& ring = rings[frame];
@@ -2443,6 +2035,12 @@ void Passes::State::BeginRendering(VkCommandBuffer commands, Target* color, Targ
     return;
   }
   EndRendering(commands);
+  if (color) {
+    RestoreContents(commands, *color);
+  }
+  if (depth) {
+    RestoreContents(commands, *depth);
+  }
   VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
@@ -2486,10 +2084,11 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   if (format == VK_FORMAT_UNDEFINED || !surface.pitch) {
     return nullptr;
   }
-  // Surfaces drawn while tiling get targets of their own, as large as the
-  // tiles together (their EDRAM wouldn't hold them).
-  std::array<uint32_t, 6> key{uint32_t(depth), surface.edram_base, surface.pitch, surface.msaa,
-                              uint32_t(format), tiling ? 1u : 0u};
+  // A target an image, by the surface object the game made it as, its size,
+  // samples and format. Surfaces drawn while tiling get targets of their
+  // own, as large as the tiles together.
+  std::array<uint32_t, 7> key{uint32_t(depth), object, surface.width, surface.height,
+                              surface.msaa, uint32_t(format), tiling ? 1u : 0u};
   auto [it, added] = targets.try_emplace(key);
   Target& t = it->second;
   if (!added) {
@@ -2499,36 +2098,22 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   t.surface = surface;
   t.format = format;
   t.samples = SampleCount(surface.msaa);
-  t.guest_extent = SurfaceExtent(surface, depth);
+  t.guest_extent = {std::clamp(surface.width, 1u, 8192u), std::clamp(surface.height, 1u, 8192u)};
   if (tiling) {
     t.guest_extent = {std::max(t.guest_extent.width, tiling_extent.width),
                       std::max(t.guest_extent.height, tiling_extent.height)};
   }
   t.scale = IsMainViewSurface(surface) ? main_view_scale : scale;
   t.extent = ScaledBy(t.guest_extent, t.scale);
-  VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            (depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                                   : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-  if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, format,
-                   {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
+  if (!CreateTargetImage(t)) {
     ITC_LOG_ERROR("native renderer: couldn't create a {}x{} target", t.extent.width,
                   t.extent.height);
     t.image = {};
     return nullptr;
   }
-  t.sample_view = t.image.view;
-  if (depth) {
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view.image = t.image.image;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = format;
-    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-    vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
-  }
-  ITC_LOG_INFO("native renderer: {} target: EDRAM base {}, pitch {}, MSAA {}, format {}; {}x{}{} "
+  ITC_LOG_INFO("native renderer: {} target: surface {:08X}, pitch {}, MSAA {}, format {}; {}x{}{} "
                "({}x{} drawn)",
-               depth ? "depth" : "color", surface.edram_base, surface.pitch, surface.msaa,
+               depth ? "depth" : "color", object, surface.pitch, surface.msaa,
                surface.format, t.guest_extent.width, t.guest_extent.height,
                tiling ? " (tiled)" : "", t.extent.width, t.extent.height);
   stats.targets++;
@@ -2541,9 +2126,65 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint32_t object,
   return &t;
 }
 
+bool Passes::State::CreateTargetImage(Target& t) {
+  VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            (t.depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                     : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+  if (!CreateImage(t.image, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, t.format,
+                   {t.extent.width, t.extent.height, 1}, 1, usage, t.aspects(), 0, t.samples)) {
+    return false;
+  }
+  t.sample_view = t.image.view;
+  if (t.depth) {
+    // Its depth alone, for resolving and sampling.
+    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    view.image = t.image.image;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = t.format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    vk::vkCreateImageView(context.device, &view, nullptr, &t.sample_view);
+  }
+  return true;
+}
+
+void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
+  if (!t.handed_image) {
+    return;
+  }
+  VkImage source = t.handed_image;
+  t.handed_image = VK_NULL_HANDLE;
+  if (!textures.HoldsHanded(t.handed_fetch, t.handed_scale, source)) {
+    return;  // gone (a race's end): as after a clear
+  }
+  EndRendering(commands);
+  // The destination keeps its image in SHADER_READ_ONLY_OPTIMAL.
+  VkImageLayout source_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  Transition(commands, source, t.aspects(), source_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  Transition(commands, t.image.image, t.aspects(), t.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  VkImageCopy region{};
+  region.srcSubresource = {t.aspects(), 0, 0, 1};
+  region.dstSubresource = region.srcSubresource;
+  region.extent = {t.extent.width, t.extent.height, 1};
+  vk::vkCmdCopyImage(commands, source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, t.image.image,
+                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  Transition(commands, source, t.aspects(), source_layout,
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  recorded.valid = false;
+  stats.resolves_copied_back++;
+  if (logged_copy_backs.insert(uint64_t(t.surface.pitch) << 32 | t.handed_fetch[1]).second) {
+    ITC_LOG_INFO("native renderer: target (pitch {}, format {}) drawn or read again without a "
+                 "clear after handing its image to {:08X}: copied back",
+                 t.surface.pitch, t.surface.format, t.handed_fetch[1] & 0xFFFFF000u);
+  }
+}
+
 void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
                                 const VkClearValue& value, VkImageAspectFlags aspects) {
   EndRendering(commands);
+  if (!aspects || aspects == target.aspects()) {
+    target.handed_image = VK_NULL_HANDLE;  // all of it cleared
+  }
   Transition(commands, target.image.image, target.aspects(), target.layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   VkImageSubresourceRange range{aspects ? aspects : target.aspects(), 0, 1, 0, 1};
@@ -2814,6 +2455,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
+  RestoreContents(commands, source);
   TextureCache::ResolveDestination dest;
   if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
     return false;
@@ -2859,6 +2501,93 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
                 ScaledBy(top + height, source_scale) - host_top,
                 int32_t(dest.host_height) - host_y, int32_t(source.extent.height) - host_top});
   if (host_width <= 0 || host_height <= 0) {
+    return false;
+  }
+  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
+  // copy_dest_swap: when the destination's swizzle takes X from another
+  // component than the first (bits 1-3 of fetch word 3), so sampling it
+  // through the swizzle swaps them back.
+  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
+  // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
+  // on the main view's HDR copies).
+  int32_t bias = int32_t(flags) >> 26;
+  // A whole-image copy from a single-sample color target: the pass has drawn
+  // into its texture. The target's image is handed to the destination, and
+  // what the copy did is left to the readers (the views' swizzle, the
+  // reader scale); the target draws next into the image the destination
+  // held (or a new one).
+  bool whole = host_x == 0 && host_y == 0 && host_left == 0 && host_top == 0 &&
+               uint32_t(host_width) == dest.host_width &&
+               uint32_t(host_height) == dest.host_height &&
+               dest.host_width == source.extent.width && dest.host_height == source.extent.height;
+  // A depth target's image is sampled as depth (the copy is the depth as
+  // is, into an R32F texture), where its format can be filtered.
+  bool color_hand_over = !source.depth &&
+                         FormatComponents(source.format) == FormatComponents(dest.native_format) &&
+                         FormatComponents(source.format) != 0;
+  bool depth_hand_over = source.depth && dest.native_format == VK_FORMAT_R32_SFLOAT &&
+                         bias == 0 && depth_filterable;
+  if (hand_over_resolves && whole && !dest.copied && source.samples == VK_SAMPLE_COUNT_1_BIT &&
+      (color_hand_over || depth_hand_over)) {
+    float reader_scale = 0.0f;
+    float factor = std::ldexp(1.0f, bias);
+    if (IsUnorm(dest.native_format)) {
+      // What the normalized format kept: 0-1 (nothing to do for a
+      // normalized target and no bias).
+      if (bias != 0 || !IsUnorm(source.format)) {
+        reader_scale = factor;
+      }
+    } else if (bias != 0) {
+      reader_scale = -factor;
+    }
+    EndRendering(commands);
+    Transition(commands, source.image.image, source.aspects(), source.layout,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    TextureCache::HandedImage handed{source.image.image, source.image.memory, source.image.view,
+                                     source.format};
+    if (source.depth) {
+      handed.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+      handed.depth_view = source.sample_view;
+    }
+    TextureCache::HandedImage back =
+        textures.HandOver(fetch, source.scale, handed, swap, reader_scale);
+    if (back.image) {
+      source.image = {back.image, back.memory, back.view};
+      source.sample_view = source.depth ? back.depth_view : back.view;
+      source.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    } else {
+      if (logged_new_target_images < 40) {
+        logged_new_target_images++;
+        ITC_LOG_INFO("native renderer: hand-over to {:08X} ({}x{}, held its own {} format {}) "
+                     "from target {:08X} format {}: a new target image",
+                     fetch[1] & 0xFFFFF000u, dest.host_width, dest.host_height,
+                     dest.handed ? "no:" : "yes:", int(dest.format), source.surface.pitch,
+                     int(source.format));
+      }
+      source.image = {};
+      source.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      if (!CreateTargetImage(source)) {
+        ITC_LOG_ERROR("native renderer: couldn't create a {}x{} target", source.extent.width,
+                      source.extent.height);
+      }
+      stats.targets++;
+    }
+    source.handed_image = handed.image;
+    std::copy(fetch, fetch + 6, source.handed_fetch);
+    source.handed_scale = source.scale;
+    recorded.valid = false;
+    stats.resolves_handed++;
+    Resolved& resolved = frame_resolves.emplace_back();
+    resolved = {handed.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
+                fetch[1] & 0x3F, flags,
+                source.depth ? VK_FORMAT_R32_SFLOAT : source.format};
+    std::copy(fetch, fetch + 6, resolved.fetch);
+    resolved.handed = true;
+    resolved.scale = source.scale;
+    resolved.aspect = source.depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    return true;
+  }
+  if (!dest.copied && !textures.RestoreResolveDestination(fetch, source.scale, dest)) {
     return false;
   }
   VkPipeline pipeline = GetResolvePipeline(dest.format, source.samples != VK_SAMPLE_COUNT_1_BIT);
@@ -2908,13 +2637,6 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout, 0, 1,
                               &set, 0, nullptr);
-  // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
-  // on the main view's HDR copies).
-  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
-  // copy_dest_swap: when the destination's swizzle takes X from another
-  // component than the first (bits 1-3 of fetch word 3), so sampling it
-  // through the swizzle swaps them back.
-  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
   struct {
     int32_t offset[2];
     int32_t samples;
@@ -2922,7 +2644,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
     int32_t swap_red_blue;
   } constants{{host_left - host_x, host_top - host_y},
               source.depth ? 1 : int32_t(source.samples),
-              std::ldexp(1.0f, int32_t(flags) >> 26), swap ? 1 : 0};
+              std::ldexp(1.0f, bias), swap ? 1 : 0};
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
@@ -3076,7 +2798,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
     }
     ITC_LOG_INFO("native renderer: movies drawn from {}x{} planes", planes.width, planes.height);
   }
-  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  uint32_t object = render::BoundTargets().color[0];
   Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   if (!target) {
     return;
@@ -3118,6 +2840,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   if (width <= 0 || height <= 0) {
     return;
   }
+  s.RestoreContents(commands, *target);
   Transition(commands, target->image.image, target->aspects(), target->layout,
              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   VkRect2D area{{0, 0}, {uint32_t(width), uint32_t(height)}};
@@ -3147,9 +2870,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   s.stats.movie_draws++;
 }
 
-Passes::Passes() : state_(std::make_unique<State>()) {
-  std::memset(state_->regs.values, 0, sizeof(state_->regs.values));  // see ReadRegisters
-}
+Passes::Passes() : state_(std::make_unique<State>()) {}
 Passes::~Passes() = default;
 
 bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
@@ -3169,7 +2890,7 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
-  if (!s.CreateGuestMemoryMirror()) {
+  if (!s.arena.Init(context, frames_in_flight)) {
     return false;
   }
   const std::string& gamma = ITC_FLAG(xbox_gamma);
@@ -3190,14 +2911,17 @@ bool Passes::Init(const DeviceContext& context, uint32_t frames_in_flight,
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
-  ShaderFeatures features;
-  features.max_storage_buffer_range = context.max_storage_buffer_range;
-  features.clip_distance = context.clip_distance;
-  features.cull_distance = context.cull_distance;
-  features.demote_to_helper_invocation = context.demote_to_helper_invocation;
-  s.shaders = std::make_unique<ShaderCache>(features);
+  VkFormatProperties depth_properties{};
+  vk::vkGetPhysicalDeviceFormatProperties(context.physical_device, kDepthFormat,
+                                          &depth_properties);
+  s.depth_filterable = depth_properties.optimalTilingFeatures &
+                       VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+  ITC_LOG_INFO("native renderer: depth targets {} handed to their resolves' textures (linear "
+               "filtering of the depth format {})",
+               s.depth_filterable ? "can be" : "can't be",
+               s.depth_filterable ? "supported" : "not supported");
+  s.shaders = std::make_unique<ShaderCache>();
   if (std::filesystem::path directory = DiskCacheDirectory(); !directory.empty()) {
-    s.shaders->OpenDiskCache(directory / "shaders.bin");
     s.pipeline_cache_file = directory / "pipelines.bin";
   }
   s.OpenPipelineCache();
@@ -3292,35 +3016,14 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.main_view = nullptr;
   s.front = nullptr;
   s.frame_resolves.clear();
-  s.mirrored.clear();
-  s.used_mirrored.clear();
-  s.mirror_frames++;
-  if (s.mirror_by_tick) {
-    Buffers_KeepSegments(s.MirrorPerDraw());
-    s.MirrorByTickFrameStart();
-  }
+  Buffers_KeepSegments(false);
+  s.arena.BeginFrame(frame_index);
   if (Buffers_LogPhysicalWrites()) {
     Buffers_OnFrameStart([&s](uint32_t start, uint32_t end) { return s.textures.Holds(start, end); });
   }
   if (s.log_texture_bindings) {
     s.binding_counts.frames++;
   }
-  if (s.log_shader_lookups) {
-    s.lookup_counts.frames++;
-  }
-  if (s.log_index_ranges) {
-    // Writes taken since the last frame's start (memcpy's, into the
-    // physical views).
-    Buffers_NewestWrite(0, 0);
-    State::IndexRangeCounts& c = s.index_range_counts;
-    c.frames++;
-    c.writes += Buffers_Sequence() - c.frame_sequence;
-    c.frame_sequence = Buffers_Sequence();
-  }
-  s.inline_offset = 0;
-  s.mirrored_hashes.clear();
-  s.clobber_ranges.clear();
-  s.clobber_longest = 0;
   s.id_draws.clear();
   s.id_drawn = false;
   s.watched_this_frame.clear();
@@ -3342,17 +3045,25 @@ VkCommandBuffer Passes::EndUploads() {
   return state_->textures.EndUploads();
 }
 
+VkCommandBuffer Passes::EndBufferUploads() {
+  return state_->arena.EndUploads();
+}
+
+std::string Passes::TakeArenaStats() {
+  return state_->arena.TakeStats();
+}
+
 void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                          const DrawCall& call) {
   State& s = *this;
   auto& regs = s.regs;
   // The bound surfaces: render target 0 and depth (others aren't drawn).
-  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0);
-  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
+  uint32_t color_object = render::BoundTargets().color[0];
+  uint32_t depth_object = render::BoundTargets().depth;
   for (uint32_t i = 1; i < 4; i++) {
     // The same surface in another slot (seen: target 1 = target 0) adds
     // nothing.
-    if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * i);
+    if (uint32_t object = render::BoundTargets().color[i];
         object && object != color_object) {
       if (!s.logged_extra_targets) {
         s.logged_extra_targets = true;
@@ -3399,17 +3110,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     s.stats.unsupported++;
     return;
   }
-  // The base vertex the GPU adds to each index: VGT_INDX_OFFSET, as the
-  // plugin takes it (the item's upper half is the library's argument, which
-  // it may already have applied to the vertex buffers' addresses).
-  int32_t item_base_vertex = int32_t(base_start) >> 16;
-  int32_t base_vertex = int32_t(regs.values[XE_GPU_REG_VGT_INDX_OFFSET]);
-  if (!call.inline_vertices && base_vertex != item_base_vertex) {
-    s.stats.base_vertex_differs++;
-    if (!s.stats.base_vertex_sample[0] && !s.stats.base_vertex_sample[1]) {
-      s.stats.base_vertex_sample = {uint32_t(item_base_vertex), uint32_t(base_vertex)};
-    }
-  }
+  // The base vertex added to each index: the draw's own (the item's upper
+  // half, as the library's DrawIndexedVertices puts it in VGT_INDX_OFFSET:
+  // never another in the runs that compared them); 0 for inline draws.
+  int32_t base_vertex = call.inline_vertices ? 0 : int32_t(base_start) >> 16;
   uint32_t start_index = base_start & 0xFFFF;
   // Inline draws: the vertices in order (indices only to expand rectangle
   // and quad lists).
@@ -3417,9 +3121,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                                               : primitive_count * primitive.a + primitive.b;
 
   // Shaders, read through physical memory as the GPU reads them.
-  uint32_t program_control = regs.values[XE_GPU_REG_SQ_PROGRAM_CNTL];
-  uint32_t vertex_object = guest::LoadU32(device + kDeviceVertexShader);
-  uint32_t pixel_object = guest::LoadU32(device + kDevicePixelShader);
+  const render::Bindings& bound = render::BoundResources();
+  uint32_t program_control, context_misc;
+  render::ShaderControls(program_control, context_misc);
+  uint32_t vertex_object = bound.vertex_shader;
+  uint32_t pixel_object = bound.pixel_shader;
   if (!vertex_object) {
     s.stats.failed++;
     s.stats.failed_by[1]++;
@@ -3428,41 +3134,26 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   uint32_t vertex_address = guest::LoadU32(vertex_object + 48);
   const uint8_t* vertex_ucode = PhysicalHostAddress(GpuPhysicalAddress(vertex_address));
   uint32_t vertex_size = guest::LoadU32(vertex_object + 600);
-  uint32_t declaration = guest::LoadU32(device + kDeviceVertexDeclaration);
-  uint32_t declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
-  uint32_t patched_for = guest::LoadU32(vertex_object + 24);
-  bool patched = g_vertex_shader_patches != s.vertex_shader_patches;
-  s.vertex_shader_patches = g_vertex_shader_patches;
-  // The object's microcode is patched for another declaration: the GPU runs
-  // the copy the library patched in the command buffer instead.
-  const LoadedVertexShader& loaded = g_loaded_vertex_shader;
-  bool vertex_copy = false;
-  if (declaration_id != patched_for && loaded.object == vertex_object &&
-      loaded.declaration_id == declaration_id && loaded.microcode.size() == vertex_size) {
-    vertex_ucode = loaded.microcode.data();
-    patched_for = declaration_id;
-    vertex_copy = true;
-    s.stats.vertex_shader_copies++;
+  uint32_t declaration = bound.declaration;
+  // The fetches take their fields from the declaration and the stream
+  // strides (the library's patch of the microcode no longer runs), unless
+  // the shader is one the library doesn't patch (its +592 bit 6).
+  bool fields_from_declaration =
+      declaration && !(guest::LoadU32(vertex_object + 592) & 0x40);
+  // Each stream's stride in words; an inline draw's stream 0 its own.
+  uint8_t stream_strides[16];
+  std::memcpy(stream_strides, bound.strides, sizeof(stream_strides));
+  if (call.inline_vertices) {
+    stream_strides[0] = uint8_t(call.inline_stride >> 2);
   }
-  if (declaration_id != patched_for) {
-    s.stats.declaration_mismatches++;
-    s.stats.declaration_mismatches_patched += patched;
-    if (s.declaration_lines.size() < 6) {
-      s.declaration_lines.push_back(std::format(
-          "vs object {:08X} patched for {} ({:016X}), bound declaration {:08X} id {}; this "
-          "draw patched {}; last patch: object {:08X} declaration {:08X} id {}",
-          vertex_object, patched_for, base::Hash64(vertex_ucode, vertex_size), declaration,
-          declaration_id, patched, g_last_patch[0], g_last_patch[1], g_last_patch[2]));
-    }
-    if (!s.stats.declaration_sample[0] && !s.stats.declaration_sample[1]) {
-      s.stats.declaration_sample = {patched_for, declaration_id};
-    }
+  uint32_t strides[4] = {};
+  if (fields_from_declaration) {
+    std::memcpy(strides, stream_strides, sizeof(strides));
   }
   uint32_t pixel_address = pixel_object ? guest::LoadU32(pixel_object + 24) : 0;
   const uint8_t* pixel_ucode =
       pixel_object ? PhysicalHostAddress(GpuPhysicalAddress(pixel_address)) : nullptr;
   uint32_t pixel_size = pixel_object ? guest::LoadU32(pixel_object + 64) : 0;
-  uint32_t context_misc = regs.values[XE_GPU_REG_SQ_CONTEXT_MISC];
   // The lookup in full: each microcode hashed once (the cache's lookups take
   // the hash), which interpolators connect them (an unconnected one the
   // pixel shader reads would be undefined), and the translations.
@@ -3470,28 +3161,63 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     ShaderLookup r;
     r.vertex_hash = MicrocodeHash(vertex_ucode, vertex_size);
     r.pixel_hash = pixel_ucode ? MicrocodeHash(pixel_ucode, pixel_size) : 0;
+    // The file's microcode with the fetches' fields made for the
+    // declaration, for its GLSL (shader_ports.h): the object keeps its
+    // fetches' records (+60, +64) and file instructions (+192).
+    VertexFetchRemap remap;
+    uint32_t fetch_count = guest::LoadU32(vertex_object + 60);
+    bool remapped = false;
+    if (fetch_count <= 32) {
+      uint32_t records[32];
+      std::array<uint32_t, 3> made[32];
+      for (uint32_t j = 0; j < fetch_count; j++) {
+        records[j] = guest::LoadU32(vertex_object + 64 + 4 * j);
+        uint32_t original[3];
+        for (uint32_t w = 0; w < 3; w++) {
+          original[w] = guest::LoadU32(vertex_object + 192 + 12 * j + 4 * w);
+        }
+        if (fields_from_declaration) {
+          graphics::shader_patch::Fetch fetch = graphics::shader_patch::FetchFromDeclaration(
+              records[j], original, declaration, stream_strides);
+          made[j] = {fetch.words[0], fetch.words[1], fetch.words[2]};
+        } else {
+          made[j] = {original[0], original[1], original[2]};
+        }
+      }
+      remapped = FitVertexFetches(vertex_ucode, vertex_size, fetch_count, records,
+                                  guest::Pointer(vertex_object + 192), made, remap);
+    }
+    if (remapped) {
+      // The shader as fitted, for the caches.
+      r.vertex_hash = MicrocodeHash(remap.ucode.data(), vertex_size) ^
+                      base::Hash64(remap.swizzles.data(),
+                                   remap.swizzles.size() * sizeof(remap.swizzles[0]));
+    }
     r.interface = s.shaders->GetInterface(vertex_ucode, vertex_size, r.vertex_hash, pixel_ucode,
                                           pixel_size, r.pixel_hash, program_control,
-                                          context_misc);
+                                          context_misc, remapped ? &remap : nullptr);
     r.interface.param_gen_point = type == 1;  // point list
     r.interface.rectangle_list = rectangle_list;
     r.vertex = s.shaders->Get(ShaderStage::kVertex, vertex_ucode, vertex_size, r.vertex_hash,
-                              program_control & 0x3F, r.interface);
+                              r.interface, remapped ? &remap : nullptr);
     if (pixel_object) {
       r.pixel = s.shaders->Get(ShaderStage::kPixel, pixel_ucode, pixel_size, r.pixel_hash,
-                               (program_control >> 8) & 0x3F, r.interface);
+                               r.interface);
     }
     return r;
   };
-  // Kept by what the draw read from the shader objects (ShaderLookupTable),
-  // except for the patched copy (its contents change at one address) and
-  // with the diagnostic that needs the hashes worked out.
+  // Kept by what the draw read from the shader objects and the
+  // declaration (ShaderLookupTable).
   ShaderLookup lookup;
-  if (s.cache_shader_lookups && !vertex_copy && !s.log_shader_lookups) {
-    ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size, patched_for,
-                                   declaration_id, pixel_object, pixel_address, pixel_size,
+  if (s.cache_shader_lookups) {
+    ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size,
+                                   uint32_t(bound.declaration_hash >> 32),
+                                   uint32_t(bound.declaration_hash), strides[0], strides[1], strides[2],
+                                   strides[3], pixel_object, pixel_address, pixel_size,
                                    program_control, context_misc,
-                                   uint32_t(type == 1) | uint32_t(rectangle_list) << 1, 0}};
+                                   uint32_t(type == 1) | uint32_t(rectangle_list) << 1 |
+                                       uint32_t(fields_from_declaration) << 2,
+                                   0}};
     const ShaderLookup* kept = nullptr;
     bool last = s.last_shader_valid && key == s.last_shader_key;
     if (last) {
@@ -3516,13 +3242,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   const ShaderCache::Interface& interface = lookup.interface;
   uint64_t pixel_hash = lookup.pixel_hash;
-  if (s.log_shader_lookups) {
-    State::ShaderKey keys[2] = {
-        {vertex_object, vertex_address, vertex_size, patched_for, declaration_id, vertex_copy},
-        {pixel_object, pixel_address, pixel_size, 0, 0, 0}};
-    uint64_t hashes[2] = {lookup.vertex_hash, pixel_hash};
-    s.CountShaderLookup(keys, hashes, program_control, context_misc, type == 1, rectangle_list);
-  }
   if (pixel_ucode && interface.param_gen_interpolator < 16) {
     s.stats.param_gen_draws++;
     if (s.collect_interfaces) {
@@ -3575,14 +3294,23 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     r.inline_vertices = call.inline_vertices;
     for (uint32_t k = 0; k < 96; k++) {
       if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
-        r.vertex_fetches.push_back({k, regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k],
-                                    regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1]});
+        r.vertex_fetches.push_back({k, regs.fetch[2 * k],
+                                    regs.fetch[2 * k + 1]});
       }
     }
-    r.render_state = {regs.values[0x2200], regs.values[0x2201], regs.values[0x2202],
-                      regs.values[0x2208], regs.values[0x2104], regs.values[0x2105],
-                      regs.values[0x2106], regs.values[0x2107], regs.values[0x2108],
-                      regs.values[0x210E]};
+    // The render states in the registers' layouts the dump prints them in.
+    const render::RenderStates& rs = render::States();
+    r.render_state = {uint32_t(rs.z_enable) << 1 | uint32_t(rs.z_write) << 2 |
+                          uint32_t(rs.z_func) << 4,
+                      rs.blend[0].fields,
+                      uint32_t(rs.alpha_func) | uint32_t(rs.alpha_test) << 3,
+                      pixel_object ? 4u : 5u,
+                      rs.color_write[0],
+                      std::bit_cast<uint32_t>(rs.blend_constants[0]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[1]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[2]),
+                      std::bit_cast<uint32_t>(rs.blend_constants[3]),
+                      std::bit_cast<uint32_t>(rs.alpha_ref)};
     for (const TranslatedShader* shader : {vertex, pixel}) {
       for (size_t i = 0; shader && i < shader->textures.size(); i++) {
         const ShaderTexture& texture = shader->textures[i];
@@ -3590,7 +3318,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
         t.pixel = shader == pixel;
         t.texture = texture;
         std::memcpy(t.fetch,
-                    &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant],
+                    &regs.fetch[6 * texture.fetch_constant],
                     sizeof(t.fetch));
       }
     }
@@ -3599,23 +3327,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (log_glow && pixel && pixel->hash == kGlowCrossFade) {
     glow_frame.cross_fades++;
     glow_frame.constants.clear();
-    if (call.inline_vertices) {
-      // Its weight: the vertices' color alpha (the shader outputs the
-      // history times the color, and the color's alpha).
-      // In the mirror past guest memory, in the guest's byte order.
-      const uint8_t* vertices = draw_mirror().mapped;
-      auto vertex_float = [vertices](uint32_t address) {
-        uint32_t v;
-        std::memcpy(&v, vertices + address, 4);
-        return std::bit_cast<float>(__builtin_bswap32(v));
-      };
-      glow_frame.constants += std::format(
-          "vertex color {:.4g} {:.4g} {:.4g} {:.4g}; ",
-          vertex_float(call.vertex_address + 16),
-          vertex_float(call.vertex_address + 20),
-          vertex_float(call.vertex_address + 24),
-          vertex_float(call.vertex_address + 28));
-    }
     for (uint32_t c = 0; c < 256; c++) {
       if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
         uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
@@ -3627,7 +3338,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
     for (const ShaderTexture& texture : pixel->textures) {
       glow_frame.cross_fade_texture =
-          regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * texture.fetch_constant + 1] &
+          regs.fetch[6 * texture.fetch_constant + 1] &
           0x1FFFF000u;
       break;
     }
@@ -3641,7 +3352,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   bool index_32bit = false;
   uint32_t index_endian = 0, index_address = 0;
   if (!call.inline_vertices) {
-    uint32_t index_buffer = guest::LoadU32(device + kDeviceIndexBuffer);
+    uint32_t index_buffer = bound.index_buffer;
     if (!index_buffer) {
       s.stats.failed++;
       s.stats.failed_by[3]++;
@@ -3655,20 +3366,44 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
 
   // Viewport and scissor.
-  reg::RB_DEPTHCONTROL depth_control = draw_util::GetNormalizedDepthControl(regs);
-  draw_util::ViewportInfo viewport_info;
-  draw_util::GetHostViewportInfo(regs, 1, 1, false, 8192, 8192, true, depth_control, false,
-                                 false, false, viewport_info);
+  bool z_enable = false, z_write = false;
+  uint32_t z_func = 0;
+  const render::RenderStates& states = render::States();
+  // No depth drawn (RB_MODECONTROL), or a test that always passes and
+  // doesn't write: off.
+  {  // Depth is drawn with a pixel shader or without (depth only).
+    z_enable = states.z_enable;
+    z_write = states.z_write;
+    z_func = uint32_t(states.z_func);
+    if (z_enable && !z_write && z_func == VK_COMPARE_OP_ALWAYS) {
+      z_enable = false;
+    }
+  }
+  // D3D's viewport clamped to the target drawn into (a tiled target is the
+  // tiles' whole size).
+  render::Viewport set_viewport = render::BoundTargets().viewport;
+  {
+    uint64_t right = std::min<uint64_t>(uint64_t(set_viewport.x) + set_viewport.width,
+                                        guest_extent.width);
+    uint64_t bottom = std::min<uint64_t>(uint64_t(set_viewport.y) + set_viewport.height,
+                                         guest_extent.height);
+    set_viewport.width = right > set_viewport.x ? uint32_t(right - set_viewport.x) : 0;
+    set_viewport.height = bottom > set_viewport.y ? uint32_t(bottom - set_viewport.y) : 0;
+  }
+  const DrawRegisters::Viewport viewport_info =
+      HostViewport(set_viewport, states.viewport_enable, states.half_pixel_offset);
   // Scissor: the window scissor registers aren't in the shadow's flushed
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
   // SetScissorRect; otherwise the whole target.
-  draw_util::Scissor scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
-  if (guest::LoadU32(device + kDeviceScissorEnable)) {
-    int32_t left = int32_t(guest::LoadU32(device + kDeviceScissorRect));
-    int32_t top = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4));
-    int32_t right = int32_t(guest::LoadU32(device + kDeviceScissorRect + 8));
-    int32_t bottom = int32_t(guest::LoadU32(device + kDeviceScissorRect + 12));
+  struct {
+    uint32_t offset[2], extent[2];
+  } scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
+  if (states.scissor_enable) {
+    int32_t left = states.scissor[0];
+    int32_t top = states.scissor[1];
+    int32_t right = states.scissor[2];
+    int32_t bottom = states.scissor[3];
     scissor.offset[0] = uint32_t(std::max(left, 0));
     scissor.offset[1] = uint32_t(std::max(top, 0));
     scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
@@ -3676,12 +3411,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   uint32_t scissor_right = std::min(scissor.offset[0] + scissor.extent[0], guest_extent.width);
   uint32_t scissor_bottom = std::min(scissor.offset[1] + scissor.extent[1], guest_extent.height);
-  if (!viewport_info.xy_extent[0] || !viewport_info.xy_extent[1] ||
+  if (!viewport_info.extent[0] || !viewport_info.extent[1] ||
       scissor.offset[0] >= scissor_right || scissor.offset[1] >= scissor_bottom) {
     s.stats.invisible++;
     if (!s.stats.invisible_sample[0]) {  // one example per log line
-      s.stats.invisible_sample = {viewport_info.xy_offset[0], viewport_info.xy_offset[1],
-                                  viewport_info.xy_extent[0], viewport_info.xy_extent[1],
+      s.stats.invisible_sample = {viewport_info.offset[0], viewport_info.offset[1],
+                                  viewport_info.extent[0], viewport_info.extent[1],
                                   scissor.offset[0], scissor.offset[1], scissor.extent[0],
                                   scissor.extent[1]};
       s.stats.invisible_sample[0] |= 0x80000000u;  // mark as set
@@ -3689,109 +3424,54 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     return;  // nothing visible
   }
 
-  uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
-  s.draw_index_newest = State::kNewestUnknown;
-  if (call.inline_vertices) {
-    min_vertex = 0;
-    max_vertex = call.vertex_count - 1;
-  }
-  bool mirror_per_draw = s.MirrorPerDraw();
-  if (!call.inline_vertices && index_count && mirror_per_draw) {
-    bool skip_restart = primitive.strip && regs.Get<reg::PA_SU_SC_MODE_CNTL>().multi_prim_ib_ena;
-    auto [low, high] = s.DrawIndexRange(index_address, index_count, index_32bit,
-                                        index_endian, skip_restart);
-    if (s.log_index_ranges) {
-      s.CountIndexRange(index_address, index_count, index_32bit, index_endian, skip_restart, low,
-                        high);
-    }
-    if (low <= high) {
-      // After the base vertex, as the GPU reads them. Adding it to the
-      // extremes keeps their order unless the sum wraps (a negative base
-      // vertex under some index), where each index is taken again.
-      int64_t low_sum = int64_t(int32_t(low)) + base_vertex;
-      int64_t high_sum = int64_t(int32_t(high)) + base_vertex;
-      if (low_sum >= 0 && high_sum <= INT32_MAX && int32_t(low) >= 0 && int32_t(high) >= 0) {
-        min_vertex = uint32_t(low_sum);
-        max_vertex = uint32_t(high_sum);
-      } else {
-        for (uint32_t i = 0; i < index_count; i++) {
-          auto [index, unused] = IndexRange(PhysicalHostAddress(index_address) +
-                                                (index_32bit ? 4 : 2) * i,
-                                            1, index_32bit, index_endian, skip_restart);
-          if (index == UINT32_MAX && !unused) {
-            continue;  // the restart index
-          }
-          max_vertex = std::max(max_vertex, uint32_t(int32_t(index) + base_vertex));
-          min_vertex = std::min(min_vertex, uint32_t(int32_t(index) + base_vertex));
-        }
-      }
-    }
-  }
-  // System constants (as the plugin's UpdateSystemConstantValues, for what
-  // these draws use).
-  Translator::SystemConstants system{};
+  // The draw's own constants (draw_constants.h).
+  DrawConstants system{};
   uint32_t flags = 0;
-  auto vte = regs.Get<reg::PA_CL_VTE_CNTL>();
-  if (vte.vtx_xy_fmt) {
-    flags |= Translator::kSysFlag_XYDividedByW;
-  }
-  if (vte.vtx_z_fmt) {
-    flags |= Translator::kSysFlag_ZDividedByW;
-  }
-  if (vte.vtx_w0_fmt) {
-    flags |= Translator::kSysFlag_WNotReciprocal;
-  }
   if (primitive.polygonal) {
-    flags |= Translator::kSysFlag_PrimitivePolygonal;
+    flags |= kFlagPrimitivePolygonal;
   } else if (type == 2 || type == 3) {
-    flags |= Translator::kSysFlag_PrimitiveLine;
+    flags |= kFlagPrimitiveLine;
   }
-  auto color_control = regs.Get<reg::RB_COLORCONTROL>();
-  uint32_t alpha_function = color_control.alpha_test_enable ? uint32_t(color_control.alpha_func)
-                                                            : 7;  // always
-  flags |= alpha_function << Translator::kSysFlag_AlphaPassIfLess_Shift;
+  uint32_t alpha_function = states.alpha_test ? uint32_t(states.alpha_func) : 7;  // 7: always
+  flags |= alpha_function << kFlagAlphaTestShift;
   system.flags = flags;
-  system.vertex_index_endian = xenos::Endian(index_endian);
-  system.vertex_base_index = base_vertex;
-  system.vertex_index_min = regs.values[XE_GPU_REG_VGT_MIN_VTX_INDX];
-  system.vertex_index_max = regs.values[XE_GPU_REG_VGT_MAX_VTX_INDX];
-  if (system.vertex_index_max <= system.vertex_index_min || call.inline_vertices) {
-    system.vertex_index_min = 0;
-    system.vertex_index_max = xenos::kVertexIndexMask;
-  }
-  // Indices the clamp changes (the registers may be another draw's).
-  if (index_count && (max_vertex > system.vertex_index_max ||
-                      min_vertex < system.vertex_index_min)) {
-    s.stats.clamped_draws++;
-    if (!s.stats.clamped_sample[1]) {
-      s.stats.clamped_sample = {min_vertex, max_vertex, system.vertex_index_min,
-                                system.vertex_index_max};
-    }
-  }
-  if (s.no_index_clamp) {
-    system.vertex_index_min = 0;
-    system.vertex_index_max = xenos::kVertexIndexMask;
-  }
   for (uint32_t i = 0; i < 3; i++) {
     system.ndc_scale[i] = viewport_info.ndc_scale[i];
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
   }
-  system.alpha_test_reference = regs.Get<float>(XE_GPU_REG_RB_ALPHA_REF);
-  // Each sampled texture's post-swizzle signs, a byte per fetch constant.
+  system.alpha_test_reference = states.alpha_ref;
+  // Each sampled texture's reader scale. The shaders sample a texture's
+  // view as it is: signed, biased or gamma components and an exponent bias
+  // in the texture aren't applied (none of the game's textures has them in
+  // the attract race or the pad replay; logged once each if one does). Its
+  // LOD bias is the sampler's (render::SamplerState).
   for (const TranslatedShader* shader : {vertex, pixel}) {
     if (!shader) {
       continue;
     }
     for (const ShaderTexture& texture : shader->textures) {
       uint32_t index = texture.fetch_constant;
-      uint8_t signs = TextureCache::SwizzledSigns(
-          &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 6 * index]);
-      system.texture_swizzled_signs[index >> 2] |= uint32_t(signs) << (8 * (index & 3));
+      const uint32_t* words = &regs.fetch[6 * index];
+      system.texture_scale[index & 31] = s.textures.ReaderScale(words);
+      uint8_t signs = TextureCache::SwizzledSigns(words);
+      int32_t exponent = int32_t(words[3] << 13) >> 26;
+      if (signs || exponent) [[unlikely]] {
+        static std::unordered_set<uint64_t> logged;
+        if (logged.insert(shader->hash ^ (uint64_t(words[1]) << 32) ^ signs).second) {
+          ITC_LOG_ERROR("native renderer: {} shader {:016X} samples texture {:08X} (format {}) "
+                        "with signs {:02X} or exponent bias {}, which the shaders don't apply",
+                        shader == vertex ? "vertex" : "pixel", shader->hash,
+                        words[1] & 0xFFFFF000u, words[1] & 63, signs, exponent);
+        }
+      }
     }
   }
+  // Each bound target's exponent bias, from its surface's color info (+28,
+  // bits 20-25).
   for (uint32_t i = 0; i < 4; i++) {
-    auto info = regs.Get<reg::RB_COLOR_INFO>(reg::RB_COLOR_INFO::rt_register_indices[i]);
-    int32_t bias = info.color_exp_bias;
+    uint32_t surface = render::BoundTargets().color[i];
+    uint32_t info = surface ? guest::LoadU32(surface + 28) : 0;
+    int32_t bias = int32_t(info << 6) >> 26;
     uint32_t scale_bits = uint32_t(0x3F800000 + (bias << 23));
     std::memcpy(&system.color_exp_bias[i], &scale_bits, 4);
   }
@@ -3799,7 +3479,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // Constants into this frame's ring: system, vertex float, pixel float,
   // bool/loop, fetch. A block the same as the last one written points at it.
   static_assert(sizeof(system) <= kFloatConstantsRange);
-  uint32_t offsets[5];
+  uint32_t offsets[kConstantBlocks];
   if (!s.ReserveDrawConstants() ||
       !s.PlaceConstants(0, &system, sizeof(system), sizeof(system), offsets[0])) {
     s.stats.failed++;
@@ -3808,26 +3488,17 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   for (uint32_t stage = 0; stage < 2; stage++) {
     const TranslatedShader* shader = stage == 0 ? vertex : pixel;
-    uint32_t source = device + (stage == 0 ? kDeviceVertexFloatConstants
-                                           : kDevicePixelFloatConstants);
-    // Only the registers the shader reads, packed in order, into the last
-    // copy, noting whether any differ: run by run of consecutive registers
-    // (testing each of the 256 bits in turn was ~14% of the render thread,
-    // mostly mispredicted branches).
+    const float(*source)[4] = render::ShaderConstants().floats[stage];
+    // The registers the shader is given, from its lowest to its highest,
+    // into the last copy, noting whether any differ.
     uint32_t* copy = reinterpret_cast<uint32_t*>(s.last_constants.bytes[1 + stage]);
     bool same = s.last_constants.valid[1 + stage];
-    uint32_t packed = 0;
-    for (uint32_t w = 0; shader && w < 4; w++) {
-      uint64_t bits = shader->float_constants[w];
-      while (bits) {
-        uint32_t first = std::countr_zero(bits);
-        uint32_t count = std::countr_one(bits >> first);
-        bits = count == 64 ? 0 : bits & ~(((uint64_t(1) << count) - 1) << first);
-        if (guest::CopyU32s(source + 16 * (64 * w + first), copy + 4 * packed,
-                            4 * count)) {
-          same = false;
-        }
-        packed += count;
+    const uint32_t packed = shader ? shader->float_count : 0;
+    if (packed) {
+      const float* from = source[shader->float_first];
+      if (!same || std::memcmp(copy, from, 16 * packed)) {
+        std::memcpy(copy, from, 16 * packed);
+        same = false;
       }
     }
     if (!s.PlaceConstants(1 + stage, copy, 16 * packed, kFloatConstantsRange,
@@ -3837,48 +3508,83 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       return;
     }
   }
-  // Why the fetch block changed (log_constant_changes): in the fetch
-  // constants the shaders read (textures, vertices), or only in others.
-  const uint32_t* fetch = &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
-  if (s.log_constant_changes && s.last_constants.valid[4] &&
-      s.last_constants.sizes[4] == kFetchConstantsRange) {
-    const uint32_t* last = reinterpret_cast<const uint32_t*>(s.last_constants.bytes[4]);
-    if (std::memcmp(last, fetch, kFetchConstantsRange)) {
-      s.stats.fetch_changed++;
-      bool texture_differs = false, vertex_differs = false, vertex_address_only = true;
-      for (const TranslatedShader* shader : {vertex, pixel}) {
-        if (!shader) {
-          continue;
-        }
-        for (const ShaderTexture& texture : shader->textures) {
-          uint32_t i = 6 * texture.fetch_constant;
-          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
-        }
-        for (const ShaderSampler& sampler : shader->samplers) {
-          uint32_t i = 6 * sampler.fetch_constant;
-          texture_differs |= !!std::memcmp(last + i, fetch + i, 24);
-        }
-      }
-      for (uint32_t k = 0; vertex && k < 96; k++) {
-        if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-          continue;
-        }
-        if (last[2 * k + 1] != fetch[2 * k + 1]) {
-          vertex_differs = true;
-          vertex_address_only = false;
-        } else if (last[2 * k] != fetch[2 * k]) {
-          vertex_differs = true;
-        }
-      }
-      s.stats.fetch_changed_texture += texture_differs;
-      s.stats.fetch_changed_vertex += vertex_differs;
-      s.stats.fetch_changed_vertex_address += vertex_differs && vertex_address_only;
-      s.stats.fetch_changed_unread += !texture_differs && !vertex_differs;
+  // The draw's vertex streams and indices in the vertex arena: each stream
+  // the vertex shader reads gets its range's arena offset in place of the
+  // address (word 0, low 2 bits the type; word 1 bits 2-25 the size in
+  // words). An inline draw's stream points into the arena already.
+  uint32_t arena_fetch[kFetchConstantsBytes / 4];
+  std::memcpy(arena_fetch, regs.fetch,
+              kFetchConstantsBytes);
+  if (!call.inline_vertices) {
+    // The streams' vertex fetch constants as bound (95 - stream).
+    for (uint32_t stream = 0; stream < 16; stream++) {
+      arena_fetch[2 * (95 - stream)] = bound.stream_fetch[stream][0];
+      arena_fetch[2 * (95 - stream) + 1] = bound.stream_fetch[stream][1];
     }
   }
-  if (!s.PlaceConstants(3, &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
-                        kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3]) ||
-      !s.PlaceConstants(4, fetch, kFetchConstantsRange, kFetchConstantsRange, offsets[4])) {
+  uint32_t index_offset = 0;
+  if (!call.inline_vertices) {
+    for (uint32_t k = 0; k < 96; k++) {
+      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+        continue;
+      }
+      uint32_t word0 = arena_fetch[2 * k];
+      uint32_t size = ((arena_fetch[2 * k + 1] >> 2) & 0xFFFFFFu) * 4;
+      // A buffer the arena holds by its object, else placed by address, in
+      // the host's byte order (the fetch constant's endian mode).
+      uint32_t offset = UINT32_MAX;
+      if (k >= 80) {
+        if (uint32_t object = bound.stream_buffer[95 - k]) {
+          offset = s.arena.HeldBuffer(object, word0 & 0x1FFFFFFCu, arena_fetch[2 * k + 1] & 3);
+        }
+      }
+      if (offset == UINT32_MAX) {
+        offset = s.arena.Place(word0 & 0x1FFFFFFCu, size, arena_fetch[2 * k + 1] & 3);
+      }
+      if (offset == UINT32_MAX) {
+        s.stats.failed++;
+        s.stats.failed_by[7]++;
+        return;
+      }
+      arena_fetch[2 * k] = offset | (word0 & 3);
+    }
+    // In the host's byte order, as the vertex input fetches by them: held by
+    // its object, else placed by address.
+    index_offset = s.arena.HeldBuffer(bound.index_buffer, index_address, index_endian);
+    if (index_offset == UINT32_MAX) {
+      index_offset =
+          s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2), index_endian);
+    }
+    if (index_offset == UINT32_MAX) {
+      s.stats.failed++;
+      s.stats.failed_by[7]++;
+      return;
+    }
+  }
+  // The vertex buffers: each fetch's stream in the arena, bound at its
+  // element (the fetch's offset in the vertex); a rectangle list's three
+  // times, a vertex apart.
+  VkDeviceSize vertex_offsets[kMaxVertexBindings];
+  uint32_t vertex_bindings = 0;
+  if (vertex->vertex_fetches.size() > kMaxVertexFetches) {
+    s.stats.failed++;
+    s.stats.failed_by[7]++;
+    return;
+  }
+  for (const TranslatedShader::VertexFetch& f : vertex->vertex_fetches) {
+    int64_t at = int64_t(arena_fetch[2 * f.fetch_constant] & 0x1FFFFFFCu) +
+                 4 * int64_t(f.offset_words);
+    if (at < 0) {
+      s.stats.failed++;
+      s.stats.failed_by[7]++;
+      return;
+    }
+    for (uint32_t g = 0; g < (rectangle_list ? 3u : 1u); g++) {
+      vertex_offsets[vertex_bindings++] = VkDeviceSize(at) + 4 * f.stride_words * g;
+    }
+  }
+  if (!s.PlaceConstants(3, &render::ShaderConstants().bool_loop,
+                        kBoolLoopConstantsRange, kBoolLoopConstantsRange, offsets[3])) {
     s.stats.failed++;
     s.stats.failed_by[4]++;
     return;
@@ -3909,37 +3615,43 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.pixel = s.GetModule(pixel);
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
-  auto mode = regs.Get<reg::PA_SU_SC_MODE_CNTL>();
-  key.primitive_restart = (primitive.strip && mode.multi_prim_ib_ena) || rectangle_list;
-  key.cull_mode = (mode.cull_front ? VK_CULL_MODE_FRONT_BIT : 0) |
-                  (mode.cull_back ? VK_CULL_MODE_BACK_BIT : 0);
-  key.front_clockwise = mode.face != 0;
+  key.primitive_restart = primitive.strip && states.primitive_restart;
+  key.cull_mode = states.cull;
+  key.front_clockwise = states.front_clockwise;
   if (depth) {
-    key.z_enable = depth_control.z_enable;
-    key.z_write = depth_control.z_write_enable;
-    key.z_func = uint32_t(depth_control.zfunc);
+    key.z_enable = z_enable;
+    key.z_write = z_write;
+    key.z_func = z_func;
   }
   key.color_format = color ? color->format : VK_FORMAT_UNDEFINED;
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
-  auto blend = regs.Get<reg::RB_BLENDCONTROL>(reg::RB_BLENDCONTROL::rt_register_indices[0]);
-  key.src_color = BlendFactor(uint32_t(blend.color_srcblend));
-  key.dst_color = BlendFactor(uint32_t(blend.color_destblend));
-  key.color_op = BlendOp(uint32_t(blend.color_comb_fcn));
-  key.src_alpha = BlendFactor(uint32_t(blend.alpha_srcblend));
-  key.dst_alpha = BlendFactor(uint32_t(blend.alpha_destblend));
-  key.alpha_op = BlendOp(uint32_t(blend.alpha_comb_fcn));
+  const render::BlendState& blend = states.blend[0];
+  key.src_color = blend.src_color;
+  key.dst_color = blend.dst_color;
+  key.color_op = blend.color_op;
+  key.src_alpha = blend.src_alpha;
+  key.dst_alpha = blend.dst_alpha;
+  key.alpha_op = blend.alpha_op;
   key.blend_enable =
       !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
         key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
         key.dst_alpha == VK_BLEND_FACTOR_ZERO && key.alpha_op == VK_BLEND_OP_ADD);
+  // Each bound target's color format, from its surface's color info.
+  uint32_t target_formats[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    uint32_t surface = render::BoundTargets().color[i];
+    target_formats[i] = surface ? guest::LoadU32(surface + 28) >> 16 & 0xF : 0;
+  }
   // As the plugin normalizes it: nothing without a pixel shader, for a
   // target the pixel shader doesn't write, or in depth-only EDRAM mode.
   // (With the raw mask, those draws wrote Vulkan's undefined fragment output:
   // the rainbow effect on buildings, from ~230 main view draws a frame
   // without a pixel shader.)
   key.write_mask =
-      draw_util::GetNormalizedColorMask(regs, pixel ? pixel->writes_color_targets : 0) & 0xF;
+      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write,
+                               pixel_object != 0, target_formats) &
+      0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
     return;
@@ -3951,66 +3663,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[0]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[1]),
                 reinterpret_cast<const uint32_t*>(s.constant_block().mapped + offsets[2]),
-                &regs.values[XE_GPU_REG_SHADER_CONSTANT_BOOL_000_031],
-                &regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0]);
+                reinterpret_cast<const uint32_t*>(&render::ShaderConstants().bool_loop),
+                regs.fetch);
   }
   if (!pipeline) {
     s.stats.failed++;
     return;
-  }
-
-  // The draw's indices and vertex buffers, into the mirror (an inline
-  // draw's vertices are there already). A vertex fetch constant is two
-  // words: the address (word 0, low 2 bits the type) and the size in words
-  // (word 1, bits 2-25).
-  if (!call.inline_vertices && mirror_per_draw) {
-    s.Mirror(index_address, index_count * (index_32bit ? 4 : 2), true,
-             s.draw_index_newest);
-  }
-  // The highest vertex the draw uses (indices as the GPU reads them, after
-  // the base vertex): a vertex buffer is copied up to it even past the size
-  // its fetch constant gives, as the GPU reads whatever is there.
-  for (uint32_t k = 0; k < 96 && !call.inline_vertices && mirror_per_draw; k++) {
-    if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
-      continue;
-    }
-    uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
-    uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
-    uint32_t size = ((word1 >> 2) & 0xFFFFFFu) * 4;
-    for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
-      uint64_t needed = (uint64_t(max_vertex) + 1) * stride_words * 4;
-      if (fetch_constant == k && needed > size && needed < (64u << 20)) {
-        s.stats.vertex_overruns++;
-        if (!s.stats.vertex_overrun_sample[1]) {
-          s.stats.vertex_overrun_sample = {word0 & 0x1FFFFFFCu, size, uint32_t(needed),
-                                           max_vertex, stride_words};
-        }
-        size = uint32_t(needed);
-      }
-    }
-    if (s.check_mirror_frames) {
-      // The bytes this draw's vertices span in this buffer.
-      uint64_t begin = UINT64_MAX, end = 0;
-      for (const auto& [fetch_constant, stride_words] : vertex->vertex_strides) {
-        if (fetch_constant == k && min_vertex <= max_vertex) {
-          begin = std::min(begin, uint64_t(min_vertex) * stride_words * 4);
-          end = std::max(end, (uint64_t(max_vertex) + 1) * stride_words * 4);
-        }
-      }
-      if (begin >= end) {
-        begin = 0;
-        end = size;  // stride unknown: the whole buffer
-      }
-      end = std::min<uint64_t>(end, size);
-      if (begin < end) {
-        uint32_t address = (word0 & 0x1FFFFFFCu) + uint32_t(begin);
-        uint32_t length = uint32_t(end - begin);
-        if (s.used_mirrored.insert((uint64_t(address) << 32) | length).second) {
-          s.used_vertex_bytes += length;
-        }
-      }
-    }
-    s.Mirror(word0 & 0x1FFFFFFCu, size, false);
   }
 
   // Draw.
@@ -4023,10 +3681,10 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // ratios, unchanged), by the targets' scale (color and depth share one:
   // the main view's surfaces are both scaled alike).
   float draw_scale = color ? color->scale : depth->scale;
-  VkViewport viewport{float(viewport_info.xy_offset[0]) * draw_scale,
-                      float(viewport_info.xy_offset[1]) * draw_scale,
-                      float(viewport_info.xy_extent[0]) * draw_scale,
-                      float(viewport_info.xy_extent[1]) * draw_scale,
+  VkViewport viewport{float(viewport_info.offset[0]) * draw_scale,
+                      float(viewport_info.offset[1]) * draw_scale,
+                      float(viewport_info.extent[0]) * draw_scale,
+                      float(viewport_info.extent[1]) * draw_scale,
                       viewport_info.z_min,
                       viewport_info.z_max};
   uint32_t scissor_left = State::ScaledBy(scissor.offset[0], draw_scale);
@@ -4042,10 +3700,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (depth) {
     // As the plugin sets it for its host render targets: the guest's depth
     // is float24 (24_8_FLOAT) or unorm24, the slope in 1/16 pixels.
-    draw_util::GetPreferredFacePolygonOffset(regs, primitive.polygonal, slope, constant);
-    constant *= depth->surface.format == uint32_t(xenos::DepthRenderTargetFormat::kD24S8)
-                    ? draw_util::kD3D10PolygonOffsetFactorUnorm24
-                    : draw_util::kD3D10PolygonOffsetFactorFloat24;
+    // Both faces take the same bias (D3D's DepthBias and SlopeScaleDepthBias),
+    // on when either isn't 0; lines take none.
+    if (primitive.polygonal &&
+        (states.depth_bias_slope != 0.0f || states.depth_bias_constant != 0.0f) &&
+        (states.cull & VK_CULL_MODE_FRONT_AND_BACK) != VK_CULL_MODE_FRONT_AND_BACK) {
+      slope = states.depth_bias_slope;
+      constant = states.depth_bias_constant;
+    }
+    // D3D10's factors: 2^24 - 1 for unorm24 (D24S8, format 0), 2^24 for float24.
+    constant *= depth->surface.format == 0 ? float((1u << 24) - 1) : float(1u << 24);
     // Per pixel: scaled pixels are smaller, so the slope (as the plugin
     // scales it).
     slope *= xenos::kPolygonOffsetScaleSubpixelUnit * std::max(draw_scale, 1.0f);
@@ -4058,8 +3722,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
-  std::memcpy(blend_constants, &regs.values[0x2105], sizeof(blend_constants));
-  VkDescriptorSet sets[4] = {s.draw_mirror().set, s.constant_block().set,
+  std::memcpy(blend_constants, states.blend_constants, sizeof(blend_constants));
+  VkDescriptorSet sets[4] = {s.arena_set, s.constant_block().set,
                              vertex_textures, pixel_textures};
 
   // The state this draw needs. Indexed draws bind the mirror at offset 0
@@ -4076,14 +3740,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   now.layout = key.layout;
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
-  now.indexed = rectangle_list || quad_list || !call.inline_vertices;
-  now.index_buffer = s.draw_mirror().buffer;
-  now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
-                                                              : VK_INDEX_TYPE_UINT16;
+  now.indexed = quad_list || !call.inline_vertices;
+  now.index_buffer = s.arena.buffer();
+  now.index_type = quad_list || index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
-  uint64_t index_start = rectangle_list ? kRectangleIndices
-                         : quad_list    ? kQuadIndices
-                                        : index_address;
+  uint64_t index_start = quad_list ? kQuadIndices : index_offset;
+  now.vertex_bindings = vertex_bindings;
+  std::copy(vertex_offsets, vertex_offsets + vertex_bindings, now.vertex_offsets);
   uint32_t first_index = 0;
   if (s.skip_repeated_state && index_start % index_bytes == 0) {
     first_index = uint32_t(index_start / index_bytes);
@@ -4116,14 +3779,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     }
     if (s.log_constant_changes && repeated[5] && !repeated[8]) {
       s.stats.offsets_differ++;
-      uint32_t differ = 0;
-      for (int i = 0; i < 5; i++) {
+      for (uint32_t i = 0; i < kConstantBlocks; i++) {
         if (last.offsets[i] != now.offsets[i]) {
           s.stats.offset_differs[i]++;
-          differ |= 1u << i;
         }
       }
-      s.stats.only_fetch_offset_differs += differ == 1u << 4;
     }
   }
   bool skip = s.skip_repeated_state;
@@ -4144,19 +3804,30 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   if (!(skip && repeated[8])) {
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, key.layout, 0, 4, sets,
-                                5, offsets);
+                                kConstantBlocks, offsets);
   }
   if (now.indexed && !(skip && repeated[6])) {
     vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
   }
+  bool vertex_repeated = last.valid && last.vertex_bindings == vertex_bindings &&
+                         std::equal(vertex_offsets, vertex_offsets + vertex_bindings,
+                                    last.vertex_offsets);
+  if (vertex_bindings && !(skip && vertex_repeated)) {
+    VkBuffer buffers[kMaxVertexBindings];
+    std::fill(buffers, buffers + vertex_bindings, s.arena.buffer());
+    vk::vkCmdBindVertexBuffers(commands, 0, vertex_bindings, buffers, vertex_offsets);
+  }
+  // The base vertex is the vertex input's (VGT_INDX_OFFSET; 0 for inline
+  // draws). A rectangle list is an instance a rectangle, four vertices each
+  // (the vertex shader makes the fourth corner).
   if (rectangle_list) {
-    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, first_index, 0, 0);
+    vk::vkCmdDraw(commands, 4, index_count / 3, 0, 0);
   } else if (quad_list) {
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, base_vertex, 0);
   } else if (call.inline_vertices) {
-    vk::vkCmdDraw(commands, index_count, 1, 0, 0);
+    vk::vkCmdDraw(commands, index_count, 1, uint32_t(base_vertex), 0);
   } else {
-    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, base_vertex, 0);
   }
   if (!now.indexed && last.valid) {
     // A draw without indices leaves the earlier binding in place.
@@ -4181,9 +3852,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     std::copy(offsets, offsets + 5, id.offsets);
     id.viewport = viewport;
     id.scissor = scissor_rect;
-    id.index_offset = index_address;
+    id.index_offset = index_offset;
     id.index_type = index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
     id.index_count = index_count;
+    id.base_vertex = base_vertex;
+    id.vertex_bindings = vertex_bindings;
+    std::copy(vertex_offsets, vertex_offsets + vertex_bindings, id.vertex_offsets);
     id.key = key;
     id.bias_constant = constant;
     id.bias_slope = slope;
@@ -4217,6 +3891,12 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   stages[1].module = id_pixel;
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  if (auto input = vertex_inputs.find(draw.vertex); input != vertex_inputs.end()) {
+    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
+    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
+    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
+  }
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   input_assembly.topology = VkPrimitiveTopology(key.topology);
@@ -4336,10 +4016,16 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     VkPipelineLayout layout = id_layouts[draw.layout];
     vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
-                                draw.sets, 5, draw.offsets);
+                                draw.sets, kConstantBlocks, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
-    vk::vkCmdBindIndexBuffer(commands, draw_mirror().buffer, draw.index_offset, draw.index_type);
-    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
+    vk::vkCmdBindIndexBuffer(commands, arena.buffer(), draw.index_offset, draw.index_type);
+    if (draw.vertex_bindings) {
+      VkBuffer buffers[kMaxVertexBindings];
+      std::fill(buffers, buffers + draw.vertex_bindings, arena.buffer());
+      vk::vkCmdBindVertexBuffers(commands, 0, draw.vertex_bindings, buffers,
+                                 draw.vertex_offsets);
+    }
+    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, draw.base_vertex, 0);
   }
   vk::vkCmdEndRendering(commands);
   recorded.valid = false;
@@ -4348,49 +4034,44 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   id_drawn = true;
 }
 
-void Passes::AfterDraw(VkCommandBuffer commands, uint32_t id, uint32_t payload,
-                       uint32_t arg1) {
+void Passes::DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_start,
+                         uint32_t primitive_count) {
   State& s = *state_;
-  // Only indexed draws for now (command 18, 12 bytes an item).
-  if (id != 18) {
-    s.stats.unsupported += arg1;
-    return;
-  }
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 12 * i;
-    DrawCall call;
-    call.type = guest::LoadU32(item);
-    call.base_start = guest::LoadU32(item + 4);
-    call.primitive_count = guest::LoadU32(item + 8);
-    s.Draw(commands, device, call);
-  }
+  DrawCall call;
+  call.type = type;
+  call.base_start = base_start;
+  call.primitive_count = primitive_count;
+  s.Draw(commands, device, call);
 }
 
 void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                         uint32_t stride, uint32_t data) {
   State& s = *state_;
   uint32_t size = count * stride;
-  uint32_t offset = (s.inline_offset + 15) & ~15u;
-  if (!count || !stride || offset + size > s.inline_slot_size()) {
+  // In the host's byte order: inline vertices are 8-in-32, as BeginVertices'
+  // fetch constant has them.
+  uint32_t offset = count && stride
+                        ? s.arena.PlaceInline(guest::Pointer(data), size,
+                                              uint32_t(xenos::Endian::k8in32))
+                        : UINT32_MAX;
+  if (offset == UINT32_MAX) {
     s.stats.failed++;
     s.stats.failed_by[7]++;
     return;
   }
-  s.inline_offset = offset + size;
   DrawCall call;
   call.type = type;
   call.inline_vertices = true;
   call.vertex_count = count;
-  call.vertex_address =
-      kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, guest::Pointer(data), size);
+  call.vertex_address = offset;
+  call.inline_stride = stride;
   s.stats.mirrored_bytes += size;
   uint32_t device = guest::LoadU32(kDevicePointer);
   s.ReadState(device);
   // What BeginVertices wrote to the GPU instead of the shadow.
-  uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
+  uint32_t* fetch = s.regs.fetch;
   fetch[2 * (kInlineFetchConstant - 2)] = 1;
   fetch[2 * (kInlineFetchConstant - 2) + 1] = 0;
   fetch[2 * (kInlineFetchConstant - 1)] = 1;
@@ -4398,88 +4079,51 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
-  s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
   s.Draw(commands, device, call);
-  // Read them from the shadow again next time.
-  static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);
-  MarkFetchConstantsDirty(1ull << (63 - kInlineFetchConstant / 3));
-  MarkRegistersDirty(XE_GPU_REG_VGT_INDX_OFFSET, 1ull << 63);
 }
 
-void Passes::AfterClear(VkCommandBuffer commands, uint32_t payload,
-                        uint32_t arg1) {
+void Passes::Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, float z,
+                   uint32_t stencil, bool rects) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
-  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
-  // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
-  // is cleared.
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 280 * i;
-    uint32_t flags = guest::LoadU32(item + 8);
-    s.stats.clears++;
-    if (guest::LoadU32(item + 4)) {
-      s.stats.clear_rects++;
+  // Flags: bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil; color a
+  // D3DCOLOR. Rects aren't kept: the whole target is cleared.
+  s.stats.clears++;
+  if (rects) {
+    s.stats.clear_rects++;
+  }
+  if (flags & 0xF) {
+    VkClearValue value{};
+    value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
+                    float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
+    if (flags & 0xE) {
+      s.stats.extra_targets++;
     }
-    if (flags & 0xF) {
-      uint32_t color = guest::LoadU32(item + 268);
+    if (uint32_t object = render::BoundTargets().color[0]; object && (flags & 1)) {
+      if (Target* target = s.GetTarget(commands, object, false)) {
+        s.ClearTarget(commands, *target, value);
+      }
+    }
+  }
+  if (flags & 0x30) {
+    uint32_t object = render::BoundTargets().depth;
+    Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
+    if (target) {
       VkClearValue value{};
-      value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
-                      float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
-      if (flags & 0xE) {
-        s.stats.extra_targets++;
-      }
-      if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0); object && (flags & 1)) {
-        if (Target* target = s.GetTarget(commands, object, false)) {
-          s.ClearTarget(commands, *target, value);
-        }
-      }
-    }
-    if (flags & 0x30) {
-      uint32_t object = guest::LoadU32(device + kDeviceDepthStencil);
-      Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
-      if (target) {
-        VkClearValue value{};
-        uint32_t z = guest::LoadU32(item + 272);
-        std::memcpy(&value.depthStencil.depth, &z, 4);
-        value.depthStencil.stencil = guest::LoadU32(item + 276) & 0xFF;
-        s.ClearTarget(commands, *target, value,
-                      ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
-                          ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
-      }
+      value.depthStencil.depth = z;
+      value.depthStencil.stencil = stencil & 0xFF;
+      s.ClearTarget(commands, *target, value,
+                    ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+                        ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
     }
   }
 }
 
-void Passes::AfterResolve(VkCommandBuffer commands, uint32_t payload,
-                          uint32_t arg1) {
+void Passes::Resolve(VkCommandBuffer commands, uint32_t flags, const int32_t* rect,
+                     uint32_t destination, const int32_t* point, bool level_or_slice,
+                     const float* clear_color, float clear_z, uint32_t clear_stencil) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 25's item (68 bytes; see "Pass command items" in
-  // docs/gpu-functions.md); its flags are State::Resolve's.
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 68 * i;
-    uint32_t fields = guest::LoadU32(item);
-    uint32_t flags = guest::LoadU32(item + 4);
-    int32_t rect[4], point[2];
-    for (uint32_t k = 0; k < 4; k++) {
-      rect[k] = int32_t(guest::LoadU32(item + 8 + 4 * k));
-    }
-    point[0] = int32_t(guest::LoadU32(item + 28));
-    point[1] = int32_t(guest::LoadU32(item + 32));
-    // The clear color's 4 bytes, as floats (as the handler converts them).
-    float color[4] = {};
-    for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
-      color[c] = float(guest::LoadU8(item + 44 + c)) / 255.0f;
-    }
-    uint32_t z = guest::LoadU32(item + 48);
-    float clear_z;
-    std::memcpy(&clear_z, &z, 4);
-    s.Resolve(commands, device, flags, (fields & 1) ? rect : nullptr,
-              (fields & 2) ? guest::LoadU32(item + 24) : 0, (fields & 4) ? point : nullptr,
-              guest::LoadU32(item + 36) || guest::LoadU32(item + 40), color, clear_z,
-              guest::LoadU32(item + 52), true);
-  }
+  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point,
+            level_or_slice, clear_color, clear_z, clear_stencil, true);
 }
 
 void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
@@ -4495,8 +4139,8 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
     stats.resolve_flags_sample = flags;
   }
   bool from_depth = flags & 4;
-  uint32_t color_object = guest::LoadU32(device + kDeviceRenderTarget0 + 4 * (flags & 3));
-  uint32_t depth_object = guest::LoadU32(device + kDeviceDepthStencil);
+  uint32_t color_object = render::BoundTargets().color[flags & 3];
+  uint32_t depth_object = render::BoundTargets().depth;
   uint32_t source_object = from_depth ? depth_object : color_object;
   Target* source = source_object ? GetTarget(commands, source_object, from_depth) : nullptr;
   if (source && destination && !level_or_slice &&
@@ -4527,46 +4171,26 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
   }
 }
 
-void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
+void Passes::BeginTiling(VkCommandBuffer commands, uint32_t width, uint32_t height,
+                         float clear) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
-  // rectangles (16 bytes each: left, top, right, bottom). The handler gives
-  // BeginTiling a clear color and Z of the float at 0x82000A34, stencil 0.
-  uint32_t flags = guest::LoadU32(payload);
-  uint32_t count = guest::LoadU32(payload + 4);
-  uint32_t rects = guest::LoadU32(payload + 8);
-  uint32_t width = 0, height = 0;
-  std::string tiles;
-  for (uint32_t i = 0; rects && i < count && i < 16; i++) {
-    int32_t r[4];
-    for (uint32_t k = 0; k < 4; k++) {
-      r[k] = int32_t(guest::LoadU32(rects + 16 * i + 4 * k));
-    }
-    width = std::max(width, uint32_t(std::max(r[2], 0)));
-    height = std::max(height, uint32_t(std::max(r[3], 0)));
-    tiles += std::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
-  }
-  uint32_t clear_bits = guest::LoadU32(0x82000A34);
-  float clear;
-  std::memcpy(&clear, &clear_bits, 4);
-  if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
-    ITC_LOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
-                 flags, count, tiles, clear);
+  if (s.logged_tilings.insert(uint64_t(width) << 32 | height).second) {
+    ITC_LOG_INFO("native renderer: begin tiling: {}x{}; clear color and Z {}", width, height,
+                 clear);
   }
   s.EndRendering(commands);
   s.tiling = true;
   s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
   s.stats.tilings++;
   // Each tile starts cleared to these.
-  if (uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0)) {
+  if (uint32_t object = render::BoundTargets().color[0]) {
     if (Target* target = s.GetTarget(commands, object, false)) {
       VkClearValue value{};
       value.color = {{clear, clear, clear, clear}};
       s.ClearTarget(commands, *target, value);
     }
   }
-  if (uint32_t object = guest::LoadU32(device + kDeviceDepthStencil)) {
+  if (uint32_t object = render::BoundTargets().depth) {
     if (Target* target = s.GetTarget(commands, object, true)) {
       VkClearValue value{};
       value.depthStencil = {clear, 0};
@@ -4575,46 +4199,31 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
   }
 }
 
-void Passes::TiledResolve(VkCommandBuffer commands, uint32_t device,
-                          uint32_t flags, uint32_t rect_address, uint32_t destination,
-                          uint32_t point_address, uint32_t clear_color_address, float clear_z,
-                          uint32_t tile, uint32_t tiles) {
+void Passes::EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destination,
+                       float clear) {
   State& s = *state_;
-  int32_t rect[4], point[2];
-  for (uint32_t k = 0; rect_address && k < 4; k++) {
-    rect[k] = int32_t(guest::LoadU32(rect_address + 4 * k));
+  // The tiled target drawn whole: one resolve of all of it (the library's
+  // EndTiling resolves each tile to its place, the same rectangle in all),
+  // then the clears its flags ask for (the library's last tile's: it
+  // clears the target after each tile for the next).
+  const int32_t rect[4] = {0, 0, int32_t(s.tiling_extent.width),
+                           int32_t(s.tiling_extent.height)};
+  const int32_t point[2] = {0, 0};
+  const float color[4] = {clear, clear, clear, clear};
+  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 32 | flags).second) {
+    ITC_LOG_INFO("native renderer: end tiling: flags {:08X}, {}x{} to {:08X}", flags,
+                 rect[2], rect[3], destination);
   }
-  for (uint32_t k = 0; point_address && k < 2; k++) {
-    point[k] = int32_t(guest::LoadU32(point_address + 4 * k));
-  }
-  float color[4] = {};
-  for (uint32_t c = 0; clear_color_address && c < 4; c++) {
-    uint32_t bits = guest::LoadU32(clear_color_address + 4 * c);
-    std::memcpy(&color[c], &bits, 4);
-  }
-  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
-    ITC_LOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
-                 "{:08X} at {},{}",
-                 tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
-                 rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
-                 point_address ? point[0] : -1, point_address ? point[1] : -1);
-  }
-  // The library clears the target after each tile but the last for the
-  // next tile; the whole surface is drawn at once here, so only the last
-  // tile's clears are made.
-  s.Resolve(commands, device, flags, rect_address ? rect : nullptr, destination,
-            point_address ? point : nullptr, false, color, clear_z, 0, tile + 1 >= tiles);
+  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point, false,
+            color, clear, 0, true);
   s.stats.tiled_resolves++;
-}
-
-void Passes::EndTiling() {
-  state_->tiling = false;
+  s.tiling = false;
 }
 
 void Passes::FrontBufferResolve(VkCommandBuffer commands, uint32_t device,
                                 uint32_t front_buffer) {
   State& s = *state_;
-  uint32_t object = guest::LoadU32(device + kDeviceRenderTarget0);
+  uint32_t object = render::BoundTargets().color[0];
   Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   // The front buffer's size, from its fetch constant's word 2 (2D: width - 1
   // in bits 0-12, height - 1 in bits 13-25).
@@ -4719,47 +4328,6 @@ void Passes::set_log_constant_changes(bool log) {
   state_->log_constant_changes = log;
 }
 
-void Passes::set_log_register_reads(bool log) {
-  state_->log_register_reads = log;
-}
-
-void Passes::set_cache_index_ranges(bool cache) {
-  state_->cache_index_ranges = cache;
-}
-
-void Passes::set_log_index_ranges(bool log) {
-  state_->log_index_ranges = log;
-}
-
-std::string Passes::TakeIndexRanges() {
-  State::IndexRangeCounts& c = state_->index_range_counts;
-  double frames = double(std::max<uint64_t>(c.frames, 1));
-  double scans = double(std::max<uint64_t>(c.scans, 1));
-  double asked = double(std::max<uint64_t>(c.newest_asked, 1));
-  std::string text = std::format(
-      "index ranges: {:.1f} scans a frame ({:.0f} indices), {:.1f} distinct; of the scans, "
-      "first seen {:.1f}%, seen earlier this frame {:.1f}%, written by memcpy since last "
-      "scanned {:.1f}%, unchanged {:.1f}% ({:.0f} indices a frame), unchanged with another "
-      "result {}; memcpy writes taken {:.1f} a frame; mirror: {:.1f} calls a frame, {:.1f}% "
-      "already copied this frame, {:.1f} asked whether written, {:.1f}% of those with no "
-      "write taken since the copy; {} ranges known",
-      c.scans / frames, c.indices / frames, c.distinct / frames, 100.0 * c.first / scans,
-      100.0 * c.same_frame / scans, 100.0 * c.written / scans, 100.0 * c.unchanged / scans,
-      c.unchanged_indices / frames, c.mismatched, c.writes / frames, c.mirror_calls / frames,
-      100.0 * c.mirror_repeats / double(std::max<uint64_t>(c.mirror_calls, 1)),
-      c.newest_asked / frames, 100.0 * c.nothing_taken / asked,
-      state_->index_ranges_seen.size());
-  if (c.mismatched) {
-    const uint32_t* m = c.mismatch_sample;
-    text += std::format(" (e.g. {:08X} x{}: {}-{} kept, {}-{} scanned)", m[0], m[1], m[2], m[3],
-                        m[4], m[5]);
-  }
-  uint64_t frame_sequence = c.frame_sequence;
-  c = {};
-  c.frame_sequence = frame_sequence;
-  return text;
-}
-
 void Passes::set_reuse_texture_sets(bool reuse) {
   state_->reuse_texture_sets = reuse;
 }
@@ -4800,128 +4368,14 @@ void Passes::set_cache_shader_lookups(bool cache) {
   state_->cache_shader_lookups = cache;
 }
 
-void Passes::set_log_shader_lookups(bool log) {
-  state_->log_shader_lookups = log;
-}
-
-std::string Passes::TakeShaderLookups() {
-  State& s = *state_;
-  State::ShaderLookupCounts& c = s.lookup_counts;
-  double frames = double(std::max<uint64_t>(c.frames, 1));
-  auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
-  std::string text = std::format(
-      "shader lookups: {:.1f} draws a frame ({:.1f} with the patched copy); the same keys as "
-      "the last draw: vertex {:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; seen before: vertex "
-      "{:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; stale (seen, microcode changed): vertex {} "
-      "({} with a patch between), pixel {} ({} with a patch between); {} vertex shader patches; "
-      "keys this session: vertex {}, pixel {}, whole lookups {}",
-      c.draws / frames, c.copies / frames, share(c.same[0], c.draws), share(c.same[1], c.draws),
-      share(c.lookup_same, c.draws), share(c.seen[0], c.draws), share(c.seen[1], c.draws),
-      share(c.lookup_seen, c.draws), c.stale[0], c.stale_patched[0], c.stale[1],
-      c.stale_patched[1], g_vertex_shader_patches - c.patches, s.shaders_seen[0].size(),
-      s.shaders_seen[1].size(), s.lookups_seen.size());
-  static const char* const kStage[2] = {"vertex", "pixel"};
-  for (int stage = 0; stage < 2; stage++) {
-    const State::ShaderKey& k = c.stale_sample[stage];
-    if (k.object) {
-      text += std::format(
-          "; stale {} sample without a patch: object {:08X} microcode {:08X} size {} patched for "
-          "{} declaration {} copy {}, hash {:016X} then {:016X}",
-          kStage[stage], k.object, k.microcode, k.size, k.patched_for, k.declaration_id, k.copy,
-          c.stale_hashes[stage][0], c.stale_hashes[stage][1]);
-    }
-  }
-  c = {};
-  c.patches = g_vertex_shader_patches;
-  return text;
-}
-
-void Passes::set_copy_all(bool copy_all) {
-  state_->copy_all = copy_all;
-}
-
-void Passes::set_mirror_to_both(bool to_both) {
-  state_->mirror_to_both = to_both;
-}
-
-void Passes::set_mirror_by_tick(bool by_tick) {
-  State& s = *state_;
-  if (by_tick && s.mirrors.size() != 2) {
-    ITC_LOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
-                 s.mirrors.size());
-    return;
-  }
-  s.mirror_by_tick = by_tick;
-  if (by_tick) {
-    Buffers_CollectMirrorWrites();
-  }
-}
-
-std::string Passes::TakeMirrorByTick() {
-  State& s = *state_;
-  if (!s.mirror_by_tick) {
-    return {};
-  }
-  State::MirrorByTickStats& b = s.by_tick;
-  std::string text = std::format(
-      "{} frames, {} swaps; {} writes applied ({:.1f} MB); drawn ranges missing a write: {} in "
-      "logic passes' lists ({:.2f} MB), {} in render-only passes' ({:.2f} MB)",
-      b.frames, b.swaps, b.writes, b.bytes / 1048576.0, b.stale[0], b.stale_bytes[0] / 1048576.0,
-      b.stale[1], b.stale_bytes[1] / 1048576.0);
-  b.frames = b.swaps = b.writes = b.bytes = 0;
-  b.stale[0] = b.stale[1] = b.stale_bytes[0] = b.stale_bytes[1] = 0;
-  return text;
-}
-
-void Passes::set_verify_mirror(bool verify) {
-  state_->verify_mirror = verify;
-}
-
-void Passes::set_check_mirror_frames(bool check) {
-  state_->check_mirror_frames = check;
-}
-
-std::string Passes::TakeMirrorChanges() {
-  State& s = *state_;
-  // The ranges that changed, the most changed first.
-  std::vector<std::pair<uint64_t, State::RangeHistory>> changed;
-  uint64_t bytes = 0;
-  for (auto& [key, history] : s.range_history) {
-    if (history.changes) {
-      changed.emplace_back(key, history);
-      bytes += key & 0xFFFFFFFF;
-      history.changes = 0;
-    }
-  }
-  std::sort(changed.begin(), changed.end(),
-            [](const auto& a, const auto& b) { return a.second.changes > b.second.changes; });
-  double frames = double(std::max<uint64_t>(s.mirror_frames, 1));
-  std::string text = std::format(
-      "per frame {:.2f} MB copied with changed contents, {:.2f} MB of ranges new, vertex "
-      "buffers {:.2f} MB copied but {:.2f} MB within the draws' vertices; {} of {} ranges "
-      "changed ({:.1f} MB)",
-      s.mirror_changed_bytes / 1048576.0 / frames, s.mirror_new_bytes / 1048576.0 / frames,
-      s.mirror_vertex_bytes / 1048576.0 / frames, s.used_vertex_bytes / 1048576.0 / frames,
-      changed.size(), s.range_history.size(), bytes / 1048576.0);
-  s.mirror_frames = s.mirror_changed_bytes = s.mirror_new_bytes = s.mirror_vertex_bytes =
-      s.used_vertex_bytes = 0;
-  for (size_t i = 0; i < changed.size() && i < 12; i++) {
-    text += std::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
-                        uint32_t(changed[i].first >> 32), uint32_t(changed[i].first),
-                        changed[i].second.changes);
-  }
-  return text;
-}
-
 namespace {
 
 // The float constant registers a shader reads, in packed order.
+// The registers a shader is given, in its block's order.
 std::vector<uint32_t> FloatRegisters(const TranslatedShader* shader) {
   std::vector<uint32_t> registers;
-  for (uint32_t i = 0; shader && i < 256; i++) {
-    if (shader->float_constants[i >> 6] & (uint64_t(1) << (i & 63))) {
-      registers.push_back(i);
-    }
+  for (uint32_t i = 0; shader && i < shader->float_count; i++) {
+    registers.push_back(shader->float_first + i);
   }
   return registers;
 }
@@ -4974,7 +4428,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
       watched_this_frame[{vertex->hash, ps, index_address, primitive_count}]++;
   WatchedDraw now;
   now.frame = frames;
-  now.system.assign(system, system + sizeof(Translator::SystemConstants) / 4);
+  now.system.assign(system, system + sizeof(DrawConstants) / 4);
   std::vector<uint32_t> vertex_registers = FloatRegisters(vertex);
   std::vector<uint32_t> pixel_registers = FloatRegisters(pixel);
   now.vertex_floats.assign(vertex_floats, vertex_floats + 4 * vertex_registers.size());
@@ -4982,7 +4436,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
   now.bool_loop.assign(bool_loop, bool_loop + kBoolLoopConstantsRange / 4);
   // Only the fetch constants the shaders read (the space is shared: texture
   // slot n is vertex buffers 3n-3n+2); unused ones are zeroed.
-  now.fetch.assign(kFetchConstantsRange / 4, 0);
+  now.fetch.assign(kFetchConstantsBytes / 4, 0);
   for (const TranslatedShader* shader : {vertex, pixel}) {
     for (size_t i = 0; shader && i < shader->textures.size(); i++) {
       uint32_t slot = shader->textures[i].fetch_constant;
@@ -5040,8 +4494,9 @@ std::string Passes::TakeInterfaces() {
   return text;
 }
 
-void Passes::set_no_index_clamp(bool off) {
-  state_->no_index_clamp = off;
+
+void Passes::set_hand_over_resolves(bool hand_over) {
+  state_->hand_over_resolves = hand_over;
 }
 
 void Passes::set_hide_cubes(bool hide) {
@@ -5059,63 +4514,6 @@ std::vector<std::string> Passes::TakeWatchLines(uint64_t& changes, uint64_t& dra
   draws = s.watched_draws;
   s.watched_changes = s.watched_draws = 0;
   return std::exchange(s.watch_lines, {});
-}
-
-void Passes::set_check_late_writes(bool check) {
-  state_->check_late_writes = check;
-}
-
-std::string Passes::TakeLateWrites() {
-  State& s = *state_;
-  std::string text = std::format("{} of {} copied ranges changed by the end of the frame",
-                                 s.late_written, s.late_checked);
-  if (!s.late_sample.empty()) {
-    text += ", e.g. " + s.late_sample + "; by vertex shader:";
-    for (const auto& [shader, count] : s.late_by_shader) {
-      text += std::format(" {:016X} x{}", shader, count);
-    }
-  }
-  s.late_written = s.late_checked = 0;
-  s.late_by_shader.clear();
-  s.late_sample.clear();
-  return text;
-}
-
-void Passes::set_check_clobbers(bool check) {
-  state_->check_clobbers = check;
-}
-
-std::vector<std::string> Passes::TakeDeclarationLines() {
-  return std::exchange(state_->declaration_lines, {});
-}
-
-std::string Passes::TakeClobbers() {
-  State& s = *state_;
-  std::string text =
-      std::format("{} of {} copies changed bytes an earlier copy this frame put in the mirror "
-                  "({} bytes)",
-                  s.clobbers, s.clobber_copies, s.clobbered_bytes);
-  if (!s.clobber_sample.empty()) {
-    text += ", e.g. " + s.clobber_sample + "; by shaders (earlier vs/ps, then vs/ps):";
-    std::vector<std::pair<uint64_t, std::array<uint64_t, 4>>> pairs;
-    for (const auto& [shaders, count] : s.clobbers_by_shaders) {
-      pairs.push_back({count, shaders});
-    }
-    std::sort(pairs.rbegin(), pairs.rend());
-    for (size_t i = 0; i < std::min<size_t>(pairs.size(), 12); i++) {
-      const auto& [count, k] = pairs[i];
-      text += std::format(" {:08X}/{:08X} by {:08X}/{:08X} x{};", k[0] >> 32, k[1] >> 32,
-                          k[2] >> 32, k[3] >> 32, count);
-    }
-  }
-  s.clobbers = s.clobbered_bytes = s.clobber_copies = 0;
-  s.clobbers_by_shaders.clear();
-  s.clobber_sample.clear();
-  return text;
-}
-
-void Passes::set_check_mirror(bool check) {
-  state_->check_mirror = check;
 }
 
 void Passes::set_debug_hide(TextureCache::Hide hide, uint32_t value) {
@@ -5173,7 +4571,9 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   Transition(commands, shown, VK_IMAGE_ASPECT_COLOR_BIT, s.shown_layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   VkExtent2D extent = s.main_view_extent;
-  if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size()) {
+  if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size() &&
+      s.Held(s.frame_resolves[show_resolve]) &&
+      s.frame_resolves[show_resolve].aspect == VK_IMAGE_ASPECT_COLOR_BIT) {
     // A resolve destination, as is.
     const State::Resolved& resolved = s.frame_resolves[show_resolve];
     extent = {std::min(resolved.extent.width, s.shown_extent.width),
@@ -5193,6 +4593,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
   } else if (Target* front = s.front) {
     // The frame as the game resolves it to the front buffer.
     s.EndRendering(commands);
+    s.RestoreContents(commands, *front);
     Transition(commands, front->image.image, front->aspects(), front->layout,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     VkExtent2D front_extent = s.Scaled(s.front_extent);
@@ -5343,16 +4744,22 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   };
   add(prefix, kShownFormat, shown_extent);
   std::vector<VkImage> images = {shown.image};
+  std::vector<VkImageAspectFlags> aspects = {VK_IMAGE_ASPECT_COLOR_BIT};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
+    if (!Held(r)) {
+      continue;  // a handed image back with its target since
+    }
     add(std::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);
     images.push_back(r.image);
+    aspects.push_back(r.aspect);
   }
   size_t resolve_end = images.size();
   if (id_drawn) {
     add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
     images.push_back(id_image.image);
+    aspects.push_back(VK_IMAGE_ASPECT_COLOR_BIT);
   }
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = size;
@@ -5377,18 +4784,21 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     VkImage image = images[i];
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     bool resolve = i && i < resolve_end;  // in SHADER_READ_ONLY_OPTIMAL
+    // A depth image's both aspects change layout; its depth is copied.
+    VkImageAspectFlags transition_aspects =
+        aspects[i] == VK_IMAGE_ASPECT_DEPTH_BIT ? kDepthStencilAspects : aspects[i];
     if (resolve) {
-      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+      Transition(commands, image, transition_aspects, layout,
                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     }
     VkBufferImageCopy copy{};
     copy.bufferOffset = dumped[i].offset;
-    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy.imageSubresource = {aspects[i], 0, 0, 1};
     copy.imageExtent = {dumped[i].extent.width, dumped[i].extent.height, 1};
     vk::vkCmdCopyImageToBuffer(commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dump_buffer,
                                1, &copy);
     if (resolve) {
-      Transition(commands, image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
+      Transition(commands, image, transition_aspects, layout,
                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
   }
@@ -5470,9 +4880,9 @@ void Passes::WriteDump(const std::string& directory) {
         for (const State::RecordedDraw::Texture& t : r.textures) {
           const uint32_t* f = t.fetch;
           line += std::format(
-              "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
+              "; {} tex {}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
               "{:08X} {:08X} {:08X} {:08X}",
-              t.pixel ? "ps" : "vs", t.texture.fetch_constant, t.texture.is_signed ? "s" : "",
+              t.pixel ? "ps" : "vs", t.texture.fetch_constant,
               f[1] & 0xFFFFF000u, f[1] & 0x3F, (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1,
               (f[5] >> 9) & 3, int(t.texture.view_type), f[0], f[1], f[2], f[3], f[4], f[5]);
         }
@@ -5496,9 +4906,7 @@ VkImage Passes::shown() const {
 Passes::Stats Passes::TakeStats() {
   Stats stats = state_->stats;
   stats.textures = state_->textures.TakeStats();
-  stats.shaders_translated = state_->shaders->translated();
-  stats.shaders_failed = state_->shaders->failed();
-  stats.shaders_from_disk = state_->shaders->from_disk();
+  stats.shaders_ported = state_->shaders->ported();
   uint32_t pipelines = state_->stats.pipelines, targets = state_->stats.targets;
   state_->stats = {};
   state_->stats.pipelines = pipelines;

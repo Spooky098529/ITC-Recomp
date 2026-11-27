@@ -15,7 +15,7 @@
 // Resolve, the tiling, the drawer's and objects' vtable slots) is a guest
 // call through `call`, from a frame made where the original makes its own,
 // so the adapters and our renderer's wraps around those run as before.
-// Adapters: src/native/replay_hooks.cpp (inside its wraps, --native_replay_commands)
+// Adapters: src/hooks/replay_commands.cpp (inside its wraps, --native_replay_commands)
 // and command 7's in src/interpolation/blend_state.cpp.
 
 #pragma once

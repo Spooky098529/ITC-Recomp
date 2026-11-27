@@ -10,6 +10,7 @@
 #include "car_physics/float_ops.h"
 #include "game_data/data_file.h"
 #include "guest.h"
+#include "memory/heap.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "model_animation/model_animation.h"
@@ -126,6 +127,7 @@ void BindAndPose(uint32_t skeleton, uint32_t file, uint32_t frame,
 uint32_t PartArrived(uint32_t slot, uint32_t model, const FileLoadedCalls& calls) {
   const schema::LoadSlot s(slot);
   const uint32_t file = s.buffer();
+  memory::PhysicalTag tag("model vertices: car parts");
   if (!models::ModelLoad(model, file, 0, calls.model_load)) {
     calls.model_load_original(model, file);
   }
@@ -404,6 +406,7 @@ std::optional<uint64_t> TrafficFileLoaded(uint32_t request, uint32_t traffic,
   for (uint32_t i = 0; i < 6; i++) {
     const uint32_t model = t.part_models_address() + 464 * i;
     const uint32_t part = entry(2 + i);
+    memory::PhysicalTag tag("model vertices: traffic");
     if (!models::ModelLoad(model, part, 0, calls.model_load)) {
       calls.model_load_original(model, part);
     }

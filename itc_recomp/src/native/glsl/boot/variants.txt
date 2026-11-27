@@ -1,0 +1,13 @@
+# The 2D shaders the game compiles at boot (src/graphics/compiled_shaders.h),
+# written by hand: the game's shader name, the file, the defines. See
+# docs/shaders.md, "Hand-written shaders".
+
+ps_9567C79307ACC6F5  sprite.frag  TEXTURE VERTEX_COLOR       # k82001070_ps_3_0
+ps_800BAA981E59B832  sprite.frag  TEXTURE                    # k820012E8_ps_3_0
+ps_46E16128D157D50B  sprite.frag  VERTEX_COLOR               # k82001540_ps_3_0
+ps_E2CEF62EAE21A6AB  sprite.frag  VERTEX_COLOR ALPHA_CHANNEL=w  # k82006D28_ps_2_0
+ps_95CDB2FE143FD9E7  sprite.frag  VERTEX_COLOR ALPHA_CHANNEL=z  # k82006F90_ps_2_0
+ps_CA0FB1474BA9BB09  sprite.frag  VERTEX_COLOR ALPHA_CHANNEL=y  # k820071F8_ps_2_0
+ps_958E44CCD28B2BE7  sprite.frag  VERTEX_COLOR ALPHA_CHANNEL=x  # k82007460_ps_2_0
+ps_3290DE6676442FB7  depth_view.frag                         # k8206E848_ps_3_0
+ps_D6135642F477C186  hue_gradient.frag                       # k8206E308_ps_3_0

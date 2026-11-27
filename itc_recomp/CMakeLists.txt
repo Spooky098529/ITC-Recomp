@@ -1,8 +1,8 @@
 # itc - Import Tuner Challenge, native
 #
-# Our own build: no ReXGlue SDK in it but its shader translator, a static
-# dependency (cmake/xenos_translator.cmake; E4 in docs/rexglue-removal.md);
-# the third-party libraries are our own copies (cmake/thirdparty.cmake).
+# Our own build: no ReXGlue SDK in it (its shader translator, the last
+# piece, went with docs/pc-renderer.md's step 5, 2026-11-26); the third-party
+# libraries are our own copies (cmake/thirdparty.cmake).
 # generated/ (the recompiled code) stays in the repo, out of the build.
 
 cmake_minimum_required(VERSION 3.25)
@@ -28,7 +28,6 @@ if(WIN32 AND ITC_WIN_LTO)
 endif()
 
 include(cmake/thirdparty.cmake)
-include(cmake/xenos_translator.cmake)
 include(cmake/version.cmake)
 include(cmake/ffmpeg.cmake)
 
@@ -376,7 +375,6 @@ set(ITC_SOURCES
     src/track_zones/track_zones.cpp
     src/hooks/graphics_resources.cpp
     src/graphics/resources.cpp
-    src/graphics/edram.cpp
     src/hooks/video_output.cpp
     src/graphics/video_output.cpp
     src/hooks/command_buffer.cpp
@@ -770,14 +768,19 @@ set(ITC_SOURCES
     src/native/app_window.cpp
     src/native/buffers.cpp
     src/native/disk_cache.cpp
-    src/native/draw_packets.cpp
-    src/native/gpu_link.cpp
+    src/hooks/draw_packets.cpp
     src/native/passes.cpp
+    src/native/vertex_arena.cpp
+    src/native/shader_ports.cpp
+    src/native/port_spirv.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
-    src/native/replay_hooks.cpp
+    src/hooks/replay_commands.cpp
     src/native/shaders.cpp
-    src/native/state.cpp
+    src/native/draw_registers.cpp
+    src/render/state.cpp
+    src/graphics/shader_load.cpp
+    src/hooks/shader_load.cpp
     src/native/textures.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
@@ -965,7 +968,7 @@ function(itc_add_executable name)
     # included with their folder (<xxHash/xxhash.h>).
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_avutil
         SDL3::SDL3-static itc_vulkan_headers itc_simde)
 
     # The flags the SDK's target set-up gave us (rexglue_apply_target_settings),

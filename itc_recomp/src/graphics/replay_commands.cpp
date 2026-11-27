@@ -8,7 +8,10 @@
 #include "graphics/device_state.h"
 #include "graphics/resources.h"
 #include "helpers/debug_output.h"
+#include "native/refcount.h"
+#include "render/state.h"
 
+#include <algorithm>
 #include <cstdint>
 
 namespace graphics::replay_commands {
@@ -53,13 +56,10 @@ uint32_t PrimitiveCount(uint32_t type, uint32_t primitives) {
 uint32_t SetRenderStates(uint32_t items, uint32_t count, uint32_t sp,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FBD0 Command::SetRenderStates");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's setters no longer called: nothing else
+  // reads what they wrote).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t state = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t value = guest::LoadU32(item + 4);
-    const uint32_t setter = guest::LoadU32(device + state + 56);
-    call(setter, frame, 0x8258FC10, {device, value}, std::nullopt);
+    render::SetRenderState(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -67,14 +67,10 @@ uint32_t SetRenderStates(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetSamplerStates(uint32_t items, uint32_t count, uint32_t sp,
                           const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FC30 Command::SetSamplerStates");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's setters no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t state = guest::LoadU32(item + 4);
-    const uint32_t device = Device();
-    const uint32_t value = guest::LoadU32(item + 8);
-    const uint32_t sampler = guest::LoadU32(item);
-    const uint32_t setter = guest::LoadU32(device + state + 440);
-    call(setter, frame, 0x8258FC74, {device, sampler, value}, std::nullopt);
+    render::SetSamplerState(guest::LoadU32(item), guest::LoadU32(item + 4),
+                            guest::LoadU32(item + 8));
   }
   return count;
 }
@@ -82,8 +78,7 @@ uint32_t SetSamplerStates(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetBlendControls(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_8258FC90 Command::SetBlendControls");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t value = guest::LoadU32(item + 4);
-    ds::SetBlendControl(Device(), guest::LoadU32(item), value);
+    render::SetBlendControl(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -91,15 +86,10 @@ uint32_t SetBlendControls(uint32_t items, uint32_t count) {
 uint32_t SetTextures(uint32_t items, uint32_t count, uint32_t sp,
                      const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FCE0 Command::SetTextures");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetTexture no longer called: nothing else
+  // reads its slots, and its fences fed only the dropped GPU waits).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t stage = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t texture = guest::LoadU32(item + 4);
-    const uint64_t dirty = HighBitShifted(stage + 20);
-    if (!ds::SetTexture(device, stage, texture, dirty)) {
-      call(0x822A6008, frame, 0x8258FD28, {device, stage, texture, dirty}, std::nullopt);
-    }
+    render::SetTexture(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -133,33 +123,10 @@ uint32_t SetShaderConstants(uint32_t payload, uint32_t count, uint32_t packed,
   const bool vertex = stage == 0;
   const uint32_t type = uint32_t(int32_t(packed << 8) >> 24);
   const uint32_t first = (packed >> 8) & 0xFF;
+  // Our renderer's (the device's constant setters no longer called).
+  render::SetConstants(vertex, type, first, count, payload);
+  (void)frame;
   switch (type) {
-    case 0:  // the loop constants (sub_822A84C8, sub_822A8518)
-      call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258FDB8 : 0x8258FED4,
-           {Device(), first, payload, count}, std::nullopt);
-      break;
-    case 1: {  // the floats, with the dirty mask of their 4-register blocks
-      const uint32_t last_block = uint32_t(first + count - 1) >> 2;
-      const uint32_t first_block = first >> 2;
-      uint32_t shift = (last_block - first_block) & 0x7F;
-      if (shift > 63) shift = 63;
-      const int64_t ones = int64_t(0x8000000000000000ull) >> shift;
-      const uint64_t dirty = (first_block & 0x40) ? 0 : (uint64_t(ones) >> (first_block & 0x3F));
-      if (vertex) {
-        ds::SetVertexShaderConstantF(Device(), first, payload, count, dirty);
-      } else {
-        ds::SetPixelShaderConstantF(Device(), first, payload, count, dirty);
-      }
-      break;
-    }
-    case 2:  // the bools: the vertex shader's setter (sub_822A8418) a guest call
-      if (vertex) {
-        call(0x822A8418, frame, 0x8258FE40, {Device(), first, payload, count},
-             std::nullopt);
-      } else {
-        ds::SetPixelShaderConstantB(Device(), first, payload, count);
-      }
-      break;
     case 3:  // OutputDebugStringA("aaaa...\n") (0x8206CB64), which goes nowhere
       helpers::DebugOutput(nullptr);
       break;
@@ -176,6 +143,7 @@ uint32_t SetVertexShaders(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     call(0x822A8958, frame, 0x8258FF80, {Device(), guest::LoadU32(item)},
          std::nullopt);
+    render::SetVertexShader(guest::LoadU32(item));
   }
   return count;
 }
@@ -183,10 +151,10 @@ uint32_t SetVertexShaders(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetPixelShaders(uint32_t items, uint32_t count, uint32_t sp,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FFA0 Command::SetPixelShaders");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetPixelShader, which takes no reference,
+  // no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    call(0x822A8618, frame, 0x8258FFD0, {Device(), guest::LoadU32(item)},
-         std::nullopt);
+    render::SetPixelShader(guest::LoadU32(item));
   }
   return count;
 }
@@ -194,10 +162,8 @@ uint32_t SetPixelShaders(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetVertexDeclarations(uint32_t items, uint32_t count, uint32_t sp,
                                const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258FFF0 Command::SetVertexDeclarations");
-  const uint32_t frame = Frame(sp, 128);
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    call(0x822A8960, frame, 0x82590020, {Device(), guest::LoadU32(item)},
-         std::nullopt);
+    render::SetVertexLayout(guest::LoadU32(item));
   }
   return count;
 }
@@ -205,20 +171,10 @@ uint32_t SetVertexDeclarations(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetStreamSources(uint32_t items, uint32_t count, uint32_t sp,
                           const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590040 Command::SetStreamSources");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetStreamSource no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t stream = guest::LoadU32(item);
-    const uint32_t device = Device();
-    const uint32_t stride = guest::LoadU32(item + 12);
-    const uint32_t offset = guest::LoadU32(item + 8);
-    const uint32_t buffer = guest::LoadU32(item + 4);
-    // subfic, mulli 21846, the high halfword (rlwinm 16,16,31), + 20.
-    const uint32_t product = (95u - stream) * 21846u;
-    const uint64_t dirty = HighBitShifted((product >> 16) + 20);
-    if (!ds::SetStreamSource(device, stream, buffer, offset, stride, dirty)) {
-      call(0x822A3758, frame, 0x8259009C, {device, stream, buffer, offset, stride, dirty},
-           std::nullopt);
-    }
+    render::SetVertexBuffer(guest::LoadU32(item), guest::LoadU32(item + 4),
+                            guest::LoadU32(item + 8), guest::LoadU32(item + 12));
   }
   return count;
 }
@@ -226,13 +182,9 @@ uint32_t SetStreamSources(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetIndices(uint32_t items, uint32_t count, uint32_t sp,
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825900B8 Command::SetIndices");
-  const uint32_t frame = Frame(sp, 128);
+  // Our renderer's (the device's SetIndices no longer called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t device = Device();
-    const uint32_t buffer = guest::LoadU32(item);
-    if (!ds::SetIndices(device, buffer)) {
-      call(0x822A3908, frame, 0x825900E8, {device, buffer}, std::nullopt);
-    }
+    render::SetIndexBuffer(guest::LoadU32(item));
   }
   return count;
 }
@@ -251,6 +203,11 @@ uint32_t SetUpDrawer(uint32_t items, uint32_t count, uint32_t sp,
     guest::StoreU32(state + 4, vertex_shader);
     guest::StoreU32(state + 8, pixel_shader);
     guest::StoreU32(state + 0, type);
+    // The drawer's SetShaders (sub_825A16B0): its shaders from two tables
+    // of 12-byte entries (the shader at +8), the vertex shader's by item +4
+    // (0 or 1), the pixel shader's by item +8 (0 to 4).
+    render::SetVertexShader(guest::LoadU32(0x82970F2C + 8 + 12 * (vertex_shader ? 1 : 0)));
+    render::SetPixelShader(guest::LoadU32(0x82970F44 + 8 + 12 * std::min(pixel_shader, 4u)));
     const uint32_t set_shaders = guest::LoadU32(guest::LoadU32(drawer) + 8);
     call(set_shaders, frame, 0x8258EAB4, {drawer, device, vertex_shader, pixel_shader},
          std::nullopt);
@@ -265,23 +222,23 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
     if (guest::LoadU32(guest::LoadU32(kDrawerState) + 16) == 0) {
       continue;
     }
-    ds::GetViewportEnable(Device());  // read, and not kept
     {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
-      ds::SetViewportEnable(Device(), on);
+      render::SetRenderState(304, on);
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
+      // The drawer's draws set its declaration, [[drawer +4]].
+      render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
+      // The drawer's Draw (sub_825A17A0, no longer called): its vertices
+      // (state +12, 24 bytes each, state +16 of them) drawn inline as the
+      // state's +0 type.
       const uint32_t state = guest::LoadU32(kDrawerState);
-      const uint32_t device = Device();
-      const uint32_t draw = guest::LoadU32(guest::LoadU32(drawer) + 12);
-      call(draw, frame, 0x8259018C,
-           {drawer, device, guest::LoadU32(state + 0), guest::LoadU32(state + 12),
-            guest::LoadU32(state + 16)},
-           std::nullopt);
+      render::DrawUP(guest::LoadU32(state + 0), guest::LoadU32(state + 16), 24,
+                     guest::LoadU32(state + 12));
     }
-    ds::SetViewportEnable(Device(), 1);
+    render::SetRenderState(304, 1);
   }
   return count;
 }
@@ -293,14 +250,16 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
     if (guest::LoadU32(guest::LoadU32(kDrawerState) + 16) == 0) {
       continue;
     }
-    const uint32_t viewport = ds::GetViewportEnable(Device());
+    const uint32_t viewport = render::States().viewport_enable ? 1 : 0;
     {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
-      ds::SetViewportEnable(Device(), on);
+      render::SetRenderState(304, on);
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
+      // The drawer's draws set its declaration, [[drawer +4]].
+      render::SetVertexLayout(guest::LoadU32(guest::LoadU32(drawer + 4)));
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t device = Device();
       const uint32_t draw = guest::LoadU32(guest::LoadU32(drawer) + 16);
@@ -310,7 +269,7 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
             guest::LoadU32(state + 24), guest::LoadU32(state + 28)},
            std::nullopt);
     }
-    ds::SetViewportEnable(Device(), viewport);
+    render::SetRenderState(304, viewport);
   }
   return count;
 }
@@ -331,14 +290,11 @@ uint32_t DrawVertices(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t DrawIndexedVertices(uint32_t items, uint32_t count, uint32_t sp,
                              const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825902E0 Command::DrawIndexedVertices");
-  const uint32_t frame = Frame(sp, 128);
+  // Drawn by our renderer (the library's DrawIndexedVertices, sub_825BE708,
+  // no longer called: its shader load and dirty masks fed only the GPU).
   for (uint32_t i = 0, item = items; i < count; i++, item += 12) {
-    const uint32_t type = guest::LoadU32(item);
-    const uint32_t word = guest::LoadU32(item + 4);
-    const uint32_t indices = PrimitiveCount(type, guest::LoadU32(item + 8));
-    const uint64_t base_vertex = uint64_t(int64_t(int32_t(word) >> 16));  // srawi
-    call(0x825BE708, frame, 0x82590340, {Device(), type, base_vertex, word & 0xFFFF, indices},
-         std::nullopt);
+    render::DrawIndexed(guest::LoadU32(item), guest::LoadU32(item + 4),
+                        guest::LoadU32(item + 8));
   }
   return count;
 }
@@ -346,20 +302,12 @@ uint32_t DrawIndexedVertices(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t DrawVerticesUP(uint32_t items, uint32_t count, uint32_t sp,
                         const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590360 Command::DrawVerticesUP");
-  const uint32_t frame = Frame(sp, 128);
+  // Drawn by our renderer from the item's vertices (the library's
+  // BeginVertices, memcpy into the command buffer and EndVertices no longer
+  // called).
   for (uint32_t i = 0, item = items; i < count; i++, item += 12) {
-    const uint32_t vertices = guest::LoadU16(item + 4);
-    const uint32_t stride = guest::LoadU16(item + 6);
-    const uint32_t type = guest::LoadU32(item);
-    const uint32_t data = uint32_t(
-        call(0x825BD8F0, frame, 0x82590398, {Device(), type, vertices, stride}, std::nullopt));
-    if (data == 0) {
-      continue;
-    }
-    const uint32_t bytes = guest::LoadU16(item + 6) * guest::LoadU16(item + 4);
-    call(0x825A7410, frame, 0x825903B4, {data, guest::LoadU32(item + 8), bytes},
-         std::nullopt);
-    call(0x825BDDA0, frame, 0x825903BC, {Device()}, std::nullopt);
+    render::DrawUP(guest::LoadU32(item), guest::LoadU16(item + 4), guest::LoadU16(item + 6),
+                   guest::LoadU32(item + 8));
   }
   return count;
 }
@@ -410,8 +358,7 @@ uint32_t DeferRelease(uint32_t items, uint32_t count, uint32_t sp,
 uint32_t SetRenderTargets(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590428 Command::SetRenderTargets");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    const uint32_t surface = guest::LoadU32(item + 4);
-    ds::SetRenderTargetExternal(Device(), guest::LoadU32(item), surface);
+    render::SetRenderTarget(guest::LoadU32(item), guest::LoadU32(item + 4));
   }
   return count;
 }
@@ -419,7 +366,7 @@ uint32_t SetRenderTargets(uint32_t items, uint32_t count) {
 uint32_t SetDepthStencilSurfaces(uint32_t items, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590478 Command::SetDepthStencilSurfaces");
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
-    ds::SetDepthStencilSurface(Device(), guest::LoadU32(item));
+    render::SetDepthTarget(guest::LoadU32(item));
   }
   return count;
 }
@@ -449,10 +396,26 @@ uint32_t Resolves(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t level = guest::LoadU32(item + 36);
     const uint32_t device = Device();
     const uint32_t flags = guest::LoadU32(item + 4);
-    guest::StoreU32(frame + 100, parameters);
-    guest::StoreU32(frame + 92, word52);
-    call(0x822AFA58, frame, 0x825905F4,
-         {device, flags, source_rect, texture, point, level, slice, color}, z);
+    // Made by our renderer (the library's Resolve, sub_822AFA58, no longer
+    // called from here: its register and command buffer work fed only the
+    // GPU). The clear color as the library takes it (the bytes times the
+    // scale, 1/255).
+    (void)device;
+    (void)parameters;
+    (void)word52;
+    (void)color;
+    int32_t rect[4], at[2];
+    for (uint32_t k = 0; k < 4; k++) {
+      rect[k] = int32_t(guest::LoadU32(item + 8 + 4 * k));
+    }
+    at[0] = int32_t(guest::LoadU32(item + 28));
+    at[1] = int32_t(guest::LoadU32(item + 32));
+    float clear_color[4] = {};
+    for (int c = 0; (which & 8) && c < 4; c++) {
+      clear_color[c] = float(double(bytes[c])) * scale;
+    }
+    render::Resolve(flags, source_rect ? rect : nullptr, texture, point ? at : nullptr,
+                    level != 0 || slice != 0, clear_color, float(z), word52);
   }
   return uint32_t(count * 68u + 15u) >> 4;
 }
@@ -469,9 +432,12 @@ uint32_t Clears(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t color = guest::LoadU32(item + 268);
     const uint32_t device = Device();
     const uint32_t flags = guest::LoadU32(item + 8);
-    // r8 isn't set by the original (Clear doesn't read it): 0 here.
-    call(0x822A04F8, frame, 0x82590674, {device, rects, rect_data, flags, color, 0, stencil, 0},
-         z);
+    // Made by our renderer (the library's Clear, sub_822A04F8, no longer
+    // called: its work fed only the GPU).
+    (void)device;
+    (void)rect_data;
+    (void)frame;
+    render::Clear(flags, color, float(z), stencil, rects != 0);
   }
   return uint32_t(count * 280u + 15u) >> 4;
 }
@@ -528,13 +494,12 @@ uint32_t RestoreSurfaces(uint32_t items, uint32_t count) {
     for (uint32_t target = 0; target < 4; target++) {
       if (guest::LoadU32(item) & (1u << target)) {
         const uint32_t set = guest::LoadU32(kRestoreSet);
-        ds::SetRenderTargetExternal(Device(), target,
-                                    guest::LoadU32(set + 4 * target));
+        render::SetRenderTarget(target, guest::LoadU32(set + 4 * target));
       }
     }
     if (guest::LoadU32(item) & 0x80) {
       const uint32_t set = guest::LoadU32(kRestoreSet);
-      ds::SetDepthStencilSurface(Device(), guest::LoadU32(set + 16));
+      render::SetDepthTarget(guest::LoadU32(set + 16));
     }
   }
   return count;
@@ -551,7 +516,9 @@ uint32_t SetViewports(uint32_t items, uint32_t count, uint32_t sp) {
     guest::StoreU32(viewport + 4, guest::LoadU16(item + 2));
     guest::StoreU32(viewport + 8, guest::LoadU16(item + 4));
     guest::StoreU32(viewport + 12, guest::LoadU16(item + 6));
-    ds::SetViewport(Device(), viewport);
+    render::SetViewport(guest::LoadU16(item + 0), guest::LoadU16(item + 2),
+                        guest::LoadU16(item + 4), guest::LoadU16(item + 6),
+                        guest::LoadFloat(item + 8), guest::LoadFloat(item + 12));
   }
   return count;
 }
@@ -565,8 +532,10 @@ uint32_t SetScissorRects(uint32_t items, uint32_t count, uint32_t sp) {
       const int32_t value = int16_t(guest::LoadU16(item + 2 * c));
       guest::StoreU32(rect + 4 * c, uint32_t(value));
     }
-    ds::SetScissorTestEnable(Device(), 1);
-    ds::SetScissorRect(Device(), rect);
+    render::SetRenderState(200, 1);
+    render::SetScissorRect(int32_t(guest::LoadU32(rect)), int32_t(guest::LoadU32(rect + 4)),
+                           int32_t(guest::LoadU32(rect + 8)),
+                           int32_t(guest::LoadU32(rect + 12)));
   }
   return count;
 }
@@ -579,13 +548,22 @@ uint32_t BeginTiling(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t c = 0; c < 4; c++) {
     guest::StoreFloat(frame + 80 + 4 * c, value);
   }
-  // Each pass takes the first item (the original doesn't step through
-  // them); r8 isn't set by the original, nor read by BeginTiling: 0 here.
-  for (uint32_t i = 0; i < count; i++) {
-    call(0x825BED08, frame, 0x825909C8,
-         {Device(), guest::LoadU32(items), guest::LoadU32(items + 4),
-          guest::LoadU32(items + 8), frame + 80, 0, 0},
-         double(value));
+  {
+    // The tiles' extent together: item +4 the count, +8 the rectangles
+    // (left, top, right, bottom).
+    const uint32_t tiles = guest::LoadU32(items + 4), rects = guest::LoadU32(items + 8);
+    uint32_t width = 0, height = 0;
+    for (uint32_t t = 0; rects && t < tiles && t < 16; t++) {
+      width = std::max(width, uint32_t(std::max(int32_t(guest::LoadU32(rects + 16 * t + 8)), 0)));
+      height =
+          std::max(height, uint32_t(std::max(int32_t(guest::LoadU32(rects + 16 * t + 12)), 0)));
+    }
+    // Each pass takes the first item, as the original (the library's
+    // BeginTiling, sub_825BED08, no longer called: our renderer draws the
+    // tiled target whole).
+    for (uint32_t i = 0; i < count; i++) {
+      render::BeginTiling(width, height, value);
+    }
   }
   return count;
 }
@@ -598,46 +576,45 @@ uint32_t EndTiling(uint32_t items, uint32_t count, uint32_t sp,
   for (uint32_t c = 0; c < 4; c++) {
     guest::StoreFloat(frame + 80 + 4 * c, value);
   }
-  // As BeginTiling: the first item each pass; r8 unset by the original and
-  // not read by EndTiling.
+  // As BeginTiling: the first item each pass (the library's EndTiling,
+  // sub_825BF200, no longer called: one resolve of the whole tiled target
+  // to item +4 with item +0's flags).
+  (void)frame;
   for (uint32_t i = 0; i < count; i++) {
-    call(0x825BF200, frame, 0x82590A4C,
-         {Device(), guest::LoadU32(items), 0, guest::LoadU32(items + 4),
-          frame + 80, 0, 0, 0},
-         double(value));
+    render::EndTiling(guest::LoadU32(items), guest::LoadU32(items + 4), value);
   }
   return count;
 }
 
 uint32_t SaveSurfaces(uint32_t count, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82590A68 Command::SaveSurfaces");
-  const uint32_t frame = Frame(sp, 128);
+  (void)sp;
+  (void)call;
+  // The bound targets kept in the saved set, each with a reference taken as
+  // Device::GetRenderTarget and GetDepthStencilSurface take them (the
+  // render::'s bound surfaces: the replay no longer binds them on the
+  // device, whose bound surfaces only the boot reads; docs/pc-renderer.md,
+  // step 3). The device's viewport, which only 35 read, isn't saved.
   const uint32_t saved = kSavedSurfaces;
-  {
-    const uint32_t device = guest::LoadU32(saved + 48);
-    if (!ds::GetViewport(device, saved)) {
-      call(0x822A3740, frame, 0x82590A8C, {device, saved}, std::nullopt);
-    }
-  }
+  const render::Targets& bound = render::BoundTargets();
   for (uint32_t target = 0; target < 4; target++) {
-    const uint32_t surface = GetRenderTarget(guest::LoadU32(saved + 48), target);
+    const uint32_t surface = bound.color[target];
+    if (surface != 0) {
+      refcount::AddRef(surface);
+    }
     guest::StoreU32(saved + 24 + 4 * target, surface);
   }
-  guest::StoreU32(saved + 40,
-                  GetDepthStencilSurface(guest::LoadU32(saved + 48)));
+  if (bound.depth != 0) {
+    refcount::AddRef(bound.depth);
+  }
+  guest::StoreU32(saved + 40, bound.depth);
+  render::SaveTargets();
   return count;
 }
 
 uint32_t RestoreSavedSurfaces(uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82590AD0 Command::RestoreSavedSurfaces");
-  const uint32_t saved = kSavedSurfaces;
-  for (uint32_t target = 0; target < 4; target++) {
-    const uint32_t surface = guest::LoadU32(saved + 24 + 4 * target);
-    ds::SetRenderTargetExternal(guest::LoadU32(saved + 48), target, surface);
-  }
-  ds::SetDepthStencilSurface(guest::LoadU32(saved + 48),
-                             guest::LoadU32(saved + 40));
-  ds::SetViewport(guest::LoadU32(saved + 48), saved);
+  render::RestoreTargets();
   return count;
 }
 

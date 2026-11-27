@@ -6,6 +6,9 @@
 
 #include "base/log.h"
 
+#include <sys/mman.h>
+#include <vector>
+
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
@@ -13,6 +16,8 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#include <string>
+#include <format>
 #include <set>
 #include <unordered_map>
 
@@ -40,6 +45,11 @@ std::unordered_map<uint32_t, Block> blocks;
 // Physical blocks' allocated sizes (the size rounded to their page size), by
 // address: what MmQueryAllocationSize answers for them.
 std::unordered_map<uint32_t, uint32_t> physical_sizes;
+// Who asked for each block (PhysicalTag; "other" when no tag was set).
+std::unordered_map<uint32_t, const char*> physical_tags;
+thread_local const char* g_physical_tag = "other";
+// SetPhysicalFreeListener's.
+std::atomic<void (*)(uint32_t, uint32_t)> g_physical_free_listener{nullptr};
 std::set<uint64_t> seen;  // what's been logged once: kind << 32 | value
 
 enum Seen : uint64_t {
@@ -449,6 +459,7 @@ uint32_t AllocPhysical(uint32_t size, uint32_t low, uint32_t high, uint32_t alig
     address = view->base + (physical - view->offset);
     // What MmQueryAllocationSize answers.
     physical_sizes[address] = rounded_size;
+    physical_tags[address] = g_physical_tag;
   }
   return address;
 }
@@ -459,18 +470,84 @@ void FreePhysical(uint32_t address) {
     FreeHandle(address);  // a host object (E5)
     return;
   }
-  std::lock_guard lock(mutex);
-  const auto it = physical_sizes.find(address);
-  if (it == physical_sizes.end()) {
-    if (FirstTime(kUnknownFreePhysical, address)) {
-      ITC_LOG_ERROR("native heap: XPhysicalFree of {:#x}, not a physical block the layer gave",
-                    address);
+  uint32_t size = 0;
+  {
+    std::lock_guard lock(mutex);
+    const auto it = physical_sizes.find(address);
+    if (it == physical_sizes.end()) {
+      if (FirstTime(kUnknownFreePhysical, address)) {
+        ITC_LOG_ERROR("native heap: XPhysicalFree of {:#x}, not a physical block the layer gave",
+                      address);
+      }
+      return;
     }
-    return;
+    size = it->second;
+    const PhysicalView& view = ViewOf(address);
+    const uint32_t offset = address - view.base + view.offset;
+    Give(physical_free, offset, it->second);
+    // Its pages back to the system (docs/pc-renderer.md, step 2b): a freed
+    // block's GPU data stayed resident until something else took the space
+    // (~94 MB in a pad replay). Whole 4 KB pages; read again they're zeros.
+    const uint32_t first = (offset + 0xFFF) & ~0xFFFu;
+    const uint32_t end = (offset + it->second) & ~0xFFFu;
+    if (end > first) {
+      madvise(g_physical + first, end - first, MADV_DONTNEED);
+    }
+    physical_sizes.erase(it);
+    physical_tags.erase(address);
   }
-  const PhysicalView& view = ViewOf(address);
-  Give(physical_free, address - view.base + view.offset, it->second);
-  physical_sizes.erase(it);
+  if (auto listener = g_physical_free_listener.load(std::memory_order_acquire)) {
+    listener(address, size);
+  }
+}
+
+void SetPhysicalFreeListener(void (*listener)(uint32_t address, uint32_t size)) {
+  g_physical_free_listener.store(listener, std::memory_order_release);
+}
+
+PhysicalTag::PhysicalTag(const char* name, bool keep_outer) : previous_(g_physical_tag) {
+  if (!keep_outer || std::strcmp(g_physical_tag, "other") == 0) {
+    g_physical_tag = name;
+  }
+}
+
+PhysicalTag::~PhysicalTag() {
+  g_physical_tag = previous_;
+}
+
+std::string DescribePhysical() {
+  // Each tag's live blocks: their sizes, count, and the bytes of them
+  // resident now (mincore over the whole block once).
+  struct Totals {
+    uint64_t live = 0, resident = 0;
+    uint32_t count = 0;
+  };
+  std::map<std::string, Totals> by_tag;
+  std::vector<unsigned char> pages(kPhysicalBytes / 0x1000);
+  const bool have_pages = mincore(g_physical, kPhysicalBytes, pages.data()) == 0;
+  {
+    std::lock_guard lock(mutex);
+    for (const auto& [address, size] : physical_sizes) {
+      Totals& t = by_tag[physical_tags[address]];
+      t.live += size;
+      t.count++;
+      if (!have_pages) {
+        continue;
+      }
+      const PhysicalView& view = ViewOf(address);
+      const uint64_t offset = address - view.base + view.offset;
+      for (uint64_t page = offset / 0x1000;
+           page < (offset + size + 0xFFF) / 0x1000 && page < pages.size(); page++) {
+        t.resident += (pages[page] & 1) * 0x1000;
+      }
+    }
+  }
+  std::string out;
+  for (const auto& [tag, t] : by_tag) {
+    out += std::format("{}{} {:.1f} MB ({}, {:.1f} MB resident)", out.empty() ? "" : ", ", tag,
+                       t.live / 1048576.0, t.count, t.resident / 1048576.0);
+  }
+  return out;
 }
 
 uint32_t PhysicalSize(uint32_t address) {

@@ -53,10 +53,10 @@ jobs:
           ./${base}/xwin --accept-license --arch x86_64 --temp \
             splat --use-winsysroot-style --preserve-ms-arch-notation --output itc_recomp/out/xwin-sdk
 
-      # Headers our code and the SDK include with another case than the SDK's
+      # Headers our code includes with another case than the Windows SDK's
       # files; rerun every build, as it depends on the sources.
       - name: Case links
-        run: python3 -I itc_recomp/tools/xwin_case_links.py itc_recomp/out/xwin-sdk rexglue-sdk itc_recomp/src
+        run: python3 -I itc_recomp/tools/xwin_case_links.py itc_recomp/out/xwin-sdk itc_recomp/src
 
       - name: Set up sccache
         uses: hendrikmuhs/ccache-action@v1.2.22

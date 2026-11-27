@@ -3,6 +3,8 @@
 
 #include "shader_objects/shader_objects.h"
 
+#include "base/flags.h"
+#include "base/hash.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
@@ -12,9 +14,16 @@
 #include "schema/models.h"
 #include "schema/shader_objects.h"
 
+#include <cstdio>
 #include <cstdlib>
+#include <format>
 #include <cstring>
 #include <string>
+
+ITC_FLAG_STRING(dump_shader_files, "", "ITC",
+                "Directory: write each shader file the game loads there (its header and "
+                "microcode, named by the whole file's hash), for itc_recomp/tools/shader_port "
+                "(docs/pc-renderer.md)");
 
 namespace shader_objects {
 
@@ -81,6 +90,15 @@ FileRecord ReadFile(uint32_t file) {
   ITC_NATIVE_RUNNING("sub_822A8568 ShaderFile::Parse");
   const schema::ShaderFile view(file);
   const uint32_t header = view.header_size();
+  if (const std::string& dir = ITC_FLAG(dump_shader_files); !dir.empty()) {
+    const uint8_t* bytes = guest::Pointer(file);
+    const uint32_t size = header + view.microcode_size();
+    std::string path = std::format("{}/{:016X}.xpu", dir, base::Hash64(bytes, size));
+    if (std::FILE* out = std::fopen(path.c_str(), "wb")) {
+      std::fwrite(bytes, 1, size, out);
+      std::fclose(out);
+    }
+  }
   return {file, ObjectBytes(view.magic(), header), header + file, view.microcode_size()};
 }
 

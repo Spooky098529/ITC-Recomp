@@ -15,7 +15,6 @@ struct DeviceContext {
   VkDevice device;
   uint32_t queue_family;
   VkQueue queue;
-  uint32_t max_storage_buffer_range;
   uint32_t min_uniform_buffer_offset_alignment;
   bool clip_distance, cull_distance, demote_to_helper_invocation;
   bool sampler_anisotropy, sampler_mirror_clamp_to_edge;

@@ -12,4 +12,9 @@ bool TitleScreen_SkipTickWait(bool in_race);
 // returned (--skip_intro waits for it before ending the boot movie).
 void TitleScreen_MovieRendered();
 
+// Main thread: a race starts (its loading done): --attract_seed sets the
+// game's random seed again, as the per-frame draws during the load (the
+// camera shake's) vary with load times.
+void TitleScreen_RaceStarted();
+
 }  // namespace hooks

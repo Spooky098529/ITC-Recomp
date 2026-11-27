@@ -2,14 +2,11 @@
 
 A native port of Import Tuner Challenge (Xbox 360), started as a static
 recompilation on ReXGlue. Since E4's step 5 (2026-11-16) the SDK isn't part
-of our build: the `rexglue-sdk/` submodule is only the source of its shader
-translator, a static dependency (`itc_recomp/cmake/xenos_translator.cmake`,
-its logging and flags through `itc_recomp/src/translator_shims/`), and the
-third-party libraries are our own submodules in `itc_recomp/thirdparty/`
-(SDL, Vulkan-Headers, simde, glslang, fmt, FFmpeg, xxHash). Act as if the
-SDK were deleted (the user's call). Our patches to the SDK
-(`patches/rexglue-sdk/`) were removed in E4's step 7: the submodule stays
-clean at its pinned commit.
+of our build, and since the PC renderer's steps 3 and 5 (2026-11-26, on
+`pc-renderer`) nothing of it is: its shader translator (the last piece) is
+gone with the `rexglue-sdk` submodule, every shader comes from its GLSL,
+and the third-party libraries are our own submodules in
+`itc_recomp/thirdparty/` (SDL, Vulkan-Headers, simde, FFmpeg, xxHash).
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
 (`functions.md` holds the rows not yet moved, `system-services.md` B5's,
@@ -98,6 +95,17 @@ new name can change the measure's type names: after renaming, run
 `tools/function_names.py`, re-emit, and read the lifted diff.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
+`docs/pc-renderer.md` is the plan for a regular PC-style renderer (on
+`pc-renderer`, since 2026-11-26): no EDRAM, GPU data in GPU memory, the
+game's shaders as GLSL with PC inputs (from SBX-Recomp's tool, with its
+author's OK); `docs/conventional-renderer.md`, the first attempt, is a dead
+end kept for its research. Step 0 (`--log_memory_use`) measured ~1.9 GB of
+system memory, 1.09 GB of it the renderer's two mirrors; step 1 replaced
+the mirrors with a device-local vertex arena (`src/native/vertex_arena.*`):
+GTT ~1,690 -> ~630 MB; step 2's first part draws every shader from GLSL
+(SBX-Recomp's ports and hand-written shaders, `docs/shaders.md`); later steps took the
+draw state off the SDK's register file, removed the GPU kick and the draw
+packets, and the SDK itself (`docs/pc-renderer.md`, steps 3 and 5).
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core
@@ -924,7 +932,6 @@ cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share \
   $B/itc --native_audio=true \
-  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
@@ -935,10 +942,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   (`itc.toml`'s settings and the defaults; the flags it spells out are on
   by default now): always `--native_audio=true` (without it the SDK's
   Audio Worker spins on a core and frame rates come out lower than players
-  get) and the mirrors updated once a frame
-  (`--native_renderer_mirror_by_tick=true
-  --native_renderer_mirror_to_both=true`; `=false` on the first for the
-  old per-draw mirror). `profile_render_thread.sh` does the same.
+  get). `profile_render_thread.sh` does the same. (The mirror flags,
+  `--native_renderer_mirror_by_tick` and `_to_both`, went with the mirrors
+  on `pc-renderer`, 2026-11-26: the game rejects them now.)
 - For logs to read (frame rate, where each frame's time goes, each busy
   thread's CPU use), add `--log_level=info --log_fps=true
   --log_frame_times=true --log_thread_cpu=true`.

@@ -6962,3 +6962,18 @@ tick (both races matching the baseline) and frame dumps clean. The
 boundary's figures don't move: overridden 128, Native (with Lifted) 204,
 Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
 caller.
+
+**2026-11-26, the PC renderer's step 3 and step 5's SDK removal (branch
+`pc-renderer`, `docs/pc-renderer.md`):** the renderer reads the draw state
+from the device itself with its own decoding (no `RegisterFile`,
+`draw_util` or `ReadRegisters`); no GPU kick, no draw packets; every shader
+from its GLSL with what it reads from the port table (no translator); the
+fetch constant's fields and formats our own (`native/xenos_types.h`). The
+shader translator's static library, its shims, glslang and fmt left the
+build, and the `rexglue-sdk`, `glslang` and `fmt` submodules are removed:
+**nothing of the ReXGlue SDK is built, linked or checked out.** Attract
+races, the pad replay, the tick replay (both races matching) and frame
+dumps (per-draw records the same) clean. The boundary's figures don't move
+(they come from the docs' rows): overridden 128, Native (with Lifted) 204,
+Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.

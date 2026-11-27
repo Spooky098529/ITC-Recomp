@@ -1,6 +1,3 @@
-[submodule "rexglue-sdk"]
-	path = rexglue-sdk
-	url = https://github.com/rexglue/rexglue-sdk.git
 [submodule "itc_recomp/thirdparty/FFmpeg"]
 	path = itc_recomp/thirdparty/FFmpeg
 	url = https://github.com/FFmpeg/FFmpeg.git
@@ -20,12 +17,4 @@
 [submodule "itc_recomp/thirdparty/simde"]
 	path = itc_recomp/thirdparty/simde
 	url = https://github.com/simd-everywhere/simde.git
-	shallow = true
-[submodule "itc_recomp/thirdparty/glslang"]
-	path = itc_recomp/thirdparty/glslang
-	url = https://github.com/KhronosGroup/glslang.git
-	shallow = true
-[submodule "itc_recomp/thirdparty/fmt"]
-	path = itc_recomp/thirdparty/fmt
-	url = https://github.com/fmtlib/fmt.git
 	shallow = true

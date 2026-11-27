@@ -259,7 +259,7 @@ void SetDepthStencilSurface(uint32_t device, uint32_t surface);
 //
 // These wrote packets straight into the command buffer (device +40), which
 // nothing reads since the emulated GPU went (the kick only looks for fences,
-// interrupts and memory writes, src/native/gpu_link.cpp): the native versions
+// interrupts and memory writes; since pc-renderer step 3 there is no kick): the native versions
 // leave the packets out (with the segment ends and the reservations they
 // made), and keep every write to the device's state (the register shadow,
 // the dirty masks, the tables, the software copies).

@@ -37,3 +37,22 @@ The game's known issues on PC. Moved out of
   as not blended, moving 1-8 m a tick). What they draw isn't known yet.
 - **One tick of latency**: drawing shows between the previous and the
   current tick, as usual for this kind of interpolation.
+
+## Calls by address with no dispatch entry (found 2026-11-26)
+
+Lifted code calls some functions by a constant address through the dispatch
+table, and an address with no entry stops the program ("lifted: a call to
+X, which has no entry in the dispatch table"). Hand ports whose adapters were
+removed (only native callers were left in play) have no entry, so a lifted
+original that a native caller falls back to can reach one. Two were hit by
+pad replays that took a rarer menu path (slower runs, on `pc-renderer`):
+`BuildScreen::RestoreBuildList` (`8219BB80`) and `CarDealer::SetScrollArrows`
+(`82182DD0`); both have entries now.
+
+`itc_recomp/tools/call_targets.py > <file>` lists every constant call target
+in `src/`, and `itc --check_call_targets=<file>` logs those with no entry and
+exits: 441 of 1,720 left. 438 are called only from `src/lifted/originals.cpp`
+(the fallback originals); 3 from live lifted code (`825B0BB0`, `825B0BE4`,
+`825B8778`: the C runtime's floating-point exception paths, not reached in
+play). Giving every hand port an entry (or the originals direct calls) is
+left for later.

@@ -1,7 +1,7 @@
 // The graphics library's command buffer (docs/functions/command-buffer.md):
 // the segments its packet writers fill, the data space reserved beside
-// them, the segments' tails (the fences and read positions our kick applies,
-// src/native/gpu_link.cpp), the callback packets and predicated tiling's
+// them, the segments' tails (their fences and read positions written into
+// the progress block at once), the callback packets and predicated tiling's
 // chains of blocks. Plain C++ over the device in guest memory, which
 // recompiled packet writers share; the adapters are in
 // src/hooks/command_buffer.cpp (--native_command_buffer).
@@ -67,12 +67,14 @@ inline uint32_t PhysicalAddress(uint32_t address) {
   return (address & 0x1FFFFFFFu) + ((((address >> 20) & 0xFFFu) + 0x200u) & 0x1000u);
 }
 
-// Device::WriteSegmentTail (sub_8229E768): the 10 words ending a segment at
-// `position` (the invalidate and two EVENT_WRITE_SHD: the read position with
-// the generation's low bits and the fence into the progress block), the
-// position and generation kept at +12968 and +12972, and both written into
-// the progress block when the GPU hung (+10809 bit 1, +19980 0); the fence
-// +10780 advanced by 2. Returns position + 40.
+// Device::WriteSegmentTail (sub_8229E768): ends a segment at `position`.
+// The original writes 10 words there (the invalidate and two EVENT_WRITE_SHD:
+// the read position with the generation's low bits and the fence into the
+// progress block), and writes both into the progress block itself when the
+// GPU hung (+10809 bit 1, +19980 0). Here both always go into the progress
+// block at once and the packets are left out (no GPU reads them:
+// docs/pc-renderer.md, step 3). The position and generation kept at +12968
+// and +12972; the fence +10780 advanced by 2. Returns position + 40.
 uint32_t WriteSegmentTail(uint32_t device, uint32_t position);
 
 // Device::SaveSegment (sub_8229DBF0): the write position, the end, the
@@ -96,7 +98,7 @@ void CloseChain(uint32_t chain);
 // WAIT_UNTIL first unless `flags` has bits outside the CPUs (24-29); then
 // CALLBACK_ADDRESS and CALLBACK_CONTEXT = `function`, `argument`, the CPUs
 // (0: 4) into SCRATCH_REG0, a WAIT_REG_MEM on the callback block, the
-// INTERRUPT our kick runs (src/native/gpu_link.cpp), CALLBACK_ACK, a
+// INTERRUPT (no GPU runs it), CALLBACK_ACK, a
 // WAIT_REG_MEM for the callbacks done and CALLBACK_ADDRESS = 0BADF00D.
 // Returns the last word written.
 uint32_t WriteCallback(uint32_t device, uint32_t position, uint32_t flags,
@@ -160,7 +162,7 @@ uint32_t InitChain(uint32_t chain, uint32_t device);
 bool Recording(uint32_t device);
 
 // The kick a segment's end hands its words to: Device::DeferredKick
-// (sub_8229E848, overridden in src/native/gpu_link.cpp), a guest call, as
+// (sub_8229E848, a no-op in src/hooks/command_buffer.cpp), a guest call, as
 // the kick runs the segment's callbacks (guest functions). Its arguments are
 // the original call's registers r3-r8: the device, a word returned as is
 // (the tail's end), the segment's physical address, its word count, the

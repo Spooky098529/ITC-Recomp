@@ -343,6 +343,9 @@ ITC_REGS_STEP(HelpLineSet) {
 // The machine's set-up (from the type 2 mode's Init sub_82197278,
 // recompiled).
 ITC_CAR_DEALER(82185920, CarDealerInitStates)
+// For lifted callers: an original falling back to it calls it by address; a
+// pad replay took that path and stopped on the missing entry (2026-11-26).
+ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)
 // The handlers: member function functors the machine calls (no direct
 // callers).
 ITC_CAR_DEALER(82180D68, CarDealerCreate)

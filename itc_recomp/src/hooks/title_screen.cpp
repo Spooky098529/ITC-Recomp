@@ -18,6 +18,7 @@
 
 #include "guest.h"
 #include "schema/boot_mode.h"
+#include "schema/race_overlays.h"
 #include "schema/title_screen.h"
 
 #include "base/flags.h"
@@ -35,6 +36,11 @@ ITC_FLAG_BOOL(skip_intro, false, "ITC",
 ITC_FLAG_INT32(attract_after_s, 0, "ITC",
                "Testing: seconds the title screen waits before the attract race "
                "(0 = the game's 20)");
+ITC_FLAG_INT32(attract_seed, -1, "ITC",
+               "Testing: the game's random seed set to this when the attract race is "
+               "about to be set up and again when a race starts, so the attract race "
+               "comes out the same every run (with --max_fps=30 and no interpolation: "
+               "frame dumps compared between builds); -1 leaves it");
 
 namespace {
 
@@ -66,6 +72,12 @@ bool TitleScreen_SkipTickWait(bool in_race) {
   return ITC_FLAG(skip_intro) && !g_first_race_started;
 }
 
+void TitleScreen_RaceStarted() {
+  if (int32_t seed = ITC_FLAG(attract_seed); seed >= 0) {
+    schema::RaceOverlaysGlobals::set_rand_seed(uint32_t(seed));
+  }
+}
+
 }  // namespace hooks
 
 // TitleScreen_Update: its plain C++ (src/title_screen/press_start.cpp) with
@@ -81,7 +93,16 @@ ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
   } else {
     lifted::original::c822221A0(ctx);
   }
-  if (after <= 0 || !title || G::data().address != title.address) {
+  if (!title || G::data().address != title.address) {
+    return;
+  }
+  // --attract_seed: at the tick before the game's limit (the next one sets
+  // up the attract race).
+  if (int32_t seed = ITC_FLAG(attract_seed); seed >= 0 &&
+      int32_t(title.idle_ticks()) == kAttractTicks - 1 && before != kAttractTicks - 1) {
+    schema::RaceOverlaysGlobals::set_rand_seed(uint32_t(seed));
+  }
+  if (after <= 0) {
     return;
   }
   // Only after a tick that counted (the counter went up by one): the next
@@ -89,6 +110,9 @@ ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
   int32_t now = int32_t(title.idle_ticks());
   if (now == before + 1 && now >= after && now < kAttractTicks - 1) {
     title.set_idle_ticks(uint32_t(kAttractTicks - 1));
+    if (int32_t seed = ITC_FLAG(attract_seed); seed >= 0) {
+      schema::RaceOverlaysGlobals::set_rand_seed(uint32_t(seed));
+    }
   }
 }
 

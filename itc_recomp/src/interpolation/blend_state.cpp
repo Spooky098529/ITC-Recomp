@@ -31,7 +31,7 @@
 #include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
-#include "native/replay_hooks.h"
+#include "hooks/replay_commands.h"
 
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
@@ -4376,7 +4376,7 @@ ITC_REGS_STEP(SetShaderConstants) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = graphics::replay_commands::SetShaderConstants(payload, count, packed,
                                                              ctx.r1.u32,
-                                                             native::ReplayCall(ctx));
+                                                             hooks::ReplayCall(ctx));
 }
 }  // namespace
 

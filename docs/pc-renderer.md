@@ -1,0 +1,890 @@
+# A PC renderer (a plan; steps 0, 1, 2, 3 and 4 done; 2b and 5 in part)
+
+Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
+after E5's step 10 was merged). This is a plan: no code has changed for it.
+It is built from three surveys of `src/` (the game's graphics library, our
+Vulkan renderer, and what reads and writes GPU data) and from SBX-Recomp's
+shader work (`../SBX-Recomp` at `b128953`, read on the user's word).
+
+The first attempt, `docs/conventional-renderer.md` (the `conventional-renderer`
+branch, 2026-11-01 to 03), is a dead end (the user's call): its branch is
+1,344 commits behind and was never merged. Its research still holds and is
+cited here (its section 2, every resolve of a race frame; its section 3,
+the 360 machinery), and so are its lessons (frees applied one list later;
+the wheels' morphs writing over made shapes; the vinyl sheet read by the
+CPU). Its code isn't reused.
+
+## The goal
+
+The user, 2026-11-26: turn the game's graphics code into a regular PC-style
+renderer. No EDRAM, no GPU results written back to system RAM, and no GPU
+data held in system RAM unless the CPU needs it. The motive is the memory
+footprint: today every vertex, index and texture sits in the 512 MB
+physical memory block, and the renderer keeps two more 512 MB copies of
+that block (host-visible, so in system RAM on a discrete GPU) because the
+translated shaders fetch vertices from it by address.
+
+The user's decisions so far:
+
+1. **The game's shaders become GLSL with PC conventions**, made by an
+   offline tool from the microcode (not by hand), its output committed as
+   source. SBX-Recomp has such a tool and hand-written GLSL for all 135
+   shaders; we start from theirs (below).
+2. Earlier calls that still apply: frames that look correct are the bar,
+   not matching the 360's device state, and no harnesses on the render
+   path; no EDRAM behavior (a pass starts cleared or with what its image
+   holds); no profiling until all of this is done.
+
+## How a frame is made today
+
+From the surveys (paths under `itc_recomp/src/`):
+
+- **The main thread records a command list** (`command_list/`): 16-byte
+  slots `[id, arg1, arg2, 0]` plus payload, double-buffered, about 50
+  recorders (`docs/functions/command-list.md`). This is the game's own
+  design, not a 360 mechanism, and frame interpolation is built on it
+  (logic and render-only lists, command 7's constants). **It stays.**
+- **The render thread replays it** (`graphics/render_queue.cpp`,
+  `RunCommands`) through 33 command handlers (`graphics/replay_commands.cpp`;
+  the table in `docs/gpu-functions.md`). Each handler calls the game's
+  Direct3D, which writes the **register shadow**: render states, fetch
+  constants (textures and vertex streams), float constants, dirty masks
+  (`graphics/device_state.cpp`, 131 setters).
+- **Our renderer reads that shadow back** after each command
+  (`native/replay_hooks.cpp`, `native/state.cpp`'s `ReadRegisters`) and
+  rebuilds a Vulkan draw (`native/passes.cpp`'s `State::Draw`): the
+  target keyed by EDRAM base, pitch, MSAA and format; the shaders
+  translated from the microcode by the SDK's translator; vertices and
+  indices from the 512 MB copies by guest address; textures keyed by the
+  fetch constant's words, reloaded when memcpy writes over them.
+- **Resolves** copy a target into an image looked up by the destination
+  texture's 4 KB page; later draws find it by address. About 25 a race
+  frame (`conventional-renderer.md`, section 2). Only the GPU reads them:
+  nothing rendered is written to guest memory, and no shader uses
+  memexport.
+- **Faked GPU side effects:** `native/gpu_link.cpp` walks the command
+  buffers the game kicks and makes their memory writes (fences, MEM_WRITE,
+  REG_TO_MEM, interrupts calling the library's callbacks), which the
+  library's waits read.
+
+## What the CPU needs of GPU data
+
+From the old branch's read watch (attract races, a drive) and the code:
+
+- **Read by the CPU, must stay in system memory** (or keep a CPU copy):
+  - the vinyl sheet (CPU-drawn by the decal rasterizer, read by
+    `XGCompressSurface`; the compressed result is GPU-only);
+  - the license plate's and decal images' textures while they're written
+    (`Resource::Lock` users);
+  - the morph sources: the wheels' set-up morphs read a shape's base
+    streams and write them back; the per-draw morphs read base and target
+    streams on worker threads and write blended vertices into the frame's
+    work memory;
+  - the billboards' and inline draws' vertices (written per frame; already
+    copied per frame).
+- **Never read by the CPU after loading:** model vertex and index data
+  (`Mesh::Parse`, `Model::Load`), XPR textures (`XPR::Create`), resolve
+  destinations, render targets, front buffers. Collision has its own mesh
+  data; the minimap reads only matrices.
+- **Shader microcode** is read once (for translation now; for the shader
+  lookup later).
+
+## The design
+
+### The seam: the handlers call our renderer
+
+The command list and its replay stay. The 33 handlers (and the single
+commands that run in play: 5, 7, 13/14, 15, 28) stop calling the game's
+Direct3D and call **our renderer's interface** instead (`render/`, new),
+with PC-style calls:
+
+- state: blend, depth, stencil, raster and sampler states as values (the
+  game's D3D render state numbers mapped once, in the handler);
+- `SetTexture(stage, Texture)`, `SetVertexBuffer(stream, Buffer, offset,
+  stride)`, `SetIndexBuffer`, `SetVertexLayout` (from the game's vertex
+  declaration), `SetShaders(vs, ps)`;
+- `SetConstants(stage, first, count, data)`: the game's float constant
+  registers (c0-c255, D3D9-style) uploaded as a uniform block. Command 7's
+  interpolation substitution stays where it is, before this call;
+- `SetRenderTarget(slot, Texture)`, `SetDepthTarget`, `Clear`, `Draw`,
+  `DrawIndexed`, `CopyTexture` (for a grab pass), `Present`.
+
+The handlers are plain C++ on the command list's payload; nothing on the
+render path writes the register shadow, the dirty masks, PM4 packets or
+fences. The game's Direct3D stays only where game code outside the replay
+needs it (resource creation, below).
+
+### Resources: created once, held by the GPU
+
+Textures and buffers become renderer objects, made where the game makes
+them (`graphics/resources.cpp`'s `CreateTexture`, `CreateVertexBuffer`,
+`CreateIndexBuffer`; `Mesh::Parse` and `Model::Load`; `XPR::Create`) and
+filled where the game fills them (the loaders' copies, `Resource::Unlock`,
+the morphs). The header (the game's small heap block) keeps a handle to
+the object; the handlers bind by handle.
+
+- Data the CPU never reads goes **straight to device-local memory** through
+  a staging upload, and is never written to (or is freed from) the
+  physical block.
+- Data the CPU reads keeps its system memory copy, and its writer tells
+  the renderer when it changed (`Texture::Written`, `Buffer::Written`).
+- Per-frame vertices (billboards, inline draws, post-effect quads, the
+  per-draw morphs' output) go through a per-frame upload ring.
+- Frees are applied one list later (the old branch's lesson: a list
+  handed over can still draw a texture freed after it).
+
+With this, memcpy's write tracking (`native/buffers.cpp`), the texture
+reloads by overlap, and the 512 MB copies go.
+
+### Shaders: GLSL with PC inputs
+
+From SBX-Recomp (`docs/shaders.md` there; `sbx_pc/tools/shader_port/` and
+`sbx_pc/src/renderer/vulkan/glsl/`):
+
+- a microcode-to-GLSL tool (`ucode_to_glsl.py`, `xenos_ucode.py`,
+  `port_all.py`) that found all 135 shaders (30 vertex, 105 pixel) and
+  wrote a register-by-register port of each, checked bit for bit against
+  the SDK's translation (`tools/shader_port/check`);
+- **hand-written GLSL for all 135**, which is what they ship: `lit.frag`,
+  `unlit.frag` (car parts), `course.frag`, `course_projected.frag`, the
+  post effects, the boot sprites and font, and two vertex shaders,
+  `model.vert` and `screen.vert`, with defines per shader
+  (`variants.txt`).
+
+They kept the translator's interface on purpose, so theirs still read
+vertices through `xe_vfetch` from guest memory as one storage buffer, with
+the translator's constant packing and system constants. **We change the
+interface**:
+
+- vertex shaders take **vertex attributes** (`layout(location = n) in`),
+  their formats and strides from the game's vertex declaration as a Vulkan
+  vertex input state; the game's shader patcher (`sub_822AE340`) and its
+  fetch fields go;
+- constants as uniform blocks by name (the shader's constant table gives
+  the names and registers);
+- textures as ordinary combined image samplers, already in RGBA order and
+  in PC formats (the loader converts or the view swizzles); no signed and
+  unsigned views picked by system constants;
+- the exponent bias, the alpha test and the gamma conversions as uniforms
+  or defines where the game uses them.
+
+Shaders are found by the microcode's hash (pixel) or the layout-free hash
+(vertex), as SBX does. A shader the table lacks stops the program, named,
+so a missing one is found at once.
+
+### Render targets: passes into their textures
+
+EDRAM surfaces become render target textures. Each resolve in
+`conventional-renderer.md`'s section 2 is classified once (the old plan's
+table holds most of the answers):
+
+- a pass whose result is only resolved and then cleared **draws straight
+  into its destination texture** (most of them: the camera passes, the
+  glow chain, the motion blur's velocity, the minimap);
+- a depth resolve becomes the depth image sampled as depth;
+- an MSAA resolve stays as a standard MSAA resolve (`vkCmdResolveImage` or
+  a resolve attachment);
+- a copy in the middle of a pass (the main view, then ~350 more draws)
+  stays as a `CopyTexture` (a grab pass);
+- predicated tiling is drawn once into one target (as now);
+- the front buffer is our own frame image, presented.
+
+The EDRAM allocator (`graphics/edram.cpp`), `Device::Resolve`'s register
+work, and the tiling machinery go.
+
+### What else goes
+
+`native/state.cpp` (the shadow read), `native/draw_packets.cpp`,
+`native/replay_hooks.cpp`, `native/gpu_link.cpp` (the library's fence
+waits and callbacks are dropped or answered at once instead), the command
+buffer's packet writers, `Device::LoadShaders` (lifted), the shader patch,
+and **the SDK's shader translator**: with every shader ours, the
+`rexglue-sdk/` submodule leaves the build, which ends the ReXGlue removal.
+
+### What stays
+
+The window, device and swapchain code (`native/renderer.cpp`), frames in
+flight, the constant ring, the pipeline cache (and its disk cache), the
+texture upload and deferred retirement, the gamma and movie passes, and
+frame interpolation's four joins: command 7's constant substitution, the
+logic and render-only lists, the glow's history pass, the motion blur's
+previous view-projection.
+
+## The steps
+
+Each step keeps the game running, is checked by frame dumps (against the
+step before, differences explained), interpolation's logs
+(`--log_blend_state`), an attract race and the pad replay, and a drive by
+the user before the next. No profiles until the end.
+
+| Step | What | Removes | Size |
+|---|---|---|---|
+| **0** | **Measure.** Log resident memory by source (the physical block's touched pages, the two copies, texture staging) and the renderer's GPU memory, in a race and the menus; a frame dump baseline | Nothing | Small |
+| **1** | **The vertex arena** (done 2026-11-26, below; moved ahead of the shaders: the translated shaders read each stream at its fetch constant's address, which a draw can point anywhere). One device-local buffer holding the ranges draws use, copied from physical memory at their first draw and again after memcpy writes them | The 512 MB mirrors, their diagnostics and flags | Medium |
+| **2** | **The shaders.** Bring in SBX's tool (its author's OK given, below); run it over our `BUILD_OUT` and course archives and the boot shaders, and compare hashes with their table; take their hand-written GLSL and give it PC inputs (vertex attributes, constants by name, plain textures), with the vertex data byte-swapped and its components in PC order where it's uploaded | The SDK translator on the draw path, the shader patch, `xe_vfetch` | Large |
+| **2b** | **Resources by handle.** Textures and buffers made, filled and freed where the game does it; uploaded once into GPU memory, bound by handle; the GPU data written into the physical block only where the CPU reads it | memcpy's tracking, texture reloads by overlap; most GPU data in the physical block | Medium |
+| **3** | **The handlers call our interface.** The 33 handlers and the singles in play call `render/` directly | The register shadow on the render path, `ReadRegisters`, the dirty masks, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp`, the packets, the lifted shader load | Large |
+| **4** | **Passes into their textures.** The resolves classified and replaced (above); render targets as textures | The EDRAM allocator, resolve copies but grab passes, the tiling machinery | Medium |
+| **5** | **Clean-up.** The SDK translator and the `rexglue-sdk/` submodule out of the build; the physical block shrunk to what's left in it; step 0's measures again, and the one profile | ReXGlue entirely | Small |
+| later | MSAA as a player option; a second backend; tick replay (`docs/tick-replay.md`) | | |
+
+## Step 0's measures (2026-11-26)
+
+`--log_memory_use` (new; `memory::DescribeResident`, logged by the
+renderer every 5 s with the GPU memory line): each block's touched pages
+(`mincore`), the process's resident set (`/proc/self/status`), and on
+amdgpu the driver's VRAM and GTT in use (sysfs, the whole card). GTT is
+system memory the driver pins for the GPU: it isn't in the process's
+resident set, which is why the mirrors never showed there. The renderer
+also logs which memory type each mirror got.
+
+On this PC (amdgpu; idle before the runs: VRAM 3,017 MB, GTT 346 MB),
+attract races `itc_5953` (60 s) and the pad replay `itc_5954` (menus, then a
+race, 126 s):
+
+| | Menus | Race |
+|---|---|---|
+| The process's resident set | ~510-580 MB | ~530-645 MB |
+| of which the physical block (touched pages) | ~205-211 MB | ~220-255 MB |
+| of which the heap | 70 MB | 71-84 MB |
+| GTT, whole card (idle 346 MB) | ~1,690 MB | ~1,690 MB |
+| The renderer's host-visible buffers in it | 1,344 MB: the two mirrors (2 × 544 MB, memory type 2, not device-local), texture staging (128 MB), the constant rings (128 MB) | the same |
+| The renderer's device memory | textures 63-82 MB, resolve destinations 25 MB, images (targets) 208 MB | the same |
+
+So the game holds about **1.9 GB of system memory**: ~0.6 GB resident in the
+process and ~1.35 GB pinned by the driver, against ~0.3 GB of GPU memory.
+The mirrors are 1.09 GB of it, and the physical block's ~250 MB is mostly
+GPU data the CPU never reads again. The physical block's pages stay
+resident after its data is freed (its allocator doesn't give pages back).
+The other host-visible buffers (staging, constants, 256 MB) are sized
+generously and can shrink with the steps.
+
+The frame dump baseline is an attract race's dump (`--native_renderer_dump`,
+10 s in), kept locally in `itc_recomp/out/pc-renderer-baseline/`: 2,390
+draws, 24 resolves.
+
+## Step 1: the vertex arena (2026-11-26)
+
+`src/native/vertex_arena.{h,cpp}`. One device-local buffer (224 MB: the
+built-in index lists for rectangle and quad lists, 16 MB of inline vertices
+a frame slot, 192 MB of ranges) in place of the two 544 MB host-visible
+mirrors:
+
+- A draw places each stream its vertex shader reads, by its fetch
+  constant's address and size (no draw reads past the size: checked with
+  the old per-draw mirror's overrun count, none in an attract race), and
+  its index range; the fetch constants handed to the shaders get the
+  arena offsets in place of the addresses, and the index buffer is bound
+  at its range's offset. Inline draws copy their vertices into this frame's
+  slot.
+- Copies go through per-frame staging (16 MB, more chunks while a load
+  needs them) and a command buffer submitted after the texture uploads,
+  before the frame; it starts with a barrier on earlier frames' reads, so
+  a range copied again in place waits for the draws still reading it.
+- memcpy's writes into physical memory (`Buffers_TakeMirrorWrites`, at each
+  frame's start) mark the ranges they overlap; those are copied again at
+  their next draw. Ranges not drawn for 900 frames are given back (once no
+  frame in flight can read them), sooner when it's full.
+- Gone with the mirrors: `--native_renderer_mirror_by_tick`, `_to_both`,
+  `_verify_mirror`, `_check_mirror`, `_copy_all`, `_check_late_writes`,
+  `_check_clobbers`, `_cache_index_ranges`, `_log_index_ranges` (the run
+  scripts and CLAUDE.md no longer pass the first two).
+
+Checked: attract races (`itc_5957`, 60 s; 0 error lines, 0 draws left
+out), the pad replay (`itc_5959`, menus and a race, 126 s, 0 error
+lines), a frame dump against step 0's (`draws.txt` the same length, 2,390
+draws; the shown frame 0.08% of pixels off by more than 0.02, within runs'
+spread; a resolve identical). The arena holds ~14-25 MB of ranges in ~1,500.
+**GTT ~1,690 -> ~630 MB** (whole card; idle 346 MB): the game's pinned
+system memory from ~1,345 to ~285 MB (texture staging 128 MB, the constant
+rings 128 MB, the arena's staging 32 MB).
+
+## Step 2: the shaders (done 2026-11-27)
+
+**Part 1 (2026-11-26): every shader drawn from GLSL.** SBX-Recomp's tool,
+ports, hand-written shaders and renderer code brought in
+(`docs/shaders.md` says what came and what differs here). In an attract
+race all 74 shaders used come from GLSL and none is translated; the
+translator now runs only for a shader with no GLSL (logged). Our graphics
+library's vertex fetch patch differs from SBX's (sorted, merged into
+mini-fetches, swizzles rewritten), so `RemapVertexFetches` rebuilds each
+vertex shader's file microcode and fetch fields from its object
+(`shader_ports.h`), and a new swizzle constant gives the declaration's
+component order. Checked: attract races (0 error lines), a frame dump
+against step 0's (0.27% of pixels off by more than 0.02: GLSL's arithmetic
+against the console's), and a race frame from the pad replay with the
+colors right.
+
+Found on the way and fixed: two calls by address from lifted code to hand
+ports with no dispatch entry (`known-issues.md`, "Calls by address with no
+dispatch entry"; `--check_call_targets`).
+
+**Part 2 (2026-11-27): vertex attributes.** Every vertex fetch reads its
+vertex's element from Vulkan vertex attributes instead of the arena by
+address as a storage buffer:
+
+- The attributes carry the element's raw words (`R32..R32G32B32A32_UINT`,
+  by the format's size), so the shader-side unpack and endian swap stay
+  (most data is `k8in32`, and `10_11_11` has no Vulkan format). Fetch n's
+  attributes are at locations 3n to 3n + 2 (`xe_interface.glsl`'s
+  `XE_VF_IN`; the ports' and `vertex.glsl`'s fetch calls name n); a
+  binding a fetch at its element (its stream's arena offset plus the
+  fetch's offset), stride the vertex's size, made per vertex shader module
+  (`passes.cpp`, `vertex_inputs`) from the fetches' fields kept on the
+  shader (`TranslatedShader::vertex_fetches`).
+- Indexed draws: the index ranges are kept in the host's byte order in the
+  arena (`VertexArena::Place`'s endian, keyed apart from the same range as
+  it is), the base vertex (VGT_INDX_OFFSET) is `vertexOffset`. The
+  VGT_MIN/MAX_VTX_INDX clamp went (its count never measured indexed draws)
+  with `--native_renderer_no_index_clamp`.
+- Rectangle lists (inline draws only) are drawn an instance a rectangle,
+  four vertices each, each fetch bound three times at instance rate a
+  vertex apart: an invocation still runs the shader for the rectangle's
+  three vertices and makes the fourth corner. Quad lists keep the built-in
+  index list. Every fetch reads by the vertex index (all 37 vertex ports
+  checked), so no fetch needs another index.
+- SBX's stream normal for its AO (fetch constant 93 read by address in
+  `model.vert`, read by nothing here) is gone.
+
+Checked: attract races (0 failed draws, 0 error lines), the pad replay
+(the tuning shop, the loading screen's rectangle lists, the race's
+cockpit, HUD, minimap and mirror; 0 error lines).
+
+**Part 3 (2026-11-27): the fields from the declaration.** The graphics
+library's patch of the vertex shader's microcode for the declaration
+(`sub_822AE340`) no longer runs (`Device::LoadShaders` keeps only the
+declaration's id and the strides it loads with; the exports' remap copy,
+never seen, is logged instead). The renderer makes each fetch's
+instruction from the declaration and the loaded strides (device +11568:
+an inline draw changes the stream strides, +12272, around its load) as the
+patch's first loop does (`graphics::shader_patch::FetchFromDeclaration`;
+its stack-garbage nibble reaches only bit 0 of the swizzle's component
+mask, which no swizzle mask in its table uses), without the sort and merge
+into mini-fetches, and fits the port from the file's microcode
+(`FitVertexFetches`, in place of `RemapVertexFetches`). Shader lookups are
+kept by the declaration and the strides. Gone with the patch: its wrap and
+copy in `replay_hooks.cpp`, the declaration mismatch and copy counts, and
+`--native_renderer_log_shader_lookups`.
+
+**Part 4 (2026-11-27): PC inputs.** The shaders read no 360 register
+files or descriptors (`docs/shaders.md`, "PC inputs"):
+
+- **Vertex data in the host's byte order.** The vertex arena swaps each
+  stream from its fetch constant's endian mode as it copies it in (inline
+  vertices from 8-in-32), as it did for indices; `xe_vfetch` swaps
+  nothing.
+- **Plain textures.** Measured first (a survey at every draw, the attract
+  race and the pad replay): no texture has signed, biased or gamma
+  components, an exponent bias or a LOD bias. Each texture is one view
+  (a 2D array's first layer, or a cube) and one sampler bound by its stage;
+  its size comes from `textureSize`, its LOD bias is the sampler's. The
+  draw's only word on a texture is its reader scale (step 4). A texture
+  with signs or an exponent is logged as an error. SBX's menu texture
+  filter and distance-field font, which read the fetch constant and were
+  never turned on here, are removed.
+- **Samplers mapped where they're set.** `render::SetSamplerState` maps the
+  game's sampler states to a stage's `render::SamplerState` of Vulkan
+  values (filters, mip mode, address modes, anisotropy from the game's
+  table, border, LOD bias); the texture cache makes the sampler that
+  describes with the texture's level range. The decode of the sampler
+  fields merged into the descriptor words is gone, and so are the shader
+  instruction's filter overrides (no game shader has any; a port with one
+  fails its fit, named). Checked against the old decode at every draw
+  first (no difference in an attract race, the tick replay or the pad
+  replay).
+- **Constants as D3D's registers, by name.** Each stage's float registers
+  go up as one range, from the lowest the shader reads to the highest (all
+  256 for a shader addressing them by the loop index; its literal
+  constants left out), and a constant's name is `xe_fc[register -
+  lowest]`: the draw copies the range instead of gathering a mask's
+  registers. Bools stay a bit each; loops are D3D's int4s (count, start,
+  step; `render::BoolLoopConstants`) instead of the 360's packed word.
+- **The draw's own constants** (`draw_constants.h`): the flags (polygonal,
+  line, the alpha test), the alpha reference, the NDC scale and offset,
+  the targets' exponent biases and the reader scales, 176 bytes, in place
+  of the translator's system constants (504 bytes, most of them unused).
+  The fetch constant block (set 1, binding 4) is gone, and so are SBX's AO
+  extras (the normals and light outputs, the dithered alpha).
+
+The ports, the generator (`ucode_to_glsl.py`, `port_all.py`,
+`table_from_json.py`), `shaders.json`, the table and the hand-written
+header follow each change. `--attract_seed` (new) makes the attract race
+the same every run: with `--max_fps=30` and no interpolation, two runs'
+dumps are identical when they land on the same moment (the attract
+cameras seem to follow the wall clock: a run lands on one of two moments).
+Checked: each part against the build before at the same moment (from the
+plain textures on, every part's frame and resolves pixel for pixel the
+same as the vertex data part's), the tick replay (both races match), the
+pad replay's menus.
+
+Left for step 2: the texture views are still found by the stage's six
+descriptor words (`render::TextureDescriptor`, the texture's fields with
+the sampler fields still merged in, which the views ignore); they go with
+textures by handle (step 2b).
+
+**The order from here (2026-11-26).** The faked GPU (`gpu_link.cpp`) only
+makes fences in play now (~3,000 a second, two a kick; no memory writes,
+interrupts or callbacks in a race), and it goes with step 3, when the
+handlers stop calling the game's Direct3D and so stop writing packets: an
+interim for the fences alone would be thrown away. So step 4 (the render
+targets, the EDRAM part of the goal) comes next, then step 3, then 2b and 5.
+Step 4's approach:
+
+- Targets keyed by the game's surface object instead of its EDRAM base
+  (the renderer stops knowing EDRAM).
+- A resolve that is a plain copy hands the target's image to the
+  destination texture (the pass has drawn into the texture: no copy). A
+  target drawn into again without a clear first (a grab pass, the main
+  view after its first resolve) gets the image copied back once.
+- MSAA resolves, format changes and the exponent bias (-3 on the main
+  view's and the glow's copies) stay copies, as PC renderers do them.
+
+## Step 4: render targets (done 2026-11-27)
+
+- **Targets keyed by the surface object.** `Passes::State::GetTarget` keys
+  an image by the game's surface object, its size (the object's +36:
+  width - 1 from bit 18, height - 1 from bit 3), samples and format; the
+  EDRAM base and the "as tall as the EDRAM left" height are gone from the
+  renderer.
+- **Surfaces take no EDRAM.** `graphics::CreateSurface` no longer calls the
+  EDRAM allocator (base 0, or the parameters'), `DestroySurface` frees
+  none, and `graphics/edram.{h,cpp}` are removed.
+- **Explained difference:** the camera pass of type 20 (resolve 6 in
+  `conventional-renderer.md`'s table: depth only, into `[0x826BABC4]`,
+  use unknown) has its own depth surface sharing EDRAM with the shadow
+  map's (type 10); on the 360 it starts with the shadow map's depth, and
+  its 4 draws in an attract race write nothing. It now starts from its own
+  image (cleared: all 1.0), as the no-EDRAM rule has it. The shown frame
+  doesn't change (an attract race's dump: 0.30% of pixels off by more
+  than 0.02, as step 2's).
+- **What stayed after the first part:** the ~25 resolves a race frame were
+  copies, because none was a plain copy: each changes format, averages
+  MSAA samples or applies the exponent bias (the old table's "What a
+  resolve does"). The second part (below) moves the format, swap and bias
+  into the readers so the single-sample ones hand their images over.
+
+- **Passes into their textures (second part, 2026-11-27).** A resolve that
+  is a whole-image copy from a single-sample color target hands the
+  target's image to the destination texture instead of copying
+  (`TextureCache::HandOver`; `--native_renderer_hand_over_resolves`, on):
+  the pass has drawn into its texture. What the copy did is left to the
+  readers: the red and blue exchange (the copy's `copy_dest_swap`) goes
+  into the views' swizzle, and the exponent bias with the normalized
+  destination's clamp into a reader scale (a system constant a fetch
+  constant, `texture_scale`, applied in `xe_texture_result`:
+  `clamp(x * 2^bias, 0, 1)` for a normalized destination, `x * 2^bias`
+  otherwise, nothing for a normalized target without a bias). The glow's
+  −3 is what fits its HDR steps into a `16_16_16_16` (unorm) texture: its
+  steps now draw into float images their readers scale. The target draws
+  next into the image the destination held (a pass's image from the frame
+  before), so a target resolved every frame alternates between two
+  images; a target drawn into or read again without a clear first gets its
+  contents copied back once (`RestoreContents`). A destination a resolve
+  ever copies into (the MSAA ones, the main view's partial rectangle into
+  `1ECC2000`) stays a copy destination. The two depth resolves (the
+  shadow map's and the type 20 pass's, `24_8_FLOAT` copied as the depth
+  as is into R32F) hand the depth image over too, its depth sampled
+  through a depth-aspect view (where the depth format can be filtered
+  linearly; logged at start-up). In an attract race: 19 of the 25
+  resolves a frame handed over, 5 targets copied back (logged once each:
+  the type 20 depth pass, drawn every frame without a clear; the glow's
+  target after its last step, `15CCB000`; the boot filter's 512x512
+  target between its blur passes). Still copies: the MSAA resolves (the
+  mirror, the reflection map, the minimap, the main view twice and its
+  partial copy for the upscale).
+
+Order of a race frame's passes (one frame traced, 2026-11-26): each camera
+pass draws, then resolves (the shadow map's 66 draws, then its depth
+resolve); the main view draws, is resolved twice, the glow's steps draw
+and resolve on one 256x144 target in turn, then the main view draws on
+(the grab pass) and is resolved for the scene target, then the front.
+
+## Step 3: the draw state (done 2026-11-27)
+
+- **The draw reads the device's shadow directly**
+  (`src/native/draw_registers.{h,cpp}`, `DrawRegisters::Read`): the fetch
+  and bool/loop constants copied in host order, and the ~20 registers the
+  draw decodes, with our own decoding (the depth and color mask
+  normalization, the depth bias, the host viewport: the SDK's `draw_util`
+  for this renderer's arguments). Gone: the SDK's `RegisterFile` and
+  `draw_util` in the renderer, `ReadRegisters` and the dirty masks it
+  followed (`native/state.cpp`; `MarkRegistersDirty`,
+  `MarkFetchConstantsDirty`, `MarkDeviceDirty` and their calls in the
+  inline draws' flush, the resolve and the draw's packet writers), and
+  `--native_renderer_log_register_reads`. Every writer of the shadow is
+  the game's Direct3D, which keeps it current, so reading it whole at the
+  draw is the same as the copy of its dirty words.
+- Checked: an attract race's per-draw records (`draws.txt`: shaders,
+  render state words, fetch constants) the same as the build before's,
+  line for line; the shown frame within the runs' spread; the pad replay
+  (menus, both races) with 0 error lines, a menu frame the same as the build
+  before's on the same schedule.
+
+- **No GPU kick (second part, 2026-11-26).** In play the kicked buffers
+  only carried the segment tails' fences and read positions (and, at a
+  predicated tiling's end, a worker wake our kick already skipped).
+  `WriteSegmentTail` now writes both into the progress block at once (the
+  library's own hung-GPU path) and leaves its packets out; `Device::Kick`
+  and `Device::DeferredKick` do nothing (`src/hooks/command_buffer.cpp`).
+  `src/native/gpu_link.cpp` (the buffer walk: fences, memory writes,
+  scratch registers, interrupts) is gone with `--native_renderer_log_gpu`;
+  the tiling worker's entries moved to `src/hooks/predicated_tiling.cpp`.
+  Checked: attract races and the pad replay (menus, loading screens, both
+  races) with 0 error lines, the tick replay's digests the same.
+
+- **No draw packets (third part, 2026-11-26).** The indexed draw always
+  takes our path (the shader load and the dirty masks cleared, no
+  packets), tiled draws too (their packets went into chains only the
+  never-run tiling worker reads); the draw's five packet writers are plain
+  drops. Gone: the check machinery and `--native_renderer_check_draw_writes`,
+  `--native_draw_packets`, `--native_renderer_library_packets`. Checked:
+  the pad replay (the tiled menus' 3D views, loading screens, both races),
+  an attract race, the tick replay.
+
+- **No translator on the shader path (2026-11-26).** What the renderer
+  took from the SDK translator's analysis (each shader's float constants,
+  vertex fetch constants, interpolators and color targets) comes from the
+  table (`game_shader_ports.h`, the vertex fetch constants from the patched
+  microcode); checked against the analysis for every shader and interface
+  of an attract race and the pad replay first (no difference). The
+  translator's fallback, its disk cache (`shaders.bin`), the system
+  constants' struct (now `native/system_constants.h`) and
+  `--native_shaders`, `--native_shaders_off`,
+  `--native_renderer_log_shader_ucode` are gone; a shader the table lacks
+  stops the program, named.
+
+- **The shader load natively, without packets (2026-11-26).**
+  `Device::LoadShaders` (`sub_822AED18`, lifted until now) is plain C++
+  (`src/graphics/shader_load.{h,cpp}`, its adapter `src/hooks/shader_load.cpp`),
+  from a reading of the lifted body and its copy path (`sub_822AEBF0`): the
+  register fields the draw and the renderer read (SQ_PROGRAM_CNTL,
+  SQ_CONTEXT_MISC, SQ_INTERPOLATOR_CNTL, RB_HIZCONTROL, RB_MODECONTROL, the
+  tiling's last EDRAM mode), the flags, the loaded strides and the vertex
+  shader's patch for the declaration (in place, recording what it's patched
+  for and giving the declaration its id; or in a copy, now in a heap buffer
+  of ours instead of the command buffer, with the exports remapped by the
+  lifted `sub_822AEAA0` when the shaders' interpolators differ: never seen).
+  Left out: the IM_LOAD packets, the shaders' fences and fence list (no GPU
+  reads the shaders, so the original's "in use: copy" never applies), the
+  HiZ event and the tiling's register packets. Checked: per-draw records the
+  same, the pad replay clean, the tick replay matching.
+
+- **The seam, first part: the render states (2026-11-27).** The plan's
+  `render/` interface starts with the render states (`src/render/state.{h,cpp}`):
+  the handlers of commands 1 (by the game's render state numbers, the byte
+  offsets into the device's setter table; the table at `0x826388F8` names
+  them), 3 (blend controls) and 31 (the scissor), and the drawer commands'
+  viewport toggles (15, 16 and the single 15), set Vulkan values: depth test,
+  each target's blend (the original's rules for blending and separate
+  alpha off kept), cull mode and front face, color write enables, the
+  blend constants, the alpha test, the depth bias, primitive restart, the
+  viewport transform on or off, the half-pixel offset, the scissor. The
+  draw builds its pipeline key and dynamic state from them, not from the
+  shadow (`NormalizedDepth`, `PolygonOffset` and the VTE decoding gone).
+  Checked first against the shadow at every draw
+  (`--native_renderer_check_render_states`, kept while the game's setters
+  still run): no difference in an attract race or the pad replay (menus,
+  tiled views, loading screens, both races); then frames right in both.
+  The handlers still call the game's setters too, until nothing reads
+  what they write.
+
+- **The seam, second part: targets and the viewport (2026-11-27).**
+  `render::SetRenderTarget`, `SetDepthTarget`, `SetViewport`,
+  `BeginTiling` and `EndTiling`, from commands 23, 24, 29, 30, 32-35: the
+  bound surfaces (the game's surface objects) and D3D's viewport, clamped
+  to the bound surface (or the tiles together while tiling) as the game's
+  SetViewport does; binding render target 0 makes the viewport and
+  scissor the whole surface. The draws, clears, resolves, the tiling, the
+  movie and the shown frame take the bound surfaces from there; the host
+  viewport is computed from D3D's viewport (y down, D3D's clip space); each
+  target's exponent bias from its surface's color info. Checked against
+  the shadow first (bound surfaces, the viewport transform, exponent
+  biases, depth formats, the clip space: no difference in an attract race
+  or the pad replay, once the tiling's size was taken), then frames right.
+
+- **The seam, third part: shaders and vertex input (2026-11-27).**
+  `render::SetVertexShader`, `SetPixelShader`, `SetVertexLayout`,
+  `SetVertexBuffer` and `SetIndexBuffer`, from commands 8 to 12 and the
+  drawer's (13 to 16, the single 15: its shaders from the tables at
+  `0x82970F2C` and `0x82970F44`, its declaration `[[drawer +4]]`). The
+  draw takes the shaders, declaration and index buffer from there, each
+  stream's fetch constant and stride (an inline draw's own for stream 0),
+  the program controls (SQ_PROGRAM_CNTL, SQ_CONTEXT_MISC) from the bound
+  shaders' headers as the shader load combines them, and draws color only
+  with a pixel shader. Checked against the shadow first (no difference in
+  an attract race or the pad replay; only the strides of streams the
+  shader reads compared: the loaded copy lags for unused ones), then
+  frames right.
+
+- **The seam, fourth part: the constants (2026-11-27).**
+  `render::SetConstants`, from command 7 and the single 7 (after
+  interpolation's substitution, which writes the payload first): each
+  stage's 256 float registers and the bool and loop block as the shaders'
+  uniform takes it (loops from D3D's int4s: count, start, step). A shader's
+  literal constants (its file's `def` and `defi`: the drawer's vertex
+  shader's c255, the lit material's light counts in pixel loops 14 and 15)
+  come with the shader: `render::SetVertexShader` and `SetPixelShader`
+  apply the records its object carries that land in the constants, as the
+  game's setters apply them all to the device. The draw packs the float
+  registers and places the bool/loop block from there. Checked against
+  the shadow (no difference in an attract race or the pad replay), then
+  frames right.
+
+- **The seam, fifth part: textures and sampler states (2026-11-27).**
+  `render::SetTexture` and `SetSamplerState`, from commands 4 and 2 (and
+  the single 15's reset of stage 0): each stage's texture descriptor (the
+  six words the shaders' uniform and the texture cache still read: the
+  texture object's own fields merged with the stage's sampler fields, by
+  the game's SetTexture and sampler setters' rules, ported, with the
+  stage's bytes they keep beside: maximum anisotropy, Z filters, mip
+  level limits), its defaults applied as SetDefaultState applies them.
+  The draw's fetch constant block is built from these and the streams'.
+  Checked against the shadow (no difference in an attract race or the pad
+  replay), then frames right. The descriptor words stay until the shaders
+  take plain textures and the cache binds by handle (2b).
+
+- **The draw without the shadow (2026-11-27).** With the base vertex taken
+  from the draw command's own item (the runs comparing it with
+  VGT_INDX_OFFSET never saw another) and the targets' color formats from
+  their surfaces, nothing the draw uses comes from the device's register
+  shadow: it's read only for the diagnostics that compare with it or
+  describe it (`--native_renderer_check_render_states`, a dump's draw
+  records). The base vertex comparison and its log line are gone.
+
+- **The seam, sixth part: the draws (2026-11-27).** `render::DrawIndexed`
+  and `render::DrawUP`, made by the renderer: command 18's items, command
+  19's vertices and the drawer's (15 and the single 15, its 24-byte
+  vertices from its state) go to them; the library's DrawIndexedVertices,
+  BeginVertices, the memcpy into the command buffer, EndVertices and the
+  drawer's Draw are no longer called from the replay (their shader load
+  and dirty masks fed only the GPU). Without the shader load no
+  declaration gets an id, so shader lookups are keyed by the declaration's
+  elements, hashed when it's bound. Checked: an attract race's dump
+  against the build before's at the same moment (2,413 draws, 0.008% of
+  pixels off), the pad replay with dumps, the tick replay (both races
+  match).
+
+- **The seam, seventh part: clears and resolves (2026-11-27).**
+  `render::Clear` and `render::Resolve`, made by the renderer from
+  commands 26 and 25's item fields; the library's Clear (lifted) and
+  Resolve are no longer called from them (their register and command
+  buffer work fed only the GPU). Checked: an attract race (the same 9
+  clears and 25 resolves a frame, 19 handed over), the pad replay with
+  dumps.
+
+- **The seam, eighth part: tiling (2026-11-27).** `render::BeginTiling`
+  and `EndTiling` from commands 32 and 33: the renderer draws the tiled
+  target whole (as it did), and at the end makes one resolve of all of it
+  with EndTiling's flags (0x303 in the menus, as each tile's was) and the
+  last tile's clears; the library's BeginTiling and EndTiling (and so its
+  per-tile Resolves) are no longer called. Two things the device did for
+  the tiled views moved over: the viewport is kept as D3D sets it and
+  clamped at the draw to the target drawn into (a tiled target is the
+  tiles' whole size; the device clamped it when it was set, to the tiling
+  while the library's tiling flags held), and commands 34 and 35 save and
+  put back `render::`'s own targets and viewport (they read the device's
+  clamped viewport before: the tuning shop's car squashed into the first
+  tile's 256 lines). The renderer's after-command hook and its tiled
+  resolve path are gone. Checked: the pad replay with dumps (the tuning
+  shop, the system menu, both races), an attract race's frame against an
+  earlier build's at the same moment (2,413 draws, 0.016% of pixels off),
+  the tick replay (both races match).
+
+- **The setters out of the handlers, first part (2026-11-27).** The
+  handlers no longer call the game's render state, sampler state, blend
+  control, constant, declaration, viewport, scissor and viewport-enable
+  setters (the drawer's and single commands' included): with the shader
+  load, Clear and Resolve no longer run, nothing else read what they wrote
+  (the one getter, ViewportEnable, was the drawer handlers' own; they keep
+  `render::`'s instead). The render state check went with the shadow it
+  compared against; `draw_registers.{h,cpp}` keep only the draw's fetch
+  constant block, the write mask and the host viewport; a dump's draw
+  records describe `render::`'s states. Checked: an attract race's frame,
+  the pad replay with dumps (the tuning shop, both races), the tick replay
+  (both races match).
+
+- **The setters out of the handlers, second part (2026-11-27).** SetTexture,
+  SetStreamSource, SetIndices and SetPixelShader are no longer called from
+  the handlers (nor the single drawer's resets of stream 0 and stage 0):
+  nothing else reads the device's slots, their fences fed only the GPU
+  waits dropped long ago, and the pixel shader setter takes no reference.
+  Checked: an attract race's frame (2,413 draws), the pad replay with
+  dumps, the tick replay (both races match).
+
+- **`replay_hooks.cpp` out of the renderer (2026-11-27).** The replay's
+  command entries, the inline draw, resolve and front buffer wraps and the
+  library's packet-free draw are the game's hooks, not the renderer's:
+  moved to `src/hooks/replay_commands.{h,cpp}` (`hooks::ReplayCall`) and
+  `src/hooks/draw_packets.{h,cpp}`. The renderer is reached from them only
+  for command counting and the front buffer; its inline draw hook (for
+  commands 15 and 19, which now draw through `render::DrawUP`) is gone.
+
+- **The surface setters out of the handlers (2026-11-27).** Nothing outside
+  the replay reads what the device's render target and depth surface
+  setters write: the device's bound surfaces are read (logged across the
+  pad replay) only by `CameraPass::SetUpSurfaces` for the main view's
+  passes and `RenderQueue::Init`, once each at boot, before the replay's
+  first `SetRenderTarget` (they get the device's own surfaces, which stay
+  bound); the device's viewport only by command 34. So commands 23, 24 and
+  29 call `render::` alone, and 34 and 35 keep their saved set from
+  `render::`'s bound surfaces, taking the same references
+  `Device::GetRenderTarget` and `GetDepthStencilSurface` took (the setters
+  take none). Checked: the tick replay with dumps (both races match), the
+  pad replay with dumps (the tuning shop's tiled view, the menus).
+
+The vertex shader setter stays (it keeps the shader's
+reference count: kept).
+
+## Step 5: the SDK out and the measures (done 2026-11-27 but the profile)
+
+Done ahead of the clean-up, once nothing used it: the texture fetch
+constant's fields and the formats the renderer reads are our own
+(`src/native/xenos_types.h`, with `SwizzleSigns`), the Vulkan header is
+our own Vulkan-Headers' (`vulkan_functions.h`), and the shader translator's
+static library (`cmake/xenos_translator.cmake`), its shims
+(`src/translator_shims/`), glslang and fmt left the build; the
+`rexglue-sdk`, `glslang` and `fmt` submodules are removed (CI no longer
+fetches them; the Windows build's case links no longer scan the SDK).
+Nothing of the ReXGlue SDK is built, linked or checked out.
+`tools/shader_port/check` (the ports against the SDK's translation) takes
+an SDK checkout's folder as its argument and still works from one.
+
+Found on the way and fixed (`c6b578c1`): `Member1136::Save` and `Restore`
+(the race snapshot at a standing start) read and wrote the body's row 0 at
+address 0 since E5 step 2's swarm (`body_row1_address() * i` for
+`vehicle + 16 * i`), which since E5 step 10 stops the program: the pad
+replay stopped there once.
+
+Step 0's measures again (2026-11-26, the pad replay, `itc_6025`):
+
+| | Step 0 | Now |
+|---|---|---|
+| The process's resident set | ~510-645 MB | ~350-450 MB (menus ~400, a race ~450) |
+| of which the physical block (touched pages) | ~205-255 MB | ~13-64 MB |
+| GTT, whole card | ~1,690 MB | ~530 MB (the idle desktop's ~350 included) |
+| The renderer's host-visible buffers in it | 1,344 MB | ~128 MB (texture and arena staging 96, constants 32) |
+| The renderer's GPU memory | ~300 MB | ~600 MB: the arena 224, textures 100, targets 119, resolve destinations 33 |
+
+So the game's system memory went from about **1.9 GB to about 0.6 GB**;
+the GPU's own memory grew by the vertex arena (device-local, in VRAM).
+
+**What's left in the physical block (2026-11-27).** The block is an
+anonymous `MAP_NORESERVE` mapping: its 512 MB are address space, and it
+costs only its resident pages. `--log_memory_use` now gives each tag's
+resident bytes, and the graphics library's own textures and buffers are
+tagged. In the pad replay (`itc_6139`) the block holds 15-38 MB resident
+(~205-255 at step 0), all of it data the CPU reads or writes: the game's
+`CreateTexture` textures 5.5 MB (of 27-30 MB live: the CPU-drawn vinyl
+sheet, plates and decals; resolve destinations are never touched), the
+cars' and the scene's models ~10 MB (the wheels' morphs read them), ~15 MB
+in ~500-740 small blocks the game allocates otherwise, and 3.5 MB of XPR
+files' and held models' leftovers (the memory blocks' header pages). Its
+range isn't made smaller: the live blocks reach ~280 MB of address space
+(the XPR files' given-back blocks among them).
+
+Step 0's measures again (2026-11-27, the pad replay, `itc_6139`):
+
+| | Step 0 | 2026-11-26 | Now |
+|---|---|---|---|
+| The process's resident set | ~510-645 MB | ~350-450 MB | ~330-445 MB |
+| of which the physical block | ~205-255 MB | ~13-64 MB | ~15-38 MB |
+| GTT, whole card | ~1,690 MB | ~530 MB | ~380-400 MB |
+| The renderer's GPU memory | ~300 MB | ~600 MB | ~605 MB: the arena 224 (the held models in it), textures 100, targets 119, resolve destinations 35, staging 96, constants 32 |
+
+An uncapped attract race (one run, seconds 3-18): 300.6 fps mean. **The
+profile is still to take**: `profile_render_thread.sh` (perf) wasn't
+allowed to run in this session.
+
+## Step 2b: XPR textures and the course's models held by the GPU (2026-11-26 and 27)
+
+`--log_memory_use` now also lists the physical memory's live blocks by who
+asked (`memory::PhysicalTag`): in the pad replay's menus, XPR textures
+109.4 MB (53 files), model vertices 9.5 MB, the rest 42.9 MB; the XPR
+files are where the GPU data is.
+
+- **XPR textures uploaded at load, their pages given back**
+  (`--give_back_xpr_data`, on): `XPR::Create` hands the renderer its data
+  block and each texture's fetch constant (`TextureCache_XprLoaded`); at
+  the next frame's start each is uploaded as a draw would, and once all are
+  on the GPU the block's pages are `madvise(MADV_DONTNEED)`d. Those
+  textures stay through race ends (they can't be loaded again) and leave
+  when `XPR::Release` says so (`TextureCache_XprReleased`). Only files whose
+  records are all textures.
+- **Freed physical blocks' pages given back** (`memory::FreePhysical`,
+  always): a freed block's data stayed resident until something else took
+  the space.
+- **The fault found on the way:** the headers' base and mip addresses
+  (fetch words 1 and 5) are the CPU's view of the physical memory
+  (`0xE0000000`, 4 KB back), as `RelocateTexture` writes them, and
+  `SetTexture` binds the GPU's. Uploaded under the headers' words, no draw
+  found them, and draws read the given-back zeros (the menus' 2D elements
+  and much of a race, the user's report). They're translated
+  (`GpuPhysicalAddress`) before the upload. The sampler fields `SetTexture`
+  merges in (clamps, filters, LOD) aren't in the texture's key (`KeyOf`),
+  so every variant shares the one image. A draw reaching a given-back XPR
+  with a key not uploaded, and memcpy writing into one, are logged as
+  errors: none in the checks.
+
+Checked: an attract race's frame against step 0's (2,390 draws, 0.08% of
+pixels off by more than 0.02), attract races (0 error lines), the tick
+replay (both races' digests match), and the pad replay (menus, the garage,
+the tuning shop, both races with their HUD, the pause menu, the return to
+the garage: frames right, 0 error lines). **The physical block's resident
+pages: ~205 -> ~33 MB in the menus, ~250 -> ~64 MB in a race; the process's
+resident set ~510-645 -> ~400-490 MB.**
+
+- **An XPR's given-back data written over (2026-11-27).** Twice in the pad
+  replay, leaving the tuning screen, memcpy wrote over an XPR's data whose
+  pages were given back without the XPR's release having been seen (the
+  memory reused). Its textures were then stale; now such an XPR is taken
+  as released (its kept textures retired), logged once a run at info.
+
+- **The course's and the scenery's model buffers held by object
+  (2026-11-27).** `--log_memory_use` now names the model vertex blocks by
+  loader; in a race the course's (CourseSet, AreaModel) held 10.7-16.8 MB
+  and the scenery lists' 18.7 MB, the car parts 0.5-0.8, traffic 1.3, the
+  scene's objects 1.5-1.9, and Model::Load's callers through its adapter
+  5-9 MB (the garage's cars among them). The course's and the scenery
+  lists' models are never read by the CPU after loading, so their loaders
+  hand them over after `Model::Load` (`VertexArena_GpuOnlyModel`): each
+  buffer (`models::ModelBuffers`: the shapes' vertex buffers, the
+  materials' index buffers) is copied into the vertex arena at the next
+  frame's start in the host's byte order, a place of its own (buffers of
+  the same range share one), and the data's pages are given back (not the
+  memory block's header page in front of it, which the game reads when it
+  frees the block). Draws bind them by their objects (`render::Bindings`
+  keeps each stream's buffer object; the arena's place for the bound object
+  at the fetch's address, else a range placed by address as before). They
+  go when the data's physical block is freed
+  (`memory::SetPhysicalFreeListener`, whatever path frees it). A memcpy
+  into a held block's data is logged as an error (none seen).
+  Checked: attract races, the tick replay with dumps (both races' course
+  and scenery right, the digests matching, every held buffer let go on the
+  return to the garage), the pad replay (0 error lines). ~32 MB held in
+  ~1,200 buffers of ~105 models in a race; **the physical block's resident
+  pages in the pad replay peak at 37.7 MB (63.9 before).**
+
+Left for 2b: the other loaders' models stay placed by address, with
+memcpy's tracking: the wheels' (tire, rim and brake models), which the
+morphs read and write on the CPU, are among the car parts' and the
+garage's, and those blocks are small (~2-10 MB together). Textures other
+than XPR files' (the render targets' destinations, the vinyl sheet's)
+are found by address too.
+
+## Open questions
+
+1. **SBX-Recomp's license.** Answered 2026-11-26: its author is OK with
+   the user using its code. Files taken from it say so in a header comment
+   (where they came from, at which SBX-Recomp commit), as
+   `src/lifted/vector_helpers.h` does for the SDK's.
+2. **Whether our shaders are SBX's.** Their doc says SBX's graphics library
+   is a different revision from ours, and the Japanese release's data may
+   differ: step 1 starts by running their tool over our files.
+3. **The exponent bias** on the main view's and the glow's copies (−3):
+   decided in step 4 (2026-11-27): where a pass's image is handed to its
+   texture, the readers apply it (with the normalized destination's clamp)
+   as a reader scale; the main view's copies are MSAA resolves and keep it
+   in the copy.
+4. **The upscale draw and the 1280x720 `1ECB9000` texture** (the main
+   view's partial-rect resolve): drawn into that region, or the frame
+   composed natively (`docs/unlocked-res.md`, "Later"). Decided in step 4.

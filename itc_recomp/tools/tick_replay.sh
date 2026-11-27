@@ -21,7 +21,7 @@ newest_log() { ls -t $B/logs/itc_*.log 2>/dev/null | head -1; }
 before=$(newest_log)
 SDL_GAMECONTROLLER_IGNORE_DEVICES=0x2E24/0x072F XDG_DATA_DIRS=/usr/local/share:/usr/share \
   timeout 300 "$B/itc" \
-  --native_audio=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
+  --native_audio=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \
   --interpolate_draw_state=true --log_level=info --skip_intro \
   --state_digest=true --pad_ticks_play="$TICKS" "$@" >/dev/null 2>&1 &

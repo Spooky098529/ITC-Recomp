@@ -892,8 +892,8 @@ memory).
   `E0D070FB58A4EA03`), the texture they read, the 256x144 resolves without
   a clear and which of them write that texture back, and the cross-fade's
   pixel constants and vertex color (see the bloom under Known issues).
-- `--native_renderer_log_shader_ucode=<hash>`: log a shader's microcode
-  disassembly when it's first used.
+- (`--native_renderer_log_shader_ucode` went with the translator on
+  `pc-renderer`, 2026-11-26.)
 - `--native_renderer_watch_draws`: log what changes in the main view's
   draws' inputs between frames (with the camera still, only flickering
   draws should change). Ignores float changes under 0.1% and compares only
@@ -1004,9 +1004,9 @@ memory).
 - `--native_renderer_reuse_texture_sets=false`: build every draw's texture
   sets instead of reusing a stage's last one when nothing it was built
   from changed (on by default; see "Texture binding").
-- `--native_renderer_log_register_reads`: how often the register shadow is
-  read a frame, the words copied (those marked dirty) and what changed
-  since the last read (see "Register reads").
+- (`--native_renderer_log_register_reads` went with `ReadRegisters` on
+  `pc-renderer`, 2026-11-26: the draw reads the shadow directly,
+  `src/native/draw_registers.h`.)
 - `--native_renderer_log_texture_writes`: which code writes textures'
   memory: on first load, and when a texture is found changed, what the
   library's memcpy wrote there (with `--native_renderer_verify_textures`

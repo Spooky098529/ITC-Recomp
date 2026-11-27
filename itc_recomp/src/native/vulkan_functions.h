@@ -3,10 +3,13 @@
 
 #pragma once
 
-// Through the SDK's Vulkan header, so every Vulkan include in the build
-// agrees on its defines (no prototypes, beta extensions, the Wayland and XCB
-// platforms): the shader translator's headers use the C++ bindings.
-#include <rex/ui/vulkan/api.h>
+// Our own Vulkan-Headers (itc_vulkan_headers), without prototypes: every
+// function is loaded below. The surface comes from SDL, so no platform's
+// defines are needed.
+#ifndef VK_NO_PROTOTYPES
+#define VK_NO_PROTOTYPES
+#endif
+#include <vulkan/vulkan.h>
 
 // Functions by the level they're loaded at.
 #define NATIVE_VK_GLOBAL_FUNCTIONS(X) \
@@ -28,6 +31,7 @@
   X(vkGetPhysicalDeviceFeatures2)              \
   X(vkGetPhysicalDeviceProperties2)            \
   X(vkGetPhysicalDeviceMemoryProperties)       \
+  X(vkGetPhysicalDeviceFormatProperties)       \
   X(vkEnumerateDeviceExtensionProperties)
 
 #define NATIVE_VK_DEVICE_FUNCTIONS(X) \
@@ -87,12 +91,15 @@
   X(vkCmdBindPipeline)                 \
   X(vkCmdBindDescriptorSets)           \
   X(vkCmdBindIndexBuffer)              \
+  X(vkCmdBindVertexBuffers)            \
   X(vkCmdDrawIndexed)                  \
   X(vkCmdSetViewport)                  \
   X(vkCmdSetScissor)                   \
   X(vkCmdSetDepthBias)                 \
   X(vkCmdSetBlendConstants)            \
   X(vkCmdBlitImage)                    \
+  X(vkCmdCopyBuffer)                   \
+  X(vkCmdCopyImage)                    \
   X(vkCmdCopyBufferToImage)            \
   X(vkCmdCopyImageToBuffer)            \
   X(vkQueueWaitIdle)                   \

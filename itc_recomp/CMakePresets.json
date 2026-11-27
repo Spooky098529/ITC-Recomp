@@ -11,8 +11,7 @@
                 "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++",
                 "CMAKE_C_FLAGS": "-march=x86-64-v2",
-                "CMAKE_CXX_FLAGS": "-march=x86-64-v2",
-                "REXSDK_DIR": "${sourceDir}/../rexglue-sdk"
+                "CMAKE_CXX_FLAGS": "-march=x86-64-v2"
             },
             "condition": {
                 "type": "equals",
@@ -29,8 +28,7 @@
                 "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++",
                 "CMAKE_C_FLAGS": "-march=x86-64-v2",
-                "CMAKE_CXX_FLAGS": "-march=x86-64-v2",
-                "REXSDK_DIR": "${sourceDir}/../rexglue-sdk"
+                "CMAKE_CXX_FLAGS": "-march=x86-64-v2"
             },
             "condition": {
                 "type": "equals",
@@ -48,7 +46,6 @@
                 "CMAKE_CXX_COMPILER": "clang++",
                 "CMAKE_C_FLAGS": "-march=x86-64-v3",
                 "CMAKE_CXX_FLAGS": "-march=x86-64-v3",
-                "REXSDK_DIR": "${sourceDir}/../rexglue-sdk",
                 "CMAKE_OSX_ARCHITECTURES": "x86_64"
             },
             "condition": {
@@ -107,8 +104,7 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "REXGLUE_USE_VULKAN": "ON",
                 "REXGLUE_USE_D3D12": "OFF",
-                "ITC_WIN_LTO": "ON",
-                "REXSDK_DIR": "${sourceDir}/../rexglue-sdk"
+                "ITC_WIN_LTO": "ON"
             },
             "condition": {
                 "type": "equals",

@@ -6,22 +6,16 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "device_context.h"
+#include "render/state.h"
 #include "vulkan_functions.h"
 
 namespace native {
-
-// A shader's sampler binding: the fetch constant and the instruction's
-// filter overrides (xenos::TextureFilter, AnisoFilter values; 3 and 7 mean
-// "from the fetch constant").
-struct SamplerOverrides {
-  uint32_t fetch_constant;
-  uint32_t mag_filter, min_filter, mip_filter, aniso_filter;
-};
 
 class TextureCache {
  public:
@@ -44,9 +38,12 @@ class TextureCache {
   // constant's last answer (fetch_constant: its index, 0-31).
   VkImageView GetView(const uint32_t fetch[6], VkImageViewType view_type,
                       uint32_t fetch_constant);
-  VkSampler GetSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
+  // A sampler as the stage's state describes it (render::StageSampler), for
+  // the texture in `fetch` (its level range; a cube map clamps to the edge).
+  VkSampler GetSampler(const render::SamplerState& state, const uint32_t fetch[6]);
   // The post-swizzle signedness of each component, 2 bits each (the
-  // translator's texture_swizzled_signs byte).
+  // translator's swizzled signs byte; the shaders no longer apply them:
+  // a texture with signs is logged).
   static uint8_t SwizzledSigns(const uint32_t fetch[6]);
 
   // A resolve's destination texture (fetch: its fetch constant, addresses
@@ -65,8 +62,48 @@ class TextureCache {
     uint32_t host_width, host_height;  // the image's (scaled)
     float scale;                       // the scale it was made at
     bool fresh;
+    // It holds a pass's image handed over (HandOver), not its own.
+    bool handed;
+    VkFormat native_format;  // its own image's format
+    // A resolve has copied into it (RestoreResolveDestination): it isn't
+    // handed images (a partial copy keeps what's outside its rectangle).
+    bool copied;
   };
   bool GetResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
+
+  // A pass's image handed to a resolve destination in place of a copy
+  // (docs/pc-renderer.md, step 4): the pass has drawn into its texture.
+  // The image, its memory and its view (all of it, in `format`) become the
+  // destination's (GetResolveDestination made it first), left in
+  // SHADER_READ_ONLY_OPTIMAL by the caller. What the copy did is left to
+  // the readers: red and blue exchanged by the views' swizzle
+  // (swap_red_blue), and reader_scale (ReaderScale). Returns the image the
+  // destination held when it's of `format` (a pass's image handed over
+  // before: the target draws into it next), else retires it and returns
+  // none.
+  struct HandedImage {
+    VkImage image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    // A depth target's (its depth sampled, as the resolve's 24_8 copy
+    // holds): the aspect its views take, and its depth-only view.
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkImageView depth_view = VK_NULL_HANDLE;
+  };
+  HandedImage HandOver(const uint32_t fetch[6], float scale, const HandedImage& image,
+                       bool swap_red_blue, float reader_scale);
+  // Before a resolve copies into the destination: marked as copied into
+  // from now on, and if it holds a handed image, made its own again (a new
+  // image of its format); `out` as from GetResolveDestination.
+  bool RestoreResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
+  // Whether the destination still holds `image` (handed over).
+  bool HoldsHanded(const uint32_t fetch[6], float scale, VkImage image) const;
+  // What a draw's sampling of the texture applies (xe_interface.glsl's
+  // xe_texture_result): 0 nothing; above 0 times it, clamped to 0-1 (what
+  // the resolve's exponent bias and a normalized destination did); below 0
+  // times its negation.
+  float ReaderScale(const uint32_t fetch[6]) const;
 
   // Diagnostics: whether [start, end) (physical) overlaps a texture held.
   bool Holds(uint32_t start, uint32_t end) const;
@@ -109,7 +146,7 @@ class TextureCache {
   uint64_t generation() const { return generation_; }
   // The same for samplers (bumped when base_level_only changes).
   uint64_t sampler_generation() const { return sampler_generation_; }
-  // GetView and GetSampler answers not kept in the table so far (null, a
+  // GetView answers not kept in the table so far (null, a
   // reload deferred, or the table off): a caller keeping what it built from
   // answers can tell whether all of them would be asked again.
   uint64_t unkept_answers() const { return unkept_answers_; }
@@ -122,6 +159,8 @@ class TextureCache {
   // This frame's uploads, ended, to be submitted before its drawing; null if
   // none.
   VkCommandBuffer EndUploads();
+  // XPR files' events, at the frame's start (TextureCache_XprLoaded).
+  void ProcessXprs();
 
   struct Stats {
     uint64_t loaded = 0, reloaded = 0, loaded_bytes = 0, unsupported = 0, mismatched = 0,
@@ -150,11 +189,12 @@ class TextureCache {
 
  private:
   struct State;
-  // GetView and GetSampler worked out in full; `cacheable`: whether the
+  // GetView worked out in full; `cacheable`: whether the
   // answer may be kept until the generation changes.
   VkImageView LookUpView(const uint32_t fetch[6], VkImageViewType view_type,
                          bool& cacheable);
-  VkSampler LookUpSampler(const uint32_t fetch[6], const SamplerOverrides& overrides);
+  // The sampler made from `info`, kept by its fields.
+  VkSampler SamplerFor(const VkSamplerCreateInfo& info);
   std::unique_ptr<State> state_;
   bool cache_bindings_ = true;
   bool log_writes_ = false;
@@ -172,5 +212,12 @@ class TextureCache {
 // The game left a race (main thread): the texture cache frees its loaded
 // textures at its next frame.
 void TextureCache_RaceLeft();
+// An XPR file loaded (its data block, guest address and size, and each
+// texture's fetch constant as its header has it), and released: its
+// textures are uploaded at a frame's start and its data's pages given back
+// (docs/pc-renderer.md, step 2b). Any thread.
+void TextureCache_XprLoaded(uint32_t data, uint32_t size,
+                            std::vector<std::array<uint32_t, 6>> fetches);
+void TextureCache_XprReleased(uint32_t data);
 
 }  // namespace native

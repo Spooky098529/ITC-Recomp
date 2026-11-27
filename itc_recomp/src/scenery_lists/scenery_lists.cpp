@@ -6,6 +6,8 @@
 #include "base/log.h"
 #include "game_data/data_file.h"
 #include "guest.h"
+#include "memory/heap.h"
+#include "native/vertex_arena.h"
 #include "memory/c_runtime_heap.h"
 #include "models/model.h"
 #include "schema/course_scenery.h"
@@ -87,8 +89,12 @@ uint32_t ModelListLoad(uint32_t list, uint32_t container, uint32_t frame,
     }
     guest::StoreU32(frame + 80, model);
     const uint32_t entry = game_data::GetEntry(container, uint32_t(i), false);
+    memory::PhysicalTag tag("model vertices: scenery lists");
     if (model == 0 || !models::ModelLoad(model, entry, 0, calls.model_load)) {
       calls.load(calls.user, model, entry);
+    } else {
+      // The scenery's models: their vertex data only the GPU reads.
+      native::VertexArena_GpuOnlyModel(model);
     }
     track_zones::List64Insert(nodes, model, uint32_t(int32_t(int16_t(l.list_count()))));
     r3 = nodes;

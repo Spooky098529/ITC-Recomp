@@ -1,5 +1,6 @@
 #include <format>
 #include "renderer.h"
+#include "render/state.h"
 #include "frame_costs.h"
 #include "base/log.h"
 
@@ -32,11 +33,16 @@
 #include <vector>
 #include "base/log.h"
 #include "base/flags.h"
+#include "memory/mapping.h"
 
 ITC_FLAG_BOOL(log_gpu_memory, false, "ITC",
               "Log every 5 s the GPU memory the native renderer holds, by what it's for, "
               "and its counts of views, samplers, descriptor pools and pipelines (to find "
               "what grows from race to race)");
+ITC_FLAG_BOOL(log_memory_use, false, "ITC",
+              "Log every 5 s the resident memory by block (the heap, the image, the "
+              "physical memory: touched pages) and the process's resident set, with the "
+              "renderer's GPU memory (docs/pc-renderer.md, step 0)");
 ITC_FLAG_BOOL(native_renderer_validation, false, "ITC",
               "Enable the Vulkan validation layer for the native renderer, if installed");
 ITC_FLAG_INT32(native_renderer_show_resolve, -1, "ITC",
@@ -46,9 +52,6 @@ ITC_FLAG_INT32(native_renderer_show_resolve, -1, "ITC",
 ITC_FLAG_BOOL(native_renderer_serialize, false, "ITC",
               "Wait for the GPU to finish each frame before recording the next (a "
               "debugging aid: rules out frames in flight sharing data)");
-ITC_FLAG_BOOL(native_renderer_check_mirror, false, "ITC",
-              "Log the vertex and index ranges whose contents change between frames "
-              "(a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_skip_repeated_state, true, "ITC",
               "Don't record a draw's viewport, scissor, depth bias, blend constants, "
               "pipeline or index buffer again when the command buffer already holds them");
@@ -58,59 +61,28 @@ ITC_FLAG_BOOL(native_renderer_reuse_constants, true, "ITC",
 ITC_FLAG_BOOL(native_renderer_log_constant_changes, false, "ITC",
               "Log why draws' constants aren't reused: what differs in the fetch block, "
               "and which blocks' offsets differ when the descriptor sets repeat");
-ITC_FLAG_BOOL(native_renderer_log_register_reads, false, "ITC",
-              "Log how often the device's register shadow is read a frame, how many words "
-              "are copied (those marked dirty) and what changed since the last read");
-ITC_FLAG_BOOL(native_renderer_cache_index_ranges, true, "ITC",
-              "Keep each draw's lowest and highest index until memcpy writes its index "
-              "range, instead of scanning the indices every draw");
-ITC_FLAG_BOOL(native_renderer_log_index_ranges, false, "ITC",
-              "Log how often draws' index ranges are scanned again unchanged since memcpy "
-              "last wrote them, and how the guest memory mirror's checks go");
 ITC_FLAG_BOOL(native_renderer_log_texture_bindings, false, "ITC",
               "Log how often draws' texture bindings repeat the last ones (fetch constants, "
               "views, samplers, descriptor sets) and what would empty a cache of them");
 ITC_FLAG_BOOL(native_renderer_cache_shader_lookups, true, "ITC",
               "Keep draws' shader lookups by what they read from the shader objects "
               "instead of hashing the shaders' microcode every draw");
-ITC_FLAG_BOOL(native_renderer_log_shader_lookups, false, "ITC",
-              "Log how often draws' shader lookups repeat the last ones and whether a key "
-              "of the shader objects' fields would ever give a shader whose microcode "
-              "changed");
 ITC_FLAG_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
               "Give a draw the last draw's texture descriptor set when its shader and the "
               "fetch constants it reads are unchanged, and no texture changed");
-ITC_FLAG_BOOL(native_renderer_copy_all, false, "ITC",
-              "Copy every vertex and index range into the mirror every frame, not only "
-              "those the library's memcpy wrote since (a debugging aid)");
-ITC_FLAG_BOOL(native_renderer_mirror_by_tick, true, "ITC",
-              "Draws read a guest memory mirror updated only as a logic pass's list starts "
-              "replaying, the two mirrors alternating (=false for the old per-draw "
-              "mirror; see 'Hypothesis to test: the mirrors updated once a tick' in "
-              "docs/native-renderer.md)");
-ITC_FLAG_BOOL(native_renderer_mirror_to_both, true, "ITC",
-              "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
-              "at each frame's start, the one draws read included");
-ITC_FLAG_BOOL(native_renderer_verify_mirror, false, "ITC",
-              "Compare each vertex and index range not copied into the mirror with guest "
-              "memory every frame, logging those that differ (a debugging aid; slow, ~20 "
-              "fps in a race). With --native_renderer_mirror_by_tick: each drawn range "
-              "looked up in the writes the mirror hasn't had instead (fast)");
 ITC_FLAG_BOOL(native_renderer_watch_draws, false, "ITC",
               "Log what changes in the main view's draws' inputs between frames: with the "
               "camera still, only flickering draws should (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_hand_over_resolves, true, "ITC",
+              "Hand a pass's image to its resolve's destination texture when the resolve is a "
+              "whole-image copy from a single-sample target, instead of copying "
+              "(docs/pc-renderer.md, step 4)");
 ITC_FLAG_BOOL(native_renderer_hide_cubes, false, "ITC",
               "Give cube maps the white placeholder (a debugging aid)");
 ITC_FLAG_STRING(native_renderer_cycle, "", "ITC",
                 "Directory: when a file named 'now' appears in it, leave out the main "
                 "view's draws of each pixel shader in turn for 3 s, saving a frame of each "
                 "(a debugging aid that keeps frames recorded at their usual speed)");
-ITC_FLAG_BOOL(native_renderer_check_late_writes, false, "ITC",
-              "Log vertex and index ranges written after we copied them, by the end of "
-              "the frame (a debugging aid)");
-ITC_FLAG_BOOL(native_renderer_check_clobbers, false, "ITC",
-              "Log copies into the mirror that change bytes an earlier draw's copy put "
-              "there in the same frame (a debugging aid)");
 ITC_FLAG_STRING(native_renderer_watch_pixel_shader, "", "ITC",
                 "With native_renderer_watch_draws: only the draws of this pixel shader "
                 "(hash in hex)");
@@ -127,8 +99,6 @@ ITC_FLAG_BOOL(native_renderer_base_level_only, false, "ITC",
 ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "Hash every texture used each frame, logging and reloading those whose "
               "memory changed with no memcpy write recorded (a debugging aid)");
-ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
-              "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
                "With native_renderer_dump: dump only the frame itself (shown image, draw "
                "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
@@ -308,14 +278,10 @@ class Renderer {
   // Render thread. Returns false if the renderer can't run.
   bool Init();
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
-  void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
-                    uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
-                    uint32_t tile, uint32_t tiles) {
-    passes_.TiledResolve(BeginFrame(), device, flags, rect, destination, point, clear_color,
-                         clear_z, tile, tiles);
-  }
+  void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
+  VkCommandBuffer Commands() { return BeginFrame(); }
+  Passes& passes() { return passes_; }
   void FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), device, front_buffer);
   }
@@ -528,7 +494,15 @@ bool Renderer::CreateDevice() {
   context_.device = device_;
   context_.queue_family = queue_family_;
   context_.queue = queue_;
-  context_.max_storage_buffer_range = properties.limits.maxStorageBufferRange;
+  // The vertex shaders take up to 24 attributes and bindings (a fetch's
+  // three, passes.cpp's kMaxVertexBindings; Vulkan promises 16).
+  if (properties.limits.maxVertexInputAttributes < 24 ||
+      properties.limits.maxVertexInputBindings < 24) {
+    ITC_LOG_ERROR("native renderer: the device takes {} vertex attributes and {} bindings; the "
+                  "game's shaders may need 24",
+                  properties.limits.maxVertexInputAttributes,
+                  properties.limits.maxVertexInputBindings);
+  }
   context_.min_uniform_buffer_offset_alignment =
       uint32_t(properties.limits.minUniformBufferOffsetAlignment);
   context_.clip_distance = enabled.features.shaderClipDistance;
@@ -663,8 +637,6 @@ bool Renderer::Init() {
       !passes_.Init(context_, kFramesInFlight, ResolutionScale(swapchain_extent_))) {
     return false;
   }
-  passes_.set_mirror_by_tick(ITC_FLAG(native_renderer_mirror_by_tick));
-  passes_.set_mirror_to_both(ITC_FLAG(native_renderer_mirror_to_both));
   return true;
 }
 
@@ -737,27 +709,18 @@ VkCommandBuffer Renderer::BeginFrame() {
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
-    passes_.set_check_mirror_frames(ITC_FLAG(native_renderer_check_mirror));
-    passes_.set_copy_all(ITC_FLAG(native_renderer_copy_all));
     passes_.set_skip_repeated_state(ITC_FLAG(native_renderer_skip_repeated_state));
     passes_.set_reuse_constants(ITC_FLAG(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(ITC_FLAG(native_renderer_log_constant_changes));
-    passes_.set_log_register_reads(ITC_FLAG(native_renderer_log_register_reads));
-    passes_.set_log_index_ranges(ITC_FLAG(native_renderer_log_index_ranges));
     passes_.set_log_texture_bindings(ITC_FLAG(native_renderer_log_texture_bindings));
-    passes_.set_log_shader_lookups(ITC_FLAG(native_renderer_log_shader_lookups));
     passes_.set_cache_shader_lookups(ITC_FLAG(native_renderer_cache_shader_lookups));
     passes_.set_reuse_texture_sets(ITC_FLAG(native_renderer_reuse_texture_sets));
     passes_.set_log_glow(ITC_FLAG(native_renderer_log_glow));
-    passes_.set_cache_index_ranges(ITC_FLAG(native_renderer_cache_index_ranges));
-    passes_.set_verify_mirror(ITC_FLAG(native_renderer_verify_mirror));
-    passes_.set_check_late_writes(ITC_FLAG(native_renderer_check_late_writes));
-    passes_.set_check_clobbers(ITC_FLAG(native_renderer_check_clobbers));
     passes_.set_watch_draws(
         ITC_FLAG(native_renderer_watch_draws),
         std::strtoull(ITC_FLAG(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(ITC_FLAG(native_renderer_hide_cubes));
-    passes_.set_no_index_clamp(ITC_FLAG(native_renderer_no_index_clamp));
+    passes_.set_hand_over_resolves(ITC_FLAG(native_renderer_hand_over_resolves));
     passes_.set_base_level_only(ITC_FLAG(native_renderer_base_level_only));
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
@@ -770,23 +733,8 @@ void Renderer::InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
   passes_.InlineDraw(BeginFrame(), type, count, stride, data);
 }
 
-void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
-  // Commands 15 and 19 draw inline vertices, drawn at the library's End
-  // (Renderer_InlineDraw).
-  if (IsDraw(id) && id != 15 && id != 19) {
-    passes_.AfterDraw(BeginFrame(), id, payload, arg1);
-  } else if (id == 25) {
-    passes_.AfterResolve(BeginFrame(), payload, arg1);
-  } else if (id == 26) {
-    passes_.AfterClear(BeginFrame(), payload, arg1);
-  } else if (id == 32) {
-    // One item of 16 bytes per tiling begun.
-    for (uint32_t i = 0; i < arg1; i++) {
-      passes_.BeginTiling(BeginFrame(), payload + 16 * i);
-    }
-  } else if (id == 33) {
-    passes_.EndTiling();
-  }
+void Renderer::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
+  passes_.DrawIndexed(BeginFrame(), type, base_start, primitive_count);
 }
 
 void Renderer::EndFrame() {
@@ -886,10 +834,13 @@ void Renderer::EndFrame() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &render_done_[image_index];
   }
-  // Texture uploads first, then the frame.
-  VkCommandBuffer command_buffers[2];
+  // Texture and vertex arena uploads first, then the frame.
+  VkCommandBuffer command_buffers[3];
   submit.commandBufferCount = 0;
   if (VkCommandBuffer uploads = passes_.EndUploads()) {
+    command_buffers[submit.commandBufferCount++] = uploads;
+  }
+  if (VkCommandBuffer uploads = passes_.EndBufferUploads()) {
     command_buffers[submit.commandBufferCount++] = uploads;
   }
   command_buffers[submit.commandBufferCount++] = commands;
@@ -991,13 +942,13 @@ void Renderer::LogStats() {
   ITC_LOG_INFO("native renderer: {:.0f} frames/s presented, {} skipped; per frame {:.0f} "
                "commands, {:.0f} draws; {:.0f} drawn, {:.0f} unsupported, {:.0f} failed; {:.1f} "
                "MB copied a frame ({:.1f} MB unchanged, not copied); {} pipelines; shaders "
-               "translated {}, failed {}, from the disk cache {}",
+               "from their GLSL {}",
                frames_presented_ / seconds, frames_skipped_, double(commands_) / frames,
                double(draws_) / frames, double(view.drawn) / frames,
                double(view.unsupported) / frames, double(view.failed) / frames,
                view.mirrored_bytes / 1048576.0 / frames,
                view.mirror_skipped_bytes / 1048576.0 / frames, view.pipelines,
-               view.shaders_translated, view.shaders_failed, view.shaders_from_disk);
+               view.shaders_ported);
   if (view.failed) {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",
@@ -1012,32 +963,21 @@ void Renderer::LogStats() {
     }
     ITC_LOG_INFO("native renderer: failed draws a frame by reason:{}", reasons);
   }
-  if (ITC_FLAG(log_gpu_memory)) {
+  if (ITC_FLAG(log_gpu_memory) || ITC_FLAG(log_memory_use)) {
     ITC_LOG_INFO("native renderer: GPU memory: {}", gpu_memory::Describe());
   }
-  if (std::string by_tick = passes_.TakeMirrorByTick(); !by_tick.empty()) {
-    uint64_t missing, most;
-    Renderer_TakeListStats(missing, most);
-    ITC_LOG_INFO("native renderer: mirror by tick: {}; lists replayed without a hand-over {}, "
-                 "most waiting {}",
-                 by_tick, missing, most);
+  if (ITC_FLAG(log_memory_use)) {
+    ITC_LOG_INFO("memory use: {}", memory::DescribeResident());
   }
-  if (ITC_FLAG(native_renderer_verify_mirror)) {
-    ITC_LOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
-                 "differed from guest memory ({:.1f} MB){}",
-                 view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
-                 view.mirror_stale ? std::format(", e.g. {} {:08X} ({} bytes)",
-                                                view.mirror_stale_sample_index ? "index" : "vertex",
-                                                view.mirror_stale_sample_address,
-                                                view.mirror_stale_sample_size)
-                                  : std::string());
-  }
+  ITC_LOG_INFO("native renderer: {}", passes_.TakeArenaStats());
   ITC_LOG_INFO("native renderer: {} targets; per frame {:.1f} clears ({:.1f} with rects), {:.1f} "
-               "resolves, {:.1f} skipped; {:.1f} draws with targets 1-3 bound, {:.1f} with "
+               "resolves ({:.1f} handed over, {:.1f} targets copied back), {:.1f} skipped; {:.1f} "
+               "draws with targets 1-3 bound, {:.1f} with "
                "mismatched sample counts, {:.1f} with a depth bias, {:.1f} with an equal depth "
                "test; {} resolves with unknown flags (e.g. {:08X}); {} tilings, {} tiled resolves",
                view.targets, double(view.clears) / frames, double(view.clear_rects) / frames,
-               double(view.resolves) / frames, double(view.resolves_skipped) / frames,
+               double(view.resolves) / frames, double(view.resolves_handed) / frames,
+               double(view.resolves_copied_back) / frames, double(view.resolves_skipped) / frames,
                double(view.extra_targets) / frames, double(view.mismatched_samples) / frames,
                double(view.depth_biased) / frames, double(view.depth_equal) / frames,
                view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
@@ -1074,12 +1014,6 @@ void Renderer::LogStats() {
   }
   ITC_LOG_INFO("native renderer: {:.1f} draws a frame with PsParamGen;{}",
                double(view.param_gen_draws) / frames, passes_.TakeInterfaces());
-  if (view.clamped_draws) {
-    const auto& c = view.clamped_sample;
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
-                 "e.g. {}-{} against {}-{}",
-                 double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
-  }
   if (view.inline_draws) {
     const auto& t = view.inline_by_type;
     ITC_LOG_INFO("native renderer: {:.1f} inline vertex draws a frame (triangle lists {:.1f}, "
@@ -1100,61 +1034,19 @@ void Renderer::LogStats() {
     if (view.offsets_differ) {
       ITC_LOG_INFO("native renderer: descriptor sets repeated with other offsets for {:.0f}% of "
                    "draws: system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, "
-                   "bool/loop {:.0f}%, fetch {:.0f}% (fetch alone {:.0f}%)",
+                   "bool/loop {:.0f}%",
                    share(view.offsets_differ), share(o[0]), share(o[1]), share(o[2]),
-                   share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
+                   share(o[3]));
     }
-  }
-  if (const RegisterReadStats& r = view.register_reads; r.calls) {
-    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(r.calls); };
-    const auto& b = r.blocks_changed;
-    ITC_LOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
-                 "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
-                 "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
-                 "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
-                 double(r.calls) / frames, double(r.words) / frames,
-                 double(r.words_copied) / frames, double(r.words_changed) / frames,
-                 share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
-                 share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
   }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
     ITC_LOG_INFO("native renderer: of {:.1f} draws a frame given constants, reusing the last "
                  "written system {:.0f}%, vertex floats {:.0f}%, pixel floats {:.0f}%, bool/loop "
-                 "{:.0f}%, fetch {:.0f}%; {:.0f} KB written a frame",
+                 "{:.0f}%; {:.0f} KB written a frame",
                  double(view.constants_draws) / frames, share(r[0]), share(r[1]), share(r[2]),
-                 share(r[3]), share(r[4]), double(view.constant_bytes) / frames / 1024);
-    if (view.fetch_changed) {
-      ITC_LOG_INFO("native renderer: fetch block differed from the last written for {:.0f}% of "
-                   "draws: in a texture fetch constant read {:.0f}%, a vertex fetch constant "
-                   "read {:.0f}% (address only {:.0f}%), only in unread ones {:.0f}%",
-                   share(view.fetch_changed), share(view.fetch_changed_texture),
-                   share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
-                   share(view.fetch_changed_unread));
-    }
-  }
-  if (view.vertex_shader_copies) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
-                 "patched copy in the command buffer",
-                 double(view.vertex_shader_copies) / frames);
-  }
-  if (view.declaration_mismatches) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
-                 "vertex declaration than the bound one ({:.1f} patched in their library call), "
-                 "e.g. {} (bound {})",
-                 double(view.declaration_mismatches) / frames,
-                 double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
-                 view.declaration_sample[1]);
-  }
-  for (const std::string& line : passes_.TakeDeclarationLines()) {
-    ITC_LOG_INFO("native renderer: declaration mismatch: {}", line);
-  }
-  if (view.base_vertex_differs) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
-                 "than VGT_INDX_OFFSET, e.g. {} and {}",
-                 double(view.base_vertex_differs) / frames, int32_t(view.base_vertex_sample[0]),
-                 int32_t(view.base_vertex_sample[1]));
+                 share(r[3]), double(view.constant_bytes) / frames / 1024);
   }
   if (view.vertex_overruns) {
     const auto& v = view.vertex_overrun_sample;
@@ -1171,23 +1063,8 @@ void Renderer::LogStats() {
       ITC_LOG_INFO("native renderer: changed: {}", line);
     }
   }
-  if (ITC_FLAG(native_renderer_check_clobbers)) {
-    ITC_LOG_INFO("native renderer: {}", passes_.TakeClobbers());
-  }
-  if (ITC_FLAG(native_renderer_check_late_writes)) {
-    ITC_LOG_INFO("native renderer: {}", passes_.TakeLateWrites());
-  }
-  if (ITC_FLAG(native_renderer_check_mirror)) {
-    ITC_LOG_INFO("native renderer: between frames, {}", passes_.TakeMirrorChanges());
-  }
-  if (ITC_FLAG(native_renderer_log_index_ranges)) {
-    ITC_LOG_INFO("native renderer: {}", passes_.TakeIndexRanges());
-  }
   if (ITC_FLAG(native_renderer_log_texture_bindings)) {
     ITC_LOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
-  }
-  if (ITC_FLAG(native_renderer_log_shader_lookups)) {
-    ITC_LOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;
@@ -1236,31 +1113,49 @@ void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
   }
 }
 
-void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
-                           uint32_t arg2) {
-  if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
-    return;
-  }
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterCommand(id, payload, arg1);
+
+}  // namespace native
+
+void render::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->DrawIndexed(type, base_start, primitive_count);
   }
 }
 
-void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
-                         uint32_t data) {
-  if (Renderer* renderer = GetRenderer()) {
+void render::Clear(uint32_t flags, uint32_t color, float z, uint32_t stencil, bool rects) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().Clear(renderer->Commands(), flags, color, z, stencil, rects);
+  }
+}
+
+void render::Resolve(uint32_t flags, const int32_t* rect, uint32_t destination,
+                     const int32_t* point, bool level_or_slice, const float clear_color[4],
+                     float clear_z, uint32_t clear_stencil) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().Resolve(renderer->Commands(), flags, rect, destination, point,
+                               level_or_slice, clear_color, clear_z, clear_stencil);
+  }
+}
+
+void render::TilingBegun(uint32_t width, uint32_t height, float clear) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().BeginTiling(renderer->Commands(), width, height, clear);
+  }
+}
+
+void render::TilingEnded(uint32_t flags, uint32_t destination, float clear) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().EndTiling(renderer->Commands(), flags, destination, clear);
+  }
+}
+
+void render::DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t data) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
     renderer->InlineDraw(type, count, stride, data);
   }
 }
 
-void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
-                           uint32_t destination, uint32_t point, uint32_t clear_color,
-                           float clear_z, uint32_t tile, uint32_t tiles) {
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->TiledResolve(device, flags, rect, destination, point, clear_color, clear_z,
-                           tile, tiles);
-  }
-}
+namespace native {
 
 void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
   g_commands_seen = true;
@@ -1331,7 +1226,7 @@ namespace native::gpu_memory {
 
 std::string Describe() {
   static constexpr const char* kKinds[] = {"textures", "resolved", "images",   "staging",
-                                           "mirrors",  "constants", "other"};
+                                           "arena",    "constants", "other"};
   static constexpr const char* kObjects[] = {"views", "samplers", "descriptor pools",
                                              "pipelines"};
   static_assert(std::size(kKinds) == size_t(Kind::kCount));
