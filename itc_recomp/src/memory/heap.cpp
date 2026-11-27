@@ -7,6 +7,7 @@
 #include "base/log.h"
 
 #include <sys/mman.h>
+#include <vector>
 
 #include <algorithm>
 #include <atomic>
@@ -515,19 +516,36 @@ PhysicalTag::~PhysicalTag() {
 }
 
 std::string DescribePhysical() {
-  std::map<std::string, std::pair<uint64_t, uint32_t>> by_tag;
+  // Each tag's live blocks: their sizes, count, and the bytes of them
+  // resident now (mincore over the whole block once).
+  struct Totals {
+    uint64_t live = 0, resident = 0;
+    uint32_t count = 0;
+  };
+  std::map<std::string, Totals> by_tag;
+  std::vector<unsigned char> pages(kPhysicalBytes / 0x1000);
+  const bool have_pages = mincore(g_physical, kPhysicalBytes, pages.data()) == 0;
   {
     std::lock_guard lock(mutex);
     for (const auto& [address, size] : physical_sizes) {
-      auto& t = by_tag[physical_tags[address]];
-      t.first += size;
-      t.second++;
+      Totals& t = by_tag[physical_tags[address]];
+      t.live += size;
+      t.count++;
+      if (!have_pages) {
+        continue;
+      }
+      const PhysicalView& view = ViewOf(address);
+      const uint64_t offset = address - view.base + view.offset;
+      for (uint64_t page = offset / 0x1000;
+           page < (offset + size + 0xFFF) / 0x1000 && page < pages.size(); page++) {
+        t.resident += (pages[page] & 1) * 0x1000;
+      }
     }
   }
   std::string out;
   for (const auto& [tag, t] : by_tag) {
-    out += std::format("{}{} {:.1f} MB ({})", out.empty() ? "" : ", ", tag,
-                       t.first / 1048576.0, t.second);
+    out += std::format("{}{} {:.1f} MB ({}, {:.1f} MB resident)", out.empty() ? "" : ", ", tag,
+                       t.live / 1048576.0, t.count, t.resident / 1048576.0);
   }
   return out;
 }

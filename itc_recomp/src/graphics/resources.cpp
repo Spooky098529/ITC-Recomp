@@ -4,6 +4,7 @@
 #include "graphics/resources.h"
 
 #include "guest.h"
+#include "memory/heap.h"
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
@@ -879,7 +880,10 @@ uint32_t CreateVertexBuffer(uint32_t bytes, uint32_t usage) {
   if (usage & kUsage200) {
     common |= 0x00400000;
   }
-  const uint32_t data = memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
+  const uint32_t data = [&] {
+    memory::PhysicalTag tag("vertex buffers", true);
+    return memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
+  }();
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
@@ -909,7 +913,10 @@ uint32_t CreateIndexBuffer(uint32_t bytes, uint32_t usage, uint32_t format) {
   if (usage & kUsage200) {
     common |= 0x00400000;
   }
-  const uint32_t data = memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
+  const uint32_t data = [&] {
+    memory::PhysicalTag tag("index buffers", true);
+    return memory::crt::XMemAlloc(bytes, kDataAttributes | (protection << 28));
+  }();
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
@@ -934,6 +941,7 @@ uint32_t CreateTexture(uint32_t width, uint32_t height, uint32_t depth,
                                                     usage, format, 2, 0, 0, 0, header);
   // Physical, the protection field 3, or 2 (write-combined) with usage 0x4.
   const uint32_t attributes = 0x8C800000 | (((~usage >> 2) & 1) | 2) << 28;
+  memory::PhysicalTag tag("textures", true);
   const uint32_t data = memory::crt::XMemAlloc(sizes.base_size, attributes);
   if (data == 0) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
