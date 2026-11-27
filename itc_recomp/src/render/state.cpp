@@ -83,9 +83,10 @@ BlendState Decode(uint32_t control) {
   b.src_alpha = BlendFactor(control >> 16 & 0x1F);
   b.alpha_op = BlendOp(control >> 21 & 7);
   b.dst_alpha = BlendFactor(control >> 24 & 0x1F);
-  b.enable = !(b.src_color == VK_BLEND_FACTOR_ONE && b.dst_color == VK_BLEND_FACTOR_ZERO &&
-               b.color_op == VK_BLEND_OP_ADD && b.src_alpha == VK_BLEND_FACTOR_ONE &&
-               b.dst_alpha == VK_BLEND_FACTOR_ZERO && b.alpha_op == VK_BLEND_OP_ADD);
+  using F = gpu::BlendFactor;
+  b.enable = !(b.src_color == F::kOne && b.dst_color == F::kZero &&
+               b.color_op == gpu::BlendOp::kAdd && b.src_alpha == F::kOne &&
+               b.dst_alpha == F::kZero && b.alpha_op == gpu::BlendOp::kAdd);
   return b;
 }
 
@@ -112,33 +113,34 @@ float Float(uint32_t bits) { return std::bit_cast<float>(bits); }
 
 }  // namespace
 
-VkBlendFactor BlendFactor(uint32_t factor) {
-  static const VkBlendFactor kMap[17] = {
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_ONE,
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_SRC_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
-      VK_BLEND_FACTOR_SRC_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-      VK_BLEND_FACTOR_DST_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
-      VK_BLEND_FACTOR_DST_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
-      VK_BLEND_FACTOR_CONSTANT_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
-      VK_BLEND_FACTOR_CONSTANT_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
-      VK_BLEND_FACTOR_SRC_ALPHA_SATURATE,
+gpu::BlendFactor BlendFactor(uint32_t factor) {
+  using F = gpu::BlendFactor;
+  static const F kMap[17] = {
+      F::kZero,
+      F::kOne,
+      F::kZero,
+      F::kZero,
+      F::kSrcColor,
+      F::kOneMinusSrcColor,
+      F::kSrcAlpha,
+      F::kOneMinusSrcAlpha,
+      F::kDstColor,
+      F::kOneMinusDstColor,
+      F::kDstAlpha,
+      F::kOneMinusDstAlpha,
+      F::kConstantColor,
+      F::kOneMinusConstantColor,
+      F::kConstantAlpha,
+      F::kOneMinusConstantAlpha,
+      F::kSrcAlphaSaturate,
   };
-  return factor < 17 ? kMap[factor] : VK_BLEND_FACTOR_ZERO;
+  return factor < 17 ? kMap[factor] : F::kZero;
 }
 
-VkBlendOp BlendOp(uint32_t op) {
-  static const VkBlendOp kMap[5] = {VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_MIN,
-                                    VK_BLEND_OP_MAX, VK_BLEND_OP_REVERSE_SUBTRACT};
-  return op < 5 ? kMap[op] : VK_BLEND_OP_ADD;
+gpu::BlendOp BlendOp(uint32_t op) {
+  using O = gpu::BlendOp;
+  static const O kMap[5] = {O::kAdd, O::kSubtract, O::kMin, O::kMax, O::kReverseSubtract};
+  return op < 5 ? kMap[op] : O::kAdd;
 }
 
 const RenderStates& States() { return g_states; }
@@ -197,15 +199,16 @@ void SetMipLevel(Stage& s, uint32_t value, bool max) {
   (max ? s.max_mip : s.min_mip) = uint8_t(value);
 }
 
-// The GPU's clamp modes (D3D's address modes on the 360) as Vulkan's;
+// The GPU's clamp modes (D3D's address modes on the 360) as the renderer's;
 // mirror clamp to edge where a device lacks it is the sampler cache's.
-VkSamplerAddressMode AddressMode(uint32_t mode) {
+gpu::AddressMode AddressMode(uint32_t mode) {
+  using A = gpu::AddressMode;
   switch (mode & 7) {
-    case 0: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    case 1: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-    case 6: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    case 3: case 5: case 7: return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-    default: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;  // 2, 4: to the edge, halfway
+    case 0: return A::kRepeat;
+    case 1: return A::kMirroredRepeat;
+    case 6: return A::kClampToBorder;
+    case 3: case 5: case 7: return A::kMirrorClampToEdge;
+    default: return A::kClampToEdge;  // 2, 4: to the edge, halfway
   }
 }
 
@@ -221,28 +224,27 @@ void MapSampler(Stage& s) {
                                               4 * s.max_anisotropy) & 7
                              : 0;
   m.max_anisotropy = aniso >= 1 ? float(1u << (aniso - 1)) : 0.0f;
-  m.mag_filter = s.filters[0] == 1 || aniso >= 1 ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  m.min_filter = s.filters[1] == 1 || aniso >= 1 ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+  m.mag_filter = s.filters[0] == 1 || aniso >= 1 ? gpu::Filter::kLinear : gpu::Filter::kNearest;
+  m.min_filter = s.filters[1] == 1 || aniso >= 1 ? gpu::Filter::kLinear : gpu::Filter::kNearest;
 }
 
 void ApplySamplerState(Stage& s, uint32_t state, uint32_t value) {
   using G = schema::DeviceStateGlobals;
-  // The sampler, as Vulkan's.
+  // The sampler, as the renderer's.
   switch (state) {
     case 0: case 4: case 8:  // AddressU, V, W
       s.sampler.address[state / 4] = AddressMode(value);
       break;
     case 12:  // BorderColor: opaque white unless 0
-      s.sampler.border = value != 0 ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
-                                    : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+      s.sampler.border =
+          value != 0 ? gpu::BorderColor::kOpaqueWhite : gpu::BorderColor::kTransparentBlack;
       break;
     case 16: case 20:  // MagFilter, MinFilter (4 anisotropic, as linear)
       s.filters[state == 20] = uint8_t((value | value >> 2) & 3);
       s.anisotropic[state == 20] = (value >> 2) != 0;
       break;
     case 24:  // MipFilter: point 0, linear 1, none 2
-      s.sampler.mip_mode =
-          (value & 3) == 1 ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+      s.sampler.mip_mode = (value & 3) == 1 ? gpu::MipMode::kLinear : gpu::MipMode::kNearest;
       s.sampler.base_level_only = (value & 3) == 2;
       break;
     case 28:  // MipMapLodBias, in levels
@@ -610,15 +612,14 @@ void SetRenderState(uint32_t state, uint32_t value) {
     case 40:  // ZEnable
       s.z_enable = value != 0;
       break;
-    case 44:  // ZFunc: the GPU's compare numbers, Vulkan's order
-      s.z_func = VkCompareOp(value & 7);
+    case 44:  // ZFunc: the GPU's compare numbers, gpu::CompareOp's
+      s.z_func = gpu::CompareOp(value & 7);
       break;
     case 48:  // ZWriteEnable
       s.z_write = value != 0;
       break;
     case 56:  // CullMode: bit 0 cull front faces, 1 back faces, 2 front is clockwise
-      s.cull = ((value & 1) ? VK_CULL_MODE_FRONT_BIT : 0) |
-               ((value & 2) ? VK_CULL_MODE_BACK_BIT : 0);
+      s.cull = gpu::CullMode(value & 3);
       s.front_clockwise = (value & 4) != 0;
       break;
     case 60:  // AlphaBlendEnable
@@ -660,7 +661,7 @@ void SetRenderState(uint32_t state, uint32_t value) {
       s.alpha_ref = float(double(value)) * (1.0f / 255.0f);
       break;
     case 104:  // AlphaFunc
-      s.alpha_func = VkCompareOp(value & 7);
+      s.alpha_func = gpu::CompareOp(value & 7);
       break;
     case 200:  // ScissorTestEnable
       s.scissor_enable = value != 0;

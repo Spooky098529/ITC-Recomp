@@ -5,6 +5,7 @@
 #include "shader_ports.h"
 #include "graphics/shader_patch.h"
 #include "render/state.h"
+#include "native/vulkan_types.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -294,36 +295,6 @@ bool GetPrimitiveInfo(uint32_t type, PrimitiveInfo& out) {
   }
 }
 
-// Xenos blend factors and ops (as the plugin maps them).
-VkBlendFactor BlendFactor(uint32_t factor) {
-  static const VkBlendFactor kMap[17] = {
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_ONE,
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_ZERO,
-      VK_BLEND_FACTOR_SRC_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
-      VK_BLEND_FACTOR_SRC_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-      VK_BLEND_FACTOR_DST_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
-      VK_BLEND_FACTOR_DST_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
-      VK_BLEND_FACTOR_CONSTANT_COLOR,
-      VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
-      VK_BLEND_FACTOR_CONSTANT_ALPHA,
-      VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
-      VK_BLEND_FACTOR_SRC_ALPHA_SATURATE,
-  };
-  return factor < 17 ? kMap[factor] : VK_BLEND_FACTOR_ZERO;
-}
-
-VkBlendOp BlendOp(uint32_t op) {
-  static const VkBlendOp kMap[5] = {VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_MIN,
-                                    VK_BLEND_OP_MAX, VK_BLEND_OP_REVERSE_SUBTRACT};
-  return op < 5 ? kMap[op] : VK_BLEND_OP_ADD;
-}
-
 uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint32_t type_bits,
                         VkMemoryPropertyFlags wanted) {
   for (uint32_t i = 0; i < properties.memoryTypeCount; i++) {
@@ -346,6 +317,7 @@ struct PipelineKey {
   uint32_t z_enable, z_write, z_func;
   uint32_t blend_enable, src_color, dst_color, color_op, src_alpha, dst_alpha, alpha_op;
   uint32_t write_mask;
+  // cull_mode, z_func and the blend fields are gpu:: values (src/gpu/types.h).
   // The targets: color format (UNDEFINED for none), depth or not, samples.
   uint32_t color_format, depth, samples;
 
@@ -1897,7 +1869,7 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   VkPipelineRasterizationStateCreateInfo raster{
       VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
   raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = key.cull_mode;
+  raster.cullMode = vk_types::CullMode(gpu::CullMode(key.cull_mode));
   raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
   raster.lineWidth = 1.0f;
   VkPipelineMultisampleStateCreateInfo multisample{
@@ -1907,15 +1879,15 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depth.depthTestEnable = key.z_enable;
   depth.depthWriteEnable = key.z_write;
-  depth.depthCompareOp = VkCompareOp(key.z_func);  // Xenos' order is Vulkan's
+  depth.depthCompareOp = vk_types::CompareOp(gpu::CompareOp(key.z_func));
   VkPipelineColorBlendAttachmentState attachment{};
   attachment.blendEnable = key.blend_enable;
-  attachment.srcColorBlendFactor = VkBlendFactor(key.src_color);
-  attachment.dstColorBlendFactor = VkBlendFactor(key.dst_color);
-  attachment.colorBlendOp = VkBlendOp(key.color_op);
-  attachment.srcAlphaBlendFactor = VkBlendFactor(key.src_alpha);
-  attachment.dstAlphaBlendFactor = VkBlendFactor(key.dst_alpha);
-  attachment.alphaBlendOp = VkBlendOp(key.alpha_op);
+  attachment.srcColorBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.src_color));
+  attachment.dstColorBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.dst_color));
+  attachment.colorBlendOp = vk_types::BlendOp(gpu::BlendOp(key.color_op));
+  attachment.srcAlphaBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.src_alpha));
+  attachment.dstAlphaBlendFactor = vk_types::BlendFactor(gpu::BlendFactor(key.dst_alpha));
+  attachment.alphaBlendOp = vk_types::BlendOp(gpu::BlendOp(key.alpha_op));
   attachment.colorWriteMask = key.write_mask;
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
   bool has_color = key.color_format != VK_FORMAT_UNDEFINED;
@@ -3375,7 +3347,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     z_enable = states.z_enable;
     z_write = states.z_write;
     z_func = uint32_t(states.z_func);
-    if (z_enable && !z_write && z_func == VK_COMPARE_OP_ALWAYS) {
+    if (z_enable && !z_write && states.z_func == gpu::CompareOp::kAlways) {
       z_enable = false;
     }
   }
@@ -3616,7 +3588,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
   key.primitive_restart = primitive.strip && states.primitive_restart;
-  key.cull_mode = states.cull;
+  key.cull_mode = uint32_t(states.cull);
   key.front_clockwise = states.front_clockwise;
   if (depth) {
     key.z_enable = z_enable;
@@ -3627,16 +3599,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
   const render::BlendState& blend = states.blend[0];
-  key.src_color = blend.src_color;
-  key.dst_color = blend.dst_color;
-  key.color_op = blend.color_op;
-  key.src_alpha = blend.src_alpha;
-  key.dst_alpha = blend.dst_alpha;
-  key.alpha_op = blend.alpha_op;
+  key.src_color = uint32_t(blend.src_color);
+  key.dst_color = uint32_t(blend.dst_color);
+  key.color_op = uint32_t(blend.color_op);
+  key.src_alpha = uint32_t(blend.src_alpha);
+  key.dst_alpha = uint32_t(blend.dst_alpha);
+  key.alpha_op = uint32_t(blend.alpha_op);
   key.blend_enable =
-      !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
-        key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
-        key.dst_alpha == VK_BLEND_FACTOR_ZERO && key.alpha_op == VK_BLEND_OP_ADD);
+      !(blend.src_color == gpu::BlendFactor::kOne && blend.dst_color == gpu::BlendFactor::kZero &&
+        blend.color_op == gpu::BlendOp::kAdd && blend.src_alpha == gpu::BlendFactor::kOne &&
+        blend.dst_alpha == gpu::BlendFactor::kZero && blend.alpha_op == gpu::BlendOp::kAdd);
   // Each bound target's color format, from its surface's color info.
   uint32_t target_formats[4];
   for (uint32_t i = 0; i < 4; i++) {
@@ -3704,7 +3676,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     // on when either isn't 0; lines take none.
     if (primitive.polygonal &&
         (states.depth_bias_slope != 0.0f || states.depth_bias_constant != 0.0f) &&
-        (states.cull & VK_CULL_MODE_FRONT_AND_BACK) != VK_CULL_MODE_FRONT_AND_BACK) {
+        states.cull != gpu::CullMode::kFrontAndBack) {
       slope = states.depth_bias_slope;
       constant = states.depth_bias_constant;
     }
@@ -3716,7 +3688,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     if (constant != 0.0f || slope != 0.0f) {
       s.stats.depth_biased++;
     }
-    if (key.z_enable && key.z_func == VK_COMPARE_OP_EQUAL) {
+    if (key.z_enable && gpu::CompareOp(key.z_func) == gpu::CompareOp::kEqual) {
       s.stats.depth_equal++;
     }
   }
@@ -3907,7 +3879,7 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   VkPipelineRasterizationStateCreateInfo raster{
       VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
   raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = key.cull_mode;
+  raster.cullMode = vk_types::CullMode(gpu::CullMode(key.cull_mode));
   raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
   raster.depthBiasEnable = VK_TRUE;
   raster.lineWidth = 1.0f;
@@ -3918,7 +3890,7 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depth.depthTestEnable = key.z_enable;
   depth.depthWriteEnable = key.z_write;
-  depth.depthCompareOp = VkCompareOp(key.z_func);
+  depth.depthCompareOp = vk_types::CompareOp(gpu::CompareOp(key.z_func));
   VkPipelineColorBlendAttachmentState attachment{};
   attachment.colorWriteMask = 0xF;
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
@@ -3975,8 +3947,9 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   // Depth cleared to far: 0 for the game's reversed depth (greater tests).
   bool reversed = false;
   for (const IdDraw& draw : id_draws) {
-    reversed |= draw.key.z_enable && (draw.key.z_func == VK_COMPARE_OP_GREATER ||
-                                      draw.key.z_func == VK_COMPARE_OP_GREATER_OR_EQUAL);
+    const gpu::CompareOp z_func = gpu::CompareOp(draw.key.z_func);
+    reversed |= draw.key.z_enable && (z_func == gpu::CompareOp::kGreater ||
+                                      z_func == gpu::CompareOp::kGreaterOrEqual);
   }
   VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   color.imageView = id_image.view;

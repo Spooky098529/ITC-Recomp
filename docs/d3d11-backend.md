@@ -1,7 +1,7 @@
-# A Direct3D 11 backend (a plan; not started)
+# A Direct3D 11 backend (a plan; step 2 done)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
-renderer's merge). This is a plan: no code has changed for it.
+renderer's merge). Step 2 is done (below, "Step 2: `render::`'s own types").
 
 ## The goal
 
@@ -24,8 +24,8 @@ Above the seam, backend-neutral already:
 - `render::` (`src/render/state.{h,cpp}`): what the handlers set, as values
   (render states, blend, samplers, the bound shaders, declaration, streams,
   index buffer, targets, viewport, constants), and the draws, clears and
-  resolves passed on. Its values are Vulkan's enums (16 Vulkan types in
-  `state.h`), by the PC renderer plan's design.
+  resolves passed on. Its values were Vulkan's enums, by the PC renderer
+  plan's design; since step 2 they're our own (`src/gpu/types.h`).
 
 Below it, one Vulkan renderer (`src/native/`), its logic and its API calls
 mixed:
@@ -108,6 +108,27 @@ moment (`--attract_seed`, `--max_fps=30`, no interpolation), and by a drive.
 
 No profiling until the end, as with the PC renderer: then one profile of
 each backend.
+
+## Step 2: `render::`'s own types (done 2026-11-27)
+
+- `src/gpu/types.h` holds the renderer's own values for what `render::`
+  held as Vulkan's: `CompareOp` (in the GPU's order, D3D's minus one: the
+  draw constants' alpha test flag passes it to the shaders as is),
+  `BlendFactor`, `BlendOp`, `CullMode` (bits: front 1, back 2; both culls
+  everything, which D3D11 lacks: its backend will skip such draws, as the
+  draw already takes no depth bias for them), `Filter`, `MipMode`,
+  `AddressMode` (`kMirrorClampToEdge` is D3D11's `MIRROR_ONCE`) and
+  `BorderColor`.
+- `render::` (`state.{h,cpp}`) and the handlers no longer include anything
+  of Vulkan's. The pipeline key carries the `gpu::` values; the Vulkan code
+  maps them where it makes a pipeline (the draw's and the ID pass's) or a
+  sampler (`src/native/vulkan_types.h`). The pipeline disk cache is the
+  driver's `VkPipelineCache` blob, not our keys, so it's unaffected.
+  `passes.cpp`'s own copies of the blend factor and op maps had no callers:
+  gone.
+- Checked: an attract race's dump against the build before's at the same
+  moment (2,654 draws; all 59 images 0.0000% of pixels off, `draws.txt` the
+  same), the tick replay (both races match, 0 error lines).
 
 ## Open questions
 

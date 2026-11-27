@@ -5,6 +5,7 @@
 #include "buffers.h"
 #include "gpu_memory.h"
 #include "state.h"
+#include "native/vulkan_types.h"
 
 #include <algorithm>
 #include <array>
@@ -1935,11 +1936,12 @@ VkSamplerCreateInfo InfoFromState(const render::SamplerState& state, bool cube,
                                   const DeviceContext& context) {
   VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
   bool anisotropic = state.max_anisotropy >= 1.0f && context.sampler_anisotropy;
-  info.magFilter = anisotropic ? VK_FILTER_LINEAR : state.mag_filter;
-  info.minFilter = anisotropic ? VK_FILTER_LINEAR : state.min_filter;
-  info.mipmapMode = state.mip_mode;
+  info.magFilter = anisotropic ? VK_FILTER_LINEAR : vk_types::Filter(state.mag_filter);
+  info.minFilter = anisotropic ? VK_FILTER_LINEAR : vk_types::Filter(state.min_filter);
+  info.mipmapMode = vk_types::MipMode(state.mip_mode);
   for (uint32_t i = 0; i < 3; i++) {
-    VkSamplerAddressMode mode = cube ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : state.address[i];
+    VkSamplerAddressMode mode = cube ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+                                     : vk_types::AddressMode(state.address[i]);
     if (mode == VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE && !context.sampler_mirror_clamp_to_edge) {
       mode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
     }
@@ -1952,7 +1954,7 @@ VkSamplerCreateInfo InfoFromState(const render::SamplerState& state, bool cube,
   info.mipLodBias = state.mip_lod_bias;
   info.minLod = float(min_level);
   info.maxLod = float(state.base_level_only || base_level_only ? min_level : max_level);
-  info.borderColor = state.border;
+  info.borderColor = vk_types::BorderColor(state.border);
   return info;
 }
 

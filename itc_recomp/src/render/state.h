@@ -1,6 +1,6 @@
 // The renderer's own draw state (docs/pc-renderer.md, "The seam: the
 // handlers call our renderer"): what the render command replay's handlers
-// set, as Vulkan values, mapped once where the game's Direct3D call is
+// set, as the renderer's own values (src/gpu/types.h), mapped once where the game's Direct3D call is
 // handled. The draw builds its pipeline and dynamic state from it instead of
 // reading the graphics device's register shadow.
 //
@@ -13,16 +13,16 @@
 
 #include <cstdint>
 
-#include "native/vulkan_functions.h"
+#include "gpu/types.h"
 
 namespace render {
 
 struct BlendState {
   bool enable = false;
-  VkBlendFactor src_color = VK_BLEND_FACTOR_ONE, dst_color = VK_BLEND_FACTOR_ZERO;
-  VkBlendOp color_op = VK_BLEND_OP_ADD;
-  VkBlendFactor src_alpha = VK_BLEND_FACTOR_ONE, dst_alpha = VK_BLEND_FACTOR_ZERO;
-  VkBlendOp alpha_op = VK_BLEND_OP_ADD;
+  gpu::BlendFactor src_color = gpu::BlendFactor::kOne, dst_color = gpu::BlendFactor::kZero;
+  gpu::BlendOp color_op = gpu::BlendOp::kAdd;
+  gpu::BlendFactor src_alpha = gpu::BlendFactor::kOne, dst_alpha = gpu::BlendFactor::kZero;
+  gpu::BlendOp alpha_op = gpu::BlendOp::kAdd;
   // The fields as the game gave them (the blend control's layout), for
   // diagnostics.
   uint32_t fields = 0x00010001;
@@ -32,12 +32,12 @@ struct BlendState {
 struct RenderStates {
   // Depth.
   bool z_enable = true, z_write = true;
-  VkCompareOp z_func = VK_COMPARE_OP_LESS_OR_EQUAL;
+  gpu::CompareOp z_func = gpu::CompareOp::kLessOrEqual;
   // Depth bias: the slope in the GPU's 1/16 pixel units (D3D's slope scale
   // times 16) and the constant, both faces; on when either isn't 0.
   float depth_bias_slope = 0.0f, depth_bias_constant = 0.0f;
   // Rasterization.
-  VkCullModeFlags cull = VK_CULL_MODE_BACK_BIT;
+  gpu::CullMode cull = gpu::CullMode::kBack;
   bool front_clockwise = true;
   bool primitive_restart = false;
   // The viewport transform applied (D3D's ViewportEnable; off: positions
@@ -53,9 +53,8 @@ struct RenderStates {
   BlendState blend[4];
   uint32_t color_write[4] = {0xF, 0xF, 0xF, 0xF};
   float blend_constants[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-  // The alpha test: its compare (VK_COMPARE_OP_ALWAYS when off) and
-  // reference (0-1).
-  VkCompareOp alpha_func = VK_COMPARE_OP_ALWAYS;
+  // The alpha test: its compare (always when off) and reference (0-1).
+  gpu::CompareOp alpha_func = gpu::CompareOp::kAlways;
   bool alpha_test = false;
   float alpha_ref = 0.0f;
 };
@@ -144,22 +143,21 @@ void SetSamplerState(uint32_t stage, uint32_t state, uint32_t value);
 // Stage `stage`'s descriptor (stages 0-25).
 const uint32_t* TextureDescriptor(uint32_t stage);
 
-// A stage's sampler, as Vulkan's, mapped from the game's sampler states as
+// A stage's sampler, mapped from the game's sampler states as
 // they're set (the device's own clamps applied when the sampler is made:
 // the most anisotropy, mirror clamp to edge's support). The level range is
 // the texture's, from its view.
 struct SamplerState {
-  VkFilter mag_filter = VK_FILTER_NEAREST, min_filter = VK_FILTER_NEAREST;
-  VkSamplerMipmapMode mip_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  gpu::Filter mag_filter = gpu::Filter::kNearest, min_filter = gpu::Filter::kNearest;
+  gpu::MipMode mip_mode = gpu::MipMode::kNearest;
   // The mip filter none: the base level only.
   bool base_level_only = false;
-  VkSamplerAddressMode address[3] = {VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                     VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                     VK_SAMPLER_ADDRESS_MODE_REPEAT};
+  gpu::AddressMode address[3] = {gpu::AddressMode::kRepeat, gpu::AddressMode::kRepeat,
+                                 gpu::AddressMode::kRepeat};
   // 0: off.
   float max_anisotropy = 0.0f;
   float mip_lod_bias = 0.0f;
-  VkBorderColor border = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+  gpu::BorderColor border = gpu::BorderColor::kTransparentBlack;
   bool operator==(const SamplerState&) const = default;
 };
 const SamplerState& StageSampler(uint32_t stage);
@@ -216,8 +214,8 @@ void ResetRenderStates();
 const RenderStates& States();
 
 // The GPU's blend factor and op numbers (the blend control's fields, and
-// D3D's on the 360) as Vulkan's.
-VkBlendFactor BlendFactor(uint32_t factor);
-VkBlendOp BlendOp(uint32_t op);
+// D3D's on the 360) as the renderer's.
+gpu::BlendFactor BlendFactor(uint32_t factor);
+gpu::BlendOp BlendOp(uint32_t op);
 
 }  // namespace render
