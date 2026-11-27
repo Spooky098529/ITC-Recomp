@@ -27,7 +27,8 @@ compile() {  # name, source, extra arguments
   # The HLSL, from SPIR-V with its names; vertex shaders with Y flipped to
   # D3D's clip space.
   case "$1" in
-    *.vert) profile=vs_5_0; flip=--flip-vert-y ;;
+    *.vert) profile=vs_5_0  # as compile_game.py's VERTEX_OPTIONS
+            flip="--flip-vert-y --hlsl-support-nonzero-basevertex-baseinstance --hlsl-basevertex-baseinstance-binding 4 0" ;;
     *.frag) profile=ps_5_0; flip= ;;
     *.comp) profile=cs_5_0; flip= ;;
   esac

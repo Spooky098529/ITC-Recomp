@@ -3,6 +3,12 @@
 #pragma once
 inline constexpr char k_hlsl_resolve_vert[] = R"hlsl(static float4 gl_Position;
 static int gl_VertexIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 struct SPIRV_Cross_Input
 {
     uint gl_VertexIndex : SV_VertexID;
@@ -22,7 +28,7 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
     vert_main();
     SPIRV_Cross_Output stage_output;
     stage_output.gl_Position = gl_Position;

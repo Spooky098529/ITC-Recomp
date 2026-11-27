@@ -162,6 +162,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -925,8 +931,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -1175,6 +1181,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -1988,8 +2000,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -2160,6 +2172,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -2951,8 +2969,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -3142,6 +3160,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -3902,8 +3926,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -4040,6 +4064,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -4751,8 +4781,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -5023,6 +5053,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -6038,8 +6074,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -6269,6 +6305,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -7058,8 +7100,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -7199,6 +7241,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -7910,8 +7958,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -8126,6 +8174,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -8923,8 +8977,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -9148,6 +9202,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -9932,8 +9992,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -10129,6 +10189,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -10889,8 +10955,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -11139,6 +11205,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -11961,8 +12033,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -12161,6 +12233,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -12941,8 +13019,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_1_0 = stage_input.xe_vf_in_1_0;
     xe_vf_in_1_1 = stage_input.xe_vf_in_1_1;
     xe_vf_in_1_2 = stage_input.xe_vf_in_1_2;
@@ -13191,6 +13269,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -14030,8 +14114,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -14314,6 +14398,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -15178,8 +15268,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -15381,6 +15471,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -16202,8 +16298,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -16396,6 +16492,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -17153,8 +17255,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -17375,6 +17477,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -18158,8 +18266,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -18467,6 +18575,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -19512,8 +19626,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -19746,6 +19860,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -20551,8 +20671,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_1_0 = stage_input.xe_vf_in_1_0;
     xe_vf_in_1_1 = stage_input.xe_vf_in_1_1;
     xe_vf_in_1_2 = stage_input.xe_vf_in_1_2;
@@ -20776,6 +20896,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -21679,8 +21805,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -21904,6 +22030,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -22692,8 +22824,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -22889,6 +23021,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -23647,8 +23785,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -23869,6 +24007,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -24720,8 +24864,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -25001,6 +25145,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -25839,8 +25989,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -25986,6 +26136,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -26695,8 +26851,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -26939,6 +27095,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -27769,8 +27931,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -27941,6 +28103,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -28674,8 +28842,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -28921,6 +29089,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -29734,8 +29908,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -29962,6 +30136,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -30750,8 +30930,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -31003,6 +31183,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static uint4 xe_vf_in_0_0;
 static uint4 xe_vf_in_0_1;
 static uint4 xe_vf_in_0_2;
@@ -31935,8 +32121,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -32135,6 +32321,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -32893,8 +33085,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -33087,6 +33279,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -33845,8 +34043,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -34039,6 +34237,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -34798,8 +35002,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -34964,6 +35168,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -35698,8 +35908,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -35861,6 +36071,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -36596,8 +36812,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;
@@ -36787,6 +37003,12 @@ cbuffer XeBoolLoopConstants : register(b3)
 static float4 gl_Position;
 static int gl_VertexIndex;
 static int gl_InstanceIndex;
+cbuffer SPIRV_Cross_VertexInfo : register(b4)
+{
+    int SPIRV_Cross_BaseVertex;
+    int SPIRV_Cross_BaseInstance;
+};
+
 static float4 xe_out_interpolator_0;
 static float4 xe_out_interpolator_1;
 static float4 xe_out_interpolator_2;
@@ -37545,8 +37767,8 @@ void vert_main()
 
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
-    gl_VertexIndex = int(stage_input.gl_VertexIndex);
-    gl_InstanceIndex = int(stage_input.gl_InstanceIndex);
+    gl_VertexIndex = int(stage_input.gl_VertexIndex) + SPIRV_Cross_BaseVertex;
+    gl_InstanceIndex = int(stage_input.gl_InstanceIndex) + SPIRV_Cross_BaseInstance;
     xe_vf_in_0_0 = stage_input.xe_vf_in_0_0;
     xe_vf_in_0_1 = stage_input.xe_vf_in_0_1;
     xe_vf_in_0_2 = stage_input.xe_vf_in_0_2;

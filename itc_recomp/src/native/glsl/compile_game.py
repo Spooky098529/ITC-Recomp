@@ -17,7 +17,8 @@ include), for tools/shader_port/check to compile and test.
 Every shader is also written as HLSL (Shader Model 5) for the D3D11 backend,
 into ../generated_game_shaders_hlsl.h (docs/d3d11-backend.md, "Shaders for
 D3D11"): SPIRV-Cross from the same GLSL (compiled again with its names, for
-readable HLSL), vertex shaders with Y flipped to D3D's clip space. The run-time
+readable HLSL), vertex shaders with Y flipped to D3D's clip space and the
+draw's base vertex and first instance from b4 (VERTEX_OPTIONS). The run-time
 fit becomes defines: each specialization constant SPIRV_CROSS_CONSTANT_ID_n,
 and interpolator n's semantic XE_INTERPOLATOR_n (TEXCOORDn unless defined).
 --check-hlsl also compiles every HLSL shader with D3DCompile under Wine
@@ -207,13 +208,21 @@ def spirv_cross():
     return built if os.path.exists(built) else "spirv-cross"
 
 
+# Vertex shaders: Y flipped to D3D's clip space, and gl_VertexIndex and
+# gl_InstanceIndex with the draw's base vertex and first instance added from
+# a constant block at b4 (D3D's SV_VertexID and SV_InstanceID leave them
+# out; Vulkan's include them, and the shaders pass the index on as r0).
+VERTEX_OPTIONS = ["--flip-vert-y", "--hlsl-support-nonzero-basevertex-baseinstance",
+                  "--hlsl-basevertex-baseinstance-binding", "4", "0"]
+
+
 def to_hlsl(spirv, vertex, interpolators=True):
     """The SPIR-V file as Shader Model 5 HLSL. With interpolators, the
     interpolators' semantics (the vertex shader's outputs, the pixel shader's
     inputs) become XE_INTERPOLATOR_n, which the backend defines as the places
     it gives them (as port_spirv.cpp moves their locations for Vulkan)."""
     text = subprocess.run([spirv_cross(), "--hlsl", "--shader-model", "50"] +
-                          (["--flip-vert-y"] if vertex else []) + [spirv],
+                          (VERTEX_OPTIONS if vertex else []) + [spirv],
                           check=True, stdout=subprocess.PIPE, text=True).stdout
     if not interpolators:
         return text
