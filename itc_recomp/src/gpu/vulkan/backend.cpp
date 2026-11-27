@@ -1475,6 +1475,18 @@ void Backend::CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload*
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, copies.data());
 }
 
+void Backend::CopyImageToBuffer(Image* image, Buffer* buffer, uint64_t offset, uint32_t width,
+                                uint32_t height) {
+  const ImageObject& o = Object(image);
+  VkBufferImageCopy copy{};
+  copy.bufferOffset = offset;
+  copy.imageSubresource = {o.depth_view ? VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT) : o.aspects,
+                           0, 0, 1};
+  copy.imageExtent = {width, height, 1};
+  vk::vkCmdCopyImageToBuffer(commands(), o.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             Handle(buffer), 1, &copy);
+}
+
 View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   const ImageObject& o = Object(image);
   auto component = [](Swizzle swizzle) {

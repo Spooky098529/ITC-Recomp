@@ -148,6 +148,8 @@ class Backend final : public gpu::Backend {
   void ResolveImage(Image* source, Image* dest, uint32_t width, uint32_t height) override;
   void CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
                          uint32_t count) override;
+  void CopyImageToBuffer(Image* image, Buffer* buffer, uint64_t offset, uint32_t width,
+                         uint32_t height) override;
   void EndPass() override;
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;

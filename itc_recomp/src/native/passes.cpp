@@ -163,28 +163,6 @@ VkSampleCountFlagBits SampleCount(uint32_t msaa) {
                                                        : VK_SAMPLE_COUNT_1_BIT;
 }
 
-constexpr VkAccessFlags kAllAccess = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-
-// Changes an image's layout, waiting for everything before.
-void Transition(VkCommandBuffer commands, VkImage image, VkImageAspectFlags aspect,
-                VkImageLayout& layout, VkImageLayout wanted) {
-  if (layout == wanted) {
-    return;
-  }
-  VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-  barrier.srcAccessMask = kAllAccess;
-  barrier.dstAccessMask = kAllAccess;
-  barrier.oldLayout = layout;
-  barrier.newLayout = wanted;
-  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
-  barrier.subresourceRange = {aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                           &barrier);
-  layout = wanted;
-}
-
 constexpr VkImageAspectFlags kDepthStencilAspects =
     VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
@@ -840,7 +818,7 @@ struct Passes::State {
   const uint16_t* gamma_values = nullptr;
   bool logged_gamma_failure = false;
   struct Resolved {
-    VkImage image;
+    gpu::Image* object;
     VkExtent2D extent;
     uint32_t address, format, flags;
     VkFormat host_format;
@@ -849,12 +827,12 @@ struct Passes::State {
     // destination only until a later hand-over gives it back to a target.
     bool handed = false;
     float scale = 1.0f;
-    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    bool depth = false;  // a depth target's image handed over
   };
   std::vector<Resolved> frame_resolves;
   // The resolve's image still in SHADER_READ_ONLY_OPTIMAL as its texture's.
   bool Held(const Resolved& r) const {
-    return !r.handed || textures.HoldsHanded(r.fetch, r.scale, r.image);
+    return !r.handed || textures.HoldsHanded(r.fetch, r.scale, r.object);
   }
   uint64_t frames = 0;  // for logging the resolve list now and then
   size_t last_frame_resolves = 0;
@@ -869,7 +847,6 @@ struct Passes::State {
   };
   std::vector<Dumped> dumped;
   gpu::Buffer* dump_object = nullptr;
-  VkBuffer dump_buffer = VK_NULL_HANDLE;  // the object's
   void RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent, const std::string& prefix,
                   bool with_resolves);
   void DumpGuestResolves();
@@ -1569,8 +1546,7 @@ void Passes::State::RestoreContents(VkCommandBuffer commands, Target& t) {
   }
   gpu::Image* handed = t.handed_image;
   t.handed_image = nullptr;
-  const VkImage source = gpu::vulkan::Backend::Object(handed).image;
-  if (!textures.HoldsHanded(t.handed_fetch, t.handed_scale, source)) {
+  if (!textures.HoldsHanded(t.handed_fetch, t.handed_scale, handed)) {
     return;  // gone (a race's end): as after a clear
   }
   EndRendering(commands);
@@ -1736,13 +1712,13 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
     recorded.valid = false;
     stats.resolves_handed++;
     Resolved& resolved = frame_resolves.emplace_back();
-    resolved = {handed.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
+    resolved = {handed.object, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
                 fetch[1] & 0x3F, flags,
                 source.depth ? VK_FORMAT_R32_SFLOAT : source.format};
     std::copy(fetch, fetch + 6, resolved.fetch);
     resolved.handed = true;
     resolved.scale = source.scale;
-    resolved.aspect = source.depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    resolved.depth = source.depth;
     return true;
   }
   if (!dest.copied && !textures.RestoreResolveDestination(fetch, source.scale, dest)) {
@@ -1766,7 +1742,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   recorded.valid = false;
   backend->Use(dest.object, gpu::Usage::kSampled);
   Resolved& resolved = frame_resolves.emplace_back();
-  resolved = {dest.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
+  resolved = {dest.object, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
               fetch[1] & 0x3F, flags, dest.format};
   std::copy(fetch, fetch + 6, resolved.fetch);
   if (log_glow && dest.width == 256 && dest.height == 144 && !(flags & 0x100)) {
@@ -3396,28 +3372,20 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     }
     ITC_LOG_INFO("native renderer: this frame's resolves: {}", list);
   }
-  VkImage shown = gpu::vulkan::Backend::Object(s.shown).image;
   s.backend->Use(s.shown, gpu::Usage::kCopyDest);
   VkExtent2D extent = s.main_view_extent;
   if (show_resolve >= 0 && size_t(show_resolve) < s.frame_resolves.size() &&
       s.Held(s.frame_resolves[show_resolve]) &&
-      s.frame_resolves[show_resolve].aspect == VK_IMAGE_ASPECT_COLOR_BIT) {
+      !s.frame_resolves[show_resolve].depth) {
     // A resolve destination, as is.
     const State::Resolved& resolved = s.frame_resolves[show_resolve];
     extent = {std::min(resolved.extent.width, s.shown_extent.width),
               std::min(resolved.extent.height, s.shown_extent.height)};
-    VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
-               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    VkImageBlit blit{};
-    blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit.srcOffsets[1] = {int32_t(extent.width), int32_t(extent.height), 1};
-    blit.dstSubresource = blit.srcSubresource;
-    blit.dstOffsets[1] = blit.srcOffsets[1];
-    vk::vkCmdBlitImage(commands, resolved.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, shown,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
-    Transition(commands, resolved.image, VK_IMAGE_ASPECT_COLOR_BIT, layout,
-               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // (Its texture's: sampled again after.)
+    s.backend->Use(resolved.object, gpu::Usage::kCopySource);
+    const gpu::Rect all{0, 0, extent.width, extent.height};
+    s.backend->BlitImage(resolved.object, all, s.shown, all, gpu::Filter::kNearest);
+    s.backend->Use(resolved.object, gpu::Usage::kSampled);
   } else if (Target* front = s.front) {
     // The frame as the game resolves it to the front buffer.
     s.EndRendering(commands);
@@ -3559,8 +3527,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     size += (VkDeviceSize(extent.width) * extent.height * BytesPerPixel(format) + 15) & ~15ull;
   };
   add(prefix, kShownFormat, shown_extent);
-  std::vector<VkImage> images = {gpu::vulkan::Backend::Object(shown).image};
-  std::vector<VkImageAspectFlags> aspects = {VK_IMAGE_ASPECT_COLOR_BIT};
+  std::vector<gpu::Image*> images = {shown};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
     if (!Held(r)) {
@@ -3568,41 +3535,29 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
     }
     add(std::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);
-    images.push_back(r.image);
-    aspects.push_back(r.aspect);
+    images.push_back(r.object);
   }
   size_t resolve_end = images.size();
   if (id_drawn) {
     add("draw_ids", VK_FORMAT_R32_UINT, main_view_extent);
-    images.push_back(gpu::vulkan::Backend::Object(id_image).image);
-    aspects.push_back(VK_IMAGE_ASPECT_COLOR_BIT);
+    images.push_back(id_image);
   }
   dump_object = backend->CreateBuffer({size, gpu::kBufferCopyDest, true});
   if (!dump_object) {
     dumped.clear();
     return;
   }
-  dump_buffer = gpu::vulkan::Backend::Handle(dump_object);
   for (size_t i = 0; i < dumped.size(); i++) {
-    VkImage image = images[i];
-    VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    bool resolve = i && i < resolve_end;  // in SHADER_READ_ONLY_OPTIMAL
-    // A depth image's both aspects change layout; its depth is copied.
-    VkImageAspectFlags transition_aspects =
-        aspects[i] == VK_IMAGE_ASPECT_DEPTH_BIT ? kDepthStencilAspects : aspects[i];
+    // The resolves' images are their textures' (sampled again after); the
+    // shown and ID images are copy sources already.
+    const bool resolve = i && i < resolve_end;
     if (resolve) {
-      Transition(commands, image, transition_aspects, layout,
-                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+      backend->Use(images[i], gpu::Usage::kCopySource);
     }
-    VkBufferImageCopy copy{};
-    copy.bufferOffset = dumped[i].offset;
-    copy.imageSubresource = {aspects[i], 0, 0, 1};
-    copy.imageExtent = {dumped[i].extent.width, dumped[i].extent.height, 1};
-    vk::vkCmdCopyImageToBuffer(commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dump_buffer,
-                               1, &copy);
+    backend->CopyImageToBuffer(images[i], dump_object, dumped[i].offset, dumped[i].extent.width,
+                               dumped[i].extent.height);
     if (resolve) {
-      Transition(commands, image, transition_aspects, layout,
-                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      backend->Use(images[i], gpu::Usage::kSampled);
     }
   }
 }
@@ -3695,7 +3650,6 @@ void Passes::WriteDump(const std::string& directory) {
   }
   s.backend->DestroyBuffer(s.dump_object);
   s.dump_object = nullptr;
-  s.dump_buffer = VK_NULL_HANDLE;
   s.dumped.clear();
 }
 

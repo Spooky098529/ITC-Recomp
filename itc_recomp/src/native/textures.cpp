@@ -1797,11 +1797,12 @@ bool TextureCache::RestoreResolveDestination(const uint32_t fetch_words[6], floa
   return GetResolveDestination(fetch_words, scale, out);
 }
 
-bool TextureCache::HoldsHanded(const uint32_t fetch_words[6], float scale, VkImage image) const {
+bool TextureCache::HoldsHanded(const uint32_t fetch_words[6], float scale,
+                               const gpu::Image* image) const {
   const State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   auto it = s.resolved.find(State::ResolveKey(fetch.base_address & 0x1FFFF, scale));
-  return it != s.resolved.end() && it->second.handed && it->second.image == image;
+  return it != s.resolved.end() && it->second.handed && it->second.object == image;
 }
 
 float TextureCache::ReaderScale(const uint32_t fetch_words[6]) const {

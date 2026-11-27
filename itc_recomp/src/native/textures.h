@@ -105,7 +105,7 @@ class TextureCache {
   // image of its format); `out` as from GetResolveDestination.
   bool RestoreResolveDestination(const uint32_t fetch[6], float scale, ResolveDestination& out);
   // Whether the destination still holds `image` (handed over).
-  bool HoldsHanded(const uint32_t fetch[6], float scale, VkImage image) const;
+  bool HoldsHanded(const uint32_t fetch[6], float scale, const gpu::Image* image) const;
   // What a draw's sampling of the texture applies (xe_interface.glsl's
   // xe_texture_result): 0 nothing; above 0 times it, clamped to 0-1 (what
   // the resolve's exponent bias and a normalized destination did); below 0

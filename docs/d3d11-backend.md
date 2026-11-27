@@ -331,11 +331,22 @@ each backend.
   moment (the images it doesn't touch identical, `shown` the reference's
   through the table, 0.0000% off), the boot movie drawn, the tick replay,
   the pad replay without errors.
-- **Next:** the dumps (`RecordDump`, `WriteDump`, `DumpGuestResolves`) and
-  `--native_renderer_show_resolve`'s blit: their raw transitions and
-  copies (the dumps' read-back are `passes.cpp`'s last `vkCmd*` calls);
-  then the in-between accessors go, the renderer holding only
-  `gpu::Backend` and `gpu::` types.
+- **The dumps and showing a resolve (2026-11-27).**
+  `Backend::CopyImageToBuffer` (a depth image's depth): the dump's
+  read-back goes through it, the resolves' images taken out of their
+  sampled use and back with `Use` (no more hand-made transitions beside the
+  tracked layout), and `--native_renderer_show_resolve` blits with
+  `BlitImage`. The frame's resolves carry their `gpu::Image`
+  (`TextureCache::HoldsHanded` takes one). `passes.cpp` makes no `vkCmd*`
+  call now. Checked: the dump identical, a shown resolve equal to its own
+  dumped image, the pad replay with dumps in the menus (the garage's
+  frame drawn; the replay then drifted into the known `8219BCC0` stop, as
+  dump stalls do) and without (no errors), the tick replay.
+- **Next:** the in-between accessors go (`context()`, `commands()`,
+  `Object(...)`, `Handle(...)`, `empty_set()`, `constants_set()`,
+  `TexturesLayout`): the renderer (`passes.cpp`, `textures.cpp`,
+  `vertex_arena.cpp`, `renderer.cpp`) holding only `gpu::Backend` and
+  `gpu::` types, its `VkFormat`, `VkExtent2D` and view logic types too.
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
 - **Dump runs:** a run lands on one of at least four moments (2,654,

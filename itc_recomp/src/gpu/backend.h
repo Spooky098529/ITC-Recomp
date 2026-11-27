@@ -140,6 +140,11 @@ class Backend {
   // As UploadImage, but here in the frame (the image a copy destination).
   virtual void CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
                                  uint32_t count) = 0;
+  // The top-left `width` x `height` (a depth image's depth) into `buffer`
+  // at `offset`, rows tightly packed: read once the frame is done (a
+  // host-visible buffer).
+  virtual void CopyImageToBuffer(Image* image, Buffer* buffer, uint64_t offset, uint32_t width,
+                                 uint32_t height) = 0;
 
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
