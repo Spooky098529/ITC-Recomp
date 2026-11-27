@@ -285,6 +285,8 @@ class Renderer {
   void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
   void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
+  VkCommandBuffer Commands() { return BeginFrame(); }
+  Passes& passes() { return passes_; }
   void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
                     uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
                     uint32_t tile, uint32_t tiles) {
@@ -750,11 +752,8 @@ void Renderer::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitiv
 void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
   // The draws come through render::DrawIndexed and DrawUP from the
   // handlers.
-  if (id == 25) {
-    passes_.AfterResolve(BeginFrame(), payload, arg1);
-  } else if (id == 26) {
-    passes_.AfterClear(BeginFrame(), payload, arg1);
-  } else if (id == 32) {
+  // Clears and resolves through render::Clear and Resolve.
+  if (id == 32) {
     // One item of 16 bytes per tiling begun.
     for (uint32_t i = 0; i < arg1; i++) {
       passes_.BeginTiling(BeginFrame(), payload + 16 * i);
@@ -1154,7 +1153,7 @@ void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
 
 void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
                            uint32_t arg2) {
-  if (!(id == 25 || id == 26 || id == 32 || id == 33)) {
+  if (!(id == 32 || id == 33)) {
     return;
   }
   if (Renderer* renderer = GetRenderer()) {
@@ -1174,6 +1173,21 @@ void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
 void render::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count) {
   if (native::Renderer* renderer = native::GetRenderer()) {
     renderer->DrawIndexed(type, base_start, primitive_count);
+  }
+}
+
+void render::Clear(uint32_t flags, uint32_t color, float z, uint32_t stencil, bool rects) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().Clear(renderer->Commands(), flags, color, z, stencil, rects);
+  }
+}
+
+void render::Resolve(uint32_t flags, const int32_t* rect, uint32_t destination,
+                     const int32_t* point, bool level_or_slice, const float clear_color[4],
+                     float clear_z, uint32_t clear_stencil) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().Resolve(renderer->Commands(), flags, rect, destination, point,
+                               level_or_slice, clear_color, clear_z, clear_stencil);
   }
 }
 

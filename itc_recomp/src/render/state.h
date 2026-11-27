@@ -153,6 +153,15 @@ const Constants& ShaderConstants();
 // drawer's 15).
 void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
 void DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
+// Command 26's clear (flags: bits 0-3 render targets, 0x10 Z, 0x20
+// stencil; color a D3DCOLOR; rects: whether it gives rectangles, the whole
+// target cleared anyway) and command 25's resolve (the bound target, or the
+// depth surface with flags 0x4, copied to the destination texture object;
+// rect and point optional; then the clears the flags ask for).
+void Clear(uint32_t flags, uint32_t color, float z, uint32_t stencil, bool rects);
+void Resolve(uint32_t flags, const int32_t* rect, uint32_t destination, const int32_t* point,
+             bool level_or_slice, const float clear_color[4], float clear_z,
+             uint32_t clear_stencil);
 
 // The game's render state `state` (a byte offset: 40 ZEnable, 44 ZFunc, ...)
 // set to `value`, as the device's setter for it gives it meaning.

@@ -611,7 +611,15 @@ and resolve on one 256x144 target in turn, then the main view draws on
   pixels off), the pad replay with dumps, the tick replay (both races
   match).
 
-Left for step 3: clears, resolves and tiling through the interface, then
+- **The seam, seventh part: clears and resolves (2026-11-27).**
+  `render::Clear` and `render::Resolve`, made by the renderer from
+  commands 26 and 25's item fields; the library's Clear (lifted) and
+  Resolve are no longer called from them (their register and command
+  buffer work fed only the GPU). Checked: an attract race (the same 9
+  clears and 25 resolves a frame, 19 handed over), the pad replay with
+  dumps.
+
+Left for step 3: tiling (commands 32 and 33) through the interface, then
 the game's setters out of the handlers (only game code outside the replay
 that reads the Direct3D state keeps what it needs), and `replay_hooks.cpp`.
 

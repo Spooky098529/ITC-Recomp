@@ -464,10 +464,26 @@ uint32_t Resolves(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t level = guest::LoadU32(item + 36);
     const uint32_t device = Device();
     const uint32_t flags = guest::LoadU32(item + 4);
-    guest::StoreU32(frame + 100, parameters);
-    guest::StoreU32(frame + 92, word52);
-    call(0x822AFA58, frame, 0x825905F4,
-         {device, flags, source_rect, texture, point, level, slice, color}, z);
+    // Made by our renderer (the library's Resolve, sub_822AFA58, no longer
+    // called from here: its register and command buffer work fed only the
+    // GPU). The clear color as the library takes it (the bytes times the
+    // scale, 1/255).
+    (void)device;
+    (void)parameters;
+    (void)word52;
+    (void)color;
+    int32_t rect[4], at[2];
+    for (uint32_t k = 0; k < 4; k++) {
+      rect[k] = int32_t(guest::LoadU32(item + 8 + 4 * k));
+    }
+    at[0] = int32_t(guest::LoadU32(item + 28));
+    at[1] = int32_t(guest::LoadU32(item + 32));
+    float clear_color[4] = {};
+    for (int c = 0; (which & 8) && c < 4; c++) {
+      clear_color[c] = float(double(bytes[c])) * scale;
+    }
+    render::Resolve(flags, source_rect ? rect : nullptr, texture, point ? at : nullptr,
+                    level != 0 || slice != 0, clear_color, float(z), word52);
   }
   return uint32_t(count * 68u + 15u) >> 4;
 }
@@ -484,9 +500,12 @@ uint32_t Clears(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t color = guest::LoadU32(item + 268);
     const uint32_t device = Device();
     const uint32_t flags = guest::LoadU32(item + 8);
-    // r8 isn't set by the original (Clear doesn't read it): 0 here.
-    call(0x822A04F8, frame, 0x82590674, {device, rects, rect_data, flags, color, 0, stencil, 0},
-         z);
+    // Made by our renderer (the library's Clear, sub_822A04F8, no longer
+    // called: its work fed only the GPU).
+    (void)device;
+    (void)rect_data;
+    (void)frame;
+    render::Clear(flags, color, float(z), stencil, rects != 0);
   }
   return uint32_t(count * 280u + 15u) >> 4;
 }

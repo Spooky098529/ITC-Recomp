@@ -40,9 +40,13 @@ class Passes {
   // address. type: the primitive type; count: vertices; stride in bytes.
   void InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
                   uint32_t stride, uint32_t data);
-  // After a clear (26) or resolve (25) command's library call.
-  void AfterClear(VkCommandBuffer commands, uint32_t payload, uint32_t arg1);
-  void AfterResolve(VkCommandBuffer commands, uint32_t payload, uint32_t arg1);
+  // A clear (render::Clear, command 26's item fields) and a resolve
+  // (render::Resolve, command 25's).
+  void Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, float z,
+             uint32_t stencil, bool rects);
+  void Resolve(VkCommandBuffer commands, uint32_t flags, const int32_t* rect,
+               uint32_t destination, const int32_t* point, bool level_or_slice,
+               const float* clear_color, float clear_z, uint32_t clear_stencil);
   // Predicated tiling (see "Predicated tiling" in docs/gpu-functions.md):
   // after command 32 (BeginTiling); each Resolve the library's EndTiling
   // (command 33) makes, tile of tiles, with its arguments (guest addresses

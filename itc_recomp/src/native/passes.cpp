@@ -4136,80 +4136,48 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
   s.Draw(commands, device, call);
 }
 
-void Passes::AfterClear(VkCommandBuffer commands, uint32_t payload,
-                        uint32_t arg1) {
+void Passes::Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, float z,
+                   uint32_t stencil, bool rects) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
-  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
-  // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
-  // is cleared.
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 280 * i;
-    uint32_t flags = guest::LoadU32(item + 8);
-    s.stats.clears++;
-    if (guest::LoadU32(item + 4)) {
-      s.stats.clear_rects++;
+  // Flags: bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil; color a
+  // D3DCOLOR. Rects aren't kept: the whole target is cleared.
+  s.stats.clears++;
+  if (rects) {
+    s.stats.clear_rects++;
+  }
+  if (flags & 0xF) {
+    VkClearValue value{};
+    value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
+                    float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
+    if (flags & 0xE) {
+      s.stats.extra_targets++;
     }
-    if (flags & 0xF) {
-      uint32_t color = guest::LoadU32(item + 268);
+    if (uint32_t object = render::BoundTargets().color[0]; object && (flags & 1)) {
+      if (Target* target = s.GetTarget(commands, object, false)) {
+        s.ClearTarget(commands, *target, value);
+      }
+    }
+  }
+  if (flags & 0x30) {
+    uint32_t object = render::BoundTargets().depth;
+    Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
+    if (target) {
       VkClearValue value{};
-      value.color = {{float((color >> 16) & 0xFF) / 255.0f, float((color >> 8) & 0xFF) / 255.0f,
-                      float(color & 0xFF) / 255.0f, float(color >> 24) / 255.0f}};
-      if (flags & 0xE) {
-        s.stats.extra_targets++;
-      }
-      if (uint32_t object = render::BoundTargets().color[0]; object && (flags & 1)) {
-        if (Target* target = s.GetTarget(commands, object, false)) {
-          s.ClearTarget(commands, *target, value);
-        }
-      }
-    }
-    if (flags & 0x30) {
-      uint32_t object = render::BoundTargets().depth;
-      Target* target = object ? s.GetTarget(commands, object, true) : nullptr;
-      if (target) {
-        VkClearValue value{};
-        uint32_t z = guest::LoadU32(item + 272);
-        std::memcpy(&value.depthStencil.depth, &z, 4);
-        value.depthStencil.stencil = guest::LoadU32(item + 276) & 0xFF;
-        s.ClearTarget(commands, *target, value,
-                      ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
-                          ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
-      }
+      value.depthStencil.depth = z;
+      value.depthStencil.stencil = stencil & 0xFF;
+      s.ClearTarget(commands, *target, value,
+                    ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+                        ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
     }
   }
 }
 
-void Passes::AfterResolve(VkCommandBuffer commands, uint32_t payload,
-                          uint32_t arg1) {
+void Passes::Resolve(VkCommandBuffer commands, uint32_t flags, const int32_t* rect,
+                     uint32_t destination, const int32_t* point, bool level_or_slice,
+                     const float* clear_color, float clear_z, uint32_t clear_stencil) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 25's item (68 bytes; see "Pass command items" in
-  // docs/gpu-functions.md); its flags are State::Resolve's.
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 68 * i;
-    uint32_t fields = guest::LoadU32(item);
-    uint32_t flags = guest::LoadU32(item + 4);
-    int32_t rect[4], point[2];
-    for (uint32_t k = 0; k < 4; k++) {
-      rect[k] = int32_t(guest::LoadU32(item + 8 + 4 * k));
-    }
-    point[0] = int32_t(guest::LoadU32(item + 28));
-    point[1] = int32_t(guest::LoadU32(item + 32));
-    // The clear color's 4 bytes, as floats (as the handler converts them).
-    float color[4] = {};
-    for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
-      color[c] = float(guest::LoadU8(item + 44 + c)) / 255.0f;
-    }
-    uint32_t z = guest::LoadU32(item + 48);
-    float clear_z;
-    std::memcpy(&clear_z, &z, 4);
-    s.Resolve(commands, device, flags, (fields & 1) ? rect : nullptr,
-              (fields & 2) ? guest::LoadU32(item + 24) : 0, (fields & 4) ? point : nullptr,
-              guest::LoadU32(item + 36) || guest::LoadU32(item + 40), color, clear_z,
-              guest::LoadU32(item + 52), true);
-  }
+  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point,
+            level_or_slice, clear_color, clear_z, clear_stencil, true);
 }
 
 void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
