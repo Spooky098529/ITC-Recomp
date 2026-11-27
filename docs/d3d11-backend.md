@@ -309,9 +309,33 @@ each backend.
   offsets): set 0's empty set and each block's set 1 are the backend's.
   Checked: the dump identical, the tick replay, the pad replay without
   errors.
-- **Next:** the resolve, movie, gamma and ID passes' own pipelines,
-  shaders and binds (their `vkCmd*` calls are `passes.cpp`'s last but the
-  dumps'); then the dumps.
+- **The renderer's own passes (2026-11-27).** Decided: the resolve, movie
+  and gamma passes are high-level operations each backend draws with its
+  own shaders (made from the same GLSL, `src/native/glsl`), not a general
+  full-screen-pass or compute interface: `Backend::DrawResolve`
+  (`gpu::ResolveDraw`: source, destination, area, offset, samples to
+  average, scale, red and blue exchanged), `DrawMovie` (three planes, a
+  target, an area) and `ApplyGamma` (an image in its storage usage, its
+  size, the table). The renderer says the images' uses before and after;
+  the backend makes the pass, pipeline, set and push constants. The draw
+  ID pass stays on the draw's calls: `GetIdPipeline` (the draw's
+  `PipelineDesc`: its vertex shader, geometry and depth state, writing into
+  R32Uint) and `SetDrawId` (D3D11: a small constant buffer); its draws
+  bind no pixel textures (`BindResources` binds the empty set for a null
+  texture set). The Vulkan backend owns the shaders, layouts, samplers,
+  the pipelines by format, the per-frame pass sets (reset at the frame's
+  start) and the gamma table (made at its first use); it saves its disk
+  cache itself, counting every pipeline (`MaybeSaveDiskCache` and
+  `pipeline_cache()` gone from the in-between accessors). Checked: the dump
+  identical (the ID pass's image too), `--xbox_gamma=hdtv` at a reference
+  moment (the images it doesn't touch identical, `shown` the reference's
+  through the table, 0.0000% off), the boot movie drawn, the tick replay,
+  the pad replay without errors.
+- **Next:** the dumps (`RecordDump`, `WriteDump`, `DumpGuestResolves`) and
+  `--native_renderer_show_resolve`'s blit: their raw transitions and
+  copies (the dumps' read-back are `passes.cpp`'s last `vkCmd*` calls);
+  then the in-between accessors go, the renderer holding only
+  `gpu::Backend` and `gpu::` types.
   *(D3D11 later: `UpdateSubresource` from the staging memory for the
   uploads.)*
 - **Dump runs:** a run lands on one of at least four moments (2,654,
@@ -332,6 +356,8 @@ each backend.
 3. **DXVK-native for Linux tests** (step 5).
 4. **View swizzles.** D3D11's shader resource views have no component
    swizzle, which the texture cache's views carry (the fetch constant's
-   swizzle, red and blue exchanged for handed images). With D3D11 the
-   shaders must apply it (a per-texture constant), and then perhaps with
-   Vulkan too, so both draw alike: decided at step 4 or 5.
+   swizzle, red and blue exchanged for handed images). Decided (the user,
+   2026-11-27): the swizzle stays in `gpu::ViewDesc` and the renderer's
+   logic and the shaders don't change; the D3D11 backend applies it itself
+   (how, at step 5: for example a per-texture swizzle its own HLSL reads,
+   or the common cases as format choices). Vulkan keeps its view swizzle.

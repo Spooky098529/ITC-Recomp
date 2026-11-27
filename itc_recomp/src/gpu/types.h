@@ -284,6 +284,20 @@ struct Viewport {
   float min_depth = 0.0f, max_depth = 1.0f;
 };
 
+// A resolve drawn (Backend::DrawResolve): each pixel of `area` in `dest`
+// from `source`'s pixel at the same place plus `offset`, its first
+// `samples` averaged (a multisampled source; a depth image's depth),
+// times `scale`, red and blue exchanged if asked.
+struct ResolveDraw {
+  struct Image* source = nullptr;
+  struct Image* dest = nullptr;
+  Rect area;
+  int32_t offset[2] = {};
+  int32_t samples = 1;
+  float scale = 1.0f;
+  bool swap_red_blue = false;
+};
+
 // The backends' objects: opaque, each backend's own behind them.
 struct TextureSet;
 struct Pipeline;

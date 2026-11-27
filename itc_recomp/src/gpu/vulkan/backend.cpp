@@ -15,6 +15,12 @@
 #include "native/frame_costs.h"
 #include "native/gpu_memory.h"
 #include "native/vulkan_types.h"
+#include "native/generated_gamma_comp.h"
+#include "native/generated_id_frag.h"
+#include "native/generated_movie_frag.h"
+#include "native/generated_resolve_frag.h"
+#include "native/generated_resolve_ms_frag.h"
+#include "native/generated_resolve_vert.h"
 
 namespace gpu::vulkan {
 
@@ -183,7 +189,7 @@ std::string Backend::AttachWindow(SDL_Window* window) {
   return {};
 }
 
-bool Backend::Init() { return CreateDevice() && CreateSwapchain(); }
+bool Backend::Init() { return CreateDevice() && CreateSwapchain() && CreatePassResources(); }
 
 bool Backend::CreateDevice() {
   uint32_t count = 0;
@@ -472,6 +478,8 @@ uint32_t Backend::BeginFrame() {
     vk::vkResetDescriptorPool(device_, frame.texture_pools[i], 0);
   }
   frame.texture_pool = 0;
+  vk::vkResetDescriptorPool(device_, frame.pass_pool, 0);
+  MaybeSaveDiskCache();
   vk::vkResetCommandBuffer(frame.commands, 0);
   VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -639,8 +647,9 @@ void Backend::OpenDiskCache(const std::filesystem::path& directory) {
   }
 }
 
-void Backend::MaybeSaveDiskCache(size_t made) {
-  made += pipelines_.size();
+void Backend::MaybeSaveDiskCache() {
+  const size_t made = pipelines_.size() + id_pipelines_.size() + resolve_pipelines_.size() +
+                      movie_pipelines_.size();
   auto now = std::chrono::steady_clock::now();
   if (!pipeline_cache_ || pipeline_cache_file_.empty() || made == pipeline_cache_saved_pipelines_ ||
       now - pipeline_cache_saved_ < std::chrono::seconds(10)) {
@@ -1082,6 +1091,14 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   }
   native::ScopedCost cost(native::g_frame_costs.pipeline_ns);
   native::g_frame_costs.pipelines++;
+  o.pipeline = MakeGraphicsPipeline(key, key.pixel ? Object(key.pixel).module : VK_NULL_HANDLE,
+                                    layout, true);
+  it->second = std::move(object);
+  return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
+}
+
+VkPipeline Backend::MakeGraphicsPipeline(const PipelineDesc& key, VkShaderModule pixel,
+                                         VkPipelineLayout layout, bool blend_constants) {
   const ShaderObject& vertex = Object(key.vertex);
   VkPipelineShaderStageCreateInfo stages[2] = {};
   uint32_t stage_count = 0;
@@ -1089,10 +1106,10 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   stages[stage_count].stage = VK_SHADER_STAGE_VERTEX_BIT;
   stages[stage_count].module = vertex.module;
   stages[stage_count++].pName = "main";
-  if (key.pixel) {
+  if (pixel) {
     stages[stage_count] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     stages[stage_count].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[stage_count].module = Object(key.pixel).module;
+    stages[stage_count].module = pixel;
     stages[stage_count++].pName = "main";
   }
   VkPipelineVertexInputStateCreateInfo vertex_input{
@@ -1141,7 +1158,7 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
                                      VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_BLEND_CONSTANTS};
   VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 4;
+  dynamic.dynamicStateCount = blend_constants ? 4 : 3;
   dynamic.pDynamicStates = dynamic_states;
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
   rendering.colorAttachmentCount = has_color ? 1 : 0;
@@ -1163,16 +1180,15 @@ Pipeline* Backend::GetPipeline(const PipelineDesc& key, bool* made) {
   info.pColorBlendState = &blend;
   info.pDynamicState = &dynamic;
   info.layout = layout;
+  VkPipeline pipeline = VK_NULL_HANDLE;
   if (VkResult result =
-          vk::vkCreateGraphicsPipelines(device_, pipeline_cache_, 1, &info, nullptr, &o.pipeline);
+          vk::vkCreateGraphicsPipelines(device_, pipeline_cache_, 1, &info, nullptr, &pipeline);
       result != VK_SUCCESS) {
     ITC_LOG_ERROR("native renderer: vkCreateGraphicsPipelines: {}", int(result));
-    o.pipeline = VK_NULL_HANDLE;
-  } else {
-    native::gpu_memory::Created(native::gpu_memory::Object::kPipeline);
+    return VK_NULL_HANDLE;
   }
-  it->second = std::move(object);
-  return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
+  native::gpu_memory::Created(native::gpu_memory::Object::kPipeline);
+  return pipeline;
 }
 
 bool Backend::AddTexturePool(Frame& frame) {
@@ -1300,8 +1316,10 @@ bool Backend::DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) {
 
 void Backend::BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel,
                             Buffer* constants, const uint32_t offsets[4]) {
-  VkDescriptorSet sets[4] = {empty_set_, constants_sets_[constants], Handle(vertex),
-                             Handle(pixel)};
+  // Without textures: the empty set (an empty layout's, compatible).
+  VkDescriptorSet sets[4] = {empty_set_, constants_sets_[constants],
+                             vertex ? Handle(vertex) : empty_set_,
+                             pixel ? Handle(pixel) : empty_set_};
   vk::vkCmdBindDescriptorSets(commands(), VK_PIPELINE_BIND_POINT_GRAPHICS,
                               Object(pipeline).layout, 0, 4, sets, 4, offsets);
 }
@@ -1360,6 +1378,7 @@ void Backend::SetBlendConstants(const float constants[4]) {
 }
 
 void Backend::BindPipeline(Pipeline* pipeline) {
+  bound_pipeline_ = &Object(pipeline);
   vk::vkCmdBindPipeline(commands(), VK_PIPELINE_BIND_POINT_GRAPHICS, Object(pipeline).pipeline);
 }
 
@@ -1541,6 +1560,421 @@ Sampler* Backend::CreateSampler(const SamplerDesc& desc) {
     return nullptr;
   }
   return reinterpret_cast<Sampler*>(sampler);
+}
+
+// The resolve and movie passes.
+
+namespace {
+// Their sets a frame (one sampled image each for a resolve, three for a
+// movie).
+constexpr uint32_t kResolvesPerFrame = 256;
+constexpr uint32_t kMoviesPerFrame = 16;
+}  // namespace
+
+bool Backend::CreatePassResources() {
+  auto module = [&](const uint32_t* code, size_t size, VkShaderModule& out) {
+    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    info.codeSize = size;
+    info.pCode = code;
+    return vk::vkCreateShaderModule(device_, &info, nullptr, &out) == VK_SUCCESS;
+  };
+  auto layouts = [&](uint32_t images, uint32_t push_bytes, VkDescriptorSetLayout& set_layout,
+                     VkPipelineLayout& layout) {
+    VkDescriptorSetLayoutBinding bindings[3];
+    for (uint32_t i = 0; i < images; i++) {
+      bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                     nullptr};
+    }
+    VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    set_info.bindingCount = images;
+    set_info.pBindings = bindings;
+    if (vk::vkCreateDescriptorSetLayout(device_, &set_info, nullptr, &set_layout) != VK_SUCCESS) {
+      return false;
+    }
+    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, push_bytes};
+    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &set_layout;
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &push;
+    return vk::vkCreatePipelineLayout(device_, &layout_info, nullptr, &layout) == VK_SUCCESS;
+  };
+  if (!layouts(1, 20, resolve_set_layout_, resolve_layout_) ||
+      !layouts(3, 16, movie_set_layout_, movie_layout_) ||
+      !module(k_resolve_vert, sizeof(k_resolve_vert), resolve_vertex_) ||
+      !module(k_resolve_frag, sizeof(k_resolve_frag), resolve_pixel_) ||
+      !module(k_resolve_ms_frag, sizeof(k_resolve_ms_frag), resolve_pixel_ms_) ||
+      !module(k_movie_frag, sizeof(k_movie_frag), movie_pixel_)) {
+    return false;
+  }
+  SamplerDesc sampler;
+  sampler.address[0] = sampler.address[1] = sampler.address[2] = AddressMode::kClampToEdge;
+  resolve_sampler_ = Handle(CreateSampler(sampler));
+  // Bilinear, as the movie library's sampler states.
+  sampler.mag_filter = sampler.min_filter = Filter::kLinear;
+  movie_sampler_ = Handle(CreateSampler(sampler));
+  if (!resolve_sampler_ || !movie_sampler_) {
+    return false;
+  }
+  for (Frame& frame : frames_) {
+    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                              kResolvesPerFrame + 3 * kMoviesPerFrame};
+    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.maxSets = kResolvesPerFrame + kMoviesPerFrame;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &size;
+    if (vk::vkCreateDescriptorPool(device_, &pool_info, nullptr, &frame.pass_pool) !=
+        VK_SUCCESS) {
+      return false;
+    }
+  }
+  return true;
+}
+
+VkDescriptorSet Backend::PassSet(VkDescriptorSetLayout layout) {
+  VkDescriptorSet set = VK_NULL_HANDLE;
+  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  alloc.descriptorPool = frames_[frame_index_].pass_pool;
+  alloc.descriptorSetCount = 1;
+  alloc.pSetLayouts = &layout;
+  if (vk::vkAllocateDescriptorSets(device_, &alloc, &set) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return set;
+}
+
+VkPipeline Backend::MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
+                                           VkFormat format, VkSampleCountFlagBits samples) {
+  VkPipelineShaderStageCreateInfo stages[2] = {};
+  for (VkPipelineShaderStageCreateInfo& stage : stages) {
+    stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    stage.pName = "main";
+  }
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = resolve_vertex_;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = pixel;
+  VkPipelineVertexInputStateCreateInfo vertex_input{
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{
+      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  viewport.viewportCount = 1;
+  viewport.scissorCount = 1;
+  VkPipelineRasterizationStateCreateInfo raster{
+      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.lineWidth = 1.0f;
+  VkPipelineMultisampleStateCreateInfo multisample_state{
+      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  multisample_state.rasterizationSamples = samples;
+  VkPipelineColorBlendAttachmentState attachment{};
+  attachment.colorWriteMask = 0xF;
+  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  blend.attachmentCount = 1;
+  blend.pAttachments = &attachment;
+  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamic_states;
+  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+  rendering.colorAttachmentCount = 1;
+  rendering.pColorAttachmentFormats = &format;
+  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  info.pNext = &rendering;
+  info.stageCount = 2;
+  info.pStages = stages;
+  info.pVertexInputState = &vertex_input;
+  info.pInputAssemblyState = &input_assembly;
+  info.pViewportState = &viewport;
+  info.pRasterizationState = &raster;
+  info.pMultisampleState = &multisample_state;
+  info.pColorBlendState = &blend;
+  info.pDynamicState = &dynamic;
+  info.layout = layout;
+  VkPipeline pipeline = VK_NULL_HANDLE;
+  if (vk::vkCreateGraphicsPipelines(device_, pipeline_cache_, 1, &info, nullptr, &pipeline) !=
+      VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return pipeline;
+}
+
+bool Backend::DrawResolve(const ResolveDraw& draw) {
+  ImageObject& source = Object(draw.source);
+  ImageObject& dest = Object(draw.dest);
+  const bool multisample = source.desc.samples > 1;
+  auto [it, added] = resolve_pipelines_.try_emplace({dest.format, multisample}, VK_NULL_HANDLE);
+  if (added) {
+    it->second = MakeFullscreenPipeline(multisample ? resolve_pixel_ms_ : resolve_pixel_,
+                                        resolve_layout_, dest.format, VK_SAMPLE_COUNT_1_BIT);
+    if (!it->second) {
+      ITC_LOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
+                    int(dest.format));
+    }
+  }
+  const VkPipeline pipeline = it->second;
+  if (!pipeline) {
+    return false;
+  }
+  const VkDescriptorSet set = PassSet(resolve_set_layout_);
+  if (!set) {
+    return false;
+  }
+  // A depth image's depth alone, in the layout its sampled use left it.
+  VkDescriptorImageInfo image_info{resolve_sampler_, source.depth_view ? source.depth_view
+                                                                       : source.view,
+                                   source.layout};
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstSet = set;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write.pImageInfo = &image_info;
+  vk::vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+  PassTarget target;
+  target.image = draw.dest;
+  BeginPass(target, {}, draw.area);
+  const VkCommandBuffer commands = this->commands();
+  SetViewport({float(draw.area.x), float(draw.area.y), float(draw.area.width),
+               float(draw.area.height), 0.0f, 1.0f});
+  SetScissor(draw.area);
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout_, 0, 1,
+                              &set, 0, nullptr);
+  struct {
+    int32_t offset[2];
+    int32_t samples;
+    float scale;
+    int32_t swap_red_blue;
+  } constants{{draw.offset[0], draw.offset[1]}, draw.samples, draw.scale,
+              draw.swap_red_blue ? 1 : 0};
+  vk::vkCmdPushConstants(commands, resolve_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(constants), &constants);
+  vk::vkCmdDraw(commands, 3, 1, 0, 0);
+  EndPass();
+  bound_pipeline_ = nullptr;
+  return true;
+}
+
+bool Backend::DrawMovie(Image* const planes[3], Image* target_image, const Rect& area) {
+  ImageObject& target = Object(target_image);
+  const VkSampleCountFlagBits samples = VkSampleCountFlagBits(target.desc.samples);
+  auto [it, added] = movie_pipelines_.try_emplace({target.format, samples}, VK_NULL_HANDLE);
+  if (added) {
+    it->second = MakeFullscreenPipeline(movie_pixel_, movie_layout_, target.format, samples);
+    if (!it->second) {
+      ITC_LOG_ERROR("native renderer: couldn't create a movie pipeline for format {}",
+                    int(target.format));
+    }
+  }
+  const VkPipeline pipeline = it->second;
+  if (!pipeline) {
+    return false;
+  }
+  const VkDescriptorSet set = PassSet(movie_set_layout_);
+  if (!set) {
+    return false;
+  }
+  VkDescriptorImageInfo images[3];
+  VkWriteDescriptorSet writes[3];
+  for (uint32_t i = 0; i < 3; i++) {
+    images[i] = {movie_sampler_, Object(planes[i]).view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[i].dstSet = set;
+    writes[i].dstBinding = i;
+    writes[i].descriptorCount = 1;
+    writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[i].pImageInfo = &images[i];
+  }
+  vk::vkUpdateDescriptorSets(device_, 3, writes, 0, nullptr);
+  PassTarget pass_target;
+  pass_target.image = target_image;
+  BeginPass(pass_target, {}, area);
+  const VkCommandBuffer commands = this->commands();
+  SetViewport({float(area.x), float(area.y), float(area.width), float(area.height), 0.0f, 1.0f});
+  SetScissor(area);
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, movie_layout_, 0, 1,
+                              &set, 0, nullptr);
+  const float constants[4] = {float(area.x), float(area.y), float(area.width),
+                              float(area.height)};
+  vk::vkCmdPushConstants(commands, movie_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(constants), constants);
+  vk::vkCmdDraw(commands, 3, 1, 0, 0);
+  EndPass();
+  bound_pipeline_ = nullptr;
+  return true;
+}
+
+// The gamma pass (gamma.comp).
+
+bool Backend::ApplyGamma(Image* image, Extent2D size, const uint16_t table[256]) {
+  if (gamma_failed_) {
+    return false;
+  }
+  const VkCommandBuffer commands = this->commands();
+  if (!gamma_pipeline_) {
+    gamma_failed_ = true;  // until made
+    gamma_table_ = CreateBuffer({256 * sizeof(uint32_t), kBufferStorage | kBufferCopyDest, false});
+    if (!gamma_table_) {
+      return false;
+    }
+    native::gpu_memory::Allocated(native::gpu_memory::Kind::kOther, MemorySize(gamma_table_));
+    VkDescriptorSetLayoutBinding bindings[2] = {
+        {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+    VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    set_info.bindingCount = 2;
+    set_info.pBindings = bindings;
+    VkPushConstantRange push{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8};
+    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &gamma_set_layout_;
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &push;
+    VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+                                     {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.maxSets = 1;
+    pool_info.poolSizeCount = 2;
+    pool_info.pPoolSizes = sizes;
+    if (vk::vkCreateDescriptorSetLayout(device_, &set_info, nullptr, &gamma_set_layout_) !=
+            VK_SUCCESS ||
+        vk::vkCreatePipelineLayout(device_, &layout_info, nullptr, &gamma_layout_) != VK_SUCCESS ||
+        vk::vkCreateDescriptorPool(device_, &pool_info, nullptr, &gamma_pool_) != VK_SUCCESS) {
+      return false;
+    }
+    VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    set_alloc.descriptorPool = gamma_pool_;
+    set_alloc.descriptorSetCount = 1;
+    set_alloc.pSetLayouts = &gamma_set_layout_;
+    if (vk::vkAllocateDescriptorSets(device_, &set_alloc, &gamma_set_) != VK_SUCCESS) {
+      return false;
+    }
+    VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    module_info.codeSize = sizeof(k_gamma_comp);
+    module_info.pCode = k_gamma_comp;
+    VkShaderModule module;
+    if (vk::vkCreateShaderModule(device_, &module_info, nullptr, &module) != VK_SUCCESS) {
+      return false;
+    }
+    VkComputePipelineCreateInfo info{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    info.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+    info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    info.stage.module = module;
+    info.stage.pName = "main";
+    info.layout = gamma_layout_;
+    const VkResult result =
+        vk::vkCreateComputePipelines(device_, pipeline_cache_, 1, &info, nullptr, &gamma_pipeline_);
+    vk::vkDestroyShaderModule(device_, module, nullptr);
+    if (result != VK_SUCCESS) {
+      gamma_pipeline_ = VK_NULL_HANDLE;
+      return false;
+    }
+    gamma_failed_ = false;
+  }
+  if (image != gamma_image_) {
+    // Written while no frame in flight reads it: once (the renderer's
+    // shown image lives as long as the backend).
+    gamma_image_ = image;
+    VkDescriptorImageInfo image_info{VK_NULL_HANDLE, Object(image).view, VK_IMAGE_LAYOUT_GENERAL};
+    VkDescriptorBufferInfo table_info{Handle(gamma_table_), 0, VK_WHOLE_SIZE};
+    VkWriteDescriptorSet writes[2] = {{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
+                                      {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
+    writes[0].dstSet = writes[1].dstSet = gamma_set_;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[0].pImageInfo = &image_info;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[1].pBufferInfo = &table_info;
+    vk::vkUpdateDescriptorSets(device_, 2, writes, 0, nullptr);
+  }
+  if (!gamma_uploaded_) {  // the first frame: the table into its buffer
+    uint32_t entries[256];
+    std::copy(table, table + 256, entries);
+    vk::vkCmdUpdateBuffer(commands, Handle(gamma_table_), 0, sizeof(entries), entries);
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0,
+                             nullptr);
+    gamma_uploaded_ = true;
+  }
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_pipeline_);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_layout_, 0, 1,
+                              &gamma_set_, 0, nullptr);
+  const int32_t extent[2] = {int32_t(size.width), int32_t(size.height)};
+  vk::vkCmdPushConstants(commands, gamma_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(extent),
+                         extent);
+  vk::vkCmdDispatch(commands, (size.width + 7) / 8, (size.height + 7) / 8, 1);
+  return true;
+}
+
+// The draw ID pass (id.frag).
+
+Pipeline* Backend::GetIdPipeline(const PipelineDesc& desc) {
+  PipelineDesc key = desc;
+  key.pixel = nullptr;
+  key.blend_enable = key.src_color = key.dst_color = key.color_op = 0;
+  key.src_alpha = key.dst_alpha = key.alpha_op = key.write_mask = 0;
+  key.color_format = key.samples = 0;
+  key.depth = 1;
+  auto [it, added] = id_pipelines_.try_emplace(key);
+  if (!added) {
+    PipelineObject* o = it->second.get();
+    return o && o->pipeline ? reinterpret_cast<Pipeline*>(o) : nullptr;
+  }
+  if (!id_pixel_) {
+    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    info.codeSize = sizeof(k_id_frag);
+    info.pCode = k_id_frag;
+    if (vk::vkCreateShaderModule(device_, &info, nullptr, &id_pixel_) != VK_SUCCESS) {
+      id_pixel_ = VK_NULL_HANDLE;
+      return nullptr;
+    }
+  }
+  auto object = std::make_unique<PipelineObject>();
+  PipelineObject& o = *object;
+  o.sets[0] = empty_layout_;
+  o.sets[1] = constants_layout_;
+  o.sets[2] = TexturesLayout(key.vertex, ShaderStage::kVertex);
+  o.sets[3] = TexturesLayout(nullptr, ShaderStage::kPixel);
+  if (!key.vertex || !o.sets[2] || !o.sets[3]) {
+    return nullptr;  // (kept as made: not tried again)
+  }
+  // The draw's layout with the number as a push constant.
+  VkPipelineLayout& layout = id_layouts_[o.sets[2]];
+  if (!layout) {
+    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4};
+    VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    info.setLayoutCount = 4;
+    info.pSetLayouts = o.sets;
+    info.pushConstantRangeCount = 1;
+    info.pPushConstantRanges = &push;
+    vk::vkCreatePipelineLayout(device_, &info, nullptr, &layout);
+  }
+  o.layout = layout;
+  if (!layout) {
+    return nullptr;
+  }
+  PipelineDesc build = key;
+  build.write_mask = 0xF;
+  build.color_format = uint32_t(Format::kR32Uint);
+  build.samples = 1;
+  o.pipeline = MakeGraphicsPipeline(build, id_pixel_, layout, false);
+  it->second = std::move(object);
+  return it->second->pipeline ? reinterpret_cast<Pipeline*>(it->second.get()) : nullptr;
+}
+
+void Backend::SetDrawId(uint32_t id) {
+  vk::vkCmdPushConstants(commands(), bound_pipeline_->layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4,
+                         &id);
 }
 
 }  // namespace gpu::vulkan

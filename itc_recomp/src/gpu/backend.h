@@ -144,6 +144,26 @@ class Backend {
   // A view for sampling (null if it can't be made), destroyed at once.
   virtual View* CreateView(Image* image, const ViewDesc& desc) = 0;
   virtual void DestroyView(View* view) = 0;
+
+  // The renderer's own passes, each backend with its own shaders (made
+  // from the same GLSL). In the frame, outside passes (each its own).
+  // A resolve, the source in its sampled usage (depth sampled for a depth
+  // image), the destination a color target. False if it couldn't be drawn.
+  virtual bool DrawResolve(const ResolveDraw& draw) = 0;
+  // A movie's frame from its three planes (Y, half-size U and V; R8,
+  // sampled) over `area` of `target` (a color target), as BT.709.
+  virtual bool DrawMovie(Image* const planes[3], Image* target, const Rect& area) = 0;
+  // `image`'s top-left `size` (RGBA16F, in its storage usage) through the
+  // display's gamma table (256 entries out of 1023, the same for R, G and
+  // B), in place. The table is read once: the same every call.
+  virtual bool ApplyGamma(Image* image, Extent2D size, const uint16_t table[256]) = 0;
+  // The draw ID pass's pipeline for a draw's: its vertex shader, geometry
+  // and depth state, writing a number (SetDrawId) into an R32Uint target
+  // over a D32FloatS8Uint one, one sample; bound with the draw's vertex
+  // textures and constants (BindResources, no pixel textures).
+  virtual Pipeline* GetIdPipeline(const PipelineDesc& desc) = 0;
+  // In a pass, with an ID pipeline bound: the number its draws write.
+  virtual void SetDrawId(uint32_t id) = 0;
 };
 
 }  // namespace gpu

@@ -9,6 +9,7 @@
 #include <memory>
 #include <chrono>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <cstdint>
@@ -86,9 +87,6 @@ class Backend final : public gpu::Backend {
   bool EndFrame(Image* shown, Extent2D size) override;
   void WaitIdle() override;
   void OpenDiskCache(const std::filesystem::path& directory) override;
-  // Saved at most every 10 s, when `made` (pipelines made so far) grew.
-  void MaybeSaveDiskCache(size_t made);
-  VkPipelineCache pipeline_cache() const { return pipeline_cache_; }
   Sampler* CreateSampler(const SamplerDesc& desc) override;
   static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
   Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) override;
@@ -154,6 +152,11 @@ class Backend final : public gpu::Backend {
   View* CreateView(Image* image, const ViewDesc& desc) override;
   void DestroyView(View* view) override;
   static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
+  bool DrawResolve(const ResolveDraw& draw) override;
+  bool DrawMovie(Image* const planes[3], Image* target, const Rect& area) override;
+  bool ApplyGamma(Image* image, Extent2D size, const uint16_t table[256]) override;
+  Pipeline* GetIdPipeline(const PipelineDesc& desc) override;
+  void SetDrawId(uint32_t id) override;
   static ImageObject& Object(Image* image) { return *reinterpret_cast<ImageObject*>(image); }
   static const ImageObject& Object(const Image* image) {
     return *reinterpret_cast<const ImageObject*>(image);
@@ -166,6 +169,21 @@ class Backend final : public gpu::Backend {
 
  private:
   bool CreateDevice();
+  // The resolve's and movie's shaders, layouts and samplers.
+  bool CreatePassResources();
+  // Saved at most every 10 s, when the pipelines made so far grew.
+  void MaybeSaveDiskCache();
+  // A graphics pipeline for `key` with `pixel` (none: depth only) and
+  // `layout`; its dynamic state viewport, scissor, depth bias and (with
+  // `blend_constants`) blend constants.
+  VkPipeline MakeGraphicsPipeline(const PipelineDesc& key, VkShaderModule pixel,
+                                  VkPipelineLayout layout, bool blend_constants);
+  // A pipeline drawing the resolve's viewport-covering triangle with
+  // `pixel` into one color target, no blending.
+  VkPipeline MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
+                                    VkFormat format, VkSampleCountFlagBits samples);
+  // One of this frame's sets for the resolve and movie passes.
+  VkDescriptorSet PassSet(VkDescriptorSetLayout layout);
   // The frame's upload commands, begun if they aren't.
   VkCommandBuffer Uploads();
   // Records `commands` with `record` and runs them now, waiting for them.
@@ -202,6 +220,8 @@ class Backend final : public gpu::Backend {
     // Texture sets: pools, kept for later frames, and the one in use.
     std::vector<VkDescriptorPool> texture_pools;
     size_t texture_pool = 0;
+    // The resolve and movie passes' sets.
+    VkDescriptorPool pass_pool = VK_NULL_HANDLE;
   };
   bool AddTexturePool(Frame& frame);
   std::vector<Frame> frames_;
@@ -235,6 +255,37 @@ class Backend final : public gpu::Backend {
                      LayoutPairHash>
       pipeline_layouts_;
   std::unordered_map<PipelineDesc, std::unique_ptr<PipelineObject>, DescHash> pipelines_;
+  PipelineObject* bound_pipeline_ = nullptr;
+
+  // The resolve and movie passes: pipelines by target format and
+  // multisampling (the resolve's source, the movie's target).
+  VkDescriptorSetLayout resolve_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout resolve_layout_ = VK_NULL_HANDLE;
+  VkShaderModule resolve_vertex_ = VK_NULL_HANDLE, resolve_pixel_ = VK_NULL_HANDLE,
+                 resolve_pixel_ms_ = VK_NULL_HANDLE;
+  VkSampler resolve_sampler_ = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, bool>, VkPipeline> resolve_pipelines_;
+  VkDescriptorSetLayout movie_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout movie_layout_ = VK_NULL_HANDLE;
+  VkShaderModule movie_pixel_ = VK_NULL_HANDLE;
+  VkSampler movie_sampler_ = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, VkSampleCountFlagBits>, VkPipeline> movie_pipelines_;
+  // The gamma pass, made at its first use, its set for `gamma_image_`.
+  Buffer* gamma_table_ = nullptr;
+  VkDescriptorSetLayout gamma_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout gamma_layout_ = VK_NULL_HANDLE;
+  VkPipeline gamma_pipeline_ = VK_NULL_HANDLE;
+  VkDescriptorPool gamma_pool_ = VK_NULL_HANDLE;
+  VkDescriptorSet gamma_set_ = VK_NULL_HANDLE;
+  Image* gamma_image_ = nullptr;
+  bool gamma_uploaded_ = false, gamma_failed_ = false;
+  // The draw ID pass: its pixel shader, layouts by the vertex textures',
+  // pipelines by the draw's description (its pixel and blend state
+  // cleared).
+  VkShaderModule id_pixel_ = VK_NULL_HANDLE;
+  std::unordered_map<VkDescriptorSetLayout, VkPipelineLayout> id_layouts_;
+  std::unordered_map<PipelineDesc, std::unique_ptr<PipelineObject>, DescHash> id_pipelines_;
+
   VkPipelineCache pipeline_cache_ = VK_NULL_HANDLE;
   std::filesystem::path pipeline_cache_file_;
   size_t pipeline_cache_saved_pipelines_ = 0;

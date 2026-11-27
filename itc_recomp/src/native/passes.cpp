@@ -11,13 +11,7 @@
 #include "base/log.h"
 #include "disk_cache.h"
 
-#include "generated_gamma_comp.h"
-#include "generated_id_frag.h"
 #include "xbox_gamma_table.h"
-#include "generated_movie_frag.h"
-#include "generated_resolve_frag.h"
-#include "generated_resolve_ms_frag.h"
-#include "generated_resolve_vert.h"
 
 #include "buffers.h"
 #include "gpu_memory.h"
@@ -193,9 +187,6 @@ void Transition(VkCommandBuffer commands, VkImage image, VkImageAspectFlags aspe
 
 constexpr VkImageAspectFlags kDepthStencilAspects =
     VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-
-// Resolve draws a frame can make (a descriptor set each).
-constexpr uint32_t kResolvesPerFrame = 256;
 
 // Per frame in flight: the draws' constants, in blocks of this size (about
 // 1,750 draws each, fewer reused); a frame that fills its blocks gets
@@ -616,16 +607,13 @@ struct Passes::State {
   // state, writing its number in recorded_draws into an R32_UINT image.
   struct IdDraw {
     uint32_t number;
-    VkShaderModule vertex;
-    gpu::Shader* vertex_shader;
-    VkPipelineLayout layout;
-    VkDescriptorSetLayout set_layouts[4];  // the draw's layout's
-    VkDescriptorSet sets[4];
+    gpu::TextureSet* vertex_textures;
+    gpu::Buffer* constants;
     uint32_t offsets[kConstantBlocks];
     VkViewport viewport;
     VkRect2D scissor;
     VkDeviceSize index_offset;
-    VkIndexType index_type;
+    bool index_32bit;
     uint32_t index_count;
     int32_t base_vertex;
     uint32_t vertex_bindings;
@@ -634,28 +622,9 @@ struct Passes::State {
     float bias_constant, bias_slope;
   };
   std::vector<IdDraw> id_draws;
-  std::unordered_map<VkPipelineLayout, VkPipelineLayout> id_layouts;
-  std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> id_pipelines;
-  VkShaderModule id_pixel = VK_NULL_HANDLE;
   gpu::Image* id_image = nullptr;
   gpu::Image* id_depth = nullptr;
   bool id_drawn = false;  // this frame, for the dump
-  VkPipeline GetIdPipeline(const IdDraw& draw);
-  // The draw's layout with the ID pass's push constant (its sets stay
-  // compatible).
-  VkPipelineLayout GetIdLayout(const IdDraw& draw) {
-    VkPipelineLayout& layout = id_layouts[draw.layout];
-    if (!layout) {
-      VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4};
-      VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-      info.setLayoutCount = 4;
-      info.pSetLayouts = draw.set_layouts;
-      info.pushConstantRangeCount = 1;
-      info.pPushConstantRanges = &push;
-      vk::vkCreatePipelineLayout(context.device, &info, nullptr, &layout);
-    }
-    return layout;
-  }
   void DrawIds(VkCommandBuffer commands);
   uint64_t watch_pixel_shader = 0;  // only its draws, if set
   bool hide_cubes = false;
@@ -869,16 +838,7 @@ struct Passes::State {
   // --xbox_gamma: a gamma table (xbox_gamma_table.h) applied to `shown` in
   // place (gamma.comp).
   const uint16_t* gamma_values = nullptr;
-  VkBuffer gamma_table = VK_NULL_HANDLE;
-  gpu::Buffer* gamma_table_object = nullptr;  // gamma_table is its
-  VkDescriptorSetLayout gamma_set_layout = VK_NULL_HANDLE;
-  VkPipelineLayout gamma_layout = VK_NULL_HANDLE;
-  VkPipeline gamma_pipeline = VK_NULL_HANDLE;
-  VkDescriptorPool gamma_pool = VK_NULL_HANDLE;
-  VkDescriptorSet gamma_set = VK_NULL_HANDLE;
-  bool gamma_ready = false;  // the table has been uploaded
-  bool CreateGammaResources();
-  void ApplyGamma(VkCommandBuffer commands);
+  bool logged_gamma_failure = false;
   struct Resolved {
     VkImage image;
     VkExtent2D extent;
@@ -915,37 +875,21 @@ struct Passes::State {
   void DumpGuestResolves();
   bool logged_extra_targets = false;
 
-  // Resolves: drawn with our own shaders (src/native/glsl), sampling the
-  // source target; pipelines by destination format and multisampling.
-  VkDescriptorSetLayout resolve_set_layout = VK_NULL_HANDLE;
-  VkPipelineLayout resolve_layout = VK_NULL_HANDLE;
-  VkShaderModule resolve_vertex = VK_NULL_HANDLE, resolve_pixel = VK_NULL_HANDLE,
-                 resolve_pixel_ms = VK_NULL_HANDLE;
-  VkSampler resolve_sampler = VK_NULL_HANDLE;
-  std::map<std::pair<VkFormat, bool>, VkPipeline> resolve_pipelines;
-  std::vector<VkDescriptorPool> resolve_pools;  // per frame in flight
-  // Source and destination pairs logged so far.
+  // Resolves drawn (the backend's DrawResolve): source and destination
+  // pairs logged so far.
   std::unordered_set<uint64_t> logged_resolves;
 
-  // Movies' frames (DrawMovie): their own pixel shader with the resolve's
-  // vertex shader; per frame in flight, the three planes and the buffer
-  // they're uploaded through. Made at the first frame, for its size.
+  // Movies' frames (DrawMovie, drawn by the backend): per frame in
+  // flight, the three planes and the buffer they're uploaded through. Made
+  // at the first frame, for its size.
   struct MovieUpload {
     gpu::Image* planes[3] = {};
-    gpu::Buffer* staging_object = nullptr;
-    VkBuffer staging = VK_NULL_HANDLE;  // the object's
+    gpu::Buffer* staging = nullptr;
     uint8_t* mapped = nullptr;
-    VkDescriptorSet set = VK_NULL_HANDLE;
   };
   std::vector<MovieUpload> movie_uploads;
   VkExtent2D movie_extent{};
   bool movie_failed = false;
-  VkDescriptorSetLayout movie_set_layout = VK_NULL_HANDLE;
-  VkPipelineLayout movie_layout = VK_NULL_HANDLE;
-  VkDescriptorPool movie_pool = VK_NULL_HANDLE;
-  VkShaderModule movie_pixel = VK_NULL_HANDLE;
-  VkSampler movie_sampler = VK_NULL_HANDLE;
-  std::map<std::pair<VkFormat, VkSampleCountFlagBits>, VkPipeline> movie_pipelines;
 
   struct ConstantBlock {
     gpu::Buffer* object = nullptr;
@@ -984,9 +928,6 @@ struct Passes::State {
   std::vector<gpu::Sampler*> set_samplers;
 
   std::unique_ptr<ShaderCache> shaders;
-  // The driver's compiled pipelines, kept in the disk cache (disk_cache.h):
-  // loaded at start and saved at most every 10 s after new pipelines.
-  VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
   // The draw's state, from the device's shadow (ReadState).
   DrawRegisters regs;
   Stats stats;
@@ -1085,14 +1026,7 @@ struct Passes::State {
   // so targets made while tiling are as large as the tiles together.
   bool tiling = false;
   VkExtent2D tiling_extent{};
-  bool CreateResolveResources();
-  VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
-  // A pipeline drawing the resolve's viewport-covering triangle with
-  // `pixel`, into one color attachment, no blending.
-  VkPipeline MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
-                                    VkFormat format, VkSampleCountFlagBits samples);
   bool CreateMovieResources(VkExtent2D extent);
-  VkPipeline GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples);
   void EndRendering(VkCommandBuffer commands);
   bool CreateRings();
   bool CreateConstantBlock(Ring& ring);
@@ -1671,241 +1605,6 @@ void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
   }
 }
 
-bool Passes::State::CreateResolveResources() {
-  VkDevice device = context.device;
-  VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
-                                       VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-  VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  set_info.bindingCount = 1;
-  set_info.pBindings = &binding;
-  if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &resolve_set_layout) !=
-      VK_SUCCESS) {
-    return false;
-  }
-  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 20};
-  VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-  layout_info.setLayoutCount = 1;
-  layout_info.pSetLayouts = &resolve_set_layout;
-  layout_info.pushConstantRangeCount = 1;
-  layout_info.pPushConstantRanges = &push;
-  if (vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &resolve_layout) != VK_SUCCESS) {
-    return false;
-  }
-  auto module = [&](const uint32_t* code, size_t size, VkShaderModule& out) {
-    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    info.codeSize = size;
-    info.pCode = code;
-    return vk::vkCreateShaderModule(device, &info, nullptr, &out) == VK_SUCCESS;
-  };
-  if (!module(k_resolve_vert, sizeof(k_resolve_vert), resolve_vertex) ||
-      !module(k_resolve_frag, sizeof(k_resolve_frag), resolve_pixel) ||
-      !module(k_resolve_ms_frag, sizeof(k_resolve_ms_frag), resolve_pixel_ms)) {
-    return false;
-  }
-  gpu::SamplerDesc sampler_desc;
-  sampler_desc.address[0] = sampler_desc.address[1] = sampler_desc.address[2] =
-      gpu::AddressMode::kClampToEdge;
-  resolve_sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
-  if (!resolve_sampler) {
-    return false;
-  }
-  resolve_pools.resize(frames_in_flight);
-  for (VkDescriptorPool& pool : resolve_pools) {
-    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kResolvesPerFrame};
-    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pool_info.maxSets = kResolvesPerFrame;
-    pool_info.poolSizeCount = 1;
-    pool_info.pPoolSizes = &size;
-    if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &pool) != VK_SUCCESS) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool Passes::State::CreateGammaResources() {
-  VkDevice device = context.device;
-  gamma_table_object =
-      backend->CreateBuffer({256 * sizeof(uint32_t), gpu::kBufferStorage | gpu::kBufferCopyDest,
-                             false});
-  if (!gamma_table_object) {
-    return false;
-  }
-  gamma_table = gpu::vulkan::Backend::Handle(gamma_table_object);
-  gpu_memory::Allocated(gpu_memory::Kind::kOther, backend->MemorySize(gamma_table_object));
-  VkDescriptorSetLayoutBinding bindings[2] = {
-      {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
-  VkDescriptorSetLayoutCreateInfo set_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  set_info.bindingCount = 2;
-  set_info.pBindings = bindings;
-  if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &gamma_set_layout) !=
-      VK_SUCCESS) {
-    return false;
-  }
-  VkPushConstantRange push{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8};
-  VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-  layout_info.setLayoutCount = 1;
-  layout_info.pSetLayouts = &gamma_set_layout;
-  layout_info.pushConstantRangeCount = 1;
-  layout_info.pPushConstantRanges = &push;
-  if (vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &gamma_layout) != VK_SUCCESS) {
-    return false;
-  }
-  VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-                                   {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
-  VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  pool_info.maxSets = 1;
-  pool_info.poolSizeCount = 2;
-  pool_info.pPoolSizes = sizes;
-  if (vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &gamma_pool) != VK_SUCCESS) {
-    return false;
-  }
-  VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  set_alloc.descriptorPool = gamma_pool;
-  set_alloc.descriptorSetCount = 1;
-  set_alloc.pSetLayouts = &gamma_set_layout;
-  if (vk::vkAllocateDescriptorSets(device, &set_alloc, &gamma_set) != VK_SUCCESS) {
-    return false;
-  }
-  // `shown` is only ever written by transfers and this pass, and lives as
-  // long as the set: the set is written once.
-  VkDescriptorImageInfo image_info{VK_NULL_HANDLE, View(shown), VK_IMAGE_LAYOUT_GENERAL};
-  VkDescriptorBufferInfo table_info{gamma_table, 0, VK_WHOLE_SIZE};
-  VkWriteDescriptorSet writes[2] = {{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
-                                    {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
-  writes[0].dstSet = writes[1].dstSet = gamma_set;
-  writes[0].dstBinding = 0;
-  writes[0].descriptorCount = 1;
-  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-  writes[0].pImageInfo = &image_info;
-  writes[1].dstBinding = 1;
-  writes[1].descriptorCount = 1;
-  writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  writes[1].pBufferInfo = &table_info;
-  vk::vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
-  VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-  module_info.codeSize = sizeof(k_gamma_comp);
-  module_info.pCode = k_gamma_comp;
-  VkShaderModule module;
-  if (vk::vkCreateShaderModule(device, &module_info, nullptr, &module) != VK_SUCCESS) {
-    return false;
-  }
-  VkComputePipelineCreateInfo info{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-  info.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-  info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  info.stage.module = module;
-  info.stage.pName = "main";
-  info.layout = gamma_layout;
-  VkResult result =
-      vk::vkCreateComputePipelines(device, pipeline_cache, 1, &info, nullptr, &gamma_pipeline);
-  vk::vkDestroyShaderModule(device, module, nullptr);
-  if (result != VK_SUCCESS) {
-    gamma_pipeline = VK_NULL_HANDLE;
-    return false;
-  }
-  ITC_LOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display is "
-               "applied to the frame",
-               ITC_FLAG(xbox_gamma));
-  return true;
-}
-
-void Passes::State::ApplyGamma(VkCommandBuffer commands) {
-  if (!gamma_ready) {  // the first frame: the table into its buffer
-    uint32_t table[256];
-    std::copy(gamma_values, gamma_values + 256, table);
-    vk::vkCmdUpdateBuffer(commands, gamma_table, 0, sizeof(table), table);
-    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0,
-                             nullptr);
-    gamma_ready = true;
-  }
-  backend->Use(shown, gpu::Usage::kStorage);
-  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_pipeline);
-  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_COMPUTE, gamma_layout, 0, 1,
-                              &gamma_set, 0, nullptr);
-  int32_t extent[2] = {int32_t(shown_extent.width), int32_t(shown_extent.height)};
-  vk::vkCmdPushConstants(commands, gamma_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(extent),
-                         extent);
-  vk::vkCmdDispatch(commands, (shown_extent.width + 7) / 8, (shown_extent.height + 7) / 8, 1);
-}
-
-VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) {
-  auto [it, added] = resolve_pipelines.try_emplace({format, multisample}, VK_NULL_HANDLE);
-  if (!added) {
-    return it->second;
-  }
-  it->second = MakeFullscreenPipeline(multisample ? resolve_pixel_ms : resolve_pixel,
-                                      resolve_layout, format, VK_SAMPLE_COUNT_1_BIT);
-  if (!it->second) {
-    ITC_LOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
-                  int(format));
-  }
-  return it->second;
-}
-
-VkPipeline Passes::State::MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
-                                                 VkFormat format, VkSampleCountFlagBits samples) {
-  VkPipelineShaderStageCreateInfo stages[2] = {};
-  for (VkPipelineShaderStageCreateInfo& stage : stages) {
-    stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stage.pName = "main";
-  }
-  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].module = resolve_vertex;
-  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].module = pixel;
-  VkPipelineVertexInputStateCreateInfo vertex_input{
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-  VkPipelineInputAssemblyStateCreateInfo input_assembly{
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-  viewport.viewportCount = 1;
-  viewport.scissorCount = 1;
-  VkPipelineRasterizationStateCreateInfo raster{
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = VK_CULL_MODE_NONE;
-  raster.lineWidth = 1.0f;
-  VkPipelineMultisampleStateCreateInfo multisample_state{
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  multisample_state.rasterizationSamples = samples;
-  VkPipelineColorBlendAttachmentState attachment{};
-  attachment.colorWriteMask = 0xF;
-  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  blend.attachmentCount = 1;
-  blend.pAttachments = &attachment;
-  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 2;
-  dynamic.pDynamicStates = dynamic_states;
-  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  rendering.colorAttachmentCount = 1;
-  rendering.pColorAttachmentFormats = &format;
-  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-  info.pNext = &rendering;
-  info.stageCount = 2;
-  info.pStages = stages;
-  info.pVertexInputState = &vertex_input;
-  info.pInputAssemblyState = &input_assembly;
-  info.pViewportState = &viewport;
-  info.pRasterizationState = &raster;
-  info.pMultisampleState = &multisample_state;
-  info.pColorBlendState = &blend;
-  info.pDynamicState = &dynamic;
-  info.layout = layout;
-  VkPipeline pipeline = VK_NULL_HANDLE;
-  if (vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info, nullptr,
-                                    &pipeline) != VK_SUCCESS) {
-    return VK_NULL_HANDLE;
-  }
-  return pipeline;
-}
-
 bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
                                 uint32_t destination, const int32_t* rect,
                                 const int32_t* point, uint32_t flags) {
@@ -2049,54 +1748,21 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   if (!dest.copied && !textures.RestoreResolveDestination(fetch, source.scale, dest)) {
     return false;
   }
-  VkPipeline pipeline = GetResolvePipeline(dest.format, source.samples != VK_SAMPLE_COUNT_1_BIT);
-  if (!pipeline) {
-    return false;
-  }
-  VkDescriptorSet set;
-  VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc.descriptorPool = resolve_pools[frame];
-  alloc.descriptorSetCount = 1;
-  alloc.pSetLayouts = &resolve_set_layout;
-  if (vk::vkAllocateDescriptorSets(context.device, &alloc, &set) != VK_SUCCESS) {
-    return false;
-  }
-  VkImageLayout read_layout = source.depth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                                           : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  VkDescriptorImageInfo image_info{resolve_sampler, source.sample_view(), read_layout};
-  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  write.dstSet = set;
-  write.descriptorCount = 1;
-  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write.pImageInfo = &image_info;
-  vk::vkUpdateDescriptorSets(context.device, 1, &write, 0, nullptr);
-
   EndRendering(commands);
   backend->Use(source.image, source.depth ? gpu::Usage::kDepthSampled : gpu::Usage::kSampled);
   backend->Use(dest.object, gpu::Usage::kColorTarget);
-  VkRect2D area{{host_x, host_y}, {uint32_t(host_width), uint32_t(host_height)}};
-  gpu::PassTarget dest_target;
-  dest_target.image = dest.object;
-  backend->BeginPass(dest_target, {}, {host_x, host_y, area.extent.width, area.extent.height});
-  VkViewport viewport{float(host_x), float(host_y), float(host_width), float(host_height), 0.0f,
-                      1.0f};
-  vk::vkCmdSetViewport(commands, 0, 1, &viewport);
-  vk::vkCmdSetScissor(commands, 0, 1, &area);
-  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resolve_layout, 0, 1,
-                              &set, 0, nullptr);
-  struct {
-    int32_t offset[2];
-    int32_t samples;
-    float scale;
-    int32_t swap_red_blue;
-  } constants{{host_left - host_x, host_top - host_y},
-              source.depth ? 1 : int32_t(source.samples),
-              std::ldexp(1.0f, bias), swap ? 1 : 0};
-  vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(constants), &constants);
-  vk::vkCmdDraw(commands, 3, 1, 0, 0);
-  backend->EndPass();
+  gpu::ResolveDraw draw;
+  draw.source = source.image;
+  draw.dest = dest.object;
+  draw.area = {host_x, host_y, uint32_t(host_width), uint32_t(host_height)};
+  draw.offset[0] = host_left - host_x;
+  draw.offset[1] = host_top - host_y;
+  draw.samples = source.depth ? 1 : int32_t(source.samples);
+  draw.scale = std::ldexp(1.0f, bias);
+  draw.swap_red_blue = swap;
+  if (!backend->DrawResolve(draw)) {
+    return false;
+  }
   recorded.valid = false;
   backend->Use(dest.object, gpu::Usage::kSampled);
   Resolved& resolved = frame_resolves.emplace_back();
@@ -2117,46 +1783,6 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
 
 bool Passes::State::CreateMovieResources(VkExtent2D extent) {
   VkDevice device = context.device;
-  if (!movie_layout) {
-    VkDescriptorSetLayoutBinding bindings[3];
-    for (uint32_t i = 0; i < 3; i++) {
-      bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
-                     VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-    }
-    VkDescriptorSetLayoutCreateInfo set_info{
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    set_info.bindingCount = 3;
-    set_info.pBindings = bindings;
-    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
-    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &movie_set_layout;
-    layout_info.pushConstantRangeCount = 1;
-    layout_info.pPushConstantRanges = &push;
-    VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    module_info.codeSize = sizeof(k_movie_frag);
-    module_info.pCode = k_movie_frag;
-    // Bilinear, as the movie library's sampler states.
-    gpu::SamplerDesc sampler_desc;
-    sampler_desc.mag_filter = sampler_desc.min_filter = gpu::Filter::kLinear;
-    sampler_desc.address[0] = sampler_desc.address[1] = sampler_desc.address[2] =
-        gpu::AddressMode::kClampToEdge;
-    movie_sampler = gpu::vulkan::Backend::Handle(backend->CreateSampler(sampler_desc));
-    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                              3 * frames_in_flight};
-    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pool_info.maxSets = frames_in_flight;
-    pool_info.poolSizeCount = 1;
-    pool_info.pPoolSizes = &size;
-    if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &movie_set_layout) !=
-            VK_SUCCESS ||
-        vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &movie_layout) != VK_SUCCESS ||
-        vk::vkCreateShaderModule(device, &module_info, nullptr, &movie_pixel) != VK_SUCCESS ||
-        !movie_sampler ||
-        vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &movie_pool) != VK_SUCCESS) {
-      return false;
-    }
-  }
   // Another size than the last movie's (none in the game: all are
   // 1280x720): the old planes are left, as the renderer leaves its other
   // images at exit.
@@ -2178,46 +1804,14 @@ bool Passes::State::CreateMovieResources(VkExtent2D extent) {
         return false;
       }
     }
-    upload.staging_object = backend->CreateBuffer({staging_size, gpu::kBufferCopySource, true});
-    if (!upload.staging_object) {
+    upload.staging = backend->CreateBuffer({staging_size, gpu::kBufferCopySource, true});
+    if (!upload.staging) {
       return false;
     }
-    upload.staging = gpu::vulkan::Backend::Handle(upload.staging_object);
-    upload.mapped = backend->Mapped(upload.staging_object);
-    gpu_memory::Allocated(gpu_memory::Kind::kOther, backend->MemorySize(upload.staging_object));
-    VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    set_alloc.descriptorPool = movie_pool;
-    set_alloc.descriptorSetCount = 1;
-    set_alloc.pSetLayouts = &movie_set_layout;
-    if (vk::vkAllocateDescriptorSets(device, &set_alloc, &upload.set) != VK_SUCCESS) {
-      return false;
-    }
-    VkDescriptorImageInfo images[3];
-    VkWriteDescriptorSet writes[3];
-    for (uint32_t i = 0; i < 3; i++) {
-      images[i] = {movie_sampler, View(upload.planes[i]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-      writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-      writes[i].dstSet = upload.set;
-      writes[i].dstBinding = i;
-      writes[i].descriptorCount = 1;
-      writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      writes[i].pImageInfo = &images[i];
-    }
-    vk::vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+    upload.mapped = backend->Mapped(upload.staging);
+    gpu_memory::Allocated(gpu_memory::Kind::kOther, backend->MemorySize(upload.staging));
   }
   return true;
-}
-
-VkPipeline Passes::State::GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples) {
-  auto [it, added] = movie_pipelines.try_emplace({format, samples}, VK_NULL_HANDLE);
-  if (added) {
-    it->second = MakeFullscreenPipeline(movie_pixel, movie_layout, format, samples);
-    if (!it->second) {
-      ITC_LOG_ERROR("native renderer: couldn't create a movie pipeline for format {}",
-                    int(format));
-    }
-  }
-  return it->second;
 }
 
 void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
@@ -2237,10 +1831,6 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   uint32_t object = render::BoundTargets().color[0];
   Target* target = object ? s.GetTarget(commands, object, false) : nullptr;
   if (!target) {
-    return;
-  }
-  VkPipeline pipeline = s.GetMoviePipeline(target->format, target->samples);
-  if (!pipeline) {
     return;
   }
   State::MovieUpload& upload = s.movie_uploads[s.frame];
@@ -2264,7 +1854,7 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
     copy.offset = offsets[i];
     copy.width = sizes[i].width;
     copy.height = sizes[i].height;
-    s.backend->CopyBufferToImage(upload.staging_object, upload.planes[i], &copy, 1);
+    s.backend->CopyBufferToImage(upload.staging, upload.planes[i], &copy, 1);
     s.backend->Use(upload.planes[i], gpu::Usage::kSampled);
   }
   // The library's rectangle: the target's top-left 1280x720 guest pixels.
@@ -2275,21 +1865,10 @@ void Passes::DrawMovie(VkCommandBuffer commands, uint32_t device,
   }
   s.RestoreContents(commands, *target);
   s.backend->Use(target->image, gpu::Usage::kColorTarget);
-  VkRect2D area{{0, 0}, {uint32_t(width), uint32_t(height)}};
-  gpu::PassTarget movie_target;
-  movie_target.image = target->image;
-  s.backend->BeginPass(movie_target, {}, {0, 0, area.extent.width, area.extent.height});
-  VkViewport viewport{0.0f, 0.0f, float(width), float(height), 0.0f, 1.0f};
-  vk::vkCmdSetViewport(commands, 0, 1, &viewport);
-  vk::vkCmdSetScissor(commands, 0, 1, &area);
-  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, s.movie_layout, 0, 1,
-                              &upload.set, 0, nullptr);
-  float constants[4] = {0.0f, 0.0f, float(width), float(height)};
-  vk::vkCmdPushConstants(commands, s.movie_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(constants), constants);
-  vk::vkCmdDraw(commands, 3, 1, 0, 0);
-  s.backend->EndPass();
+  if (!s.backend->DrawMovie(upload.planes, target->image,
+                           {0, 0, uint32_t(width), uint32_t(height)})) {
+    return;
+  }
   s.recorded.valid = false;
   s.stats.movie_draws++;
 }
@@ -2327,6 +1906,11 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
   } else if (gamma != "off") {
     ITC_LOG_WARN("native renderer: --xbox_gamma={}: not off, hdtv or power; off", gamma);
   }
+  if (s.gamma_values) {
+    ITC_LOG_INFO("native renderer: --xbox_gamma={}: the Xbox 360's gamma table for that display "
+                 "is applied to the frame",
+                 gamma);
+  }
   gpu::ImageDesc shown_desc;
   shown_desc.format = gpu::Format::kR16G16B16A16Float;  // kShownFormat
   shown_desc.width = s.shown_extent.width;
@@ -2335,8 +1919,8 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
                      (s.gamma_values ? gpu::kImageStorage : 0);
   s.shown = s.NewImage(shown_desc);
   if (!s.shown ||
-      (s.gamma_values && !s.CreateGammaResources()) || !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
-      !s.CreateResolveResources() || !s.textures.Init(backend, frames_in_flight)) {
+      !s.CreateRings() || !s.CreateDescriptors() || !s.CreateDummyTextures() ||
+      !s.textures.Init(backend, frames_in_flight)) {
     ITC_LOG_ERROR("native renderer: couldn't create the passes' resources");
     return false;
   }
@@ -2351,13 +1935,11 @@ bool Passes::Init(gpu::vulkan::Backend& backend, uint32_t frames_in_flight,
                s.depth_filterable ? "supported" : "not supported");
   s.shaders = std::make_unique<ShaderCache>();
   backend.OpenDiskCache(DiskCacheDirectory());
-  s.pipeline_cache = backend.pipeline_cache();
   return true;
 }
 
 void Passes::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
-  s.backend->MaybeSaveDiskCache(s.resolve_pipelines.size() + s.id_pipelines.size());
   s.frame = frame_index;
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
@@ -2383,7 +1965,6 @@ void Passes::BeginFrame(uint32_t frame_index) {
   for (State::LastTextureSet& last : s.last_texture_sets) {
     last.set = VK_NULL_HANDLE;
   }
-  vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
   s.textures.BeginFrame(frame_index);
 }
 
@@ -3196,17 +2777,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (s.record_draws && main_view_draw && !call.inline_vertices) {
     IdDraw& id = s.id_draws.emplace_back();
     id.number = uint32_t(s.recorded_draws.size() - 1);
-    id.vertex = gpu::vulkan::Backend::Object(key.vertex).module;
-    id.vertex_shader = key.vertex;
-    id.layout = pipeline_layout;
-    std::copy(std::begin(gpu::vulkan::Backend::Object(pipeline_object).sets),
-              std::end(gpu::vulkan::Backend::Object(pipeline_object).sets), id.set_layouts);
-    std::copy(sets, sets + 4, id.sets);
-    std::copy(offsets, offsets + 5, id.offsets);
+    id.vertex_textures = reinterpret_cast<gpu::TextureSet*>(vertex_textures);
+    id.constants = s.constant_block().object;
+    std::copy(offsets, offsets + kConstantBlocks, id.offsets);
     id.viewport = viewport;
     id.scissor = scissor_rect;
     id.index_offset = index_offset;
-    id.index_type = index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
+    id.index_32bit = index_32bit;
     id.index_count = index_count;
     id.base_vertex = base_vertex;
     id.vertex_bindings = vertex_bindings;
@@ -3215,98 +2792,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     id.bias_constant = constant;
     id.bias_slope = slope;
   }
-}
-
-VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
-  PipelineKey key = draw.key;
-  key.pixel = nullptr;
-  key.blend_enable = key.src_color = key.dst_color = key.color_op = 0;
-  key.src_alpha = key.dst_alpha = key.alpha_op = key.write_mask = 0;
-  key.color_format = key.samples = 0;
-  auto [it, added] = id_pipelines.try_emplace(key, VK_NULL_HANDLE);
-  if (!added) {
-    return it->second;
-  }
-  if (!id_pixel) {
-    VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    info.codeSize = sizeof(k_id_frag);
-    info.pCode = k_id_frag;
-    vk::vkCreateShaderModule(context.device, &info, nullptr, &id_pixel);
-  }
-  VkPipelineShaderStageCreateInfo stages[2] = {};
-  for (VkPipelineShaderStageCreateInfo& stage : stages) {
-    stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
-    stage.pName = "main";
-  }
-  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].module = draw.vertex;
-  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].module = id_pixel;
-  VkPipelineVertexInputStateCreateInfo vertex_input{
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-  {
-    const gpu::vulkan::ShaderObject& input = gpu::vulkan::Backend::Object(draw.vertex_shader);
-    vertex_input.vertexBindingDescriptionCount = uint32_t(input.bindings.size());
-    vertex_input.pVertexBindingDescriptions = input.bindings.data();
-    vertex_input.vertexAttributeDescriptionCount = uint32_t(input.attributes.size());
-    vertex_input.pVertexAttributeDescriptions = input.attributes.data();
-  }
-  VkPipelineInputAssemblyStateCreateInfo input_assembly{
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-  input_assembly.topology = VkPrimitiveTopology(key.topology);
-  input_assembly.primitiveRestartEnable = key.primitive_restart;
-  VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-  viewport.viewportCount = 1;
-  viewport.scissorCount = 1;
-  VkPipelineRasterizationStateCreateInfo raster{
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = vk_types::CullMode(gpu::CullMode(key.cull_mode));
-  raster.frontFace = key.front_clockwise ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  raster.depthBiasEnable = VK_TRUE;
-  raster.lineWidth = 1.0f;
-  VkPipelineMultisampleStateCreateInfo multisample{
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-  VkPipelineDepthStencilStateCreateInfo depth{
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  depth.depthTestEnable = key.z_enable;
-  depth.depthWriteEnable = key.z_write;
-  depth.depthCompareOp = vk_types::CompareOp(gpu::CompareOp(key.z_func));
-  VkPipelineColorBlendAttachmentState attachment{};
-  attachment.colorWriteMask = 0xF;
-  VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  blend.attachmentCount = 1;
-  blend.pAttachments = &attachment;
-  VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
-                                     VK_DYNAMIC_STATE_DEPTH_BIAS};
-  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamic.dynamicStateCount = 3;
-  dynamic.pDynamicStates = dynamic_states;
-  VkFormat color_format = VK_FORMAT_R32_UINT;
-  VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  rendering.colorAttachmentCount = 1;
-  rendering.pColorAttachmentFormats = &color_format;
-  rendering.depthAttachmentFormat = kDepthFormat;
-  rendering.stencilAttachmentFormat = kDepthFormat;
-  VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-  info.pNext = &rendering;
-  info.stageCount = 2;
-  info.pStages = stages;
-  info.pVertexInputState = &vertex_input;
-  info.pInputAssemblyState = &input_assembly;
-  info.pViewportState = &viewport;
-  info.pRasterizationState = &raster;
-  info.pMultisampleState = &multisample;
-  info.pDepthStencilState = &depth;
-  info.pColorBlendState = &blend;
-  info.pDynamicState = &dynamic;
-  info.layout = GetIdLayout(draw);
-  if (vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info, nullptr,
-                                    &it->second) != VK_SUCCESS) {
-    it->second = VK_NULL_HANDLE;
-  }
-  return it->second;
 }
 
 void Passes::State::DrawIds(VkCommandBuffer commands) {
@@ -3347,7 +2832,7 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   depth.clear_depth = reversed ? 0.0f : 1.0f;
   backend->BeginPass(color, depth, {0, 0, main_view_extent.width, main_view_extent.height});
   for (const IdDraw& draw : id_draws) {
-    VkPipeline pipeline = GetIdPipeline(draw);
+    gpu::Pipeline* pipeline = backend->GetIdPipeline(draw.key);
     if (!pipeline) {
       continue;
     }
@@ -3358,22 +2843,19 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
     scissor.extent.height = std::min<uint32_t>(
         scissor.extent.height,
         uint32_t(std::max(0, int32_t(main_view_extent.height) - scissor.offset.y)));
-    vk::vkCmdSetViewport(commands, 0, 1, &draw.viewport);
-    vk::vkCmdSetScissor(commands, 0, 1, &scissor);
-    vk::vkCmdSetDepthBias(commands, draw.bias_constant, 0.0f, draw.bias_slope);
-    vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    VkPipelineLayout layout = GetIdLayout(draw);
-    vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 4,
-                                draw.sets, kConstantBlocks, draw.offsets);
-    vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
-    vk::vkCmdBindIndexBuffer(commands, arena.buffer(), draw.index_offset, draw.index_type);
+    backend->SetViewport({draw.viewport.x, draw.viewport.y, draw.viewport.width,
+                          draw.viewport.height, draw.viewport.minDepth, draw.viewport.maxDepth});
+    backend->SetScissor({scissor.offset.x, scissor.offset.y, scissor.extent.width,
+                         scissor.extent.height});
+    backend->SetDepthBias(draw.bias_constant, draw.bias_slope);
+    backend->BindPipeline(pipeline);
+    backend->BindResources(pipeline, draw.vertex_textures, nullptr, draw.constants, draw.offsets);
+    backend->SetDrawId(draw.number);
+    backend->BindIndexBuffer(arena.object(), draw.index_offset, draw.index_32bit);
     if (draw.vertex_bindings) {
-      VkBuffer buffers[kMaxVertexBindings];
-      std::fill(buffers, buffers + draw.vertex_bindings, arena.buffer());
-      vk::vkCmdBindVertexBuffers(commands, 0, draw.vertex_bindings, buffers,
-                                 draw.vertex_offsets);
+      backend->BindVertexBuffers(arena.object(), draw.vertex_bindings, draw.vertex_offsets);
     }
-    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, draw.base_vertex, 0);
+    backend->DrawIndexed(draw.index_count, 1, 0, draw.base_vertex, 0);
   }
   backend->EndPass();
   recorded.valid = false;
@@ -3963,8 +3445,14 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     std::memcpy(bits, color, sizeof(bits));
     s.backend->ClearColor(s.shown, bits);
   }
-  if (s.gamma_pipeline) {
-    s.ApplyGamma(commands);
+  if (s.gamma_values) {
+    s.backend->Use(s.shown, gpu::Usage::kStorage);
+    if (!s.backend->ApplyGamma(s.shown, {s.shown_extent.width, s.shown_extent.height},
+                               s.gamma_values) &&
+        !s.logged_gamma_failure) {
+      s.logged_gamma_failure = true;
+      ITC_LOG_ERROR("native renderer: --xbox_gamma: couldn't make the gamma pass");
+    }
   }
   s.backend->Use(s.shown, gpu::Usage::kCopySource);
   if (dump) {
