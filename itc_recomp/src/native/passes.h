@@ -51,11 +51,8 @@ class Passes {
   // after command 32 (BeginTiling); each Resolve the library's EndTiling
   // (command 33) makes, tile of tiles, with its arguments (guest addresses
   // of the rectangle, point and clear color, 0 if none); after command 33.
-  void BeginTiling(VkCommandBuffer commands, uint32_t payload);
-  void TiledResolve(VkCommandBuffer commands, uint32_t device, uint32_t flags,
-                    uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
-                    float clear_z, uint32_t tile, uint32_t tiles);
-  void EndTiling();
+  void BeginTiling(VkCommandBuffer commands, uint32_t width, uint32_t height, float clear);
+  void EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destination, float clear);
   // A movie's frame (docs/native-movies.md), drawn over render target 0 of
   // `device` at the place of the command that drew it (command 28): the Y
   // plane (width x height) and the half-size U and V, rows with no padding,

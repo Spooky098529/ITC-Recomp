@@ -57,8 +57,8 @@ struct RenderStates {
   float alpha_ref = 0.0f;
 };
 
-// The viewport, as D3D's (pixels; Z range 0-1), clamped to the bound
-// surface as the game's Direct3D clamps it.
+// The viewport, as D3D's (pixels; Z range 0-1), as set: the renderer
+// clamps it to the target it draws into.
 struct Viewport {
   uint32_t x = 0, y = 0, width = 0, height = 0;
   float min_z = 0.0f, max_z = 1.0f;
@@ -81,11 +81,18 @@ void SetDepthTarget(uint32_t surface);
 // Commands 30 and 35: the viewport (pixels, Z range).
 void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float min_z,
                  float max_z);
-// Commands 32 and 33: predicated tiling begun with its tiles' rectangles
-// (the viewport is then clamped to the tiles together, as the game's
-// Direct3D clamps it while tiling holds the bound surfaces), and ended.
-void BeginTiling(uint32_t width, uint32_t height);
-void EndTiling();
+// Commands 32 and 33: predicated tiling begun (the tiles' extent together:
+// the renderer draws the tiled target whole) and ended.
+// clear: the tiles' clear color and Z; flags and destination: EndTiling's
+// resolve of the tiled target.
+void BeginTiling(uint32_t width, uint32_t height, float clear);
+void EndTiling(uint32_t flags, uint32_t destination, float clear);
+// The renderer's side of the tiling (src/native/renderer.cpp).
+void TilingBegun(uint32_t width, uint32_t height, float clear);
+void TilingEnded(uint32_t flags, uint32_t destination, float clear);
+// Commands 34 and 35: the bound targets and viewport saved, and put back.
+void SaveTargets();
+void RestoreTargets();
 const Targets& BoundTargets();
 
 // What a draw reads its shaders and vertices from: the game's shader,

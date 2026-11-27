@@ -282,17 +282,10 @@ class Renderer {
   // Render thread. Returns false if the renderer can't run.
   bool Init();
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1);
   void InlineDraw(uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
   void DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitive_count);
   VkCommandBuffer Commands() { return BeginFrame(); }
   Passes& passes() { return passes_; }
-  void TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
-                    uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
-                    uint32_t tile, uint32_t tiles) {
-    passes_.TiledResolve(BeginFrame(), device, flags, rect, destination, point, clear_color,
-                         clear_z, tile, tiles);
-  }
   void FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), device, front_buffer);
   }
@@ -749,20 +742,6 @@ void Renderer::DrawIndexed(uint32_t type, uint32_t base_start, uint32_t primitiv
   passes_.DrawIndexed(BeginFrame(), type, base_start, primitive_count);
 }
 
-void Renderer::AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1) {
-  // The draws come through render::DrawIndexed and DrawUP from the
-  // handlers.
-  // Clears and resolves through render::Clear and Resolve.
-  if (id == 32) {
-    // One item of 16 bytes per tiling begun.
-    for (uint32_t i = 0; i < arg1; i++) {
-      passes_.BeginTiling(BeginFrame(), payload + 16 * i);
-    }
-  } else if (id == 33) {
-    passes_.EndTiling();
-  }
-}
-
 void Renderer::EndFrame() {
   commands_ += frame_commands_;
   draws_ += frame_draws_;
@@ -1151,16 +1130,6 @@ void Renderer_OnCommand(uint32_t id, uint32_t payload, uint32_t arg1,
   }
 }
 
-void Renderer_AfterCommand(uint32_t id, uint32_t payload, uint32_t arg1,
-                           uint32_t arg2) {
-  if (!(id == 32 || id == 33)) {
-    return;
-  }
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterCommand(id, payload, arg1);
-  }
-}
-
 void Renderer_InlineDraw(uint32_t type, uint32_t count, uint32_t stride,
                          uint32_t data) {
   if (Renderer* renderer = GetRenderer()) {
@@ -1191,6 +1160,18 @@ void render::Resolve(uint32_t flags, const int32_t* rect, uint32_t destination,
   }
 }
 
+void render::TilingBegun(uint32_t width, uint32_t height, float clear) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().BeginTiling(renderer->Commands(), width, height, clear);
+  }
+}
+
+void render::TilingEnded(uint32_t flags, uint32_t destination, float clear) {
+  if (native::Renderer* renderer = native::GetRenderer()) {
+    renderer->passes().EndTiling(renderer->Commands(), flags, destination, clear);
+  }
+}
+
 void render::DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t data) {
   if (native::Renderer* renderer = native::GetRenderer()) {
     renderer->InlineDraw(type, count, stride, data);
@@ -1198,15 +1179,6 @@ void render::DrawUP(uint32_t type, uint32_t count, uint32_t stride, uint32_t dat
 }
 
 namespace native {
-
-void Renderer_TiledResolve(uint32_t device, uint32_t flags, uint32_t rect,
-                           uint32_t destination, uint32_t point, uint32_t clear_color,
-                           float clear_z, uint32_t tile, uint32_t tiles) {
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->TiledResolve(device, flags, rect, destination, point, clear_color, clear_z,
-                           tile, tiles);
-  }
-}
 
 void Renderer_FrontBufferResolve(uint32_t device, uint32_t front_buffer) {
   g_commands_seen = true;

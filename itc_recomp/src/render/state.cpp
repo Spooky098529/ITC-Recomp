@@ -14,8 +14,6 @@ namespace {
 
 RenderStates g_states;
 Targets g_targets;
-// D3D's viewport as last set (before the clamp to a surface).
-Viewport g_set_viewport;
 Bindings g_bindings;
 Constants g_constants;
 
@@ -44,32 +42,10 @@ int64_t ToInt64(double d) {
   }
   return int64_t(d);
 }
-// While tiling: the tiles' extent together.
-uint32_t g_tiling_width = 0, g_tiling_height = 0;
-
-// The viewport clamped to the surface render target 0 (or the depth
-// surface) is, as the game's SetViewport.
-void ClampViewport(const Viewport& v) {
-  uint32_t surface = g_targets.color[0] ? g_targets.color[0] : g_targets.depth;
-  if (!surface) {
-    return;  // kept as it was
-  }
-  const uint32_t size = schema::DeviceSurface(surface).size();
-  uint32_t max_height = (std::rotl(size, 29) & 0x7FFF) + 1;
-  uint32_t max_width = (std::rotl(size, 14) & 0x3FFF) + 1;
-  if (g_tiling_width) {
-    max_width = g_tiling_width;
-    max_height = g_tiling_height;
-  }
-  const uint32_t right = std::min(v.width + v.x, max_width);
-  const uint32_t bottom = std::min(v.height + v.y, max_height);
-  g_targets.viewport = {v.x, v.y, right - v.x, bottom - v.y, v.min_z, v.max_z};
-}
 
 // The whole surface: the viewport and the scissor rectangle.
 void Whole() {
-  g_set_viewport = {0, 0, uint32_t(INT_MAX), uint32_t(INT_MAX), 0.0f, 1.0f};
-  ClampViewport(g_set_viewport);
+  g_targets.viewport = {0, 0, uint32_t(INT_MAX), uint32_t(INT_MAX), 0.0f, 1.0f};
   g_states.scissor[0] = g_states.scissor[1] = 0;
   g_states.scissor[2] = g_states.scissor[3] = INT_MAX;
 }
@@ -486,21 +462,31 @@ void SetDepthTarget(uint32_t surface) {
   }
 }
 
-void BeginTiling(uint32_t width, uint32_t height) {
-  g_tiling_width = width;
-  g_tiling_height = height;
-  ClampViewport(g_set_viewport);
+void BeginTiling(uint32_t width, uint32_t height, float clear) {
+  TilingBegun(width, height, clear);
 }
 
-void EndTiling() {
-  g_tiling_width = g_tiling_height = 0;
-  ClampViewport(g_set_viewport);
+void EndTiling(uint32_t flags, uint32_t destination, float clear) {
+  TilingEnded(flags, destination, clear);
+}
+
+Targets g_saved_targets;
+
+void SaveTargets() { g_saved_targets = g_targets; }
+
+void RestoreTargets() {
+  // As the handler puts back each render target, the depth surface, then
+  // the viewport (binding target 0 makes them whole first).
+  for (uint32_t i = 0; i < 4; i++) {
+    SetRenderTarget(i, g_saved_targets.color[i]);
+  }
+  SetDepthTarget(g_saved_targets.depth);
+  g_targets.viewport = g_saved_targets.viewport;
 }
 
 void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float min_z,
                  float max_z) {
-  g_set_viewport = {x, y, width, height, min_z, max_z};
-  ClampViewport(g_set_viewport);
+  g_targets.viewport = {x, y, width, height, min_z, max_z};
 }
 
 void ResetRenderStates() {

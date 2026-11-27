@@ -99,7 +99,6 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx) {
       lifted::original::c##address(ctx);                                 \
     }                                                                               \
     native::g_current_command = outer_command;                                      \
-    native::Renderer_AfterCommand(id, payload, arg1, arg2);                   \
   }
 
 namespace native {
@@ -296,20 +295,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825BE708) {
 // makes one per tile (the tile count at device +12488), passed on here.
 ITC_NATIVE_ENTRY_ALWAYS(822AFA58) {
   
-  static uint32_t serial = 0, tile = 0;
-  uint32_t command = native::g_current_command;
-  if (command == 33) {
-    if (serial != native::g_command_serial) {
-      serial = native::g_command_serial;
-      tile = 0;
-    }
-    uint32_t device = ctx.r3.u32;
-    native::Renderer_TiledResolve(device, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-                                  ctx.r10.u32, float(ctx.f1.f64), tile++,
-                                  guest::LoadU32(device + 12488));
-  } else if (command != 25) {
-    LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
-  }
+  // The replay's resolves (commands 25 and 33) are our renderer's
+  // (render::Resolve, render::EndTiling); the front buffer's comes here.
+  LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), native::g_current_command);
   if (!ITC_FLAG(native_resolve)) {
     lifted::original::c822AFA58(ctx);
     return;

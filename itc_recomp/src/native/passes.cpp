@@ -3411,9 +3411,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       z_enable = false;
     }
   }
+  // D3D's viewport clamped to the target drawn into (a tiled target is the
+  // tiles' whole size).
+  render::Viewport set_viewport = render::BoundTargets().viewport;
+  {
+    uint64_t right = std::min<uint64_t>(uint64_t(set_viewport.x) + set_viewport.width,
+                                        guest_extent.width);
+    uint64_t bottom = std::min<uint64_t>(uint64_t(set_viewport.y) + set_viewport.height,
+                                         guest_extent.height);
+    set_viewport.width = right > set_viewport.x ? uint32_t(right - set_viewport.x) : 0;
+    set_viewport.height = bottom > set_viewport.y ? uint32_t(bottom - set_viewport.y) : 0;
+  }
   const DrawRegisters::Viewport viewport_info =
-      HostViewport(render::BoundTargets().viewport, states.viewport_enable,
-                   states.half_pixel_offset);
+      HostViewport(set_viewport, states.viewport_enable, states.half_pixel_offset);
   // Scissor: the window scissor registers aren't in the shadow's flushed
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
@@ -4225,32 +4235,12 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint32_t device,
   }
 }
 
-void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
+void Passes::BeginTiling(VkCommandBuffer commands, uint32_t width, uint32_t height,
+                         float clear) {
   State& s = *state_;
-  uint32_t device = guest::LoadU32(kDevicePointer);
-  // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
-  // rectangles (16 bytes each: left, top, right, bottom). The handler gives
-  // BeginTiling a clear color and Z of the float at 0x82000A34, stencil 0.
-  uint32_t flags = guest::LoadU32(payload);
-  uint32_t count = guest::LoadU32(payload + 4);
-  uint32_t rects = guest::LoadU32(payload + 8);
-  uint32_t width = 0, height = 0;
-  std::string tiles;
-  for (uint32_t i = 0; rects && i < count && i < 16; i++) {
-    int32_t r[4];
-    for (uint32_t k = 0; k < 4; k++) {
-      r[k] = int32_t(guest::LoadU32(rects + 16 * i + 4 * k));
-    }
-    width = std::max(width, uint32_t(std::max(r[2], 0)));
-    height = std::max(height, uint32_t(std::max(r[3], 0)));
-    tiles += std::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
-  }
-  uint32_t clear_bits = guest::LoadU32(0x82000A34);
-  float clear;
-  std::memcpy(&clear, &clear_bits, 4);
-  if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
-    ITC_LOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
-                 flags, count, tiles, clear);
+  if (s.logged_tilings.insert(uint64_t(width) << 32 | height).second) {
+    ITC_LOG_INFO("native renderer: begin tiling: {}x{}; clear color and Z {}", width, height,
+                 clear);
   }
   s.EndRendering(commands);
   s.tiling = true;
@@ -4273,40 +4263,25 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint32_t payload) {
   }
 }
 
-void Passes::TiledResolve(VkCommandBuffer commands, uint32_t device,
-                          uint32_t flags, uint32_t rect_address, uint32_t destination,
-                          uint32_t point_address, uint32_t clear_color_address, float clear_z,
-                          uint32_t tile, uint32_t tiles) {
+void Passes::EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destination,
+                       float clear) {
   State& s = *state_;
-  int32_t rect[4], point[2];
-  for (uint32_t k = 0; rect_address && k < 4; k++) {
-    rect[k] = int32_t(guest::LoadU32(rect_address + 4 * k));
+  // The tiled target drawn whole: one resolve of all of it (the library's
+  // EndTiling resolves each tile to its place, the same rectangle in all),
+  // then the clears its flags ask for (the library's last tile's: it
+  // clears the target after each tile for the next).
+  const int32_t rect[4] = {0, 0, int32_t(s.tiling_extent.width),
+                           int32_t(s.tiling_extent.height)};
+  const int32_t point[2] = {0, 0};
+  const float color[4] = {clear, clear, clear, clear};
+  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 32 | flags).second) {
+    ITC_LOG_INFO("native renderer: end tiling: flags {:08X}, {}x{} to {:08X}", flags,
+                 rect[2], rect[3], destination);
   }
-  for (uint32_t k = 0; point_address && k < 2; k++) {
-    point[k] = int32_t(guest::LoadU32(point_address + 4 * k));
-  }
-  float color[4] = {};
-  for (uint32_t c = 0; clear_color_address && c < 4; c++) {
-    uint32_t bits = guest::LoadU32(clear_color_address + 4 * c);
-    std::memcpy(&color[c], &bits, 4);
-  }
-  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
-    ITC_LOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
-                 "{:08X} at {},{}",
-                 tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
-                 rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
-                 point_address ? point[0] : -1, point_address ? point[1] : -1);
-  }
-  // The library clears the target after each tile but the last for the
-  // next tile; the whole surface is drawn at once here, so only the last
-  // tile's clears are made.
-  s.Resolve(commands, device, flags, rect_address ? rect : nullptr, destination,
-            point_address ? point : nullptr, false, color, clear_z, 0, tile + 1 >= tiles);
+  s.Resolve(commands, guest::LoadU32(kDevicePointer), flags, rect, destination, point, false,
+            color, clear, 0, true);
   s.stats.tiled_resolves++;
-}
-
-void Passes::EndTiling() {
-  state_->tiling = false;
+  s.tiling = false;
 }
 
 void Passes::FrontBufferResolve(VkCommandBuffer commands, uint32_t device,

@@ -619,9 +619,27 @@ and resolve on one 256x144 target in turn, then the main view draws on
   clears and 25 resolves a frame, 19 handed over), the pad replay with
   dumps.
 
-Left for step 3: tiling (commands 32 and 33) through the interface, then
-the game's setters out of the handlers (only game code outside the replay
-that reads the Direct3D state keeps what it needs), and `replay_hooks.cpp`.
+- **The seam, eighth part: tiling (2026-11-27).** `render::BeginTiling`
+  and `EndTiling` from commands 32 and 33: the renderer draws the tiled
+  target whole (as it did), and at the end makes one resolve of all of it
+  with EndTiling's flags (0x303 in the menus, as each tile's was) and the
+  last tile's clears; the library's BeginTiling and EndTiling (and so its
+  per-tile Resolves) are no longer called. Two things the device did for
+  the tiled views moved over: the viewport is kept as D3D sets it and
+  clamped at the draw to the target drawn into (a tiled target is the
+  tiles' whole size; the device clamped it when it was set, to the tiling
+  while the library's tiling flags held), and commands 34 and 35 save and
+  put back `render::`'s own targets and viewport (they read the device's
+  clamped viewport before: the tuning shop's car squashed into the first
+  tile's 256 lines). The renderer's after-command hook and its tiled
+  resolve path are gone. Checked: the pad replay with dumps (the tuning
+  shop, the system menu, both races), an attract race's frame against an
+  earlier build's at the same moment (2,413 draws, 0.016% of pixels off),
+  the tick replay (both races match).
+
+Left for step 3: the game's setters out of the handlers (only game code
+outside the replay that reads the Direct3D state keeps what it needs),
+and `replay_hooks.cpp`.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 
