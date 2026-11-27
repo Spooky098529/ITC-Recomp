@@ -1,4 +1,4 @@
-# A PC renderer (a plan; steps 0, 1 and 4 done, 2, 2b, 3 and 5 in progress)
+# A PC renderer (a plan; steps 0, 1, 2, 3 and 4 done; 2b and 5 in part)
 
 Written 2026-11-26 on `pc-renderer` (branched from `main` at `a56e837b`,
 after E5's step 10 was merged). This is a plan: no code has changed for it.
@@ -299,7 +299,7 @@ spread; a resolve identical). The arena holds ~14-25 MB of ranges in ~1,500.
 system memory from ~1,345 to ~285 MB (texture staging 128 MB, the constant
 rings 128 MB, the arena's staging 32 MB).
 
-## Step 2: the shaders (in progress)
+## Step 2: the shaders (done 2026-11-27)
 
 **Part 1 (2026-11-26): every shader drawn from GLSL.** SBX-Recomp's tool,
 ports, hand-written shaders and renderer code brought in
@@ -499,7 +499,7 @@ resolve); the main view draws, is resolved twice, the glow's steps draw
 and resolve on one 256x144 target in turn, then the main view draws on
 (the grab pass) and is resolved for the scene target, then the front.
 
-## Step 3: the draw state (first part done 2026-11-26)
+## Step 3: the draw state (done 2026-11-27)
 
 - **The draw reads the device's shadow directly**
   (`src/native/draw_registers.{h,cpp}`, `DrawRegisters::Read`): the fetch
@@ -732,10 +732,10 @@ and resolve on one 256x144 target in turn, then the main view draws on
   take none). Checked: the tick replay with dumps (both races match), the
   pad replay with dumps (the tuning shop's tiled view, the menus).
 
-Left for step 3: the vertex shader setter (it keeps the shader's
+The vertex shader setter stays (it keeps the shader's
 reference count: kept).
 
-## Step 5: the SDK out (first part done 2026-11-26)
+## Step 5: the SDK out and the measures (done 2026-11-27 but the profile)
 
 Done ahead of the clean-up, once nothing used it: the texture fetch
 constant's fields and the formats the renderer reads are our own
@@ -768,8 +768,32 @@ Step 0's measures again (2026-11-26, the pad replay, `itc_6025`):
 So the game's system memory went from about **1.9 GB to about 0.6 GB**;
 the GPU's own memory grew by the vertex arena (device-local, in VRAM).
 
-Left for step 5: the physical block shrunk to what's left in it, and the
-one profile.
+**What's left in the physical block (2026-11-27).** The block is an
+anonymous `MAP_NORESERVE` mapping: its 512 MB are address space, and it
+costs only its resident pages. `--log_memory_use` now gives each tag's
+resident bytes, and the graphics library's own textures and buffers are
+tagged. In the pad replay (`itc_6139`) the block holds 15-38 MB resident
+(~205-255 at step 0), all of it data the CPU reads or writes: the game's
+`CreateTexture` textures 5.5 MB (of 27-30 MB live: the CPU-drawn vinyl
+sheet, plates and decals; resolve destinations are never touched), the
+cars' and the scene's models ~10 MB (the wheels' morphs read them), ~15 MB
+in ~500-740 small blocks the game allocates otherwise, and 3.5 MB of XPR
+files' and held models' leftovers (the memory blocks' header pages). Its
+range isn't made smaller: the live blocks reach ~280 MB of address space
+(the XPR files' given-back blocks among them).
+
+Step 0's measures again (2026-11-27, the pad replay, `itc_6139`):
+
+| | Step 0 | 2026-11-26 | Now |
+|---|---|---|---|
+| The process's resident set | ~510-645 MB | ~350-450 MB | ~330-445 MB |
+| of which the physical block | ~205-255 MB | ~13-64 MB | ~15-38 MB |
+| GTT, whole card | ~1,690 MB | ~530 MB | ~380-400 MB |
+| The renderer's GPU memory | ~300 MB | ~600 MB | ~605 MB: the arena 224 (the held models in it), textures 100, targets 119, resolve destinations 35, staging 96, constants 32 |
+
+An uncapped attract race (one run, seconds 3-18): 300.6 fps mean. **The
+profile is still to take**: `profile_render_thread.sh` (perf) wasn't
+allowed to run in this session.
 
 ## Step 2b: XPR textures and the course's models held by the GPU (2026-11-26 and 27)
 
