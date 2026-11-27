@@ -516,8 +516,29 @@ and resolve on one 256x144 target in turn, then the main view draws on
   HiZ event and the tiling's register packets. Checked: per-draw records the
   same, the pad replay clean, the tick replay matching.
 
-Left for step 3: the handlers calling our interface instead of the game's
-Direct3D, which ends the shadow on the render path.
+- **The seam, first part: the render states (2026-11-27).** The plan's
+  `render/` interface starts with the render states (`src/render/state.{h,cpp}`):
+  the handlers of commands 1 (by the game's render state numbers, the byte
+  offsets into the device's setter table; the table at `0x826388F8` names
+  them), 3 (blend controls) and 31 (the scissor), and the drawer commands'
+  viewport toggles (15, 16 and the single 15), set Vulkan values: depth test,
+  each target's blend (the original's rules for blending and separate
+  alpha off kept), cull mode and front face, color write enables, the
+  blend constants, the alpha test, the depth bias, primitive restart, the
+  viewport transform on or off, the half-pixel offset, the scissor. The
+  draw builds its pipeline key and dynamic state from them, not from the
+  shadow (`NormalizedDepth`, `PolygonOffset` and the VTE decoding gone).
+  Checked first against the shadow at every draw
+  (`--native_renderer_check_render_states`, kept while the game's setters
+  still run): no difference in an attract race or the pad replay (menus,
+  tiled views, loading screens, both races); then frames right in both.
+  The handlers still call the game's setters too, until nothing reads
+  what they write.
+
+Left for step 3: the rest of the interface (render targets and the
+viewport, shaders, textures and vertex buffers by handle, constants,
+clears and draws), then the game's setters out of the handlers, which ends
+the shadow on the render path.
 
 ## Step 5: the SDK out (first part done 2026-11-26)
 

@@ -1,6 +1,7 @@
 // The render command replay's single commands
 // (docs/functions/single-commands.md): see single_commands.h.
 
+#include "render/state.h"
 #include "graphics/single_commands.h"
 
 #include "guest.h"
@@ -140,11 +141,13 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     return 0;
   }
   const uint32_t viewport = device_state::GetViewportEnable(Globals::replay_device());
+  const bool render_viewport = render::States().viewport_enable;
   {
     const uint32_t state = Globals::replay_drawer_state();
     const uint32_t device = Globals::replay_device();
     const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
     device_state::SetViewportEnable(device, on);
+    render::SetRenderState(304, on);
   }
   {
     const uint32_t drawer = Globals::replay_drawer();
@@ -171,6 +174,7 @@ uint32_t DrawerDraw(uint32_t sp, const GuestCall& call) {
     }
   }
   device_state::SetViewportEnable(Globals::replay_device(), viewport);
+  render::SetRenderState(304, render_viewport ? 1 : 0);
   return 0;
 }
 

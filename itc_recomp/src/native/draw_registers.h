@@ -78,11 +78,6 @@ struct DrawRegisters {
   bool primitive_restart() const { return mode_control >> 21 & 1; }
   bool clip_disable() const { return clip_control >> 16 & 1; }
   bool direct3d_clip_space() const { return clip_control >> 19 & 1; }
-  // PA_CL_VTE_CNTL: bits 0-5 the viewport's x/y/z scale and offset enables;
-  // 8 xy already divided by w, 9 z, 10 w not its reciprocal.
-  bool viewport_enabled(uint32_t bit) const { return viewport_control >> bit & 1; }
-  // D3D's pixel centers at integers (not half-pixel): PA_SU_VTX_CNTL bit 0.
-  bool pixel_center_zero() const { return (vertex_control & 1) == 0; }
   // RB_MODECONTROL: 4 color and depth, 5 depth only.
   bool draws_color() const { return (edram_mode & 7) == 4; }
   bool draws_depth() const { return (edram_mode & 7) == 4 || (edram_mode & 7) == 5; }
@@ -92,15 +87,11 @@ struct DrawRegisters {
   }
   bool depth_float24() const { return depth_info >> 16 & 1; }
 
-  // As the SDK's draw_util did, for this renderer (no EDRAM mode depth:
-  // depth off; a test that always passes and doesn't write: off).
-  void NormalizedDepth(bool& enable, bool& write, uint32_t& func) const;
   // The color write mask (4 bits a target) for the targets the pixel shader
-  // writes, components the format lacks counted as written.
-  uint32_t NormalizedColorMask(uint32_t pixel_shader_writes_targets) const;
-  // The depth bias (slope in the GPU's 1/16 pixel units, constant), the
-  // front face's preferred.
-  void PolygonOffset(bool polygonal, float& scale, float& offset) const;
+  // writes, from each target's write enables (the render states,
+  // render/state.h), components the format lacks counted as written.
+  uint32_t NormalizedColorMask(uint32_t pixel_shader_writes_targets,
+                               const uint32_t color_write[4]) const;
 
   // The host viewport (integer pixels, unscaled) and how the shaders
   // rescale positions into it (ndc_scale, ndc_offset), as the SDK's
@@ -112,7 +103,9 @@ struct DrawRegisters {
     float z_min, z_max;
     float ndc_scale[3], ndc_offset[3];
   };
-  Viewport HostViewport() const;
+  // viewport_enable and half_pixel_offset: the render states
+  // (render/state.h).
+  Viewport HostViewport(bool viewport_enable, bool half_pixel_offset) const;
 };
 
 }  // namespace native

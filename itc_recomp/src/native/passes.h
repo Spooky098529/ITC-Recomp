@@ -124,6 +124,11 @@ class Passes {
   // resolve is a whole-image copy (on by default; docs/pc-renderer.md,
   // step 4).
   void set_hand_over_resolves(bool hand_over);
+  // Check the renderer's own render states (render/state.h) against the
+  // device's shadow at each draw; TakeRenderStateChecks gives each field's
+  // draws that differed so far.
+  void set_check_render_states(bool check);
+  std::string TakeRenderStateChecks();
   // Which pixel shaders got PsParamGen, and with which interpolators.
   std::string TakeInterfaces();
   void set_base_level_only(bool base_only);

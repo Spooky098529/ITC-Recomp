@@ -88,21 +88,8 @@ void DrawRegisters::Read(uint32_t device) {
   }
 }
 
-void DrawRegisters::NormalizedDepth(bool& enable, bool& write, uint32_t& func) const {
-  if (!draws_depth()) {
-    enable = write = false;
-    func = 0;
-    return;
-  }
-  enable = z_enable();
-  write = z_write();
-  func = z_func();
-  if (enable && !write && func == 7) {  // always
-    enable = false;
-  }
-}
-
-uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets) const {
+uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets,
+                                            const uint32_t color_write[4]) const {
   if (!draws_color()) {
     return 0;
   }
@@ -112,7 +99,7 @@ uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets
       continue;
     }
     uint32_t components = (1u << ComponentCount(color_format(i))) - 1;
-    uint32_t target = (color_mask >> (4 * i)) & components;
+    uint32_t target = color_write[i] & components;
     if (target) {
       mask |= (target | (0xF & ~components)) << (4 * i);
     }
@@ -120,40 +107,24 @@ uint32_t DrawRegisters::NormalizedColorMask(uint32_t pixel_shader_writes_targets
   return mask;
 }
 
-void DrawRegisters::PolygonOffset(bool polygonal, float& scale, float& offset) const {
-  scale = offset = 0.0f;
-  if (polygonal) {
-    if (polygon_offset_front() && !cull_front()) {
-      scale = polygon_offset[0];
-      offset = polygon_offset[1];
-    }
-    if (polygon_offset_back() && !cull_back() && !scale && !offset) {
-      scale = polygon_offset[2];
-      offset = polygon_offset[3];
-    }
-  } else if (polygon_offset_lines()) {
-    scale = polygon_offset[0];
-    offset = polygon_offset[1];
-  }
-}
-
-DrawRegisters::Viewport DrawRegisters::HostViewport() const {
+DrawRegisters::Viewport DrawRegisters::HostViewport(bool viewport_enable,
+                                                    bool half_pixel_offset) const {
   constexpr uint32_t kMax = 8192;
   Viewport v{};
-  float scale_xy[2] = {viewport_enabled(0) ? viewport_scale[0] : 1.0f,
-                       viewport_enabled(2) ? viewport_scale[1] : 1.0f};
-  float scale_z = viewport_enabled(4) ? viewport_scale[2] : 1.0f;
-  float offset_base_xy[2] = {viewport_enabled(1) ? viewport_offset[0] : 0.0f,
-                             viewport_enabled(3) ? viewport_offset[1] : 0.0f};
-  float offset_z = viewport_enabled(5) ? viewport_offset[2] : 0.0f;
+  float scale_xy[2] = {viewport_enable ? viewport_scale[0] : 1.0f,
+                       viewport_enable ? viewport_scale[1] : 1.0f};
+  float scale_z = viewport_enable ? viewport_scale[2] : 1.0f;
+  float offset_base_xy[2] = {viewport_enable ? viewport_offset[0] : 0.0f,
+                             viewport_enable ? viewport_offset[1] : 0.0f};
+  float offset_z = viewport_enable ? viewport_offset[2] : 0.0f;
   // The window offset (PA_SC_WINDOW_OFFSET) isn't in the shadow's blocks:
   // 0, as the register file always had it.
   float offset_add_xy[2] = {};
-  if (pixel_center_zero()) {
+  if (!half_pixel_offset) {
     offset_add_xy[0] += 0.5f;
     offset_add_xy[1] += 0.5f;
   }
-  if (clip_disable()) {
+  if (!viewport_enable) {
     for (uint32_t i = 0; i < 2; i++) {
       v.offset[i] = 0;
       v.extent[i] = kMax;

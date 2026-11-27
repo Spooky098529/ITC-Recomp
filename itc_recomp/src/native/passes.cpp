@@ -4,6 +4,7 @@
 #include "vertex_arena.h"
 #include "shader_ports.h"
 #include "graphics/shader_patch.h"
+#include "render/state.h"
 #include "frame_costs.h"
 #include "base/log.h"
 #include "disk_cache.h"
@@ -888,6 +889,12 @@ struct Passes::State {
   // hands the target's image to the destination texture instead
   // (docs/pc-renderer.md, step 4; --native_renderer_hand_over_resolves).
   bool hand_over_resolves = true;
+  // The renderer's own render states (render/state.h) against the
+  // device's shadow at each draw, differences logged
+  // (--native_renderer_check_render_states).
+  bool check_render_states = false;
+  uint64_t render_state_mismatches[16] = {};
+  void CheckRenderStates(bool has_color, bool has_depth, uint32_t device);
   // The depth format can be sampled with linear filtering (the depth
   // resolves' readers' samplers may ask for it).
   bool depth_filterable = false;
@@ -3366,8 +3373,19 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // Viewport and scissor.
   bool z_enable = false, z_write = false;
   uint32_t z_func = 0;
-  regs.NormalizedDepth(z_enable, z_write, z_func);
-  const DrawRegisters::Viewport viewport_info = regs.HostViewport();
+  const render::RenderStates& states = render::States();
+  // No depth drawn (RB_MODECONTROL), or a test that always passes and
+  // doesn't write: off.
+  if (regs.draws_depth()) {
+    z_enable = states.z_enable;
+    z_write = states.z_write;
+    z_func = uint32_t(states.z_func);
+    if (z_enable && !z_write && z_func == VK_COMPARE_OP_ALWAYS) {
+      z_enable = false;
+    }
+  }
+  const DrawRegisters::Viewport viewport_info =
+      regs.HostViewport(states.viewport_enable, states.half_pixel_offset);
   // Scissor: the window scissor registers aren't in the shadow's flushed
   // blocks, so take it as the library keeps it: enabled by render state 200
   // (device +11600), rectangle (left, top, right, bottom) at +12416 from
@@ -3375,11 +3393,11 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   struct {
     uint32_t offset[2], extent[2];
   } scissor{{0, 0}, {guest_extent.width, guest_extent.height}};
-  if (guest::LoadU32(device + kDeviceScissorEnable)) {
-    int32_t left = int32_t(guest::LoadU32(device + kDeviceScissorRect));
-    int32_t top = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4));
-    int32_t right = int32_t(guest::LoadU32(device + kDeviceScissorRect + 8));
-    int32_t bottom = int32_t(guest::LoadU32(device + kDeviceScissorRect + 12));
+  if (states.scissor_enable) {
+    int32_t left = states.scissor[0];
+    int32_t top = states.scissor[1];
+    int32_t right = states.scissor[2];
+    int32_t bottom = states.scissor[3];
     scissor.offset[0] = uint32_t(std::max(left, 0));
     scissor.offset[1] = uint32_t(std::max(top, 0));
     scissor.extent[0] = uint32_t(std::max(right - int32_t(scissor.offset[0]), 0));
@@ -3404,28 +3422,23 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // these draws use).
   SystemConstants system{};
   uint32_t flags = 0;
-  if (regs.viewport_enabled(8)) {
-    flags |= kFlagXYDividedByW;
-  }
-  if (regs.viewport_enabled(9)) {
-    flags |= kFlagZDividedByW;
-  }
-  if (regs.viewport_enabled(10)) {
-    flags |= kFlagWNotReciprocal;
-  }
+  // The game's shaders write W as it is, with the viewport transform on or
+  // off (D3D's ViewportEnable sets PA_CL_VTE_CNTL to 0x43F or 0x400: bit 10
+  // either way), and never X, Y or Z already divided by it.
+  flags |= kFlagWNotReciprocal;
   if (primitive.polygonal) {
     flags |= kFlagPrimitivePolygonal;
   } else if (type == 2 || type == 3) {
     flags |= kFlagPrimitiveLine;
   }
-  uint32_t alpha_function = regs.alpha_test() ? regs.alpha_func() : 7;  // 7: always
+  uint32_t alpha_function = states.alpha_test ? uint32_t(states.alpha_func) : 7;  // 7: always
   flags |= alpha_function << kFlagAlphaTestShift;
   system.flags = flags;
   for (uint32_t i = 0; i < 3; i++) {
     system.ndc_scale[i] = viewport_info.ndc_scale[i];
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
   }
-  system.alpha_test_reference = regs.alpha_ref;
+  system.alpha_test_reference = states.alpha_ref;
   // Each sampled texture's post-swizzle signs, a byte per fetch constant.
   for (const TranslatedShader* shader : {vertex, pixel}) {
     if (!shader) {
@@ -3612,10 +3625,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.pixel = s.GetModule(pixel);
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
-  key.primitive_restart = primitive.strip && regs.primitive_restart();
-  key.cull_mode = (regs.cull_front() ? VK_CULL_MODE_FRONT_BIT : 0) |
-                  (regs.cull_back() ? VK_CULL_MODE_BACK_BIT : 0);
-  key.front_clockwise = regs.front_clockwise();
+  key.primitive_restart = primitive.strip && states.primitive_restart;
+  key.cull_mode = states.cull;
+  key.front_clockwise = states.front_clockwise;
   if (depth) {
     key.z_enable = z_enable;
     key.z_write = z_write;
@@ -3624,15 +3636,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.color_format = color ? color->format : VK_FORMAT_UNDEFINED;
   key.depth = depth != nullptr;
   key.samples = color ? color->samples : depth->samples;
-  // RB_BLENDCONTROL: source, op, destination for color (bits 0, 5, 8) and
-  // alpha (16, 21, 24).
-  const uint32_t blend = regs.blend_control[0];
-  key.src_color = BlendFactor(blend & 0x1F);
-  key.dst_color = BlendFactor(blend >> 8 & 0x1F);
-  key.color_op = BlendOp(blend >> 5 & 7);
-  key.src_alpha = BlendFactor(blend >> 16 & 0x1F);
-  key.dst_alpha = BlendFactor(blend >> 24 & 0x1F);
-  key.alpha_op = BlendOp(blend >> 21 & 7);
+  const render::BlendState& blend = states.blend[0];
+  key.src_color = blend.src_color;
+  key.dst_color = blend.dst_color;
+  key.color_op = blend.color_op;
+  key.src_alpha = blend.src_alpha;
+  key.dst_alpha = blend.dst_alpha;
+  key.alpha_op = blend.alpha_op;
   key.blend_enable =
       !(key.src_color == VK_BLEND_FACTOR_ONE && key.dst_color == VK_BLEND_FACTOR_ZERO &&
         key.color_op == VK_BLEND_OP_ADD && key.src_alpha == VK_BLEND_FACTOR_ONE &&
@@ -3643,10 +3653,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   // the rainbow effect on buildings, from ~230 main view draws a frame
   // without a pixel shader.)
   key.write_mask =
-      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0) & 0xF;
+      regs.NormalizedColorMask(pixel ? pixel->writes_color_targets : 0, states.color_write) &
+      0xF;
   if (!key.vertex || (pixel && !key.pixel) || !key.layout) {
     s.stats.failed++;
     return;
+  }
+  if (s.check_render_states) {
+    s.CheckRenderStates(color != nullptr, depth != nullptr, device);
   }
   VkPipeline pipeline = s.GetPipeline(key);
   if (s.watch_draws && main_view_draw &&
@@ -3692,7 +3706,14 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (depth) {
     // As the plugin sets it for its host render targets: the guest's depth
     // is float24 (24_8_FLOAT) or unorm24, the slope in 1/16 pixels.
-    regs.PolygonOffset(primitive.polygonal, slope, constant);
+    // Both faces take the same bias (D3D's DepthBias and SlopeScaleDepthBias),
+    // on when either isn't 0; lines take none.
+    if (primitive.polygonal &&
+        (states.depth_bias_slope != 0.0f || states.depth_bias_constant != 0.0f) &&
+        (states.cull & VK_CULL_MODE_FRONT_AND_BACK) != VK_CULL_MODE_FRONT_AND_BACK) {
+      slope = states.depth_bias_slope;
+      constant = states.depth_bias_constant;
+    }
     // D3D10's factors: 2^24 - 1 for unorm24 (D24S8, format 0), 2^24 for float24.
     constant *= depth->surface.format == 0 ? float((1u << 24) - 1) : float(1u << 24);
     // Per pixel: scaled pixels are smaller, so the slope (as the plugin
@@ -3707,7 +3728,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   }
   // RB_BLEND_RED/GREEN/BLUE/ALPHA, for the constant blend factors.
   float blend_constants[4];
-  std::memcpy(blend_constants, regs.blend_constants, sizeof(blend_constants));
+  std::memcpy(blend_constants, states.blend_constants, sizeof(blend_constants));
   VkDescriptorSet sets[4] = {s.arena_set, s.constant_block().set,
                              vertex_textures, pixel_textures};
 
@@ -4553,6 +4574,106 @@ std::string Passes::TakeInterfaces() {
   return text;
 }
 
+
+void Passes::State::CheckRenderStates(bool has_color, bool has_depth, uint32_t device) {
+  const render::RenderStates& r = render::States();
+  auto check = [&](int field, const char* name, bool same, const std::string& detail) {
+    if (same) {
+      return;
+    }
+    if (render_state_mismatches[field]++ < 3) {
+      ITC_LOG_INFO("native renderer: render state {} differs from the shadow's: {} (command "
+                   "{})",
+                   name, detail, g_current_command);
+    }
+  };
+  if (has_depth) {
+    check(0, "z_enable", r.z_enable == regs.z_enable(),
+          std::format("ours {} shadow {}", r.z_enable, regs.z_enable()));
+    check(1, "z_write", r.z_write == regs.z_write(),
+          std::format("ours {} shadow {}", r.z_write, regs.z_write()));
+    check(2, "z_func", uint32_t(r.z_func) == regs.z_func(),
+          std::format("ours {} shadow {}", int(r.z_func), regs.z_func()));
+  }
+  VkCullModeFlags cull = (regs.cull_front() ? VK_CULL_MODE_FRONT_BIT : 0) |
+                         (regs.cull_back() ? VK_CULL_MODE_BACK_BIT : 0);
+  check(3, "cull", r.cull == cull && r.front_clockwise == regs.front_clockwise(),
+        std::format("ours {} {} shadow {} {}", r.cull, r.front_clockwise, cull,
+                    regs.front_clockwise()));
+  const uint32_t b = regs.blend_control[0];
+  render::BlendState shadow_blend;
+  shadow_blend.src_color = render::BlendFactor(b & 0x1F);
+  shadow_blend.color_op = render::BlendOp(b >> 5 & 7);
+  shadow_blend.dst_color = render::BlendFactor(b >> 8 & 0x1F);
+  shadow_blend.src_alpha = render::BlendFactor(b >> 16 & 0x1F);
+  shadow_blend.alpha_op = render::BlendOp(b >> 21 & 7);
+  shadow_blend.dst_alpha = render::BlendFactor(b >> 24 & 0x1F);
+  render::BlendState ours = r.blend[0];
+  ours.enable = shadow_blend.enable = false;
+  check(4, "blend", ours == shadow_blend, std::format("shadow {:08X}", b));
+  if (has_color) {
+    check(5, "color_write", r.color_write[0] == (regs.color_mask & 0xF),
+          std::format("ours {:X} shadow {:X}", r.color_write[0], regs.color_mask & 0xF));
+  }
+  check(6, "blend_constants",
+        !std::memcmp(r.blend_constants, regs.blend_constants, sizeof(r.blend_constants)),
+        std::format("ours {} {} {} {} shadow {} {} {} {}", r.blend_constants[0],
+                    r.blend_constants[1], r.blend_constants[2], r.blend_constants[3],
+                    regs.blend_constants[0], regs.blend_constants[1], regs.blend_constants[2],
+                    regs.blend_constants[3]));
+  check(7, "alpha_test",
+        r.alpha_test == regs.alpha_test() && uint32_t(r.alpha_func) == regs.alpha_func() &&
+            r.alpha_ref == regs.alpha_ref,
+        std::format("ours {} {} {} shadow {} {} {}", r.alpha_test, int(r.alpha_func),
+                    r.alpha_ref, regs.alpha_test(), regs.alpha_func(), regs.alpha_ref));
+  bool bias_on = r.depth_bias_slope != 0.0f || r.depth_bias_constant != 0.0f;
+  check(8, "depth_bias",
+        r.depth_bias_slope == regs.polygon_offset[0] &&
+            r.depth_bias_constant == regs.polygon_offset[1] &&
+            bias_on == regs.polygon_offset_front() && bias_on == regs.polygon_offset_back(),
+        std::format("ours {} {} shadow {} {} enables {} {}", r.depth_bias_slope,
+                    r.depth_bias_constant, regs.polygon_offset[0], regs.polygon_offset[1],
+                    regs.polygon_offset_front(), regs.polygon_offset_back()));
+  check(9, "primitive_restart", r.primitive_restart == regs.primitive_restart(),
+        std::format("ours {} shadow {}", r.primitive_restart, regs.primitive_restart()));
+  check(10, "viewport_enable",
+        regs.viewport_control == (r.viewport_enable ? 0x43Fu : 0x400u) &&
+            regs.clip_disable() == !r.viewport_enable,
+        std::format("ours {} shadow VTE {:X} clip disable {}", r.viewport_enable,
+                    regs.viewport_control, regs.clip_disable()));
+  check(11, "half_pixel_offset", r.half_pixel_offset == ((regs.vertex_control & 1) != 0),
+        std::format("ours {} shadow {}", r.half_pixel_offset, regs.vertex_control & 1));
+  bool scissor = guest::LoadU32(device + kDeviceScissorEnable) != 0;
+  check(12, "scissor_enable", r.scissor_enable == scissor,
+        std::format("ours {} shadow {}", r.scissor_enable, scissor));
+  if (scissor) {
+    int32_t rect[4];
+    for (uint32_t i = 0; i < 4; i++) {
+      rect[i] = int32_t(guest::LoadU32(device + kDeviceScissorRect + 4 * i));
+    }
+    check(13, "scissor_rect", !std::memcmp(rect, r.scissor, sizeof(rect)),
+          std::format("ours {},{}-{},{} shadow {},{}-{},{}", r.scissor[0], r.scissor[1],
+                      r.scissor[2], r.scissor[3], rect[0], rect[1], rect[2], rect[3]));
+  }
+}
+
+void Passes::set_check_render_states(bool check) {
+  state_->check_render_states = check;
+}
+
+std::string Passes::TakeRenderStateChecks() {
+  State& s = *state_;
+  static const char* const kNames[14] = {
+      "z_enable",      "z_write",         "z_func",       "cull",
+      "blend",         "color_write",     "blend_constants", "alpha_test",
+      "depth_bias",    "primitive_restart", "viewport_enable", "half_pixel_offset",
+      "scissor_enable", "scissor_rect"};
+  std::string text;
+  for (int i = 0; i < 14; i++) {
+    text += std::format("{}{} {}", i ? ", " : "", kNames[i], s.render_state_mismatches[i]);
+  }
+  return text;
+}
 
 void Passes::set_hand_over_resolves(bool hand_over) {
   state_->hand_over_resolves = hand_over;

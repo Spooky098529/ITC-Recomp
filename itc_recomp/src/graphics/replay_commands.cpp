@@ -8,6 +8,7 @@
 #include "graphics/device_state.h"
 #include "graphics/resources.h"
 #include "helpers/debug_output.h"
+#include "render/state.h"
 
 #include <cstdint>
 
@@ -60,6 +61,7 @@ uint32_t SetRenderStates(uint32_t items, uint32_t count, uint32_t sp,
     const uint32_t value = guest::LoadU32(item + 4);
     const uint32_t setter = guest::LoadU32(device + state + 56);
     call(setter, frame, 0x8258FC10, {device, value}, std::nullopt);
+    render::SetRenderState(state, value);
   }
   return count;
 }
@@ -84,6 +86,7 @@ uint32_t SetBlendControls(uint32_t items, uint32_t count) {
   for (uint32_t i = 0, item = items; i < count; i++, item += 16) {
     const uint32_t value = guest::LoadU32(item + 4);
     ds::SetBlendControl(Device(), guest::LoadU32(item), value);
+    render::SetBlendControl(guest::LoadU32(item), value);
   }
   return count;
 }
@@ -270,6 +273,7 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
       ds::SetViewportEnable(Device(), on);
+      render::SetRenderState(304, on);
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
@@ -282,6 +286,7 @@ uint32_t DrawerDraw(uint32_t count, uint32_t sp, const GuestCall& call) {
            std::nullopt);
     }
     ds::SetViewportEnable(Device(), 1);
+    render::SetRenderState(304, 1);
   }
   return count;
 }
@@ -298,6 +303,7 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
       const uint32_t state = guest::LoadU32(kDrawerState);
       const uint32_t on = int32_t(guest::LoadU32(state + 4)) == 1 ? 0 : 1;
       ds::SetViewportEnable(Device(), on);
+      render::SetRenderState(304, on);
     }
     {
       const uint32_t drawer = guest::LoadU32(kDrawer);
@@ -311,6 +317,7 @@ uint32_t DrawerDrawIndexed(uint32_t count, uint32_t sp, const GuestCall& call) {
            std::nullopt);
     }
     ds::SetViewportEnable(Device(), viewport);
+    render::SetRenderState(304, viewport);
   }
   return count;
 }
@@ -567,6 +574,10 @@ uint32_t SetScissorRects(uint32_t items, uint32_t count, uint32_t sp) {
     }
     ds::SetScissorTestEnable(Device(), 1);
     ds::SetScissorRect(Device(), rect);
+    render::SetRenderState(200, 1);
+    render::SetScissorRect(int32_t(guest::LoadU32(rect)), int32_t(guest::LoadU32(rect + 4)),
+                           int32_t(guest::LoadU32(rect + 8)),
+                           int32_t(guest::LoadU32(rect + 12)));
   }
   return count;
 }

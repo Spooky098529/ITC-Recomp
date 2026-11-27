@@ -778,6 +778,7 @@ set(ITC_SOURCES
     src/native/replay_hooks.cpp
     src/native/shaders.cpp
     src/native/draw_registers.cpp
+    src/render/state.cpp
     src/graphics/shader_load.cpp
     src/hooks/shader_load.cpp
     src/native/textures.cpp
