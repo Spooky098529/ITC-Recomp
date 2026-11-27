@@ -17,7 +17,6 @@
 #include "base/log.h"
 #include "graphics/inline_draws.h"
 #include "graphics/resolve.h"
-#include "graphics/shader_patch.h"
 #include "graphics/video_output.h"
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
@@ -31,8 +30,7 @@ ITC_FLAG_BOOL(native_replay_commands, true, "ITC",
               "Run the render command replay's command handlers (the table 0x8265EDE0, "
               "docs/functions/functions.md's Command::* rows: sub_8258FBD0 to sub_82591798 and "
               "command 7's sub_8258FD48) and the frame's end resolve "
-              "(VideoOutput::ResolveFrontBuffer sub_8258D998), and the vertex shader patcher "
-              "(sub_822AE340) natively inside their wraps "
+              "(VideoOutput::ResolveFrontBuffer sub_8258D998) natively inside their wraps "
               "instead of through the "
               "translated code (the same writes; the device's native setters called as plain "
               "C++, everything else a guest call; checked by frame dumps, as the render path's "
@@ -104,75 +102,9 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx) {
     native::Renderer_AfterCommand(id, payload, arg1, arg2);                   \
   }
 
-// The library's vertex shader patcher (see "Vertex declaration" in
-// docs/gpu-functions.md): counted, so the native renderer can tell whether a
-// draw's library call patched the shader's microcode.
 namespace native {
-uint32_t g_vertex_shader_patches = 0;
-uint32_t g_last_patch[3] = {};
-LoadedVertexShader g_loaded_vertex_shader;
 uint32_t g_current_command = 0;
 uint32_t g_command_serial = 0;
-}
-
-// The vertex shader patcher's plain C++ (src/graphics/shader_patch.h): r3
-// the shader, r4 where the patched instructions go, r5 the declaration, r6
-// the stream bytes; its memcpy a guest call (memcpy's override records
-// copies for the renderer's mirrors), from the original's return address.
-namespace {
-struct PatchCopyContext {
-  lifted::Regs* ctx;
-};
-void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t size) {
-  PatchCopyContext& c = *static_cast<PatchCopyContext*>(context);
-  lifted::Regs& ctx = *c.ctx;
-  const uint64_t stack = ctx.r1.u64;
-  ctx.r1.u64 = stack - 592;
-  ctx.r3.u64 = destination;
-  ctx.r4.u64 = source;
-  ctx.r5.u64 = size;
-  ctx.lr = 0x822AE900;
-  lifted::Enter(ctx, game::memcpy_825A7410);
-  ctx.r1.u64 = stack;
-}
-ITC_REGS_STEP(NativePatchVertexShader) {
-  PatchCopyContext context{&ctx};
-  const uint32_t shader = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32,
-                 streams = ctx.r6.u32, sp = ctx.r1.u32;
-  ctx.r3.u64 = graphics::shader_patch::PatchVertexShader(shader, microcode, declaration,
-                                                         streams, sp, PatchCopy, &context);
-}
-}  // namespace
-
-// When the GPU may still be using a vertex shader's microcode, the library
-// can't patch it in place: sub_822AEBF0 copies it into the command buffer
-// (IM_LOAD_IMMEDIATE) and patches the copy, leaving the object's microcode
-// (+48) and the id it's patched for (+24) as they were. The GPU then runs
-// the copy, and keeps running it while the shader isn't loaded again. So
-// the copy, once patched, is kept here for the native renderer.
-ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
-  
-  uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
-  bool copy = microcode != guest::LoadU32(object + 48);
-  native::g_vertex_shader_patches++;
-  native::g_last_patch[0] = object;
-  native::g_last_patch[1] = declaration;
-  native::g_last_patch[2] = declaration ? guest::LoadU32(declaration + 48) : 0;
-  if (ITC_FLAG(native_replay_commands)) {
-    ctx.fpscr.disableFlushMode();
-    NativePatchVertexShader(ctx);
-  } else {
-    lifted::original::c822AE340(ctx);
-  }
-  if (copy) {
-    native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
-    loaded.object = object;
-    loaded.declaration_id = declaration ? guest::LoadU32(declaration + 48) : 0;
-    uint32_t size = guest::LoadU32(object + 600);
-    loaded.microcode.assign(guest::Pointer(microcode), guest::Pointer(microcode) + size);
-  } else {
-    native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
-  }
 }
 
 // Inline vertex draws (DrawPrimitiveUP, command 19, and the helper object's

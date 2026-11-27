@@ -66,10 +66,6 @@ ITC_FLAG_BOOL(native_renderer_log_texture_bindings, false, "ITC",
 ITC_FLAG_BOOL(native_renderer_cache_shader_lookups, true, "ITC",
               "Keep draws' shader lookups by what they read from the shader objects "
               "instead of hashing the shaders' microcode every draw");
-ITC_FLAG_BOOL(native_renderer_log_shader_lookups, false, "ITC",
-              "Log how often draws' shader lookups repeat the last ones and whether a key "
-              "of the shader objects' fields would ever give a shader whose microcode "
-              "changed");
 ITC_FLAG_BOOL(native_renderer_reuse_texture_sets, true, "ITC",
               "Give a draw the last draw's texture descriptor set when its shader and the "
               "fetch constants it reads are unchanged, and no texture changed");
@@ -717,7 +713,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_reuse_constants(ITC_FLAG(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(ITC_FLAG(native_renderer_log_constant_changes));
     passes_.set_log_texture_bindings(ITC_FLAG(native_renderer_log_texture_bindings));
-    passes_.set_log_shader_lookups(ITC_FLAG(native_renderer_log_shader_lookups));
     passes_.set_cache_shader_lookups(ITC_FLAG(native_renderer_cache_shader_lookups));
     passes_.set_reuse_texture_sets(ITC_FLAG(native_renderer_reuse_texture_sets));
     passes_.set_log_glow(ITC_FLAG(native_renderer_log_glow));
@@ -1073,22 +1068,6 @@ void Renderer::LogStats() {
                    share(view.fetch_changed_unread));
     }
   }
-  if (view.vertex_shader_copies) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
-                 "patched copy in the command buffer",
-                 double(view.vertex_shader_copies) / frames);
-  }
-  if (view.declaration_mismatches) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
-                 "vertex declaration than the bound one ({:.1f} patched in their library call), "
-                 "e.g. {} (bound {})",
-                 double(view.declaration_mismatches) / frames,
-                 double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
-                 view.declaration_sample[1]);
-  }
-  for (const std::string& line : passes_.TakeDeclarationLines()) {
-    ITC_LOG_INFO("native renderer: declaration mismatch: {}", line);
-  }
   if (view.base_vertex_differs) {
     ITC_LOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
                  "than VGT_INDX_OFFSET, e.g. {} and {}",
@@ -1112,9 +1091,6 @@ void Renderer::LogStats() {
   }
   if (ITC_FLAG(native_renderer_log_texture_bindings)) {
     ITC_LOG_INFO("native renderer: {}", passes_.TakeTextureBindings());
-  }
-  if (ITC_FLAG(native_renderer_log_shader_lookups)) {
-    ITC_LOG_INFO("native renderer: {}", passes_.TakeShaderLookups());
   }
   if (view.invisible) {
     const auto& v = view.invisible_sample;

@@ -319,9 +319,55 @@ Found on the way and fixed: two calls by address from lifted code to hand
 ports with no dispatch entry (`known-issues.md`, "Calls by address with no
 dispatch entry"; `--check_call_targets`).
 
-Left: the PC-style inputs (vertex attributes, constants by name, plain
-textures), with step 3, where the draw state stops coming from the
-registers.
+**Part 2 (2026-11-27): vertex attributes.** Every vertex fetch reads its
+vertex's element from Vulkan vertex attributes instead of the arena by
+address as a storage buffer:
+
+- The attributes carry the element's raw words (`R32..R32G32B32A32_UINT`,
+  by the format's size), so the shader-side unpack and endian swap stay
+  (most data is `k8in32`, and `10_11_11` has no Vulkan format). Fetch n's
+  attributes are at locations 3n to 3n + 2 (`xe_interface.glsl`'s
+  `XE_VF_IN`; the ports' and `vertex.glsl`'s fetch calls name n); a
+  binding a fetch at its element (its stream's arena offset plus the
+  fetch's offset), stride the vertex's size, made per vertex shader module
+  (`passes.cpp`, `vertex_inputs`) from the fetches' fields kept on the
+  shader (`TranslatedShader::vertex_fetches`).
+- Indexed draws: the index ranges are kept in the host's byte order in the
+  arena (`VertexArena::Place`'s endian, keyed apart from the same range as
+  it is), the base vertex (VGT_INDX_OFFSET) is `vertexOffset`. The
+  VGT_MIN/MAX_VTX_INDX clamp went (its count never measured indexed draws)
+  with `--native_renderer_no_index_clamp`.
+- Rectangle lists (inline draws only) are drawn an instance a rectangle,
+  four vertices each, each fetch bound three times at instance rate a
+  vertex apart: an invocation still runs the shader for the rectangle's
+  three vertices and makes the fourth corner. Quad lists keep the built-in
+  index list. Every fetch reads by the vertex index (all 37 vertex ports
+  checked), so no fetch needs another index.
+- SBX's stream normal for its AO (fetch constant 93 read by address in
+  `model.vert`, read by nothing here) is gone.
+
+Checked: attract races (0 failed draws, 0 error lines), the pad replay
+(the tuning shop, the loading screen's rectangle lists, the race's
+cockpit, HUD, minimap and mirror; 0 error lines).
+
+**Part 3 (2026-11-27): the fields from the declaration.** The graphics
+library's patch of the vertex shader's microcode for the declaration
+(`sub_822AE340`) no longer runs (`Device::LoadShaders` keeps only the
+declaration's id and the strides it loads with; the exports' remap copy,
+never seen, is logged instead). The renderer makes each fetch's
+instruction from the declaration and the loaded strides (device +11568:
+an inline draw changes the stream strides, +12272, around its load) as the
+patch's first loop does (`graphics::shader_patch::FetchFromDeclaration`;
+its stack-garbage nibble reaches only bit 0 of the swizzle's component
+mask, which no swizzle mask in its table uses), without the sort and merge
+into mini-fetches, and fits the port from the file's microcode
+(`FitVertexFetches`, in place of `RemapVertexFetches`). Shader lookups are
+kept by the declaration and the strides. Gone with the patch: its wrap and
+copy in `replay_hooks.cpp`, the declaration mismatch and copy counts, and
+`--native_renderer_log_shader_lookups`.
+
+Left for step 2: constants by name and plain textures, with step 3, where
+the draw state stops coming from the registers.
 
 **The order from here (2026-11-26).** The faked GPU (`gpu_link.cpp`) only
 makes fences in play now (~3,000 a second, two a kick; no memory writes,

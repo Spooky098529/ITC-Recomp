@@ -78,82 +78,31 @@ uint32_t BigWord(const uint8_t* p) {
 
 }  // namespace
 
-bool RemapVertexFetches(const uint8_t* patched, uint32_t size_bytes, uint32_t fetch_count,
-                        const uint32_t* fetch_records, const uint8_t* original_fetches,
-                        VertexFetchRemap& out) {
-  out.ucode.assign(patched, patched + size_bytes);
+bool FitVertexFetches(const uint8_t* ucode, uint32_t size_bytes, uint32_t fetch_count,
+                      const uint32_t* fetch_records, const uint8_t* original_fetches,
+                      const std::array<uint32_t, 3>* made, VertexFetchRemap& out) {
+  out.ucode.assign(ucode, ucode + size_bytes);
   out.swizzles.clear();
-  if (fetch_count == 0 || fetch_count > 32) {
-    return fetch_count == 0;
-  }
-  // The patched fetches, in the patched order: each one's destination
-  // register and its fields, a mini-fetch's fetch constant and stride from
-  // the full fetch before it.
-  // A fetch's destination: its register, and the components it writes
-  // (a register can take several fetches, each writing some).
-  auto destination = [](uint32_t w0, uint32_t w1) {
-    uint32_t written = 0;
-    for (uint32_t c = 0; c < 4; c++) {
-      written |= uint32_t(((w1 >> (3 * c)) & 7) != 7) << c;
-    }
-    return ((w0 >> 12) & 63) << 4 | written;
-  };
-  struct Patched {
-    uint32_t dest, w0, w1, w2;
-  };
-  std::vector<Patched> patched_fetches;
-  std::vector<uint32_t> slots;
-  for (uint32_t j = 0; j < fetch_count; j++) {
-    slots.push_back(fetch_records[j] & 0xFFF);
-  }
-  std::sort(slots.begin(), slots.end());
-  uint32_t full_w0 = 0, full_w2 = 0;
-  for (uint32_t slot : slots) {
-    if ((slot * 3 + 3) * 4 > size_bytes) {
-      return false;
-    }
-    uint32_t w0 = Word(patched, slot * 3), w1 = Word(patched, slot * 3 + 1),
-             w2 = Word(patched, slot * 3 + 2);
-    if ((w0 & 31) != 0) {
-      continue;  // not a vertex fetch
-    }
-    bool mini = (w1 >> 30) & 1;
-    if (!mini) {
-      full_w0 = w0;
-      full_w2 = w2;
-    }
-    patched_fetches.push_back({destination(w0, w1), (w0 & ~(0x7Fu << 20)) | (full_w0 & (0x7Fu << 20)), w1,
-                               (w2 & ~0xFFu) | (full_w2 & 0xFF)});
+  if (fetch_count > 32) {
+    return false;
   }
   for (uint32_t j = 0; j < fetch_count; j++) {
     uint32_t slot = fetch_records[j] & 0xFFF;
-    const uint8_t* original = original_fetches + 12 * j;
-    uint32_t o0 = BigWord(original), o1 = BigWord(original + 4), o2 = BigWord(original + 8);
-    uint32_t dest = destination(o0, o1);
-    const Patched* p = nullptr;
-    for (const Patched& candidate : patched_fetches) {
-      if (candidate.dest == dest) {
-        if (p) {
-          return false;  // two fetches into the same components
-        }
-        p = &candidate;
-      }
-    }
-    if (!p) {
+    if ((slot * 3 + 3) * 4 > size_bytes) {
       return false;
     }
-    // The file's instruction, with the patched layout fields (as
-    // LayoutFreeHash masks them).
-    uint32_t w0 = (o0 & ~(0x7Fu << 20)) | (p->w0 & (0x7Fu << 20));
-    uint32_t w1 = (o1 & ~(0x3FFFFu << 12)) | (p->w1 & (0x3FFFFu << 12));
-    uint32_t w2 = p->w2;
-    PutWord(out.ucode.data(), slot * 3, w0);
-    PutWord(out.ucode.data(), slot * 3 + 1, w1);
-    PutWord(out.ucode.data(), slot * 3 + 2, w2);
+    const uint8_t* original = original_fetches + 12 * j;
+    uint32_t o0 = BigWord(original), o1 = BigWord(original + 4);
+    const std::array<uint32_t, 3>& m = made[j];
+    // The file's instruction, with the layout fields made for the
+    // declaration (as LayoutFreeHash masks them).
+    PutWord(out.ucode.data(), slot * 3, (o0 & ~(0x7Fu << 20)) | (m[0] & (0x7Fu << 20)));
+    PutWord(out.ucode.data(), slot * 3 + 1, (o1 & ~(0x3FFFFu << 12)) | (m[1] & (0x3FFFFu << 12)));
+    PutWord(out.ucode.data(), slot * 3 + 2, m[2]);
     // The swizzle: for each destination component the file's swizzle reads
-    // from the fetched value (0-3), what the patched swizzle gives that
+    // from the fetched value (0-3), what the made swizzle gives that
     // component instead.
-    uint32_t file = o1 & 0xFFF, now = p->w1 & 0xFFF;
+    uint32_t file = o1 & 0xFFF, now = m[1] & 0xFFF;
     uint32_t swizzle = 0x688;
     uint32_t set = 0;
     for (uint32_t c = 0; c < 4; c++) {
@@ -163,12 +112,12 @@ bool RemapVertexFetches(const uint8_t* patched, uint32_t size_bytes, uint32_t fe
       }
       if (f >= 4) {
         if (n != f) {
-          return false;  // a constant the patch turns into something else
+          return false;  // a constant the declaration turns into something else
         }
         continue;
       }
       if (n == 7) {
-        n = 4;  // the patch leaves it unwritten: 0
+        n = 4;  // left unwritten: 0
       }
       uint32_t old = (swizzle >> (3 * f)) & 7;
       if ((set >> f) & 1) {

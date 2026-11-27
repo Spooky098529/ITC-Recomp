@@ -8,28 +8,43 @@ hand-written shaders (`materials/`, `post/`, `boot/`, `vertex/`), the
 renderer's table and fitting (`src/native/shader_ports.*`,
 `port_spirv.*`). What differs here (docs/pc-renderer.md, step 2):
 
-- **Our graphics library patches vertex fetches differently.** It sorts a
-  shader's fetches, merges neighbors into mini-fetches and rewrites their
-  destination swizzles for the declaration (D3DCOLOR's red and blue
-  exchanged: `zyxw`), so the patched microcode doesn't have the file's
-  instructions in the file's places. `RemapVertexFetches`
-  (`shader_ports.cpp`) rebuilds the file's microcode from the shader
-  object (its fetches' original instructions at +192, their instruction
-  indices at +64), takes each fetch's layout fields from the patched fetch
-  writing the same register components (a mini-fetch's fetch constant and
-  stride from its full fetch), and gives `xe_vfetch` a swizzle
+- **The vertex fetches' fields come from the declaration** (since
+  2026-11-27, `docs/pc-renderer.md`, step 2). The graphics library's patch
+  of a vertex shader's microcode for the bound declaration
+  (`sub_822AE340`) no longer runs: the object's microcode stays the
+  file's, and the renderer makes each fetch's instruction from the
+  declaration and the strides the shaders were loaded with, as the patch's
+  first loop does (`graphics::shader_patch::FetchFromDeclaration`; the
+  patch's sort and merge into mini-fetches left out), then fits the port
+  (`FitVertexFetches`, `shader_ports.cpp`): each fetch's layout fields
+  from its made instruction, and a swizzle for `xe_vfetch`
   (`XE_VF<n>_SWIZZLE`, specialization constant 100 + 10n + 6): what the
-  fetch's result gives each component the file's swizzle then reads.
+  fetch's result gives each component the file's swizzle then reads (the
+  declaration's component order, D3DCOLOR's red and blue exchanged:
+  `zyxw`). Shader lookups are kept by the declaration (its address and id)
+  and the strides.
 - **16 more shaders** (ours, not in SBX's run): ported by
   `tools/shader_port/port_all.py` from the shader files the game loads here
   (`--dump_shader_files=<dir>`), merged into `glsl/game/shaders.json` and
   the table by `tools/shader_port/table_from_json.py`; 151 in all.
-- The vertex shaders read the vertex arena (`src/native/vertex_arena.h`),
-  not guest memory.
+- **Vertex shaders take vertex attributes** (since 2026-11-27): fetch n
+  reads its vertex's element as raw words from the attributes at locations
+  3n to 3n + 2 (`XE_VF_IN` in `xe_interface.glsl`), unpacked and
+  byte-swapped in the shader as before; the renderer binds each fetch's
+  stream in the vertex arena (`src/native/vertex_arena.h`) at its element
+  and makes the vertex input state from the fetches' fields. A rectangle
+  list is drawn an instance a rectangle (four vertices), each fetch bound
+  three times at instance rate, a vertex apart, so an invocation still
+  runs the shader for the rectangle's three vertices and makes the
+  fourth. Indices are kept in the host's byte order in the arena and the
+  base vertex is the draw's `vertexOffset`; the shaders' index remap (base,
+  24-bit mask, the VGT_MIN/MAX clamp), index loads and the line loop's
+  closing index are gone.
 - SBX's own additions are compiled in but not used: the menu texture
   filtering and the distance-field font (`sbx_sprite_mode`, never set
-  here), the AO normals (`STREAM_NORMAL_REG`: interpolator 15, read by
-  nothing here), `--motion_blur_quality` and `--bloom_quality` (always 1,
+  here), the AO normals (`STREAM_NORMAL_REG` in `course.frag`, which no
+  variant sets: `model.vert`'s read of the normal stream by address is
+  gone), `--motion_blur_quality` and `--bloom_quality` (always 1,
   the game's).
 - Every shader is drawn from its GLSL; the SDK's translator isn't used
   (since 2026-11-26, `docs/pc-renderer.md`, step 3): a shader with no GLSL,
@@ -184,24 +199,23 @@ sprites' generated coordinates (`param_gen_point`) aren't made either.
 - The port's SPIR-V is copied and fitted (`port_spirv.cpp`): the
   specialization constants' values (the interpolator mask and the
   generated parameter's register; rectangle lists and each vertex fetch's
-  fields, read from the patched microcode) and the interpolators'
+  fields, made from the declaration) and the interpolators'
   locations (an interpolator in the mask goes at its index among the
   mask's, the translator's locations; one that isn't goes at 16 + n, where
   nothing reads it). So the pipeline needs no VkSpecializationInfo.
 - What a shader reads comes from the table (`table_from_json.py` from
   `shaders.json`): the float constants, the interpolators it writes or
   reads and the color targets it writes, besides the textures and
-  samplers. The vertex fetch constants are read from the patched
-  microcode's fetches (the files all say 95; the game patches each for the
-  declaration). Checked against the translator's analysis for every
+  samplers. The vertex fetch constants are read from the fetches as made
+  for the declaration (the files all say 95). Checked against the translator's analysis for every
   shader and interface of an attract race and the pad replay before it
   went (2026-11-26): no difference.
 - How a vertex and a pixel shader connect: the vertex shader's written
   interpolators and the pixel shader's first registers' worth (up to 16),
   less the generated parameter's (SQ_PROGRAM_CNTL bit 18, SQ_CONTEXT_MISC
   bits 8-15).
-- Ported vertex shaders read the vertex arena as one storage buffer (the
-  arena checks it fits the device's limit at start-up).
+- Vertex shaders take vertex attributes (above), up to 24 (the renderer
+  checks the device's limits at start-up).
 - The system constants are ours (`system_constants.h`), at the offsets the
   ports read.
 

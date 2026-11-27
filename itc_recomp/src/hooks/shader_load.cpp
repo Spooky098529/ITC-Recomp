@@ -4,28 +4,24 @@
 
 #include "graphics/shader_load.h"
 #include "guest.h"
-#include "hooks/lifted_call.h"
-#include "lifted/functions.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
 
 namespace hooks {
 
 uint64_t LoadShaders(uint32_t device, uint64_t mask, uint32_t sp, uint64_t r13) {
-  // A 256-byte frame: the remap's scratch at +80 (128 bytes) and the program
-  // control word at +208; the calls' own frames below it.
+  // A 256-byte frame: the program control word at +208.
   const uint32_t frame = (sp - 256) & ~15u;
   guest::StoreU32(frame, sp);
-  graphics::shader_load::Calls calls;
-  // Through its entry, whose wrap keeps the patched copy for the renderer
-  // (src/native/replay_hooks.cpp).
-  calls.patch = [&](uint32_t shader, uint32_t microcode, uint32_t declaration,
-                    uint32_t streams) {
-    lifted_call::Call(0x822AE340, frame, r13, {shader, microcode, declaration, streams});
-  };
-  calls.remap_exports = [&](uint32_t scratch, uint32_t vertex_header, uint32_t copy,
-                            uint32_t program_control, uint32_t pixel_header) {
-    lifted::f822AEAA0(frame, r13, scratch, vertex_header, copy, program_control, pixel_header);
-  };
-  return graphics::shader_load::LoadShaders(device, mask, frame + 80, calls);
+  return graphics::shader_load::LoadShaders(device, mask, frame + 80);
 }
 
 }  // namespace hooks
+
+// The vertex shader patcher (sub_822AE340): no longer called (the shader
+// load above doesn't patch, docs/pc-renderer.md, step 2); only the lifted
+// shader load, which no longer runs, names it. Its entry runs the lifted
+// original.
+ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
+  lifted::original::c822AE340(ctx);
+}

@@ -111,17 +111,9 @@ class Passes {
   // changed (on by default).
   void set_reuse_texture_sets(bool reuse);
   std::string TakeTextureBindings();
-  // A diagnostic: how much of the shader lookup repeats from draw to draw,
-  // and whether a key of what draws read from the shader objects would
-  // ever give a shader whose microcode changed (to judge caching by it);
-  // TakeShaderLookups describes it since it was last called.
   // Keep draws' shader lookups by what they read from the shader objects
   // instead of hashing the microcode (on by default).
   void set_cache_shader_lookups(bool cache);
-  void set_log_shader_lookups(bool log);
-  std::string TakeShaderLookups();
-  // Examples of draws counted in Stats::declaration_mismatches.
-  std::vector<std::string> TakeDeclarationLines();
   // A debugging aid: compare each main view draw's inputs with the same
   // draw's in the previous frame; TakeWatchLines gives how many changed (of
   // how many watched) and descriptions of the first since the last call.
@@ -187,14 +179,6 @@ class Passes {
     // example (item's, register's).
     uint64_t base_vertex_differs = 0;
     uint64_t param_gen_draws = 0;
-    // Draws whose vertex shader's microcode, when read, was patched for
-    // another vertex declaration than the bound one, and an example (the
-    // shader's declaration id, the bound one's).
-    // Of those, draws whose library call patched a vertex shader.
-    uint64_t declaration_mismatches = 0, declaration_mismatches_patched = 0;
-    // Draws given the vertex shader copy the library patched in the
-    // command buffer (the object's own being patched for another declaration).
-    uint64_t vertex_shader_copies = 0;
     // Inline vertex draws drawn (also counted in drawn), and by primitive
     // type (4, 6, 8 rectangle list, 13 quad list).
     uint64_t inline_draws = 0;
@@ -222,7 +206,6 @@ class Passes {
     uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
     uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
              fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
-    std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
     uint64_t clears = 0, clear_rects = 0;

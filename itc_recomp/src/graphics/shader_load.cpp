@@ -1,10 +1,10 @@
 // The graphics library's shader load (see shader_load.h), from the lifted
-// sub_822AED18 and its copy path sub_822AEBF0, read 2026-11-26.
+// sub_822AED18 and its copy path sub_822AEBF0, read 2026-11-26; without the
+// vertex shader's patch since 2026-11-27.
 
 #include "graphics/shader_load.h"
 
 #include "guest.h"
-#include "memory/heap.h"
 
 #include "base/log.h"
 
@@ -32,9 +32,6 @@ constexpr uint32_t kDeclarationIds = 0x829537F0;
 
 constexpr uint64_t Bit(uint32_t n) { return 1ull << n; }
 
-// The copy a vertex shader is patched in when it can't be in place (the
-// original's is in the command buffer): grown as needed, kept.
-uint32_t g_copy = 0, g_copy_size = 0;
 std::mutex g_ids_mutex;
 
 // sub_822ADA98: whether HiZ can be used for this depth state (`ps_flag`
@@ -70,7 +67,7 @@ void LoadStrides(uint32_t device) {
 
 }  // namespace
 
-uint64_t LoadShaders(uint32_t device, uint64_t mask, uint32_t scratch, const Calls& calls) {
+uint64_t LoadShaders(uint32_t device, uint64_t mask, uint32_t scratch) {
   ITC_NATIVE_RUNNING("sub_822AED18 Device::LoadShaders");
   const uint32_t vs = guest::LoadU32(device + kVertexShader);
   const uint32_t ps = guest::LoadU32(device + kPixelShader);
@@ -88,66 +85,34 @@ uint64_t LoadShaders(uint32_t device, uint64_t mask, uint32_t scratch, const Cal
       ps_header ? (guest::LoadU32(ps_header + 16) ^ guest::LoadU32(vs_header + 16)) & 0x7FFFF
                 : guest::LoadU32(vs_header + 16) & 0x1F;
 
-  // The copy path (sub_822AEBF0): the microcode patched in a copy, its
-  // exports remapped first when they differ; the object stays as it was.
-  auto patch_copy = [&](bool remap) {
-    const uint32_t size = guest::LoadU32(vs + 600);
-    if (size > g_copy_size) {
-      memory::Free(g_copy);
-      g_copy = memory::Alloc(size, 0);
-      g_copy_size = size;
+  // The vertex shader isn't patched for the declaration (the original's
+  // patch in place or in a copy, sub_822AE340 and sub_822AEBF0): the
+  // renderer takes the fetches' fields from the declaration and the strides
+  // (docs/pc-renderer.md, step 2). What stays is the declaration's id (the
+  // renderer keys its shader lookups by it) and the strides loaded.
+  if (differs) {
+    // The original remaps the vertex shader's exports to the pixel shader's
+    // interpolators in a copy (sub_822AEAA0): never seen.
+    static bool logged = false;
+    if (!logged) {
+      logged = true;
+      ITC_LOG_ERROR("Device::LoadShaders: vertex shader {:08X}'s outputs aren't pixel shader "
+                    "{:08X}'s inputs; its exports aren't remapped",
+                    vs, ps);
     }
-    std::memcpy(guest::Pointer(g_copy), guest::Pointer(guest::LoadU32(vs + 48)), size);
-    if (remap) {
-      calls.remap_exports(scratch, vs_header, g_copy, program_control, ps_header);
-    }
-    guest::StoreU8(device + kFlags2,
-                   uint8_t((guest::LoadU8(device + kFlags2) & 0x7F) | (remap ? 0x80 : 0)));
-    // The original patches with no declaration too, reading its +24 at 0:
-    // never seen; nothing to patch for here.
-    if (declaration != 0) {
-      calls.patch(vs, g_copy, declaration, device + kStreamStrides);
+  }
+  if (differs || (mask & Bit(51))) {
+    if (declaration != 0 && !(guest::LoadU32(vs + 592) & 0x40) &&
+        guest::LoadU32(declaration + 48) == 0) {
+      std::lock_guard lock(g_ids_mutex);
+      uint32_t id;
+      do {
+        id = guest::LoadU32(kDeclarationIds) + 1;
+        guest::StoreU32(kDeclarationIds, id);
+      } while (id == 0 || id == 0xFFFFFFFFu);
+      guest::StoreU32(declaration + 48, id);
     }
     LoadStrides(device);
-  };
-
-  if ((guest::LoadU8(device + kFlags2) & 0x80) || differs) {
-    patch_copy(differs != 0);
-  } else if (mask & Bit(51)) {
-    const uint32_t microcode = guest::LoadU32(vs + 48);
-    // Patched for this declaration and these strides already (the
-    // declaration's +32 and +40: a byte mask of the streams it uses).
-    auto patched_for_this = [&] {
-      return guest::LoadU32(declaration + 48) == guest::LoadU32(vs + 24) &&
-             (((guest::LoadU64(device + kStreamStrides + 8) ^ guest::LoadU64(vs + 40)) &
-               guest::LoadU64(declaration + 40)) |
-              ((guest::LoadU64(device + kStreamStrides) ^ guest::LoadU64(vs + 32)) &
-               guest::LoadU64(declaration + 32))) == 0;
-    };
-    if (declaration == 0 || (guest::LoadU32(vs + 592) & 0x40)) {
-      LoadStrides(device);
-    } else if (guest::LoadU8(device + kTiling) & 0x80) {
-      patch_copy(false);
-    } else if (patched_for_this()) {
-      LoadStrides(device);
-    } else {
-      // In place (the original copies when the GPU may still be reading the
-      // shader, by its fence: no GPU reads it).
-      calls.patch(vs, microcode, declaration, device + kStreamStrides);
-      if (guest::LoadU32(declaration + 48) == 0) {
-        std::lock_guard lock(g_ids_mutex);
-        uint32_t id;
-        do {
-          id = guest::LoadU32(kDeclarationIds) + 1;
-          guest::StoreU32(kDeclarationIds, id);
-        } while (id == 0 || id == 0xFFFFFFFFu);
-        guest::StoreU32(declaration + 48, id);
-      }
-      guest::StoreU32(vs + 24, guest::LoadU32(declaration + 48));
-      guest::StoreU64(vs + 32, guest::LoadU64(device + kStreamStrides));
-      guest::StoreU64(vs + 40, guest::LoadU64(device + kStreamStrides + 8));
-      LoadStrides(device);
-    }
   }
   uint32_t cntl = guest::LoadU32(program_control);
 

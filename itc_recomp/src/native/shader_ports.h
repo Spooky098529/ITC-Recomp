@@ -79,29 +79,26 @@ struct PostQuality {
   uint32_t bloom = 1;
 };
 
-// A vertex shader as its GLSL is found and fitted (ITC-Recomp's,
-// docs/pc-renderer.md step 2): our graphics library's patch of the
-// vertex fetches for the declaration (graphics::shader_patch) sorts them,
-// merges neighbors into mini-fetches and rewrites their destination
-// swizzles, so the patched microcode no longer has the file's instructions
-// at the file's places. `ucode` is the file's microcode again (each fetch's
-// original instruction, kept in the shader object), with each fetch's
-// layout fields (fetch constant, format, signedness, exponent, stride and
-// offset) as the patch gave its destination register, a mini-fetch's
-// fetch constant and stride its full fetch's; `swizzles` is each fetch's
-// instruction index and what its result gives each component of the value
-// the file's destination swizzle then reads (xe_vfetch's swizzle).
+// A vertex shader as its GLSL is found and fitted (docs/pc-renderer.md,
+// step 2): the file's microcode (the shader object's: the graphics
+// library's patch of it for the declaration no longer runs) with each
+// vertex fetch's layout fields (fetch constant, format, signedness,
+// exponent, stride and offset) as made for the bound declaration
+// (graphics::shader_patch::FetchFromDeclaration), and `swizzles`: each
+// fetch's instruction index and what its result gives each component of
+// the value the file's destination swizzle then reads (xe_vfetch's
+// swizzle).
 struct VertexFetchRemap {
   std::vector<uint8_t> ucode;
   std::vector<std::pair<uint32_t, uint32_t>> swizzles;
 };
-// From the vertex shader object (+60 its fetch count, +64 a word a fetch:
-// bits 0-11 its instruction index; +192 the fetches' original
-// instructions) and its patched microcode. False when a fetch can't be
-// matched (the shader is then translated).
-bool RemapVertexFetches(const uint8_t* patched, uint32_t size_bytes, uint32_t fetch_count,
-                        const uint32_t* fetch_records, const uint8_t* original_fetches,
-                        VertexFetchRemap& out);
+// From the shader object's microcode, its fetch records (+60 the count,
+// +64 a word a fetch: bits 0-11 its instruction index), its fetches' file
+// instructions (+192, big-endian) and each fetch's instruction as made for
+// the declaration (host words). False when a fetch can't be fitted.
+bool FitVertexFetches(const uint8_t* ucode, uint32_t size_bytes, uint32_t fetch_count,
+                      const uint32_t* fetch_records, const uint8_t* original_fetches,
+                      const std::array<uint32_t, 3>* made, VertexFetchRemap& out);
 
 bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_bytes,
                   uint32_t interpolator_mask, uint32_t param_gen_interpolator,
