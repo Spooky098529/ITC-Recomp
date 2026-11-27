@@ -16,17 +16,6 @@
 //                    for the velocity pass)
 //   SHADOW_REG       the world position in the directional light's shadow
 //                    map (matDLVPVS)
-//   STREAM_NORMAL_REG  SBX's: the mesh's own normal in world space, length
-//                    1, which the game's shader doesn't read, for the AO's
-//                    normals target (course.frag). A part's shape has a
-//                    normal stream right after its positions (16 bytes a
-//                    vertex: a half4 normal, then a second half4 vector;
-//                    stream type 0x0D, docs/game_data.md), and the game
-//                    leaves it bound to fetch constant 93 for the course's
-//                    shaders without a normal (frame dump of the parking
-//                    area, 2026-11-18). Read only when fetch 93 is that
-//                    stream: right after POSITION's buffer, with as many
-//                    vertices; else 0.
 //   COURSE_LIGHTS_REG  the world position in light space for the course's
 //                    lights, seven interpolators from there: light 0's
 //                    shadow map (matPLVPVS), the two projectors (matTXVPVS)
@@ -54,32 +43,6 @@ void vertex_shader(float vertex_index) {
   normal = normalized(normal);
 #endif
   out_interpolators[NORMAL_REG].xyz = normal;
-#endif
-#ifdef STREAM_NORMAL_REG
-  {
-    const uint kNormalStream = 93u;
-    uint p0 = xe_fetch_word(XE_VF_CONSTANT_OF(POSITION) * 2u);
-    uint p1 = xe_fetch_word(XE_VF_CONSTANT_OF(POSITION) * 2u + 1u);
-    uint n0 = xe_fetch_word(kNormalStream * 2u), n1 = xe_fetch_word(kNormalStream * 2u + 1u);
-    // Words: the address (bits 2-31 of word 0), the size (bits 2-25 of word
-    // 1); type 3 (a vertex buffer) in word 0's low bits.
-    uint position_words = (p1 >> 2u) & 0xFFFFFFu, normal_words = (n1 >> 2u) & 0xFFFFFFu;
-    uint position_stride = XE_VF_STRIDE_OF(POSITION);
-    bool belongs = (n0 & 3u) == 3u && (n0 >> 2u) == (p0 >> 2u) + position_words &&
-                   position_stride != 0u && normal_words * position_stride == position_words * 4u;
-    vec3 stream_normal = vec3(0.0);
-    if (belongs) {
-      // 16_16_16_16_FLOAT (32) at the vertex's first word, 4 words a vertex.
-      stream_normal = xe_vfetch(kNormalStream, 0, 4u, 32u, 0u, 0, 0x688u, vertex_index, 7u).xyz;
-#ifdef matWorldVS
-      stream_normal = MATRIX3(matWorldVS) * stream_normal;
-#endif
-      // (Without matWorldVS, as the course's unlit shaders have it: the
-      // course's meshes are taken as already in world space.)
-      stream_normal = normalized(stream_normal);
-    }
-    out_interpolators[STREAM_NORMAL_REG].xyz = stream_normal;
-  }
 #endif
 #ifdef TANGENT_REG
   vec4 tangent = fetch_attribute(TANGENT, 15u);

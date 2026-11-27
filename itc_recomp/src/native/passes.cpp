@@ -167,7 +167,6 @@ constexpr uint32_t kFetchConstantsRange = 32 * 6 * 4;
 
 // The built-in index lists (rectangle and quad lists) live in the vertex
 // arena (vertex_arena.h), with the frame's inline vertices.
-constexpr uint32_t kRectangleIndices = VertexArena::kRectangleIndices;
 constexpr uint32_t kQuadIndices = VertexArena::kQuadIndices;
 
 // An inline draw's vertices: vertex fetch constant 95 (stream 0), as the
@@ -175,6 +174,27 @@ constexpr uint32_t kQuadIndices = VertexArena::kQuadIndices;
 // instead of the shadow, with 93 and 94 as [1, 0] (the same register write)
 // and VGT_INDX_OFFSET 0; endianness 8-in-32.
 constexpr uint32_t kInlineFetchConstant = 95;
+
+// A vertex shader's vertex input (docs/pc-renderer.md, step 2): a fetch's
+// attributes at locations 3n to 3n + 2 (xe_interface.glsl's XE_VF_IN), so
+// up to 8 fetches; a rectangle list's shaders (the screen quads') have at
+// most 4, three bindings each.
+constexpr uint32_t kMaxVertexFetches = 8;
+constexpr uint32_t kMaxVertexBindings = 3 * kMaxVertexFetches;
+
+// The attribute format holding a fetch's raw words.
+VkFormat RawWordsFormat(uint32_t words) {
+  switch (words) {
+    case 1:
+      return VK_FORMAT_R32_UINT;
+    case 2:
+      return VK_FORMAT_R32G32_UINT;
+    case 3:
+      return VK_FORMAT_R32G32B32_UINT;
+    default:
+      return VK_FORMAT_R32G32B32A32_UINT;
+  }
+}
 
 // A draw: command 18's item (an indexed draw) or an inline one.
 struct DrawCall {
@@ -663,6 +683,9 @@ struct Passes::State {
     VkDeviceSize index_offset;
     VkIndexType index_type;
     uint32_t index_count;
+    int32_t base_vertex;
+    uint32_t vertex_bindings;
+    VkDeviceSize vertex_offsets[kMaxVertexBindings];
     PipelineKey key;
     float bias_constant, bias_slope;
   };
@@ -678,7 +701,6 @@ struct Passes::State {
   bool hide_cubes = false;
   uint64_t mismatched_seen = 0;
   std::unordered_set<std::string> mismatch_lines;
-  bool no_index_clamp = false;  // debugging aid
   // Pixel shaders given PsParamGen (interpolators, a bit each), and the
   // interpolator masks each was translated with (bits 16-31: with
   // SQ_PROGRAM_CNTL's param_gen set).
@@ -1059,7 +1081,17 @@ struct Passes::State {
     VkBuffer index_buffer;
     VkDeviceSize index_offset;
     VkIndexType index_type;
+    // The vertex buffers bound (the arena at these offsets).
+    uint32_t vertex_bindings;
+    VkDeviceSize vertex_offsets[kMaxVertexBindings];
   } recorded;
+  // Each vertex shader module's vertex input: a binding a fetch (three for
+  // a rectangle list, at instance rate), its attributes the raw words.
+  struct VertexInput {
+    std::vector<VkVertexInputBindingDescription> bindings;
+    std::vector<VkVertexInputAttributeDescription> attributes;
+  };
+  std::unordered_map<VkShaderModule, VertexInput> vertex_inputs;
   // The constants each block (system, vertex floats, pixel floats,
   // bool/loop, fetch) last had written into the constant block in use: a
   // copy of the bytes and where they went, so a draw whose block holds the
@@ -1822,6 +1854,24 @@ VkShaderModule Passes::State::GetModule(TranslatedShader* shader) {
     info.codeSize = shader->spirv.size() * 4;
     info.pCode = shader->spirv.data();
     vk::vkCreateShaderModule(context.device, &info, nullptr, &shader->module);
+    if (shader->module && shader->stage == ShaderStage::kVertex) {
+      VertexInput& input = vertex_inputs[shader->module];
+      const auto& fetches = shader->vertex_fetches;
+      for (uint32_t n = 0; n < fetches.size() && n < kMaxVertexFetches; n++) {
+        uint32_t stride = 4 * fetches[n].stride_words;
+        VkFormat format = RawWordsFormat(fetches[n].words);
+        for (uint32_t g = 0; g < 3; g++) {
+          uint32_t binding = shader->rectangle_list ? 3 * n + g : n;
+          if (shader->rectangle_list || g == 0) {
+            input.bindings.push_back(
+                {binding, shader->rectangle_list ? 3 * stride : stride,
+                 shader->rectangle_list ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                        : VK_VERTEX_INPUT_RATE_VERTEX});
+          }
+          input.attributes.push_back({3 * n + g, binding, format, 0});
+        }
+      }
+    }
   }
   return shader->module;
 }
@@ -1847,6 +1897,12 @@ VkPipeline Passes::State::GetPipeline(const PipelineKey& key) {
   }
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  if (auto input = vertex_inputs.find(key.vertex); input != vertex_inputs.end()) {
+    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
+    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
+    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
+  }
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   input_assembly.topology = VkPrimitiveTopology(key.topology);
@@ -3230,11 +3286,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     return;  // nothing visible
   }
 
-  uint32_t max_vertex = 0, min_vertex = UINT32_MAX;
-  if (call.inline_vertices) {
-    min_vertex = 0;
-    max_vertex = call.vertex_count - 1;
-  }
   // System constants (as the plugin's UpdateSystemConstantValues, for what
   // these draws use).
   SystemConstants system{};
@@ -3256,27 +3307,6 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   uint32_t alpha_function = regs.alpha_test() ? regs.alpha_func() : 7;  // 7: always
   flags |= alpha_function << kFlagAlphaTestShift;
   system.flags = flags;
-  system.vertex_index_endian = index_endian;
-  system.vertex_base_index = base_vertex;
-  system.vertex_index_min = regs.vertex_index_min;
-  system.vertex_index_max = regs.vertex_index_max;
-  if (system.vertex_index_max <= system.vertex_index_min || call.inline_vertices) {
-    system.vertex_index_min = 0;
-    system.vertex_index_max = xenos::kVertexIndexMask;
-  }
-  // Indices the clamp changes (the registers may be another draw's).
-  if (index_count && (max_vertex > system.vertex_index_max ||
-                      min_vertex < system.vertex_index_min)) {
-    s.stats.clamped_draws++;
-    if (!s.stats.clamped_sample[1]) {
-      s.stats.clamped_sample = {min_vertex, max_vertex, system.vertex_index_min,
-                                system.vertex_index_max};
-    }
-  }
-  if (s.no_index_clamp) {
-    system.vertex_index_min = 0;
-    system.vertex_index_max = xenos::kVertexIndexMask;
-  }
   for (uint32_t i = 0; i < 3; i++) {
     system.ndc_scale[i] = viewport_info.ndc_scale[i];
     system.ndc_offset[i] = viewport_info.ndc_offset[i];
@@ -3366,11 +3396,35 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
       }
       arena_fetch[2 * k] = offset | (word0 & 3);
     }
-    index_offset = s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2));
+    // In the host's byte order, as the vertex input fetches by them.
+    index_offset =
+        s.arena.Place(index_address, index_count * (index_32bit ? 4 : 2), index_endian);
     if (index_offset == UINT32_MAX) {
       s.stats.failed++;
       s.stats.failed_by[7]++;
       return;
+    }
+  }
+  // The vertex buffers: each fetch's stream in the arena, bound at its
+  // element (the fetch's offset in the vertex); a rectangle list's three
+  // times, a vertex apart.
+  VkDeviceSize vertex_offsets[kMaxVertexBindings];
+  uint32_t vertex_bindings = 0;
+  if (vertex->vertex_fetches.size() > kMaxVertexFetches) {
+    s.stats.failed++;
+    s.stats.failed_by[7]++;
+    return;
+  }
+  for (const TranslatedShader::VertexFetch& f : vertex->vertex_fetches) {
+    int64_t at = int64_t(arena_fetch[2 * f.fetch_constant] & 0x1FFFFFFCu) +
+                 4 * int64_t(f.offset_words);
+    if (at < 0) {
+      s.stats.failed++;
+      s.stats.failed_by[7]++;
+      return;
+    }
+    for (uint32_t g = 0; g < (rectangle_list ? 3u : 1u); g++) {
+      vertex_offsets[vertex_bindings++] = VkDeviceSize(at) + 4 * f.stride_words * g;
     }
   }
   const uint32_t* fetch = arena_fetch;
@@ -3443,7 +3497,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   key.pixel = s.GetModule(pixel);
   key.layout = s.GetPipelineLayout(vertex_layout, pixel_layout);
   key.topology = primitive.topology;
-  key.primitive_restart = (primitive.strip && regs.primitive_restart()) || rectangle_list;
+  key.primitive_restart = primitive.strip && regs.primitive_restart();
   key.cull_mode = (regs.cull_front() ? VK_CULL_MODE_FRONT_BIT : 0) |
                   (regs.cull_back() ? VK_CULL_MODE_BACK_BIT : 0);
   key.front_clockwise = regs.front_clockwise();
@@ -3556,14 +3610,13 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   now.layout = key.layout;
   std::memcpy(now.sets, sets, sizeof(sets));
   std::memcpy(now.offsets, offsets, sizeof(offsets));
-  now.indexed = rectangle_list || quad_list || !call.inline_vertices;
+  now.indexed = quad_list || !call.inline_vertices;
   now.index_buffer = s.arena.buffer();
-  now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
-                                                              : VK_INDEX_TYPE_UINT16;
+  now.index_type = quad_list || index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
-  uint64_t index_start = rectangle_list ? kRectangleIndices
-                         : quad_list    ? kQuadIndices
-                                        : index_offset;
+  uint64_t index_start = quad_list ? kQuadIndices : index_offset;
+  now.vertex_bindings = vertex_bindings;
+  std::copy(vertex_offsets, vertex_offsets + vertex_bindings, now.vertex_offsets);
   uint32_t first_index = 0;
   if (s.skip_repeated_state && index_start % index_bytes == 0) {
     first_index = uint32_t(index_start / index_bytes);
@@ -3629,14 +3682,25 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
   if (now.indexed && !(skip && repeated[6])) {
     vk::vkCmdBindIndexBuffer(commands, now.index_buffer, now.index_offset, now.index_type);
   }
+  bool vertex_repeated = last.valid && last.vertex_bindings == vertex_bindings &&
+                         std::equal(vertex_offsets, vertex_offsets + vertex_bindings,
+                                    last.vertex_offsets);
+  if (vertex_bindings && !(skip && vertex_repeated)) {
+    VkBuffer buffers[kMaxVertexBindings];
+    std::fill(buffers, buffers + vertex_bindings, s.arena.buffer());
+    vk::vkCmdBindVertexBuffers(commands, 0, vertex_bindings, buffers, vertex_offsets);
+  }
+  // The base vertex is the vertex input's (VGT_INDX_OFFSET; 0 for inline
+  // draws). A rectangle list is an instance a rectangle, four vertices each
+  // (the vertex shader makes the fourth corner).
   if (rectangle_list) {
-    vk::vkCmdDrawIndexed(commands, RectangleIndexCount(index_count / 3), 1, first_index, 0, 0);
+    vk::vkCmdDraw(commands, 4, index_count / 3, 0, 0);
   } else if (quad_list) {
-    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count / 4 * 6, 1, first_index, base_vertex, 0);
   } else if (call.inline_vertices) {
-    vk::vkCmdDraw(commands, index_count, 1, 0, 0);
+    vk::vkCmdDraw(commands, index_count, 1, uint32_t(base_vertex), 0);
   } else {
-    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, 0, 0);
+    vk::vkCmdDrawIndexed(commands, index_count, 1, first_index, base_vertex, 0);
   }
   if (!now.indexed && last.valid) {
     // A draw without indices leaves the earlier binding in place.
@@ -3661,9 +3725,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint32_t device,
     std::copy(offsets, offsets + 5, id.offsets);
     id.viewport = viewport;
     id.scissor = scissor_rect;
-    id.index_offset = index_address;
+    id.index_offset = index_offset;
     id.index_type = index_32bit ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
     id.index_count = index_count;
+    id.base_vertex = base_vertex;
+    id.vertex_bindings = vertex_bindings;
+    std::copy(vertex_offsets, vertex_offsets + vertex_bindings, id.vertex_offsets);
     id.key = key;
     id.bias_constant = constant;
     id.bias_slope = slope;
@@ -3697,6 +3764,12 @@ VkPipeline Passes::State::GetIdPipeline(const IdDraw& draw) {
   stages[1].module = id_pixel;
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  if (auto input = vertex_inputs.find(draw.vertex); input != vertex_inputs.end()) {
+    vertex_input.vertexBindingDescriptionCount = uint32_t(input->second.bindings.size());
+    vertex_input.pVertexBindingDescriptions = input->second.bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = uint32_t(input->second.attributes.size());
+    vertex_input.pVertexAttributeDescriptions = input->second.attributes.data();
+  }
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   input_assembly.topology = VkPrimitiveTopology(key.topology);
@@ -3819,7 +3892,13 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
                                 draw.sets, 5, draw.offsets);
     vk::vkCmdPushConstants(commands, layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &draw.number);
     vk::vkCmdBindIndexBuffer(commands, arena.buffer(), draw.index_offset, draw.index_type);
-    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, 0, 0);
+    if (draw.vertex_bindings) {
+      VkBuffer buffers[kMaxVertexBindings];
+      std::fill(buffers, buffers + draw.vertex_bindings, arena.buffer());
+      vk::vkCmdBindVertexBuffers(commands, 0, draw.vertex_bindings, buffers,
+                                 draw.vertex_offsets);
+    }
+    vk::vkCmdDrawIndexed(commands, draw.index_count, 1, 0, draw.base_vertex, 0);
   }
   vk::vkCmdEndRendering(commands);
   recorded.valid = false;
@@ -4395,9 +4474,6 @@ std::string Passes::TakeInterfaces() {
   return text;
 }
 
-void Passes::set_no_index_clamp(bool off) {
-  state_->no_index_clamp = off;
-}
 
 void Passes::set_hide_cubes(bool hide) {
   state_->hide_cubes = hide;

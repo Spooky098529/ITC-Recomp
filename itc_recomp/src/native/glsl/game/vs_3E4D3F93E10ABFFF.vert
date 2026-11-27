@@ -16,6 +16,9 @@ layout(constant_id = 103) const uint XE_VF0_FORMAT = 0u;
 layout(constant_id = 104) const uint XE_VF0_FLAGS = 0u;
 layout(constant_id = 105) const int XE_VF0_EXP_ADJUST = 0;
 layout(constant_id = 106) const uint XE_VF0_SWIZZLE = 0x688u;
+layout(location = 0) in uvec4 xe_vf_in_0_0;
+layout(location = 1) in uvec4 xe_vf_in_0_1;
+layout(location = 2) in uvec4 xe_vf_in_0_2;
 // Vertex fetch 1 (instruction 4): its fields as in the shader file, until the renderer sets them from the patched instruction.
 layout(constant_id = 110) const uint XE_VF1_CONSTANT = 95u;
 layout(constant_id = 111) const int XE_VF1_OFFSET = 0;
@@ -24,6 +27,9 @@ layout(constant_id = 113) const uint XE_VF1_FORMAT = 0u;
 layout(constant_id = 114) const uint XE_VF1_FLAGS = 0u;
 layout(constant_id = 115) const int XE_VF1_EXP_ADJUST = 0;
 layout(constant_id = 116) const uint XE_VF1_SWIZZLE = 0x688u;
+layout(location = 3) in uvec4 xe_vf_in_1_0;
+layout(location = 4) in uvec4 xe_vf_in_1_1;
+layout(location = 5) in uvec4 xe_vf_in_1_2;
 // Vertex fetch 2 (instruction 5): its fields as in the shader file, until the renderer sets them from the patched instruction.
 layout(constant_id = 120) const uint XE_VF2_CONSTANT = 95u;
 layout(constant_id = 121) const int XE_VF2_OFFSET = 0;
@@ -32,6 +38,9 @@ layout(constant_id = 123) const uint XE_VF2_FORMAT = 0u;
 layout(constant_id = 124) const uint XE_VF2_FLAGS = 0u;
 layout(constant_id = 125) const int XE_VF2_EXP_ADJUST = 0;
 layout(constant_id = 126) const uint XE_VF2_SWIZZLE = 0x688u;
+layout(location = 6) in uvec4 xe_vf_in_2_0;
+layout(location = 7) in uvec4 xe_vf_in_2_1;
+layout(location = 8) in uvec4 xe_vf_in_2_2;
 // Drawing a rectangle list: each invocation runs the shader for the
 // rectangle's three vertices and makes the fourth.
 layout(constant_id = 2) const bool XE_RECTANGLE_LIST = false;
@@ -64,9 +73,9 @@ void xe_shader(float vertex_index) {
   precise vec4 r2 = vec4(0.0);
   bool p = false;
   do {
-    { vec4 f = xe_vfetch(XE_VF0_CONSTANT, XE_VF0_OFFSET, XE_VF0_STRIDE, XE_VF0_FORMAT, XE_VF0_FLAGS, XE_VF0_EXP_ADJUST, XE_VF0_SWIZZLE, r0.x, 7u); r2.xyz = f.xyz; r2.w = 1.0; }
-    r1 = xe_vfetch(XE_VF1_CONSTANT, XE_VF1_OFFSET, XE_VF1_STRIDE, XE_VF1_FORMAT, XE_VF1_FLAGS, XE_VF1_EXP_ADJUST, XE_VF1_SWIZZLE, r0.x, 15u);
-    r0.xy = xe_vfetch(XE_VF2_CONSTANT, XE_VF2_OFFSET, XE_VF2_STRIDE, XE_VF2_FORMAT, XE_VF2_FLAGS, XE_VF2_EXP_ADJUST, XE_VF2_SWIZZLE, r0.x, 3u).xy;
+    { vec4 f = xe_vfetch(0, XE_VF0_CONSTANT, XE_VF0_OFFSET, XE_VF0_STRIDE, XE_VF0_FORMAT, XE_VF0_FLAGS, XE_VF0_EXP_ADJUST, XE_VF0_SWIZZLE, r0.x, 7u); r2.xyz = f.xyz; r2.w = 1.0; }
+    r1 = xe_vfetch(1, XE_VF1_CONSTANT, XE_VF1_OFFSET, XE_VF1_STRIDE, XE_VF1_FORMAT, XE_VF1_FLAGS, XE_VF1_EXP_ADJUST, XE_VF1_SWIZZLE, r0.x, 15u);
+    r0.xy = xe_vfetch(2, XE_VF2_CONSTANT, XE_VF2_OFFSET, XE_VF2_STRIDE, XE_VF2_FORMAT, XE_VF2_FLAGS, XE_VF2_EXP_ADJUST, XE_VF2_SWIZZLE, r0.x, 3u).xy;
     { precise vec2 e = r2.zw; xe_position.zw = e; }
     { precise vec2 e = r2.xy + lit255.xx; xe_position.xy = e; }
     { precise vec2 e = r0.xy; xe_interpolators[0].xy = e; }
@@ -95,21 +104,14 @@ void xe_write_interpolators(vec4 interpolators[16]) {
 }
 
 void main() {
-  uint host_index = uint(gl_VertexIndex);
-  uint index = host_index == xe_sys.line_loop_closing_index ? 0u : host_index;
-  // A rectangle list runs the shader for the rectangle's three vertices.
+  // A rectangle list runs the shader for the rectangle's three vertices
+  // (an instance a rectangle, its vertices' attributes at instance rate).
   vec4 positions[3];
   vec4 interpolators[3][16];
   uint runs = XE_RECTANGLE_LIST ? 3u : 1u;
   for (uint g = 0u; g < runs; g++) {
-    uint vertex;
-    if (XE_RECTANGLE_LIST) {
-      vertex = ((g == 0u ? index : host_index) >> 2u) * 3u + g;
-      if ((xe_sys.flags & kXeFlagPrimitiveVertexIndexLoad) != 0u) vertex = xe_load_vertex_index(vertex);
-    } else {
-      vertex = xe_endian_swap(index, xe_sys.vertex_index_endian);
-    }
-    xe_shader(xe_remap_vertex_index(vertex));
+    xe_vf_slot = g;
+    xe_shader(XE_RECTANGLE_LIST ? float(uint(gl_InstanceIndex) * 3u + g) : float(gl_VertexIndex));
     positions[g] = xe_host_position(xe_position);
     interpolators[g] = xe_interpolators;
   }
@@ -127,7 +129,7 @@ void main() {
   }
   int v0 = (edges[0] > edges[1] && edges[0] > edges[2]) ? 0 : (edges[1] > edges[2] ? 1 : 2);
   int v1 = (v0 + 1) % 3, v2 = (v0 + 2) % 3;
-  uint corner = host_index & 3u;
+  uint corner = uint(gl_VertexIndex) & 3u;
   int pick = corner == 0u ? v0 : (corner == 1u ? v1 : v2);
   precise vec4 synthetic_position = (positions[v1] - positions[v0]) + positions[v2];
   gl_Position = corner == 3u ? synthetic_position : positions[pick];

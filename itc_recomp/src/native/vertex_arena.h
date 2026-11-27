@@ -6,10 +6,9 @@
 // quad lists. It replaces the guest memory mirrors (two host-visible copies
 // of the whole 512 MB physical memory, pinned in system RAM by the driver).
 //
-// The translated shaders read every vertex stream from one storage buffer
-// by the address in its fetch constant: a draw gives each stream it reads
-// the arena offset of its range in place of the address (Place), and binds
-// its index buffer at the offset of its range.
+// A draw binds each vertex stream it reads at the arena offset of its range
+// (Place) as a vertex buffer, and its index buffer at the offset of its
+// range.
 //
 // Render thread only.
 
@@ -50,8 +49,12 @@ class VertexArena {
 
   // The arena offset of the physical range [address, address + size),
   // copied in if it's new this way or was written since; UINT32_MAX if
-  // there's no room (the draw is left out, counted).
-  uint32_t Place(uint32_t address, uint32_t size);
+  // there's no room (the draw is left out, counted). endian: 0 as it is
+  // (vertices: the shaders swap them), or an index buffer's (xenos::Endian:
+  // 1 16-bit indices, 2 32-bit ones) to keep it in the host's byte order
+  // for the vertex input to fetch by (kept apart from the same range as
+  // it is).
+  uint32_t Place(uint32_t address, uint32_t size, uint32_t endian = 0);
   // The frame's inline vertices: copied into this frame's part of the
   // arena; UINT32_MAX if it's full.
   uint32_t PlaceInline(const void* data, uint32_t size);

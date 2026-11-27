@@ -33,6 +33,31 @@ constexpr uint32_t kSpecVertexFetches = 100;    // vertex: 10 a fetch, from 100
 constexpr uint32_t kSpecMotionBlurQuality = 10;  // pixel
 constexpr uint32_t kSpecBloomQuality = 11;       // pixel
 
+// The words a vertex format's element has (xe_vf_needed_words with every
+// component used).
+uint32_t VertexFormatWords(uint32_t format) {
+  switch (format) {
+    case 26:  // 16_16_16_16
+    case 32:  // 16_16_16_16_FLOAT
+    case 34:  // 32_32
+    case 37:  // 32_32_FLOAT
+      return 2;
+    case 57:  // 32_32_32_FLOAT
+      return 3;
+    case 6:   // 8_8_8_8
+    case 7:   // 2_10_10_10
+    case 16:  // 10_11_11
+    case 17:  // 11_11_10
+    case 25:  // 16_16
+    case 31:  // 16_16_FLOAT
+    case 33:  // 32
+    case 36:  // 32_FLOAT
+      return 1;
+    default:  // 32_32_32_32, 32_32_32_32_FLOAT, and as the shader reads others
+      return 4;
+  }
+}
+
 }  // namespace
 
 uint32_t GamePortCount() { return uint32_t(std::size(kGamePorts)); }
@@ -205,6 +230,7 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   specialization.vertex = port.stage == ShaderStage::kVertex;
   specialization.interpolator_mask = interpolator_mask & 0xFFFF;
   auto& constants = specialization.constants;
+  shader.vertex_fetches.clear();
   if (specialization.vertex) {
     constants.push_back({kSpecRectangleList, rectangle_list ? 1u : 0u});
     // Each vertex fetch's fields as the game patched them.
@@ -235,7 +261,11 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
         }
       }
       constants.push_back({base + 6, swizzle});
+      shader.vertex_fetches.push_back({fetch_constant,
+                                       SignExtend((w2 >> 8) & 0x7FFFFF, 23), w2 & 0xFF,
+                                       VertexFormatWords((w1 >> 16) & 63)});
     }
+    shader.rectangle_list = rectangle_list;
   } else {
     constants.push_back({kSpecInterpolatorMask, specialization.interpolator_mask});
     constants.push_back({kSpecParamGenRegister,

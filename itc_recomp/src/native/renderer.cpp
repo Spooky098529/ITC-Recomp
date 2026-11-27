@@ -98,8 +98,6 @@ ITC_FLAG_BOOL(native_renderer_base_level_only, false, "ITC",
 ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "Hash every texture used each frame, logging and reloading those whose "
               "memory changed with no memcpy write recorded (a debugging aid)");
-ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
-              "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
                "With native_renderer_dump: dump only the frame itself (shown image, draw "
                "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
@@ -500,6 +498,15 @@ bool Renderer::CreateDevice() {
   context_.queue_family = queue_family_;
   context_.queue = queue_;
   context_.max_storage_buffer_range = properties.limits.maxStorageBufferRange;
+  // The vertex shaders take up to 24 attributes and bindings (a fetch's
+  // three, passes.cpp's kMaxVertexBindings; Vulkan promises 16).
+  if (properties.limits.maxVertexInputAttributes < 24 ||
+      properties.limits.maxVertexInputBindings < 24) {
+    ITC_LOG_ERROR("native renderer: the device takes {} vertex attributes and {} bindings; the "
+                  "game's shaders may need 24",
+                  properties.limits.maxVertexInputAttributes,
+                  properties.limits.maxVertexInputBindings);
+  }
   context_.min_uniform_buffer_offset_alignment =
       uint32_t(properties.limits.minUniformBufferOffsetAlignment);
   context_.clip_distance = enabled.features.shaderClipDistance;
@@ -718,7 +725,6 @@ VkCommandBuffer Renderer::BeginFrame() {
         ITC_FLAG(native_renderer_watch_draws),
         std::strtoull(ITC_FLAG(native_renderer_watch_pixel_shader).c_str(), nullptr, 16));
     passes_.set_hide_cubes(ITC_FLAG(native_renderer_hide_cubes));
-    passes_.set_no_index_clamp(ITC_FLAG(native_renderer_no_index_clamp));
     passes_.set_base_level_only(ITC_FLAG(native_renderer_base_level_only));
     passes_.set_verify_textures(ITC_FLAG(native_renderer_verify_textures));
     recording_ = true;
@@ -1025,12 +1031,6 @@ void Renderer::LogStats() {
   }
   ITC_LOG_INFO("native renderer: {:.1f} draws a frame with PsParamGen;{}",
                double(view.param_gen_draws) / frames, passes_.TakeInterfaces());
-  if (view.clamped_draws) {
-    const auto& c = view.clamped_sample;
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame have indices outside VGT_MIN/MAX_VTX_INDX, "
-                 "e.g. {}-{} against {}-{}",
-                 double(view.clamped_draws) / frames, c[0], c[1], c[2], c[3]);
-  }
   if (view.inline_draws) {
     const auto& t = view.inline_by_type;
     ITC_LOG_INFO("native renderer: {:.1f} inline vertex draws a frame (triangle lists {:.1f}, "

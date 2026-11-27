@@ -20,15 +20,12 @@ vs_B2BD800956768112  model.vert  POSITION=0                                     
 vs_1579E2CF1BCA8E4D  model.vert  POSITION=0 CLIP_POSITION_REG=0 CLIP_POSITION_REG_2=1  # 00000013
 vs_13D2A485CE84A7A9  model.vert  POSITION=0 CLIP_POSITION_REG=0 OLD_CLIP_POSITION_REG=1  # 00000009, 67 (velocity)
 
-# Unlit models: coordinates and color. The two the course's shaders without
-# a normal are drawn with (00001247, 00001249: the parking area's and the
-# courses' vertex-colored surfaces) also pass the mesh's own normal on in
-# interpolator 15 (STREAM_NORMAL_REG, model.vert), for the AO.
+# Unlit models: coordinates and color.
 vs_BB9F34FE57827C8D  model.vert  POSITION=0 COLOR=1 COLOR_REG=0                      # vs_10, 00011249
 vs_93F94842A4742732  model.vert  POSITION=0 COLOR=1 UV0=2 UV0_REG=0 COLOR_REG=1      # vs_01, 00000141
 vs_FA17356113DFBFDA  model.vert  POSITION=0 COLOR=1 UV0=2 UV0_REG=0 COLOR_REG=1      # vs_07, 00000893
-vs_E76C7F598230D74B  model.vert  POSITION=0 COLOR=1 UV0=2 UV0_REG=1 COLOR_REG=2 STREAM_NORMAL_REG=15 # 00022810, 00001247
-vs_86F28F82FA50FE98  model.vert  POSITION=0 COLOR=1 UV0=2 UV1=3 UV0_REG=1 UV1_REG=2 COLOR_REG=3 STREAM_NORMAL_REG=15 # 00001249
+vs_E76C7F598230D74B  model.vert  POSITION=0 COLOR=1 UV0=2 UV0_REG=1 COLOR_REG=2 # 00022810, 00001247
+vs_86F28F82FA50FE98  model.vert  POSITION=0 COLOR=1 UV0=2 UV1=3 UV0_REG=1 UV1_REG=2 COLOR_REG=3 # 00001249
 
 # Lit models: world position and normal.
 vs_07147F7735F408F8  model.vert  POSITION=0 NORMAL=1 COLOR=2 WORLD_POSITION_REG=0 NORMAL_REG=1 COLOR_REG=2  # vs_03, 00000587

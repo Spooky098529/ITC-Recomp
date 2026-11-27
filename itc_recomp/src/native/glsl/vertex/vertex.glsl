@@ -11,7 +11,7 @@
 // used: the components the shader reads, a bit each.
 #define fetch_attribute(n, used) fetch_attribute_(n, used)
 #define fetch_attribute_(n, used)                                                         \
-  xe_vfetch(XE_VF##n##_CONSTANT, XE_VF##n##_OFFSET, XE_VF##n##_STRIDE, XE_VF##n##_FORMAT, \
+  xe_vfetch(n, XE_VF##n##_CONSTANT, XE_VF##n##_OFFSET, XE_VF##n##_STRIDE, XE_VF##n##_FORMAT, \
             XE_VF##n##_FLAGS, XE_VF##n##_EXP_ADJUST, XE_VF##n##_SWIZZLE, vertex_index, used)
 // Vertex fetch n's fetch constant and stride (in words).
 #define XE_VF_CONSTANT_OF(n) XE_VF_CONSTANT_OF_(n)
@@ -76,26 +76,20 @@ void write_interpolators(vec4 interpolators[16]) {
   xe_out_interpolator_15 = interpolators[15];
 }
 
-// Runs the shader for the vertex. A rectangle list (XE_RECTANGLE_LIST) has
-// three vertices a rectangle; each invocation runs the shader for all three
-// and makes the fourth corner from them.
+// Runs the shader for the vertex. A rectangle list (XE_RECTANGLE_LIST) is
+// drawn an instance a rectangle, four vertices each, with its three
+// vertices' attributes at instance rate: each invocation runs the shader for
+// all three and makes the fourth corner from them.
 void main() {
-  uint host_index = uint(gl_VertexIndex);
-  uint index = host_index == xe_sys.line_loop_closing_index ? 0u : host_index;
   vec4 positions[3];
   vec4 interpolators[3][16];
   uint runs = XE_RECTANGLE_LIST ? 3u : 1u;
   for (uint g = 0u; g < runs; g++) {
-    uint vertex;
-    if (XE_RECTANGLE_LIST) {
-      vertex = ((g == 0u ? index : host_index) >> 2u) * 3u + g;
-      if ((xe_sys.flags & kXeFlagPrimitiveVertexIndexLoad) != 0u) vertex = xe_load_vertex_index(vertex);
-    } else {
-      vertex = xe_endian_swap(index, xe_sys.vertex_index_endian);
-    }
+    xe_vf_slot = g;
     out_position = vec4(0.0);
     for (int i = 0; i < 16; i++) out_interpolators[i] = vec4(0.0);
-    vertex_shader(xe_remap_vertex_index(vertex));
+    vertex_shader(XE_RECTANGLE_LIST ? float(uint(gl_InstanceIndex) * 3u + g)
+                                    : float(gl_VertexIndex));
     positions[g] = xe_host_position(out_position);
     interpolators[g] = out_interpolators;
   }
@@ -113,7 +107,7 @@ void main() {
   }
   int v0 = (edges[0] > edges[1] && edges[0] > edges[2]) ? 0 : (edges[1] > edges[2] ? 1 : 2);
   int v1 = (v0 + 1) % 3, v2 = (v0 + 2) % 3;
-  uint corner = host_index & 3u;
+  uint corner = uint(gl_VertexIndex) & 3u;
   int pick = corner == 0u ? v0 : (corner == 1u ? v1 : v2);
   precise vec4 fourth_position = (positions[v1] - positions[v0]) + positions[v2];
   gl_Position = corner == 3u ? fourth_position : positions[pick];

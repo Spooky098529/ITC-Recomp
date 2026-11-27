@@ -22,6 +22,8 @@ namespace {
 // The arena: the built-in index lists, then each frame slot's inline
 // vertices, then the ranges draws use.
 constexpr uint32_t kInlineSlotBytes = 16u << 20;
+// A range key's address bits (its top two: the endian mode, Place).
+constexpr uint32_t kAddressBits = 0x3FFFFFFFu;
 constexpr uint32_t kRangeBytes = 192u << 20;
 // Staging: a chunk a frame slot, more while one frame needs more (a load),
 // given back when the slot comes round again.
@@ -105,7 +107,7 @@ struct VertexArena::State {
   void DestroyStaging(StagingChunk& chunk);
   // Space in this frame's staging for `bytes`: the chunk and its offset.
   std::pair<StagingChunk*, uint32_t> Stage(uint32_t bytes);
-  void Copy(const void* data, uint32_t bytes, uint32_t arena_offset);
+  void Copy(const void* data, uint32_t bytes, uint32_t arena_offset, uint32_t endian = 0);
   void BeginRecording();
   uint32_t Allocate(uint32_t bytes);
   void Free(uint32_t offset, uint32_t bytes);
@@ -198,6 +200,7 @@ bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) 
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = s.size;
   info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vk::vkCreateBuffer(device, &info, nullptr, &s.buffer) != VK_SUCCESS) {
@@ -360,7 +363,7 @@ void VertexArena::State::GiveBack(uint64_t older_than) {
       ++it;
       continue;
     }
-    uint32_t start = uint32_t(it->first >> 32), bytes = uint32_t(it->first);
+    uint32_t start = uint32_t(it->first >> 32) & kAddressBits, bytes = uint32_t(it->first);
     // Freed when this slot's fence has passed again: frames in flight may
     // still draw from it.
     to_free.emplace_back(it->second.offset, bytes);
@@ -415,7 +418,8 @@ std::pair<VertexArena::State::StagingChunk*, uint32_t> VertexArena::State::Stage
   return {chunk, at};
 }
 
-void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_offset) {
+void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_offset,
+                              uint32_t endian) {
   if (!bytes) {
     return;
   }
@@ -424,6 +428,28 @@ void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_o
     return;
   }
   std::memcpy(chunk->mapped + at, data, bytes);
+  if (endian == 1) {  // 8-in-16
+    uint8_t* p = chunk->mapped + at;
+    for (uint32_t i = 0; i + 1 < bytes; i += 2) {
+      std::swap(p[i], p[i + 1]);
+    }
+  } else if (endian == 2) {  // 8-in-32
+    uint8_t* p = chunk->mapped + at;
+    for (uint32_t i = 0; i + 3 < bytes; i += 4) {
+      uint32_t v;
+      std::memcpy(&v, p + i, 4);
+      v = __builtin_bswap32(v);
+      std::memcpy(p + i, &v, 4);
+    }
+  } else if (endian == 3) {  // 16-in-32
+    uint8_t* p = chunk->mapped + at;
+    for (uint32_t i = 0; i + 3 < bytes; i += 4) {
+      uint32_t v;
+      std::memcpy(&v, p + i, 4);
+      v = v << 16 | v >> 16;
+      std::memcpy(p + i, &v, 4);
+    }
+  }
   BeginRecording();
   VkBufferCopy region{at, arena_offset, bytes};
   vk::vkCmdCopyBuffer(frames[recording_slot].uploads, chunk->buffer, buffer, 1, &region);
@@ -431,13 +457,14 @@ void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_o
   stats.copied_bytes += bytes;
 }
 
-uint32_t VertexArena::Place(uint32_t address, uint32_t size) {
+uint32_t VertexArena::Place(uint32_t address, uint32_t size, uint32_t endian) {
   State& s = *state_;
   s.stats.placed++;
   if (!size) {
     return s.range_start;
   }
-  uint64_t key = (uint64_t(address) << 32) | size;
+  // The endian mode in the key's top bits (physical addresses are 29 bits).
+  uint64_t key = (uint64_t(address | (endian & 3) << 30) << 32) | size;
   auto it = s.ranges.find(key);
   if (it == s.ranges.end()) {
     uint32_t offset = s.Allocate(size);
@@ -467,7 +494,7 @@ uint32_t VertexArena::Place(uint32_t address, uint32_t size) {
   range.last_used = s.frame_number;
   if (range.written) {
     range.written = false;
-    s.Copy(PhysicalHostAddress(address), size, range.offset);
+    s.Copy(PhysicalHostAddress(address), size, range.offset, endian);
   }
   return range.offset;
 }
@@ -499,7 +526,8 @@ VkCommandBuffer VertexArena::EndUploads() {
   VkCommandBuffer commands = s.frames[s.recording_slot].uploads;
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
   barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+                          VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
   vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
                                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,

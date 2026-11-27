@@ -453,8 +453,8 @@ class Port:
                 self.store_fetch(out, i.dest, i.dest_swizzle, "vec4(0.0)")
                 return
             index = "r%d.%s" % (i.source, XYZW[i.source_component])
-            call = ("xe_vfetch(XE_VF%d_CONSTANT, XE_VF%d_OFFSET, XE_VF%d_STRIDE, XE_VF%d_FORMAT, "
-                    "XE_VF%d_FLAGS, XE_VF%d_EXP_ADJUST, XE_VF%d_SWIZZLE, %s, %du)" % ((slot,) * 7 + (index, used)))
+            call = ("xe_vfetch(%d, XE_VF%d_CONSTANT, XE_VF%d_OFFSET, XE_VF%d_STRIDE, XE_VF%d_FORMAT, "
+                    "XE_VF%d_FLAGS, XE_VF%d_EXP_ADJUST, XE_VF%d_SWIZZLE, %s, %du)" % ((slot,) * 8 + (index, used)))
             lines = []
             self.store_fetch(lines, i.dest, i.dest_swizzle, "f")
             if len(lines) == 1 and lines[0].count(" = f") == 1:
@@ -655,6 +655,10 @@ class Port:
                         ("FLAGS", "uint", "%du" % flags), ("EXP_ADJUST", "int", str(f.exp_adjust)),
                         ("SWIZZLE", "uint", "0x688u"))):
                     L.append("layout(constant_id = %d) const %s XE_VF%d_%s = %s;" % (100 + 10 * n + k, ty, n, field, value))
+                # The fetch's attribute: the element's raw words, a vertex of
+                # the rectangle each (xe_interface.glsl, XE_VF_IN).
+                for g in range(3):
+                    L.append("layout(location = %d) in uvec4 xe_vf_in_%d_%d;" % (3 * n + g, n, g))
             L += ["// Drawing a rectangle list: each invocation runs the shader for the",
                   "// rectangle's three vertices and makes the fourth.",
                   "layout(constant_id = 2) const bool XE_RECTANGLE_LIST = false;", ""]
@@ -707,21 +711,14 @@ class Port:
             ] + ["  xe_out_interpolator_%d = interpolators[%d];" % (k, k) for k in range(16)] + [
                 "}", "",
                 "void main() {",
-                "  uint host_index = uint(gl_VertexIndex);",
-                "  uint index = host_index == xe_sys.line_loop_closing_index ? 0u : host_index;",
-                "  // A rectangle list runs the shader for the rectangle's three vertices.",
+                "  // A rectangle list runs the shader for the rectangle's three vertices",
+                "  // (an instance a rectangle, its vertices' attributes at instance rate).",
                 "  vec4 positions[3];",
                 "  vec4 interpolators[3][16];",
                 "  uint runs = XE_RECTANGLE_LIST ? 3u : 1u;",
                 "  for (uint g = 0u; g < runs; g++) {",
-                "    uint vertex;",
-                "    if (XE_RECTANGLE_LIST) {",
-                "      vertex = ((g == 0u ? index : host_index) >> 2u) * 3u + g;",
-                "      if ((xe_sys.flags & kXeFlagPrimitiveVertexIndexLoad) != 0u) vertex = xe_load_vertex_index(vertex);",
-                "    } else {",
-                "      vertex = xe_endian_swap(index, xe_sys.vertex_index_endian);",
-                "    }",
-                "    xe_shader(xe_remap_vertex_index(vertex));",
+                "    xe_vf_slot = g;",
+                "    xe_shader(XE_RECTANGLE_LIST ? float(uint(gl_InstanceIndex) * 3u + g) : float(gl_VertexIndex));",
                 "    positions[g] = xe_host_position(xe_position);",
                 "    interpolators[g] = xe_interpolators;",
                 "  }",
@@ -739,7 +736,7 @@ class Port:
                 "  }",
                 "  int v0 = (edges[0] > edges[1] && edges[0] > edges[2]) ? 0 : (edges[1] > edges[2] ? 1 : 2);",
                 "  int v1 = (v0 + 1) % 3, v2 = (v0 + 2) % 3;",
-                "  uint corner = host_index & 3u;",
+                "  uint corner = uint(gl_VertexIndex) & 3u;",
                 "  int pick = corner == 0u ? v0 : (corner == 1u ? v1 : v2);",
                 "  precise vec4 synthetic_position = (positions[v1] - positions[v0]) + positions[v2];",
                 "  gl_Position = corner == 3u ? synthetic_position : positions[pick];",

@@ -379,25 +379,36 @@ uint xe_vf_needed_words(uint format, uint used) {
   return used;
 }
 
+// Vertex fetch n's attribute: the raw words of the vertex's element (in the
+// guest's byte order), one input a fetch and a vertex of the rectangle
+// (locations 3n to 3n + 2; a rectangle list reads its three vertices'
+// through bindings at instance rate, other draws read the first). The
+// renderer makes the vertex input state from the fetches' fields
+// (passes.cpp, docs/pc-renderer.md, step 2).
+uint xe_vf_slot = 0u;
+#define XE_VF_IN(n) XE_VF_IN_(n)
+#define XE_VF_IN_(n) \
+  (xe_vf_slot == 0u ? xe_vf_in_##n##_0 : (xe_vf_slot == 1u ? xe_vf_in_##n##_1 : xe_vf_in_##n##_2))
+// The fetch n with its fields; index (the register the instruction reads)
+// is the vertex the invocation runs for, already applied by the vertex input.
+#define xe_vfetch(n, fetch_constant, offset, stride, format, flags, exp_adjust, swizzle, index, \
+                  used)                                                                         \
+  xe_vfetch_words(XE_VF_IN(n), fetch_constant, format, flags, exp_adjust, swizzle, used)
+
 // used: the result components the shader reads (a bit each).
 // swizzle: 3 bits a component, what the fetch's result gives that
 // component of the value the shader's instruction then swizzles as the file
 // has it (0-3 a component of the fetched value, 4 zero, 5 one): the
 // declaration's component order and defaults, as the game's patch of the
 // instruction gives them (identity: 0x688, xyzw).
-vec4 xe_vfetch(uint fetch_constant, int offset, uint stride, uint format, uint flags,
-               int exp_adjust, uint swizzle, float index, uint used) {
-  uint word_0 = xe_fetch_word(fetch_constant * 2u), word_1 = xe_fetch_word(fetch_constant * 2u + 1u);
-  int address = int(word_0 >> 2u);
-  if (stride != 0u) {
-    precise float i = (flags & kXeVfIndexRounded) != 0u ? index + 0.5 : index;
-    address += int(floor(i)) * int(stride);
-  }
+vec4 xe_vfetch_words(uvec4 words, uint fetch_constant, uint format, uint flags, int exp_adjust,
+                     uint swizzle, uint used) {
+  uint word_1 = xe_fetch_word(fetch_constant * 2u + 1u);
   uint needed = xe_vf_needed_words(format, used);
   uvec4 w = uvec4(0u);
   for (int i = 0; i < 4; i++) {
     if ((needed & (1u << i)) != 0u) {
-      w[i] = xe_endian_swap(xe_memory[address + offset + i], word_1 & 3u);
+      w[i] = xe_endian_swap(words[i], word_1 & 3u);
     }
   }
   vec4 r = vec4(0.0);
@@ -451,21 +462,7 @@ vec4 xe_vfetch(uint fetch_constant, int offset, uint stride, uint format, uint f
   return swizzled;
 }
 
-// --- the vertex index and the position -----------------------------------------
-float xe_remap_vertex_index(uint index) {
-  index = (index + uint(xe_sys.vertex_base_index)) & 0xFFFFFFu;
-  return float(clamp(index, xe_sys.vertex_index_min, xe_sys.vertex_index_max));
-}
-// An index from the index buffer in guest memory (for rectangle lists drawn
-// with one).
-uint xe_load_vertex_index(uint index) {
-  bool is_32bit = (xe_sys.flags & kXeFlagPrimitiveVertexIndexLoad32Bit) != 0u;
-  uint address = xe_sys.vertex_index_load_address + (index << (is_32bit ? 2u : 1u));
-  uint word = xe_memory[int(address >> 2u)];
-  if (!is_32bit) word = bitfieldExtract(word, int((address & 2u) << 3u), 16);
-  return xe_endian_swap(word, xe_sys.vertex_index_endian);
-}
-
+// --- the position -------------------------------------------------------------
 // The position as the shader wrote it, to Vulkan's clip space.
 vec4 xe_host_position(vec4 guest) {
   precise float w = (xe_sys.flags & kXeFlagWNotReciprocal) != 0u ? guest.w : 1.0 / guest.w;

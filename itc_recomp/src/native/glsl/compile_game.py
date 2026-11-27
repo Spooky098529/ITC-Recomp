@@ -131,6 +131,8 @@ def header(info, source, defines):
             lines.append("layout(constant_id = %d) const uint XE_VF%d_FLAGS = 0u;" % (base + 4, n))
             lines.append("layout(constant_id = %d) const int XE_VF%d_EXP_ADJUST = 0;" % (base + 5, n))
             lines.append("layout(constant_id = %d) const uint XE_VF%d_SWIZZLE = 0x688u;" % (base + 6, n))
+            for g in range(3):
+                lines.append("layout(location = %d) in uvec4 xe_vf_in_%d_%d;" % (3 * n + g, n, g))
         lines.append("layout(constant_id = 2) const bool XE_RECTANGLE_LIST = false;")
     for d in defines:
         lines.append("#define %s" % d.replace("=", " ", 1))

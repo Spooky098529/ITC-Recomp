@@ -128,7 +128,6 @@ class Passes {
   void set_watch_draws(bool watch, uint64_t pixel_shader = 0);
   // A debugging aid: cube maps get the white placeholder.
   void set_hide_cubes(bool hide);
-  void set_no_index_clamp(bool off);
   // Which pixel shaders got PsParamGen, and with which interpolators.
   std::string TakeInterfaces();
   void set_base_level_only(bool base_only);
@@ -187,9 +186,7 @@ class Passes {
     // Draws whose item's base vertex differs from VGT_INDX_OFFSET, and an
     // example (item's, register's).
     uint64_t base_vertex_differs = 0;
-    // Draws with indices outside VGT_MIN/MAX_VTX_INDX (the shader clamps
-    // them), and an example: lowest and highest index, the registers.
-    uint64_t clamped_draws = 0, param_gen_draws = 0;
+    uint64_t param_gen_draws = 0;
     // Draws whose vertex shader's microcode, when read, was patched for
     // another vertex declaration than the bound one, and an example (the
     // shader's declaration id, the bound one's).
@@ -226,7 +223,6 @@ class Passes {
     uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
              fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
     std::array<uint32_t, 2> declaration_sample{};
-    std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
     uint64_t clears = 0, clear_rects = 0;

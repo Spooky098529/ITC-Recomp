@@ -47,6 +47,22 @@ struct TranslatedShader {
   // The vertex fetch constants it reads (0-95), one bit each: the vertex
   // buffers it fetches from.
   std::array<uint32_t, 3> vertex_fetch_constants{};
+  // A vertex shader's fetches, in its order (fetch n reads its vertex's
+  // element from the attributes at locations 3n to 3n + 2, the raw words in
+  // the guest's byte order): the fetch constant (its stream), where the
+  // element starts in the vertex and the vertex's size, in words, and how
+  // many words the element's format has. The renderer makes the vertex
+  // input state from them (docs/pc-renderer.md, step 2).
+  struct VertexFetch {
+    uint32_t fetch_constant;
+    int32_t offset_words;
+    uint32_t stride_words;
+    uint32_t words;
+  };
+  std::vector<VertexFetch> vertex_fetches;
+  // Made for a rectangle list: an instance a rectangle, each fetch read
+  // for its three vertices through bindings at instance rate.
+  bool rectangle_list = false;
   // Its texture descriptors (set 2 or 3): images, then samplers.
   std::vector<ShaderTexture> textures;
   std::vector<ShaderSampler> samplers;

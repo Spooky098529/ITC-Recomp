@@ -90,6 +90,7 @@
   X(vkCmdBindPipeline)                 \
   X(vkCmdBindDescriptorSets)           \
   X(vkCmdBindIndexBuffer)              \
+  X(vkCmdBindVertexBuffers)            \
   X(vkCmdDrawIndexed)                  \
   X(vkCmdSetViewport)                  \
   X(vkCmdSetScissor)                   \
