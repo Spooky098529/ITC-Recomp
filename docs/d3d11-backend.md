@@ -300,12 +300,8 @@ each backend.
   with `passes.cpp`'s per-frame set cache and last-set reuse moving into
   the backend; the constant blocks by offset), then the resolve, movie,
   gamma and ID passes' own pipelines, shaders and binds; then the dumps.
-  Was: binds (pipeline, the texture sets from views
-  and samplers, the constant blocks by offset, vertex and index buffers),
-  draws, copies and resolves in the frame (the movie planes' copies too);
-  then the resolve, movie, gamma and ID passes' own pipelines and shaders;
-  then the dumps. *(D3D11 later: `UpdateSubresource` from the staging
-  memory for the uploads.)*
+  *(D3D11 later: `UpdateSubresource` from the staging memory for the
+  uploads.)*
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between
