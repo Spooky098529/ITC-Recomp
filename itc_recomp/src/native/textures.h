@@ -59,6 +59,7 @@ class TextureCache {
   // SHADER_READ_ONLY_OPTIMAL, or UNDEFINED while `fresh`. False if its
   // format can't be a color attachment.
   struct ResolveDestination {
+    gpu::Image* object;  // its image (Use: undefined while fresh)
     VkImage image;
     VkImageView view;  // all components as is, for drawing into
     VkFormat format;

@@ -6,6 +6,7 @@
 #include "gpu_memory.h"
 #include "state.h"
 #include "gpu/vulkan/backend.h"
+#include "native/vulkan_types.h"
 
 #include <algorithm>
 #include <array>
@@ -810,58 +811,37 @@ void TextureCache::State::LogWriteSummary() {
 }
 
 bool TextureCache::State::CreateTexture(Texture& t) {
-  VkDevice device = context.device;
   const Layout& l = t.layout;
   t.levels = t.resolved ? 1 : l.max_level + 1;
-  VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-  info.flags = l.cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
-  info.imageType = VK_IMAGE_TYPE_2D;
-  info.format = t.format.format;
-  info.extent = t.resolved ? VkExtent3D{t.host_width, t.host_height, 1}
-                           : VkExtent3D{l.width, l.height, 1};
-  info.mipLevels = t.levels;
-  info.arrayLayers = l.layers;
-  info.samples = VK_SAMPLE_COUNT_1_BIT;
-  info.tiling = VK_IMAGE_TILING_OPTIMAL;
-  info.usage = t.resolved ? VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-                          : VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  if (VkResult result = vk::vkCreateImage(device, &info, nullptr, &t.image);
-      result != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: texture {}x{} format {}: vkCreateImage: {}", l.width, l.height,
-                  int(t.format.format), int(result));
-    t.image = VK_NULL_HANDLE;
+  gpu::ImageDesc desc;
+  desc.type = t.resolved ? gpu::ImageType::k2D
+              : l.cube   ? gpu::ImageType::kCube
+                         : gpu::ImageType::k2DArray;
+  desc.format = vk_types::FormatFrom(t.format.format);
+  desc.width = t.resolved ? t.host_width : l.width;
+  desc.height = t.resolved ? t.host_height : l.height;
+  desc.layers = l.layers;
+  desc.levels = t.levels;
+  desc.usage = t.resolved ? gpu::kImageSampled | gpu::kImageColorTarget | gpu::kImageCopySource
+                          : gpu::kImageSampled | gpu::kImageCopyDest;
+  if (desc.format == gpu::Format::kUndefined) {
+    ITC_LOG_ERROR("native renderer: texture format {} has no gpu::Format", int(t.format.format));
     return false;
   }
-  VkMemoryRequirements requirements;
-  vk::vkGetImageMemoryRequirements(device, t.image, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &t.memory) != VK_SUCCESS ||
-      vk::vkBindImageMemory(device, t.image, t.memory, 0) != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: no memory for a {}x{} texture", l.width, l.height);
-    vk::vkDestroyImage(device, t.image, nullptr);
-    t.image = VK_NULL_HANDLE;
+  t.object = backend->CreateImage(desc);
+  if (!t.object) {
+    ITC_LOG_ERROR("native renderer: couldn't create a {}x{} texture of format {}", desc.width,
+                  desc.height, int(t.format.format));
     return false;
   }
-  t.memory_size = alloc.allocationSize;
+  const gpu::vulkan::ImageObject& object = gpu::vulkan::Backend::Object(t.object);
+  t.image = object.image;
+  t.memory = object.memory;
+  t.memory_size = object.memory_size;
   gpu_memory::Allocated(t.resolved ? gpu_memory::Kind::kResolved : gpu_memory::Kind::kTexture,
-                        alloc.allocationSize);
-
+                        t.memory_size);
   if (t.resolved) {
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view.image = t.image;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = t.format.format;
-    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    if (vk::vkCreateImageView(device, &view, nullptr, &t.attachment_view) != VK_SUCCESS) {
-      return false;
-    }
-    gpu_memory::Created(gpu_memory::Object::kImageView);
+    t.attachment_view = object.view;  // the object's
     stats.textures++;
     return true;
   }
@@ -1010,6 +990,7 @@ bool TextureCache::State::Upload(Texture& t) {
                            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
                                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            0, 0, nullptr, 0, nullptr, 1, &barrier);
+  gpu::vulkan::Backend::Object(t.object).layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   stats.loaded_bytes += needed;
   (t.loaded ? stats.reloaded : stats.loaded)++;
   t.loaded = true;
@@ -1310,18 +1291,10 @@ void TextureCache::State::Retire(const Texture& t) {
       r.views.push_back(view);
     }
   }
-  if (t.object) {
-    r.object = t.object;
-    r.image = VK_NULL_HANDLE;
-    r.memory = VK_NULL_HANDLE;
-  } else {
-    if (t.attachment_view) {
-      r.views.push_back(t.attachment_view);
-    }
-    if (t.depth_view && t.depth_view != t.attachment_view) {
-      r.views.push_back(t.depth_view);
-    }
-  }
+  // The image and its own views go with the object.
+  r.object = t.object;
+  r.image = VK_NULL_HANDLE;
+  r.memory = VK_NULL_HANDLE;
   retired.push_back(std::move(r));
 }
 
@@ -1790,7 +1763,8 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
     generation_++;
     events_.resolve_changes++;
   }
-  out = {t.image,         t.attachment_view, t.format.format, width,     height,
+  out = {t.object,        t.image,
+         t.attachment_view, t.format.format, width,     height,
          t.host_width,    t.host_height,     t.scale,         !t.loaded, t.handed,
          t.native_format, t.copied};
   t.loaded = true;  // written by the caller
@@ -1831,20 +1805,11 @@ TextureCache::HandedImage TextureCache::HandOver(const uint32_t fetch_words[6], 
             t.depth_view};
     gpu_memory::Freed(gpu_memory::Kind::kResolved, t.memory_size);
     gpu_memory::Allocated(gpu_memory::Kind::kImage, t.memory_size);
-  } else if (t.object) {
-    // A handed image of another format: the backend's to destroy.
+  } else {
+    // Its own image, or a handed one of another format: the backend's to
+    // destroy.
     views.object = t.object;
     views.memory_size = t.memory_size;
-  } else {
-    views.image = t.image;
-    views.memory = t.memory;
-    views.memory_size = t.memory_size;
-    if (t.attachment_view) {
-      views.views.push_back(t.attachment_view);
-    }
-    if (t.depth_view && t.depth_view != t.attachment_view) {
-      views.views.push_back(t.depth_view);
-    }
   }
   s.retired.push_back(std::move(views));
   t.object = image.object;

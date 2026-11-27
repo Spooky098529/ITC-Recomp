@@ -206,6 +206,16 @@ each backend.
   the dump identical, the tick replay, the pad replay with dumps (the
   tuning shop's and garage's tiled views; 8 hand-overs and 4 copy-backs a
   frame in the menus), the boot movie, `--xbox_gamma=hdtv`.
+- **Images, second part (2026-11-27).** The texture cache's own images
+  (loaded textures, resolve destinations) come from the backend too
+  (`TextureCache::State::CreateTexture`); a resolve destination's own view
+  is its object's, and `ResolveDestination::object` lets the resolve say
+  its uses (`Use`) instead of working out its layout from `fresh`. Every
+  retired texture's image is the backend's to destroy. Uploads still
+  record their own barriers in the cache's upload command buffer and set
+  the object's layout after (until uploads move); the swizzled views are
+  still the cache's own Vulkan views. Checked: the dump identical, the tick
+  replay, the pad replay (no errors).
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between

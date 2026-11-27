@@ -126,7 +126,7 @@ enum class ImageType : uint8_t {
   k2D,
   k2DArray,  // a 2D image viewed as an array (of `layers`)
   k3D,
-  kCube,  // 6 layers
+  kCube,  // layers: 6 (or a multiple)
 };
 
 // What an image may be used for (bits).

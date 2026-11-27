@@ -1399,6 +1399,7 @@ bool Passes::State::CreateDummyTextures() {
     desc.type = gpu::ImageType::k3D;
     gpu::Image* volume = NewImage(desc, texels);
     desc.type = gpu::ImageType::kCube;
+    desc.layers = 6;
     gpu::Image* cube = NewImage(desc, texels);
     if (!array || !volume || !cube) {
       return false;
@@ -2485,10 +2486,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
 
   EndRendering(commands);
   backend->Use(source.image, source.depth ? gpu::Usage::kDepthSampled : gpu::Usage::kSampled);
-  VkImageLayout dest_layout =
-      dest.fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
-             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  backend->Use(dest.object, gpu::Usage::kColorTarget);
   VkRect2D area{{host_x, host_y}, {uint32_t(host_width), uint32_t(host_height)}};
   VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   attachment.imageView = dest.view;
@@ -2521,8 +2519,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, Target& source,
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
   vk::vkCmdEndRendering(commands);
   recorded.valid = false;
-  Transition(commands, dest.image, VK_IMAGE_ASPECT_COLOR_BIT, dest_layout,
-             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  backend->Use(dest.object, gpu::Usage::kSampled);
   Resolved& resolved = frame_resolves.emplace_back();
   resolved = {dest.image, {dest.host_width, dest.host_height}, fetch[1] & 0xFFFFF000u,
               fetch[1] & 0x3F, flags, dest.format};

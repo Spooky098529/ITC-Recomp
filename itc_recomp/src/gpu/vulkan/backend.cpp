@@ -497,7 +497,7 @@ Image* Backend::CreateImage(const ImageDesc& desc, const void* initial) {
   const bool depth = desc.format == Format::kD32FloatS8Uint;
   o.aspects = depth ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
                     : VK_IMAGE_ASPECT_COLOR_BIT;
-  const uint32_t layers = desc.type == ImageType::kCube ? 6 : desc.layers;
+  const uint32_t layers = desc.layers;
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.flags = desc.type == ImageType::kCube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
   info.imageType = desc.type == ImageType::k3D ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
