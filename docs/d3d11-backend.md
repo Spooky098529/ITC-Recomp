@@ -185,6 +185,27 @@ each backend.
   movie's, the linear placeholder's) come from the backend too.
   `Passes::Init` and `TextureCache::Init` take the backend. Checked as
   before (dump 0.0000%, the tick replay matching).
+- **Images, first part (2026-11-27).** `gpu::Format`, `ImageDesc` and
+  `Usage` (`src/gpu/types.h`); `Backend::CreateImage` (with initial texels,
+  then ready to sample), `DestroyImage`, `Describe`, `MemorySize` and
+  `Use`. The Vulkan backend's image (`gpu::vulkan::ImageObject`) holds its
+  image, memory, views (all of it; a depth image's depth alone) and its
+  layout; `Use` records the renderer's full barrier (all stages, all
+  access) only when the layout changes, as `Transition` did, and
+  `Usage::kUndefined` forgets the layout without a barrier (the ID pass's
+  images, drawn from nothing each frame). On it so far: the six
+  placeholders (made with their texels, no longer cleared by hand), the
+  shown image (`Backend::EndFrame` takes it), the ID pass's images, the
+  movie planes, and the render targets with the images they hand to
+  resolve destinations: the texture cache carries a handed image as its
+  `gpu::Image` (`HandedImage::object`), gives it back as such, and has the
+  backend destroy it when retired. The cache's own images (textures,
+  resolve destinations' own) are still its raw Vulkan ones; the dump's and
+  `--native_renderer_show_resolve`'s transitions of resolve images still go
+  out and back by hand (they leave the tracked layout as it was). Checked:
+  the dump identical, the tick replay, the pad replay with dumps (the
+  tuning shop's and garage's tiled views; 8 hand-overs and 4 copy-backs a
+  frame in the menus), the boot movie, `--xbox_gamma=hdtv`.
 - **Dump runs:** a run lands on one of at least three moments (2,654,
   2,381 and 2,338 draws seen): take runs until one has the reference's
   line count. `draws.txt`'s inline vertex addresses may differ between

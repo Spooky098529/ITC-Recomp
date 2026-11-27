@@ -86,6 +86,8 @@ class TextureCache {
   // before: the target draws into it next), else retires it and returns
   // none.
   struct HandedImage {
+    // The backend's image (its image, memory and views below are its).
+    gpu::Image* object = nullptr;
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     VkImageView view = VK_NULL_HANDLE;

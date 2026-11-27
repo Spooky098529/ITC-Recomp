@@ -607,6 +607,9 @@ struct TextureCache::State {
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
+    // A handed image's backend object (HandOver): its image, memory,
+    // attachment_view and depth_view are the object's.
+    gpu::Image* object = nullptr;
     // A resolve destination holding a pass's image (HandOver): its format
     // (format.format is the image's), and what readers apply.
     bool handed = false;
@@ -673,6 +676,9 @@ struct TextureCache::State {
     VkDeviceMemory memory;
     VkDeviceSize memory_size;
     std::vector<VkImageView> views;
+    // A handed image: destroyed by the backend (with its own views; `views`
+    // holds only the cache's).
+    gpu::Image* object = nullptr;
   };
   std::vector<Retired> retired;
   void Retire(const Texture& t);
@@ -1304,11 +1310,17 @@ void TextureCache::State::Retire(const Texture& t) {
       r.views.push_back(view);
     }
   }
-  if (t.attachment_view) {
-    r.views.push_back(t.attachment_view);
-  }
-  if (t.depth_view && t.depth_view != t.attachment_view) {
-    r.views.push_back(t.depth_view);
+  if (t.object) {
+    r.object = t.object;
+    r.image = VK_NULL_HANDLE;
+    r.memory = VK_NULL_HANDLE;
+  } else {
+    if (t.attachment_view) {
+      r.views.push_back(t.attachment_view);
+    }
+    if (t.depth_view && t.depth_view != t.attachment_view) {
+      r.views.push_back(t.depth_view);
+    }
   }
   retired.push_back(std::move(r));
 }
@@ -1411,8 +1423,12 @@ void TextureCache::State::DestroyRetired() {
       vk::vkDestroyImageView(context.device, view, nullptr);
     }
     gpu_memory::Created(gpu_memory::Object::kImageView, -int64_t(r.views.size()));
-    vk::vkDestroyImage(context.device, r.image, nullptr);
-    vk::vkFreeMemory(context.device, r.memory, nullptr);
+    if (r.object) {
+      backend->DestroyImage(r.object);
+    } else {
+      vk::vkDestroyImage(context.device, r.image, nullptr);
+      vk::vkFreeMemory(context.device, r.memory, nullptr);
+    }
     gpu_memory::Freed(r.kind, r.memory_size);
   }
   retired.erase(retired.begin(), due);
@@ -1811,9 +1827,14 @@ TextureCache::HandedImage TextureCache::HandOver(const uint32_t fetch_words[6], 
   HandedImage back;
   if (t.handed && t.format.format == image.format) {
     // A pass's image before: back to drawing (its views for sampling go).
-    back = {t.image, t.memory, t.attachment_view, t.format.format, t.aspect, t.depth_view};
+    back = {t.object, t.image, t.memory, t.attachment_view, t.format.format, t.aspect,
+            t.depth_view};
     gpu_memory::Freed(gpu_memory::Kind::kResolved, t.memory_size);
     gpu_memory::Allocated(gpu_memory::Kind::kImage, t.memory_size);
+  } else if (t.object) {
+    // A handed image of another format: the backend's to destroy.
+    views.object = t.object;
+    views.memory_size = t.memory_size;
   } else {
     views.image = t.image;
     views.memory = t.memory;
@@ -1826,6 +1847,7 @@ TextureCache::HandedImage TextureCache::HandOver(const uint32_t fetch_words[6], 
     }
   }
   s.retired.push_back(std::move(views));
+  t.object = image.object;
   t.image = image.image;
   t.memory = image.memory;
   t.attachment_view = image.view;
@@ -1858,6 +1880,7 @@ bool TextureCache::RestoreResolveDestination(const uint32_t fetch_words[6], floa
   t.copied = true;
   if (t.handed) {
     s.Retire(t);
+    t.object = nullptr;
     t.image = VK_NULL_HANDLE;
     t.memory = VK_NULL_HANDLE;
     t.attachment_view = VK_NULL_HANDLE;
