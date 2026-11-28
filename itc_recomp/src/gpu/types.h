@@ -199,7 +199,7 @@ struct BufferDesc {
 // compressed format) or into a buffer.
 struct ImageUpload {
   uint64_t offset = 0;
-  uint32_t row_texels = 0, rows = 0;
+  uint32_t row_texels = 0, rows = 0;  // 0: tightly packed (the width, the height)
   uint32_t level = 0, layer = 0;
   uint32_t width = 0, height = 0;
 };

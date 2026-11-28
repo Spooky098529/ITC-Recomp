@@ -986,7 +986,9 @@ void Backend::UploadImage(Buffer* staging, Image* image, const ImageUpload* regi
   for (uint32_t i = 0; i < count; i++) {
     const ImageUpload& r = regions[i];
     UINT row_pitch, layer_pitch;
-    Pitches(o.desc.format, r.row_texels, r.rows, row_pitch, layer_pitch);
+    // 0: tightly packed (the width and height), as Vulkan's.
+    Pitches(o.desc.format, r.row_texels ? r.row_texels : r.width, r.rows ? r.rows : r.height,
+            row_pitch, layer_pitch);
     if (o.decoded) {
       const uint32_t bytes = o.desc.format == Format::kBC5 ? 2 : 4;
       std::vector<uint8_t> texels(size_t(r.width) * r.height * bytes);
