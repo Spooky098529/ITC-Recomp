@@ -106,6 +106,12 @@ GTT ~1,690 -> ~630 MB; step 2's first part draws every shader from GLSL
 (SBX-Recomp's ports and hand-written shaders, `docs/shaders.md`); later steps took the
 draw state off the SDK's register file, removed the GPU kick and the draw
 packets, and the SDK itself (`docs/pc-renderer.md`, steps 3 and 5).
+`docs/d3d11-backend.md` is the Direct3D 11 backend beside Vulkan (on
+`d3d11`, 2026-11-27 to 28; steps 1 to 5 done): the renderer over
+`gpu::Backend` (`src/gpu/`), every shader also as HLSL (SPIRV-Cross,
+`tools/build_spirv_cross.sh`), `--renderer=d3d11` (Windows only; `renderer`
+in `itc.toml`), tested under Wine with DXVK in the test prefix (wined3d
+draws some of the course black).
 `docs/rexglue-removal.md` is the plan for a native port without the
 ReXGlue SDK: host-side pieces first (track A), then the game's functions
 made native from the SDK boundary inward (track B), the SDK's core

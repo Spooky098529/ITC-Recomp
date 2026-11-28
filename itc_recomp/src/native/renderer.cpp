@@ -345,7 +345,7 @@ bool Renderer::Init() {
 #endif
   if (!backend_) {
     if (api != "vulkan") {
-      ITC_LOG_ERROR("native renderer: --renderer={} isn't available here; Vulkan instead", api);
+      ITC_LOG_WARN("native renderer: --renderer={} isn't available here; Vulkan instead", api);
     }
     gpu::vulkan::Backend::Options options;
     options.frames_in_flight = kFramesInFlight;

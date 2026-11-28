@@ -31,6 +31,10 @@ width = 0
 height = 0
 fullscreen = false
 
+# Graphics API: "vulkan", or "d3d11" (Windows only; for drivers where
+# Vulkan doesn't work well). Linux always uses Vulkan.
+renderer = "vulkan"
+
 # Motion blur: the game's blur of the picture at speed. false for a sharp
 # picture. The glow around lights is always drawn.
 motion_blur = true
