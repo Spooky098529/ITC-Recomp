@@ -189,6 +189,11 @@ vkd3d-shader's HLSL compiler, which refuses most of our HLSL
 (`docs/d3d11-backend.md`, step 4); `itc_recomp/tools/hlsl_check` compiles
 HLSL with it.
 
+The prefix also has DXVK (`winetricks -q dxvk`, 3.2, 2026-11-28): the
+D3D11 backend (`--renderer=d3d11`) is tested on it, as Wine's own D3D11
+(wined3d) draws some of the course black (`docs/d3d11-backend.md`, step 5).
+It replaces Wine's `dxgi.dll` too, which the Vulkan backend doesn't use.
+
 Logs go to `logs/` next to `itc.exe`. The local build folders have an
 `itc.toml` of their own with `audio_mute = true` (the user's call,
 2026-11-27: test runs launch muted; not the shipped one). The tick

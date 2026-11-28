@@ -1,4 +1,4 @@
-# A Direct3D 11 backend (a plan; steps 1 to 4 done)
+# A Direct3D 11 backend (a plan; steps 1 to 5 done)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
 renderer's merge). Steps 2 and 3 are done (below): the renderer holds only
@@ -402,12 +402,9 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
   and the pixel position's origin is the top left in both).
 - **The fit as defines.** Each specialization constant is
   `SPIRV_CROSS_CONSTANT_ID_n` (SPIRV-Cross's own, its value in the GLSL the
-  default). Interpolator n's semantic (the vertex shader's outputs, the pixel
-  shader's inputs) is `XE_INTERPOLATOR_n`, `TEXCOORDn` unless the backend
-  defines it: the D3D11 backend defines it as `port_spirv.cpp` moves the
-  locations (an interpolator in the pair's mask at its place among them, the
-  others at 16 + n). A define in a semantic works with D3DCompile (checked:
-  remapped places compile, two on one place are refused).
+  default). The interpolators were first given semantics by define
+  (`XE_INTERPOLATOR_n`); step 5 replaced that with fixed slots (below,
+  "Interpolators").
 - **Bindings as SPIRV-Cross writes them.** The constant blocks are `b0`
   (the draw constants), `b1` or `b2` (the vertex or pixel float constants),
   `b3` (bools and loops); a stage's views and samplers keep their bindings
@@ -440,13 +437,85 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
   That's also what the D3D11 backend compiles with under Wine in step 5,
   with DXVK running the result (or wined3d), as Windows' own
   `d3dcompiler_47.dll` is Microsoft's.
-- **Next:** step 5 (the D3D11 backend). For it, from this step: the vertex
-  shaders read `SV_VertexID` as `gl_VertexIndex` (no base vertex added:
-  SPIRV-Cross's default, so a draw with a base vertex must offset its
-  vertex buffer instead, or the shaders be made with
-  `--hlsl-support-nonzero-basevertex-baseinstance`); the vertex shader
-  declares all 16 interpolators before `SV_Position`, and the pixel shader
-  only those it reads.
+- **Next:** step 5.
+
+## Step 5: the D3D11 backend (done 2026-11-28)
+
+- **`gpu::d3d11::Backend`** (`src/gpu/d3d11/backend.{h,cpp}`, Windows only,
+  linking `d3d11` and `dxgi`): `--renderer=d3d11` (`renderer.cpp`; anything
+  else, or D3D11 on Linux, is Vulkan, named in the log). Direct3D 11.1:
+  the draws' four constant blocks are ranges of one buffer
+  (`*SetConstantBuffers1`, offsets of 256 bytes), copied from our memory
+  into a dynamic buffer at each `BindResources` (`MAP_WRITE_NO_OVERWRITE`:
+  no frame in flight reads the slot's ranges). The device and swapchain
+  (flip discard, tearing allowed where DXGI has it) are made on the window's
+  thread (`AttachWindow`), used on the render thread; frames in flight are
+  event queries waited for at the slot's next `BeginFrame`. Uploads are
+  `UpdateSubresource` in place (D3D11 orders them with the draws).
+- **Shaders.** Each port's HLSL is found by its SPIR-V array
+  (`kGamePortsHlsl`, written by `compile_game.py`; linked in on Windows
+  only), compiled once with its fit's defines (`TranslatedShader::hlsl_defines`,
+  carried on `gpu::ShaderDesc`) by `D3DCompile` from `d3dcompiler_47.dll`
+  (loaded at start; Windows has it), kept in memory and on disk
+  (`cache/d3d11_shaders/<hash>.dxbc`, by the hash of the HLSL, profile and
+  defines). Vertex inputs are `TEXCOORD<location>`; the input layout is made
+  with each pipeline.
+- **Interpolators.** D3D links a vertex shader's outputs to a pixel shader's
+  inputs by register, which follows declaration order (Vulkan by location):
+  `to_hlsl` makes both stages declare the same 16 slots (`TEXCOORD0`-`15`,
+  first), each interpolator copied to or from its slot (`XE_SLOT_n`, on with
+  `XE_SLOT_n_ON`; an array input, the course's `v_mask[4]`, an element a
+  slot). The renderer keeps the defaults, slot n for interpolator n:
+  `SpecializePort` moves a pair's locations in both stages alike, so n
+  always pairs with n (in the mask or not). Without the slots the buildings
+  came out green and yellow.
+- **Vertex and instance indices.** D3D's `SV_VertexID` and `SV_InstanceID`
+  leave out the base vertex and first instance, which Vulkan's include (the
+  shaders pass the index on as `r0`): the vertex shaders add them from a
+  constant block at `b4` (SPIRV-Cross's
+  `--hlsl-support-nonzero-basevertex-baseinstance`), set per draw (a
+  non-indexed draw's vertex ID already counts from its first vertex).
+- **What D3D11 lacks, done in the backend:**
+  - views' swizzles (open question 4): a swizzled view is a copy of its
+    image through `swizzle.frag`, drawn again (every level and layer) at the
+    first bind after the image is written (each image counts its writes);
+    compressed images' copies are RGBA8 (RG8 for BC5), a depth image's
+    RGBA32F. Seen in races: red and blue exchanged (RGBA8,
+    A2B10G10R10), RG16F with blue and alpha 1, a depth as RRRR;
+  - scaled copies: `BlitImage` and the shown frame fitted to the window are
+    draws (`blit.frag`), so an image that's a copy source is also sampled;
+    a resolve or MSAA resolve between sizes goes through an image of the
+    source's size; depth and multisampled copies are whole images (D3D11's
+    rule);
+  - triangle fans: non-indexed ones drawn as lists of indices made per draw;
+    indexed ones aren't drawn (logged once; none seen in races or menus);
+  - BC textures whose top level isn't a multiple of 4 (1x1 placeholders):
+    kept decoded (RGBA8, RG8 for BC5), their uploads decoded on the CPU;
+  - the alpha constant for color blending: the blend factor's color set to
+    its alpha for such pipelines; alpha factors that name a color use its
+    alpha; depth bias is whole units (D3D's `DepthBias` is an integer);
+  - an upload's row length 0 is tightly packed, as Vulkan's (the movies were
+    distorted without it).
+- **The renderer's own passes** (`DrawResolve`, `DrawMovie`, `ApplyGamma`,
+  the ID pass) use the HLSL of the same GLSL; the gamma needs typed UAV
+  loads of RGBA16F (logged if missing).
+- **Testing: DXVK, not wined3d.** Under Wine's own D3D11 (wined3d) the road
+  (the projected course shader) draws black and the car darker; under DXVK
+  (`winetricks dxvk`, 3.2, in the test prefix since 2026-11-28, the user's
+  call) the frame matches Vulkan's. Windows players get their driver's
+  D3D11, so wined3d's bug isn't ours to chase.
+- **`--native_renderer_dump_at_tick=N`** (a debugging aid): the dump at race
+  tick N, counted as `--state_digest` counts (`debug::RaceTicks`, counted
+  in every run now), so two builds or backends dump the same moment (the
+  frame-count trigger lands on different moments when frames carry more than
+  one tick). Two Vulkan runs at tick 300: identical.
+- **Checked (under Wine, DXVK):** an attract race at tick 300 against Vulkan
+  (2,600 draws both; the frame differs in under 0.7% of pixels, edge pixels
+  of depth ties and rounding; not chased, the user's call 2026-11-28: a
+  second API is judged by eye and a drive, not pixel for pixel), the tick
+  replay through the menus into race 0 (all ticks match, 0 error lines, no
+  backend warnings), the boot movie with `--xbox_gamma=hdtv`, fullscreen.
+  The user saw an attract race in the window. A drive is welcome.
 
 ## Open questions
 
@@ -457,8 +526,9 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
    does differently, to find in step 3: mirror-clamp-to-edge (D3D11 has
    `MIRROR_ONCE`), primitive restart (D3D11 always restarts on the strip
    cut index), rectangle lists (drawn as instances already), the depth
-   formats, sampling a depth image.
-3. **DXVK-native for Linux tests** (step 5).
+   formats, sampling a depth image. Answered in step 5 ("What D3D11 lacks").
+3. **DXVK-native for Linux tests** (step 5). Not needed: the Windows build
+   under Wine with DXVK tests the D3D11 backend.
 4. **View swizzles.** D3D11's shader resource views have no component
    swizzle, which the texture cache's views carry (the fetch constant's
    swizzle, red and blue exchanged for handed images). Decided (the user,
@@ -466,3 +536,4 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
    logic and the shaders don't change; the D3D11 backend applies it itself
    (how, at step 5: for example a per-texture swizzle its own HLSL reads,
    or the common cases as format choices). Vulkan keeps its view swizzle.
+   Done in step 5 as copies drawn through the swizzle.
