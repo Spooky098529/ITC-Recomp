@@ -440,3 +440,18 @@ ITC_CAR_LIST(8224D7E0, CarListCarPanelBaseDestruct)
 ITC_CAR_LIST(8224EBB0, CarListConfirmPanelConstruct)
 ITC_CAR_LIST(8224E490, CarListPanel6CSetStats)
 ITC_CAR_LIST(8224E878, CarListBaseSetCarName)
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(82249668) { hooks::CarListSaveData(ctx); }
+ITC_DIRECT_ENTRY(8224A490) { hooks::CarListShowStandCar(ctx); }
+ITC_DIRECT_ENTRY(8224C008) { hooks::CarListUpdateStand(ctx); }
+ITC_DIRECT_ENTRY(8224D2D0) { hooks::CarListColorSetArrows(ctx); }
+ITC_DIRECT_ENTRY(8224D3E0) { hooks::CarListColorPlaceCursor(ctx); }
+ITC_DIRECT_ENTRY(8224D458) { hooks::CarListColorSetCount(ctx); }
+ITC_DIRECT_ENTRY(8224D518) { hooks::CarListColorSetSwatches(ctx); }
+ITC_DIRECT_ENTRY(8224D7F0) { hooks::CarListCarSetTexts(ctx); }
+ITC_DIRECT_ENTRY(8224D9A0) { hooks::CarListCarPlaceCursor(ctx); }
+ITC_DIRECT_ENTRY(8224E920) { hooks::CarListCarShowStats(ctx); }
+ITC_DIRECT_ENTRY(8224EF18) { hooks::CarListSetCaption(ctx); }
+ITC_DIRECT_ENTRY(8224F758) { hooks::CarListRowFill(ctx); }
+ITC_DIRECT_ENTRY(8224F888) { hooks::CarListRowRefresh(ctx); }

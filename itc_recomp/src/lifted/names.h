@@ -23,6 +23,7 @@ inline constexpr auto& CountBodyKits = lifted::entry::e820CBD20;  // sub_820CBD2
 inline constexpr auto& CreateEvent = lifted::f82295E78;  // sub_82295E78
 inline constexpr auto& CreateFile = lifted::entry::e82295508;  // sub_82295508
 inline constexpr auto& CreateHeap = lifted::entry::e82297C08;  // sub_82297C08
+inline constexpr auto& CreateThread = lifted::entry::e825BA380;  // sub_825BA380
 inline constexpr auto& CreateVertexDeclaration = lifted::entry::e822A8980;  // sub_822A8980
 inline constexpr auto& D3DDevice_SetVertexShader = lifted::entry::e822A8958;  // sub_822A8958
 inline constexpr auto& D3DXCompileShader = lifted::entry::e822B8F10;  // sub_822B8F10
@@ -78,6 +79,7 @@ inline constexpr auto& SetUnhandledExceptionFilter = lifted::entry::e82297870;  
 inline constexpr auto& SinCos = lifted::entry::e820B0E10;  // sub_820B0E10
 inline constexpr auto& Sleep = lifted::f82295500;  // sub_82295500
 inline constexpr auto& SrgbCurve = lifted::f822B07B0;  // sub_822B07B0
+inline constexpr auto& SwapWord = lifted::entry::e820C97D8;  // sub_820C97D8
 inline constexpr auto& SystemTimeToFileTime = lifted::entry::e8229B680;  // sub_8229B680
 inline constexpr auto& UnhandledExceptionFilter = lifted::entry::e82297940;  // sub_82297940
 inline constexpr auto& VirtualAlloc = lifted::entry::e82295398;  // sub_82295398
@@ -86,6 +88,7 @@ inline constexpr auto& WSAStartup = lifted::entry::e82459B68;  // sub_82459B68
 inline constexpr auto& WaitForSingleObject = lifted::f822970A0;  // sub_822970A0
 inline constexpr auto& WaitForSingleObjectEx = lifted::f82297D58;  // sub_82297D58
 inline constexpr auto& WideCharToMultiByte = lifted::entry::e82296720;  // sub_82296720
+inline constexpr auto& WildcardSearch = lifted::entry::e82592740;  // sub_82592740
 inline constexpr auto& X3DAudioInitialize = lifted::entry::e82480710;  // sub_82480710
 inline constexpr auto& XACT3CreateEngine = lifted::f825BF5C8;  // sub_825BF5C8
 inline constexpr auto& XACTCreateRenderer = lifted::f825C3460;  // sub_825C3460
@@ -103,18 +106,22 @@ inline constexpr auto& XAudioRegisterProcessingCallback = lifted::entry::e8245A5
 inline constexpr auto& XAudioShutDown = lifted::f8245A4E8;  // sub_8245A4E8
 inline constexpr auto& XContentClose = lifted::entry::e82295BF0;  // sub_82295BF0
 inline constexpr auto& XContentGetCreator = lifted::f82295C00;  // sub_82295C00
+inline constexpr auto& XGCompressSurface = lifted::entry::e8235AAC0;  // sub_8235AAC0
 inline constexpr auto& XGSetTextureHeader = lifted::entry::e8235A920;  // sub_8235A920
+inline constexpr auto& XGSetVertexBufferHeader = lifted::entry::e8235A688;  // sub_8235A688
 inline constexpr auto& XLaunchNewImage = lifted::f822967E0;  // sub_822967E0
 inline constexpr auto& XMemAlloc = lifted::entry::e822976F8;  // sub_822976F8
 inline constexpr auto& XMemCpy = lifted::entry::e82295890;  // sub_82295890
 inline constexpr auto& XMemFree = lifted::entry::e82297790;  // sub_82297790
 inline constexpr auto& XMemSet = lifted::entry::e822962B0;  // sub_822962B0
 inline constexpr auto& XNetGetTitleXnAddr = lifted::entry::e82459D50;  // sub_82459D50
+inline constexpr auto& XNetStartup = lifted::entry::e82575B08;  // sub_82575B08
 inline constexpr auto& XNetXnAddrToMachineId = lifted::entry::e82459D40;  // sub_82459D40
 inline constexpr auto& XNotifyCreateListener = lifted::entry::e822952B8;  // sub_822952B8
 inline constexpr auto& XPhysicalAlloc = lifted::entry::e822964C8;  // sub_822964C8
 inline constexpr auto& XPhysicalAllocEx = lifted::entry::e82296550;  // sub_82296550
 inline constexpr auto& XPhysicalFree = lifted::entry::e822965C8;  // sub_822965C8
+inline constexpr auto& XPhysicalSize = lifted::entry::e822965C0;  // sub_822965C0
 inline constexpr auto& XSessionCreate = lifted::f82575E50;  // sub_82575E50
 inline constexpr auto& XSessionDelete = lifted::f82576080;  // sub_82576080
 inline constexpr auto& XSessionEnd = lifted::f82576540;  // sub_82576540
@@ -142,6 +149,7 @@ inline constexpr auto& __CxxRestoreUnhandledExceptionFilter = lifted::entry::e82
 inline constexpr auto& __CxxSetUnhandledExceptionFilter = lifted::entry::e825DAC58;  // sub_825DAC58
 inline constexpr auto& __CxxUnhandledExceptionFilter = lifted::entry::e825B4CD0;  // sub_825B4CD0
 inline constexpr auto& __WSAFDIsSet = lifted::f82459D20;  // sub_82459D20
+inline constexpr auto& ___dtold = lifted::entry::e825B6378;  // sub_825B6378
 inline constexpr auto& __chkstk = lifted::entry::e825A9934;  // sub_825A9934
 inline constexpr auto& __crtInitCritSecNoSpinCount = lifted::entry::e825B3570;  // sub_825B3570
 inline constexpr auto& __crtTlsAlloc = lifted::entry::e825AA3F8;  // sub_825AA3F8
@@ -150,6 +158,7 @@ inline constexpr auto& __get_sigabrt = lifted::entry::e825B49B0;  // sub_825B49B
 inline constexpr auto& __initmbctable = lifted::entry::e825B6958;  // sub_825B6958
 inline constexpr auto& __iob_func = lifted::entry::e825AD4C0;  // sub_825AD4C0
 inline constexpr auto& __lock_fhandle = lifted::entry::e825B7958;  // sub_825B7958
+inline constexpr auto& __mtold12 = lifted::entry::e825B7F10;  // sub_825B7F10
 inline constexpr auto& __onexitinit = lifted::entry::e825A6F00;  // sub_825A6F00
 inline constexpr auto& __ultod = lifted::entry::e825A9DB0;  // sub_825A9DB0
 inline constexpr auto& _abstract_sw = lifted::entry::e825AB380;  // sub_825AB380
@@ -178,6 +187,7 @@ inline constexpr auto& _fassign_l = lifted::entry::e825ADEB0;  // sub_825ADEB0
 inline constexpr auto& _fcloseall = lifted::entry::e825B4E78;  // sub_825B4E78
 inline constexpr auto& _fileno = lifted::entry::e825B0E88;  // sub_825B0E88
 inline constexpr auto& _flsbuf = lifted::entry::e825AEE28;  // sub_825AEE28
+inline constexpr auto& _fltin2 = lifted::entry::e825AFDC8;  // sub_825AFDC8
 inline constexpr auto& _flush = lifted::entry::e825ACC78;  // sub_825ACC78
 inline constexpr auto& _forcdecpt = lifted::entry::e825ADF18;  // sub_825ADF18
 inline constexpr auto& _forcdecpt_l = lifted::entry::e825ADD38;  // sub_825ADD38
@@ -217,6 +227,7 @@ inline constexpr auto& _unlock_fhandle = lifted::entry::e825B7A58;  // sub_825B7
 inline constexpr auto& _unlock_file = lifted::entry::e825AD688;  // sub_825AD688
 inline constexpr auto& _unlock_file2 = lifted::entry::e825AD6C0;  // sub_825AD6C0
 inline constexpr auto& _vsnprintf = lifted::entry::e825AB010;  // sub_825AB010
+inline constexpr auto& _vswprintf_l = lifted::entry::e825A9980;  // sub_825A9980
 inline constexpr auto& _write = lifted::entry::e825B11A8;  // sub_825B11A8
 inline constexpr auto& abs = lifted::entry::e825AC870;  // sub_825AC870
 inline constexpr auto& accept = lifted::f82459CA0;  // sub_82459CA0
@@ -347,6 +358,7 @@ inline constexpr auto& EncodeRow = lifted::f823EB4A0;  // sub_823EB4A0
 namespace game::Accessories {
 inline constexpr auto& Acquire = lifted::entry::e820F0EB8;  // sub_820F0EB8
 inline constexpr auto& Create = lifted::entry::e820F1038;  // sub_820F1038
+inline constexpr auto& Ctor = lifted::entry::e820F0E60;  // sub_820F0E60
 inline constexpr auto& Dtor = lifted::entry::e820F0FE0;  // sub_820F0FE0
 inline constexpr auto& ReleaseAll = lifted::entry::e820F0AD8;  // sub_820F0AD8
 inline constexpr auto& SetScale = lifted::entry::e820F0F00;  // sub_820F0F00
@@ -364,10 +376,13 @@ inline constexpr auto& Step = lifted::f820EF250;  // sub_820EF250
 }  // namespace game::Accessory
 
 namespace game::AccessoryEntry {
+inline constexpr auto& New = lifted::entry::e820F0920;  // sub_820F0920
 inline constexpr auto& OnLoaded = lifted::entry::e820F0820;  // sub_820F0820
 }  // namespace game::AccessoryEntry
 
 namespace game::AccessoryFile {
+inline constexpr auto& FreeData = lifted::entry::e820F08D0;  // sub_820F08D0
+inline constexpr auto& Load = lifted::entry::e820F0C90;  // sub_820F0C90
 inline constexpr auto& OnArchiveDone = lifted::entry::e820F0C20;  // sub_820F0C20
 }  // namespace game::AccessoryFile
 
@@ -380,22 +395,31 @@ inline constexpr auto& Update = lifted::f820F0628;  // sub_820F0628
 inline constexpr auto& WaitForStep = lifted::f820EFB28;  // sub_820EFB28
 }  // namespace game::AccessorySkeleton
 
+namespace game::Achievements {
+inline constexpr auto& AllBeaten = lifted::entry::e82290698;  // sub_82290698
+inline constexpr auto& BeatsCourseTime = lifted::entry::e82290710;  // sub_82290710
+}  // namespace game::Achievements
+
 namespace game::ActionCurve {
 inline constexpr auto& Apply = lifted::entry::e8210B5B8;  // sub_8210B5B8
 }  // namespace game::ActionCurve
 
 namespace game::ActionMapper {
+inline constexpr auto& Analog = lifted::entry::e8210B7D0;  // sub_8210B7D0
 inline constexpr auto& AnalogRaw = lifted::entry::e8210BA28;  // sub_8210BA28
 inline constexpr auto& AnalogValue = lifted::entry::e8210BA68;  // sub_8210BA68
 inline constexpr auto& Fired = lifted::entry::e8210C010;  // sub_8210C010
 inline constexpr auto& Held = lifted::entry::e8210BE70;  // sub_8210BE70
 inline constexpr auto& HeldBefore = lifted::entry::e8210BED8;  // sub_8210BED8
+inline constexpr auto& Hysteresis = lifted::entry::e8210B718;  // sub_8210B718
 inline constexpr auto& Pressed = lifted::entry::e8210BF40;  // sub_8210BF40
 inline constexpr auto& Released = lifted::entry::e8210BFA8;  // sub_8210BFA8
+inline constexpr auto& ResetStages = lifted::entry::e8210C078;  // sub_8210C078
 inline constexpr auto& SetCurve = lifted::entry::e8210BE30;  // sub_8210BE30
 inline constexpr auto& SetRepeat = lifted::entry::e8210BDF0;  // sub_8210BDF0
 inline constexpr auto& SetThreshold = lifted::entry::e8210B698;  // sub_8210B698
 inline constexpr auto& Update = lifted::entry::e8210C370;  // sub_8210C370
+inline constexpr auto& Words = lifted::entry::e8210BBA0;  // sub_8210BBA0
 }  // namespace game::ActionMapper
 
 namespace game::ActionMappers {
@@ -418,6 +442,7 @@ inline constexpr auto& AnswerPage = lifted::entry::e8221A720;  // sub_8221A720
 inline constexpr auto& CloseList = lifted::f8221B9C8;  // sub_8221B9C8
 inline constexpr auto& CloseMain = lifted::entry::e8221A950;  // sub_8221A950
 inline constexpr auto& ConfirmPage = lifted::entry::e8221A6C8;  // sub_8221A6C8
+inline constexpr auto& Draw = lifted::entry::e8221BB48;  // sub_8221BB48
 inline constexpr auto& HideListItem = lifted::f8221AB60;  // sub_8221AB60
 inline constexpr auto& Intro = lifted::entry::e8221A730;  // sub_8221A730
 inline constexpr auto& MainPage = lifted::entry::e8221A4A8;  // sub_8221A4A8
@@ -428,6 +453,7 @@ inline constexpr auto& OpenList = lifted::f8221B918;  // sub_8221B918
 inline constexpr auto& SetUpList = lifted::f8221B6A0;  // sub_8221B6A0
 inline constexpr auto& Show = lifted::entry::e8221A7A8;  // sub_8221A7A8
 inline constexpr auto& ShowItem = lifted::f8221A8A8;  // sub_8221A8A8
+inline constexpr auto& ShowItems = lifted::entry::e8221AC00;  // sub_8221AC00
 inline constexpr auto& ShowList = lifted::f8221ACC0;  // sub_8221ACC0
 inline constexpr auto& ShowListItem = lifted::f8221AAD8;  // sub_8221AAD8
 inline constexpr auto& ShowReplay = lifted::f8221AE58;  // sub_8221AE58
@@ -435,13 +461,20 @@ inline constexpr auto& Start = lifted::entry::e8221B860;  // sub_8221B860
 }  // namespace game::AfterRaceMenu
 
 namespace game::AiDriver {
+inline constexpr auto& AdjustForOther = lifted::entry::e821452A0;  // sub_821452A0
+inline constexpr auto& Drive = lifted::entry::e8213B058;  // sub_8213B058
 inline constexpr auto& DriveCar = lifted::entry::e8215F678;  // sub_8215F678
 inline constexpr auto& Of = lifted::entry::e82139728;  // sub_82139728
+inline constexpr auto& PickTarget = lifted::entry::e82145118;  // sub_82145118
+inline constexpr auto& ReactToOthers = lifted::entry::e82145CA8;  // sub_82145CA8
 inline constexpr auto& ReadCar = lifted::entry::e82144F50;  // sub_82144F50
 inline constexpr auto& ReadVehicle = lifted::entry::e821467F0;  // sub_821467F0
 inline constexpr auto& ReadVehicleOwnSlice = lifted::entry::e821469D0;  // sub_821469D0
 inline constexpr auto& Reset = lifted::entry::e8213AAA8;  // sub_8213AAA8
+inline constexpr auto& ResetControl = lifted::entry::e82139580;  // sub_82139580
+inline constexpr auto& SetFlag2 = lifted::entry::e82138D20;  // sub_82138D20
 inline constexpr auto& Setup = lifted::entry::e82170FF8;  // sub_82170FF8
+inline constexpr auto& StartRace = lifted::entry::e82139DA0;  // sub_82139DA0
 inline constexpr auto& UpdateIdle = lifted::entry::e821399A8;  // sub_821399A8
 inline constexpr auto& UpdateLane = lifted::entry::e82144EF8;  // sub_82144EF8
 inline constexpr auto& UpdateStarting = lifted::f8213A1B8;  // sub_8213A1B8
@@ -459,14 +492,35 @@ inline constexpr auto& StartRanked = lifted::entry::e8213A8B0;  // sub_8213A8B0
 inline constexpr auto& UpdateAll = lifted::entry::e82139628;  // sub_82139628
 }  // namespace game::AiDrivers
 
+namespace game::AiOther {
+inline constexpr auto& Mirror = lifted::entry::e82145610;  // sub_82145610
+inline constexpr auto& Update = lifted::entry::e821454C8;  // sub_821454C8
+inline constexpr auto& UpdateTimer = lifted::entry::e821456A0;  // sub_821456A0
+}  // namespace game::AiOther
+
 namespace game::AiPath {
+inline constexpr auto& AvoidOthers = lifted::entry::e8213E690;  // sub_8213E690
 inline constexpr auto& BranchMasksFor = lifted::entry::e8213D378;  // sub_8213D378
+inline constexpr auto& DropPassed = lifted::entry::e8213F2E0;  // sub_8213F2E0
+inline constexpr auto& Extend = lifted::entry::e8213ECF8;  // sub_8213ECF8
+inline constexpr auto& FollowLeaderBranch = lifted::entry::e8213EB48;  // sub_8213EB48
+inline constexpr auto& FollowTargets = lifted::entry::e8213D9D8;  // sub_8213D9D8
 inline constexpr auto& NormalizeByBranch = lifted::entry::e8213C908;  // sub_8213C908
 inline constexpr auto& NormalizeByLane = lifted::entry::e8213B428;  // sub_8213B428
 inline constexpr auto& NoteFixedSections = lifted::f8213C248;  // sub_8213C248
+inline constexpr auto& PlanLine = lifted::entry::e8213F4B0;  // sub_8213F4B0
+inline constexpr auto& RefreshPoints = lifted::entry::e8213B5D8;  // sub_8213B5D8
+inline constexpr auto& SetMode = lifted::entry::e8213D508;  // sub_8213D508
+inline constexpr auto& SetRanges = lifted::entry::e8213D670;  // sub_8213D670
 }  // namespace game::AiPath
 
+namespace game::AiPathEntry {
+inline constexpr auto& BlockLeft = lifted::entry::e8213C5C8;  // sub_8213C5C8
+inline constexpr auto& BlockRight = lifted::entry::e8213C630;  // sub_8213C630
+}  // namespace game::AiPathEntry
+
 namespace game::AiSkill {
+inline constexpr auto& Reset = lifted::entry::e8213F698;  // sub_8213F698
 inline constexpr auto& Update = lifted::entry::e8213FCF8;  // sub_8213FCF8
 }  // namespace game::AiSkill
 
@@ -475,9 +529,26 @@ inline constexpr auto& GaugeFloat = lifted::f82216FD0;  // sub_82216FD0
 inline constexpr auto& GaugeInt119 = lifted::f82217168;  // sub_82217168
 inline constexpr auto& GaugeInt149 = lifted::f82217270;  // sub_82217270
 inline constexpr auto& RunMovie = lifted::entry::e82216C00;  // sub_82216C00
+inline constexpr auto& SetBar = lifted::entry::e822175A0;  // sub_822175A0
 inline constexpr auto& SetBigSpeed = lifted::f82216EE8;  // sub_82216EE8
+inline constexpr auto& SetBoost = lifted::entry::e82217538;  // sub_82217538
+inline constexpr auto& SetBrake = lifted::entry::e82217690;  // sub_82217690
+inline constexpr auto& SetGear = lifted::entry::e82217460;  // sub_82217460
+inline constexpr auto& SetNode25 = lifted::entry::e822174E0;  // sub_822174E0
+inline constexpr auto& SetSpeed = lifted::entry::e82216E00;  // sub_82216E00
+inline constexpr auto& SetSteering = lifted::entry::e822176E8;  // sub_822176E8
+inline constexpr auto& SetTach = lifted::entry::e822173E8;  // sub_822173E8
+inline constexpr auto& SetThrottle = lifted::entry::e82217638;  // sub_82217638
+inline constexpr auto& SetUpExtraGauges = lifted::entry::e822178A0;  // sub_822178A0
+inline constexpr auto& SetUpGauges = lifted::entry::e82216C40;  // sub_82216C40
+inline constexpr auto& ShowPanels = lifted::entry::e82216D78;  // sub_82216D78
 inline constexpr auto& ToggleView = lifted::f82217778;  // sub_82217778
+inline constexpr auto& UpdateExtraGauges = lifted::entry::e82217A30;  // sub_82217A30
 }  // namespace game::AltHud
+
+namespace game::Animation {
+inline constexpr auto& Advance = lifted::entry::e82146AC0;  // sub_82146AC0
+}  // namespace game::Animation
 
 namespace game::AnimationList {
 inline constexpr auto& Insert = lifted::entry::e8211B4D0;  // sub_8211B4D0
@@ -486,6 +557,7 @@ inline constexpr auto& RemoveAt = lifted::entry::e8211B080;  // sub_8211B080
 
 namespace game::AnimationSet {
 inline constexpr auto& CurrentFrame = lifted::entry::e82146B80;  // sub_82146B80
+inline constexpr auto& FindByTexture = lifted::entry::e82146A38;  // sub_82146A38
 }  // namespace game::AnimationSet
 
 namespace game::App {
@@ -573,6 +645,7 @@ inline constexpr auto& PauseCategory = lifted::f8259D120;  // sub_8259D120
 inline constexpr auto& ResumeCategory = lifted::f8259D140;  // sub_8259D140
 inline constexpr auto& SetCategoryVolume = lifted::f8259D100;  // sub_8259D100
 inline constexpr auto& Start3D = lifted::entry::e8259CE10;  // sub_8259CE10
+inline constexpr auto& StartXAudio = lifted::entry::e8259CD50;  // sub_8259CD50
 }  // namespace game::AudioEngine
 
 namespace game::AudioManager {
@@ -648,6 +721,7 @@ inline constexpr auto& SetLights = lifted::entry::e8209F5C8;  // sub_8209F5C8
 
 namespace game::Billboards {
 inline constexpr auto& BuildVertices = lifted::entry::e8209C6E0;  // sub_8209C6E0
+inline constexpr auto& Draw = lifted::entry::e8209CDB0;  // sub_8209CDB0
 inline constexpr auto& FlipRing = lifted::entry::e8209BD18;  // sub_8209BD18
 inline constexpr auto& Init = lifted::entry::e8209BE88;  // sub_8209BE88
 inline constexpr auto& Record = lifted::entry::e8209CC38;  // sub_8209CC38
@@ -676,6 +750,10 @@ inline constexpr auto& LinearWeights = lifted::f8236A9C8;  // sub_8236A9C8
 inline constexpr auto& TriangleWeights = lifted::f8236B418;  // sub_8236B418
 }  // namespace game::Blitter
 
+namespace game::BodyState {
+inline constexpr auto& Restore = lifted::entry::e821031A0;  // sub_821031A0
+}  // namespace game::BodyState
+
 namespace game::Boot {
 inline constexpr auto& EndMovie = lifted::entry::e82107BF8;  // sub_82107BF8
 inline constexpr auto& StartMovie = lifted::entry::e82107B90;  // sub_82107B90
@@ -694,9 +772,16 @@ inline constexpr auto& Init = lifted::entry::e82107F68;  // sub_82107F68
 inline constexpr auto& NextMode = lifted::entry::e82108018;  // sub_82108018
 }  // namespace game::BootMode
 
+namespace game::Box {
+inline constexpr auto& Extend = lifted::entry::e82597150;  // sub_82597150
+}  // namespace game::Box
+
 namespace game::BoxBox {
+inline constexpr auto& EdgesCrossing = lifted::entry::e820BF080;  // sub_820BF080
 inline constexpr auto& FindImpact = lifted::entry::e820BF038;  // sub_820BF038
 inline constexpr auto& FindPushOut = lifted::entry::e820BFB28;  // sub_820BFB28
+inline constexpr auto& Separated = lifted::entry::e820BD280;  // sub_820BD280
+inline constexpr auto& SeparatedAfterMove = lifted::entry::e820BD578;  // sub_820BD578
 }  // namespace game::BoxBox
 
 namespace game::BoxShape {
@@ -718,6 +803,7 @@ inline constexpr auto& Translate = lifted::entry::e820BA2F0;  // sub_820BA2F0
 }  // namespace game::BoxShape
 
 namespace game::Buffer28 {
+inline constexpr auto& Dtor = lifted::entry::e82152D28;  // sub_82152D28
 inline constexpr auto& Free = lifted::entry::e82152028;  // sub_82152028
 inline constexpr auto& Reset = lifted::entry::e82152D38;  // sub_82152D38
 }  // namespace game::Buffer28
@@ -771,8 +857,17 @@ namespace game::Camera {
 inline constexpr auto& Ctor = lifted::entry::e82593908;  // sub_82593908
 inline constexpr auto& SetFieldOfView = lifted::entry::e82593278;  // sub_82593278
 inline constexpr auto& SetViewportSize = lifted::entry::e82593500;  // sub_82593500
+inline constexpr auto& ShakeRandom = lifted::entry::e82152BD8;  // sub_82152BD8
 inline constexpr auto& Update = lifted::entry::e82593568;  // sub_82593568
 }  // namespace game::Camera
+
+namespace game::CameraAnim {
+inline constexpr auto& EvalTarget = lifted::entry::e821504E0;  // sub_821504E0
+}  // namespace game::CameraAnim
+
+namespace game::CameraAnimBlock {
+inline constexpr auto& Free = lifted::entry::e8214FFF0;  // sub_8214FFF0
+}  // namespace game::CameraAnimBlock
 
 namespace game::CameraAnims {
 inline constexpr auto& Clear = lifted::entry::e82150078;  // sub_82150078
@@ -830,6 +925,10 @@ namespace game::CameraPath {
 inline constexpr auto& Dtor = lifted::f821540B0;  // sub_821540B0
 inline constexpr auto& OnLoaded = lifted::entry::e82152078;  // sub_82152078
 }  // namespace game::CameraPath
+
+namespace game::CameraPreset {
+inline constexpr auto& Ctor = lifted::entry::e8217BE08;  // sub_8217BE08
+}  // namespace game::CameraPreset
 
 namespace game::Car {
 inline constexpr auto& Clear = lifted::entry::e820CD7F0;  // sub_820CD7F0
@@ -992,13 +1091,16 @@ namespace game::CarPanel {
 inline constexpr auto& Hide = lifted::f8224DC50;  // sub_8224DC50
 inline constexpr auto& IsHidden = lifted::f8224E1A8;  // sub_8224E1A8
 inline constexpr auto& IsShownAgain = lifted::f8224E168;  // sub_8224E168
+inline constexpr auto& PlaceCursor = lifted::entry::e8224D9A0;  // sub_8224D9A0
 inline constexpr auto& PlayStats = lifted::f8224DF90;  // sub_8224DF90
 inline constexpr auto& PlayStatsOut = lifted::f8224DFF0;  // sub_8224DFF0
 inline constexpr auto& SetCarName = lifted::entry::e822417E8;  // sub_822417E8
 inline constexpr auto& SetPrice = lifted::f8224E7E8;  // sub_8224E7E8
 inline constexpr auto& SetStats = lifted::entry::e8224E288;  // sub_8224E288
+inline constexpr auto& SetTexts = lifted::entry::e8224D7F0;  // sub_8224D7F0
 inline constexpr auto& ShowAgain = lifted::f8224DBA0;  // sub_8224DBA0
 inline constexpr auto& ShowCarStats = lifted::f8224EA10;  // sub_8224EA10
+inline constexpr auto& ShowStats = lifted::entry::e8224E920;  // sub_8224E920
 inline constexpr auto& StatsHidden = lifted::f8224E248;  // sub_8224E248
 inline constexpr auto& StatsShown = lifted::f8224E208;  // sub_8224E208
 }  // namespace game::CarPanel
@@ -1026,6 +1128,7 @@ inline constexpr auto& WalkMaterials = lifted::entry::e820D6EB8;  // sub_820D6EB
 namespace game::CarRecord {
 inline constexpr auto& Copy = lifted::entry::e820D7EE8;  // sub_820D7EE8
 inline constexpr auto& Reset = lifted::entry::e820D0A98;  // sub_820D0A98
+inline constexpr auto& ResetBytes = lifted::entry::e820D0900;  // sub_820D0900
 }  // namespace game::CarRecord
 
 namespace game::CarScene {
@@ -1149,6 +1252,11 @@ inline constexpr auto& SetBanks = lifted::entry::e8210CB48;  // sub_8210CB48
 inline constexpr auto& StopAll = lifted::entry::e8210F7C8;  // sub_8210F7C8
 }  // namespace game::CarSounds
 
+namespace game::CarSpec {
+inline constexpr auto& GetTire = lifted::entry::e820C9928;  // sub_820C9928
+inline constexpr auto& Swap = lifted::entry::e820CC168;  // sub_820CC168
+}  // namespace game::CarSpec
+
 namespace game::Career {
 inline constexpr auto& AddRivalWin = lifted::f821116E0;  // sub_821116E0
 inline constexpr auto& EventQuery = lifted::entry::e82111638;  // sub_82111638
@@ -1169,6 +1277,7 @@ inline constexpr auto& Next4 = lifted::f82219730;  // sub_82219730
 inline constexpr auto& NextEntry = lifted::f8221A110;  // sub_8221A110
 inline constexpr auto& Page1 = lifted::entry::e82219A78;  // sub_82219A78
 inline constexpr auto& SetEntry = lifted::f82219D00;  // sub_82219D00
+inline constexpr auto& SetTexts = lifted::entry::e822197A8;  // sub_822197A8
 inline constexpr auto& Show = lifted::entry::e822192B0;  // sub_822192B0
 inline constexpr auto& Start = lifted::entry::e822191D0;  // sub_822191D0
 }  // namespace game::CareerResults
@@ -1183,6 +1292,11 @@ inline constexpr auto& RunInline = lifted::f8258E698;  // sub_8258E698
 inline constexpr auto& RunInlineLinked = lifted::f8258E718;  // sub_8258E718
 }  // namespace game::ChunkChain
 
+namespace game::ClientList {
+inline constexpr auto& Add = lifted::entry::e8259C960;  // sub_8259C960
+inline constexpr auto& Ctor = lifted::entry::e8259C7B8;  // sub_8259C7B8
+}  // namespace game::ClientList
+
 namespace game::Cockpit {
 inline constexpr auto& BindTextures = lifted::entry::e820D6108;  // sub_820D6108
 inline constexpr auto& DeletingDestructor = lifted::entry::e820D6798;  // sub_820D6798
@@ -1190,6 +1304,7 @@ inline constexpr auto& OnFileLoaded = lifted::entry::e820D6528;  // sub_820D6528
 }  // namespace game::Cockpit
 
 namespace game::CockpitPoints {
+inline constexpr auto& Draw = lifted::entry::e820DBD38;  // sub_820DBD38
 inline constexpr auto& Find = lifted::entry::e820DBC88;  // sub_820DBC88
 }  // namespace game::CockpitPoints
 
@@ -1202,8 +1317,12 @@ inline constexpr auto& SetFlags = lifted::entry::e82467078;  // sub_82467078
 namespace game::CollisionObject {
 inline constexpr auto& AccumulateForce = lifted::entry::e820B7DF8;  // sub_820B7DF8
 inline constexpr auto& AddContact = lifted::entry::e820B7C50;  // sub_820B7C50
+inline constexpr auto& Ctor = lifted::entry::e820B7AE8;  // sub_820B7AE8
 inline constexpr auto& FirstContact = lifted::entry::e820B7C90;  // sub_820B7C90
+inline constexpr auto& Init = lifted::entry::e820B7A00;  // sub_820B7A00
+inline constexpr auto& Link = lifted::entry::e820B7BF0;  // sub_820B7BF0
 inline constexpr auto& ResetTransform = lifted::entry::e820B7998;  // sub_820B7998
+inline constexpr auto& Unlink = lifted::entry::e820B7C18;  // sub_820B7C18
 }  // namespace game::CollisionObject
 
 namespace game::CollisionPair {
@@ -1215,19 +1334,35 @@ namespace game::CollisionShape {
 inline constexpr auto& Current = lifted::entry::e820BAE38;  // sub_820BAE38
 inline constexpr auto& Place = lifted::entry::e820BB758;  // sub_820BB758
 inline constexpr auto& Previous = lifted::entry::e820BADF8;  // sub_820BADF8
+inline constexpr auto& Translate = lifted::entry::e820BACD0;  // sub_820BACD0
+inline constexpr auto& Type = lifted::entry::e820BACB8;  // sub_820BACB8
 inline constexpr auto& UpdateBounds = lifted::entry::e820BAC00;  // sub_820BAC00
 }  // namespace game::CollisionShape
 
+namespace game::CollisionSurface {
+inline constexpr auto& A = lifted::entry::e820BC1F8;  // sub_820BC1F8
+inline constexpr auto& B = lifted::entry::e820BC240;  // sub_820BC240
+inline constexpr auto& C = lifted::entry::e820BC288;  // sub_820BC288
+inline constexpr auto& D = lifted::entry::e820BC2D0;  // sub_820BC2D0
+}  // namespace game::CollisionSurface
+
 namespace game::CollisionWorld {
+inline constexpr auto& AddPairs = lifted::entry::e820B94B0;  // sub_820B94B0
+inline constexpr auto& Callback = lifted::entry::e820B8798;  // sub_820B8798
+inline constexpr auto& MovePair = lifted::entry::e820BBD30;  // sub_820BBD30
 inline constexpr auto& NewContact = lifted::entry::e820B8A48;  // sub_820B8A48
 inline constexpr auto& RemoveObject = lifted::entry::e820B9448;  // sub_820B9448
+inline constexpr auto& RemovePairsByGroups = lifted::entry::e820B8AF8;  // sub_820B8AF8
 inline constexpr auto& Reset = lifted::entry::e820B85E8;  // sub_820B85E8
+inline constexpr auto& ResetSurfaces = lifted::entry::e820BC550;  // sub_820BC550
 inline constexpr auto& Setup = lifted::entry::e820FF250;  // sub_820FF250
+inline constexpr auto& UnlinkPair = lifted::entry::e820BBC40;  // sub_820BBC40
 inline constexpr auto& Update = lifted::entry::e820B92C8;  // sub_820B92C8
 }  // namespace game::CollisionWorld
 
 namespace game::Color {
-inline constexpr auto& HsvToRgb = lifted::entry::e820D0D60;  // sub_820D0D60
+inline constexpr auto& HsvToRgb_820D0D60 = lifted::entry::e820D0D60;  // sub_820D0D60
+inline constexpr auto& HsvToRgb_8224AB50 = lifted::entry::e8224AB50;  // sub_8224AB50
 }  // namespace game::Color
 
 namespace game::ColorFilter {
@@ -1240,6 +1375,7 @@ inline constexpr auto& SetColor0 = lifted::entry::e821350F8;  // sub_821350F8
 }  // namespace game::ColorFilter
 
 namespace game::ColorListScreen {
+inline constexpr auto& Ctor = lifted::entry::e822550F8;  // sub_822550F8
 inline constexpr auto& DeletingDestructor = lifted::entry::e82255840;  // sub_82255840
 inline constexpr auto& Draw = lifted::entry::e82256CA0;  // sub_82256CA0
 inline constexpr auto& Dtor = lifted::entry::e82255198;  // sub_82255198
@@ -1282,6 +1418,10 @@ inline constexpr auto& SetColors = lifted::entry::e82248198;  // sub_82248198
 namespace game::ColorPanel {
 inline constexpr auto& Hide = lifted::f8224D090;  // sub_8224D090
 inline constexpr auto& IsHidden = lifted::f8224D230;  // sub_8224D230
+inline constexpr auto& PlaceCursor = lifted::entry::e8224D3E0;  // sub_8224D3E0
+inline constexpr auto& SetArrows = lifted::entry::e8224D2D0;  // sub_8224D2D0
+inline constexpr auto& SetCount = lifted::entry::e8224D458;  // sub_8224D458
+inline constexpr auto& SetSwatches = lifted::entry::e8224D518;  // sub_8224D518
 }  // namespace game::ColorPanel
 
 namespace game::Command {
@@ -1355,11 +1495,16 @@ inline constexpr auto& Ctor = lifted::entry::e8223A208;  // sub_8223A208
 }  // namespace game::ConfirmPanel8
 
 namespace game::Contact {
+inline constexpr auto& Flip = lifted::entry::e820BC858;  // sub_820BC858
 inline constexpr auto& Next = lifted::entry::e820B8D10;  // sub_820B8D10
 inline constexpr auto& Object = lifted::entry::e820B8CC0;  // sub_820B8CC0
 inline constexpr auto& Position = lifted::entry::e820B8D00;  // sub_820B8D00
 inline constexpr auto& Strength = lifted::entry::e820B8D08;  // sub_820B8D08
 }  // namespace game::Contact
+
+namespace game::ControlMap {
+inline constexpr auto& SetDefault = lifted::entry::e821058A8;  // sub_821058A8
+}  // namespace game::ControlMap
 
 namespace game::ControllerOptions {
 inline constexpr auto& ChangePage1Value = lifted::f821C5F80;  // sub_821C5F80
@@ -1424,6 +1569,7 @@ inline constexpr auto& Get = lifted::entry::e820FFF50;  // sub_820FFF50
 }  // namespace game::CourseRoutes
 
 namespace game::CourseSet {
+inline constexpr auto& InitParts = lifted::entry::e820F2230;  // sub_820F2230
 inline constexpr auto& Load = lifted::entry::e820F2520;  // sub_820F2520
 inline constexpr auto& OnLoaded = lifted::entry::e820F22B8;  // sub_820F22B8
 inline constexpr auto& Reset = lifted::entry::e820F1138;  // sub_820F1138
@@ -1486,6 +1632,7 @@ inline constexpr auto& Word4832 = lifted::entry::e821105A0;  // sub_821105A0
 }  // namespace game::DayBlock
 
 namespace game::DayLog {
+inline constexpr auto& Push = lifted::entry::e82112028;  // sub_82112028
 inline constexpr auto& SumRaces = lifted::f82110928;  // sub_82110928
 inline constexpr auto& SumWord8 = lifted::f82110970;  // sub_82110970
 }  // namespace game::DayLog
@@ -1497,7 +1644,11 @@ inline constexpr auto& SetPosition = lifted::entry::e82091050;  // sub_82091050
 }  // namespace game::DebugText
 
 namespace game::DecalImages {
+inline constexpr auto& FreeTexture = lifted::entry::e821FE6A0;  // sub_821FE6A0
 inline constexpr auto& OnLoaded = lifted::entry::e821FE608;  // sub_821FE608
+inline constexpr auto& RestoreMovieTexture = lifted::entry::e822081A0;  // sub_822081A0
+inline constexpr auto& RestoreStickerTexture = lifted::entry::e821F89B8;  // sub_821F89B8
+inline constexpr auto& SavePlaceholders14 = lifted::entry::e821F8950;  // sub_821F8950
 }  // namespace game::DecalImages
 
 namespace game::Defaults {
@@ -1547,6 +1698,7 @@ inline constexpr auto& Resolve = lifted::entry::e822AFA58;  // sub_822AFA58
 inline constexpr auto& SetBlendControl = lifted::entry::e822A3B30;  // sub_822A3B30
 inline constexpr auto& SetDepthStencilSurface = lifted::entry::e822A4060;  // sub_822A4060
 inline constexpr auto& SetDisplayMode = lifted::entry::e822AD0B0;  // sub_822AD0B0
+inline constexpr auto& SetFVF = lifted::entry::e822AA0E8;  // sub_822AA0E8
 inline constexpr auto& SetIndices = lifted::entry::e822A3908;  // sub_822A3908
 inline constexpr auto& SetOutOfSpace = lifted::f8229E098;  // sub_8229E098
 inline constexpr auto& SetPixelShader = lifted::entry::e822A8618;  // sub_822A8618
@@ -1664,6 +1816,7 @@ inline constexpr auto& SetScissorRect = lifted::entry::e822A3450;  // sub_822A34
 inline constexpr auto& SetScreenScissor = lifted::entry::e822A0F80;  // sub_822A0F80
 inline constexpr auto& SetShaderGprAllocation = lifted::entry::e822A8A60;  // sub_822A8A60
 inline constexpr auto& SetStreamSource = lifted::entry::e822A3758;  // sub_822A3758
+inline constexpr auto& SetSurfaceInfo = lifted::entry::e822A3C88;  // sub_822A3C88
 inline constexpr auto& SetTexture = lifted::entry::e822A6008;  // sub_822A6008
 inline constexpr auto& SetUpDisplay = lifted::entry::e822ACE00;  // sub_822ACE00
 inline constexpr auto& SetUpRing = lifted::entry::e8229F280;  // sub_8229F280
@@ -1684,6 +1837,7 @@ inline constexpr auto& WriteCallback = lifted::entry::e8229E9D0;  // sub_8229E9D
 inline constexpr auto& WriteDefaultDrawRegisters = lifted::entry::e822AF978;  // sub_822AF978
 inline constexpr auto& WriteFlushPackets = lifted::entry::e8229E5D0;  // sub_8229E5D0
 inline constexpr auto& WriteIdlePackets = lifted::entry::e8229F0E0;  // sub_8229F0E0
+inline constexpr auto& WriteSegmentTail = lifted::entry::e8229E768;  // sub_8229E768
 }  // namespace game::Device
 
 namespace game::Dialog {
@@ -1738,6 +1892,8 @@ inline constexpr auto& QuantizeColorKey = lifted::f823F6170;  // sub_823F6170
 
 namespace game::DxtColor {
 inline constexpr auto& DecodeBlock = lifted::f82421938;  // sub_82421938
+inline constexpr auto& FitEndpoints = lifted::entry::e82420AB8;  // sub_82420AB8
+inline constexpr auto& PackR5G6B5 = lifted::entry::e824206E8;  // sub_824206E8
 }  // namespace game::DxtColor
 
 namespace game::Emitter {
@@ -1764,6 +1920,16 @@ namespace game::EventCondition {
 inline constexpr auto& Power = lifted::f82141668;  // sub_82141668
 }  // namespace game::EventCondition
 
+namespace game::EventGroup {
+inline constexpr auto& Alloc = lifted::entry::e821433A8;  // sub_821433A8
+inline constexpr auto& Free = lifted::entry::e82143358;  // sub_82143358
+}  // namespace game::EventGroup
+
+namespace game::EventPools {
+inline constexpr auto& AddRivals = lifted::entry::e82144458;  // sub_82144458
+inline constexpr auto& CopyIds = lifted::entry::e82143420;  // sub_82143420
+}  // namespace game::EventPools
+
 namespace game::File {
 inline constexpr auto& Close = lifted::entry::e8258C718;  // sub_8258C718
 inline constexpr auto& GetSize = lifted::entry::e822B80D8;  // sub_822B80D8
@@ -1780,9 +1946,14 @@ inline constexpr auto& Dtor = lifted::f820A7180;  // sub_820A7180
 }  // namespace game::FloatPairItem
 
 namespace game::Font {
+inline constexpr auto& ClipGlyph = lifted::entry::e82108C90;  // sub_82108C90
+inline constexpr auto& Ctor = lifted::entry::e82109228;  // sub_82109228
 inline constexpr auto& Draw = lifted::entry::e8210A400;  // sub_8210A400
 inline constexpr auto& DrawPass = lifted::entry::e82109EF0;  // sub_82109EF0
+inline constexpr auto& LineGlyphs = lifted::entry::e82108810;  // sub_82108810
+inline constexpr auto& LineWidth = lifted::entry::e82108458;  // sub_82108458
 inline constexpr auto& OnPageLoaded = lifted::f82109160;  // sub_82109160
+inline constexpr auto& TextWidth = lifted::entry::e82108B30;  // sub_82108B30
 }  // namespace game::Font
 
 namespace game::FrameDriver {
@@ -1883,6 +2054,7 @@ inline constexpr auto& OpenDoorsB = lifted::f8217A0A8;  // sub_8217A0A8
 }  // namespace game::GarageAnims
 
 namespace game::GarageCamera {
+inline constexpr auto& FreePresets = lifted::entry::e8217D760;  // sub_8217D760
 inline constexpr auto& OnPresetsLoaded = lifted::entry::e8217FBE8;  // sub_8217FBE8
 inline constexpr auto& Reset = lifted::entry::e8217D888;  // sub_8217D888
 inline constexpr auto& Update = lifted::entry::e8217BE98;  // sub_8217BE98
@@ -1931,6 +2103,7 @@ inline constexpr auto& CameraCommand = lifted::entry::e821808F0;  // sub_821808F
 inline constexpr auto& Command = lifted::entry::e82180108;  // sub_82180108
 inline constexpr auto& Draw = lifted::entry::e8217FE60;  // sub_8217FE60
 inline constexpr auto& FitCar = lifted::entry::e82178C40;  // sub_82178C40
+inline constexpr auto& Init = lifted::entry::e82180968;  // sub_82180968
 inline constexpr auto& IsBusy = lifted::entry::e82179BE0;  // sub_82179BE0
 inline constexpr auto& ReloadModel = lifted::entry::e8217F880;  // sub_8217F880
 inline constexpr auto& SetCar = lifted::entry::e8217FD58;  // sub_8217FD58
@@ -1942,9 +2115,15 @@ inline constexpr auto& ShowCarById = lifted::entry::e82182C90;  // sub_82182C90
 inline constexpr auto& ShowCarByIdWithClass = lifted::entry::e82182D30;  // sub_82182D30
 }  // namespace game::GarageStage
 
+namespace game::GlareDef {
+inline constexpr auto& Ctor = lifted::entry::e8212ED78;  // sub_8212ED78
+inline constexpr auto& Init = lifted::entry::e8212EC90;  // sub_8212EC90
+}  // namespace game::GlareDef
+
 namespace game::Glow {
 inline constexpr auto& Dtor = lifted::entry::e821389C8;  // sub_821389C8
 inline constexpr auto& Record = lifted::entry::e821379D8;  // sub_821379D8
+inline constexpr auto& RecordStarPass = lifted::entry::e82134060;  // sub_82134060
 inline constexpr auto& Set8436 = lifted::entry::e82136EF8;  // sub_82136EF8
 inline constexpr auto& Set8440 = lifted::entry::e82136F00;  // sub_82136F00
 inline constexpr auto& Set8444 = lifted::entry::e82136F08;  // sub_82136F08
@@ -1964,6 +2143,7 @@ inline constexpr auto& BlockSize = lifted::entry::e822A4410;  // sub_822A4410
 }  // namespace game::GpuFormat
 
 namespace game::GroupPair {
+inline constexpr auto& Ctor = lifted::entry::e82249C08;  // sub_82249C08
 inline constexpr auto& DeletingDestructor = lifted::entry::e8224ACE0;  // sub_8224ACE0
 inline constexpr auto& Dtor = lifted::entry::e82249C20;  // sub_82249C20
 inline constexpr auto& FinishAll = lifted::entry::e82249C70;  // sub_82249C70
@@ -1978,14 +2158,20 @@ inline constexpr auto& Remove = lifted::f82118790;  // sub_82118790
 }  // namespace game::HandleList
 
 namespace game::HandlerMap {
+inline constexpr auto& AllocateNodes = lifted::entry::e82099C80;  // sub_82099C80
 inline constexpr auto& Ctor = lifted::entry::e82099FB0;  // sub_82099FB0
 inline constexpr auto& ForEach = lifted::entry::e82092BF0;  // sub_82092BF0
 inline constexpr auto& Insert = lifted::entry::e82093740;  // sub_82093740
+inline constexpr auto& NewNode = lifted::entry::e82099E20;  // sub_82099E20
 }  // namespace game::HandlerMap
 
 namespace game::HelpLine {
 inline constexpr auto& Set = lifted::entry::e82199B38;  // sub_82199B38
 }  // namespace game::HelpLine
+
+namespace game::Hermite {
+inline constexpr auto& Basis = lifted::entry::e82293A48;  // sub_82293A48
+}  // namespace game::Hermite
 
 namespace game::HudBar {
 inline constexpr auto& Snap = lifted::f82212100;  // sub_82212100
@@ -2014,6 +2200,10 @@ inline constexpr auto& Create = lifted::entry::e820993E8;  // sub_820993E8
 inline constexpr auto& Update = lifted::entry::e820990F0;  // sub_820990F0
 }  // namespace game::Input
 
+namespace game::InputClient {
+inline constexpr auto& Ctor = lifted::entry::e8210AE60;  // sub_8210AE60
+}  // namespace game::InputClient
+
 namespace game::InputClientList {
 inline constexpr auto& BindAll = lifted::entry::e8210AF08;  // sub_8210AF08
 }  // namespace game::InputClientList
@@ -2034,7 +2224,12 @@ inline constexpr auto& TestRepeat = lifted::entry::e8258CEE0;  // sub_8258CEE0
 inline constexpr auto& Update = lifted::entry::e82592188;  // sub_82592188
 }  // namespace game::InputProcessor
 
+namespace game::InputProcessorBase {
+inline constexpr auto& Ctor = lifted::entry::e825920D0;  // sub_825920D0
+}  // namespace game::InputProcessorBase
+
 namespace game::InputRecording {
+inline constexpr auto& Append = lifted::entry::e821029A8;  // sub_821029A8
 inline constexpr auto& HasRoom = lifted::entry::e82102968;  // sub_82102968
 }  // namespace game::InputRecording
 
@@ -2050,7 +2245,18 @@ inline constexpr auto& IsLoaded = lifted::entry::e820D7790;  // sub_820D7790
 inline constexpr auto& OnPartLoaded = lifted::entry::e820D7578;  // sub_820D7578
 }  // namespace game::Interior
 
+namespace game::InteriorDials {
+inline constexpr auto& DrawFaces = lifted::entry::e820E3170;  // sub_820E3170
+inline constexpr auto& DrawReadouts = lifted::entry::e820E51D0;  // sub_820E51D0
+}  // namespace game::InteriorDials
+
+namespace game::InteriorMeters {
+inline constexpr auto& DrawFaces = lifted::entry::e820E3AD8;  // sub_820E3AD8
+}  // namespace game::InteriorMeters
+
 namespace game::InteriorPoints {
+inline constexpr auto& DrawRollCage = lifted::entry::e820E3548;  // sub_820E3548
+inline constexpr auto& DrawSeats = lifted::entry::e820E3CF0;  // sub_820E3CF0
 inline constexpr auto& Find = lifted::entry::e820E3660;  // sub_820E3660
 }  // namespace game::InteriorPoints
 
@@ -2070,12 +2276,18 @@ inline constexpr auto& Item = lifted::entry::e82116DA8;  // sub_82116DA8
 namespace game::Items {
 inline constexpr auto& AllWonKind5Or4 = lifted::f82110B40;  // sub_82110B40
 inline constexpr auto& Available = lifted::entry::e821435C8;  // sub_821435C8
+inline constexpr auto& Beaten = lifted::entry::e82143528;  // sub_82143528
 }  // namespace game::Items
 
 namespace game::Job {
 inline constexpr auto& Dtor = lifted::entry::e820AC9E8;  // sub_820AC9E8
 inline constexpr auto& Wait = lifted::entry::e82094B10;  // sub_82094B10
 }  // namespace game::Job
+
+namespace game::Key {
+inline constexpr auto& Interpolate = lifted::entry::e825A66F8;  // sub_825A66F8
+inline constexpr auto& Value = lifted::entry::e820AC178;  // sub_820AC178
+}  // namespace game::Key
 
 namespace game::Kind6Menu {
 inline constexpr auto& Close = lifted::entry::e8221C168;  // sub_8221C168
@@ -2110,10 +2322,13 @@ inline constexpr auto& ChaseLevel = lifted::f820DC5C8;  // sub_820DC5C8
 
 namespace game::LightPoints {
 inline constexpr auto& DrawFrontLeds = lifted::f820DCC70;  // sub_820DCC70
+inline constexpr auto& DrawFrontNeon = lifted::entry::e820DCC10;  // sub_820DCC10
 inline constexpr auto& DrawFrontSpots = lifted::f820DCF98;  // sub_820DCF98
 inline constexpr auto& DrawRearLeds = lifted::f820DD620;  // sub_820DD620
+inline constexpr auto& DrawRearNeon = lifted::entry::e820DD5C0;  // sub_820DD5C0
 inline constexpr auto& DrawRearSpots = lifted::f820DD948;  // sub_820DD948
 inline constexpr auto& DrawSidesLeds = lifted::f820DD110;  // sub_820DD110
+inline constexpr auto& DrawSidesNeon = lifted::entry::e820DD0B0;  // sub_820DD0B0
 inline constexpr auto& DrawSidesSpots = lifted::f820DD438;  // sub_820DD438
 inline constexpr auto& Find = lifted::entry::e820DC900;  // sub_820DC900
 }  // namespace game::LightPoints
@@ -2128,26 +2343,42 @@ inline constexpr auto& Update = lifted::f8211E8C0;  // sub_8211E8C0
 }  // namespace game::LightSprite
 
 namespace game::List {
+inline constexpr auto& Append = lifted::entry::e82294BA8;  // sub_82294BA8
 inline constexpr auto& At = lifted::entry::e82593FC0;  // sub_82593FC0
 inline constexpr auto& Clear = lifted::f82294CF0;  // sub_82294CF0
+inline constexpr auto& DeleteAll = lifted::entry::e82593FF8;  // sub_82593FF8
 inline constexpr auto& DeleteNodes = lifted::f82294C88;  // sub_82294C88
 inline constexpr auto& Dtor = lifted::f82294D48;  // sub_82294D48
 inline constexpr auto& Init = lifted::entry::e82593FB0;  // sub_82593FB0
 }  // namespace game::List
 
+namespace game::List128 {
+inline constexpr auto& Link = lifted::entry::e8228B5A0;  // sub_8228B5A0
+}  // namespace game::List128
+
 namespace game::List16 {
+inline constexpr auto& Copy32 = lifted::entry::e82154300;  // sub_82154300
 inline constexpr auto& Link = lifted::entry::e821531C0;  // sub_821531C0
 }  // namespace game::List16
+
+namespace game::List40 {
+inline constexpr auto& Link = lifted::entry::e82153228;  // sub_82153228
+}  // namespace game::List40
 
 namespace game::List64 {
 inline constexpr auto& Insert = lifted::entry::e820FE330;  // sub_820FE330
 }  // namespace game::List64
+
+namespace game::List80 {
+inline constexpr auto& Link = lifted::entry::e820F40C0;  // sub_820F40C0
+}  // namespace game::List80
 
 namespace game::ListNode {
 inline constexpr auto& Dtor = lifted::entry::e8224FB10;  // sub_8224FB10
 }  // namespace game::ListNode
 
 namespace game::ListPart {
+inline constexpr auto& Ctor = lifted::entry::e82252908;  // sub_82252908
 inline constexpr auto& DeletingDestructor = lifted::entry::e82252A38;  // sub_82252A38
 inline constexpr auto& Dtor = lifted::entry::e82252968;  // sub_82252968
 }  // namespace game::ListPart
@@ -2337,7 +2568,12 @@ namespace game::LogicalPad {
 inline constexpr auto& Values = lifted::entry::e82591B30;  // sub_82591B30
 }  // namespace game::LogicalPad
 
+namespace game::MachineMember {
+inline constexpr auto& Ctor = lifted::entry::e82108160;  // sub_82108160
+}  // namespace game::MachineMember
+
 namespace game::MachineScreen {
+inline constexpr auto& Ctor = lifted::entry::e8224CF58;  // sub_8224CF58
 inline constexpr auto& Dtor = lifted::entry::e8224CB18;  // sub_8224CB18
 }  // namespace game::MachineScreen
 
@@ -2359,6 +2595,7 @@ inline constexpr auto& FromQuaternion = lifted::entry::e822936F0;  // sub_822936
 inline constexpr auto& FromRows = lifted::entry::e820BFBB8;  // sub_820BFBB8
 inline constexpr auto& FromScaleRotationTranslation = lifted::entry::e820EF660;  // sub_820EF660
 inline constexpr auto& Inverse = lifted::entry::e820A9988;  // sub_820A9988
+inline constexpr auto& InverseRotate = lifted::entry::e82293998;  // sub_82293998
 inline constexpr auto& Multiply = lifted::entry::e8209BD50;  // sub_8209BD50
 inline constexpr auto& MultiplyReversed = lifted::entry::e82293988;  // sub_82293988
 inline constexpr auto& MultiplyTranslation = lifted::entry::e820B0D68;  // sub_820B0D68
@@ -2366,9 +2603,21 @@ inline constexpr auto& RotateX = lifted::entry::e820A65F0;  // sub_820A65F0
 inline constexpr auto& RotateY = lifted::entry::e820A67F8;  // sub_820A67F8
 inline constexpr auto& RotateZ = lifted::entry::e820A2D30;  // sub_820A2D30
 inline constexpr auto& SetIdentity = lifted::entry::e822936E0;  // sub_822936E0
+inline constexpr auto& SetTranslation = lifted::entry::e82293818;  // sub_82293818
+inline constexpr auto& Shadow = lifted::entry::e82597FE0;  // sub_82597FE0
 inline constexpr auto& TransformPoint = lifted::entry::e822938F0;  // sub_822938F0
 inline constexpr auto& TransposeRotation = lifted::entry::e820D1CB0;  // sub_820D1CB0
 }  // namespace game::Matrix
+
+namespace game::Member1136 {
+inline constexpr auto& Ctor = lifted::entry::e82102888;  // sub_82102888
+inline constexpr auto& Restore = lifted::entry::e82102C60;  // sub_82102C60
+}  // namespace game::Member1136
+
+namespace game::Member4080 {
+inline constexpr auto& Ctor = lifted::entry::e82104690;  // sub_82104690
+inline constexpr auto& Restore = lifted::entry::e82102B98;  // sub_82102B98
+}  // namespace game::Member4080
 
 namespace game::MemberDelegate {
 inline constexpr auto& Invoke = lifted::f82233460;  // sub_82233460
@@ -2393,6 +2642,7 @@ inline constexpr auto& Init = lifted::entry::e8220BAC0;  // sub_8220BAC0
 inline constexpr auto& IsEnabled = lifted::entry::e8220BC10;  // sub_8220BC10
 inline constexpr auto& Pressed152 = lifted::entry::e8220BE70;  // sub_8220BE70
 inline constexpr auto& Pressed166 = lifted::entry::e8220BF90;  // sub_8220BF90
+inline constexpr auto& PressedX = lifted::entry::e8220BF00;  // sub_8220BF00
 inline constexpr auto& Release = lifted::entry::e8220BBB0;  // sub_8220BBB0
 inline constexpr auto& Selection = lifted::entry::e8220BC20;  // sub_8220BC20
 inline constexpr auto& SetEnabled = lifted::entry::e8220BC00;  // sub_8220BC00
@@ -2403,6 +2653,10 @@ inline constexpr auto& Update = lifted::entry::e8220C1E0;  // sub_8220C1E0
 namespace game::MenuSound {
 inline constexpr auto& Play = lifted::entry::e821103F0;  // sub_821103F0
 }  // namespace game::MenuSound
+
+namespace game::Mesh {
+inline constexpr auto& LoadShaders = lifted::entry::e82594D20;  // sub_82594D20
+}  // namespace game::Mesh
 
 namespace game::MessageVector {
 inline constexpr auto& Allocate = lifted::entry::e82092B78;  // sub_82092B78
@@ -2535,19 +2789,26 @@ inline constexpr auto& WaitForShown = lifted::entry::e8225DA68;  // sub_8225DA68
 namespace game::Model {
 inline constexpr auto& Ctor = lifted::entry::e825948C0;  // sub_825948C0
 inline constexpr auto& Dtor = lifted::entry::e82594F58;  // sub_82594F58
+inline constexpr auto& HasPoint = lifted::entry::e820D9DB0;  // sub_820D9DB0
 inline constexpr auto& IsShapeVisible = lifted::entry::e825951E0;  // sub_825951E0
 inline constexpr auto& Load = lifted::entry::e82596920;  // sub_82596920
 inline constexpr auto& Material = lifted::entry::e82594B20;  // sub_82594B20
 inline constexpr auto& MaterialCount = lifted::entry::e82594AD8;  // sub_82594AD8
+inline constexpr auto& PointPosition = lifted::entry::e820DA988;  // sub_820DA988
 inline constexpr auto& RecordMaterials = lifted::entry::e820CECA0;  // sub_820CECA0
 inline constexpr auto& RecordShape = lifted::entry::e82595550;  // sub_82595550
 inline constexpr auto& RecordShapeDepth = lifted::entry::e825960D0;  // sub_825960D0
 inline constexpr auto& Release = lifted::entry::e82594970;  // sub_82594970
 inline constexpr auto& SetVinylTextures = lifted::entry::e820CE9F8;  // sub_820CE9F8
 inline constexpr auto& SkinShape = lifted::f82594FD0;  // sub_82594FD0
+inline constexpr auto& StreamData = lifted::entry::e82594A60;  // sub_82594A60
+inline constexpr auto& StreamData2 = lifted::entry::e82594A90;  // sub_82594A90
+inline constexpr auto& StreamSize = lifted::entry::e82594A78;  // sub_82594A78
+inline constexpr auto& StreamSize2 = lifted::entry::e82594AA8;  // sub_82594AA8
 }  // namespace game::Model
 
 namespace game::ModelList {
+inline constexpr auto& Init = lifted::entry::e820F1A20;  // sub_820F1A20
 inline constexpr auto& Release = lifted::entry::e82147FB8;  // sub_82147FB8
 }  // namespace game::ModelList
 
@@ -2703,6 +2964,7 @@ inline constexpr auto& LoadItem = lifted::entry::e82257060;  // sub_82257060
 }  // namespace game::NodeListScreen
 
 namespace game::NodeScreen {
+inline constexpr auto& Ctor = lifted::entry::e8225A3D8;  // sub_8225A3D8
 inline constexpr auto& DeletingDestructor = lifted::entry::e8225A168;  // sub_8225A168
 inline constexpr auto& Draw = lifted::entry::e8225A1B8;  // sub_8225A1B8
 inline constexpr auto& Dtor = lifted::entry::e82259948;  // sub_82259948
@@ -2737,6 +2999,12 @@ inline constexpr auto& SetPairs = lifted::entry::e82247CB8;  // sub_82247CB8
 inline constexpr auto& Show = lifted::entry::e82248300;  // sub_82248300
 inline constexpr auto& ShowNode = lifted::entry::e82247ED0;  // sub_82247ED0
 }  // namespace game::NodeTable
+
+namespace game::ObjectPools {
+inline constexpr auto& Init = lifted::entry::e820FBBE8;  // sub_820FBBE8
+inline constexpr auto& Object = lifted::entry::e820FC0E8;  // sub_820FC0E8
+inline constexpr auto& Shutdown = lifted::entry::e820FBDC8;  // sub_820FBDC8
+}  // namespace game::ObjectPools
 
 namespace game::Options {
 inline constexpr auto& AnalogPage = lifted::entry::e821C21A8;  // sub_821C21A8
@@ -2877,15 +3145,33 @@ inline constexpr auto& SavePairs = lifted::entry::e82247CE0;  // sub_82247CE0
 }  // namespace game::PairedNodeTable
 
 namespace game::Panel6C {
+inline constexpr auto& Ctor = lifted::entry::e82231CD0;  // sub_82231CD0
 inline constexpr auto& DeletingDestructor = lifted::f82231EF0;  // sub_82231EF0
 inline constexpr auto& SetStats = lifted::entry::e8224E490;  // sub_8224E490
 inline constexpr auto& ShowArrows = lifted::f82231DF0;  // sub_82231DF0
 }  // namespace game::Panel6C
 
+namespace game::Panel6D {
+inline constexpr auto& Ctor = lifted::entry::e82231E40;  // sub_82231E40
+}  // namespace game::Panel6D
+
+namespace game::Panel6F {
+inline constexpr auto& Ctor = lifted::entry::e822308E8;  // sub_822308E8
+}  // namespace game::Panel6F
+
 namespace game::Panel7C {
+inline constexpr auto& Ctor = lifted::entry::e822416D8;  // sub_822416D8
 inline constexpr auto& DeletingDestructor = lifted::f82241968;  // sub_82241968
 inline constexpr auto& ShowArrows = lifted::entry::e82241868;  // sub_82241868
 }  // namespace game::Panel7C
+
+namespace game::Panel7D {
+inline constexpr auto& Ctor = lifted::entry::e822418B8;  // sub_822418B8
+}  // namespace game::Panel7D
+
+namespace game::Panel7F {
+inline constexpr auto& Ctor = lifted::entry::e82240268;  // sub_82240268
+}  // namespace game::Panel7F
 
 namespace game::Panel8C {
 inline constexpr auto& Ctor = lifted::entry::e82239E78;  // sub_82239E78
@@ -2906,15 +3192,29 @@ namespace game::Panel8F {
 inline constexpr auto& Ctor = lifted::entry::e82239C70;  // sub_82239C70
 }  // namespace game::Panel8F
 
+namespace game::PanelE {
+inline constexpr auto& Ctor = lifted::entry::e82230800;  // sub_82230800
+}  // namespace game::PanelE
+
 namespace game::PanelFade {
 inline constexpr auto& In = lifted::entry::e82249BE8;  // sub_82249BE8
 }  // namespace game::PanelFade
 
 namespace game::PanelGroup {
+inline constexpr auto& Ctor = lifted::entry::e82240110;  // sub_82240110
 inline constexpr auto& DeletingDestructor = lifted::entry::e82240348;  // sub_82240348
 inline constexpr auto& Dtor = lifted::entry::e82231CC0;  // sub_82231CC0
 inline constexpr auto& Movie = lifted::entry::e82258FC8;  // sub_82258FC8
+inline constexpr auto& SetCaption = lifted::entry::e8224EF18;  // sub_8224EF18
 }  // namespace game::PanelGroup
+
+namespace game::PanelGroup6B {
+inline constexpr auto& Ctor = lifted::entry::e82231C68;  // sub_82231C68
+}  // namespace game::PanelGroup6B
+
+namespace game::PanelGroup7B {
+inline constexpr auto& Ctor = lifted::entry::e82241680;  // sub_82241680
+}  // namespace game::PanelGroup7B
 
 namespace game::PanelGroup8 {
 inline constexpr auto& Ctor = lifted::entry::e82239C10;  // sub_82239C10
@@ -2949,6 +3249,7 @@ inline constexpr auto& WaitForMovie = lifted::entry::e82249D88;  // sub_82249D88
 
 namespace game::PanelSet {
 inline constexpr auto& Build = lifted::entry::e8224CAD8;  // sub_8224CAD8
+inline constexpr auto& Ctor = lifted::entry::e8224B660;  // sub_8224B660
 inline constexpr auto& DeletingDestructor = lifted::f8224C9D8;  // sub_8224C9D8
 inline constexpr auto& Dtor = lifted::entry::e8224B708;  // sub_8224B708
 inline constexpr auto& Free = lifted::entry::e8224B880;  // sub_8224B880
@@ -2978,7 +3279,9 @@ inline constexpr auto& Dtor = lifted::entry::e8224AE60;  // sub_8224AE60
 inline constexpr auto& PickedPage = lifted::entry::e82248EF0;  // sub_82248EF0
 inline constexpr auto& PowerGraphPage = lifted::entry::e8224BDC0;  // sub_8224BDC0
 inline constexpr auto& RowsPage = lifted::entry::e8224A178;  // sub_8224A178
+inline constexpr auto& SaveData = lifted::entry::e82249668;  // sub_82249668
 inline constexpr auto& SetKind = lifted::f82249610;  // sub_82249610
+inline constexpr auto& ShowStandCar = lifted::entry::e8224A490;  // sub_8224A490
 inline constexpr auto& Step0 = lifted::entry::e8224A570;  // sub_8224A570
 inline constexpr auto& Step1 = lifted::entry::e8224A6A0;  // sub_8224A6A0
 inline constexpr auto& Step10 = lifted::f8224CC00;  // sub_8224CC00
@@ -3007,6 +3310,7 @@ inline constexpr auto& Step7 = lifted::entry::e82249098;  // sub_82249098
 inline constexpr auto& Step8 = lifted::entry::e82248FE0;  // sub_82248FE0
 inline constexpr auto& Step9 = lifted::entry::e8224CB28;  // sub_8224CB28
 inline constexpr auto& TabsPage = lifted::entry::e82249EB8;  // sub_82249EB8
+inline constexpr auto& UpdateStand = lifted::entry::e8224C008;  // sub_8224C008
 }  // namespace game::PanelSetBase
 
 namespace game::PanelSetInterface {
@@ -3074,6 +3378,30 @@ inline constexpr auto& Update = lifted::entry::e8212C2F0;  // sub_8212C2F0
 }  // namespace game::ParticlesC
 
 namespace game::PartsPoints {
+inline constexpr auto& DrawBonnet = lifted::entry::e820E0998;  // sub_820E0998
+inline constexpr auto& DrawCabinWindow01 = lifted::entry::e820DEFA8;  // sub_820DEFA8
+inline constexpr auto& DrawCabinWindow02 = lifted::entry::e820DEF38;  // sub_820DEF38
+inline constexpr auto& DrawDoorWindows01 = lifted::entry::e820DE948;  // sub_820DE948
+inline constexpr auto& DrawDoorWindows02 = lifted::entry::e820DE760;  // sub_820DE760
+inline constexpr auto& DrawDoorsBody = lifted::entry::e820DEA88;  // sub_820DEA88
+inline constexpr auto& DrawDoorsWindows = lifted::entry::e820DEAF0;  // sub_820DEAF0
+inline constexpr auto& DrawEngine = lifted::entry::e820DF070;  // sub_820DF070
+inline constexpr auto& DrawFenderLights = lifted::entry::e820DEDD8;  // sub_820DEDD8
+inline constexpr auto& DrawFendersBody = lifted::entry::e820DED88;  // sub_820DED88
+inline constexpr auto& DrawFrontBumper = lifted::entry::e820DF308;  // sub_820DF308
+inline constexpr auto& DrawFrontBumperLights = lifted::entry::e820DE1C8;  // sub_820DE1C8
+inline constexpr auto& DrawHeadlightBody = lifted::entry::e820E13E0;  // sub_820E13E0
+inline constexpr auto& DrawHeadlights = lifted::entry::e820E1690;  // sub_820E1690
+inline constexpr auto& DrawLeftDoor = lifted::entry::e820E0B40;  // sub_820E0B40
+inline constexpr auto& DrawLeftDoorPanel = lifted::entry::e820DE6E0;  // sub_820DE6E0
+inline constexpr auto& DrawMirror = lifted::entry::e820E1138;  // sub_820E1138
+inline constexpr auto& DrawRearBumper = lifted::entry::e820DF458;  // sub_820DF458
+inline constexpr auto& DrawRearBumperLights = lifted::entry::e820DE3C0;  // sub_820DE3C0
+inline constexpr auto& DrawRightDoor = lifted::entry::e820E0E38;  // sub_820E0E38
+inline constexpr auto& DrawRightDoorPanel = lifted::entry::e820DE8C8;  // sub_820DE8C8
+inline constexpr auto& DrawShadows = lifted::entry::e820E1D88;  // sub_820E1D88
+inline constexpr auto& DrawTailLights = lifted::entry::e820DF8B0;  // sub_820DF8B0
+inline constexpr auto& DrawWithShadow = lifted::entry::e820E1260;  // sub_820E1260
 inline constexpr auto& Find = lifted::entry::e820E0258;  // sub_820E0258
 inline constexpr auto& Reset = lifted::entry::e820E00F0;  // sub_820E00F0
 }  // namespace game::PartsPoints
@@ -3095,6 +3423,8 @@ inline constexpr auto& CloseMain = lifted::entry::e8220C700;  // sub_8220C700
 inline constexpr auto& CloseOptions = lifted::entry::e8220EFA8;  // sub_8220EFA8
 inline constexpr auto& CloseVolume = lifted::entry::e8220F0A0;  // sub_8220F0A0
 inline constexpr auto& ConfirmPage = lifted::entry::e8220C578;  // sub_8220C578
+inline constexpr auto& Draw = lifted::entry::e8220FB10;  // sub_8220FB10
+inline constexpr auto& LoadData = lifted::entry::e8220F840;  // sub_8220F840
 inline constexpr auto& MainPage = lifted::entry::e8220D898;  // sub_8220D898
 inline constexpr auto& MoveAdjust = lifted::entry::e8220E1F8;  // sub_8220E1F8
 inline constexpr auto& MoveMain = lifted::entry::e8220C7B8;  // sub_8220C7B8
@@ -3106,6 +3436,7 @@ inline constexpr auto& OpenOptions = lifted::entry::e8220EEF0;  // sub_8220EEF0
 inline constexpr auto& OpenVolume = lifted::entry::e8220F6D0;  // sub_8220F6D0
 inline constexpr auto& OptionsPage = lifted::entry::e8220DB98;  // sub_8220DB98
 inline constexpr auto& RunTen = lifted::entry::e8220C5E0;  // sub_8220C5E0
+inline constexpr auto& SaveOptions = lifted::entry::e8220D6A0;  // sub_8220D6A0
 inline constexpr auto& SetAdjust = lifted::entry::e8220F1B8;  // sub_8220F1B8
 inline constexpr auto& SetArrowB = lifted::f8220CE68;  // sub_8220CE68
 inline constexpr auto& SetArrowC = lifted::f8220D1D8;  // sub_8220D1D8
@@ -3136,6 +3467,7 @@ inline constexpr auto& Stop = lifted::entry::e8246D500;  // sub_8246D500
 
 namespace game::PendingFrees {
 inline constexpr auto& FreeDue = lifted::entry::e8258E1D8;  // sub_8258E1D8
+inline constexpr auto& Insert = lifted::entry::e8258E398;  // sub_8258E398
 }  // namespace game::PendingFrees
 
 namespace game::PhysicalPad {
@@ -3149,6 +3481,10 @@ inline constexpr auto& IsSpecial = lifted::f821115C8;  // sub_821115C8
 namespace game::PixelShader {
 inline constexpr auto& Create = lifted::entry::e822A9EE8;  // sub_822A9EE8
 }  // namespace game::PixelShader
+
+namespace game::Plane {
+inline constexpr auto& Intersect3 = lifted::entry::e825976C8;  // sub_825976C8
+}  // namespace game::Plane
 
 namespace game::PlateEditor {
 inline constexpr auto& CharsPage = lifted::entry::e82198540;  // sub_82198540
@@ -3165,6 +3501,7 @@ inline constexpr auto& RegionPage = lifted::entry::e82199ED0;  // sub_82199ED0
 inline constexpr auto& SetUpConfirmMenu = lifted::f82199E48;  // sub_82199E48
 inline constexpr auto& ShowCharRow = lifted::f821995D8;  // sub_821995D8
 inline constexpr auto& ShowConfirmCells = lifted::f821997E8;  // sub_821997E8
+inline constexpr auto& ShowDigitCells = lifted::entry::e82199350;  // sub_82199350
 inline constexpr auto& ShowRegionRow = lifted::f82199220;  // sub_82199220
 inline constexpr auto& Start = lifted::entry::e82199BB8;  // sub_82199BB8
 inline constexpr auto& Transition0 = lifted::entry::e8219A3A8;  // sub_8219A3A8
@@ -3198,6 +3535,10 @@ inline constexpr auto& Mark = lifted::entry::e82111628;  // sub_82111628
 inline constexpr auto& Update = lifted::entry::e82112838;  // sub_82112838
 }  // namespace game::PlayTime
 
+namespace game::PlayerControl {
+inline constexpr auto& ReadPad = lifted::entry::e8215FCA8;  // sub_8215FCA8
+}  // namespace game::PlayerControl
+
 namespace game::Players {
 inline constexpr auto& ResetControllers = lifted::entry::e8209F5E0;  // sub_8209F5E0
 inline constexpr auto& SignedInSlot = lifted::entry::e8209F658;  // sub_8209F658
@@ -3229,6 +3570,8 @@ inline constexpr auto& Dtor = lifted::entry::e825940B0;  // sub_825940B0
 
 namespace game::PoolObject {
 inline constexpr auto& DeletingDestructor = lifted::entry::e820DB400;  // sub_820DB400
+inline constexpr auto& InUse = lifted::entry::e820FB8E0;  // sub_820FB8E0
+inline constexpr auto& IsLoaded = lifted::entry::e820FB8F0;  // sub_820FB8F0
 inline constexpr auto& Key = lifted::entry::e820FB9F0;  // sub_820FB9F0
 inline constexpr auto& Reset = lifted::entry::e820FB9D8;  // sub_820FB9D8
 }  // namespace game::PoolObject
@@ -3359,6 +3702,7 @@ inline constexpr auto& Ctor = lifted::entry::e8211A948;  // sub_8211A948
 
 namespace game::Quaternion {
 inline constexpr auto& FromAngles = lifted::entry::e8217C120;  // sub_8217C120
+inline constexpr auto& FromAxisAngle = lifted::entry::e82293E68;  // sub_82293E68
 inline constexpr auto& FromMatrix = lifted::entry::e82293AD8;  // sub_82293AD8
 inline constexpr auto& Multiply = lifted::entry::e82293D78;  // sub_82293D78
 inline constexpr auto& NormalizeSelf = lifted::entry::e82293F10;  // sub_82293F10
@@ -3416,8 +3760,10 @@ inline constexpr auto& ShowSaving = lifted::entry::e82218AB0;  // sub_82218AB0
 namespace game::RaceEvent {
 inline constexpr auto& Current = lifted::entry::e821434E8;  // sub_821434E8
 inline constexpr auto& Destroy = lifted::entry::e82144DF0;  // sub_82144DF0
+inline constexpr auto& Entry = lifted::entry::e82143508;  // sub_82143508
 inline constexpr auto& FirstOwned = lifted::entry::e821430A0;  // sub_821430A0
 inline constexpr auto& GroupItem = lifted::entry::e821431C0;  // sub_821431C0
+inline constexpr auto& PlaceStartsCurrent = lifted::entry::e82144A38;  // sub_82144A38
 inline constexpr auto& PlaceUnlockedCurrent = lifted::entry::e821442D8;  // sub_821442D8
 inline constexpr auto& SectionRivalCurrent = lifted::entry::e821434A0;  // sub_821434A0
 }  // namespace game::RaceEvent
@@ -3441,8 +3787,22 @@ namespace game::RaceHud {
 inline constexpr auto& GaugeFloat = lifted::f82214330;  // sub_82214330
 inline constexpr auto& GaugeInt119 = lifted::f822144B0;  // sub_822144B0
 inline constexpr auto& GaugeInt149 = lifted::f822145A0;  // sub_822145A0
+inline constexpr auto& Init = lifted::entry::e82215260;  // sub_82215260
 inline constexpr auto& RunMovie = lifted::entry::e822141E8;  // sub_822141E8
+inline constexpr auto& SetBar = lifted::entry::e82214698;  // sub_82214698
+inline constexpr auto& SetBoost = lifted::entry::e82212E18;  // sub_82212E18
+inline constexpr auto& SetGear = lifted::entry::e82212DB0;  // sub_82212DB0
+inline constexpr auto& SetSpeed = lifted::entry::e82214260;  // sub_82214260
+inline constexpr auto& SetTach = lifted::entry::e82212D58;  // sub_82212D58
+inline constexpr auto& SetUpRacers = lifted::entry::e82213F20;  // sub_82213F20
+inline constexpr auto& SetUpTimer = lifted::entry::e822123C8;  // sub_822123C8
+inline constexpr auto& ShowGauge = lifted::entry::e82212D08;  // sub_82212D08
 inline constexpr auto& StopCountdown = lifted::f82212888;  // sub_82212888
+inline constexpr auto& TickRacers = lifted::entry::e822151F8;  // sub_822151F8
+inline constexpr auto& TickTimer = lifted::entry::e82214D78;  // sub_82214D78
+inline constexpr auto& UpdateExtraGauges = lifted::entry::e82215160;  // sub_82215160
+inline constexpr auto& UpdateRecordingFull = lifted::entry::e82212E60;  // sub_82212E60
+inline constexpr auto& UpdateSigns = lifted::entry::e82214718;  // sub_82214718
 }  // namespace game::RaceHud
 
 namespace game::RaceHudMachine {
@@ -3496,6 +3856,7 @@ inline constexpr auto& SetUp = lifted::entry::e8215CF78;  // sub_8215CF78
 
 namespace game::RaceManager {
 inline constexpr auto& BranchesMeet = lifted::entry::e82170860;  // sub_82170860
+inline constexpr auto& BuildNeighbors = lifted::entry::e82170CB8;  // sub_82170CB8
 inline constexpr auto& EntryOfRecord = lifted::entry::e821705A8;  // sub_821705A8
 inline constexpr auto& GiveVehicle = lifted::entry::e821706E8;  // sub_821706E8
 inline constexpr auto& ListRacers = lifted::entry::e82171E50;  // sub_82171E50
@@ -3529,12 +3890,14 @@ inline constexpr auto& NextMode = lifted::entry::e82151EF0;  // sub_82151EF0
 }  // namespace game::RaceMode
 
 namespace game::RaceModeMember {
+inline constexpr auto& Ctor = lifted::entry::e82107168;  // sub_82107168
 inline constexpr auto& DeletingDestructor = lifted::f82106B60;  // sub_82106B60
 inline constexpr auto& Dtor = lifted::entry::e82106AF0;  // sub_82106AF0
 }  // namespace game::RaceModeMember
 
 namespace game::RaceOverlays {
 inline constexpr auto& Bind = lifted::f8215E2E0;  // sub_8215E2E0
+inline constexpr auto& Clear = lifted::entry::e8215DE80;  // sub_8215DE80
 inline constexpr auto& Create = lifted::f8215E208;  // sub_8215E208
 inline constexpr auto& DeleteAll = lifted::f8215DF80;  // sub_8215DF80
 inline constexpr auto& Destroy = lifted::f8215E1D0;  // sub_8215E1D0
@@ -3576,6 +3939,7 @@ inline constexpr auto& Update = lifted::entry::e8221F930;  // sub_8221F930
 }  // namespace game::RaceResults
 
 namespace game::RaceScene {
+inline constexpr auto& Ctor = lifted::entry::e8215D6C8;  // sub_8215D6C8
 inline constexpr auto& Destroy = lifted::entry::e8215D790;  // sub_8215D790
 inline constexpr auto& LoadScenery = lifted::entry::e8215B790;  // sub_8215B790
 inline constexpr auto& RemakeCarModel = lifted::entry::e8215C0D8;  // sub_8215C0D8
@@ -3599,6 +3963,8 @@ inline constexpr auto& TogglePause = lifted::entry::e8215C750;  // sub_8215C750
 }  // namespace game::RaceSceneMachine
 
 namespace game::RaceScreens {
+inline constexpr auto& Make1004 = lifted::entry::e82216A60;  // sub_82216A60
+inline constexpr auto& MovieMask = lifted::entry::e82211BE8;  // sub_82211BE8
 inline constexpr auto& RunMovie18 = lifted::f8220B9E8;  // sub_8220B9E8
 }  // namespace game::RaceScreens
 
@@ -3713,6 +4079,12 @@ inline constexpr auto& NearestHumanVehicle = lifted::entry::e820C2248;  // sub_8
 inline constexpr auto& Vehicle = lifted::entry::e820C9718;  // sub_820C9718
 }  // namespace game::Racers
 
+namespace game::Record5232 {
+inline constexpr auto& Copy = lifted::entry::e82104BC0;  // sub_82104BC0
+inline constexpr auto& RestoreTrack = lifted::entry::e82104310;  // sub_82104310
+inline constexpr auto& Save = lifted::entry::e82104538;  // sub_82104538
+}  // namespace game::Record5232
+
 namespace game::Recorder {
 inline constexpr auto& RecordObject = lifted::entry::e825953D0;  // sub_825953D0
 inline constexpr auto& RecordSceneLights = lifted::entry::e82595490;  // sub_82595490
@@ -3730,6 +4102,10 @@ inline constexpr auto& Recording = lifted::entry::e8258E5F8;  // sub_8258E5F8
 inline constexpr auto& Replay = lifted::entry::e82591238;  // sub_82591238
 inline constexpr auto& Replaying = lifted::entry::e8258E618;  // sub_8258E618
 }  // namespace game::RenderQueue
+
+namespace game::RenderTexture {
+inline constexpr auto& Create = lifted::entry::e821330D0;  // sub_821330D0
+}  // namespace game::RenderTexture
 
 namespace game::Replay {
 inline constexpr auto& CopyFrom = lifted::entry::e821A66A8;  // sub_821A66A8
@@ -3798,6 +4174,7 @@ inline constexpr auto& StaticInit = lifted::entry::e825D91B0;  // sub_825D91B0
 
 namespace game::RequestVector {
 inline constexpr auto& Clear = lifted::entry::e8209A080;  // sub_8209A080
+inline constexpr auto& InsertN = lifted::entry::e8209A0E8;  // sub_8209A0E8
 inline constexpr auto& PushBack = lifted::entry::e8209A930;  // sub_8209A930
 }  // namespace game::RequestVector
 
@@ -3835,6 +4212,7 @@ inline constexpr auto& AddTorque = lifted::entry::e820B6960;  // sub_820B6960
 inline constexpr auto& AddTorqueAt = lifted::entry::e820B69D8;  // sub_820B69D8
 inline constexpr auto& AngularVelocity = lifted::entry::e820B6948;  // sub_820B6948
 inline constexpr auto& ContactImpulseWith = lifted::entry::e820B72C8;  // sub_820B72C8
+inline constexpr auto& EffectiveMassAt = lifted::entry::e820B6A38;  // sub_820B6A38
 inline constexpr auto& Force = lifted::entry::e820988C0;  // sub_820988C0
 inline constexpr auto& Integrate = lifted::entry::e820B7658;  // sub_820B7658
 inline constexpr auto& IsFixed = lifted::entry::e820B6638;  // sub_820B6638
@@ -3843,13 +4221,19 @@ inline constexpr auto& Matrix = lifted::entry::e820B6930;  // sub_820B6930
 inline constexpr auto& PointVelocity = lifted::entry::e820B68C0;  // sub_820B68C0
 inline constexpr auto& Position = lifted::entry::e820B67D8;  // sub_820B67D8
 inline constexpr auto& SetAngularVelocity = lifted::entry::e820B7500;  // sub_820B7500
+inline constexpr auto& SetCenterOfMassPosition = lifted::entry::e820B71B0;  // sub_820B71B0
 inline constexpr auto& SetOrientation = lifted::entry::e820B71E8;  // sub_820B71E8
 inline constexpr auto& SetPosition = lifted::entry::e820B6710;  // sub_820B6710
 inline constexpr auto& SetVelocity = lifted::entry::e820B7238;  // sub_820B7238
+inline constexpr auto& UpdateAngularVelocity = lifted::entry::e820B7478;  // sub_820B7478
+inline constexpr auto& UpdateOrientation = lifted::entry::e820B6F38;  // sub_820B6F38
+inline constexpr auto& UpdateOrigin = lifted::entry::e820B6E70;  // sub_820B6E70
+inline constexpr auto& UpdateVelocity = lifted::entry::e820B70C8;  // sub_820B70C8
 }  // namespace game::RigidBody
 
 namespace game::RivalLogo {
 inline constexpr auto& Draw = lifted::entry::e82211A28;  // sub_82211A28
+inline constexpr auto& InitXpr = lifted::entry::e82211708;  // sub_82211708
 inline constexpr auto& LoadXpr = lifted::f82211878;  // sub_82211878
 inline constexpr auto& ReleaseXpr = lifted::f82211768;  // sub_82211768
 }  // namespace game::RivalLogo
@@ -3866,7 +4250,13 @@ inline constexpr auto& Test = lifted::entry::e820FE6F8;  // sub_820FE6F8
 inline constexpr auto& Update = lifted::entry::e820FE878;  // sub_820FE878
 }  // namespace game::RouteRange
 
+namespace game::RouteSections {
+inline constexpr auto& Before = lifted::entry::e82162E70;  // sub_82162E70
+}  // namespace game::RouteSections
+
 namespace game::RowPanel {
+inline constexpr auto& Fill = lifted::entry::e8224F758;  // sub_8224F758
+inline constexpr auto& Refresh = lifted::entry::e8224F888;  // sub_8224F888
 inline constexpr auto& ShowFirst = lifted::f8224F158;  // sub_8224F158
 }  // namespace game::RowPanel
 
@@ -4058,6 +4448,7 @@ inline constexpr auto& Finish = lifted::entry::e820DDA60;  // sub_820DDA60
 }  // namespace game::SceneLights
 
 namespace game::SceneModel {
+inline constexpr auto& AddSecondWheels = lifted::entry::e820D9E00;  // sub_820D9E00
 inline constexpr auto& ApplyPalettes = lifted::entry::e820D9EA0;  // sub_820D9EA0
 inline constexpr auto& Beam = lifted::entry::e820DAAC8;  // sub_820DAAC8
 inline constexpr auto& BeamColor = lifted::entry::e820DAA38;  // sub_820DAA38
@@ -4129,11 +4520,20 @@ inline constexpr auto& Create = lifted::entry::e820F2F88;  // sub_820F2F88
 inline constexpr auto& Destroy = lifted::entry::e820F2AF8;  // sub_820F2AF8
 inline constexpr auto& Draw = lifted::entry::e820F6068;  // sub_820F6068
 inline constexpr auto& MakePoolObject = lifted::entry::e820F2638;  // sub_820F2638
+inline constexpr auto& PoolSizes = lifted::entry::e820F2030;  // sub_820F2030
 inline constexpr auto& Setup = lifted::entry::e820F3020;  // sub_820F3020
 inline constexpr auto& StartLoad = lifted::entry::e820F1E00;  // sub_820F1E00
 inline constexpr auto& Unload = lifted::entry::e820F2B38;  // sub_820F2B38
 inline constexpr auto& Update = lifted::entry::e820F4558;  // sub_820F4558
 }  // namespace game::Scenery
+
+namespace game::SceneryConfig {
+inline constexpr auto& ModelAsset = lifted::entry::e820F1530;  // sub_820F1530
+}  // namespace game::SceneryConfig
+
+namespace game::SceneryList {
+inline constexpr auto& LoadAll = lifted::entry::e820F1598;  // sub_820F1598
+}  // namespace game::SceneryList
 
 namespace game::SceneryModel {
 inline constexpr auto& RecordShape = lifted::entry::e82146BD0;  // sub_82146BD0
@@ -4175,6 +4575,7 @@ inline constexpr auto& Stop = lifted::f8212EED0;  // sub_8212EED0
 }  // namespace game::ScreenObject
 
 namespace game::ScreenPages {
+inline constexpr auto& Finish = lifted::entry::e8220BA28;  // sub_8220BA28
 inline constexpr auto& Go = lifted::entry::e8220BA68;  // sub_8220BA68
 inline constexpr auto& Init = lifted::entry::e8220BA98;  // sub_8220BA98
 }  // namespace game::ScreenPages
@@ -4193,6 +4594,7 @@ inline constexpr auto& Wait = lifted::entry::e82592670;  // sub_82592670
 
 namespace game::Session {
 inline constexpr auto& IsActive = lifted::f82260908;  // sub_82260908
+inline constexpr auto& Release = lifted::entry::e82291670;  // sub_82291670
 }  // namespace game::Session
 
 namespace game::Settings {
@@ -4205,6 +4607,7 @@ inline constexpr auto& OnPairLoaded = lifted::entry::e820A06D0;  // sub_820A06D0
 }  // namespace game::Shaders
 
 namespace game::Shape {
+inline constexpr auto& Ctor = lifted::entry::e820BB020;  // sub_820BB020
 inline constexpr auto& DeletingDestructor = lifted::entry::e820BB140;  // sub_820BB140
 inline constexpr auto& Radius = lifted::entry::e820BAB40;  // sub_820BAB40
 }  // namespace game::Shape
@@ -4274,10 +4677,15 @@ inline constexpr auto& Clear = lifted::entry::e825A2068;  // sub_825A2068
 namespace game::Smoke {
 inline constexpr auto& Ctor = lifted::entry::e8212B2E8;  // sub_8212B2E8
 inline constexpr auto& Dtor = lifted::entry::e8212B358;  // sub_8212B358
+inline constexpr auto& Emit = lifted::entry::e8212A350;  // sub_8212A350
 inline constexpr auto& Init = lifted::f8212B3A8;  // sub_8212B3A8
 inline constexpr auto& Reset = lifted::entry::e8212A9E0;  // sub_8212A9E0
 inline constexpr auto& Update = lifted::entry::e8212AA78;  // sub_8212AA78
 }  // namespace game::Smoke
+
+namespace game::SoftRaster {
+inline constexpr auto& DrawSpan = lifted::entry::e820EDE00;  // sub_820EDE00
+}  // namespace game::SoftRaster
 
 namespace game::SortedList {
 inline constexpr auto& Clear = lifted::entry::e82170A88;  // sub_82170A88
@@ -4382,6 +4790,9 @@ inline constexpr auto& Handle = lifted::entry::e82106280;  // sub_82106280
 }  // namespace game::StateMachine
 
 namespace game::Stats {
+inline constexpr auto& AddLoss = lifted::entry::e82113AB8;  // sub_82113AB8
+inline constexpr auto& AddOutcome3 = lifted::entry::e82113B50;  // sub_82113B50
+inline constexpr auto& AddWin = lifted::entry::e821139B8;  // sub_821139B8
 inline constexpr auto& WinStreak = lifted::entry::e82110B10;  // sub_82110B10
 }  // namespace game::Stats
 
@@ -4392,6 +4803,7 @@ inline constexpr auto& _Xran = lifted::f825944B0;  // sub_825944B0
 
 namespace game::Std::string {
 inline constexpr auto& Ctor = lifted::entry::e825929E8;  // sub_825929E8
+inline constexpr auto& _Copy = lifted::entry::e82091458;  // sub_82091458
 inline constexpr auto& _Tidy = lifted::entry::e82091328;  // sub_82091328
 }  // namespace game::Std::string
 
@@ -4405,6 +4817,7 @@ inline constexpr auto& Format = lifted::entry::e8210ABC0;  // sub_8210ABC0
 inline constexpr auto& FormatV = lifted::entry::e8210A990;  // sub_8210A990
 inline constexpr auto& Load = lifted::entry::e8210A8D0;  // sub_8210A8D0
 inline constexpr auto& OnLoaded = lifted::entry::e8210A850;  // sub_8210A850
+inline constexpr auto& PageCount = lifted::entry::e8210A5C0;  // sub_8210A5C0
 inline constexpr auto& Release = lifted::entry::e8210A538;  // sub_8210A538
 }  // namespace game::Strings
 
@@ -4417,6 +4830,8 @@ inline constexpr auto& Unlock = lifted::entry::e822A43F8;  // sub_822A43F8
 
 namespace game::TGA {
 inline constexpr auto& CreateImage = lifted::entry::e820ED020;  // sub_820ED020
+inline constexpr auto& Decode = lifted::entry::e820EF168;  // sub_820EF168
+inline constexpr auto& ParseHeader = lifted::entry::e820EEBF8;  // sub_820EEBF8
 }  // namespace game::TGA
 
 namespace game::TargetFilter {
@@ -4443,10 +4858,13 @@ inline constexpr auto& Set = lifted::entry::e8211B370;  // sub_8211B370
 
 namespace game::Texture {
 inline constexpr auto& Create = lifted::entry::e820ECF08;  // sub_820ECF08
+inline constexpr auto& Format = lifted::entry::e822A44A8;  // sub_822A44A8
 inline constexpr auto& Free = lifted::entry::e820ECFC8;  // sub_820ECFC8
 inline constexpr auto& GetLevelDesc = lifted::entry::e822A5B78;  // sub_822A5B78
 inline constexpr auto& GetSurfaceLevel = lifted::entry::e822A5B80;  // sub_822A5B80
+inline constexpr auto& LevelLayout = lifted::entry::e822A4B98;  // sub_822A4B98
 inline constexpr auto& LevelOffset = lifted::entry::e822A4FF0;  // sub_822A4FF0
+inline constexpr auto& LockLevel = lifted::entry::e822A54B0;  // sub_822A54B0
 inline constexpr auto& LockRectLevel = lifted::entry::e822A5C38;  // sub_822A5C38
 inline constexpr auto& Unlock = lifted::entry::e822A43E0;  // sub_822A43E0
 }  // namespace game::Texture
@@ -4454,6 +4872,11 @@ inline constexpr auto& Unlock = lifted::entry::e822A43E0;  // sub_822A43E0
 namespace game::TextureAnimations {
 inline constexpr auto& Advance = lifted::entry::e820F11A8;  // sub_820F11A8
 }  // namespace game::TextureAnimations
+
+namespace game::TextureLayout {
+inline constexpr auto& LevelCount = lifted::entry::e822A4530;  // sub_822A4530
+inline constexpr auto& Sizes = lifted::entry::e822A46C8;  // sub_822A46C8
+}  // namespace game::TextureLayout
 
 namespace game::TextureProjection {
 inline constexpr auto& Fit = lifted::entry::e82598768;  // sub_82598768
@@ -4469,11 +4892,17 @@ inline constexpr auto& Get = lifted::entry::e825946B8;  // sub_825946B8
 inline constexpr auto& GetXprTexture = lifted::entry::e825941D0;  // sub_825941D0
 inline constexpr auto& InsertN = lifted::entry::e82590EF0;  // sub_82590EF0
 inline constexpr auto& Set = lifted::entry::e82594718;  // sub_82594718
+inline constexpr auto& UninitializedCopy = lifted::entry::e82594380;  // sub_82594380
 }  // namespace game::TextureProvider
 
 namespace game::TgaHeader {
 inline constexpr auto& Clear = lifted::entry::e820EEBC0;  // sub_820EEBC0
 }  // namespace game::TgaHeader
+
+namespace game::TgaImage {
+inline constexpr auto& Clear = lifted::entry::e820EED38;  // sub_820EED38
+inline constexpr auto& Free = lifted::entry::e820EED58;  // sub_820EED58
+}  // namespace game::TgaImage
 
 namespace game::Thread {
 inline constexpr auto& Begin = lifted::entry::e8258DF18;  // sub_8258DF18
@@ -4487,12 +4916,21 @@ namespace game::TickHandler {
 inline constexpr auto& Invoke = lifted::entry::e82099A98;  // sub_82099A98
 }  // namespace game::TickHandler
 
+namespace game::Tiling {
+inline constexpr auto& LargestTile = lifted::entry::e8209ADD8;  // sub_8209ADD8
+}  // namespace game::Tiling
+
 namespace game::Time {
 inline constexpr auto& Add = lifted::entry::e820FF458;  // sub_820FF458
 inline constexpr auto& Clamp = lifted::f820FF790;  // sub_820FF790
 inline constexpr auto& Less = lifted::entry::e820FF708;  // sub_820FF708
 inline constexpr auto& Pack = lifted::entry::e82101700;  // sub_82101700
 }  // namespace game::Time
+
+namespace game::Tire {
+inline constexpr auto& InchUp = lifted::entry::e820C46B8;  // sub_820C46B8
+inline constexpr auto& MagicFormula = lifted::entry::e820B09C8;  // sub_820B09C8
+}  // namespace game::Tire
 
 namespace game::TitleLoad {
 inline constexpr auto& Create = lifted::entry::e82220BA8;  // sub_82220BA8
@@ -4566,6 +5004,7 @@ inline constexpr auto& WaitForMovie = lifted::entry::e82221FC8;  // sub_82221FC8
 }  // namespace game::TitleScreen
 
 namespace game::TitledListScreen {
+inline constexpr auto& Ctor = lifted::entry::e822570F0;  // sub_822570F0
 inline constexpr auto& DeletingDestructor = lifted::entry::e82257990;  // sub_82257990
 inline constexpr auto& Draw = lifted::entry::e822579E8;  // sub_822579E8
 inline constexpr auto& Dtor = lifted::entry::e82257138;  // sub_82257138
@@ -4630,6 +5069,7 @@ inline constexpr auto& WallHits = lifted::entry::e820FF1B0;  // sub_820FF1B0
 
 namespace game::TrackMesh {
 inline constexpr auto& Free = lifted::entry::e820F6940;  // sub_820F6940
+inline constexpr auto& GroundHeight = lifted::entry::e820F7AA0;  // sub_820F7AA0
 inline constexpr auto& Load = lifted::f820F77A0;  // sub_820F77A0
 inline constexpr auto& OnLoaded = lifted::entry::e820F69B0;  // sub_820F69B0
 inline constexpr auto& Prepare = lifted::entry::e820F68E8;  // sub_820F68E8
@@ -4661,13 +5101,18 @@ inline constexpr auto& Prepare = lifted::entry::e820F8600;  // sub_820F8600
 inline constexpr auto& SlicePoint = lifted::entry::e820F9768;  // sub_820F9768
 inline constexpr auto& SliceTest = lifted::entry::e820F8DE8;  // sub_820F8DE8
 inline constexpr auto& SpecialSection = lifted::entry::e820F8D38;  // sub_820F8D38
+inline constexpr auto& SplinePoint = lifted::entry::e820AB6A0;  // sub_820AB6A0
 inline constexpr auto& ToMainRoad = lifted::entry::e820FA728;  // sub_820FA728
 }  // namespace game::TrackRoute
 
 namespace game::TrackSet {
+inline constexpr auto& Advance = lifted::entry::e825A1D68;  // sub_825A1D68
+inline constexpr auto& Advance32 = lifted::entry::e825A10A8;  // sub_825A10A8
 inline constexpr auto& Ctor = lifted::entry::e825A1B70;  // sub_825A1B70
 inline constexpr auto& Release = lifted::entry::e825A1BA8;  // sub_825A1BA8
 inline constexpr auto& ReleaseArray = lifted::entry::e825A11D0;  // sub_825A11D0
+inline constexpr auto& Sample32 = lifted::entry::e825A0FE0;  // sub_825A0FE0
+inline constexpr auto& SampleFloat4 = lifted::entry::e825A1C88;  // sub_825A1C88
 inline constexpr auto& Setup208 = lifted::entry::e825A1A38;  // sub_825A1A38
 inline constexpr auto& Setup32 = lifted::entry::e825A1218;  // sub_825A1218
 inline constexpr auto& SetupFloat = lifted::entry::e825A1BE8;  // sub_825A1BE8
@@ -4681,6 +5126,10 @@ inline constexpr auto& IsInside = lifted::entry::e8228BDD0;  // sub_8228BDD0
 inline constexpr auto& Update = lifted::entry::e8228BD30;  // sub_8228BD30
 }  // namespace game::TrackZones
 
+namespace game::Traffic {
+inline constexpr auto& PickModel = lifted::entry::e82171070;  // sub_82171070
+}  // namespace game::Traffic
+
 namespace game::TrafficCar {
 inline constexpr auto& BindTextures = lifted::entry::e820D7D38;  // sub_820D7D38
 inline constexpr auto& DeletingDestructor = lifted::entry::e820D89B8;  // sub_820D89B8
@@ -4688,6 +5137,11 @@ inline constexpr auto& OnFileLoaded = lifted::entry::e820D8430;  // sub_820D8430
 }  // namespace game::TrafficCar
 
 namespace game::TrafficPoints {
+inline constexpr auto& DrawBody = lifted::entry::e820E55A0;  // sub_820E55A0
+inline constexpr auto& DrawHeadlights = lifted::entry::e820E61D8;  // sub_820E61D8
+inline constexpr auto& DrawTailLights = lifted::entry::e820E5B08;  // sub_820E5B08
+inline constexpr auto& DrawWindow = lifted::entry::e820E5668;  // sub_820E5668
+inline constexpr auto& Dtor = lifted::entry::e820E6980;  // sub_820E6980
 inline constexpr auto& Find = lifted::entry::e820E58C8;  // sub_820E58C8
 }  // namespace game::TrafficPoints
 
@@ -4701,6 +5155,7 @@ inline constexpr auto& Update = lifted::entry::e821292E8;  // sub_821292E8
 }  // namespace game::Trail
 
 namespace game::Triangle {
+inline constexpr auto& Init = lifted::entry::e820F4040;  // sub_820F4040
 inline constexpr auto& Record = lifted::entry::e8217DAA0;  // sub_8217DAA0
 }  // namespace game::Triangle
 
@@ -4719,6 +5174,7 @@ inline constexpr auto& WaitForMovies = lifted::entry::e821CE9E8;  // sub_821CE9E
 }  // namespace game::TuningMachine
 
 namespace game::TuningScreen {
+inline constexpr auto& AeroPartValue = lifted::entry::e821DE2D8;  // sub_821DE2D8
 inline constexpr auto& AnimateInteriorGrid = lifted::f821ED108;  // sub_821ED108
 inline constexpr auto& AnimateInteriorList = lifted::f821EC038;  // sub_821EC038
 inline constexpr auto& AnimateInteriorModes = lifted::f821EBA00;  // sub_821EBA00
@@ -4730,7 +5186,9 @@ inline constexpr auto& AnimateLightKinds = lifted::f821E9DD8;  // sub_821E9DD8
 inline constexpr auto& AnimatePaint = lifted::f821F3A68;  // sub_821F3A68
 inline constexpr auto& AnimateSlots = lifted::f821EDCA8;  // sub_821EDCA8
 inline constexpr auto& DrawPowerGraph = lifted::entry::e821DF350;  // sub_821DF350
+inline constexpr auto& EquipChoice = lifted::entry::e821DF448;  // sub_821DF448
 inline constexpr auto& HandleInput = lifted::entry::e821E6950;  // sub_821E6950
+inline constexpr auto& HideNode19 = lifted::entry::e821DFBE8;  // sub_821DFBE8
 inline constexpr auto& InputInteriorGrid = lifted::f821F1130;  // sub_821F1130
 inline constexpr auto& InputInteriorList = lifted::f821F0998;  // sub_821F0998
 inline constexpr auto& InputInteriorModes = lifted::f821F5B98;  // sub_821F5B98
@@ -4743,11 +5201,30 @@ inline constexpr auto& InputOptionRows = lifted::f821D7C90;  // sub_821D7C90
 inline constexpr auto& InputPaint = lifted::f821F5288;  // sub_821F5288
 inline constexpr auto& InputPickSlot = lifted::f821F1780;  // sub_821F1780
 inline constexpr auto& InputRemoveSlot = lifted::f821F1AB8;  // sub_821F1AB8
+inline constexpr auto& IsItemAvailable = lifted::entry::e821CDB18;  // sub_821CDB18
+inline constexpr auto& LoadCurrentChoices = lifted::entry::e821DA4B0;  // sub_821DA4B0
+inline constexpr auto& LoadInteriorSlots = lifted::entry::e821DE280;  // sub_821DE280
+inline constexpr auto& LoadOwnedParts = lifted::entry::e821DBAB0;  // sub_821DBAB0
+inline constexpr auto& LoadUnlockedParts = lifted::entry::e821CFFC8;  // sub_821CFFC8
 inline constexpr auto& MoveOptionRow = lifted::f821D4540;  // sub_821D4540
 inline constexpr auto& OnDialogYes = lifted::entry::e821E2660;  // sub_821E2660
+inline constexpr auto& PickCameraPreset = lifted::entry::e821D99A0;  // sub_821D99A0
 inline constexpr auto& PlaceInteriorMarks = lifted::f821F32C8;  // sub_821F32C8
+inline constexpr auto& PreviewItem = lifted::entry::e821E07B0;  // sub_821E07B0
+inline constexpr auto& RefreshInterior = lifted::entry::e821F2AD8;  // sub_821F2AD8
+inline constexpr auto& RefreshLightKits = lifted::entry::e821F2378;  // sub_821F2378
+inline constexpr auto& RefreshMovie13 = lifted::entry::e822076E8;  // sub_822076E8
+inline constexpr auto& RefreshMovie14 = lifted::entry::e821F7A98;  // sub_821F7A98
+inline constexpr auto& RefreshPaint = lifted::entry::e821F2110;  // sub_821F2110
+inline constexpr auto& SetAeroAvailability = lifted::entry::e821DE160;  // sub_821DE160
+inline constexpr auto& SetCarStats = lifted::entry::e821DF788;  // sub_821DF788
+inline constexpr auto& SetPrices = lifted::entry::e821DAD58;  // sub_821DAD58
+inline constexpr auto& SetStateTexts = lifted::entry::e821F1DE0;  // sub_821F1DE0
 inline constexpr auto& SetUpCarData = lifted::entry::e821DF2F8;  // sub_821DF2F8
+inline constexpr auto& ShowInteriorPicture = lifted::entry::e821DA3F8;  // sub_821DA3F8
+inline constexpr auto& ShowTireMarks = lifted::entry::e821E22E8;  // sub_821E22E8
 inline constexpr auto& Update = lifted::entry::e821E6C50;  // sub_821E6C50
+inline constexpr auto& WheelNumber = lifted::entry::e821CDED8;  // sub_821CDED8
 }  // namespace game::TuningScreen
 
 namespace game::TvCamera {
@@ -4899,6 +5376,7 @@ inline constexpr auto& Reenter = lifted::entry::e8218D9B8;  // sub_8218D9B8
 inline constexpr auto& Resume = lifted::f8218DE18;  // sub_8218DE18
 inline constexpr auto& SavePromptPage = lifted::f82190168;  // sub_82190168
 inline constexpr auto& SelectCarSettings = lifted::f8218F620;  // sub_8218F620
+inline constexpr auto& ShowNoticeImage = lifted::entry::e8218F3F8;  // sub_8218F3F8
 inline constexpr auto& Start = lifted::entry::e8218F6E0;  // sub_8218F6E0
 inline constexpr auto& Transition0 = lifted::entry::e821901C0;  // sub_821901C0
 inline constexpr auto& Transition1 = lifted::entry::e8218EC78;  // sub_8218EC78
@@ -5376,6 +5854,10 @@ namespace game::UiNode {
 inline constexpr auto& CopyFields = lifted::f82119EA8;  // sub_82119EA8
 }  // namespace game::UiNode
 
+namespace game::Unlock {
+inline constexpr auto& State = lifted::entry::e82142EC0;  // sub_82142EC0
+}  // namespace game::Unlock
+
 namespace game::UserInfo {
 inline constexpr auto& Close = lifted::entry::e8220ABB8;  // sub_8220ABB8
 inline constexpr auto& Closing = lifted::entry::e8220AC60;  // sub_8220AC60
@@ -5396,8 +5878,20 @@ inline constexpr auto& Create = lifted::f82099A08;  // sub_82099A08
 inline constexpr auto& SignedIn = lifted::entry::e820996D8;  // sub_820996D8
 }  // namespace game::Users
 
+namespace game::UvColumn {
+inline constexpr auto& Copy = lifted::entry::e82130088;  // sub_82130088
+inline constexpr auto& Ctor = lifted::entry::e82130140;  // sub_82130140
+inline constexpr auto& Dtor = lifted::entry::e82131EE0;  // sub_82131EE0
+inline constexpr auto& InsertUnique = lifted::entry::e82131CB8;  // sub_82131CB8
+inline constexpr auto& LowerBound = lifted::entry::e8212FFC8;  // sub_8212FFC8
+}  // namespace game::UvColumn
+
 namespace game::UvMap {
+inline constexpr auto& AllocateNodes = lifted::entry::e8212FC50;  // sub_8212FC50
 inline constexpr auto& Ctor = lifted::entry::e82130198;  // sub_82130198
+inline constexpr auto& Erase = lifted::entry::e82132BD8;  // sub_82132BD8
+inline constexpr auto& InsertUnique = lifted::entry::e821321F8;  // sub_821321F8
+inline constexpr auto& LowerBound = lifted::entry::e82130028;  // sub_82130028
 }  // namespace game::UvMap
 
 namespace game::V16U16Codec {
@@ -5428,6 +5922,7 @@ inline constexpr auto& SwapXZ = lifted::entry::e820AB688;  // sub_820AB688
 
 namespace game::Vec4 {
 inline constexpr auto& Copy = lifted::entry::e822940E0;  // sub_822940E0
+inline constexpr auto& DivideBy = lifted::entry::e82294348;  // sub_82294348
 inline constexpr auto& Equal = lifted::entry::e82123300;  // sub_82123300
 inline constexpr auto& ScaleTo = lifted::entry::e822940A8;  // sub_822940A8
 inline constexpr auto& Scaled = lifted::entry::e82294430;  // sub_82294430
@@ -5438,7 +5933,12 @@ namespace game::Vector {
 inline constexpr auto& AngleBetween = lifted::f821266C8;  // sub_821266C8
 }  // namespace game::Vector
 
+namespace game::Vector16 {
+inline constexpr auto& Size = lifted::entry::e825971E8;  // sub_825971E8
+}  // namespace game::Vector16
+
 namespace game::Vehicle {
+inline constexpr auto& AxleReactionTorque = lifted::entry::e820B3130;  // sub_820B3130
 inline constexpr auto& Ctor = lifted::entry::e820B42C8;  // sub_820B42C8
 inline constexpr auto& DestroyPhysics = lifted::entry::e820B0E70;  // sub_820B0E70
 inline constexpr auto& EngineTorque = lifted::entry::e820B00C8;  // sub_820B00C8
@@ -5458,6 +5958,7 @@ inline constexpr auto& RemoveFromWorld = lifted::entry::e820C20E0;  // sub_820C2
 inline constexpr auto& ResetForCar = lifted::entry::e820C33B8;  // sub_820C33B8
 inline constexpr auto& ResetPhysics = lifted::entry::e820B5B08;  // sub_820B5B08
 inline constexpr auto& SetBrake = lifted::entry::e820B3E08;  // sub_820B3E08
+inline constexpr auto& SetGearValues = lifted::entry::e820B3C90;  // sub_820B3C90
 inline constexpr auto& SetHandbrake = lifted::entry::e820B3E38;  // sub_820B3E38
 inline constexpr auto& SetSteering = lifted::entry::e820B3D10;  // sub_820B3D10
 inline constexpr auto& SetThrottle = lifted::entry::e820B3E68;  // sub_820B3E68
@@ -5468,8 +5969,17 @@ inline constexpr auto& SetupFromCar = lifted::entry::e820C27E8;  // sub_820C27E8
 inline constexpr auto& SlipWheelValue = lifted::entry::e820C0310;  // sub_820C0310
 inline constexpr auto& Speed = lifted::entry::e820C0148;  // sub_820C0148
 inline constexpr auto& SteerTowards = lifted::entry::e820B5FD8;  // sub_820B5FD8
+inline constexpr auto& SurfaceValue = lifted::entry::e820B0508;  // sub_820B0508
+inline constexpr auto& SurfaceValue12 = lifted::entry::e820B05B8;  // sub_820B05B8
+inline constexpr auto& SurfaceValue16 = lifted::entry::e820B0610;  // sub_820B0610
+inline constexpr auto& SurfaceValue20 = lifted::entry::e820B0560;  // sub_820B0560
 inline constexpr auto& SyncFromBody = lifted::entry::e820B13C8;  // sub_820B13C8
 inline constexpr auto& Tick = lifted::entry::e820C3020;  // sub_820C3020
+inline constexpr auto& UpdateDrivenAxle = lifted::entry::e820B31D0;  // sub_820B31D0
+inline constexpr auto& UpdateFreeAxle = lifted::entry::e820B3010;  // sub_820B3010
+inline constexpr auto& UpdateGearbox = lifted::entry::e820B4CF0;  // sub_820B4CF0
+inline constexpr auto& UpdateWheelSuspension = lifted::entry::e820B5588;  // sub_820B5588
+inline constexpr auto& WheelSlip = lifted::entry::e820C0180;  // sub_820C0180
 }  // namespace game::Vehicle
 
 namespace game::VehicleStatus {
@@ -5540,6 +6050,11 @@ inline constexpr auto& Process = lifted::entry::e825A6210;  // sub_825A6210
 inline constexpr auto& Size = lifted::entry::e825A60E0;  // sub_825A60E0
 }  // namespace game::VolumeMeter
 
+namespace game::WallQuery {
+inline constexpr auto& GatherCells = lifted::entry::e820FC188;  // sub_820FC188
+inline constexpr auto& TestCell = lifted::entry::e820FDC18;  // sub_820FDC18
+}  // namespace game::WallQuery
+
 namespace game::WaveBankHolder {
 inline constexpr auto& Ctor = lifted::entry::e8259D418;  // sub_8259D418
 }  // namespace game::WaveBankHolder
@@ -5550,9 +6065,17 @@ inline constexpr auto& Init = lifted::entry::e8210C9D8;  // sub_8210C9D8
 
 namespace game::Wheel {
 inline constexpr auto& Copy = lifted::entry::e820B0A50;  // sub_820B0A50
+inline constexpr auto& Swap = lifted::entry::e820CB588;  // sub_820CB588
 }  // namespace game::Wheel
 
 namespace game::WheelPoints {
+inline constexpr auto& DrawBrakes = lifted::entry::e820EB388;  // sub_820EB388
+inline constexpr auto& DrawBrakesMorphed = lifted::entry::e820EBEB8;  // sub_820EBEB8
+inline constexpr auto& DrawRimA = lifted::entry::e820E9A28;  // sub_820E9A28
+inline constexpr auto& DrawRimAMorphed = lifted::entry::e820EA148;  // sub_820EA148
+inline constexpr auto& DrawRimB = lifted::entry::e820EA950;  // sub_820EA950
+inline constexpr auto& DrawTire = lifted::entry::e820E8AE8;  // sub_820E8AE8
+inline constexpr auto& DrawTireMorphed = lifted::entry::e820E9318;  // sub_820E9318
 inline constexpr auto& SetUp = lifted::entry::e820E8668;  // sub_820E8668
 }  // namespace game::WheelPoints
 
@@ -5564,6 +6087,7 @@ namespace game::Wheels {
 inline constexpr auto& ApplyPalette = lifted::entry::e820D92A0;  // sub_820D92A0
 inline constexpr auto& DeletingDestructor = lifted::entry::e820D95E8;  // sub_820D95E8
 inline constexpr auto& SetRecord = lifted::entry::e820D8EC0;  // sub_820D8EC0
+inline constexpr auto& SetTireTextures = lifted::entry::e820D8F18;  // sub_820D8F18
 inline constexpr auto& SetUp = lifted::entry::e820D9110;  // sub_820D9110
 }  // namespace game::Wheels
 
@@ -5594,6 +6118,8 @@ inline constexpr auto& EncodeRow = lifted::f823EC0A0;  // sub_823EC0A0
 namespace game::X3DAudio {
 inline constexpr auto& Delay = lifted::f82481708;  // sub_82481708
 inline constexpr auto& EmitterAngle = lifted::f82480780;  // sub_82480780
+inline constexpr auto& EvaluateCurve = lifted::entry::e82480818;  // sub_82480818
+inline constexpr auto& Pan = lifted::entry::e82480F80;  // sub_82480F80
 }  // namespace game::X3DAudio
 
 namespace game::X4R4G4B4Codec {
@@ -5880,8 +6406,10 @@ inline constexpr auto& UsesWaveBank = lifted::f825D03B0;  // sub_825D03B0
 
 namespace game::XACTTrackInstance {
 inline constexpr auto& AddHelper = lifted::f825D5DE8;  // sub_825D5DE8
+inline constexpr auto& CancelEvents = lifted::entry::e825D5520;  // sub_825D5520
 inline constexpr auto& Ctor = lifted::entry::e825D57D0;  // sub_825D57D0
 inline constexpr auto& Dtor = lifted::entry::e825D5E58;  // sub_825D5E58
+inline constexpr auto& Prepare = lifted::entry::e825D5A48;  // sub_825D5A48
 inline constexpr auto& RemoveHelper = lifted::f825D5E08;  // sub_825D5E08
 inline constexpr auto& SetChannelMatrix = lifted::f825D5758;  // sub_825D5758
 inline constexpr auto& SetMainMatrix = lifted::f825D5738;  // sub_825D5738
@@ -5907,7 +6435,9 @@ inline constexpr auto& Entry = lifted::f825D36F0;  // sub_825D36F0
 }  // namespace game::XACTTransitionTable
 
 namespace game::XACTVariable {
+inline constexpr auto& Ctor = lifted::entry::e825C20B0;  // sub_825C20B0
 inline constexpr auto& DeletingDestructor = lifted::entry::e825C3EE0;  // sub_825C3EE0
+inline constexpr auto& Init = lifted::entry::e825C1DE0;  // sub_825C1DE0
 inline constexpr auto& Notify = lifted::f825C1E08;  // sub_825C1E08
 inline constexpr auto& SetValue = lifted::f825C1F88;  // sub_825C1F88
 }  // namespace game::XACTVariable
@@ -5943,6 +6473,7 @@ inline constexpr auto& AudioUpdate = lifted::entry::e825D2560;  // sub_825D2560
 inline constexpr auto& Dtor = lifted::f825D2A48;  // sub_825D2A48
 inline constexpr auto& GetDurationMs = lifted::f825D2380;  // sub_825D2380
 inline constexpr auto& GetLengthMs = lifted::f825D2300;  // sub_825D2300
+inline constexpr auto& Notify = lifted::entry::e825D2030;  // sub_825D2030
 inline constexpr auto& OnBankEvent = lifted::f825D24B0;  // sub_825D24B0
 inline constexpr auto& Pause = lifted::entry::e825D1ED8;  // sub_825D1ED8
 inline constexpr auto& RequestNext = lifted::entry::e825D1C30;  // sub_825D1C30
@@ -5988,6 +6519,7 @@ inline constexpr auto& Dtor = lifted::f825CC6D0;  // sub_825CC6D0
 }  // namespace game::XACTWaveBankRoot
 
 namespace game::XACTWaveEntry {
+inline constexpr auto& FindXmaBlock = lifted::entry::e825CEF50;  // sub_825CEF50
 inline constexpr auto& GetLoopLength = lifted::entry::e82379D50;  // sub_82379D50
 inline constexpr auto& GetPlayLength = lifted::f82099BA0;  // sub_82099BA0
 }  // namespace game::XACTWaveEntry
@@ -6097,6 +6629,10 @@ inline constexpr auto& Start = lifted::entry::e8245EBA0;  // sub_8245EBA0
 inline constexpr auto& Stop = lifted::entry::e8245E9F0;  // sub_8245E9F0
 }  // namespace game::XAudioSourceVoice
 
+namespace game::XAudioStage {
+inline constexpr auto& Swap = lifted::entry::e8245B208;  // sub_8245B208
+}  // namespace game::XAudioStage
+
 namespace game::XAudioSubmixVoice {
 inline constexpr auto& DeletingDestructor = lifted::entry::e8245F3A0;  // sub_8245F3A0
 inline constexpr auto& GetState = lifted::f8245F218;  // sub_8245F218
@@ -6123,10 +6659,12 @@ inline constexpr auto& MixToOutputs = lifted::entry::e82460CB8;  // sub_82460CB8
 inline constexpr auto& Pass = lifted::entry::e82461070;  // sub_82461070
 inline constexpr auto& Play = lifted::entry::e82461798;  // sub_82461798
 inline constexpr auto& ProcessEffects = lifted::entry::e82461E88;  // sub_82461E88
+inline constexpr auto& ReleaseOutputs = lifted::entry::e82460A58;  // sub_82460A58
 inline constexpr auto& Release_82459E18 = lifted::entry::e82459E18;  // sub_82459E18
 inline constexpr auto& Release_8245F878 = lifted::entry::e8245F878;  // sub_8245F878
 inline constexpr auto& SetEffectEnabled = lifted::f824614C8;  // sub_824614C8
 inline constexpr auto& SetEffectParameters = lifted::entry::e82461418;  // sub_82461418
+inline constexpr auto& SetFormatWords = lifted::entry::e82461140;  // sub_82461140
 inline constexpr auto& SetOutputMatrices = lifted::entry::e82460AB8;  // sub_82460AB8
 inline constexpr auto& SetOutputMatrix = lifted::entry::e82459F48;  // sub_82459F48
 inline constexpr auto& SetOutputVoices_82459EF0 = lifted::entry::e82459EF0;  // sub_82459EF0

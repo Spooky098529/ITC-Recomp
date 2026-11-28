@@ -677,3 +677,8 @@ ITC_NATIVE_ENTRY_ALWAYS(82110258) {
   }
   hooks::CarSoundsGlobalsInit(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): they call these by
+// address, so each runs its register step directly (no dispatch entry).
+ITC_DIRECT_ENTRY(82480818) { hooks::CarSoundsX3DEvaluateCurve(ctx); }
+ITC_DIRECT_ENTRY(82480F80) { hooks::CarSoundsX3DPan(ctx); }

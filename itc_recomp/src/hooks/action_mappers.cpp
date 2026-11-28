@@ -270,3 +270,48 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   });
   ctx.lr = saved_lr;
 }
+
+// For the fallback originals (docs/missing-functions.md): hand ports with
+// no adapter that lifted/originals.cpp calls by address. The floats as the
+// originals' (no flush to zero).
+// InputClient::InputClient: r3 = the node (left), r4 = the type.
+ITC_DIRECT_ENTRY(8210AE60) { InputClientConstruct(ctx.r3.u32, ctx.r4.u32); }
+// ActionMapper::Hysteresis: r3 = the words (mapper + 448), r4 = the index,
+// f1 = the value, r6 = the config.
+ITC_DIRECT_ENTRY(8210B718) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Hysteresis(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
+}
+// ActionMapper::Analog: r3 = mapper + 1072, r4 = the config, r5 = the raw
+// values; f1 left as the last curve's result. The original where a curve
+// object's slot isn't the one seen in play.
+ITC_DIRECT_ENTRY(8210B7D0) {
+  if (!CurvesKnown(ctx.r3.u32 - 1072)) {
+    lifted::original::c8210B7D0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = ctx.f1.f64;
+  ctx.r3.u64 = Analog(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+// ActionMapper::Words: r3 = mapper + 448, r4 = the config, r5 = the
+// states' word's address; the held word's stack bits from r1 - 64 (its
+// frame's +80). The original where a repeat object's slot isn't known.
+ITC_DIRECT_ENTRY(8210BBA0) {
+  if (!RepeatsKnown(ctx.r3.u32 - 448)) {
+    lifted::original::c8210BBA0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Words(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, guest::LoadU32(ctx.r1.u32 - 64));
+}
+// ActionMapper::ResetStages: r3 = mapper + 448.
+ITC_DIRECT_ENTRY(8210C078) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ResetStages(ctx.r3.u32);
+}
+// ClientList::ClientList and ClientList::Add: r3 = the list or the node
+// (left).
+ITC_DIRECT_ENTRY(8259C7B8) { ClientListConstruct(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(8259C960) { ClientListAdd(ctx.r3.u32); }

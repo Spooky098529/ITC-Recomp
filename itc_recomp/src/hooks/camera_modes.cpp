@@ -1590,3 +1590,50 @@ ITC_REGS_STEP(CameraModesStep82156CC0) {
 }  // namespace hooks
 
 ITC_CAMERA_MODES_CONSTRUCT(82156CC0)
+
+// For the fallback originals (docs/missing-functions.md).
+// TrackRoute::SplinePoint: r3 = out, r4 = the matrix, r5 = the position,
+// f1 = t; its atexit through the translated code from its frame (720 bytes)
+// when the native one can't, the original without native atexit (as
+// CameraPath::Evaluate's step).
+ITC_DIRECT_ENTRY(820AB6A0) {
+  if (!hooks::NativeAtexit()) {
+    lifted::original::c820AB6A0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  SplineAtexit atexit{ctx, ctx.r1.u32 - 720};
+  cm::SplinePoint(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32,
+                  atexit.Call());
+}
+// Key::Value: r3 = the pair, f1 = t; f1 the value.
+ITC_DIRECT_ENTRY(820AC178) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = cm::KeyValue(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
+}
+// CameraAnimBlock::Free: r3 = the block.
+ITC_DIRECT_ENTRY(8214FFF0) { cm::BlockFree(ctx.r3.u32); }
+// CameraAnim::EvalTarget: r4 = the object, r5 = out, r6 = the time.
+ITC_DIRECT_ENTRY(821504E0) {
+  ctx.fpscr.disableFlushMode();
+  cm::AnimEvalTarget(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+// Camera::ShakeRandom: r3 = the viewport, f1 = the amount; its frame 160
+// bytes below.
+ITC_DIRECT_ENTRY(82152BD8) {
+  ctx.fpscr.disableFlushMode();
+  cm::ShakeRandom(ctx.r3.u32, ctx.f1.f64, ctx.r1.u32 - 160);
+}
+ITC_DIRECT_ENTRY(82153228) { hooks::CameraModesStep82153228(ctx); }
+ITC_DIRECT_ENTRY(82154300) { hooks::CameraModesStep82154300(ctx); }
+// RivalLogo::InitXpr: r3 = the holder; r3 = its XPR (+4), as XPR::XPR
+// leaves it.
+ITC_DIRECT_ENTRY(82211708) {
+  cm::RivalLogoInitXpr(ctx.r3.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 4;
+}
+// Hermite::Basis: r3 = out, r4, r5 the keys, f1 = t.
+ITC_DIRECT_ENTRY(82293A48) {
+  ctx.fpscr.disableFlushMode();
+  cm::HermiteBasis(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64);
+}

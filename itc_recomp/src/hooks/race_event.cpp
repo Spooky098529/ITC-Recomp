@@ -327,3 +327,11 @@ RACE_EVENT_ADAPTER(821442D8, RaceEventPlaceUnlockedCurrent)
 RACE_EVENT_ADAPTER(821434A0, RaceEventSectionRivalCurrent)
 RACE_EVENT_ADAPTER(821435C8, RaceEventItemsAvailable)
 RACE_EVENT_ADAPTER(821431C0, RaceEventGroupItem)
+
+// For the fallback originals (docs/missing-functions.md)
+ITC_DIRECT_ENTRY(82142EC0) { hooks::RaceEventUnlockState(ctx); }
+ITC_DIRECT_ENTRY(82143358) { hooks::RaceEventGroupFree(ctx); }
+ITC_DIRECT_ENTRY(821433A8) { hooks::RaceEventGroupAlloc(ctx); }
+ITC_DIRECT_ENTRY(82143420) { hooks::RaceEventPoolsCopyIds(ctx); }
+ITC_DIRECT_ENTRY(82143528) { hooks::RaceEventItemsBeaten(ctx); }
+ITC_DIRECT_ENTRY(82144458) { hooks::RaceEventPoolsAddRivals(ctx); }

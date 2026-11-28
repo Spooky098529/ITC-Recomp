@@ -504,3 +504,33 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 ITC_POST_EFFECT_DELETE(821389C8, EffectKind::kGlow)
 ITC_POST_EFFECT_DELETE(82138570, EffectKind::kColorFilter)
 ITC_POST_EFFECT_DELETE(821385C0, EffectKind::kMotionBlur)
+
+// For the fallback originals (docs/missing-functions.md).
+// GlareDef::Init: r3 = the glare, r4 = the type.
+ITC_DIRECT_ENTRY(8212EC90) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = GlareDefInit(ctx.r3.u32, ctx.r4.u32);
+}
+// GlareDef::GlareDef: r3 = the glare, left as is.
+ITC_DIRECT_ENTRY(8212ED78) {
+  ctx.fpscr.disableFlushMode();
+  GlareDefConstruct(ctx.r3.u32);
+}
+// RenderTexture::Create: r3 = the entry, r4 = the format, r5, r6 = the
+// size, r7 = the id, r8, r9 = the key (r1 = the stack).
+ITC_DIRECT_ENTRY(821330D0) {
+  ctx.r3.u64 = RenderTextureCreate(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                   ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
+}
+// Glow::RecordStarPass: r3 = the glow, r4 = the texture, r5 = samples,
+// f1-f4, r8 = the colors, r9 = the pass, the destination at r1 + 92.
+ITC_DIRECT_ENTRY(82134060) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t r3 = GlowRecordStarPass(
+      ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
+      ctx.f4.f64, ctx.r8.u32, ctx.r9.u32, guest::LoadU32(ctx.r1.u32 + 92),
+      hooks::PostEffectsRecordCalls(ctx));
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}

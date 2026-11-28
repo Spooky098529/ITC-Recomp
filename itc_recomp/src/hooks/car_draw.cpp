@@ -443,6 +443,21 @@ ITC_REGS_STEP(CarDrawUpdate) {
   LeaveLeft(ctx, left);
 }
 
+// A direct entry's draw (docs/missing-functions.md): the plain C++ with the
+// area's calls from the register view, r3 as the original leaves it. No
+// callees check: there's no original to fall back to, and the native
+// callers call these the same way.
+template <typename Draw>
+void CarDrawDirect(lifted::Regs& ctx, Draw draw) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left = draw(calls);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)                         \
@@ -482,3 +497,85 @@ ITC_REGS_STEP(CarDrawUpdate) {
 // C++).
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 #undef ITC_CAR_DRAW
+
+// For the fallback originals (docs/missing-functions.md): the hand ports
+// with no adapter that lifted/originals.cpp calls by address. r1 is the
+// stack; the callers' r24 and r28 aren't carried (diagnostic only), so 0.
+#define ITC_CAR_DRAW_DIRECT(address, ...)                                    \
+  ITC_DIRECT_ENTRY(address) {                                                \
+    hooks::CarDrawDirect(ctx, [&](const car_draw::Calls& calls) {            \
+      [[maybe_unused]] const uint32_t r1 = ctx.r1.u32, r3 = ctx.r3.u32;       \
+      [[maybe_unused]] const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32;       \
+      [[maybe_unused]] const uint32_t r6 = ctx.r6.u32;                        \
+      return car_draw::__VA_ARGS__;                                          \
+    });                                                                      \
+  }
+
+// The cockpit and the light kit's neons (never had adapters).
+ITC_CAR_DRAW_DIRECT(820DBD38, CockpitPointsDraw(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820DCC10, LightPointsDrawNeon(calls, car_draw::LightGroup::kFront, r1, r3,
+                                                  ctx.r4.u64, r5, r6, 0, 0))
+ITC_CAR_DRAW_DIRECT(820DD0B0, LightPointsDrawNeon(calls, car_draw::LightGroup::kSides, r1, r3,
+                                                  ctx.r4.u64, r5, r6, 0, 0))
+ITC_CAR_DRAW_DIRECT(820DD5C0, LightPointsDrawNeon(calls, car_draw::LightGroup::kRear, r1, r3,
+                                                  ctx.r4.u64, r5, r6, 0, 0))
+// The parts' small draws, the lamps and the shadows.
+ITC_CAR_DRAW_DIRECT(820DE1C8, PartsDrawFrontBumperLights(calls, r1, r3, r4, r5, r6, 0))
+ITC_CAR_DRAW_DIRECT(820DE3C0, PartsDrawRearBumperLights(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DE6E0, PartsDrawDoorPanel(calls, false, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DE760, PartsDrawDoorWindows(calls, false, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DE8C8, PartsDrawDoorPanel(calls, true, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DE948, PartsDrawDoorWindows(calls, true, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DEA88, PartsDrawDoorsBody(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DEAF0, PartsDrawDoorsWindows(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DED88, PartsDrawFendersBody(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DEDD8, PartsDrawFenderLights(calls, r1, r3, r4, r5, r6, 0))
+ITC_CAR_DRAW_DIRECT(820DEF38, PartsDrawCabinWindow02(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DEFA8, PartsDrawCabinWindow01(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DF070, PartsDrawEngine(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DF308, PartsDrawFrontBumper(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DF458, PartsDrawRearBumper(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820DF8B0, PartsDrawTailLights(calls, r1, r3, r4, r5, 0, 0))
+ITC_CAR_DRAW_DIRECT(820E0998, PartsDrawBonnet(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E0B40, PartsDrawDoor(calls, false, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E0E38, PartsDrawDoor(calls, true, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E1138, PartsDrawShadowed(calls, true, r1, r3, r5, r6, 0))
+ITC_CAR_DRAW_DIRECT(820E1260, PartsDrawShadowed(calls, false, r1, r3, r5, r4 + 16, 0))
+ITC_CAR_DRAW_DIRECT(820E13E0, PartsDrawHeadlightBody(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E1690, PartsDrawHeadlights(calls, r1, r3, r4, r5, ctx.r6.u64, ctx.r7.u64,
+                                                  0))
+ITC_CAR_DRAW_DIRECT(820E1D88, PartsDrawShadows(calls, r1, r3, r4))
+// The interior's leaves.
+ITC_CAR_DRAW_DIRECT(820E3170, InteriorDrawDialFaces(calls, r1, r3, r4, r5, 0, 0))
+ITC_CAR_DRAW_DIRECT(820E3548, InteriorDrawRollCage(calls, r1, r3, r4, r5, 0, 0))
+ITC_CAR_DRAW_DIRECT(820E3AD8, InteriorDrawMeterFaces(calls, r1, ctx.r3.u64, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E3CF0, InteriorDrawSeats(calls, r1, r3, r4, r5, 0, 0))
+ITC_CAR_DRAW_DIRECT(820E51D0, InteriorDrawReadouts(calls, r1, ctx.r3.u64, r4, r5, 0, 0))
+// The traffic body's leaves.
+ITC_CAR_DRAW_DIRECT(820E55A0, TrafficDrawBody(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E5668, TrafficDrawWindow(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E5B08, TrafficDrawTailLights(calls, r1, r3, r4, r5, 0, 0))
+ITC_CAR_DRAW_DIRECT(820E61D8, TrafficDrawHeadlights(calls, r1, r3, r4, r5, 0, 0))
+// The wheels' tires, rims and brakes (r4 the camera pass, r5 the block).
+ITC_CAR_DRAW_DIRECT(820E8AE8, WheelsDrawTire(calls, r1, r3, r4, r5))
+ITC_CAR_DRAW_DIRECT(820E9318, WheelsDrawTireMorphed(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820E9A28, WheelsDrawRimA(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820EA148, WheelsDrawRimAMorphed(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820EA950, WheelsDrawRimB(calls, r1, r3, r4, r5))
+ITC_CAR_DRAW_DIRECT(820EB388, WheelsDrawBrakes(calls, r1, r3, r4, r5, 0))
+ITC_CAR_DRAW_DIRECT(820EBEB8, WheelsDrawBrakesMorphed(calls, r1, r3, r4, r5, 0))
+#undef ITC_CAR_DRAW_DIRECT
+
+// XGSetVertexBufferHeader: r3 = the length, r4 = the usage, r5 = the pool
+// (not read), r6 = the offset, r7 = the header; returns the header.
+ITC_DIRECT_ENTRY(8235A688) {
+  ctx.r3.u64 = car_draw::XgSetVertexBufferHeader(ctx.r3.u32, ctx.r4.u32, ctx.r6.u32,
+                                                 ctx.r7.u32, ctx.r1.u32);
+}
+
+// Matrix::Shadow (a leaf): r3 = out, r4 = the light, r5 = a point, r6 = the
+// normal; r3 left as it came, as the original's.
+ITC_DIRECT_ENTRY(82597FE0) {
+  ctx.fpscr.disableFlushMode();
+  car_draw::MatrixShadow(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}

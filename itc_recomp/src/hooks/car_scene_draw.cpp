@@ -299,3 +299,8 @@ ITC_REGS_STEP(CarSceneDrawRoot) {
 // and Matrix::LookAt by the projectors'). The register steps above stay for
 // the harness and the wraps: the wrapped functions' are called by their wraps
 // in src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(82597150) { hooks::CarSceneDrawBoxExtend(ctx); }
+ITC_DIRECT_ENTRY(825971E8) { hooks::CarSceneDrawVector16Size(ctx); }
+ITC_DIRECT_ENTRY(825976C8) { hooks::CarSceneDrawPlaneIntersect3(ctx); }

@@ -11,6 +11,7 @@
 #include "hooks/car_physics.h"
 
 #include "base/flags.h"
+#include "c_runtime/strings.h"
 #include "car_physics/car_physics.h"
 #include "hooks/heap.h"
 #include "lifted/sdk.h"
@@ -472,3 +473,127 @@ ITC_NATIVE_ENTRY(820B92C8, ITC_FLAG(native_car_physics)) {
   ctx.r3.u64 = CollisionWorldUpdate(ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32,
                                     hooks::CollisionWorldUpdateCalls(ctx));
 }
+
+// For the fallback originals (docs/missing-functions.md): ports with no
+// adapter that lifted/originals.cpp calls by address. Flush-to-zero off for
+// the work (VECTOR leaves it on after), r3 and f1 left as the originals
+// leave them, as the adapters above.
+#define ITC_CAR_PHYSICS_DIRECT(address, body) \
+  ITC_DIRECT_ENTRY(address) {                 \
+    ctx.fpscr.disableFlushMode();             \
+    body;                                     \
+  }
+#define ITC_CAR_PHYSICS_DIRECT_VECTOR(address, body) \
+  ITC_DIRECT_ENTRY(address) {                        \
+    ctx.fpscr.disableFlushMode();                    \
+    body;                                            \
+    ctx.fpscr.enableFlushMode();                     \
+  }
+
+// r4 = the wheel; f1 = the value (r3 left as it is: leaves).
+ITC_CAR_PHYSICS_DIRECT(820B0508, ctx.f1.f64 = VehicleSurfaceValue(ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS_DIRECT(820B0560, ctx.f1.f64 = VehicleSurfaceValue20(ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS_DIRECT(820B05B8, ctx.f1.f64 = VehicleSurfaceValue12(ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS_DIRECT(820B0610, ctx.f1.f64 = VehicleSurfaceValue16(ctx.r3.u32, ctx.r4.u32))
+// r4 = the coefficients, f1 = x; f1 = the force.
+ITC_CAR_PHYSICS_DIRECT(820B09C8, ctx.f1.f64 = TireMagicFormula(ctx.r4.u32, ctx.f1.f64))
+// r4 = the axle's first wheel (r3 left as it is).
+ITC_CAR_PHYSICS_DIRECT(820B3010, VehicleUpdateFreeAxle(ctx.r3.u32, ctx.r4.u32))
+// r4 = the axle's first wheel; f1 = the sum.
+ITC_CAR_PHYSICS_DIRECT(820B3130,
+                       ctx.f1.f64 = VehicleAxleReactionTorque(ctx.r3.u32, ctx.r4.u32))
+// r4 = the axle's first wheel, f1 = the drive term; its temporaries below
+// r1 (r3 left as it is).
+ITC_CAR_PHYSICS_DIRECT(820B31D0, VehicleUpdateDrivenAxle(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
+                                                         ctx.r1.u32))
+ITC_CAR_PHYSICS_DIRECT(820B3C90, VehicleSetGearValues(ctx.r3.u32))
+// r4 = the byte; r3 left as it is (the physics step relies on it).
+ITC_CAR_PHYSICS_DIRECT(820B4CF0,
+                       VehicleUpdateGearbox(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112))
+// r4 = the wheel; f1 = SuspensionSpring's.
+ITC_CAR_PHYSICS_DIRECT(820B5588, ctx.f1.f64 = VehicleUpdateWheelSuspension(
+                                     ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 176))
+// r4 = out (3 floats), r5 = the point; f1 = the last dot product, r3 its
+// temporary (the frame's +192).
+ITC_CAR_PHYSICS_DIRECT(820B6A38,
+                       ctx.f1.f64 = RigidBodyEffectiveMassAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                             ctx.r1.u32 - 272);
+                       ctx.r3.u64 = ctx.r1.u32 - 272 + 192)
+// r3 comes back as the body matrix's fourth row (the last copy's).
+ITC_CAR_PHYSICS_DIRECT(820B6E70, RigidBodyUpdateOrigin(ctx.r3.u32, ctx.r1.u32 - 176);
+                       ctx.r3.u64 = ctx.r3.u32 + 336)
+// r3 comes back as +416 (Matrix::MultiplyReversed's out).
+ITC_CAR_PHYSICS_DIRECT_VECTOR(820B6F38, RigidBodyUpdateOrientation(ctx.r3.u32, ctx.r1.u32 - 320);
+                              ctx.r3.u64 = ctx.r3.u32 + 416)
+ITC_CAR_PHYSICS_DIRECT(820B70C8,
+                       ctx.r3.u64 = RigidBodyUpdateVelocity(ctx.r3.u32, ctx.r1.u32 - 160))
+// r4 = the point; r3 comes back as +336.
+ITC_CAR_PHYSICS_DIRECT(820B71B0,
+                       RigidBodySetCenterOfMassPosition(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96);
+                       ctx.r3.u64 = ctx.r3.u32 + 336)
+// r3 comes back as +96.
+ITC_CAR_PHYSICS_DIRECT(820B7478,
+                       ctx.f1.f64 = RigidBodyUpdateAngularVelocity(ctx.r3.u32, ctx.r1.u32 - 144);
+                       ctx.r3.u64 = ctx.r3.u32 + 96)
+// r3 = the object, r4 = the body, r5 = the shape, r6 = the groups, r7 =
+// the world's +0; r3 comes back as +304 (the last Vec4::Copy's). Where it
+// can't be native (CollisionObjectInitFits), the original.
+ITC_DIRECT_ENTRY(820B7A00) {
+  if (!CollisionObjectInitFits(ctx.r3.u32, ctx.r5.u32, ctx.r7.u32)) {
+    lifted::original::c820B7A00(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  CollisionObjectInit(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                      ctx.r1.u32 - 112);
+  ctx.r3.u64 = ctx.r3.u32 + 304;
+}
+// r3 = the object (left as it is).
+ITC_CAR_PHYSICS_DIRECT(820B7AE8, CollisionObjectConstruct(ctx.r3.u32))
+// r3 = the result, r4 = the point, r5 = the position; r3 = what the
+// callback returns. For any callback but the ground's, the original.
+ITC_DIRECT_ENTRY(820B8798) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!CollisionWorldCallback(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &r3)) {
+    lifted::original::c820B8798(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r3 = the object, r4 = the groups. Where a pair's removal can't be native,
+// the original from the start (it does the same with the pairs before).
+ITC_DIRECT_ENTRY(820B8AF8) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!CollisionWorldRemovePairsByGroups(ctx.r3.u32, ctx.r4.u32, &r3)) {
+    lifted::original::c820B8AF8(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r3 = the object, r4 = the groups.
+ITC_CAR_PHYSICS_DIRECT(820B94B0, ctx.r3.u64 = CollisionWorldAddPairs(ctx.r3.u32, ctx.r4.u32))
+ITC_CAR_PHYSICS_DIRECT(820BBC40, ctx.r3.u64 = CollisionWorldUnlinkPair(ctx.r3.u32))
+// r3 = the pair, r4 = its new slot; r3 comes back as memcpy's (the slot).
+// Its memcpy natively only where RemovePair's check allows it (outside the
+// physical views, the two ranges not sharing memory); else the original.
+ITC_DIRECT_ENTRY(820BBD30) {
+  const uint32_t pair = ctx.r3.u32;
+  const uint32_t slot = ctx.r4.u32;
+  if (!(slot < 0xA0000000u && pair < 0xA0000000u && c_runtime::InOneView(slot, 32) &&
+        c_runtime::InOneView(pair, 32) && !c_runtime::MayShare(slot, 32, pair, 32))) {
+    lifted::original::c820BBD30(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  CollisionWorldMovePair(pair, slot);
+  ctx.r3.u64 = slot;
+}
+// r3 = the flags; f1 = the surface's value (r3 left as it is: leaves).
+ITC_CAR_PHYSICS_DIRECT(820BC1F8, ctx.f1.f64 = CollisionSurfaceA(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820BC240, ctx.f1.f64 = CollisionSurfaceB(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820BC288, ctx.f1.f64 = CollisionSurfaceC(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820BC2D0, ctx.f1.f64 = CollisionSurfaceD(ctx.r3.u32))
+// r3 comes back as 0x826C2E30.
+ITC_CAR_PHYSICS_DIRECT(820BC550, CollisionWorldResetSurfaces(); ctx.r3.u64 = 0x826C2E30)

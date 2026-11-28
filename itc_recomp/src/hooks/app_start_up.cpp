@@ -911,3 +911,17 @@ bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint32_t function) {
   ctx.ctr.u64 = slot->target;
   return true;
 }
+
+// For the fallback originals (docs/missing-functions.md): XNetStartup
+// (sub_82575B08) has no adapter; no arguments, r3 = 0 or 1627. Its memcpy
+// from XNet::Configure's frame below the original's 496-byte one.
+ITC_DIRECT_ENTRY(82575B08) {
+  const uint64_t sp = ctx.r1.u64;
+  const uint64_t lr = ctx.lr;
+  ctx.r1.u64 = sp - 496;
+  guest::StoreU32(ctx.r1.u32, uint32_t(sp));
+  const uint32_t r3 = asu::XNetStartup(XNetMemcpy(ctx));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}

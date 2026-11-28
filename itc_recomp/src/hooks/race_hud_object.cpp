@@ -519,3 +519,22 @@ ITC_REGS_STEP(RaceHudObjectTickPanel) {
 // here, and --native_race_hud_object switches nothing in the game: the
 // native callers' flags (--native_race_hud_machine, --native_alt_hud) do;
 // the harnesses still set it.
+
+// For the fallback originals (docs/missing-functions.md): they call these by
+// address, so each runs its register step directly (no dispatch entry).
+ITC_DIRECT_ENTRY(82211BE8) { hooks::RaceHudObjectMovieMask(ctx); }
+ITC_DIRECT_ENTRY(822123C8) { hooks::RaceHudObjectSetUpTimer(ctx); }
+ITC_DIRECT_ENTRY(82212D08) { hooks::RaceHudObjectShowGauge(ctx); }
+ITC_DIRECT_ENTRY(82212D58) { hooks::RaceHudObjectSetTach(ctx); }
+ITC_DIRECT_ENTRY(82212DB0) { hooks::RaceHudObjectSetGear(ctx); }
+ITC_DIRECT_ENTRY(82212E18) { hooks::RaceHudObjectSetBoost(ctx); }
+ITC_DIRECT_ENTRY(82212E60) { hooks::RaceHudObjectUpdateRecordingFull(ctx); }
+ITC_DIRECT_ENTRY(82213F20) { hooks::RaceHudObjectSetUpRacers(ctx); }
+ITC_DIRECT_ENTRY(82214260) { hooks::RaceHudObjectSetSpeed(ctx); }
+ITC_DIRECT_ENTRY(82214698) { hooks::RaceHudObjectSetBar(ctx); }
+ITC_DIRECT_ENTRY(82214718) { hooks::RaceHudObjectUpdateSigns(ctx); }
+ITC_DIRECT_ENTRY(82214D78) { hooks::RaceHudObjectTickTimer(ctx); }
+ITC_DIRECT_ENTRY(82215160) { hooks::RaceHudObjectUpdateExtraGauges(ctx); }
+ITC_DIRECT_ENTRY(822151F8) { hooks::RaceHudObjectTickRacers(ctx); }
+ITC_DIRECT_ENTRY(82215260) { hooks::RaceHudObjectInit(ctx); }
+ITC_DIRECT_ENTRY(82216A60) { hooks::RaceHudObjectMake1004(ctx); }

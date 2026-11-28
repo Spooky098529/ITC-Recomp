@@ -569,3 +569,6 @@ ITC_REGS_STEP(StandModelsLightValue) {
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(820D8F18) { hooks::StandModelsSetTireTextures(ctx); }

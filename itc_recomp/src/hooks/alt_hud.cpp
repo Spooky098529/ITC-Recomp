@@ -225,3 +225,20 @@ ITC_REGS_STEP(AltHudRunMovie) {
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)
 ITC_ALT_HUD(82216C00, AltHudRunMovie)
+
+// For the fallback originals (docs/missing-functions.md): they call these by
+// address, so each runs its register step directly (no dispatch entry).
+ITC_DIRECT_ENTRY(8220BF00) { hooks::AltHudMenuListPressedX(ctx); }
+ITC_DIRECT_ENTRY(82216C40) { hooks::AltHudSetUpGauges(ctx); }
+ITC_DIRECT_ENTRY(82216D78) { hooks::AltHudShowPanels(ctx); }
+ITC_DIRECT_ENTRY(82216E00) { hooks::AltHudSetSpeed(ctx); }
+ITC_DIRECT_ENTRY(822173E8) { hooks::AltHudSetTach(ctx); }
+ITC_DIRECT_ENTRY(82217460) { hooks::AltHudSetGear(ctx); }
+ITC_DIRECT_ENTRY(822174E0) { hooks::AltHudSetNode25(ctx); }
+ITC_DIRECT_ENTRY(82217538) { hooks::AltHudSetBoost(ctx); }
+ITC_DIRECT_ENTRY(822175A0) { hooks::AltHudSetBar(ctx); }
+ITC_DIRECT_ENTRY(82217638) { hooks::AltHudSetThrottle(ctx); }
+ITC_DIRECT_ENTRY(82217690) { hooks::AltHudSetBrake(ctx); }
+ITC_DIRECT_ENTRY(822176E8) { hooks::AltHudSetSteering(ctx); }
+ITC_DIRECT_ENTRY(822178A0) { hooks::AltHudSetUpExtraGauges(ctx); }
+ITC_DIRECT_ENTRY(82217A30) { hooks::AltHudUpdateExtraGauges(ctx); }

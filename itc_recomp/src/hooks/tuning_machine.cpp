@@ -273,3 +273,11 @@ ITC_NATIVE_ENTRY_ALWAYS(821E7368) {
   }
   hooks::TuningMachineStart(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(821CFFC8) { hooks::TuningMachineLoadUnlockedParts(ctx); }
+ITC_DIRECT_ENTRY(821DA4B0) { hooks::TuningMachineLoadCurrentChoices(ctx); }
+ITC_DIRECT_ENTRY(821DAD58) { hooks::TuningMachineSetPrices(ctx); }
+ITC_DIRECT_ENTRY(821DBAB0) { hooks::TuningMachineLoadOwnedParts(ctx); }
+ITC_DIRECT_ENTRY(821DE280) { hooks::TuningMachineLoadInteriorSlots(ctx); }
+ITC_DIRECT_ENTRY(821F8950) { hooks::TuningMachineSavePlaceholders14(ctx); }

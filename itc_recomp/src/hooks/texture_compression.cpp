@@ -28,6 +28,7 @@
 #include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
 #include "texture_compression/dxt_alpha.h"
+#include "texture_compression/dxt_color.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_texture_compression, true, "ITC",
@@ -158,3 +159,58 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(823F2620, TextureCompressionDecodeA8R8G8B8Row)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6298, TextureCompressionDxtEncodeRow)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6B70, TextureCompressionImageCodecDelete)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6BC0, TextureCompressionDxtCodecDelete)
+
+// For the fallback originals (docs/missing-functions.md): XGCompressSurface,
+// DxtColor::PackR5G6B5 and DxtColor::FitEndpoints, mapped as their removed
+// adapters did.
+ITC_DIRECT_ENTRY(8235AAC0) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c8235AAC0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const texture_compression::CompressArguments arguments{
+      ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.f1.f64};
+  const auto r3 = texture_compression::CompressSurface(arguments, ctx.r1.u32,
+                                                       hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c8235AAC0(ctx);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+// r3 = a float4 color; r3 the 5:6:5 value.
+ITC_DIRECT_ENTRY(824206E8) {
+  ctx.fpscr.disableFlushMode();
+  float color[3];
+  for (uint32_t i = 0; i < 3; i++) {
+    color[i] = guest::LoadFloat(ctx.r3.u32 + 4 * i);
+  }
+  ctx.r3.u64 = texture_compression::PackR5G6B5(color);
+}
+// r3 the low end, r4 the high end, r5 the 16 float4 pixels, r6 3 or 4 colors
+// (another count: the original); r5 left + 8 as the original walks it.
+ITC_DIRECT_ENTRY(82420AB8) {
+  if (ctx.r6.u32 != 3 && ctx.r6.u32 != 4) {
+    lifted::original::c82420AB8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  float pixels[16][3];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 3; c++) {
+      pixels[i][c] = guest::LoadFloat(ctx.r5.u32 + texture_compression::kPixelBytes * i + 4 * c);
+    }
+  }
+  float low[3];
+  float high[3];
+  texture_compression::FitColorEndpoints(pixels, ctx.r6.u32, ctx.r1.u32, low, high);
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(ctx.r3.u32 + 4 * c, low[c]);
+  }
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(ctx.r4.u32 + 4 * c, high[c]);
+  }
+  ctx.r5.s64 = ctx.r5.s64 + 8;
+}

@@ -566,3 +566,70 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   ITC_SCENERY_CALLS;
   ctx.r3.u64 = SceneryModelDestruct(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md): hand ports with
+// no adapter that lifted/originals.cpp calls by address.
+// SceneryConfig::ModelAsset: r3 = the configuration, r4 = an area, r5 = a
+// model; -1 as li r3,-1 leaves it.
+ITC_DIRECT_ENTRY(820F1530) {
+  SetIndex(ctx, ModelAsset(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+// SceneryList::LoadAll: r3 = the manager, r4 = a list.
+ITC_DIRECT_ENTRY(820F1598) {
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = ListLoadAll(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                           hooks::NativeArchiveQueue());
+}
+// ModelList::Init: r3 = the list, left in r3.
+ITC_DIRECT_ENTRY(820F1A20) { ModelListInit(ctx.r3.u32); }
+// Scenery::PoolSizes: r3 = the area counts, r4 = the model counts, r5 = the
+// five words out (guest memory: the caller's frame), r6 = the configuration.
+ITC_DIRECT_ENTRY(820F2030) {
+  uint32_t out[5] = {};
+  const uint64_t r3 = PoolSizes(ctx.r3.u32, ctx.r4.u32, out, ctx.r6.u32);
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(ctx.r5.u32 + 4 * i, out[i]);
+  }
+  ctx.r3.u64 = r3;
+}
+// CourseSet::InitParts: r3 = the parts, left in r3 (the original's last
+// mr r3,r31).
+ITC_DIRECT_ENTRY(820F2230) {
+  const uint64_t parts = ctx.r3.u64;
+  ITC_SCENERY_CALLS;
+  CourseSetInitParts(calls, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = parts;
+}
+// PoolObject::InUse and IsLoaded: r3 = the object.
+ITC_DIRECT_ENTRY(820FB8E0) { ctx.r3.u64 = InUse(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(820FB8F0) { ctx.r3.u64 = IsLoaded(ctx.r3.u32); }
+// ObjectPools::Init: r3 = the set, r4 = the pool count, r5 = the
+// descriptors. The original where the port declines (the native heap not
+// active).
+ITC_DIRECT_ENTRY(820FBBE8) {
+  ITC_SCENERY_CALLS;
+  uint32_t r3 = 0;
+  if (Init(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c820FBBE8(ctx);
+}
+// ObjectPools::Shutdown: r3 = the set; as Init.
+ITC_DIRECT_ENTRY(820FBDC8) {
+  ITC_SCENERY_CALLS;
+  uint32_t r3 = 0;
+  if (Shutdown(calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c820FBDC8(ctx);
+}
+// ObjectPools::Object: r3 = the set, r4 = a pool, r5 = an index.
+ITC_DIRECT_ENTRY(820FC0E8) {
+  ctx.r3.u64 = PoolObjectAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// AnimationSet::FindByTexture: r3 = the set, r4 = the texture.
+ITC_DIRECT_ENTRY(82146A38) { ctx.r3.u64 = FindAnimationByTexture(ctx.r3.u32, ctx.r4.u32); }
+// Animation::Advance: r3 = the animation, left in r3.
+ITC_DIRECT_ENTRY(82146AC0) { AdvanceAnimation(ctx.r3.u32); }

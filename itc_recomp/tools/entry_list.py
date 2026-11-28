@@ -31,7 +31,9 @@ def entries_in(exe):
     return sorted(set(SYMBOL.findall(out)))
 
 
-DIRECT = re.compile(r"\bITC_DIRECT_ENTRY\((8[0-9A-F]{7})\)")
+# ITC_DIRECT_ENTRY(address) and an area's wrappers around it (a name with
+# DIRECT in it, the address first: ITC_CAR_DRAW_DIRECT(820DE1C8, ...)).
+DIRECT = re.compile(r"\bITC_[A-Z0-9_]*DIRECT[A-Z0-9_]*\((8[0-9A-F]{7})\b")
 
 
 def direct_entries():

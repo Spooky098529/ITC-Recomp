@@ -54,6 +54,9 @@
 // the dispatch table. For ports with no adapter that the fallback originals
 // (lifted/originals.cpp) still call by a constant address: listed in
 // lifted/entries.h, the originals call it directly.
+// tools/entry_list.py finds it in src/ (a link-time optimized build drops
+// it before anything calls it): an area's wrapper around it keeps DIRECT
+// in its name and the address as its first argument.
 #define ITC_DIRECT_ENTRY(address)                                                        \
   namespace lifted::entry {                                                              \
   lifted::Result e##address(const lifted::Args& args);                                   \

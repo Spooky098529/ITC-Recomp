@@ -27,6 +27,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "lifted/sdk.h"
+#include "schema/game_modes.h"
 
 ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Run the game modes and their state machines (docs/functions/game-modes.md: "
@@ -203,4 +204,23 @@ ITC_NATIVE_ENTRY_ALWAYS(821077A8) {
     }
   }
   lifted::original::c821077A8(ctx);
+}
+
+// For the fallback originals (docs/missing-functions.md): they call these by
+// address (no dispatch entry).
+// RaceModeMember::RaceModeMember and MachineMember::MachineMember: r3 = the
+// object (left, as the originals leave it).
+ITC_DIRECT_ENTRY(82107168) { RaceModeMemberConstruct(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(82108160) { MachineMemberConstruct(ctx.r3.u32); }
+// Buffer28::~Buffer28: r3 = the buffer; r3 as Buffer28::Free leaves it. As
+// Free's adapter: over the allocation layer and when the block is its page,
+// else the original's two steps (the vtable stored, then Free's adapter).
+ITC_DIRECT_ENTRY(82152D28) {
+  if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive() &&
+      Buffer28Freeable(ctx.r3.u32)) {
+    ctx.r3.u64 = Buffer28Destroy(ctx.r3.u32);
+    return;
+  }
+  schema::CameraPathBuffer(ctx.r3.u32).set_vtable(schema::CameraPathBuffer::kVtable);
+  lifted::CallFromContext(ctx, 0x82152028);
 }

@@ -11087,7 +11087,7 @@ loc_82273A00:
   guest::StoreU64(uint32_t(r10) + 8, r11);
   // bl 0x820d0d60
   // (left out: dead in C++)
-  { const lifted::Result o = game::Color::HsvToRgb(LIFTED_ARGS(0x82273A34, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Color::HsvToRgb_820D0D60(LIFTED_ARGS(0x82273A34, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r5,r30
   r5 = r30;
   // li r4,22

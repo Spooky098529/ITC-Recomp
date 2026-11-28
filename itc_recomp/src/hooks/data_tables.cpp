@@ -109,3 +109,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82117240) {
   }
   hooks::SetArchiveSerial(ctx, Load(hooks::NativeArchiveLoad()));
 }
+
+// For the fallback originals (docs/missing-functions.md). SwapWord: r3 =
+// the word's address, left as is; flush-to-zero off, as its lfs leaves it.
+ITC_DIRECT_ENTRY(820C97D8) {
+  ctx.fpscr.disableFlushMode();
+  SwapWord(ctx.r3.u32);
+}

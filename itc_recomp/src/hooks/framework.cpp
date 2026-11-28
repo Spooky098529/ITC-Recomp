@@ -667,3 +667,39 @@ ITC_NATIVE_ENTRY_ALWAYS(82090108) {
   ITC_FRAMEWORK_FALLBACK(82090108)
   hooks::Main(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md).
+// HandlerMap::AllocateNodes: r3 = the count; r3 the block. The original for
+// its bad_alloc path or without the allocation layer.
+ITC_DIRECT_ENTRY(82099C80) {
+  if (NativeHeap()) {
+    if (const auto block = fw::MapAllocateNodes(ctx.r3.u32)) {
+      ctx.r3.u64 = *block;
+      return;
+    }
+  }
+  lifted::original::c82099C80(ctx);
+}
+// HandlerMap::NewNode: r4, r5, r6 = left, parent, right, r7 = the value,
+// r8 = the color; r3 the node.
+ITC_DIRECT_ENTRY(82099E20) {
+  if (!NativeHeap() || !fw::CanAllocate()) {
+    lifted::original::c82099E20(ctx);
+    return;
+  }
+  ctx.r3.u64 = fw::MapNewNode(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u8);
+}
+// RequestVector::InsertN: r3 = the vector, r4 = where (the vector in the
+// high word, also stored in the caller's frame at r1 + 24 as the original
+// does), r5 = the count, r6 = the request. r3 isn't the original's (a
+// leftover its callers don't read).
+ITC_DIRECT_ENTRY(8209A0E8) {
+  if (!NativeHeap() ||
+      !fw::RequestsInsertN(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    lifted::original::c8209A0E8(ctx);
+    return;
+  }
+  guest::StoreU64(ctx.r1.u32 + 24, ctx.r4.u64);
+}
+// sub_8209ABE8: r3 = the framework; App::Run's answer.
+ITC_DIRECT_ENTRY(8209ABE8) { hooks::RunFramework(ctx); }

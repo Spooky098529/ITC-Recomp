@@ -578,8 +578,13 @@ void RivalLogoConstruct(uint32_t entry) {
   r.set_flags(2);
   r.set_anim(0);
   r.set_asset(0);
+  RivalLogoInitXpr(r.holder_address());
+}
+
+void RivalLogoInitXpr(uint32_t holder) {
   ITC_NATIVE_RUNNING("sub_82211708 RivalLogo::InitXpr");
   // The holder (+20): its +0, its XPR (+4), +28, +56 to +68.
+  const schema::RivalLogo r(holder - 20);
   r.set_holder(0xFFFFFFFFu);
   if (r.xpr_address() != 0) {
     models::XprConstruct(r.xpr_address());

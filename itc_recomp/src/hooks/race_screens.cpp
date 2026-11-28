@@ -663,3 +663,12 @@ ITC_RACE_SCREENS(82219A78, RaceScreensCareerResultsPage1)
 // CareerResults::SetTexts and Open have no adapters (removed, 2026-11-08):
 // their only callers, Open and the race HUD machine's AwardPrize, are native
 // and call their plain C++; their steps are the harness's.
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(8220BA28) { hooks::RaceScreensPagesFinish(ctx); }
+ITC_DIRECT_ENTRY(8220D6A0) { hooks::RaceScreensPauseMenuSaveOptions(ctx); }
+ITC_DIRECT_ENTRY(8220F840) { hooks::RaceScreensPauseMenuLoadData(ctx); }
+ITC_DIRECT_ENTRY(8220FB10) { hooks::RaceScreensPauseMenuDraw(ctx); }
+ITC_DIRECT_ENTRY(822197A8) { hooks::RaceScreensCareerResultsSetTexts(ctx); }
+ITC_DIRECT_ENTRY(8221AC00) { hooks::RaceScreensAfterRaceMenuShowItems(ctx); }
+ITC_DIRECT_ENTRY(8221BB48) { hooks::RaceScreensAfterRaceMenuDraw(ctx); }

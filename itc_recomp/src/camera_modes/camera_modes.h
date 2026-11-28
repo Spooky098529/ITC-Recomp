@@ -257,6 +257,8 @@ void FixTriple(uint32_t triple, uint32_t curves);
 // +12, +16 = 0, then sub_82211708 RivalLogo::InitXpr on the holder at +20:
 // +0 = -1, XPR::XPR(+4), +28 = 2, +56, +60 = 0, +64 = 3, +68 = 4.
 void RivalLogoConstruct(uint32_t entry);
+// RivalLogo::InitXpr sub_82211708: r3 = the holder (the entry's +20).
+void RivalLogoInitXpr(uint32_t holder);
 // sub_82211AB0 RivalLogo::Play: with +4's bit 0x4, logo 0 (+0) once its XPR
 // is loaded (+48's bit 0x10), others once their movie (+8) is loaded
 // (UiMovies::IsLoaded): the movie (UiMovies::Find), for logo 0 its

@@ -112,3 +112,6 @@ ITC_RACE_SCENE(8215D790, RaceSceneDestroy)
 // RaceScene::Create (sub_8215D738) and RaceScene::RaceScene (sub_8215D6C8)
 // have no adapters: their only caller, RaceSceneMachine::Init, is native;
 // --native_race_scene switches it.
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(8215D6C8) { ctx.r3.u64 = race_scene::SceneConstruct(ctx.r3.u32); }

@@ -796,3 +796,10 @@ ITC_SECOND_SET(820DE030, SecondSetSceneLightsConstruct)
 ITC_SECOND_SET(820ECE40, SecondSetSceneWheelsConstruct)
 ITC_SECOND_SET(820E6E70, SecondSetSceneTrafficConstruct)
 ITC_SECOND_SET(820DB330, SecondSetSceneModelConstruct)
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(820E6980) { hooks::SecondSetTrafficPointsDestruct(ctx); }
+ITC_DIRECT_ENTRY(82594A60) { hooks::SecondSetModelStreamData(ctx); }
+ITC_DIRECT_ENTRY(82594A78) { hooks::SecondSetModelStreamSize(ctx); }
+ITC_DIRECT_ENTRY(82594A90) { hooks::SecondSetModelStreamData2(ctx); }
+ITC_DIRECT_ENTRY(82594AA8) { hooks::SecondSetModelStreamSize2(ctx); }

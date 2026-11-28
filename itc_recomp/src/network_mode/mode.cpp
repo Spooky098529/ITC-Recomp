@@ -288,6 +288,8 @@ void Answer(uint32_t mode, uint32_t block, uint32_t frame) {
   Delegate(mode, frame + 80);
 }
 
+}  // namespace
+
 // sub_82291670 Session::Release (r3 the session).
 void SessionRelease(uint32_t session, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82291670 Session::Release");
@@ -302,6 +304,8 @@ void SessionRelease(uint32_t session, uint32_t sp, const Calls& calls) {
     G::set_leaderboard_results(0u);
   }
 }
+
+namespace {
 
 // NextMode's time attack race (screen 5 in state 11), in its frame: the car
 // built at +96.

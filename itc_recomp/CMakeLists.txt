@@ -518,6 +518,16 @@ set(ITC_SOURCES
     src/front_end_screen_helpers/dialogs.cpp
     src/front_end_screen_helpers/car_cards.cpp
     src/hooks/car_dealer.cpp
+    src/hooks/direct/unit_0.cpp
+    src/hooks/direct/unit_1.cpp
+    src/hooks/direct/unit_2.cpp
+    src/hooks/direct/unit_3.cpp
+    src/hooks/direct/unit_4.cpp
+    src/hooks/direct/unit_5.cpp
+    src/hooks/direct/unit_6.cpp
+    src/hooks/direct/unit_7.cpp
+    src/hooks/direct/unit_8.cpp
+    src/hooks/direct/unit_9.cpp
     src/car_dealer/init_states.cpp
     src/car_dealer/handlers.cpp
     src/car_dealer/texts.cpp
