@@ -541,6 +541,30 @@ set(ITC_SOURCES
     src/hooks/direct/unit_24.cpp
     src/hooks/direct/unit_25.cpp
     src/hooks/direct/unit_26.cpp
+    src/hooks/direct/unit_30.cpp
+    src/hooks/direct/unit_31.cpp
+    src/hooks/direct/unit_32.cpp
+    src/hooks/direct/unit_33.cpp
+    src/hooks/direct/unit_34.cpp
+    src/hooks/direct/unit_35.cpp
+    src/hooks/direct/unit_36.cpp
+    src/hooks/direct/unit_37.cpp
+    src/hooks/direct/unit_38.cpp
+    src/hooks/direct/unit_39.cpp
+    src/hooks/direct/unit_40.cpp
+    src/hooks/direct/unit_41.cpp
+    src/hooks/direct/unit_42.cpp
+    src/hooks/direct/unit_43.cpp
+    src/hooks/direct/unit_44.cpp
+    src/hooks/direct/unit_45.cpp
+    src/hooks/direct/unit_46.cpp
+    src/hooks/direct/unit_47.cpp
+    src/hooks/direct/unit_48.cpp
+    src/hooks/direct/unit_49.cpp
+    src/hooks/direct/unit_50.cpp
+    src/hooks/direct/unit_51.cpp
+    src/hooks/direct/unit_52.cpp
+    src/hooks/direct/unit_53.cpp
     src/car_dealer/init_states.cpp
     src/car_dealer/handlers.cpp
     src/car_dealer/texts.cpp

@@ -429,3 +429,22 @@ ITC_RACE_STATES(820FF458, RaceStatesTimeAdd)
 // CheckLap and CheckFinish; OnGo and RaceTick) are native;
 // --native_race_states switches those callers. The register steps stay for
 // the harness.
+
+// For the fallback originals (docs/missing-functions.md)
+ITC_DIRECT_ENTRY(821622A8) { hooks::RaceStatesPositionNotAfter(ctx); }
+ITC_DIRECT_ENTRY(82162330) { hooks::RaceStatesRouteDistance(ctx); }
+ITC_DIRECT_ENTRY(82162D80) { hooks::RaceStatesRank(ctx); }
+ITC_DIRECT_ENTRY(82162E08) { hooks::RaceStatesCountTime(ctx); }
+ITC_DIRECT_ENTRY(82162F78) { hooks::RaceStatesSectionsBeside(ctx); }
+ITC_DIRECT_ENTRY(82163140) { hooks::RaceStatesTickFraction(ctx); }
+ITC_DIRECT_ENTRY(82163930) { hooks::RaceStatesMapToSection(ctx); }
+ITC_DIRECT_ENTRY(82163C50) { hooks::RaceStatesFollowRoute(ctx); }
+ITC_DIRECT_ENTRY(82164090) { hooks::RaceStatesCheckLap(ctx); }
+ITC_DIRECT_ENTRY(82164228) { hooks::RaceStatesDamage(ctx); }
+ITC_DIRECT_ENTRY(82164A90) { hooks::RaceStatesRacersStill(ctx); }
+ITC_DIRECT_ENTRY(82164E18) { hooks::RaceStatesCheckFinish(ctx); }
+ITC_DIRECT_ENTRY(82164F08) { hooks::RaceStatesCountHits(ctx); }
+ITC_DIRECT_ENTRY(821650A0) { hooks::RaceStatesDrainSp(ctx); }
+ITC_DIRECT_ENTRY(82165AB0) { hooks::RaceStatesRacersNear(ctx); }
+ITC_DIRECT_ENTRY(82165C78) { hooks::RaceStatesRacersClose(ctx); }
+ITC_DIRECT_ENTRY(821698B0) { hooks::RaceStatesProgressCreate(ctx); }

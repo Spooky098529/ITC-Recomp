@@ -175,3 +175,9 @@ ITC_DIRECT_ENTRY(82091540) {
   }
   lifted::original::c82091540(ctx);
 }
+// String::Find: r3 = the string, r4 = the pattern, r5 = the match's offset
+// (in and out), r6 = its length (out), r7 = where to start; r3 = the match
+// or 0. Neither allocates nor frees.
+ITC_DIRECT_ENTRY(82592970) {
+  ctx.r3.u64 = Find(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}

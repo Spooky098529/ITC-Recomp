@@ -551,3 +551,31 @@ ITC_DIRECT_ENTRY(82213C40) { hooks::RaceHudObjectPowInt(ctx); }
 ITC_DIRECT_ENTRY(82214790) { hooks::RaceHudObjectUpdateRacerBar(ctx); }
 ITC_DIRECT_ENTRY(822153A0) { hooks::RaceHudObjectTick(ctx); }
 ITC_DIRECT_ENTRY(82215820) { hooks::RaceHudObjectTouching(ctx); }
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code runs the ports.
+ITC_DIRECT_ENTRY(82211B98) { hooks::RaceHudObjectScreensDestruct(ctx); }
+ITC_DIRECT_ENTRY(82211D10) { hooks::RaceHudObjectDrawAfterRaceMenu(ctx); }
+ITC_DIRECT_ENTRY(82211D18) { hooks::RaceHudObjectScreensDestroy(ctx); }
+ITC_DIRECT_ENTRY(82211DA0) { hooks::RaceHudObjectScreensInit(ctx); }
+ITC_DIRECT_ENTRY(82211F40) { hooks::RaceHudObjectScreensCreate(ctx); }
+ITC_DIRECT_ENTRY(822121C0) { hooks::RaceHudObjectReset(ctx); }
+ITC_DIRECT_ENTRY(82212270) { hooks::RaceHudObjectStartCountdown(ctx); }
+ITC_DIRECT_ENTRY(822122A0) { hooks::RaceHudObjectClearWarning(ctx); }
+ITC_DIRECT_ENTRY(822122B0) { hooks::RaceHudObjectSetUpSigns(ctx); }
+ITC_DIRECT_ENTRY(82212668) { hooks::RaceHudObjectResetBar(ctx); }
+ITC_DIRECT_ENTRY(82212690) { hooks::RaceHudObjectSetPlayer(ctx); }
+ITC_DIRECT_ENTRY(82212718) { hooks::RaceHudObjectStartMovie1(ctx); }
+ITC_DIRECT_ENTRY(82212768) { hooks::RaceHudObjectApplyOptions(ctx); }
+ITC_DIRECT_ENTRY(82212878) { hooks::RaceHudObjectFinishMovie1(ctx); }
+ITC_DIRECT_ENTRY(822129A8) { hooks::RaceHudObjectRunCountdown(ctx); }
+ITC_DIRECT_ENTRY(82212A48) { hooks::RaceHudObjectRunWarning(ctx); }
+ITC_DIRECT_ENTRY(82212AF8) { hooks::RaceHudObjectRunMovie1(ctx); }
+ITC_DIRECT_ENTRY(82212B08) { hooks::RaceHudObjectRunItem(ctx); }
+ITC_DIRECT_ENTRY(82212C50) { hooks::RaceHudObjectUpdateWarning(ctx); }
+ITC_DIRECT_ENTRY(822135B0) { hooks::RaceHudObjectSetUpMirror(ctx); }
+ITC_DIRECT_ENTRY(82213C90) { hooks::RaceHudObjectSetUpGauges(ctx); }
+ITC_DIRECT_ENTRY(82213DB0) { hooks::RaceHudObjectSetUpExtraGauges(ctx); }
+ITC_DIRECT_ENTRY(822141A0) { hooks::RaceHudObjectTearDown(ctx); }
+ITC_DIRECT_ENTRY(82214238) { hooks::RaceHudObjectUpdateItem(ctx); }
+ITC_DIRECT_ENTRY(82215488) { hooks::RaceHudObjectTickPanel(ctx); }
+ITC_DIRECT_ENTRY(822157A8) { hooks::RaceHudObjectSetMode(ctx); }

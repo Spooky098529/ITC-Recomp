@@ -90,18 +90,20 @@ uint32_t FontConstruct(uint32_t font, uint32_t frame, uint32_t shaders_frame,
   return 14;
 }
 
+uint32_t FontInit(uint32_t font_frame, uint32_t shaders_frame, const FontCalls& calls) {
+  // Font::Init (sub_82109A00): VirtualAlloc(0, 16592, MEM_COMMIT,
+  // PAGE_READWRITE), then Font::Font.
+  ITC_NATIVE_RUNNING("sub_82109A00 Font::Init");
+  // The font in host memory (E5 step 5): Font::New for VirtualAlloc's pages.
+  const uint32_t font = schema::Font::New().address;
+  Store(kFontPointer, font);
+  return FontConstruct(font, font_frame, shaders_frame, calls);
+}
+
 uint32_t TextInit(uint32_t font_frame, uint32_t shaders_frame,
                   const FontCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8210ADD0 Text::Init");
-  // Font::Init (sub_82109A00): VirtualAlloc(0, 16592, MEM_COMMIT,
-  // PAGE_READWRITE), then Font::Font.
-  {
-    ITC_NATIVE_RUNNING("sub_82109A00 Font::Init");
-    // The font in host memory (E5 step 5): Font::New for VirtualAlloc's pages.
-    const uint32_t font = schema::Font::New().address;
-    Store(kFontPointer, font);
-    FontConstruct(font, font_frame, shaders_frame, calls);
-  }
+  FontInit(font_frame, shaders_frame, calls);
   return calls.strings_init();
 }
 

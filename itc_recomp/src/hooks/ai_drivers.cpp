@@ -537,3 +537,43 @@ ITC_AI_DRIVERS_DIRECT(8213CB30,
                       ctx.r3.u64 = AvoidOnLeft(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 176))
 ITC_AI_DRIVERS_DIRECT(8213CD50,
                       ctx.r3.u64 = AvoidOnRight(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 160))
+
+// For the fallback originals (docs/missing-functions.md).
+// r3 = the driver, kept.
+ITC_AI_DRIVERS_DIRECT(8213AD48, InitPath(ctx.r3.u32))
+// r3 = the skill, kept.
+ITC_AI_DRIVERS_DIRECT(8213F700, ClearSkill(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(82146408, ctx.r3.u64 = IsSettled(ctx.r3.u32))
+// r3 left at the skill (+6048), as the original's tail call leaves it.
+ITC_AI_DRIVERS_DIRECT(821394F0, ResetToMode0(ctx.r3.u32, ctx.r1.u32 - 128);
+                      ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS_DIRECT(8213AD98, ctx.r3.u64 = DestroyRings(ctx.r3.u64))
+// r3 = a, r4 = the other's index's address.
+ITC_AI_DRIVERS_DIRECT(82145B08,
+                      ctx.r3.u64 = CompareWith(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - 144))
+// AiPath::Update: r3 = the path. The original where DropPassed can't be
+// native.
+ITC_AI_DRIVERS_DIRECT(8213F530, {
+  PathCall call{&ctx};
+  const PathCalls calls{&call, CallNormalizer};
+  uint64_t r3 = 0;
+  if (UpdatePath(ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c8213F530(ctx);
+})
+// AiDriver::Update: r3 = the driver, r4 = the input record, r5 = &the flag;
+// r3 and f1 Drive's. The original where AiPath::Update can't be native.
+ITC_AI_DRIVERS_DIRECT(8213B310, {
+  PathCall call{&ctx};
+  const PathCalls calls{&call, CallNormalizer};
+  uint64_t r3 = 0;
+  double f1 = ctx.f1.f64;
+  if (UpdateDriver(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3, &f1)) {
+    ctx.r3.u64 = r3;
+    ctx.f1.f64 = f1;
+    return;
+  }
+  lifted::original::c8213B310(ctx);
+})

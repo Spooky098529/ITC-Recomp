@@ -1919,7 +1919,7 @@ lifted::Result f82294D38(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, ui
   return {r3, f1};
 }
 
-// sub_82294D48 game::List::Dtor: lifted from generated/ by lift.py.
+// sub_82294D48 game::List::Dtor_82294D48: lifted from generated/ by lift.py.
 lifted::Result f82294D48(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_82294D48 (lifted)");
   uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;

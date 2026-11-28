@@ -1640,3 +1640,146 @@ ITC_DIRECT_ENTRY(82293A48) {
 // CameraAnims::Evaluate: its register step (EvalCamera's original from
 // Evaluate's frame where the port declines).
 ITC_DIRECT_ENTRY(82150960) { hooks::CameraModesStep82150960(ctx); }
+
+// For the fallback originals (docs/missing-functions.md): swarm unit 34's
+// shims (the stale originals round), so lifted code calls the ports.
+// Matrix::FromFloats: its register step.
+ITC_DIRECT_ENTRY(82090000) { hooks::CameraModesStep82090000(ctx); }
+// CameraPath::RoutePoint: r3 = out, r4 = the position, r6 = the offset (r5
+// unread), f1 = t; SplinePoint's atexit through the translated code from
+// its frame (208 + 720 bytes below) when the native one can't, the
+// original without native atexit (as CameraPath::Evaluate's step).
+ITC_DIRECT_ENTRY(820ABDA8) {
+  if (!hooks::NativeAtexit()) {
+    lifted::original::c820ABDA8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  SplineAtexit atexit{ctx, ctx.r1.u32 - 208 - 720};
+  cm::RoutePoint(ctx.r3.u32, ctx.r4.u32, ctx.r6.u32, ctx.f1.f64, ctx.r1.u32,
+                 atexit.Call());
+}
+// Curve::Evaluate: r4 = the curve (r3 unread), f1 = t; f1 the value.
+ITC_DIRECT_ENTRY(820AC060) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = cm::CurveEvaluate(ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+}
+// Key::Vec3: r3 = the pairs, r4 = out, f1 = t; r3 = the last pair (its
+// third Key::Value's argument, as a constant pair leaves it).
+ITC_DIRECT_ENTRY(820AC1D0) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t pairs = ctx.r3.u32;
+  cm::KeyVec3(pairs, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+  ctx.r3.u64 = pairs + 16;
+}
+// CameraPath::Evaluate: its register step.
+ITC_DIRECT_ENTRY(820AC248) { hooks::CameraModesStep820AC248(ctx); }
+// TrackRoute::SliceFraction: its register step.
+ITC_DIRECT_ENTRY(820F9B48) { hooks::CameraModesStep820F9B48(ctx); }
+// RouteRange::Advance: r3 = out (left), r4 = the range, r5 = the distance.
+ITC_DIRECT_ENTRY(820FE598) {
+  cm::RangeAdvance(ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
+}
+// RouteRange::CameraAt: its register step.
+ITC_DIRECT_ENTRY(820FE830) { hooks::CameraModesStep820FE830(ctx); }
+// CameraAnim::Free: r3 = the object; r3 = VirtualFree's 1 after a block,
+// else left. The original without --native_heap.
+ITC_DIRECT_ENTRY(82150098) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c82150098(ctx);
+    return;
+  }
+  const uint32_t object = ctx.r3.u32;
+  const bool blocks = schema::CameraAnim(object).blocks_used() != 0;
+  cm::AnimFree(object);
+  if (blocks) {
+    ctx.r3.u64 = 1;
+  }
+}
+// CameraAnim::ParseObject: r3 = the file's object; r3 = the copy. The
+// copies XMemCpy refuses through the guest from ParseObject's frame (144
+// bytes, returning to 0x821502B8). The original without --native_heap.
+ITC_DIRECT_ENTRY(82150100) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c82150100(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cm::AnimParseObject(ctx.r3.u32,
+      [&](uint32_t to, uint32_t from, uint32_t size) {
+        GuestXMemCpy(ctx, 144, 0x821502B8, to, from, size);
+      });
+}
+// CameraAnims::Find: its register step.
+ITC_DIRECT_ENTRY(82150300) { hooks::CameraModesStep82150300(ctx); }
+// CameraAnim::EvalCamera: r4 = the object, r5 = out, r6 = the time; f1 =
+// tan's. The original where tan's native form can't stand in.
+ITC_DIRECT_ENTRY(82150350) {
+  ctx.fpscr.disableFlushMode();
+  const auto f1 = cm::AnimEvalCamera(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  if (!f1) {
+    lifted::original::c82150350(ctx);
+    return;
+  }
+  ctx.f1.f64 = *f1;
+}
+// CameraAnim::Matrix: r4 = the object, r5 = out, r6 = the time; its frame
+// 320 bytes below (16-byte aligned, so a stack pointer that isn't runs the
+// original); memcpy's refused copy from it (returning to 0x82150600).
+ITC_DIRECT_ENTRY(82150590) {
+  if ((ctx.r1.u32 & 0xF) != 0) {
+    lifted::original::c82150590(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  cm::AnimMatrix(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 320,
+      [&](uint32_t to, uint32_t from, uint32_t size) {
+        GuestMemcpy(ctx, 320, 0x82150600, to, from, size);
+      });
+}
+// The steps (each maps its registers and runs the original where its port
+// declines).
+ITC_DIRECT_ENTRY(82150A10) { hooks::CameraModesStep82150A10(ctx); }
+ITC_DIRECT_ENTRY(82152108) { hooks::CameraModesStep82152108(ctx); }
+ITC_DIRECT_ENTRY(82152548) { hooks::CameraModesStep82152548(ctx); }
+ITC_DIRECT_ENTRY(821525F8) { hooks::CameraModesStep821525F8(ctx); }
+ITC_DIRECT_ENTRY(82152698) { hooks::CameraModesStep82152698(ctx); }
+ITC_DIRECT_ENTRY(82152788) { hooks::CameraModesStep82152788(ctx); }
+ITC_DIRECT_ENTRY(82152CD8) { hooks::CameraModesStep82152CD8(ctx); }
+// CameraPath::Load: r3 = the path buffer, r4 = the asset id; r3 = the
+// serial (as Archive::Load leaves it). The original without --native_heap
+// or the archive's queue (as Request's step).
+ITC_DIRECT_ENTRY(82152D80) {
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    lifted::original::c82152D80(ctx);
+    return;
+  }
+  hooks::SetArchiveSerial(ctx, cm::PathLoad(ctx.r3.u32, ctx.r4.u32,
+                                            hooks::NativeArchiveLoad()));
+}
+ITC_DIRECT_ENTRY(82152E08) { hooks::CameraModesStep82152E08(ctx); }
+ITC_DIRECT_ENTRY(82152E78) { hooks::CameraModesStep82152E78(ctx); }
+ITC_DIRECT_ENTRY(82153290) { hooks::CameraModesStep82153290(ctx); }
+ITC_DIRECT_ENTRY(82153478) { hooks::CameraModesStep82153478(ctx); }
+ITC_DIRECT_ENTRY(82153640) { hooks::CameraModesStep82153640(ctx); }
+// IntroCamera::MakeShot: r3 = the shot, r4 = the viewport, r5 = the
+// vehicle; its frame 192 bytes below, the atexit's fallback from it (as
+// IntroCamera::IntroCamera's step). The original without native atexit.
+ITC_DIRECT_ENTRY(82154108) {
+  if (!hooks::NativeAtexit()) {
+    lifted::original::c82154108(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 192;
+  MakeShotAtexit atexit{ctx, frame};
+  cm::IntroMakeShot(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, atexit.Call());
+}
+ITC_DIRECT_ENTRY(82154378) { hooks::CameraModesStep82154378(ctx); }
+ITC_DIRECT_ENTRY(821543E8) { hooks::CameraModesStep821543E8(ctx); }
+ITC_DIRECT_ENTRY(82154458) { hooks::CameraModesStep82154458(ctx); }
+ITC_DIRECT_ENTRY(821544E0) { hooks::CameraModesStep821544E0(ctx); }
+ITC_DIRECT_ENTRY(821562F8) { hooks::CameraModesStep821562F8(ctx); }
+ITC_DIRECT_ENTRY(82156B68) { hooks::CameraModesStep82156B68(ctx); }
+ITC_DIRECT_ENTRY(82211848) { hooks::CameraModesStep82211848(ctx); }
+ITC_DIRECT_ENTRY(822118E0) { hooks::CameraModesStep822118E0(ctx); }

@@ -8,6 +8,10 @@
 #include "screen_constructors/screen_constructors.h"
 
 #include "base/flags.h"
+#include "hooks/native_entry.h"
+#include "lifted/originals.h"
+#include "lifted/sdk.h"
+#include "memory/c_runtime_heap.h"
 
 ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
               "Build the type 6 and type 7 modes' screens "
@@ -39,3 +43,60 @@ ITC_FLAG_BOOL(native_screen_constructors, true, "ITC",
 // and call Type6Screens' and Type7Screens' plain C++ (the panels' operator
 // new its plain C++, the original's call through the guest when it fails),
 // or their originals with this flag off.
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code calls the ports. Each
+// original leaves `this` (r3) in r3.
+
+namespace {
+
+// The panels' operator new as the modes' slot 0 gives it
+// (src/hooks/type67_modes.cpp): our C runtime heap, else the original's
+// call through the guest from the caller's frame.
+struct PanelNew {
+  lifted::Regs* ctx;
+  static uint32_t New(void* user, uint32_t size, uint32_t frame) {
+    auto* p = static_cast<PanelNew*>(user);
+    if (auto block = memory::crt::OperatorNew(size)) {
+      return *block;
+    }
+    lifted::Regs& ctx = *p->ctx;
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = size;
+    lifted::Sdk(ctx, lifted::original::c825A6880);
+    const uint32_t block = ctx.r3.u32;
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return block;
+  }
+};
+
+template <void (*Construct)(uint32_t, uint32_t, const screen_constructors::New&)>
+void WithNew(lifted::Regs& ctx) {
+  const uint64_t self = ctx.r3.u64;
+  PanelNew panel_new{&ctx};
+  const screen_constructors::New new_panel{&panel_new, PanelNew::New};
+  Construct(ctx.r3.u32, ctx.r1.u32, new_panel);
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = self;
+}
+
+template <void (*Construct)(uint32_t)>
+void Plain(lifted::Regs& ctx) {
+  Construct(ctx.r3.u32);
+}
+
+}  // namespace
+
+ITC_DIRECT_ENTRY(822309C8) { WithNew<screen_constructors::Type6PanelScreen>(ctx); }
+ITC_DIRECT_ENTRY(822403A0) { WithNew<screen_constructors::Type7PanelScreen>(ctx); }
+ITC_DIRECT_ENTRY(822366F0) { WithNew<screen_constructors::Type6Screens>(ctx); }
+ITC_DIRECT_ENTRY(82246B28) { WithNew<screen_constructors::Type7Screens>(ctx); }
+ITC_DIRECT_ENTRY(822330F0) { Plain<screen_constructors::Type6ListScreen>(ctx); }
+ITC_DIRECT_ENTRY(82242BE8) { Plain<screen_constructors::Type7ListScreen>(ctx); }
+ITC_DIRECT_ENTRY(82235BD8) { Plain<screen_constructors::Type6Screen0>(ctx); }
+ITC_DIRECT_ENTRY(82245FF8) { Plain<screen_constructors::Type7Screen0>(ctx); }
+ITC_DIRECT_ENTRY(82236C30) {
+  screen_constructors::Type6NodeScreen(ctx.r3.u32, ctx.r1.u32);
+}

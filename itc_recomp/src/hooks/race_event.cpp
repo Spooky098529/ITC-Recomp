@@ -336,3 +336,14 @@ ITC_DIRECT_ENTRY(82143420) { hooks::RaceEventPoolsCopyIds(ctx); }
 ITC_DIRECT_ENTRY(82143528) { hooks::RaceEventItemsBeaten(ctx); }
 ITC_DIRECT_ENTRY(82144458) { hooks::RaceEventPoolsAddRivals(ctx); }
 ITC_DIRECT_ENTRY(82140400) { hooks::RaceEventFloatAtLeast(ctx); }
+ITC_DIRECT_ENTRY(82140308) { hooks::RaceEventHasSectionCondition(ctx); }
+ITC_DIRECT_ENTRY(82142F20) { hooks::RaceEventConstruct(ctx); }
+ITC_DIRECT_ENTRY(82142F68) { hooks::RaceEventSetMode(ctx); }
+ITC_DIRECT_ENTRY(82143620) { hooks::RaceEventAlloc(ctx); }
+ITC_DIRECT_ENTRY(821436C8) { hooks::RaceEventFree(ctx); }
+ITC_DIRECT_ENTRY(82144170) { hooks::RaceEventPoolsToGroup(ctx); }
+ITC_DIRECT_ENTRY(821441D8) { hooks::RaceEventPoolsToGroupNoList(ctx); }
+ITC_DIRECT_ENTRY(821444D0) { hooks::RaceEventPoolsTrim(ctx); }
+ITC_DIRECT_ENTRY(82144950) { hooks::RaceEventPoolsAddItem(ctx); }
+ITC_DIRECT_ENTRY(82144A50) { hooks::RaceEventInit(ctx); }
+ITC_DIRECT_ENTRY(82144E58) { hooks::RaceEventMake(ctx); }

@@ -249,3 +249,46 @@ ITC_NATIVE_ENTRY(82250670, ITC_FLAG(native_power_graph)) {
 ITC_NATIVE_ENTRY(82250700, ITC_FLAG(native_power_graph)) {
   hooks::CarListDrawCarPowerGraph(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md).
+// Line::RecordFlat: r3 = Draw's (not read), r4 = the sprite, r5 = the pass,
+// r6 = the key; its guest calls from its 128-byte frame as PowerGraph::Draw's
+// adapter makes them; r3 as RenderQueue::Add leaves it. The original (r3 to
+// r6 and lr put back) where the plain C++ hands back.
+ITC_DIRECT_ENTRY(8217B508) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
+  const uint64_t lr = ctx.lr;
+  pg::LineCalls calls;
+  calls.list_and_queue = [&](uint32_t line_frame) {
+    std::pair<uint32_t, uint32_t> answer;
+    From(ctx, line_frame, pg::kLineFrame, 0x8217B538, [&] {
+      const uint32_t scene = VtableCall(ctx, guest::LoadU32(kRenderManager), 32, 0x8217B538);
+      answer.first = VtableCall(ctx, scene, 4, 0x8217B548);
+      const uint32_t again = VtableCall(ctx, guest::LoadU32(kRenderManager), 32, 0x8217B564);
+      answer.second = VtableCall(ctx, again, 8, 0x8217B574);
+    });
+    return answer;
+  };
+  calls.add = [&](uint32_t line_frame, uint32_t queue, uint32_t chunk, uint32_t key) {
+    From(ctx, line_frame, pg::kLineFrame, 0x8217B6B0, [&] {
+      ctx.r4.u64 = chunk;
+      ctx.r5.u64 = key;
+      ctx.f1.f64 = double(guest::LoadFloat(0x82000A34));
+      VtableCall(ctx, queue, 16, 0x8217B6B0);
+    });
+  };
+  // (Not called: only PowerGraph::Draw's own lines fall back through it.)
+  calls.original = [](uint32_t, uint32_t) {};
+  if (pg::LineRecordFlat(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - pg::kLineFrame,
+                         calls)) {
+    ctx.lr = lr;
+    return;
+  }
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.r5.u64 = r5;
+  ctx.r6.u64 = r6;
+  ctx.lr = lr;
+  lifted::original::c8217B508(ctx);
+}

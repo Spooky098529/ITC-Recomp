@@ -462,3 +462,9 @@ ITC_DIRECT_ENTRY(8224B248) { hooks::CarListSetUpColors(ctx); }
 ITC_DIRECT_ENTRY(8224C560) { hooks::CarListSetUpCarPage(ctx); }
 ITC_DIRECT_ENTRY(8224DED8) { hooks::CarListCarSetName(ctx); }
 ITC_DIRECT_ENTRY(8224F5E8) { hooks::CarListRowIsShown(ctx); }
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round.
+ITC_DIRECT_ENTRY(8224CD00) { hooks::CarListBaseUpdate(ctx); }
+ITC_DIRECT_ENTRY(8224D010) { hooks::CarListColorShow(ctx); }
+ITC_DIRECT_ENTRY(8224D1F0) { hooks::CarListColorIsShown(ctx); }
+ITC_DIRECT_ENTRY(8224DF30) { hooks::CarListCarStopArrows(ctx); }

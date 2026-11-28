@@ -689,3 +689,10 @@ ITC_DIRECT_ENTRY(82481880) { hooks::CarSoundsX3DCalculate(ctx); }
 ITC_DIRECT_ENTRY(824819B8) { hooks::CarSoundsX3DVecDot(ctx); }
 ITC_DIRECT_ENTRY(824819E0) { hooks::CarSoundsX3DVecSub(ctx); }
 ITC_DIRECT_ENTRY(82481A18) { hooks::CarSoundsX3DVecCross(ctx); }
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round, each its register step.
+ITC_DIRECT_ENTRY(82480918) { hooks::CarSoundsX3DCurves(ctx); }
+ITC_DIRECT_ENTRY(82480BA8) { hooks::CarSoundsX3DCone(ctx); }
+ITC_DIRECT_ENTRY(82480E90) { hooks::CarSoundsX3DDoppler(ctx); }
+ITC_DIRECT_ENTRY(82481390) { hooks::CarSoundsX3DMatrix(ctx); }
+ITC_DIRECT_ENTRY(82481998) { hooks::CarSoundsX3DVecLength(ctx); }

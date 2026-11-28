@@ -598,13 +598,13 @@ ITC_MODE_TYPE(82106F88, 12, 0x82006C6C, 0x82006C60, false)
 
 #undef ITC_MODE_TYPE
 
+}  // namespace
+
 void ModeType3Construct(uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82106C80 ModeType3::ModeType3");
   ModeBaseConstruct(mode, 0x82006B70, 0x82006B64, false);
   MachineMemberConstruct(mode + 848);
 }
-
-}  // namespace
 
 void ModeTypeConstruct(uint32_t type, uint32_t mode) {
   switch (type) {

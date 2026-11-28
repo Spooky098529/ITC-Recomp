@@ -281,3 +281,5 @@ ITC_DIRECT_ENTRY(821DAD58) { hooks::TuningMachineSetPrices(ctx); }
 ITC_DIRECT_ENTRY(821DBAB0) { hooks::TuningMachineLoadOwnedParts(ctx); }
 ITC_DIRECT_ENTRY(821DE280) { hooks::TuningMachineLoadInteriorSlots(ctx); }
 ITC_DIRECT_ENTRY(821F8950) { hooks::TuningMachineSavePlaceholders14(ctx); }
+ITC_DIRECT_ENTRY(821E1B48) { hooks::TuningMachineSetUp(ctx); }
+ITC_DIRECT_ENTRY(82208130) { hooks::TuningMachineSavePlaceholders(ctx); }

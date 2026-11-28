@@ -349,3 +349,48 @@ ITC_DIRECT_ENTRY(82130290) {
   }
   StoreIterator(ctx.r3.u32, *it);
 }
+
+// For the fallback originals (docs/missing-functions.md): ports with no
+// adapter that lifted code calls by address.
+// ScreenObject::Release: r3 = the object; through its register step, as
+// ~ScreenObject's adapter decides (with the video output native).
+ITC_DIRECT_ENTRY(8212F0B8) {
+  if (!Native() || !ITC_FLAG(native_video_output)) {
+    lifted::original::c8212F0B8(ctx);
+    return;
+  }
+  hooks::ScreenObjectRelease(ctx);
+}
+// UvMap::NewHead: r3 the head (operator new, as UvMap::UvMap's adapter).
+ITC_DIRECT_ENTRY(8212FF68) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FF68)
+  if (!so::CanAllocate()) {
+    lifted::original::c8212FF68(ctx);
+    return;
+  }
+  ctx.r3.u64 = so::MapNewHead();
+}
+// ScreenObject::AddRingPoint: r3 = the object, f1-f4 = x, y, u, v; its
+// temporaries in the 272-byte frame below r1. r3 as the original leaves it;
+// the original where the port declines.
+ITC_DIRECT_ENTRY(82132778) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132778)
+  const auto r3 = so::AddRingPoint(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.f4.f64,
+                                   ctx.r1.u32);
+  if (!r3) {
+    lifted::original::c82132778(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// ~UvMap: r3 = the map; r3 the freed head. The original where the port
+// declines.
+ITC_DIRECT_ENTRY(82132F58) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132F58)
+  const auto head = so::MapDestroy(ctx.r3.u32);
+  if (!head) {
+    lifted::original::c82132F58(ctx);
+    return;
+  }
+  ctx.r3.u64 = *head;
+}

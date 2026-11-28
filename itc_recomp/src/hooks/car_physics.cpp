@@ -597,3 +597,91 @@ ITC_CAR_PHYSICS_DIRECT(820BC288, ctx.f1.f64 = CollisionSurfaceC(ctx.r3.u32))
 ITC_CAR_PHYSICS_DIRECT(820BC2D0, ctx.f1.f64 = CollisionSurfaceD(ctx.r3.u32))
 // r3 comes back as 0x826C2E30.
 ITC_CAR_PHYSICS_DIRECT(820BC550, CollisionWorldResetSurfaces(); ctx.r3.u64 = 0x826C2E30)
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round (lifted code calling these by address ran the stale
+// originals). Mapped as their deleted adapters did.
+// The car data: r3 = the car data, r4 = the source, r5 = the byte.
+ITC_CAR_PHYSICS_DIRECT(820AEE98, CarDataFillAxle(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// f1 comes back as +812's new value.
+ITC_CAR_PHYSICS_DIRECT(820AF018, ctx.f1.f64 = CarDataConvertUnits(ctx.r3.u32))
+// f1 comes back as the second sqrtf, r3 as the temporary body (the frame's
+// +352).
+ITC_CAR_PHYSICS_DIRECT(820AF1C0, ctx.f1.f64 = CarDataDerive(ctx.r3.u32, ctx.r1.u32 - 1008);
+                       ctx.r3.u64 = ctx.r1.u32 - 1008 + 352)
+// The physics step's callees: r3 = the vehicle, left as it is where the
+// port returns nothing (the physics step relies on it). f1 = dt (left as
+// it is).
+ITC_CAR_PHYSICS_DIRECT(820AFAE8, ctx.r3.u64 = VehicleBeginStep(ctx.r3.u32, ctx.f1.f64))
+ITC_CAR_PHYSICS_DIRECT(820AFBD8,
+                       ctx.r3.u64 = VehicleSuspensionTorques(ctx.r3.u32, ctx.r1.u32 - 256))
+ITC_CAR_PHYSICS_DIRECT(820AFD30, VehicleWheelLoads(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820AFDA8, VehicleTurnWheels(ctx.r3.u32, ctx.r1.u32))
+// r3 comes back as the original leaves it. Where the callback isn't the
+// ground's, the original.
+ITC_DIRECT_ENTRY(820AFE90) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!VehicleUnflip(ctx.r3.u32, ctx.r1.u32 - 384, &r3)) {
+    lifted::original::c820AFE90(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+ITC_CAR_PHYSICS_DIRECT(820B0718, VehicleAntiLock(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820B0838, VehicleBrakeTorques(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820B0908,
+                       ctx.r3.u64 = VehicleAccumulateTireForces(ctx.r3.u32, ctx.r1.u32 - 192))
+// Vehicle::Reset: f1 comes back as the last FromAxisAngle's, r3 as +3312.
+ITC_DIRECT_ENTRY(820B0EE8) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  VehicleReset(ctx.r3.u32, ctx.r1.u32 - 240, &f1);
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = ctx.r3.u32 + 3312;
+}
+ITC_CAR_PHYSICS_DIRECT(820B1790, VehicleTractionControl(ctx.r3.u32, ctx.r1.u32))
+// Where tan would take its _except1 path (an infinite or NaN steering), the
+// original. r3 isn't kept: the step sets it again after this call.
+ITC_DIRECT_ENTRY(820B18B8) {
+  ctx.fpscr.disableFlushMode();
+  if (!VehicleUpdateSteering(ctx.r3.u32, ctx.r1.u32 - 160)) {
+    lifted::original::c820B18B8(ctx);
+  }
+}
+ITC_CAR_PHYSICS_DIRECT(820B1B00,
+                       ctx.r3.u64 = VehicleUpdateWheelAxes(ctx.r3.u32, ctx.r1.u32 - 256))
+ITC_CAR_PHYSICS_DIRECT(820B1FB8, VehicleUpdateTireGrip(ctx.r3.u32))
+// Mode 2 in a forward gear (sub_820B0340, never in play): the original.
+ITC_DIRECT_ENTRY(820B2100) {
+  ctx.fpscr.disableFlushMode();
+  if (!VehicleUpdateTorqueSplit(ctx.r3.u32)) {
+    lifted::original::c820B2100(ctx);
+  }
+}
+ITC_CAR_PHYSICS_DIRECT(820B22D8, VehicleUpdateEngineTorque(ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_CAR_PHYSICS_DIRECT(820B24A8, VehicleUpdateTurbo(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820B2748, VehicleRollingResistance(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820B2808,
+                       ctx.r3.u64 = VehicleUpdateAtRest(ctx.r3.u32, ctx.r1.u32 - 192))
+ITC_CAR_PHYSICS_DIRECT(820B2A48, ctx.r3.u64 = VehicleUpdateAero(ctx.r3.u32, ctx.r1.u32 - 240))
+ITC_CAR_PHYSICS_DIRECT(820B2CC0,
+                       ctx.r3.u64 = VehicleApplyForces(ctx.r3.u32, ctx.r1.u32 - 352))
+ITC_CAR_PHYSICS_DIRECT(820B35C8, VehicleUpdateBrakeHeat(ctx.r3.u32))
+ITC_CAR_PHYSICS_DIRECT(820B3788, VehicleUpdateBackfire(ctx.r3.u32, ctx.r1.u32))
+ITC_CAR_PHYSICS_DIRECT(820B39C8, VehicleUpdateTireWear(ctx.r3.u32, ctx.r1.u32 - 112))
+ITC_CAR_PHYSICS_DIRECT(820B3F80,
+                       ctx.r3.u64 = VehicleUpdateTireForces(ctx.r3.u32, ctx.r1.u32 - 272))
+// r3 comes back as `frame` + 160, f1 as the last dot product. Where the
+// callback isn't the ground's, the original.
+ITC_DIRECT_ENTRY(820B4420) {
+  if (!CollisionWorldCallbackKnown()) {
+    lifted::original::c820B4420(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = VehicleProbeGround(ctx.r3.u32, ctx.r1.u32 - 304, &f1);
+  ctx.f1.f64 = f1;
+}
+ITC_CAR_PHYSICS_DIRECT(820B4778, VehicleUpdateDrivetrain(ctx.r3.u32, ctx.r1.u32 - 176))

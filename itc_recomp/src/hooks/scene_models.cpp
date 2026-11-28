@@ -285,3 +285,15 @@ ITC_NATIVE_ENTRY_ALWAYS(820C3CA0) {
   }
   hooks::SceneModelsAllocPages(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round (2026-11-28), lifted code calling these hand ports by
+// address; their register steps above.
+ITC_DIRECT_ENTRY(820D97B8) { hooks::SceneModelsAccessory(ctx); }
+ITC_DIRECT_ENTRY(820D9D48) { hooks::SceneModelsReloadDecals(ctx); }
+ITC_DIRECT_ENTRY(820DA180) { hooks::SceneModelUpdate(ctx); }
+ITC_DIRECT_ENTRY(820DA758) { hooks::SceneModelsApplyRecord(ctx); }
+ITC_DIRECT_ENTRY(820E08B0) { hooks::SceneModelsPartsApply(ctx); }
+ITC_DIRECT_ENTRY(820E4258) { hooks::SceneModelsInteriorApply(ctx); }
+ITC_DIRECT_ENTRY(820E7378) { hooks::SceneModelsWheelsSetRecord(ctx); }
+ITC_DIRECT_ENTRY(820F0E50) { hooks::SceneModelsAccessories(ctx); }

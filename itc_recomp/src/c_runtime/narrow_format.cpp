@@ -533,6 +533,35 @@ bool Sprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
   return true;
 }
 
+bool NarrowOutputToString(uint32_t stream, uint32_t buffer, int32_t room, uint32_t format,
+                          uint32_t args, uint32_t frame, int32_t* count, uint32_t* end,
+                          int32_t* room_out) {
+  {
+    NarrowOutput dry(buffer, room, format, args, frame, true);
+    int32_t ignored;
+    if (!dry.Run(&ignored)) {
+      return false;
+    }
+    if (buffer != 0) {
+      const Range written{buffer, uint64_t(dry.pointer())};
+      if (Overlaps(written, {frame, uint64_t(frame) + kFrameBytes}) ||
+          Overlaps(written, {stream, uint64_t(stream) + 16})) {
+        return false;
+      }
+      for (const Range& read : dry.reads()) {
+        if (Overlaps(written, read)) {
+          return false;
+        }
+      }
+    }
+  }
+  NarrowOutput output(buffer, room, format, args, frame, false);
+  output.Run(count);
+  *end = output.pointer();
+  *room_out = output.room();
+  return true;
+}
+
 bool Vsnprintf(uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
                uint32_t frame, int32_t* count) {
   if (format == 0 || (size != 0 && buffer == 0)) {

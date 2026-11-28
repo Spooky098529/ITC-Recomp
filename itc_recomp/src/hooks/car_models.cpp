@@ -31,6 +31,8 @@
 #include "schema/models.h"
 #include "lifted/sdk.h"
 
+#include <vector>
+
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
               "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
@@ -533,3 +535,205 @@ ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)
 ITC_CAR_MODELS(820EE638, CarModelsDrawDecal)
 ITC_CAR_MODELS(820D5750, CarModelsOnDecalLoaded)
 ITC_CAR_MODELS(820C8DE8, CarModelsSceneSetUp)
+
+// For the fallback originals (docs/missing-functions.md): the car models'
+// hand ports with no adapter that lifted code calls by address, each on its
+// original's registers; where the port's caller checked a condition first
+// (the allocation layer, a native memcpy, a decodable file), the shim checks
+// it and runs the original otherwise.
+
+// The buffer's release: r4 = where the buffer's address is (r3 not read);
+// r3 VirtualFree's 1.
+ITC_DIRECT_ENTRY(820C3CE0) {
+  if (const auto r3 = car_models::FreePagesAt(ctx.r4.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  lifted::original::c820C3CE0(ctx);
+}
+
+// The deferred release: r3 = the first pool set (left), r4 to r7 the words.
+ITC_DIRECT_ENTRY(820C3F50) {
+  car_models::DeferRelease(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+// PlateImage: r3 = the second set, r4 = the kind, r5 = the index, r6 = where
+// the header goes, r7 = where the pixels' address goes; r3 memcpy's (r6).
+ITC_DIRECT_ENTRY(820C4DD8) {
+  if (!native::Buffers_NativeMemcpy()) {
+    lifted::original::c820C4DD8(ctx);
+    return;
+  }
+  ctx.r3.u64 = car_models::PlateImage(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r7.u32);
+}
+
+// Vinyl::ClearCorner: r3 = the car model.
+ITC_DIRECT_ENTRY(820D3C80) { car_models::ClearCorner(ctx.r3.u32); }
+
+// The team emblem: r4 = the block (r3 the car model, not read); r3 the id
+// or -1, sign-extended.
+ITC_DIRECT_ENTRY(820D3CF8) {
+  ctx.r3.s64 = car_models::TeamEmblem(ctx.r4.u32);
+}
+
+// Vinyl::DrawDecals: r3 = the car model; r3 = 1. Natively where every slot
+// it would draw passes DecalsNative's check (an uncompressed 24- or 32-bit
+// TGA whose file LoadSlot::ReleaseBuffer frees natively, no two the same
+// pages), with the allocation layer; else the original.
+ITC_DIRECT_ENTRY(820D4078) {
+  const uint32_t car = ctx.r3.u32;
+  bool native = hooks::NativeHeapActive();
+  std::vector<uint32_t> freed;
+  auto drawable = [&](uint32_t slot) {
+    const schema::LoadSlot s(slot);
+    const int32_t state = int32_t(s.state());
+    if (state == 0 || state == 1 || state == 2) {
+      return true;
+    }
+    uint32_t pages = 0;
+    if (s.buffer() == 0 || !car_models::TgaDecodable(s.buffer()) ||
+        !car_models::LoadSlotReleasable(slot, &pages)) {
+      return false;
+    }
+    if (pages != 0) {
+      for (uint32_t other : freed) {
+        if (other == pages) {
+          return false;
+        }
+      }
+      freed.push_back(pages);
+    }
+    return true;
+  };
+  const schema::CarModel c(car);
+  for (uint32_t i = 0; native && i < 6; i++) {
+    native = drawable(c.layer_slots_address() + 48 * i);
+  }
+  for (uint32_t j = 0; native && j < 48; j++) {
+    native = drawable(c.sticker_slots_address() + 48 * j);
+  }
+  if (!native) {
+    lifted::original::c820D4078(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  ctx.r3.u64 = car_models::DrawDecals(car, ctx.r1.u32);
+}
+
+// CarModel::LoadSetA: r3 = the car model; r3 the last serial
+// (sign-extended) or pages. With the allocation layer.
+ITC_DIRECT_ENTRY(820D59D8) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820D59D8(ctx);
+    return;
+  }
+  ctx.r3.s64 = car_models::CarModelLoadSetA(ctx.r3.u32, hooks::NativeArchiveLoad());
+}
+
+// CarModel::LoadSetB: r3 = the car model; r3 the body's serial
+// (sign-extended). With the allocation layer.
+ITC_DIRECT_ENTRY(820D5AC0) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820D5AC0(ctx);
+    return;
+  }
+  ctx.r3.s64 = car_models::CarModelLoadSetB(ctx.r3.u32, ctx.r13.u32, hooks::NativeArchiveLoad());
+}
+
+// CarModel::LoadDecals: r3 = the car model; r3 = 1.
+ITC_DIRECT_ENTRY(820D5B50) {
+  ctx.r3.u64 = car_models::CarModelLoadDecals(ctx.r3.u32, hooks::NativeArchiveLoad());
+}
+
+// CarInterior::LoadParts: r3 = the object, r4 = the base, r5 = the stride,
+// r6 = the offset; r3 the last LoadShared's.
+ITC_DIRECT_ENTRY(820D7730) {
+  ctx.r3.u64 = car_models::InteriorLoadParts(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                             hooks::NativeArchiveLoad());
+}
+
+// Wheels::Rims and Wheels::Brakes: r3 = the wheels (left).
+ITC_DIRECT_ENTRY(820D8BA8) { car_models::WheelsRims(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(820D8C50) { car_models::WheelsBrakes(ctx.r3.u32); }
+
+// SceneModel::Build: r3 = the scene model; through its register step.
+ITC_DIRECT_ENTRY(820D9870) { hooks::SceneModelBuild(ctx); }
+
+// Vinyl::Compress: r3, r4 = the size, r5, r6 = where the sheet's header and
+// data are; r3 as the original leaves it. With the allocation layer and a
+// header TextureFreeable takes, else the original.
+ITC_DIRECT_ENTRY(820ED090) {
+  if (!hooks::NativeHeapActive() || !car_models::TextureFreeable(ctx.r5.u32)) {
+    lifted::original::c820ED090(ctx);
+    return;
+  }
+  ctx.r3.u64 = hooks::CarModelsVinylCompressAt(ctx, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r6.u32);
+}
+
+// Vinyl::DecalCorner: r3 = out, r4 = p, r5 = c, r6 = the scale, r8 = the
+// offset, f1 the angle.
+ITC_DIRECT_ENTRY(820ED1E8) {
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  car_models::DecalCorner(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r8.u32,
+                          ctx.f1.f64);
+}
+
+// CopyRect: r3 = the destination, r4 to r7, r8 = the source, r9, r10 and the
+// caller's stack word at r1 + 96. With a native memcpy.
+ITC_DIRECT_ENTRY(820ED630) {
+  if (!native::Buffers_NativeMemcpy()) {
+    lifted::original::c820ED630(ctx);
+    return;
+  }
+  car_models::CopyRect(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64, ctx.r8.u32,
+                       ctx.r9.u64, ctx.r10.u64, ctx.r1.u32);
+}
+
+// SoftRaster::DrawTriangle: r3 = the canvas, r4 = the region, r5 = the
+// positions, r6 = the texels, r7 = the image, r8 = the flags.
+ITC_DIRECT_ENTRY(820EE0C8) {
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  car_models::DrawTriangle(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u32, ctx.r1.u32);
+}
+
+// TgaReader::Load: r3 = the reader, r4 = the size, r5 = the buffer; r3 5
+// when busy, else Decode's. With the allocation layer and a file
+// TgaDecodable takes (when not busy), else the original.
+ITC_DIRECT_ENTRY(820EEA78) {
+  const bool busy = schema::TgaReader(ctx.r3.u32).file<schema::View>().address != 0;
+  if (!hooks::NativeHeapActive() || (!busy && !car_models::TgaDecodable(ctx.r5.u32))) {
+    lifted::original::c820EEA78(ctx);
+    return;
+  }
+  ctx.r3.u64 = car_models::TgaReaderLoad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// TgaReader::~TgaReader: r3 = the reader. With the allocation layer
+// (VirtualFree).
+ITC_DIRECT_ENTRY(820EEAE8) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820EEAE8(ctx);
+    return;
+  }
+  car_models::TgaReaderFree(ctx.r3.u32);
+}
+
+// TgaReader::TgaReader: r3 = the reader, returned.
+ITC_DIRECT_ENTRY(820EEB58) {
+  const uint32_t reader = ctx.r3.u32;
+  car_models::TgaReaderInit(reader);
+  ctx.r3.u64 = reader;
+}
+
+// TGA::ToARGB: r3 = the image, r4 = where the pixels go. With the
+// allocation layer (VirtualAlloc).
+ITC_DIRECT_ENTRY(820EEF08) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820EEF08(ctx);
+    return;
+  }
+  car_models::TgaToArgb(ctx.r3.u32, ctx.r4.u32);
+}

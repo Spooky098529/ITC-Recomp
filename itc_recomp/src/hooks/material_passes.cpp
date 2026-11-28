@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "material_passes/material_passes.h"
+#include "guest.h"
 
 ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "Run the part models' material passes and the helpers beside them "
@@ -162,3 +163,44 @@ ITC_MATERIAL_PASSES(820D1378, MaterialPassesSetPaintBody)
 ITC_MATERIAL_PASSES(820D2EA8, MaterialPassesApplyPalette)
 ITC_MATERIAL_PASSES(820D1EB8, MaterialPassesProjectorMatrices)
 ITC_MATERIAL_PASSES(820D2330, MaterialPassesPaintPaletteInit)
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code calls the ports.
+
+// Matrix::LookAt: r3 out, r4 position, r5 direction, r6 up; r3 is left as
+// out (the inverse's answer), as the original leaves it.
+ITC_DIRECT_ENTRY(820D1D70) {
+  ctx.fpscr.disableFlushMode();
+  material_passes::LookAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
+// PartModel::SetMaterialFields (a leaf without a frame): r3 to r10 the
+// eight args, homed by the original at r1 + 16 to + 80 in its caller's
+// frame; the material at r1 + 116, the 24 bytes SetMaterials copied at
+// r1 + 88 (+88's doubleword the third float4's second half, the floats at
+// +96 to +104). The homes are stored as the original does. r3 untouched.
+ITC_DIRECT_ENTRY(820D3250) {
+  const uint32_t sp = ctx.r1.u32;
+  const uint64_t args[8] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+                            ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  static constexpr uint32_t kHomes[8] = {16, 24, 32, 48, 56, 64, 72, 80};
+  for (int i = 0; i < 8; i++) {
+    guest::StoreU64(sp + kHomes[i], args[i]);
+  }
+  uint32_t copied[6];
+  for (uint32_t w = 0; w < 6; w++) {
+    copied[w] = guest::LoadU32(sp + 88 + 4 * w);
+  }
+  ctx.fpscr.disableFlushMode();
+  material_passes::SetMaterialFields(guest::LoadU32(sp + 116), args, copied);
+}
+
+// Model::MaterialTotal: r3 model, r4 shape; r3 = the count (lwz).
+ITC_DIRECT_ENTRY(82594AC0) {
+  ctx.r3.u64 = material_passes::MaterialTotal(ctx.r3.u32, ctx.r4.u64);
+}
+
+// Model::MaterialAt: r3 model, r4 shape, r5 index; r3 = the material.
+ITC_DIRECT_ENTRY(82594B00) {
+  ctx.r3.u64 = material_passes::MaterialAt(ctx.r3.u32, ctx.r4.u64, ctx.r5.u64);
+}

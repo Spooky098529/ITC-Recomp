@@ -588,3 +588,92 @@ ITC_DIRECT_ENTRY(82594570) {
   }
   lifted::original::c82594570(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): lifted code calls
+// these hand ports by address.
+// Shaders::LoadPair: r3 = the vertex shader's asset, r4 = the pair; r3 = the
+// second load's serial (-1 sign-extended); the original without the native
+// heap and archive queue (LoadAll's condition) or where operator new hands
+// back.
+ITC_DIRECT_ENTRY(820A07F0) {
+  if (ITC_FLAG(native_models) && hooks::NativeHeapActive() && hooks::NativeArchiveQueue()) {
+    const archive::LoadCall load = hooks::NativeArchiveLoad();
+    if (const auto serial = models::ShadersLoadPair(ctx.r3.u32, ctx.r4.u32, load)) {
+      hooks::SetArchiveSerial(ctx, *serial);
+      return;
+    }
+  }
+  lifted::original::c820A07F0(ctx);
+}
+// TextureHeader::Relocate: r3 = the header, r4 and r5 the base and mip
+// addresses; r3 = the level count (as the original leaves it).
+ITC_DIRECT_ENTRY(8235A990) {
+  ctx.r3.u64 = models::RelocateTexture(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+ITC_DIRECT_ENTRY(825896C0) { hooks::ModelsSetSharedShaders(ctx); }
+// The vertex declaration: r3, r4 (signed), r5 the stream types; r3 = the
+// declaration; the original for a type pair the tables don't cover.
+ITC_DIRECT_ENTRY(82589728) {
+  if (const auto declaration = models::VertexDeclaration(ctx.r3.u32, ctx.r4.s32, ctx.r5.u32)) {
+    ctx.r3.u64 = *declaration;
+    return;
+  }
+  lifted::original::c82589728(ctx);
+}
+// Memory::AllocPhysical: r3 = bytes, r4 = XMemAlloc's attributes; r3 = the
+// block or 0 (its deleted adapter's mapping).
+ITC_DIRECT_ENTRY(8258E138) {
+  if (!NativeLifetime()) {
+    lifted::original::c8258E138(ctx);
+    return;
+  }
+  ctx.r3.u64 = models::AllocPhysical(ctx.r3.u32, ctx.r4.u32);
+}
+// Memory::FreePhysicalLater: r3 = the block, r4 = the attributes; r3 as
+// FreeLater's (its deleted adapter's mapping).
+ITC_DIRECT_ENTRY(8258E498) {
+  if (NativeLifetime() && models::FreePhysicalLater(ctx.r3.u32, ctx.r4.u32)) {
+    ctx.r3.u64 = models::kMemoryBlocksLock;
+    return;
+  }
+  lifted::original::c8258E498(ctx);
+}
+// TextureProvider::Allocate: r3 = the allocator (unread), r4 = the count; r3 =
+// the block.
+ITC_DIRECT_ENTRY(825942B8) {
+  if (NativeLifetime()) {
+    if (const auto block = models::PointersAllocate(ctx.r4.u32)) {
+      ctx.r3.u64 = *block;
+      return;
+    }
+  }
+  lifted::original::c825942B8(ctx);
+}
+// TextureProvider::Assign: r3 = the vector, r4 = the count, r5 = the value's
+// address; r3 as the original leaves it.
+ITC_DIRECT_ENTRY(825947D0) {
+  if (NativeLifetime()) {
+    const uint32_t value = schema::TextureSlot(ctx.r5.u32).texture();
+    if (const auto r3 = models::PointersAssign(ctx.r3.u32, ctx.r4.u32, value)) {
+      SetR3(ctx, *r3);
+      return;
+    }
+  }
+  lifted::original::c825947D0(ctx);
+}
+// Mesh::Parse: r3 = the model, r4 = the part file (r3 not read after by its
+// callers; left as the port leaves it). Under Model::Load's conditions (the
+// native lifetime, LoadFits), else the original. Flush-to-zero off, as
+// Model::Load's adapter.
+ITC_DIRECT_ENTRY(825963F0) {
+  if (NativeLifetime() && models::LoadFits(ctx.r4.u32)) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    const uint32_t model = ctx.r3.u32, file = ctx.r4.u32;
+    hooks::ModelLoadGuest guest{ctx};
+    models::MeshParse(model, file, guest.Calls());
+    ctx.lr = lr;
+    return;
+  }
+  lifted::original::c825963F0(ctx);
+}

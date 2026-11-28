@@ -42,7 +42,7 @@ How to get each shim right:
 - Multiple-register results, out-parameters through memory, etc.: follow the original exactly.
 
 This round (2026-11-28, the stale originals): every target here ALREADY has a lifted original registered as a fallback
-(lifted::original::c<address> exists, so decline fallbacks compile). The lift.py batches call these hand ports by address,
+(lifted::original::c<address> exists, so decline fallbacks compile). Lifted code (the batches or the fallback originals) calls these hand ports by address,
 and that runs the stale original instead of the port. E5 moved some objects' data to host memory, so an original can read
 the wrong place (a camera stop: lifted CameraAnim::EvalCamera reading blocks by guest pointer arithmetic). The shim makes
 lifted code call the PORT. Map registers exactly as before; there's no needs_original work in this round.

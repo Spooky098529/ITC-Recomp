@@ -315,3 +315,67 @@ ITC_DIRECT_ENTRY(8210C078) {
 // (left).
 ITC_DIRECT_ENTRY(8259C7B8) { ClientListConstruct(ctx.r3.u32); }
 ITC_DIRECT_ENTRY(8259C960) { ClientListAdd(ctx.r3.u32); }
+
+// For the fallback originals (docs/missing-functions.md): the set-up's and
+// the update's ports called by address from lifted code, with the checks
+// their callers' adapters make (the original where one fails).
+// ActionMappers::Configure: r3 = the settings' index; r3 and f1-f3 as the
+// original leaves them.
+ITC_DIRECT_ENTRY(8209F228) {
+  if (!ConfigureKnown()) {
+    lifted::original::c8209F228(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+  ctx.r3.u64 = Configure(ctx.r3.u32, f);
+  ctx.f1.f64 = f[0];
+  ctx.f2.f64 = f[1];
+  ctx.f3.f64 = f[2];
+}
+// InputClientList::InputClientList: r3 = the list (left), r4 = the manager.
+ITC_DIRECT_ENTRY(8210AEB0) { InputClientListConstruct(ctx.r3.u32, ctx.r4.u32); }
+// InputClientList::Add: r4 = the node; r3 comes back as the node.
+ITC_DIRECT_ENTRY(8210AF00) {
+  InputClientListAdd(ctx.r4.u32);
+  ctx.r3.u64 = ctx.r4.u32;
+}
+// ActionMapper::Bind: r3 = the mapper, r4 = the input object; returns 1. As
+// BindAll: natively with the native heap and MapperBindKnown.
+ITC_DIRECT_ENTRY(8210B270) {
+  if (!hooks::NativeHeapActive() || !MapperBindKnown(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c8210B270(ctx);
+    return;
+  }
+  ctx.r3.u64 = MapperBind(ctx.r3.u32, ctx.r4.u32);
+}
+// ActionMapper::Rebuild: r3 = mapper + 448, r4 = the config (mapper + 372),
+// r5 = the raw values (mapper + 388); r3 and f1 as the original leaves
+// them. The held word's bits 30 and 31 (the high half of a caller's r25,
+// no source here) are 0, as at ActionMapper::Update's entry. The original
+// unless the mapper's repeat and curve slots are the ones seen in play.
+ITC_DIRECT_ENTRY(8210C0E0) {
+  if (!MapperCallsKnown(ctx.r3.u32 - 448)) {
+    lifted::original::c8210C0E0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0;
+  ctx.r3.u64 = Rebuild(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 0, &f1);
+  ctx.f1.f64 = f1;
+}
+// ActionMapper::ActionMapper: r3 = the mapper (left), r4 = the player. The
+// original unless the repeat and curve objects' resets are the known ones.
+ITC_DIRECT_ENTRY(8210C180) {
+  if (!MapperConstructKnown()) {
+    lifted::original::c8210C180(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  MapperConstruct(ctx.r3.u32, ctx.r4.u32);
+}
+// ClientList::BoundCount: r3 = the list, r4 = the type, r5 = bump (its low
+// byte); r3 the count.
+ITC_DIRECT_ENTRY(8259C898) {
+  ctx.r3.u64 = ClientListBoundCount(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}

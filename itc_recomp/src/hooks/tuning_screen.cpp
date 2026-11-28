@@ -1036,3 +1036,6 @@ ITC_DIRECT_ENTRY(821CD160) { hooks::TuningGetPrice(ctx); }
 ITC_DIRECT_ENTRY(821CD868) { hooks::TuningGetCurrentChoice(ctx); }
 ITC_DIRECT_ENTRY(821CDC38) { hooks::TuningGetChoiceFlag(ctx); }
 ITC_DIRECT_ENTRY(821E7DA0) { hooks::TuningSetRgb(ctx); }
+// For the fallback originals (docs/missing-functions.md): TuningScreen::
+// Refresh through its step (r3 the screen; r3 1 or 0, f1 as it leaves it).
+ITC_DIRECT_ENTRY(821E3AD0) { hooks::TuningRefresh(ctx); }

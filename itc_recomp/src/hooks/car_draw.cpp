@@ -612,3 +612,62 @@ ITC_DIRECT_ENTRY(82594E88) {
   ctx.lr = lr;
   hooks::LeaveLeft(ctx, *left);
 }
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round. r1 is the stack; the callers' r24 and r28 aren't carried
+// (diagnostic only), so 0.
+#define ITC_CAR_DRAW_DIRECT(address, ...)                                    \
+  ITC_DIRECT_ENTRY(address) {                                                \
+    hooks::CarDrawDirect(ctx, [&](const car_draw::Calls& calls) {            \
+      [[maybe_unused]] const uint32_t r1 = ctx.r1.u32, r3 = ctx.r3.u32;       \
+      [[maybe_unused]] const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32;       \
+      [[maybe_unused]] const uint32_t r6 = ctx.r6.u32;                        \
+      return car_draw::__VA_ARGS__;                                          \
+    });                                                                      \
+  }
+
+// CarLighting::Gather: r3 = the out record (64 bits), r4 = the world, r5 =
+// the flag; r3 as the original leaves it.
+ITC_CAR_DRAW_DIRECT(820C9170,
+                    Left{false, car_draw::CarLightingGather(calls, r1, ctx.r3.u64, r4, r5)})
+// SceneCockpit::DrawBody: r3 = the cockpit, r4 = the block.
+ITC_CAR_DRAW_DIRECT(820DC350, SceneCockpitDrawBody(calls, r1, r3, r4, 0, 0))
+// LightPoints::DrawFront, DrawSides, DrawRear: r3 = the group, r4 = its
+// counter, r5 = the block, r6 = the view-projection.
+ITC_CAR_DRAW_DIRECT(820DDAE8, LightPointsDraw(calls, car_draw::LightGroup::kFront, r1, r3,
+                                              ctx.r4.u64, r5, r6, 0, 0))
+ITC_CAR_DRAW_DIRECT(820DDB98, LightPointsDraw(calls, car_draw::LightGroup::kSides, r1, r3,
+                                              ctx.r4.u64, r5, r6, 0, 0))
+ITC_CAR_DRAW_DIRECT(820DDC48, LightPointsDraw(calls, car_draw::LightGroup::kRear, r1, r3,
+                                              ctx.r4.u64, r5, r6, 0, 0))
+// The parts', interior's, traffic body's and wheels' point draws: r3 = the
+// point block, r4 = the block.
+ITC_CAR_DRAW_DIRECT(820E2448, PartsDrawFrontEnd(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820E2760, PartsDrawRace(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820E4078, InteriorDrawFrontEnd(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820E5220, InteriorDrawRace(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820E6820, TrafficPointsDraw(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820ECA30, WheelsPointsDraw(calls, r1, r3, r4, 0))
+ITC_CAR_DRAW_DIRECT(820ECB68, WheelsPointsDrawMorphed(calls, r1, r3, r4, 0))
+#undef ITC_CAR_DRAW_DIRECT
+
+// Model::Draw: r3 = the model, r4 = the view-projection, r5 = the world, r6
+// = the shape, r7 = draw the depth entry too; r3 as the original leaves it.
+// The original where the plain C++ declines (a recorder would).
+ITC_DIRECT_ENTRY(820D04E8) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  std::optional<car_draw::Draw> draw;
+  {
+    hooks::SceneryDrawGuest guest{ctx};
+    const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+    draw = car_draw::ModelDraw(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                               ctx.r6.u32, ctx.r7.u32, 0);
+  }
+  if (!draw) {
+    lifted::original::c820D04E8(ctx);
+    return;
+  }
+  ctx.lr = lr;
+  hooks::LeaveDraw(ctx, *draw);
+}

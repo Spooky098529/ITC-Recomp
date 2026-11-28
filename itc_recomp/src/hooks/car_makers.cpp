@@ -366,3 +366,13 @@ ITC_CAR_MAKERS(8217F880, CarMakersReloadModel)
 // batches call it by address (CarData::FromGarageCar: r4 a garage car, r5
 // the data; the original where the garage's callees aren't native).
 ITC_DIRECT_ENTRY(82179A60) { hooks::CarMakersFromGarageCar(ctx); }
+// For the fallback originals (docs/missing-functions.md): the record
+// setters, CopyRecord and the re-applies through their steps above (the
+// originals where the re-applies' and CopyRecord's callees aren't native).
+ITC_DIRECT_ENTRY(8215AC70) { hooks::CarMakersSetPaint(ctx); }
+ITC_DIRECT_ENTRY(8215B0E0) { hooks::CarMakersSetBytes(ctx); }
+ITC_DIRECT_ENTRY(8215B1A0) { hooks::CarMakersSetChoice(ctx); }
+ITC_DIRECT_ENTRY(8215B238) { hooks::CarMakersSetWheels(ctx); }
+ITC_DIRECT_ENTRY(82178DF8) { hooks::CarMakersReapplyRecord(ctx); }
+ITC_DIRECT_ENTRY(82178E60) { hooks::CarMakersReapplyRecordNoDecals(ctx); }
+ITC_DIRECT_ENTRY(8217FC60) { hooks::CarMakersCopyRecord(ctx); }

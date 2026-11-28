@@ -180,6 +180,18 @@ std::optional<uint32_t> PairsReserve(uint32_t vector, uint32_t capacity) {
   return Reserve(vector, capacity, 8, true);
 }
 
+std::optional<uint32_t> WordsReserve(uint32_t vector, uint32_t capacity) {
+  const UiMovieWordVector v(vector);
+  if (capacity == v.capacity()) {
+    return vector;
+  }
+  if (!CanAllocate(ArrayBytes(capacity, 4)) || !CanDelete(v.words())) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211A788 (the words' capacity changed)");
+  return Reserve(vector, capacity, 4, false);
+}
+
 std::optional<uint32_t> PairsSet(uint32_t vector, uint32_t key, uint32_t value) {
   const UiMoviePairVector v(vector);
   const uint32_t count = v.count();

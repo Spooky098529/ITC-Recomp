@@ -234,6 +234,11 @@ constexpr uint32_t kPathAssets = schema::CameraModesGlobals::path_assets_address
 // checks).
 std::optional<int64_t> PathRequest(uint32_t buffer, uint32_t index,
                                    const archive::LoadCall& load);
+// sub_82152D80 CameraPath::Load (PathRequest's last part): the path buffer
+// at `buffer` +24 = 1, +20 = the file's blob (Archive::AssetSize(id)), +16 =
+// Archive::Load(id, +20, CameraPath::OnLoaded, the buffer), +24 = 2. Returns
+// the serial.
+int64_t PathLoad(uint32_t buffer, uint32_t id, const archive::LoadCall& load);
 // sub_82152078 CameraPath::OnLoaded: the file at `data` (+0 the paths'
 // count, +4 the keys', the 20-byte paths at +16, the 216-byte keys after
 // them, the 24-byte curves after those): each path's keys fixed up

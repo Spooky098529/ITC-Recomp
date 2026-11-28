@@ -740,3 +740,4 @@ ITC_DIRECT_ENTRY(821BF520) { hooks::OptionsShowAnalogList(ctx); }
 ITC_DIRECT_ENTRY(821BF630) { hooks::OptionsShowAnalogPicture(ctx); }
 ITC_DIRECT_ENTRY(821BF698) { hooks::OptionsShowAnalogClashes(ctx); }
 ITC_DIRECT_ENTRY(821BFA68) { hooks::OptionsResetNode(ctx); }
+ITC_DIRECT_ENTRY(821B9DB8) { hooks::OptionsSettingsReset(ctx); }

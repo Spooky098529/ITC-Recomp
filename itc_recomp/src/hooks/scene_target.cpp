@@ -50,7 +50,11 @@ bool Native() {
 }  // namespace
 
 
-void hooks::SceneTargetTexturedRect(lifted::Regs& ctx) {
+namespace {
+
+// TexturedRect::RecordFlat's work (TexturedRect::Record is a tail call to
+// it): false, with nothing done, where the plain C++ declines.
+bool RecordFlatAndSubmit(lifted::Regs& ctx) {
   const uint32_t rect = ctx.r3.u32;
   const uint64_t bucket = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
@@ -74,7 +78,13 @@ void hooks::SceneTargetTexturedRect(lifted::Regs& ctx) {
     lifted::CallFromContext(ctx, function);
   });
   ctx.lr = lr;
-  if (!done) {
+  return done;
+}
+
+}  // namespace
+
+void hooks::SceneTargetTexturedRect(lifted::Regs& ctx) {
+  if (!RecordFlatAndSubmit(ctx)) {
     lifted::original::c8217C368(ctx);
   }
 }
@@ -135,4 +145,13 @@ void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx) {
     return;
   }
   hooks::SceneTargetRecordPasses(ctx);
+}
+
+// For the fallback originals (docs/missing-functions.md).
+// TexturedRect::RecordFlat sub_8217AA98: r3 = the rectangle, r5 = the
+// bucket; its chunk handed to the render queue (r3 as that call leaves it).
+ITC_DIRECT_ENTRY(8217AA98) {
+  if (!RecordFlatAndSubmit(ctx)) {
+    lifted::original::c8217AA98(ctx);
+  }
 }

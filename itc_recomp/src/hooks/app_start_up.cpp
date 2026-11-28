@@ -925,3 +925,162 @@ ITC_DIRECT_ENTRY(82575B08) {
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
+
+// For the fallback originals (docs/missing-functions.md): App::StartUp's
+// callees, the scene target's, font's, sound manager's, camera class's,
+// network's and movie class's constructors and set-ups (r3 left as the
+// originals leave it; the originals with the flags off).
+#define ITC_APP_START_UP_DIRECT_SETTER(address, plain)    \
+  ITC_DIRECT_ENTRY(address) {                      \
+    if (!ITC_FLAG(native_app_start_up)) {          \
+      lifted::original::c##address(ctx);           \
+      return;                                      \
+    }                                              \
+    asu::plain(ctx.r3.u32); /* r3 left */          \
+  }
+
+ITC_APP_START_UP_DIRECT_SETTER(8209AC30, SetAppInterface84)
+ITC_APP_START_UP_DIRECT_SETTER(8209AC50, ReadErrorSetApp)
+ITC_APP_START_UP_DIRECT_SETTER(8209F580, SetRenderApp)
+
+#undef ITC_APP_START_UP_DIRECT_SETTER
+
+// sub_8225FB70: no arguments, r3 left.
+ITC_DIRECT_ENTRY(8225FB70) {
+  if (!ITC_FLAG(native_app_start_up)) {
+    lifted::original::c8225FB70(ctx);
+    return;
+  }
+  asu::ClearWords8110();
+}
+
+// Movies::Set: r3 = the interface; the original where the plain C++ hands
+// back.
+ITC_DIRECT_ENTRY(820A4360) {
+  if (ITC_FLAG(native_app_start_up)) {
+    if (const auto r3 = asu::MoviesSet(ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c820A4360(ctx);
+}
+
+// SceneTarget::SceneTarget: r3 = the target, from its 192-byte frame.
+ITC_DIRECT_ENTRY(8209B070) {
+  if (!DeviceUsersNative()) {
+    lifted::original::c8209B070(ctx);
+    return;
+  }
+  const uint32_t target = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  InFrame(ctx, 192, 0x8209B0B0, [&](uint32_t frame) {
+    r3 = asu::SceneTargetConstruct(target, frame, SceneTargetVideoOutput(ctx));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// Font::Init: no arguments; its 96-byte frame, Font::Font's 128 and
+// Font::CreateShaders' 160 below it.
+ITC_DIRECT_ENTRY(82109A00) {
+  if (!DeviceUsersNative()) {
+    lifted::original::c82109A00(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  const uint32_t init_frame = sp - 96;
+  const uint32_t font_frame = init_frame - 128;
+  const uint32_t shaders_frame = font_frame - 160;
+  guest::StoreU32(init_frame, sp);
+  guest::StoreU32(font_frame, init_frame);
+  guest::StoreU32(shaders_frame, font_frame);
+  const uint32_t r3 = asu::FontInit(
+      font_frame, shaders_frame, FontCallsFor(ctx, init_frame, font_frame, shaders_frame));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// AudioManager::AudioManager: r3 = the manager, r4 = the owner, r5 = the
+// name, r6 = the bank count's address; its 256-byte frame, StartXAudio's
+// 144 below it.
+ITC_DIRECT_ENTRY(821197E0) {
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    lifted::original::c821197E0(ctx);
+    return;
+  }
+  const uint32_t manager = ctx.r3.u32, owner = ctx.r4.u32, name = ctx.r5.u32,
+                 count = ctx.r6.u32;
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  const uint32_t frame = sp - 256;
+  const uint32_t start_frame = frame - 144;
+  guest::StoreU32(frame, sp);
+  guest::StoreU32(start_frame, frame);
+  const uint32_t r3 = asu::AudioManagerConstruct(manager, owner, name, count, frame,
+                                                 start_frame, AudioManagerCallsFor(ctx, frame));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// The second camera class's camera and list constructors: r3 = the block.
+ITC_DIRECT_ENTRY(820A9E28) {
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    lifted::original::c820A9E28(ctx);
+    return;
+  }
+  hooks::AppCameraCameraConstructSteps(ctx);
+}
+
+ITC_DIRECT_ENTRY(820A98C0) {
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    lifted::original::c820A98C0(ctx);
+    return;
+  }
+  hooks::AppCameraListConstructSteps(ctx);
+}
+
+// Network::StartUp: r3 = the app; its 96-byte frame, XNetStartup's 496
+// below it (XNet::Configure's memcpy from below that).
+ITC_DIRECT_ENTRY(82148868) {
+  if (!ITC_FLAG(native_app_start_up)) {
+    lifted::original::c82148868(ctx);
+    return;
+  }
+  const uint32_t app = ctx.r3.u32;
+  const uint64_t sp = ctx.r1.u64;
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = uint32_t(sp) - 96;
+  const uint32_t xnet_frame = frame - 496;
+  guest::StoreU32(frame, uint32_t(sp));
+  guest::StoreU32(xnet_frame, frame);
+  ctx.r1.u64 = xnet_frame;
+  const uint32_t r3 = asu::NetworkStartUp(app, XNetMemcpy(ctx));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// SignIn::SetUp: r3 = the fewest users, r4 = the most, r5 and r6 the words
+// at 0x826C7948 and 0x82618B80, r7 = the app.
+ITC_DIRECT_ENTRY(8214F1C0) {
+  if (!ITC_FLAG(native_app_start_up)) {
+    lifted::original::c8214F1C0(ctx);
+    return;
+  }
+  ctx.r3.u64 = asu::SignInSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+// MovieWrapper::MovieWrapper: r3 = the wrapper (its steps run the original
+// where the plain C++ hands back).
+ITC_DIRECT_ENTRY(82593DC0) {
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    lifted::original::c82593DC0(ctx);
+    return;
+  }
+  hooks::MovieWrapperSteps(ctx);
+}

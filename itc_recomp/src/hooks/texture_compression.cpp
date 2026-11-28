@@ -328,3 +328,16 @@ ITC_DIRECT_ENTRY(82420F50) {
   }
   ctx.r3.u64 = 0;
 }
+
+// For the fallback originals (docs/missing-functions.md): DxtCodec's
+// destructor, r3 = the codec; r3 ~ImageCodec's (+92); the original where the
+// port declines or without the native heap.
+ITC_DIRECT_ENTRY(823EA770) {
+  const auto r3 = hooks::NativeHeapActive() ? texture_compression::DxtCodecDestruct(ctx.r3.u32)
+                                            : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EA770(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}

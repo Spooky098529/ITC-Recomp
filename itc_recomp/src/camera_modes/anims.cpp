@@ -540,7 +540,12 @@ std::optional<int64_t> PathRequest(uint32_t buffer, uint32_t index,
   game_modes::Buffer28Free(buffer);
   game_modes::Buffer28Reset(buffer);
   b.set_index(index);
+  return PathLoad(buffer, id, load);
+}
+
+int64_t PathLoad(uint32_t buffer, uint32_t id, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82152D80 CameraPath::Load");
+  const schema::CameraPathBuffer b(buffer);
   b.set_state(1);
   // The file, a blob (E5 step 5) in place of the VirtualAlloc returning at
   // 0x82152DC0; Buffer28::Free frees it.

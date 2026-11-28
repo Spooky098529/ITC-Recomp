@@ -144,3 +144,46 @@ ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(ctx.r3.u32))
   }
 ITC_SOUND_HOLDER_DELETE(82117AD8, WaveBankHolderDelete)
 ITC_SOUND_HOLDER_DELETE(82117B30, SoundBankHolderDelete)
+
+// For the fallback originals (docs/missing-functions.md): lifted code calls
+// these hand ports by address. Each leaves r3 as the original does; the
+// floats moved as the original's lfs and stfs.
+// BankPair::Release: r3 = the pair (left).
+ITC_DIRECT_ENTRY(82117760) { BankPairRelease(ctx.r3.u32); }
+// The bank vector's allocation: r3 = the vector, r4 = the count; r3 = 1 or 0.
+// The original without --native_heap or where it hands back (its writes made
+// again there).
+ITC_DIRECT_ENTRY(821193C0) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = WordVectorAllocate(ctx.r3.u32, ctx.r4.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  lifted::original::c821193C0(ctx);
+}
+// sub_8259CC80: r3 = the object (left), r4 = the vector.
+ITC_DIRECT_ENTRY(8259CC80) {
+  ctx.fpscr.disableFlushMode();
+  SetVector36(ctx.r3.u32, ctx.r4.u32);
+}
+// WaveBankHolder::~WaveBankHolder: r3 = the holder; r3 = the handle (-1); the
+// original where there's a handle to close.
+ITC_DIRECT_ENTRY(8259D438) {
+  uint32_t r3 = 0;
+  if (!WaveBankHolderDestroy(ctx.r3.u32, &r3)) {
+    lifted::original::c8259D438(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// Listener::SetOrientation: r3 = the listener (left), r4 = front, r5 = top.
+ITC_DIRECT_ENTRY(8259D550) {
+  ctx.fpscr.disableFlushMode();
+  ListenerSetOrientation(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// Listener::SetPosition: r3 = the listener (left), r4 = the position.
+ITC_DIRECT_ENTRY(8259D588) {
+  ctx.fpscr.disableFlushMode();
+  ListenerSetPosition(ctx.r3.u32, ctx.r4.u32);
+}

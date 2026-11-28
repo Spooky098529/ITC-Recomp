@@ -388,6 +388,10 @@ std::optional<uint32_t> SoundSetUpRpcs(uint32_t sound);
 // layer only (they allocate).
 std::optional<uint32_t> SettingsLoad(uint32_t settings, uint32_t buffer,
                                      uint32_t size, uint32_t flags, uint32_t attributes);
+// MakeState alone (for the fallback originals, docs/missing-functions.md):
+// nullopt, with nothing changed, where the slots it reaches aren't the
+// native accessors. Native layer only.
+std::optional<uint32_t> SettingsMakeState(uint32_t settings);
 // XACTGlobalSettings::SetUpDspPreset (sub_825C27C0): 0 where there's
 // nothing to do (no DSP presets in the file and no effect made, or both);
 // nullopt where the renderer would make or release the effect (never in

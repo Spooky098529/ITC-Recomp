@@ -224,3 +224,20 @@ ITC_DIRECT_ENTRY(82152D28) {
   schema::CameraPathBuffer(ctx.r3.u32).set_vtable(schema::CameraPathBuffer::kVtable);
   lifted::CallFromContext(ctx, 0x82152028);
 }
+
+// For the fallback originals (docs/missing-functions.md), this round's.
+// sub_82106A00 (the four 28-byte buffers destroyed): r3 = the object; r3 as
+// the last Free leaves it. Over the allocation layer and when each block is
+// its pages, else the original.
+ITC_DIRECT_ENTRY(82106A00) {
+  if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive() &&
+      Buffers28Freeable(ctx.r3.u32)) {
+    ctx.r3.u64 = Buffers28Destroy(ctx.r3.u32);
+    return;
+  }
+  lifted::original::c82106A00(ctx);
+}
+// ModeType3::ModeType3 and RaceMode::RaceMode: r3 = the mode (left, as the
+// originals leave it).
+ITC_DIRECT_ENTRY(82106C80) { ModeType3Construct(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(821073B8) { RaceModeConstruct(ctx.r3.u32); }

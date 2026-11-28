@@ -246,3 +246,5 @@ ITC_DIRECT_ENTRY(82217A30) { hooks::AltHudUpdateExtraGauges(ctx); }
 // batches call these by address too (round of 2026-11-28).
 ITC_DIRECT_ENTRY(82216B08) { hooks::AltHudPowerClass(ctx); }
 ITC_DIRECT_ENTRY(82217C70) { hooks::AltHudSetUp(ctx); }
+ITC_DIRECT_ENTRY(82216BA8) { hooks::AltHudDestroy(ctx); }
+ITC_DIRECT_ENTRY(82217AC8) { hooks::AltHudTick(ctx); }

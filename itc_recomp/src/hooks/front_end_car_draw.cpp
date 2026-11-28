@@ -317,3 +317,25 @@ ITC_NATIVE_ENTRY(8217FE60, ITC_FLAG(native_front_end_car_draw)) {
 // GarageStage::StepAngles sub_82179C88 and GarageAnims::Add sub_8217F9E0
 // (GarageStage::Command), GarageAnims::Turn sub_82179D78, Open sub_82179DF0
 // and Close sub_82179EA8 (GarageAnims::Run).
+
+// For the fallback originals (docs/missing-functions.md): the ports above
+// with no adapter, called by address from lifted code, through their
+// register steps (the originals where the steps fall back).
+ITC_DIRECT_ENTRY(820C8480) {
+  // Floor::Draw (the caller's r24: diagnostic only, not carried: 0).
+  hooks::FrontEndCarDrawFloorDraw(ctx);
+}
+ITC_DIRECT_ENTRY(820D9D10) { hooks::FrontEndCarDrawApplyLightKit(ctx); }
+ITC_DIRECT_ENTRY(820DF180) { hooks::FrontEndCarDrawPlatesShow(ctx); }
+ITC_DIRECT_ENTRY(820DF190) { hooks::FrontEndCarDrawPlatesHide(ctx); }
+ITC_DIRECT_ENTRY(82179678) { hooks::FrontEndCarDrawSetLightKit(ctx); }
+ITC_DIRECT_ENTRY(82179C88) { hooks::FrontEndCarDrawStepAngles(ctx); }
+ITC_DIRECT_ENTRY(82179D78) { hooks::FrontEndCarDrawAnimsTurn(ctx); }
+ITC_DIRECT_ENTRY(82179DF0) { hooks::FrontEndCarDrawAnimsOpen(ctx); }
+ITC_DIRECT_ENTRY(82179EA8) { hooks::FrontEndCarDrawAnimsClose(ctx); }
+ITC_DIRECT_ENTRY(8217AFE8) { hooks::FrontEndCarDrawSyncPlates(ctx); }
+ITC_DIRECT_ENTRY(8217BA20) { hooks::FrontEndCarDrawSetLights(ctx); }
+ITC_DIRECT_ENTRY(8217CAB8) { hooks::FrontEndCarDrawPoseCar(ctx); }
+ITC_DIRECT_ENTRY(8217D120) { hooks::FrontEndCarDrawAnimsRun(ctx); }
+ITC_DIRECT_ENTRY(8217D2B0) { hooks::FrontEndCarDrawApplyPreset(ctx); }
+ITC_DIRECT_ENTRY(8217F9E0) { hooks::FrontEndCarDrawAnimsAdd(ctx); }
