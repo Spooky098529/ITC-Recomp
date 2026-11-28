@@ -31,6 +31,24 @@ def entries_in(exe):
     return sorted(set(SYMBOL.findall(out)))
 
 
+# ITC_DIRECT_ENTRY(address) and an area's wrappers around it (a name with
+# DIRECT in it, the address first: ITC_CAR_DRAW_DIRECT(820DE1C8, ...)).
+DIRECT = re.compile(r"\bITC_[A-Z0-9_]*DIRECT[A-Z0-9_]*\((8[0-9A-F]{7})\b")
+
+
+def direct_entries():
+    """ITC_DIRECT_ENTRY's addresses, read from src/ (docs/missing-functions.md):
+    not registered, so nothing calls them until this list names them, and a
+    link-time optimized build drops them before `nm` sees them."""
+    found = set()
+    for folder, _, files in os.walk(os.path.join(ROOT, "src")):
+        for name in files:
+            if name.endswith((".cpp", ".h")) and name != "native_entry.h":
+                with open(os.path.join(folder, name), errors="ignore") as f:
+                    found.update(DIRECT.findall(f.read()))
+    return found
+
+
 def entries_in_header(path=HEADER):
     """The addresses the current header declares (for lift.py)."""
     with open(path) as f:
@@ -39,7 +57,7 @@ def entries_in_header(path=HEADER):
 
 def main(argv):
     exe = argv[1] if len(argv) > 1 else DEFAULT_EXE
-    addresses = entries_in(exe)
+    addresses = sorted(set(entries_in(exe)) | direct_entries())
     if not addresses:
         print(f"no lifted::entry symbols in {exe}", file=sys.stderr)
         return 1

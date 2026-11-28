@@ -795,3 +795,22 @@ ITC_NATIVE_ENTRY_ALWAYS(82092968) {
   kind = std::format("component {:08X}", component);
   debug::MenuSelectionScan_After(kind.c_str(), update);
 }
+
+// For the fallback originals (docs/missing-functions.md): the message
+// vector's, the operation list's and the layers' functions through their
+// register steps (each maps r3 to r7 and r1 as its original, builds the
+// AppCalls over ctx, and leaves r3 as the original; the original where the
+// step declines or without the native heap).
+ITC_DIRECT_ENTRY(82092E70) { hooks::AppMessagesErase(ctx); }
+ITC_DIRECT_ENTRY(820938C0) { hooks::AppMessagesInsertN(ctx); }
+ITC_DIRECT_ENTRY(82094110) { hooks::AppMessagesInsert(ctx); }
+ITC_DIRECT_ENTRY(820944E0) { hooks::AppMessagesPushBack(ctx); }
+ITC_DIRECT_ENTRY(820ACF10) { hooks::AppOpAllocateNodes(ctx); }
+ITC_DIRECT_ENTRY(820AD0B8) { hooks::AppOpConstruct(ctx); }
+ITC_DIRECT_ENTRY(820AD118) { hooks::AppLayerConstruct(ctx); }
+ITC_DIRECT_ENTRY(820AD440) { hooks::AppOpListForEach(ctx); }
+ITC_DIRECT_ENTRY(820AD680) { hooks::AppLayerToggleOff(ctx); }
+ITC_DIRECT_ENTRY(820ADA08) { hooks::AppLayerAddChild(ctx); }
+ITC_DIRECT_ENTRY(820ADAD0) { hooks::AppLayerPush(ctx); }
+ITC_DIRECT_ENTRY(820ADBD8) { hooks::AppLayerConstructWithState(ctx); }
+ITC_DIRECT_ENTRY(820AE348) { hooks::AppStatesConstruct(ctx); }

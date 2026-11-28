@@ -436,4 +436,20 @@ bool Vswprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
   return true;
 }
 
+bool WideOutputToString(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+                        int32_t* count, uint32_t* end, int32_t* room) {
+  {
+    WideOutput dry(buffer, format, args, frame, true);
+    int32_t ignored;
+    if (!dry.Run(&ignored)) {
+      return false;
+    }
+  }
+  WideOutput output(buffer, format, args, frame, false);
+  output.Run(count);
+  *end = output.pointer();
+  *room = output.room();
+  return true;
+}
+
 }  // namespace c_runtime

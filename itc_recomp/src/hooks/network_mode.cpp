@@ -494,3 +494,17 @@ ITC_NETWORK_MODE(8227BFB8, NetModeSelectOnYes)
 ITC_NETWORK_MODE(8227BFD8, NetModeSelectOnDialogClosed)
 ITC_NETWORK_MODE(8227C7A8, NetModeSelectUnload)
 ITC_NETWORK_MODE(8227C810, NetModeSelectUnloaded)
+
+// For the fallback originals (docs/missing-functions.md).
+// Session::Release: r3 = the session; its frees through the guest calls
+// below the caller's r1. r3 left as the guest calls leave it.
+ITC_DIRECT_ENTRY(82291670) {
+  hooks::GuestCalls guest(ctx);
+  network_mode::SessionRelease(ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+// ModeType12's block helpers (r3 = the block, r4 = the index) and
+// Session::Free (its 96-byte frames below the caller's r1).
+ITC_DIRECT_ENTRY(82277E10) { hooks::ModeType12Machine(ctx); }
+ITC_DIRECT_ENTRY(82277EE0) { hooks::ModeType12AllLoaded(ctx); }
+ITC_DIRECT_ENTRY(82277FF0) { hooks::ModeType12FindShown(ctx); }
+ITC_DIRECT_ENTRY(82292710) { hooks::SessionFree(ctx); }

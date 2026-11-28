@@ -125,7 +125,7 @@ lifted::Result f821A0E50(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   r3 = r27;
   // bl 0x821a0d38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A0D38, LIFTED_ARGS(0x821A0EE4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::ListBuilds(LIFTED_ARGS(0x821A0EE4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,3
   r11 = uint64_t(int64_t(196608));
   // li r10,0
@@ -146,17 +146,17 @@ lifted::Result f821A0E50(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   guest::StoreU32(uint32_t(r11) + uint32_t(r8), uint32_t(r10));
   // bl 0x8219bfe8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8219BFE8, LIFTED_ARGS(0x821A0F0C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::InitBuildList(LIFTED_ARGS(0x821A0F0C, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8219d3e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8219D3E8, LIFTED_ARGS(0x821A0F10, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::DrawBuildRows(LIFTED_ARGS(0x821A0F10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31672(r31)
   r11 = guest::LoadU32(uint32_t(r31) + -31672);
   // lwzx r3,r28,r11
   r3 = guest::LoadU32(uint32_t(r28) + uint32_t(r11));
   // bl 0x8219cf08
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8219CF08, LIFTED_ARGS(0x821A0F1C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::ShowGroup(LIFTED_ARGS(0x821A0F1C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,-31680(r29)
   r3 = guest::LoadU32(uint32_t(r29) + -31680);
   // bl 0x8220bc20
@@ -254,7 +254,7 @@ loc_821A0FAC:
   r3 = guest::LoadU32(uint32_t(r10) + uint32_t(r11));
   // bl 0x8219d440
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8219D440, LIFTED_ARGS(0x821A0FCC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::ShowBuildMark(LIFTED_ARGS(0x821A0FCC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,3
   r11 = uint64_t(int64_t(196608));
   // ori r10,r11,8176
@@ -269,7 +269,7 @@ loc_821A0FAC:
   r4 = uint64_t(int64_t(int16_t(guest::LoadU16(uint32_t(r11) + uint32_t(r10)))));
   // bl 0x8219d4b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8219D4B8, LIFTED_ARGS(0x821A0FE8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BuildScreen::BuildArrows(LIFTED_ARGS(0x821A0FE8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r24)
@@ -4553,7 +4553,7 @@ loc_821A60C4:
   r3 = uint64_t(int64_t(99));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A60EC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A60EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,99
   r3 = uint64_t(int64_t(99));
 loc_821A60F0:
@@ -4561,7 +4561,7 @@ loc_821A60F0:
   r4 = uint64_t(int64_t(int64_t(r1) + 112));
   // bl 0x821a52c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A52C0, LIFTED_ARGS(0x821A60F8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetNote(LIFTED_ARGS(0x821A60F8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821a61d4
   goto loc_821A61D4;
 loc_821A60FC:
@@ -4569,13 +4569,13 @@ loc_821A60FC:
   r3 = uint64_t(int64_t(86));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A6104, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A6104, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,86
   r3 = uint64_t(int64_t(86));
 loc_821A6108:
   // bl 0x821a52c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A52C0, LIFTED_ARGS(0x821A610C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetNote(LIFTED_ARGS(0x821A610C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31660(r31)
   r11 = guest::LoadU32(uint32_t(r31) + -31660);
   // stw r29,48(r11)
@@ -4587,7 +4587,7 @@ loc_821A6118:
   r3 = uint64_t(int64_t(62));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A6120, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A6120, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,62
   r3 = uint64_t(int64_t(62));
   // b 0x821a61d0
@@ -4597,7 +4597,7 @@ loc_821A6128:
   r3 = uint64_t(int64_t(83));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A6130, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A6130, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,83
   r3 = uint64_t(int64_t(83));
   // b 0x821a6108
@@ -4607,12 +4607,12 @@ loc_821A6138:
   r3 = uint64_t(int64_t(84));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A6140, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A6140, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,84
   r3 = uint64_t(int64_t(84));
   // bl 0x821a52c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A52C0, LIFTED_ARGS(0x821A6148, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetNote(LIFTED_ARGS(0x821A6148, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31660(r31)
   r11 = guest::LoadU32(uint32_t(r31) + -31660);
   // stw r28,48(r11)
@@ -4624,7 +4624,7 @@ loc_821A6154:
   r3 = uint64_t(int64_t(84));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A615C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A615C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,84
   r3 = uint64_t(int64_t(84));
   // b 0x821a6108
@@ -4634,7 +4634,7 @@ loc_821A6164:
   r3 = uint64_t(int64_t(85));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A616C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A616C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,85
   r3 = uint64_t(int64_t(85));
   // b 0x821a61d0
@@ -4661,7 +4661,7 @@ loc_821A6174:
   r3 = uint64_t(int64_t(100));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A619C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A619C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,100
   r3 = uint64_t(int64_t(100));
   // b 0x821a60f0
@@ -4671,7 +4671,7 @@ loc_821A61A4:
   r3 = uint64_t(int64_t(88));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A61AC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A61AC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,88
   r3 = uint64_t(int64_t(88));
   // b 0x821a61d0
@@ -4681,7 +4681,7 @@ loc_821A61B4:
   r3 = uint64_t(int64_t(60));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A61BC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A61BC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,60
   r3 = uint64_t(int64_t(60));
   // b 0x821a61d0
@@ -4691,13 +4691,13 @@ loc_821A61C4:
   r3 = uint64_t(int64_t(103));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A61CC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A61CC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,103
   r3 = uint64_t(int64_t(103));
 loc_821A61D0:
   // bl 0x821a52c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A52C0, LIFTED_ARGS(0x821A61D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetNote(LIFTED_ARGS(0x821A61D4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821A61D4:
   // lwz r11,-31660(r31)
   r11 = guest::LoadU32(uint32_t(r31) + -31660);
@@ -4969,7 +4969,7 @@ loc_frag_821A60B4:
   r3 = uint64_t(int64_t(101));
   // bl 0x821a51c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A51C8, LIFTED_ARGS(0x821A60BC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetText(LIFTED_ARGS(0x821A60BC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,101
   r3 = uint64_t(int64_t(101));
   // b 0x821a61d0
@@ -4977,7 +4977,7 @@ loc_frag_821A60B4:
 loc_821A61D0_821A60B4:
   // bl 0x821a52c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821A52C0, LIFTED_ARGS(0x821A61D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SaveScreen::SetNote(LIFTED_ARGS(0x821A61D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31660(r31)
   r11 = guest::LoadU32(uint32_t(r31) + -31660);
   // lwz r11,16(r11)

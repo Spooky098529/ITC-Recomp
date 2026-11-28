@@ -497,3 +497,39 @@ ITC_RACE_SETUP(82101900, RaceSetupStagesClear)
 // sub_82101D20 has no adapter: the array helper's plain C++
 // (c_runtime::VectorConstruct, --native_c_runtime) calls its plain C++ when
 // handed its address, as RaceData::RaceData's does.
+
+// For the fallback originals (docs/missing-functions.md): RaceStages::Reset,
+// r3 = the list; r3 as the original leaves it (its step).
+ITC_DIRECT_ENTRY(82101860) { hooks::RaceSetupStagesReset(ctx); }
+
+// For the fallback originals (docs/missing-functions.md): the race data's
+// pieces with register steps (each maps r3 to r6, f1 and r1 as its original
+// and leaves r3 and f1 as it does; the original where the step declines).
+ITC_DIRECT_ENTRY(820FF808) { hooks::RaceSetupRacerRecordInit(ctx); }
+ITC_DIRECT_ENTRY(820FF860) { hooks::RaceSetupRacersAdd(ctx); }
+ITC_DIRECT_ENTRY(820FF978) { hooks::RaceSetupRacersReset(ctx); }
+ITC_DIRECT_ENTRY(82101630) { hooks::RaceSetupRivalLocation(ctx); }
+ITC_DIRECT_ENTRY(82101990) { hooks::RaceSetupRouteReset(ctx); }
+ITC_DIRECT_ENTRY(82101A10) { hooks::RaceSetupRouteSet(ctx); }
+ITC_DIRECT_ENTRY(82101A98) { hooks::RaceSetupStartPosition(ctx); }
+ITC_DIRECT_ENTRY(82101D50) { hooks::RaceSetupSetStart(ctx); }
+ITC_DIRECT_ENTRY(82101EB0) { hooks::RaceSetupEntryReset(ctx); }
+ITC_DIRECT_ENTRY(821020F0) { hooks::RaceSetupRaceDataReset(ctx); }
+ITC_DIRECT_ENTRY(82110AC0) { hooks::RaceSetupCountRace(ctx); }
+ITC_DIRECT_ENTRY(821434C8) { hooks::RaceSetupEventCurrentFirstOwned(ctx); }
+ITC_DIRECT_ENTRY(821434F8) { hooks::RaceSetupEventCount(ctx); }
+// sub_82101FD0 (the race data's 77 records' reset): r3 = the records, from
+// its 112-byte frame (each sub_82101F68's 128 bytes under it). r3 as the
+// last sub_82101F68 leaves it (its Route::Reset's frame + 80), f1 = 0.0. The
+// original where a route's copies wouldn't be native.
+ITC_DIRECT_ENTRY(82101FD0) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 112;
+  if (!race_setup::RecordResetNative(frame - 128)) {
+    lifted::original::c82101FD0(ctx);
+    return;
+  }
+  race_setup::RecordsReset(ctx.r3.u32, frame);
+  ctx.r3.u64 = ctx.r1.u64 - 112 - 128 - race_setup::kRouteFrameBytes + 80;
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero());
+}

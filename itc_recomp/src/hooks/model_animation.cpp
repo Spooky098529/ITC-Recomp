@@ -154,3 +154,73 @@ ITC_NATIVE_ENTRY_ALWAYS(825998B8) {
   ctx.fpscr.disableFlushMode();
   SkeletonApplyAnimation(ctx.r3.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md):
+// Skeleton::UpdateNodeMatrices, r3 = the skeleton; r3 as
+// Skeleton::UpdateMatrices' entry leaves it. The original for a node of
+// type 8 or 16 (nothing done before it).
+ITC_DIRECT_ENTRY(8259C3A8) {
+  ITC_MODEL_ANIMATION_FALLBACK(8259C3A8)
+  switch (SkeletonUpdateNodeMatrices(ctx.r3.u32)) {
+    case MatricesResult::kNothing:
+      return;
+    case MatricesResult::kMultiplied:
+      ctx.fpscr.enableFlushMode();
+      return;
+    case MatricesResult::kOriginal:
+      lifted::original::c8259C3A8(ctx);
+      return;
+  }
+}
+
+// For the fallback originals (docs/missing-functions.md): Model::Animate,
+// the track sets' accessors, the skeleton cursor's and node file's views
+// and the node channels' sampler (the originals with the flag off).
+// Model::Animate: r3 = the model; r3 the last count.
+ITC_DIRECT_ENTRY(82594B60) {
+  ITC_MODEL_ANIMATION_FALLBACK(82594B60)
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ModelAnimate(ctx.r3.u32);
+}
+// TrackSet::StartTime: r3 = the set, r4 = the track; f1 the time.
+ITC_DIRECT_ENTRY(825A1F08) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A1F08)
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = TrackSetStartTime(ctx.r3.u32, ctx.r4.u32);
+}
+// SkeletonCursor::View and TrackSet::View: r3 = the cursor or set, r4 =
+// the section (r3 left).
+ITC_DIRECT_ENTRY(825A2090) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A2090)
+  ctx.fpscr.disableFlushMode();
+  SkeletonCursorView(ctx.r3.u32, ctx.r4.u32);
+}
+ITC_DIRECT_ENTRY(825A6690) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A6690)
+  ctx.fpscr.disableFlushMode();
+  TrackSetView(ctx.r3.u32, ctx.r4.u32);
+}
+// sub_825A20E8: r4 = the keys, r5 = the cursor word, r6 = the count, f1 =
+// the time; f1 the value (r3, a key's address the original leaves, isn't
+// read).
+ITC_DIRECT_ENTRY(825A20E8) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A20E8)
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = CursorCurveSample(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64);
+}
+// NodeFile::View: r3 = the view, r4 = the file (r3 left).
+ITC_DIRECT_ENTRY(825A21A8) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A21A8)
+  NodeFileView(ctx.r3.u32, ctx.r4.u32);
+}
+// TrackSet::Clear: r3 = the set (r3 left).
+ITC_DIRECT_ENTRY(825A6670) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A6670)
+  ctx.fpscr.disableFlushMode();
+  TrackSetClear(ctx.r3.u32);
+}
+// TrackSet::Count: r3 = the set; r3 the count.
+ITC_DIRECT_ENTRY(825A66D8) {
+  ITC_MODEL_ANIMATION_FALLBACK(825A66D8)
+  ctx.r3.u64 = TrackSetCount(ctx.r3.u32);
+}

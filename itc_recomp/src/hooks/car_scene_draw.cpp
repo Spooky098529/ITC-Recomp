@@ -299,3 +299,19 @@ ITC_REGS_STEP(CarSceneDrawRoot) {
 // and Matrix::LookAt by the projectors'). The register steps above stay for
 // the harness and the wraps: the wrapped functions' are called by their wraps
 // in src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(82597150) { hooks::CarSceneDrawBoxExtend(ctx); }
+ITC_DIRECT_ENTRY(825971E8) { hooks::CarSceneDrawVector16Size(ctx); }
+ITC_DIRECT_ENTRY(825976C8) { hooks::CarSceneDrawPlaneIntersect3(ctx); }
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code runs the ports.
+ITC_DIRECT_ENTRY(82597210) { hooks::CarSceneDrawBoxFromPoints(ctx); }
+ITC_DIRECT_ENTRY(825972A8) { hooks::CarSceneDrawPerspective(ctx); }
+ITC_DIRECT_ENTRY(82597378) { hooks::CarSceneDrawLookAt(ctx); }
+ITC_DIRECT_ENTRY(82597878) { hooks::CarSceneDrawFrustumFromMatrix(ctx); }
+ITC_DIRECT_ENTRY(82597E58) { hooks::CarSceneDrawPlaneSegmentCrossing(ctx); }
+ITC_DIRECT_ENTRY(82598158) { hooks::CarSceneDrawVector16Allocate(ctx); }
+ITC_DIRECT_ENTRY(82598288) { hooks::CarSceneDrawVector16InsertN(ctx); }
+ITC_DIRECT_ENTRY(82598648) { hooks::CarSceneDrawVector16Insert(ctx); }
+ITC_DIRECT_ENTRY(825986B8) { hooks::CarSceneDrawVector16PushBack(ctx); }

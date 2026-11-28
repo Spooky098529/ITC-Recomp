@@ -1263,3 +1263,49 @@ ITC_TUNING_PAGES(821E6950, TuningPagesHandleInput)
 // OnDialogYes, is native and calls their plain C++; the register steps above
 // are the harness's): MarkOwned sub_821CD498, SetCurrentChoice sub_821E1DB0
 // (sub_821F1780, recompiled and not seen in play, calls the original).
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code runs the ports.
+ITC_DIRECT_ENTRY(821F6DD8) { hooks::TuningPagesRestoreStickerMovie(ctx); }
+ITC_DIRECT_ENTRY(822081D8) { hooks::TuningPagesRestoreVinylMovie(ctx); }
+
+// DecalImages::Unload: r3 the images, r4 the entry; with the native heap (as
+// UnloadAll's step), else its original.
+ITC_DIRECT_ENTRY(821FEA68) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c821FEA68(ctx);
+    return;
+  }
+  const uint64_t images = ctx.r3.u64, i = ctx.r4.u64;
+  const uint32_t sp = ctx.r1.u32;
+  const bool native_free = ITC_FLAG(native_car_models);
+  hooks::WithCalls(ctx, [&](const tuning_screen::GuestCall& call) {
+    return tuning_pages::Unload(call, images, i, sp, native_free);
+  });
+}
+
+// Texture::FromTga: r3 the file, r4 its size, r5 and r6 the header and data
+// out; with the native heap (as DecalImages::Update's step) and when the port
+// takes it, else its original.
+ITC_DIRECT_ENTRY(820ED528) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c820ED528(ctx);
+    return;
+  }
+  const uint32_t file = ctx.r3.u32, size = ctx.r4.u32;
+  const uint32_t header = ctx.r5.u32, data = ctx.r6.u32, sp = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const tuning_screen::GuestCall call = hooks::StandModelsGuestCall(ctx);
+  const auto made = tuning_pages::TextureFromTga(call, file, size, header, data, sp);
+  ctx.lr = lr;
+  if (!made) {
+    ctx.r3.u64 = file;
+    ctx.r4.u64 = size;
+    ctx.r5.u64 = header;
+    ctx.r6.u64 = data;
+    lifted::original::c820ED528(ctx);
+    return;
+  }
+  ctx.r3.u64 = *made;
+}

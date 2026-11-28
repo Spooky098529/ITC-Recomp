@@ -353,6 +353,22 @@ ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)
 ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
 ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
 ITC_CAR_DEALER(82182158, CarDealerSetKindBar)
+// For the fallback originals (docs/missing-functions.md): lifted ShowCarInfo
+// sub_82182620 (reached from lifted OpenColors sub_821847A0, a new career's
+// first visit) calls these three by address.
+ITC_DIRECT_ENTRY(82182388) { hooks::CarDealerSetNameTexts(ctx); }
+ITC_DIRECT_ENTRY(82182418) { hooks::CarDealerSetPriceTexts(ctx); }
+ITC_DIRECT_ENTRY(821824A8) { hooks::CarDealerSetSpecTexts(ctx); }
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address (Transition10, 13, 14, 18, 20 and 21,
+// OnMessage26), so each runs its register step directly.
+ITC_DIRECT_ENTRY(82181330) { hooks::CarDealerReloadStandModel(ctx); }
+ITC_DIRECT_ENTRY(82182620) { hooks::CarDealerShowCarInfo(ctx); }
+ITC_DIRECT_ENTRY(82182B30) { hooks::CarDealerSetPrompts(ctx); }
+ITC_DIRECT_ENTRY(82182C28) { hooks::CarDealerSetHeader(ctx); }
+ITC_DIRECT_ENTRY(82184488) { hooks::CarDealerOpenCarList(ctx); }
+ITC_DIRECT_ENTRY(82184650) { hooks::CarDealerOpenCar(ctx); }
+ITC_DIRECT_ENTRY(821847A0) { hooks::CarDealerOpenColors(ctx); }
 // The handlers: member function functors the machine calls (no direct
 // callers).
 ITC_CAR_DEALER(82180D68, CarDealerCreate)

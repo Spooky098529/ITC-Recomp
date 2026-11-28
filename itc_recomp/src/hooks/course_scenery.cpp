@@ -566,3 +566,180 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   ITC_SCENERY_CALLS;
   ctx.r3.u64 = SceneryModelDestruct(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md): hand ports with
+// no adapter that lifted/originals.cpp calls by address.
+// SceneryConfig::ModelAsset: r3 = the configuration, r4 = an area, r5 = a
+// model; -1 as li r3,-1 leaves it.
+ITC_DIRECT_ENTRY(820F1530) {
+  SetIndex(ctx, ModelAsset(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+// SceneryList::LoadAll: r3 = the manager, r4 = a list.
+ITC_DIRECT_ENTRY(820F1598) {
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = ListLoadAll(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                           hooks::NativeArchiveQueue());
+}
+// ModelList::Init: r3 = the list, left in r3.
+ITC_DIRECT_ENTRY(820F1A20) { ModelListInit(ctx.r3.u32); }
+// Scenery::PoolSizes: r3 = the area counts, r4 = the model counts, r5 = the
+// five words out (guest memory: the caller's frame), r6 = the configuration.
+ITC_DIRECT_ENTRY(820F2030) {
+  uint32_t out[5] = {};
+  const uint64_t r3 = PoolSizes(ctx.r3.u32, ctx.r4.u32, out, ctx.r6.u32);
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(ctx.r5.u32 + 4 * i, out[i]);
+  }
+  ctx.r3.u64 = r3;
+}
+// CourseSet::InitParts: r3 = the parts, left in r3 (the original's last
+// mr r3,r31).
+ITC_DIRECT_ENTRY(820F2230) {
+  const uint64_t parts = ctx.r3.u64;
+  ITC_SCENERY_CALLS;
+  CourseSetInitParts(calls, ctx.r1.u32, ctx.r3.u32);
+  ctx.r3.u64 = parts;
+}
+// PoolObject::InUse and IsLoaded: r3 = the object.
+ITC_DIRECT_ENTRY(820FB8E0) { ctx.r3.u64 = InUse(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(820FB8F0) { ctx.r3.u64 = IsLoaded(ctx.r3.u32); }
+// ObjectPools::Init: r3 = the set, r4 = the pool count, r5 = the
+// descriptors. The original where the port declines (the native heap not
+// active).
+ITC_DIRECT_ENTRY(820FBBE8) {
+  ITC_SCENERY_CALLS;
+  uint32_t r3 = 0;
+  if (Init(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c820FBBE8(ctx);
+}
+// ObjectPools::Shutdown: r3 = the set; as Init.
+ITC_DIRECT_ENTRY(820FBDC8) {
+  ITC_SCENERY_CALLS;
+  uint32_t r3 = 0;
+  if (Shutdown(calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c820FBDC8(ctx);
+}
+// ObjectPools::Object: r3 = the set, r4 = a pool, r5 = an index.
+ITC_DIRECT_ENTRY(820FC0E8) {
+  ctx.r3.u64 = PoolObjectAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// AnimationSet::FindByTexture: r3 = the set, r4 = the texture.
+ITC_DIRECT_ENTRY(82146A38) { ctx.r3.u64 = FindAnimationByTexture(ctx.r3.u32, ctx.r4.u32); }
+// Animation::Advance: r3 = the animation, left in r3.
+ITC_DIRECT_ENTRY(82146AC0) { AdvanceAnimation(ctx.r3.u32); }
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round (2026-11-28), lifted code calling these hand ports by
+// address.
+// AreaModel::Parse: r3 = the model. As AreaModel::OnLoaded's condition.
+ITC_DIRECT_ENTRY(820F1258) {
+  if (!NativeParses()) {
+    lifted::original::c820F1258(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = AreaModelParse(calls, ctx.r1.u32, ctx.r3.u32);
+}
+// Scenery::Init: r3 = the manager; r3 as the original's last XMemSet leaves
+// it (the manager + 144).
+ITC_DIRECT_ENTRY(820F1360) {
+  const uint32_t manager = ctx.r3.u32;
+  Init(manager);
+  ctx.r3.u64 = uint32_t(manager + 144);
+}
+// Scenery::ClearGlobal: no arguments; r3 left.
+ITC_DIRECT_ENTRY(820F1480) { ClearGlobal(); }
+// Scenery::AllocPhysical: r3 = the size; r3 = the block.
+ITC_DIRECT_ENTRY(820F1490) { ctx.r3.u64 = AllocPhysical(ctx.r3.u32); }
+// Scenery::FreePhysical: r3 = the block; r3 = XPhysicalFree's 0.
+ITC_DIRECT_ENTRY(820F14E8) {
+  FreePhysical(ctx.r3.u32);
+  ctx.r3.u64 = 0;
+}
+// CourseSet::Parse: r3 = the course set. As CourseSet::OnLoaded's parses.
+ITC_DIRECT_ENTRY(820F1A70) {
+  if (!NativeParses()) {
+    lifted::original::c820F1A70(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = CourseSetParse(calls, ctx.r1.u32, ctx.r3.u32);
+}
+// AreaModel::AreaModel: r3 = the model, r4 and r5 the sizes, r6 the index;
+// r3 = the model. As MakePoolObject's condition.
+ITC_DIRECT_ENTRY(820F1C68) {
+  if (!NativeParses()) {
+    lifted::original::c820F1C68(ctx);
+    return;
+  }
+  const uint64_t model = ctx.r3.u64;
+  ITC_SCENERY_CALLS;
+  AreaModelConstruct(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  ctx.r3.u64 = model;
+}
+// Scenery::UnloadPools: r3 = the manager; the original where the native
+// heap isn't active.
+ITC_DIRECT_ENTRY(820F1D20) {
+  ITC_SCENERY_CALLS;
+  uint32_t r3 = 0;
+  if (UnloadPools(calls, ctx.r1.u32, ctx.r3.u32, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c820F1D20(ctx);
+}
+// Scenery::IsLoaded: r3 = the manager.
+ITC_DIRECT_ENTRY(820F1F68) {
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = SceneryIsLoaded(calls, ctx.r1.u32, ctx.r3.u32, hooks::NativeArchiveQueue());
+}
+// CourseSet::CourseSet: r3 = the set, r4 and r5 the sizes, r6 the index;
+// r3 = the set. As MakePoolObject's condition.
+ITC_DIRECT_ENTRY(820F2478) {
+  if (!NativeParses()) {
+    lifted::original::c820F2478(ctx);
+    return;
+  }
+  const uint64_t set = ctx.r3.u64;
+  ITC_SCENERY_CALLS;
+  CourseSetConstruct(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  ctx.r3.u64 = set;
+}
+// Scenery::SetupPools: r3 = the manager, r4 = the configuration. As
+// Scenery::Setup's condition.
+ITC_DIRECT_ENTRY(820F2720) {
+  if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
+    lifted::original::c820F2720(ctx);
+    return;
+  }
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = SetupPools(calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+// Scenery::RecordHeadlightProjectors, DrawArea and DrawSetLists: their
+// register steps above (DrawArea's original where its plain C++ may not run).
+ITC_DIRECT_ENTRY(820F34C8) { hooks::CourseSceneryRecordHeadlightProjectors(ctx); }
+ITC_DIRECT_ENTRY(820F3B70) {
+  if (!hooks::CourseSceneryDrawAreaNative()) {
+    lifted::original::c820F3B70(ctx);
+    return;
+  }
+  hooks::CourseSceneryDrawArea(ctx);
+}
+ITC_DIRECT_ENTRY(820F52A8) { hooks::CourseSceneryDrawSetLists(ctx); }
+// PoolObject::AllocData: r3 = the object's +4, r4 = the size.
+ITC_DIRECT_ENTRY(820FB8B8) { ctx.r3.u64 = AllocData(ctx.r3.u32, ctx.r4.u32); }
+// PoolObject::PoolObject: r3 = the object, r4 and r5 the sizes, r6 the
+// index; r3 left (the object).
+ITC_DIRECT_ENTRY(820FBB20) {
+  ConstructObject(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+// AnimationSet::Advance: r3 = the set.
+ITC_DIRECT_ENTRY(82146B20) { ctx.r3.u64 = AdvanceAnimationSet(ctx.r3.u32); }

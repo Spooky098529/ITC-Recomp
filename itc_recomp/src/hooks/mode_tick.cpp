@@ -265,3 +265,46 @@ ITC_NATIVE_ENTRY_ALWAYS(825D9518) {
   hooks::GuestAtexit guest{ctx};
   ctx.r3.s64 = SignInWatchStaticInit(guest.Call());
 }
+
+// For the fallback originals (docs/missing-functions.md): ScreenFades::
+// RecordScissor (r3 = the key; r3 as the render queue's last call leaves
+// it) and ColorRect::RecordFlat (r3 = the rectangle, r4 = the camera pass,
+// not read, r5 = the key), as ScreenFades::Update's native body runs them;
+// lr put back. With the command list's diagnostics on, the originals (as
+// ScreenFades::Update's).
+ITC_DIRECT_ENTRY(8209CE68) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    lifted::original::c8209CE68(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  RecordScissor(ctx, ctx.r3.u32);
+  ctx.lr = lr;
+}
+ITC_DIRECT_ENTRY(8217A370) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    lifted::original::c8217A370(ctx);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const auto chunk = mode_tick::ColorRectRecordFlat(ctx.r3.u32);
+  if (!chunk) {
+    lifted::original::c8217A370(ctx);
+    return;
+  }
+  const uint32_t key = ctx.r5.u32;
+  guest_call::InFrame(ctx, 368, 0x8217A74C, [&](uint32_t) {
+    Submit(ctx, schema::ModeTickGlobals::color_rect_queue(), *chunk, key,
+           schema::ModeTickGlobals::float_zero_address(), 0x8217A74C);
+  });
+  ctx.lr = lr;
+}
+// SignInWatch::CheckIdle: no arguments (r3 left, as the original). Where
+// the plain C++ declines (the original's traps), the original.
+ITC_DIRECT_ENTRY(8209ED58) {
+  if (!SignInWatchCheckIdle()) {
+    lifted::original::c8209ED58(ctx);
+  }
+}

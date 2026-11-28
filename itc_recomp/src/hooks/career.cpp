@@ -353,3 +353,46 @@ CAREER_ADAPTER(82111638, CareerEventQuery)
 CAREER_ADAPTER(82114268, CareerSetUpEvent)
 CAREER_ADAPTER(821104D8, CareerCarSetModelAndClass)
 CAREER_ADAPTER(82116CE0, CareerGarageAdd)
+
+// For the fallback originals (docs/missing-functions.md): lifted code calls
+// these hand ports by address. Each leaves r3 as the original does.
+ITC_DIRECT_ENTRY(82110590) { hooks::CareerDayBlockAddWord4832(ctx); }
+// ResultRecord::Fill: r3 = the 48-byte record, r4 = the race data; r3 = the
+// result (RacerRecords::At's).
+ITC_DIRECT_ENTRY(82110850) {
+  ctx.r3.u64 = career::ResultRecordFill(ctx.r3.u32, ctx.r4.u32);
+}
+ITC_DIRECT_ENTRY(82111780) { hooks::CareerAnyWonKind3Stage1(ctx); }
+// The stage tests: no arguments read; r3 = 0 or 1.
+ITC_DIRECT_ENTRY(82111818) { ctx.r3.u64 = career::AnyWonKind3Stage2(); }
+ITC_DIRECT_ENTRY(821118B0) { ctx.r3.u64 = career::AllWonKind3(); }
+ITC_DIRECT_ENTRY(82111940) { ctx.r3.u64 = career::AllWonKind4Stage2(); }
+ITC_DIRECT_ENTRY(821119D0) { ctx.r3.u64 = career::AllWonKind4Stage3(); }
+ITC_DIRECT_ENTRY(82111A60) { ctx.r3.u64 = career::AllWonKind5(); }
+ITC_DIRECT_ENTRY(82111BA8) { hooks::CareerEntry56Allows(ctx); }
+ITC_DIRECT_ENTRY(82111CB0) { hooks::CareerRunningMeanMerge(ctx); }
+// Locations::Unlock and Unlock2: r3 = the save data (left), r4 = the bit.
+ITC_DIRECT_ENTRY(82111D20) { career::LocationsUnlock(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(82111D98) { career::LocationsUnlock2(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(82111FC8) { hooks::CareerResultsPush(ctx); }
+ITC_DIRECT_ENTRY(82112088) { hooks::CareerStatsStartDay(ctx); }
+// RunningMean::MergeTwo: r3 = the stats, r4 = the packed mean and count, from
+// its frame below r1; r3 = stats + 5904.
+ITC_DIRECT_ENTRY(82112148) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = career::RunningMeanMergeTwo(ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
+}
+ITC_DIRECT_ENTRY(82112950) { hooks::CareerConditionTest(ctx); }
+// Stats::CloseDay: r3 = the stats, from its frame below r1; r3 = stats + 5928.
+ITC_DIRECT_ENTRY(82113898) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = career::StatsCloseDay(ctx.r3.u32, ctx.r1.u32);
+}
+// ItemRecords::AddOutcome3: r3 = the save data, r4 = the item id, from its
+// frame below r1; r3 = Stats::AddOutcome3's.
+ITC_DIRECT_ENTRY(82114A88) {
+  ctx.r3.u64 = career::ItemRecordsAddOutcome3(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+ITC_DIRECT_ENTRY(82114B08) { hooks::CareerItemRecordsAddLoss(ctx); }
+ITC_DIRECT_ENTRY(82114B88) { hooks::CareerItemRecordsAddWin(ctx); }
+ITC_DIRECT_ENTRY(82114C08) { hooks::CareerRewardsGrant(ctx); }

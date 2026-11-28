@@ -188,6 +188,8 @@ void RaceModeConstruct(uint32_t mode);
 constexpr uint32_t kModeBytes = 852;
 constexpr uint32_t kMode3Bytes = 10460;
 void ModeTypeConstruct(uint32_t type, uint32_t mode);
+// sub_82106C80 ModeType3::ModeType3 alone (for its direct entry).
+void ModeType3Construct(uint32_t mode);
 // sub_82108160 MachineMember::MachineMember: StateMachine::StateMachine, then
 // its count and state = 0.
 void MachineMemberConstruct(uint32_t machine);

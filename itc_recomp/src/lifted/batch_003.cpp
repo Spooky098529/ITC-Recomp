@@ -1080,7 +1080,7 @@ loc_820A8270:
   if (cr0.eq) goto loc_820A828C;
   // bl 0x820a75e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820A75E8, LIFTED_ARGS(0x820A8284, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::AppCameraEntry::Ctor(LIFTED_ARGS(0x820A8284, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r31,r3
   r31 = r3;
   // b 0x820a8290
@@ -1105,7 +1105,7 @@ loc_820A8298:
   if (cr0.eq) goto loc_820A82B4;
   // bl 0x820a75e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820A75E8, LIFTED_ARGS(0x820A82AC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::AppCameraEntry::Ctor(LIFTED_ARGS(0x820A82AC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r31,r3
   r31 = r3;
   // b 0x820a82b8

@@ -796,3 +796,67 @@ ITC_SECOND_SET(820DE030, SecondSetSceneLightsConstruct)
 ITC_SECOND_SET(820ECE40, SecondSetSceneWheelsConstruct)
 ITC_SECOND_SET(820E6E70, SecondSetSceneTrafficConstruct)
 ITC_SECOND_SET(820DB330, SecondSetSceneModelConstruct)
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(820E6980) { hooks::SecondSetTrafficPointsDestruct(ctx); }
+ITC_DIRECT_ENTRY(82594A60) { hooks::SecondSetModelStreamData(ctx); }
+ITC_DIRECT_ENTRY(82594A78) { hooks::SecondSetModelStreamSize(ctx); }
+ITC_DIRECT_ENTRY(82594A90) { hooks::SecondSetModelStreamData2(ctx); }
+ITC_DIRECT_ENTRY(82594AA8) { hooks::SecondSetModelStreamSize2(ctx); }
+
+// For the fallback originals (docs/missing-functions.md): the hand ports
+// lifted code calls by address, through their register steps above (each
+// keeps its step's fallback to the original where the port doesn't run).
+ITC_DIRECT_ENTRY(820CE8D8) { hooks::SecondSetPointSetNode(ctx); }
+ITC_DIRECT_ENTRY(820CE900) { hooks::SecondSetPointSetShape(ctx); }
+ITC_DIRECT_ENTRY(820CEA08) { hooks::SecondSetPointClear(ctx); }
+ITC_DIRECT_ENTRY(820CEB30) { hooks::SecondSetFindShape(ctx); }
+ITC_DIRECT_ENTRY(820D0270) { hooks::SecondSetPointConstruct(ctx); }
+ITC_DIRECT_ENTRY(820D9F50) { hooks::SecondSetSceneModelBlockReset(ctx); }
+ITC_DIRECT_ENTRY(820DA5D0) { hooks::SecondSetSceneModelRelease(ctx); }
+ITC_DIRECT_ENTRY(820DB6C0) { hooks::SecondSetSceneCarModelRelease(ctx); }
+ITC_DIRECT_ENTRY(820DB720) { hooks::SecondSetSceneCarModelDestruct(ctx); }
+ITC_DIRECT_ENTRY(820DB878) { hooks::SecondSetCockpitResetFenders(ctx); }
+ITC_DIRECT_ENTRY(820DB930) { hooks::SecondSetCockpitResetCabin(ctx); }
+ITC_DIRECT_ENTRY(820DB9E8) { hooks::SecondSetCockpitResetDoors(ctx); }
+ITC_DIRECT_ENTRY(820DBAA0) { hooks::SecondSetCockpitResetHeadlights(ctx); }
+ITC_DIRECT_ENTRY(820DBC10) { hooks::SecondSetCockpitPointsReset(ctx); }
+ITC_DIRECT_ENTRY(820DBE20) { hooks::SecondSetSceneCockpitReset(ctx); }
+ITC_DIRECT_ENTRY(820DBF88) { hooks::SecondSetSceneCockpitRelease(ctx); }
+ITC_DIRECT_ENTRY(820DC0A8) { hooks::SecondSetCockpitInitBonnet(ctx); }
+ITC_DIRECT_ENTRY(820DC0F0) { hooks::SecondSetCockpitInitMirror(ctx); }
+ITC_DIRECT_ENTRY(820DC190) { hooks::SecondSetCockpitPointsConstruct(ctx); }
+ITC_DIRECT_ENTRY(820DC258) { hooks::SecondSetCockpitPointsDestruct(ctx); }
+ITC_DIRECT_ENTRY(820DC2F8) { hooks::SecondSetSceneCockpitDestruct(ctx); }
+ITC_DIRECT_ENTRY(820DC748) { hooks::SecondSetLightsResetFront(ctx); }
+ITC_DIRECT_ENTRY(820DC7A0) { hooks::SecondSetLightsResetSides(ctx); }
+ITC_DIRECT_ENTRY(820DC7F8) { hooks::SecondSetLightsResetRear(ctx); }
+ITC_DIRECT_ENTRY(820DC8A8) { hooks::SecondSetLightPointsReset(ctx); }
+ITC_DIRECT_ENTRY(820DCA40) { hooks::SecondSetSceneLightsReset(ctx); }
+ITC_DIRECT_ENTRY(820DCB20) { hooks::SecondSetSceneLightsRelease(ctx); }
+ITC_DIRECT_ENTRY(820DDCF8) { hooks::SecondSetLightPointsConstruct(ctx); }
+ITC_DIRECT_ENTRY(820DDD90) { hooks::SecondSetLightPointsDestruct(ctx); }
+ITC_DIRECT_ENTRY(820DDE00) { hooks::SecondSetSceneLightsDestruct(ctx); }
+ITC_DIRECT_ENTRY(820DE0E0) { hooks::SecondSetPartsResetFrontBumper(ctx); }
+ITC_DIRECT_ENTRY(820DE2C8) { hooks::SecondSetPartsResetRearBumper(ctx); }
+ITC_DIRECT_ENTRY(820DE498) { hooks::SecondSetPartsResetRearSpoiler(ctx); }
+ITC_DIRECT_ENTRY(820DE548) { hooks::SecondSetPartsResetBonnet(ctx); }
+
+// A point group's find (r3 = the group, r4 = its part model, r3 as the plain
+// C++ returns it), as the block finds' steps run theirs: the original where
+// the finds don't run natively.
+#define ITC_SECOND_SET_DIRECT_FIND(address, name)                \
+  ITC_DIRECT_ENTRY(address) {                                    \
+    if (!hooks::SecondSetFindsNative()) {                        \
+      lifted::original::c##address(ctx);                         \
+      return;                                                    \
+    }                                                            \
+    hooks::SecondSetFindStep(ctx, second_set::name);             \
+  }
+
+ITC_SECOND_SET_DIRECT_FIND(820DBB08, CockpitFindHeadlights)
+ITC_SECOND_SET_DIRECT_FIND(820DC850, LightsFindGroup)
+ITC_SECOND_SET_DIRECT_FIND(820DE140, PartsFindFrontBumper)
+ITC_SECOND_SET_DIRECT_FIND(820DE328, PartsFindRearBumper)
+ITC_SECOND_SET_DIRECT_FIND(820DE4E8, PartsFindRearSpoiler)
+ITC_SECOND_SET_DIRECT_FIND(820DE5B0, PartsFindBonnet)

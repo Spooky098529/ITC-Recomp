@@ -28,6 +28,7 @@
 #include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
 #include "texture_compression/dxt_alpha.h"
+#include "texture_compression/dxt_color.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_texture_compression, true, "ITC",
@@ -158,3 +159,185 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(823F2620, TextureCompressionDecodeA8R8G8B8Row)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6298, TextureCompressionDxtEncodeRow)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6B70, TextureCompressionImageCodecDelete)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6BC0, TextureCompressionDxtCodecDelete)
+
+// For the fallback originals (docs/missing-functions.md): XGCompressSurface,
+// DxtColor::PackR5G6B5 and DxtColor::FitEndpoints, mapped as their removed
+// adapters did.
+ITC_DIRECT_ENTRY(8235AAC0) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c8235AAC0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const texture_compression::CompressArguments arguments{
+      ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.f1.f64};
+  const auto r3 = texture_compression::CompressSurface(arguments, ctx.r1.u32,
+                                                       hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c8235AAC0(ctx);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+// r3 = a float4 color; r3 the 5:6:5 value.
+ITC_DIRECT_ENTRY(824206E8) {
+  ctx.fpscr.disableFlushMode();
+  float color[3];
+  for (uint32_t i = 0; i < 3; i++) {
+    color[i] = guest::LoadFloat(ctx.r3.u32 + 4 * i);
+  }
+  ctx.r3.u64 = texture_compression::PackR5G6B5(color);
+}
+// r3 the low end, r4 the high end, r5 the 16 float4 pixels, r6 3 or 4 colors
+// (another count: the original); r5 left + 8 as the original walks it.
+ITC_DIRECT_ENTRY(82420AB8) {
+  if (ctx.r6.u32 != 3 && ctx.r6.u32 != 4) {
+    lifted::original::c82420AB8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  float pixels[16][3];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 3; c++) {
+      pixels[i][c] = guest::LoadFloat(ctx.r5.u32 + texture_compression::kPixelBytes * i + 4 * c);
+    }
+  }
+  float low[3];
+  float high[3];
+  texture_compression::FitColorEndpoints(pixels, ctx.r6.u32, ctx.r1.u32, low, high);
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(ctx.r3.u32 + 4 * c, low[c]);
+  }
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(ctx.r4.u32 + 4 * c, high[c]);
+  }
+  ctx.r5.s64 = ctx.r5.s64 + 8;
+}
+// For the fallback originals (docs/missing-functions.md): Blitter::CopyRows,
+// Blitter::ConvertRows, ImageCodec::Prepare and ImageCodec::Create, mapped as
+// their removed adapters did.
+// r3 = the blitter; r3 0, E_FAIL or CopyBlocks' (made by lis: sign-extended).
+ITC_DIRECT_ENTRY(82369860) {
+  ctx.r3.s64 = int32_t(texture_compression::BlitterCopyRows(
+      ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx)));
+}
+// r3 = the blitter; r3 0 or E_FAIL (sign-extended); the original where the
+// port declines or without the native heap.
+ITC_DIRECT_ENTRY(823699F8) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c823699F8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = texture_compression::BlitterConvertRows(
+      ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c823699F8(ctx);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+// r3 = the destination's codec, r4 = the source's; r3 0 or E_OUTOFMEMORY.
+ITC_DIRECT_ENTRY(823EAA90) {
+  const auto r3 = hooks::NativeHeapActive()
+                      ? texture_compression::PrepareCodecs(ctx.r3.u32, ctx.r4.u32)
+                      : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EAA90(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the image description; r3 the codec or 0.
+ITC_DIRECT_ENTRY(823F6C60) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c823F6C60(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = texture_compression::CreateCodec(ctx.r3.u32, ctx.r1.u32,
+                                                   hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c823F6C60(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// For the fallback originals (docs/missing-functions.md): ImageCodec::
+// ImageCodec and DxtCodec::DxtCodec, mapped as their removed adapters did.
+// r3 = the codec, r4 = the description, r5 = bits per pixel, r6 = the kind;
+// r3 the codec; the original where the port declines or without the native
+// heap.
+ITC_DIRECT_ENTRY(823EA800) {
+  std::optional<uint32_t> r3;
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    r3 = texture_compression::ImageCodecConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32);
+  }
+  if (!r3) {
+    lifted::original::c823EA800(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the codec, r4 = the description; r3 the codec; as ImageCodec's.
+ITC_DIRECT_ENTRY(823F5FA0) {
+  std::optional<uint32_t> r3;
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    r3 = texture_compression::DxtCodecConstruct(ctx.r3.u32, ctx.r4.u32);
+  }
+  if (!r3) {
+    lifted::original::c823F5FA0(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// For the fallback originals (docs/missing-functions.md): ImageCodec's
+// destructor and DxtColor::EncodeBlock, mapped as their harness steps did.
+// r3 = the codec; r3 the original's (+92); the original where the port
+// declines or without the native heap.
+ITC_DIRECT_ENTRY(823EA070) {
+  const auto r3 = hooks::NativeHeapActive() ? texture_compression::ImageCodecDestruct(ctx.r3.u32)
+                                            : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EA070(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the 8-byte block, r4 = 16 float4 pixels, r5 = 1-bit alpha (nonzero),
+// r6 = dither (nonzero). r6 and r3 also stored in their slots of the caller's
+// frame (r1 + 44, r1 + 20) as the original does. r3 = 0.
+ITC_DIRECT_ENTRY(82420F50) {
+  ctx.fpscr.disableFlushMode();
+  guest::StoreU32(ctx.r1.u32 + 44, ctx.r6.u32);
+  guest::StoreU32(ctx.r1.u32 + 20, ctx.r3.u32);
+  float pixels[16][4];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) {
+      pixels[i][c] = guest::LoadFloat(ctx.r4.u32 + texture_compression::kPixelBytes * i + 4 * c);
+    }
+  }
+  uint8_t block[8];
+  texture_compression::EncodeColorBlock(pixels, ctx.r5.u32 != 0, ctx.r6.s32, ctx.r1.u32, block);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}
+
+// For the fallback originals (docs/missing-functions.md): DxtCodec's
+// destructor, r3 = the codec; r3 ~ImageCodec's (+92); the original where the
+// port declines or without the native heap.
+ITC_DIRECT_ENTRY(823EA770) {
+  const auto r3 = hooks::NativeHeapActive() ? texture_compression::DxtCodecDestruct(ctx.r3.u32)
+                                            : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EA770(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}

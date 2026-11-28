@@ -667,3 +667,153 @@ ITC_NATIVE_ENTRY_ALWAYS(82090108) {
   ITC_FRAMEWORK_FALLBACK(82090108)
   hooks::Main(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md).
+// HandlerMap::AllocateNodes: r3 = the count; r3 the block. The original for
+// its bad_alloc path or without the allocation layer.
+ITC_DIRECT_ENTRY(82099C80) {
+  if (NativeHeap()) {
+    if (const auto block = fw::MapAllocateNodes(ctx.r3.u32)) {
+      ctx.r3.u64 = *block;
+      return;
+    }
+  }
+  lifted::original::c82099C80(ctx);
+}
+// HandlerMap::NewNode: r4, r5, r6 = left, parent, right, r7 = the value,
+// r8 = the color; r3 the node.
+ITC_DIRECT_ENTRY(82099E20) {
+  if (!NativeHeap() || !fw::CanAllocate()) {
+    lifted::original::c82099E20(ctx);
+    return;
+  }
+  ctx.r3.u64 = fw::MapNewNode(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u8);
+}
+// RequestVector::InsertN: r3 = the vector, r4 = where (the vector in the
+// high word, also stored in the caller's frame at r1 + 24 as the original
+// does), r5 = the count, r6 = the request. r3 isn't the original's (a
+// leftover its callers don't read).
+ITC_DIRECT_ENTRY(8209A0E8) {
+  if (!NativeHeap() ||
+      !fw::RequestsInsertN(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    lifted::original::c8209A0E8(ctx);
+    return;
+  }
+  guest::StoreU64(ctx.r1.u32 + 24, ctx.r4.u64);
+}
+// sub_8209ABE8: r3 = the framework; App::Run's answer.
+ITC_DIRECT_ENTRY(8209ABE8) { hooks::RunFramework(ctx); }
+
+// For the fallback originals (docs/missing-functions.md).
+// sub_82090378: r3 = the framework's holder; r3 App::Run's answer.
+ITC_DIRECT_ENTRY(82090378) { hooks::RunFrameworkAt(ctx); }
+// Framework::Framework: r3 = the framework; r3 left.
+ITC_DIRECT_ENTRY(82090420) { fw::FrameworkConstruct(ctx.r3.u32); }
+// Framework::Create: r3 = the holder; r3 the holder. The original without
+// the allocation layer or where operator new fails.
+ITC_DIRECT_ENTRY(820909B8) {
+  if (NativeHeap()) {
+    if (const auto holder = fw::FrameworkCreate(ctx.r3.u32)) {
+      ctx.r3.u64 = *holder;
+      return;
+    }
+  }
+  lifted::original::c820909B8(ctx);
+}
+// DebugText::DebugText: r3 = the debug text, r4 = the block; the stack word
+// from its 160-byte frame (r1 - 160 + 100), the post from that frame; r3 the
+// debug text.
+ITC_DIRECT_ENTRY(82090EA8) {
+  const uint32_t stack_word = guest::LoadU32(ctx.r1.u32 - 160 + 100);
+  ctx.r3.u64 = fw::DebugTextConstruct(
+      ctx.r3.u32, ctx.r4.u32, stack_word, [&](uint32_t interface, uint32_t job) {
+        guest_call::InFrame(ctx, 160, 0x82090F78, [&](uint32_t) {
+          ctx.r4.u64 = job;
+          ctx.r5.u64 = 1;
+          VirtualCallFrom(
+              ctx, interface,
+              [&] { return schema::WorkerPoolInterface(interface).vtable().post(); },
+              0x82090F78);
+        });
+      });
+}
+// The map iterator's operator--: r3 = the iterator; r3 left. The original
+// where it traps.
+ITC_DIRECT_ENTRY(82091AE8) {
+  if (!ITC_FLAG(native_framework)) {
+    lifted::original::c82091AE8(ctx);
+    return;
+  }
+  fw::Iterator it = IteratorAt(ctx.r3.u32);
+  if (!fw::MapDecrement(it)) {
+    lifted::original::c82091AE8(ctx);
+    return;
+  }
+  schema::HandlerMapIterator(ctx.r3.u32).set_node(it.node);
+}
+// RequestVector::Erase: r3 = the result, r4 = the vector, r5 and r6 = first
+// and last (the vector in the high word), both also stored in the caller's
+// frame (r1 + 32, + 40) as the original does; the result = first; r3 left.
+// The original where it traps.
+ITC_DIRECT_ENTRY(82092EF8) {
+  if (!ITC_FLAG(native_framework)) {
+    lifted::original::c82092EF8(ctx);
+    return;
+  }
+  const fw::Iterator first{uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32};
+  const fw::Iterator last{uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32};
+  if (!fw::RequestsErase(ctx.r4.u32, first, last)) {
+    lifted::original::c82092EF8(ctx);
+    return;
+  }
+  guest::StoreU64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(ctx.r1.u32 + 40, ctx.r6.u64);
+  guest::StoreU64(ctx.r3.u32, ctx.r5.u64);
+}
+// HandlerMap::InsertNode: r3 = the result (an iterator), r4 = the map, r5 =
+// add on the left (its low byte), r6 = where, r7 = the value; r3 the result.
+// The original without the allocation layer or at the size limit.
+ITC_DIRECT_ENTRY(82093400) {
+  std::optional<fw::Iterator> it;
+  if (NativeHeap()) {
+    it = fw::MapInsert(ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0, ctx.r6.u32, ctx.r7.u32);
+  }
+  if (!it) {
+    lifted::original::c82093400(ctx);
+    return;
+  }
+  const schema::HandlerMapIterator answer(ctx.r3.u32);
+  answer.set_map(it->container);
+  answer.set_node(it->node);
+}
+// HandlerMap::NewHead: r3 the head.
+ITC_DIRECT_ENTRY(82099E88) {
+  if (!NativeHeap() || !fw::CanAllocate()) {
+    lifted::original::c82099E88(ctx);
+    return;
+  }
+  ctx.r3.u64 = fw::MapNewHead();
+}
+// RequestVector::Insert: r3 = the result (an iterator), r4 = the vector, r5
+// = where (the vector in the high word, also stored in the caller's frame at
+// r1 + 32 as the original does), r6 = the request; r3 the result. The
+// original without the allocation layer or where it traps.
+ITC_DIRECT_ENTRY(8209A600) {
+  std::optional<fw::Iterator> it;
+  if (NativeHeap()) {
+    it = fw::RequestsInsert(ctx.r4.u32, {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32},
+                            ctx.r6.u32);
+  }
+  if (!it) {
+    lifted::original::c8209A600(ctx);
+    return;
+  }
+  guest::StoreU64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(ctx.r3.u32, (uint64_t(it->container) << 32) | it->node);
+}
+// sub_824892F8: r3 = the object; r3 its +44 word.
+ITC_DIRECT_ENTRY(824892F8) { ctx.r3.u64 = fw::Word44(ctx.r3.u32); }
+// DebugFont::Init: r3 = the data; r3 as the plain C++ answers.
+ITC_DIRECT_ENTRY(8258BD58) { hooks::DebugFontInitSteps(ctx); }
+// DebugFont::SetPosition: r3, r4 = x and y; r3 and r4 left.
+ITC_DIRECT_ENTRY(8258BE08) { fw::DebugFontSetPosition(ctx.r3.u32, ctx.r4.u32); }

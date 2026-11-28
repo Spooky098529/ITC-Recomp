@@ -663,3 +663,44 @@ ITC_RACE_SCREENS(82219A78, RaceScreensCareerResultsPage1)
 // CareerResults::SetTexts and Open have no adapters (removed, 2026-11-08):
 // their only callers, Open and the race HUD machine's AwardPrize, are native
 // and call their plain C++; their steps are the harness's.
+
+// For the fallback originals (docs/missing-functions.md).
+ITC_DIRECT_ENTRY(8220BA28) { hooks::RaceScreensPagesFinish(ctx); }
+ITC_DIRECT_ENTRY(8220D6A0) { hooks::RaceScreensPauseMenuSaveOptions(ctx); }
+ITC_DIRECT_ENTRY(8220F840) { hooks::RaceScreensPauseMenuLoadData(ctx); }
+ITC_DIRECT_ENTRY(8220FB10) { hooks::RaceScreensPauseMenuDraw(ctx); }
+ITC_DIRECT_ENTRY(822197A8) { hooks::RaceScreensCareerResultsSetTexts(ctx); }
+ITC_DIRECT_ENTRY(8221AC00) { hooks::RaceScreensAfterRaceMenuShowItems(ctx); }
+ITC_DIRECT_ENTRY(8221BB48) { hooks::RaceScreensAfterRaceMenuDraw(ctx); }
+// The lift.py batches call these by address too (round of 2026-11-28).
+ITC_DIRECT_ENTRY(8220FA88) { hooks::RaceScreensPauseMenuOpen(ctx); }
+ITC_DIRECT_ENTRY(8221B5C8) { hooks::RaceScreensAfterRaceMenuSetUpItems(ctx); }
+ITC_DIRECT_ENTRY(8221BA68) { hooks::RaceScreensAfterRaceMenuOpen(ctx); }
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals round (2026-11-28), so lifted code calls the ports.
+ITC_DIRECT_ENTRY(8220C020) { hooks::RaceScreensListFired(ctx); }
+ITC_DIRECT_ENTRY(8220C4C8) { hooks::RaceScreensPauseMenuDestroy(ctx); }
+ITC_DIRECT_ENTRY(8220D7E8) { hooks::RaceScreensPauseMenuCreate(ctx); }
+ITC_DIRECT_ENTRY(8220D890) { hooks::RaceScreensPauseMenuClose(ctx); }
+ITC_DIRECT_ENTRY(8220F638) { hooks::RaceScreensPauseMenuUpdate(ctx); }
+ITC_DIRECT_ENTRY(8220FC98) { hooks::RaceScreensPauseMenu4Destroy(ctx); }
+ITC_DIRECT_ENTRY(82210868) { hooks::RaceScreensPauseMenu4Create(ctx); }
+ITC_DIRECT_ENTRY(82217CD0) { hooks::RaceScreensRaceDialogDestroy(ctx); }
+ITC_DIRECT_ENTRY(82217D70) { hooks::RaceScreensRaceDialogCreate(ctx); }
+ITC_DIRECT_ENTRY(82218838) { hooks::RaceScreensRaceDialogSetText(ctx); }
+ITC_DIRECT_ENTRY(82218918) { hooks::RaceScreensRaceDialogSetNote(ctx); }
+ITC_DIRECT_ENTRY(82219138) { hooks::RaceScreensCareerResultsCreate(ctx); }
+ITC_DIRECT_ENTRY(82219170) { hooks::RaceScreensCareerResultsDestroy(ctx); }
+ITC_DIRECT_ENTRY(8221A090) { hooks::RaceScreensCareerResultsUpdate(ctx); }
+ITC_DIRECT_ENTRY(8221A1F0) { hooks::RaceScreensCareerResultsOpen(ctx); }
+ITC_DIRECT_ENTRY(8221A2F8) { hooks::RaceScreensCareerResultsDraw(ctx); }
+ITC_DIRECT_ENTRY(8221A3E8) { hooks::RaceScreensAfterRaceMenuDestroy(ctx); }
+ITC_DIRECT_ENTRY(8221A498) { hooks::RaceScreensAfterRaceMenuClose(ctx); }
+ITC_DIRECT_ENTRY(8221B1F0) { hooks::RaceScreensAfterRaceMenuCreate(ctx); }
+ITC_DIRECT_ENTRY(8221BD20) { hooks::RaceScreensAfterRaceMenuUpdate(ctx); }
+ITC_DIRECT_ENTRY(8221BDD0) { hooks::RaceScreensKind6MenuCreate(ctx); }
+ITC_DIRECT_ENTRY(8221BE30) { hooks::RaceScreensKind6MenuDestroy(ctx); }
+ITC_DIRECT_ENTRY(8221F390) { hooks::RaceScreensRaceResultsCreate(ctx); }
+ITC_DIRECT_ENTRY(8221F3C8) { hooks::RaceScreensRaceResultsDestroy(ctx); }
+ITC_DIRECT_ENTRY(8221FA30) { hooks::RaceScreensSplitResultsCreate(ctx); }
+ITC_DIRECT_ENTRY(8221FA68) { hooks::RaceScreensSplitResultsDestroy(ctx); }

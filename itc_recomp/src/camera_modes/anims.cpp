@@ -540,7 +540,12 @@ std::optional<int64_t> PathRequest(uint32_t buffer, uint32_t index,
   game_modes::Buffer28Free(buffer);
   game_modes::Buffer28Reset(buffer);
   b.set_index(index);
+  return PathLoad(buffer, id, load);
+}
+
+int64_t PathLoad(uint32_t buffer, uint32_t id, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_82152D80 CameraPath::Load");
+  const schema::CameraPathBuffer b(buffer);
   b.set_state(1);
   // The file, a blob (E5 step 5) in place of the VirtualAlloc returning at
   // 0x82152DC0; Buffer28::Free frees it.
@@ -578,8 +583,13 @@ void RivalLogoConstruct(uint32_t entry) {
   r.set_flags(2);
   r.set_anim(0);
   r.set_asset(0);
+  RivalLogoInitXpr(r.holder_address());
+}
+
+void RivalLogoInitXpr(uint32_t holder) {
   ITC_NATIVE_RUNNING("sub_82211708 RivalLogo::InitXpr");
   // The holder (+20): its +0, its XPR (+4), +28, +56 to +68.
+  const schema::RivalLogo r(holder - 20);
   r.set_holder(0xFFFFFFFFu);
   if (r.xpr_address() != 0) {
     models::XprConstruct(r.xpr_address());

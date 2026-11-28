@@ -988,3 +988,54 @@ ITC_NATIVE_ENTRY_ALWAYS(821E6C50) {
   // (the caller's r24: diagnostic only, not carried)
   hooks::TuningUpdate(ctx, 0);
 }
+
+// For the fallback originals (docs/missing-functions.md): the steps above,
+// and the refresh's pages (no step) mapped the way TuningRefresh calls them.
+ITC_DIRECT_ENTRY(821CDB18) { hooks::TuningIsItemAvailable(ctx); }
+ITC_DIRECT_ENTRY(821CDED8) { hooks::TuningWheelNumber(ctx); }
+ITC_DIRECT_ENTRY(821D99A0) { hooks::TuningPickCameraPreset(ctx); }
+ITC_DIRECT_ENTRY(821DA3F8) { hooks::TuningShowInteriorPicture(ctx); }
+ITC_DIRECT_ENTRY(821DE2D8) { hooks::TuningAeroPartValue(ctx); }
+ITC_DIRECT_ENTRY(821DF448) { hooks::TuningEquipChoice(ctx); }
+ITC_DIRECT_ENTRY(821DF788) { hooks::TuningSetCarStats(ctx); }
+ITC_DIRECT_ENTRY(821DFBE8) { hooks::TuningHideNode19(ctx); }
+ITC_DIRECT_ENTRY(821E07B0) { hooks::TuningPreviewItem(ctx); }
+ITC_DIRECT_ENTRY(821E22E8) { hooks::TuningShowTireMarks(ctx); }
+ITC_DIRECT_ENTRY(821F1DE0) { hooks::TuningSetStateTexts(ctx); }
+ITC_DIRECT_ENTRY(822076E8) { hooks::TuningRefreshMovie13(ctx); }
+ITC_DIRECT_ENTRY(821F2110) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  hooks::WithCalls(ctx, [&](const tuning_screen::GuestCall& call) {
+    return tuning_screen::RefreshPaint(call, screen, sp);
+  });
+}
+ITC_DIRECT_ENTRY(821F2378) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  hooks::WithStandF1(ctx, [&](const tuning_screen::StandCalls& stand,
+                              std::optional<double>* f1) {
+    return tuning_screen::RefreshLightKits(stand, r3, sp, f1);
+  });
+}
+ITC_DIRECT_ENTRY(821F2AD8) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  hooks::WithCalls(ctx, [&](const tuning_screen::GuestCall& call) {
+    return tuning_screen::RefreshInterior(call, screen, sp);
+  });
+}
+ITC_DIRECT_ENTRY(821F7A98) {
+  const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
+  hooks::WithCalls(ctx, [&](const tuning_screen::GuestCall& call) {
+    return tuning_screen::RefreshMovie14(call, screen, sp);
+  });
+}
+// For the fallback originals (docs/missing-functions.md): the price and
+// choice getters (r3 the screen, r4 the choice; r3 the result) and SetRgb
+// (r4 the node, r5-r7 the color), through their steps.
+ITC_DIRECT_ENTRY(821CD160) { hooks::TuningGetPrice(ctx); }
+ITC_DIRECT_ENTRY(821CD868) { hooks::TuningGetCurrentChoice(ctx); }
+ITC_DIRECT_ENTRY(821CDC38) { hooks::TuningGetChoiceFlag(ctx); }
+ITC_DIRECT_ENTRY(821E7DA0) { hooks::TuningSetRgb(ctx); }
+// For the fallback originals (docs/missing-functions.md): TuningScreen::
+// Refresh through its step (r3 the screen; r3 1 or 0, f1 as it leaves it).
+ITC_DIRECT_ENTRY(821E3AD0) { hooks::TuningRefresh(ctx); }

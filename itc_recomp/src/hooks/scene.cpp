@@ -483,3 +483,15 @@ ITC_SCENE(820C9608, SceneUpdate)
 // loop, 2026-11-06), their callers in play native: ScenePools::UpdateA
 // sub_820C3DA0, CarScene::~CarScene sub_820C9110 and SceneAssets::Release
 // sub_820C4C80 (CarScene::Update's plain C++ calls their steps).
+
+// For the fallback originals (docs/missing-functions.md): the scene's
+// pieces through their register steps (r3 and r1 as the originals, r3 left
+// as they leave it; the original where the step declines).
+ITC_DIRECT_ENTRY(820C3C80) { hooks::SceneStartTeardownA(ctx); }
+ITC_DIRECT_ENTRY(820C3CF8) { hooks::SceneDestroyA(ctx); }
+ITC_DIRECT_ENTRY(820C4A70) { hooks::SceneAssetsReset(ctx); }
+ITC_DIRECT_ENTRY(820C5008) { hooks::SceneAssetsConstruct(ctx); }
+ITC_DIRECT_ENTRY(820C5168) { hooks::SceneAssetsDestruct(ctx); }
+ITC_DIRECT_ENTRY(820C8528) { hooks::SceneInitLighting(ctx); }
+ITC_DIRECT_ENTRY(820C89A8) { hooks::SceneCarSceneConstruct(ctx); }
+ITC_DIRECT_ENTRY(82594188) { hooks::SceneListDestruct(ctx); }

@@ -717,3 +717,27 @@ ITC_OPTIONS_LOAD_SAVE(821BCC10, SavePageNote)
 ITC_OPTIONS_LOAD_SAVE(821BBD18, SavePageWait)
 ITC_OPTIONS_LOAD_SAVE(821C6468, LoadPageLeave)
 ITC_OPTIONS_LOAD_SAVE(821C6550, SavePageLeave)
+
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches and the originals call these by address, so each runs its port
+// (its register step where one exists) directly.
+ITC_DIRECT_ENTRY(821BA550) { hooks::OptionsStepButtons(ctx); }
+ITC_DIRECT_ENTRY(821BA7E0) { hooks::OptionsIsButtonTaken(ctx); }
+// Options::HasButtonClash: no arguments (the edits copied below r1); r3 = 1
+// or 0.
+ITC_DIRECT_ENTRY(821BA890) { ctx.r3.u64 = options_screen::HasButtonClash(ctx.r1.u32); }
+ITC_DIRECT_ENTRY(821BAB58) { hooks::OptionsIsAnalogTaken(ctx); }
+ITC_DIRECT_ENTRY(821BABD8) { hooks::OptionsStepAnalog(ctx); }
+// Options::HasAnalogClash: as HasButtonClash for the analog edits.
+ITC_DIRECT_ENTRY(821BAC78) { ctx.r3.u64 = options_screen::HasAnalogClash(ctx.r1.u32); }
+ITC_DIRECT_ENTRY(821BAD08) { hooks::OptionsAnalogPicture(ctx); }
+ITC_DIRECT_ENTRY(821BE988) { hooks::OptionsShowSlider(ctx); }
+ITC_DIRECT_ENTRY(821BEAC8) { hooks::OptionsStepSliders(ctx); }
+ITC_DIRECT_ENTRY(821BEFE8) { hooks::OptionsShowButtonList(ctx); }
+ITC_DIRECT_ENTRY(821BF0F0) { hooks::OptionsShowButtonPicture(ctx); }
+ITC_DIRECT_ENTRY(821BF158) { hooks::OptionsShowButtonClashes(ctx); }
+ITC_DIRECT_ENTRY(821BF520) { hooks::OptionsShowAnalogList(ctx); }
+ITC_DIRECT_ENTRY(821BF630) { hooks::OptionsShowAnalogPicture(ctx); }
+ITC_DIRECT_ENTRY(821BF698) { hooks::OptionsShowAnalogClashes(ctx); }
+ITC_DIRECT_ENTRY(821BFA68) { hooks::OptionsResetNode(ctx); }
+ITC_DIRECT_ENTRY(821B9DB8) { hooks::OptionsSettingsReset(ctx); }

@@ -705,7 +705,7 @@ uint64_t f820907F0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t lr) {
   // addi r3,r3,-4
   r3 = uint64_t(int64_t(int64_t(r3) + -4));
   // b 0x82090778
-  { const lifted::Result o = lifted::Call(0x82090778, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82090778(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
@@ -737,7 +737,7 @@ uint64_t f82090808(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t lr) {
   // addi r3,r3,-8
   r3 = uint64_t(int64_t(int64_t(r3) + -8));
   // b 0x82090778
-  { const lifted::Result o = lifted::Call(0x82090778, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82090778(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
@@ -801,7 +801,7 @@ uint64_t f82090858(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t lr) {
   // addi r3,r3,-12
   r3 = uint64_t(int64_t(int64_t(r3) + -12));
   // b 0x82117770
-  { const lifted::Result o = lifted::Call(0x82117770, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::BankPair::SoundBank(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
@@ -4040,7 +4040,7 @@ loc_82093250:
   guest::StoreU8(uint32_t(r31) + 20, uint8_t(r29));
   // bl 0x82092b10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092B10, LIFTED_ARGS(0x8209328C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateLeft(LIFTED_ARGS(0x8209328C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,8(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 8);
 loc_82093290:
@@ -4087,7 +4087,7 @@ loc_820932BC:
   guest::StoreU8(uint32_t(r11) + 20, uint8_t(r29));
   // bl 0x82092a00
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092A00, LIFTED_ARGS(0x820932E4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateRight(LIFTED_ARGS(0x820932E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,8(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 8);
 loc_820932E8:
@@ -4107,7 +4107,7 @@ loc_820932E8:
   guest::StoreU8(uint32_t(r11) + 20, uint8_t(r30));
   // bl 0x82092b10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092B10, LIFTED_ARGS(0x82093308, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateLeft(LIFTED_ARGS(0x82093308, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x820933c8
   goto loc_820933C8;
 loc_8209330C:
@@ -4127,7 +4127,7 @@ loc_8209330C:
   guest::StoreU8(uint32_t(r31) + 20, uint8_t(r29));
   // bl 0x82092a00
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092A00, LIFTED_ARGS(0x8209332C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateRight(LIFTED_ARGS(0x8209332C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 0);
 loc_82093330:
@@ -4192,7 +4192,7 @@ loc_8209337C:
   schema::FrameDriverMapNode(uint32_t(r11)).set_color_bits(uint8_t(r29));
   // bl 0x82092b10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092B10, LIFTED_ARGS(0x820933A4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateLeft(LIFTED_ARGS(0x820933A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 0);
 loc_820933A8:
@@ -4212,7 +4212,7 @@ loc_820933A8:
   guest::StoreU8(uint32_t(r11) + 20, uint8_t(r30));
   // bl 0x82092a00
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82092A00, LIFTED_ARGS(0x820933C8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::HandlerMap::RotateRight(LIFTED_ARGS(0x820933C8, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820933C8:
   // stb r30,20(r28)
   guest::StoreU8(uint32_t(r28) + 20, uint8_t(r30));

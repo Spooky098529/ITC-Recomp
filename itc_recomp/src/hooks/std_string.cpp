@@ -161,3 +161,23 @@ ITC_NATIVE_ENTRY_ALWAYS(82593088) {
 
 ITC_STD_STRING_STATIC_INIT(825DA540, InitGlobalString8265EE7C)
 ITC_STD_STRING_STATIC_INIT(825DA580, InitGlobalString8265EE98)
+
+// For the fallback originals (docs/missing-functions.md).
+// _Grow: r3 = the string, r4 = the new length, r5 = trim (its low byte); r3
+// 1 when the new length isn't 0, else 0. The original where the port
+// declines or off the allocation layer.
+ITC_DIRECT_ENTRY(82091540) {
+  if (NativeLifetime()) {
+    if (const auto grown = Grow(ctx.r3.u32, ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0)) {
+      ctx.r3.u64 = *grown ? 1 : 0;
+      return;
+    }
+  }
+  lifted::original::c82091540(ctx);
+}
+// String::Find: r3 = the string, r4 = the pattern, r5 = the match's offset
+// (in and out), r6 = its length (out), r7 = where to start; r3 = the match
+// or 0. Neither allocates nor frees.
+ITC_DIRECT_ENTRY(82592970) {
+  ctx.r3.u64 = Find(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}

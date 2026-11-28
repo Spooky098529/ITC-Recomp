@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <format>
+#include <map>
 #include <vector>
 
 
@@ -32,10 +34,68 @@ struct Entry {
 Entry* g_entries = nullptr;            // kGranules, allocated once
 std::mutex g_mutex;
 uint32_t g_next = 0;                   // the first granule never handed out
-// Freed spans by their granule count (reused first fit by count).
-std::vector<std::pair<uint32_t, uint32_t>> g_free;  // (first granule, count)
+// Freed spans below g_next, by first granule (first granule -> count),
+// never two adjacent: a new handle takes the first one big enough (the rest
+// stays free), and a freed span merges with its free neighbors (with
+// g_next when it ends there). Exact-size reuse alone ran the range out
+// (2026-11-28): the streamed files' many sizes left it nearly all free in
+// thousands of spans.
+std::map<uint32_t, uint32_t> g_free;
 
 uint32_t Granule(uint32_t handle) { return (handle - kHandlesStart) / kHandleGranule; }
+
+// What holds the range (logged when it's full, g_mutex held): the live
+// objects by type (count, granules), and the freed spans waiting for an
+// allocation of exactly their size.
+void LogUseLocked(bool full) {
+  struct Use {
+    uint64_t count = 0, granules = 0;
+  };
+  std::vector<std::pair<const char*, Use>> uses;
+  uint64_t live = 0;
+  for (uint32_t g = 0; g < g_next; g++) {
+    const Entry& e = g_entries[g];
+    if (!e.object || e.start != kHandlesStart + g * kHandleGranule) {
+      continue;
+    }
+    const uint64_t n = std::max<uint32_t>(1, (e.size + kHandleGranule - 1) / kHandleGranule);
+    live += n;
+    const char* type = e.type ? e.type : "?";
+    auto it = std::find_if(uses.begin(), uses.end(), [&](const auto& u) {
+      return u.first == type || std::strcmp(u.first, type) == 0;
+    });
+    if (it == uses.end()) {
+      uses.push_back({type, {}});
+      it = uses.end() - 1;
+    }
+    it->second.count++;
+    it->second.granules += n;
+  }
+  uint64_t freed = 0, largest = 0;
+  for (const auto& [first, count] : g_free) {
+    freed += count;
+    largest = std::max<uint64_t>(largest, count);
+  }
+  const auto line = std::format("handles: {} granules handed out, {} live, {} in {} freed spans "
+                                "(largest {})",
+                                g_next, live, freed, g_free.size(), largest);
+  if (full) {
+    ITC_LOG_ERROR("{}", line);
+  } else {
+    ITC_LOG_INFO("{}", line);
+  }
+  std::sort(uses.begin(), uses.end(),
+            [](const auto& a, const auto& b) { return a.second.granules > b.second.granules; });
+  for (size_t i = 0; i < uses.size() && i < 20; i++) {
+    const auto line = std::format("handles:   {}: {} live, {} granules", uses[i].first,
+                                  uses[i].second.count, uses[i].second.granules);
+    if (full) {
+      ITC_LOG_ERROR("{}", line);
+    } else {
+      ITC_LOG_INFO("{}", line);
+    }
+  }
+}
 
 }  // namespace
 
@@ -51,19 +111,31 @@ uint32_t MakeHandle(void* object, uint32_t size, const char* type, const Layout*
   std::lock_guard lock(g_mutex);
   uint32_t first = UINT32_MAX;
   for (auto it = g_free.begin(); it != g_free.end(); ++it) {
-    if (it->second == count) {
+    if (it->second >= count) {
       first = it->first;
+      const uint32_t left = it->second - count;
       g_free.erase(it);
+      if (left != 0) {
+        g_free.emplace(first + count, left);
+      }
       break;
     }
   }
   if (first == UINT32_MAX) {
     if (g_next + count > kGranules) {
       ITC_LOG_ERROR("handles: the range is full ({} for a {})", size, type);
+      LogUseLocked(true);
       std::abort();
     }
     first = g_next;
     g_next += count;
+    // Each eighth of the range newly handed out (again when the end moved
+    // back and came past it again): it grows only when no freed span is big
+    // enough.
+    if (g_next * 8 / kGranules != first * 8 / kGranules) {
+      ITC_LOG_INFO("handles: {}/8 of the range handed out", g_next * 8 / kGranules);
+      LogUseLocked(false);
+    }
   }
   const uint32_t handle = kHandlesStart + first * kHandleGranule;
   for (uint32_t i = 0; i < count; i++) {
@@ -87,7 +159,26 @@ void ReleaseHandle(uint32_t handle) {
   for (uint32_t i = 0; i < count; i++) {
     g_entries[first + i] = {};
   }
-  g_free.emplace_back(first, count);
+  uint32_t start = first, size = count;
+  // Merge with the free span before it and the one after it.
+  auto next = g_free.lower_bound(start);
+  if (next != g_free.begin()) {
+    auto before = std::prev(next);
+    if (before->first + before->second == start) {
+      start = before->first;
+      size += before->second;
+      g_free.erase(before);
+    }
+  }
+  if (next != g_free.end() && next->first == first + count) {
+    size += next->second;
+    g_free.erase(next);
+  }
+  if (start + size == g_next) {
+    g_next = start;  // the end of what's handed out moves back
+  } else {
+    g_free.emplace(start, size);
+  }
 }
 
 bool FreeHandle(uint32_t handle) {

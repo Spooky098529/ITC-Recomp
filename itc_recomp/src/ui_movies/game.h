@@ -354,6 +354,12 @@ std::optional<uint32_t> MakePairs(uint32_t vector);
 // when the doubled capacity is the same). Returns the r3 the original
 // leaves: the old array when it was freed, else the vector.
 std::optional<uint32_t> PairsAppend(uint32_t vector, uint32_t key, uint32_t value);
+// sub_8211B160 on its own (for the fallback originals,
+// docs/missing-functions.md): nothing when `capacity` is the vector's
+// (returns the vector), else PairsAppend's capacity change to it. Returns
+// the r3 the original leaves; nullopt where the original must run (the
+// allocation or the free not native).
+std::optional<uint32_t> PairsReserve(uint32_t vector, uint32_t capacity);
 // sub_8211C168: the value set for the key (compared as signed words) when
 // it's there, else the pair appended (PairsAppend). Returns r3 as the
 // original leaves it (the vector, or PairsAppend's).
@@ -364,6 +370,10 @@ std::optional<uint32_t> MakeWords(uint32_t vector);
 // sub_8211AE68 (with sub_8211A788, the capacity changed: the new array not
 // cleared): the word appended, as PairsAppend.
 std::optional<uint32_t> WordsAppend(uint32_t vector, uint32_t word);
+// sub_8211A788 on its own (for the fallback originals,
+// docs/missing-functions.md): as PairsReserve, for the words (the new array
+// not cleared). nullopt where the original must run.
+std::optional<uint32_t> WordsReserve(uint32_t vector, uint32_t capacity);
 
 // A movie's named animations: 1,024 entries of 36 bytes from +176 (a
 // std::string, then +28 the scene and +32 the animation), the count at

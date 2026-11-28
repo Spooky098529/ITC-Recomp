@@ -123,3 +123,41 @@ ITC_NATIVE_ENTRY_ALWAYS(822A9EE8) {
   }
   lifted::original::c822A9EE8(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): Mesh::LoadShaders
+// sub_82594D20, r3 = the model, r4 = the shader section (no return value
+// read). With --native_models, over the allocation layer with the memory
+// blocks' host lock, as its removed adapter; where VertexShader::Init's plain C++ declines, its
+// original from LoadShaders' 176-byte frame (returning to 0x82594DEC). The
+// original where the plain C++ declines.
+namespace {
+
+struct LoadShadersContext {
+  lifted::Regs& ctx;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<LoadShadersContext*>(user);
+    guest_call::InFrame(c.ctx, 176, 0x82594DEC, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      lifted::original::c822A8740(c.ctx);
+    });
+  }
+};
+
+}  // namespace
+
+ITC_DIRECT_ENTRY(82594D20) {
+  if (hooks::ModelsNativeLifetime()) {
+    const uint64_t lr = ctx.lr;
+    LoadShadersContext context{ctx};
+    shader_objects::CreateCalls calls;
+    calls.init = &LoadShadersContext::Init;
+    calls.user = &context;
+    const bool done = shader_objects::LoadShaders(ctx.r3.u32, ctx.r4.u32, calls);
+    ctx.lr = lr;
+    if (done) {
+      return;
+    }
+  }
+  lifted::original::c82594D20(ctx);
+}

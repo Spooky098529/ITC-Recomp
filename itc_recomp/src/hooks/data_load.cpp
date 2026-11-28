@@ -303,3 +303,30 @@ ITC_NATIVE_ENTRY_ALWAYS(82106618) {
   }
   hooks::BootDataLoadSteps(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): the stale
+// originals' round. LoadingScreen::AddMovie and sub_822912A0: r3 = the asset
+// id; r3 the serial (UiMovie::Load's). The movie calls from the adder's own
+// 112-byte frame (below the caller's r1), with the original's return address
+// after UiMovie::UiMovie. Where operator new's plain C++ hands back, the
+// original.
+ITC_DIRECT_ENTRY(82247AA0) {
+  const uint64_t lr = ctx.lr;
+  const auto serial = dl::LoadingScreenAddMovie(ctx.r3.u32, MovieCalls(ctx, 0x82247AD0));
+  ctx.lr = lr;
+  if (!serial) {
+    lifted::original::c82247AA0(ctx);
+    return;
+  }
+  hooks::SetArchiveSerial(ctx, *serial);
+}
+ITC_DIRECT_ENTRY(822912A0) {
+  const uint64_t lr = ctx.lr;
+  const auto serial = dl::OtherMoviesAdd(ctx.r3.u32, MovieCalls(ctx, 0x822912D0));
+  ctx.lr = lr;
+  if (!serial) {
+    lifted::original::c822912A0(ctx);
+    return;
+  }
+  hooks::SetArchiveSerial(ctx, *serial);
+}

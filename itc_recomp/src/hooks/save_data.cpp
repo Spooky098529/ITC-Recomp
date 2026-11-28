@@ -240,3 +240,19 @@ ITC_NATIVE_ENTRY_ALWAYS(8220BAC0) {
   hooks::SaveDataMenuListInit(ctx);
 }
 ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)
+
+// For the fallback originals (docs/missing-functions.md): the functions
+// with no adapter above, through their register steps.
+// Stats::Stats: r3 = the stats.
+ITC_DIRECT_ENTRY(821056C0) { hooks::SaveDataStatsConstruct(ctx); }
+// Options::SetDefaults: r3 = the options; r3 as the original leaves it.
+ITC_DIRECT_ENTRY(82105940) { hooks::SaveDataOptionsSetDefaults(ctx); }
+// CourseRecords::Reset: r3 = the records.
+ITC_DIRECT_ENTRY(82105D08) { hooks::SaveDataCourseRecordsReset(ctx); }
+// BitSet400::SetAll: r3 = the set.
+ITC_DIRECT_ENTRY(821133A8) { hooks::SaveDataBitSetAll(ctx); }
+// The default tables' getters: no arguments; r3 the table.
+ITC_DIRECT_ENTRY(820CCCC0) { hooks::SaveDataTable50A8(ctx); }
+ITC_DIRECT_ENTRY(820CCCE0) { hooks::SaveDataTable3E34(ctx); }
+ITC_DIRECT_ENTRY(820CCCF0) { hooks::SaveDataTable3C24(ctx); }
+ITC_DIRECT_ENTRY(820CCD00) { hooks::SaveDataTable50E4(ctx); }

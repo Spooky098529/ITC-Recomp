@@ -1946,7 +1946,7 @@ lifted::Result f825CD270(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r31 = r3;
   // bl 0x825c5e58
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C5E58, LIFTED_ARGS(0x825CD284, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCueBase::Ctor(LIFTED_ARGS(0x825CD284, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32252
   r11 = uint64_t(int64_t(-2113667072));
   // lis r10,0
@@ -3298,7 +3298,7 @@ loc_825CDB78:
   r3 = r31;
   // bl 0x825c5960
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C5960, LIFTED_ARGS(0x825CDB8C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::GetVariable(LIFTED_ARGS(0x825CDB8C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // mr r3,r28
@@ -5045,7 +5045,7 @@ loc_825CE73C:
   r3 = uint64_t(int64_t(int64_t(r11) + 24));
   // bl 0x825c60c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C60C0, LIFTED_ARGS(0x825CE748, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTNodePool::PushBack(LIFTED_ARGS(0x825CE748, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,368(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 368);
   // li r10,1
@@ -6193,7 +6193,7 @@ lifted::Result f825CF220(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r4 = r11 + r10;
   // bl 0x825cf080
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CF080, LIFTED_ARGS(0x825CF248, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::SamplesToBytes(LIFTED_ARGS(0x825CF248, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,16(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 16);
   // clrlwi r11,r11,30
@@ -6439,7 +6439,7 @@ lifted::Result f825CF410(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   if (!cr6.eq) goto loc_825CF480;
   // bl 0x82295f18
   // (left out: dead in C++)
-  { const lifted::Result o = game::GetLastError(LIFTED_ARGS(0x825CF454, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82295F18(LIFTED_ARGS(0x825CF454, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,997
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 997, so);
   // beq cr6,0x825cf480
@@ -6666,7 +6666,7 @@ lifted::Result f825CF598(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r28 = r8;
   // bl 0x825ced88
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CED88, LIFTED_ARGS(0x825CF5C4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::Ctor(LIFTED_ARGS(0x825CF5C4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r5,r30
   r5 = r30;
   // mr r4,r24
@@ -6675,7 +6675,7 @@ lifted::Result f825CF598(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825ced98
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CED98, LIFTED_ARGS(0x825CF5D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::Set(LIFTED_ARGS(0x825CF5D4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r3,r1,96
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x82099ba0
@@ -6687,7 +6687,7 @@ lifted::Result f825CF598(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CF5E8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CF5E8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // bne cr6,0x825cf68c
@@ -6798,7 +6798,7 @@ loc_825CF6A8:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CF6B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CF6B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,0
   r11 = uint64_t(int64_t(0));
   // cmpwi cr6,r3,1
@@ -6832,7 +6832,7 @@ loc_825CF6C8:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cf210
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CF210, LIFTED_ARGS(0x825CF6F0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetLoopStartBytes(LIFTED_ARGS(0x825CF6F0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplw cr6,r28,r3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r3), so);
   // bgt cr6,0x825cf750
@@ -6852,7 +6852,7 @@ loc_825CF708:
   r25 = uint64_t(int64_t(1));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CF714, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CF714, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // bne cr6,0x825cf728
@@ -7268,7 +7268,7 @@ uint64_t f825CF9B0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   r31 = r3;
   // bl 0x825cc620
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CC620, LIFTED_ARGS(0x825CF9C8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBankRoot::Ctor(LIFTED_ARGS(0x825CF9C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r9,-32249
   r9 = uint64_t(int64_t(-2113470464));
   // addi r11,r31,296
@@ -7532,7 +7532,7 @@ loc_825CFB78:
   r22 = r30;
   // bl 0x825ced88
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CED88, LIFTED_ARGS(0x825CFB84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::Ctor(LIFTED_ARGS(0x825CFB84, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r5,r29
   r5 = r29;
   // mr r4,r23
@@ -7541,7 +7541,7 @@ loc_825CFB78:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825ced98
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CED98, LIFTED_ARGS(0x825CFB94, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::Set(LIFTED_ARGS(0x825CFB94, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // addi r3,r1,96
@@ -7550,7 +7550,7 @@ loc_825CFB78:
   guest::StoreU32(uint32_t(r1) + 80, uint32_t(r21));
   // bl 0x825cf210
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CF210, LIFTED_ARGS(0x825CFBA4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetLoopStartBytes(LIFTED_ARGS(0x825CFBA4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r31,r3
   r31 = r3;
   // addi r4,r1,84
@@ -7596,7 +7596,7 @@ loc_825CFBEC:
   r24 = r31 - r25;
   // bl 0x825cf288
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CF288, LIFTED_ARGS(0x825CFBF8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetLoopLengthBytes(LIFTED_ARGS(0x825CFBF8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = lifted::VtableWord(uint32_t(r29));
   // mr r27,r3
@@ -7658,7 +7658,7 @@ loc_825CFC60:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CFC68, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CFC68, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // bne cr6,0x825cfd0c
@@ -7769,7 +7769,7 @@ loc_825CFD28:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CFD30, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CFD30, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // bne cr6,0x825cfd70
@@ -7795,7 +7795,7 @@ loc_825CFD28:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x820a8958
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820A8958, LIFTED_ARGS(0x825CFD60, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetLoopStart(LIFTED_ARGS(0x825CFD60, r31)); r3 = o.r3; f1 = o.f1; }
   // rlwinm r11,r31,31,1,31
   r11 = __builtin_rotateleft64(uint32_t(r31) | (r31 << 32), 31) & 0x7FFFFFFF;
   // cmplw cr6,r11,r3
@@ -7829,7 +7829,7 @@ loc_825CFD94:
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // bl 0x825cee28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CEE28, LIFTED_ARGS(0x825CFD9C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveEntry::GetFormatTag(LIFTED_ARGS(0x825CFD9C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // bne cr6,0x825cfdb8
@@ -8617,7 +8617,7 @@ loc_825D0B38:
   r3 = r31;
   // bl 0x825d02f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825D02F8, LIFTED_ARGS(0x825D0B48, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::CreateInstance(LIFTED_ARGS(0x825D0B48, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt cr6,0x825d0b58
@@ -8692,7 +8692,7 @@ lifted::Result f825D0B70(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   guest::StoreU32(uint32_t(r31) + 28, uint32_t(r11));
   // bl 0x825d5980
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825D5980, LIFTED_ARGS(0x825D0BC4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrackInstance::Play(LIFTED_ARGS(0x825D0BC4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -8766,7 +8766,7 @@ lifted::Result f825D0C78(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = guest::LoadU32(uint32_t(r31) + 20);
   // bl 0x825cac48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825CAC48, LIFTED_ARGS(0x825D0CB4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::GetPitch(LIFTED_ARGS(0x825D0CB4, r31)); r3 = o.r3; f1 = o.f1; }
   // fadds f0,f1,f31
   lifted::ScalarFloatMode();
   f0 = double(float(f1 + f31));
@@ -8829,7 +8829,7 @@ uint64_t f825D17D0(uint64_t r3, uint64_t r4) {
   return r3;
 }
 
-// sub_825D17E0 game::XACTEvent::Dtor: lifted from generated/ by lift.py.
+// sub_825D17E0 game::XACTEvent::Dtor_825D17E0: lifted from generated/ by lift.py.
 lifted::Result f825D17E0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_825D17E0 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -8983,7 +8983,7 @@ loc_825D18C4:
   r3 = guest::LoadU32(uint32_t(r31) + 44);
   // bl 0x825d55e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825D55E0, LIFTED_ARGS(0x825D18DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrackInstance::CheckDone(LIFTED_ARGS(0x825D18DC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)

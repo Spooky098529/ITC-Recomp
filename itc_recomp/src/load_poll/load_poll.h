@@ -75,6 +75,8 @@ uint64_t CarPartsSetVinylTextures(uint32_t parts, uint64_t r3, uint32_t stack);
 // sub_820D3728(block); +8 = the scene + 1132 for set B (sub_820D3638), else
 // + 1064 for set A (sub_820D3600), else left. r3 the last test's answer.
 uint64_t InteriorDialsSetBlock(uint32_t dials, uint64_t block);
+// sub_820D3658: r3 = index, r4 = value; the table entry's address.
+uint64_t GaugeTableEntry(uint64_t index, int32_t value);
 // InteriorMeters::SetGauge (sub_820E32E8; never seen in play): +4 x (1324 +
 // gauge) = `entry`; PartModel::SetTexture on the gauge's point record's
 // model and shape with the texture index [+0] + 12 x gauge + 16 (3 above 2

@@ -504,3 +504,132 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 ITC_POST_EFFECT_DELETE(821389C8, EffectKind::kGlow)
 ITC_POST_EFFECT_DELETE(82138570, EffectKind::kColorFilter)
 ITC_POST_EFFECT_DELETE(821385C0, EffectKind::kMotionBlur)
+
+// For the fallback originals (docs/missing-functions.md).
+// GlareDef::Init: r3 = the glare, r4 = the type.
+ITC_DIRECT_ENTRY(8212EC90) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = GlareDefInit(ctx.r3.u32, ctx.r4.u32);
+}
+// GlareDef::GlareDef: r3 = the glare, left as is.
+ITC_DIRECT_ENTRY(8212ED78) {
+  ctx.fpscr.disableFlushMode();
+  GlareDefConstruct(ctx.r3.u32);
+}
+// RenderTexture::Create: r3 = the entry, r4 = the format, r5, r6 = the
+// size, r7 = the id, r8, r9 = the key (r1 = the stack).
+ITC_DIRECT_ENTRY(821330D0) {
+  ctx.r3.u64 = RenderTextureCreate(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                   ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
+}
+// Glow::RecordStarPass: r3 = the glow, r4 = the texture, r5 = samples,
+// f1-f4, r8 = the colors, r9 = the pass, the destination at r1 + 92.
+ITC_DIRECT_ENTRY(82134060) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t r3 = GlowRecordStarPass(
+      ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
+      ctx.f4.f64, ctx.r8.u32, ctx.r9.u32, guest::LoadU32(ctx.r1.u32 + 92),
+      hooks::PostEffectsRecordCalls(ctx));
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+// The stale originals' round (2026-11-28): lifted code calling these hand
+// ports by address.
+// RenderTexture::Release: r3 = the entry; the original where the header
+// isn't the layer's.
+ITC_DIRECT_ENTRY(82133070) {
+  const std::optional<uint32_t> r3 = RenderTextureRelease(ctx.r3.u32);
+  if (!r3) {
+    lifted::original::c82133070(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// PostEffect::RecordPixelBool: r4 = the command list, r5 = the value, r6 =
+// the register; the original when the list is full.
+ITC_DIRECT_ENTRY(82133D70) {
+  const std::optional<uint32_t> r3 = RecordPixelBool(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  if (!r3) {
+    lifted::original::c82133D70(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// The constructors: r3 = the object, r4 = the table entry (r1 = the stack,
+// as PostEffects::Create's plain C++ passes its frame); r3 = the object.
+ITC_DIRECT_ENTRY(82135008) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ColorFilterConstruct(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+ITC_DIRECT_ENTRY(82136130) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = MotionBlurConstruct(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+ITC_DIRECT_ENTRY(82138610) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = GlowConstruct(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+// TargetFilter::TargetFilter: as the constructors, its frame (112 bytes)
+// below r1; the original where the copy can't be made natively.
+ITC_DIRECT_ENTRY(82135AA8) {
+  ctx.fpscr.disableFlushMode();
+  const std::optional<uint32_t> r3 =
+      TargetFilterConstruct(ctx.r1.u32 - 112, ctx.r3.u32, ctx.r4.u32);
+  if (!r3) {
+    lifted::original::c82135AA8(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// The destructors: r3 = the effect; r3 as the last release leaves it. From
+// a frame like the originals' (96 or 112 bytes), as the deleting
+// destructors' adapters call them.
+ITC_DIRECT_ENTRY(821351A8) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t filter = ctx.r3.u32;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, 96, 0, [&](uint32_t) {
+    r3 = ColorFilterDestroy(filter, hooks::PostEffectsDestroyCalls(ctx));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+ITC_DIRECT_ENTRY(82136390) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t blur = ctx.r3.u32;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, 96, 0, [&](uint32_t) {
+    r3 = MotionBlurDestroy(blur, hooks::PostEffectsDestroyCalls(ctx));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+ITC_DIRECT_ENTRY(82136E30) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t glow = ctx.r3.u32;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, 112, 0, [&](uint32_t) {
+    r3 = GlowDestroy(glow, hooks::PostEffectsDestroyCalls(ctx));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+// Glow::RecordStar: r3 = the glow (r1 = Glow::Record's frame); the original
+// where the plain C++ declines (no room, more passes or lines than it takes).
+ITC_DIRECT_ENTRY(82136FA8) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t glow = ctx.r3.u64;
+  const std::optional<uint32_t> r3 =
+      GlowRecordStar(ctx.r1.u32, ctx.r3.u32, hooks::PostEffectsRecordCalls(ctx));
+  ctx.lr = lr;
+  if (!r3) {
+    ctx.r3.u64 = glow;
+    lifted::original::c82136FA8(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// PostEffects::InitBoot: r3 = the device or 0; its register step above.
+ITC_DIRECT_ENTRY(82138C38) { hooks::PostEffectsInitBoot(ctx); }

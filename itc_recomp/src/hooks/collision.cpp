@@ -243,3 +243,172 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB218) {
   }
   ctx.r3.u64 = copy;
 }
+
+// For the fallback originals (docs/missing-functions.md): the box-box
+// tests and the shape record's set-up, called by address. r3 as the
+// originals leave it (the deleted adapters' and harness steps' mappings).
+// BoxShape::RelativePlacement: r3 = box A, r4 = the block, r5 = box B.
+ITC_DIRECT_ENTRY(820BA408) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxRelativePlacement(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// BoxShape::RelativeCenter: as RelativePlacement, the center only.
+ITC_DIRECT_ENTRY(820BA5D8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxRelativeCenter(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// BoxBox::FaceSeparates: r3, r4 = the faces, r5, r6 = box B's copies.
+ITC_DIRECT_ENTRY(820BB300) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxBoxFaceSeparates(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+// CollisionShape::SetUp: r3 = the record, r4 = the template, r5 = the
+// matrix, r6 = memory for the clones or 0; its 128-byte frame; r3 comes
+// back as the record (left). The original where the port declines.
+ITC_DIRECT_ENTRY(820BB580) {
+  if (!NativeLifetime()) {
+    lifted::original::c820BB580(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionShapeSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                           ctx.r1.u32 - 128)) {
+    lifted::original::c820BB580(ctx);
+  }
+}
+// BoxBox::BlockCorners: r3 = the block, its 320-byte frame; r3 comes back
+// as the block + 304.
+ITC_DIRECT_ENTRY(820BC978) {
+  ctx.fpscr.disableFlushMode();
+  BoxBoxBlockCorners(ctx.r3.u32, ctx.r1.u32 - 320);
+  ctx.r3.u64 = ctx.r3.u32 + 304;
+}
+// BoxBox::MoveCorners: r3 = the block's corners (its +80; the port takes
+// the block), r4 = the offset; r3 comes back as the last corner.
+ITC_DIRECT_ENTRY(820BCCE8) {
+  ctx.fpscr.disableFlushMode();
+  BoxBoxMoveCorners(ctx.r3.u32 - 80, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 224;
+}
+// BoxBox::Outcode: r3 = the block; returns the bits.
+ITC_DIRECT_ENTRY(820BD0C8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxBoxOutcode(ctx.r3.u32);
+}
+
+// For the fallback originals (docs/missing-functions.md): the shape record,
+// the box's constructor, the query and its tests, the impacts, push-outs
+// and the pair's response, called by address from lifted code. The
+// registers as the deleted harness steps mapped them (each frame the
+// original's r1 after its stwu); shapes that aren't boxes run the original.
+// CollisionShape::PreviousCenter: r3 = the record; r3 the center.
+ITC_DIRECT_ENTRY(820BAB30) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = CollisionShapePreviousCenter(ctx.r3.u32);
+}
+// CollisionShape::UpdateMotion: r3 = the record, its 240-byte frame; r3
+// comes back as the record + 96.
+ITC_DIRECT_ENTRY(820BAE78) {
+  ctx.fpscr.disableFlushMode();
+  CollisionShapeUpdateMotion(ctx.r3.u32, ctx.r1.u32 - 240);
+  ctx.r3.u64 = ctx.r3.u32 + 96;
+}
+// BoxShape::BoxShape: r3 = the box, r4 and r5 = the corners, its 112-byte
+// frame.
+ITC_DIRECT_ENTRY(820BB188) {
+  ctx.fpscr.disableFlushMode();
+  BoxConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112);
+}
+// CollisionPair::Respond: r3, r4 = objects A and B, r5 = the contact, its
+// 240-byte frame. The original where it can't be native.
+ITC_DIRECT_ENTRY(820BB868) {
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionPairRespondNative(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c820BB868(ctx);
+    return;
+  }
+  uint32_t r3 = 0;
+  CollisionPairRespond(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 240, &r3);
+  ctx.r3.u64 = r3;
+}
+// Query::SetShapes: r3 = the query, r4 and r5 = the shape records.
+ITC_DIRECT_ENTRY(820BC848) {
+  ctx.fpscr.disableFlushMode();
+  QuerySetShapes(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// Query::FindPushOut: r3 = the query, r4 = the direction, its 112-byte
+// frame.
+ITC_DIRECT_ENTRY(820BCDD0) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (!QueryFindPushOut(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112, &result)) {
+    lifted::original::c820BCDD0(ctx);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+// Query::FindImpact: r3 = the query.
+ITC_DIRECT_ENTRY(820BCE80) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (!QueryFindImpact(ctx.r3.u32, &result)) {
+    lifted::original::c820BCE80(ctx);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+// Query::Query: r3 = the query.
+ITC_DIRECT_ENTRY(820BD1C8) {
+  ctx.fpscr.disableFlushMode();
+  QueryConstruct(ctx.r3.u32);
+}
+// Query::Separated: r3 = the query, r4 = the cache, its 112-byte frame.
+ITC_DIRECT_ENTRY(820BD508) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (!QuerySeparated(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112, &result)) {
+    lifted::original::c820BD508(ctx);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+// Query::SeparatedAfterMove: r3 = the query, its 96-byte frame.
+ITC_DIRECT_ENTRY(820BD6E0) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t result = 0;
+  if (!QuerySeparatedAfterMove(ctx.r3.u32, ctx.r1.u32 - 96, &result)) {
+    lifted::original::c820BD6E0(ctx);
+    return;
+  }
+  ctx.r3.u64 = result;
+}
+// BoxBox::PushOutCorners: r3 = the query, its 304-byte frame.
+ITC_DIRECT_ENTRY(820BE150) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!BoxBoxPushOutCorners(ctx.r3.u32, ctx.r1.u32 - 304, &r3)) {
+    lifted::original::c820BE150(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// BoxBox::CornerImpacts: r3 = the query.
+ITC_DIRECT_ENTRY(820BECA0) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!BoxBoxCornerImpacts(ctx.r3.u32, &r3)) {
+    lifted::original::c820BECA0(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// BoxBox::PushOutEdges: r3 = the query, its 544-byte frame.
+ITC_DIRECT_ENTRY(820BF320) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!BoxBoxPushOutEdges(ctx.r3.u32, ctx.r1.u32 - 544, &r3)) {
+    lifted::original::c820BF320(ctx);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}

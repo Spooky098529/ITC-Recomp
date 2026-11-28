@@ -143,3 +143,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820F9768) {
   }
   lifted::original::c820F9768(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): r3 = the linear
+// index (FromIndex: r3 the packed position, zero-extended as the original's
+// lwz); r3 = the route, r4 = &the point, r5 = the section (SectionOutcode:
+// r3 the outcode).
+ITC_DIRECT_ENTRY(820AB498) { ctx.r3.u64 = FromIndex(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(820F8EF0) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = SectionOutcode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}

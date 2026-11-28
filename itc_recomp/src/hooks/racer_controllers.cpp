@@ -199,3 +199,29 @@ ITC_RACER_CONTROLLERS(8215FC38, {
   ITC_RACER_CALLS;
   ctx.r3.u64 = OnState34(ctx.r1.u32, calls);
 })
+
+// For the fallback originals (docs/missing-functions.md).
+// InputRecording::Append: r3 = the record, r4 = the player.
+ITC_DIRECT_ENTRY(821029A8) { ctx.r3.u64 = RecordingAppend(ctx.r3.u32, ctx.r4.u32); }
+// PlayerControl::ReadPad: r3 = a record, r4 = a racer index, r5 = a player,
+// r6 = the message ring's owner, r7 = may pause.
+ITC_DIRECT_ENTRY(8215FCA8) {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ReadPad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                       ctx.r1.u32, calls);
+}
+// RacerControl::DriveByAi: r3 = the racer's index, r4 = the hold flag; r3
+// (and f1) as the original leaves them.
+ITC_DIRECT_ENTRY(8215F968) {
+  ITC_RACER_CALLS;
+  DriveByAi(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls, &ctx.r3.u64);
+}
+// PlayerControl::Update: r3 = the racer's record slot, r4 = the racer's
+// index, r5 = the player, r6 = the message ring's owner, r7 = may pause.
+ITC_DIRECT_ENTRY(821604C8) {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayerUpdate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                            ctx.r1.u32, calls);
+}

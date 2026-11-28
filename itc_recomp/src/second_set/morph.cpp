@@ -60,6 +60,8 @@ simde__m128 WeightVector(uint32_t weight, uint32_t zero) {
   return VectorOf(weight, weight, weight, zero);
 }
 
+}  // namespace
+
 BlendResult Blend6(uint32_t morph, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8258B578 Morph::Blend6");
   // The original's frame (128 bytes) held only the weights' vector at +80,
@@ -153,8 +155,6 @@ BlendResult Blend7(uint32_t morph, uint32_t stack) {
   }
   return result;
 }
-
-}  // namespace
 
 uint32_t ModelStreamData(uint32_t model, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82594A60 Model::StreamData");

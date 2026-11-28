@@ -462,3 +462,118 @@ ITC_NATIVE_ENTRY_ALWAYS(821399A8) {
   
   hooks::AiUpdateIdle(ctx);
 }
+
+// --- For the fallback originals (docs/missing-functions.md) ---
+
+// Ports with no adapter that lifted/originals.cpp calls by address. `frame`
+// is the original's own frame (its size below the caller's stack pointer,
+// r1 at entry); the void ones leave r3 as it came, as the others here.
+#define ITC_AI_DRIVERS_DIRECT(address, ...) \
+  ITC_DIRECT_ENTRY(address) {               \
+    ctx.fpscr.disableFlushMode();           \
+    __VA_ARGS__;                            \
+  }
+
+// r3 = the driver, r4 = &the word.
+ITC_AI_DRIVERS_DIRECT(82138D20, ctx.r3.u64 = SetFlag2(ctx.r3.u32, ctx.r4.u32))
+ITC_AI_DRIVERS_DIRECT(82139580, ResetControl(ctx.r3.u32, ctx.r1.u32 - 112))
+ITC_AI_DRIVERS_DIRECT(82139DA0, ctx.r3.u64 = StartRace(ctx.r3.u32, ctx.r1.u32 - 112))
+// r3 = the driver, r4 = the car's input record; f1 as the original leaves it.
+ITC_AI_DRIVERS_DIRECT(8213B058, {
+  double f1 = 0;
+  ctx.r3.u64 = Drive(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &f1);
+  ctx.f1.f64 = f1;
+})
+ITC_AI_DRIVERS_DIRECT(8213B5D8, RefreshPoints(ctx.r3.u32))
+// r3 = the entry, r4 = &at, r5 = &the width, r6 = &out.
+ITC_AI_DRIVERS_DIRECT(8213C5C8, BlockLeft(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_AI_DRIVERS_DIRECT(8213C630, BlockRight(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// r3 = the path, r4 = &the mode.
+ITC_AI_DRIVERS_DIRECT(8213D508, ctx.r3.u64 = SetMode(ctx.r3.u32, ctx.r4.u32))
+// r3 = the path, r4 = &the count.
+ITC_AI_DRIVERS_DIRECT(8213D670, ctx.r3.u64 = SetRanges(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 128))
+ITC_AI_DRIVERS_DIRECT(8213D9D8, FollowTargets(ctx.r3.u32, ctx.r1.u32 - 128))
+ITC_AI_DRIVERS_DIRECT(8213E690, ctx.r3.u64 = AvoidOthers(ctx.r3.u32, ctx.r1.u32 - 272))
+ITC_AI_DRIVERS_DIRECT(8213EB48, ctx.r3.u64 = FollowLeaderBranch(ctx.r3.u32))
+// r3 = the path, r4 = the point; the normalizer as AiDriveCar's.
+ITC_AI_DRIVERS_DIRECT(8213ECF8, {
+  PathCall call{&ctx};
+  const PathCalls calls{&call, CallNormalizer};
+  ctx.r3.u64 = Extend(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208, calls);
+})
+// r3 = the path, r4 = the point; the original where AdvanceCorners' copies
+// can't be native.
+ITC_AI_DRIVERS_DIRECT(8213F2E0, {
+  uint64_t r3 = 0;
+  if (DropPassed(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 160, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c8213F2E0(ctx);
+})
+ITC_AI_DRIVERS_DIRECT(8213F4B0, ctx.r3.u64 = PlanLine(ctx.r3.u32, ctx.r1.u32 - 96))
+ITC_AI_DRIVERS_DIRECT(8213F698, ResetSkill(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(82145118, PickTarget(ctx.r3.u32))
+// r3 = the driver, r4 = the other's record, r5 = &the mode.
+ITC_AI_DRIVERS_DIRECT(821452A0, AdjustForOther(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 = the record, r4 = &the gap, r5 = &the length.
+ITC_AI_DRIVERS_DIRECT(821454C8, UpdateOther(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 = out, r4 = the record, r5 = &the value.
+ITC_AI_DRIVERS_DIRECT(82145610, MirrorOther(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 = the record, r4 = &the index word, r5 = &the limit.
+ITC_AI_DRIVERS_DIRECT(821456A0, UpdateOtherTimer(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// r3 = the driver, r4 = &the count.
+ITC_AI_DRIVERS_DIRECT(82145CA8, ctx.r3.u64 = ReactToOthers(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 240))
+
+// For the fallback originals (docs/missing-functions.md): the ports the
+// lift.py batches call by address. r3 = the driver (AccumulateSteer,
+// PickTargetBehind) or &the angle (WrapAngle).
+ITC_AI_DRIVERS_DIRECT(82138F00, AccumulateSteer(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(821451B8, PickTargetBehind(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(82145408, WrapAngle(ctx.r3.u32))
+// r3 = the path, r4 = a MeasureOthers record, r5 = the driver's record of
+// that racer; the original's frame 176 (left) or 160 (right) bytes down.
+ITC_AI_DRIVERS_DIRECT(8213CB30,
+                      ctx.r3.u64 = AvoidOnLeft(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 176))
+ITC_AI_DRIVERS_DIRECT(8213CD50,
+                      ctx.r3.u64 = AvoidOnRight(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 160))
+
+// For the fallback originals (docs/missing-functions.md).
+// r3 = the driver, kept.
+ITC_AI_DRIVERS_DIRECT(8213AD48, InitPath(ctx.r3.u32))
+// r3 = the skill, kept.
+ITC_AI_DRIVERS_DIRECT(8213F700, ClearSkill(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(82146408, ctx.r3.u64 = IsSettled(ctx.r3.u32))
+// r3 left at the skill (+6048), as the original's tail call leaves it.
+ITC_AI_DRIVERS_DIRECT(821394F0, ResetToMode0(ctx.r3.u32, ctx.r1.u32 - 128);
+                      ctx.r3.u64 += 6048)
+ITC_AI_DRIVERS_DIRECT(8213AD98, ctx.r3.u64 = DestroyRings(ctx.r3.u64))
+// r3 = a, r4 = the other's index's address.
+ITC_AI_DRIVERS_DIRECT(82145B08,
+                      ctx.r3.u64 = CompareWith(ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - 144))
+// AiPath::Update: r3 = the path. The original where DropPassed can't be
+// native.
+ITC_AI_DRIVERS_DIRECT(8213F530, {
+  PathCall call{&ctx};
+  const PathCalls calls{&call, CallNormalizer};
+  uint64_t r3 = 0;
+  if (UpdatePath(ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
+    ctx.r3.u64 = r3;
+    return;
+  }
+  lifted::original::c8213F530(ctx);
+})
+// AiDriver::Update: r3 = the driver, r4 = the input record, r5 = &the flag;
+// r3 and f1 Drive's. The original where AiPath::Update can't be native.
+ITC_AI_DRIVERS_DIRECT(8213B310, {
+  PathCall call{&ctx};
+  const PathCalls calls{&call, CallNormalizer};
+  uint64_t r3 = 0;
+  double f1 = ctx.f1.f64;
+  if (UpdateDriver(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3, &f1)) {
+    ctx.r3.u64 = r3;
+    ctx.f1.f64 = f1;
+    return;
+  }
+  lifted::original::c8213B310(ctx);
+})

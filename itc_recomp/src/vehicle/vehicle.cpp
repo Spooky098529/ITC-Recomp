@@ -246,6 +246,37 @@ std::optional<uint32_t> VehiclesCreate(uint32_t frame) {
   return *block;
 }
 
+namespace {
+
+// Vehicles::DestroyAll's loop (sub_820C21E0), the checks made.
+void DestroyAllVehicles(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820C21E0 Vehicles::DestroyAll");
+  for (int32_t i = 6; i >= 0; i--) {
+    const uint32_t vehicle = block + kVehicleBytes * uint32_t(i);
+    // The empty destructor on each: the iterator calls nothing.
+    c_runtime::VectorDestruct(schema::Vehicle(vehicle).wheel_track_positions_address(), 96, 4,
+        kEmptyDestructor,
+        [](void*, uint64_t, uint64_t) {
+          ITC_LOG_ERROR("vehicle: the track positions' destructor isn't the empty one");
+        },
+        nullptr);
+    uint32_t ignored = 0;
+    cp::VehicleDestroyPhysics(vehicle, &ignored);
+  }
+}
+
+}  // namespace
+
+bool VehiclesDestroyAll(uint32_t block) {
+  for (uint32_t i = 0; i < 7; i++) {
+    if (!DestroyPhysicsFits(block + kVehicleBytes * i)) {
+      return false;
+    }
+  }
+  DestroyAllVehicles(block);
+  return true;
+}
+
 bool VehiclesDestroy() {
   const uint32_t block = G::vehicles();
   if (block != 0) {
@@ -260,19 +291,7 @@ bool VehiclesDestroy() {
   }
   ITC_NATIVE_RUNNING("sub_820C3B78 Vehicles::Destroy");
   if (block != 0) {
-    ITC_NATIVE_RUNNING("sub_820C21E0 Vehicles::DestroyAll");
-    for (int32_t i = 6; i >= 0; i--) {
-      const uint32_t vehicle = block + kVehicleBytes * uint32_t(i);
-      // The empty destructor on each: the iterator calls nothing.
-      c_runtime::VectorDestruct(schema::Vehicle(vehicle).wheel_track_positions_address(), 96, 4,
-          kEmptyDestructor,
-          [](void*, uint64_t, uint64_t) {
-            ITC_LOG_ERROR("vehicle: the track positions' destructor isn't the empty one");
-          },
-          nullptr);
-      uint32_t ignored = 0;
-      cp::VehicleDestroyPhysics(vehicle, &ignored);
-    }
+    DestroyAllVehicles(block);
     memory::crt::OperatorDelete(block);
   }
   G::set_vehicles(0);

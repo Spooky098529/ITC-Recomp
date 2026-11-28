@@ -301,3 +301,9 @@ ITC_FRONT_END_HELPERS(821822F8, FrontEndCarCardsFillAll)
 // flag switches it); its step above is the harness's.
 ITC_FRONT_END_HELPERS(821821C8, FrontEndCarCardFill)
 ITC_FRONT_END_HELPERS(821830C0, FrontEndCarDetailOpen)
+
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address (SaveScreen::ShowMessage5 among them), so
+// each runs its register step directly.
+ITC_DIRECT_ENTRY(821A51C8) { hooks::FrontEndSaveScreenSetText(ctx); }
+ITC_DIRECT_ENTRY(821A52C0) { hooks::FrontEndSaveScreenSetNote(ctx); }

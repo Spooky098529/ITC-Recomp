@@ -158,6 +158,10 @@ uint32_t FontCreateShaders(uint32_t font, uint32_t frame, const FontCalls& calls
 // device lock native (the adapter checks).
 uint32_t FontConstruct(uint32_t font, uint32_t frame, uint32_t shaders_frame,
                        const FontCalls& calls);
+// sub_82109A00 Font::Init: the font's 16,592 bytes (a host object) into
+// 0x826C5C00, then Font::Font on them (`font_frame`, `shaders_frame` as
+// FontConstruct's). Returns Font::Font's r3 (14).
+uint32_t FontInit(uint32_t font_frame, uint32_t shaders_frame, const FontCalls& calls);
 // sub_8210ADD0 Text::Init: Font::Init (sub_82109A00: 16,592 bytes of pages,
 // the allocation layer's AllocPages as VirtualAlloc's adapter gives them,
 // into 0x826C5C00, then Font::Font on them), then Strings::Init. The frames

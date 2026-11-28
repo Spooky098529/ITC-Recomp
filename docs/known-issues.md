@@ -40,6 +40,12 @@ The game's known issues on PC. Moved out of
 
 ## Calls by address with no dispatch entry (found 2026-11-26)
 
+**Fixed for hand ports (2026-11-28, `missing-functions`):** every hand port
+the fallback originals call by address now has a direct entry, so 0 of
+those calls is left (`docs/missing-functions.md`, "Done"). 37 targets that
+aren't ports remain, mostly in the HLSL compiler, which no longer runs.
+What follows is the history.
+
 Lifted code calls some functions by a constant address through the dispatch
 table, and an address with no entry stops the program ("lifted: a call to
 X, which has no entry in the dispatch table"). Hand ports whose adapters were
@@ -71,6 +77,34 @@ folder) gets through the dealer. Left for later by the user's call
 (2026-11-27, during the D3D11 work).
 
 ## A stop after a race, in the race-end camera (found 2026-11-28)
+
+**Fixed (2026-11-28, `missing-functions`).** Lifted code (the `lift.py`
+batches) called 276 hand ports by address. Those calls ran the ports'
+fallback originals, and some originals read data E5 moved to host memory
+the 360's way. Here lifted `LocationScreen::Transition10` reached
+`CameraAnim::EvalCamera`'s original, which reads an animation's blocks by
+guest pointer arithmetic. The 276 have direct entries now
+(`docs/missing-functions.md`), and so do 937 of the 944 more called the
+same way from the fallback originals (the other 7 have no port of their
+own).
+
+**A second stop, also fixed:** "handles: the range is full". The handle
+allocator (`src/memory/handles.cpp`, since E5) reused a freed span only for
+an allocation of exactly its size. The streamed files' many sizes ran the
+range out after minutes of menus and races, while nearly all of it was
+free. A new handle now takes the first span big enough, and freed spans
+merge. A 40-minute drive afterward had no stops, with the range flat.
+
+**Seen again (2026-11-28, `missing-functions`, Linux and Vulkan):** in a new
+career (no save) at the parking area, not after a race. Right after
+`LocationScreen::ShowOpponentInfo`, `ShowOpponentPictures` and `ShowArrows`,
+lifted `sub_82228B80` ran, then the same chain: lifted `sub_8222E1A0`,
+`sub_8222CD60`, `sub_8222A150`, `sub_8222BFE8`, `sub_82150960`,
+`sub_82150300` and `sub_82150350`, which read a null pointer. So it's game
+code, not D3D11's. `sub_8222CD60` (`LocationScreen::ResetMovie`) and
+`sub_8222A150` (`HidePictures`) have hand ports, but these calls reached
+their lifted copies, since lifted code calls lift.py's own functions
+directly. It isn't a missing entry.
 
 In a drive (the Windows build under Wine, `--renderer=d3d11`), ~6 s after
 `RaceStates::OnRaceEnd` the main thread read a null pointer ("memory: an

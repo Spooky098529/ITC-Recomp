@@ -1993,7 +1993,7 @@ lifted::Result f822872A8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, do
 loc_82287390:
   // bl 0x82293460
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82293460, LIFTED_ARGS(0x82287394, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82293460(LIFTED_ARGS(0x82287394, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,208
   r1 = uint64_t(int64_t(int64_t(r1) + 208));
   // b 0x825a6ec8
@@ -3946,7 +3946,7 @@ loc_82291048:
 loc_8229104C:
   // bl 0x82290b30
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82290B30, LIFTED_ARGS(0x82291050, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UiMovie::SetFrames(LIFTED_ARGS(0x82291050, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82291050:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -5335,14 +5335,14 @@ lifted::Result f82480780(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = uint64_t(int64_t(int64_t(r10) + 24));
   // bl 0x824819e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x824819E0, LIFTED_ARGS(0x824807D0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::X3DVec::Sub(LIFTED_ARGS(0x824807D0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r4,r30,4
   r4 = uint64_t(int64_t(int64_t(r30) + 4));
   // addi r3,r1,80
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x824819b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x824819B8, LIFTED_ARGS(0x824807DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::X3DVec::Dot(LIFTED_ARGS(0x824807DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f0,36(r31)
   lifted::ScalarFloatMode();
   temp.u32 = schema::X3DAudioDspSettings(uint32_t(r31)).distance_bits();
@@ -5430,7 +5430,7 @@ lifted::Result f82481708(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, ui
   guest::StoreU32(uint32_t(r1) + 88, uint32_t(r11));
   // bl 0x82481a18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82481A18, LIFTED_ARGS(0x82481750, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::X3DVec::Cross(LIFTED_ARGS(0x82481750, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r5,r1,144
   r5 = uint64_t(int64_t(int64_t(r1) + 144));
   // addi r4,r1,96
@@ -5439,7 +5439,7 @@ lifted::Result f82481708(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, ui
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x82481a18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82481A18, LIFTED_ARGS(0x82481760, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::X3DVec::Cross(LIFTED_ARGS(0x82481760, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r29,28
   r11 = uint64_t(int64_t(int64_t(r29) + 28));
   // addi r5,r1,128
@@ -5462,7 +5462,7 @@ lifted::Result f82481708(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, ui
   guest::StoreU32(uint32_t(r1) + 120, uint32_t(r11));
   // bl 0x824819e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x824819E0, LIFTED_ARGS(0x8248178C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::X3DVec::Sub(LIFTED_ARGS(0x8248178C, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f13,132(r1)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(uint32_t(r1) + 132);
@@ -6205,7 +6205,7 @@ loc_8257604C:
   if (!cr6.eq) goto loc_82576068;
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x82576058, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x82576058, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;
@@ -6317,7 +6317,7 @@ loc_825761A4:
   if (!cr6.eq) goto loc_825761C0;
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x825761B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x825761B0, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;
@@ -6427,7 +6427,7 @@ loc_825762F0:
   if (!cr6.eq) goto loc_8257630C;
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x825762FC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x825762FC, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;
@@ -7038,7 +7038,7 @@ loc_82576BB4:
 loc_82576BC4:
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x82576BC8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x82576BC8, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;
@@ -7621,7 +7621,7 @@ loc_82592A9C:
   r3 = r26;
   // bl 0x82091540
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82091540, LIFTED_ARGS(0x82592AC8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Std::string::_Grow(LIFTED_ARGS(0x82592AC8, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82592AC8:
   // lwz r9,24(r26)
   r9 = guest::LoadU32(schema::StdString(uint32_t(r26)).capacity_address());
@@ -8329,7 +8329,7 @@ loc_82592F6C:
   r4 = r26;
   // bl 0x82091540
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82091540, LIFTED_ARGS(0x82592F88, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Std::string::_Grow(LIFTED_ARGS(0x82592F88, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -8952,7 +8952,7 @@ loc_825A67E8:
   r5 = guest::LoadU32(schema::StdException(uint32_t(r29)).what_address());
   // bl 0x825a9dd8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A9DD8, LIFTED_ARGS(0x825A6828, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::strcpy_s(LIFTED_ARGS(0x825A6828, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x825a6834
   goto loc_825A6834;
 loc_825A682C:
@@ -9052,7 +9052,7 @@ lifted::Result f825A9EC0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_825A9EE0:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825A9EE4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825A9EE4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,22
@@ -9087,7 +9087,7 @@ loc_825A9F10:
   guest::StoreU16(uint32_t(r3) + 0, uint16_t(r11));
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825A9F24, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825A9F24, r31)); r3 = o.r3; f1 = o.f1; }
   // li r31,22
   r31 = uint64_t(int64_t(22));
 loc_825A9F28:
@@ -9143,7 +9143,7 @@ loc_825A9F70:
   guest::StoreU16(uint32_t(r3) + 0, uint16_t(r11));
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825A9F84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825A9F84, r31)); r3 = o.r3; f1 = o.f1; }
   // li r31,34
   r31 = uint64_t(int64_t(34));
   // b 0x825a9f28
@@ -9197,7 +9197,7 @@ lifted::Result f825A9FA8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_825A9FD0:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825A9FD4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825A9FD4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,22
@@ -9543,7 +9543,7 @@ loc_825ACB74:
 loc_825ACB80:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825ACB84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825ACB84, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,22
@@ -9762,7 +9762,7 @@ lifted::Result f825AECC0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   if (!cr6.lt) goto loc_825AED18;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825AECEC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825AECEC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,12
@@ -10734,7 +10734,7 @@ loc_825B05BC:
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x825aff80
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825AFF80, LIFTED_ARGS(0x825B05D8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_decomp(LIFTED_ARGS(0x825B05D8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,80(r1)
   r11 = guest::LoadU32(uint32_t(r1) + 80);
   // stfd f1,80(r1)
@@ -10910,7 +10910,7 @@ lifted::Result f825B06C8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   if (cr6.gt) goto loc_825B0700;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B06EC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B06EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,34
   r11 = uint64_t(int64_t(34));
   // b 0x825b06fc
@@ -10918,7 +10918,7 @@ lifted::Result f825B06C8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_825B06F4:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B06F8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B06F8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,33
   r11 = uint64_t(int64_t(33));
 loc_825B06FC:
@@ -11197,7 +11197,7 @@ lifted::Result f825B0860(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, ui
 loc_825B08AC:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B08B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B08B0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,33
@@ -11281,7 +11281,7 @@ lifted::Result f825B08E8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, ui
 loc_825B092C:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B0930, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B0930, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,33
@@ -11740,7 +11740,7 @@ lifted::Result f825B1FB8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_825B1FF8:
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B1FFC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B1FFC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,22
@@ -12848,7 +12848,7 @@ loc_825B273C:
   r5 = guest::LoadU32(uint32_t(r11) + 172);
   // bl 0x825b7ec8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B7EC8, LIFTED_ARGS(0x825B275C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::mbtowc(LIFTED_ARGS(0x825B275C, r31)); r3 = o.r3; f1 = o.f1; }
   // lhz r11,96(r1)
   r11 = guest::LoadU16(uint32_t(r1) + 96);
   // sth r11,0(r30)
@@ -14407,7 +14407,7 @@ lifted::Result f825B4490(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   if (!cr6.eq) goto loc_825B44DC;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B44B4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B44B4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r10,22
@@ -14700,7 +14700,7 @@ lifted::Result f825B81A0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   guest::StoreU32(uint32_t(r3) + 0, uint32_t(r11));
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B81D8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B81D8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,9
   r10 = uint64_t(int64_t(9));
 loc_825B81DC:
@@ -14735,7 +14735,7 @@ loc_825B8204:
   guest::StoreU32(uint32_t(r3) + 0, uint32_t(r11));
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B8214, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B8214, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,9
   r10 = uint64_t(int64_t(9));
 loc_825B8218:
@@ -14812,7 +14812,7 @@ loc_825B8290:
   guest::StoreU32(uint32_t(r3) + 0, uint32_t(r26));
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B829C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B829C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,22
   r10 = uint64_t(int64_t(22));
   // b 0x825b8218
@@ -15039,7 +15039,7 @@ loc_825B8430:
   if (!cr0.eq) goto loc_825B82D8;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B8444, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B8444, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,12
   r11 = uint64_t(int64_t(12));
   // stw r11,0(r3)
@@ -15144,7 +15144,7 @@ loc_825B84D4:
   if (!cr0.eq) goto loc_825B8508;
   // bl 0x82295f18
   // (left out: dead in C++)
-  { const lifted::Result o = game::GetLastError(LIFTED_ARGS(0x825B8500, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82295F18(LIFTED_ARGS(0x825B8500, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // bne 0x825b857c
@@ -15321,7 +15321,7 @@ loc_825B8624:
   if (!cr0.eq) goto loc_825B8648;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B863C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B863C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,42
   r11 = uint64_t(int64_t(42));
 loc_825B8640:
@@ -15429,7 +15429,7 @@ loc_825B86D0:
   if (!cr0.eq) goto loc_825B8728;
   // bl 0x82295f18
   // (left out: dead in C++)
-  { const lifted::Result o = game::GetLastError(LIFTED_ARGS(0x825B86FC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82295F18(LIFTED_ARGS(0x825B86FC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825B86FC:
   // bl 0x825a8250
   // (left out: dead in C++)
@@ -15466,14 +15466,14 @@ loc_825B8728:
 loc_825B8730:
   // bl 0x82295f18
   // (left out: dead in C++)
-  { const lifted::Result o = game::GetLastError(LIFTED_ARGS(0x825B8734, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82295F18(LIFTED_ARGS(0x825B8734, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,5
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 5, so);
   // bne cr6,0x825b8754
   if (!cr6.eq) goto loc_825B8754;
   // bl 0x825a81e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B8740, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::_errno(LIFTED_ARGS(0x825B8740, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,9
   r11 = uint64_t(int64_t(9));
   // stw r11,0(r3)

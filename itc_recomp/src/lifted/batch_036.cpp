@@ -701,7 +701,7 @@ uint64_t f8209E698(uint64_t r1, uint64_t r13) {
   r3 = uint64_t(int64_t(0));
   // bl 0x8209f6b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8209F6B8, LIFTED_ARGS(0x8209E6F8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Players::AssignController(LIFTED_ARGS(0x8209E6F8, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8209E6F8:
   // lis r10,-32148
   r10 = uint64_t(int64_t(-2106851328));
@@ -1677,7 +1677,7 @@ loc_820A6EC0:
   r4 = r27;
   // bl 0x82091540
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82091540, LIFTED_ARGS(0x820A6EE0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Std::string::_Grow(LIFTED_ARGS(0x820A6EE0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -3107,7 +3107,7 @@ uint64_t f82107670(uint64_t r1, uint64_t r13, uint64_t r3) {
   r31 = r3;
   // bl 0x82106c20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82106C20, LIFTED_ARGS(0x82107688, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Mode::Ctor(LIFTED_ARGS(0x82107688, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r9,r31,36
   r9 = uint64_t(int64_t(int64_t(r31) + 36));
   // li r11,0
@@ -3731,7 +3731,7 @@ loc_82109DDC:
   r27 = r10 | r11;
   // bl 0x82108fe0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82108FE0, LIFTED_ARGS(0x82109E2C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Font::LineX(LIFTED_ARGS(0x82109E2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // mr r4,r29
@@ -3740,7 +3740,7 @@ loc_82109DDC:
   r3 = r30;
   // bl 0x82108568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82108568, LIFTED_ARGS(0x82109E3C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Font::LineY(LIFTED_ARGS(0x82109E3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,16(r30)
   r11 = schema::Font(uint32_t(r30)).params_bits();
   // addi r10,r1,80
@@ -3824,7 +3824,7 @@ loc_82109EBC:
   f1 = double(temp.f32);
   // bl 0x82109560
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82109560, LIFTED_ARGS(0x82109ED0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Font::AddGlyph(LIFTED_ARGS(0x82109ED0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82109ED0:
   // addic. r28,r28,-1
   ca = uint32_t(r28) > 0;

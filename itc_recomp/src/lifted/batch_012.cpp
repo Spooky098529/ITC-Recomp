@@ -742,7 +742,7 @@ loc_821F0E18:
   guest::StoreU8(schema::TuningScreen(uint32_t(r31)).history_depth_address(), uint8_t(r11));
   // bl 0x821cce30
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CCE30, LIFTED_ARGS(0x821F0E7C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::IsPickOwned(LIFTED_ARGS(0x821F0E7C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821f0ed4
@@ -792,7 +792,7 @@ loc_821F0ED4:
   r3 = r31;
   // bl 0x821cd160
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CD160, LIFTED_ARGS(0x821F0EDC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::GetPrice(LIFTED_ARGS(0x821F0EDC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,25116(r31)
   r11 = guest::LoadU32(schema::TuningScreen(uint32_t(r31)).money_address());
   // lwz r10,10036(r31)
@@ -1467,7 +1467,7 @@ loc_821F139C:
   r3 = r31;
   // bl 0x821cce30
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CCE30, LIFTED_ARGS(0x821F13A4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::IsPickOwned(LIFTED_ARGS(0x821F13A4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821f13f8
@@ -1515,7 +1515,7 @@ loc_821F13F8:
   r3 = r31;
   // bl 0x821cd160
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CD160, LIFTED_ARGS(0x821F1400, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::GetPrice(LIFTED_ARGS(0x821F1400, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,25116(r31)
   r11 = guest::LoadU32(schema::TuningScreen(uint32_t(r31)).money_address());
   // li r10,-1
@@ -1959,7 +1959,7 @@ loc_821F16E0:
   r3 = r31;
   // bl 0x821cdc38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CDC38, LIFTED_ARGS(0x821F1730, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::GetChoiceFlag(LIFTED_ARGS(0x821F1730, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821f1740
@@ -2174,7 +2174,7 @@ loc_821F1860:
   r4 = guest::LoadU32(uint32_t(r31) + uint32_t(r11));
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CE188, LIFTED_ARGS(0x821F18A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::IsSlotAvailable(LIFTED_ARGS(0x821F18A0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821f1944
@@ -2258,7 +2258,7 @@ loc_821F1924:
   guest::StoreU32(schema::TuningCommandQueue(uint32_t(r11)).current_address(), uint32_t(r8));
   // bl 0x821e1db0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821E1DB0, LIFTED_ARGS(0x821F1940, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::SetCurrentChoice(LIFTED_ARGS(0x821F1940, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821f1a98
   goto loc_821F1A98;
 loc_821F1944:
@@ -2635,7 +2635,7 @@ loc_821F1B98:
   r4 = guest::LoadU32(schema::TuningScreen(uint32_t(r30) - 33576).interior_slot_address());
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CE188, LIFTED_ARGS(0x821F1BD8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::IsSlotAvailable(LIFTED_ARGS(0x821F1BD8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821f1c7c
@@ -4286,7 +4286,7 @@ loc_821F4020:
   r3 = r29;
   // bl 0x821e9488
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821E9488, LIFTED_ARGS(0x821F40AC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::SetPaintGradients(LIFTED_ARGS(0x821F40AC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // lfd f31,-48(r1)
@@ -5988,14 +5988,14 @@ loc_821F5DC4:
   guest::StoreU32(schema::TuningCommandQueue(uint32_t(r11)).previous_page_address(), uint32_t(r10));
   // bl 0x821ccdb0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CCDB0, LIFTED_ARGS(0x821F5E50, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::PageItemCount(LIFTED_ARGS(0x821F5E50, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // mr r3,r31
   r3 = r31;
   // bl 0x821ccd38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x821CCD38, LIFTED_ARGS(0x821F5E5C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::TuningScreen::PageCursor(LIFTED_ARGS(0x821F5E5C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,10040(r31)
   r11 = guest::LoadU32(schema::TuningScreen(uint32_t(r31)).category_menu_address());
   // addi r10,r27,-1
@@ -7045,7 +7045,7 @@ lifted::Result f82211CF8(uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, ui
   uint64_t r3 = 0, r4 = 0, r5 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // b 0x82292710
-  { const lifted::Result o = lifted::Call(0x82292710, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Session::Free(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -8574,7 +8574,7 @@ loc_82215020:
   r3 = uint64_t(int64_t(int64_t(r1) + 84));
   // bl 0x82162230
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82162230, LIFTED_ARGS(0x8221502C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Time::Sub(LIFTED_ARGS(0x8221502C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r30,r3
   r30 = r3;
   // li r5,9
@@ -8673,7 +8673,7 @@ lifted::Result f822150A8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r30 = r5 ^ 1;
   // bl 0x82214790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82214790, LIFTED_ARGS(0x822150D0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RaceHud::UpdateRacerBar(LIFTED_ARGS(0x822150D0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r5,r30
   r5 = r30;
   // li r4,1
@@ -8682,7 +8682,7 @@ lifted::Result f822150A8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r3 = r31;
   // bl 0x82214790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82214790, LIFTED_ARGS(0x822150E0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RaceHud::UpdateRacerBar(LIFTED_ARGS(0x822150E0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -8888,7 +8888,7 @@ lifted::Result f822155C0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r31 = r3;
   // bl 0x82213638
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213638, LIFTED_ARGS(0x822155E4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RaceHud::ShowItem(LIFTED_ARGS(0x822155E4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,2
   r11 = uint64_t(int64_t(2));
   // li r5,0
@@ -12264,7 +12264,7 @@ lifted::Result f8221B9C8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   { const lifted::Result o = game::UiMovie::PlayNamed(LIFTED_ARGS(0x8221BA30, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8221b5c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8221B5C8, LIFTED_ARGS(0x8221BA34, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::AfterRaceMenu::SetUpItems(LIFTED_ARGS(0x8221BA34, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
@@ -13392,7 +13392,7 @@ uint64_t f82228068(uint64_t r1, uint64_t r13, uint64_t r4) {
 loc_822280AC:
   // bl 0x82116588
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82116588, LIFTED_ARGS(0x822280B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Progress::AfterRace(LIFTED_ARGS(0x822280B0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,13
   r11 = uint64_t(int64_t(13));
   // li r10,10
@@ -16219,7 +16219,7 @@ loc_8222A300:
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229108
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229108, LIFTED_ARGS(0x8222A36C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureA(LIFTED_ARGS(0x8222A36C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,1
@@ -16235,7 +16235,7 @@ loc_8222A300:
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229158
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229158, LIFTED_ARGS(0x8222A388, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureB(LIFTED_ARGS(0x8222A388, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,0
@@ -16304,7 +16304,7 @@ loc_8222A300:
   { const lifted::Result o = game::UiMovie::PlayNamed(LIFTED_ARGS(0x8222A400, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222a150
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222A150, LIFTED_ARGS(0x8222A404, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::HidePictures(LIFTED_ARGS(0x8222A404, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r27,0(r26)
   guest::StoreU32(uint32_t(r26) + 0, uint32_t(r27));
 loc_8222A408:
@@ -16455,7 +16455,7 @@ lifted::Result f8222AAB0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229108
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229108, LIFTED_ARGS(0x8222AB3C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureA(LIFTED_ARGS(0x8222AB3C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,1
@@ -16471,7 +16471,7 @@ lifted::Result f8222AAB0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229158
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229158, LIFTED_ARGS(0x8222AB58, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureB(LIFTED_ARGS(0x8222AB58, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,0
@@ -16527,7 +16527,7 @@ lifted::Result f8222AAB0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   { const lifted::Result o = game::UiMovie::PlayNamed(LIFTED_ARGS(0x8222ABB8, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222a150
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222A150, LIFTED_ARGS(0x8222ABBC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::HidePictures(LIFTED_ARGS(0x8222ABBC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r28)
@@ -17344,7 +17344,7 @@ lifted::Result f8222CEB0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   r3 = uint64_t(int64_t(80));
   // bl 0x8222bfe8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222BFE8, LIFTED_ARGS(0x8222CF04, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCursor(LIFTED_ARGS(0x8222CF04, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8222CF04:
   // li r9,0
   r9 = uint64_t(int64_t(0));
@@ -17467,10 +17467,10 @@ loc_8222CF98:
   { const lifted::Result o = game::UiMovie::ScrollText(LIFTED_ARGS(0x8222CFD8, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222ac18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222AC18, LIFTED_ARGS(0x8222CFDC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCarColor(LIFTED_ARGS(0x8222CFDC, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222a150
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222A150, LIFTED_ARGS(0x8222CFE0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::HidePictures(LIFTED_ARGS(0x8222CFE0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8222CFE0:
   // mr r3,r31
   r3 = r31;
@@ -17560,10 +17560,10 @@ loc_8222D41C:
   if (cr0.eq) goto loc_8222D43C;
   // bl 0x8222cd60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222CD60, LIFTED_ARGS(0x8222D438, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::ResetMovie(LIFTED_ARGS(0x8222D438, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222ac18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222AC18, LIFTED_ARGS(0x8222D43C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCarColor(LIFTED_ARGS(0x8222D43C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8222D43C:
   // mr r3,r31
   r3 = r31;
@@ -17626,10 +17626,10 @@ lifted::Result f8222D458(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   if (!cr6.eq) goto loc_8222D4C4;
   // bl 0x8222cd60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222CD60, LIFTED_ARGS(0x8222D49C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::ResetMovie(LIFTED_ARGS(0x8222D49C, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222b200
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222B200, LIFTED_ARGS(0x8222D4A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::ShowOpponentPictures(LIFTED_ARGS(0x8222D4A0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17663,7 +17663,7 @@ loc_8222D4C4:
   if (!cr0.eq) goto loc_8222D4DC;
   // bl 0x8222ac18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222AC18, LIFTED_ARGS(0x8222D4DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCarColor(LIFTED_ARGS(0x8222D4DC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8222D4DC:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -17759,7 +17759,7 @@ lifted::Result f8222D4F8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   r3 = uint64_t(int64_t(160));
   // bl 0x8222bfe8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222BFE8, LIFTED_ARGS(0x8222D578, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCursor(LIFTED_ARGS(0x8222D578, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r30,-32127
   r30 = uint64_t(int64_t(-2105475072));
   // mr r3,r31
@@ -17929,7 +17929,7 @@ lifted::Result f8222DCE8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
 loc_8222DD70:
   // bl 0x8222c058
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222C058, LIFTED_ARGS(0x8222DD74, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::ListNode(LIFTED_ARGS(0x8222DD74, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x8222ddd0
   goto loc_8222DDD0;
 loc_8222DD78:
@@ -18065,7 +18065,7 @@ loc_8222DDD4:
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229108
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229108, LIFTED_ARGS(0x8222DE68, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureA(LIFTED_ARGS(0x8222DE68, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,1
@@ -18081,7 +18081,7 @@ loc_8222DDD4:
   r3 = guest::LoadU32(uint32_t(r30) + 16);
   // bl 0x82229158
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82229158, LIFTED_ARGS(0x8222DE84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::PictureB(LIFTED_ARGS(0x8222DE84, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r6,r3
   r6 = r3;
   // li r5,0
@@ -18179,10 +18179,10 @@ lifted::Result f8222E1A0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   if (!cr6.eq) goto loc_8222E340;
   // bl 0x8222cd60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222CD60, LIFTED_ARGS(0x8222E1DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::ResetMovie(LIFTED_ARGS(0x8222E1DC, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x8222a150
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222A150, LIFTED_ARGS(0x8222E1E0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::HidePictures(LIFTED_ARGS(0x8222E1E0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,18
   r5 = uint64_t(int64_t(18));
   // li r4,-1
@@ -18234,7 +18234,7 @@ lifted::Result f8222E1A0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   r3 = uint64_t(int64_t(40));
   // bl 0x8222bfe8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222BFE8, LIFTED_ARGS(0x8222E23C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCursor(LIFTED_ARGS(0x8222E23C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r9,-32256
   r9 = uint64_t(int64_t(-2113929216));
   // lis r7,-32256
@@ -18326,7 +18326,7 @@ lifted::Result f8222E1A0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   r4 = guest::LoadU32(uint32_t(r11) + uint32_t(r7));
   // bl 0x82150960
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82150960, LIFTED_ARGS(0x8222E2D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::CameraAnims::Evaluate(LIFTED_ARGS(0x8222E2D4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r10,r1,144
   r10 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r11,20048(r30)
@@ -18404,7 +18404,7 @@ loc_8222E340:
   if (cr0.eq) goto loc_8222E35C;
   // bl 0x8222ac18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8222AC18, LIFTED_ARGS(0x8222E35C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::LocationScreen::SetCarColor(LIFTED_ARGS(0x8222E35C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8222E35C:
   // mr r3,r31
   r3 = r31;

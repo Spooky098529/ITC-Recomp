@@ -37612,7 +37612,7 @@ loc_825D1710:
   f1 = double(float(f1));
   // bl 0x825d0bf8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825D0BF8, LIFTED_ARGS(0x825D1744, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::SetVolume(LIFTED_ARGS(0x825D1744, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825D1744:
   // lbz r11,40(r29)
   r11 = guest::LoadU8(uint32_t(r29) + 40);

@@ -49,6 +49,26 @@
   ITC_NATIVE_ENTRY_DEFINE(address, &lifted::kAlwaysOn)                                   \
   ITC_NATIVE_ENTRY_BODY(address)
 
+// A hand port's direct entry (docs/missing-functions.md): the same
+// `lifted::entry::e<address>` on our register view, but not registered in
+// the dispatch table. For ports with no adapter that the fallback originals
+// (lifted/originals.cpp) still call by a constant address: listed in
+// lifted/entries.h, the originals call it directly.
+// tools/entry_list.py finds it in src/ (a link-time optimized build drops
+// it before anything calls it): an area's wrapper around it keeps DIRECT
+// in its name and the address as its first argument.
+#define ITC_DIRECT_ENTRY(address)                                                        \
+  namespace lifted::entry {                                                              \
+  lifted::Result e##address(const lifted::Args& args);                                   \
+  }                                                                                      \
+  static void itc_entry_body_##address(lifted::Regs& ctx);                               \
+  lifted::Result lifted::entry::e##address(const lifted::Args& args) {                   \
+    lifted::Regs ctx(args);                                                              \
+    itc_entry_body_##address(ctx);                                                       \
+    return ctx.result();                                                                 \
+  }                                                                                      \
+  ITC_NATIVE_ENTRY_BODY(address)
+
 // An entry our threads start at (a thread's start routine: the list in
 // "The kernel's entries"; once also an override in the SDK's function
 // table, gone with the SDK's context in E4): an entry like any other.

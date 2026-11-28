@@ -175,6 +175,10 @@ uint32_t Resume(uint32_t object, uint32_t sp);
 // and the session's pages freed (VirtualFree), the global cleared. 96-byte
 // frames. r3 as the original leaves it.
 uint64_t SessionFree(uint32_t sp, const Calls& calls);
+// sub_82291670 Session::Release: the session's +0x13CD34 through operator
+// delete and [0x826C6AD4] through operator delete[], each cleared when set.
+// `sp` the caller's r1 (a 96-byte frame below it).
+void SessionRelease(uint32_t session, uint32_t sp, const Calls& calls);
 
 // sub_822926B8 Session::Make (the mode select's menu page, the time
 // attack): with no session ([0x82816E3C]), its pages VirtualAlloc'ed (a

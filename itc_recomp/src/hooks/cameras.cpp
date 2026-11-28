@@ -28,6 +28,10 @@
 #include "schema/app_start_up.h"
 #include "schema/cameras.h"
 
+#include "base/float_mode.h"
+#include "c_runtime/math.h"
+
+#include <bit>
 #include <functional>
 #include <optional>
 #include "lifted/sdk.h"
@@ -862,3 +866,89 @@ ITC_NATIVE_ENTRY_ALWAYS(820AA4A8) {
   ctx.lr = lr;
 }
 
+
+// For the fallback originals (docs/missing-functions.md): the hand ports
+// with no adapter that lifted code calls by address (the stale originals'
+// round). No flag check: the plain C++ is what the native callers run.
+
+// CameraPasses::SetMode: r3 = which, r4 = the mode. Where it sets pass 4's
+// field of view, r3 and f1 as the tail call's arguments (as
+// hooks::CameraPassesInit leaves them); the original where the camera's
+// vtable slot 1 isn't SetFieldOfView (never in play).
+ITC_DIRECT_ENTRY(8209F738) {
+  const int32_t which = ctx.r3.s32;
+  const uint32_t mode = ctx.r4.u32;
+  ctx.fpscr.disableFlushMode();
+  if (!cameras::SetMode(which, mode)) {
+    lifted::original::c8209F738(ctx);
+    return;
+  }
+  if (which == 1 && (mode == 0 || mode == 1)) {
+    ctx.r3.u64 = cameras::Pass(4);
+    ctx.f1.f64 = double(guest::LoadFloat(mode == 0 ? 0x82001E8C : 0x82001E88));
+  }
+}
+// CameraPasses::InitPasses: no arguments; its frame (128 bytes) and the
+// passes' CameraPass::Init guest calls as CameraPasses::Init's adapter makes
+// them.
+ITC_DIRECT_ENTRY(8209F960) { hooks::CameraPassesInit(ctx, false); }
+// CameraPass::SetZoom: r3 = the pass, f1 = the zoom.
+ITC_DIRECT_ENTRY(820AA378) {
+  ctx.fpscr.disableFlushMode();
+  cameras::PassSetZoom(ctx.r3.u32, ctx.f1.f64);
+}
+// Viewport::UpdateEntries: r3 = the viewport; r3 = entry 16.
+ITC_DIRECT_ENTRY(820AA550) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cameras::ViewportUpdateEntries(ctx.r3.u32);
+}
+// Viewport::LookAt: r3 = the viewport, r4 = the eye, r5 = the target; r3 =
+// entry 16.
+ITC_DIRECT_ENTRY(820AAF68) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cameras::ViewportLookAt(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// Viewport::Init: r3 = the viewport. tan of the double at 0x82002818 as
+// Viewports::Init's plain C++ takes it (the original where it can't: a
+// rounding mode other than nearest), its 160-byte frame below r1, the video
+// output and atexit guest calls as Viewports::Init's adapter makes them; r3
+// left the viewport.
+ITC_DIRECT_ENTRY(820AAFF0) {
+  using Fpscr = ::base::FloatMode;
+  double tangent;
+  if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0 ||
+      !c_runtime::Tan(std::bit_cast<double>(uint64_t(guest::LoadU32(0x82002818)) << 32 |
+                                            guest::LoadU32(0x8200281C)),
+                      &tangent)) {
+    lifted::original::c820AAFF0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr, viewport = ctx.r3.u64;
+  const uint32_t frame = ctx.r1.u32 - cameras::kViewportInitFrame;
+  guest::StoreU32(frame, ctx.r1.u32);  // the back chain, as stwu
+  hooks::GuestAtexit atexit{ctx};
+  cameras::ViewportCalls calls;
+  calls.atexit = atexit.Call();
+  calls.video_output = [&](uint32_t at) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = at;
+    const uint32_t video = VideoOutputCall(ctx, 0x820AB030, 0x820AB040);
+    ctx.r1.u64 = stack;
+    return video;
+  };
+  cameras::ViewportInit(uint32_t(viewport), tangent, frame, calls);
+  ctx.lr = lr;
+  ctx.r3.u64 = viewport;
+}
+// Camera::BuildProjection: r3 = the camera, r4 to r7 = &field of view,
+// &aspect, &far, &near. Its stack words are held in the plain C++, the same
+// with the stack pointer 16-byte aligned; the original otherwise.
+ITC_DIRECT_ENTRY(825932E8) {
+  if ((ctx.r1.u32 & 0xF) != 0) {
+    lifted::original::c825932E8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  cameras::BuildProjection(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}

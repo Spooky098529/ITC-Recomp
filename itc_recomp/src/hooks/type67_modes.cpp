@@ -1149,3 +1149,27 @@ ITC_NATIVE_ENTRY_ALWAYS(82180B00) {
   }
   hooks::StandSceneCreate(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): the hand ports
+// with no adapter that lifted code calls by address, through their steps.
+ITC_DIRECT_ENTRY(8217D7D0) { hooks::CameraPresetCopy(ctx); }
+// StandSlot::Free: the original where the plain C++ declines (a block not
+// the allocation layer's pages).
+ITC_DIRECT_ENTRY(821800B0) {
+  if (!hooks::StandSlotFree(ctx)) {
+    lifted::original::c821800B0(ctx);
+  }
+}
+ITC_DIRECT_ENTRY(82180AA0) { hooks::StandSlotInit(ctx); }
+ITC_DIRECT_ENTRY(82233B70) { hooks::Type6Screen0ShowCarInfo(ctx); }
+ITC_DIRECT_ENTRY(822440D8) { hooks::Type7Screen0ShowCarInfo(ctx); }
+ITC_DIRECT_ENTRY(822343A8) { hooks::Type6Screen0PlayItem(ctx); }
+ITC_DIRECT_ENTRY(82244818) { hooks::Type7Screen0PlayItem(ctx); }
+ITC_DIRECT_ENTRY(82234428) { hooks::Type6Screen0PlaceCursor(ctx); }
+ITC_DIRECT_ENTRY(822448B0) { hooks::Type7Screen0PlaceCursor(ctx); }
+ITC_DIRECT_ENTRY(822346A8) { hooks::Type6Screen0ShowHelp(ctx); }
+ITC_DIRECT_ENTRY(82244AB8) { hooks::Type7Screen0ShowHelp(ctx); }
+ITC_DIRECT_ENTRY(82244930) { hooks::Type7Screen0ShowPage(ctx); }
+ITC_DIRECT_ENTRY(82248E10) { hooks::PanelScreenInit(ctx); }
+ITC_DIRECT_ENTRY(822515A0) { hooks::ListScreenInit(ctx); }
+ITC_DIRECT_ENTRY(82259128) { hooks::NodeScreenInit(ctx); }

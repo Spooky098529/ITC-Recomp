@@ -296,3 +296,17 @@ ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)
 // (sub_820F2EF8), List80::Insert (sub_820F5238), List80::Copy (sub_820F51A8),
 // Minimap::DrawCarMarker (sub_820F4888) and DrawPointMarker (sub_820F4BA8).
 // Their register steps above stay for the harness.
+
+// For the fallback originals (docs/missing-functions.md): they call these by
+// address (no dispatch entry). Both leave r3 as given.
+ITC_DIRECT_ENTRY(820F4040) { hooks::MinimapTriangleInit(ctx); }
+ITC_DIRECT_ENTRY(820F40C0) { minimap::List80Link(ctx.r3.u32, int16_t(ctx.r4.u16)); }
+// For the fallback originals (docs/missing-functions.md): the register steps above.
+ITC_DIRECT_ENTRY(820F2D28) { hooks::MinimapRacerMarkerType(ctx); }
+ITC_DIRECT_ENTRY(820F2EF8) { hooks::MinimapScaling(ctx); }
+ITC_DIRECT_ENTRY(820F4888) { hooks::MinimapDrawCarMarker(ctx); }
+ITC_DIRECT_ENTRY(820F4BA8) { hooks::MinimapDrawPointMarker(ctx); }
+ITC_DIRECT_ENTRY(820F51A8) { hooks::MinimapList80Copy(ctx); }
+ITC_DIRECT_ENTRY(820F5238) { hooks::MinimapList80Insert(ctx); }
+ITC_DIRECT_ENTRY(82147D18) { hooks::MinimapSetListPoint(ctx); }
+ITC_DIRECT_ENTRY(82170578) { hooks::MinimapRacerVehicle(ctx); }

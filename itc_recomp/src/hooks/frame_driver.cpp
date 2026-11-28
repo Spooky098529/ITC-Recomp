@@ -409,3 +409,60 @@ ITC_FRAME_DRIVER_ADAPTER(8258DE88, ThreadConstruct)
 ITC_FRAME_DRIVER_ADAPTER(8258DF18, ThreadBegin)
 ITC_FRAME_DRIVER_ADAPTER(8258D9F8, VideoOutputUnbindAll)
 ITC_FRAME_DRIVER_ADAPTER(82098A98, SceneConstruct)
+
+// For the fallback originals (docs/missing-functions.md): the hand ports
+// with no adapter that lifted code calls by address, each on its original's
+// registers (the register steps the harness had, where there's one).
+
+// ColorRect::SetTargets: r3 = the queue, r4 = the list.
+ITC_DIRECT_ENTRY(82178B28) { hooks::ColorRectSetTargetsStep(ctx); }
+// SetThreadPriority: r3 a handle, r4 a priority; r3 the answer.
+ITC_DIRECT_ENTRY(822977B0) { hooks::SetThreadPriorityStep(ctx); }
+// XSetThreadProcessor: r3 a handle, r4 a processor; r3 the answer.
+ITC_DIRECT_ENTRY(82297888) { hooks::XSetThreadProcessorStep(ctx); }
+// DrawGlobals::Init: r4 the capacity, r5 the count.
+ITC_DIRECT_ENTRY(82589E78) { hooks::DrawGlobalsInitStep(ctx); }
+// CommandList::Init: r3 the list, r4 the slots; r3 1.
+ITC_DIRECT_ENTRY(8258CD28) { hooks::CommandListInitStep(ctx); }
+// PrimitiveDecl::Init: r3 1.
+ITC_DIRECT_ENTRY(82591858) { hooks::PrimitiveDeclInitStep(ctx); }
+// ResumeThread: r3 a handle; r3 the answer.
+ITC_DIRECT_ENTRY(825BA118) { hooks::ResumeThreadStep(ctx); }
+// CreateThread without a processor: the original moves r8 (the id's
+// address) to r9, sets r8 = -1 and branches to sub_825BA380 (CreateThread).
+ITC_DIRECT_ENTRY(825BA158) {
+  ctx.r9.u64 = ctx.r8.u64;
+  ctx.r8.s64 = -1;
+  hooks::CreateThreadStep(ctx);
+}
+
+// The primitive word's flip (a leaf; r3 left).
+ITC_DIRECT_ENTRY(82591838) { fd::FlipPrimitiveWord(); }
+
+// VideoOutput::BeginFrame: r3 = the video output. Device::
+// SetShaderGprAllocation(the device, 0, 32, 96) from its 96-byte frame (the
+// call returning to 0x8258D978) as Scene::Draw's step makes it: the plain
+// C++ with --native_device_state, else its original; r3 as that leaves it.
+ITC_DIRECT_ENTRY(8258D958) {
+  const uint32_t video_output = ctx.r3.u32;
+  const fd::SetGpr set_gpr = [&](uint32_t gpr_device, uint32_t vertex, uint32_t pixel) {
+    guest_call::InFrame(ctx, 96, 0x8258D978, [&](uint32_t) {
+      if (!ITC_FLAG(native_device_state)) {
+        ctx.r3.u64 = gpr_device;
+        ctx.r4.u64 = 0;
+        ctx.r5.u64 = vertex;
+        ctx.r6.u64 = pixel;
+        ctx.lr = 0x8258D978;
+        lifted::original::c822A8A60(ctx);
+        return;
+      }
+      guest_call::InFrame(ctx, 112, 0x822A8AF4, [&](uint32_t) {
+        graphics::device_state::SetShaderGprAllocation(gpr_device, vertex, pixel,
+                                                       hooks::DeviceStateCalls(ctx, gpr_device));
+      });
+    });
+  };
+  const uint64_t lr = ctx.lr;
+  fd::VideoOutputBeginFrame(video_output, set_gpr);
+  ctx.lr = lr;  // as the original's epilogue puts it back
+}

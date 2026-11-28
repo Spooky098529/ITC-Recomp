@@ -753,3 +753,32 @@ ITC_SAVE_INTERFACE_ADAPTER(820A5A88, SlotCheckStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5BE8, SlotSaveStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5E68, SlotLoadStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A6010, SlotDeleteStepSteps)
+
+// For the fallback originals (docs/missing-functions.md): the interface's
+// wrappers (their steps fall back to the lifted original on a decline) and
+// the display name's copy.
+ITC_DIRECT_ENTRY(820A0018) { hooks::SaveInterfaceSlotStateOf(ctx); }
+ITC_DIRECT_ENTRY(820A02C8) { hooks::SaveInterfaceSaveCount(ctx); }
+ITC_DIRECT_ENTRY(820A0378) { hooks::SaveInterfacePending(ctx); }
+ITC_DIRECT_ENTRY(820A0428) { hooks::SaveInterfaceSaveAt(ctx); }
+ITC_DIRECT_ENTRY(820A0510) { hooks::SaveInterfaceLoad(ctx); }
+ITC_DIRECT_ENTRY(8228F780) { hooks::SaveInterfaceSlotOfController(ctx); }
+ITC_DIRECT_ENTRY(82295D48) { hooks::SaveInterfaceCopyDisplayName(ctx); }
+// For the fallback originals (docs/missing-functions.md): the rest of the
+// interface's wrappers, the save layer's, and the save devices' set-up,
+// teardown and overlapped wait (their register steps above).
+ITC_DIRECT_ENTRY(820A0208) { hooks::SaveInterfaceRequestDevice(ctx); }
+ITC_DIRECT_ENTRY(820A0320) { hooks::SaveInterfaceFreeBytes(ctx); }
+ITC_DIRECT_ENTRY(820A03D0) { hooks::SaveInterfaceDevice(ctx); }
+ITC_DIRECT_ENTRY(820A0490) { hooks::SaveInterfaceSave(ctx); }
+ITC_DIRECT_ENTRY(820A05D8) { hooks::SaveInterfaceUserCount(ctx); }
+ITC_DIRECT_ENTRY(820A0620) { hooks::SaveInterfaceUserAt(ctx); }
+ITC_DIRECT_ENTRY(820A4560) { hooks::SaveSlotAllocBuffersSteps(ctx); }
+ITC_DIRECT_ENTRY(820A55F0) { hooks::SlotArrayResetSteps(ctx); }
+ITC_DIRECT_ENTRY(820A56E8) { hooks::SaveDevicesDestroySteps(ctx); }
+ITC_DIRECT_ENTRY(820A6160) { hooks::SaveDevicesConstructSteps(ctx); }
+ITC_DIRECT_ENTRY(8228F7E8) { hooks::SaveInterfaceBuffersFreeReplayList(ctx); }
+ITC_DIRECT_ENTRY(8228F840) { hooks::SaveInterfaceReplaysSort(ctx); }
+ITC_DIRECT_ENTRY(822900E0) { hooks::SaveInterfaceReplaysReadEntry(ctx); }
+ITC_DIRECT_ENTRY(822902A0) { hooks::SaveInterfaceReplaysCount(ctx); }
+ITC_DIRECT_ENTRY(82295F20) { hooks::GetOverlappedResultSteps(ctx); }

@@ -30,6 +30,8 @@
 #include "screen_objects/uv_trees.h"
 #include "lifted/sdk.h"
 
+#include <bit>
+
 ITC_FLAG_DECLARE(bool, native_video_output);
 
 ITC_FLAG_BOOL(native_screen_objects, true, "ITC",
@@ -178,4 +180,217 @@ ITC_NATIVE_ENTRY_ALWAYS(82132FC8) {
     return;
   }
   hooks::ScreenObjectDestroy(ctx);
+}
+
+// For the fallback originals (docs/missing-functions.md).
+
+namespace {
+
+// A checked iterator at `address` (the tree, then the node).
+so::Iterator LoadIterator(uint32_t address) {
+  return {guest::LoadU32(address), guest::LoadU32(address + 4)};
+}
+
+void StoreIterator(uint32_t address, so::Iterator it) {
+  guest::StoreU32(address, it.tree);
+  guest::StoreU32(address + 4, it.node);
+}
+
+// An iterator passed by value in one register (the tree in its high word).
+so::Iterator IteratorOf(uint64_t r) { return {uint32_t(r >> 32), uint32_t(r)}; }
+
+double KeyAt(uint32_t address) { return std::bit_cast<double>(guest::LoadU64(address)); }
+
+}  // namespace
+
+// UvColumn::LowerBoundNode: r3 = the column, r4 = the key's address; r3 the
+// node.
+ITC_DIRECT_ENTRY(8212F8C8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = so::ColumnLowerBoundNode(ctx.r3.u32, KeyAt(ctx.r4.u32));
+}
+
+// UvMap::LowerBoundNode: as the column's.
+ITC_DIRECT_ENTRY(8212F9F8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = so::MapLowerBoundNode(ctx.r3.u32, KeyAt(ctx.r4.u32));
+}
+
+// UvMap::Decrement: r3 = the iterator's address (r3 left so).
+ITC_DIRECT_ENTRY(8212FB28) {
+  so::Iterator it = LoadIterator(ctx.r3.u32);
+  if (!so::MapDecrement(it)) {
+    lifted::original::c8212FB28(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, it);
+}
+
+// UvColumn::Insert: r3 = the iterator out, r4 = the column, r5 = add on the
+// left (its low byte), r6 = where, r7 = the value; r3 the iterator out.
+ITC_DIRECT_ENTRY(82131680) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131680)
+  const auto it = so::ColumnInsert(ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0, ctx.r6.u32, ctx.r7.u32);
+  if (!it) {
+    lifted::original::c82131680(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvColumn::Erase: r3 = the iterator out, r4 = the column, r5 and r6 = first
+// and last (by value, the tree in the high word); r3 the iterator out.
+ITC_DIRECT_ENTRY(82131DD8) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131DD8)
+  const auto it = so::ColumnErase(ctx.r4.u32, IteratorOf(ctx.r5.u64), IteratorOf(ctx.r6.u64));
+  if (!it) {
+    lifted::original::c82131DD8(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvMap::Insert: as the column's.
+ITC_DIRECT_ENTRY(82131FB0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131FB0)
+  const auto it = so::MapInsert(ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0, ctx.r6.u32, ctx.r7.u32);
+  if (!it) {
+    lifted::original::c82131FB0(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvMap::Clear: r3 = the map; r3 as EraseSubtree leaves it.
+ITC_DIRECT_ENTRY(82132960) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132960)
+  ctx.r3.u64 = so::MapClear(ctx.r3.u32);
+}
+
+// For the fallback originals (docs/missing-functions.md): the originals of
+// the inserts and erases above call these tree helpers by address.
+
+// UvColumn::RotateLeft and RotateRight: r3 = the column, r4 = the node; r3
+// left as it was (leaves).
+ITC_DIRECT_ENTRY(8212F920) { so::ColumnRotateLeft(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(8212F988) { so::ColumnRotateRight(ctx.r3.u32, ctx.r4.u32); }
+
+// UvMap::RotateLeft and RotateRight: as the column's.
+ITC_DIRECT_ENTRY(8212FA50) { so::MapRotateLeft(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(8212FAB8) { so::MapRotateRight(ctx.r3.u32, ctx.r4.u32); }
+
+// UvColumn::NewNode: r4 = left, r5 = parent, r6 = right, r7 = the value, r8
+// = the color (its low byte); r3 the node.
+ITC_DIRECT_ENTRY(8212FDB0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FDB0)
+  ctx.r3.u64 = so::ColumnNewNode(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                 uint8_t(ctx.r8.u32));
+}
+
+// UvColumn::Clear: r3 = the column; r3 as EraseSubtree leaves it.
+ITC_DIRECT_ENTRY(8212FE28) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FE28)
+  ctx.r3.u64 = so::ColumnClear(ctx.r3.u32);
+}
+
+// UvMap::ConstructNode: r3 = the node, r4 = left, r5 = parent, r6 = right,
+// r7 = the value, r8 = the color (its low byte); r3 the node.
+ITC_DIRECT_ENTRY(82131F50) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131F50)
+  ctx.r3.u64 = so::MapConstructNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                    ctx.r7.u32, uint8_t(ctx.r8.u32));
+}
+
+// UvMap::EraseSubtree: r3 = the map, r4 = the node; r3 the last node freed
+// (or the map).
+ITC_DIRECT_ENTRY(82132720) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132720)
+  ctx.r3.u64 = so::MapEraseSubtree(ctx.r3.u32, ctx.r4.u32);
+}
+
+// UvColumn::AllocateNodes: r3 = the count; r3 the block; the original where
+// the port declines (bad_alloc, operator new failing).
+ITC_DIRECT_ENTRY(8212FBD8) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FBD8)
+  const auto block = so::ColumnAllocateNodes(ctx.r3.u32);
+  if (!block) {
+    lifted::original::c8212FBD8(ctx);
+    return;
+  }
+  ctx.r3.u64 = *block;
+}
+
+// UvColumn::EraseSubtree: r3 = the column, r4 = the node; r3 the last node
+// freed (or the column).
+ITC_DIRECT_ENTRY(8212FD50) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FD50)
+  ctx.r3.u64 = so::ColumnEraseSubtree(ctx.r3.u32, ctx.r4.u32);
+}
+
+// For the fallback originals (docs/missing-functions.md): UvColumn::Find and
+// UvMap::Find: r3 = the iterator out, r4 = the tree, r5 =
+// the key's address; r3 left as the iterator out. The original where the port
+// declines (where it traps) or off the allocation layer, as the file's others.
+ITC_DIRECT_ENTRY(821301F0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(821301F0)
+  const auto it = so::ColumnFind(ctx.r4.u32, KeyAt(ctx.r5.u32));
+  if (!it) {
+    lifted::original::c821301F0(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+ITC_DIRECT_ENTRY(82130290) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82130290)
+  const auto it = so::MapFind(ctx.r4.u32, KeyAt(ctx.r5.u32));
+  if (!it) {
+    lifted::original::c82130290(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// For the fallback originals (docs/missing-functions.md): ports with no
+// adapter that lifted code calls by address.
+// ScreenObject::Release: r3 = the object; through its register step, as
+// ~ScreenObject's adapter decides (with the video output native).
+ITC_DIRECT_ENTRY(8212F0B8) {
+  if (!Native() || !ITC_FLAG(native_video_output)) {
+    lifted::original::c8212F0B8(ctx);
+    return;
+  }
+  hooks::ScreenObjectRelease(ctx);
+}
+// UvMap::NewHead: r3 the head (operator new, as UvMap::UvMap's adapter).
+ITC_DIRECT_ENTRY(8212FF68) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FF68)
+  if (!so::CanAllocate()) {
+    lifted::original::c8212FF68(ctx);
+    return;
+  }
+  ctx.r3.u64 = so::MapNewHead();
+}
+// ScreenObject::AddRingPoint: r3 = the object, f1-f4 = x, y, u, v; its
+// temporaries in the 272-byte frame below r1. r3 as the original leaves it;
+// the original where the port declines.
+ITC_DIRECT_ENTRY(82132778) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132778)
+  const auto r3 = so::AddRingPoint(ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.f4.f64,
+                                   ctx.r1.u32);
+  if (!r3) {
+    lifted::original::c82132778(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// ~UvMap: r3 = the map; r3 the freed head. The original where the port
+// declines.
+ITC_DIRECT_ENTRY(82132F58) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132F58)
+  const auto head = so::MapDestroy(ctx.r3.u32);
+  if (!head) {
+    lifted::original::c82132F58(ctx);
+    return;
+  }
+  ctx.r3.u64 = *head;
 }

@@ -107,6 +107,8 @@ void AfterWheels(Calls& calls) {
   }
 }
 
+}  // namespace
+
 // sub_820D3658 (never seen in play; only InteriorMeters::SetGauge calls it):
 // 0x82003600 + 16 x (2 x index + (value >= 3)), as the original's 64-bit
 // sum with the base sign-extended.
@@ -116,8 +118,6 @@ uint64_t GaugeTableEntry(uint64_t index, int32_t value) {
   const uint64_t r10 = uint64_t(uint32_t(uint32_t(index) << 1)) + r9;
   return uint64_t(uint32_t(uint32_t(r10) << 4)) + uint64_t(int64_t(-2113929216) + 13824);
 }
-
-}  // namespace
 
 // --- The first set's wheels ---
 

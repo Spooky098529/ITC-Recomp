@@ -57,6 +57,11 @@ struct BlendResult {
   Flush flush;
 };
 std::optional<BlendResult> MorphBlend(uint32_t morph, uint32_t stack);
+// Morph::Blend6 (sub_8258B578) and Blend7 (sub_8258B678) on their own (for
+// the fallback originals' direct entries): their memcpys must be ones
+// Buffers_Memcpy takes (MorphBlend's check), else they abort.
+BlendResult Blend6(uint32_t morph, uint32_t stack);
+BlendResult Blend7(uint32_t morph, uint32_t stack);
 // Morph::Run (sub_82594D10): +8 and +12 = the two outputs, then Morph::Blend
 // (a tail call, the same r1).
 std::optional<BlendResult> MorphRun(uint32_t morph, uint32_t out1, uint32_t out2,

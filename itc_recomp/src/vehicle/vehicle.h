@@ -97,6 +97,10 @@ std::optional<uint32_t> VehiclesCreate(uint32_t frame);
 // DestroyPhysics or the block's delete wouldn't be native. Only while
 // --native_heap routes the game's heap to the layer.
 bool VehiclesDestroy();
+// Vehicles::DestroyAll (sub_820C21E0) alone: Destroy's loop over the seven
+// vehicles of `block` (no delete, the global left). False, with nothing
+// done, where a vehicle's DestroyPhysics wouldn't be native.
+bool VehiclesDestroyAll(uint32_t block);
 
 // --- The vehicle's input and queries ---
 

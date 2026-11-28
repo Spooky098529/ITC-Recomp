@@ -390,3 +390,28 @@ ITC_BUILD_SCREEN(8219FE10, BuildScreenOpenStand)
 // adapters: only OpenStand calls SetUpStand, and PutOnStand's callers in
 // play are SetUpStand (MoveStand and ChangeGroupOnStand never ran); their
 // register steps above are the harness's.
+
+// For the fallback originals (docs/missing-functions.md): the builds,
+// groups and stand levels' functions the lifted code calls by address.
+ITC_DIRECT_ENTRY(8219BFE8) { hooks::BuildScreenInitBuildList(ctx); }
+ITC_DIRECT_ENTRY(8219C078) { hooks::BuildScreenInitStandList(ctx); }
+ITC_DIRECT_ENTRY(8219CE08) {
+  hooks::GuestCalls guest(ctx);
+  ctx.r3.u64 = build_screen::DrawGroupRow(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, guest.calls());
+}
+ITC_DIRECT_ENTRY(8219CF08) { hooks::BuildScreenShowGroup(ctx); }
+ITC_DIRECT_ENTRY(8219D1B0) { hooks::BuildScreenGroupArrows(ctx); }
+ITC_DIRECT_ENTRY(8219D248) {
+  hooks::GuestCalls guest(ctx);
+  ctx.r3.u64 = build_screen::DrawBuildRow(ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, guest.calls());
+}
+ITC_DIRECT_ENTRY(8219D3E8) { hooks::BuildScreenDrawBuildRows(ctx); }
+ITC_DIRECT_ENTRY(8219D440) { hooks::BuildScreenShowBuildMark(ctx); }
+ITC_DIRECT_ENTRY(8219D4B8) { hooks::BuildScreenBuildArrows(ctx); }
+ITC_DIRECT_ENTRY(8219D550) { hooks::BuildScreenDrawStandRow(ctx); }
+ITC_DIRECT_ENTRY(8219D6F0) { hooks::BuildScreenPutOnStand(ctx); }
+ITC_DIRECT_ENTRY(8219D7B0) { hooks::BuildScreenStandArrows(ctx); }
+ITC_DIRECT_ENTRY(8219D820) { hooks::BuildScreenShowDetails(ctx); }
+ITC_DIRECT_ENTRY(8219FA28) { hooks::BuildScreenDrawGroupRows(ctx); }
+ITC_DIRECT_ENTRY(821A0128) { hooks::BuildScreenCopyBuilds(ctx); }
+ITC_DIRECT_ENTRY(821A0D38) { hooks::BuildScreenListBuilds(ctx); }

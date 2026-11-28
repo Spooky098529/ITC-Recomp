@@ -270,3 +270,112 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   });
   ctx.lr = saved_lr;
 }
+
+// For the fallback originals (docs/missing-functions.md): hand ports with
+// no adapter that lifted/originals.cpp calls by address. The floats as the
+// originals' (no flush to zero).
+// InputClient::InputClient: r3 = the node (left), r4 = the type.
+ITC_DIRECT_ENTRY(8210AE60) { InputClientConstruct(ctx.r3.u32, ctx.r4.u32); }
+// ActionMapper::Hysteresis: r3 = the words (mapper + 448), r4 = the index,
+// f1 = the value, r6 = the config.
+ITC_DIRECT_ENTRY(8210B718) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Hysteresis(ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
+}
+// ActionMapper::Analog: r3 = mapper + 1072, r4 = the config, r5 = the raw
+// values; f1 left as the last curve's result. The original where a curve
+// object's slot isn't the one seen in play.
+ITC_DIRECT_ENTRY(8210B7D0) {
+  if (!CurvesKnown(ctx.r3.u32 - 1072)) {
+    lifted::original::c8210B7D0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = ctx.f1.f64;
+  ctx.r3.u64 = Analog(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+// ActionMapper::Words: r3 = mapper + 448, r4 = the config, r5 = the
+// states' word's address; the held word's stack bits from r1 - 64 (its
+// frame's +80). The original where a repeat object's slot isn't known.
+ITC_DIRECT_ENTRY(8210BBA0) {
+  if (!RepeatsKnown(ctx.r3.u32 - 448)) {
+    lifted::original::c8210BBA0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = Words(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, guest::LoadU32(ctx.r1.u32 - 64));
+}
+// ActionMapper::ResetStages: r3 = mapper + 448.
+ITC_DIRECT_ENTRY(8210C078) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ResetStages(ctx.r3.u32);
+}
+// ClientList::ClientList and ClientList::Add: r3 = the list or the node
+// (left).
+ITC_DIRECT_ENTRY(8259C7B8) { ClientListConstruct(ctx.r3.u32); }
+ITC_DIRECT_ENTRY(8259C960) { ClientListAdd(ctx.r3.u32); }
+
+// For the fallback originals (docs/missing-functions.md): the set-up's and
+// the update's ports called by address from lifted code, with the checks
+// their callers' adapters make (the original where one fails).
+// ActionMappers::Configure: r3 = the settings' index; r3 and f1-f3 as the
+// original leaves them.
+ITC_DIRECT_ENTRY(8209F228) {
+  if (!ConfigureKnown()) {
+    lifted::original::c8209F228(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+  ctx.r3.u64 = Configure(ctx.r3.u32, f);
+  ctx.f1.f64 = f[0];
+  ctx.f2.f64 = f[1];
+  ctx.f3.f64 = f[2];
+}
+// InputClientList::InputClientList: r3 = the list (left), r4 = the manager.
+ITC_DIRECT_ENTRY(8210AEB0) { InputClientListConstruct(ctx.r3.u32, ctx.r4.u32); }
+// InputClientList::Add: r4 = the node; r3 comes back as the node.
+ITC_DIRECT_ENTRY(8210AF00) {
+  InputClientListAdd(ctx.r4.u32);
+  ctx.r3.u64 = ctx.r4.u32;
+}
+// ActionMapper::Bind: r3 = the mapper, r4 = the input object; returns 1. As
+// BindAll: natively with the native heap and MapperBindKnown.
+ITC_DIRECT_ENTRY(8210B270) {
+  if (!hooks::NativeHeapActive() || !MapperBindKnown(ctx.r3.u32, ctx.r4.u32)) {
+    lifted::original::c8210B270(ctx);
+    return;
+  }
+  ctx.r3.u64 = MapperBind(ctx.r3.u32, ctx.r4.u32);
+}
+// ActionMapper::Rebuild: r3 = mapper + 448, r4 = the config (mapper + 372),
+// r5 = the raw values (mapper + 388); r3 and f1 as the original leaves
+// them. The held word's bits 30 and 31 (the high half of a caller's r25,
+// no source here) are 0, as at ActionMapper::Update's entry. The original
+// unless the mapper's repeat and curve slots are the ones seen in play.
+ITC_DIRECT_ENTRY(8210C0E0) {
+  if (!MapperCallsKnown(ctx.r3.u32 - 448)) {
+    lifted::original::c8210C0E0(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0;
+  ctx.r3.u64 = Rebuild(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 0, &f1);
+  ctx.f1.f64 = f1;
+}
+// ActionMapper::ActionMapper: r3 = the mapper (left), r4 = the player. The
+// original unless the repeat and curve objects' resets are the known ones.
+ITC_DIRECT_ENTRY(8210C180) {
+  if (!MapperConstructKnown()) {
+    lifted::original::c8210C180(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  MapperConstruct(ctx.r3.u32, ctx.r4.u32);
+}
+// ClientList::BoundCount: r3 = the list, r4 = the type, r5 = bump (its low
+// byte); r3 the count.
+ITC_DIRECT_ENTRY(8259C898) {
+  ctx.r3.u64 = ClientListBoundCount(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}

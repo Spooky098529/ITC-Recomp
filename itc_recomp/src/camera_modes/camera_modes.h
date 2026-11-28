@@ -234,6 +234,11 @@ constexpr uint32_t kPathAssets = schema::CameraModesGlobals::path_assets_address
 // checks).
 std::optional<int64_t> PathRequest(uint32_t buffer, uint32_t index,
                                    const archive::LoadCall& load);
+// sub_82152D80 CameraPath::Load (PathRequest's last part): the path buffer
+// at `buffer` +24 = 1, +20 = the file's blob (Archive::AssetSize(id)), +16 =
+// Archive::Load(id, +20, CameraPath::OnLoaded, the buffer), +24 = 2. Returns
+// the serial.
+int64_t PathLoad(uint32_t buffer, uint32_t id, const archive::LoadCall& load);
 // sub_82152078 CameraPath::OnLoaded: the file at `data` (+0 the paths'
 // count, +4 the keys', the 20-byte paths at +16, the 216-byte keys after
 // them, the 24-byte curves after those): each path's keys fixed up
@@ -257,6 +262,8 @@ void FixTriple(uint32_t triple, uint32_t curves);
 // +12, +16 = 0, then sub_82211708 RivalLogo::InitXpr on the holder at +20:
 // +0 = -1, XPR::XPR(+4), +28 = 2, +56, +60 = 0, +64 = 3, +68 = 4.
 void RivalLogoConstruct(uint32_t entry);
+// RivalLogo::InitXpr sub_82211708: r3 = the holder (the entry's +20).
+void RivalLogoInitXpr(uint32_t holder);
 // sub_82211AB0 RivalLogo::Play: with +4's bit 0x4, logo 0 (+0) once its XPR
 // is loaded (+48's bit 0x10), others once their movie (+8) is loaded
 // (UiMovies::IsLoaded): the movie (UiMovies::Find), for logo 0 its

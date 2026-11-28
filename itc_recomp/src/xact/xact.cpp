@@ -1538,6 +1538,14 @@ std::optional<uint32_t> SettingsLoad(uint32_t settings, uint32_t buffer,
   return MakeState(settings);
 }
 
+std::optional<uint32_t> SettingsMakeState(uint32_t settings) {
+  if (!BufferSlot(settings) || !SlotIs(settings, 28, kSettingsGetVolumeByte) ||
+      !RecordSlots(settings) || !SlotIs(settings, 8, kSettingsGetVariableRecord)) {
+    return std::nullopt;
+  }
+  return MakeState(settings);
+}
+
 std::optional<uint32_t> SettingsSetUpDspPreset(uint32_t settings) {
   if (!BufferSlot(settings)) {
     return std::nullopt;

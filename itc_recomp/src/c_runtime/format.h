@@ -156,6 +156,13 @@ bool Cftof(uint64_t bits, uint32_t buffer, uint32_t size, int32_t precision);
 // value, or the unit 0xFFFF written (the original's error paths read errno).
 bool Vswprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
                int32_t* count);
+// _woutput_l (sub_825B13D0) alone, as Vswprintf runs it: on a string
+// stream of INT_MAX bytes at `buffer` (no terminator), its frame at `frame`
+// (the original's r1). False, with nothing written, where the dry run says
+// the original must run; else `*count` the characters written (or -1),
+// `*end` the stream's pointer and `*room` its count after the run.
+bool WideOutputToString(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+                        int32_t* count, uint32_t* end, int32_t* room);
 
 // sprintf (sub_825A93D0) after its spills, with _output_l (sub_825AF130,
 // narrow_format.cpp): `format` with the arguments at `args` (a va_list:
@@ -180,6 +187,18 @@ bool Sprintf(uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
 // size).
 bool Vsnprintf(uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
                uint32_t frame, int32_t* count);
+
+// _output_l (sub_825AF130) alone on the string stream at `stream` (16
+// bytes) whose pointer is `buffer` (0: only counted) and room `room`, its
+// frame at `frame` (the original's r1). No terminator. False, with nothing
+// written, where the dry run says the original must run (as Sprintf's, the
+// room running out: _flsbuf) or the output would land on what it reads, on
+// the frame or on the stream; else
+// `*count` the characters written, `*end` the stream's pointer and
+// `*room_out` its room after the run.
+bool NarrowOutputToString(uint32_t stream, uint32_t buffer, int32_t room, uint32_t format,
+                          uint32_t args, uint32_t frame, int32_t* count, uint32_t* end,
+                          int32_t* room_out);
 
 // __iob_func (sub_825AD4C0): the C runtime's stream table (_iob: 32 bytes
 // a stream, stdin, stdout and stderr first).
