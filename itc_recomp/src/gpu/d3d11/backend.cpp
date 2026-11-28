@@ -838,7 +838,12 @@ Image* Backend::CreateImage(const ImageDesc& desc, const void* initial) {
   }
   const bool depth = IsDepth(desc.format);
   UINT bind = 0;
-  if (desc.usage & kImageSampled) bind |= D3D11_BIND_SHADER_RESOURCE;
+  // A copy source may be blitted (BlitImage, the shown frame): a draw
+  // sampling it here.
+  if ((desc.usage & kImageSampled) ||
+      ((desc.usage & kImageCopySource) && !IsInteger(desc.format))) {
+    bind |= D3D11_BIND_SHADER_RESOURCE;
+  }
   if ((desc.usage & kImageColorTarget) ||
       ((desc.usage & kImageCopyDest) && IsRenderable(desc.format))) {
     bind |= D3D11_BIND_RENDER_TARGET;
