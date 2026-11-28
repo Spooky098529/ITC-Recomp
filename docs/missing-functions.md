@@ -60,6 +60,57 @@ Per area (the port's folder in `src/`):
 
 The full list, by area, with each function's port name, is at the end.
 
+## Done (2026-11-28)
+
+Done by a swarm in four rounds (the script
+`itc_recomp/tools/workflows/missing-functions-swarm.js`). In each round, one
+agent per unit of areas wrote the shims and a second agent reviewed them.
+Each round's fallback originals called more hand ports, which the next round
+covered:
+
+| Round | Hand ports given direct entries | Originals lifted |
+|---|---|---|
+| 1 (10 units) | 383, plus the car dealer's 3 written by hand | 52 targets with no port of their own, and 42 ports that can decline |
+| 2 (3 units) | 34 | 14 |
+| 3 (2 units) | 15 | 8 |
+| 4 (1 unit) | 5 | 5, plus 19 functions with no port below them |
+
+- `--check_call_targets` went from 438 of 1,720 targets with no entry to
+  37 of 1,377. None of the 37 is a hand port.
+- The 37 left:
+  - 22 are in the HLSL compiler (`822B8xxx` to `822Exxxx`, `8235Cxxx` to
+    `8235Fxxx`), which hasn't run since the stored shaders replaced it.
+    Lifting its originals only pulled in more of the library: a trial grew by
+    about 600 functions in 8 passes without stopping, so it was left there.
+  - 1 is the voice engine's (`8257C798`).
+  - 4 are the C runtime's that `lift.py` refuses: the floating-point
+    exception paths `825B0BB0`, `825B0BE4` and `825B8778` (called from live
+    lifted code, never reached in play), and `825B32F0`.
+  - About 10 are deeper library functions below the lifted fallbacks (the
+    texture compression codecs, the model animation, the C runtime).
+  - A call to one of the 37 still stops the program, naming the address.
+- How the tools fit together:
+  - `tools/entry_list.py` also reads `ITC_DIRECT_ENTRY` (and an area's
+    wrappers around it, whose names contain DIRECT) from `src/`. A
+    link-time optimized build drops an entry nothing calls yet, so `nm`
+    alone can't see it.
+  - After adding a shim, run `entry_list.py`, `function_names.py`,
+    `lift_originals.py` (the current set plus the new originals) and
+    `lift.py reemit`, then build.
+  - The re-emit matters: `names.h` gives two functions that share a name an
+    address suffix (`Color::HsvToRgb`, `write_char`), and the batches must
+    call a direct entry by name, because direct entries aren't in the
+    dispatch table.
+- Shims mostly skip the checks the deleted adapters made before running the
+  port (the native heap, a flag, whether the callees are native), since
+  there's often no original to fall back to. Ports that can decline still
+  fall back to their (now lifted) original.
+- Checked:
+  - Builds for Linux and Windows.
+  - `tick_replay.sh` (both races "all match"), `scripted_run.sh
+    race_test.jsonl` and `attract_race.sh 40`, each with 0 error lines.
+  - Not yet checked: a no-save career driven through the car dealer.
+
 ## What's already there
 
 - `tools/lift.py` already emits a direct call for a callee that has an
