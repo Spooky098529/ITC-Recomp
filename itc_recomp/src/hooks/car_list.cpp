@@ -455,3 +455,10 @@ ITC_DIRECT_ENTRY(8224E920) { hooks::CarListCarShowStats(ctx); }
 ITC_DIRECT_ENTRY(8224EF18) { hooks::CarListSetCaption(ctx); }
 ITC_DIRECT_ENTRY(8224F758) { hooks::CarListRowFill(ctx); }
 ITC_DIRECT_ENTRY(8224F888) { hooks::CarListRowRefresh(ctx); }
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address too.
+ITC_DIRECT_ENTRY(8224A978) { hooks::CarListSetUpRows(ctx); }
+ITC_DIRECT_ENTRY(8224B248) { hooks::CarListSetUpColors(ctx); }
+ITC_DIRECT_ENTRY(8224C560) { hooks::CarListSetUpCarPage(ctx); }
+ITC_DIRECT_ENTRY(8224DED8) { hooks::CarListCarSetName(ctx); }
+ITC_DIRECT_ENTRY(8224F5E8) { hooks::CarListRowIsShown(ctx); }

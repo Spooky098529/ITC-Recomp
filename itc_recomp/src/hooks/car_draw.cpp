@@ -579,3 +579,36 @@ ITC_DIRECT_ENTRY(82597FE0) {
   ctx.fpscr.disableFlushMode();
   car_draw::MatrixShadow(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md), called by the
+// lift.py batches by address.
+// WorkMem::AllocVertexBuffer: r3 = &the header out, r4 = the bytes; r3 the
+// memory. The original where the plain C++ declines (a debug message).
+ITC_DIRECT_ENTRY(8258A9E8) {
+  ctx.fpscr.disableFlushMode();
+  const auto memory = car_draw::WorkMemAllocVertexBuffer(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  if (!memory) {
+    lifted::original::c8258A9E8(ctx);
+    return;
+  }
+  ctx.r3.u64 = *memory;
+}
+// Model::QueueJobRelease: r4 = the job (r3 not read); r3 the render queue
+// call's. The original where the plain C++ declines (no room on the list:
+// nothing done).
+ITC_DIRECT_ENTRY(82594E88) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  std::optional<car_draw::Left> left;
+  {
+    hooks::SceneryDrawGuest guest{ctx};
+    const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+    left = car_draw::ModelQueueJobRelease(calls, ctx.r4.u32, ctx.r1.u32);
+  }
+  if (!left) {
+    lifted::original::c82594E88(ctx);
+    return;
+  }
+  ctx.lr = lr;
+  hooks::LeaveLeft(ctx, *left);
+}

@@ -211,3 +211,17 @@ ITC_DIRECT_ENTRY(8215FCA8) {
   ctx.r3.u64 = ReadPad(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                        ctx.r1.u32, calls);
 }
+// RacerControl::DriveByAi: r3 = the racer's index, r4 = the hold flag; r3
+// (and f1) as the original leaves them.
+ITC_DIRECT_ENTRY(8215F968) {
+  ITC_RACER_CALLS;
+  DriveByAi(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls, &ctx.r3.u64);
+}
+// PlayerControl::Update: r3 = the racer's record slot, r4 = the racer's
+// index, r5 = the player, r6 = the message ring's owner, r7 = may pause.
+ITC_DIRECT_ENTRY(821604C8) {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayerUpdate(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                            ctx.r1.u32, calls);
+}

@@ -1029,3 +1029,10 @@ ITC_DIRECT_ENTRY(821F7A98) {
     return tuning_screen::RefreshMovie14(call, screen, sp);
   });
 }
+// For the fallback originals (docs/missing-functions.md): the price and
+// choice getters (r3 the screen, r4 the choice; r3 the result) and SetRgb
+// (r4 the node, r5-r7 the color), through their steps.
+ITC_DIRECT_ENTRY(821CD160) { hooks::TuningGetPrice(ctx); }
+ITC_DIRECT_ENTRY(821CD868) { hooks::TuningGetCurrentChoice(ctx); }
+ITC_DIRECT_ENTRY(821CDC38) { hooks::TuningGetChoiceFlag(ctx); }
+ITC_DIRECT_ENTRY(821E7DA0) { hooks::TuningSetRgb(ctx); }

@@ -4933,7 +4933,7 @@ loc_825C33E4:
   r4 = guest::LoadU32(uint32_t(r1) + 80);
   // bl 0x825c60c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C60C0, LIFTED_ARGS(0x825C344C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTNodePool::PushBack(LIFTED_ARGS(0x825C344C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,80(r1)
   r11 = guest::LoadU32(uint32_t(r1) + 80);
   // stw r11,0(r29)
@@ -8944,7 +8944,7 @@ lifted::Result f825C56D0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = guest::LoadU32(uint32_t(r31) + 56);
   // bl 0x825c0748
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C0748, LIFTED_ARGS(0x825C571C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825C0748(LIFTED_ARGS(0x825C571C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x825c5740
@@ -10407,7 +10407,7 @@ lifted::Result f825C63D0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = r31;
   // bl 0x825c5960
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C5960, LIFTED_ARGS(0x825C642C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::GetVariable(LIFTED_ARGS(0x825C642C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r30,r3
   r30 = r3;
   // cmpwi cr6,r30,0
@@ -10540,7 +10540,7 @@ lifted::Result f825C6498(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   guest::StoreU32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x825c5960
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C5960, LIFTED_ARGS(0x825C6504, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::GetVariable(LIFTED_ARGS(0x825C6504, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r30,r3
   r30 = r3;
   // cmpwi cr6,r30,0
@@ -11009,7 +11009,7 @@ lifted::Result f825C6858(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r31 = r3;
   // bl 0x825c5e58
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825C5E58, LIFTED_ARGS(0x825C6870, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCueBase::Ctor(LIFTED_ARGS(0x825C6870, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // lis r10,-32249

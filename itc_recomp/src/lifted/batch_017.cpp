@@ -12257,7 +12257,7 @@ loc_82575F8C:
   if (!cr6.eq) goto loc_82575FA8;
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x82575F98, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x82575F98, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;
@@ -12287,7 +12287,7 @@ loc_82575FBC:
   r3 = guest::LoadU32(schema::SysLiveSession(uint32_t(r22)).unknown_0_address());
   // bl 0x82294e20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82294E20, LIFTED_ARGS(0x82575FC4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::CloseHandle(LIFTED_ARGS(0x82575FC4, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r23,0(r22)
   guest::StoreU32(schema::SysLiveSession(uint32_t(r22)).unknown_0_address(), uint32_t(r23));
   // b 0x82575fd0
@@ -12378,7 +12378,7 @@ loc_825760E8:
   if (!cr6.eq) goto loc_82576104;
   // bl 0x82296ec0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82296EC0, LIFTED_ARGS(0x825760F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82296EC0(LIFTED_ARGS(0x825760F4, r31)); r3 = o.r3; f1 = o.f1; }
   // subfic r11,r3,0
   ca = uint32_t(r3) <= 0;
   r11 = static_cast<uint64_t>(0) - r3;

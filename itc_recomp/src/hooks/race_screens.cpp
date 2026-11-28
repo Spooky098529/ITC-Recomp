@@ -672,3 +672,7 @@ ITC_DIRECT_ENTRY(8220FB10) { hooks::RaceScreensPauseMenuDraw(ctx); }
 ITC_DIRECT_ENTRY(822197A8) { hooks::RaceScreensCareerResultsSetTexts(ctx); }
 ITC_DIRECT_ENTRY(8221AC00) { hooks::RaceScreensAfterRaceMenuShowItems(ctx); }
 ITC_DIRECT_ENTRY(8221BB48) { hooks::RaceScreensAfterRaceMenuDraw(ctx); }
+// The lift.py batches call these by address too (round of 2026-11-28).
+ITC_DIRECT_ENTRY(8220FA88) { hooks::RaceScreensPauseMenuOpen(ctx); }
+ITC_DIRECT_ENTRY(8221B5C8) { hooks::RaceScreensAfterRaceMenuSetUpItems(ctx); }
+ITC_DIRECT_ENTRY(8221BA68) { hooks::RaceScreensAfterRaceMenuOpen(ctx); }

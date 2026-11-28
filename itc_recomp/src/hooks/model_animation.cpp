@@ -154,3 +154,21 @@ ITC_NATIVE_ENTRY_ALWAYS(825998B8) {
   ctx.fpscr.disableFlushMode();
   SkeletonApplyAnimation(ctx.r3.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md):
+// Skeleton::UpdateNodeMatrices, r3 = the skeleton; r3 as
+// Skeleton::UpdateMatrices' entry leaves it. The original for a node of
+// type 8 or 16 (nothing done before it).
+ITC_DIRECT_ENTRY(8259C3A8) {
+  ITC_MODEL_ANIMATION_FALLBACK(8259C3A8)
+  switch (SkeletonUpdateNodeMatrices(ctx.r3.u32)) {
+    case MatricesResult::kNothing:
+      return;
+    case MatricesResult::kMultiplied:
+      ctx.fpscr.enableFlushMode();
+      return;
+    case MatricesResult::kOriginal:
+      lifted::original::c8259C3A8(ctx);
+      return;
+  }
+}

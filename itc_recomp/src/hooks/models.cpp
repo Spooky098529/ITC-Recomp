@@ -564,3 +564,27 @@ ITC_NATIVE_ENTRY_ALWAYS(820A06D0) {
   }
   lifted::original::c820A06D0(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address.
+// Memory::FreeLater: r3 = the block; r3 = the critical section, as
+// ScopedLock::~ScopedLock leaves it (its deleted adapter's mapping); the
+// original without the native lifetime or room in the pending frees.
+ITC_DIRECT_ENTRY(8258E410) {
+  if (NativeLifetime() && models::FreeLater(ctx.r3.u32)) {
+    ctx.r3.u64 = models::kMemoryBlocksLock;
+    return;
+  }
+  lifted::original::c8258E410(ctx);
+}
+// TextureProvider::Reserve: r3 = the vector, r4 = the count; r3 as the
+// original leaves it.
+ITC_DIRECT_ENTRY(82594570) {
+  if (NativeLifetime()) {
+    if (const auto r3 = models::PointersReserve(ctx.r3.u32, ctx.r4.u32)) {
+      SetR3(ctx, *r3);
+      return;
+    }
+  }
+  lifted::original::c82594570(ctx);
+}

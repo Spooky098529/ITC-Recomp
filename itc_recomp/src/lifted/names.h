@@ -17,6 +17,7 @@ inline constexpr auto& Bt709Curve = lifted::f822B0860;  // sub_822B0860
 inline constexpr auto& CheckHeap = lifted::entry::e82297CE0;  // sub_82297CE0
 inline constexpr auto& CheckPal50 = lifted::entry::e82296AB0;  // sub_82296AB0
 inline constexpr auto& CheckTitleId = lifted::entry::e82296EE0;  // sub_82296EE0
+inline constexpr auto& CloseHandle = lifted::entry::e82294E20;  // sub_82294E20
 inline constexpr auto& ComputeGammaRamp = lifted::entry::e822B0910;  // sub_822B0910
 inline constexpr auto& ComputeGammaRampPwl = lifted::entry::e822B0AB0;  // sub_822B0AB0
 inline constexpr auto& CountBodyKits = lifted::entry::e820CBD20;  // sub_820CBD20
@@ -35,12 +36,14 @@ inline constexpr auto& EndVertices = lifted::entry::e825BDDA0;  // sub_825BDDA0
 inline constexpr auto& EnterCriticalSection = lifted::f825A6D28;  // sub_825A6D28
 inline constexpr auto& FileTimeToSystemTime = lifted::entry::e8229B720;  // sub_8229B720
 inline constexpr auto& FlushFileBuffers = lifted::entry::e825BA510;  // sub_825BA510
+inline constexpr auto& ForEachTickHandler = lifted::entry::e82099D50;  // sub_82099D50
 inline constexpr auto& FreePagesIn = lifted::entry::e820D09A0;  // sub_820D09A0
 inline constexpr auto& GameFile_820A6B88 = lifted::f820A6B88;  // sub_820A6B88
 inline constexpr auto& GamePath_820A6CE0 = lifted::f820A6CE0;  // sub_820A6CE0
 inline constexpr auto& GetCommandLineA = lifted::entry::e822979D0;  // sub_822979D0
 inline constexpr auto& GetCutoverTime = lifted::entry::e8229B1E8;  // sub_8229B1E8
-inline constexpr auto& GetLastError = lifted::entry::e82295F18;  // sub_82295F18
+inline constexpr auto& GetLastError_82295F18 = lifted::entry::e82295F18;  // sub_82295F18
+inline constexpr auto& GetLastError_82296EC0 = lifted::entry::e82296EC0;  // sub_82296EC0
 inline constexpr auto& GetLocalTime = lifted::entry::e822968B8;  // sub_822968B8
 inline constexpr auto& GetProcessHeap = lifted::entry::e8229B670;  // sub_8229B670
 inline constexpr auto& GetTickCount = lifted::entry::e822956F0;  // sub_822956F0
@@ -59,10 +62,12 @@ inline constexpr auto& ObjectInverse = lifted::entry::e820A9BC8;  // sub_820A9BC
 inline constexpr auto& OutputDebugStringA = lifted::entry::e82296270;  // sub_82296270
 inline constexpr auto& OutputDebugStringW = lifted::entry::e825BA4A0;  // sub_825BA4A0
 inline constexpr auto& Path_82593C58 = lifted::f82593C58;  // sub_82593C58
+inline constexpr auto& PowInt = lifted::entry::e82213C40;  // sub_82213C40
 inline constexpr auto& QueryPerformanceCounter = lifted::entry::e825BA0C8;  // sub_825BA0C8
 inline constexpr auto& QueryPerformanceFrequency = lifted::entry::e825B9A70;  // sub_825B9A70
 inline constexpr auto& RacerInCurrentStage = lifted::entry::e82126B50;  // sub_82126B50
 inline constexpr auto& RaiseException = lifted::entry::e825BA420;  // sub_825BA420
+inline constexpr auto& RandomRange = lifted::entry::e8211F118;  // sub_8211F118
 inline constexpr auto& ReadTimeZoneSettings = lifted::entry::e8229B440;  // sub_8229B440
 inline constexpr auto& RecordClear = lifted::entry::e8209FA38;  // sub_8209FA38
 inline constexpr auto& ReportReadError = lifted::f8209AC78;  // sub_8209AC78
@@ -72,6 +77,7 @@ inline constexpr auto& SaveFlag199F8Or199FC = lifted::entry::e82126CB0;  // sub_
 inline constexpr auto& SaveFlag199FA = lifted::entry::e82126BB0;  // sub_82126BB0
 inline constexpr auto& SetEndOfFile = lifted::f825B9D30;  // sub_825B9D30
 inline constexpr auto& SetEvent = lifted::f825BA1E0;  // sub_825BA1E0
+inline constexpr auto& SetFilePointer = lifted::entry::e825B9DD8;  // sub_825B9DD8
 inline constexpr auto& SetLastErrorFromStatus = lifted::entry::e82296E88;  // sub_82296E88
 inline constexpr auto& SetLastError_82296E70 = lifted::entry::e82296E70;  // sub_82296E70
 inline constexpr auto& SetLastError_82296FD0 = lifted::entry::e82296FD0;  // sub_82296FD0
@@ -89,6 +95,8 @@ inline constexpr auto& WaitForSingleObject = lifted::f822970A0;  // sub_822970A0
 inline constexpr auto& WaitForSingleObjectEx = lifted::f82297D58;  // sub_82297D58
 inline constexpr auto& WideCharToMultiByte = lifted::entry::e82296720;  // sub_82296720
 inline constexpr auto& WildcardSearch = lifted::entry::e82592740;  // sub_82592740
+inline constexpr auto& WriteFile = lifted::entry::e82295D50;  // sub_82295D50
+inline constexpr auto& X3DAudioCalculate = lifted::entry::e82481880;  // sub_82481880
 inline constexpr auto& X3DAudioInitialize = lifted::entry::e82480710;  // sub_82480710
 inline constexpr auto& XACT3CreateEngine = lifted::f825BF5C8;  // sub_825BF5C8
 inline constexpr auto& XACTCreateRenderer = lifted::f825C3460;  // sub_825C3460
@@ -172,6 +180,7 @@ inline constexpr auto& _cfltcvt_l = lifted::entry::e825AEB20;  // sub_825AEB20
 inline constexpr auto& _cftoa_l = lifted::f825AE2C0;  // sub_825AE2C0
 inline constexpr auto& _cftoe2_l = lifted::entry::e825ADF28;  // sub_825ADF28
 inline constexpr auto& _cftoe_l = lifted::entry::e825AE1A8;  // sub_825AE1A8
+inline constexpr auto& _cftof_l = lifted::entry::e825AE8E0;  // sub_825AE8E0
 inline constexpr auto& _cftog_l = lifted::entry::e825AE9D0;  // sub_825AE9D0
 inline constexpr auto& _cinit = lifted::f822979E0;  // sub_822979E0
 inline constexpr auto& _clearfp = lifted::entry::e825AB568;  // sub_825AB568
@@ -180,8 +189,10 @@ inline constexpr auto& _cropzeros = lifted::entry::e825ADF20;  // sub_825ADF20
 inline constexpr auto& _cropzeros_l = lifted::entry::e825ADDD8;  // sub_825ADDD8
 inline constexpr auto& _crt_debugger_hook = lifted::entry::e825B68B8;  // sub_825B68B8
 inline constexpr auto& _ctrlfp = lifted::entry::e825B0B80;  // sub_825B0B80
+inline constexpr auto& _decomp = lifted::entry::e825AFF80;  // sub_825AFF80
 inline constexpr auto& _dosmaperr = lifted::entry::e825A8250;  // sub_825A8250
 inline constexpr auto& _endstdio = lifted::entry::e825AD5F8;  // sub_825AD5F8
+inline constexpr auto& _errno = lifted::entry::e825A81E0;  // sub_825A81E0
 inline constexpr auto& _exit = lifted::entry::e825AA378;  // sub_825AA378
 inline constexpr auto& _fassign = lifted::entry::e825ADF10;  // sub_825ADF10
 inline constexpr auto& _fassign_l = lifted::entry::e825ADEB0;  // sub_825ADEB0
@@ -263,6 +274,7 @@ inline constexpr auto& log = lifted::entry::e825A9C00;  // sub_825A9C00
 inline constexpr auto& log10 = lifted::entry::e825A9D80;  // sub_825A9D80
 inline constexpr auto& main_ = lifted::entry::e82090108;  // sub_82090108
 inline constexpr auto& malloc = lifted::entry::e825A9A90;  // sub_825A9A90
+inline constexpr auto& mbtowc = lifted::entry::e825B7EC8;  // sub_825B7EC8
 inline constexpr auto& memcpy_825A7410 = lifted::entry::e825A7410;  // sub_825A7410
 inline constexpr auto& memcpy_825A7830 = lifted::entry::e825A7830;  // sub_825A7830
 inline constexpr auto& memcpy_s = lifted::entry::e825A7270;  // sub_825A7270
@@ -279,6 +291,7 @@ inline constexpr auto& sin = lifted::entry::e825A88A0;  // sub_825A88A0
 inline constexpr auto& socket = lifted::f82459C20;  // sub_82459C20
 inline constexpr auto& sprintf = lifted::entry::e825A93D0;  // sub_825A93D0
 inline constexpr auto& sqrtf = lifted::entry::e82293590;  // sub_82293590
+inline constexpr auto& strcpy_s = lifted::entry::e825A9DD8;  // sub_825A9DD8
 inline constexpr auto& strncmp = lifted::entry::e825AACD0;  // sub_825AACD0
 inline constexpr auto& strncpy = lifted::entry::e825A7F50;  // sub_825A7F50
 inline constexpr auto& strrchr = lifted::entry::e825A8630;  // sub_825A8630
@@ -368,11 +381,16 @@ inline constexpr auto& ReleaseAll = lifted::entry::e820F0AD8;  // sub_820F0AD8
 inline constexpr auto& SetScale = lifted::entry::e820F0F00;  // sub_820F0F00
 }  // namespace game::Accessories
 
+namespace game::AccessoriesBase {
+inline constexpr auto& Dtor = lifted::entry::e820F0B58;  // sub_820F0B58
+}  // namespace game::AccessoriesBase
+
 namespace game::Accessory {
 inline constexpr auto& BindSkin = lifted::f820EF468;  // sub_820EF468
 inline constexpr auto& Draw = lifted::f820EFA78;  // sub_820EFA78
 inline constexpr auto& DrawShape = lifted::f820EF790;  // sub_820EF790
 inline constexpr auto& DrawShapes = lifted::f820EF9B8;  // sub_820EF9B8
+inline constexpr auto& Dtor = lifted::entry::e820EF310;  // sub_820EF310
 inline constexpr auto& RecordEntry = lifted::f820EF4E8;  // sub_820EF4E8
 inline constexpr auto& SetAnchor = lifted::f820EF418;  // sub_820EF418
 inline constexpr auto& SetTexture = lifted::entry::e820EF568;  // sub_820EF568
@@ -385,12 +403,14 @@ inline constexpr auto& OnLoaded = lifted::entry::e820F0820;  // sub_820F0820
 }  // namespace game::AccessoryEntry
 
 namespace game::AccessoryFile {
+inline constexpr auto& Dtor = lifted::entry::e820F0DB8;  // sub_820F0DB8
 inline constexpr auto& FreeData = lifted::entry::e820F08D0;  // sub_820F08D0
 inline constexpr auto& Load = lifted::entry::e820F0C90;  // sub_820F0C90
 inline constexpr auto& OnArchiveDone = lifted::entry::e820F0C20;  // sub_820F0C20
 }  // namespace game::AccessoryFile
 
 namespace game::AccessorySkeleton {
+inline constexpr auto& Dtor = lifted::entry::e820EFFD8;  // sub_820EFFD8
 inline constexpr auto& Move = lifted::f820EFCF8;  // sub_820EFCF8
 inline constexpr auto& Step = lifted::f820F0718;  // sub_820F0718
 inline constexpr auto& Swing = lifted::f820F0120;  // sub_820F0120
@@ -402,6 +422,8 @@ inline constexpr auto& WaitForStep = lifted::f820EFB28;  // sub_820EFB28
 namespace game::Achievements {
 inline constexpr auto& AllBeaten = lifted::entry::e82290698;  // sub_82290698
 inline constexpr auto& BeatsCourseTime = lifted::entry::e82290710;  // sub_82290710
+inline constexpr auto& Check = lifted::entry::e82290788;  // sub_82290788
+inline constexpr auto& Write = lifted::entry::e82290A30;  // sub_82290A30
 }  // namespace game::Achievements
 
 namespace game::ActionCurve {
@@ -418,9 +440,12 @@ inline constexpr auto& Fired = lifted::entry::e8210C010;  // sub_8210C010
 inline constexpr auto& Held = lifted::entry::e8210BE70;  // sub_8210BE70
 inline constexpr auto& HeldBefore = lifted::entry::e8210BED8;  // sub_8210BED8
 inline constexpr auto& Hysteresis = lifted::entry::e8210B718;  // sub_8210B718
+inline constexpr auto& IndexOf = lifted::entry::e8210B140;  // sub_8210B140
 inline constexpr auto& Pressed = lifted::entry::e8210BF40;  // sub_8210BF40
 inline constexpr auto& Released = lifted::entry::e8210BFA8;  // sub_8210BFA8
+inline constexpr auto& ResetAnalog = lifted::entry::e8210B438;  // sub_8210B438
 inline constexpr auto& ResetStages = lifted::entry::e8210C078;  // sub_8210C078
+inline constexpr auto& ResetWords = lifted::entry::e8210B8A8;  // sub_8210B8A8
 inline constexpr auto& SetCurve = lifted::entry::e8210BE30;  // sub_8210BE30
 inline constexpr auto& SetRepeat = lifted::entry::e8210BDF0;  // sub_8210BDF0
 inline constexpr auto& SetThreshold = lifted::entry::e8210B698;  // sub_8210B698
@@ -455,7 +480,9 @@ inline constexpr auto& MainPage = lifted::entry::e8221A4A8;  // sub_8221A4A8
 inline constexpr auto& Move = lifted::entry::e8221AA20;  // sub_8221AA20
 inline constexpr auto& MoveList = lifted::f8221B3C8;  // sub_8221B3C8
 inline constexpr auto& NotOnList = lifted::f8221ABE0;  // sub_8221ABE0
+inline constexpr auto& Open = lifted::entry::e8221BA68;  // sub_8221BA68
 inline constexpr auto& OpenList = lifted::f8221B918;  // sub_8221B918
+inline constexpr auto& SetUpItems = lifted::entry::e8221B5C8;  // sub_8221B5C8
 inline constexpr auto& SetUpList = lifted::f8221B6A0;  // sub_8221B6A0
 inline constexpr auto& Show = lifted::entry::e8221A7A8;  // sub_8221A7A8
 inline constexpr auto& ShowItem = lifted::f8221A8A8;  // sub_8221A8A8
@@ -467,11 +494,13 @@ inline constexpr auto& Start = lifted::entry::e8221B860;  // sub_8221B860
 }  // namespace game::AfterRaceMenu
 
 namespace game::AiDriver {
+inline constexpr auto& AccumulateSteer = lifted::entry::e82138F00;  // sub_82138F00
 inline constexpr auto& AdjustForOther = lifted::entry::e821452A0;  // sub_821452A0
 inline constexpr auto& Drive = lifted::entry::e8213B058;  // sub_8213B058
 inline constexpr auto& DriveCar = lifted::entry::e8215F678;  // sub_8215F678
 inline constexpr auto& Of = lifted::entry::e82139728;  // sub_82139728
 inline constexpr auto& PickTarget = lifted::entry::e82145118;  // sub_82145118
+inline constexpr auto& PickTargetBehind = lifted::entry::e821451B8;  // sub_821451B8
 inline constexpr auto& ReactToOthers = lifted::entry::e82145CA8;  // sub_82145CA8
 inline constexpr auto& ReadCar = lifted::entry::e82144F50;  // sub_82144F50
 inline constexpr auto& ReadVehicle = lifted::entry::e821467F0;  // sub_821467F0
@@ -506,6 +535,8 @@ inline constexpr auto& UpdateTimer = lifted::entry::e821456A0;  // sub_821456A0
 
 namespace game::AiPath {
 inline constexpr auto& AdvanceCorners = lifted::entry::e8213D020;  // sub_8213D020
+inline constexpr auto& AvoidOnLeft = lifted::entry::e8213CB30;  // sub_8213CB30
+inline constexpr auto& AvoidOnRight = lifted::entry::e8213CD50;  // sub_8213CD50
 inline constexpr auto& AvoidOthers = lifted::entry::e8213E690;  // sub_8213E690
 inline constexpr auto& BranchMasksFor = lifted::entry::e8213D378;  // sub_8213D378
 inline constexpr auto& DropPassed = lifted::entry::e8213F2E0;  // sub_8213F2E0
@@ -538,6 +569,7 @@ namespace game::AltHud {
 inline constexpr auto& GaugeFloat = lifted::f82216FD0;  // sub_82216FD0
 inline constexpr auto& GaugeInt119 = lifted::f82217168;  // sub_82217168
 inline constexpr auto& GaugeInt149 = lifted::f82217270;  // sub_82217270
+inline constexpr auto& PowerClass = lifted::entry::e82216B08;  // sub_82216B08
 inline constexpr auto& RunMovie = lifted::entry::e82216C00;  // sub_82216C00
 inline constexpr auto& SetBar = lifted::entry::e822175A0;  // sub_822175A0
 inline constexpr auto& SetBigSpeed = lifted::f82216EE8;  // sub_82216EE8
@@ -549,12 +581,17 @@ inline constexpr auto& SetSpeed = lifted::entry::e82216E00;  // sub_82216E00
 inline constexpr auto& SetSteering = lifted::entry::e822176E8;  // sub_822176E8
 inline constexpr auto& SetTach = lifted::entry::e822173E8;  // sub_822173E8
 inline constexpr auto& SetThrottle = lifted::entry::e82217638;  // sub_82217638
+inline constexpr auto& SetUp = lifted::entry::e82217C70;  // sub_82217C70
 inline constexpr auto& SetUpExtraGauges = lifted::entry::e822178A0;  // sub_822178A0
 inline constexpr auto& SetUpGauges = lifted::entry::e82216C40;  // sub_82216C40
 inline constexpr auto& ShowPanels = lifted::entry::e82216D78;  // sub_82216D78
 inline constexpr auto& ToggleView = lifted::f82217778;  // sub_82217778
 inline constexpr auto& UpdateExtraGauges = lifted::entry::e82217A30;  // sub_82217A30
 }  // namespace game::AltHud
+
+namespace game::Angle {
+inline constexpr auto& Wrap = lifted::entry::e82145408;  // sub_82145408
+}  // namespace game::Angle
 
 namespace game::Animation {
 inline constexpr auto& Advance = lifted::entry::e82146AC0;  // sub_82146AC0
@@ -603,6 +640,10 @@ namespace game::AppCamera {
 inline constexpr auto& Ctor = lifted::entry::e820A8B88;  // sub_820A8B88
 }  // namespace game::AppCamera
 
+namespace game::AppCameraEntry {
+inline constexpr auto& Ctor = lifted::entry::e820A75E8;  // sub_820A75E8
+}  // namespace game::AppCameraEntry
+
 namespace game::AppCameraList {
 inline constexpr auto& Add = lifted::f820A9928;  // sub_820A9928
 }  // namespace game::AppCameraList
@@ -644,6 +685,7 @@ inline constexpr auto& Reset = lifted::entry::e820F12F8;  // sub_820F12F8
 
 namespace game::AsyncFile {
 inline constexpr auto& Detach = lifted::f82593BB0;  // sub_82593BB0
+inline constexpr auto& Dtor = lifted::entry::e82593B00;  // sub_82593B00
 }  // namespace game::AsyncFile
 
 namespace game::AudioEngine {
@@ -721,7 +763,9 @@ inline constexpr auto& Dtor = lifted::f82117B88;  // sub_82117B88
 inline constexpr auto& GetCueIndex = lifted::f821176C0;  // sub_821176C0
 inline constexpr auto& HasName = lifted::f82117D00;  // sub_82117D00
 inline constexpr auto& IsLoaded = lifted::f82117698;  // sub_82117698
+inline constexpr auto& IsLoading = lifted::entry::e82117670;  // sub_82117670
 inline constexpr auto& Load = lifted::f821178C8;  // sub_821178C8
+inline constexpr auto& SoundBank = lifted::entry::e82117770;  // sub_82117770
 }  // namespace game::BankPair
 
 namespace game::BillboardMaterial {
@@ -801,6 +845,8 @@ inline constexpr auto& MoveCorners = lifted::entry::e820BCCE8;  // sub_820BCCE8
 inline constexpr auto& Outcode = lifted::entry::e820BD0C8;  // sub_820BD0C8
 inline constexpr auto& Separated = lifted::entry::e820BD280;  // sub_820BD280
 inline constexpr auto& SeparatedAfterMove = lifted::entry::e820BD578;  // sub_820BD578
+inline constexpr auto& SwapForImpact = lifted::entry::e820BE490;  // sub_820BE490
+inline constexpr auto& SwapForPushOut = lifted::entry::e820BEBF0;  // sub_820BEBF0
 }  // namespace game::BoxBox
 
 namespace game::BoxShape {
@@ -815,11 +861,13 @@ inline constexpr auto& EdgeStart = lifted::entry::e820B9F98;  // sub_820B9F98
 inline constexpr auto& Face = lifted::entry::e820B9EE8;  // sub_820B9EE8
 inline constexpr auto& FaceCount = lifted::entry::e820B9EE0;  // sub_820B9EE0
 inline constexpr auto& FaceDirection = lifted::entry::e820B9F00;  // sub_820B9F00
+inline constexpr auto& FaceDistance = lifted::entry::e820BA3B0;  // sub_820BA3B0
 inline constexpr auto& LowerCorner = lifted::entry::e820BA368;  // sub_820BA368
 inline constexpr auto& Place = lifted::entry::e820B9C40;  // sub_820B9C40
 inline constexpr auto& RelativeCenter = lifted::entry::e820BA5D8;  // sub_820BA5D8
 inline constexpr auto& RelativePlacement = lifted::entry::e820BA408;  // sub_820BA408
 inline constexpr auto& SetCacheWord = lifted::entry::e820BA668;  // sub_820BA668
+inline constexpr auto& SetCorners = lifted::entry::e820B99D0;  // sub_820B99D0
 inline constexpr auto& Translate = lifted::entry::e820BA2F0;  // sub_820BA2F0
 }  // namespace game::BoxShape
 
@@ -837,17 +885,25 @@ namespace game::BuildScreen {
 inline constexpr auto& BackToBuilds = lifted::f821A1258;  // sub_821A1258
 inline constexpr auto& BackToGroups = lifted::entry::e821A0A38;  // sub_821A0A38
 inline constexpr auto& BackToStand = lifted::entry::e8219FF78;  // sub_8219FF78
+inline constexpr auto& BuildArrows = lifted::entry::e8219D4B8;  // sub_8219D4B8
 inline constexpr auto& BuildPage = lifted::entry::e8219F1C8;  // sub_8219F1C8
 inline constexpr auto& BuildsPage = lifted::entry::e8219F048;  // sub_8219F048
 inline constexpr auto& ChangeCategory = lifted::entry::e8219FC60;  // sub_8219FC60
 inline constexpr auto& ChangeGroupInBuilds = lifted::f821A0E50;  // sub_821A0E50
 inline constexpr auto& ChangeGroupOnStand = lifted::f821A0B38;  // sub_821A0B38
 inline constexpr auto& Close = lifted::entry::e8219C300;  // sub_8219C300
+inline constexpr auto& CopyBuilds = lifted::entry::e821A0128;  // sub_821A0128
 inline constexpr auto& Create = lifted::entry::e8219BD80;  // sub_8219BD80
 inline constexpr auto& Destroy = lifted::entry::e8219B8C8;  // sub_8219B8C8
 inline constexpr auto& DetailsPage = lifted::entry::e8219B960;  // sub_8219B960
+inline constexpr auto& DrawBuildRow = lifted::entry::e8219D248;  // sub_8219D248
+inline constexpr auto& DrawBuildRows = lifted::entry::e8219D3E8;  // sub_8219D3E8
+inline constexpr auto& DrawGroupRow = lifted::entry::e8219CE08;  // sub_8219CE08
+inline constexpr auto& DrawGroupRows = lifted::entry::e8219FA28;  // sub_8219FA28
+inline constexpr auto& DrawStandRow = lifted::entry::e8219D550;  // sub_8219D550
 inline constexpr auto& Enter = lifted::entry::e821A0860;  // sub_821A0860
 inline constexpr auto& FadeOut = lifted::entry::e8219C850;  // sub_8219C850
+inline constexpr auto& GroupArrows = lifted::entry::e8219D1B0;  // sub_8219D1B0
 inline constexpr auto& GroupsPage = lifted::entry::e8219EEC0;  // sub_8219EEC0
 inline constexpr auto& HighlightBuilds = lifted::entry::e8219C8F8;  // sub_8219C8F8
 inline constexpr auto& HighlightDetails = lifted::entry::e8219CBD8;  // sub_8219CBD8
@@ -855,8 +911,11 @@ inline constexpr auto& HighlightGroups = lifted::entry::e8219C528;  // sub_8219C
 inline constexpr auto& HighlightGroups2 = lifted::entry::e8219C6D0;  // sub_8219C6D0
 inline constexpr auto& HighlightStand = lifted::entry::e8219CA08;  // sub_8219CA08
 inline constexpr auto& HighlightStand2 = lifted::entry::e8219CB18;  // sub_8219CB18
+inline constexpr auto& InitBuildList = lifted::entry::e8219BFE8;  // sub_8219BFE8
+inline constexpr auto& InitStandList = lifted::entry::e8219C078;  // sub_8219C078
 inline constexpr auto& InitStates = lifted::entry::e821A16C0;  // sub_821A16C0
 inline constexpr auto& LeavePage = lifted::entry::e8219C3A8;  // sub_8219C3A8
+inline constexpr auto& ListBuilds = lifted::entry::e821A0D38;  // sub_821A0D38
 inline constexpr auto& MoveBuild = lifted::f8219F3A0;  // sub_8219F3A0
 inline constexpr auto& MoveGroup = lifted::f8219FB08;  // sub_8219FB08
 inline constexpr auto& MoveStand = lifted::f8219F520;  // sub_8219F520
@@ -865,9 +924,14 @@ inline constexpr auto& OpenBuilds = lifted::entry::e821A1138;  // sub_821A1138
 inline constexpr auto& OpenDetails = lifted::entry::e8219FEC8;  // sub_8219FEC8
 inline constexpr auto& OpenMovie = lifted::entry::e8219B950;  // sub_8219B950
 inline constexpr auto& OpenStand = lifted::entry::e8219FE10;  // sub_8219FE10
+inline constexpr auto& PutOnStand = lifted::entry::e8219D6F0;  // sub_8219D6F0
 inline constexpr auto& RestoreBuildList = lifted::entry::e8219BB80;  // sub_8219BB80
 inline constexpr auto& ScrollDetails = lifted::f8219F690;  // sub_8219F690
 inline constexpr auto& SetUpBuilds = lifted::entry::e821A1008;  // sub_821A1008
+inline constexpr auto& ShowBuildMark = lifted::entry::e8219D440;  // sub_8219D440
+inline constexpr auto& ShowDetails = lifted::entry::e8219D820;  // sub_8219D820
+inline constexpr auto& ShowGroup = lifted::entry::e8219CF08;  // sub_8219CF08
+inline constexpr auto& StandArrows = lifted::entry::e8219D7B0;  // sub_8219D7B0
 inline constexpr auto& Unload = lifted::entry::e8219C298;  // sub_8219C298
 inline constexpr auto& UpdatePage = lifted::entry::e8219FA80;  // sub_8219FA80
 inline constexpr auto& ValueText = lifted::entry::e8219BCC0;  // sub_8219BCC0
@@ -892,6 +956,7 @@ inline constexpr auto& Free = lifted::entry::e8214FFF0;  // sub_8214FFF0
 
 namespace game::CameraAnims {
 inline constexpr auto& Clear = lifted::entry::e82150078;  // sub_82150078
+inline constexpr auto& Evaluate = lifted::entry::e82150960;  // sub_82150960
 inline constexpr auto& FreeAll = lifted::entry::e821507D8;  // sub_821507D8
 inline constexpr auto& Load = lifted::entry::e82150B10;  // sub_82150B10
 inline constexpr auto& OnLoaded = lifted::entry::e82150878;  // sub_82150878
@@ -972,6 +1037,7 @@ inline constexpr auto& FillAll = lifted::entry::e821822F8;  // sub_821822F8
 
 namespace game::CarData {
 inline constexpr auto& Ctor = lifted::entry::e820AEF80;  // sub_820AEF80
+inline constexpr auto& FromGarageCar = lifted::entry::e82179A60;  // sub_82179A60
 }  // namespace game::CarData
 
 namespace game::CarDealer {
@@ -987,6 +1053,9 @@ inline constexpr auto& OnMessage26 = lifted::f82183078;  // sub_82183078
 inline constexpr auto& OnMessage40 = lifted::f82180C18;  // sub_82180C18
 inline constexpr auto& OnNo = lifted::f82180CD0;  // sub_82180CD0
 inline constexpr auto& OnYes = lifted::entry::e82181968;  // sub_82181968
+inline constexpr auto& OpenCar = lifted::entry::e82184650;  // sub_82184650
+inline constexpr auto& OpenCarList = lifted::entry::e82184488;  // sub_82184488
+inline constexpr auto& OpenColors = lifted::entry::e821847A0;  // sub_821847A0
 inline constexpr auto& OpenMovie = lifted::entry::e82180C08;  // sub_82180C08
 inline constexpr auto& Page0 = lifted::entry::e82180F90;  // sub_82180F90
 inline constexpr auto& Page1 = lifted::entry::e82183428;  // sub_82183428
@@ -994,13 +1063,17 @@ inline constexpr auto& Page2 = lifted::entry::e82183600;  // sub_82183600
 inline constexpr auto& Page3 = lifted::entry::e82181A10;  // sub_82181A10
 inline constexpr auto& Page4 = lifted::entry::e82181B98;  // sub_82181B98
 inline constexpr auto& Page5 = lifted::f82181BE8;  // sub_82181BE8
+inline constexpr auto& ReloadStandModel = lifted::entry::e82181330;  // sub_82181330
 inline constexpr auto& SetColorBar = lifted::entry::e82182770;  // sub_82182770
+inline constexpr auto& SetHeader = lifted::entry::e82182C28;  // sub_82182C28
 inline constexpr auto& SetKindBar = lifted::entry::e82182158;  // sub_82182158
 inline constexpr auto& SetNameTexts = lifted::entry::e82182388;  // sub_82182388
 inline constexpr auto& SetPriceTexts = lifted::entry::e82182418;  // sub_82182418
+inline constexpr auto& SetPrompts = lifted::entry::e82182B30;  // sub_82182B30
 inline constexpr auto& SetScrollArrows = lifted::entry::e82182DD0;  // sub_82182DD0
 inline constexpr auto& SetSpecTexts = lifted::entry::e821824A8;  // sub_821824A8
 inline constexpr auto& SetUpSpecSheet = lifted::f821810E0;  // sub_821810E0
+inline constexpr auto& ShowCarInfo = lifted::entry::e82182620;  // sub_82182620
 inline constexpr auto& ShowDriveDialog = lifted::f82182990;  // sub_82182990
 inline constexpr auto& ShowFirstCarDialog = lifted::f82182A80;  // sub_82182A80
 inline constexpr auto& ShowSwatches = lifted::entry::e821826C0;  // sub_821826C0
@@ -1116,6 +1189,7 @@ inline constexpr auto& PlaceCursor = lifted::entry::e8224D9A0;  // sub_8224D9A0
 inline constexpr auto& PlayStats = lifted::f8224DF90;  // sub_8224DF90
 inline constexpr auto& PlayStatsOut = lifted::f8224DFF0;  // sub_8224DFF0
 inline constexpr auto& SetCarName = lifted::entry::e822417E8;  // sub_822417E8
+inline constexpr auto& SetName = lifted::entry::e8224DED8;  // sub_8224DED8
 inline constexpr auto& SetPrice = lifted::f8224E7E8;  // sub_8224E7E8
 inline constexpr auto& SetStats = lifted::entry::e8224E288;  // sub_8224E288
 inline constexpr auto& SetTexts = lifted::entry::e8224D7F0;  // sub_8224D7F0
@@ -1315,7 +1389,9 @@ inline constexpr auto& RunInlineLinked = lifted::f8258E718;  // sub_8258E718
 
 namespace game::ClientList {
 inline constexpr auto& Add = lifted::entry::e8259C960;  // sub_8259C960
+inline constexpr auto& Count = lifted::entry::e8259C868;  // sub_8259C868
 inline constexpr auto& Ctor = lifted::entry::e8259C7B8;  // sub_8259C7B8
+inline constexpr auto& Find = lifted::entry::e8259C818;  // sub_8259C818
 }  // namespace game::ClientList
 
 namespace game::Cockpit {
@@ -1331,8 +1407,12 @@ inline constexpr auto& Find = lifted::entry::e820DBC88;  // sub_820DBC88
 
 namespace game::CodecBase {
 inline constexpr auto& CompletePacket = lifted::entry::e824674D8;  // sub_824674D8
+inline constexpr auto& Dtor = lifted::entry::e82469960;  // sub_82469960
 inline constexpr auto& FlushPackets = lifted::entry::e824699E0;  // sub_824699E0
 inline constexpr auto& SetFlags = lifted::entry::e82467078;  // sub_82467078
+inline constexpr auto& SetFormat = lifted::entry::e82469E58;  // sub_82469E58
+inline constexpr auto& SubmitPacket = lifted::entry::e82469EF8;  // sub_82469EF8
+inline constexpr auto& SubmitRegion = lifted::entry::e8246A1C0;  // sub_8246A1C0
 }  // namespace game::CodecBase
 
 namespace game::CollisionObject {
@@ -1521,6 +1601,7 @@ inline constexpr auto& Flip = lifted::entry::e820BC858;  // sub_820BC858
 inline constexpr auto& Next = lifted::entry::e820B8D10;  // sub_820B8D10
 inline constexpr auto& Object = lifted::entry::e820B8CC0;  // sub_820B8CC0
 inline constexpr auto& Position = lifted::entry::e820B8D00;  // sub_820B8D00
+inline constexpr auto& Set = lifted::entry::e820BC908;  // sub_820BC908
 inline constexpr auto& Strength = lifted::entry::e820B8D08;  // sub_820B8D08
 }  // namespace game::Contact
 
@@ -1571,6 +1652,7 @@ inline constexpr auto& Update = lifted::entry::e821C7F98;  // sub_821C7F98
 }  // namespace game::ControllerOptions
 
 namespace game::Controls {
+inline constexpr auto& AnalogPicture = lifted::entry::e821BAD08;  // sub_821BAD08
 inline constexpr auto& CycleAnalog = lifted::f821BAD80;  // sub_821BAD80
 inline constexpr auto& CycleButton = lifted::f821BA5F0;  // sub_821BA5F0
 inline constexpr auto& CycleButtonPair = lifted::f821BA6A0;  // sub_821BA6A0
@@ -1718,6 +1800,7 @@ inline constexpr auto& ReleaseThreadOwnership = lifted::entry::e8229DA10;  // su
 inline constexpr auto& ReserveWords = lifted::entry::e8229F148;  // sub_8229F148
 inline constexpr auto& Resolve = lifted::entry::e822AFA58;  // sub_822AFA58
 inline constexpr auto& SetBlendControl = lifted::entry::e822A3B30;  // sub_822A3B30
+inline constexpr auto& SetDefaultState = lifted::entry::e822ACB90;  // sub_822ACB90
 inline constexpr auto& SetDepthStencilSurface = lifted::entry::e822A4060;  // sub_822A4060
 inline constexpr auto& SetDisplayMode = lifted::entry::e822AD0B0;  // sub_822AD0B0
 inline constexpr auto& SetFVF = lifted::entry::e822AA0E8;  // sub_822AA0E8
@@ -1813,6 +1896,7 @@ inline constexpr auto& SetRenderState_Wrap9 = lifted::entry::e822A2248;  // sub_
 inline constexpr auto& SetRenderState_ZEnable = lifted::entry::e822A18D8;  // sub_822A18D8
 inline constexpr auto& SetRenderState_ZFunc = lifted::entry::e822A1950;  // sub_822A1950
 inline constexpr auto& SetRenderState_ZWriteEnable = lifted::entry::e822A1920;  // sub_822A1920
+inline constexpr auto& SetRenderTarget = lifted::entry::e822A3D30;  // sub_822A3D30
 inline constexpr auto& SetRenderTarget_External = lifted::entry::e822A4340;  // sub_822A4340
 inline constexpr auto& SetSamplerState_AddressU = lifted::entry::e822A31A0;  // sub_822A31A0
 inline constexpr auto& SetSamplerState_AddressV = lifted::entry::e822A31F0;  // sub_822A31F0
@@ -1847,6 +1931,7 @@ inline constexpr auto& SetVertexDeclaration = lifted::entry::e822A8960;  // sub_
 inline constexpr auto& SetVertexShaderConstantF = lifted::entry::e822A81F8;  // sub_822A81F8
 inline constexpr auto& SetViewport = lifted::entry::e822A3518;  // sub_822A3518
 inline constexpr auto& Swap = lifted::entry::e822A08A0;  // sub_822A08A0
+inline constexpr auto& WaitForFence = lifted::entry::e8229E908;  // sub_8229E908
 inline constexpr auto& WaitForIdle = lifted::entry::e8229F1B0;  // sub_8229F1B0
 inline constexpr auto& WaitForWorkers = lifted::f822B64A0;  // sub_822B64A0
 inline constexpr auto& WakeWorker = lifted::entry::e822B6A78;  // sub_822B6A78
@@ -1915,6 +2000,7 @@ inline constexpr auto& QuantizeColorKey = lifted::f823F6170;  // sub_823F6170
 
 namespace game::DxtColor {
 inline constexpr auto& DecodeBlock = lifted::f82421938;  // sub_82421938
+inline constexpr auto& EncodeBlock = lifted::entry::e82420F50;  // sub_82420F50
 inline constexpr auto& FitEndpoints = lifted::entry::e82420AB8;  // sub_82420AB8
 inline constexpr auto& PackR5G6B5 = lifted::entry::e824206E8;  // sub_824206E8
 }  // namespace game::DxtColor
@@ -1940,6 +2026,7 @@ inline constexpr auto& Wait = lifted::f8258DD90;  // sub_8258DD90
 }  // namespace game::Event
 
 namespace game::EventCondition {
+inline constexpr auto& FloatAtLeast = lifted::entry::e82140400;  // sub_82140400
 inline constexpr auto& Power = lifted::f82141668;  // sub_82141668
 }  // namespace game::EventCondition
 
@@ -1955,6 +2042,7 @@ inline constexpr auto& CopyIds = lifted::entry::e82143420;  // sub_82143420
 
 namespace game::File {
 inline constexpr auto& Close = lifted::entry::e8258C718;  // sub_8258C718
+inline constexpr auto& Dtor = lifted::entry::e8258C5F8;  // sub_8258C5F8
 inline constexpr auto& GetSize = lifted::entry::e822B80D8;  // sub_822B80D8
 inline constexpr auto& OpenRead = lifted::entry::e8258C688;  // sub_8258C688
 inline constexpr auto& OpenWrite = lifted::f8258C608;  // sub_8258C608
@@ -1969,12 +2057,15 @@ inline constexpr auto& Dtor = lifted::f820A7180;  // sub_820A7180
 }  // namespace game::FloatPairItem
 
 namespace game::Font {
+inline constexpr auto& AddGlyph = lifted::entry::e82109560;  // sub_82109560
 inline constexpr auto& ClipGlyph = lifted::entry::e82108C90;  // sub_82108C90
 inline constexpr auto& Ctor = lifted::entry::e82109228;  // sub_82109228
 inline constexpr auto& Draw = lifted::entry::e8210A400;  // sub_8210A400
 inline constexpr auto& DrawPass = lifted::entry::e82109EF0;  // sub_82109EF0
 inline constexpr auto& LineGlyphs = lifted::entry::e82108810;  // sub_82108810
 inline constexpr auto& LineWidth = lifted::entry::e82108458;  // sub_82108458
+inline constexpr auto& LineX = lifted::entry::e82108FE0;  // sub_82108FE0
+inline constexpr auto& LineY = lifted::entry::e82108568;  // sub_82108568
 inline constexpr auto& OnPageLoaded = lifted::f82109160;  // sub_82109160
 inline constexpr auto& TextWidth = lifted::entry::e82108B30;  // sub_82108B30
 }  // namespace game::Font
@@ -2128,6 +2219,7 @@ inline constexpr auto& Draw = lifted::entry::e8217FE60;  // sub_8217FE60
 inline constexpr auto& FitCar = lifted::entry::e82178C40;  // sub_82178C40
 inline constexpr auto& Init = lifted::entry::e82180968;  // sub_82180968
 inline constexpr auto& IsBusy = lifted::entry::e82179BE0;  // sub_82179BE0
+inline constexpr auto& MakeModel = lifted::entry::e8217FCB0;  // sub_8217FCB0
 inline constexpr auto& ReloadModel = lifted::entry::e8217F880;  // sub_8217F880
 inline constexpr auto& SetCar = lifted::entry::e8217FD58;  // sub_8217FD58
 inline constexpr auto& SetCarClass = lifted::entry::e8217FDC8;  // sub_8217FDC8
@@ -2186,6 +2278,8 @@ inline constexpr auto& Ctor = lifted::entry::e82099FB0;  // sub_82099FB0
 inline constexpr auto& ForEach = lifted::entry::e82092BF0;  // sub_82092BF0
 inline constexpr auto& Insert = lifted::entry::e82093740;  // sub_82093740
 inline constexpr auto& NewNode = lifted::entry::e82099E20;  // sub_82099E20
+inline constexpr auto& RotateLeft = lifted::entry::e82092B10;  // sub_82092B10
+inline constexpr auto& RotateRight = lifted::entry::e82092A00;  // sub_82092A00
 }  // namespace game::HandlerMap
 
 namespace game::HelpLine {
@@ -2198,7 +2292,12 @@ inline constexpr auto& Basis = lifted::entry::e82293A48;  // sub_82293A48
 
 namespace game::HudBar {
 inline constexpr auto& Snap = lifted::f82212100;  // sub_82212100
+inline constexpr auto& Step = lifted::entry::e82211FB8;  // sub_82211FB8
 }  // namespace game::HudBar
+
+namespace game::HudCurve {
+inline constexpr auto& Eval = lifted::entry::e82212118;  // sub_82212118
+}  // namespace game::HudCurve
 
 namespace game::IdentityMatrix {
 inline constexpr auto& StaticInit = lifted::entry::e825D9060;  // sub_825D9060
@@ -2210,6 +2309,7 @@ inline constexpr auto& ApplyColorKey = lifted::f823EADB0;  // sub_823EADB0
 inline constexpr auto& ConvertRange = lifted::f823EA0C0;  // sub_823EA0C0
 inline constexpr auto& Create = lifted::entry::e823F6C60;  // sub_823F6C60
 inline constexpr auto& Ctor = lifted::entry::e823EA800;  // sub_823EA800
+inline constexpr auto& Dtor = lifted::entry::e823EA070;  // sub_823EA070
 inline constexpr auto& LinearToSrgb = lifted::f823EAE40;  // sub_823EAE40
 inline constexpr auto& Prepare = lifted::entry::e823EAA90;  // sub_823EAA90
 inline constexpr auto& QuantizeColorKey = lifted::f823EACC8;  // sub_823EACC8
@@ -2244,6 +2344,7 @@ inline constexpr auto& GetProcessor = lifted::entry::e82098CB8;  // sub_82098CB8
 
 namespace game::InputProcessor {
 inline constexpr auto& AllHeld = lifted::entry::e825924E0;  // sub_825924E0
+inline constexpr auto& Assign = lifted::entry::e82098D60;  // sub_82098D60
 inline constexpr auto& TestHeld = lifted::entry::e8258CF10;  // sub_8258CF10
 inline constexpr auto& TestPressed = lifted::entry::e8258CEB0;  // sub_8258CEB0
 inline constexpr auto& TestRepeat = lifted::entry::e8258CEE0;  // sub_8258CEE0
@@ -2338,6 +2439,8 @@ inline constexpr auto& EncodeRow = lifted::f823EEBD8;  // sub_823EEBD8
 }  // namespace game::L8Codec
 
 namespace game::Leaderboard {
+inline constexpr auto& CarLogo = lifted::entry::e8225FFC8;  // sub_8225FFC8
+inline constexpr auto& Rank = lifted::entry::e822914A8;  // sub_822914A8
 inline constexpr auto& Read = lifted::entry::e82292CC0;  // sub_82292CC0
 inline constexpr auto& SetUpSpec = lifted::entry::e82292648;  // sub_82292648
 }  // namespace game::Leaderboard
@@ -2371,7 +2474,8 @@ inline constexpr auto& Update = lifted::f8211E8C0;  // sub_8211E8C0
 namespace game::List {
 inline constexpr auto& Append = lifted::entry::e82294BA8;  // sub_82294BA8
 inline constexpr auto& At = lifted::entry::e82593FC0;  // sub_82593FC0
-inline constexpr auto& Clear = lifted::f82294CF0;  // sub_82294CF0
+inline constexpr auto& Clear_820ACF88 = lifted::entry::e820ACF88;  // sub_820ACF88
+inline constexpr auto& Clear_82294CF0 = lifted::f82294CF0;  // sub_82294CF0
 inline constexpr auto& DeleteAll = lifted::entry::e82593FF8;  // sub_82593FF8
 inline constexpr auto& DeleteNodes = lifted::f82294C88;  // sub_82294C88
 inline constexpr auto& Dtor = lifted::f82294D48;  // sub_82294D48
@@ -2513,8 +2617,10 @@ inline constexpr auto& Destroy = lifted::f82228548;  // sub_82228548
 inline constexpr auto& Free = lifted::f82228220;  // sub_82228220
 inline constexpr auto& FreePictures = lifted::entry::e82228498;  // sub_82228498
 inline constexpr auto& HasMoreUnlocks = lifted::entry::e822281D8;  // sub_822281D8
+inline constexpr auto& HidePictures = lifted::entry::e8222A150;  // sub_8222A150
 inline constexpr auto& InitStates = lifted::entry::e8222F258;  // sub_8222F258
 inline constexpr auto& IsPictureQueued = lifted::entry::e822291E8;  // sub_822291E8
+inline constexpr auto& ListNode = lifted::entry::e8222C058;  // sub_8222C058
 inline constexpr auto& LoadPicture = lifted::entry::e8222C270;  // sub_8222C270
 inline constexpr auto& NextOpponentText = lifted::entry::e82227430;  // sub_82227430
 inline constexpr auto& NextResultText = lifted::entry::e822271F8;  // sub_822271F8
@@ -2548,9 +2654,16 @@ inline constexpr auto& PictureB = lifted::entry::e82229158;  // sub_82229158
 inline constexpr auto& PollLoad = lifted::entry::e82229238;  // sub_82229238
 inline constexpr auto& PollSceneTeardown = lifted::f82227780;  // sub_82227780
 inline constexpr auto& Reset = lifted::entry::e822279A8;  // sub_822279A8
+inline constexpr auto& ResetMovie = lifted::entry::e8222CD60;  // sub_8222CD60
 inline constexpr auto& RunCardMovie = lifted::entry::e822291A8;  // sub_822291A8
 inline constexpr auto& SceneryConfig = lifted::entry::e8228F0A0;  // sub_8228F0A0
+inline constexpr auto& SetCarColor = lifted::entry::e8222AC18;  // sub_8222AC18
+inline constexpr auto& SetCursor = lifted::entry::e8222BFE8;  // sub_8222BFE8
 inline constexpr auto& SetUp = lifted::f8222C300;  // sub_8222C300
+inline constexpr auto& ShowArrows = lifted::entry::e8222C0C8;  // sub_8222C0C8
+inline constexpr auto& ShowOpponentInfo = lifted::entry::e8222B438;  // sub_8222B438
+inline constexpr auto& ShowOpponentPictures = lifted::entry::e8222B200;  // sub_8222B200
+inline constexpr auto& ShowOpponentSpecs = lifted::entry::e8222C188;  // sub_8222C188
 inline constexpr auto& ShowPictures = lifted::entry::e8222A060;  // sub_8222A060
 inline constexpr auto& Start = lifted::entry::e8222F0B0;  // sub_8222F0B0
 inline constexpr auto& Transition0 = lifted::f8222CEB0;  // sub_8222CEB0
@@ -2653,11 +2766,13 @@ inline constexpr auto& Invoke = lifted::f82233460;  // sub_82233460
 namespace game::Memory {
 inline constexpr auto& AllocPhysicalEx = lifted::entry::e8258E098;  // sub_8258E098
 inline constexpr auto& AllocVirtual = lifted::entry::e8258DFF0;  // sub_8258DFF0
+inline constexpr auto& FreeLater = lifted::entry::e8258E410;  // sub_8258E410
 }  // namespace game::Memory
 
 namespace game::Menu {
 inline constexpr auto& Pressed = lifted::entry::e821864C8;  // sub_821864C8
 inline constexpr auto& Step = lifted::entry::e82186568;  // sub_82186568
+inline constexpr auto& StepList = lifted::entry::e821CE1D0;  // sub_821CE1D0
 }  // namespace game::Menu
 
 namespace game::MenuList {
@@ -2695,6 +2810,7 @@ inline constexpr auto& Draw = lifted::entry::e820F5740;  // sub_820F5740
 
 namespace game::Mode {
 inline constexpr auto& Create = lifted::entry::e821077A8;  // sub_821077A8
+inline constexpr auto& Ctor = lifted::entry::e82106C20;  // sub_82106C20
 inline constexpr auto& DeletingDestructor = lifted::entry::e82106E38;  // sub_82106E38
 inline constexpr auto& NextModeThunk = lifted::entry::e82235C08;  // sub_82235C08
 inline constexpr auto& NoNextMode = lifted::f8222FC90;  // sub_8222FC90
@@ -2724,10 +2840,13 @@ inline constexpr auto& WaitForShown = lifted::entry::e82288CA0;  // sub_82288CA0
 }  // namespace game::ModeType10
 
 namespace game::ModeType12 {
+inline constexpr auto& AllLoaded = lifted::entry::e82277EE0;  // sub_82277EE0
+inline constexpr auto& FindShown = lifted::entry::e82277FF0;  // sub_82277FF0
 inline constexpr auto& ForceExit = lifted::entry::e822788D8;  // sub_822788D8
 inline constexpr auto& Init = lifted::entry::e82278058;  // sub_82278058
 inline constexpr auto& Interrupt = lifted::f822785E0;  // sub_822785E0
 inline constexpr auto& LeaveScreen = lifted::entry::e8227B868;  // sub_8227B868
+inline constexpr auto& Machine = lifted::entry::e82277E10;  // sub_82277E10
 inline constexpr auto& NextMode = lifted::entry::e8227B930;  // sub_8227B930
 inline constexpr auto& Release = lifted::entry::e82277DB0;  // sub_82277DB0
 inline constexpr auto& Resume = lifted::entry::e82278B98;  // sub_82278B98
@@ -2822,6 +2941,7 @@ inline constexpr auto& Load = lifted::entry::e82596920;  // sub_82596920
 inline constexpr auto& Material = lifted::entry::e82594B20;  // sub_82594B20
 inline constexpr auto& MaterialCount = lifted::entry::e82594AD8;  // sub_82594AD8
 inline constexpr auto& PointPosition = lifted::entry::e820DA988;  // sub_820DA988
+inline constexpr auto& QueueJobRelease = lifted::entry::e82594E88;  // sub_82594E88
 inline constexpr auto& RecordMaterials = lifted::entry::e820CECA0;  // sub_820CECA0
 inline constexpr auto& RecordShape = lifted::entry::e82595550;  // sub_82595550
 inline constexpr auto& RecordShapeDepth = lifted::entry::e825960D0;  // sub_825960D0
@@ -2974,6 +3094,7 @@ inline constexpr auto& WaitForMovie = lifted::entry::e8227FF10;  // sub_8227FF10
 }  // namespace game::NetTaCourse
 
 namespace game::Network {
+inline constexpr auto& SetLiveState = lifted::entry::e822927B0;  // sub_822927B0
 inline constexpr auto& SetUp = lifted::entry::e8214E190;  // sub_8214E190
 inline constexpr auto& SetUpVoice = lifted::entry::e8214F6E8;  // sub_8214F6E8
 inline constexpr auto& Update = lifted::entry::e8214E268;  // sub_8214E268
@@ -3033,6 +3154,11 @@ inline constexpr auto& Object = lifted::entry::e820FC0E8;  // sub_820FC0E8
 inline constexpr auto& Shutdown = lifted::entry::e820FBDC8;  // sub_820FBDC8
 }  // namespace game::ObjectPools
 
+namespace game::OpList {
+inline constexpr auto& BuyNode = lifted::entry::e820ACFF8;  // sub_820ACFF8
+inline constexpr auto& IncSize = lifted::entry::e820AD768;  // sub_820AD768
+}  // namespace game::OpList
+
 namespace game::Options {
 inline constexpr auto& AnalogPage = lifted::entry::e821C21A8;  // sub_821C21A8
 inline constexpr auto& AnalogPage2P = lifted::f821C2388;  // sub_821C2388
@@ -3071,7 +3197,11 @@ inline constexpr auto& EnterSliders2P = lifted::f821BDA38;  // sub_821BDA38
 inline constexpr auto& EnterSound = lifted::entry::e821BD908;  // sub_821BD908
 inline constexpr auto& FadeIn = lifted::entry::e821C7080;  // sub_821C7080
 inline constexpr auto& FadeOut = lifted::f821BD680;  // sub_821BD680
+inline constexpr auto& HasAnalogClash = lifted::entry::e821BAC78;  // sub_821BAC78
+inline constexpr auto& HasButtonClash = lifted::entry::e821BA890;  // sub_821BA890
 inline constexpr auto& HudPage = lifted::entry::e821C1270;  // sub_821C1270
+inline constexpr auto& IsAnalogTaken = lifted::entry::e821BAB58;  // sub_821BAB58
+inline constexpr auto& IsButtonTaken = lifted::entry::e821BA7E0;  // sub_821BA7E0
 inline constexpr auto& Leave = lifted::entry::e821BCF08;  // sub_821BCF08
 inline constexpr auto& LeaveAnalog = lifted::entry::e821C2A10;  // sub_821C2A10
 inline constexpr auto& LeaveButtons = lifted::entry::e821C2778;  // sub_821C2778
@@ -3095,6 +3225,7 @@ inline constexpr auto& OpenCategories = lifted::entry::e821BD468;  // sub_821BD4
 inline constexpr auto& OpenCategory = lifted::f821C7188;  // sub_821C7188
 inline constexpr auto& OpenMovie = lifted::entry::e821B9F88;  // sub_821B9F88
 inline constexpr auto& PlayMusicPreview = lifted::f821BA0F0;  // sub_821BA0F0
+inline constexpr auto& ResetNode = lifted::entry::e821BFA68;  // sub_821BFA68
 inline constexpr auto& ReturnToCategories = lifted::entry::e821BD5B0;  // sub_821BD5B0
 inline constexpr auto& SavePage = lifted::entry::e821C6F58;  // sub_821C6F58
 inline constexpr auto& SetHudArrow = lifted::f821BE4A0;  // sub_821BE4A0
@@ -3113,14 +3244,21 @@ inline constexpr auto& SetUpSlidersPage = lifted::entry::e821C51D0;  // sub_821C
 inline constexpr auto& SetUpSlidersPage2P = lifted::f821C5350;  // sub_821C5350
 inline constexpr auto& SetUpSoundPage = lifted::entry::e821C4FD0;  // sub_821C4FD0
 inline constexpr auto& Show = lifted::entry::e821C1158;  // sub_821C1158
+inline constexpr auto& ShowAnalogClashes = lifted::entry::e821BF698;  // sub_821BF698
 inline constexpr auto& ShowAnalogClashes2P = lifted::f821BF908;  // sub_821BF908
+inline constexpr auto& ShowAnalogList = lifted::entry::e821BF520;  // sub_821BF520
 inline constexpr auto& ShowAnalogList2P = lifted::f821BF7F8;  // sub_821BF7F8
+inline constexpr auto& ShowAnalogPicture = lifted::entry::e821BF630;  // sub_821BF630
+inline constexpr auto& ShowButtonClashes = lifted::entry::e821BF158;  // sub_821BF158
 inline constexpr auto& ShowButtonClashes2P = lifted::f821BF3C0;  // sub_821BF3C0
+inline constexpr auto& ShowButtonList = lifted::entry::e821BEFE8;  // sub_821BEFE8
 inline constexpr auto& ShowButtonList2P = lifted::f821BF2B8;  // sub_821BF2B8
+inline constexpr auto& ShowButtonPicture = lifted::entry::e821BF0F0;  // sub_821BF0F0
 inline constexpr auto& ShowCareerInfo = lifted::f821C0EF0;  // sub_821C0EF0
 inline constexpr auto& ShowCategory6Dialog = lifted::entry::e821C69D0;  // sub_821C69D0
 inline constexpr auto& ShowPrompts = lifted::entry::e821C1068;  // sub_821C1068
 inline constexpr auto& ShowSaveDialog = lifted::entry::e821C6638;  // sub_821C6638
+inline constexpr auto& ShowSlider = lifted::entry::e821BE988;  // sub_821BE988
 inline constexpr auto& ShowSliderMark = lifted::entry::e821BEA48;  // sub_821BEA48
 inline constexpr auto& ShowSliderMarks2P = lifted::f821BEED8;  // sub_821BEED8
 inline constexpr auto& ShowSliderNumbers2P = lifted::f821BEE48;  // sub_821BEE48
@@ -3128,6 +3266,9 @@ inline constexpr auto& ShowVolumeBar = lifted::entry::e821BE5A8;  // sub_821BE5A
 inline constexpr auto& SlidersPage = lifted::entry::e821C1888;  // sub_821C1888
 inline constexpr auto& SlidersPage2P = lifted::f821C1AA0;  // sub_821C1AA0
 inline constexpr auto& SoundPage = lifted::entry::e821C1498;  // sub_821C1498
+inline constexpr auto& StepAnalog = lifted::entry::e821BABD8;  // sub_821BABD8
+inline constexpr auto& StepButtons = lifted::entry::e821BA550;  // sub_821BA550
+inline constexpr auto& StepSliders = lifted::entry::e821BEAC8;  // sub_821BEAC8
 inline constexpr auto& StopMusicPreview = lifted::f821BA010;  // sub_821BA010
 inline constexpr auto& Update = lifted::entry::e821C81E8;  // sub_821C81E8
 inline constexpr auto& Wait = lifted::entry::e821BD3C8;  // sub_821BD3C8
@@ -3161,6 +3302,15 @@ inline constexpr auto& VehicleWord340 = lifted::entry::e82126AB0;  // sub_82126A
 namespace game::Overlays {
 inline constexpr auto& SetRenderTargets = lifted::entry::e82128190;  // sub_82128190
 }  // namespace game::Overlays
+
+namespace game::PacketList {
+inline constexpr auto& Clear = lifted::entry::e8246E060;  // sub_8246E060
+inline constexpr auto& Next = lifted::entry::e82466EA0;  // sub_82466EA0
+}  // namespace game::PacketList
+
+namespace game::PacketLists {
+inline constexpr auto& Clear = lifted::entry::e8246E0E8;  // sub_8246E0E8
+}  // namespace game::PacketLists
 
 namespace game::PaintPalette {
 inline constexpr auto& Init = lifted::entry::e820D2330;  // sub_820D2330
@@ -3308,6 +3458,9 @@ inline constexpr auto& PowerGraphPage = lifted::entry::e8224BDC0;  // sub_8224BD
 inline constexpr auto& RowsPage = lifted::entry::e8224A178;  // sub_8224A178
 inline constexpr auto& SaveData = lifted::entry::e82249668;  // sub_82249668
 inline constexpr auto& SetKind = lifted::f82249610;  // sub_82249610
+inline constexpr auto& SetUpCarPage = lifted::entry::e8224C560;  // sub_8224C560
+inline constexpr auto& SetUpColors = lifted::entry::e8224B248;  // sub_8224B248
+inline constexpr auto& SetUpRows = lifted::entry::e8224A978;  // sub_8224A978
 inline constexpr auto& ShowStandCar = lifted::entry::e8224A490;  // sub_8224A490
 inline constexpr auto& Step0 = lifted::entry::e8224A570;  // sub_8224A570
 inline constexpr auto& Step1 = lifted::entry::e8224A6A0;  // sub_8224A6A0
@@ -3438,6 +3591,9 @@ inline constexpr auto& Dtor = lifted::f82590C48;  // sub_82590C48
 }  // namespace game::PassList
 
 namespace game::Path {
+inline constexpr auto& Build = lifted::entry::e82593CA0;  // sub_82593CA0
+inline constexpr auto& Ctor = lifted::entry::e82593C28;  // sub_82593C28
+inline constexpr auto& Dtor = lifted::entry::e82593C48;  // sub_82593C48
 inline constexpr auto& Text = lifted::f82593C40;  // sub_82593C40
 }  // namespace game::Path
 
@@ -3457,6 +3613,7 @@ inline constexpr auto& MoveAdjust = lifted::entry::e8220E1F8;  // sub_8220E1F8
 inline constexpr auto& MoveMain = lifted::entry::e8220C7B8;  // sub_8220C7B8
 inline constexpr auto& MoveOptions = lifted::entry::e8220DD98;  // sub_8220DD98
 inline constexpr auto& MoveVolume = lifted::f8220DF30;  // sub_8220DF30
+inline constexpr auto& Open = lifted::entry::e8220FA88;  // sub_8220FA88
 inline constexpr auto& OpenAdjust = lifted::entry::e8220F788;  // sub_8220F788
 inline constexpr auto& OpenMain = lifted::entry::e8220ED90;  // sub_8220ED90
 inline constexpr auto& OpenOptions = lifted::entry::e8220EEF0;  // sub_8220EEF0
@@ -3484,6 +3641,7 @@ inline constexpr auto& Update = lifted::entry::e82211458;  // sub_82211458
 }  // namespace game::PauseMenu4
 
 namespace game::PcmCodec {
+inline constexpr auto& Dtor = lifted::entry::e8246CF50;  // sub_8246CF50
 inline constexpr auto& Process = lifted::entry::e8246D860;  // sub_8246D860
 inline constexpr auto& SetFormat = lifted::entry::e8246CFA8;  // sub_8246CFA8
 inline constexpr auto& SetPitch = lifted::entry::e8246D0C8;  // sub_8246D0C8
@@ -3522,14 +3680,24 @@ inline constexpr auto& Create = lifted::entry::e82198210;  // sub_82198210
 inline constexpr auto& Destroy = lifted::entry::e82198118;  // sub_82198118
 inline constexpr auto& InitStates = lifted::entry::e8219B2E8;  // sub_8219B2E8
 inline constexpr auto& LeavePage = lifted::entry::e82198988;  // sub_82198988
+inline constexpr auto& MarkField = lifted::entry::e82199AA8;  // sub_82199AA8
 inline constexpr auto& NumberPage = lifted::entry::e8219A138;  // sub_8219A138
 inline constexpr auto& OnMessage32 = lifted::entry::e82198190;  // sub_82198190
 inline constexpr auto& OpenMovie = lifted::entry::e82198180;  // sub_82198180
 inline constexpr auto& RegionPage = lifted::entry::e82199ED0;  // sub_82199ED0
+inline constexpr auto& SetUpCharsMenu = lifted::entry::e82199D88;  // sub_82199D88
 inline constexpr auto& SetUpConfirmMenu = lifted::f82199E48;  // sub_82199E48
+inline constexpr auto& SetUpNumberMenu = lifted::entry::e82199CC8;  // sub_82199CC8
+inline constexpr auto& SetUpRegionMenu = lifted::entry::e82199C10;  // sub_82199C10
+inline constexpr auto& ShowCharCells = lifted::entry::e82199488;  // sub_82199488
+inline constexpr auto& ShowCharLine = lifted::entry::e82199688;  // sub_82199688
 inline constexpr auto& ShowCharRow = lifted::f821995D8;  // sub_821995D8
+inline constexpr auto& ShowChars = lifted::entry::e82199990;  // sub_82199990
 inline constexpr auto& ShowConfirmCells = lifted::f821997E8;  // sub_821997E8
 inline constexpr auto& ShowDigitCells = lifted::entry::e82199350;  // sub_82199350
+inline constexpr auto& ShowDigits = lifted::entry::e821998F0;  // sub_821998F0
+inline constexpr auto& ShowRegion = lifted::entry::e82199898;  // sub_82199898
+inline constexpr auto& ShowRegionCells = lifted::entry::e821990D0;  // sub_821990D0
 inline constexpr auto& ShowRegionRow = lifted::f82199220;  // sub_82199220
 inline constexpr auto& Start = lifted::entry::e82199BB8;  // sub_82199BB8
 inline constexpr auto& Transition0 = lifted::entry::e8219A3A8;  // sub_8219A3A8
@@ -3565,9 +3733,11 @@ inline constexpr auto& Update = lifted::entry::e82112838;  // sub_82112838
 
 namespace game::PlayerControl {
 inline constexpr auto& ReadPad = lifted::entry::e8215FCA8;  // sub_8215FCA8
+inline constexpr auto& Update = lifted::entry::e821604C8;  // sub_821604C8
 }  // namespace game::PlayerControl
 
 namespace game::Players {
+inline constexpr auto& AssignController = lifted::entry::e8209F6B8;  // sub_8209F6B8
 inline constexpr auto& ResetControllers = lifted::entry::e8209F5E0;  // sub_8209F5E0
 inline constexpr auto& SignedInSlot = lifted::entry::e8209F658;  // sub_8209F658
 }  // namespace game::Players
@@ -3597,10 +3767,12 @@ inline constexpr auto& Dtor = lifted::entry::e825940B0;  // sub_825940B0
 }  // namespace game::PoolNode
 
 namespace game::PoolObject {
+inline constexpr auto& ClearLoadFlags = lifted::entry::e820FB998;  // sub_820FB998
 inline constexpr auto& DeletingDestructor = lifted::entry::e820DB400;  // sub_820DB400
 inline constexpr auto& InUse = lifted::entry::e820FB8E0;  // sub_820FB8E0
 inline constexpr auto& IsLoaded = lifted::entry::e820FB8F0;  // sub_820FB8F0
 inline constexpr auto& Key = lifted::entry::e820FB9F0;  // sub_820FB9F0
+inline constexpr auto& MarkLoaded = lifted::entry::e820FB9A8;  // sub_820FB9A8
 inline constexpr auto& Reset = lifted::entry::e820FB9D8;  // sub_820FB9D8
 }  // namespace game::PoolObject
 
@@ -3612,6 +3784,7 @@ inline constexpr auto& RecordPixelConstants = lifted::entry::e82133D00;  // sub_
 inline constexpr auto& RecordResolve = lifted::entry::e82133F58;  // sub_82133F58
 inline constexpr auto& RecordTargets = lifted::entry::e82133790;  // sub_82133790
 inline constexpr auto& RecordTexelSize = lifted::entry::e82133DD8;  // sub_82133DD8
+inline constexpr auto& ReleaseSurface = lifted::entry::e82133C60;  // sub_82133C60
 }  // namespace game::PostEffect
 
 namespace game::PostEffects {
@@ -3691,6 +3864,7 @@ inline constexpr auto& SetShaders = lifted::f825A16B0;  // sub_825A16B0
 }  // namespace game::PrimitiveDrawer
 
 namespace game::Progress {
+inline constexpr auto& AfterRace = lifted::entry::e82116588;  // sub_82116588
 inline constexpr auto& Clear = lifted::entry::e82113BD8;  // sub_82113BD8
 inline constexpr auto& Restart = lifted::f82114128;  // sub_82114128
 inline constexpr auto& SetDefaults = lifted::entry::e82113E60;  // sub_82113E60
@@ -3707,6 +3881,7 @@ namespace game::PtrList {
 inline constexpr auto& AllocateNodes = lifted::entry::e82099C08;  // sub_82099C08
 inline constexpr auto& Ctor = lifted::entry::e820AD058;  // sub_820AD058
 inline constexpr auto& Erase = lifted::entry::e82098E80;  // sub_82098E80
+inline constexpr auto& ForEach = lifted::entry::e820AD3A0;  // sub_820AD3A0
 inline constexpr auto& Insert = lifted::entry::e82095958;  // sub_82095958
 }  // namespace game::PtrList
 
@@ -3812,6 +3987,8 @@ inline constexpr auto& OnState7 = lifted::entry::e82160940;  // sub_82160940
 }  // namespace game::RaceFlow
 
 namespace game::RaceHud {
+inline constexpr auto& Draw = lifted::entry::e822128A8;  // sub_822128A8
+inline constexpr auto& DrawWarning = lifted::entry::e82212AC8;  // sub_82212AC8
 inline constexpr auto& GaugeFloat = lifted::f82214330;  // sub_82214330
 inline constexpr auto& GaugeInt119 = lifted::f822144B0;  // sub_822144B0
 inline constexpr auto& GaugeInt149 = lifted::f822145A0;  // sub_822145A0
@@ -3825,12 +4002,17 @@ inline constexpr auto& SetTach = lifted::entry::e82212D58;  // sub_82212D58
 inline constexpr auto& SetUpRacers = lifted::entry::e82213F20;  // sub_82213F20
 inline constexpr auto& SetUpTimer = lifted::entry::e822123C8;  // sub_822123C8
 inline constexpr auto& ShowGauge = lifted::entry::e82212D08;  // sub_82212D08
+inline constexpr auto& ShowItem = lifted::entry::e82213638;  // sub_82213638
 inline constexpr auto& StopCountdown = lifted::f82212888;  // sub_82212888
+inline constexpr auto& Tick = lifted::entry::e822153A0;  // sub_822153A0
 inline constexpr auto& TickRacers = lifted::entry::e822151F8;  // sub_822151F8
 inline constexpr auto& TickTimer = lifted::entry::e82214D78;  // sub_82214D78
+inline constexpr auto& Touching = lifted::entry::e82215820;  // sub_82215820
 inline constexpr auto& UpdateExtraGauges = lifted::entry::e82215160;  // sub_82215160
+inline constexpr auto& UpdateRacerBar = lifted::entry::e82214790;  // sub_82214790
 inline constexpr auto& UpdateRecordingFull = lifted::entry::e82212E60;  // sub_82212E60
 inline constexpr auto& UpdateSigns = lifted::entry::e82214718;  // sub_82214718
+inline constexpr auto& UpdateView = lifted::entry::e82212B68;  // sub_82212B68
 }  // namespace game::RaceHud
 
 namespace game::RaceHudMachine {
@@ -3991,12 +4173,14 @@ inline constexpr auto& TogglePause = lifted::entry::e8215C750;  // sub_8215C750
 }  // namespace game::RaceSceneMachine
 
 namespace game::RaceScreens {
+inline constexpr auto& DrawPauseMenu = lifted::entry::e82211D08;  // sub_82211D08
 inline constexpr auto& Make1004 = lifted::entry::e82216A60;  // sub_82216A60
 inline constexpr auto& MovieMask = lifted::entry::e82211BE8;  // sub_82211BE8
 inline constexpr auto& RunMovie18 = lifted::f8220B9E8;  // sub_8220B9E8
 }  // namespace game::RaceScreens
 
 namespace game::RaceSnapshot {
+inline constexpr auto& Copy = lifted::entry::e82104EA8;  // sub_82104EA8
 inline constexpr auto& Destroy = lifted::f82104630;  // sub_82104630
 }  // namespace game::RaceSnapshot
 
@@ -4096,7 +4280,12 @@ inline constexpr auto& Tick = lifted::entry::e82174BC0;  // sub_82174BC0
 inline constexpr auto& Unload = lifted::entry::e82171250;  // sub_82171250
 }  // namespace game::RaceWorld
 
+namespace game::RacerControl {
+inline constexpr auto& DriveByAi = lifted::entry::e8215F968;  // sub_8215F968
+}  // namespace game::RacerControl
+
 namespace game::RacerRecords {
+inline constexpr auto& Add = lifted::entry::e820FFE08;  // sub_820FFE08
 inline constexpr auto& At = lifted::entry::e820FFE58;  // sub_820FFE58
 }  // namespace game::RacerRecords
 
@@ -4134,6 +4323,11 @@ inline constexpr auto& Replaying = lifted::entry::e8258E618;  // sub_8258E618
 namespace game::RenderTexture {
 inline constexpr auto& Create = lifted::entry::e821330D0;  // sub_821330D0
 }  // namespace game::RenderTexture
+
+namespace game::RenderTextures {
+inline constexpr auto& Acquire = lifted::entry::e82133190;  // sub_82133190
+inline constexpr auto& Release = lifted::entry::e821332F0;  // sub_821332F0
+}  // namespace game::RenderTextures
 
 namespace game::Replay {
 inline constexpr auto& CopyFrom = lifted::entry::e821A66A8;  // sub_821A66A8
@@ -4251,9 +4445,11 @@ inline constexpr auto& PointVelocity = lifted::entry::e820B68C0;  // sub_820B68C
 inline constexpr auto& Position = lifted::entry::e820B67D8;  // sub_820B67D8
 inline constexpr auto& SetAngularVelocity = lifted::entry::e820B7500;  // sub_820B7500
 inline constexpr auto& SetCenterOfMassPosition = lifted::entry::e820B71B0;  // sub_820B71B0
+inline constexpr auto& SetFloat48 = lifted::entry::e8259D5A8;  // sub_8259D5A8
 inline constexpr auto& SetOrientation = lifted::entry::e820B71E8;  // sub_820B71E8
 inline constexpr auto& SetPosition = lifted::entry::e820B6710;  // sub_820B6710
 inline constexpr auto& SetVelocity = lifted::entry::e820B7238;  // sub_820B7238
+inline constexpr auto& Torque = lifted::entry::e82379328;  // sub_82379328
 inline constexpr auto& UpdateAngularVelocity = lifted::entry::e820B7478;  // sub_820B7478
 inline constexpr auto& UpdateOrientation = lifted::entry::e820B6F38;  // sub_820B6F38
 inline constexpr auto& UpdateOrigin = lifted::entry::e820B6E70;  // sub_820B6E70
@@ -4285,6 +4481,7 @@ inline constexpr auto& Before = lifted::entry::e82162E70;  // sub_82162E70
 
 namespace game::RowPanel {
 inline constexpr auto& Fill = lifted::entry::e8224F758;  // sub_8224F758
+inline constexpr auto& IsShown = lifted::entry::e8224F5E8;  // sub_8224F5E8
 inline constexpr auto& Refresh = lifted::entry::e8224F888;  // sub_8224F888
 inline constexpr auto& ShowFirst = lifted::f8224F158;  // sub_8224F158
 }  // namespace game::RowPanel
@@ -4323,7 +4520,12 @@ inline constexpr auto& Update = lifted::entry::e820A4610;  // sub_820A4610
 namespace game::SaveInterface {
 inline constexpr auto& Clear = lifted::f820A0008;  // sub_820A0008
 inline constexpr auto& Init = lifted::entry::e8209FFB8;  // sub_8209FFB8
+inline constexpr auto& Load = lifted::entry::e820A0510;  // sub_820A0510
+inline constexpr auto& Pending = lifted::entry::e820A0378;  // sub_820A0378
 inline constexpr auto& Request980 = lifted::f820A01B0;  // sub_820A01B0
+inline constexpr auto& SaveAt = lifted::entry::e820A0428;  // sub_820A0428
+inline constexpr auto& SaveCount = lifted::entry::e820A02C8;  // sub_820A02C8
+inline constexpr auto& SlotState = lifted::entry::e820A0018;  // sub_820A0018
 inline constexpr auto& Word84 = lifted::f820A0260;  // sub_820A0260
 inline constexpr auto& Word992 = lifted::f820A00F8;  // sub_820A00F8
 }  // namespace game::SaveInterface
@@ -4382,6 +4584,8 @@ inline constexpr auto& Page6 = lifted::entry::e821A32C0;  // sub_821A32C0
 inline constexpr auto& Page7 = lifted::entry::e821A33E8;  // sub_821A33E8
 inline constexpr auto& Page8 = lifted::entry::e821A3728;  // sub_821A3728
 inline constexpr auto& Page9 = lifted::entry::e821A4DE0;  // sub_821A4DE0
+inline constexpr auto& SetNote = lifted::entry::e821A52C0;  // sub_821A52C0
+inline constexpr auto& SetText = lifted::entry::e821A51C8;  // sub_821A51C8
 inline constexpr auto& Show = lifted::entry::e821A6608;  // sub_821A6608
 inline constexpr auto& ShowKind3 = lifted::f821A1E18;  // sub_821A1E18
 inline constexpr auto& ShowKind4 = lifted::f821A1ED8;  // sub_821A1ED8
@@ -4432,6 +4636,7 @@ inline constexpr auto& WriteFile = lifted::entry::e820A4D68;  // sub_820A4D68
 
 namespace game::SaveSlots {
 inline constexpr auto& Device = lifted::entry::e8228FA90;  // sub_8228FA90
+inline constexpr auto& OfController = lifted::entry::e8228F780;  // sub_8228F780
 inline constexpr auto& Pending = lifted::entry::e8228FAC8;  // sub_8228FAC8
 inline constexpr auto& RequestDevice = lifted::entry::e8228F9B0;  // sub_8228F9B0
 inline constexpr auto& State = lifted::entry::e8228F9E8;  // sub_8228F9E8
@@ -4515,6 +4720,7 @@ namespace game::ScenePools {
 inline constexpr auto& ClaimB = lifted::entry::e820C5AB0;  // sub_820C5AB0
 inline constexpr auto& CreateA = lifted::entry::e820C3FD8;  // sub_820C3FD8
 inline constexpr auto& FindModel = lifted::entry::e820C5D70;  // sub_820C5D70
+inline constexpr auto& GetB = lifted::entry::e820C5C20;  // sub_820C5C20
 inline constexpr auto& MakeA = lifted::entry::e820C3C40;  // sub_820C3C40
 inline constexpr auto& ReleaseA = lifted::entry::e820C4488;  // sub_820C4488
 inline constexpr auto& ReleaseB = lifted::entry::e820C5C88;  // sub_820C5C88
@@ -4626,6 +4832,7 @@ inline constexpr auto& Wait = lifted::entry::e82592670;  // sub_82592670
 }  // namespace game::Semaphore
 
 namespace game::Session {
+inline constexpr auto& Free = lifted::entry::e82292710;  // sub_82292710
 inline constexpr auto& IsActive = lifted::f82260908;  // sub_82260908
 inline constexpr auto& Release = lifted::entry::e82291670;  // sub_82291670
 }  // namespace game::Session
@@ -4695,6 +4902,7 @@ inline constexpr auto& LocalMatrices = lifted::entry::e82599C58;  // sub_82599C5
 inline constexpr auto& NodeCount = lifted::entry::e82599880;  // sub_82599880
 inline constexpr auto& ResetPose = lifted::entry::e82599AF0;  // sub_82599AF0
 inline constexpr auto& UpdateMatrices = lifted::entry::e825998A0;  // sub_825998A0
+inline constexpr auto& UpdateNodeMatrices = lifted::entry::e8259C3A8;  // sub_8259C3A8
 }  // namespace game::Skeleton
 
 namespace game::SkeletonBase {
@@ -4796,6 +5004,7 @@ inline constexpr auto& Copy = lifted::entry::e820FFD88;  // sub_820FFD88
 inline constexpr auto& HasNext = lifted::entry::e820FFA30;  // sub_820FFA30
 inline constexpr auto& HasRacer = lifted::entry::e820FFCF8;  // sub_820FFCF8
 inline constexpr auto& Racer = lifted::entry::e820FFC98;  // sub_820FFC98
+inline constexpr auto& Reset = lifted::entry::e82101860;  // sub_82101860
 inline constexpr auto& SetRoute = lifted::entry::e82101E90;  // sub_82101E90
 inline constexpr auto& SetType = lifted::entry::e820FFA50;  // sub_820FFA50
 inline constexpr auto& Type = lifted::entry::e820FFBE8;  // sub_820FFBE8
@@ -4814,6 +5023,7 @@ inline constexpr auto& Release = lifted::entry::e82180738;  // sub_82180738
 namespace game::StateLayer {
 inline constexpr auto& ApplyOp = lifted::entry::e820ADC60;  // sub_820ADC60
 inline constexpr auto& IsEmpty = lifted::entry::e820ACE50;  // sub_820ACE50
+inline constexpr auto& OnToggleOn = lifted::entry::e820AD4E0;  // sub_820AD4E0
 }  // namespace game::StateLayer
 
 namespace game::StateMachine {
@@ -4825,6 +5035,7 @@ inline constexpr auto& Handle = lifted::entry::e82106280;  // sub_82106280
 namespace game::Stats {
 inline constexpr auto& AddLoss = lifted::entry::e82113AB8;  // sub_82113AB8
 inline constexpr auto& AddOutcome3 = lifted::entry::e82113B50;  // sub_82113B50
+inline constexpr auto& AddPoints = lifted::entry::e82110B18;  // sub_82110B18
 inline constexpr auto& AddWin = lifted::entry::e821139B8;  // sub_821139B8
 inline constexpr auto& WinStreak = lifted::entry::e82110B10;  // sub_82110B10
 }  // namespace game::Stats
@@ -4837,8 +5048,14 @@ inline constexpr auto& _Xran = lifted::f825944B0;  // sub_825944B0
 namespace game::Std::string {
 inline constexpr auto& Ctor = lifted::entry::e825929E8;  // sub_825929E8
 inline constexpr auto& _Copy = lifted::entry::e82091458;  // sub_82091458
+inline constexpr auto& _Grow = lifted::entry::e82091540;  // sub_82091540
 inline constexpr auto& _Tidy = lifted::entry::e82091328;  // sub_82091328
 }  // namespace game::Std::string
+
+namespace game::SteerRecord {
+inline constexpr auto& Curve = lifted::entry::e820B3E98;  // sub_820B3E98
+inline constexpr auto& Fill = lifted::entry::e820B0668;  // sub_820B0668
+}  // namespace game::SteerRecord
 
 namespace game::String {
 inline constexpr auto& ReplaceAll = lifted::entry::e82593088;  // sub_82593088
@@ -4924,6 +5141,7 @@ inline constexpr auto& FindXprTexture = lifted::entry::e82594230;  // sub_825942
 inline constexpr auto& Get = lifted::entry::e825946B8;  // sub_825946B8
 inline constexpr auto& GetXprTexture = lifted::entry::e825941D0;  // sub_825941D0
 inline constexpr auto& InsertN = lifted::entry::e82590EF0;  // sub_82590EF0
+inline constexpr auto& Reserve = lifted::entry::e82594570;  // sub_82594570
 inline constexpr auto& Set = lifted::entry::e82594718;  // sub_82594718
 inline constexpr auto& UninitializedCopy = lifted::entry::e82594380;  // sub_82594380
 }  // namespace game::TextureProvider
@@ -4958,6 +5176,7 @@ inline constexpr auto& Add = lifted::entry::e820FF458;  // sub_820FF458
 inline constexpr auto& Clamp = lifted::f820FF790;  // sub_820FF790
 inline constexpr auto& Less = lifted::entry::e820FF708;  // sub_820FF708
 inline constexpr auto& Pack = lifted::entry::e82101700;  // sub_82101700
+inline constexpr auto& Sub = lifted::entry::e82162230;  // sub_82162230
 }  // namespace game::Time
 
 namespace game::Tire {
@@ -5101,11 +5320,13 @@ inline constexpr auto& WallHits = lifted::entry::e820FF1B0;  // sub_820FF1B0
 }  // namespace game::TrackCollision
 
 namespace game::TrackMesh {
+inline constexpr auto& FindSlice = lifted::entry::e820F6BE8;  // sub_820F6BE8
 inline constexpr auto& Free = lifted::entry::e820F6940;  // sub_820F6940
 inline constexpr auto& GroundHeight = lifted::entry::e820F7AA0;  // sub_820F7AA0
 inline constexpr auto& Load = lifted::f820F77A0;  // sub_820F77A0
 inline constexpr auto& OnLoaded = lifted::entry::e820F69B0;  // sub_820F69B0
 inline constexpr auto& Prepare = lifted::entry::e820F68E8;  // sub_820F68E8
+inline constexpr auto& SliceContains = lifted::entry::e820F6A38;  // sub_820F6A38
 }  // namespace game::TrackMesh
 
 namespace game::TrackPosition {
@@ -5118,6 +5339,7 @@ namespace game::TrackRoute {
 inline constexpr auto& ClampPosition = lifted::entry::e820F8420;  // sub_820F8420
 inline constexpr auto& Distance = lifted::entry::e820F9278;  // sub_820F9278
 inline constexpr auto& Free = lifted::entry::e820F8618;  // sub_820F8618
+inline constexpr auto& FromIndex = lifted::entry::e820AB498;  // sub_820AB498
 inline constexpr auto& LaneAt = lifted::entry::e820F8920;  // sub_820F8920
 inline constexpr auto& LanePoint = lifted::entry::e820F8668;  // sub_820F8668
 inline constexpr auto& Link = lifted::entry::e820F89F0;  // sub_820F89F0
@@ -5131,6 +5353,7 @@ inline constexpr auto& OnLoaded = lifted::entry::e820F9050;  // sub_820F9050
 inline constexpr auto& OnSlice = lifted::entry::e820FB1B8;  // sub_820FB1B8
 inline constexpr auto& PathDistance = lifted::entry::e820FA9D0;  // sub_820FA9D0
 inline constexpr auto& Prepare = lifted::entry::e820F8600;  // sub_820F8600
+inline constexpr auto& SectionOutcode = lifted::entry::e820F8EF0;  // sub_820F8EF0
 inline constexpr auto& SlicePoint = lifted::entry::e820F9768;  // sub_820F9768
 inline constexpr auto& SliceTest = lifted::entry::e820F8DE8;  // sub_820F8DE8
 inline constexpr auto& SpecialSection = lifted::entry::e820F8D38;  // sub_820F8D38
@@ -5220,6 +5443,9 @@ inline constexpr auto& AnimatePaint = lifted::f821F3A68;  // sub_821F3A68
 inline constexpr auto& AnimateSlots = lifted::f821EDCA8;  // sub_821EDCA8
 inline constexpr auto& DrawPowerGraph = lifted::entry::e821DF350;  // sub_821DF350
 inline constexpr auto& EquipChoice = lifted::entry::e821DF448;  // sub_821DF448
+inline constexpr auto& GetChoiceFlag = lifted::entry::e821CDC38;  // sub_821CDC38
+inline constexpr auto& GetCurrentChoice = lifted::entry::e821CD868;  // sub_821CD868
+inline constexpr auto& GetPrice = lifted::entry::e821CD160;  // sub_821CD160
 inline constexpr auto& HandleInput = lifted::entry::e821E6950;  // sub_821E6950
 inline constexpr auto& HideNode19 = lifted::entry::e821DFBE8;  // sub_821DFBE8
 inline constexpr auto& InputInteriorGrid = lifted::f821F1130;  // sub_821F1130
@@ -5235,12 +5461,16 @@ inline constexpr auto& InputPaint = lifted::f821F5288;  // sub_821F5288
 inline constexpr auto& InputPickSlot = lifted::f821F1780;  // sub_821F1780
 inline constexpr auto& InputRemoveSlot = lifted::f821F1AB8;  // sub_821F1AB8
 inline constexpr auto& IsItemAvailable = lifted::entry::e821CDB18;  // sub_821CDB18
+inline constexpr auto& IsPickOwned = lifted::entry::e821CCE30;  // sub_821CCE30
+inline constexpr auto& IsSlotAvailable = lifted::entry::e821CE188;  // sub_821CE188
 inline constexpr auto& LoadCurrentChoices = lifted::entry::e821DA4B0;  // sub_821DA4B0
 inline constexpr auto& LoadInteriorSlots = lifted::entry::e821DE280;  // sub_821DE280
 inline constexpr auto& LoadOwnedParts = lifted::entry::e821DBAB0;  // sub_821DBAB0
 inline constexpr auto& LoadUnlockedParts = lifted::entry::e821CFFC8;  // sub_821CFFC8
 inline constexpr auto& MoveOptionRow = lifted::f821D4540;  // sub_821D4540
 inline constexpr auto& OnDialogYes = lifted::entry::e821E2660;  // sub_821E2660
+inline constexpr auto& PageCursor = lifted::entry::e821CCD38;  // sub_821CCD38
+inline constexpr auto& PageItemCount = lifted::entry::e821CCDB0;  // sub_821CCDB0
 inline constexpr auto& PickCameraPreset = lifted::entry::e821D99A0;  // sub_821D99A0
 inline constexpr auto& PlaceInteriorMarks = lifted::f821F32C8;  // sub_821F32C8
 inline constexpr auto& PreviewItem = lifted::entry::e821E07B0;  // sub_821E07B0
@@ -5251,6 +5481,10 @@ inline constexpr auto& RefreshMovie14 = lifted::entry::e821F7A98;  // sub_821F7A
 inline constexpr auto& RefreshPaint = lifted::entry::e821F2110;  // sub_821F2110
 inline constexpr auto& SetAeroAvailability = lifted::entry::e821DE160;  // sub_821DE160
 inline constexpr auto& SetCarStats = lifted::entry::e821DF788;  // sub_821DF788
+inline constexpr auto& SetCurrentChoice = lifted::entry::e821E1DB0;  // sub_821E1DB0
+inline constexpr auto& SetLightKind0Bars = lifted::entry::e821EA130;  // sub_821EA130
+inline constexpr auto& SetLightKind1Bar = lifted::entry::e821EAE68;  // sub_821EAE68
+inline constexpr auto& SetPaintGradients = lifted::entry::e821E9488;  // sub_821E9488
 inline constexpr auto& SetPrices = lifted::entry::e821DAD58;  // sub_821DAD58
 inline constexpr auto& SetStateTexts = lifted::entry::e821F1DE0;  // sub_821F1DE0
 inline constexpr auto& SetUpCarData = lifted::entry::e821DF2F8;  // sub_821DF2F8
@@ -5395,6 +5629,7 @@ inline constexpr auto& FreeImage = lifted::entry::e8218D650;  // sub_8218D650
 inline constexpr auto& ImageLoaded = lifted::entry::e8218D8E8;  // sub_8218D8E8
 inline constexpr auto& InitStates = lifted::entry::e82190B18;  // sub_82190B18
 inline constexpr auto& MenuPage = lifted::entry::e8218FCC8;  // sub_8218FCC8
+inline constexpr auto& NextNotice2 = lifted::entry::e8218DD78;  // sub_8218DD78
 inline constexpr auto& NoticePage = lifted::entry::e8218E8F8;  // sub_8218E8F8
 inline constexpr auto& OnAnswer2 = lifted::f8218D6D8;  // sub_8218D6D8
 inline constexpr auto& OnDialogDone = lifted::entry::e8218F800;  // sub_8218F800
@@ -5409,6 +5644,8 @@ inline constexpr auto& Reenter = lifted::entry::e8218D9B8;  // sub_8218D9B8
 inline constexpr auto& Resume = lifted::f8218DE18;  // sub_8218DE18
 inline constexpr auto& SavePromptPage = lifted::f82190168;  // sub_82190168
 inline constexpr auto& SelectCarSettings = lifted::f8218F620;  // sub_8218F620
+inline constexpr auto& SetPrompts = lifted::entry::e8218F530;  // sub_8218F530
+inline constexpr auto& ShowNotice = lifted::entry::e821903D0;  // sub_821903D0
 inline constexpr auto& ShowNoticeImage = lifted::entry::e8218F3F8;  // sub_8218F3F8
 inline constexpr auto& Start = lifted::entry::e8218F6E0;  // sub_8218F6E0
 inline constexpr auto& Transition0 = lifted::entry::e821901C0;  // sub_821901C0
@@ -5563,6 +5800,7 @@ inline constexpr auto& PowerGraphPage = lifted::entry::e82234B80;  // sub_82234B
 inline constexpr auto& QuitPage = lifted::entry::e82234BF0;  // sub_82234BF0
 inline constexpr auto& SetUpCar = lifted::entry::e82233E80;  // sub_82233E80
 inline constexpr auto& Show = lifted::entry::e82233C80;  // sub_82233C80
+inline constexpr auto& ShowPage = lifted::entry::e822344A8;  // sub_822344A8
 inline constexpr auto& Suspend = lifted::f82233948;  // sub_82233948
 inline constexpr auto& Update = lifted::entry::e82234F08;  // sub_82234F08
 inline constexpr auto& WaitForMovie = lifted::entry::e82233B18;  // sub_82233B18
@@ -5836,6 +6074,7 @@ inline constexpr auto& FirstLine = lifted::entry::e8211C3F8;  // sub_8211C3F8
 inline constexpr auto& FixUpFile = lifted::entry::e825A0EF0;  // sub_825A0EF0
 inline constexpr auto& GetText = lifted::entry::e8211B660;  // sub_8211B660
 inline constexpr auto& HideNode = lifted::entry::e8211AC48;  // sub_8211AC48
+inline constexpr auto& IsNamedActive = lifted::entry::e8211BC18;  // sub_8211BC18
 inline constexpr auto& LineCount = lifted::entry::e8211C680;  // sub_8211C680
 inline constexpr auto& Load = lifted::entry::e8211E798;  // sub_8211E798
 inline constexpr auto& Loop = lifted::entry::e8211DDD8;  // sub_8211DDD8
@@ -5858,6 +6097,7 @@ inline constexpr auto& ScrollText = lifted::entry::e8211C570;  // sub_8211C570
 inline constexpr auto& SetCharText = lifted::f8211C2C8;  // sub_8211C2C8
 inline constexpr auto& SetChildNameText = lifted::entry::e8211D930;  // sub_8211D930
 inline constexpr auto& SetFirstLine = lifted::entry::e8211C370;  // sub_8211C370
+inline constexpr auto& SetFrames = lifted::entry::e82290B30;  // sub_82290B30
 inline constexpr auto& SetNodeCharText = lifted::entry::e8211C8A0;  // sub_8211C8A0
 inline constexpr auto& SetNodeColor = lifted::entry::e8211A5B8;  // sub_8211A5B8
 inline constexpr auto& SetNodeNumberText = lifted::entry::e8211CA18;  // sub_8211CA18
@@ -5885,6 +6125,7 @@ inline constexpr auto& Open = lifted::entry::e8211E808;  // sub_8211E808
 
 namespace game::UiNode {
 inline constexpr auto& CopyFields = lifted::f82119EA8;  // sub_82119EA8
+inline constexpr auto& SetRgb = lifted::entry::e821E7DA0;  // sub_821E7DA0
 }  // namespace game::UiNode
 
 namespace game::Unlock {
@@ -5919,6 +6160,7 @@ inline constexpr auto& Ctor = lifted::entry::e82130140;  // sub_82130140
 inline constexpr auto& Dtor = lifted::entry::e82131EE0;  // sub_82131EE0
 inline constexpr auto& Erase = lifted::entry::e82131DD8;  // sub_82131DD8
 inline constexpr auto& EraseSubtree = lifted::entry::e8212FD50;  // sub_8212FD50
+inline constexpr auto& Find = lifted::entry::e821301F0;  // sub_821301F0
 inline constexpr auto& Insert = lifted::entry::e82131680;  // sub_82131680
 inline constexpr auto& InsertUnique = lifted::entry::e82131CB8;  // sub_82131CB8
 inline constexpr auto& LowerBound = lifted::entry::e8212FFC8;  // sub_8212FFC8
@@ -5936,6 +6178,7 @@ inline constexpr auto& Ctor = lifted::entry::e82130198;  // sub_82130198
 inline constexpr auto& Decrement = lifted::entry::e8212FB28;  // sub_8212FB28
 inline constexpr auto& Erase = lifted::entry::e82132BD8;  // sub_82132BD8
 inline constexpr auto& EraseSubtree = lifted::entry::e82132720;  // sub_82132720
+inline constexpr auto& Find = lifted::entry::e82130290;  // sub_82130290
 inline constexpr auto& Insert = lifted::entry::e82131FB0;  // sub_82131FB0
 inline constexpr auto& InsertUnique = lifted::entry::e821321F8;  // sub_821321F8
 inline constexpr auto& LowerBound = lifted::entry::e82130028;  // sub_82130028
@@ -5957,6 +6200,7 @@ inline constexpr auto& EncodeRow = lifted::f823EF198;  // sub_823EF198
 namespace game::Vec3 {
 inline constexpr auto& Add = lifted::entry::e82294028;  // sub_82294028
 inline constexpr auto& AddTo = lifted::entry::e82294320;  // sub_82294320
+inline constexpr auto& Cross = lifted::entry::e82294518;  // sub_82294518
 inline constexpr auto& CrossW1 = lifted::entry::e82294108;  // sub_82294108
 inline constexpr auto& Difference = lifted::entry::e822942E0;  // sub_822942E0
 inline constexpr auto& Direction = lifted::entry::e82294200;  // sub_82294200
@@ -5965,6 +6209,7 @@ inline constexpr auto& DotOf = lifted::entry::e82294608;  // sub_82294608
 inline constexpr auto& Length = lifted::entry::e82294270;  // sub_82294270
 inline constexpr auto& Lerp = lifted::entry::e82294568;  // sub_82294568
 inline constexpr auto& Normalize = lifted::entry::e822941B0;  // sub_822941B0
+inline constexpr auto& NormalizeSelf = lifted::entry::e82294298;  // sub_82294298
 inline constexpr auto& Sub = lifted::entry::e82294068;  // sub_82294068
 inline constexpr auto& Sum = lifted::entry::e822942A0;  // sub_822942A0
 inline constexpr auto& SwapXZ = lifted::entry::e820AB688;  // sub_820AB688
@@ -5974,6 +6219,7 @@ namespace game::Vec4 {
 inline constexpr auto& Copy = lifted::entry::e822940E0;  // sub_822940E0
 inline constexpr auto& DivideBy = lifted::entry::e82294348;  // sub_82294348
 inline constexpr auto& Equal = lifted::entry::e82123300;  // sub_82123300
+inline constexpr auto& ScaleBy = lifted::entry::e82294340;  // sub_82294340
 inline constexpr auto& ScaleTo = lifted::entry::e822940A8;  // sub_822940A8
 inline constexpr auto& Scaled = lifted::entry::e82294430;  // sub_82294430
 inline constexpr auto& Transform = lifted::entry::e820AB560;  // sub_820AB560
@@ -6029,6 +6275,7 @@ inline constexpr auto& UpdateDrivenAxle = lifted::entry::e820B31D0;  // sub_820B
 inline constexpr auto& UpdateFreeAxle = lifted::entry::e820B3010;  // sub_820B3010
 inline constexpr auto& UpdateGearbox = lifted::entry::e820B4CF0;  // sub_820B4CF0
 inline constexpr auto& UpdateWheelSuspension = lifted::entry::e820B5588;  // sub_820B5588
+inline constexpr auto& WheelContact = lifted::entry::e820C0170;  // sub_820C0170
 inline constexpr auto& WheelSlip = lifted::entry::e820C0180;  // sub_820C0180
 }  // namespace game::Vehicle
 
@@ -6161,6 +6408,10 @@ inline constexpr auto& Skip = lifted::entry::e82090E08;  // sub_82090E08
 inline constexpr auto& Started = lifted::entry::e82090DE8;  // sub_82090DE8
 }  // namespace game::WorkItem
 
+namespace game::WorkMem {
+inline constexpr auto& AllocVertexBuffer = lifted::entry::e8258A9E8;  // sub_8258A9E8
+}  // namespace game::WorkMem
+
 namespace game::WorkerPool {
 inline constexpr auto& Create = lifted::f82095620;  // sub_82095620
 }  // namespace game::WorkerPool
@@ -6176,6 +6427,12 @@ inline constexpr auto& EmitterAngle = lifted::f82480780;  // sub_82480780
 inline constexpr auto& EvaluateCurve = lifted::entry::e82480818;  // sub_82480818
 inline constexpr auto& Pan = lifted::entry::e82480F80;  // sub_82480F80
 }  // namespace game::X3DAudio
+
+namespace game::X3DVec {
+inline constexpr auto& Cross = lifted::entry::e82481A18;  // sub_82481A18
+inline constexpr auto& Dot = lifted::entry::e824819B8;  // sub_824819B8
+inline constexpr auto& Sub = lifted::entry::e824819E0;  // sub_824819E0
+}  // namespace game::X3DVec
 
 namespace game::X4R4G4B4Codec {
 inline constexpr auto& DecodeRow = lifted::f823F3410;  // sub_823F3410
@@ -6217,6 +6474,7 @@ inline constexpr auto& FindVariable = lifted::entry::e825C5758;  // sub_825C5758
 inline constexpr auto& GetProperties = lifted::f825C5790;  // sub_825C5790
 inline constexpr auto& GetState = lifted::f825C4E30;  // sub_825C4E30
 inline constexpr auto& GetStateInternal = lifted::entry::e825C4D90;  // sub_825C4D90
+inline constexpr auto& GetVariable = lifted::entry::e825C5960;  // sub_825C5960
 inline constexpr auto& MakeInstanceVariable = lifted::entry::e825C5E28;  // sub_825C5E28
 inline constexpr auto& Notify = lifted::f825C4A98;  // sub_825C4A98
 inline constexpr auto& OnPlay = lifted::f825C5680;  // sub_825C5680
@@ -6232,6 +6490,7 @@ inline constexpr auto& UpdateVolume = lifted::f825C5610;  // sub_825C5610
 }  // namespace game::XACTCue
 
 namespace game::XACTCueBase {
+inline constexpr auto& Ctor = lifted::entry::e825C5E58;  // sub_825C5E58
 inline constexpr auto& Dtor = lifted::f825C6148;  // sub_825C6148
 }  // namespace game::XACTCueBase
 
@@ -6246,13 +6505,18 @@ inline constexpr auto& DoWork = lifted::f825C1990;  // sub_825C1990
 inline constexpr auto& GetCategory = lifted::f825C00F0;  // sub_825C00F0
 inline constexpr auto& Initialize = lifted::f825BFF38;  // sub_825BFF38
 inline constexpr auto& Pause = lifted::f825C1090;  // sub_825C1090
+inline constexpr auto& RequestCommit = lifted::entry::e825D1C78;  // sub_825D1C78
 inline constexpr auto& SendNotification = lifted::entry::e825C1388;  // sub_825C1388
 inline constexpr auto& SetVolume = lifted::f825C0178;  // sub_825C0178
 }  // namespace game::XACTEngine
 
 namespace game::XACTEvent {
 inline constexpr auto& Cancel = lifted::f825D1830;  // sub_825D1830
-inline constexpr auto& Dtor = lifted::f825D17E0;  // sub_825D17E0
+inline constexpr auto& Ctor = lifted::entry::e825D1760;  // sub_825D1760
+inline constexpr auto& Done = lifted::entry::e825D13F0;  // sub_825D13F0
+inline constexpr auto& Dtor_825D0EF0 = lifted::entry::e825D0EF0;  // sub_825D0EF0
+inline constexpr auto& Dtor_825D17E0 = lifted::f825D17E0;  // sub_825D17E0
+inline constexpr auto& Fire = lifted::entry::e825D1358;  // sub_825D1358
 inline constexpr auto& GetStartTime = lifted::f825D18F0;  // sub_825D18F0
 inline constexpr auto& Prepare = lifted::f825D17D0;  // sub_825D17D0
 inline constexpr auto& ResetTimes = lifted::f825D0E78;  // sub_825D0E78
@@ -6302,6 +6566,7 @@ inline constexpr auto& Alloc = lifted::entry::e825C2CC8;  // sub_825C2CC8
 inline constexpr auto& Ctor = lifted::entry::e825C2060;  // sub_825C2060
 inline constexpr auto& Free = lifted::entry::e825C2C60;  // sub_825C2C60
 inline constexpr auto& FreeChunks = lifted::entry::e825C1F30;  // sub_825C1F30
+inline constexpr auto& PushBack = lifted::entry::e825C60C0;  // sub_825C60C0
 }  // namespace game::XACTNodePool
 
 namespace game::XACTPlayWaveEvent {
@@ -6360,10 +6625,12 @@ inline constexpr auto& AudioUpdate = lifted::f825CBD10;  // sub_825CBD10
 inline constexpr auto& CheckInstanceLimit = lifted::f825CAAC0;  // sub_825CAAC0
 inline constexpr auto& Ctor = lifted::f825CB958;  // sub_825CB958
 inline constexpr auto& Dtor = lifted::f825CAE90;  // sub_825CAE90
+inline constexpr auto& GetPitch = lifted::entry::e825CAC48;  // sub_825CAC48
 inline constexpr auto& GetVolume = lifted::entry::e825CB5E8;  // sub_825CB5E8
 inline constexpr auto& OnCueGone = lifted::f825CAFD8;  // sub_825CAFD8
 inline constexpr auto& Pause = lifted::f825CA6F8;  // sub_825CA6F8
 inline constexpr auto& Play = lifted::f825CBB28;  // sub_825CBB28
+inline constexpr auto& ScheduleEvent = lifted::entry::e825CB0C8;  // sub_825CB0C8
 inline constexpr auto& SetState = lifted::f825CB1A8;  // sub_825CB1A8
 inline constexpr auto& SetTrackParameter = lifted::entry::e825CA980;  // sub_825CA980
 inline constexpr auto& SetUpRpcs = lifted::entry::e825CB470;  // sub_825CB470
@@ -6430,10 +6697,13 @@ inline constexpr auto& Update = lifted::f825D46E8;  // sub_825D46E8
 
 namespace game::XACTTrack {
 inline constexpr auto& AudioUpdate = lifted::entry::e825D0D88;  // sub_825D0D88
+inline constexpr auto& CreateInstance = lifted::entry::e825D02F8;  // sub_825D02F8
 inline constexpr auto& CreateNextInstance = lifted::f825D0B08;  // sub_825D0B08
 inline constexpr auto& CreateRpcs = lifted::entry::e825D06B8;  // sub_825D06B8
 inline constexpr auto& Ctor = lifted::entry::e825D0CE0;  // sub_825D0CE0
 inline constexpr auto& Dtor = lifted::entry::e825D0978;  // sub_825D0978
+inline constexpr auto& GetPitch = lifted::entry::e825D02B0;  // sub_825D02B0
+inline constexpr auto& GetVolume = lifted::entry::e825D0268;  // sub_825D0268
 inline constexpr auto& HasReleaseRpc = lifted::f825D05C0;  // sub_825D05C0
 inline constexpr auto& IsBusy = lifted::entry::e825D0590;  // sub_825D0590
 inline constexpr auto& Pause = lifted::entry::e825D05A8;  // sub_825D05A8
@@ -6450,6 +6720,7 @@ inline constexpr auto& SetPitch = lifted::f825D0C78;  // sub_825D0C78
 inline constexpr auto& SetReverbSend = lifted::f825D0490;  // sub_825D0490
 inline constexpr auto& SetRpcPitch = lifted::f825D06A0;  // sub_825D06A0
 inline constexpr auto& SetRpcVolume = lifted::f825D0670;  // sub_825D0670
+inline constexpr auto& SetVolume = lifted::entry::e825D0BF8;  // sub_825D0BF8
 inline constexpr auto& StartRpcs = lifted::entry::e825D0800;  // sub_825D0800
 inline constexpr auto& Stop = lifted::entry::e825D01D8;  // sub_825D01D8
 inline constexpr auto& SwitchInstance = lifted::f825D0B70;  // sub_825D0B70
@@ -6462,8 +6733,10 @@ inline constexpr auto& UsesWaveBank = lifted::f825D03B0;  // sub_825D03B0
 namespace game::XACTTrackInstance {
 inline constexpr auto& AddHelper = lifted::f825D5DE8;  // sub_825D5DE8
 inline constexpr auto& CancelEvents = lifted::entry::e825D5520;  // sub_825D5520
+inline constexpr auto& CheckDone = lifted::entry::e825D55E0;  // sub_825D55E0
 inline constexpr auto& Ctor = lifted::entry::e825D57D0;  // sub_825D57D0
 inline constexpr auto& Dtor = lifted::entry::e825D5E58;  // sub_825D5E58
+inline constexpr auto& Play = lifted::entry::e825D5980;  // sub_825D5980
 inline constexpr auto& Prepare = lifted::entry::e825D5A48;  // sub_825D5A48
 inline constexpr auto& RemoveHelper = lifted::f825D5E08;  // sub_825D5E08
 inline constexpr auto& SetChannelMatrix = lifted::f825D5758;  // sub_825D5758
@@ -6473,6 +6746,8 @@ inline constexpr auto& SetOutputVoices = lifted::f825D56D8;  // sub_825D56D8
 inline constexpr auto& SetOutputs = lifted::f825D5718;  // sub_825D5718
 inline constexpr auto& SetPitch = lifted::f825D56B8;  // sub_825D56B8
 inline constexpr auto& SetReverbSend = lifted::f825D5698;  // sub_825D5698
+inline constexpr auto& SetVolume = lifted::entry::e825D5678;  // sub_825D5678
+inline constexpr auto& Stop = lifted::entry::e825D5D18;  // sub_825D5D18
 inline constexpr auto& UsesWaveBank = lifted::f825D5620;  // sub_825D5620
 }  // namespace game::XACTTrackInstance
 
@@ -6525,12 +6800,17 @@ inline constexpr auto& SubmitPacket = lifted::entry::e825C9E08;  // sub_825C9E08
 
 namespace game::XACTWave {
 inline constexpr auto& AudioUpdate = lifted::entry::e825D2560;  // sub_825D2560
-inline constexpr auto& Dtor = lifted::f825D2A48;  // sub_825D2A48
+inline constexpr auto& Ctor = lifted::entry::e825D23F0;  // sub_825D23F0
+inline constexpr auto& Dtor_825D29E8 = lifted::entry::e825D29E8;  // sub_825D29E8
+inline constexpr auto& Dtor_825D2A48 = lifted::f825D2A48;  // sub_825D2A48
 inline constexpr auto& GetDurationMs = lifted::f825D2380;  // sub_825D2380
 inline constexpr auto& GetLengthMs = lifted::f825D2300;  // sub_825D2300
+inline constexpr auto& GetStartPosition = lifted::entry::e825D2170;  // sub_825D2170
 inline constexpr auto& Notify = lifted::entry::e825D2030;  // sub_825D2030
 inline constexpr auto& OnBankEvent = lifted::f825D24B0;  // sub_825D24B0
 inline constexpr auto& Pause = lifted::entry::e825D1ED8;  // sub_825D1ED8
+inline constexpr auto& PrepareNext = lifted::entry::e825D2778;  // sub_825D2778
+inline constexpr auto& Release = lifted::entry::e825D28D0;  // sub_825D28D0
 inline constexpr auto& RequestNext = lifted::entry::e825D1C30;  // sub_825D1C30
 inline constexpr auto& RequestNotify = lifted::f825D1C50;  // sub_825D1C50
 inline constexpr auto& SetChannelMatrix = lifted::f825D1DD0;  // sub_825D1DD0
@@ -6540,6 +6820,8 @@ inline constexpr auto& SetOutputVoices = lifted::f825D1D50;  // sub_825D1D50
 inline constexpr auto& SetOutputs = lifted::f825D1D90;  // sub_825D1D90
 inline constexpr auto& SetPitch = lifted::f825D1D30;  // sub_825D1D30
 inline constexpr auto& SetReverbSend = lifted::f825D1CE8;  // sub_825D1CE8
+inline constexpr auto& SetState = lifted::entry::e825D24D8;  // sub_825D24D8
+inline constexpr auto& SetVoice = lifted::entry::e825D1DF8;  // sub_825D1DF8
 inline constexpr auto& StopCue = lifted::f825D43F0;  // sub_825D43F0
 }  // namespace game::XACTWave
 
@@ -6570,13 +6852,23 @@ inline constexpr auto& Dtor = lifted::f825CEC38;  // sub_825CEC38
 }  // namespace game::XACTWaveBankBase
 
 namespace game::XACTWaveBankRoot {
+inline constexpr auto& Ctor = lifted::entry::e825CC620;  // sub_825CC620
 inline constexpr auto& Dtor = lifted::f825CC6D0;  // sub_825CC6D0
 }  // namespace game::XACTWaveBankRoot
 
 namespace game::XACTWaveEntry {
+inline constexpr auto& Ctor = lifted::entry::e825CED88;  // sub_825CED88
 inline constexpr auto& FindXmaBlock = lifted::entry::e825CEF50;  // sub_825CEF50
+inline constexpr auto& GetDuration = lifted::entry::e825CEE00;  // sub_825CEE00
+inline constexpr auto& GetFormatTag = lifted::entry::e825CEE28;  // sub_825CEE28
 inline constexpr auto& GetLoopLength = lifted::entry::e82379D50;  // sub_82379D50
+inline constexpr auto& GetLoopLengthBytes = lifted::entry::e825CF288;  // sub_825CF288
+inline constexpr auto& GetLoopStart = lifted::entry::e820A8958;  // sub_820A8958
+inline constexpr auto& GetLoopStartBytes = lifted::entry::e825CF210;  // sub_825CF210
 inline constexpr auto& GetPlayLength = lifted::f82099BA0;  // sub_82099BA0
+inline constexpr auto& HasLoopRegion = lifted::entry::e825CEE10;  // sub_825CEE10
+inline constexpr auto& SamplesToBytes = lifted::entry::e825CF080;  // sub_825CF080
+inline constexpr auto& Set = lifted::entry::e825CED98;  // sub_825CED98
 }  // namespace game::XACTWaveEntry
 
 namespace game::XACTWaveEventBase {
@@ -6602,8 +6894,10 @@ inline constexpr auto& Stop = lifted::f825D7848;  // sub_825D7848
 
 namespace game::XAudio {
 inline constexpr auto& AddStat = lifted::entry::e8245F640;  // sub_8245F640
+inline constexpr auto& Alloc = lifted::entry::e8245EF80;  // sub_8245EF80
 inline constexpr auto& Commit = lifted::entry::e8245A6E8;  // sub_8245A6E8
 inline constexpr auto& CreateEngine = lifted::entry::e82459D60;  // sub_82459D60
+inline constexpr auto& Free = lifted::entry::e8245EF90;  // sub_8245EF90
 inline constexpr auto& GetAllocator = lifted::entry::e82460688;  // sub_82460688
 inline constexpr auto& MasterThread = lifted::entry::e8245BE08;  // sub_8245BE08
 inline constexpr auto& MixerCallback = lifted::entry::e8245FBE0;  // sub_8245FBE0
@@ -6615,6 +6909,7 @@ inline constexpr auto& WorkerThread = lifted::entry::e8245BED0;  // sub_8245BED0
 namespace game::XAudioAllocator {
 inline constexpr auto& Alloc = lifted::entry::e82460288;  // sub_82460288
 inline constexpr auto& Commit = lifted::f82460210;  // sub_82460210
+inline constexpr auto& Dtor = lifted::entry::e824602F8;  // sub_824602F8
 inline constexpr auto& Remaining = lifted::entry::e82460388;  // sub_82460388
 inline constexpr auto& Reserve = lifted::f824601F8;  // sub_824601F8
 }  // namespace game::XAudioAllocator
@@ -6623,6 +6918,7 @@ namespace game::XAudioBuffer {
 inline constexpr auto& ClearThunk = lifted::entry::e8245FA10;  // sub_8245FA10
 inline constexpr auto& Create = lifted::entry::e8245FA80;  // sub_8245FA80
 inline constexpr auto& GetFormatThunk = lifted::entry::e8245F718;  // sub_8245F718
+inline constexpr auto& ReleaseThunk = lifted::entry::e8245F6D0;  // sub_8245F6D0
 inline constexpr auto& Size = lifted::entry::e8245FA28;  // sub_8245FA28
 }  // namespace game::XAudioBuffer
 
@@ -6676,12 +6972,14 @@ inline constexpr auto& Release = lifted::entry::e8246CE70;  // sub_8246CE70
 namespace game::XAudioSourceVoice {
 inline constexpr auto& ApplyVolume = lifted::entry::e8245DFC0;  // sub_8245DFC0
 inline constexpr auto& DeletingDestructor = lifted::entry::e8245E7A0;  // sub_8245E7A0
+inline constexpr auto& FlushPackets = lifted::entry::e8245A208;  // sub_8245A208
 inline constexpr auto& GetState = lifted::entry::e8245DDC8;  // sub_8245DDC8
 inline constexpr auto& Pass = lifted::entry::e8245DED0;  // sub_8245DED0
 inline constexpr auto& Reset = lifted::entry::e8245A0B0;  // sub_8245A0B0
 inline constexpr auto& SetFormat = lifted::entry::e82459FF8;  // sub_82459FF8
 inline constexpr auto& Start = lifted::entry::e8245EBA0;  // sub_8245EBA0
 inline constexpr auto& Stop = lifted::entry::e8245E9F0;  // sub_8245E9F0
+inline constexpr auto& SubmitPacket = lifted::entry::e8245A050;  // sub_8245A050
 }  // namespace game::XAudioSourceVoice
 
 namespace game::XAudioStage {
@@ -6702,6 +7000,7 @@ inline constexpr auto& AddRef_8245F860 = lifted::entry::e8245F860;  // sub_8245F
 inline constexpr auto& BaseSize = lifted::entry::e82461158;  // sub_82461158
 inline constexpr auto& Construct = lifted::entry::e82461500;  // sub_82461500
 inline constexpr auto& Deactivate = lifted::entry::e82460D50;  // sub_82460D50
+inline constexpr auto& Destroy = lifted::entry::e82461240;  // sub_82461240
 inline constexpr auto& EngineBuffer = lifted::entry::e8245DEB0;  // sub_8245DEB0
 inline constexpr auto& GetCallbackContext = lifted::f8245E308;  // sub_8245E308
 inline constexpr auto& GetEffectEnabled = lifted::f82461490;  // sub_82461490
@@ -6718,12 +7017,16 @@ inline constexpr auto& ReleaseOutputs = lifted::entry::e82460A58;  // sub_82460A
 inline constexpr auto& Release_82459E18 = lifted::entry::e82459E18;  // sub_82459E18
 inline constexpr auto& Release_8245F878 = lifted::entry::e8245F878;  // sub_8245F878
 inline constexpr auto& SetEffectEnabled = lifted::f824614C8;  // sub_824614C8
-inline constexpr auto& SetEffectParameters = lifted::entry::e82461418;  // sub_82461418
+inline constexpr auto& SetEffectParameters_82459E80 = lifted::entry::e82459E80;  // sub_82459E80
+inline constexpr auto& SetEffectParameters_82461418 = lifted::entry::e82461418;  // sub_82461418
+inline constexpr auto& SetFormat = lifted::entry::e82460778;  // sub_82460778
 inline constexpr auto& SetFormatWords = lifted::entry::e82461140;  // sub_82461140
 inline constexpr auto& SetOutputMatrices = lifted::entry::e82460AB8;  // sub_82460AB8
 inline constexpr auto& SetOutputMatrix = lifted::entry::e82459F48;  // sub_82459F48
 inline constexpr auto& SetOutputVoices_82459EF0 = lifted::entry::e82459EF0;  // sub_82459EF0
 inline constexpr auto& SetOutputVoices_82460BF0 = lifted::entry::e82460BF0;  // sub_82460BF0
+inline constexpr auto& Start = lifted::entry::e8245A168;  // sub_8245A168
+inline constexpr auto& Stop = lifted::entry::e8245A1B0;  // sub_8245A1B0
 inline constexpr auto& StopOrTail = lifted::entry::e824619B0;  // sub_824619B0
 }  // namespace game::XAudioVoice
 
@@ -6739,6 +7042,7 @@ inline constexpr auto& Release_825970A8 = lifted::entry::e825970A8;  // sub_8259
 }  // namespace game::XPR
 
 namespace game::XmaCodec {
+inline constexpr auto& Dtor = lifted::entry::e8246AAD0;  // sub_8246AAD0
 inline constexpr auto& SetPitch = lifted::entry::e8246AC40;  // sub_8246AC40
 inline constexpr auto& SetVolume = lifted::entry::e8246AB48;  // sub_8246AB48
 inline constexpr auto& SubmitPacket = lifted::f8246A7D0;  // sub_8246A7D0

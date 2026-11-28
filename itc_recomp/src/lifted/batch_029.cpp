@@ -3876,7 +3876,7 @@ loc_8211F5A8:
   guest::StoreU32(uint32_t(r31) + 4, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F5D8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F5D8, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -3891,7 +3891,7 @@ loc_8211F5A8:
   guest::StoreU32(uint32_t(r31) + 56, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F5F0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F5F0, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -3906,7 +3906,7 @@ loc_8211F5A8:
   guest::StoreU32(uint32_t(r31) + 60, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F608, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F608, r31)); r3 = o.r3; f1 = o.f1; }
   // fmuls f0,f1,f29
   lifted::ScalarFloatMode();
   f0 = double(float(f1 * f29));
@@ -4181,7 +4181,7 @@ loc_8211F770:
   guest::StoreU32(uint32_t(r31) + 4, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F7A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F7A0, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -4196,7 +4196,7 @@ loc_8211F770:
   guest::StoreU32(uint32_t(r31) + 56, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F7B8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F7B8, r31)); r3 = o.r3; f1 = o.f1; }
   // fmr f0,f1
   lifted::ScalarFloatMode();
   f0 = f1;
@@ -4211,7 +4211,7 @@ loc_8211F770:
   guest::StoreU32(uint32_t(r31) + 60, temp.u32);
   // bl 0x8211f118
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211F118, LIFTED_ARGS(0x8211F7D0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RandomRange(LIFTED_ARGS(0x8211F7D0, r31)); r3 = o.r3; f1 = o.f1; }
   // fmuls f0,f1,f29
   lifted::ScalarFloatMode();
   f0 = double(float(f1 * f29));
@@ -14104,7 +14104,7 @@ loc_821811EC:
   r3 = schema::StandHolder(uint32_t(r11)).stage_block_0_bits();
   // bl 0x82179a60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82179A60, LIFTED_ARGS(0x82181258, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::CarData::FromGarageCar(LIFTED_ARGS(0x82181258, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,2000
   r1 = uint64_t(int64_t(int64_t(r1) + 2000));
   // lwz r12,-8(r1)
@@ -14201,7 +14201,7 @@ loc_821811EC_8218119C:
   r3 = guest::LoadU32(uint32_t(r11) + 0);
   // bl 0x82179a60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82179A60, LIFTED_ARGS(0x82181258, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::CarData::FromGarageCar(LIFTED_ARGS(0x82181258, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,2000
   r1 = uint64_t(int64_t(int64_t(r1) + 2000));
   // lwz r12,-8(r1)
@@ -16778,7 +16778,7 @@ loc_82214424:
   f1 = f30;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x82214444, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x82214444, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -16940,7 +16940,7 @@ loc_82214500:
   f1 = f31;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x82214544, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x82214544, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -17092,7 +17092,7 @@ loc_822145F0:
   f1 = f31;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x82214634, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x82214634, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -17367,7 +17367,7 @@ loc_82216F4C:
   f1 = f31;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x82216F90, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x82216F90, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -17590,7 +17590,7 @@ loc_822170DC:
   f1 = f30;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x822170FC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x822170FC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -17765,7 +17765,7 @@ loc_822171D0:
   f1 = f31;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x82217214, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x82217214, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -17930,7 +17930,7 @@ loc_822172D8:
   f1 = f31;
   // bl 0x82213c40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82213C40, LIFTED_ARGS(0x8221731C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::PowInt(LIFTED_ARGS(0x8221731C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,80
   r11 = uint64_t(int64_t(int64_t(r1) + 80));
   // fctiwz f0,f1
@@ -41749,7 +41749,7 @@ loc_82421FE4:
   r5 = uint64_t(int64_t(1));
   // bl 0x82420f50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82420F50, LIFTED_ARGS(0x82421FEC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::DxtColor::EncodeBlock(LIFTED_ARGS(0x82421FEC, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82421ff8

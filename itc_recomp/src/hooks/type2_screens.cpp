@@ -738,3 +738,20 @@ ITC_TYPE2_SCREENS(82198FB8, PlateTransition19)
 // their callers in play are native (the transitions never seen in play
 // reach the originals), the flag switches those; their steps above are the
 // harness's.
+
+// For the fallback originals (docs/missing-functions.md): the hub's and the
+// license plate editor's helpers the lifted batches call by address, through
+// their steps above (the ports with r1 and, where they take one, r3).
+ITC_DIRECT_ENTRY(8218DD78) { hooks::HubNextNotice2(ctx); }
+ITC_DIRECT_ENTRY(8218F530) { hooks::HubSetPrompts(ctx); }
+ITC_DIRECT_ENTRY(821903D0) { hooks::HubShowNotice(ctx); }
+ITC_DIRECT_ENTRY(821990D0) { hooks::PlateShowRegionCells(ctx); }
+ITC_DIRECT_ENTRY(82199488) { hooks::PlateShowCharCells(ctx); }
+ITC_DIRECT_ENTRY(82199688) { hooks::PlateShowCharLine(ctx); }
+ITC_DIRECT_ENTRY(82199898) { hooks::PlateShowRegion(ctx); }
+ITC_DIRECT_ENTRY(821998F0) { hooks::PlateShowDigits(ctx); }
+ITC_DIRECT_ENTRY(82199990) { hooks::PlateShowChars(ctx); }
+ITC_DIRECT_ENTRY(82199AA8) { hooks::PlateMarkField(ctx); }
+ITC_DIRECT_ENTRY(82199C10) { hooks::PlateSetUpRegionMenu(ctx); }
+ITC_DIRECT_ENTRY(82199CC8) { hooks::PlateSetUpNumberMenu(ctx); }
+ITC_DIRECT_ENTRY(82199D88) { hooks::PlateSetUpCharsMenu(ctx); }

@@ -1063,7 +1063,7 @@ uint64_t f8227E7C8(uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(6));
   // bl 0x8211bc18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211BC18, LIFTED_ARGS(0x8227E80C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UiMovie::IsNamedActive(LIFTED_ARGS(0x8227E80C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r3,1
@@ -2295,7 +2295,7 @@ uint64_t f8227F480(uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(3));
   // bl 0x8211bc18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8211BC18, LIFTED_ARGS(0x8227F4C4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UiMovie::IsNamedActive(LIFTED_ARGS(0x8227F4C4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r3,1
@@ -5015,7 +5015,7 @@ lifted::Result f82280C68(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_82280CD8:
   // bl 0x82293460
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82293460, LIFTED_ARGS(0x82280CDC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82293460(LIFTED_ARGS(0x82280CDC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -6937,7 +6937,7 @@ loc_82282234:
   schema::NetRankingData(uint32_t(r11)).set_row_limit_bits(uint32_t(r10));
   // bl 0x822914a8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x822914A8, LIFTED_ARGS(0x82282240, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Leaderboard::Rank(LIFTED_ARGS(0x82282240, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,25040(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 25040);
   // stw r3,48(r11)
@@ -7919,7 +7919,7 @@ loc_82282C8C:
   r3 = uint64_t(int64_t(4109));
   // bl 0x822927b0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x822927B0, LIFTED_ARGS(0x82282C94, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Network::SetLiveState(LIFTED_ARGS(0x82282C94, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r31,-32127
   r31 = uint64_t(int64_t(-2105475072));
   // lwz r11,28220(r31)
@@ -9531,7 +9531,7 @@ loc_82283768:
 loc_8228376C:
   // bl 0x8225ffc8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8225FFC8, LIFTED_ARGS(0x82283770, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Leaderboard::CarLogo(LIFTED_ARGS(0x82283770, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,27348(r25)
   r11 = guest::LoadU32(uint32_t(r25) + 27348);
   // mr r23,r3
@@ -9832,7 +9832,7 @@ loc_82283974:
 loc_82283978:
   // bl 0x8225ffc8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8225FFC8, LIFTED_ARGS(0x8228397C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Leaderboard::CarLogo(LIFTED_ARGS(0x8228397C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,27348(r26)
   r11 = guest::LoadU32(uint32_t(r26) + 27348);
   // mr r24,r3
@@ -9948,7 +9948,7 @@ loc_82283A44:
   r3 = f82291478();
   // bl 0x8225ffc8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8225FFC8, LIFTED_ARGS(0x82283A4C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Leaderboard::CarLogo(LIFTED_ARGS(0x82283A4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,28220(r22)
   r11 = guest::LoadU32(uint32_t(r22) + 28220);
   // mr r24,r3

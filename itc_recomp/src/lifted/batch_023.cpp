@@ -4460,7 +4460,7 @@ lifted::Result f825CA560(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   guest::StoreU32(uint32_t(r1) + 80, temp.u32);
   // bl 0x82459e80
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82459E80, LIFTED_ARGS(0x825CA5A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetEffectParameters_82459E80(LIFTED_ARGS(0x825CA5A0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt cr6,0x825ca678
@@ -4586,7 +4586,7 @@ lifted::Result f825CA560(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   guest::StoreU32(uint32_t(r1) + 84, uint32_t(r11));
   // bl 0x82459e80
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82459E80, LIFTED_ARGS(0x825CA678, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetEffectParameters_82459E80(LIFTED_ARGS(0x825CA678, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825CA678:
   // addi r1,r1,224
   r1 = uint64_t(int64_t(int64_t(r1) + 224));

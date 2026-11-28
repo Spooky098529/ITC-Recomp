@@ -335,3 +335,4 @@ ITC_DIRECT_ENTRY(821433A8) { hooks::RaceEventGroupAlloc(ctx); }
 ITC_DIRECT_ENTRY(82143420) { hooks::RaceEventPoolsCopyIds(ctx); }
 ITC_DIRECT_ENTRY(82143528) { hooks::RaceEventItemsBeaten(ctx); }
 ITC_DIRECT_ENTRY(82144458) { hooks::RaceEventPoolsAddRivals(ctx); }
+ITC_DIRECT_ENTRY(82140400) { hooks::RaceEventFloatAtLeast(ctx); }

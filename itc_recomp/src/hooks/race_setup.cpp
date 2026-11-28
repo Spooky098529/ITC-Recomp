@@ -497,3 +497,7 @@ ITC_RACE_SETUP(82101900, RaceSetupStagesClear)
 // sub_82101D20 has no adapter: the array helper's plain C++
 // (c_runtime::VectorConstruct, --native_c_runtime) calls its plain C++ when
 // handed its address, as RaceData::RaceData's does.
+
+// For the fallback originals (docs/missing-functions.md): RaceStages::Reset,
+// r3 = the list; r3 as the original leaves it (its step).
+ITC_DIRECT_ENTRY(82101860) { hooks::RaceSetupStagesReset(ctx); }

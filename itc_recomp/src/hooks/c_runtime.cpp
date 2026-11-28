@@ -634,3 +634,8 @@ ITC_DIRECT_ENTRY(825B7A80) {
     lifted::original::c825B7A80(ctx);
   }
 }
+
+// For the fallback originals (docs/missing-functions.md): _cftof_l, as the
+// step above (r3 = the double's address, r4 = the buffer, r5 = its size, r6 =
+// the precision; r3 0, the original where the port declines).
+ITC_DIRECT_ENTRY(825AE8E0) { CftofL(ctx); }

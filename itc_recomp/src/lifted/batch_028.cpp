@@ -205,7 +205,7 @@ lifted::Result f825DB2E0(uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, ui
   r3 = r31;
   // bl 0x820acf88
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820ACF88, LIFTED_ARGS(0x825DB300, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::List::Clear_820ACF88(LIFTED_ARGS(0x825DB300, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,4(r31)
   r3 = guest::LoadU32(uint32_t(r31) + 4);
   // bl 0x825a70e8

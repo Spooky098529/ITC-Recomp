@@ -682,3 +682,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82110258) {
 // address, so each runs its register step directly (no dispatch entry).
 ITC_DIRECT_ENTRY(82480818) { hooks::CarSoundsX3DEvaluateCurve(ctx); }
 ITC_DIRECT_ENTRY(82480F80) { hooks::CarSoundsX3DPan(ctx); }
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address too. X3DAudioCalculate's step runs the
+// original where its port declines (EmitterAngle or Delay asked for).
+ITC_DIRECT_ENTRY(82481880) { hooks::CarSoundsX3DCalculate(ctx); }
+ITC_DIRECT_ENTRY(824819B8) { hooks::CarSoundsX3DVecDot(ctx); }
+ITC_DIRECT_ENTRY(824819E0) { hooks::CarSoundsX3DVecSub(ctx); }
+ITC_DIRECT_ENTRY(82481A18) { hooks::CarSoundsX3DVecCross(ctx); }

@@ -326,3 +326,26 @@ ITC_DIRECT_ENTRY(8212FD50) {
   ITC_SCREEN_OBJECTS_FALLBACK(8212FD50)
   ctx.r3.u64 = so::ColumnEraseSubtree(ctx.r3.u32, ctx.r4.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md): UvColumn::Find and
+// UvMap::Find: r3 = the iterator out, r4 = the tree, r5 =
+// the key's address; r3 left as the iterator out. The original where the port
+// declines (where it traps) or off the allocation layer, as the file's others.
+ITC_DIRECT_ENTRY(821301F0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(821301F0)
+  const auto it = so::ColumnFind(ctx.r4.u32, KeyAt(ctx.r5.u32));
+  if (!it) {
+    lifted::original::c821301F0(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+ITC_DIRECT_ENTRY(82130290) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82130290)
+  const auto it = so::MapFind(ctx.r4.u32, KeyAt(ctx.r5.u32));
+  if (!it) {
+    lifted::original::c82130290(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}

@@ -1637,3 +1637,6 @@ ITC_DIRECT_ENTRY(82293A48) {
   ctx.fpscr.disableFlushMode();
   cm::HermiteBasis(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64);
 }
+// CameraAnims::Evaluate: its register step (EvalCamera's original from
+// Evaluate's frame where the port declines).
+ITC_DIRECT_ENTRY(82150960) { hooks::CameraModesStep82150960(ctx); }

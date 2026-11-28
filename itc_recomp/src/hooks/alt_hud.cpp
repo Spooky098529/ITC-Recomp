@@ -242,3 +242,7 @@ ITC_DIRECT_ENTRY(82217690) { hooks::AltHudSetBrake(ctx); }
 ITC_DIRECT_ENTRY(822176E8) { hooks::AltHudSetSteering(ctx); }
 ITC_DIRECT_ENTRY(822178A0) { hooks::AltHudSetUpExtraGauges(ctx); }
 ITC_DIRECT_ENTRY(82217A30) { hooks::AltHudUpdateExtraGauges(ctx); }
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address too (round of 2026-11-28).
+ITC_DIRECT_ENTRY(82216B08) { hooks::AltHudPowerClass(ctx); }
+ITC_DIRECT_ENTRY(82217C70) { hooks::AltHudSetUp(ctx); }

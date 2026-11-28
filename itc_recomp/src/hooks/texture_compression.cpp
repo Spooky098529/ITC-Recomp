@@ -295,3 +295,36 @@ ITC_DIRECT_ENTRY(823F5FA0) {
   }
   ctx.r3.u64 = *r3;
 }
+// For the fallback originals (docs/missing-functions.md): ImageCodec's
+// destructor and DxtColor::EncodeBlock, mapped as their harness steps did.
+// r3 = the codec; r3 the original's (+92); the original where the port
+// declines or without the native heap.
+ITC_DIRECT_ENTRY(823EA070) {
+  const auto r3 = hooks::NativeHeapActive() ? texture_compression::ImageCodecDestruct(ctx.r3.u32)
+                                            : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EA070(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the 8-byte block, r4 = 16 float4 pixels, r5 = 1-bit alpha (nonzero),
+// r6 = dither (nonzero). r6 and r3 also stored in their slots of the caller's
+// frame (r1 + 44, r1 + 20) as the original does. r3 = 0.
+ITC_DIRECT_ENTRY(82420F50) {
+  ctx.fpscr.disableFlushMode();
+  guest::StoreU32(ctx.r1.u32 + 44, ctx.r6.u32);
+  guest::StoreU32(ctx.r1.u32 + 20, ctx.r3.u32);
+  float pixels[16][4];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) {
+      pixels[i][c] = guest::LoadFloat(ctx.r4.u32 + texture_compression::kPixelBytes * i + 4 * c);
+    }
+  }
+  uint8_t block[8];
+  texture_compression::EncodeColorBlock(pixels, ctx.r5.u32 != 0, ctx.r6.s32, ctx.r1.u32, block);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}

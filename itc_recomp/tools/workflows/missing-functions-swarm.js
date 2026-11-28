@@ -41,6 +41,12 @@ How to get each shim right:
   namespace) with the smallest change. Don't change any port's behavior.
 - Multiple-register results, out-parameters through memory, etc.: follow the original exactly.
 
+This round (2026-11-28, the stale originals): every target here ALREADY has a lifted original registered as a fallback
+(lifted::original::c<address> exists, so decline fallbacks compile). The lift.py batches call these hand ports by address,
+and that runs the stale original instead of the port. E5 moved some objects' data to host memory, so an original can read
+the wrong place (a camera stop: lifted CameraAnim::EvalCamera reading blocks by guest pointer arithmetic). The shim makes
+lifted code call the PORT. Map registers exactly as before; there's no needs_original work in this round.
+
 Where to write:
 - In the hooks file of one of YOUR areas (src/hooks/<area>.cpp, the area's own adapters) when the shim needs something
   private there (a step, a GuestCalls class). Put shims after the area's existing entries with a one-line comment

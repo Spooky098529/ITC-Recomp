@@ -534,6 +534,13 @@ set(ITC_SOURCES
     src/hooks/direct/unit_13.cpp
     src/hooks/direct/unit_14.cpp
     src/hooks/direct/unit_15.cpp
+    src/hooks/direct/unit_20.cpp
+    src/hooks/direct/unit_21.cpp
+    src/hooks/direct/unit_22.cpp
+    src/hooks/direct/unit_23.cpp
+    src/hooks/direct/unit_24.cpp
+    src/hooks/direct/unit_25.cpp
+    src/hooks/direct/unit_26.cpp
     src/car_dealer/init_states.cpp
     src/car_dealer/handlers.cpp
     src/car_dealer/texts.cpp

@@ -538,3 +538,16 @@ ITC_DIRECT_ENTRY(82215160) { hooks::RaceHudObjectUpdateExtraGauges(ctx); }
 ITC_DIRECT_ENTRY(822151F8) { hooks::RaceHudObjectTickRacers(ctx); }
 ITC_DIRECT_ENTRY(82215260) { hooks::RaceHudObjectInit(ctx); }
 ITC_DIRECT_ENTRY(82216A60) { hooks::RaceHudObjectMake1004(ctx); }
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call these by address too (round of 2026-11-28).
+ITC_DIRECT_ENTRY(82211D08) { hooks::RaceHudObjectDrawPauseMenu(ctx); }
+ITC_DIRECT_ENTRY(82211FB8) { hooks::RaceHudObjectBarStep(ctx); }
+ITC_DIRECT_ENTRY(82212118) { hooks::RaceHudObjectCurveEval(ctx); }
+ITC_DIRECT_ENTRY(822128A8) { hooks::RaceHudObjectDraw(ctx); }
+ITC_DIRECT_ENTRY(82212AC8) { hooks::RaceHudObjectDrawWarning(ctx); }
+ITC_DIRECT_ENTRY(82212B68) { hooks::RaceHudObjectUpdateView(ctx); }
+ITC_DIRECT_ENTRY(82213638) { hooks::RaceHudObjectShowItem(ctx); }
+ITC_DIRECT_ENTRY(82213C40) { hooks::RaceHudObjectPowInt(ctx); }
+ITC_DIRECT_ENTRY(82214790) { hooks::RaceHudObjectUpdateRacerBar(ctx); }
+ITC_DIRECT_ENTRY(822153A0) { hooks::RaceHudObjectTick(ctx); }
+ITC_DIRECT_ENTRY(82215820) { hooks::RaceHudObjectTouching(ctx); }

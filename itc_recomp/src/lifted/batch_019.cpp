@@ -1020,7 +1020,7 @@ loc_8257D550:
   if (!cr0.eq) goto loc_8257D5D4;
   // bl 0x82295f18
   // (left out: dead in C++)
-  { const lifted::Result o = game::GetLastError(LIFTED_ARGS(0x8257D5B8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetLastError_82295F18(LIFTED_ARGS(0x8257D5B8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bgt 0x8257d5c8

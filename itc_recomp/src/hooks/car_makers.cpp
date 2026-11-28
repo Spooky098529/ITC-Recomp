@@ -361,3 +361,8 @@ ITC_CAR_MAKERS(8217F880, CarMakersReloadModel)
 // ReapplyRecordNoDecals sub_82178E60 have none since their callers,
 // GarageStage::SetCar and SetCarClass, are native and call their plain C++
 // (their register steps above are the harness's).
+
+// For the fallback originals (docs/missing-functions.md): the lift.py
+// batches call it by address (CarData::FromGarageCar: r4 a garage car, r5
+// the data; the original where the garage's callees aren't native).
+ITC_DIRECT_ENTRY(82179A60) { hooks::CarMakersFromGarageCar(ctx); }

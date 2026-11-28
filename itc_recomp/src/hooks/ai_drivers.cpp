@@ -524,3 +524,16 @@ ITC_AI_DRIVERS_DIRECT(82145610, MirrorOther(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_AI_DRIVERS_DIRECT(821456A0, UpdateOtherTimer(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // r3 = the driver, r4 = &the count.
 ITC_AI_DRIVERS_DIRECT(82145CA8, ctx.r3.u64 = ReactToOthers(ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 240))
+
+// For the fallback originals (docs/missing-functions.md): the ports the
+// lift.py batches call by address. r3 = the driver (AccumulateSteer,
+// PickTargetBehind) or &the angle (WrapAngle).
+ITC_AI_DRIVERS_DIRECT(82138F00, AccumulateSteer(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(821451B8, PickTargetBehind(ctx.r3.u32))
+ITC_AI_DRIVERS_DIRECT(82145408, WrapAngle(ctx.r3.u32))
+// r3 = the path, r4 = a MeasureOthers record, r5 = the driver's record of
+// that racer; the original's frame 176 (left) or 160 (right) bytes down.
+ITC_AI_DRIVERS_DIRECT(8213CB30,
+                      ctx.r3.u64 = AvoidOnLeft(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 176))
+ITC_AI_DRIVERS_DIRECT(8213CD50,
+                      ctx.r3.u64 = AvoidOnRight(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 160))
