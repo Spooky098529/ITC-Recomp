@@ -118,8 +118,23 @@ A hand port with no entry but with a lifted fallback original isn't
 E5 moved an object's data to host memory, the original can read the wrong
 place (a camera stop at the parking area). 1,220 hand ports are called this
 way, at 3,203 sites. One more swarm round (7 units) gave direct entries to
-the 276 the `lift.py` batches call. The ~940 called only from the fallback
-originals are left.
+the 276 the `lift.py` batches call. A last round (24 units, 48 agents)
+gave direct entries to 937 of the 944 called only from the fallback
+originals.
+
+The 7 left are helpers merged into a bigger port, with no C++ of their own:
+`8211AF90`, `8211B018`, `8211C930`, `8211D1B8`, `8211D210`, `8211E318` and
+`8259D730`. Their originals stay.
+
+Constant call targets in `src/` went from 1,720 to 167; every other call is
+now direct. Checked on the final build:
+- builds for Linux and Windows;
+- `tick_replay.sh`: both races "all match";
+- `scripted_run.sh race_test.jsonl` and `attract_race.sh 40`: 0 error lines.
+
+An area's wrapper around `ITC_DIRECT_ENTRY` must keep DIRECT in its name.
+`entry_list.py` finds entries by that name, and one wrapper without it
+(`ITC_APP_START_UP_SETTER`) left 3 entries out until it was renamed.
 
 ## What's already there
 

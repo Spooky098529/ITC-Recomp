@@ -84,8 +84,9 @@ fallback originals, and some originals read data E5 moved to host memory
 the 360's way. Here lifted `LocationScreen::Transition10` reached
 `CameraAnim::EvalCamera`'s original, which reads an animation's blocks by
 guest pointer arithmetic. The 276 have direct entries now
-(`docs/missing-functions.md`). About 940 more hand ports are still called
-this way, but only from the fallback originals.
+(`docs/missing-functions.md`), and so do 937 of the 944 more called the
+same way from the fallback originals (the other 7 have no port of their
+own).
 
 **A second stop, also fixed:** "handles: the range is full". The handle
 allocator (`src/memory/handles.cpp`, since E5) reused a freed span only for
