@@ -78,6 +78,22 @@ folder) gets through the dealer. Left for later by the user's call
 
 ## A stop after a race, in the race-end camera (found 2026-11-28)
 
+**Fixed (2026-11-28, `missing-functions`).** Lifted code (the `lift.py`
+batches) called 276 hand ports by address. Those calls ran the ports'
+fallback originals, and some originals read data E5 moved to host memory
+the 360's way. Here lifted `LocationScreen::Transition10` reached
+`CameraAnim::EvalCamera`'s original, which reads an animation's blocks by
+guest pointer arithmetic. The 276 have direct entries now
+(`docs/missing-functions.md`). About 940 more hand ports are still called
+this way, but only from the fallback originals.
+
+**A second stop, also fixed:** "handles: the range is full". The handle
+allocator (`src/memory/handles.cpp`, since E5) reused a freed span only for
+an allocation of exactly its size. The streamed files' many sizes ran the
+range out after minutes of menus and races, while nearly all of it was
+free. A new handle now takes the first span big enough, and freed spans
+merge. A 40-minute drive afterward had no stops, with the range flat.
+
 **Seen again (2026-11-28, `missing-functions`, Linux and Vulkan):** in a new
 career (no save) at the parking area, not after a race. Right after
 `LocationScreen::ShowOpponentInfo`, `ShowOpponentPictures` and `ShowArrows`,

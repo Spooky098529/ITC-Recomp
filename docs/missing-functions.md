@@ -111,6 +111,16 @@ covered:
     race_test.jsonl` and `attract_race.sh 40`, each with 0 error lines.
   - Not yet checked: a no-save career driven through the car dealer.
 
+## The stale originals (2026-11-28)
+
+A hand port with no entry but with a lifted fallback original isn't
+"missing": a call by address runs the original instead of the port. Where
+E5 moved an object's data to host memory, the original can read the wrong
+place (a camera stop at the parking area). 1,220 hand ports are called this
+way, at 3,203 sites. One more swarm round (7 units) gave direct entries to
+the 276 the `lift.py` batches call. The ~940 called only from the fallback
+originals are left.
+
 ## What's already there
 
 - `tools/lift.py` already emits a direct call for a callee that has an
