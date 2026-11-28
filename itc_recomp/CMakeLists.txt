@@ -37,6 +37,7 @@ set(ITC_SOURCES
     src/app/start_up.cpp
     src/base/flags.cpp
     src/base/log.cpp
+    src/base/os_memory.cpp
     src/audio/native_audio.cpp
     src/audio/render_driver.cpp
     src/audio/output_mix.cpp
@@ -775,6 +776,7 @@ set(ITC_SOURCES
     src/native/port_spirv.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
+    src/gpu/vulkan/backend.cpp
     src/hooks/replay_commands.cpp
     src/native/shaders.cpp
     src/native/draw_registers.cpp
@@ -782,7 +784,7 @@ set(ITC_SOURCES
     src/graphics/shader_load.cpp
     src/hooks/shader_load.cpp
     src/native/textures.cpp
-    src/native/vulkan_functions.cpp
+    src/gpu/vulkan/functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
     src/frame_pacing/per_frame_logic.cpp
@@ -982,7 +984,15 @@ function(itc_add_executable name)
     endif()
 endfunction()
 
+if(WIN32)
+    # The Direct3D 11 backend (docs/d3d11-backend.md, step 5).
+    list(APPEND ITC_SOURCES src/gpu/d3d11/backend.cpp)
+endif()
+
 itc_add_executable(itc ${ITC_SOURCES})
+if(WIN32)
+    target_link_libraries(itc PRIVATE d3d11 dxgi)
+endif()
 
 # The coverage build (itc_coverage: which recompiled functions ran in play,
 # docs/coverage.md) instrumented the recompiled code, which isn't built since

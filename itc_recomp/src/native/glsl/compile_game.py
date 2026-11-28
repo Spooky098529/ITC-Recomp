@@ -14,7 +14,20 @@ names, and its textures by their sampler names.
 --emit writes every shader's full source to a folder (with the files they
 include), for tools/shader_port/check to compile and test.
 
-Needs glslangValidator and spirv-opt (both in the Vulkan SDK). The SPIR-V
+Every shader is also written as HLSL (Shader Model 5) for the D3D11 backend,
+into ../generated_game_shaders_hlsl.h (docs/d3d11-backend.md, "Shaders for
+D3D11"): SPIRV-Cross from the same GLSL (compiled again with its names, for
+readable HLSL), vertex shaders with Y flipped to D3D's clip space and the
+draw's base vertex and first instance from b4 (VERTEX_OPTIONS). The run-time
+fit becomes defines: each specialization constant SPIRV_CROSS_CONSTANT_ID_n,
+and interpolator n's slot XE_SLOT_n (on if XE_SLOT_n_ON; to_hlsl; the
+renderer keeps the defaults).
+--check-hlsl also compiles every HLSL shader with D3DCompile under Wine
+(tools/hlsl_check, Microsoft's d3dcompiler_47.dll in the prefix).
+
+Needs glslangValidator and spirv-opt (both in the Vulkan SDK) and
+spirv-cross (tools/build_spirv_cross.sh builds it into out/tools; $SPIRV_CROSS
+or the PATH otherwise). The SPIR-V
 isn't optimized (the driver does that; inlining every helper made the
 modules several times bigger), only stripped of its debug names and unused
 functions. tools/shader_port/check compiles them the same way."""
@@ -22,12 +35,14 @@ import argparse
 import glob
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.normpath(os.path.join(HERE, "..", "..", "..", ".."))
 GAME = os.path.join(HERE, "game")
 # The folders of hand-written shaders. Their files are compiled side by
 # side, so a file name is used once across them.
@@ -172,18 +187,142 @@ def write_sources(folder):
     return names
 
 
-def compile_shader(source, folder):
+def compile_spirv(source, folder, names=False):
+    """The shader's SPIR-V file, without debug names unless names."""
     raw, out = os.path.join(folder, "raw.spv"), os.path.join(folder, "out.spv")
-    subprocess.run(["glslangValidator", "-V", "-g0", "--target-env", "vulkan1.3", "-o", raw,
-                    source], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["glslangValidator", "-V"] + ([] if names else ["-g0"]) +
+                   ["--target-env", "vulkan1.3", "-o", raw, source],
+                   check=True, stdout=subprocess.DEVNULL)
     subprocess.run(["spirv-opt", "--eliminate-dead-functions", raw, "-o", out], check=True)
-    data = open(out, "rb").read()
+    return out
+
+
+def compile_shader(source, folder):
+    data = open(compile_spirv(source, folder), "rb").read()
     return struct.unpack("<%dI" % (len(data) // 4), data)
+
+
+def spirv_cross():
+    if os.environ.get("SPIRV_CROSS"):
+        return os.environ["SPIRV_CROSS"]
+    built = os.path.join(REPO, "itc_recomp", "out", "tools", "spirv-cross", "spirv-cross")
+    return built if os.path.exists(built) else "spirv-cross"
+
+
+# Vertex shaders: Y flipped to D3D's clip space, and gl_VertexIndex and
+# gl_InstanceIndex with the draw's base vertex and first instance added from
+# a constant block at b4 (D3D's SV_VertexID and SV_InstanceID leave them
+# out; Vulkan's include them, and the shaders pass the index on as r0).
+VERTEX_OPTIONS = ["--flip-vert-y", "--hlsl-support-nonzero-basevertex-baseinstance",
+                  "--hlsl-basevertex-baseinstance-binding", "4", "0"]
+
+
+def to_hlsl(spirv, vertex, interpolators=True):
+    """The SPIR-V file as Shader Model 5 HLSL. With interpolators, both
+    stages declare the same 16 interpolator slots (TEXCOORD0-15, first in
+    the vertex shader's outputs and the pixel shader's inputs: D3D links the
+    two by register, which follows declaration order; Vulkan by location),
+    interpolator n written to or read from slot XE_SLOT_n if XE_SLOT_n_ON
+    (else not written, or read as 0). Undefined: slot n, on, which is what
+    the renderer gives (SpecializePort moves a location in both stages of a
+    pair alike, so interpolator n always pairs with n)."""
+    text = subprocess.run([spirv_cross(), "--hlsl", "--shader-model", "50"] +
+                          (VERTEX_OPTIONS if vertex else []) + [spirv],
+                          check=True, stdout=subprocess.PIPE, text=True).stdout
+    if not interpolators:
+        return text
+    struct_name = "SPIRV_Cross_Output" if vertex else "SPIRV_Cross_Input"
+    match = re.search(r"^struct %s\n\{\n.*?^\};\n" % struct_name, text, re.M | re.S)
+    if not match:
+        return text  # no interpolators
+    # (name, array size or "" for one, first slot)
+    members = re.findall(r"^    float4 (\w+)(?:\[(\d+)\])? : TEXCOORD(\d+);\n", match.group(0),
+                         re.M)
+    if not members:
+        return text
+    block = re.sub(r"^    float4 \w+(\[\d+\])? : TEXCOORD\d+;\n", "", match.group(0), flags=re.M)
+    slots = "".join("    float4 xe_slot_%d : TEXCOORD%d;\n" % (k, k) for k in range(16))
+    block = block.replace("{\n", "{\n" + slots, 1)
+    body = text[match.end():]
+    for name, size, k in members:
+        if size:  # an array (a pixel shader's): an element a slot
+            if vertex:
+                raise SystemExit("an array output %s" % name)
+            pattern = r"^(\s*)(\w+) = stage_input\.%s;$" % name
+
+            def elements(m, name=name, size=int(size), first=int(k)):
+                lines = []
+                for i in range(size):
+                    lines += ["#if XE_SLOT_%d_ON" % (first + i),
+                              "%s%s[%d] = stage_input.XE_SLOT_%d;" % (m.group(1), m.group(2), i,
+                                                                      first + i),
+                              "#else", "%s%s[%d] = 0.0f.xxxx;" % (m.group(1), m.group(2), i),
+                              "#endif"]
+                return "\n".join(lines)
+            body, count = re.subn(pattern, elements, body, flags=re.M)
+            if count != 1:
+                raise SystemExit("interpolator %s: %d copies found" % (name, count))
+            continue
+        if vertex:
+            pattern = r"^(\s*)stage_output\.%s = (.+);$" % name
+            replacement = ("#if XE_SLOT_%s_ON\n\\1stage_output.XE_SLOT_%s = \\2;\n#endif" %
+                           (k, k))
+        else:
+            pattern = r"^(\s*)(\w+) = stage_input\.%s;$" % name
+            replacement = ("#if XE_SLOT_%s_ON\n\\1\\2 = stage_input.XE_SLOT_%s;\n#else\n"
+                           "\\1\\2 = 0.0f.xxxx;\n#endif" % (k, k))
+        body, count = re.subn(pattern, replacement, body, flags=re.M)
+        if count != 1:
+            raise SystemExit("interpolator %s: %d copies found" % (name, count))
+    prelude = ["// The interpolator slots (to_hlsl in compile_game.py): interpolator n in",
+               "// slot XE_SLOT_n if XE_SLOT_n_ON, as the renderer defines them."]
+    for k in range(16):
+        prelude += ["#ifndef XE_SLOT_%d" % k, "#define XE_SLOT_%d xe_slot_%d" % (k, k),
+                    "#define XE_SLOT_%d_ON 1" % k, "#endif"]
+    return "\n".join(prelude) + "\n" + text[:match.start()] + block + body
+
+
+def check_hlsl(files):
+    """Compiles HLSL files ((profile, path) pairs) with D3DCompile under Wine;
+    False if any fails."""
+    exe = os.path.join(REPO, "itc_recomp", "out", "tools", "hlsl_check.exe")
+    if not os.path.exists(exe):
+        raise SystemExit("build tools/hlsl_check first (its build.sh)")
+    env = dict(os.environ, WINEDEBUG="-all", WINEDLLOVERRIDES="mscoree,mshtml=")
+    env.setdefault("WINEPREFIX", os.path.join(REPO, "itc_recomp", "out", "wineprefix"))
+    result = subprocess.run(["wine", exe] + ["%s:%s" % (p, f) for p, f in files], env=env,
+                            stdout=subprocess.PIPE, text=True)
+    print(result.stdout.strip().splitlines()[-1] if result.returncode == 0 else result.stdout)
+    return result.returncode == 0
+
+
+def hlsl_header(comment, shaders):
+    """A header of raw string literals: shaders is (name, text) pairs."""
+    lines = comment + ["#pragma once"]
+    for name, text in shaders:
+        if ")hlsl\"" in text:
+            raise SystemExit("%s's HLSL holds the literal's end" % name)
+        lines.append("inline constexpr char k_hlsl_%s[] = R\"hlsl(%s)hlsl\";" % (name, text))
+    return "\n".join(lines) + "\n"
+
+
+def hlsl_table(shaders):
+    """The game shaders' HLSL by their SPIR-V (the port table's GamePort::spirv),
+    for shader_ports.cpp."""
+    lines = ["", '#include "generated_game_shaders.h"', "", "namespace native {", "",
+             "struct GamePortHlsl {", "  const uint32_t* spirv;", "  const char* hlsl;", "};", "",
+             "inline constexpr GamePortHlsl kGamePortsHlsl[] = {"]
+    for name, _ in shaders:
+        lines.append("  {k_%s, k_hlsl_%s}," % (name, name))
+    lines += ["};", "", "}  // namespace native", ""]
+    return "\n".join(lines)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--emit", help="write the full sources to this folder instead")
+    parser.add_argument("--check-hlsl", action="store_true",
+                        help="compile every HLSL shader with D3DCompile under Wine")
     args = parser.parse_args()
     if args.emit:
         os.makedirs(args.emit, exist_ok=True)
@@ -192,17 +331,32 @@ def main():
     lines = ["// Generated by src/native/glsl/compile_game.py from game/ and the hand-written",
              "// shaders (materials/, post/, boot/, vertex/);",
              "// don't edit.", "#pragma once", "#include <cstdint>"]
+    hlsl = []
     with tempfile.TemporaryDirectory() as folder:
         sources = os.path.join(folder, "sources")
         os.makedirs(sources)
         names = write_sources(sources)
+        checks = []
         for file_name in names:
             name = os.path.splitext(file_name)[0]
-            words = compile_shader(os.path.join(sources, file_name), folder)
+            source = os.path.join(sources, file_name)
+            words = compile_shader(source, folder)
             rows = [",".join("0x%x" % w for w in words[i:i + 12]) for i in range(0, len(words), 12)]
             lines.append("inline constexpr uint32_t k_game_%s[] = {\n%s};" % (name, ",\n".join(rows)))
+            vertex = file_name.endswith(".vert")
+            text = to_hlsl(compile_spirv(source, folder, names=True), vertex)
+            hlsl.append(("game_" + name, text))
+            path = os.path.join(folder, name + ".hlsl")
+            open(path, "w", newline="\n").write(text)
+            checks.append(("vs_5_0" if vertex else "ps_5_0", path))
+        if args.check_hlsl and not check_hlsl(checks):
+            raise SystemExit("an HLSL shader didn't compile; nothing written")
     open(os.path.join(HERE, "..", "generated_game_shaders.h"), "w", newline="\n").write(
         "\n".join(lines) + "\n")
+    open(os.path.join(HERE, "..", "generated_game_shaders_hlsl.h"), "w", newline="\n").write(
+        hlsl_header(["// Generated by src/native/glsl/compile_game.py: the game's shaders as HLSL",
+                     "// (Shader Model 5) for the D3D11 backend, through SPIRV-Cross; don't edit."],
+                    hlsl) + hlsl_table(hlsl))
     print("%d shaders compiled (%d written by hand)" % (len(names), len(read_variants())))
 
 

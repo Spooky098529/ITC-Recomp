@@ -7,6 +7,7 @@
 #include "input/physical_pad.h"
 #include "memory/mapping.h"
 
+#include <atomic>
 #include <bit>
 #include <cstdint>
 #include <cstring>
@@ -31,11 +32,11 @@ constexpr uint32_t kVehicleStride = 6272;
 constexpr uint32_t kVehicleMatrix = 3312;
 constexpr uint32_t kVehicleSpeedSquared = 2440;
 
-uint64_t g_tick = 0;
+std::atomic<uint64_t> g_tick{0};
 // Whether the race entered has started (its world loaded): the ticks before
 // (the world still, for as long as the race's loads take, which varies) are
 // left out, so two runs' ticks line up from the start.
-bool g_started = false;
+std::atomic<bool> g_started{false};
 
 float LoadFloat(uint32_t address) {
   return std::bit_cast<float>(guest::LoadU32(address));
@@ -55,11 +56,16 @@ void StateDigest_OnRaceStarted() {
   }
 }
 
+uint64_t RaceTicks() { return g_started ? g_tick.load() : 0; }
+
 void StateDigest_OnRaceTick() {
-  if (!ITC_FLAG(state_digest) || !g_started) {
+  if (!g_started) {
     return;
   }
   const uint64_t tick = g_tick++;
+  if (!ITC_FLAG(state_digest)) {
+    return;
+  }
   const uint32_t manager = guest::LoadU32(kRacersManager);
   const uint32_t vehicles = guest::LoadU32(kVehicles);
   if (manager == 0 || vehicles == 0) {

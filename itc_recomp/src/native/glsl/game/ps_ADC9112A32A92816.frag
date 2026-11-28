@@ -52,7 +52,7 @@ void xe_shader() {
       // loop 31
       loop_count = uvec4(xe_loop_count(31u), loop_count.xyz);
       loop_aL = ivec4(xe_loop_start(31u), loop_aL.xyz);
-      if (loop_count.x == 0u) { pc = 4; continue; }
+      if (loop_count.x == 0u) { pc = 4; break; }
     case 2:
       r1.yzw = xe_mul(xe_fc[loop_aL.x + 41].xyz, MatAmbientDiffuse.www);
       r1.x = xe_dp3(r4.xyz, xe_fc[loop_aL.x + 5].xyz);
@@ -63,7 +63,7 @@ void xe_shader() {
         if (count != 0u) {
           loop_count.x = count;
           loop_aL.x += xe_loop_step(31u);
-          pc = 2; continue;
+          pc = 2; break;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 4:
@@ -71,7 +71,7 @@ void xe_shader() {
       // loop 30
       loop_count = uvec4(xe_loop_count(30u), loop_count.xyz);
       loop_aL = ivec4(xe_loop_start(30u), loop_aL.xyz);
-      if (loop_count.x == 0u) { pc = 15; continue; }
+      if (loop_count.x == 0u) { pc = 15; break; }
     case 6:
       r6.xyz = xe_fc[loop_aL.x + 8].xyz + -r0.xyz;
       r3.x = xe_dp3(r6.xyz, r6.xyz);
@@ -80,7 +80,7 @@ void xe_shader() {
       { precise float v = xe_dp3(r3.xyz, xe_fc[loop_aL.x + 16].xyz); precise float s = inversesqrt(abs(r3.x)); r3.y = v; r1.x = s; }
       { precise vec3 v = xe_mul(r6.xyz, r1.xxx); precise float s = 1.0 / r3.y; r1.xzw = v; r3.x = s; }
       if (!p) {
-        pc = 17; continue;
+        pc = 17; break;
       }
       r2.w = xe_dp3(r1.xzw, xe_fc[loop_aL.x + 24].xyz);
       r3.y = (r2.w > xe_fc[loop_aL.x + 32].x ? 1.0 : 0.0);
@@ -109,7 +109,7 @@ void xe_shader() {
         if (count != 0u) {
           loop_count.x = count;
           loop_aL.x += xe_loop_step(30u);
-          pc = 6; continue;
+          pc = 6; break;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 15:
@@ -117,16 +117,17 @@ void xe_shader() {
       r0.xyz = r0.xyz + r5.xyz;
       r0.xyz = xe_mul(r0.xyz, r2.xyz);
       { precise vec4 e = r0; xe_color0 = e; }
-      break;  // the end
+      pc = -1; break;  // the end
     case 17:
       r3.yzw = xe_mul(xe_fc[loop_aL.x + 47].xyz, MatAmbientDiffuse.www);
       r1.z = xe_dp3(r4.xyz, r1.xzw);
       r1.z = xe_max(r1.z, lit255.y);
       r3.yzw = xe_mul(r3.yzw, r1.zzz);
       r5.xyz = xe_mul(r3.yzw, r3.xxx) + r5.xyz;
-      pc = 13; continue;
+      pc = 13; break;
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

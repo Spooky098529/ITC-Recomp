@@ -151,7 +151,7 @@ void xe_shader() {
         r2.z = ps;
       }
       if (!p) {
-        pc = 26; continue;
+        pc = 26; break;
       }
       r13.xyz = -r0.xzy + PntLightPos_0.xzy;
       r15.y = xe_dp3(r13.yxz, r13.yxz);
@@ -310,7 +310,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 39; continue;
+        pc = 39; break;
       }
       r7.xyz = -r0.xyz + PntLightPos_1.xyz;
       r4.x = xe_dp3(r7.zxy, r7.zxy);
@@ -384,7 +384,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 52; continue;
+        pc = 52; break;
       }
       r7.xyz = -r0.xyz + PntLightPos_2.xyz;
       r4.x = xe_dp3(r7.zxy, r7.zxy);
@@ -458,7 +458,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 65; continue;
+        pc = 65; break;
       }
       r4.xyz = -r0.xyz + PntLightPos_3.xyz;
       r7.x = xe_dp3(r4.zxy, r4.zxy);
@@ -537,11 +537,11 @@ void xe_shader() {
       r4.xyz = xe_mul(r11.zxy, r7.www) + r4.zxy;
       { precise vec3 v = r4.xzy + r15.yxz; p = !(r2.z == 0.0); precise float s = (p ? 0.0 : 1.0); ps = s; r3.xyz = v; }
       if (!p) {
-        pc = 91; continue;
+        pc = 91; break;
       }
       { precise float v = (-abs(r11.x) > lit247.w ? 1.0 : 0.0); p = !(r2.z == 0.0); precise float s = (p ? 0.0 : 1.0); ps = s; r0.z = v; }
       if (!p) {
-        pc = 78; continue;
+        pc = 78; break;
       }
       ps = ProjectionPos_0.w - r0.y;
       r11.z = ps;
@@ -589,13 +589,13 @@ void xe_shader() {
       r11.x = r0.z;
       r11.y = r0.z;
       r0.xw = r11.xy;
-      pc = 79; continue;
+      pc = 79; break;
     case 78:
       r0.xw = r0.zz;
     case 79:
       { precise float v = (-abs(r11.x) > lit247.w ? 1.0 : 0.0); p = !(r2.z == 0.0); precise float s = (p ? 0.0 : 1.0); ps = s; r11.w = v; }
       if (!p) {
-        pc = 89; continue;
+        pc = 89; break;
       }
       ps = ProjectionPos_1.w - r0.y;
       r11.z = ps;
@@ -652,7 +652,7 @@ void xe_shader() {
         r11.xy = r11.ww;
       }
       { float pop = r11.z - 1.0; p = pop <= 0.0; ps = (p ? 0.0 : pop); r11.z = ps; }
-      pc = 90; continue;
+      pc = 90; break;
     case 89:
       r11.xy = r11.ww;
     case 90:
@@ -666,9 +666,10 @@ void xe_shader() {
         r3.xyz = xe_max(r3.xyz, lit247.www);
       }
       { precise vec4 e = r3.zyxw; xe_color0 = e; }
-      break;  // the end
+      pc = -1; break;  // the end
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

@@ -78,7 +78,7 @@ void xe_shader() {
       { precise float v = (PntLightColor_0.w > lit255.x ? 1.0 : 0.0); precise float s = inversesqrt(abs(r2.z)); ps = s; r0.w = v; r2.z = s; }
       { precise vec3 v = xe_mul(r2.zzz, r1.xyz); p = !(r0.w == 0.0); precise float s = (p ? 0.0 : 1.0); ps = s; r1.yzw = v; }
       if (!p) {
-        pc = 7; continue;
+        pc = 7; break;
       }
       r4.xyz = -r0.xzy + PntLightPos_0.xzy;
       r5.y = xe_dp3(r4.yxz, r4.yxz);
@@ -110,7 +110,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 13; continue;
+        pc = 13; break;
       }
       r4.xyz = -r0.xyz + PntLightPos_1.xyz;
       r6.x = xe_dp3(r4.zxy, r4.zxy);
@@ -140,7 +140,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 19; continue;
+        pc = 19; break;
       }
       r4.xyz = -r0.xyz + PntLightPos_2.xyz;
       r6.x = xe_dp3(r4.zxy, r4.zxy);
@@ -171,7 +171,7 @@ void xe_shader() {
       p = !(r0.w == 0.0);
       ps = (p ? 0.0 : 1.0);
       if (!p) {
-        pc = 25; continue;
+        pc = 25; break;
       }
       r0.xyz = -r0.xyz + PntLightPos_3.xyz;
       r4.x = xe_dp3(r0.zxy, r0.zxy);
@@ -208,9 +208,10 @@ void xe_shader() {
         r3.xyz = xe_max(r3.xyz, lit255.yyy);
       }
       { precise vec4 e = r3.zyxw; xe_color0 = e; }
-      break;  // the end
+      pc = -1; break;  // the end
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

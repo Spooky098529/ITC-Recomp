@@ -47,3 +47,8 @@ target_include_directories(itc_vulkan_headers SYSTEM INTERFACE ${ITC_THIRDPARTY}
 # simde (header-only): the vector helpers' portable intrinsics.
 add_library(itc_simde INTERFACE)
 target_include_directories(itc_simde SYSTEM INTERFACE ${ITC_THIRDPARTY}/simde)
+# The MSVC runtime's math.h, included before simde without <cmath>, makes
+# simde take std::isnan, which only <cmath> declares: <cmath> first.
+if(WIN32)
+    target_compile_options(itc_simde INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-include cmath>)
+endif()

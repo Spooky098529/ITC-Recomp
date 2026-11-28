@@ -1,13 +1,14 @@
 // See vertex_arena.h.
 
 #include "vertex_arena.h"
+#include "gpu/backend.h"
 
 #include <algorithm>
 #include <cstring>
 #include <format>
 #include <map>
 #include <mutex>
-#include <sys/mman.h>
+#include "base/os_memory.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -40,16 +41,6 @@ constexpr uint32_t kAlignment = 256;
 // Ranges not drawn for this many frames are given back (models of a race
 // left, the work memory's moved morphs).
 constexpr uint64_t kUnusedFrames = 900;
-
-uint32_t FindMemoryType(const VkPhysicalDeviceMemoryProperties& properties, uint32_t type_bits,
-                        VkMemoryPropertyFlags wanted) {
-  for (uint32_t i = 0; i < properties.memoryTypeCount; i++) {
-    if ((type_bits & (1u << i)) && (properties.memoryTypes[i].propertyFlags & wanted) == wanted) {
-      return i;
-    }
-  }
-  return UINT32_MAX;
-}
 
 uint32_t AlignUp(uint32_t value) {
   return (value + kAlignment - 1) & ~(kAlignment - 1);
@@ -130,26 +121,21 @@ void VertexArena_GpuOnlyModel(uint32_t model) {
 }
 
 struct VertexArena::State {
-  DeviceContext context{};
-  VkPhysicalDeviceMemoryProperties memory_properties{};
+  gpu::Backend* backend = nullptr;
   uint32_t frames_in_flight = 0;
   uint32_t frame = 0;
   uint64_t frame_number = 0;
 
-  VkBuffer buffer = VK_NULL_HANDLE;
-  VkDeviceMemory memory = VK_NULL_HANDLE;
+  gpu::Buffer* object = nullptr;
   uint32_t inline_start = 0, range_start = 0, size = 0;
   uint32_t inline_used = 0;
 
   struct StagingChunk {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
+    gpu::Buffer* object = nullptr;
     uint8_t* mapped = nullptr;
     uint32_t size = 0;
   };
   struct Frame {
-    VkCommandPool pool = VK_NULL_HANDLE;
-    VkCommandBuffer uploads = VK_NULL_HANDLE;
     std::vector<StagingChunk> staging;  // [0] kept; others freed at the slot's next frame
     uint32_t chunk = 0, chunk_used = 0;
     // Ranges given back while this slot's frame was recorded: free once its
@@ -218,94 +204,50 @@ VertexArena::VertexArena() : state_(std::make_unique<State>()) {}
 
 VertexArena::~VertexArena() {
   State& s = *state_;
-  if (!s.context.device) {
+  if (!s.backend) {
     return;
   }
-  VkDevice device = s.context.device;
   for (State::Frame& f : s.frames) {
     for (State::StagingChunk& chunk : f.staging) {
       s.DestroyStaging(chunk);
     }
-    if (f.pool) {
-      vk::vkDestroyCommandPool(device, f.pool, nullptr);
-    }
   }
-  if (s.buffer) {
-    vk::vkDestroyBuffer(device, s.buffer, nullptr);
-  }
-  if (s.memory) {
-    vk::vkFreeMemory(device, s.memory, nullptr);
+  if (s.object) {
+    s.backend->DestroyBuffer(s.object);
     gpu_memory::Freed(gpu_memory::Kind::kMirror, s.size);
   }
 }
 
 bool VertexArena::State::CreateStaging(StagingChunk& chunk, uint32_t bytes) {
-  VkDevice device = context.device;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = bytes;
-  info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &chunk.buffer) != VK_SUCCESS) {
+  chunk.object = backend->CreateBuffer({bytes, gpu::kBufferCopySource, true});
+  if (!chunk.object) {
     return false;
   }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, chunk.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex =
-      FindMemoryType(memory_properties, requirements.memoryTypeBits,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &chunk.memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(device, chunk.buffer, chunk.memory, 0) != VK_SUCCESS ||
-      vk::vkMapMemory(device, chunk.memory, 0, VK_WHOLE_SIZE, 0,
-                      reinterpret_cast<void**>(&chunk.mapped)) != VK_SUCCESS) {
-    return false;
-  }
+  chunk.mapped = backend->Mapped(chunk.object);
   chunk.size = bytes;
-  gpu_memory::Allocated(gpu_memory::Kind::kStaging, alloc.allocationSize);
+  gpu_memory::Allocated(gpu_memory::Kind::kStaging, backend->MemorySize(chunk.object));
   return true;
 }
 
 void VertexArena::State::DestroyStaging(StagingChunk& chunk) {
-  VkDevice device = context.device;
-  if (chunk.buffer) {
-    vk::vkDestroyBuffer(device, chunk.buffer, nullptr);
-  }
-  if (chunk.memory) {
-    vk::vkFreeMemory(device, chunk.memory, nullptr);
+  if (chunk.object) {
+    backend->DestroyBuffer(chunk.object);
     gpu_memory::Freed(gpu_memory::Kind::kStaging, chunk.size);
   }
   chunk = {};
 }
 
-bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) {
+bool VertexArena::Init(gpu::Backend& backend, uint32_t frames_in_flight) {
   State& s = *state_;
-  s.context = context;
+  s.backend = &backend;
   s.frames_in_flight = frames_in_flight;
-  VkDevice device = context.device;
-  vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
 
   s.inline_start = AlignUp(kQuadIndices + 4 * 6 * kBuiltinPrimitives);
   s.range_start = s.inline_start + frames_in_flight * kInlineSlotBytes;
   s.size = s.range_start + kRangeBytes;
-  VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  info.size = s.size;
-  info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-               VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  if (vk::vkCreateBuffer(device, &info, nullptr, &s.buffer) != VK_SUCCESS) {
-    return false;
-  }
-  VkMemoryRequirements requirements;
-  vk::vkGetBufferMemoryRequirements(device, s.buffer, &requirements);
-  VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  alloc.allocationSize = requirements.size;
-  alloc.memoryTypeIndex = FindMemoryType(s.memory_properties, requirements.memoryTypeBits,
-                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (alloc.memoryTypeIndex == UINT32_MAX ||
-      vk::vkAllocateMemory(device, &alloc, nullptr, &s.memory) != VK_SUCCESS ||
-      vk::vkBindBufferMemory(device, s.buffer, s.memory, 0) != VK_SUCCESS) {
+  s.object = backend.CreateBuffer(
+      {s.size, gpu::kBufferIndex | gpu::kBufferVertex | gpu::kBufferCopyDest, false});
+  if (!s.object) {
     ITC_LOG_ERROR("native renderer: the vertex arena ({} MB, device-local) couldn't be made",
                   s.size >> 20);
     return false;
@@ -315,19 +257,6 @@ bool VertexArena::Init(const DeviceContext& context, uint32_t frames_in_flight) 
 
   s.frames.resize(frames_in_flight);
   for (State::Frame& f : s.frames) {
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = context.queue_family;
-    if (vk::vkCreateCommandPool(device, &pool_info, nullptr, &f.pool) != VK_SUCCESS) {
-      return false;
-    }
-    VkCommandBufferAllocateInfo command_alloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    command_alloc.commandPool = f.pool;
-    command_alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_alloc.commandBufferCount = 1;
-    if (vk::vkAllocateCommandBuffers(device, &command_alloc, &f.uploads) != VK_SUCCESS) {
-      return false;
-    }
     f.staging.emplace_back();
     if (!s.CreateStaging(f.staging.back(), kStagingChunk)) {
       return false;
@@ -380,7 +309,6 @@ void VertexArena::BeginFrame(uint32_t frame) {
   }
   f.to_free.clear();
   if (!s.recording) {
-    vk::vkResetCommandPool(s.context.device, f.pool, 0);
     while (f.staging.size() > 1) {
       s.DestroyStaging(f.staging.back());
       f.staging.pop_back();
@@ -515,7 +443,7 @@ void VertexArena::State::ProcessModels(const std::vector<ModelEvent>& events) {
     uintptr_t first = (reinterpret_cast<uintptr_t>(host) + 0xFFF) & ~uintptr_t(0xFFF);
     uintptr_t end = (reinterpret_cast<uintptr_t>(host) + e.data_size) & ~uintptr_t(0xFFF);
     if (end > first) {
-      madvise(reinterpret_cast<void*>(first), end - first, MADV_DONTNEED);
+      base::DropPages(reinterpret_cast<void*>(first), end - first);
       given_back_bytes += end - first;
     }
   }
@@ -594,22 +522,9 @@ void VertexArena::State::GiveBack(uint64_t older_than) {
 }
 
 void VertexArena::State::BeginRecording() {
-  if (recording) {
-    return;
-  }
+  // (The backend's upload commands hold the copies; this slot's staging
+  // stays in use until they're submitted.)
   recording = true;
-  VkCommandBuffer commands = frames[recording_slot].uploads;
-  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vk::vkBeginCommandBuffer(commands, &begin);
-  // Earlier frames' draws may still read ranges copied again in place:
-  // the copies wait for them.
-  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = 0;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &barrier, 0, nullptr, 0,
-                           nullptr);
 }
 
 std::pair<VertexArena::State::StagingChunk*, uint32_t> VertexArena::State::Stage(
@@ -665,8 +580,7 @@ void VertexArena::State::Copy(const void* data, uint32_t bytes, uint32_t arena_o
     }
   }
   BeginRecording();
-  VkBufferCopy region{at, arena_offset, bytes};
-  vk::vkCmdCopyBuffer(frames[recording_slot].uploads, chunk->buffer, buffer, 1, &region);
+  backend->UploadBuffer(chunk->object, object, {at, arena_offset, bytes});
   stats.copied++;
   stats.copied_bytes += bytes;
 }
@@ -727,26 +641,12 @@ uint32_t VertexArena::PlaceInline(const void* data, uint32_t size, uint32_t endi
   return offset;
 }
 
-VkBuffer VertexArena::buffer() const {
-  return state_->buffer;
+gpu::Buffer* VertexArena::object() const {
+  return state_->object;
 }
 
-VkCommandBuffer VertexArena::EndUploads() {
-  State& s = *state_;
-  if (!s.recording) {
-    return VK_NULL_HANDLE;
-  }
-  s.recording = false;
-  VkCommandBuffer commands = s.frames[s.recording_slot].uploads;
-  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-  vk::vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           0, 1, &barrier, 0, nullptr, 0, nullptr);
-  vk::vkEndCommandBuffer(commands);
-  return commands;
+void VertexArena::EndUploads() {
+  state_->recording = false;
 }
 
 std::string VertexArena::TakeStats() {

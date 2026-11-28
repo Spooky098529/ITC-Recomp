@@ -12,10 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "device_context.h"
 #include "state.h"
 #include "textures.h"
-#include "vulkan_functions.h"
 
 namespace native {
 
@@ -27,32 +25,32 @@ class Passes {
   // base: the guest memory base. resolution_scale: every target and resolve
   // destination is drawn this many times its guest size (see "Resolution"
   // in docs/native-renderer.md).
-  bool Init(const DeviceContext& context, uint32_t frames_in_flight,
+  bool Init(gpu::Backend& backend, uint32_t frames_in_flight,
             float resolution_scale);
 
   // Render thread. Before a frame's first command.
   void BeginFrame(uint32_t frame_index);
   // An indexed draw (render::DrawIndexed): command 18's item fields.
-  void DrawIndexed(VkCommandBuffer commands, uint32_t type, uint32_t base_start,
+  void DrawIndexed(uint32_t type, uint32_t base_start,
                    uint32_t primitive_count);
   // A draw of vertices given inline (render::DrawUP: DrawPrimitiveUP,
   // command 19, and the helper object's draws, command 15): `data` a guest
   // address. type: the primitive type; count: vertices; stride in bytes.
-  void InlineDraw(VkCommandBuffer commands, uint32_t type, uint32_t count,
+  void InlineDraw(uint32_t type, uint32_t count,
                   uint32_t stride, uint32_t data);
   // A clear (render::Clear, command 26's item fields) and a resolve
   // (render::Resolve, command 25's).
-  void Clear(VkCommandBuffer commands, uint32_t flags, uint32_t color, float z,
+  void Clear(uint32_t flags, uint32_t color, float z,
              uint32_t stencil, bool rects);
-  void Resolve(VkCommandBuffer commands, uint32_t flags, const int32_t* rect,
+  void Resolve(uint32_t flags, const int32_t* rect,
                uint32_t destination, const int32_t* point, bool level_or_slice,
                const float* clear_color, float clear_z, uint32_t clear_stencil);
   // Predicated tiling (see "Predicated tiling" in docs/gpu-functions.md):
   // after command 32 (BeginTiling); each Resolve the library's EndTiling
   // (command 33) makes, tile of tiles, with its arguments (guest addresses
   // of the rectangle, point and clear color, 0 if none); after command 33.
-  void BeginTiling(VkCommandBuffer commands, uint32_t width, uint32_t height, float clear);
-  void EndTiling(VkCommandBuffer commands, uint32_t flags, uint32_t destination, float clear);
+  void BeginTiling(uint32_t width, uint32_t height, float clear);
+  void EndTiling(uint32_t flags, uint32_t destination, float clear);
   // A movie's frame (docs/native-movies.md), drawn over render target 0 of
   // `device` at the place of the command that drew it (command 28): the Y
   // plane (width x height) and the half-size U and V, rows with no padding,
@@ -64,12 +62,12 @@ class Passes {
     const uint8_t* u = nullptr;
     const uint8_t* v = nullptr;
   };
-  void DrawMovie(VkCommandBuffer commands, uint32_t device,
+  void DrawMovie(uint32_t device,
                  const MoviePlanes& planes);
   // The frame's end (sub_8258D998, outside the command list): the game
   // resolves render target 0 of `device` whole into a front buffer texture
   // (`front_buffer`, its fetch constant at +28). That target is then shown.
-  void FrontBufferResolve(VkCommandBuffer commands, uint32_t device,
+  void FrontBufferResolve(uint32_t device,
                           uint32_t front_buffer);
   // Ends the frame's drawing and puts what's to be shown into the image
   // `shown()` returns, in TRANSFER_SRC_OPTIMAL: the frame resolved to the
@@ -80,7 +78,7 @@ class Passes {
   // into memory, for WriteDump once the frame is done (a debugging aid).
   // dump_prefix: the shown image's file name; dump_resolves: the resolves
   // too.
-  VkExtent2D EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool dump,
+  gpu::Extent2D EndFrame(int32_t show_resolve, bool dump,
                       const std::string& dump_prefix = "shown", bool dump_resolves = true);
   // For the next frames: the texture cache's debug_hide (see TextureCache).
   void set_debug_hide(TextureCache::Hide hide, uint32_t value = 0);
@@ -137,13 +135,10 @@ class Passes {
   void WriteDump(const std::string& directory);
   // How many resolves the last frame made (a race frame makes about 25).
   size_t frame_resolve_count() const;
-  VkImage shown() const;
-  // The frame's texture uploads, to be submitted before its commands; null
-  // if none.
-  VkCommandBuffer EndUploads();
-  // The vertex arena's copies for this frame (vertex_arena.h), ended; null
-  // if none. Submitted after the texture uploads, before the frame.
-  VkCommandBuffer EndBufferUploads();
+  gpu::Image* shown() const;
+  // The frame's uploads are all asked for (the backend submits them before
+  // its commands).
+  void EndUploads();
   std::string TakeArenaStats();
 
   // Logged by the renderer.

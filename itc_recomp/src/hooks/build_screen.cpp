@@ -359,6 +359,9 @@ ITC_REGS_STEP(BuildScreenChangeCategory) {
   }
 
 ITC_BUILD_SCREEN(8219C230, BuildListInsert)
+// For lifted callers (sub_8219D550 calls it by address): a pad replay that
+// drifted into the build screen stopped on the missing entry.
+ITC_BUILD_SCREEN(8219BCC0, BuildScreenValueText)
 // For lifted callers: the original InitBuildList (lifted::original, where a
 // caller falls back to it) calls it by address; a pad replay took that path
 // and stopped on the missing entry (2026-11-26).

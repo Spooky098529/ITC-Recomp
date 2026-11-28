@@ -75,7 +75,7 @@ void xe_shader() {
       // loop 31
       loop_count = uvec4(xe_loop_count(31u), loop_count.xyz);
       loop_aL = ivec4(xe_loop_start(31u), loop_aL.xyz);
-      if (loop_count.x == 0u) { pc = 18; continue; }
+      if (loop_count.x == 0u) { pc = 18; break; }
     case 3:
       { precise vec3 v = -r0.xzy + xe_fc[loop_aL.x + 8].xzy; precise float s = (-abs(r3.x) > 0.0 ? 1.0 : 0.0); ps = s; r4.xyz = v; r1.x = s; }
       { precise float v = xe_dp3(r4.yxz, r4.yxz); p = r2.z == 0.0; precise float s = (p ? 0.0 : 1.0); ps = s; r9.y = v; }
@@ -83,14 +83,14 @@ void xe_shader() {
       { precise float v = xe_dp3(xe_fc[loop_aL.x + 16].xyz, r9.yxz); precise float s = inversesqrt(abs(r9.y)); ps = s; r0.w = v; r1.y = s; }
       { precise vec3 v = xe_mul(r4.yzx, r1.yyy); precise float s = 1.0 / r0.w; ps = s; r4.xyz = v; r1.y = s; }
       if (!p) {
-        pc = 7; continue;
+        pc = 7; break;
       }
       r9.xyz = xe_mul(xe_fc[loop_aL.x + 47].xzy, MatAmbientDiffuse.www);
       r0.w = xe_dp3(r7.xzy, r4.xzy);
       r0.w = xe_max(r0.w, lit255.x);
       r4.xyz = xe_mul(r9.zxy, r0.www);
       r6.xyz = xe_mul(r4.yzx, r1.yyy) + r6.xyz;
-      pc = 16; continue;
+      pc = 16; break;
     case 7:
       r0.w = xe_dp3(r4.xzy, xe_fc[loop_aL.x + 24].zxy);
       r2.w = (r0.w > xe_fc[loop_aL.x + 32].x ? 1.0 : 0.0);
@@ -137,7 +137,7 @@ void xe_shader() {
         if (count != 0u) {
           loop_count.x = count;
           loop_aL.x += xe_loop_step(31u);
-          pc = 3; continue;
+          pc = 3; break;
         }
         loop_count = uvec4(loop_count.yzw, 0u); loop_aL = ivec4(loop_aL.yzw, 0); }
     case 18:
@@ -149,7 +149,7 @@ void xe_shader() {
       r3.xyz = xe_mul(r2.yxz, r3.zxy);
       r3.xyz = xe_mul(r3.xzy, r0.zyx) + r8.xzy;
       if (!xe_bool(128u /* UseProjTex */)) {
-        pc = 22; continue;
+        pc = 22; break;
       }
       r3.xyz = xe_max(r3.xyz, lit255.xxx);
     case 22:
@@ -158,9 +158,10 @@ void xe_shader() {
       r3.xyz = r3.xyz + -fogColor.zyx;
       r3.xyz = xe_mul(r3.zyx, r0.xxx) + fogColor.xyz;
       { precise vec4 e = r3; xe_color0 = e; }
-      break;  // the end
+      pc = -1; break;  // the end
+      pc = -1;
     }
-    break;
+    if (pc < 0) break;
   }
 }
 

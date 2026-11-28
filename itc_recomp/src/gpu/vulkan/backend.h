@@ -1,0 +1,298 @@
+// The Vulkan backend (docs/d3d11-backend.md, step 3): gpu::Backend on
+// Vulkan 1.3 (dynamic rendering), with its own shaders for the renderer's
+// passes (resolve, movie, gamma, draw IDs).
+
+#pragma once
+
+#include <array>
+#include <atomic>
+#include <memory>
+#include <chrono>
+#include <filesystem>
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "gpu/backend.h"
+#include "gpu/vulkan/device_context.h"
+#include "gpu/vulkan/functions.h"
+
+namespace gpu::vulkan {
+
+// A shader as this backend holds it (behind gpu::Shader): its module, its
+// stage's texture set layout (shared by shaders of the same stage, texture
+// types and sampler count), and a vertex shader's vertex input.
+struct ShaderObject {
+  VkShaderModule module = VK_NULL_HANDLE;
+  VkDescriptorSetLayout textures = VK_NULL_HANDLE;
+  std::vector<VkVertexInputBindingDescription> bindings;
+  std::vector<VkVertexInputAttributeDescription> attributes;
+};
+
+// A pipeline as this backend holds it (behind gpu::Pipeline), with its
+// layout and the layout's sets (0 empty, 1 the constant blocks, 2 and 3 the
+// vertex and pixel shaders' textures).
+struct PipelineObject {
+  VkPipeline pipeline = VK_NULL_HANDLE;
+  VkPipelineLayout layout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout sets[4] = {};
+};
+
+// A buffer as this backend holds it (behind gpu::Buffer).
+struct BufferObject {
+  BufferDesc desc;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDeviceSize memory_size = 0;
+  uint8_t* mapped = nullptr;
+};
+
+// An image as this backend holds it (behind gpu::Image).
+struct ImageObject {
+  ImageDesc desc;
+  VkImage image = VK_NULL_HANDLE;
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDeviceSize memory_size = 0;
+  VkFormat format = VK_FORMAT_UNDEFINED;
+  VkImageAspectFlags aspects = 0;  // color, or depth and stencil
+  // All of it (both aspects of a depth image), and a depth image's depth
+  // alone (for sampling it).
+  VkImageView view = VK_NULL_HANDLE;
+  VkImageView depth_view = VK_NULL_HANDLE;
+  // Its layout as the frame's commands leave it.
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+};
+
+class Backend final : public gpu::Backend {
+ public:
+  struct Options {
+    uint32_t frames_in_flight = 2;
+    bool validation = false;
+    // The window's size asked for, where the window system leaves the
+    // swapchain's size to us (Wayland) and the window can't say.
+    Extent2D requested_size;
+  };
+  explicit Backend(const Options& options);
+  ~Backend() override;
+
+  SDL_WindowFlags WindowFlags() const override { return SDL_WINDOW_VULKAN; }
+  std::string AttachWindow(SDL_Window* window) override;
+  bool Init() override;
+  Extent2D OutputSize() const override { return {swapchain_extent_.width, swapchain_extent_.height}; }
+  void WindowResized() override { window_resized_ = true; }
+  uint32_t BeginFrame() override;
+  bool EndFrame(Image* shown, Extent2D size) override;
+  void WaitIdle() override;
+  void OpenDiskCache(const std::filesystem::path& directory) override;
+  uint32_t ConstantsAlignment() const override {
+    return uint32_t(context_.min_uniform_buffer_offset_alignment);
+  }
+  bool CanFilter(Format format) const override;
+  const void* ResourceLayout(Pipeline* pipeline) const override {
+    return Object(pipeline).layout;
+  }
+  Sampler* CreateSampler(const SamplerDesc& desc) override;
+  static VkSampler Handle(Sampler* sampler) { return reinterpret_cast<VkSampler>(sampler); }
+  Image* CreateImage(const ImageDesc& desc, const void* initial = nullptr) override;
+  void DestroyImage(Image* image) override;
+  const ImageDesc& Describe(const Image* image) const override { return Object(image).desc; }
+  uint64_t MemorySize(const Image* image) const override { return Object(image).memory_size; }
+  void Use(Image* image, Usage usage) override;
+  Buffer* CreateBuffer(const BufferDesc& desc) override;
+  void DestroyBuffer(Buffer* buffer) override;
+  uint8_t* Mapped(Buffer* buffer) override { return Object(buffer).mapped; }
+  uint64_t MemorySize(const Buffer* buffer) const override {
+    return reinterpret_cast<const BufferObject*>(buffer)->memory_size;
+  }
+  static BufferObject& Object(Buffer* buffer) { return *reinterpret_cast<BufferObject*>(buffer); }
+  static VkBuffer Handle(Buffer* buffer) { return buffer ? Object(buffer).buffer : VK_NULL_HANDLE; }
+  void UploadImage(Buffer* staging, Image* image, const ImageUpload* regions,
+                   uint32_t count) override;
+  void UploadBuffer(Buffer* staging, Buffer* buffer, const BufferUpload& region) override;
+  Shader* CreateShader(const ShaderDesc& desc) override;
+  static ShaderObject& Object(Shader* shader) { return *reinterpret_cast<ShaderObject*>(shader); }
+  Pipeline* GetPipeline(const PipelineDesc& desc, bool* made = nullptr) override;
+  static PipelineObject& Object(Pipeline* pipeline) {
+    return *reinterpret_cast<PipelineObject*>(pipeline);
+  }
+  static const PipelineObject& Object(const Pipeline* pipeline) {
+    return *reinterpret_cast<const PipelineObject*>(pipeline);
+  }
+  TextureSet* MakeTextureSet(Shader* shader, ShaderStage stage, View* const* views,
+                             uint32_t view_count, Sampler* const* samplers, uint32_t sampler_count,
+                             bool* found = nullptr) override;
+  static VkDescriptorSet Handle(TextureSet* set) { return reinterpret_cast<VkDescriptorSet>(set); }
+  bool DescribeConstants(Buffer* buffer, const uint32_t ranges[4]) override;
+  void BindResources(Pipeline* pipeline, TextureSet* vertex, TextureSet* pixel, Buffer* constants,
+                     const uint32_t offsets[4]) override;
+  void BeginPass(const PassTarget& color, const PassTarget& depth, const Rect& area) override;
+  void SetViewport(const Viewport& viewport) override;
+  void SetScissor(const Rect& scissor) override;
+  void SetDepthBias(float constant, float slope) override;
+  void SetBlendConstants(const float constants[4]) override;
+  void BindPipeline(Pipeline* pipeline) override;
+  void BindVertexBuffers(Buffer* buffer, uint32_t count, const uint64_t* offsets) override;
+  void BindIndexBuffer(Buffer* buffer, uint64_t offset, bool index_32bit) override;
+  void Draw(uint32_t vertices, uint32_t instances, uint32_t first_vertex,
+            uint32_t first_instance) override;
+  void DrawIndexed(uint32_t indices, uint32_t instances, uint32_t first_index, int32_t base_vertex,
+                   uint32_t first_instance) override;
+  void ClearColor(Image* image, const uint32_t bits[4]) override;
+  void ClearDepthStencil(Image* image, float depth, uint32_t stencil, bool clear_depth,
+                         bool clear_stencil) override;
+  void CopyImage(Image* source, Image* dest, uint32_t width, uint32_t height) override;
+  void BlitImage(Image* source, const Rect& from, Image* dest, const Rect& to,
+                 Filter filter) override;
+  void ResolveImage(Image* source, Image* dest, uint32_t width, uint32_t height) override;
+  void CopyBufferToImage(Buffer* buffer, Image* image, const ImageUpload* regions,
+                         uint32_t count) override;
+  void CopyImageToBuffer(Image* image, Buffer* buffer, uint64_t offset, uint32_t width,
+                         uint32_t height) override;
+  void EndPass() override;
+  View* CreateView(Image* image, const ViewDesc& desc) override;
+  void DestroyView(View* view) override;
+  static VkImageView Handle(View* view) { return reinterpret_cast<VkImageView>(view); }
+  bool DrawResolve(const ResolveDraw& draw) override;
+  bool DrawMovie(Image* const planes[3], Image* target, const Rect& area) override;
+  bool ApplyGamma(Image* image, Extent2D size, const uint16_t table[256]) override;
+  Pipeline* GetIdPipeline(const PipelineDesc& desc) override;
+  void SetDrawId(uint32_t id) override;
+  static ImageObject& Object(Image* image) { return *reinterpret_cast<ImageObject*>(image); }
+  static const ImageObject& Object(const Image* image) {
+    return *reinterpret_cast<const ImageObject*>(image);
+  }
+
+
+ private:
+  // A stage's texture set layout: the shader's, or an empty one without.
+  VkDescriptorSetLayout TexturesLayout(Shader* shader, ShaderStage stage);
+  // The frame's command buffer, open between BeginFrame and EndFrame.
+  VkCommandBuffer commands() const { return frames_[frame_index_].commands; }
+  bool CreateDevice();
+  // The resolve's and movie's shaders, layouts and samplers.
+  bool CreatePassResources();
+  // Saved at most every 10 s, when the pipelines made so far grew.
+  void MaybeSaveDiskCache();
+  // A graphics pipeline for `key` with `pixel` (none: depth only) and
+  // `layout`; its dynamic state viewport, scissor, depth bias and (with
+  // `blend_constants`) blend constants.
+  VkPipeline MakeGraphicsPipeline(const PipelineDesc& key, VkShaderModule pixel,
+                                  VkPipelineLayout layout, bool blend_constants);
+  // A pipeline drawing the resolve's viewport-covering triangle with
+  // `pixel` into one color target, no blending.
+  VkPipeline MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
+                                    VkFormat format, VkSampleCountFlagBits samples);
+  // One of this frame's sets for the resolve and movie passes.
+  VkDescriptorSet PassSet(VkDescriptorSetLayout layout);
+  // The frame's upload commands, begun if they aren't.
+  VkCommandBuffer Uploads();
+  // Records `commands` with `record` and runs them now, waiting for them.
+  template <typename Record>
+  bool RunNow(Record record);
+  bool CreateSwapchain();
+  void DestroySwapchain();
+
+  Options options_;
+  SDL_Window* window_ = nullptr;
+  VkInstance instance_ = VK_NULL_HANDLE;
+  VkSurfaceKHR surface_ = VK_NULL_HANDLE;
+  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
+  VkDevice device_ = VK_NULL_HANDLE;
+  uint32_t queue_family_ = 0;
+  VkQueue queue_ = VK_NULL_HANDLE;
+
+  VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+  VkFormat swapchain_format_ = VK_FORMAT_UNDEFINED;
+  VkExtent2D swapchain_extent_{};
+  std::vector<VkImage> swapchain_images_;
+  std::vector<VkSemaphore> render_done_;  // one per swapchain image
+  bool swapchain_stale_ = false;
+  std::atomic<bool> window_resized_{false};
+
+  struct Frame {
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandBuffer commands = VK_NULL_HANDLE;
+    VkFence done = VK_NULL_HANDLE;
+    VkSemaphore image_ready = VK_NULL_HANDLE;
+    // Uploads, submitted before the frame's commands.
+    VkCommandPool upload_pool = VK_NULL_HANDLE;
+    VkCommandBuffer uploads = VK_NULL_HANDLE;
+    // Texture sets: pools, kept for later frames, and the one in use.
+    std::vector<VkDescriptorPool> texture_pools;
+    size_t texture_pool = 0;
+    // The resolve and movie passes' sets.
+    VkDescriptorPool pass_pool = VK_NULL_HANDLE;
+  };
+  bool AddTexturePool(Frame& frame);
+  std::vector<Frame> frames_;
+  uint32_t frame_index_ = 0;
+
+  native::DeviceContext context_{};
+  VkPhysicalDeviceMemoryProperties memory_properties_{};
+  std::vector<VkCommandBuffer> before_;
+  // The upload commands are open (from the first upload, maybe before the
+  // first frame, to the frame's end), and hold buffer uploads.
+  bool uploading_ = false, uploaded_buffers_ = false;
+  std::unordered_map<std::string, VkDescriptorSetLayout> texture_layouts_;
+  // This frame's texture sets by their contents (backend.cpp).
+  std::unique_ptr<class FrameSetCache> texture_sets_;
+  std::vector<uint64_t> set_key_;
+  std::vector<VkDescriptorImageInfo> set_infos_;
+  std::vector<VkWriteDescriptorSet> set_writes_;
+  VkDescriptorSetLayout empty_layout_ = VK_NULL_HANDLE, constants_layout_ = VK_NULL_HANDLE;
+  VkDescriptorSet empty_set_ = VK_NULL_HANDLE;
+  std::unordered_map<Buffer*, VkDescriptorSet> constants_sets_;
+  struct DescHash {
+    size_t operator()(const PipelineDesc& desc) const;
+  };
+  struct LayoutPairHash {
+    size_t operator()(const std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>& key) const {
+      return std::hash<const void*>()(key.first) ^
+             (std::hash<const void*>()(key.second) * 0x9E3779B97F4A7C15ull);
+    }
+  };
+  std::unordered_map<std::pair<VkDescriptorSetLayout, VkDescriptorSetLayout>, VkPipelineLayout,
+                     LayoutPairHash>
+      pipeline_layouts_;
+  std::unordered_map<PipelineDesc, std::unique_ptr<PipelineObject>, DescHash> pipelines_;
+  PipelineObject* bound_pipeline_ = nullptr;
+
+  // The resolve and movie passes: pipelines by target format and
+  // multisampling (the resolve's source, the movie's target).
+  VkDescriptorSetLayout resolve_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout resolve_layout_ = VK_NULL_HANDLE;
+  VkShaderModule resolve_vertex_ = VK_NULL_HANDLE, resolve_pixel_ = VK_NULL_HANDLE,
+                 resolve_pixel_ms_ = VK_NULL_HANDLE;
+  VkSampler resolve_sampler_ = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, bool>, VkPipeline> resolve_pipelines_;
+  VkDescriptorSetLayout movie_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout movie_layout_ = VK_NULL_HANDLE;
+  VkShaderModule movie_pixel_ = VK_NULL_HANDLE;
+  VkSampler movie_sampler_ = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, VkSampleCountFlagBits>, VkPipeline> movie_pipelines_;
+  // The gamma pass, made at its first use, its set for `gamma_image_`.
+  Buffer* gamma_table_ = nullptr;
+  VkDescriptorSetLayout gamma_set_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout gamma_layout_ = VK_NULL_HANDLE;
+  VkPipeline gamma_pipeline_ = VK_NULL_HANDLE;
+  VkDescriptorPool gamma_pool_ = VK_NULL_HANDLE;
+  VkDescriptorSet gamma_set_ = VK_NULL_HANDLE;
+  Image* gamma_image_ = nullptr;
+  bool gamma_uploaded_ = false, gamma_failed_ = false;
+  // The draw ID pass: its pixel shader, layouts by the vertex textures',
+  // pipelines by the draw's description (its pixel and blend state
+  // cleared).
+  VkShaderModule id_pixel_ = VK_NULL_HANDLE;
+  std::unordered_map<VkDescriptorSetLayout, VkPipelineLayout> id_layouts_;
+  std::unordered_map<PipelineDesc, std::unique_ptr<PipelineObject>, DescHash> id_pipelines_;
+
+  VkPipelineCache pipeline_cache_ = VK_NULL_HANDLE;
+  std::filesystem::path pipeline_cache_file_;
+  size_t pipeline_cache_saved_pipelines_ = 0;
+  std::chrono::steady_clock::time_point pipeline_cache_saved_;
+};
+
+}  // namespace gpu::vulkan

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace debug {
 
 // Main thread, after a logic pass in a race.
@@ -16,5 +18,9 @@ void StateDigest_OnRaceEntered();
 // set-up's message 4): the first one in a race starts the count again; ticks
 // before it aren't logged.
 void StateDigest_OnRaceStarted();
+
+// The race ticks since the race started (as the digest numbers them; 0
+// before), counted with or without --state_digest. Any thread.
+uint64_t RaceTicks();
 
 }  // namespace debug

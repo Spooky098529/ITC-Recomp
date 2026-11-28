@@ -1,6 +1,6 @@
 // What every draw hands its shaders besides the game's own constants (set 1,
 // binding 0), at the offsets the GLSL reads them
-// (glsl/game/xe_interface.glsl's XeDrawConstants).
+// (glsl/game/xe_interface.glsl's xe_draw_* functions).
 
 #pragma once
 

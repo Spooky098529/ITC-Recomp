@@ -12,6 +12,7 @@
 // don't need (their window, ImGui overlays, achievement toasts, the GPU
 // plugin) is left out.
 
+#include "helpers/executable.h"
 #include "lifted/lifted.h"
 #include <fstream>
 #include "app/app.h"
@@ -76,8 +77,8 @@ uint32_t g_wake_event = 0;
 // files are there).
 std::filesystem::path ExecutableFolder() {
   std::error_code error;
-  const std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe", error);
-  return error ? std::filesystem::current_path() : exe.parent_path();
+  const std::filesystem::path folder = helpers::ExecutableFolder(error);
+  return error ? std::filesystem::current_path() : folder;
 }
 
 // The game's files: --game_data_root (the command line or itc.toml), else

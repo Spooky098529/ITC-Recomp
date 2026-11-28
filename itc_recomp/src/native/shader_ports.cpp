@@ -5,11 +5,15 @@
 #include "shader_ports.h"
 
 #include <algorithm>
+#include <string>
 #include <cstring>
 #include <unordered_map>
 
 #include "game_shader_ports.h"
 #include "port_spirv.h"
+#if defined(_WIN32)
+#include "generated_game_shaders_hlsl.h"  // the D3D11 backend's (Windows only)
+#endif
 
 namespace native {
 
@@ -226,11 +230,31 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   if (shader.spirv.empty()) {
     return false;
   }
+  // The same fit for the HLSL (docs/d3d11-backend.md, step 4): each
+  // constant's value (as an unsigned literal: an int constant takes its
+  // bits, a bool constant is true when not 0).
+  shader.hlsl = nullptr;
+#if defined(_WIN32)
+  for (const GamePortHlsl& h : kGamePortsHlsl) {
+    if (h.spirv == port.spirv) {
+      shader.hlsl = h.hlsl;
+      break;
+    }
+  }
+#endif
+  shader.hlsl_defines.clear();
+  for (const auto& [id, value] : constants) {
+    shader.hlsl_defines.emplace_back("SPIRV_CROSS_CONSTANT_ID_" + std::to_string(id),
+                                     std::to_string(value) + "u");
+  }
+  // The interpolators keep their slots (the HLSL's default): SpecializePort
+  // moves a location in both stages of a pair alike, so interpolator n
+  // always pairs with n, in the mask or not.
   shader.textures.clear();
   for (uint32_t i = 0; i < port.texture_count; i++) {
     const GamePortTexture& t = port.textures[i];
     shader.textures.push_back({t.fetch_constant,
-                               t.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY});
+                               t.cube ? gpu::ImageType::kCube : gpu::ImageType::k2DArray});
   }
   shader.samplers.clear();
   for (uint32_t i = 0; i < port.sampler_count; i++) {

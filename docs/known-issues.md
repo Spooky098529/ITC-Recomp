@@ -56,3 +56,27 @@ exits: 441 of 1,720 left. 438 are called only from `src/lifted/originals.cpp`
 `825B8778`: the C runtime's floating-point exception paths, not reached in
 play). Giving every hand port an entry (or the originals direct calls) is
 left for later.
+
+**A new career stops in the car dealer (found 2026-11-27, Linux and
+Windows alike).** With no save (`saves/` next to the executable empty), the
+career's first visit to the car dealer goes through lifted `sub_82185518`
+and OpenColors `sub_821847A0`, which call hand ports by address. Entries
+were added for `CarDealer::SetColorBar` (`82182770`), `ShowSwatches`
+(`821826C0`), `SetKindBar` (`82182158`) and `BuildScreen::ValueText`
+(`8219BCC0`, the build screen stop seen in drifted pad replays); the run then
+stops at `821824A8`, so more are missing on that path. Every new player
+would hit it: to fix by giving the hand ports on the list above their
+entries, then checking a no-save run (the tick replay's input from an empty
+folder) gets through the dealer. Left for later by the user's call
+(2026-11-27, during the D3D11 work).
+
+## A stop after a race, in the race-end camera (found 2026-11-28)
+
+In a drive (the Windows build under Wine, `--renderer=d3d11`), ~6 s after
+`RaceStates::OnRaceEnd` the main thread read a null pointer ("memory: an
+access at 00000000, in no block (a null pointer): stopping") in the camera
+animation's evaluation (`CameraAnim::EvalCamera` `sub_82150350`, called
+through lifted `sub_82150960` and `sub_82150300`, after lifted
+`sub_8222E1A0`, `sub_8222CD60`, `sub_8222A150` and `sub_8222BFE8`). Game code,
+not the renderer's; seen once; whether Vulkan or Linux hit it too isn't
+known. Not looked into yet (log `itc_092.log` of that run).

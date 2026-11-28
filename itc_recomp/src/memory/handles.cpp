@@ -13,8 +13,6 @@
 #include <mutex>
 #include <vector>
 
-#include <sys/mman.h>
-#include <unistd.h>
 
 namespace memory {
 namespace {

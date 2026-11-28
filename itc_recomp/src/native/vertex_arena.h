@@ -18,8 +18,11 @@
 #include <memory>
 #include <string>
 
-#include "device_context.h"
-#include "vulkan_functions.h"
+#include "gpu/types.h"
+
+namespace gpu {
+class Backend;
+}
 
 namespace native {
 
@@ -40,7 +43,7 @@ class VertexArena {
   static constexpr uint32_t kRectangleIndices = 0;
   static constexpr uint32_t kQuadIndices = (4 * RectangleIndexCount(kBuiltinPrimitives) + 255) & ~255u;
 
-  bool Init(const DeviceContext& context, uint32_t frames_in_flight);
+  bool Init(gpu::Backend& backend, uint32_t frames_in_flight);
 
   // A frame's recording starts in slot `frame` (its fence waited): its
   // staging is free again, and memcpy's writes since the last frame mark
@@ -64,10 +67,10 @@ class VertexArena {
   // the object holds no buffer there (the draw places it by address).
   uint32_t HeldBuffer(uint32_t object, uint32_t address, uint32_t endian) const;
 
-  VkBuffer buffer() const;
-  // This frame's copies, ended, to be submitted before its drawing; null if
-  // there were none.
-  VkCommandBuffer EndUploads();
+  gpu::Buffer* object() const;  // the buffer's
+  // This frame's copies are all asked for (the backend submits them before
+  // its drawing): the next frame's go into its own slot's staging.
+  void EndUploads();
 
   // "arena 41.2 of 192 MB in 1503 ranges; this frame ... " for the log, and
   // the counts reset.

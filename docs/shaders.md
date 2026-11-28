@@ -76,7 +76,11 @@ renderer's table and fitting (`src/native/shader_ports.*`,
   `--native_shaders_off` went with the translator.
 
 To remake the SPIR-V after changing the GLSL: `cd itc_recomp/src/native/glsl
-&& python3 compile_game.py` (glslangValidator and spirv-opt).
+&& python3 compile_game.py` (glslangValidator, spirv-opt and spirv-cross,
+built by `itc_recomp/tools/build_spirv_cross.sh`); it writes the HLSL for the
+D3D11 backend too (`generated_game_shaders_hlsl.h`; `--check-hlsl` compiles it
+under Wine; `docs/d3d11-backend.md`, step 4). `compile.sh` does the same for
+the renderer's own shaders.
 
 SBX's page follows, its paths changed to ours.
 

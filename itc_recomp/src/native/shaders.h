@@ -11,17 +11,17 @@
 #include <memory>
 #include <vector>
 
-#include "vulkan_functions.h"
+#include "gpu/types.h"
 
 namespace native {
 
 enum class ShaderStage { kVertex, kPixel };
 
 // A texture the shader samples: its fetch constant and how it's declared
-// (the descriptor's image view type).
+// (k2DArray or kCube).
 struct ShaderTexture {
   uint32_t fetch_constant;
-  VkImageViewType view_type;
+  gpu::ImageType view_type;
 };
 
 // A sampler the shader uses: its fetch constant and the fetch instruction's
@@ -38,6 +38,10 @@ struct TranslatedShader {
   // glsl/game/shaders.json's lookup_hash).
   uint64_t port_hash = 0;
   std::vector<uint32_t> spirv;
+  // Its HLSL and the defines fitting it as `spirv` was fitted (the D3D11
+  // backend's; the HLSL is only linked in on Windows, else null).
+  const char* hlsl = nullptr;
+  std::vector<std::pair<std::string, std::string>> hlsl_defines;
   // The float constants the shader reads, one bit per register (c0-c255;
   // its literal constants left out, which it holds itself).
   std::array<uint64_t, 4> float_constants{};
@@ -69,7 +73,7 @@ struct TranslatedShader {
   std::vector<ShaderSampler> samplers;
   // The render targets the (pixel) shader writes, a bit each.
   uint32_t writes_color_targets = 0;
-  VkShaderModule module = VK_NULL_HANDLE;  // created by the renderer
+  gpu::Shader* gpu = nullptr;  // made by the renderer (the backend's)
 };
 
 // The cache's key for a shader's microcode (as in guest memory).

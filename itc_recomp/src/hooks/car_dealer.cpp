@@ -346,6 +346,13 @@ ITC_CAR_DEALER(82185920, CarDealerInitStates)
 // For lifted callers: an original falling back to it calls it by address; a
 // pad replay took that path and stopped on the missing entry (2026-11-26).
 ITC_CAR_DEALER(82182DD0, CarDealerSetScrollArrows)
+// The same for SetColorBar, ShowSwatches and SetKindBar: lifted OpenColors
+// sub_821847A0 (reached from lifted sub_82185518) calls the first two, a
+// new career's first visit (no save) stopped on SetColorBar's missing entry
+// (2026-11-27).
+ITC_CAR_DEALER(82182770, CarDealerSetColorBar)
+ITC_CAR_DEALER(821826C0, CarDealerShowSwatches)
+ITC_CAR_DEALER(82182158, CarDealerSetKindBar)
 // The handlers: member function functors the machine calls (no direct
 // callers).
 ITC_CAR_DEALER(82180D68, CarDealerCreate)
