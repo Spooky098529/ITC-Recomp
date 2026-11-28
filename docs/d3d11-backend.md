@@ -1,4 +1,4 @@
-# A Direct3D 11 backend (a plan; steps 1 to 5 done)
+# A Direct3D 11 backend (done: steps 1 to 6)
 
 Written 2026-11-27 on `d3d11` (branched from `main` at `c37e7acd`, the PC
 renderer's merge). Steps 2 and 3 are done (below): the renderer holds only
@@ -516,6 +516,25 @@ plan's: a new career stops in the car dealer (`docs/known-issues.md`).
   replay through the menus into race 0 (all ticks match, 0 error lines, no
   backend warnings), the boot movie with `--xbox_gamma=hdtv`, fullscreen.
   The user saw an attract race in the window. A drive is welcome.
+
+## Step 6: clean-up (done 2026-11-28)
+
+- `itc.toml` has `renderer = "vulkan"` (or `"d3d11"`, Windows only), with a
+  comment; `--renderer=d3d11` elsewhere logs a warning and uses Vulkan.
+- CLAUDE.md names this plan; `docs/windows.md` has DXVK in the test prefix.
+- CI: both workflows build `d3d11` (runs 46143282902, Windows, and
+  46143311543, Linux: success); the Windows build links `d3d11` and `dxgi`
+  from the xwin SDK, nothing to add to the workflow or the package (Windows
+  has `d3d11.dll`, `dxgi.dll` and `d3dcompiler_47.dll`).
+- A Windows test zip: `itc_recomp/out/dist/itc-d3d11-win-amd64.zip` (packaged
+  as `docs/windows.md` says).
+- Drives by the user (2026-11-28, under Wine with DXVK): an attract race and a
+  career race seen drawn; the movies were distorted (fixed: an upload's row
+  length 0 is tightly packed); a parking area against Vulkan and v0.5.0
+  alike. Two stops met on the way are the game's, not the renderer's
+  (`docs/known-issues.md`: the new career's car dealer; a null pointer in the
+  race-end camera). Left: one profile of each backend (no profiling until the
+  end, as planned) and a test on Windows itself.
 
 ## Open questions
 
