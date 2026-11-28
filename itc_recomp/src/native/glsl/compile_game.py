@@ -20,7 +20,8 @@ D3D11"): SPIRV-Cross from the same GLSL (compiled again with its names, for
 readable HLSL), vertex shaders with Y flipped to D3D's clip space and the
 draw's base vertex and first instance from b4 (VERTEX_OPTIONS). The run-time
 fit becomes defines: each specialization constant SPIRV_CROSS_CONSTANT_ID_n,
-and interpolator n's semantic XE_INTERPOLATOR_n (TEXCOORDn unless defined).
+and interpolator n's slot XE_SLOT_n (on if XE_SLOT_n_ON; to_hlsl; the
+renderer keeps the defaults).
 --check-hlsl also compiles every HLSL shader with D3DCompile under Wine
 (tools/hlsl_check, Microsoft's d3dcompiler_47.dll in the prefix).
 
@@ -217,10 +218,14 @@ VERTEX_OPTIONS = ["--flip-vert-y", "--hlsl-support-nonzero-basevertex-baseinstan
 
 
 def to_hlsl(spirv, vertex, interpolators=True):
-    """The SPIR-V file as Shader Model 5 HLSL. With interpolators, the
-    interpolators' semantics (the vertex shader's outputs, the pixel shader's
-    inputs) become XE_INTERPOLATOR_n, which the backend defines as the places
-    it gives them (as port_spirv.cpp moves their locations for Vulkan)."""
+    """The SPIR-V file as Shader Model 5 HLSL. With interpolators, both
+    stages declare the same 16 interpolator slots (TEXCOORD0-15, first in
+    the vertex shader's outputs and the pixel shader's inputs: D3D links the
+    two by register, which follows declaration order; Vulkan by location),
+    interpolator n written to or read from slot XE_SLOT_n if XE_SLOT_n_ON
+    (else not written, or read as 0). Undefined: slot n, on, which is what
+    the renderer gives (SpecializePort moves a location in both stages of a
+    pair alike, so interpolator n always pairs with n)."""
     text = subprocess.run([spirv_cross(), "--hlsl", "--shader-model", "50"] +
                           (VERTEX_OPTIONS if vertex else []) + [spirv],
                           check=True, stdout=subprocess.PIPE, text=True).stdout
@@ -230,18 +235,51 @@ def to_hlsl(spirv, vertex, interpolators=True):
     match = re.search(r"^struct %s\n\{\n.*?^\};\n" % struct_name, text, re.M | re.S)
     if not match:
         return text  # no interpolators
-    used = []
+    # (name, array size or "" for one, first slot)
+    members = re.findall(r"^    float4 (\w+)(?:\[(\d+)\])? : TEXCOORD(\d+);\n", match.group(0),
+                         re.M)
+    if not members:
+        return text
+    block = re.sub(r"^    float4 \w+(\[\d+\])? : TEXCOORD\d+;\n", "", match.group(0), flags=re.M)
+    slots = "".join("    float4 xe_slot_%d : TEXCOORD%d;\n" % (k, k) for k in range(16))
+    block = block.replace("{\n", "{\n" + slots, 1)
+    body = text[match.end():]
+    for name, size, k in members:
+        if size:  # an array (a pixel shader's): an element a slot
+            if vertex:
+                raise SystemExit("an array output %s" % name)
+            pattern = r"^(\s*)(\w+) = stage_input\.%s;$" % name
 
-    def semantic(m):
-        used.append(int(m.group(1)))
-        return ": XE_INTERPOLATOR_%s;" % m.group(1)
-    block = re.sub(r": TEXCOORD(\d+);", semantic, match.group(0))
-    prelude = ["// Interpolator n's semantic: the place the renderer gives it, TEXCOORDn",
-               "// unless it defines XE_INTERPOLATOR_n."]
-    for n in sorted(used):
-        prelude += ["#ifndef XE_INTERPOLATOR_%d" % n, "#define XE_INTERPOLATOR_%d TEXCOORD%d" % (n, n),
-                    "#endif"]
-    return "\n".join(prelude) + "\n" + text[:match.start()] + block + text[match.end():]
+            def elements(m, name=name, size=int(size), first=int(k)):
+                lines = []
+                for i in range(size):
+                    lines += ["#if XE_SLOT_%d_ON" % (first + i),
+                              "%s%s[%d] = stage_input.XE_SLOT_%d;" % (m.group(1), m.group(2), i,
+                                                                      first + i),
+                              "#else", "%s%s[%d] = 0.0f.xxxx;" % (m.group(1), m.group(2), i),
+                              "#endif"]
+                return "\n".join(lines)
+            body, count = re.subn(pattern, elements, body, flags=re.M)
+            if count != 1:
+                raise SystemExit("interpolator %s: %d copies found" % (name, count))
+            continue
+        if vertex:
+            pattern = r"^(\s*)stage_output\.%s = (.+);$" % name
+            replacement = ("#if XE_SLOT_%s_ON\n\\1stage_output.XE_SLOT_%s = \\2;\n#endif" %
+                           (k, k))
+        else:
+            pattern = r"^(\s*)(\w+) = stage_input\.%s;$" % name
+            replacement = ("#if XE_SLOT_%s_ON\n\\1\\2 = stage_input.XE_SLOT_%s;\n#else\n"
+                           "\\1\\2 = 0.0f.xxxx;\n#endif" % (k, k))
+        body, count = re.subn(pattern, replacement, body, flags=re.M)
+        if count != 1:
+            raise SystemExit("interpolator %s: %d copies found" % (name, count))
+    prelude = ["// The interpolator slots (to_hlsl in compile_game.py): interpolator n in",
+               "// slot XE_SLOT_n if XE_SLOT_n_ON, as the renderer defines them."]
+    for k in range(16):
+        prelude += ["#ifndef XE_SLOT_%d" % k, "#define XE_SLOT_%d xe_slot_%d" % (k, k),
+                    "#define XE_SLOT_%d_ON 1" % k, "#endif"]
+    return "\n".join(prelude) + "\n" + text[:match.start()] + block + body
 
 
 def check_hlsl(files):

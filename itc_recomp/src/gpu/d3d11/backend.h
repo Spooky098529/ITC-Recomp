@@ -14,6 +14,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #ifndef NOMINMAX
@@ -309,6 +310,7 @@ class Backend final : public gpu::Backend {
   ComPtr<ID3D11Buffer> fan_indices_;
   uint32_t fan_index_at_ = 0;
   std::unique_ptr<ImageObject> resolve_temp_;
+  std::unordered_set<uint32_t> log_swizzles_;
   bool warned_indexed_fan_ = false, warned_swizzle_ = false, warned_copy_ = false;
 };
 

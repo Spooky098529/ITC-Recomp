@@ -5,7 +5,6 @@
 #include "shader_ports.h"
 
 #include <algorithm>
-#include <bit>
 #include <string>
 #include <cstring>
 #include <unordered_map>
@@ -233,8 +232,7 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
   }
   // The same fit for the HLSL (docs/d3d11-backend.md, step 4): each
   // constant's value (as an unsigned literal: an int constant takes its
-  // bits, a bool constant is true when not 0), and each interpolator's
-  // semantic at the place SpecializePort gives its location.
+  // bits, a bool constant is true when not 0).
   shader.hlsl = nullptr;
 #if defined(_WIN32)
   for (const GamePortHlsl& h : kGamePortsHlsl) {
@@ -249,12 +247,9 @@ bool MakeFromPort(const GamePort& port, const uint8_t* ucode, uint32_t size_byte
     shader.hlsl_defines.emplace_back("SPIRV_CROSS_CONSTANT_ID_" + std::to_string(id),
                                      std::to_string(value) + "u");
   }
-  const uint32_t mask = specialization.interpolator_mask;
-  for (uint32_t n = 0; n < 16; n++) {
-    uint32_t place = (mask >> n) & 1 ? uint32_t(std::popcount(mask & ((1u << n) - 1))) : 16 + n;
-    shader.hlsl_defines.emplace_back("XE_INTERPOLATOR_" + std::to_string(n),
-                                     "TEXCOORD" + std::to_string(place));
-  }
+  // The interpolators keep their slots (the HLSL's default): SpecializePort
+  // moves a location in both stages of a pair alike, so interpolator n
+  // always pairs with n, in the mask or not.
   shader.textures.clear();
   for (uint32_t i = 0; i < port.texture_count; i++) {
     const GamePortTexture& t = port.textures[i];

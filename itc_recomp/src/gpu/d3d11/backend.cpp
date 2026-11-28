@@ -770,7 +770,7 @@ bool Backend::MakeViews(ImageObject& o) {
         device_->CreateShaderResourceView(o.resource.Get(), &plain, &o.srv_2d);
       }
     }
-    if (desc.type != ImageType::k3D && !multisample && !depth) {
+    if (desc.type != ImageType::k3D && !multisample) {
       D3D11_SHADER_RESOURCE_VIEW_DESC array = srv;
       array.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
       array.Texture2DArray = {0, desc.levels, 0, desc.layers};
@@ -1670,7 +1670,14 @@ View* Backend::CreateView(Image* image, const ViewDesc& desc) {
   if (FAILED(device_->CreateShaderResourceView(o.resource.Get(), &srv, &v.srv))) {
     return nullptr;
   }
-  if (!identity && !depth) {
+  if (!identity) {
+    if (log_swizzles_.insert(uint32_t(o.desc.format) << 24 | uint32_t(desc.swizzle[0]) << 9 |
+                             uint32_t(desc.swizzle[1]) << 6 | uint32_t(desc.swizzle[2]) << 3 |
+                             uint32_t(desc.swizzle[3])).second) {
+      ITC_LOG_INFO("D3D11: swizzled views of format {}: {} {} {} {} (by copy)", int(o.desc.format),
+                   int(desc.swizzle[0]), int(desc.swizzle[1]), int(desc.swizzle[2]),
+                   int(desc.swizzle[3]));
+    }
     if (IsInteger(o.desc.format) || o.desc.type == ImageType::k3D || o.desc.samples > 1 ||
         !o.srv_array) {
       if (!warned_swizzle_) {
@@ -1684,7 +1691,8 @@ View* Backend::CreateView(Image* image, const ViewDesc& desc) {
       copy.format = IsCompressed(o.desc.format)  // (a decoded one too)
                         ? (o.desc.format == Format::kBC5 ? Format::kR8G8Unorm
                                                          : Format::kR8G8B8A8Unorm)
-                        : o.desc.format;
+                    : depth ? Format::kR32G32B32A32Float  // the depth, wherever the swizzle puts it
+                            : o.desc.format;
       copy.usage = kImageSampled | kImageColorTarget;
       Image* made = CreateImage(copy);
       if (made) {

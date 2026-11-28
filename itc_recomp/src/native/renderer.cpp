@@ -17,6 +17,7 @@
 #endif
 
 #include "guest.h"
+#include "debug/state_digest.h"
 
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -101,6 +102,10 @@ ITC_FLAG_BOOL(native_renderer_base_level_only, false, "ITC",
 ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "Hash every texture used each frame, logging and reloading those whose "
               "memory changed with no memcpy write recorded (a debugging aid)");
+ITC_FLAG_INT32(native_renderer_dump_at_tick, 0, "ITC",
+               "With native_renderer_dump: dump at this race tick (counted from the race's "
+               "start, as --state_digest counts) instead of 10 s into the race, so runs of "
+               "different builds or backends dump the same moment (a debugging aid)");
 ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
                "With native_renderer_dump: dump only the frame itself (shown image, draw "
                "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
@@ -390,8 +395,11 @@ void Renderer::BeginFrame() {
       int32_t every = ITC_FLAG(native_renderer_dump_every);
       bool in_race = passes_.frame_resolve_count() >= 20;
       bool periodic = every > 0 && in_race && Clock::now() - last_dump_ >= std::chrono::seconds(every);
-      if (asked || periodic ||
-          (every <= 0 && dumps_ == 0 && in_race && ++race_frames_ >= 600)) {
+      const int32_t at_tick = ITC_FLAG(native_renderer_dump_at_tick);
+      const bool timed =
+          at_tick > 0 ? dumps_ == 0 && debug::RaceTicks() >= uint64_t(at_tick)
+                      : every <= 0 && dumps_ == 0 && in_race && ++race_frames_ >= 600;
+      if (asked || periodic || timed) {
         last_dump_ = Clock::now();
         dumping_ = true;
         dump_step_ = 0;
