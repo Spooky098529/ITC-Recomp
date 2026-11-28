@@ -623,3 +623,14 @@ void hooks::CRuntimeRand(lifted::Regs& ctx) {
 ITC_NATIVE_ENTRY(825A9BB8, ITC_FLAG(native_c_runtime)) {
   hooks::CRuntimeRand(ctx);
 }
+
+// For the fallback originals (docs/missing-functions.md): _putwc_nolock, as
+// its removed adapter did. r3 = the UTF-16 unit, r4 = the stream; r3 left as
+// it came. Only string streams natively: the console, file streams and no
+// room left (_flswbuf) run the original. (The original also stores the unit
+// in its caller's frame, at r1 + 22: no caller reads it.)
+ITC_DIRECT_ENTRY(825B7A80) {
+  if (!ITC_FLAG(native_c_runtime) || !c_runtime::PutwcString(ctx.r3.u16, ctx.r4.u32)) {
+    lifted::original::c825B7A80(ctx);
+  }
+}

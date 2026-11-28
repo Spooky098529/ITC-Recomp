@@ -2066,6 +2066,57 @@ loc_82091B8C:
   return;
 }
 
+// sub_82091CD0: lifted from generated/ by lift.py.
+uint64_t f82091CD0(uint64_t r3, uint64_t r4, uint64_t r5) {
+  ITC_NATIVE_RUNNING("sub_82091CD0 (lifted)");
+  uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  // mr r10,r3
+  r10 = r3;
+  // mr r11,r4
+  r11 = r4;
+  // li r8,12
+  r8 = uint64_t(int64_t(12));
+  // subf r9,r10,r11
+  r9 = r11 - r10;
+  // cmplw cr6,r10,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r11), so);
+  // divw r9,r9,r8
+  r9 = uint32_t((int32_t(r8) && !(int32_t(r9) == INT32_MIN && int32_t(r8) == -1)) ? int32_t(r9) / int32_t(r8) : 0);
+  // mulli r9,r9,12
+  r9 = uint64_t(int64_t(static_cast<int64_t>(r9 * static_cast<uint64_t>(12))));
+  // subf r3,r9,r5
+  r3 = r5 - r9;
+  // beqlr cr6
+  if (cr6.eq) return r3;
+  // subf r9,r11,r5
+  r9 = r5 - r11;
+loc_82091CF8:
+  // addi r11,r11,-12
+  r11 = uint64_t(int64_t(int64_t(r11) + -12));
+  // add r7,r9,r11
+  r7 = r9 + r11;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // lwz r8,0(r11)
+  r8 = guest::LoadU32(uint32_t(r11) + 0);
+  // stw r8,0(r7)
+  guest::StoreU32(uint32_t(r7) + 0, uint32_t(r8));
+  // lwz r8,4(r11)
+  r8 = guest::LoadU32(uint32_t(r11) + 4);
+  // stw r8,4(r7)
+  guest::StoreU32(uint32_t(r7) + 4, uint32_t(r8));
+  // lwz r8,8(r11)
+  r8 = guest::LoadU32(uint32_t(r11) + 8);
+  // stw r8,8(r7)
+  guest::StoreU32(uint32_t(r7) + 8, uint32_t(r8));
+  // bne cr6,0x82091cf8
+  if (!cr6.eq) goto loc_82091CF8;
+  // blr
+  return r3;
+}
+
 // sub_82091E58: lifted from generated/ by lift.py.
 lifted::Result f82091E58(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_82091E58 (lifted)");
@@ -138556,6 +138607,116 @@ loc_820EF0A0:
   return {r3, f1};
 }
 
+// sub_820EF0B8: lifted from generated/ by lift.py.
+uint64_t f820EF0B8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
+  ITC_NATIVE_RUNNING("sub_820EF0B8 (lifted)");
+  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
+  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // lwz r11,12(r3)
+  r11 = guest::LoadU32(uint32_t(r3) + 12);
+  // mr r10,r4
+  r10 = r4;
+  // lwz r9,20(r3)
+  r9 = guest::LoadU32(uint32_t(r3) + 20);
+  // li r7,0
+  r7 = uint64_t(int64_t(0));
+  // stw r11,84(r1)
+  guest::StoreU32(uint32_t(r1) + 84, uint32_t(r11));
+  // lwz r11,24(r3)
+  r11 = guest::LoadU32(uint32_t(r3) + 24);
+  // mullw r11,r11,r9
+  r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r9))));
+  // addic. r11,r11,-1
+  ca = uint32_t(r11) > 0;
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x820ef154
+  if (cr0.eq) goto loc_820EF154;
+  // b 0x820ef0f0
+  goto loc_820EF0F0;
+loc_820EF0EC:
+  // lwz r10,80(r1)
+  r10 = guest::LoadU32(uint32_t(r1) + 80);
+loc_820EF0F0:
+  // lbz r11,0(r10)
+  r11 = guest::LoadU8(uint32_t(r10) + 0);
+  // addi r6,r1,80
+  r6 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r5,r1,84
+  r5 = uint64_t(int64_t(int64_t(r1) + 84));
+  // rlwinm. r9,r11,0,0,24
+  r9 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFF80;
+  cr0 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
+  // beq 0x820ef124
+  if (cr0.eq) goto loc_820EF124;
+  // addi r10,r10,1
+  r10 = uint64_t(int64_t(int64_t(r10) + 1));
+  // clrlwi r11,r11,25
+  r11 = uint32_t(r11) & 0x7F;
+  // addi r4,r11,1
+  r4 = uint64_t(int64_t(int64_t(r11) + 1));
+  // stw r10,80(r1)
+  guest::StoreU32(uint32_t(r1) + 80, uint32_t(r10));
+  // add r10,r11,r7
+  r10 = r11 + r7;
+  // addi r7,r10,1
+  r7 = uint64_t(int64_t(int64_t(r10) + 1));
+  // bl 0x820eeda8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x820EEDA8, LIFTED_ARGS(0x820EF120, r31)); r3 = o.r3; f1 = o.f1; }
+  // b 0x820ef13c
+  goto loc_820EF13C;
+loc_820EF124:
+  // add r9,r11,r7
+  r9 = r11 + r7;
+  // addi r4,r11,1
+  r4 = uint64_t(int64_t(int64_t(r11) + 1));
+  // addi r11,r10,1
+  r11 = uint64_t(int64_t(int64_t(r10) + 1));
+  // addi r7,r9,1
+  r7 = uint64_t(int64_t(int64_t(r9) + 1));
+  // stw r11,80(r1)
+  guest::StoreU32(uint32_t(r1) + 80, uint32_t(r11));
+  // bl 0x820eee58
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x820EEE58, LIFTED_ARGS(0x820EF13C, r31)); r3 = o.r3; f1 = o.f1; }
+loc_820EF13C:
+  // lwz r11,24(r3)
+  r11 = guest::LoadU32(uint32_t(r3) + 24);
+  // lwz r10,20(r3)
+  r10 = guest::LoadU32(uint32_t(r3) + 20);
+  // mullw r11,r11,r10
+  r11 = uint64_t(int64_t(int64_t(int32_t(r11)) * int64_t(int32_t(r10))));
+  // addi r11,r11,-1
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  // cmplw cr6,r7,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r7), uint32_t(r11), so);
+  // blt cr6,0x820ef0ec
+  if (cr6.lt) goto loc_820EF0EC;
+loc_820EF154:
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // addi r1,r1,96
+  r1 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // blr
+  return r3;
+}
+
 // sub_820EF168 game::TGA::Decode: lifted from generated/ by lift.py.
 lifted::Result f820EF168(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_820EF168 (lifted)");
@@ -154006,7 +154167,7 @@ loc_820FC5D0:
   guest::StoreU32(schema::WallQuery(uint32_t(r31)).hit_wall_address(), uint32_t(r11));
   // bl 0x820fc2e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC2E0, LIFTED_ARGS(0x820FC620, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::WallQuery::AddHit(LIFTED_ARGS(0x820FC620, r31)); r3 = o.r3; f1 = o.f1; }
   // li r24,1
   r24 = uint64_t(int64_t(1));
 loc_820FC624:
@@ -154404,7 +154565,7 @@ loc_820FCB00:
   guest::StoreU32(uint32_t(r1) + 236, uint32_t(r22));
   // bl 0x820fc658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC658, LIFTED_ARGS(0x820FCB4C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Segments::Intersect2D(LIFTED_ARGS(0x820FCB4C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x820fd170
@@ -154905,7 +155066,7 @@ loc_820FCDF4:
   guest::StoreU32(uint32_t(r1) + 284, uint32_t(r11));
   // bl 0x820fc658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC658, LIFTED_ARGS(0x820FCE5C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Segments::Intersect2D(LIFTED_ARGS(0x820FCE5C, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f0,4(r23)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(schema::WallQuery(uint32_t(r23) - 16).wall_a_y_address());
@@ -154964,7 +155125,7 @@ loc_820FCE68:
   guest::StoreU32(uint32_t(r1) + 252, uint32_t(r11));
   // bl 0x820fc658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC658, LIFTED_ARGS(0x820FCEB8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Segments::Intersect2D(LIFTED_ARGS(0x820FCEB8, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f0,4(r22)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(schema::WallQuery(uint32_t(r22) - 32).wall_b_y_address());
@@ -155827,7 +155988,7 @@ loc_820FD3A4:
   guest::StoreU32(uint32_t(r1) + 136, temp.u32);
   // bl 0x820fc658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC658, LIFTED_ARGS(0x820FD414, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Segments::Intersect2D(LIFTED_ARGS(0x820FD414, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f13,4(r23)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(schema::WallQuery(uint32_t(r23) - 16).wall_a_y_address());
@@ -155889,7 +156050,7 @@ loc_820FD3A4:
   guest::StoreU32(uint32_t(r1) + 120, temp.u32);
   // bl 0x820fc658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC658, LIFTED_ARGS(0x820FD474, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Segments::Intersect2D(LIFTED_ARGS(0x820FD474, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f0,4(r22)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(schema::WallQuery(uint32_t(r22) - 32).wall_b_y_address());
@@ -156239,7 +156400,7 @@ loc_820FD634:
   guest::StoreU32(schema::WallQuery(uint32_t(r26)).hit_wall_address(), uint32_t(r11));
   // bl 0x820fc2e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x820FC2E0, LIFTED_ARGS(0x820FD69C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::WallQuery::AddHit(LIFTED_ARGS(0x820FD69C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r16,1
   r16 = uint64_t(int64_t(1));
 loc_820FD6A0:
@@ -206711,6 +206872,172 @@ loc_8212DF84:
   return;
 }
 
+// sub_8212EFA8: lifted from generated/ by lift.py.
+void f8212EFA8(uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_8212EFA8 (lifted)");
+  uint64_t r9 = 0, r10 = 0, r11 = 0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  // lwz r11,0(r3)
+  r11 = guest::LoadU32(uint32_t(r3) + 0);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x8212efb8
+  if (!cr6.eq) goto loc_8212EFB8;
+  // twi 31,r0,22
+  lifted::Trap(22);
+loc_8212EFB8:
+  // lwz r10,4(r3)
+  r10 = guest::LoadU32(uint32_t(r3) + 4);
+  // lbz r11,41(r10)
+  r11 = guest::LoadU8(uint32_t(r10) + 41);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x8212efd0
+  if (cr6.eq) goto loc_8212EFD0;
+  // twi 31,r0,22
+  lifted::Trap(22);
+  // blr
+  return;
+loc_8212EFD0:
+  // lwz r11,8(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 8);
+  // lbz r9,41(r11)
+  r9 = guest::LoadU8(uint32_t(r11) + 41);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x8212efec
+  if (cr6.eq) goto loc_8212EFEC;
+  // lwz r11,4(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 4);
+  // b 0x8212f01c
+  goto loc_8212F01C;
+loc_8212EFE8:
+  // mr r11,r10
+  r11 = r10;
+loc_8212EFEC:
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r9,41(r10)
+  r9 = guest::LoadU8(uint32_t(r10) + 41);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x8212efe8
+  if (cr6.eq) goto loc_8212EFE8;
+  // b 0x8212f028
+  goto loc_8212F028;
+loc_8212F000:
+  // lwz r10,4(r3)
+  r10 = guest::LoadU32(uint32_t(r3) + 4);
+  // lwz r9,8(r11)
+  r9 = guest::LoadU32(uint32_t(r11) + 8);
+  // cmplw cr6,r10,r9
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r9), so);
+  // bne cr6,0x8212f028
+  if (!cr6.eq) goto loc_8212F028;
+  // stw r11,4(r3)
+  guest::StoreU32(uint32_t(r3) + 4, uint32_t(r11));
+  // rotlwi r11,r11,0
+  r11 = __builtin_rotateleft32(uint32_t(r11), 0);
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+loc_8212F01C:
+  // lbz r10,41(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 41);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x8212f000
+  if (cr6.eq) goto loc_8212F000;
+loc_8212F028:
+  // stw r11,4(r3)
+  guest::StoreU32(uint32_t(r3) + 4, uint32_t(r11));
+  // blr
+  return;
+}
+
+// sub_8212F030: lifted from generated/ by lift.py.
+void f8212F030(uint64_t r3) {
+  ITC_NATIVE_RUNNING("sub_8212F030 (lifted)");
+  uint64_t r9 = 0, r10 = 0, r11 = 0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  // lwz r11,0(r3)
+  r11 = guest::LoadU32(uint32_t(r3) + 0);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x8212f040
+  if (!cr6.eq) goto loc_8212F040;
+  // twi 31,r0,22
+  lifted::Trap(22);
+loc_8212F040:
+  // lwz r10,4(r3)
+  r10 = guest::LoadU32(uint32_t(r3) + 4);
+  // lbz r11,33(r10)
+  r11 = guest::LoadU8(uint32_t(r10) + 33);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x8212f058
+  if (cr6.eq) goto loc_8212F058;
+  // twi 31,r0,22
+  lifted::Trap(22);
+  // blr
+  return;
+loc_8212F058:
+  // lwz r11,8(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 8);
+  // lbz r9,33(r11)
+  r9 = guest::LoadU8(uint32_t(r11) + 33);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x8212f074
+  if (cr6.eq) goto loc_8212F074;
+  // lwz r11,4(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 4);
+  // b 0x8212f0a4
+  goto loc_8212F0A4;
+loc_8212F070:
+  // mr r11,r10
+  r11 = r10;
+loc_8212F074:
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r9,33(r10)
+  r9 = guest::LoadU8(uint32_t(r10) + 33);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x8212f070
+  if (cr6.eq) goto loc_8212F070;
+  // b 0x8212f0b0
+  goto loc_8212F0B0;
+loc_8212F088:
+  // lwz r10,4(r3)
+  r10 = guest::LoadU32(uint32_t(r3) + 4);
+  // lwz r9,8(r11)
+  r9 = guest::LoadU32(uint32_t(r11) + 8);
+  // cmplw cr6,r10,r9
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r9), so);
+  // bne cr6,0x8212f0b0
+  if (!cr6.eq) goto loc_8212F0B0;
+  // stw r11,4(r3)
+  guest::StoreU32(uint32_t(r3) + 4, uint32_t(r11));
+  // rotlwi r11,r11,0
+  r11 = __builtin_rotateleft32(uint32_t(r11), 0);
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+loc_8212F0A4:
+  // lbz r10,33(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 33);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x8212f088
+  if (cr6.eq) goto loc_8212F088;
+loc_8212F0B0:
+  // stw r11,4(r3)
+  guest::StoreU32(uint32_t(r3) + 4, uint32_t(r11));
+  // blr
+  return;
+}
+
 // sub_8212F0B8: lifted from generated/ by lift.py.
 lifted::Result f8212F0B8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
   ITC_NATIVE_RUNNING("sub_8212F0B8 (lifted)");
@@ -206906,6 +207233,79 @@ loc_8212FBCC:
   return;
 }
 
+// sub_8212FBD8 game::UvColumn::AllocateNodes: lifted from generated/ by lift.py.
+lifted::Result f8212FBD8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_8212FBD8 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r3
+  r31 = r3;
+  // cmplwi cr6,r31,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
+  // beq cr6,0x8212fc30
+  if (cr6.eq) goto loc_8212FC30;
+  // li r11,-1
+  r11 = uint64_t(int64_t(-1));
+  // twllei r31,0
+  if (int32_t(r31) == 0 || uint32_t(r31) < 0u) lifted::Trap(0);
+  // divwu r11,r11,r31
+  r11 = uint32_t(uint32_t(r31) ? uint32_t(r11) / uint32_t(r31) : 0);
+  // cmplwi cr6,r11,40
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 40, so);
+  // bge cr6,0x8212fc30
+  if (!cr6.lt) goto loc_8212FC30;
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // li r10,0
+  r10 = uint64_t(int64_t(0));
+  // addi r11,r11,3276
+  r11 = uint64_t(int64_t(int64_t(r11) + 3276));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // stw r10,84(r1)
+  guest::StoreU32(uint32_t(r1) + 84, uint32_t(r10));
+  // stw r11,80(r1)
+  guest::StoreU32(uint32_t(r1) + 80, uint32_t(r11));
+  // bl 0x82091200
+  // (left out: dead in C++)
+  { const lifted::Result o = f82091200(r1, r13, r3, r4, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // addi r11,r11,3264
+  r11 = uint64_t(int64_t(int64_t(r11) + 3264));
+  // stw r11,80(r1)
+  guest::StoreU32(uint32_t(r1) + 80, uint32_t(r11));
+loc_8212FC30:
+  // mulli r3,r31,40
+  r3 = uint64_t(int64_t(static_cast<int64_t>(r31 * static_cast<uint64_t>(40))));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x8212FC38, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
 // sub_8212FC50 game::UvMap::AllocateNodes: lifted from generated/ by lift.py.
 lifted::Result f8212FC50(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_8212FC50 (lifted)");
@@ -206969,6 +207369,197 @@ loc_8212FCA8:
   { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x8212FCB0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
+// sub_8212FD50 game::UvColumn::EraseSubtree: lifted from generated/ by lift.py.
+lifted::Result f8212FD50(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_8212FD50 (lifted)");
+  uint64_t r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r3
+  r30 = r3;
+  // mr r31,r4
+  r31 = r4;
+  // b 0x8212fd88
+  goto loc_8212FD88;
+loc_8212FD70:
+  // mr r3,r30
+  r3 = r30;
+  // lwz r4,8(r31)
+  r4 = schema::ScreenObjectUvColumnNode(uint32_t(r31)).right_bits();
+  // bl 0x8212fd50
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::EraseSubtree(LIFTED_ARGS(0x8212FD7C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r3,r31
+  r3 = r31;
+  // lwz r31,0(r31)
+  r31 = schema::ScreenObjectUvColumnNode(uint32_t(r31)).left_bits();
+  // bl 0x825a70e8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A70E8(LIFTED_ARGS(0x8212FD88, r31)); r3 = o.r3; f1 = o.f1; }
+loc_8212FD88:
+  // lbz r11,33(r31)
+  r11 = schema::ScreenObjectUvColumnNode(uint32_t(r31)).is_nil_bits();
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x8212fd70
+  if (cr6.eq) goto loc_8212FD70;
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
+// sub_8212FDB0 game::UvColumn::NewNode: lifted from generated/ by lift.py.
+lifted::Result f8212FDB0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_8212FDB0 (lifted)");
+  uint64_t r3 = 0, r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e84
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-128(r1)
+  ea = -128 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r4
+  r30 = r4;
+  // li r4,0
+  r4 = uint64_t(int64_t(0));
+  // li r3,1
+  r3 = uint64_t(int64_t(1));
+  // mr r29,r5
+  r29 = r5;
+  // mr r28,r6
+  r28 = r6;
+  // mr r31,r7
+  r31 = r7;
+  // mr r27,r8
+  r27 = r8;
+  // bl 0x8212fbd8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::AllocateNodes(LIFTED_ARGS(0x8212FDDC, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmplwi r3,0
+  cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // beq 0x8212fe20
+  if (cr0.eq) goto loc_8212FE20;
+  // stw r30,0(r3)
+  schema::ScreenObjectUvColumnNode(uint32_t(r3)).set_left_bits(uint32_t(r30));
+  // addi r11,r3,16
+  r11 = uint64_t(int64_t(int64_t(r3) + 16));
+  // stw r29,4(r3)
+  schema::ScreenObjectUvColumnNode(uint32_t(r3)).set_parent_bits(uint32_t(r29));
+  // li r10,0
+  r10 = uint64_t(int64_t(0));
+  // stw r28,8(r3)
+  schema::ScreenObjectUvColumnNode(uint32_t(r3)).set_right_bits(uint32_t(r28));
+  // lwz r9,0(r31)
+  r9 = schema::ScreenObjectUvColumnValue(uint32_t(r31)).key_high_bits();
+  // stw r9,0(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11) - 16).set_key_high_bits(uint32_t(r9));
+  // lwz r9,4(r31)
+  r9 = schema::ScreenObjectUvColumnValue(uint32_t(r31)).key_low_bits();
+  // stw r9,4(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11) - 16).set_key_low_bits(uint32_t(r9));
+  // lwz r9,8(r31)
+  r9 = schema::ScreenObjectUvColumnValue(uint32_t(r31)).u_bits();
+  // stw r9,8(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11) - 16).set_u_bits(uint32_t(r9));
+  // lwz r9,12(r31)
+  r9 = schema::ScreenObjectUvColumnValue(uint32_t(r31)).v_bits();
+  // stw r9,12(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11) - 16).set_v_bits(uint32_t(r9));
+  // stb r27,32(r3)
+  schema::ScreenObjectUvColumnNode(uint32_t(r3)).set_color_bits(uint8_t(r27));
+  // stb r10,33(r3)
+  schema::ScreenObjectUvColumnNode(uint32_t(r3)).set_is_nil_bits(uint8_t(r10));
+loc_8212FE20:
+  // addi r1,r1,128
+  r1 = uint64_t(int64_t(int64_t(r1) + 128));
+  // b 0x825a6ed4
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_8212FE28 game::UvColumn::Clear: lifted from generated/ by lift.py.
+lifted::Result f8212FE28(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_8212FE28 (lifted)");
+  uint64_t r4 = 0, r5 = 0, r11 = 0, r12 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r3
+  r31 = r3;
+  // lwz r11,4(r31)
+  r11 = schema::ScreenObjectUvColumn(uint32_t(r31)).head_bits();
+  // lwz r4,4(r11)
+  r4 = schema::ScreenObjectUvColumnNode(uint32_t(r11)).parent_bits();
+  // bl 0x8212fd50
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::EraseSubtree(LIFTED_ARGS(0x8212FE48, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,4(r31)
+  r11 = schema::ScreenObjectUvColumn(uint32_t(r31)).head_bits();
+  // li r10,0
+  r10 = uint64_t(int64_t(0));
+  // stw r11,4(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11)).set_parent_bits(uint32_t(r11));
+  // lwz r11,4(r31)
+  r11 = schema::ScreenObjectUvColumn(uint32_t(r31)).head_bits();
+  // stw r10,8(r31)
+  schema::ScreenObjectUvColumn(uint32_t(r31)).set_size_bits(uint32_t(r10));
+  // stw r11,0(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11)).set_left_bits(uint32_t(r11));
+  // lwz r11,4(r31)
+  r11 = schema::ScreenObjectUvColumn(uint32_t(r31)).head_bits();
+  // stw r11,8(r11)
+  schema::ScreenObjectUvColumnNode(uint32_t(r11)).set_right_bits(uint32_t(r11));
+  // addi r1,r1,96
+  r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
   r12 = guest::LoadU32(uint32_t(r1) + -8);
   // mtlr r12
@@ -209398,7 +209989,7 @@ loc_821316F8:
   r4 = r6;
   // bl 0x8212fdb0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FDB0, LIFTED_ARGS(0x82131714, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::NewNode(LIFTED_ARGS(0x82131714, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,8(r30)
   r10 = schema::ScreenObjectUvColumn(uint32_t(r30)).size_bits();
   // lwz r11,4(r30)
@@ -209509,7 +210100,7 @@ loc_821317A0:
   r4 = r31;
   // bl 0x8212f920
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212F920, LIFTED_ARGS(0x821317E4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::RotateLeft(LIFTED_ARGS(0x821317E4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821317E4:
   // lwz r11,4(r31)
   r11 = schema::ScreenObjectUvColumnNode(uint32_t(r31)).parent_bits();
@@ -209529,7 +210120,7 @@ loc_821317E4:
   r4 = schema::ScreenObjectUvColumnNode(uint32_t(r11)).parent_bits();
   // bl 0x8212f988
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212F988, LIFTED_ARGS(0x82131808, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::RotateRight(LIFTED_ARGS(0x82131808, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x82131880
   goto loc_82131880;
 loc_8213180C:
@@ -209575,7 +210166,7 @@ loc_82131840:
   r4 = r31;
   // bl 0x8212f988
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212F988, LIFTED_ARGS(0x8213185C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::RotateRight(LIFTED_ARGS(0x8213185C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8213185C:
   // lwz r11,4(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 4);
@@ -209595,7 +210186,7 @@ loc_8213185C:
   r4 = guest::LoadU32(uint32_t(r11) + 4);
   // bl 0x8212f920
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212F920, LIFTED_ARGS(0x82131880, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::RotateLeft(LIFTED_ARGS(0x82131880, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82131880:
   // addi r11,r31,4
   r11 = uint64_t(int64_t(int64_t(r31) + 4));
@@ -209623,6 +210214,581 @@ loc_82131894:
   // addi r1,r1,208
   r1 = uint64_t(int64_t(int64_t(r1) + 208));
   // b 0x825a6ed0
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_821318B8: lifted from generated/ by lift.py.
+lifted::Result f821318B8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_821318B8 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e7c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-224(r1)
+  ea = -224 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // std r5,256(r1)
+  guest::StoreU64(uint32_t(r1) + 256, r5);
+  // mr r25,r3
+  r25 = r3;
+  // lwz r31,260(r1)
+  r31 = guest::LoadU32(uint32_t(r1) + 260);
+  // mr r27,r4
+  r27 = r4;
+  // lbz r11,33(r31)
+  r11 = guest::LoadU8(uint32_t(r31) + 33);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82131924
+  if (cr6.eq) goto loc_82131924;
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r4,r11,3324
+  r4 = uint64_t(int64_t(int64_t(r11) + 3324));
+  // bl 0x825931d0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825931D0(LIFTED_ARGS(0x821318F0, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r4,r1,80
+  r4 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r3,r1,112
+  r3 = uint64_t(int64_t(int64_t(r1) + 112));
+  // bl 0x820919b8
+  // (left out: dead in C++)
+  { const lifted::Result o = f820919B8(r1, r13, r3, r4, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  // bl 0x82091200
+  // (left out: dead in C++)
+  { const lifted::Result o = f82091200(r1, r13, r3, r4, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // addi r3,r1,112
+  r3 = uint64_t(int64_t(int64_t(r1) + 112));
+  // addi r11,r11,3300
+  r11 = uint64_t(int64_t(int64_t(r11) + 3300));
+  // stw r11,112(r1)
+  guest::StoreU32(uint32_t(r1) + 112, uint32_t(r11));
+  // bl 0x820915f8
+  // (left out: dead in C++)
+  { const lifted::Result o = f820915F8(r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // li r4,1
+  r4 = uint64_t(int64_t(1));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // bl 0x82091328
+  // (left out: dead in C++)
+  { const lifted::Result o = game::Std::string::_Tidy(LIFTED_ARGS(0x82131924, r31)); r3 = o.r3; f1 = o.f1; }
+loc_82131924:
+  // addi r3,r1,256
+  r3 = uint64_t(int64_t(int64_t(r1) + 256));
+  // mr r26,r31
+  r26 = r31;
+  // bl 0x8212f030
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8212F030, LIFTED_ARGS(0x82131930, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r26)
+  r11 = guest::LoadU32(uint32_t(r26) + 0);
+  // lbz r10,33(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 33);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x82131948
+  if (cr6.eq) goto loc_82131948;
+  // lwz r28,8(r26)
+  r28 = guest::LoadU32(uint32_t(r26) + 8);
+  // b 0x82131970
+  goto loc_82131970;
+loc_82131948:
+  // lwz r10,8(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 8);
+  // lbz r10,33(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 33);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x82131960
+  if (cr6.eq) goto loc_82131960;
+  // mr r28,r11
+  r28 = r11;
+  // b 0x82131970
+  goto loc_82131970;
+loc_82131960:
+  // lwz r11,260(r1)
+  r11 = guest::LoadU32(uint32_t(r1) + 260);
+  // cmplw cr6,r11,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r26), so);
+  // lwz r28,8(r11)
+  r28 = guest::LoadU32(uint32_t(r11) + 8);
+  // bne cr6,0x82131a4c
+  if (!cr6.eq) goto loc_82131A4C;
+loc_82131970:
+  // lbz r11,33(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 33);
+  // lwz r31,4(r26)
+  r31 = guest::LoadU32(uint32_t(r26) + 4);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x82131984
+  if (!cr6.eq) goto loc_82131984;
+  // stw r31,4(r28)
+  guest::StoreU32(uint32_t(r28) + 4, uint32_t(r31));
+loc_82131984:
+  // lwz r11,4(r27)
+  r11 = guest::LoadU32(uint32_t(r27) + 4);
+  // lwz r10,4(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r10,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r26), so);
+  // bne cr6,0x8213199c
+  if (!cr6.eq) goto loc_8213199C;
+  // stw r28,4(r11)
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r28));
+  // b 0x821319b4
+  goto loc_821319B4;
+loc_8213199C:
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // cmplw cr6,r11,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r26), so);
+  // bne cr6,0x821319b0
+  if (!cr6.eq) goto loc_821319B0;
+  // stw r28,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r28));
+  // b 0x821319b4
+  goto loc_821319B4;
+loc_821319B0:
+  // stw r28,8(r31)
+  guest::StoreU32(uint32_t(r31) + 8, uint32_t(r28));
+loc_821319B4:
+  // lwz r9,4(r27)
+  r9 = guest::LoadU32(uint32_t(r27) + 4);
+  // lwz r11,0(r9)
+  r11 = guest::LoadU32(uint32_t(r9) + 0);
+  // cmplw cr6,r11,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r26), so);
+  // bne cr6,0x821319fc
+  if (!cr6.eq) goto loc_821319FC;
+  // lbz r11,33(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 33);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x821319d8
+  if (cr6.eq) goto loc_821319D8;
+  // mr r11,r31
+  r11 = r31;
+  // b 0x821319f8
+  goto loc_821319F8;
+loc_821319D8:
+  // lwz r10,0(r28)
+  r10 = guest::LoadU32(uint32_t(r28) + 0);
+  // mr r11,r28
+  r11 = r28;
+  // b 0x821319ec
+  goto loc_821319EC;
+loc_821319E4:
+  // mr r11,r10
+  r11 = r10;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+loc_821319EC:
+  // lbz r8,33(r10)
+  r8 = guest::LoadU8(uint32_t(r10) + 33);
+  // cmplwi cr6,r8,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r8), 0, so);
+  // beq cr6,0x821319e4
+  if (cr6.eq) goto loc_821319E4;
+loc_821319F8:
+  // stw r11,0(r9)
+  guest::StoreU32(uint32_t(r9) + 0, uint32_t(r11));
+loc_821319FC:
+  // lwz r8,4(r27)
+  r8 = guest::LoadU32(uint32_t(r27) + 4);
+  // lwz r11,8(r8)
+  r11 = guest::LoadU32(uint32_t(r8) + 8);
+  // cmplw cr6,r11,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r26), so);
+  // bne cr6,0x82131ae4
+  if (!cr6.eq) goto loc_82131AE4;
+  // lbz r11,33(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 33);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82131a20
+  if (cr6.eq) goto loc_82131A20;
+  // mr r11,r31
+  r11 = r31;
+  // b 0x82131a44
+  goto loc_82131A44;
+loc_82131A20:
+  // addi r10,r28,8
+  r10 = uint64_t(int64_t(int64_t(r28) + 8));
+  // mr r11,r28
+  r11 = r28;
+  // b 0x82131a34
+  goto loc_82131A34;
+loc_82131A2C:
+  // lwz r11,0(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 0);
+  // addi r10,r11,8
+  r10 = uint64_t(int64_t(int64_t(r11) + 8));
+loc_82131A34:
+  // lwz r9,0(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 0);
+  // lbz r9,33(r9)
+  r9 = guest::LoadU8(uint32_t(r9) + 33);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x82131a2c
+  if (cr6.eq) goto loc_82131A2C;
+loc_82131A44:
+  // stw r11,8(r8)
+  guest::StoreU32(uint32_t(r8) + 8, uint32_t(r11));
+  // b 0x82131ae4
+  goto loc_82131AE4;
+loc_82131A4C:
+  // lwz r10,0(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 0);
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+  // lwz r10,0(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 0);
+  // stw r10,0(r11)
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r10));
+  // lwz r10,8(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 8);
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // bne cr6,0x82131a70
+  if (!cr6.eq) goto loc_82131A70;
+  // mr r31,r11
+  r31 = r11;
+  // b 0x82131a98
+  goto loc_82131A98;
+loc_82131A70:
+  // lbz r10,33(r28)
+  r10 = guest::LoadU8(uint32_t(r28) + 33);
+  // lwz r31,4(r11)
+  r31 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82131a84
+  if (!cr6.eq) goto loc_82131A84;
+  // stw r31,4(r28)
+  guest::StoreU32(uint32_t(r28) + 4, uint32_t(r31));
+loc_82131A84:
+  // stw r28,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r28));
+  // lwz r10,8(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 8);
+  // stw r10,8(r11)
+  guest::StoreU32(uint32_t(r11) + 8, uint32_t(r10));
+  // lwz r10,8(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 8);
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+loc_82131A98:
+  // lwz r10,4(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 4);
+  // lwz r9,4(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 4);
+  // cmplw cr6,r9,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r26), so);
+  // bne cr6,0x82131ab0
+  if (!cr6.eq) goto loc_82131AB0;
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+  // b 0x82131acc
+  goto loc_82131ACC;
+loc_82131AB0:
+  // lwz r10,4(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 4);
+  // lwz r9,0(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 0);
+  // cmplw cr6,r9,r26
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r26), so);
+  // bne cr6,0x82131ac8
+  if (!cr6.eq) goto loc_82131AC8;
+  // stw r11,0(r10)
+  guest::StoreU32(uint32_t(r10) + 0, uint32_t(r11));
+  // b 0x82131acc
+  goto loc_82131ACC;
+loc_82131AC8:
+  // stw r11,8(r10)
+  guest::StoreU32(uint32_t(r10) + 8, uint32_t(r11));
+loc_82131ACC:
+  // lwz r10,4(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 4);
+  // stw r10,4(r11)
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r10));
+  // lbz r9,32(r26)
+  r9 = guest::LoadU8(uint32_t(r26) + 32);
+  // lbz r10,32(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 32);
+  // stb r9,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r9));
+  // stb r10,32(r26)
+  guest::StoreU8(uint32_t(r26) + 32, uint8_t(r10));
+loc_82131AE4:
+  // lbz r11,32(r26)
+  r11 = guest::LoadU8(uint32_t(r26) + 32);
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // bne cr6,0x82131c84
+  if (!cr6.eq) goto loc_82131C84;
+  // lwz r11,4(r27)
+  r11 = guest::LoadU32(uint32_t(r27) + 4);
+  // li r30,1
+  r30 = uint64_t(int64_t(1));
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // beq cr6,0x82131c80
+  if (cr6.eq) goto loc_82131C80;
+  // li r29,0
+  r29 = uint64_t(int64_t(0));
+loc_82131B08:
+  // lbz r11,32(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 32);
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // bne cr6,0x82131c80
+  if (!cr6.eq) goto loc_82131C80;
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // bne cr6,0x82131bc4
+  if (!cr6.eq) goto loc_82131BC4;
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+  // lbz r10,32(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 32);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82131b48
+  if (!cr6.eq) goto loc_82131B48;
+  // mr r4,r31
+  r4 = r31;
+  // stb r30,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r30));
+  // mr r3,r27
+  r3 = r27;
+  // stb r29,32(r31)
+  guest::StoreU8(uint32_t(r31) + 32, uint8_t(r29));
+  // bl 0x8212f920
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateLeft(LIFTED_ARGS(0x82131B44, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+loc_82131B48:
+  // lbz r10,33(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 33);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82131c18
+  if (!cr6.eq) goto loc_82131C18;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82131b74
+  if (!cr6.eq) goto loc_82131B74;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // beq cr6,0x82131c14
+  if (cr6.eq) goto loc_82131C14;
+loc_82131B74:
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82131ba0
+  if (!cr6.eq) goto loc_82131BA0;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // mr r4,r11
+  r4 = r11;
+  // mr r3,r27
+  r3 = r27;
+  // stb r30,32(r10)
+  guest::StoreU8(uint32_t(r10) + 32, uint8_t(r30));
+  // stb r29,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r29));
+  // bl 0x8212f988
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateRight(LIFTED_ARGS(0x82131B9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+loc_82131BA0:
+  // lbz r10,32(r31)
+  r10 = guest::LoadU8(uint32_t(r31) + 32);
+  // mr r4,r31
+  r4 = r31;
+  // mr r3,r27
+  r3 = r27;
+  // stb r10,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r10));
+  // stb r30,32(r31)
+  guest::StoreU8(uint32_t(r31) + 32, uint8_t(r30));
+  // lwz r11,8(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 8);
+  // stb r30,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r30));
+  // bl 0x8212f920
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateLeft(LIFTED_ARGS(0x82131BC0, r31)); r3 = o.r3; f1 = o.f1; }
+  // b 0x82131c80
+  goto loc_82131C80;
+loc_82131BC4:
+  // lbz r10,32(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 32);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82131be8
+  if (!cr6.eq) goto loc_82131BE8;
+  // mr r4,r31
+  r4 = r31;
+  // stb r30,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r30));
+  // mr r3,r27
+  r3 = r27;
+  // stb r29,32(r31)
+  guest::StoreU8(uint32_t(r31) + 32, uint8_t(r29));
+  // bl 0x8212f988
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateRight(LIFTED_ARGS(0x82131BE4, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+loc_82131BE8:
+  // lbz r10,33(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 33);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82131c18
+  if (!cr6.eq) goto loc_82131C18;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82131c34
+  if (!cr6.eq) goto loc_82131C34;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82131c34
+  if (!cr6.eq) goto loc_82131C34;
+loc_82131C14:
+  // stb r29,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r29));
+loc_82131C18:
+  // lwz r11,4(r27)
+  r11 = guest::LoadU32(uint32_t(r27) + 4);
+  // mr r28,r31
+  r28 = r31;
+  // lwz r31,4(r31)
+  r31 = guest::LoadU32(uint32_t(r31) + 4);
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // bne cr6,0x82131b08
+  if (!cr6.eq) goto loc_82131B08;
+  // b 0x82131c80
+  goto loc_82131C80;
+loc_82131C34:
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,32(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 32);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82131c60
+  if (!cr6.eq) goto loc_82131C60;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // mr r4,r11
+  r4 = r11;
+  // mr r3,r27
+  r3 = r27;
+  // stb r30,32(r10)
+  guest::StoreU8(uint32_t(r10) + 32, uint8_t(r30));
+  // stb r29,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r29));
+  // bl 0x8212f920
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateLeft(LIFTED_ARGS(0x82131C5C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+loc_82131C60:
+  // lbz r10,32(r31)
+  r10 = guest::LoadU8(uint32_t(r31) + 32);
+  // mr r4,r31
+  r4 = r31;
+  // mr r3,r27
+  r3 = r27;
+  // stb r10,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r10));
+  // stb r30,32(r31)
+  guest::StoreU8(uint32_t(r31) + 32, uint8_t(r30));
+  // lwz r11,0(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 0);
+  // stb r30,32(r11)
+  guest::StoreU8(uint32_t(r11) + 32, uint8_t(r30));
+  // bl 0x8212f988
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::RotateRight(LIFTED_ARGS(0x82131C80, r31)); r3 = o.r3; f1 = o.f1; }
+loc_82131C80:
+  // stb r30,32(r28)
+  guest::StoreU8(uint32_t(r28) + 32, uint8_t(r30));
+loc_82131C84:
+  // mr r3,r26
+  r3 = r26;
+  // bl 0x825a70e8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A70E8(LIFTED_ARGS(0x82131C8C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r27)
+  r11 = guest::LoadU32(uint32_t(r27) + 8);
+  // cmplwi r11,0
+  cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq 0x82131ca0
+  if (cr0.eq) goto loc_82131CA0;
+  // addi r11,r11,-1
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  // stw r11,8(r27)
+  guest::StoreU32(uint32_t(r27) + 8, uint32_t(r11));
+loc_82131CA0:
+  // ld r11,256(r1)
+  r11 = guest::LoadU64(uint32_t(r1) + 256);
+  // mr r3,r25
+  r3 = r25;
+  // std r11,0(r25)
+  guest::StoreU64(uint32_t(r25) + 0, r11);
+  // addi r1,r1,224
+  r1 = uint64_t(int64_t(int64_t(r1) + 224));
+  // b 0x825a6ecc
   // (left out: dead in C++)
   return {r3, f1};
 }
@@ -209888,7 +211054,7 @@ loc_82131E44:
   r3 = r31;
   // bl 0x8212fe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FE28, LIFTED_ARGS(0x82131E5C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvColumn::Clear(LIFTED_ARGS(0x82131E5C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
   r11 = guest::LoadU32(schema::ScreenObjectUvColumnAt24(uint32_t(r31)).unknown_4_address());
   // stw r31,0(r30)
@@ -210032,6 +211198,69 @@ lifted::Result f82131EE0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r7, ui
   return {r3, f1};
 }
 
+// sub_82131F50 game::UvMap::ConstructNode: lifted from generated/ by lift.py.
+lifted::Result f82131F50(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_82131F50 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e88
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-128(r1)
+  ea = -128 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r3
+  r31 = r3;
+  // mr r30,r7
+  r30 = r7;
+  // addi r11,r31,16
+  r11 = uint64_t(int64_t(int64_t(r31) + 16));
+  // mr r28,r8
+  r28 = r8;
+  // addi r29,r11,8
+  r29 = uint64_t(int64_t(int64_t(r11) + 8));
+  // stw r4,0(r31)
+  guest::StoreU32(schema::ScreenObjectUvMap(uint32_t(r31)).fault_node_left_address(), uint32_t(r4));
+  // stw r5,4(r31)
+  guest::StoreU32(schema::ScreenObjectUvMap(uint32_t(r31)).head_address(), uint32_t(r5));
+  // mr r3,r29
+  r3 = r29;
+  // stw r6,8(r31)
+  guest::StoreU32(schema::ScreenObjectUvMap(uint32_t(r31)).size_address(), uint32_t(r6));
+  // lfd f0,0(r30)
+  lifted::ScalarFloatMode();
+  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(schema::ScreenObjectUvMapValue(uint32_t(r30)).key_address())));
+  // stfd f0,0(r11)
+  guest::StoreU64(schema::ScreenObjectUvMap(uint32_t(r11) - 16).fault_node_key_address(), std::bit_cast<uint64_t>(f0));
+  // bl 0x82130140
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::Ctor(LIFTED_ARGS(0x82131F8C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r4,r30,8
+  r4 = uint64_t(int64_t(int64_t(r30) + 8));
+  // mr r3,r29
+  r3 = r29;
+  // bl 0x82130088
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::Copy(LIFTED_ARGS(0x82131F98, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // mr r3,r31
+  r3 = r31;
+  // stb r28,40(r31)
+  guest::StoreU8(schema::ScreenObjectUvMap(uint32_t(r31)).fault_node_color_address(), uint8_t(r28));
+  // stb r11,41(r31)
+  guest::StoreU8(schema::ScreenObjectUvMap(uint32_t(r31)).fault_node_is_nil_address(), uint8_t(r11));
+  // addi r1,r1,128
+  r1 = uint64_t(int64_t(int64_t(r1) + 128));
+  // b 0x825a6ed8
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
 // sub_82131FB0 game::UvMap::Insert: lifted from generated/ by lift.py.
 lifted::Result f82131FB0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_82131FB0 (lifted)");
@@ -210137,7 +211366,7 @@ loc_82132028:
   r3 = r28;
   // bl 0x82131f50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82131F50, LIFTED_ARGS(0x8213205C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::ConstructNode(LIFTED_ARGS(0x8213205C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8213205C:
   // lwz r10,8(r30)
   r10 = guest::LoadU32(schema::ScreenObjectUvMapAt76124_2(uint32_t(r30)).unknown_8_address());
@@ -210247,7 +211476,7 @@ loc_821320E4:
   r4 = r31;
   // bl 0x8212fa50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FA50, LIFTED_ARGS(0x82132128, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::RotateLeft(LIFTED_ARGS(0x82132128, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82132128:
   // lwz r11,4(r31)
   r11 = schema::ScreenObjectUvMapNode(uint32_t(r31)).parent_bits();
@@ -210267,7 +211496,7 @@ loc_82132128:
   r4 = schema::ScreenObjectUvMapNode(uint32_t(r11)).parent_bits();
   // bl 0x8212fab8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FAB8, LIFTED_ARGS(0x8213214C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::RotateRight(LIFTED_ARGS(0x8213214C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821321c4
   goto loc_821321C4;
 loc_82132150:
@@ -210313,7 +211542,7 @@ loc_82132184:
   r4 = r31;
   // bl 0x8212fab8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FAB8, LIFTED_ARGS(0x821321A0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::RotateRight(LIFTED_ARGS(0x821321A0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821321A0:
   // lwz r11,4(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 4);
@@ -210333,7 +211562,7 @@ loc_821321A0:
   r4 = guest::LoadU32(uint32_t(r11) + 4);
   // bl 0x8212fa50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x8212FA50, LIFTED_ARGS(0x821321C4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::RotateLeft(LIFTED_ARGS(0x821321C4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821321C4:
   // addi r11,r31,4
   r11 = uint64_t(int64_t(int64_t(r31) + 4));
@@ -210539,6 +211768,649 @@ loc_8213230C:
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // b 0x825a6ed0
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_82132318: lifted from generated/ by lift.py.
+lifted::Result f82132318(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_82132318 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e7c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-224(r1)
+  ea = -224 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // std r5,256(r1)
+  guest::StoreU64(uint32_t(r1) + 256, r5);
+  // mr r25,r3
+  r25 = r3;
+  // lwz r31,260(r1)
+  r31 = guest::LoadU32(uint32_t(r1) + 260);
+  // mr r26,r4
+  r26 = r4;
+  // lbz r11,41(r31)
+  r11 = guest::LoadU8(uint32_t(r31) + 41);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82132384
+  if (cr6.eq) goto loc_82132384;
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r4,r11,3324
+  r4 = uint64_t(int64_t(int64_t(r11) + 3324));
+  // bl 0x825931d0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825931D0(LIFTED_ARGS(0x82132350, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r4,r1,80
+  r4 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r3,r1,112
+  r3 = uint64_t(int64_t(int64_t(r1) + 112));
+  // bl 0x820919b8
+  // (left out: dead in C++)
+  { const lifted::Result o = f820919B8(r1, r13, r3, r4, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  // bl 0x82091200
+  // (left out: dead in C++)
+  { const lifted::Result o = f82091200(r1, r13, r3, r4, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // addi r3,r1,112
+  r3 = uint64_t(int64_t(int64_t(r1) + 112));
+  // addi r11,r11,3300
+  r11 = uint64_t(int64_t(int64_t(r11) + 3300));
+  // stw r11,112(r1)
+  guest::StoreU32(uint32_t(r1) + 112, uint32_t(r11));
+  // bl 0x820915f8
+  // (left out: dead in C++)
+  { const lifted::Result o = f820915F8(r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // li r4,1
+  r4 = uint64_t(int64_t(1));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // bl 0x82091328
+  // (left out: dead in C++)
+  { const lifted::Result o = game::Std::string::_Tidy(LIFTED_ARGS(0x82132384, r31)); r3 = o.r3; f1 = o.f1; }
+loc_82132384:
+  // addi r3,r1,256
+  r3 = uint64_t(int64_t(int64_t(r1) + 256));
+  // mr r27,r31
+  r27 = r31;
+  // bl 0x8212efa8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8212EFA8, LIFTED_ARGS(0x82132390, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r27)
+  r11 = guest::LoadU32(uint32_t(r27) + 0);
+  // lbz r10,41(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 41);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x821323a8
+  if (cr6.eq) goto loc_821323A8;
+  // lwz r28,8(r27)
+  r28 = guest::LoadU32(uint32_t(r27) + 8);
+  // b 0x821323d0
+  goto loc_821323D0;
+loc_821323A8:
+  // lwz r10,8(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 8);
+  // lbz r10,41(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 41);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // beq cr6,0x821323c0
+  if (cr6.eq) goto loc_821323C0;
+  // mr r28,r11
+  r28 = r11;
+  // b 0x821323d0
+  goto loc_821323D0;
+loc_821323C0:
+  // lwz r11,260(r1)
+  r11 = guest::LoadU32(uint32_t(r1) + 260);
+  // cmplw cr6,r11,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r27), so);
+  // lwz r28,8(r11)
+  r28 = guest::LoadU32(uint32_t(r11) + 8);
+  // bne cr6,0x821324ac
+  if (!cr6.eq) goto loc_821324AC;
+loc_821323D0:
+  // lbz r11,41(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 41);
+  // lwz r31,4(r27)
+  r31 = guest::LoadU32(uint32_t(r27) + 4);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x821323e4
+  if (!cr6.eq) goto loc_821323E4;
+  // stw r31,4(r28)
+  guest::StoreU32(uint32_t(r28) + 4, uint32_t(r31));
+loc_821323E4:
+  // lwz r11,4(r26)
+  r11 = guest::LoadU32(uint32_t(r26) + 4);
+  // lwz r10,4(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r10,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r27), so);
+  // bne cr6,0x821323fc
+  if (!cr6.eq) goto loc_821323FC;
+  // stw r28,4(r11)
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r28));
+  // b 0x82132414
+  goto loc_82132414;
+loc_821323FC:
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // cmplw cr6,r11,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r27), so);
+  // bne cr6,0x82132410
+  if (!cr6.eq) goto loc_82132410;
+  // stw r28,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r28));
+  // b 0x82132414
+  goto loc_82132414;
+loc_82132410:
+  // stw r28,8(r31)
+  guest::StoreU32(uint32_t(r31) + 8, uint32_t(r28));
+loc_82132414:
+  // lwz r9,4(r26)
+  r9 = guest::LoadU32(uint32_t(r26) + 4);
+  // lwz r11,0(r9)
+  r11 = guest::LoadU32(uint32_t(r9) + 0);
+  // cmplw cr6,r11,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r27), so);
+  // bne cr6,0x8213245c
+  if (!cr6.eq) goto loc_8213245C;
+  // lbz r11,41(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 41);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82132438
+  if (cr6.eq) goto loc_82132438;
+  // mr r11,r31
+  r11 = r31;
+  // b 0x82132458
+  goto loc_82132458;
+loc_82132438:
+  // lwz r10,0(r28)
+  r10 = guest::LoadU32(uint32_t(r28) + 0);
+  // mr r11,r28
+  r11 = r28;
+  // b 0x8213244c
+  goto loc_8213244C;
+loc_82132444:
+  // mr r11,r10
+  r11 = r10;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+loc_8213244C:
+  // lbz r8,41(r10)
+  r8 = guest::LoadU8(uint32_t(r10) + 41);
+  // cmplwi cr6,r8,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r8), 0, so);
+  // beq cr6,0x82132444
+  if (cr6.eq) goto loc_82132444;
+loc_82132458:
+  // stw r11,0(r9)
+  guest::StoreU32(uint32_t(r9) + 0, uint32_t(r11));
+loc_8213245C:
+  // lwz r8,4(r26)
+  r8 = guest::LoadU32(uint32_t(r26) + 4);
+  // lwz r11,8(r8)
+  r11 = guest::LoadU32(uint32_t(r8) + 8);
+  // cmplw cr6,r11,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r27), so);
+  // bne cr6,0x82132544
+  if (!cr6.eq) goto loc_82132544;
+  // lbz r11,41(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 41);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82132480
+  if (cr6.eq) goto loc_82132480;
+  // mr r11,r31
+  r11 = r31;
+  // b 0x821324a4
+  goto loc_821324A4;
+loc_82132480:
+  // addi r10,r28,8
+  r10 = uint64_t(int64_t(int64_t(r28) + 8));
+  // mr r11,r28
+  r11 = r28;
+  // b 0x82132494
+  goto loc_82132494;
+loc_8213248C:
+  // lwz r11,0(r10)
+  r11 = guest::LoadU32(uint32_t(r10) + 0);
+  // addi r10,r11,8
+  r10 = uint64_t(int64_t(int64_t(r11) + 8));
+loc_82132494:
+  // lwz r9,0(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 0);
+  // lbz r9,41(r9)
+  r9 = guest::LoadU8(uint32_t(r9) + 41);
+  // cmplwi cr6,r9,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
+  // beq cr6,0x8213248c
+  if (cr6.eq) goto loc_8213248C;
+loc_821324A4:
+  // stw r11,8(r8)
+  guest::StoreU32(uint32_t(r8) + 8, uint32_t(r11));
+  // b 0x82132544
+  goto loc_82132544;
+loc_821324AC:
+  // lwz r10,0(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 0);
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+  // lwz r10,0(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 0);
+  // stw r10,0(r11)
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r10));
+  // lwz r10,8(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 8);
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // bne cr6,0x821324d0
+  if (!cr6.eq) goto loc_821324D0;
+  // mr r31,r11
+  r31 = r11;
+  // b 0x821324f8
+  goto loc_821324F8;
+loc_821324D0:
+  // lbz r10,41(r28)
+  r10 = guest::LoadU8(uint32_t(r28) + 41);
+  // lwz r31,4(r11)
+  r31 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x821324e4
+  if (!cr6.eq) goto loc_821324E4;
+  // stw r31,4(r28)
+  guest::StoreU32(uint32_t(r28) + 4, uint32_t(r31));
+loc_821324E4:
+  // stw r28,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r28));
+  // lwz r10,8(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 8);
+  // stw r10,8(r11)
+  guest::StoreU32(uint32_t(r11) + 8, uint32_t(r10));
+  // lwz r10,8(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 8);
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+loc_821324F8:
+  // lwz r10,4(r26)
+  r10 = guest::LoadU32(uint32_t(r26) + 4);
+  // lwz r9,4(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 4);
+  // cmplw cr6,r9,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r27), so);
+  // bne cr6,0x82132510
+  if (!cr6.eq) goto loc_82132510;
+  // stw r11,4(r10)
+  guest::StoreU32(uint32_t(r10) + 4, uint32_t(r11));
+  // b 0x8213252c
+  goto loc_8213252C;
+loc_82132510:
+  // lwz r10,4(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 4);
+  // lwz r9,0(r10)
+  r9 = guest::LoadU32(uint32_t(r10) + 0);
+  // cmplw cr6,r9,r27
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r27), so);
+  // bne cr6,0x82132528
+  if (!cr6.eq) goto loc_82132528;
+  // stw r11,0(r10)
+  guest::StoreU32(uint32_t(r10) + 0, uint32_t(r11));
+  // b 0x8213252c
+  goto loc_8213252C;
+loc_82132528:
+  // stw r11,8(r10)
+  guest::StoreU32(uint32_t(r10) + 8, uint32_t(r11));
+loc_8213252C:
+  // lwz r10,4(r27)
+  r10 = guest::LoadU32(uint32_t(r27) + 4);
+  // stw r10,4(r11)
+  guest::StoreU32(uint32_t(r11) + 4, uint32_t(r10));
+  // lbz r9,40(r27)
+  r9 = guest::LoadU8(uint32_t(r27) + 40);
+  // lbz r10,40(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 40);
+  // stb r9,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r9));
+  // stb r10,40(r27)
+  guest::StoreU8(uint32_t(r27) + 40, uint8_t(r10));
+loc_82132544:
+  // lbz r11,40(r27)
+  r11 = guest::LoadU8(uint32_t(r27) + 40);
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // bne cr6,0x821326e4
+  if (!cr6.eq) goto loc_821326E4;
+  // lwz r11,4(r26)
+  r11 = guest::LoadU32(uint32_t(r26) + 4);
+  // li r30,1
+  r30 = uint64_t(int64_t(1));
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // beq cr6,0x821326e0
+  if (cr6.eq) goto loc_821326E0;
+  // li r29,0
+  r29 = uint64_t(int64_t(0));
+loc_82132568:
+  // lbz r11,40(r28)
+  r11 = guest::LoadU8(uint32_t(r28) + 40);
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // bne cr6,0x821326e0
+  if (!cr6.eq) goto loc_821326E0;
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // bne cr6,0x82132624
+  if (!cr6.eq) goto loc_82132624;
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+  // lbz r10,40(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 40);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x821325a8
+  if (!cr6.eq) goto loc_821325A8;
+  // mr r4,r31
+  r4 = r31;
+  // stb r30,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r30));
+  // mr r3,r26
+  r3 = r26;
+  // stb r29,40(r31)
+  guest::StoreU8(uint32_t(r31) + 40, uint8_t(r29));
+  // bl 0x8212fa50
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateLeft(LIFTED_ARGS(0x821325A4, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+loc_821325A8:
+  // lbz r10,41(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 41);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82132678
+  if (!cr6.eq) goto loc_82132678;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x821325d4
+  if (!cr6.eq) goto loc_821325D4;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // beq cr6,0x82132674
+  if (cr6.eq) goto loc_82132674;
+loc_821325D4:
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82132600
+  if (!cr6.eq) goto loc_82132600;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // mr r4,r11
+  r4 = r11;
+  // mr r3,r26
+  r3 = r26;
+  // stb r30,40(r10)
+  guest::StoreU8(uint32_t(r10) + 40, uint8_t(r30));
+  // stb r29,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r29));
+  // bl 0x8212fab8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateRight(LIFTED_ARGS(0x821325FC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 8);
+loc_82132600:
+  // lbz r10,40(r31)
+  r10 = guest::LoadU8(uint32_t(r31) + 40);
+  // mr r4,r31
+  r4 = r31;
+  // mr r3,r26
+  r3 = r26;
+  // stb r10,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r10));
+  // stb r30,40(r31)
+  guest::StoreU8(uint32_t(r31) + 40, uint8_t(r30));
+  // lwz r11,8(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 8);
+  // stb r30,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r30));
+  // bl 0x8212fa50
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateLeft(LIFTED_ARGS(0x82132620, r31)); r3 = o.r3; f1 = o.f1; }
+  // b 0x821326e0
+  goto loc_821326E0;
+loc_82132624:
+  // lbz r10,40(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 40);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82132648
+  if (!cr6.eq) goto loc_82132648;
+  // mr r4,r31
+  r4 = r31;
+  // stb r30,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r30));
+  // mr r3,r26
+  r3 = r26;
+  // stb r29,40(r31)
+  guest::StoreU8(uint32_t(r31) + 40, uint8_t(r29));
+  // bl 0x8212fab8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateRight(LIFTED_ARGS(0x82132644, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+loc_82132648:
+  // lbz r10,41(r11)
+  r10 = guest::LoadU8(uint32_t(r11) + 41);
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // bne cr6,0x82132678
+  if (!cr6.eq) goto loc_82132678;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82132694
+  if (!cr6.eq) goto loc_82132694;
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x82132694
+  if (!cr6.eq) goto loc_82132694;
+loc_82132674:
+  // stb r29,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r29));
+loc_82132678:
+  // lwz r11,4(r26)
+  r11 = guest::LoadU32(uint32_t(r26) + 4);
+  // mr r28,r31
+  r28 = r31;
+  // lwz r31,4(r31)
+  r31 = guest::LoadU32(uint32_t(r31) + 4);
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 4);
+  // cmplw cr6,r28,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), uint32_t(r11), so);
+  // bne cr6,0x82132568
+  if (!cr6.eq) goto loc_82132568;
+  // b 0x821326e0
+  goto loc_821326E0;
+loc_82132694:
+  // lwz r10,0(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 0);
+  // lbz r10,40(r10)
+  r10 = guest::LoadU8(uint32_t(r10) + 40);
+  // cmplwi cr6,r10,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 1, so);
+  // bne cr6,0x821326c0
+  if (!cr6.eq) goto loc_821326C0;
+  // lwz r10,8(r11)
+  r10 = guest::LoadU32(uint32_t(r11) + 8);
+  // mr r4,r11
+  r4 = r11;
+  // mr r3,r26
+  r3 = r26;
+  // stb r30,40(r10)
+  guest::StoreU8(uint32_t(r10) + 40, uint8_t(r30));
+  // stb r29,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r29));
+  // bl 0x8212fa50
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateLeft(LIFTED_ARGS(0x821326BC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+loc_821326C0:
+  // lbz r10,40(r31)
+  r10 = guest::LoadU8(uint32_t(r31) + 40);
+  // mr r4,r31
+  r4 = r31;
+  // mr r3,r26
+  r3 = r26;
+  // stb r10,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r10));
+  // stb r30,40(r31)
+  guest::StoreU8(uint32_t(r31) + 40, uint8_t(r30));
+  // lwz r11,0(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 0);
+  // stb r30,40(r11)
+  guest::StoreU8(uint32_t(r11) + 40, uint8_t(r30));
+  // bl 0x8212fab8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::RotateRight(LIFTED_ARGS(0x821326E0, r31)); r3 = o.r3; f1 = o.f1; }
+loc_821326E0:
+  // stb r30,40(r28)
+  guest::StoreU8(uint32_t(r28) + 40, uint8_t(r30));
+loc_821326E4:
+  // addi r3,r27,24
+  r3 = uint64_t(int64_t(int64_t(r27) + 24));
+  // bl 0x82131ee0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::Dtor(LIFTED_ARGS(0x821326EC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r3,r27
+  r3 = r27;
+  // bl 0x825a70e8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A70E8(LIFTED_ARGS(0x821326F4, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,8(r26)
+  r11 = guest::LoadU32(uint32_t(r26) + 8);
+  // cmplwi r11,0
+  cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq 0x82132708
+  if (cr0.eq) goto loc_82132708;
+  // addi r11,r11,-1
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  // stw r11,8(r26)
+  guest::StoreU32(uint32_t(r26) + 8, uint32_t(r11));
+loc_82132708:
+  // ld r11,256(r1)
+  r11 = guest::LoadU64(uint32_t(r1) + 256);
+  // mr r3,r25
+  r3 = r25;
+  // std r11,0(r25)
+  guest::StoreU64(uint32_t(r25) + 0, r11);
+  // addi r1,r1,224
+  r1 = uint64_t(int64_t(int64_t(r1) + 224));
+  // b 0x825a6ecc
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_82132720 game::UvMap::EraseSubtree: lifted from generated/ by lift.py.
+lifted::Result f82132720(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_82132720 (lifted)");
+  uint64_t r5 = 0, r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e8c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r4
+  r30 = r4;
+  // mr r29,r3
+  r29 = r3;
+  // mr r31,r30
+  r31 = r30;
+  // lbz r11,41(r30)
+  r11 = schema::ScreenObjectUvMapNode(uint32_t(r30)).is_nil_bits();
+  // b 0x82132768
+  goto loc_82132768;
+loc_82132740:
+  // mr r3,r29
+  r3 = r29;
+  // lwz r4,8(r31)
+  r4 = schema::ScreenObjectUvMapNode(uint32_t(r31)).right_bits();
+  // bl 0x82132720
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvMap::EraseSubtree(LIFTED_ARGS(0x8213274C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r3,r30,24
+  r3 = uint64_t(int64_t(int64_t(r30) + 24));
+  // lwz r31,0(r31)
+  r31 = schema::ScreenObjectUvMapNode(uint32_t(r31)).left_bits();
+  // bl 0x82131ee0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::UvColumn::Dtor(LIFTED_ARGS(0x82132758, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r3,r30
+  r3 = r30;
+  // bl 0x825a70e8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A70E8(LIFTED_ARGS(0x82132760, r31)); r3 = o.r3; f1 = o.f1; }
+  // lbz r11,41(r31)
+  r11 = schema::ScreenObjectUvMapNode(uint32_t(r31)).is_nil_bits();
+  // mr r30,r31
+  r30 = r31;
+loc_82132768:
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82132740
+  if (cr6.eq) goto loc_82132740;
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // b 0x825a6edc
   // (left out: dead in C++)
   return {r3, f1};
 }
@@ -210864,7 +212736,7 @@ lifted::Result f82132960(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r6, ui
   r4 = guest::LoadU32(schema::ScreenObjectUvMap(uint32_t(r11)).head_address());
   // bl 0x82132720
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82132720, LIFTED_ARGS(0x82132980, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::UvMap::EraseSubtree(LIFTED_ARGS(0x82132980, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
   r11 = guest::LoadU32(schema::ScreenObjectUvMapAt76124_2(uint32_t(r31)).unknown_4_address());
   // li r10,0
@@ -373614,6 +375486,359 @@ lifted::Result f8235F6D0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   return {r3, f1};
 }
 
+// sub_82365D88: lifted from generated/ by lift.py.
+lifted::Result f82365D88(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_82365D88 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r16 = 0, r17 = 0, r18 = 0, r19 = 0, r20 = 0, r21 = 0, r22 = 0, r23 = 0, r24 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  lifted::Temp temp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e58
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-352(r1)
+  ea = -352 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // srawi r11,r3,2
+  ca = (int32_t(r3) < 0) & ((uint32_t(r3) & 0x3) != 0);
+  r11 = uint64_t(int64_t(int32_t(r3) >> 2));
+  // mr r22,r6
+  r22 = r6;
+  // addze r27,r11
+  temp.s64 = int64_t(r11) + ca;
+  ca = temp.u32 < uint32_t(r11);
+  r27 = uint64_t(int64_t(temp.s64));
+  // srawi r11,r4,2
+  ca = (int32_t(r4) < 0) & ((uint32_t(r4) & 0x3) != 0);
+  r11 = uint64_t(int64_t(int32_t(r4) >> 2));
+  // mr r31,r7
+  r31 = r7;
+  // mr r17,r9
+  r17 = r9;
+  // mr r16,r10
+  r16 = r10;
+  // li r23,0
+  r23 = uint64_t(int64_t(0));
+  // addze. r26,r11
+  temp.s64 = int64_t(r11) + ca;
+  ca = temp.u32 < uint32_t(r11);
+  r26 = uint64_t(int64_t(temp.s64));
+  cr0 = lifted::Compare<int32_t>(int32_t(r26), 0, so);
+  // ble 0x82365e9c
+  if (!cr0.gt) goto loc_82365E9C;
+  // subf r11,r27,r8
+  r11 = r8 - r27;
+  // addi r18,r26,-1
+  r18 = uint64_t(int64_t(int64_t(r26) + -1));
+  // rlwinm r20,r11,4,0,27
+  r20 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
+  // rlwinm r19,r22,2,0,29
+  r19 = __builtin_rotateleft64(uint32_t(r22) | (r22 << 32), 2) & 0xFFFFFFFC;
+  // mr r24,r5
+  r24 = r5;
+loc_82365DD0:
+  // cmpw cr6,r23,r18
+  cr6 = lifted::Compare<int32_t>(int32_t(r23), int32_t(r18), so);
+  // li r25,4
+  r25 = uint64_t(int64_t(4));
+  // blt cr6,0x82365de0
+  if (cr6.lt) goto loc_82365DE0;
+  // subfic r25,r16,4
+  ca = uint32_t(r16) <= 4;
+  r25 = static_cast<uint64_t>(4) - r16;
+loc_82365DE0:
+  // li r28,0
+  r28 = uint64_t(int64_t(0));
+  // cmpwi cr6,r27,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r27), 0, so);
+  // ble cr6,0x82365e88
+  if (!cr6.gt) goto loc_82365E88;
+  // addi r21,r27,-1
+  r21 = uint64_t(int64_t(int64_t(r27) + -1));
+  // mr r29,r24
+  r29 = r24;
+loc_82365DF4:
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // mr r9,r29
+  r9 = r29;
+loc_82365DFC:
+  // mr r10,r9
+  r10 = r9;
+  // li r8,4
+  r8 = uint64_t(int64_t(4));
+loc_82365E04:
+  // addi r7,r1,80
+  r7 = uint64_t(int64_t(int64_t(r1) + 80));
+  // lfs f0,0(r10)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 0);
+  f0 = double(temp.f32);
+  // addi r6,r1,144
+  r6 = uint64_t(int64_t(int64_t(r1) + 144));
+  // lfs f13,4(r10)
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 4);
+  f13 = double(temp.f32);
+  // addic. r8,r8,-1
+  ca = uint32_t(r8) > 0;
+  r8 = uint64_t(int64_t(int64_t(r8) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // addi r10,r10,8
+  r10 = uint64_t(int64_t(int64_t(r10) + 8));
+  // stfsx f0,r11,r7
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r11) + uint32_t(r7), temp.u32);
+  // stfsx f13,r11,r6
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r11) + uint32_t(r6), temp.u32);
+  // addi r11,r11,4
+  r11 = uint64_t(int64_t(int64_t(r11) + 4));
+  // bne 0x82365e04
+  if (!cr0.eq) goto loc_82365E04;
+  // add r9,r9,r22
+  r9 = r9 + r22;
+  // cmpwi cr6,r11,64
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 64, so);
+  // blt cr6,0x82365dfc
+  if (cr6.lt) goto loc_82365DFC;
+  // cmpw cr6,r28,r21
+  cr6 = lifted::Compare<int32_t>(int32_t(r28), int32_t(r21), so);
+  // li r30,4
+  r30 = uint64_t(int64_t(4));
+  // blt cr6,0x82365e48
+  if (cr6.lt) goto loc_82365E48;
+  // subfic r30,r17,4
+  ca = uint32_t(r17) <= 4;
+  r30 = static_cast<uint64_t>(4) - r17;
+loc_82365E48:
+  // mr r6,r25
+  r6 = r25;
+  // mr r5,r30
+  r5 = r30;
+  // addi r4,r1,80
+  r4 = uint64_t(int64_t(int64_t(r1) + 80));
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x82365ae8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x82365AE8, LIFTED_ARGS(0x82365E5C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r31,r31,8
+  r31 = uint64_t(int64_t(int64_t(r31) + 8));
+  // mr r6,r25
+  r6 = r25;
+  // mr r5,r30
+  r5 = r30;
+  // addi r4,r1,144
+  r4 = uint64_t(int64_t(int64_t(r1) + 144));
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x82365ae8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x82365AE8, LIFTED_ARGS(0x82365E74, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r28,r28,1
+  r28 = uint64_t(int64_t(int64_t(r28) + 1));
+  // addi r31,r31,8
+  r31 = uint64_t(int64_t(int64_t(r31) + 8));
+  // addi r29,r29,32
+  r29 = uint64_t(int64_t(int64_t(r29) + 32));
+  // cmpw cr6,r28,r27
+  cr6 = lifted::Compare<int32_t>(int32_t(r28), int32_t(r27), so);
+  // blt cr6,0x82365df4
+  if (cr6.lt) goto loc_82365DF4;
+loc_82365E88:
+  // addi r23,r23,1
+  r23 = uint64_t(int64_t(int64_t(r23) + 1));
+  // add r31,r20,r31
+  r31 = r20 + r31;
+  // add r24,r19,r24
+  r24 = r19 + r24;
+  // cmpw cr6,r23,r26
+  cr6 = lifted::Compare<int32_t>(int32_t(r23), int32_t(r26), so);
+  // blt cr6,0x82365dd0
+  if (cr6.lt) goto loc_82365DD0;
+loc_82365E9C:
+  // addi r1,r1,352
+  r1 = uint64_t(int64_t(int64_t(r1) + 352));
+  // b 0x825a6ea8
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_82366458: lifted from generated/ by lift.py.
+lifted::Result f82366458(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_82366458 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r17 = 0, r18 = 0, r19 = 0, r20 = 0, r21 = 0, r22 = 0, r23 = 0, r24 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  lifted::Temp temp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e5c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-336(r1)
+  ea = -336 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // srawi r11,r3,2
+  ca = (int32_t(r3) < 0) & ((uint32_t(r3) & 0x3) != 0);
+  r11 = uint64_t(int64_t(int32_t(r3) >> 2));
+  // mr r23,r6
+  r23 = r6;
+  // addze r29,r11
+  temp.s64 = int64_t(r11) + ca;
+  ca = temp.u32 < uint32_t(r11);
+  r29 = uint64_t(int64_t(temp.s64));
+  // srawi r11,r4,2
+  ca = (int32_t(r4) < 0) & ((uint32_t(r4) & 0x3) != 0);
+  r11 = uint64_t(int64_t(int32_t(r4) >> 2));
+  // mr r28,r7
+  r28 = r7;
+  // mr r18,r9
+  r18 = r9;
+  // mr r17,r10
+  r17 = r10;
+  // li r25,0
+  r25 = uint64_t(int64_t(0));
+  // addze. r27,r11
+  temp.s64 = int64_t(r11) + ca;
+  ca = temp.u32 < uint32_t(r11);
+  r27 = uint64_t(int64_t(temp.s64));
+  cr0 = lifted::Compare<int32_t>(int32_t(r27), 0, so);
+  // ble 0x82366554
+  if (!cr0.gt) goto loc_82366554;
+  // subf r11,r29,r8
+  r11 = r8 - r29;
+  // addi r19,r27,-1
+  r19 = uint64_t(int64_t(int64_t(r27) + -1));
+  // rlwinm r21,r11,3,0,28
+  r21 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 3) & 0xFFFFFFF8;
+  // rlwinm r20,r23,2,0,29
+  r20 = __builtin_rotateleft64(uint32_t(r23) | (r23 << 32), 2) & 0xFFFFFFFC;
+  // mr r26,r5
+  r26 = r5;
+loc_823664A0:
+  // cmpw cr6,r25,r19
+  cr6 = lifted::Compare<int32_t>(int32_t(r25), int32_t(r19), so);
+  // li r24,4
+  r24 = uint64_t(int64_t(4));
+  // blt cr6,0x823664b0
+  if (cr6.lt) goto loc_823664B0;
+  // subfic r24,r17,4
+  ca = uint32_t(r17) <= 4;
+  r24 = static_cast<uint64_t>(4) - r17;
+loc_823664B0:
+  // li r30,0
+  r30 = uint64_t(int64_t(0));
+  // cmpwi cr6,r29,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r29), 0, so);
+  // ble cr6,0x82366540
+  if (!cr6.gt) goto loc_82366540;
+  // addi r22,r29,-1
+  r22 = uint64_t(int64_t(int64_t(r29) + -1));
+  // mr r31,r26
+  r31 = r26;
+loc_823664C4:
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // mr r9,r31
+  r9 = r31;
+loc_823664CC:
+  // mr r10,r9
+  r10 = r9;
+  // li r8,4
+  r8 = uint64_t(int64_t(4));
+loc_823664D4:
+  // addi r7,r1,80
+  r7 = uint64_t(int64_t(int64_t(r1) + 80));
+  // lfs f0,0(r10)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 0);
+  f0 = double(temp.f32);
+  // addi r6,r1,144
+  r6 = uint64_t(int64_t(int64_t(r1) + 144));
+  // lfs f13,4(r10)
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 4);
+  f13 = double(temp.f32);
+  // addic. r8,r8,-1
+  ca = uint32_t(r8) > 0;
+  r8 = uint64_t(int64_t(int64_t(r8) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // addi r10,r10,8
+  r10 = uint64_t(int64_t(int64_t(r10) + 8));
+  // stfsx f0,r11,r7
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r11) + uint32_t(r7), temp.u32);
+  // stfsx f13,r11,r6
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r11) + uint32_t(r6), temp.u32);
+  // addi r11,r11,4
+  r11 = uint64_t(int64_t(int64_t(r11) + 4));
+  // bne 0x823664d4
+  if (!cr0.eq) goto loc_823664D4;
+  // add r9,r9,r23
+  r9 = r9 + r23;
+  // cmpwi cr6,r11,64
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 64, so);
+  // blt cr6,0x823664cc
+  if (cr6.lt) goto loc_823664CC;
+  // cmpw cr6,r30,r22
+  cr6 = lifted::Compare<int32_t>(int32_t(r30), int32_t(r22), so);
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // blt cr6,0x82366518
+  if (cr6.lt) goto loc_82366518;
+  // subfic r6,r18,4
+  ca = uint32_t(r18) <= 4;
+  r6 = static_cast<uint64_t>(4) - r18;
+loc_82366518:
+  // mr r7,r24
+  r7 = r24;
+  // addi r5,r1,80
+  r5 = uint64_t(int64_t(int64_t(r1) + 80));
+  // addi r4,r1,144
+  r4 = uint64_t(int64_t(int64_t(r1) + 144));
+  // mr r3,r28
+  r3 = r28;
+  // bl 0x82365ea8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x82365EA8, LIFTED_ARGS(0x8236652C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r30,r30,1
+  r30 = uint64_t(int64_t(int64_t(r30) + 1));
+  // addi r28,r28,8
+  r28 = uint64_t(int64_t(int64_t(r28) + 8));
+  // addi r31,r31,32
+  r31 = uint64_t(int64_t(int64_t(r31) + 32));
+  // cmpw cr6,r30,r29
+  cr6 = lifted::Compare<int32_t>(int32_t(r30), int32_t(r29), so);
+  // blt cr6,0x823664c4
+  if (cr6.lt) goto loc_823664C4;
+loc_82366540:
+  // addi r25,r25,1
+  r25 = uint64_t(int64_t(int64_t(r25) + 1));
+  // add r28,r21,r28
+  r28 = r21 + r28;
+  // add r26,r20,r26
+  r26 = r20 + r26;
+  // cmpw cr6,r25,r27
+  cr6 = lifted::Compare<int32_t>(int32_t(r25), int32_t(r27), so);
+  // blt cr6,0x823664a0
+  if (cr6.lt) goto loc_823664A0;
+loc_82366554:
+  // addi r1,r1,336
+  r1 = uint64_t(int64_t(int64_t(r1) + 336));
+  // b 0x825a6eac
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
 // sub_82368D30 game::Blitter::Release: lifted from generated/ by lift.py.
 lifted::Result f82368D30(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_82368D30 (lifted)");
@@ -373682,6 +375907,198 @@ loc_82368D84:
   return {r3, f1};
 }
 
+// sub_823699F8 game::Blitter::ConvertRows: lifted from generated/ by lift.py.
+lifted::Result f823699F8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, double f1) {
+  ITC_NATIVE_RUNNING("sub_823699F8 (lifted)");
+  uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e84
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-128(r1)
+  ea = -128 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r3
+  r30 = r3;
+  // lwz r11,0(r30)
+  r11 = guest::LoadU32(schema::Blitter(uint32_t(r30)).source_address());
+  // lwz r10,4(r30)
+  r10 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // lwz r8,104(r11)
+  r8 = schema::ImageCodec(uint32_t(r11)).width_bits();
+  // lwz r9,104(r10)
+  r9 = schema::ImageCodec(uint32_t(r10)).width_bits();
+  // cmplw cr6,r9,r8
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r8), so);
+  // bne cr6,0x82369b34
+  if (!cr6.eq) goto loc_82369B34;
+  // lwz r8,108(r10)
+  r8 = schema::ImageCodec(uint32_t(r10)).height_bits();
+  // lwz r7,108(r11)
+  r7 = schema::ImageCodec(uint32_t(r11)).height_bits();
+  // cmplw cr6,r8,r7
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r8), uint32_t(r7), so);
+  // bne cr6,0x82369b34
+  if (!cr6.eq) goto loc_82369B34;
+  // lwz r10,112(r10)
+  r10 = schema::ImageCodec(uint32_t(r10)).depth_bits();
+  // lwz r11,112(r11)
+  r11 = schema::ImageCodec(uint32_t(r11)).depth_bits();
+  // cmplw cr6,r10,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r11), so);
+  // bne cr6,0x82369b34
+  if (!cr6.eq) goto loc_82369B34;
+  // lis r11,4095
+  r11 = uint64_t(int64_t(268369920));
+  // rlwinm r3,r9,4,0,27
+  r3 = __builtin_rotateleft64(uint32_t(r9) | (r9 << 32), 4) & 0xFFFFFFF0;
+  // ori r11,r11,65535
+  r11 = r11 | 65535;
+  // cmplw cr6,r9,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r11), so);
+  // ble cr6,0x82369a58
+  if (!cr6.gt) goto loc_82369A58;
+  // li r3,-1
+  r3 = uint64_t(int64_t(-1));
+loc_82369A58:
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x82369A5C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r28,r3
+  r28 = r3;
+  // cmplwi cr6,r28,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r28), 0, so);
+  // beq cr6,0x82369b34
+  if (cr6.eq) goto loc_82369B34;
+  // lwz r11,4(r30)
+  r11 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // li r27,0
+  r27 = uint64_t(int64_t(0));
+  // lwz r10,16(r11)
+  r10 = schema::ImageCodec(uint32_t(r11)).srgb_bits();
+  // cmpwi cr6,r10,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
+  // beq cr6,0x82369a98
+  if (cr6.eq) goto loc_82369A98;
+  // lwz r10,0(r30)
+  r10 = guest::LoadU32(schema::Blitter(uint32_t(r30)).source_address());
+  // lwz r10,16(r10)
+  r10 = schema::ImageCodec(uint32_t(r10)).srgb_bits();
+  // cmpwi cr6,r10,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
+  // beq cr6,0x82369a98
+  if (cr6.eq) goto loc_82369A98;
+  // stw r27,16(r11)
+  schema::ImageCodec(uint32_t(r11)).set_srgb_bits(uint32_t(r27));
+  // lwz r11,0(r30)
+  r11 = guest::LoadU32(schema::Blitter(uint32_t(r30)).source_address());
+  // stw r27,16(r11)
+  schema::ImageCodec(uint32_t(r11)).set_srgb_bits(uint32_t(r27));
+loc_82369A98:
+  // lwz r11,4(r30)
+  r11 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // mr r29,r27
+  r29 = r27;
+  // lwz r10,112(r11)
+  r10 = schema::ImageCodec(uint32_t(r11)).depth_bits();
+  // cmplwi cr6,r10,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
+  // ble cr6,0x82369b24
+  if (!cr6.gt) goto loc_82369B24;
+  // lwz r11,108(r11)
+  r11 = schema::ImageCodec(uint32_t(r11)).height_bits();
+loc_82369AB0:
+  // mr r31,r27
+  r31 = r27;
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x82369b10
+  if (cr6.eq) goto loc_82369B10;
+loc_82369ABC:
+  // lwz r3,0(r30)
+  r3 = guest::LoadU32(schema::Blitter(uint32_t(r30)).source_address());
+  // mr r6,r28
+  r6 = r28;
+  // mr r5,r29
+  r5 = r29;
+  // mr r4,r31
+  r4 = r31;
+  // lwz r11,0(r3)
+  r11 = lifted::VtableWord(uint32_t(r3));
+  // lwz r11,4(r11)
+  r11 = guest::LoadU32(schema::ImageCodecVtable(uint32_t(r11)).decode_row_address());
+  // mtctr r11
+  ctr = r11;
+  // bctrl
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82369ADC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r3,4(r30)
+  r3 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // mr r6,r28
+  r6 = r28;
+  // mr r5,r29
+  r5 = r29;
+  // mr r4,r31
+  r4 = r31;
+  // lwz r11,0(r3)
+  r11 = lifted::VtableWord(uint32_t(r3));
+  // lwz r11,8(r11)
+  r11 = guest::LoadU32(schema::ImageCodecVtable(uint32_t(r11)).encode_row_address());
+  // mtctr r11
+  ctr = r11;
+  // bctrl
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82369AFC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,4(r30)
+  r11 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // addi r31,r31,1
+  r31 = uint64_t(int64_t(int64_t(r31) + 1));
+  // lwz r11,108(r11)
+  r11 = schema::ImageCodec(uint32_t(r11)).height_bits();
+  // cmplw cr6,r31,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
+  // blt cr6,0x82369abc
+  if (cr6.lt) goto loc_82369ABC;
+loc_82369B10:
+  // lwz r10,4(r30)
+  r10 = guest::LoadU32(schema::Blitter(uint32_t(r30)).destination_address());
+  // addi r29,r29,1
+  r29 = uint64_t(int64_t(int64_t(r29) + 1));
+  // lwz r10,112(r10)
+  r10 = schema::ImageCodec(uint32_t(r10)).depth_bits();
+  // cmplw cr6,r29,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r29), uint32_t(r10), so);
+  // blt cr6,0x82369ab0
+  if (cr6.lt) goto loc_82369AB0;
+loc_82369B24:
+  // mr r3,r28
+  r3 = r28;
+  // bl 0x825a70e8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A70E8(LIFTED_ARGS(0x82369B2C, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // b 0x82369b3c
+  goto loc_82369B3C;
+loc_82369B34:
+  // lis r3,-32768
+  r3 = uint64_t(int64_t(-2147483648));
+  // ori r3,r3,16389
+  r3 = r3 | 16389;
+loc_82369B3C:
+  // addi r1,r1,128
+  r1 = uint64_t(int64_t(int64_t(r1) + 128));
+  // b 0x825a6ed4
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
 // sub_8236C630 game::Blitter::Init: lifted from generated/ by lift.py.
 lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_8236C630 (lifted)");
@@ -373744,7 +376161,7 @@ lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   guest::StoreU32(schema::ImageDescription(uint32_t(r4)).diffusion_address(), uint32_t(r8));
   // bl 0x823f6c60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x823F6C60, LIFTED_ARGS(0x8236C694, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::ImageCodec::Create(LIFTED_ARGS(0x8236C694, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r3,4(r31)
@@ -373755,7 +376172,7 @@ lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = r30;
   // bl 0x823f6c60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x823F6C60, LIFTED_ARGS(0x8236C6A8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::ImageCodec::Create(LIFTED_ARGS(0x8236C6A8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r4,r3
   r4 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r4), 0, so);
@@ -373767,7 +376184,7 @@ lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = guest::LoadU32(schema::Blitter(uint32_t(r31)).destination_address());
   // bl 0x823eaa90
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x823EAA90, LIFTED_ARGS(0x8236C6BC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::ImageCodec::Prepare(LIFTED_ARGS(0x8236C6BC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr. r30,r3
   r30 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r30), 0, so);
@@ -373777,7 +376194,7 @@ lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = r31;
   // bl 0x82369860
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x82369860, LIFTED_ARGS(0x8236C6CC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Blitter::CopyRows(LIFTED_ARGS(0x8236C6CC, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x8236c770
@@ -373786,7 +376203,7 @@ lifted::Result f8236C630(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
   r3 = r31;
   // bl 0x823699f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x823699F8, LIFTED_ARGS(0x8236C6DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Blitter::ConvertRows(LIFTED_ARGS(0x8236C6DC, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bge 0x8236c770
@@ -373966,6 +376383,51 @@ loc_8236C808:
   return {r3, f1};
 }
 
+// sub_8236D380: lifted from generated/ by lift.py.
+lifted::Result f8236D380(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
+  ITC_NATIVE_RUNNING("sub_8236D380 (lifted)");
+  uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r10,r8
+  r10 = r8;
+  // stw r9,92(r1)
+  guest::StoreU32(uint32_t(r1) + 92, uint32_t(r9));
+  // li r11,1
+  r11 = uint64_t(int64_t(1));
+  // mr r9,r7
+  r9 = r7;
+  // mullw r8,r6,r10
+  r8 = uint64_t(int64_t(int64_t(int32_t(r6)) * int64_t(int32_t(r10))));
+  // stw r11,84(r1)
+  guest::StoreU32(uint32_t(r1) + 84, uint32_t(r11));
+  // mr r7,r6
+  r7 = r6;
+  // mr r6,r5
+  r6 = r5;
+  // mullw r5,r4,r10
+  r5 = uint64_t(int64_t(int64_t(int32_t(r4)) * int64_t(int32_t(r10))));
+  // bl 0x8236d150
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8236D150, LIFTED_ARGS(0x8236D3B4, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // blr
+  return {r3, f1};
+}
+
 // sub_82379328: lifted from generated/ by lift.py.
 uint64_t f82379328(uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82379328 (lifted)");
@@ -374130,6 +376592,702 @@ loc_823EA7E0:
   return {r3, f1};
 }
 
+// sub_823EA800 game::ImageCodec::Ctor: lifted from generated/ by lift.py.
+lifted::Result f823EA800(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, double f1) {
+  ITC_NATIVE_RUNNING("sub_823EA800 (lifted)");
+  uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  lifted::Temp temp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e84
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-176(r1)
+  ea = -176 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // mr r31,r3
+  r31 = r3;
+  // addi r11,r11,-18568
+  r11 = uint64_t(int64_t(int64_t(r11) + -18568));
+  // mr r30,r4
+  r30 = r4;
+  // addi r28,r31,60
+  r28 = uint64_t(int64_t(int64_t(r31) + 60));
+  // mr r29,r5
+  r29 = r5;
+  // addi r4,r30,40
+  r4 = uint64_t(int64_t(int64_t(r30) + 40));
+  // stw r11,0(r31)
+  schema::ImageCodec(uint32_t(r31)).set_vtable_bits(uint32_t(r11));
+  // li r5,24
+  r5 = uint64_t(int64_t(24));
+  // lwz r11,0(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).vtable_bits();
+  // mr r3,r28
+  r3 = r28;
+  // mr r27,r6
+  r27 = r6;
+  // stw r11,32(r31)
+  schema::ImageCodec(uint32_t(r31)).set_surface_bits(uint32_t(r11));
+  // lwz r11,4(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).format_bits();
+  // rlwinm r11,r11,0,24,22
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFEFF;
+  // stw r11,4(r31)
+  schema::ImageCodec(uint32_t(r31)).set_format_bits(uint32_t(r11));
+  // lwz r11,8(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).kind_bits();
+  // stw r11,96(r31)
+  schema::ImageCodec(uint32_t(r31)).set_row_pitch_bits(uint32_t(r11));
+  // lwz r11,12(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).has_bits_bits();
+  // stw r11,100(r31)
+  schema::ImageCodec(uint32_t(r31)).set_slice_pitch_bits(uint32_t(r11));
+  // bl 0x825a7410
+  // (left out: dead in C++)
+  { const lifted::Result o = game::memcpy_825A7410(LIFTED_ARGS(0x823EA860, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,64(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).box_top_bits();
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // lis r11,-32156
+  r11 = uint64_t(int64_t(-2107375616));
+  // beq cr6,0x823ea87c
+  if (cr6.eq) goto loc_823EA87C;
+  // addi r11,r11,-14488
+  r11 = uint64_t(int64_t(int64_t(r11) + -14488));
+  // addi r10,r11,128
+  r10 = uint64_t(int64_t(int64_t(r11) + 128));
+  // b 0x823ea880
+  goto loc_823EA880;
+loc_823EA87C:
+  // addi r10,r11,-14488
+  r10 = uint64_t(int64_t(int64_t(r11) + -14488));
+loc_823EA880:
+  // cntlzw r11,r29
+  r11 = uint32_t(r29) == 0 ? 32 : __builtin_clz(uint32_t(r29));
+  // stw r10,52(r31)
+  schema::ImageCodec(uint32_t(r31)).set_rounding_bits(uint32_t(r10));
+  // rlwinm r6,r29,29,3,31
+  r6 = __builtin_rotateleft64(uint32_t(r29) | (r29 << 32), 29) & 0x1FFFFFFF;
+  // stw r27,8(r31)
+  schema::ImageCodec(uint32_t(r31)).set_kind_bits(uint32_t(r27));
+  // rlwinm r11,r11,27,31,31
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 27) & 0x1;
+  // xori r7,r11,1
+  r7 = r11 ^ 1;
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // stw r6,120(r31)
+  schema::ImageCodec(uint32_t(r31)).set_bytes_per_pixel_bits(uint32_t(r6));
+  // stw r7,12(r31)
+  schema::ImageCodec(uint32_t(r31)).set_has_bits_bits(uint32_t(r7));
+  // stw r11,84(r31)
+  schema::ImageCodec(uint32_t(r31)).set_convert_from_bits(uint32_t(r11));
+  // stw r11,88(r31)
+  schema::ImageCodec(uint32_t(r31)).set_row_bits(uint32_t(r11));
+  // lwz r10,76(r30)
+  r10 = schema::ImageCodec(uint32_t(r30)).box_front_bits();
+  // stw r11,28(r31)
+  schema::ImageCodec(uint32_t(r31)).set_palette_set_bits(uint32_t(r11));
+  // stw r11,56(r31)
+  schema::ImageCodec(uint32_t(r31)).set_palette_bits(uint32_t(r11));
+  // stw r10,24(r31)
+  schema::ImageCodec(uint32_t(r31)).set_color_key_bits(uint32_t(r10));
+  // lwz r10,72(r30)
+  r10 = schema::ImageCodec(uint32_t(r30)).box_bottom_bits();
+  // lwz r9,24(r31)
+  r9 = schema::ImageCodec(uint32_t(r31)).color_key_bits();
+  // stw r11,20(r31)
+  schema::ImageCodec(uint32_t(r31)).set_srgb_both_bits(uint32_t(r11));
+  // cmpwi cr6,r9,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
+  // stw r10,16(r31)
+  schema::ImageCodec(uint32_t(r31)).set_srgb_bits(uint32_t(r10));
+  // beq cr6,0x823ea978
+  if (cr6.eq) goto loc_823EA978;
+  // lwz r10,76(r30)
+  r10 = schema::ImageCodec(uint32_t(r30)).box_front_bits();
+  // addi r9,r1,112
+  r9 = uint64_t(int64_t(int64_t(r1) + 112));
+  // addi r8,r31,36
+  r8 = uint64_t(int64_t(int64_t(r31) + 36));
+  // rlwinm r4,r10,24,24,31
+  r4 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 24) & 0xFF;
+  // rlwinm r5,r10,16,24,31
+  r5 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 16) & 0xFF;
+  // clrlwi r3,r10,24
+  r3 = uint32_t(r10) & 0xFF;
+  // rlwinm r10,r10,8,24,31
+  r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 8) & 0xFF;
+  // std r4,88(r1)
+  guest::StoreU64(uint32_t(r1) + 88, r4);
+  // std r5,80(r1)
+  guest::StoreU64(uint32_t(r1) + 80, r5);
+  // std r3,96(r1)
+  guest::StoreU64(uint32_t(r1) + 96, r3);
+  // std r10,112(r1)
+  guest::StoreU64(uint32_t(r1) + 112, r10);
+  // lfd f11,112(r1)
+  lifted::ScalarFloatMode();
+  f11 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 112)));
+  // fcfid f11,f11
+  f11 = double(std::bit_cast<int64_t>(f11));
+  // lis r10,-32256
+  r10 = uint64_t(int64_t(-2113929216));
+  // frsp f11,f11
+  f11 = double(float(f11));
+  // lfd f13,88(r1)
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 88)));
+  // lfd f0,80(r1)
+  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 80)));
+  // fcfid f13,f13
+  f13 = double(std::bit_cast<int64_t>(f13));
+  // lfd f12,96(r1)
+  f12 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 96)));
+  // fcfid f0,f0
+  f0 = double(std::bit_cast<int64_t>(f0));
+  // fcfid f12,f12
+  f12 = double(std::bit_cast<int64_t>(f12));
+  // frsp f13,f13
+  f13 = double(float(f13));
+  // frsp f10,f0
+  f10 = double(float(f0));
+  // lfs f0,8704(r10)
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 8704);
+  f0 = double(temp.f32);
+  // frsp f12,f12
+  f12 = double(float(f12));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // stfs f13,116(r1)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r1) + 116, temp.u32);
+  // fmuls f10,f10,f0
+  f10 = double(float(f10 * f0));
+  // stfs f10,112(r1)
+  temp.f32 = float(f10);
+  guest::StoreU32(uint32_t(r1) + 112, temp.u32);
+  // fmuls f13,f12,f0
+  f13 = double(float(f12 * f0));
+  // stfs f13,120(r1)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r1) + 120, temp.u32);
+  // fmuls f0,f11,f0
+  f0 = double(float(f11 * f0));
+  // stfs f0,124(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 124, temp.u32);
+  // lwz r10,0(r9)
+  r10 = guest::LoadU32(uint32_t(r9) + 0);
+  // lwz r5,4(r9)
+  r5 = guest::LoadU32(uint32_t(r9) + 4);
+  // lwz r4,8(r9)
+  r4 = guest::LoadU32(uint32_t(r9) + 8);
+  // lwz r9,12(r9)
+  r9 = guest::LoadU32(uint32_t(r9) + 12);
+  // stw r10,0(r8)
+  schema::ImageCodec(uint32_t(r8) - 36).set_color_key_red_bits(uint32_t(r10));
+  // stw r5,4(r8)
+  schema::ImageCodec(uint32_t(r8) - 36).set_color_key_green_bits(uint32_t(r5));
+  // stw r4,8(r8)
+  schema::ImageCodec(uint32_t(r8) - 36).set_color_key_blue_bits(uint32_t(r4));
+  // stw r9,12(r8)
+  schema::ImageCodec(uint32_t(r8) - 36).set_color_key_alpha_bits(uint32_t(r9));
+loc_823EA978:
+  // cmplwi cr6,r27,2
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r27), 2, so);
+  // bne cr6,0x823ea998
+  if (!cr6.eq) goto loc_823EA998;
+  // lis r9,10784
+  r9 = uint64_t(int64_t(706740224));
+  // lwz r10,4(r31)
+  r10 = schema::ImageCodec(uint32_t(r31)).format_bits();
+  // ori r9,r9,2885
+  r9 = r9 | 2885;
+  // cmpw cr6,r10,r9
+  cr6 = lifted::Compare<int32_t>(int32_t(r10), int32_t(r9), so);
+  // beq cr6,0x823ea998
+  if (cr6.eq) goto loc_823EA998;
+  // stw r11,16(r31)
+  schema::ImageCodec(uint32_t(r31)).set_srgb_bits(uint32_t(r11));
+loc_823EA998:
+  // cmplwi cr6,r27,3
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r27), 3, so);
+  // bne cr6,0x823ea9a4
+  if (!cr6.eq) goto loc_823EA9A4;
+  // stw r11,16(r31)
+  schema::ImageCodec(uint32_t(r31)).set_srgb_bits(uint32_t(r11));
+loc_823EA9A4:
+  // cmpwi cr6,r7,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r7), 0, so);
+  // lwz r10,0(r28)
+  r10 = schema::ImageCodec(uint32_t(r28) - 60).box_left_bits();
+  // lwz r7,68(r31)
+  r7 = schema::ImageCodec(uint32_t(r31)).box_right_bits();
+  // lwz r9,64(r31)
+  r9 = schema::ImageCodec(uint32_t(r31)).box_top_bits();
+  // lwz r8,76(r31)
+  r8 = schema::ImageCodec(uint32_t(r31)).box_front_bits();
+  // subf r7,r10,r7
+  r7 = r7 - r10;
+  // lwz r5,72(r31)
+  r5 = schema::ImageCodec(uint32_t(r31)).box_bottom_bits();
+  // lwz r4,80(r31)
+  r4 = schema::ImageCodec(uint32_t(r31)).box_back_bits();
+  // mullw r3,r7,r6
+  r3 = uint64_t(int64_t(int64_t(int32_t(r7)) * int64_t(int32_t(r6))));
+  // stw r7,104(r31)
+  schema::ImageCodec(uint32_t(r31)).set_width_bits(uint32_t(r7));
+  // stw r3,116(r31)
+  schema::ImageCodec(uint32_t(r31)).set_row_bytes_bits(uint32_t(r3));
+  // subf r5,r9,r5
+  r5 = r5 - r9;
+  // subf r4,r8,r4
+  r4 = r4 - r8;
+  // stw r5,108(r31)
+  schema::ImageCodec(uint32_t(r31)).set_height_bits(uint32_t(r5));
+  // stw r4,112(r31)
+  schema::ImageCodec(uint32_t(r31)).set_depth_bits(uint32_t(r4));
+  // beq cr6,0x823eaa30
+  if (cr6.eq) goto loc_823EAA30;
+  // lwz r7,100(r31)
+  r7 = schema::ImageCodec(uint32_t(r31)).slice_pitch_bits();
+  // mullw r10,r10,r6
+  r10 = uint64_t(int64_t(int64_t(int32_t(r10)) * int64_t(int32_t(r6))));
+  // lwz r5,96(r31)
+  r5 = schema::ImageCodec(uint32_t(r31)).row_pitch_bits();
+  // mullw r7,r8,r7
+  r7 = uint64_t(int64_t(int64_t(int32_t(r8)) * int64_t(int32_t(r7))));
+  // lwz r6,104(r31)
+  r6 = schema::ImageCodec(uint32_t(r31)).width_bits();
+  // lwz r4,108(r31)
+  r4 = schema::ImageCodec(uint32_t(r31)).height_bits();
+  // lwz r3,112(r31)
+  r3 = schema::ImageCodec(uint32_t(r31)).depth_bits();
+  // stw r11,0(r28)
+  schema::ImageCodec(uint32_t(r28) - 60).set_box_left_bits(uint32_t(r11));
+  // stw r11,64(r31)
+  schema::ImageCodec(uint32_t(r31)).set_box_top_bits(uint32_t(r11));
+  // stw r6,68(r31)
+  schema::ImageCodec(uint32_t(r31)).set_box_right_bits(uint32_t(r6));
+  // stw r4,72(r31)
+  schema::ImageCodec(uint32_t(r31)).set_box_bottom_bits(uint32_t(r4));
+  // stw r3,80(r31)
+  schema::ImageCodec(uint32_t(r31)).set_box_back_bits(uint32_t(r3));
+  // lwz r8,32(r31)
+  r8 = schema::ImageCodec(uint32_t(r31)).surface_bits();
+  // stw r11,76(r31)
+  schema::ImageCodec(uint32_t(r31)).set_box_front_bits(uint32_t(r11));
+  // add r10,r10,r7
+  r10 = r10 + r7;
+  // mullw r9,r9,r5
+  r9 = uint64_t(int64_t(int64_t(int32_t(r9)) * int64_t(int32_t(r5))));
+  // add r10,r10,r9
+  r10 = r10 + r9;
+  // add r10,r10,r8
+  r10 = r10 + r8;
+  // stw r10,32(r31)
+  schema::ImageCodec(uint32_t(r31)).set_surface_bits(uint32_t(r10));
+loc_823EAA30:
+  // lwz r10,68(r30)
+  r10 = schema::ImageCodec(uint32_t(r30)).box_right_bits();
+  // cmpwi cr6,r10,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
+  // beq cr6,0x823eaa7c
+  if (cr6.eq) goto loc_823EAA7C;
+  // lwz r11,104(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).width_bits();
+  // lis r10,4095
+  r10 = uint64_t(int64_t(268369920));
+  // addi r11,r11,2
+  r11 = uint64_t(int64_t(int64_t(r11) + 2));
+  // ori r10,r10,65535
+  r10 = r10 | 65535;
+  // rlwinm r3,r11,4,0,27
+  r3 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // ble cr6,0x823eaa5c
+  if (!cr6.gt) goto loc_823EAA5C;
+  // li r3,-1
+  r3 = uint64_t(int64_t(-1));
+loc_823EAA5C:
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823EAA60, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,104(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).width_bits();
+  // li r4,0
+  r4 = uint64_t(int64_t(0));
+  // stw r3,92(r31)
+  schema::ImageCodec(uint32_t(r31)).set_error_row_bits(uint32_t(r3));
+  // addi r11,r11,2
+  r11 = uint64_t(int64_t(int64_t(r11) + 2));
+  // rlwinm r5,r11,4,0,27
+  r5 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
+  // bl 0x825a71d0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::memset(LIFTED_ARGS(0x823EAA78, r31)); r3 = o.r3; f1 = o.f1; }
+  // b 0x823eaa80
+  goto loc_823EAA80;
+loc_823EAA7C:
+  // stw r11,92(r31)
+  schema::ImageCodec(uint32_t(r31)).set_error_row_bits(uint32_t(r11));
+loc_823EAA80:
+  // mr r3,r31
+  r3 = r31;
+  // addi r1,r1,176
+  r1 = uint64_t(int64_t(int64_t(r1) + 176));
+  // b 0x825a6ed4
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_823EAA90 game::ImageCodec::Prepare: lifted from generated/ by lift.py.
+lifted::Result f823EAA90(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
+  ITC_NATIVE_RUNNING("sub_823EAA90 (lifted)");
+  uint64_t r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r3
+  r31 = r3;
+  // mr r30,r4
+  r30 = r4;
+  // lwz r11,8(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).kind_bits();
+  // lwz r10,8(r30)
+  r10 = schema::ImageCodec(uint32_t(r30)).kind_bits();
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // beq cr6,0x823eaac8
+  if (cr6.eq) goto loc_823EAAC8;
+  // cmplwi cr6,r11,4
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 4, so);
+  // beq cr6,0x823eaac8
+  if (cr6.eq) goto loc_823EAAC8;
+  // stw r10,84(r31)
+  schema::ImageCodec(uint32_t(r31)).set_convert_from_bits(uint32_t(r10));
+loc_823EAAC8:
+  // lwz r11,84(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).convert_from_bits();
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x823eaae0
+  if (!cr6.eq) goto loc_823EAAE0;
+  // lwz r11,16(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).srgb_bits();
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq cr6,0x823eab18
+  if (cr6.eq) goto loc_823EAB18;
+loc_823EAAE0:
+  // lis r10,4095
+  r10 = uint64_t(int64_t(268369920));
+  // lwz r11,104(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).width_bits();
+  // ori r10,r10,65535
+  r10 = r10 | 65535;
+  // rlwinm r3,r11,4,0,27
+  r3 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // ble cr6,0x823eaafc
+  if (!cr6.gt) goto loc_823EAAFC;
+  // li r3,-1
+  r3 = uint64_t(int64_t(-1));
+loc_823EAAFC:
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823EAB00, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // stw r3,88(r31)
+  schema::ImageCodec(uint32_t(r31)).set_row_bits(uint32_t(r3));
+  // bne cr6,0x823eab18
+  if (!cr6.eq) goto loc_823EAB18;
+  // lis r3,-32761
+  r3 = uint64_t(int64_t(-2147024896));
+  // ori r3,r3,14
+  r3 = r3 | 14;
+  // b 0x823eab40
+  goto loc_823EAB40;
+loc_823EAB18:
+  // lwz r11,16(r31)
+  r11 = schema::ImageCodec(uint32_t(r31)).srgb_bits();
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq cr6,0x823eab3c
+  if (cr6.eq) goto loc_823EAB3C;
+  // lwz r11,16(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).srgb_bits();
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq cr6,0x823eab3c
+  if (cr6.eq) goto loc_823EAB3C;
+  // li r11,1
+  r11 = uint64_t(int64_t(1));
+  // stw r11,20(r30)
+  schema::ImageCodec(uint32_t(r30)).set_srgb_both_bits(uint32_t(r11));
+  // stw r11,20(r31)
+  schema::ImageCodec(uint32_t(r31)).set_srgb_both_bits(uint32_t(r11));
+loc_823EAB3C:
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+loc_823EAB40:
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
+// sub_823EAB58: lifted from generated/ by lift.py.
+lifted::Result f823EAB58(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_823EAB58 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  lifted::Temp temp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-144(r1)
+  ea = -144 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r3
+  r31 = r3;
+  // li r3,4096
+  r3 = uint64_t(int64_t(4096));
+  // mr r30,r4
+  r30 = r4;
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823EAB7C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // stw r3,56(r31)
+  guest::StoreU32(uint32_t(r31) + 56, uint32_t(r3));
+  // bne cr6,0x823eab94
+  if (!cr6.eq) goto loc_823EAB94;
+  // lis r3,-32761
+  r3 = uint64_t(int64_t(-2147024896));
+  // ori r3,r3,14
+  r3 = r3 | 14;
+  // b 0x823eacb0
+  goto loc_823EACB0;
+loc_823EAB94:
+  // lwz r11,80(r30)
+  r11 = guest::LoadU32(uint32_t(r30) + 80);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // beq cr6,0x823eac6c
+  if (cr6.eq) goto loc_823EAC6C;
+  // lis r9,-32256
+  r9 = uint64_t(int64_t(-2113929216));
+  // li r10,0
+  r10 = uint64_t(int64_t(0));
+  // lfs f0,8704(r9)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r9) + 8704);
+  f0 = double(temp.f32);
+loc_823EABB0:
+  // lwz r9,80(r30)
+  r9 = guest::LoadU32(uint32_t(r30) + 80);
+  // lwz r8,56(r31)
+  r8 = guest::LoadU32(uint32_t(r31) + 56);
+  // lbzx r9,r9,r11
+  r9 = guest::LoadU8(uint32_t(r9) + uint32_t(r11));
+  // std r9,80(r1)
+  guest::StoreU64(uint32_t(r1) + 80, r9);
+  // lfd f13,80(r1)
+  lifted::ScalarFloatMode();
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 80)));
+  // fcfid f13,f13
+  f13 = double(std::bit_cast<int64_t>(f13));
+  // frsp f13,f13
+  f13 = double(float(f13));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // stfsx f13,r10,r8
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r10) + uint32_t(r8), temp.u32);
+  // lwz r8,80(r30)
+  r8 = guest::LoadU32(uint32_t(r30) + 80);
+  // lwz r9,56(r31)
+  r9 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r8,r8,r11
+  r8 = r8 + r11;
+  // add r9,r10,r9
+  r9 = r10 + r9;
+  // lbz r8,1(r8)
+  r8 = guest::LoadU8(uint32_t(r8) + 1);
+  // std r8,88(r1)
+  guest::StoreU64(uint32_t(r1) + 88, r8);
+  // lfd f13,88(r1)
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 88)));
+  // fcfid f13,f13
+  f13 = double(std::bit_cast<int64_t>(f13));
+  // frsp f13,f13
+  f13 = double(float(f13));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // stfs f13,4(r9)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r9) + 4, temp.u32);
+  // lwz r8,80(r30)
+  r8 = guest::LoadU32(uint32_t(r30) + 80);
+  // lwz r9,56(r31)
+  r9 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r8,r8,r11
+  r8 = r8 + r11;
+  // add r9,r10,r9
+  r9 = r10 + r9;
+  // lbz r8,2(r8)
+  r8 = guest::LoadU8(uint32_t(r8) + 2);
+  // std r8,96(r1)
+  guest::StoreU64(uint32_t(r1) + 96, r8);
+  // lfd f13,96(r1)
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 96)));
+  // fcfid f13,f13
+  f13 = double(std::bit_cast<int64_t>(f13));
+  // frsp f13,f13
+  f13 = double(float(f13));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // stfs f13,8(r9)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r9) + 8, temp.u32);
+  // lwz r8,80(r30)
+  r8 = guest::LoadU32(uint32_t(r30) + 80);
+  // lwz r9,56(r31)
+  r9 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r8,r8,r11
+  r8 = r8 + r11;
+  // add r9,r10,r9
+  r9 = r10 + r9;
+  // addi r11,r11,4
+  r11 = uint64_t(int64_t(int64_t(r11) + 4));
+  // addi r10,r10,16
+  r10 = uint64_t(int64_t(int64_t(r10) + 16));
+  // cmplwi cr6,r11,1024
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1024, so);
+  // lbz r8,3(r8)
+  r8 = guest::LoadU8(uint32_t(r8) + 3);
+  // std r8,104(r1)
+  guest::StoreU64(uint32_t(r1) + 104, r8);
+  // lfd f13,104(r1)
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + 104)));
+  // fcfid f13,f13
+  f13 = double(std::bit_cast<int64_t>(f13));
+  // frsp f13,f13
+  f13 = double(float(f13));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // stfs f13,12(r9)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r9) + 12, temp.u32);
+  // blt cr6,0x823eabb0
+  if (cr6.lt) goto loc_823EABB0;
+  // b 0x823eacac
+  goto loc_823EACAC;
+loc_823EAC6C:
+  // lis r10,-32256
+  r10 = uint64_t(int64_t(-2113929216));
+  // lfs f0,2608(r10)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 2608);
+  f0 = double(temp.f32);
+loc_823EAC74:
+  // lwz r10,56(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r10,r11,r10
+  r10 = r11 + r10;
+  // stfs f0,12(r10)
+  lifted::ScalarFloatMode();
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r10) + 12, temp.u32);
+  // lwz r10,56(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r10,r11,r10
+  r10 = r11 + r10;
+  // stfs f0,8(r10)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r10) + 8, temp.u32);
+  // lwz r10,56(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 56);
+  // add r10,r11,r10
+  r10 = r11 + r10;
+  // stfs f0,4(r10)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r10) + 4, temp.u32);
+  // lwz r10,56(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 56);
+  // stfsx f0,r11,r10
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r11) + uint32_t(r10), temp.u32);
+  // addi r11,r11,16
+  r11 = uint64_t(int64_t(int64_t(r11) + 16));
+  // cmplwi cr6,r11,4096
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 4096, so);
+  // blt cr6,0x823eac74
+  if (cr6.lt) goto loc_823EAC74;
+loc_823EACAC:
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+loc_823EACB0:
+  // addi r1,r1,144
+  r1 = uint64_t(int64_t(int64_t(r1) + 144));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
 // sub_823F2620 game::A8R8G8B8Codec::DecodeRow: lifted from generated/ by lift.py.
 uint64_t f823F2620(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6) {
   ITC_NATIVE_RUNNING("sub_823F2620 (lifted)");
@@ -374288,6 +377446,406 @@ loc_823F271C:
   // (left out: dead in C++)
   // blr
   return r3;
+}
+
+// sub_823F55B0: lifted from generated/ by lift.py.
+lifted::Result f823F55B0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
+  ITC_NATIVE_RUNNING("sub_823F55B0 (lifted)");
+  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e8c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // mr r31,r3
+  r31 = r3;
+  // mr r29,r4
+  r29 = r4;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F55D0, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,68(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 68);
+  // li r30,0
+  r30 = uint64_t(int64_t(0));
+  // lwz r10,60(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 60);
+  // li r8,1
+  r8 = uint64_t(int64_t(1));
+  // addi r11,r11,1
+  r11 = uint64_t(int64_t(int64_t(r11) + 1));
+  // rlwinm r10,r10,0,0,30
+  r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 0) & 0xFFFFFFFE;
+  // rlwinm r9,r11,0,0,30
+  r9 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFE;
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // stw r30,136(r31)
+  guest::StoreU32(uint32_t(r31) + 136, uint32_t(r30));
+  // stw r30,148(r31)
+  guest::StoreU32(uint32_t(r31) + 148, uint32_t(r30));
+  // addi r11,r11,-17928
+  r11 = uint64_t(int64_t(int64_t(r11) + -17928));
+  // stw r30,144(r31)
+  guest::StoreU32(uint32_t(r31) + 144, uint32_t(r30));
+  // stw r30,152(r31)
+  guest::StoreU32(uint32_t(r31) + 152, uint32_t(r30));
+  // stw r30,160(r31)
+  guest::StoreU32(uint32_t(r31) + 160, uint32_t(r30));
+  // stw r8,164(r31)
+  guest::StoreU32(uint32_t(r31) + 164, uint32_t(r8));
+  // stw r10,132(r31)
+  guest::StoreU32(uint32_t(r31) + 132, uint32_t(r10));
+  // stw r11,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r11));
+  // lis r11,4095
+  r11 = uint64_t(int64_t(268369920));
+  // stw r9,140(r31)
+  guest::StoreU32(uint32_t(r31) + 140, uint32_t(r9));
+  // ori r7,r11,65535
+  r7 = r11 | 65535;
+  // subf r11,r10,r9
+  r11 = r9 - r10;
+  // cmplw cr6,r11,r7
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r7), so);
+  // rlwinm r3,r11,4,0,27
+  r3 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 4) & 0xFFFFFFF0;
+  // stw r11,156(r31)
+  guest::StoreU32(uint32_t(r31) + 156, uint32_t(r11));
+  // ble cr6,0x823f5638
+  if (!cr6.gt) goto loc_823F5638;
+  // li r3,-1
+  r3 = uint64_t(int64_t(-1));
+loc_823F5638:
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F563C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // stw r3,128(r31)
+  guest::StoreU32(uint32_t(r31) + 128, uint32_t(r3));
+  // bne cr6,0x823f564c
+  if (!cr6.eq) goto loc_823F564C;
+  // stw r30,164(r31)
+  guest::StoreU32(uint32_t(r31) + 164, uint32_t(r30));
+loc_823F564C:
+  // lwz r11,4(r29)
+  r11 = guest::LoadU32(uint32_t(r29) + 4);
+  // addis r11,r11,-6184
+  r11 = uint64_t(int64_t(int64_t(r11) + -405274624));
+  // addic. r11,r11,-75
+  ca = uint32_t(r11) > 74;
+  r11 = uint64_t(int64_t(int64_t(r11) + -75));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f5688
+  if (cr0.eq) goto loc_823F5688;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f5678
+  if (cr6.eq) goto loc_823F5678;
+  // addis r11,r11,-504
+  r11 = uint64_t(int64_t(int64_t(r11) + -33030144));
+  // cmplwi r11,0
+  cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq 0x823f5688
+  if (cr0.eq) goto loc_823F5688;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // bne cr6,0x823f5694
+  if (!cr6.eq) goto loc_823F5694;
+loc_823F5678:
+  // li r11,8
+  r11 = uint64_t(int64_t(8));
+  // stw r30,172(r31)
+  guest::StoreU32(uint32_t(r31) + 172, uint32_t(r30));
+  // stw r11,168(r31)
+  guest::StoreU32(uint32_t(r31) + 168, uint32_t(r11));
+  // b 0x823f5694
+  goto loc_823F5694;
+loc_823F5688:
+  // li r11,8
+  r11 = uint64_t(int64_t(8));
+  // stw r30,168(r31)
+  guest::StoreU32(uint32_t(r31) + 168, uint32_t(r30));
+  // stw r11,172(r31)
+  guest::StoreU32(uint32_t(r31) + 172, uint32_t(r11));
+loc_823F5694:
+  // mr r3,r31
+  r3 = r31;
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // b 0x825a6edc
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_823F5FA0 game::DxtCodec::Ctor: lifted from generated/ by lift.py.
+lifted::Result f823F5FA0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
+  ITC_NATIVE_RUNNING("sub_823F5FA0 (lifted)");
+  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e7c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-144(r1)
+  ea = -144 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // mr r31,r3
+  r31 = r3;
+  // mr r29,r4
+  r29 = r4;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F5FC0, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r11,4(r31)
+  r11 = schema::DxtCodec(uint32_t(r31)).format_bits();
+  // lis r10,-32252
+  r10 = uint64_t(int64_t(-2113667072));
+  // rlwinm r11,r11,0,24,22
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFEFF;
+  // addi r10,r10,-17944
+  r10 = uint64_t(int64_t(int64_t(r10) + -17944));
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-82
+  ca = uint32_t(r11) > 81;
+  r11 = uint64_t(int64_t(int64_t(r11) + -82));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // stw r10,0(r31)
+  schema::DxtCodec(uint32_t(r31)).set_vtable_bits(uint32_t(r10));
+  // beq 0x823f6058
+  if (cr0.eq) goto loc_823F6058;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f6040
+  if (cr6.eq) goto loc_823F6040;
+  // cmplwi cr6,r11,2
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2, so);
+  // beq cr6,0x823f6028
+  if (cr6.eq) goto loc_823F6028;
+  // cmplwi cr6,r11,40
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 40, so);
+  // beq cr6,0x823f6014
+  if (cr6.eq) goto loc_823F6014;
+  // cmplwi cr6,r11,41
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 41, so);
+  // bne cr6,0x823f6078
+  if (!cr6.eq) goto loc_823F6078;
+  // lis r10,-32190
+  r10 = uint64_t(int64_t(-2109603840));
+  // lis r11,-32190
+  r11 = uint64_t(int64_t(-2109603840));
+  // addi r10,r10,8568
+  r10 = uint64_t(int64_t(int64_t(r10) + 8568));
+  // addi r11,r11,7304
+  r11 = uint64_t(int64_t(int64_t(r11) + 7304));
+  // b 0x823f6068
+  goto loc_823F6068;
+loc_823F6014:
+  // lis r10,-32190
+  r10 = uint64_t(int64_t(-2109603840));
+  // lis r11,-32190
+  r11 = uint64_t(int64_t(-2109603840));
+  // addi r10,r10,8192
+  r10 = uint64_t(int64_t(int64_t(r10) + 8192));
+  // addi r11,r11,7152
+  r11 = uint64_t(int64_t(int64_t(r11) + 7152));
+  // b 0x823f6068
+  goto loc_823F6068;
+loc_823F6028:
+  // lis r10,-32190
+  r10 = uint64_t(int64_t(-2109603840));
+  // lis r11,-32190
+  r11 = uint64_t(int64_t(-2109603840));
+  // li r9,16
+  r9 = uint64_t(int64_t(16));
+  // addi r10,r10,10856
+  r10 = uint64_t(int64_t(int64_t(r10) + 10856));
+  // addi r11,r11,10808
+  r11 = uint64_t(int64_t(int64_t(r11) + 10808));
+  // b 0x823f606c
+  goto loc_823F606C;
+loc_823F6040:
+  // lis r10,-32190
+  r10 = uint64_t(int64_t(-2109603840));
+  // lis r11,-32190
+  r11 = uint64_t(int64_t(-2109603840));
+  // li r9,16
+  r9 = uint64_t(int64_t(16));
+  // addi r10,r10,10832
+  r10 = uint64_t(int64_t(int64_t(r10) + 10832));
+  // addi r11,r11,10784
+  r11 = uint64_t(int64_t(int64_t(r11) + 10784));
+  // b 0x823f606c
+  goto loc_823F606C;
+loc_823F6058:
+  // lis r10,-32190
+  r10 = uint64_t(int64_t(-2109603840));
+  // lis r11,-32190
+  r11 = uint64_t(int64_t(-2109603840));
+  // addi r10,r10,7856
+  r10 = uint64_t(int64_t(int64_t(r10) + 7856));
+  // addi r11,r11,6456
+  r11 = uint64_t(int64_t(int64_t(r11) + 6456));
+loc_823F6068:
+  // li r9,8
+  r9 = uint64_t(int64_t(8));
+loc_823F606C:
+  // stw r9,136(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_bytes_bits(uint32_t(r9));
+  // stw r10,144(r31)
+  schema::DxtCodec(uint32_t(r31)).set_encode_block_bits(uint32_t(r10));
+  // stw r11,140(r31)
+  schema::DxtCodec(uint32_t(r31)).set_decode_block_bits(uint32_t(r11));
+loc_823F6078:
+  // addi r30,r31,148
+  r30 = uint64_t(int64_t(int64_t(r31) + 148));
+  // addi r4,r29,16
+  r4 = uint64_t(int64_t(int64_t(r29) + 16));
+  // li r5,24
+  r5 = uint64_t(int64_t(24));
+  // mr r3,r30
+  r3 = r30;
+  // bl 0x825a7410
+  // (left out: dead in C++)
+  { const lifted::Result o = game::memcpy_825A7410(LIFTED_ARGS(0x823F608C, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r11,-1
+  r11 = uint64_t(int64_t(-1));
+  // lwz r4,160(r31)
+  r4 = schema::DxtCodec(uint32_t(r31)).extent_bottom_bits();
+  // lwz r9,68(r31)
+  r9 = schema::DxtCodec(uint32_t(r31)).box_right_bits();
+  // mr r25,r11
+  r25 = r11;
+  // addi r4,r4,3
+  r4 = uint64_t(int64_t(int64_t(r4) + 3));
+  // lwz r10,72(r31)
+  r10 = schema::DxtCodec(uint32_t(r31)).box_bottom_bits();
+  // lwz r8,60(r31)
+  r8 = schema::DxtCodec(uint32_t(r31)).box_left_bits();
+  // addi r6,r9,3
+  r6 = uint64_t(int64_t(int64_t(r9) + 3));
+  // stw r11,232(r31)
+  schema::DxtCodec(uint32_t(r31)).set_unknown_232_bits(uint32_t(r11));
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // rlwinm r4,r4,0,0,29
+  r4 = __builtin_rotateleft64(uint32_t(r4) | (r4 << 32), 0) & 0xFFFFFFFC;
+  // lwz r7,64(r31)
+  r7 = schema::DxtCodec(uint32_t(r31)).box_top_bits();
+  // addi r5,r10,3
+  r5 = uint64_t(int64_t(int64_t(r10) + 3));
+  // lwz r9,76(r31)
+  r9 = schema::DxtCodec(uint32_t(r31)).box_front_bits();
+  // rlwinm r10,r8,0,0,29
+  r10 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 0) & 0xFFFFFFFC;
+  // lwz r3,156(r31)
+  r3 = schema::DxtCodec(uint32_t(r31)).extent_right_bits();
+  // rlwinm r8,r7,0,0,29
+  r8 = __builtin_rotateleft64(uint32_t(r7) | (r7 << 32), 0) & 0xFFFFFFFC;
+  // lwz r7,80(r31)
+  r7 = schema::DxtCodec(uint32_t(r31)).box_back_bits();
+  // rlwinm r6,r6,0,0,29
+  r6 = __builtin_rotateleft64(uint32_t(r6) | (r6 << 32), 0) & 0xFFFFFFFC;
+  // stw r11,240(r31)
+  schema::DxtCodec(uint32_t(r31)).set_decode_cache_bits(uint32_t(r11));
+  // rlwinm r5,r5,0,0,29
+  r5 = __builtin_rotateleft64(uint32_t(r5) | (r5 << 32), 0) & 0xFFFFFFFC;
+  // stw r11,244(r31)
+  schema::DxtCodec(uint32_t(r31)).set_cache_count_bits(uint32_t(r11));
+  // stw r11,248(r31)
+  schema::DxtCodec(uint32_t(r31)).set_cache_bits(uint32_t(r11));
+  // addi r3,r3,3
+  r3 = uint64_t(int64_t(int64_t(r3) + 3));
+  // stw r4,184(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_bottom_bits(uint32_t(r4));
+  // subf r11,r10,r6
+  r11 = r6 - r10;
+  // lwz r30,0(r30)
+  r30 = schema::DxtCodec(uint32_t(r30) - 148).extent_left_bits();
+  // subf r4,r8,r5
+  r4 = r5 - r8;
+  // lwz r28,152(r31)
+  r28 = schema::DxtCodec(uint32_t(r31)).extent_top_bits();
+  // rlwinm r3,r3,0,0,29
+  r3 = __builtin_rotateleft64(uint32_t(r3) | (r3 << 32), 0) & 0xFFFFFFFC;
+  // stw r10,196(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_left_bits(uint32_t(r10));
+  // rlwinm r11,r11,30,2,31
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 30) & 0x3FFFFFFF;
+  // stw r9,212(r31)
+  schema::DxtCodec(uint32_t(r31)).set_front_bits(uint32_t(r9));
+  // rlwinm r30,r30,0,0,29
+  r30 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 0) & 0xFFFFFFFC;
+  // lwz r27,164(r31)
+  r27 = schema::DxtCodec(uint32_t(r31)).extent_front_bits();
+  // rlwinm r28,r28,0,0,29
+  r28 = __builtin_rotateleft64(uint32_t(r28) | (r28 << 32), 0) & 0xFFFFFFFC;
+  // lwz r26,168(r31)
+  r26 = schema::DxtCodec(uint32_t(r31)).extent_back_bits();
+  // rlwinm r10,r4,30,2,31
+  r10 = __builtin_rotateleft64(uint32_t(r4) | (r4 << 32), 30) & 0x3FFFFFFF;
+  // subf r9,r9,r7
+  r9 = r7 - r9;
+  // stw r3,180(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_right_bits(uint32_t(r3));
+  // stw r25,236(r31)
+  schema::DxtCodec(uint32_t(r31)).set_unknown_236_bits(uint32_t(r25));
+  // mr r3,r31
+  r3 = r31;
+  // stw r30,172(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_left_bits(uint32_t(r30));
+  // stw r28,176(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_top_bits(uint32_t(r28));
+  // stw r27,188(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_front_bits(uint32_t(r27));
+  // stw r26,192(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_extent_back_bits(uint32_t(r26));
+  // stw r8,200(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_top_bits(uint32_t(r8));
+  // stw r6,204(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_right_bits(uint32_t(r6));
+  // stw r5,208(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_bottom_bits(uint32_t(r5));
+  // stw r7,216(r31)
+  schema::DxtCodec(uint32_t(r31)).set_back_bits(uint32_t(r7));
+  // stw r11,220(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_columns_bits(uint32_t(r11));
+  // stw r10,224(r31)
+  schema::DxtCodec(uint32_t(r31)).set_block_rows_bits(uint32_t(r10));
+  // stw r9,228(r31)
+  schema::DxtCodec(uint32_t(r31)).set_slices_bits(uint32_t(r9));
+  // lwz r11,64(r29)
+  r11 = schema::ImageCodec(uint32_t(r29)).box_top_bits();
+  // stw r11,252(r31)
+  schema::DxtCodec(uint32_t(r31)).set_dither_bits(uint32_t(r11));
+  // addi r1,r1,144
+  r1 = uint64_t(int64_t(int64_t(r1) + 144));
+  // b 0x825a6ecc
+  // (left out: dead in C++)
+  return {r3, f1};
 }
 
 // sub_823F6298 game::DxtCodec::EncodeRow: lifted from generated/ by lift.py.
@@ -375173,6 +378731,1688 @@ lifted::Result f823F6BC0(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, ui
 loc_823F6BF0:
   // mr r3,r31
   r3 = r31;
+  // addi r1,r1,112
+  r1 = uint64_t(int64_t(int64_t(r1) + 112));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
+// sub_823F6C60 game::ImageCodec::Create: lifted from generated/ by lift.py.
+lifted::Result f823F6C60(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
+  ITC_NATIVE_RUNNING("sub_823F6C60 (lifted)");
+  uint64_t r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0, ctr = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-112(r1)
+  ea = -112 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r3
+  r30 = r3;
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,43866
+  r10 = r10 | 43866;
+  // lwz r11,4(r30)
+  r11 = schema::ImageCodec(uint32_t(r30)).format_bits();
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f71c8
+  if (cr6.gt) goto loc_823F71C8;
+  // beq cr6,0x823f7198
+  if (cr6.eq) goto loc_823F7198;
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,84
+  r10 = r10 | 84;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f6f1c
+  if (cr6.gt) goto loc_823F6F1C;
+  // beq cr6,0x823f701c
+  if (cr6.eq) goto loc_823F701C;
+  // lis r10,6184
+  r10 = uint64_t(int64_t(405274624));
+  // ori r10,r10,323
+  r10 = r10 | 323;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f6de8
+  if (cr6.gt) goto loc_823F6DE8;
+  // beq cr6,0x823f6d04
+  if (cr6.eq) goto loc_823F6D04;
+  // lis r10,6184
+  r10 = uint64_t(int64_t(405274624));
+  // ori r10,r10,75
+  r10 = r10 | 75;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f6d94
+  if (cr6.gt) goto loc_823F6D94;
+  // beq cr6,0x823f6ea8
+  if (cr6.eq) goto loc_823F6EA8;
+  // addis r11,r11,-1168
+  r11 = uint64_t(int64_t(int64_t(r11) + -76546048));
+  // addic. r11,r11,-2
+  ca = uint32_t(r11) > 1;
+  r11 = uint64_t(int64_t(int64_t(r11) + -2));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f6d64
+  if (cr0.eq) goto loc_823F6D64;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f6d64
+  if (cr6.eq) goto loc_823F6D64;
+  // addis r11,r11,-880
+  r11 = uint64_t(int64_t(int64_t(r11) + -57671680));
+  // addic. r11,r11,-72
+  ca = uint32_t(r11) > 71;
+  r11 = uint64_t(int64_t(int64_t(r11) + -72));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f6d34
+  if (cr0.eq) goto loc_823F6D34;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f6d34
+  if (cr6.eq) goto loc_823F6D34;
+  // lis r10,4135
+  r10 = uint64_t(int64_t(270991360));
+  // ori r10,r10,65529
+  r10 = r10 | 65529;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F6D04:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6D0C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6D28, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18360
+  r11 = uint64_t(int64_t(int64_t(r11) + -18360));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6D34:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6D3C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6D58, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18184
+  r11 = uint64_t(int64_t(int64_t(r11) + -18184));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6D64:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6D6C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,8
+  r5 = uint64_t(int64_t(8));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6D88, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18328
+  r11 = uint64_t(int64_t(int64_t(r11) + -18328));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6D94:
+  // addis r11,r11,-6184
+  r11 = uint64_t(int64_t(int64_t(r11) + -405274624));
+  // addic. r11,r11,-76
+  ca = uint32_t(r11) > 75;
+  r11 = uint64_t(int64_t(int64_t(r11) + -76));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f6e80
+  if (cr0.eq) goto loc_823F6E80;
+  // cmplwi cr6,r11,3
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 3, so);
+  // beq cr6,0x823f6e50
+  if (cr6.eq) goto loc_823F6E50;
+  // cmplwi cr6,r11,58
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 58, so);
+  // beq cr6,0x823f6e20
+  if (cr6.eq) goto loc_823F6E20;
+  // cmplwi cr6,r11,106
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 106, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F6DB8:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6DC0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6DDC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18232
+  r11 = uint64_t(int64_t(int64_t(r11) + -18232));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6DE8:
+  // lis r10,6184
+  r10 = uint64_t(int64_t(405274624));
+  // ori r10,r10,438
+  r10 = r10 | 438;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f6ed0
+  if (cr6.gt) goto loc_823F6ED0;
+  // beq cr6,0x823f6db8
+  if (cr6.eq) goto loc_823F6DB8;
+  // addis r11,r11,-6184
+  r11 = uint64_t(int64_t(int64_t(r11) + -405274624));
+  // addic. r11,r11,-331
+  ca = uint32_t(r11) > 330;
+  r11 = uint64_t(int64_t(int64_t(r11) + -331));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f6ea8
+  if (cr0.eq) goto loc_823F6EA8;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f6e80
+  if (cr6.eq) goto loc_823F6E80;
+  // cmplwi cr6,r11,4
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 4, so);
+  // beq cr6,0x823f6e50
+  if (cr6.eq) goto loc_823F6E50;
+  // cmplwi cr6,r11,59
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 59, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F6E20:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6E28, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6E44, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18424
+  r11 = uint64_t(int64_t(int64_t(r11) + -18424));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6E50:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6E58, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6E74, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18344
+  r11 = uint64_t(int64_t(int64_t(r11) + -18344));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6E80:
+  // li r3,176
+  r3 = uint64_t(int64_t(176));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6E88, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f55b0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x823F55B0, LIFTED_ARGS(0x823F6E9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17928
+  r11 = uint64_t(int64_t(int64_t(r11) + -17928));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6EA8:
+  // li r3,176
+  r3 = uint64_t(int64_t(176));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6EB0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f55b0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x823F55B0, LIFTED_ARGS(0x823F6EC4, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17928
+  r11 = uint64_t(int64_t(int64_t(r11) + -17928));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6ED0:
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-75
+  ca = uint32_t(r11) > 74;
+  r11 = uint64_t(int64_t(int64_t(r11) + -75));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+loc_823F6ED8:
+  // beq 0x823f6ff4
+  if (cr0.eq) goto loc_823F6FF4;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f6fcc
+  if (cr6.eq) goto loc_823F6FCC;
+  // cmplwi cr6,r11,7
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 7, so);
+  // beq cr6,0x823f6fa4
+  if (cr6.eq) goto loc_823F6FA4;
+  // cmplwi cr6,r11,8
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 8, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+  // li r3,256
+  r3 = uint64_t(int64_t(256));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6EFC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f5fa0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::DxtCodec::Ctor(LIFTED_ARGS(0x823F6F10, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17944
+  r11 = uint64_t(int64_t(int64_t(r11) + -17944));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6F1C:
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,340
+  r10 = r10 | 340;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f7044
+  if (cr6.gt) goto loc_823F7044;
+  // beq cr6,0x823f701c
+  if (cr6.eq) goto loc_823F701C;
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,182
+  r10 = r10 | 182;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f6f98
+  if (cr6.gt) goto loc_823F6F98;
+  // beq cr6,0x823f70e4
+  if (cr6.eq) goto loc_823F70E4;
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-90
+  ca = uint32_t(r11) > 89;
+  r11 = uint64_t(int64_t(int64_t(r11) + -90));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+loc_823F6F4C:
+  // beq 0x823f70b4
+  if (cr0.eq) goto loc_823F70B4;
+  // cmplwi cr6,r11,32
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 32, so);
+  // beq cr6,0x823f708c
+  if (cr6.eq) goto loc_823F708C;
+  // cmplwi cr6,r11,33
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 33, so);
+  // beq cr6,0x823f7064
+  if (cr6.eq) goto loc_823F7064;
+  // cmplwi cr6,r11,44
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 44, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6F70, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F6F8C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18280
+  r11 = uint64_t(int64_t(int64_t(r11) + -18280));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6F98:
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-331
+  ca = uint32_t(r11) > 330;
+  r11 = uint64_t(int64_t(int64_t(r11) + -331));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // b 0x823f6ed8
+  goto loc_823F6ED8;
+loc_823F6FA4:
+  // li r3,256
+  r3 = uint64_t(int64_t(256));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6FAC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f5fa0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::DxtCodec::Ctor(LIFTED_ARGS(0x823F6FC0, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17944
+  r11 = uint64_t(int64_t(int64_t(r11) + -17944));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6FCC:
+  // li r3,176
+  r3 = uint64_t(int64_t(176));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6FD4, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f55b0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x823F55B0, LIFTED_ARGS(0x823F6FE8, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17928
+  r11 = uint64_t(int64_t(int64_t(r11) + -17928));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F6FF4:
+  // li r3,176
+  r3 = uint64_t(int64_t(176));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F6FFC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f55b0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x823F55B0, LIFTED_ARGS(0x823F7010, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17928
+  r11 = uint64_t(int64_t(int64_t(r11) + -17928));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F701C:
+  // li r3,256
+  r3 = uint64_t(int64_t(256));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7024, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f5fa0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::DxtCodec::Ctor(LIFTED_ARGS(0x823F7038, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17944
+  r11 = uint64_t(int64_t(int64_t(r11) + -17944));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7044:
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,438
+  r10 = r10 | 438;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f7114
+  if (cr6.gt) goto loc_823F7114;
+  // beq cr6,0x823f70e4
+  if (cr6.eq) goto loc_823F70E4;
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-346
+  ca = uint32_t(r11) > 345;
+  r11 = uint64_t(int64_t(int64_t(r11) + -346));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // b 0x823f6f4c
+  goto loc_823F6F4C;
+loc_823F7064:
+  // li r3,256
+  r3 = uint64_t(int64_t(256));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F706C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f5fa0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::DxtCodec::Ctor(LIFTED_ARGS(0x823F7080, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17944
+  r11 = uint64_t(int64_t(int64_t(r11) + -17944));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F708C:
+  // li r3,256
+  r3 = uint64_t(int64_t(256));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7094, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823f5fa0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::DxtCodec::Ctor(LIFTED_ARGS(0x823F70A8, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17944
+  r11 = uint64_t(int64_t(int64_t(r11) + -17944));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F70B4:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F70BC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,64
+  r5 = uint64_t(int64_t(64));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F70D8, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18216
+  r11 = uint64_t(int64_t(int64_t(r11) + -18216));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F70E4:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F70EC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7108, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18296
+  r11 = uint64_t(int64_t(int64_t(r11) + -18296));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7114:
+  // addis r11,r11,-6688
+  r11 = uint64_t(int64_t(int64_t(r11) + -438304768));
+  // addic. r11,r11,-10934
+  ca = uint32_t(r11) > 10933;
+  r11 = uint64_t(int64_t(int64_t(r11) + -10934));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f7168
+  if (cr0.eq) goto loc_823F7168;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f7168
+  if (cr6.eq) goto loc_823F7168;
+  // cmplwi cr6,r11,32676
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 32676, so);
+  // beq cr6,0x823f7198
+  if (cr6.eq) goto loc_823F7198;
+  // cmplwi cr6,r11,32720
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 32720, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F7138:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7140, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,3
+  r6 = uint64_t(int64_t(3));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F715C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18104
+  r11 = uint64_t(int64_t(int64_t(r11) + -18104));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7168:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7170, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,2
+  r6 = uint64_t(int64_t(2));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F718C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18072
+  r11 = uint64_t(int64_t(int64_t(r11) + -18072));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7198:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F71A0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,3
+  r6 = uint64_t(int64_t(3));
+  // li r5,64
+  r5 = uint64_t(int64_t(64));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F71BC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18056
+  r11 = uint64_t(int64_t(int64_t(r11) + -18056));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F71C8:
+  // lis r10,10784
+  r10 = uint64_t(int64_t(706740224));
+  // ori r10,r10,134
+  r10 = r10 | 134;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f746c
+  if (cr6.gt) goto loc_823F746C;
+  // beq cr6,0x823f74e8
+  if (cr6.eq) goto loc_823F74E8;
+  // lis r10,10240
+  r10 = uint64_t(int64_t(671088640));
+  // ori r10,r10,258
+  r10 = r10 | 258;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f7348
+  if (cr6.gt) goto loc_823F7348;
+  // beq cr6,0x823f7318
+  if (cr6.eq) goto loc_823F7318;
+  // lis r10,6690
+  r10 = uint64_t(int64_t(438435840));
+  // ori r10,r10,43686
+  r10 = r10 | 43686;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f7290
+  if (cr6.gt) goto loc_823F7290;
+  // beq cr6,0x823f72e8
+  if (cr6.eq) goto loc_823F72E8;
+  // lis r10,6688
+  r10 = uint64_t(int64_t(438304768));
+  // ori r10,r10,43910
+  r10 = r10 | 43910;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // beq cr6,0x823f7138
+  if (cr6.eq) goto loc_823F7138;
+  // addis r11,r11,-6690
+  r11 = uint64_t(int64_t(int64_t(r11) + -438435840));
+  // addic. r11,r11,-88
+  ca = uint32_t(r11) > 87;
+  r11 = uint64_t(int64_t(int64_t(r11) + -88));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f7260
+  if (cr0.eq) goto loc_823F7260;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f7260
+  if (cr6.eq) goto loc_823F7260;
+  // cmplwi cr6,r11,43528
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 43528, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F7230:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7238, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,64
+  r5 = uint64_t(int64_t(64));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7254, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18008
+  r11 = uint64_t(int64_t(int64_t(r11) + -18008));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7260:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7268, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7284, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18168
+  r11 = uint64_t(int64_t(int64_t(r11) + -18168));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7290:
+  // addis r11,r11,-6691
+  r11 = uint64_t(int64_t(int64_t(r11) + -438501376));
+  // addic. r11,r11,21664
+  ca = uint32_t(r11) > 4294945631;
+  r11 = uint64_t(int64_t(int64_t(r11) + 21664));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f7230
+  if (cr0.eq) goto loc_823F7230;
+  // cmplwi cr6,r11,70
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 70, so);
+  // beq cr6,0x823f72e8
+  if (cr6.eq) goto loc_823F72E8;
+  // addis r11,r11,-3549
+  r11 = uint64_t(int64_t(int64_t(r11) + -232587264));
+  // addic. r11,r11,-21666
+  ca = uint32_t(r11) > 21665;
+  r11 = uint64_t(int64_t(int64_t(r11) + -21666));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f7318
+  if (cr0.eq) goto loc_823F7318;
+  // cmplwi cr6,r11,86
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 86, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F72B8:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F72C0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F72DC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18168
+  r11 = uint64_t(int64_t(int64_t(r11) + -18168));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F72E8:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F72F0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,128
+  r5 = uint64_t(int64_t(128));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F730C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17960
+  r11 = uint64_t(int64_t(int64_t(r11) + -17960));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7318:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7320, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,8
+  r5 = uint64_t(int64_t(8));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F733C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18200
+  r11 = uint64_t(int64_t(int64_t(r11) + -18200));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7348:
+  // lis r10,10280
+  r10 = uint64_t(int64_t(673710080));
+  // ori r10,r10,134
+  r10 = r10 | 134;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f73b8
+  if (cr6.gt) goto loc_823F73B8;
+  // beq cr6,0x823f73dc
+  if (cr6.eq) goto loc_823F73DC;
+  // lis r10,10240
+  r10 = uint64_t(int64_t(671088640));
+  // ori r10,r10,344
+  r10 = r10 | 344;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // beq cr6,0x823f72b8
+  if (cr6.eq) goto loc_823F72B8;
+  // addis r11,r11,-10280
+  r11 = uint64_t(int64_t(int64_t(r11) + -673710080));
+  // addic. r11,r11,-67
+  ca = uint32_t(r11) > 66;
+  r11 = uint64_t(int64_t(int64_t(r11) + -67));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f743c
+  if (cr0.eq) goto loc_823F743C;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f740c
+  if (cr6.eq) goto loc_823F740C;
+  // cmplwi cr6,r11,12
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 12, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F7388:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7390, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F73AC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18312
+  r11 = uint64_t(int64_t(int64_t(r11) + -18312));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F73B8:
+  // addis r11,r11,-10280
+  r11 = uint64_t(int64_t(int64_t(r11) + -673710080));
+  // addic. r11,r11,-323
+  ca = uint32_t(r11) > 322;
+  r11 = uint64_t(int64_t(int64_t(r11) + -323));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f743c
+  if (cr0.eq) goto loc_823F743C;
+  // cmplwi cr6,r11,1
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
+  // beq cr6,0x823f740c
+  if (cr6.eq) goto loc_823F740C;
+  // cmplwi cr6,r11,12
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 12, so);
+  // beq cr6,0x823f7388
+  if (cr6.eq) goto loc_823F7388;
+  // cmplwi cr6,r11,67
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 67, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F73DC:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F73E4, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7400, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18408
+  r11 = uint64_t(int64_t(int64_t(r11) + -18408));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F740C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7414, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7430, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18392
+  r11 = uint64_t(int64_t(int64_t(r11) + -18392));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F743C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7444, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7460, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18376
+  r11 = uint64_t(int64_t(int64_t(r11) + -18376));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F746C:
+  // lis r10,11552
+  r10 = uint64_t(int64_t(757071872));
+  // ori r10,r10,43850
+  r10 = r10 | 43850;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f75fc
+  if (cr6.gt) goto loc_823F75FC;
+  // beq cr6,0x823f75cc
+  if (cr6.eq) goto loc_823F75CC;
+  // lis r10,10784
+  r10 = uint64_t(int64_t(706740224));
+  // ori r10,r10,2950
+  r10 = r10 | 2950;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f7548
+  if (cr6.gt) goto loc_823F7548;
+  // beq cr6,0x823f7518
+  if (cr6.eq) goto loc_823F7518;
+  // addis r11,r11,-10784
+  r11 = uint64_t(int64_t(int64_t(r11) + -706740224));
+  // addic. r11,r11,-390
+  ca = uint32_t(r11) > 389;
+  r11 = uint64_t(int64_t(int64_t(r11) + -390));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f74e8
+  if (cr0.eq) goto loc_823F74E8;
+  // cmplwi cr6,r11,2239
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2239, so);
+  // beq cr6,0x823f74b8
+  if (cr6.eq) goto loc_823F74B8;
+  // cmplwi cr6,r11,2304
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2304, so);
+  // beq cr6,0x823f7518
+  if (cr6.eq) goto loc_823F7518;
+  // cmplwi cr6,r11,2495
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2495, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F74B8:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F74C0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,2
+  r6 = uint64_t(int64_t(2));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F74DC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18136
+  r11 = uint64_t(int64_t(int64_t(r11) + -18136));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F74E8:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F74F0, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F750C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18264
+  r11 = uint64_t(int64_t(int64_t(r11) + -18264));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7518:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7520, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,2
+  r6 = uint64_t(int64_t(2));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F753C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18120
+  r11 = uint64_t(int64_t(int64_t(r11) + -18120));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F7548:
+  // addis r11,r11,-11552
+  r11 = uint64_t(int64_t(int64_t(r11) + -757071872));
+  // addic. r11,r11,-153
+  ca = uint32_t(r11) > 152;
+  r11 = uint64_t(int64_t(int64_t(r11) + -153));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f759c
+  if (cr0.eq) goto loc_823F759C;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f759c
+  if (cr6.eq) goto loc_823F759C;
+  // cmplwi cr6,r11,43441
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 43441, so);
+  // beq cr6,0x823f75cc
+  if (cr6.eq) goto loc_823F75CC;
+  // cmplwi cr6,r11,43520
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 43520, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F756C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7574, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,2
+  r6 = uint64_t(int64_t(2));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7590, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18088
+  r11 = uint64_t(int64_t(int64_t(r11) + -18088));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F759C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F75A4, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,1
+  r6 = uint64_t(int64_t(1));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F75C0, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18248
+  r11 = uint64_t(int64_t(int64_t(r11) + -18248));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F75CC:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F75D4, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,2
+  r6 = uint64_t(int64_t(2));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F75F0, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18152
+  r11 = uint64_t(int64_t(int64_t(r11) + -18152));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F75FC:
+  // lis r10,11554
+  r10 = uint64_t(int64_t(757202944));
+  // ori r10,r10,43941
+  r10 = r10 | 43941;
+  // cmpw cr6,r11,r10
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r10), so);
+  // bgt cr6,0x823f769c
+  if (cr6.gt) goto loc_823F769C;
+  // beq cr6,0x823f766c
+  if (cr6.eq) goto loc_823F766C;
+  // lis r10,11552
+  r10 = uint64_t(int64_t(757071872));
+  // ori r10,r10,43929
+  r10 = r10 | 43929;
+  // cmplw cr6,r11,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
+  // beq cr6,0x823f756c
+  if (cr6.eq) goto loc_823F756C;
+  // addis r11,r11,-11555
+  r11 = uint64_t(int64_t(int64_t(r11) + -757268480));
+  // addic. r11,r11,21857
+  ca = uint32_t(r11) > 4294945438;
+  r11 = uint64_t(int64_t(int64_t(r11) + 21857));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f763c
+  if (cr0.eq) goto loc_823F763C;
+  // cmplwi cr6,r11,6
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 6, so);
+  // beq cr6,0x823f766c
+  if (cr6.eq) goto loc_823F766C;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F763C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7644, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7660, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18024
+  r11 = uint64_t(int64_t(int64_t(r11) + -18024));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F766C:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F7674, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,64
+  r5 = uint64_t(int64_t(64));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7690, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17976
+  r11 = uint64_t(int64_t(int64_t(r11) + -17976));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F769C:
+  // addis r11,r11,-11683
+  r11 = uint64_t(int64_t(int64_t(r11) + -765657088));
+  // addic. r11,r11,21922
+  ca = uint32_t(r11) > 4294945373;
+  r11 = uint64_t(int64_t(int64_t(r11) + 21922));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x823f76f0
+  if (cr0.eq) goto loc_823F76F0;
+  // cmplwi cr6,r11,70
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 70, so);
+  // beq cr6,0x823f76c0
+  if (cr6.eq) goto loc_823F76C0;
+  // cmplwi cr6,r11,256
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 256, so);
+  // beq cr6,0x823f76f0
+  if (cr6.eq) goto loc_823F76F0;
+  // cmplwi cr6,r11,326
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 326, so);
+  // bne cr6,0x823f7730
+  if (!cr6.eq) goto loc_823F7730;
+loc_823F76C0:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F76C8, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,32
+  r5 = uint64_t(int64_t(32));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F76E4, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-17992
+  r11 = uint64_t(int64_t(int64_t(r11) + -17992));
+  // b 0x823f771c
+  goto loc_823F771C;
+loc_823F76F0:
+  // li r3,128
+  r3 = uint64_t(int64_t(128));
+  // bl 0x825a6880
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::entry::e825A6880(LIFTED_ARGS(0x823F76F8, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr. r31,r3
+  r31 = r3;
+  cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
+  // beq 0x823f7724
+  if (cr0.eq) goto loc_823F7724;
+  // li r6,4
+  r6 = uint64_t(int64_t(4));
+  // li r5,16
+  r5 = uint64_t(int64_t(16));
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823ea800
+  // (left out: dead in C++)
+  { const lifted::Result o = game::ImageCodec::Ctor(LIFTED_ARGS(0x823F7714, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32252
+  r11 = uint64_t(int64_t(-2113667072));
+  // addi r11,r11,-18040
+  r11 = uint64_t(int64_t(int64_t(r11) + -18040));
+loc_823F771C:
+  // stw r11,0(r31)
+  schema::ImageCodec(uint32_t(r31)).set_vtable_bits(uint32_t(r11));
+  // b 0x823f7728
+  goto loc_823F7728;
+loc_823F7724:
+  // li r31,0
+  r31 = uint64_t(int64_t(0));
+loc_823F7728:
+  // cmplwi cr6,r31,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
+  // bne cr6,0x823f7738
+  if (!cr6.eq) goto loc_823F7738;
+loc_823F7730:
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // b 0x823f7798
+  goto loc_823F7798;
+loc_823F7738:
+  // lwz r11,28(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 28);
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq cr6,0x823f7774
+  if (cr6.eq) goto loc_823F7774;
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x823eab58
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x823EAB58, LIFTED_ARGS(0x823F7750, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi r3,0
+  cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
+  // bge 0x823f7774
+  if (!cr0.lt) goto loc_823F7774;
+  // lwz r11,0(r31)
+  r11 = lifted::VtableWord(uint32_t(r31));
+  // li r4,1
+  r4 = uint64_t(int64_t(1));
+  // mr r3,r31
+  r3 = r31;
+  // lwz r11,0(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 0);
+  // mtctr r11
+  ctr = r11;
+  // bctrl
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x823F7770, r31)); r3 = o.r3; f1 = o.f1; }
+  // b 0x823f7730
+  goto loc_823F7730;
+loc_823F7774:
+  // lwz r11,24(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 24);
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq cr6,0x823f7794
+  if (cr6.eq) goto loc_823F7794;
+  // lwz r11,0(r31)
+  r11 = lifted::VtableWord(uint32_t(r31));
+  // mr r3,r31
+  r3 = r31;
+  // lwz r11,12(r11)
+  r11 = guest::LoadU32(uint32_t(r11) + 12);
+  // mtctr r11
+  ctr = r11;
+  // bctrl
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x823F7794, r31)); r3 = o.r3; f1 = o.f1; }
+loc_823F7794:
+  // mr r3,r31
+  r3 = r31;
+loc_823F7798:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -411648,6 +416888,727 @@ loc_8259ACB0:
   return {r3, f1};
 }
 
+// sub_8259B088: lifted from generated/ by lift.py.
+lifted::Result f8259B088(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5) {
+  ITC_NATIVE_RUNNING("sub_8259B088 (lifted)");
+  uint64_t r3 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0, ctr = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f30 = 0.0, f31 = 0.0;
+  lifted::Vec v0{}, v11{}, v12{}, v13{};
+  lifted::Temp temp{};
+  lifted::Vec vTemp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stfd f30,-40(r1)
+  lifted::ScalarFloatMode();
+  guest::StoreU64(uint32_t(r1) + -40, std::bit_cast<uint64_t>(f30));
+  // stfd f31,-32(r1)
+  guest::StoreU64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  // stwu r1,-208(r1)
+  ea = -208 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r31,r5
+  r31 = r5;
+  // mr r30,r4
+  r30 = r4;
+  // lfs f13,4(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
+  f13 = double(temp.f32);
+  // fmuls f13,f13,f13
+  f13 = double(float(f13 * f13));
+  // lfs f0,0(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
+  f0 = double(temp.f32);
+  // lfs f1,8(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 8);
+  f1 = double(temp.f32);
+  // fmadds f0,f0,f0,f13
+  f0 = double(float(std::fma(f0, f0, f13)));
+  // fsqrts f2,f0
+  f2 = double(float(sqrt(f0)));
+  // bl 0x825a8770
+  // (left out: dead in C++)
+  { const lifted::Result o = game::atan2(LIFTED_ARGS(0x8259B0C8, r31)); r3 = o.r3; f1 = o.f1; }
+  // fmr f0,f1
+  lifted::ScalarFloatMode();
+  f0 = f1;
+  // lfs f2,0(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
+  f2 = double(temp.f32);
+  // lfs f1,4(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
+  f1 = double(temp.f32);
+  // frsp f0,f0
+  f0 = double(float(f0));
+  // fneg f31,f0
+  f31 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
+  // bl 0x825a8770
+  // (left out: dead in C++)
+  { const lifted::Result o = game::atan2(LIFTED_ARGS(0x8259B0E0, r31)); r3 = o.r3; f1 = o.f1; }
+  // vspltisw v0,0
+  simde_mm_store_si128((simde__m128i*)v0.u32, simde_mm_set1_epi32(int(0x0)));
+  // addi r8,r1,96
+  r8 = uint64_t(int64_t(int64_t(r1) + 96));
+  // addi r11,r1,96
+  r11 = uint64_t(int64_t(int64_t(r1) + 96));
+  // frsp f30,f1
+  lifted::ScalarFloatMode();
+  f30 = double(float(f1));
+  // mr r10,r30
+  r10 = r30;
+  // li r9,8
+  r9 = uint64_t(int64_t(8));
+  // vupkd3d128 v0,v0,4
+  temp.f32 = 3.0f;
+  temp.s32 += v0.s16[1];
+  vTemp.f32[3] = temp.f32;
+  temp.f32 = 3.0f;
+  temp.s32 += v0.s16[0];
+  vTemp.f32[2] = temp.f32;
+  vTemp.f32[1] = 0.0f;
+  vTemp.f32[0] = 1.0f;
+  v0 = vTemp;
+  // vpermwi128 v13,v0,234
+  simde_mm_store_si128((simde__m128i*)v13.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0x15));
+  // vpermwi128 v12,v0,186
+  simde_mm_store_si128((simde__m128i*)v12.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0x45));
+  // vpermwi128 v11,v0,174
+  simde_mm_store_si128((simde__m128i*)v11.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0x51));
+  // vpermwi128 v0,v0,171
+  simde_mm_store_si128((simde__m128i*)v0.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0x54));
+  // stvx v13,r0,r8
+  ea = (uint32_t(r8)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v13.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r8,r1,112
+  r8 = uint64_t(int64_t(int64_t(r1) + 112));
+  // stvx v12,r0,r8
+  ea = (uint32_t(r8)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v12.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r8,r1,128
+  r8 = uint64_t(int64_t(int64_t(r1) + 128));
+  // stvx v11,r0,r8
+  ea = (uint32_t(r8)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v11.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r8,r1,144
+  r8 = uint64_t(int64_t(int64_t(r1) + 144));
+  // stvx v0,r0,r8
+  ea = (uint32_t(r8)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // mtctr r9
+  ctr = r9;
+loc_8259B12C:
+  // ld r9,0(r11)
+  r9 = guest::LoadU64(uint32_t(r11) + 0);
+  // addi r11,r11,8
+  r11 = uint64_t(int64_t(int64_t(r11) + 8));
+  // std r9,0(r10)
+  guest::StoreU64(uint32_t(r10) + 0, r9);
+  // addi r10,r10,8
+  r10 = uint64_t(int64_t(int64_t(r10) + 8));
+  // bdnz 0x8259b12c
+  --ctr;
+  if (uint32_t(ctr) != 0) goto loc_8259B12C;
+  // addi r5,r1,80
+  r5 = uint64_t(int64_t(int64_t(r1) + 80));
+  // stfs f31,80(r1)
+  lifted::ScalarFloatMode();
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 80, temp.u32);
+  // mr r4,r30
+  r4 = r30;
+  // mr r3,r30
+  r3 = r30;
+  // bl 0x820a67f8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::Matrix::RotateY(LIFTED_ARGS(0x8259B154, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r5,r1,80
+  r5 = uint64_t(int64_t(int64_t(r1) + 80));
+  // mr r4,r30
+  r4 = r30;
+  // stfs f30,80(r1)
+  lifted::ScalarFloatMode();
+  temp.f32 = float(f30);
+  guest::StoreU32(uint32_t(r1) + 80, temp.u32);
+  // mr r3,r30
+  r3 = r30;
+  // bl 0x820a2d30
+  // (left out: dead in C++)
+  { const lifted::Result o = game::Matrix::RotateZ(LIFTED_ARGS(0x8259B168, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r1,r1,208
+  r1 = uint64_t(int64_t(int64_t(r1) + 208));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // lfd f30,-40(r1)
+  lifted::ScalarFloatMode();
+  f30 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -40)));
+  // lfd f31,-32(r1)
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -32)));
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
+// sub_8259B288: lifted from generated/ by lift.py.
+lifted::Result f8259B288(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
+  ITC_NATIVE_RUNNING("sub_8259B288 (lifted)");
+  uint64_t r3 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f26 = 0.0, f27 = 0.0, f28 = 0.0, f29 = 0.0, f30 = 0.0, f31 = 0.0;
+  lifted::Vec v0{}, v5{}, v6{}, v7{}, v8{}, v9{}, v10{}, v11{}, v12{}, v13{};
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  lifted::Temp temp{};
+  lifted::Vec vTemp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r30,-24(r1)
+  guest::StoreU64(uint32_t(r1) + -24, r30);
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // addi r12,r1,-24
+  r12 = uint64_t(int64_t(int64_t(r1) + -24));
+  // bl 0x825a7910
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-288(r1)
+  ea = -288 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // ld r9,0(r6)
+  r9 = guest::LoadU64(uint32_t(r6) + 0);
+  // ld r8,8(r6)
+  r8 = guest::LoadU64(uint32_t(r6) + 8);
+  // lis r10,-32256
+  r10 = uint64_t(int64_t(-2113929216));
+  // fmr f26,f1
+  lifted::ScalarFloatMode();
+  f26 = f1;
+  // mr r31,r7
+  r31 = r7;
+  // ld r7,0(r5)
+  r7 = guest::LoadU64(uint32_t(r5) + 0);
+  // mr r30,r4
+  r30 = r4;
+  // ld r6,8(r5)
+  r6 = guest::LoadU64(uint32_t(r5) + 8);
+  // addi r4,r1,96
+  r4 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lfs f31,2608(r11)
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
+  f31 = double(temp.f32);
+  // addi r11,r1,96
+  r11 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lfs f1,10820(r10)
+  temp.u32 = guest::LoadU32(uint32_t(r10) + 10820);
+  f1 = double(temp.f32);
+  // addi r10,r1,144
+  r10 = uint64_t(int64_t(int64_t(r1) + 144));
+  // mr r3,r31
+  r3 = r31;
+  // stfs f31,92(r1)
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 92, temp.u32);
+  // std r9,0(r11)
+  guest::StoreU64(uint32_t(r11) + 0, r9);
+  // std r8,8(r11)
+  guest::StoreU64(uint32_t(r11) + 8, r8);
+  // lfs f29,100(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 100);
+  f29 = double(temp.f32);
+  // std r7,0(r10)
+  guest::StoreU64(uint32_t(r10) + 0, r7);
+  // fmuls f0,f29,f29
+  f0 = double(float(f29 * f29));
+  // lfs f30,104(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 104);
+  f30 = double(temp.f32);
+  // lfs f28,96(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 96);
+  f28 = double(temp.f32);
+  // std r6,8(r10)
+  guest::StoreU64(uint32_t(r10) + 8, r6);
+  // fmadds f0,f30,f30,f0
+  f0 = double(float(std::fma(f30, f30, f0)));
+  // fmadds f0,f28,f28,f0
+  f0 = double(float(std::fma(f28, f28, f0)));
+  // fsqrts f0,f0
+  f0 = double(float(sqrt(f0)));
+  // fmuls f27,f0,f0
+  f27 = double(float(f0 * f0));
+  // bl 0x8259a058
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8259A058, LIFTED_ARGS(0x8259B318, r31)); r3 = o.r3; f1 = o.f1; }
+  // clrlwi r11,r3,24
+  r11 = uint32_t(r3) & 0xFF;
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x8259b4e0
+  if (!cr6.eq) goto loc_8259B4E0;
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // lfs f6,2612(r11)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2612);
+  f6 = double(temp.f32);
+  // fcmpu cr6,f27,f6
+  cr6 = lifted::CompareFloat(f27, f6);
+  // beq cr6,0x8259b4e0
+  if (cr6.eq) goto loc_8259B4E0;
+  // addi r11,r1,96
+  r11 = uint64_t(int64_t(int64_t(r1) + 96));
+  // fdivs f13,f31,f27
+  f13 = double(float(f31 / f27));
+  // lvx128 v0,r0,r31
+  ea = (uint32_t(r31)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v0.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // lfs f10,144(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 144);
+  f10 = double(temp.f32);
+  // lfs f9,0(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
+  f9 = double(temp.f32);
+  // lfs f5,4(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
+  f5 = double(temp.f32);
+  // lvx128 v13,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v13.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,144
+  r11 = uint64_t(int64_t(int64_t(r1) + 144));
+  // vmsum3fp128 v0,v0,v13
+  lifted::VectorFloatMode();
+  simde_mm_store_ps(v0.f32, simde_mm_dp_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v13.f32), 0xEF));
+  // lfs f4,8(r31)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 8);
+  f4 = double(temp.f32);
+  // stfs f31,140(r1)
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 140, temp.u32);
+  // stfs f31,124(r1)
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 124, temp.u32);
+  // lvx128 v12,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v12.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,192
+  r11 = uint64_t(int64_t(int64_t(r1) + 192));
+  // vmsum3fp128 v12,v12,v13
+  lifted::VectorFloatMode();
+  simde_mm_store_ps(v12.f32, simde_mm_dp_ps(simde_mm_load_ps(v12.f32), simde_mm_load_ps(v13.f32), 0xEF));
+  // stvx v12,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v12.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,176
+  r11 = uint64_t(int64_t(int64_t(r1) + 176));
+  // lfs f0,192(r1)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 192);
+  f0 = double(temp.f32);
+  // fmuls f0,f13,f0
+  f0 = double(float(f13 * f0));
+  // stvx v0,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // lfs f12,176(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 176);
+  f12 = double(temp.f32);
+  // fmuls f13,f13,f12
+  f13 = double(float(f13 * f12));
+  // fmuls f11,f30,f0
+  f11 = double(float(f30 * f0));
+  // fmuls f12,f29,f0
+  f12 = double(float(f29 * f0));
+  // fmuls f0,f28,f0
+  f0 = double(float(f28 * f0));
+  // fmuls f8,f29,f13
+  f8 = double(float(f29 * f13));
+  // fmuls f7,f30,f13
+  f7 = double(float(f30 * f13));
+  // fmuls f13,f28,f13
+  f13 = double(float(f28 * f13));
+  // fsubs f10,f10,f0
+  f10 = double(float(f10 - f0));
+  // lfs f0,148(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 148);
+  f0 = double(temp.f32);
+  // fsubs f0,f0,f12
+  f0 = double(float(f0 - f12));
+  // lfs f12,152(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 152);
+  f12 = double(temp.f32);
+  // stfs f0,132(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 132, temp.u32);
+  // fsubs f12,f12,f11
+  f12 = double(float(f12 - f11));
+  // stfs f12,136(r1)
+  temp.f32 = float(f12);
+  guest::StoreU32(uint32_t(r1) + 136, temp.u32);
+  // fsubs f11,f4,f7
+  f11 = double(float(f4 - f7));
+  // stfs f10,128(r1)
+  temp.f32 = float(f10);
+  guest::StoreU32(uint32_t(r1) + 128, temp.u32);
+  // fsubs f9,f9,f13
+  f9 = double(float(f9 - f13));
+  // addi r11,r1,128
+  r11 = uint64_t(int64_t(int64_t(r1) + 128));
+  // fsubs f13,f5,f8
+  f13 = double(float(f5 - f8));
+  // stfs f13,116(r1)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r1) + 116, temp.u32);
+  // stfs f9,112(r1)
+  temp.f32 = float(f9);
+  guest::StoreU32(uint32_t(r1) + 112, temp.u32);
+  // stfs f11,120(r1)
+  temp.f32 = float(f11);
+  guest::StoreU32(uint32_t(r1) + 120, temp.u32);
+  // lvx128 v0,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v0.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,112
+  r11 = uint64_t(int64_t(int64_t(r1) + 112));
+  // fmuls f8,f0,f0
+  f8 = double(float(f0 * f0));
+  // lvx128 v13,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v13.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,192
+  r11 = uint64_t(int64_t(int64_t(r1) + 192));
+  // vmsum3fp128 v0,v0,v13
+  lifted::VectorFloatMode();
+  simde_mm_store_ps(v0.f32, simde_mm_dp_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v13.f32), 0xEF));
+  // fmadds f0,f10,f10,f8
+  lifted::ScalarFloatMode();
+  f0 = double(float(std::fma(f10, f10, f8)));
+  // stvx v0,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // fmadds f0,f12,f12,f0
+  f0 = double(float(std::fma(f12, f12, f0)));
+  // fmuls f12,f13,f13
+  f12 = double(float(f13 * f13));
+  // fsqrts f0,f0
+  f0 = double(float(sqrt(f0)));
+  // fmadds f13,f9,f9,f12
+  f13 = double(float(std::fma(f9, f9, f12)));
+  // fmadds f13,f11,f11,f13
+  f13 = double(float(std::fma(f11, f11, f13)));
+  // fsqrts f13,f13
+  f13 = double(float(sqrt(f13)));
+  // fmuls f0,f13,f0
+  f0 = double(float(f13 * f0));
+  // lfs f13,192(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 192);
+  f13 = double(temp.f32);
+  // fdivs f0,f13,f0
+  f0 = double(float(f13 / f0));
+  // fadds f0,f0,f31
+  f0 = double(float(f0 + f31));
+  // fcmpu cr6,f0,f6
+  cr6 = lifted::CompareFloat(f0, f6);
+  // bge cr6,0x8259b434
+  if (!cr6.lt) goto loc_8259B434;
+  // fneg f0,f0
+  f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
+loc_8259B434:
+  // lis r11,-32249
+  r11 = uint64_t(int64_t(-2113470464));
+  // lfd f13,-12688(r11)
+  lifted::ScalarFloatMode();
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r11) + -12688)));
+  // fcmpu cr6,f0,f13
+  cr6 = lifted::CompareFloat(f0, f13);
+  // bge cr6,0x8259b498
+  if (!cr6.lt) goto loc_8259B498;
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // stfs f31,172(r1)
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 172, temp.u32);
+  // addi r4,r1,96
+  r4 = uint64_t(int64_t(int64_t(r1) + 96));
+  // addi r3,r1,160
+  r3 = uint64_t(int64_t(int64_t(r1) + 160));
+  // lfs f1,8768(r11)
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 8768);
+  f1 = double(temp.f32);
+  // bl 0x8259a5d8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8259A5D8, LIFTED_ARGS(0x8259B45C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r11,r1,160
+  r11 = uint64_t(int64_t(int64_t(r1) + 160));
+  // lfs f0,160(r1)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 160);
+  f0 = double(temp.f32);
+  // stfs f0,80(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 80, temp.u32);
+  // addi r10,r1,80
+  r10 = uint64_t(int64_t(int64_t(r1) + 80));
+  // lfs f0,164(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 164);
+  f0 = double(temp.f32);
+  // stfs f0,84(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 84, temp.u32);
+  // lfs f0,168(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 168);
+  f0 = double(temp.f32);
+  // ld r9,0(r11)
+  r9 = guest::LoadU64(uint32_t(r11) + 0);
+  // stfs f0,88(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 88, temp.u32);
+  // ld r11,8(r11)
+  r11 = guest::LoadU64(uint32_t(r11) + 8);
+  // lfs f0,172(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 172);
+  f0 = double(temp.f32);
+  // stfs f0,92(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 92, temp.u32);
+  // std r9,0(r10)
+  guest::StoreU64(uint32_t(r10) + 0, r9);
+  // std r11,8(r10)
+  guest::StoreU64(uint32_t(r10) + 8, r11);
+  // b 0x8259b4e0
+  goto loc_8259B4E0;
+loc_8259B498:
+  // addi r5,r1,112
+  r5 = uint64_t(int64_t(int64_t(r1) + 112));
+  // addi r4,r1,128
+  r4 = uint64_t(int64_t(int64_t(r1) + 128));
+  // addi r3,r1,176
+  r3 = uint64_t(int64_t(int64_t(r1) + 176));
+  // bl 0x8259a7f8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8259A7F8, LIFTED_ARGS(0x8259B4A8, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r11,r1,176
+  r11 = uint64_t(int64_t(int64_t(r1) + 176));
+  // lfs f0,176(r1)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 176);
+  f0 = double(temp.f32);
+  // addi r10,r1,80
+  r10 = uint64_t(int64_t(int64_t(r1) + 80));
+  // stfs f0,80(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 80, temp.u32);
+  // lfs f0,180(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 180);
+  f0 = double(temp.f32);
+  // stfs f0,84(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 84, temp.u32);
+  // ld r9,0(r11)
+  r9 = guest::LoadU64(uint32_t(r11) + 0);
+  // lfs f0,184(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 184);
+  f0 = double(temp.f32);
+  // ld r11,8(r11)
+  r11 = guest::LoadU64(uint32_t(r11) + 8);
+  // stfs f0,88(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 88, temp.u32);
+  // lfs f0,188(r1)
+  temp.u32 = guest::LoadU32(uint32_t(r1) + 188);
+  f0 = double(temp.f32);
+  // stfs f0,92(r1)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r1) + 92, temp.u32);
+  // std r9,0(r10)
+  guest::StoreU64(uint32_t(r10) + 0, r9);
+  // std r11,8(r10)
+  guest::StoreU64(uint32_t(r10) + 8, r11);
+loc_8259B4E0:
+  // addi r4,r1,96
+  r4 = uint64_t(int64_t(int64_t(r1) + 96));
+  // stfs f31,204(r1)
+  lifted::ScalarFloatMode();
+  temp.f32 = float(f31);
+  guest::StoreU32(uint32_t(r1) + 204, temp.u32);
+  // addi r3,r1,192
+  r3 = uint64_t(int64_t(int64_t(r1) + 192));
+  // fmr f1,f26
+  f1 = f26;
+  // bl 0x8259a5d8
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8259A5D8, LIFTED_ARGS(0x8259B4F4, r31)); r3 = o.r3; f1 = o.f1; }
+  // vspltisw v0,-1
+  simde_mm_store_si128((simde__m128i*)v0.u32, simde_mm_set1_epi32(int(0xFFFFFFFF)));
+  // addi r11,r1,80
+  r11 = uint64_t(int64_t(int64_t(r1) + 80));
+  // vspltisw v5,0
+  simde_mm_store_si128((simde__m128i*)v5.u32, simde_mm_set1_epi32(int(0x0)));
+  // addi r10,r30,32
+  r10 = uint64_t(int64_t(int64_t(r30) + 32));
+  // addi r9,r30,48
+  r9 = uint64_t(int64_t(int64_t(r30) + 48));
+  // vslw v0,v0,v0
+  {
+  simde__m128i a = simde_mm_load_si128((simde__m128i*)v0.u8);
+  simde__m128i b = simde_mm_load_si128((simde__m128i*)v0.u8);
+  simde__m128i shift = simde_mm_and_si128(b, simde_mm_set1_epi32(0x1F));
+  simde_mm_store_si128((simde__m128i*)v0.u8, simde_mm_sllv_epi32(a, shift));
+  }
+  // lvx128 v13,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v13.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r1,192
+  r11 = uint64_t(int64_t(int64_t(r1) + 192));
+  // vxor v0,v13,v0
+  simde_mm_store_si128((simde__m128i*)v0.u8, simde_mm_xor_si128(simde_mm_load_si128((simde__m128i*)v13.u8), simde_mm_load_si128((simde__m128i*)v0.u8)));
+  // lvx128 v12,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)v12.u8, simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)guest::Pointer(ea)), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r11,r30,16
+  r11 = uint64_t(int64_t(int64_t(r30) + 16));
+  // vor v11,v0,v0
+  simde_mm_store_si128((simde__m128i*)v11.u8, simde_mm_load_si128((simde__m128i*)v0.u8));
+  // vpermwi128 v7,v12,78
+  simde_mm_store_si128((simde__m128i*)v7.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v12.u32), 0xB1));
+  // vor v10,v0,v0
+  simde_mm_store_si128((simde__m128i*)v10.u8, simde_mm_load_si128((simde__m128i*)v0.u8));
+  // vpermwi128 v6,v12,228
+  simde_mm_store_si128((simde__m128i*)v6.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v12.u32), 0x1B));
+  // vor v9,v0,v0
+  simde_mm_store_si128((simde__m128i*)v9.u8, simde_mm_load_si128((simde__m128i*)v0.u8));
+  // vpermwi128 v8,v12,177
+  simde_mm_store_si128((simde__m128i*)v8.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v12.u32), 0x4E));
+  // vrlimi128 v0,v13,11,0
+  simde_mm_store_ps(v0.f32, simde_mm_blend_ps(simde_mm_load_ps(v0.f32), simde_mm_permute_ps(simde_mm_load_ps(v13.f32), 228), 11));
+  // vrlimi128 v11,v13,1,0
+  simde_mm_store_ps(v11.f32, simde_mm_blend_ps(simde_mm_load_ps(v11.f32), simde_mm_permute_ps(simde_mm_load_ps(v13.f32), 228), 1));
+  // vrlimi128 v10,v13,13,0
+  simde_mm_store_ps(v10.f32, simde_mm_blend_ps(simde_mm_load_ps(v10.f32), simde_mm_permute_ps(simde_mm_load_ps(v13.f32), 228), 13));
+  // vrlimi128 v9,v13,7,0
+  simde_mm_store_ps(v9.f32, simde_mm_blend_ps(simde_mm_load_ps(v9.f32), simde_mm_permute_ps(simde_mm_load_ps(v13.f32), 228), 7));
+  // vmsum4fp128 v0,v0,v6
+  lifted::VectorFloatMode();
+  simde_mm_store_ps(v0.f32, simde_mm_dp_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v6.f32), 0xFF));
+  // vmsum4fp128 v13,v11,v12
+  simde_mm_store_ps(v13.f32, simde_mm_dp_ps(simde_mm_load_ps(v11.f32), simde_mm_load_ps(v12.f32), 0xFF));
+  // vmsum4fp128 v12,v10,v8
+  simde_mm_store_ps(v12.f32, simde_mm_dp_ps(simde_mm_load_ps(v10.f32), simde_mm_load_ps(v8.f32), 0xFF));
+  // vmsum4fp128 v11,v9,v7
+  simde_mm_store_ps(v11.f32, simde_mm_dp_ps(simde_mm_load_ps(v9.f32), simde_mm_load_ps(v7.f32), 0xFF));
+  // vmrghw v13,v12,v13
+  simde_mm_store_si128((simde__m128i*)v13.u32, simde_mm_unpackhi_epi32(simde_mm_load_si128((simde__m128i*)v13.u32), simde_mm_load_si128((simde__m128i*)v12.u32)));
+  // vmrghw v0,v0,v11
+  simde_mm_store_si128((simde__m128i*)v0.u32, simde_mm_unpackhi_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), simde_mm_load_si128((simde__m128i*)v0.u32)));
+  // vupkd3d128 v12,v5,4
+  temp.f32 = 3.0f;
+  temp.s32 += v5.s16[1];
+  vTemp.f32[3] = temp.f32;
+  temp.f32 = 3.0f;
+  temp.s32 += v5.s16[0];
+  vTemp.f32[2] = temp.f32;
+  vTemp.f32[1] = 0.0f;
+  vTemp.f32[0] = 1.0f;
+  v12 = vTemp;
+  // vmrghw v0,v0,v13
+  simde_mm_store_si128((simde__m128i*)v0.u32, simde_mm_unpackhi_epi32(simde_mm_load_si128((simde__m128i*)v13.u32), simde_mm_load_si128((simde__m128i*)v0.u32)));
+  // vaddfp v13,v0,v0
+  simde_mm_store_ps(v13.f32, simde_mm_add_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v0.f32)));
+  // vpermwi128 v9,v0,7
+  simde_mm_store_si128((simde__m128i*)v9.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0xF8));
+  // vspltw v7,v0,3
+  simde_mm_store_si128((simde__m128i*)v7.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0x0));
+  // vmulfp128 v11,v0,v13
+  simde_mm_store_ps(v11.f32, simde_mm_mul_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v13.f32)));
+  // vpermwi128 v8,v13,155
+  simde_mm_store_si128((simde__m128i*)v8.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v13.u32), 0x64));
+  // vpermwi128 v13,v13,99
+  simde_mm_store_si128((simde__m128i*)v13.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v13.u32), 0x9C));
+  // vmulfp128 v0,v9,v8
+  simde_mm_store_ps(v0.f32, simde_mm_mul_ps(simde_mm_load_ps(v9.f32), simde_mm_load_ps(v8.f32)));
+  // vpermwi128 v9,v12,171
+  simde_mm_store_si128((simde__m128i*)v9.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v12.u32), 0x54));
+  // vmulfp128 v13,v7,v13
+  simde_mm_store_ps(v13.f32, simde_mm_mul_ps(simde_mm_load_ps(v7.f32), simde_mm_load_ps(v13.f32)));
+  // stvx v9,r0,r9
+  ea = (uint32_t(r9)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v9.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // vpermwi128 v10,v11,64
+  simde_mm_store_si128((simde__m128i*)v10.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), 0xBF));
+  // vpermwi128 v6,v11,164
+  simde_mm_store_si128((simde__m128i*)v6.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), 0x5B));
+  // vpermwi128 v11,v12,254
+  simde_mm_store_si128((simde__m128i*)v11.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v12.u32), 0x1));
+  // vsubfp v8,v11,v10
+  simde_mm_store_ps(v8.f32, simde_mm_sub_ps(simde_mm_load_ps(v11.f32), simde_mm_load_ps(v10.f32)));
+  // vaddfp v11,v0,v13
+  simde_mm_store_ps(v11.f32, simde_mm_add_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v13.f32)));
+  // vsubfp v10,v0,v13
+  simde_mm_store_ps(v10.f32, simde_mm_sub_ps(simde_mm_load_ps(v0.f32), simde_mm_load_ps(v13.f32)));
+  // vsubfp v0,v8,v6
+  simde_mm_store_ps(v0.f32, simde_mm_sub_ps(simde_mm_load_ps(v8.f32), simde_mm_load_ps(v6.f32)));
+  // vpermwi128 v13,v11,66
+  simde_mm_store_si128((simde__m128i*)v13.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), 0xBD));
+  // vsldoi v11,v10,v11,8
+  simde_mm_store_si128((simde__m128i*)v11.u8, simde_mm_alignr_epi8(simde_mm_load_si128((simde__m128i*)v10.u8), simde_mm_load_si128((simde__m128i*)v11.u8), 8));
+  // vrlimi128 v13,v10,6,3
+  simde_mm_store_ps(v13.f32, simde_mm_blend_ps(simde_mm_load_ps(v13.f32), simde_mm_permute_ps(simde_mm_load_ps(v10.f32), 57), 6));
+  // vrlimi128 v0,v12,1,3
+  simde_mm_store_ps(v0.f32, simde_mm_blend_ps(simde_mm_load_ps(v0.f32), simde_mm_permute_ps(simde_mm_load_ps(v12.f32), 57), 1));
+  // vpermwi128 v12,v11,136
+  simde_mm_store_si128((simde__m128i*)v12.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), 0x77));
+  // vpermwi128 v11,v0,7
+  simde_mm_store_si128((simde__m128i*)v11.u32, simde_mm_shuffle_epi32(simde_mm_load_si128((simde__m128i*)v0.u32), 0xF8));
+  // vrlimi128 v12,v0,3,0
+  simde_mm_store_ps(v12.f32, simde_mm_blend_ps(simde_mm_load_ps(v12.f32), simde_mm_permute_ps(simde_mm_load_ps(v0.f32), 228), 3));
+  // vrlimi128 v0,v13,6,3
+  simde_mm_store_ps(v0.f32, simde_mm_blend_ps(simde_mm_load_ps(v0.f32), simde_mm_permute_ps(simde_mm_load_ps(v13.f32), 57), 6));
+  // vmrglw v11,v13,v11
+  simde_mm_store_si128((simde__m128i*)v11.u32, simde_mm_unpacklo_epi32(simde_mm_load_si128((simde__m128i*)v11.u32), simde_mm_load_si128((simde__m128i*)v13.u32)));
+  // stvx v12,r0,r10
+  ea = (uint32_t(r10)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v12.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // stvx v0,r0,r30
+  ea = (uint32_t(r30)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // stvx v11,r0,r11
+  ea = (uint32_t(r11)) & ~0xF;
+  simde_mm_store_si128((simde__m128i*)guest::Pointer(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)v11.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
+  // addi r1,r1,288
+  r1 = uint64_t(int64_t(int64_t(r1) + 288));
+  // addi r12,r1,-24
+  r12 = uint64_t(int64_t(int64_t(r1) + -24));
+  // bl 0x825a795c
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r30,-24(r1)
+  r30 = guest::LoadU64(uint32_t(r1) + -24);
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
+}
+
 // sub_8259B748: lifted from generated/ by lift.py.
 lifted::Result f8259B748(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_8259B748 (lifted)");
@@ -412138,6 +418099,203 @@ loc_8259B99C:
   // lfd f31,-56(r1)
   f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -56)));
   // b 0x825a6ed4
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_8259BA68: lifted from generated/ by lift.py.
+lifted::Result f8259BA68(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8) {
+  ITC_NATIVE_RUNNING("sub_8259BA68 (lifted)");
+  uint64_t r3 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f31 = 0.0;
+  lifted::Cr cr6;
+  lifted::Temp temp{};
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e88
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stfd f31,-48(r1)
+  lifted::ScalarFloatMode();
+  guest::StoreU64(uint32_t(r1) + -48, std::bit_cast<uint64_t>(f31));
+  // stwu r1,-128(r1)
+  ea = -128 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r30,r8
+  r30 = r8;
+  // mr r31,r7
+  r31 = r7;
+  // mr r29,r5
+  r29 = r5;
+  // mr r5,r31
+  r5 = r31;
+  // mr r28,r6
+  r28 = r6;
+  // lfs f0,0(r30)
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 0);
+  f0 = double(temp.f32);
+  // lfs f13,4(r30)
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 4);
+  f13 = double(temp.f32);
+  // fadds f31,f0,f13
+  f31 = double(float(f0 + f13));
+  // bl 0x8259b088
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x8259B088, LIFTED_ARGS(0x8259BA9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lfs f13,4(r31)
+  lifted::ScalarFloatMode();
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 4);
+  f13 = double(temp.f32);
+  // fmuls f13,f13,f13
+  f13 = double(float(f13 * f13));
+  // lfs f0,0(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 0);
+  f0 = double(temp.f32);
+  // lfs f12,8(r31)
+  temp.u32 = guest::LoadU32(uint32_t(r31) + 8);
+  f12 = double(temp.f32);
+  // fmadds f0,f0,f0,f13
+  f0 = double(float(std::fma(f0, f0, f13)));
+  // fmadds f12,f12,f12,f0
+  f12 = double(float(std::fma(f12, f12, f0)));
+  // fsqrts f9,f12
+  f9 = double(float(sqrt(f12)));
+  // fcmpu cr6,f9,f31
+  cr6 = lifted::CompareFloat(f9, f31);
+  // bge cr6,0x8259bb8c
+  if (!cr6.lt) goto loc_8259BB8C;
+  // lfs f13,4(r30)
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 4);
+  f13 = double(temp.f32);
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // lfs f0,0(r30)
+  temp.u32 = guest::LoadU32(uint32_t(r30) + 0);
+  f0 = double(temp.f32);
+  // fmuls f10,f13,f13
+  f10 = double(float(f13 * f13));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // fmuls f9,f0,f9
+  f9 = double(float(f0 * f9));
+  // fmuls f11,f0,f0
+  f11 = double(float(f0 * f0));
+  // lfs f0,8680(r11)
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 8680);
+  f0 = double(temp.f32);
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // fmuls f13,f13,f0
+  f13 = double(float(f13 * f0));
+  // fmuls f9,f9,f0
+  f9 = double(float(f9 * f0));
+  // fsubs f0,f11,f10
+  f0 = double(float(f11 - f10));
+  // fadds f11,f10,f11
+  f11 = double(float(f10 + f11));
+  // fadds f0,f0,f12
+  f0 = double(float(f0 + f12));
+  // fsubs f12,f11,f12
+  f12 = double(float(f11 - f12));
+  // fdivs f0,f0,f9
+  f0 = double(float(f0 / f9));
+  // fdivs f12,f12,f13
+  f12 = double(float(f12 / f13));
+  // lfs f13,2608(r11)
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 2608);
+  f13 = double(temp.f32);
+  // lis r11,-32256
+  r11 = uint64_t(int64_t(-2113929216));
+  // lfs f11,7136(r11)
+  temp.u32 = guest::LoadU32(uint32_t(r11) + 7136);
+  f11 = double(temp.f32);
+  // fcmpu cr6,f0,f13
+  cr6 = lifted::CompareFloat(f0, f13);
+  // ble cr6,0x8259bb20
+  if (!cr6.gt) goto loc_8259BB20;
+  // fmr f0,f13
+  f0 = f13;
+  // b 0x8259bb2c
+  goto loc_8259BB2C;
+loc_8259BB20:
+  // fcmpu cr6,f0,f11
+  lifted::ScalarFloatMode();
+  cr6 = lifted::CompareFloat(f0, f11);
+  // bge cr6,0x8259bb2c
+  if (!cr6.lt) goto loc_8259BB2C;
+  // fmr f0,f11
+  f0 = f11;
+loc_8259BB2C:
+  // fcmpu cr6,f12,f13
+  lifted::ScalarFloatMode();
+  cr6 = lifted::CompareFloat(f12, f13);
+  // ble cr6,0x8259bb3c
+  if (!cr6.gt) goto loc_8259BB3C;
+  // fmr f12,f13
+  f12 = f13;
+  // b 0x8259bb48
+  goto loc_8259BB48;
+loc_8259BB3C:
+  // fcmpu cr6,f12,f11
+  lifted::ScalarFloatMode();
+  cr6 = lifted::CompareFloat(f12, f11);
+  // bge cr6,0x8259bb48
+  if (!cr6.lt) goto loc_8259BB48;
+  // fmr f12,f11
+  f12 = f11;
+loc_8259BB48:
+  // stfs f0,0(r29)
+  lifted::ScalarFloatMode();
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r29) + 0, temp.u32);
+  // fneg f11,f12
+  f11 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f12) ^ 0x8000000000000000));
+  // stfs f0,20(r29)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r29) + 20, temp.u32);
+  // fnmsubs f0,f0,f0,f13
+  f0 = double(float(-std::fma(f0, f0, -f13)));
+  // fnmsubs f13,f12,f12,f13
+  f13 = double(float(-std::fma(f12, f12, -f13)));
+  // fsqrts f0,f0
+  f0 = double(float(sqrt(f0)));
+  // fsqrts f13,f13
+  f13 = double(float(sqrt(f13)));
+  // fneg f0,f0
+  f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
+  // fneg f13,f13
+  f13 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f13) ^ 0x8000000000000000));
+  // stfs f0,16(r29)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r29) + 16, temp.u32);
+  // fneg f12,f0
+  f12 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
+  // stfs f12,4(r29)
+  temp.f32 = float(f12);
+  guest::StoreU32(uint32_t(r29) + 4, temp.u32);
+  // fneg f0,f13
+  f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f13) ^ 0x8000000000000000));
+  // stfs f11,0(r28)
+  temp.f32 = float(f11);
+  guest::StoreU32(uint32_t(r28) + 0, temp.u32);
+  // stfs f13,4(r28)
+  temp.f32 = float(f13);
+  guest::StoreU32(uint32_t(r28) + 4, temp.u32);
+  // stfs f0,16(r28)
+  temp.f32 = float(f0);
+  guest::StoreU32(uint32_t(r28) + 16, temp.u32);
+  // stfs f11,20(r28)
+  temp.f32 = float(f11);
+  guest::StoreU32(uint32_t(r28) + 20, temp.u32);
+loc_8259BB8C:
+  // addi r1,r1,128
+  r1 = uint64_t(int64_t(int64_t(r1) + 128));
+  // lfd f31,-48(r1)
+  lifted::ScalarFloatMode();
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(uint32_t(r1) + -48)));
+  // b 0x825a6ed8
   // (left out: dead in C++)
   return {r3, f1};
 }
@@ -425678,6 +431836,18 @@ lifted::Result f825AA1A8(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, ui
   return {r3, f1};
 }
 
+// sub_825AA1B0: lifted from generated/ by lift.py.
+lifted::Result f825AA1B0(uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t lr) {
+  ITC_NATIVE_RUNNING("sub_825AA1B0 (lifted)");
+  uint64_t r3 = 0, r10 = 0, r31 = 0;
+  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  // li r3,8
+  r3 = uint64_t(int64_t(8));
+  // b 0x825b32d0
+  { const lifted::Result o = game::_unlock(LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  return {r3, f1};
+}
+
 // sub_825AA840 game::memmove: lifted from generated/ by lift.py.
 uint64_t f825AA840(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825AA840 (lifted)");
@@ -426560,6 +432730,42 @@ loc_825AC0D0:
   r1 = uint64_t(int64_t(int64_t(r31) + 128));
   // b 0x825a6edc
   // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_825AC0D8: lifted from generated/ by lift.py.
+lifted::Result f825AC0D8(uint64_t r1, uint64_t r13, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
+  ITC_NATIVE_RUNNING("sub_825AC0D8 (lifted)");
+  uint64_t r3 = 0, r4 = 0, r11 = 0, r12 = 0, r31 = 0;
+  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // bl 0x825ad4c0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::__iob_func(LIFTED_ARGS(0x825AC0E8, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r11,r3
+  r11 = r3;
+  // li r3,1
+  r3 = uint64_t(int64_t(1));
+  // addi r4,r11,32
+  r4 = uint64_t(int64_t(int64_t(r11) + 32));
+  // bl 0x825ad6c0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_unlock_file2(LIFTED_ARGS(0x825AC0F8, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r1,0(r1)
+  r1 = guest::LoadU32(uint32_t(r1) + 0);
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // blr
   return {r3, f1};
 }
 
@@ -427645,7 +433851,7 @@ loc_825AED8C:
   return {r3, f1};
 }
 
-// sub_825AF000 game::write_char: lifted from generated/ by lift.py.
+// sub_825AF000 game::write_char_825AF000: lifted from generated/ by lift.py.
 lifted::Result f825AF000(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_825AF000 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -427797,7 +434003,7 @@ loc_825AF0DC:
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AF0F0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AF0F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = guest::LoadU32(uint32_t(r31) + 0);
   // addi r29,r29,1
@@ -427823,7 +434029,7 @@ loc_825AF0DC:
   r3 = uint64_t(int64_t(63));
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AF120, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AF120, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825AF120:
   // cmpwi cr6,r30,0
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 0, so);
@@ -428452,7 +434658,7 @@ loc_825AF538:
   r3 = r29;
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AF560, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AF560, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r29,0(r17)
   r29 = guest::LoadU8(schema::CString(uint32_t(r17) - 6).chars_address() + 6);
   // addi r17,r17,1
@@ -428470,7 +434676,7 @@ loc_825AF570:
   r3 = r29;
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AF580, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AF580, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r23,80(r1)
   r23 = guest::LoadU32(uint32_t(r1) + 80);
   // b 0x825afc5c
@@ -429399,7 +435605,7 @@ loc_825AFAFC:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AFB10, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AFB10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,80(r1)
   r11 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r11,-1
@@ -429449,7 +435655,7 @@ loc_825AFB54:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AFB68, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AFB68, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,80(r1)
   r11 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r11,-1
@@ -429563,7 +435769,7 @@ loc_825AFC20:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825af000
   // (left out: dead in C++)
-  { const lifted::Result o = game::write_char(LIFTED_ARGS(0x825AFC34, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825AF000(LIFTED_ARGS(0x825AFC34, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r23,80(r1)
   r23 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r23,-1
@@ -430007,6 +436213,73 @@ loc_825B0B68:
 loc_825B0B70:
   // blr
   return f1;
+}
+
+// sub_825B1368 game::write_char_825B1368: lifted from generated/ by lift.py.
+lifted::Result f825B1368(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_825B1368 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // std r31,-16(r1)
+  guest::StoreU64(uint32_t(r1) + -16, r31);
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // lwz r11,12(r4)
+  r11 = guest::LoadU32(uint32_t(r4) + 12);
+  // mr r31,r5
+  r31 = r5;
+  // rlwinm. r11,r11,0,25,25
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0x40;
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x825b1394
+  if (cr0.eq) goto loc_825B1394;
+  // lwz r11,8(r4)
+  r11 = guest::LoadU32(uint32_t(r4) + 8);
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x825b13ac
+  if (cr6.eq) goto loc_825B13AC;
+loc_825B1394:
+  // bl 0x825b7a80
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_putwc_nolock(LIFTED_ARGS(0x825B1398, r31)); r3 = o.r3; f1 = o.f1; }
+  // clrlwi r11,r3,16
+  r11 = uint32_t(r3) & 0xFFFF;
+  // cmplwi cr6,r11,65535
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 65535, so);
+  // bne cr6,0x825b13ac
+  if (!cr6.eq) goto loc_825B13AC;
+  // li r11,-1
+  r11 = uint64_t(int64_t(-1));
+  // b 0x825b13b4
+  goto loc_825B13B4;
+loc_825B13AC:
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // addi r11,r11,1
+  r11 = uint64_t(int64_t(int64_t(r11) + 1));
+loc_825B13B4:
+  // stw r11,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r11));
+  // addi r1,r1,96
+  r1 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // ld r31,-16(r1)
+  r31 = guest::LoadU64(uint32_t(r1) + -16);
+  // blr
+  return {r3, f1};
 }
 
 // sub_825B13D0 game::_woutput_l: lifted from generated/ by lift.py.
@@ -430468,7 +436741,7 @@ loc_825B16DC:
   r19 = uint64_t(int64_t(1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B16F0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B16F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // b 0x825b1eb4
@@ -431400,7 +437673,7 @@ loc_825B1C78:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1C8C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1C8C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r21,-1
@@ -431451,7 +437724,7 @@ loc_825B1CD4:
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1CE8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1CE8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // addi r31,r31,2
@@ -431477,7 +437750,7 @@ loc_825B1CD4:
   r3 = uint64_t(int64_t(63));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1D18, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1D18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
 loc_825B1D1C:
@@ -431513,7 +437786,7 @@ loc_825B1D40:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1D54, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1D54, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r21,-1
@@ -431566,7 +437839,7 @@ loc_825B1D80:
   r4 = r22;
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1DB4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1DB4, r31)); r3 = o.r3; f1 = o.f1; }
   // add r30,r29,r30
   r30 = r29 + r30;
   // cmpwi cr6,r31,0
@@ -431623,7 +437896,7 @@ loc_825B1E04:
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1E18, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1E18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // addi r31,r31,2
@@ -431649,7 +437922,7 @@ loc_825B1E04:
   r3 = uint64_t(int64_t(63));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1E48, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1E48, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
 loc_825B1E4C:
@@ -431684,7 +437957,7 @@ loc_825B1E70:
   r31 = uint64_t(int64_t(int64_t(r31) + -1));
   // bl 0x825b1368
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(0x825B1368, LIFTED_ARGS(0x825B1E84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::write_char_825B1368(LIFTED_ARGS(0x825B1E84, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r21,80(r1)
   r21 = guest::LoadU32(uint32_t(r1) + 80);
   // cmpwi cr6,r21,-1
@@ -433843,6 +440116,181 @@ loc_825B64E8:
   return {r3, f1};
 }
 
+// sub_825B6768: lifted from generated/ by lift.py.
+lifted::Result f825B6768(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
+  ITC_NATIVE_RUNNING("sub_825B6768 (lifted)");
+  uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  guest::StoreU32(uint32_t(r1) + -8, uint32_t(r12));
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r11,r4
+  r11 = r4;
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // bne cr6,0x825b6794
+  if (!cr6.eq) goto loc_825B6794;
+  // cmplwi cr6,r5,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r5), 0, so);
+  // beq cr6,0x825b6794
+  if (cr6.eq) goto loc_825B6794;
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // beq cr6,0x825b6878
+  if (cr6.eq) goto loc_825B6878;
+  // b 0x825b6874
+  goto loc_825B6874;
+loc_825B6794:
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // beq cr6,0x825b67a4
+  if (cr6.eq) goto loc_825B67A4;
+  // li r10,-1
+  r10 = uint64_t(int64_t(-1));
+  // stw r10,0(r3)
+  guest::StoreU32(uint32_t(r3) + 0, uint32_t(r10));
+loc_825B67A4:
+  // lis r10,32767
+  r10 = uint64_t(int64_t(2147418112));
+  // ori r10,r10,65535
+  r10 = r10 | 65535;
+  // cmplw cr6,r5,r10
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r5), uint32_t(r10), so);
+  // ble cr6,0x825b67e4
+  if (!cr6.gt) goto loc_825B67E4;
+  // bl 0x825a81e0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B67B8, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r11,r3
+  r11 = r3;
+  // li r10,22
+  r10 = uint64_t(int64_t(22));
+  // li r7,0
+  r7 = uint64_t(int64_t(0));
+  // li r6,0
+  r6 = uint64_t(int64_t(0));
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // li r4,0
+  r4 = uint64_t(int64_t(0));
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // stw r10,0(r11)
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r10));
+  // bl 0x825afcc8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_invalid_parameter(LIFTED_ARGS(0x825B67DC, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r3,22
+  r3 = uint64_t(int64_t(22));
+  // b 0x825b687c
+  goto loc_825B687C;
+loc_825B67E4:
+  // clrlwi r10,r6,16
+  r10 = uint32_t(r6) & 0xFFFF;
+  // cmplwi cr6,r10,255
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 255, so);
+  // ble cr6,0x825b6824
+  if (!cr6.gt) goto loc_825B6824;
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x825b680c
+  if (cr6.eq) goto loc_825B680C;
+  // cmplwi cr6,r5,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r5), 0, so);
+  // beq cr6,0x825b680c
+  if (cr6.eq) goto loc_825B680C;
+  // li r4,0
+  r4 = uint64_t(int64_t(0));
+  // mr r3,r11
+  r3 = r11;
+  // bl 0x825a71d0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::memset(LIFTED_ARGS(0x825B680C, r31)); r3 = o.r3; f1 = o.f1; }
+loc_825B680C:
+  // bl 0x825a81e0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B6810, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r11,42
+  r11 = uint64_t(int64_t(42));
+  // stw r11,0(r3)
+  guest::StoreU32(uint32_t(r3) + 0, uint32_t(r11));
+  // bl 0x825a81e0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B681C, r31)); r3 = o.r3; f1 = o.f1; }
+  // lwz r3,0(r3)
+  r3 = guest::LoadU32(uint32_t(r3) + 0);
+  // b 0x825b687c
+  goto loc_825B687C;
+loc_825B6824:
+  // cmplwi cr6,r11,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
+  // beq cr6,0x825b6868
+  if (cr6.eq) goto loc_825B6868;
+  // cmplwi cr6,r5,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r5), 0, so);
+  // bne cr6,0x825b6864
+  if (!cr6.eq) goto loc_825B6864;
+  // bl 0x825a81e0
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825A81E0, LIFTED_ARGS(0x825B6838, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r11,r3
+  r11 = r3;
+  // li r10,34
+  r10 = uint64_t(int64_t(34));
+  // li r7,0
+  r7 = uint64_t(int64_t(0));
+  // li r6,0
+  r6 = uint64_t(int64_t(0));
+  // li r5,0
+  r5 = uint64_t(int64_t(0));
+  // li r4,0
+  r4 = uint64_t(int64_t(0));
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // stw r10,0(r11)
+  guest::StoreU32(uint32_t(r11) + 0, uint32_t(r10));
+  // bl 0x825afcc8
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_invalid_parameter(LIFTED_ARGS(0x825B685C, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r3,34
+  r3 = uint64_t(int64_t(34));
+  // b 0x825b687c
+  goto loc_825B687C;
+loc_825B6864:
+  // stb r6,0(r11)
+  guest::StoreU8(uint32_t(r11) + 0, uint8_t(r6));
+loc_825B6868:
+  // cmplwi cr6,r3,0
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
+  // beq cr6,0x825b6878
+  if (cr6.eq) goto loc_825B6878;
+  // li r11,1
+  r11 = uint64_t(int64_t(1));
+loc_825B6874:
+  // stw r11,0(r3)
+  guest::StoreU32(uint32_t(r3) + 0, uint32_t(r11));
+loc_825B6878:
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+loc_825B687C:
+  // addi r1,r1,96
+  r1 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lwz r12,-8(r1)
+  r12 = guest::LoadU32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // blr
+  return {r3, f1};
+}
+
 // sub_825B6890: lifted from generated/ by lift.py.
 lifted::Result f825B6890(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r8, uint64_t r9, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825B6890 (lifted)");
@@ -434908,6 +441356,471 @@ loc_825B70C8:
   // b 0x825a6eb4
   // (left out: dead in C++)
   return r3;
+}
+
+// sub_825B7A80 game::_putwc_nolock: lifted from generated/ by lift.py.
+lifted::Result f825B7A80(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
+  ITC_NATIVE_RUNNING("sub_825B7A80 (lifted)");
+  uint64_t r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t ca = 0, so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // bl 0x825a6e84
+  // (left out: dead in C++)
+  // (left out: dead in C++)
+  // stwu r1,-144(r1)
+  ea = -144 + uint32_t(r1);
+  guest::StoreU32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // mr r27,r3
+  r27 = r3;
+  // mr r31,r4
+  r31 = r4;
+  // sth r27,166(r1)
+  guest::StoreU16(uint32_t(r1) + 166, uint16_t(r27));
+  // bl 0x825ad4c0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::__iob_func(LIFTED_ARGS(0x825B7A9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r11,r3,32
+  r11 = uint64_t(int64_t(int64_t(r3) + 32));
+  // cmplw cr6,r31,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
+  // beq cr6,0x825b7d5c
+  if (cr6.eq) goto loc_825B7D5C;
+  // bl 0x825ad4c0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::__iob_func(LIFTED_ARGS(0x825B7AAC, r31)); r3 = o.r3; f1 = o.f1; }
+  // addi r11,r3,64
+  r11 = uint64_t(int64_t(int64_t(r3) + 64));
+  // cmplw cr6,r31,r11
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
+  // beq cr6,0x825b7d5c
+  if (cr6.eq) goto loc_825B7D5C;
+  // lwz r11,12(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 12);
+  // rlwinm. r11,r11,0,25,25
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0x40;
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // bne 0x825b7b38
+  if (!cr0.eq) goto loc_825B7B38;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7ACC, r31)); r3 = o.r3; f1 = o.f1; }
+  // lis r11,-32104
+  r11 = uint64_t(int64_t(-2103967744));
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // addi r29,r11,-32224
+  r29 = uint64_t(int64_t(int64_t(r11) + -32224));
+  // lis r11,-32153
+  r11 = uint64_t(int64_t(-2107179008));
+  // addi r28,r11,-16456
+  r28 = uint64_t(int64_t(int64_t(r11) + -16456));
+  // beq cr6,0x825b7b24
+  if (cr6.eq) goto loc_825B7B24;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7AEC, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi cr6,r3,-2
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -2, so);
+  // beq cr6,0x825b7b24
+  if (cr6.eq) goto loc_825B7B24;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7AFC, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r30,r3
+  r30 = r3;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7B08, r31)); r3 = o.r3; f1 = o.f1; }
+  // srawi r11,r30,5
+  ca = (int32_t(r30) < 0) & ((uint32_t(r30) & 0x1F) != 0);
+  r11 = uint64_t(int64_t(int32_t(r30) >> 5));
+  // clrlwi r10,r3,27
+  r10 = uint32_t(r3) & 0x1F;
+  // rlwinm r11,r11,2,0,29
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
+  // mulli r10,r10,44
+  r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(44))));
+  // lwzx r11,r11,r29
+  r11 = guest::LoadU32(uint32_t(r11) + uint32_t(r29));
+  // add r11,r11,r10
+  r11 = r11 + r10;
+  // b 0x825b7b28
+  goto loc_825B7B28;
+loc_825B7B24:
+  // mr r11,r28
+  r11 = r28;
+loc_825B7B28:
+  // lbz r11,40(r11)
+  r11 = guest::LoadU8(uint32_t(r11) + 40);
+  // rlwinm r11,r11,0,0,30
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFE;
+  // cmplwi cr6,r11,4
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 4, so);
+  // bne cr6,0x825b7b74
+  if (!cr6.eq) goto loc_825B7B74;
+loc_825B7B38:
+  // lwz r11,4(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 4);
+  // addic. r11,r11,-2
+  ca = uint32_t(r11) > 1;
+  r11 = uint64_t(int64_t(int64_t(r11) + -2));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // stw r11,4(r31)
+  guest::StoreU32(uint32_t(r31) + 4, uint32_t(r11));
+  // blt 0x825b7b60
+  if (cr0.lt) goto loc_825B7B60;
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // sth r27,0(r11)
+  guest::StoreU16(uint32_t(r11) + 0, uint16_t(r27));
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // addi r11,r11,2
+  r11 = uint64_t(int64_t(int64_t(r11) + 2));
+  // stw r11,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r11));
+  // b 0x825b7d70
+  goto loc_825B7D70;
+loc_825B7B60:
+  // mr r4,r31
+  r4 = r31;
+  // clrlwi r3,r27,16
+  r3 = uint32_t(r27) & 0xFFFF;
+  // bl 0x825b9888
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825B9888, LIFTED_ARGS(0x825B7B6C, r31)); r3 = o.r3; f1 = o.f1; }
+  // clrlwi r3,r3,16
+  r3 = uint32_t(r3) & 0xFFFF;
+  // b 0x825b7d74
+  goto loc_825B7D74;
+loc_825B7B74:
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7B7C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // beq cr6,0x825b7bc4
+  if (cr6.eq) goto loc_825B7BC4;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7B8C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi cr6,r3,-2
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -2, so);
+  // beq cr6,0x825b7bc4
+  if (cr6.eq) goto loc_825B7BC4;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7B9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r30,r3
+  r30 = r3;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7BA8, r31)); r3 = o.r3; f1 = o.f1; }
+  // srawi r11,r30,5
+  ca = (int32_t(r30) < 0) & ((uint32_t(r30) & 0x1F) != 0);
+  r11 = uint64_t(int64_t(int32_t(r30) >> 5));
+  // clrlwi r10,r3,27
+  r10 = uint32_t(r3) & 0x1F;
+  // rlwinm r11,r11,2,0,29
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
+  // mulli r10,r10,44
+  r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(44))));
+  // lwzx r11,r11,r29
+  r11 = guest::LoadU32(uint32_t(r11) + uint32_t(r29));
+  // add r11,r11,r10
+  r11 = r11 + r10;
+  // b 0x825b7bc8
+  goto loc_825B7BC8;
+loc_825B7BC4:
+  // mr r11,r28
+  r11 = r28;
+loc_825B7BC8:
+  // lbz r11,40(r11)
+  r11 = guest::LoadU8(uint32_t(r11) + 40);
+  // rlwinm r11,r11,0,0,30
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFE;
+  // cmplwi cr6,r11,2
+  cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2, so);
+  // bne cr6,0x825b7c74
+  if (!cr6.eq) goto loc_825B7C74;
+  // lwz r11,4(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 4);
+  // addic. r11,r11,-1
+  ca = uint32_t(r11) > 0;
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // stw r11,4(r31)
+  guest::StoreU32(uint32_t(r31) + 4, uint32_t(r11));
+  // blt 0x825b7c08
+  if (cr0.lt) goto loc_825B7C08;
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // lbz r10,166(r1)
+  r10 = guest::LoadU8(uint32_t(r1) + 166);
+  // stb r10,0(r11)
+  guest::StoreU8(uint32_t(r11) + 0, uint8_t(r10));
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // addi r10,r11,1
+  r10 = uint64_t(int64_t(int64_t(r11) + 1));
+  // lbz r3,0(r11)
+  r3 = guest::LoadU8(uint32_t(r11) + 0);
+  // stw r10,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r10));
+  // b 0x825b7c18
+  goto loc_825B7C18;
+loc_825B7C08:
+  // lbz r11,166(r1)
+  r11 = guest::LoadU8(uint32_t(r1) + 166);
+  // mr r4,r31
+  r4 = r31;
+  // extsb r3,r11
+  r3 = uint64_t(int64_t(int8_t(r11)));
+  // bl 0x825aee28
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_flsbuf(LIFTED_ARGS(0x825B7C18, r31)); r3 = o.r3; f1 = o.f1; }
+loc_825B7C18:
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // bne cr6,0x825b7c28
+  if (!cr6.eq) goto loc_825B7C28;
+loc_825B7C20:
+  // li r3,-1
+  r3 = uint64_t(int64_t(-1));
+  // b 0x825b7d74
+  goto loc_825B7D74;
+loc_825B7C28:
+  // lwz r11,4(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 4);
+  // addic. r11,r11,-1
+  ca = uint32_t(r11) > 0;
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // stw r11,4(r31)
+  guest::StoreU32(uint32_t(r31) + 4, uint32_t(r11));
+  // blt 0x825b7c58
+  if (cr0.lt) goto loc_825B7C58;
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // lbz r10,167(r1)
+  r10 = guest::LoadU8(uint32_t(r1) + 167);
+  // stb r10,0(r11)
+  guest::StoreU8(uint32_t(r11) + 0, uint8_t(r10));
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // addi r10,r11,1
+  r10 = uint64_t(int64_t(int64_t(r11) + 1));
+  // lbz r3,0(r11)
+  r3 = guest::LoadU8(uint32_t(r11) + 0);
+  // stw r10,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r10));
+  // b 0x825b7c68
+  goto loc_825B7C68;
+loc_825B7C58:
+  // lbz r11,167(r1)
+  r11 = guest::LoadU8(uint32_t(r1) + 167);
+  // mr r4,r31
+  r4 = r31;
+  // extsb r3,r11
+  r3 = uint64_t(int64_t(int8_t(r11)));
+  // bl 0x825aee28
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_flsbuf(LIFTED_ARGS(0x825B7C68, r31)); r3 = o.r3; f1 = o.f1; }
+loc_825B7C68:
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // bne cr6,0x825b7d70
+  if (!cr6.eq) goto loc_825B7D70;
+  // b 0x825b7c20
+  goto loc_825B7C20;
+loc_825B7C74:
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7C7C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // beq cr6,0x825b7cc4
+  if (cr6.eq) goto loc_825B7CC4;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7C8C, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi cr6,r3,-2
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -2, so);
+  // beq cr6,0x825b7cc4
+  if (cr6.eq) goto loc_825B7CC4;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7C9C, r31)); r3 = o.r3; f1 = o.f1; }
+  // mr r30,r3
+  r30 = r3;
+  // mr r3,r31
+  r3 = r31;
+  // bl 0x825b0e88
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_fileno(LIFTED_ARGS(0x825B7CA8, r31)); r3 = o.r3; f1 = o.f1; }
+  // srawi r11,r30,5
+  ca = (int32_t(r30) < 0) & ((uint32_t(r30) & 0x1F) != 0);
+  r11 = uint64_t(int64_t(int32_t(r30) >> 5));
+  // clrlwi r10,r3,27
+  r10 = uint32_t(r3) & 0x1F;
+  // rlwinm r11,r11,2,0,29
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
+  // mulli r10,r10,44
+  r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(44))));
+  // lwzx r11,r11,r29
+  r11 = guest::LoadU32(uint32_t(r11) + uint32_t(r29));
+  // add r11,r11,r10
+  r11 = r11 + r10;
+  // b 0x825b7cc8
+  goto loc_825B7CC8;
+loc_825B7CC4:
+  // mr r11,r28
+  r11 = r28;
+loc_825B7CC8:
+  // lbz r11,4(r11)
+  r11 = guest::LoadU8(uint32_t(r11) + 4);
+  // rlwinm. r11,r11,0,0,24
+  r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFF80;
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // beq 0x825b7b38
+  if (cr0.eq) goto loc_825B7B38;
+  // mr r6,r27
+  r6 = r27;
+  // li r5,5
+  r5 = uint64_t(int64_t(5));
+  // addi r4,r1,84
+  r4 = uint64_t(int64_t(int64_t(r1) + 84));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // bl 0x825b6890
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(0x825B6890, LIFTED_ARGS(0x825B7CE8, r31)); r3 = o.r3; f1 = o.f1; }
+  // cmpwi r3,0
+  cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
+  // bne 0x825b7c20
+  if (!cr0.eq) goto loc_825B7C20;
+  // lwz r11,80(r1)
+  r11 = guest::LoadU32(uint32_t(r1) + 80);
+  // li r30,0
+  r30 = uint64_t(int64_t(0));
+  // cmpwi cr6,r11,0
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // ble cr6,0x825b7d70
+  if (!cr6.gt) goto loc_825B7D70;
+loc_825B7D00:
+  // lwz r11,4(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 4);
+  // addic. r11,r11,-1
+  ca = uint32_t(r11) > 0;
+  r11 = uint64_t(int64_t(int64_t(r11) + -1));
+  cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
+  // stw r11,4(r31)
+  guest::StoreU32(uint32_t(r31) + 4, uint32_t(r11));
+  // addi r11,r1,84
+  r11 = uint64_t(int64_t(int64_t(r1) + 84));
+  // lbzx r11,r30,r11
+  r11 = guest::LoadU8(uint32_t(r30) + uint32_t(r11));
+  // blt 0x825b7d34
+  if (cr0.lt) goto loc_825B7D34;
+  // lwz r10,0(r31)
+  r10 = guest::LoadU32(uint32_t(r31) + 0);
+  // stb r11,0(r10)
+  guest::StoreU8(uint32_t(r10) + 0, uint8_t(r11));
+  // lwz r11,0(r31)
+  r11 = guest::LoadU32(uint32_t(r31) + 0);
+  // addi r10,r11,1
+  r10 = uint64_t(int64_t(int64_t(r11) + 1));
+  // lbz r3,0(r11)
+  r3 = guest::LoadU8(uint32_t(r11) + 0);
+  // stw r10,0(r31)
+  guest::StoreU32(uint32_t(r31) + 0, uint32_t(r10));
+  // b 0x825b7d40
+  goto loc_825B7D40;
+loc_825B7D34:
+  // mr r4,r31
+  r4 = r31;
+  // extsb r3,r11
+  r3 = uint64_t(int64_t(int8_t(r11)));
+  // bl 0x825aee28
+  // (left out: dead in C++)
+  { const lifted::Result o = game::_flsbuf(LIFTED_ARGS(0x825B7D40, r31)); r3 = o.r3; f1 = o.f1; }
+loc_825B7D40:
+  // cmpwi cr6,r3,-1
+  cr6 = lifted::Compare<int32_t>(int32_t(r3), -1, so);
+  // beq cr6,0x825b7c20
+  if (cr6.eq) goto loc_825B7C20;
+  // lwz r11,80(r1)
+  r11 = guest::LoadU32(uint32_t(r1) + 80);
+  // addi r30,r30,1
+  r30 = uint64_t(int64_t(int64_t(r30) + 1));
+  // cmpw cr6,r30,r11
+  cr6 = lifted::Compare<int32_t>(int32_t(r30), int32_t(r11), so);
+  // blt cr6,0x825b7d00
+  if (cr6.lt) goto loc_825B7D00;
+  // b 0x825b7d70
+  goto loc_825B7D70;
+loc_825B7D5C:
+  // li r11,0
+  r11 = uint64_t(int64_t(0));
+  // sth r27,80(r1)
+  guest::StoreU16(uint32_t(r1) + 80, uint16_t(r27));
+  // addi r3,r1,80
+  r3 = uint64_t(int64_t(int64_t(r1) + 80));
+  // sth r11,82(r1)
+  guest::StoreU16(uint32_t(r1) + 82, uint16_t(r11));
+  // bl 0x825ba4a0
+  // (left out: dead in C++)
+  { const lifted::Result o = game::OutputDebugStringW(LIFTED_ARGS(0x825B7D70, r31)); r3 = o.r3; f1 = o.f1; }
+loc_825B7D70:
+  // mr r3,r27
+  r3 = r27;
+loc_825B7D74:
+  // addi r1,r1,144
+  r1 = uint64_t(int64_t(int64_t(r1) + 144));
+  // b 0x825a6ed4
+  // (left out: dead in C++)
+  return {r3, f1};
+}
+
+// sub_825B7EB8: lifted from generated/ by lift.py.
+lifted::Result f825B7EB8(uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
+  ITC_NATIVE_RUNNING("sub_825B7EB8 (lifted)");
+  uint64_t r7 = 0, r31 = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  // mr r7,r6
+  r7 = r6;
+  // li r6,0
+  r6 = uint64_t(int64_t(0));
+  // b 0x825b7d80
+  { const lifted::Result o = lifted::Call(0x825B7D80, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  return {r3, f1};
 }
 
 // sub_825B7EC8: lifted from generated/ by lift.py.
@@ -453410,6 +460323,10 @@ lifted::Result e82091AE8(const lifted::Args& a) {
   return {a.r[0], a.f[0]};
 }
 
+lifted::Result e82091CD0(const lifted::Args& a) {
+  return {f82091CD0(a.r[0], a.r[1], a.r[2]), a.f[0]};
+}
+
 lifted::Result e82091E58(const lifted::Args& a) {
   return f82091E58(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
@@ -456430,6 +463347,10 @@ lifted::Result e820EEF08(const lifted::Args& a) {
   return f820EEF08(a.r1, a.r13, a.r[0], a.r[1], a.r[5], a.r[6], a.r[7]);
 }
 
+lifted::Result e820EF0B8(const lifted::Args& a) {
+  return {f820EF0B8(a.r1, a.r13, a.r[0], a.r[1]), a.f[0]};
+}
+
 lifted::Result e820EF168(const lifted::Args& a) {
   return f820EF168(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
@@ -458161,6 +465082,16 @@ lifted::Result e8212DDC8(const lifted::Args& a) {
   return {a.r[0], a.f[0]};
 }
 
+lifted::Result e8212EFA8(const lifted::Args& a) {
+  f8212EFA8(a.r[0]);
+  return {a.r[0], a.f[0]};
+}
+
+lifted::Result e8212F030(const lifted::Args& a) {
+  f8212F030(a.r[0]);
+  return {a.r[0], a.f[0]};
+}
+
 lifted::Result e8212F0B8(const lifted::Args& a) {
   return f8212F0B8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[1], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
 }
@@ -458170,8 +465101,24 @@ lifted::Result e8212FB28(const lifted::Args& a) {
   return {a.r[0], a.f[0]};
 }
 
+lifted::Result e8212FBD8(const lifted::Args& a) {
+  return f8212FBD8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e8212FC50(const lifted::Args& a) {
   return f8212FC50(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e8212FD50(const lifted::Args& a) {
+  return f8212FD50(a.r1, a.r13, a.r[0], a.r[1], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e8212FDB0(const lifted::Args& a) {
+  return f8212FDB0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e8212FE28(const lifted::Args& a) {
+  return f8212FE28(a.r1, a.r13, a.r[0], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
 lifted::Result e8212FF68(const lifted::Args& a) {
@@ -458206,6 +465153,10 @@ lifted::Result e82131680(const lifted::Args& a) {
   return f82131680(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
 
+lifted::Result e821318B8(const lifted::Args& a) {
+  return f821318B8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e82131CB8(const lifted::Args& a) {
   return f82131CB8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[5], a.r[6], a.f[0]);
 }
@@ -458218,12 +465169,24 @@ lifted::Result e82131EE0(const lifted::Args& a) {
   return f82131EE0(a.r1, a.r13, a.r[0], a.r[4], a.r[5], a.f[0]);
 }
 
+lifted::Result e82131F50(const lifted::Args& a) {
+  return f82131F50(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e82131FB0(const lifted::Args& a) {
   return f82131FB0(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
 
 lifted::Result e821321F8(const lifted::Args& a) {
   return f821321F8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[5], a.r[6], a.f[0]);
+}
+
+lifted::Result e82132318(const lifted::Args& a) {
+  return f82132318(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e82132720(const lifted::Args& a) {
+  return f82132720(a.r1, a.r13, a.r[0], a.r[1], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
 lifted::Result e82132778(const lifted::Args& a) {
@@ -461223,12 +468186,28 @@ lifted::Result e8235F6D0(const lifted::Args& a) {
   return f8235F6D0(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.f[0], a.lr);
 }
 
+lifted::Result e82365D88(const lifted::Args& a) {
+  return f82365D88(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e82366458(const lifted::Args& a) {
+  return f82366458(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e82368D30(const lifted::Args& a) {
   return f82368D30(a.r1, a.r13, a.r[0], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
+lifted::Result e823699F8(const lifted::Args& a) {
+  return f823699F8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.f[0]);
+}
+
 lifted::Result e8236C630(const lifted::Args& a) {
   return f8236C630(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e8236D380(const lifted::Args& a) {
+  return f8236D380(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
 
 lifted::Result e82379328(const lifted::Args& a) {
@@ -461247,8 +468226,28 @@ lifted::Result e823EA770(const lifted::Args& a) {
   return f823EA770(a.r1, a.r13, a.r[0], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
 
+lifted::Result e823EA800(const lifted::Args& a) {
+  return f823EA800(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.f[0]);
+}
+
+lifted::Result e823EAA90(const lifted::Args& a) {
+  return f823EAA90(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
+}
+
+lifted::Result e823EAB58(const lifted::Args& a) {
+  return f823EAB58(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e823F2620(const lifted::Args& a) {
   return {f823F2620(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3]), a.f[0]};
+}
+
+lifted::Result e823F55B0(const lifted::Args& a) {
+  return f823F55B0(a.r1, a.r13, a.r[0], a.r[1], a.f[0]);
+}
+
+lifted::Result e823F5FA0(const lifted::Args& a) {
+  return f823F5FA0(a.r1, a.r13, a.r[0], a.r[1], a.f[0]);
 }
 
 lifted::Result e823F6298(const lifted::Args& a) {
@@ -461261,6 +468260,10 @@ lifted::Result e823F6B70(const lifted::Args& a) {
 
 lifted::Result e823F6BC0(const lifted::Args& a) {
   return f823F6BC0(a.r1, a.r13, a.r[0], a.r[1], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e823F6C60(const lifted::Args& a) {
+  return f823F6C60(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
 
 lifted::Result e82420AB8(const lifted::Args& a) {
@@ -462234,8 +469237,20 @@ lifted::Result e8259A9E0(const lifted::Args& a) {
   return f8259A9E0(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
+lifted::Result e8259B088(const lifted::Args& a) {
+  return f8259B088(a.r1, a.r13, a.r[1], a.r[2]);
+}
+
+lifted::Result e8259B288(const lifted::Args& a) {
+  return f8259B288(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.f[0]);
+}
+
 lifted::Result e8259B748(const lifted::Args& a) {
   return f8259B748(a.r1, a.r13, a.r[0], a.r[1]);
+}
+
+lifted::Result e8259BA68(const lifted::Args& a) {
+  return f8259BA68(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5]);
 }
 
 lifted::Result e8259BE40(const lifted::Args& a) {
@@ -462593,6 +469608,10 @@ lifted::Result e825AA1A8(const lifted::Args& a) {
   return f825AA1A8(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
+lifted::Result e825AA1B0(const lifted::Args& a) {
+  return f825AA1B0(a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.lr);
+}
+
 lifted::Result e825AA840(const lifted::Args& a) {
   return {f825AA840(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.lr), a.f[0]};
 }
@@ -462619,6 +469638,10 @@ lifted::Result e825AB1C0(const lifted::Args& a) {
 
 lifted::Result e825ABFE8(const lifted::Args& a) {
   return f825ABFE8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e825AC0D8(const lifted::Args& a) {
+  return f825AC0D8(a.r1, a.r13, a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
 lifted::Result e825AC248(const lifted::Args& a) {
@@ -462689,6 +469712,10 @@ lifted::Result e825B0B30(const lifted::Args& a) {
   return {a.r[0], f825B0B30(a.f[0])};
 }
 
+lifted::Result e825B1368(const lifted::Args& a) {
+  return f825B1368(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
 lifted::Result e825B13D0(const lifted::Args& a) {
   return f825B13D0(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
@@ -462721,12 +469748,24 @@ lifted::Result e825B6458(const lifted::Args& a) {
   return f825B6458(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[5], a.f[0]);
 }
 
+lifted::Result e825B6768(const lifted::Args& a) {
+  return f825B6768(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
+}
+
 lifted::Result e825B6890(const lifted::Args& a) {
   return f825B6890(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[5], a.r[6], a.f[0], a.lr);
 }
 
 lifted::Result e825B69B8(const lifted::Args& a) {
   return {f825B69B8(a.r1, a.r[0], a.r[1]), a.f[0]};
+}
+
+lifted::Result e825B7A80(const lifted::Args& a) {
+  return f825B7A80(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
+}
+
+lifted::Result e825B7EB8(const lifted::Args& a) {
+  return f825B7EB8(a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
 
 lifted::Result e825B7EC8(const lifted::Args& a) {
@@ -463418,6 +470457,7 @@ const Registration kFallbacks[] = {
     {0x82091A60, e82091A60},
     {0x82091A98, e82091A98},
     {0x82091AE8, e82091AE8},
+    {0x82091CD0, e82091CD0},
     {0x82091E58, e82091E58},
     {0x82091FF0, e82091FF0},
     {0x820920D8, e820920D8},
@@ -464154,6 +471194,7 @@ const Registration kFallbacks[] = {
     {0x820EEAE8, e820EEAE8},
     {0x820EEB58, e820EEB58},
     {0x820EEF08, e820EEF08},
+    {0x820EF0B8, e820EF0B8},
     {0x820EF168, e820EF168},
     {0x820EF310, e820EF310},
     {0x820EF368, e820EF368},
@@ -464577,9 +471618,15 @@ const Registration kFallbacks[] = {
     {0x8212C2F0, e8212C2F0},
     {0x8212D818, e8212D818},
     {0x8212DDC8, e8212DDC8},
+    {0x8212EFA8, e8212EFA8},
+    {0x8212F030, e8212F030},
     {0x8212F0B8, e8212F0B8},
     {0x8212FB28, e8212FB28},
+    {0x8212FBD8, e8212FBD8},
     {0x8212FC50, e8212FC50},
+    {0x8212FD50, e8212FD50},
+    {0x8212FDB0, e8212FDB0},
+    {0x8212FE28, e8212FE28},
     {0x8212FF68, e8212FF68},
     {0x8212FFC8, e8212FFC8},
     {0x82130028, e82130028},
@@ -464588,11 +471635,15 @@ const Registration kFallbacks[] = {
     {0x82130290, e82130290},
     {0x82130978, e82130978},
     {0x82131680, e82131680},
+    {0x821318B8, e821318B8},
     {0x82131CB8, e82131CB8},
     {0x82131DD8, e82131DD8},
     {0x82131EE0, e82131EE0},
+    {0x82131F50, e82131F50},
     {0x82131FB0, e82131FB0},
     {0x821321F8, e821321F8},
+    {0x82132318, e82132318},
+    {0x82132720, e82132720},
     {0x82132778, e82132778},
     {0x82132960, e82132960},
     {0x821329B8, e821329B8},
@@ -465331,16 +472382,26 @@ const Registration kFallbacks[] = {
     {0x8235F548, e8235F548},
     {0x8235F6C8, e8235F6C8},
     {0x8235F6D0, e8235F6D0},
+    {0x82365D88, e82365D88},
+    {0x82366458, e82366458},
     {0x82368D30, e82368D30},
+    {0x823699F8, e823699F8},
     {0x8236C630, e8236C630},
+    {0x8236D380, e8236D380},
     {0x82379328, e82379328},
     {0x82379D50, e82379D50},
     {0x823EA070, e823EA070},
     {0x823EA770, e823EA770},
+    {0x823EA800, e823EA800},
+    {0x823EAA90, e823EAA90},
+    {0x823EAB58, e823EAB58},
     {0x823F2620, e823F2620},
+    {0x823F55B0, e823F55B0},
+    {0x823F5FA0, e823F5FA0},
     {0x823F6298, e823F6298},
     {0x823F6B70, e823F6B70},
     {0x823F6BC0, e823F6BC0},
+    {0x823F6C60, e823F6C60},
     {0x82420AB8, e82420AB8},
     {0x82420F50, e82420F50},
     {0x82459CF8, e82459CF8},
@@ -465578,7 +472639,10 @@ const Registration kFallbacks[] = {
     {0x8259A228, e8259A228},
     {0x8259A9D0, e8259A9D0},
     {0x8259A9E0, e8259A9E0},
+    {0x8259B088, e8259B088},
+    {0x8259B288, e8259B288},
     {0x8259B748, e8259B748},
+    {0x8259BA68, e8259BA68},
     {0x8259BE40, e8259BE40},
     {0x8259C3A8, e8259C3A8},
     {0x8259C818, e8259C818},
@@ -465664,6 +472728,7 @@ const Registration kFallbacks[] = {
     {0x825A9B58, e825A9B58},
     {0x825A9DD8, e825A9DD8},
     {0x825AA1A8, e825AA1A8},
+    {0x825AA1B0, e825AA1B0},
     {0x825AA840, e825AA840},
     {0x825AAD20, e825AAD20},
     {0x825AAF18, e825AAF18},
@@ -465671,6 +472736,7 @@ const Registration kFallbacks[] = {
     {0x825AB0C0, e825AB0C0},
     {0x825AB1C0, e825AB1C0},
     {0x825ABFE8, e825ABFE8},
+    {0x825AC0D8, e825AC0D8},
     {0x825AC248, e825AC248},
     {0x825AC320, e825AC320},
     {0x825AC6B0, e825AC6B0},
@@ -465688,6 +472754,7 @@ const Registration kFallbacks[] = {
     {0x825AFE80, e825AFE80},
     {0x825AFF80, e825AFF80},
     {0x825B0B30, e825B0B30},
+    {0x825B1368, e825B1368},
     {0x825B13D0, e825B13D0},
     {0x825B32D0, e825B32D0},
     {0x825B3430, e825B3430},
@@ -465696,8 +472763,11 @@ const Registration kFallbacks[] = {
     {0x825B6140, e825B6140},
     {0x825B61E8, e825B61E8},
     {0x825B6458, e825B6458},
+    {0x825B6768, e825B6768},
     {0x825B6890, e825B6890},
     {0x825B69B8, e825B69B8},
+    {0x825B7A80, e825B7A80},
+    {0x825B7EB8, e825B7EB8},
     {0x825B7EC8, e825B7EC8},
     {0x825B7F10, e825B7F10},
     {0x825B8B48, e825B8B48},

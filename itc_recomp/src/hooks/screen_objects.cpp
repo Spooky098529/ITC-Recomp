@@ -266,3 +266,63 @@ ITC_DIRECT_ENTRY(82132960) {
   ITC_SCREEN_OBJECTS_FALLBACK(82132960)
   ctx.r3.u64 = so::MapClear(ctx.r3.u32);
 }
+
+// For the fallback originals (docs/missing-functions.md): the originals of
+// the inserts and erases above call these tree helpers by address.
+
+// UvColumn::RotateLeft and RotateRight: r3 = the column, r4 = the node; r3
+// left as it was (leaves).
+ITC_DIRECT_ENTRY(8212F920) { so::ColumnRotateLeft(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(8212F988) { so::ColumnRotateRight(ctx.r3.u32, ctx.r4.u32); }
+
+// UvMap::RotateLeft and RotateRight: as the column's.
+ITC_DIRECT_ENTRY(8212FA50) { so::MapRotateLeft(ctx.r3.u32, ctx.r4.u32); }
+ITC_DIRECT_ENTRY(8212FAB8) { so::MapRotateRight(ctx.r3.u32, ctx.r4.u32); }
+
+// UvColumn::NewNode: r4 = left, r5 = parent, r6 = right, r7 = the value, r8
+// = the color (its low byte); r3 the node.
+ITC_DIRECT_ENTRY(8212FDB0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FDB0)
+  ctx.r3.u64 = so::ColumnNewNode(ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                 uint8_t(ctx.r8.u32));
+}
+
+// UvColumn::Clear: r3 = the column; r3 as EraseSubtree leaves it.
+ITC_DIRECT_ENTRY(8212FE28) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FE28)
+  ctx.r3.u64 = so::ColumnClear(ctx.r3.u32);
+}
+
+// UvMap::ConstructNode: r3 = the node, r4 = left, r5 = parent, r6 = right,
+// r7 = the value, r8 = the color (its low byte); r3 the node.
+ITC_DIRECT_ENTRY(82131F50) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131F50)
+  ctx.r3.u64 = so::MapConstructNode(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                    ctx.r7.u32, uint8_t(ctx.r8.u32));
+}
+
+// UvMap::EraseSubtree: r3 = the map, r4 = the node; r3 the last node freed
+// (or the map).
+ITC_DIRECT_ENTRY(82132720) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132720)
+  ctx.r3.u64 = so::MapEraseSubtree(ctx.r3.u32, ctx.r4.u32);
+}
+
+// UvColumn::AllocateNodes: r3 = the count; r3 the block; the original where
+// the port declines (bad_alloc, operator new failing).
+ITC_DIRECT_ENTRY(8212FBD8) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FBD8)
+  const auto block = so::ColumnAllocateNodes(ctx.r3.u32);
+  if (!block) {
+    lifted::original::c8212FBD8(ctx);
+    return;
+  }
+  ctx.r3.u64 = *block;
+}
+
+// UvColumn::EraseSubtree: r3 = the column, r4 = the node; r3 the last node
+// freed (or the column).
+ITC_DIRECT_ENTRY(8212FD50) {
+  ITC_SCREEN_OBJECTS_FALLBACK(8212FD50)
+  ctx.r3.u64 = so::ColumnEraseSubtree(ctx.r3.u32, ctx.r4.u32);
+}

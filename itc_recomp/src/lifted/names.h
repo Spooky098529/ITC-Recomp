@@ -218,6 +218,7 @@ inline constexpr auto& _msize = lifted::entry::e825AED30;  // sub_825AED30
 inline constexpr auto& _mtinit = lifted::entry::e825AA708;  // sub_825AA708
 inline constexpr auto& _positive = lifted::entry::e825ADE90;  // sub_825ADE90
 inline constexpr auto& _purecall = lifted::entry::e825A7098;  // sub_825A7098
+inline constexpr auto& _putwc_nolock = lifted::entry::e825B7A80;  // sub_825B7A80
 inline constexpr auto& _read = lifted::f825B81A0;  // sub_825B81A0
 inline constexpr auto& _set_abort_behavior = lifted::entry::e825AD120;  // sub_825AD120
 inline constexpr auto& _stbuf = lifted::entry::e825B40B8;  // sub_825B40B8
@@ -293,7 +294,8 @@ inline constexpr auto& vsprintf = lifted::entry::e825A71B0;  // sub_825A71B0
 inline constexpr auto& wcscat = lifted::entry::e825A7EF8;  // sub_825A7EF8
 inline constexpr auto& wcscpy = lifted::entry::e825A7F30;  // sub_825A7F30
 inline constexpr auto& wcslen = lifted::f825A9958;  // sub_825A9958
-inline constexpr auto& write_char = lifted::entry::e825AF000;  // sub_825AF000
+inline constexpr auto& write_char_825AF000 = lifted::entry::e825AF000;  // sub_825AF000
+inline constexpr auto& write_char_825B1368 = lifted::entry::e825B1368;  // sub_825B1368
 inline constexpr auto& write_multi_char = lifted::entry::e825AF098;  // sub_825AF098
 }  // namespace game
 
@@ -744,7 +746,9 @@ inline constexpr auto& Advance = lifted::entry::e820DC958;  // sub_820DC958
 }  // namespace game::BlinkTimers
 
 namespace game::Blitter {
+inline constexpr auto& ConvertRows = lifted::entry::e823699F8;  // sub_823699F8
 inline constexpr auto& CopyBlocks = lifted::f82368D98;  // sub_82368D98
+inline constexpr auto& CopyRows = lifted::entry::e82369860;  // sub_82369860
 inline constexpr auto& Ctor = lifted::entry::e82368D20;  // sub_82368D20
 inline constexpr auto& FilterBox2D = lifted::f82369FF8;  // sub_82369FF8
 inline constexpr auto& FilterBox3D = lifted::f8236A4F0;  // sub_8236A4F0
@@ -1903,6 +1907,7 @@ inline constexpr auto& DecodeBlock = lifted::f82421C88;  // sub_82421C88
 }  // namespace game::DxtAlpha
 
 namespace game::DxtCodec {
+inline constexpr auto& Ctor = lifted::entry::e823F5FA0;  // sub_823F5FA0
 inline constexpr auto& DecodeRow = lifted::f823F6858;  // sub_823F6858
 inline constexpr auto& EncodeRow = lifted::entry::e823F6298;  // sub_823F6298
 inline constexpr auto& QuantizeColorKey = lifted::f823F6170;  // sub_823F6170
@@ -2203,7 +2208,10 @@ namespace game::ImageCodec {
 inline constexpr auto& AddDiffusionError = lifted::f823EB408;  // sub_823EB408
 inline constexpr auto& ApplyColorKey = lifted::f823EADB0;  // sub_823EADB0
 inline constexpr auto& ConvertRange = lifted::f823EA0C0;  // sub_823EA0C0
+inline constexpr auto& Create = lifted::entry::e823F6C60;  // sub_823F6C60
+inline constexpr auto& Ctor = lifted::entry::e823EA800;  // sub_823EA800
 inline constexpr auto& LinearToSrgb = lifted::f823EAE40;  // sub_823EAE40
+inline constexpr auto& Prepare = lifted::entry::e823EAA90;  // sub_823EAA90
 inline constexpr auto& QuantizeColorKey = lifted::f823EACC8;  // sub_823EACC8
 inline constexpr auto& SrgbToLinear = lifted::f823EB180;  // sub_823EB180
 }  // namespace game::ImageCodec
@@ -4606,6 +4614,10 @@ inline constexpr auto& Draw = lifted::entry::e82129280;  // sub_82129280
 inline constexpr auto& Record = lifted::entry::e82128E70;  // sub_82128E70
 }  // namespace game::ScreenRect
 
+namespace game::Segments {
+inline constexpr auto& Intersect2D = lifted::entry::e820FC658;  // sub_820FC658
+}  // namespace game::Segments
+
 namespace game::Semaphore {
 inline constexpr auto& Dtor = lifted::f82592638;  // sub_82592638
 inline constexpr auto& Init = lifted::f825925F0;  // sub_825925F0
@@ -5900,26 +5912,36 @@ inline constexpr auto& SignedIn = lifted::entry::e820996D8;  // sub_820996D8
 }  // namespace game::Users
 
 namespace game::UvColumn {
+inline constexpr auto& AllocateNodes = lifted::entry::e8212FBD8;  // sub_8212FBD8
+inline constexpr auto& Clear = lifted::entry::e8212FE28;  // sub_8212FE28
 inline constexpr auto& Copy = lifted::entry::e82130088;  // sub_82130088
 inline constexpr auto& Ctor = lifted::entry::e82130140;  // sub_82130140
 inline constexpr auto& Dtor = lifted::entry::e82131EE0;  // sub_82131EE0
 inline constexpr auto& Erase = lifted::entry::e82131DD8;  // sub_82131DD8
+inline constexpr auto& EraseSubtree = lifted::entry::e8212FD50;  // sub_8212FD50
 inline constexpr auto& Insert = lifted::entry::e82131680;  // sub_82131680
 inline constexpr auto& InsertUnique = lifted::entry::e82131CB8;  // sub_82131CB8
 inline constexpr auto& LowerBound = lifted::entry::e8212FFC8;  // sub_8212FFC8
 inline constexpr auto& LowerBoundNode = lifted::entry::e8212F8C8;  // sub_8212F8C8
+inline constexpr auto& NewNode = lifted::entry::e8212FDB0;  // sub_8212FDB0
+inline constexpr auto& RotateLeft = lifted::entry::e8212F920;  // sub_8212F920
+inline constexpr auto& RotateRight = lifted::entry::e8212F988;  // sub_8212F988
 }  // namespace game::UvColumn
 
 namespace game::UvMap {
 inline constexpr auto& AllocateNodes = lifted::entry::e8212FC50;  // sub_8212FC50
 inline constexpr auto& Clear = lifted::entry::e82132960;  // sub_82132960
+inline constexpr auto& ConstructNode = lifted::entry::e82131F50;  // sub_82131F50
 inline constexpr auto& Ctor = lifted::entry::e82130198;  // sub_82130198
 inline constexpr auto& Decrement = lifted::entry::e8212FB28;  // sub_8212FB28
 inline constexpr auto& Erase = lifted::entry::e82132BD8;  // sub_82132BD8
+inline constexpr auto& EraseSubtree = lifted::entry::e82132720;  // sub_82132720
 inline constexpr auto& Insert = lifted::entry::e82131FB0;  // sub_82131FB0
 inline constexpr auto& InsertUnique = lifted::entry::e821321F8;  // sub_821321F8
 inline constexpr auto& LowerBound = lifted::entry::e82130028;  // sub_82130028
 inline constexpr auto& LowerBoundNode = lifted::entry::e8212F9F8;  // sub_8212F9F8
+inline constexpr auto& RotateLeft = lifted::entry::e8212FA50;  // sub_8212FA50
+inline constexpr auto& RotateRight = lifted::entry::e8212FAB8;  // sub_8212FAB8
 }  // namespace game::UvMap
 
 namespace game::V16U16Codec {
@@ -6080,6 +6102,7 @@ inline constexpr auto& Size = lifted::entry::e825A60E0;  // sub_825A60E0
 
 namespace game::WallQuery {
 inline constexpr auto& AddCell = lifted::entry::e820FC110;  // sub_820FC110
+inline constexpr auto& AddHit = lifted::entry::e820FC2E0;  // sub_820FC2E0
 inline constexpr auto& CornersThroughWall = lifted::entry::e820FC3C8;  // sub_820FC3C8
 inline constexpr auto& EdgesAcrossWall = lifted::entry::e820FC900;  // sub_820FC900
 inline constexpr auto& GatherCells = lifted::entry::e820FC188;  // sub_820FC188

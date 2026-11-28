@@ -214,3 +214,84 @@ ITC_DIRECT_ENTRY(82420AB8) {
   }
   ctx.r5.s64 = ctx.r5.s64 + 8;
 }
+// For the fallback originals (docs/missing-functions.md): Blitter::CopyRows,
+// Blitter::ConvertRows, ImageCodec::Prepare and ImageCodec::Create, mapped as
+// their removed adapters did.
+// r3 = the blitter; r3 0, E_FAIL or CopyBlocks' (made by lis: sign-extended).
+ITC_DIRECT_ENTRY(82369860) {
+  ctx.r3.s64 = int32_t(texture_compression::BlitterCopyRows(
+      ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx)));
+}
+// r3 = the blitter; r3 0 or E_FAIL (sign-extended); the original where the
+// port declines or without the native heap.
+ITC_DIRECT_ENTRY(823699F8) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c823699F8(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = texture_compression::BlitterConvertRows(
+      ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c823699F8(ctx);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+// r3 = the destination's codec, r4 = the source's; r3 0 or E_OUTOFMEMORY.
+ITC_DIRECT_ENTRY(823EAA90) {
+  const auto r3 = hooks::NativeHeapActive()
+                      ? texture_compression::PrepareCodecs(ctx.r3.u32, ctx.r4.u32)
+                      : std::nullopt;
+  if (!r3) {
+    lifted::original::c823EAA90(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the image description; r3 the codec or 0.
+ITC_DIRECT_ENTRY(823F6C60) {
+  if (!hooks::NativeHeapActive()) {
+    lifted::original::c823F6C60(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = texture_compression::CreateCodec(ctx.r3.u32, ctx.r1.u32,
+                                                   hooks::TextureCompressionGuestCall(ctx));
+  if (!r3) {
+    lifted::original::c823F6C60(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// For the fallback originals (docs/missing-functions.md): ImageCodec::
+// ImageCodec and DxtCodec::DxtCodec, mapped as their removed adapters did.
+// r3 = the codec, r4 = the description, r5 = bits per pixel, r6 = the kind;
+// r3 the codec; the original where the port declines or without the native
+// heap.
+ITC_DIRECT_ENTRY(823EA800) {
+  std::optional<uint32_t> r3;
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    r3 = texture_compression::ImageCodecConstruct(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                  ctx.r6.u32);
+  }
+  if (!r3) {
+    lifted::original::c823EA800(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+// r3 = the codec, r4 = the description; r3 the codec; as ImageCodec's.
+ITC_DIRECT_ENTRY(823F5FA0) {
+  std::optional<uint32_t> r3;
+  if (hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    r3 = texture_compression::DxtCodecConstruct(ctx.r3.u32, ctx.r4.u32);
+  }
+  if (!r3) {
+    lifted::original::c823F5FA0(ctx);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
