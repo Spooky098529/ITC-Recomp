@@ -243,3 +243,55 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB218) {
   }
   ctx.r3.u64 = copy;
 }
+
+// For the fallback originals (docs/missing-functions.md): the box-box
+// tests and the shape record's set-up, called by address. r3 as the
+// originals leave it (the deleted adapters' and harness steps' mappings).
+// BoxShape::RelativePlacement: r3 = box A, r4 = the block, r5 = box B.
+ITC_DIRECT_ENTRY(820BA408) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxRelativePlacement(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// BoxShape::RelativeCenter: as RelativePlacement, the center only.
+ITC_DIRECT_ENTRY(820BA5D8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxRelativeCenter(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+// BoxBox::FaceSeparates: r3, r4 = the faces, r5, r6 = box B's copies.
+ITC_DIRECT_ENTRY(820BB300) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxBoxFaceSeparates(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+// CollisionShape::SetUp: r3 = the record, r4 = the template, r5 = the
+// matrix, r6 = memory for the clones or 0; its 128-byte frame; r3 comes
+// back as the record (left). The original where the port declines.
+ITC_DIRECT_ENTRY(820BB580) {
+  if (!NativeLifetime()) {
+    lifted::original::c820BB580(ctx);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!CollisionShapeSetUp(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                           ctx.r1.u32 - 128)) {
+    lifted::original::c820BB580(ctx);
+  }
+}
+// BoxBox::BlockCorners: r3 = the block, its 320-byte frame; r3 comes back
+// as the block + 304.
+ITC_DIRECT_ENTRY(820BC978) {
+  ctx.fpscr.disableFlushMode();
+  BoxBoxBlockCorners(ctx.r3.u32, ctx.r1.u32 - 320);
+  ctx.r3.u64 = ctx.r3.u32 + 304;
+}
+// BoxBox::MoveCorners: r3 = the block's corners (its +80; the port takes
+// the block), r4 = the offset; r3 comes back as the last corner.
+ITC_DIRECT_ENTRY(820BCCE8) {
+  ctx.fpscr.disableFlushMode();
+  BoxBoxMoveCorners(ctx.r3.u32 - 80, ctx.r4.u32);
+  ctx.r3.u64 = ctx.r3.u32 + 224;
+}
+// BoxBox::Outcode: r3 = the block; returns the bits.
+ITC_DIRECT_ENTRY(820BD0C8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = BoxBoxOutcode(ctx.r3.u32);
+}

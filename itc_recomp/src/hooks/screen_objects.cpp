@@ -30,6 +30,8 @@
 #include "screen_objects/uv_trees.h"
 #include "lifted/sdk.h"
 
+#include <bit>
+
 ITC_FLAG_DECLARE(bool, native_video_output);
 
 ITC_FLAG_BOOL(native_screen_objects, true, "ITC",
@@ -178,4 +180,89 @@ ITC_NATIVE_ENTRY_ALWAYS(82132FC8) {
     return;
   }
   hooks::ScreenObjectDestroy(ctx);
+}
+
+// For the fallback originals (docs/missing-functions.md).
+
+namespace {
+
+// A checked iterator at `address` (the tree, then the node).
+so::Iterator LoadIterator(uint32_t address) {
+  return {guest::LoadU32(address), guest::LoadU32(address + 4)};
+}
+
+void StoreIterator(uint32_t address, so::Iterator it) {
+  guest::StoreU32(address, it.tree);
+  guest::StoreU32(address + 4, it.node);
+}
+
+// An iterator passed by value in one register (the tree in its high word).
+so::Iterator IteratorOf(uint64_t r) { return {uint32_t(r >> 32), uint32_t(r)}; }
+
+double KeyAt(uint32_t address) { return std::bit_cast<double>(guest::LoadU64(address)); }
+
+}  // namespace
+
+// UvColumn::LowerBoundNode: r3 = the column, r4 = the key's address; r3 the
+// node.
+ITC_DIRECT_ENTRY(8212F8C8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = so::ColumnLowerBoundNode(ctx.r3.u32, KeyAt(ctx.r4.u32));
+}
+
+// UvMap::LowerBoundNode: as the column's.
+ITC_DIRECT_ENTRY(8212F9F8) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = so::MapLowerBoundNode(ctx.r3.u32, KeyAt(ctx.r4.u32));
+}
+
+// UvMap::Decrement: r3 = the iterator's address (r3 left so).
+ITC_DIRECT_ENTRY(8212FB28) {
+  so::Iterator it = LoadIterator(ctx.r3.u32);
+  if (!so::MapDecrement(it)) {
+    lifted::original::c8212FB28(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, it);
+}
+
+// UvColumn::Insert: r3 = the iterator out, r4 = the column, r5 = add on the
+// left (its low byte), r6 = where, r7 = the value; r3 the iterator out.
+ITC_DIRECT_ENTRY(82131680) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131680)
+  const auto it = so::ColumnInsert(ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0, ctx.r6.u32, ctx.r7.u32);
+  if (!it) {
+    lifted::original::c82131680(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvColumn::Erase: r3 = the iterator out, r4 = the column, r5 and r6 = first
+// and last (by value, the tree in the high word); r3 the iterator out.
+ITC_DIRECT_ENTRY(82131DD8) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131DD8)
+  const auto it = so::ColumnErase(ctx.r4.u32, IteratorOf(ctx.r5.u64), IteratorOf(ctx.r6.u64));
+  if (!it) {
+    lifted::original::c82131DD8(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvMap::Insert: as the column's.
+ITC_DIRECT_ENTRY(82131FB0) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82131FB0)
+  const auto it = so::MapInsert(ctx.r4.u32, (ctx.r5.u32 & 0xFF) != 0, ctx.r6.u32, ctx.r7.u32);
+  if (!it) {
+    lifted::original::c82131FB0(ctx);
+    return;
+  }
+  StoreIterator(ctx.r3.u32, *it);
+}
+
+// UvMap::Clear: r3 = the map; r3 as EraseSubtree leaves it.
+ITC_DIRECT_ENTRY(82132960) {
+  ITC_SCREEN_OBJECTS_FALLBACK(82132960)
+  ctx.r3.u64 = so::MapClear(ctx.r3.u32);
 }
